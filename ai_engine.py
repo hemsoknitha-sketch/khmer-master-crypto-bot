@@ -12,6 +12,7 @@ class AIInvestmentEngine:
         clean_key = str(api_key or "").strip().strip("'").strip('"')
         self.api_key = clean_key
         if clean_key and len(clean_key) > 5:
+            os.environ["GEMINI_API_KEY"] = clean_key
             try:
                 genai.configure(api_key=clean_key)
             except Exception as e:
@@ -31,7 +32,7 @@ class AIInvestmentEngine:
         
         # Dynamic Model Discovery via genai.list_models()
         self.supported_models = []
-        if clean_key and len(clean_key) > 10:
+        if clean_key and len(clean_key) > 5:
             try:
                 for m in genai.list_models():
                     if 'generateContent' in m.supported_generation_methods:
@@ -51,13 +52,19 @@ class AIInvestmentEngine:
             
         if not self.supported_models:
             self.supported_models = [
+                'gemini-2.5-flash',
+                'models/gemini-2.5-flash',
+                'gemini-2.0-flash',
+                'models/gemini-2.0-flash',
+                'gemini-2.5-pro',
+                'models/gemini-2.5-pro',
+                'gemini-2.0-flash-exp',
                 'gemini-1.5-flash',
                 'models/gemini-1.5-flash',
                 'gemini-1.5-flash-latest',
                 'gemini-1.5-flash-001',
                 'gemini-1.5-flash-002',
                 'gemini-1.5-flash-8b',
-                'gemini-2.0-flash-exp',
                 'gemini-1.5-pro',
                 'models/gemini-1.5-pro'
             ]
@@ -208,6 +215,13 @@ class AIInvestmentEngine:
         # Prepare retry list with primary model first
         retry_models = list(self.supported_models)
         extra_fallbacks = [
+            'gemini-2.5-flash',
+            'models/gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'models/gemini-2.0-flash',
+            'gemini-2.5-pro',
+            'models/gemini-2.5-pro',
+            'gemini-2.0-flash-exp',
             'gemini-1.5-flash',
             'models/gemini-1.5-flash',
             'gemini-1.5-flash-latest',
