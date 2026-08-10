@@ -179,11 +179,11 @@ class TelegramBotThread(QThread):
             
         from telegram.request import HTTPXRequest
         t_request = HTTPXRequest(
-            connect_timeout=30.0,
-            read_timeout=30.0,
-            write_timeout=30.0,
-            pool_timeout=30.0,
-            connection_pool_size=100
+            connect_timeout=5.0,
+            read_timeout=10.0,
+            write_timeout=10.0,
+            pool_timeout=5.0,
+            connection_pool_size=500
         )
         self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(True).post_init(post_init).build()
 
@@ -7626,7 +7626,7 @@ class TelegramBotThread(QThread):
         self.log_signal.emit("🤖 Telegram Bot removed from Main Thread and is now running...")
         
         try:
-            self.app.run_polling(drop_pending_updates=False, stop_signals=None)
+            self.app.run_polling(drop_pending_updates=True, stop_signals=None)
         except Exception as e:
             import traceback
             error_msg = f"💥 CRITICAL QTHREAD ERROR: {e}\n{traceback.format_exc()}"
