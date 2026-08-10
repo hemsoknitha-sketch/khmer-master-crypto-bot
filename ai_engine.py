@@ -8,9 +8,14 @@ from datetime import datetime
 
 class AIInvestmentEngine:
     def __init__(self, api_key: str):
-        # Configure Gemini API
-        genai.configure(api_key=api_key)
-        self.api_key = api_key
+        # Sanitize API key string (strip whitespace, quotes, newlines)
+        clean_key = str(api_key or "").strip().strip("'").strip('"')
+        self.api_key = clean_key
+        if clean_key and len(clean_key) > 5:
+            try:
+                genai.configure(api_key=clean_key)
+            except Exception as e:
+                print(f"⚠️ [AI ENGINE] genai.configure notice: {e}")
         
         # Load System Prompt once at startup
         try:
@@ -26,7 +31,7 @@ class AIInvestmentEngine:
         
         # Dynamic Model Discovery via genai.list_models()
         self.supported_models = []
-        if api_key and len(api_key) > 10:
+        if clean_key and len(clean_key) > 10:
             try:
                 for m in genai.list_models():
                     if 'generateContent' in m.supported_generation_methods:
@@ -38,7 +43,11 @@ class AIInvestmentEngine:
                 if self.supported_models:
                     print(f"✅ [AI ENGINE] Dynamically discovered {len(self.supported_models)} supported Gemini models.")
             except Exception as e:
-                print(f"⚠️ [AI ENGINE] Could not list models (Using Fallbacks): {e}")
+                err_str = str(e)
+                if "401" in err_str or "invalid authentication" in err_str.lower() or "access_token" in err_str.lower():
+                    print(f"⚠️ [AI ENGINE Auth Notice]: Gemini API Key in .env is invalid or expired (401 Auth Error). Using quantitative fallbacks.")
+                else:
+                    print(f"⚠️ [AI ENGINE] Could not list models (Using Fallbacks): {e}")
             
         if not self.supported_models:
             self.supported_models = [
@@ -267,7 +276,17 @@ class AIInvestmentEngine:
                     last_error = e2
                     continue
                     
-        return f"⚠️ AI Processing Error (Gemini): {str(last_error)}"
+        err_msg_str = str(last_error) if last_error else "Unknown"
+        if "401" in err_msg_str or "invalid authentication" in err_msg_str.lower() or "access_token" in err_msg_str.lower():
+            return (
+                "⚠️ **APEX AI ENGINE NOTICE ៖** Google Gemini API Key មិនទាន់ត្រឹមត្រូវ ឬផុតកំណត់ (401 Invalid Auth Credentials)។\n\n"
+                "💡 **របៀបដោះស្រាយ ៖**\n"
+                "1. សូមចូលទៅកាន់ ៖ https://aistudio.google.com/app/apikey ដើម្បីបង្កើត **Google Gemini API Key** ថ្មីដោយឥតគិតថ្លៃ (ទម្រង់ `AIzaSy...`)\n"
+                "2. បើក File `.env` លើ VPS រួចផ្លាស់ប្តូរ ៖ `GEMINI_API_KEY=AIzaSyYourNewApiKeyHere`\n"
+                "3. Double-Click លើ `git_update_vps.bat` ដើម្បីរ៉ាន់ Bot ឡើងវិញ!\n\n"
+                "🛡️ _ចំណាំ ៖ ប្រព័ន្ធជួញដូរស្វ័យប្រវត្តិ (Turbo Hedge / Quantitative Indicator Scalper) នៅតែដំណើរការ 100% ធម្មតាដោយប្រើប្រាស់ RSI/MA Technical Analysis Fallbacks!_"
+            )
+        return f"⚠️ AI Processing Error (Gemini): {err_msg_str}"
 
 
 class AGISwarmCoordinator:
