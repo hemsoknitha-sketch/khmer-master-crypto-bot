@@ -6749,7 +6749,8 @@ class TelegramBotThread(QThread):
                 infinity_grids = len(db.get_active_infinity_grids()) if hasattr(db, 'get_active_infinity_grids') else 0
                 compound_grids = len(db.get_active_compound_grids()) if hasattr(db, 'get_active_compound_grids') else 0
                 scalpers = len(db.get_active_scalpers()) if hasattr(db, 'get_active_scalpers') else 0
-                total_active_trades = trades + infinity_grids + compound_grids + scalpers
+                turbo_hedges = len(db.get_active_turbo_hedge_bots()) if hasattr(db, 'get_active_turbo_hedge_bots') else 0
+                total_active_trades = trades + infinity_grids + compound_grids + scalpers + turbo_hedges
 
                 status_icon = "🟢 Smooth" if cpu_pct < 75.0 else ("🟡 Heavy" if cpu_pct < 90.0 else "🔴 Critical")
                 mode_badge = "🧪 PAPER TRADING" if paper_on else "🚀 REAL LIVE TRADING"
