@@ -81,20 +81,43 @@ def get_symbol_info(symbol):
                 return SYMBOL_INFO_CACHE[symbol]
     except Exception as e:
         print(f"Failed to fetch exchangeInfo for {symbol}: {e}")
+_klines_cache = {}
+_klines_cache_time = {}
+
 def get_klines(symbol: str, interval: str = "1m", limit: int = 25):
-    """Fetches Binance spot/futures klines safely and returns a list of kline arrays."""
+    """Fetches Binance spot/futures klines safely with 3s TTL cache and sub-second execution."""
     if not symbol: return []
     symbol = str(symbol).upper().strip()
+    cache_key = f"{symbol}_{interval}_{limit}"
+    now = time.time()
+    if cache_key in _klines_cache and (now - _klines_cache_time.get(cache_key, 0)) < 3.0:
+        return _klines_cache[cache_key]
+
     try:
-        url = f"{BASE_URL}/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-        res = HFT_SESSION.get(url, timeout=4)
+        url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        res = HFT_SESSION.get(url, timeout=1.5)
         if res.status_code == 200:
             data = res.json()
-            if isinstance(data, list):
+            if isinstance(data, list) and data:
+                _klines_cache[cache_key] = data
+                _klines_cache_time[cache_key] = now
+                return data
+    except Exception:
+        pass
+
+    try:
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        res = HFT_SESSION.get(url, timeout=1.5)
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, list) and data:
+                _klines_cache[cache_key] = data
+                _klines_cache_time[cache_key] = now
                 return data
     except Exception as e:
         print(f"Error fetching klines for {symbol}: {e}")
-    return []
+
+    return _klines_cache.get(cache_key, [])
 
 
 FUTURES_INFO_CACHE = {}

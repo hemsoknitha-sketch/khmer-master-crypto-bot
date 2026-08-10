@@ -59,6 +59,9 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
     return ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
 
 
+_eval_cache = {}
+_eval_cache_time = {}
+
 def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_bal: float = 0.0) -> dict:
     """
     Super Smart 84-Model AI Evaluation (Multi-Factor Scoring):
@@ -73,6 +76,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
         symbol += "USDT"
     if symbol == "DODOUSDT":
         symbol = "DODOXUSDT"
+
+    cache_key = f"{symbol}_{requested_leverage}_{avail_bal:.1f}"
+    now = time.time()
+    if cache_key in _eval_cache and (now - _eval_cache_time.get(cache_key, 0)) < 3.0:
+        return _eval_cache[cache_key]
 
     # Small Capital Leverage Shield (Fallback default clamp if balance < $100)
     if avail_bal <= 0.0 or avail_bal < 100.0:
@@ -206,7 +214,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
 
     recommended_route = "SPOT" if (confidence <= 82.0 or dynamic_leverage <= 1) else "FUTURES"
 
-    return {
+    res = {
         "symbol": symbol,
         "side": side,
         "confidence_pct": round(confidence, 1),
@@ -216,6 +224,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
         "entry_price": price,
         "reason": f"AI Confidence {confidence:.1f}% ({'MAX LEVERAGE >85%' if confidence > 85 else 'SAFE LEVERAGE <=85%'}) -> Route: {recommended_route} ({dynamic_leverage}x {side})"
     }
+    _eval_cache[cache_key] = res
+    _eval_cache_time[cache_key] = now
+    return res
 
 def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount_usdt: float, side: str = "BUY", leverage: int = 75, chat_id: int = 0) -> dict:
     """
