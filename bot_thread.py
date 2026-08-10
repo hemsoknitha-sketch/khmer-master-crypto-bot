@@ -867,6 +867,11 @@ class TelegramBotThread(QThread):
                 valid_trades_found = True
                 msg += f"🛡️ **Auto-Liquidation Guard:** 🟢 `ACTIVE` (>50% Safety Distance)\n"
 
+            turbo_bots = [b for b in db.get_active_turbo_hedge_bots() if b.get("chat_id") == chat_id]
+            if turbo_bots or db.get_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0") == "1":
+                valid_trades_found = True
+                msg += f"🚀 **Turbo Hedge Auto-Scanner:** 🟢 `ACTIVE` ({len(turbo_bots)} Positions Active / 10 Max)\n"
+
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [
