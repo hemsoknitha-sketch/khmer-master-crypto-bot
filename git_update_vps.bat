@@ -1,12 +1,11 @@
 @echo off
-title Apex AI Bot - Git 1-Click Clean Auto Update
+title Apex Updater
 cd /d "%~dp0"
 
 echo =========================================================
-echo       1. Force Closing all running Python & Bot processes...
+echo       1. Force Closing running Python processes...
 echo =========================================================
 taskkill /F /IM python.exe /T >nul 2>&1
-taskkill /F /FI "WINDOWTITLE eq Apex AI Bot*" /T >nul 2>&1
 timeout /t 2 >nul
 
 echo =========================================================
