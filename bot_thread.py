@@ -5082,6 +5082,7 @@ class TelegramBotThread(QThread):
         async def turbo_hedge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
+            msg_target = update.effective_message or update.message
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
