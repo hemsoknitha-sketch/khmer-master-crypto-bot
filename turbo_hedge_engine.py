@@ -710,6 +710,21 @@ async def monitor_turbo_hedge_bots(app):
                         db.remove_turbo_hedge_bot(chat_id, symbol)
                         add_symbol_cooldown(symbol, 7200)
 
+                        if app and hasattr(app, "bot"):
+                            try:
+                                msg_stagnant = (
+                                    f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
+                                    f"───────────────────────────────\n\n"
+                                    f"🪙 កាក់ ៖ `{symbol}`\n"
+                                    f"⏱️ រយៈពេលត្រាំ ៖ `> 15 នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
+                                    f"🔒 Cooldown Status ៖ `២ ម៉ោង (2-Hour Anti-Churn Blacklist)`\n"
+                                    f"⚡ Binance Status ៖ `MARKET CLOSED (<30ms)`\n\n"
+                                    f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
+                                )
+                                await app.bot.send_message(chat_id=chat_id, text=msg_stagnant, parse_mode="Markdown")
+                            except Exception as e:
+                                print(f"Error sending stagnant notification: {e}")
+
                     elif is_stop_loss_hit:
                         # 🛡️ 15-Second Anti-Whipsaw Cooldown Protection:
                         # If a flip occurred less than 15s ago, execute a clean Market Close to avoid whipsaw churn!
