@@ -3,8 +3,9 @@ title Apex Updater
 cd /d "%~dp0"
 
 echo =========================================================
-echo       1. Force Closing running Python processes...
+echo       1. Force Closing running Bot & Old Command Windows...
 echo =========================================================
+taskkill /F /FI "WINDOWTITLE eq Apex AI Bot - 24/7 VPS Server*" /T >nul 2>&1
 taskkill /F /IM python.exe /T >nul 2>&1
 timeout /t 2 >nul
 
