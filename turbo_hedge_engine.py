@@ -402,7 +402,7 @@ async def monitor_turbo_hedge_bots(app):
         try:
             conn = db.get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT chat_id FROM api_keys WHERE api_key IS NOT NULL AND api_secret IS NOT NULL")
+            cursor.execute("SELECT DISTINCT chat_id FROM user_api_keys")
             user_rows = cursor.fetchall()
             conn.close()
             all_chat_ids = [r[0] for r in user_rows] if user_rows else []
@@ -624,11 +624,18 @@ async def monitor_turbo_hedge_bots(app):
 
                     # 💰 2. Dual-Check Target Profit Trigger (Strictly Respect User Custom Set Target e.g. $2.50)
                     user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "2.5")
-                    user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).isdigit() else 2.5
+                    user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 2.5
                     effective_tp = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
 
+                    # High-Precision Dollar Peak PnL Lock ($ Peak Lock)
+                    peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
+                    peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+                    if real_pnl_usdt > peak_pnl:
+                        peak_pnl = real_pnl_usdt
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
+
                     is_tp_harvested = (real_pnl_usdt >= effective_tp)
-                    is_peak_locked = (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio))
+                    is_peak_locked = (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or (peak_pnl >= 2.00 and real_pnl_usdt <= (peak_pnl * 0.80))
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
                     # Normal Flip: ROI <= -10.0% OR net loss <= -$2.00 USDT (with 15s Anti-Whipsaw Cooldown)
