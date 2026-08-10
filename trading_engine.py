@@ -554,14 +554,27 @@ def get_current_price(symbol) -> float:
         pass
         
     try:
+        url = f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}"
+        res = HFT_SESSION.get(url, timeout=1.5)
+        if res.status_code == 200:
+            price = float(res.json().get('price', 0.0))
+            if price > 0:
+                _price_cache[symbol] = price
+                _price_cache_time[symbol] = now
+                return price
+    except Exception:
+        pass
+
+    try:
         url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-        res = requests.get(url, timeout=5)
-        price = float(res.json()['price'])
-        if price > 0:
-            _price_cache[symbol] = price
-            _price_cache_time[symbol] = now
-            return price
-    except:
+        res = HFT_SESSION.get(url, timeout=1.5)
+        if res.status_code == 200:
+            price = float(res.json().get('price', 0.0))
+            if price > 0:
+                _price_cache[symbol] = price
+                _price_cache_time[symbol] = now
+                return price
+    except Exception:
         pass
 
     return _price_cache.get(symbol, 60000.0) # Fallback
