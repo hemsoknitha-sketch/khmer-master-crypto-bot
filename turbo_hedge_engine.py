@@ -489,7 +489,9 @@ async def monitor_turbo_hedge_bots(app):
             # Check if live balance has enough capital to fund next coin position (Dynamic Balance Sizing)
             if avail_bal >= 5.0:
                 actual_trade_amount = min(unit_amount, max(5.0, avail_bal * 0.85))
-                top_coins = get_active_high_velocity_coins(limit=20)
+                if len(_failed_candidate_symbols) > 10:
+                    _failed_candidate_symbols.clear()
+                top_coins = get_active_high_velocity_coins(limit=100)
 
                 user_active_syms = [b.get("symbol") for b in user_active_bots]
                 for c_cand in top_coins:
