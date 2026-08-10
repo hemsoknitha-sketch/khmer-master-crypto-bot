@@ -1,21 +1,19 @@
 @echo off
-title Apex AI Bot - Git 1-Click Auto Update
+title Apex AI Bot - Git 1-Click Clean Auto Update
 cd /d "%~dp0"
 
 echo =========================================================
-echo       1. Pulling Latest Code from Git Repository...
-echo =========================================================
-git pull origin main
-if errorlevel 1 (
-    echo [WARNING] Git pull encountered conflicts or issue. Retrying with force checkout...
-    git fetch --all
-    git reset --hard origin/main
-)
-
-echo =========================================================
-echo       2. Stopping old running Python process...
+echo       1. Force Closing all running Python & Bot processes...
 echo =========================================================
 taskkill /F /IM python.exe /T >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Apex AI Bot*" /T >nul 2>&1
+timeout /t 2 >nul
+
+echo =========================================================
+echo       2. Fetching & Resetting to Latest Code from GitHub...
+echo =========================================================
+git fetch --all
+git reset --hard origin/main
 
 echo =========================================================
 echo       3. Clearing __pycache__ & stale bytecode...
@@ -27,5 +25,5 @@ echo =========================================================
 echo       4. Starting Apex AI Bot with Clean Updated Code...
 echo =========================================================
 start start_vps.bat
-echo [SUCCESS] Git Update Complete! Bot successfully restarted.
+echo [SUCCESS] Clean Git Update Complete! Bot successfully restarted.
 pause
