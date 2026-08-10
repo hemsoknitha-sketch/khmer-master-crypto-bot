@@ -2736,6 +2736,24 @@ def stop_turbo_hedge_bot(chat_id: int, symbol: str):
     else:
         update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_status", "STOPPED")
 
+def remove_turbo_hedge_bot(chat_id: int, symbol: str):
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT") and symbol != "ALL":
+        symbol += "USDT"
+    if symbol == "ALL":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"turbo_hedge_{chat_id}_%",))
+        conn.commit()
+        conn.close()
+        update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
+    else:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"turbo_hedge_{chat_id}_{symbol}_%",))
+        conn.commit()
+        conn.close()
+
 def get_active_turbo_hedge_bots() -> list:
     conn = get_db_connection()
     cursor = conn.cursor()
