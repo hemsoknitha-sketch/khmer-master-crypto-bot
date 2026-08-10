@@ -1317,6 +1317,12 @@ def get_user_api(chat_id: int):
         except Exception:
             result = None
 
+    if not result:
+        env_k = os.environ.get("BINANCE_API_KEY", "").strip()
+        env_s = os.environ.get("BINANCE_API_SECRET", "").strip()
+        if env_k and env_s:
+            result = (env_k, env_s)
+
     conn.close()
     
     if result:
