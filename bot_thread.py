@@ -94,6 +94,7 @@ class TelegramBotThread(QThread):
                 BotCommand("start", "🎛️ [Main Menu] ផ្ទាំងបញ្ជាដើម TURBO AGI"),
                 BotCommand("menu", "🎛️ [Master Menu] បង្ហាញ Menu បញ្ជារួម"),
                 BotCommand("status", "📊 [AGI Status] ពិនិត្យស្ថានភាពប្រព័ន្ធ Real-Time"),
+                BotCommand("balance", "💰 [Live Balance] ពិនិត្យសមតុល្យទុន Live Real-Time"),
                 BotCommand("portfolio", "💼 [Portfolio PnL] មើលគណនីទុន & ចំណេញ PnL"),
                 BotCommand("health", "🏥 [System Health] ស្កេនសុខភាព VPS CPU/RAM/DB"),
 
