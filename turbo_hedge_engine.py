@@ -29,7 +29,7 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
             EXCLUDED_SYMBOLS = {"HFTUSDT", "GWEIUSDT", "EPICUSDT", "USD1USDT"}
             for t in tickers:
                 sym = t.get("symbol", "")
-                if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS:
+                if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS or not sym.isascii():
                     continue
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
                 price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
