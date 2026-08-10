@@ -2478,18 +2478,21 @@ class TelegramBotThread(QThread):
                 return await context.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode, reply_markup=reply_markup)
             return None
 
-        async def delete_sensitive_message(context, chat_id, message_id_or_update, user_lang="km"):
+        async def delete_sensitive_message(context, chat_id, message_id_or_update=None, user_lang="km"):
             """Sub-Second Message Destruction Engine (< 500ms). Deletes plain text secrets & sends security notification."""
             if not context or not chat_id: return
             msg_id = None
-            if isinstance(message_id_or_update, int):
-                msg_id = message_id_or_update
-            elif hasattr(message_id_or_update, 'effective_message') and message_id_or_update.effective_message:
-                msg_id = message_id_or_update.effective_message.message_id
-            elif hasattr(message_id_or_update, 'message') and message_id_or_update.message:
-                msg_id = message_id_or_update.message.message_id
-            elif hasattr(message_id_or_update, 'message_id'):
-                msg_id = message_id_or_update.message_id
+            try:
+                if isinstance(message_id_or_update, int):
+                    msg_id = message_id_or_update
+                elif hasattr(message_id_or_update, 'effective_message') and message_id_or_update.effective_message:
+                    msg_id = message_id_or_update.effective_message.message_id
+                elif hasattr(message_id_or_update, 'message') and message_id_or_update.message:
+                    msg_id = message_id_or_update.message.message_id
+                elif hasattr(message_id_or_update, 'message_id'):
+                    msg_id = message_id_or_update.message_id
+            except Exception:
+                pass
 
             if not msg_id: return
             try:
@@ -5107,8 +5110,10 @@ class TelegramBotThread(QThread):
                     "👉 **បិទដំណើរការ ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
                     "`` `/turbo_hedge STOP ALL 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                msg_target = update.effective_message or update.message
+                if msg_target:
+                    await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -5121,9 +5126,11 @@ class TelegramBotThread(QThread):
                     pin = str(args[1]).strip() if len(args) >= 2 else ""
 
                 stored_pin = db.get_user_pin(chat_id)
+                msg_target = update.effective_message or update.message
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    if msg_target:
+                        await msg_target.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
                     return
 
                 import turbo_hedge_engine
@@ -5154,8 +5161,9 @@ class TelegramBotThread(QThread):
                         f"_Bot បានបិទ និងឈប់ស្កេន Auto-Flip លើកាក់ {symbol} រួចរាល់!_"
                     )
 
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if msg_target:
+                    await msg_target.reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
             if len(args) < 4:
@@ -5206,7 +5214,8 @@ class TelegramBotThread(QThread):
                 else:
                     pin = str(args[-1]).strip()
             except ValueError:
-                await update.message.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
+                if msg_target:
+                    await msg_target.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
                 return
 
             stored_pin = db.get_user_pin(chat_id)
@@ -5215,12 +5224,14 @@ class TelegramBotThread(QThread):
                 stored_pin = db.get_user_pin(chat_id)
 
             if not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text(f"❌ **លេខកូដ PIN មិនត្រឹមត្រូវ!** (PIN របស់អ្នក ៖ `{pin}` មិនត្រូវគ្នានឹង PIN ក្នុងប្រព័ន្ធឡើយ)", parse_mode="Markdown")
+                if msg_target:
+                    await msg_target.reply_text(f"❌ **លេខកូដ PIN មិនត្រឹមត្រូវ!** (PIN របស់អ្នក ៖ `{pin}` មិនត្រូវគ្នានឹង PIN ក្នុងប្រព័ន្ធឡើយ)", parse_mode="Markdown")
                 return
 
             keys = db.get_user_api(chat_id)
             if not keys:
-                await update.message.reply_text("❌ **មិនទាន់មាន API Key!** សូមប្រើប្រាស់ពាក្យបញ្ជា `` `/add_api` `` ដើម្បភ្ជាប់ Binance API ជាមុនសិន។", parse_mode="Markdown")
+                if msg_target:
+                    await msg_target.reply_text("❌ **មិនទាន់មាន API Key!** សូមប្រើប្រាស់ពាក្យបញ្ជា `` `/add_api` `` ដើម្បភ្ជាប់ Binance API ជាមុនសិន។", parse_mode="Markdown")
                 return
 
             import turbo_hedge_engine
@@ -5279,10 +5290,11 @@ class TelegramBotThread(QThread):
                     f"🔄 **Perpetual Auto-Scanner** ៖ `ACTIVE (ស្កេន 24/7 រហូតគ្រប់ 10 កាក់)`\n\n"
                     f"_AI ស្កេន Available Balance រៀងរាល់ ៣ វិនាទី ឲ្យតែមានលុយគ្រប់ នឹងបើកកាក់ថ្មីអូតូ មិនសម្រាកឡើយ រហូតដល់ 10 កាក់អតិបរមា ឬរហូតចុច /turbo_hedge STOP!_"
                 )
-                try:
-                    await update.message.reply_text(msg, parse_mode="Markdown")
-                except Exception:
-                    await update.message.reply_text(msg, parse_mode=None)
+                if msg_target:
+                    try:
+                        await msg_target.reply_text(msg, parse_mode="Markdown")
+                    except Exception:
+                        await msg_target.reply_text(msg, parse_mode=None)
                 return
 
             eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, symbol)
@@ -5327,11 +5339,12 @@ class TelegramBotThread(QThread):
                     f"👉 Bot ត្រូវបានចុះឈ្មោះក្នុងប្រព័ន្ធស្កេន Auto-Flip ស្វ័យប្រវត្ត!"
                 )
 
-            try:
-                await update.message.reply_text(msg, parse_mode="Markdown")
-            except Exception:
-                await update.message.reply_text(msg, parse_mode=None)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if msg_target:
+                try:
+                    await msg_target.reply_text(msg, parse_mode="Markdown")
+                except Exception:
+                    await msg_target.reply_text(msg, parse_mode=None)
+            await delete_sensitive_message(context, chat_id, update, user_lang)
 
         async def compound_grid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
