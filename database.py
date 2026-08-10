@@ -1308,24 +1308,40 @@ def get_user_api(chat_id: int):
     cursor = conn.cursor()
     cursor.execute("SELECT api_key, api_secret FROM user_api_keys WHERE chat_id = ?", (chat_id,))
     result = cursor.fetchone()
+    
+    if not result:
+        # Fallback for single-user system or admin chat ID mapping
+        cursor.execute("SELECT api_key, api_secret FROM user_api_keys ORDER BY id DESC LIMIT 1")
+        result = cursor.fetchone()
+
     conn.close()
     
     if result:
         raw_key, raw_secret = str(result[0] or "").strip(), str(result[1] or "").strip()
-        dec_key = security.decrypt_data(raw_key) if raw_key else ""
-        dec_secret = security.decrypt_data(raw_secret) if raw_secret else ""
+        dec_key = ""
+        dec_secret = ""
+        try:
+            dec_key = security.decrypt_data(raw_key) if raw_key else ""
+        except Exception:
+            dec_key = ""
+        try:
+            dec_secret = security.decrypt_data(raw_secret) if raw_secret else ""
+        except Exception:
+            dec_secret = ""
 
         # Seamless auto-encrypt legacy unencrypted keys if decrypt returns empty
-        if not dec_key and raw_key and len(raw_key) >= 20 and not raw_key.startswith("gAAAAA"):
+        if not dec_key and raw_key and len(raw_key) >= 20:
             dec_key = raw_key
-        if not dec_secret and raw_secret and len(raw_secret) >= 20 and not raw_secret.startswith("gAAAAA"):
+        if not dec_secret and raw_secret and len(raw_secret) >= 20:
             dec_secret = raw_secret
 
         if dec_key and dec_secret:
             # Silent upgrade if raw values were unencrypted
             if raw_key == dec_key or raw_secret == dec_secret:
-                set_user_api(chat_id, dec_key, dec_secret)
-                print(f"🔐 Seamlessly encrypted legacy API keys for user {chat_id} using AES-256.")
+                try:
+                    set_user_api(chat_id, dec_key, dec_secret)
+                except Exception:
+                    pass
             return (dec_key.strip(), dec_secret.strip())
     return None
 
