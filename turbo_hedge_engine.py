@@ -625,16 +625,21 @@ async def monitor_turbo_hedge_bots(app):
                     db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_liq_price", str(liq_price))
 
                 if entry_price > 0 and mark_price > 0:
-                    # 📊 Binance Native Direct ROI Formula (100% Exact Match to Binance App)
-                    # Derived directly from real Binance unrealizedProfit ($) and initial margin ($)
+                    # 📊 Binance Native Direct Net ROI & PnL Formula (Deducts 2-Way Trading Fees 100%)
                     position_amt = float(pnl_info.get("positionAmt", 0.0))
+                    notional_val = abs(position_amt * mark_price)
+                    # Binance Futures 2-Way Taker Fee Deduction (0.05% Entry + 0.05% Exit = 0.10% total)
+                    est_binance_fee = notional_val * 0.0010
+                    # Net Realized/Unrealized PnL in Hand
+                    net_pnl_usdt = real_pnl_usdt - est_binance_fee
+
                     initial_margin = abs(position_amt * entry_price) / max(1.0, float(active_lev))
                     if initial_margin > 0:
-                        binance_real_roi = (real_pnl_usdt / initial_margin) * 100.0
+                        binance_real_roi = (net_pnl_usdt / initial_margin) * 100.0
                     else:
                         binance_real_roi = 0.0
 
-                    # Strictly enforce binance_real_roi matching Binance App screenshot
+                    # Strictly enforce binance_real_roi matching Net PnL in Hand
                     roi_pct = binance_real_roi
 
                     # Peak ROI tracking
@@ -647,7 +652,7 @@ async def monitor_turbo_hedge_bots(app):
                     # Dynamic Trailing Peak Profit Lock: Keep 90% of peak gains for >200% ROI, 85% for >50% ROI
                     retain_ratio = 0.90 if peak_roi >= 200.0 else (0.85 if peak_roi >= 50.0 else 0.80)
 
-                    # 💰 2. Dual-Check Target Profit Trigger (Strictly Respect User Custom Set Target e.g. $2.50)
+                    # 💰 2. Dual-Check Target Profit Trigger (Net Profit After Fees)
                     user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "2.5")
                     user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 2.5
                     effective_tp = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
@@ -655,18 +660,18 @@ async def monitor_turbo_hedge_bots(app):
                     # High-Precision Dollar Peak PnL Lock ($ Peak Lock)
                     peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
                     peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-                    if real_pnl_usdt > peak_pnl:
-                        peak_pnl = real_pnl_usdt
+                    if net_pnl_usdt > peak_pnl:
+                        peak_pnl = net_pnl_usdt
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
-                    is_tp_harvested = (real_pnl_usdt >= effective_tp)
-                    is_peak_locked = (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or (peak_pnl >= 2.00 and real_pnl_usdt <= (peak_pnl * 0.80))
+                    is_tp_harvested = (net_pnl_usdt >= effective_tp)
+                    is_peak_locked = (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or (peak_pnl >= 2.00 and net_pnl_usdt <= (peak_pnl * 0.80))
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
                     # Normal Flip: ROI <= -10.0% OR net loss <= -$2.00 USDT (with 15s Anti-Whipsaw Cooldown)
                     # Emergency Hard Breaker: ROI <= -15.0% OR net loss <= -$3.00 USDT (Instant Emergency Close WITHOUT Cooldown)
-                    is_stop_loss_hit = (roi_pct <= -10.0 or real_pnl_usdt <= -2.0)
-                    is_hard_circuit_breaker = (roi_pct <= -15.0 or real_pnl_usdt <= -3.0)
+                    is_stop_loss_hit = (roi_pct <= -10.0 or net_pnl_usdt <= -2.0)
+                    is_hard_circuit_breaker = (roi_pct <= -15.0 or net_pnl_usdt <= -3.0)
 
                     now_ts = int(time.time())
                     last_flip_key = f"{chat_id}_{symbol}"
