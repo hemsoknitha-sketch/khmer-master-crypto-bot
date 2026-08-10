@@ -1,0 +1,26 @@
+# Environment variables & API Keys
+.env
+
+# SQLite Databases & Backups
+*.db
+boot_bot_database_*.db
+backups/
+
+# Python Cache & Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Log Files & Lock Files
+*.log
+vps_crash_logs.txt
+bot_instance.lock
+recovered.txt
+recovered_sniper.txt
+debug_output*.txt
+dis_output.txt
+ico_silent_logs.txt
+
+# Charts & Temporary Images
+*.png
