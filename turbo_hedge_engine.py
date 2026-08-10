@@ -641,7 +641,10 @@ async def monitor_turbo_hedge_bots(app):
                     # ⌛ 15-Minute Stagnant Position Auto-Pruner (Crab Market Exit):
                     entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
                     entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
-                    is_stagnant_timeout = (entry_ts > 0 and (now_ts - entry_ts) >= 900 and (-0.50 <= real_pnl_usdt <= 0.50))
+                    if entry_ts == 0:
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
+                        entry_ts = now_ts
+                    is_stagnant_timeout = ((now_ts - entry_ts) >= 900 and (-0.50 <= real_pnl_usdt <= 0.50))
 
                     if is_hard_circuit_breaker:
                         # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
