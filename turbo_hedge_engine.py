@@ -12,13 +12,25 @@ import ai_engine
 _active_executing_keys = set()
 _last_flip_timestamps = {}
 _failed_candidate_symbols = set()
+_cooldown_symbols = {}
+
+def add_symbol_cooldown(symbol: str, duration_seconds: int = 7200):
+    symbol = str(symbol).upper().strip()
+    _cooldown_symbols[symbol] = time.time() + duration_seconds
+
+def is_symbol_in_cooldown(symbol: str) -> bool:
+    symbol = str(symbol).upper().strip()
+    exp = _cooldown_symbols.get(symbol, 0)
+    if time.time() < exp:
+        return True
+    return False
 
 def get_active_high_velocity_coins(limit: int = 30) -> list:
     """
     Super Smart Real-Time High-Velocity Futures Coin Scanner:
     Queries Binance Futures /fapi/v1/ticker/24hr dynamically across 200+ perpetual pairs.
     Ranks candidates by highest real-time price change % and trading volume.
-    Excludes delisted/non-tradable pairs dynamically.
+    Excludes delisted/non-tradable pairs and recently closed cooldown pairs dynamically.
     """
     try:
         url = f"{trading_engine.FUTURES_URL}/fapi/v1/ticker/24hr"
@@ -31,6 +43,8 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 sym = t.get("symbol", "")
                 if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS or not sym.isascii():
                     continue
+                if is_symbol_in_cooldown(sym):
+                    continue
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
                 price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
                 abs_change = abs(price_change_pct)
@@ -40,12 +54,12 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 if sym_info and sym_info.get("status") != "TRADING":
                     continue
 
-                if quote_vol >= 500000.0:  # Include any liquid futures pair >= $500k volume
+                if quote_vol >= 1000000.0:  # Include liquid futures pair >= $1M volume
                     candidates.append({
                         "symbol": sym,
                         "quote_volume": quote_vol,
                         "abs_change": abs_change,
-                        "score": (abs_change * 10.0) + (math.log10(max(1.0, quote_vol)))
+                        "score": (abs_change * 15.0) + (math.log10(max(1.0, quote_vol)))
                     })
             
             candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -509,7 +523,7 @@ async def monitor_turbo_hedge_bots(app):
                     if c_cand in user_active_syms:
                         continue
                     
-                    if c_cand in _failed_candidate_symbols:
+                    if c_cand in _failed_candidate_symbols or is_symbol_in_cooldown(c_cand):
                         continue
 
                     eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal)
@@ -690,10 +704,11 @@ async def monitor_turbo_hedge_bots(app):
                                 print(f"Error sending breaker notification: {e}")
 
                     elif is_stagnant_timeout:
-                        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >15 mins with stagnant PnL (${real_pnl_usdt:.2f}). Market closing to rotate capital into hot surging coin...")
+                        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >15 mins with stagnant PnL (${real_pnl_usdt:.2f}). Market closing & applying 2-Hour Cooldown...")
                         close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
                         db.remove_turbo_hedge_bot(chat_id, symbol)
+                        add_symbol_cooldown(symbol, 7200)
 
                     elif is_stop_loss_hit:
                         # 🛡️ 15-Second Anti-Whipsaw Cooldown Protection:
@@ -702,6 +717,8 @@ async def monitor_turbo_hedge_bots(app):
                             print(f"🛡️ [ANTI-WHIPSAW COOLDOWN] {symbol}: Flipped {now_ts - last_flip_ts}s ago (<15s). Executing clean Market Close to prevent whipsaw churn...")
                             close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                            db.remove_turbo_hedge_bot(chat_id, symbol)
+                            add_symbol_cooldown(symbol, 3600)
                         else:
                             flip_side = "SELL" if current_side == "BUY" else "BUY"
                             _last_flip_timestamps[last_flip_key] = now_ts
@@ -739,6 +756,8 @@ async def monitor_turbo_hedge_bots(app):
                         # Market Close Position on Binance (<50ms)
                         close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        db.remove_turbo_hedge_bot(chat_id, symbol)
+                        add_symbol_cooldown(symbol, 3600)
 
                         # Track accumulated profit
                         tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
@@ -756,40 +775,11 @@ async def monitor_turbo_hedge_bots(app):
                                     f"💵 ផលចំណេញប្រមូលបាន ៖ `+${real_pnl_usdt:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
                                     f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
                                     f"⚡ Binance Status ៖ `HARVESTED INSTANTLY (<50ms)`\n\n"
-                                    f"_AI ផ្អាក ៣ វិនាទី គិត Re-Analysis បើក Position ថ្មីកើបចំណេញ 24/7!_"
+                                    f"_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
                                 )
                                 await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
                             except Exception as e:
                                 print(f"Error sending harvest notification: {e}")
-
-                        # 3-Second AI Re-Analysis Pause for 24/7 continuous compounding
-                        await asyncio.sleep(3.0)
-                        fresh_eval = await asyncio.to_thread(scan_and_evaluate_symbol, symbol, leverage, avail_bal)
-                        next_side = fresh_eval.get("side", ai_recommended_side)
-                        next_conf = fresh_eval.get("confidence_pct", ai_confidence)
-                        next_lev = fresh_eval.get("recommended_leverage", dynamic_leverage)
-
-                        exec_res = await asyncio.to_thread(execute_turbo_hedge_trade, keys[0], keys[1], symbol, amount, next_side, next_lev, chat_id)
-                        if isinstance(exec_res, dict) and exec_res.get("status") == "success":
-                            fresh_price = trading_engine.get_current_price(symbol) or mark_price
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(fresh_price))
-                            db.update_turbo_hedge_side(chat_id, symbol, next_side)
-                            print(f"🚀 [TURBO HEDGE RE-ENTRY HARVEST SUCCESS] {symbol} Re-entered {next_side} at {fresh_price:.4f} ({next_conf}% Conf / {next_lev}x Lev)!")
-
-                            if app and hasattr(app, "bot"):
-                                try:
-                                    msg_re = (
-                                        f"🚀 **APEX TURBO HEDGE RE-ENTRY SUCCESSFUL!** 🛡️\n"
-                                        f"───────────────────────────────\n\n"
-                                        f"🪙 កាក់ ៖ `{symbol}`\n"
-                                        f"🎯 ទិសដៅ ៖ `{next_side}` (Entry: `{fresh_price:.4f}`)\n"
-                                        f"🧠 AI Confidence ៖ `{next_conf}%` (Leverage: `{next_lev}x`)\n"
-                                        f"💰 គោលដៅចំណេញបន្ទាប់ ៖ `+${effective_tp:.0f}.00 USDT (+25% ROI)`\n\n"
-                                        f"_Bot កំពុងការពារទុន និងស្កេន Auto-Harvest 24/7!_"
-                                    )
-                                    await app.bot.send_message(chat_id=chat_id, text=msg_re, parse_mode="Markdown")
-                                except Exception as e:
-                                    print(f"Error sending re-entry notification: {e}")
 
     except Exception as e:
         print(f"⚠️ [TURBO HEDGE MONITOR ERROR]: {e}")
