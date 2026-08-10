@@ -202,6 +202,16 @@ class TelegramBotThread(QThread):
         async def verify_user(update: Update) -> bool:
             """TURBO AGI Adaptive Token-Bucket Rate Limiter, Rapid Burst Intrusion Shield & VIP Verification Engine."""
             if not update: return False
+
+            # 🛡️ Global Telegram Crash Shield: Auto-populate update.message if update was triggered by CallbackQuery or EditedMessage
+            if getattr(update, 'message', None) is None:
+                if getattr(update, 'effective_message', None) is not None:
+                    try: update.message = update.effective_message
+                    except Exception: pass
+                elif getattr(update, 'callback_query', None) and getattr(update.callback_query, 'message', None) is not None:
+                    try: update.message = update.callback_query.message
+                    except Exception: pass
+
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return False
 
