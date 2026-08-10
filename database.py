@@ -1311,8 +1311,11 @@ def get_user_api(chat_id: int):
     
     if not result:
         # Fallback for single-user system or admin chat ID mapping
-        cursor.execute("SELECT api_key, api_secret FROM user_api_keys ORDER BY id DESC LIMIT 1")
-        result = cursor.fetchone()
+        try:
+            cursor.execute("SELECT api_key, api_secret FROM user_api_keys LIMIT 1")
+            result = cursor.fetchone()
+        except Exception:
+            result = None
 
     conn.close()
     
