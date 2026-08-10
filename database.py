@@ -3256,18 +3256,11 @@ def get_all_active_defenders() -> list:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT chat_id FROM users WHERE defender_enabled = 1")
+        cursor.execute("SELECT DISTINCT chat_id FROM users WHERE chat_id IS NOT NULL")
         rows = cursor.fetchall()
-        defenders = [r[0] for r in rows]
-        if not defenders:
-            cursor.execute("SELECT chat_id FROM users WHERE is_vip = 1")
-            rows = cursor.fetchall()
-            defenders = [r[0] for r in rows]
-        return defenders
+        return [r[0] for r in rows if r[0] is not None]
     except Exception:
-        cursor.execute("SELECT chat_id FROM users WHERE is_vip = 1")
-        rows = cursor.fetchall()
-        return [r[0] for r in rows]
+        return []
     finally:
         conn.close()
 
@@ -3387,7 +3380,7 @@ def get_all_active_defenders() -> list:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT chat_id FROM users WHERE liquidation_defender_enabled = 1 OR is_vip = 1")
+        cursor.execute("SELECT DISTINCT chat_id FROM users WHERE chat_id IS NOT NULL")
         rows = cursor.fetchall()
         return [r[0] for r in rows if r[0] is not None]
     except Exception as e:
