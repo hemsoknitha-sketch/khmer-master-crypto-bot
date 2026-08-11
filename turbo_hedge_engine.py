@@ -511,9 +511,13 @@ async def monitor_turbo_hedge_bots(app):
             if avail_bal <= 0.0 or avail_bal < 100.0:
                 unit_leverage = min(unit_leverage, 10)
 
-            # Check if live balance has enough capital to fund next coin position (Dynamic Balance Sizing)
+            # Check if live balance has enough capital to fund next coin position (Dynamic Balance Sizing with 50% Safety Cushion)
             if avail_bal >= 5.0:
-                actual_trade_amount = min(unit_amount, max(5.0, avail_bal * 0.85))
+                actual_trade_amount = min(unit_amount, max(5.0, avail_bal * 0.50))
+                if actual_trade_amount > avail_bal:
+                    print(f"🛡️ [AGI MARGIN SHIELD] Free margin (${avail_bal:.2f}) insufficient for safe trade amount (${actual_trade_amount:.2f}). Pausing auto-expander.")
+                    continue
+
                 if len(_failed_candidate_symbols) > 10:
                     _failed_candidate_symbols.clear()
                 top_coins = get_active_high_velocity_coins(limit=100)
@@ -562,6 +566,10 @@ async def monitor_turbo_hedge_bots(app):
                         break
                     else:
                         _failed_candidate_symbols.add(c_cand)
+                        err_str = str(exec_res) if exec_res else ""
+                        if "-2019" in err_str or "insufficient" in err_str.lower() or "Margin locked" in err_str:
+                            print(f"🛡️ [AGI MARGIN SHIELD] Free margin exhausted for User {target_chat_id}. Pausing auto-expander scanner loop until margin frees up.")
+                            break
                         print(f"⚠️ [PERPETUAL AUTO-EXPANDER SKIP] {c_cand} failed execution. Skipping candidate symbol to next coin!")
 
         for bot_info in active_hedge_bots:
