@@ -643,31 +643,78 @@ class BotDashboard(QMainWindow):
                 self.bot_thread.stop()
             event.accept()
 
+class ApexVPSHeadlessEngine:
+    def __init__(self):
+        print("🚀 Initializing Apex Super AGI v9.8 (24/7 Pure Headless VPS Engine)...")
+        db.init_db()
+        import backup_manager
+        backup_manager.perform_backup(is_boot=True)
+        
+        self.BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+        self.GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+        
+        if not self.BOT_TOKEN or self.BOT_TOKEN == "your_telegram_bot_token_here":
+            print("❌ Error: Please put your actual TELEGRAM_BOT_TOKEN in the .env file!")
+            sys.exit(1)
+            
+        if not self.GEMINI_KEY or self.GEMINI_KEY == "your_gemini_api_key_here":
+            print("❌ Error: Please put your actual GEMINI_API_KEY in the .env file!")
+            sys.exit(1)
+
+        self.ai_engine = AIInvestmentEngine(api_key=self.GEMINI_KEY)
+        self.bot_thread = TelegramBotThread(self.BOT_TOKEN, self.ai_engine)
+        self.bot_thread.log_signal.connect(self.log_vps)
+        self.bot_thread.start()
+        print("🛡️ [24/7 VPS ENGINE] Telegram Bot & AGI Engines active and running 24/7!")
+
+    def log_vps(self, text: str):
+        print(text)
+
+    def quit_app(self):
+        print("🛑 Shutting down VPS Headless Engine cleanly...")
+        if hasattr(self, 'bot_thread') and self.bot_thread and self.bot_thread.isRunning():
+            self.bot_thread.stop()
+
 if __name__ == "__main__":
     import signal
     from PyQt5.QtCore import QTimer
     
-    app = QApplication(sys.argv)
-    # Ensure app doesn't quit when the last window is hidden
-    app.setQuitOnLastWindowClosed(False)
+    is_vps_mode = ("--vps" in sys.argv or "--headless" in sys.argv)
     
-    window = BotDashboard()
-    
-    # Handle Ctrl+C (SIGINT) cleanly
-    def sigint_handler(signum, frame):
-        print("\nCtrl+C detected! Shutting down system cleanly...")
-        window.quit_app()
-        QApplication.quit()
+    if is_vps_mode:
+        from PyQt5.QtCore import QCoreApplication
+        app = QCoreApplication(sys.argv)
+        engine = ApexVPSHeadlessEngine()
         
-    signal.signal(signal.SIGINT, sigint_handler)
-    
-    # We need a timer to periodically yield control to Python's signal handler
-    # otherwise Qt's C++ event loop will block the Ctrl+C signal.
-    timer = QTimer()
-    timer.start(500)
-    timer.timeout.connect(lambda: None)
-    
-    if "--vps" not in sys.argv and "--headless" not in sys.argv:
+        def sigint_handler(signum, frame):
+            print("\nCtrl+C detected! Shutting down system cleanly...")
+            engine.quit_app()
+            QCoreApplication.quit()
+            
+        signal.signal(signal.SIGINT, sigint_handler)
+        
+        timer = QTimer()
+        timer.start(500)
+        timer.timeout.connect(lambda: None)
+        
+        sys.exit(app.exec_())
+    else:
+        app = QApplication(sys.argv)
+        app.setQuitOnLastWindowClosed(False)
+        
+        window = BotDashboard()
+        
+        def sigint_handler(signum, frame):
+            print("\nCtrl+C detected! Shutting down system cleanly...")
+            window.quit_app()
+            QApplication.quit()
+            
+        signal.signal(signal.SIGINT, sigint_handler)
+        
+        timer = QTimer()
+        timer.start(500)
+        timer.timeout.connect(lambda: None)
+        
         window.show()
-    sys.exit(app.exec_())
+        sys.exit(app.exec_())
 
