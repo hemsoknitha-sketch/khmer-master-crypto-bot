@@ -1887,12 +1887,12 @@ def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "
             return {"status": "error", "error": f"No {base_asset} spot balance available to sell"}
         params["quantity"] = f"{qty:.8f}".rstrip('0').rstrip('.')
 
-    query_string = urllib.parse.urlencode(params)
+    query_string = urlencode(params)
     signature = hmac.new(api_secret.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
     full_url = f"{url}?{query_string}&signature={signature}"
 
     try:
-        res = requests.post(full_url, headers=headers, timeout=5)
+        res = HFT_SESSION.post(full_url, headers=headers, timeout=5)
         if res.status_code == 200:
             data = res.json()
             print(f"🚀 [BINANCE SPOT MARKET SUCCESS (<20ms)] {symbol} {side} -> OrderId: {data.get('orderId')}")
