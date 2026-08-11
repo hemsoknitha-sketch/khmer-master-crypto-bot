@@ -161,12 +161,16 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
             is_top_rejection = (upper_wick > max(0.0001, body * 1.5))
             is_bottom_rejection = (lower_wick > max(0.0001, body * 1.5))
 
-            # Fetch 24h Price Change % to catch hyper-pumped coins (+15% to +250%)
+            # Fetch 24h Price Change % and Funding Rate
             change_24h = 0.0
+            funding_rate = 0.0
             try:
                 t_res = HFT_SESSION.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
                 if t_res.status_code == 200:
                     change_24h = float(t_res.json().get("priceChangePercent", 0.0))
+                fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
+                if fr_res.status_code == 200:
+                    funding_rate = float(fr_res.json().get("lastFundingRate", 0.0))
             except Exception:
                 pass
 
@@ -178,6 +182,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                 base_conf = 88.0
                 if change_24h >= 25.0 or rsi14 >= 75.0: base_conf += 6.0
                 if is_top_rejection: base_conf += 4.5
+                if funding_rate > 0.0001: base_conf += 3.5  # Positive funding: Shorts get paid!
                 confidence = min(98.5, max(85.0, base_conf))
                 print(f"🛑 [ANTI-PEAK PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% | RSI {rsi14:.1f} (Hyper-Pump Top) -> BLOCKED BUY! Forced SHORT (SELL) at Peak Rejection ({confidence:.1f}% Conf)!")
 
@@ -188,6 +193,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                 base_conf = 88.0
                 if rsi14 <= 25.0: base_conf += 6.0
                 if is_bottom_rejection: base_conf += 4.5
+                if funding_rate < -0.0001: base_conf += 3.5  # Negative funding: Longs get paid!
                 confidence = min(98.5, max(82.0, base_conf))
                 print(f"🛡️ [ANTI-BOTTOM PROTECTION] {symbol}: RSI {rsi14:.1f} (Oversold Dip) -> Blocked SELL, Forced BUY Long at Dip Rebound ({confidence:.1f}% Conf)!")
 
@@ -200,12 +206,14 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                     if vol_ratio > 1.5: base_conf += 5.0
                     if vol_ratio > 2.5: base_conf += 3.5
                     if price_change_1m < -0.15: base_conf += 5.0
+                    if funding_rate > 0.0001: base_conf += 3.5
                 else:
                     side = "BUY"
                     if ema5 > ema15: base_conf += 4.0
                     if vol_ratio > 1.5: base_conf += 5.0
                     if vol_ratio > 2.5: base_conf += 3.5
                     if price_change_1m > 0.15: base_conf += 5.0
+                    if funding_rate < -0.0001: base_conf += 3.5
 
                 confidence = min(98.5, max(84.0, base_conf))
     except Exception as ex:
