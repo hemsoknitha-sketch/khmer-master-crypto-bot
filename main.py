@@ -677,28 +677,45 @@ class ApexVPSHeadlessEngine:
 
 if __name__ == "__main__":
     import signal
-    from PyQt5.QtCore import QTimer
     
     is_vps_mode = ("--vps" in sys.argv or "--headless" in sys.argv)
     
     if is_vps_mode:
-        from PyQt5.QtCore import QCoreApplication
-        app = QCoreApplication(sys.argv)
-        engine = ApexVPSHeadlessEngine()
+        print("🚀 Initializing Apex Super AGI v9.8 (24/7 Pure Python Headless VPS Engine)...")
+        db.init_db()
+        import backup_manager
+        backup_manager.perform_backup(is_boot=True)
+        
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        
+        if not bot_token or bot_token == "your_telegram_bot_token_here":
+            print("❌ Error: Please put your actual TELEGRAM_BOT_TOKEN in the .env file!")
+            sys.exit(1)
+            
+        if not gemini_key or gemini_key == "your_gemini_api_key_here":
+            print("❌ Error: Please put your actual GEMINI_API_KEY in the .env file!")
+            sys.exit(1)
+
+        from ai_engine import AIInvestmentEngine
+        from bot_thread import TelegramBotThread
+        
+        ai_engine = AIInvestmentEngine(api_key=gemini_key)
+        bot_service = TelegramBotThread(bot_token, ai_engine)
         
         def sigint_handler(signum, frame):
             print("\nCtrl+C detected! Shutting down system cleanly...")
-            engine.quit_app()
-            QCoreApplication.quit()
+            bot_service.stop()
+            sys.exit(0)
             
         signal.signal(signal.SIGINT, sigint_handler)
         
-        timer = QTimer()
-        timer.start(500)
-        timer.timeout.connect(lambda: None)
-        
-        sys.exit(app.exec_())
+        print("🛡️ [24/7 VPS ENGINE] Telegram Bot & AGI Engines active and running 24/7 in Pure Python!")
+        bot_service.run()
     else:
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import QTimer
+        
         app = QApplication(sys.argv)
         app.setQuitOnLastWindowClosed(False)
         

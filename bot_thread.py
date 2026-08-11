@@ -1,7 +1,36 @@
 import asyncio
 import time
 import hashlib
-from PyQt5.QtCore import QThread, pyqtSignal
+import sys
+import os
+
+IS_HEADLESS_VPS = ("--vps" in sys.argv or "--headless" in sys.argv)
+
+class PurePythonSignal:
+    def __init__(self):
+        self._listeners = []
+
+    def connect(self, slot):
+        if slot not in self._listeners:
+            self._listeners.append(slot)
+
+    def emit(self, *args, **kwargs):
+        print(" ".join(str(a) for a in args))
+        for slot in self._listeners:
+            try:
+                slot(*args, **kwargs)
+            except Exception:
+                pass
+
+if IS_HEADLESS_VPS:
+    BaseThread = object
+else:
+    try:
+        from PyQt5.QtCore import QThread, pyqtSignal
+        BaseThread = QThread
+    except ImportError:
+        BaseThread = object
+
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from ai_engine import AIInvestmentEngine
@@ -33,12 +62,27 @@ def mask_sensitive_data(text: str) -> str:
     return text
 
 
-class TelegramBotThread(QThread):
-    log_signal = pyqtSignal(str)
-    direct_message_signal = pyqtSignal(int, str)  # chat_id, message_text
+class TelegramBotThread(BaseThread):
+    if not IS_HEADLESS_VPS:
+        try:
+            from PyQt5.QtCore import pyqtSignal
+            log_signal = pyqtSignal(str)
+            direct_message_signal = pyqtSignal(int, str)
+        except Exception:
+            pass
 
     def __init__(self, bot_token: str, ai_engine: AIInvestmentEngine):
-        super().__init__()
+        if not IS_HEADLESS_VPS and hasattr(super(), '__init__'):
+            try:
+                super().__init__()
+            except Exception:
+                pass
+
+        if IS_HEADLESS_VPS or not hasattr(self, 'log_signal'):
+            self.log_signal = PurePythonSignal()
+        if IS_HEADLESS_VPS or not hasattr(self, 'direct_message_signal'):
+            self.direct_message_signal = PurePythonSignal()
+
         self.bot_token = bot_token
         self.ai_engine = ai_engine
         self.loop = None
@@ -53,12 +97,22 @@ class TelegramBotThread(QThread):
         self.unauthorized_admin_tracker = {}
 
         # Connect the direct message signal
-        self.direct_message_signal.connect(self._handle_direct_message)
+        if hasattr(self.direct_message_signal, 'connect'):
+            self.direct_message_signal.connect(self._handle_direct_message)
 
         # Initialize the database and adopt active positions on startup
         db.init_db()
         if hasattr(db, 'reconcile_and_adopt_active_positions'):
             db.reconcile_and_adopt_active_positions()
+
+    def start(self):
+        import sys
+        if "--vps" in sys.argv or "--headless" in sys.argv or not hasattr(super(), 'start'):
+            import threading
+            t = threading.Thread(target=self.run, daemon=True)
+            t.start()
+        else:
+            super().start()
 
     def _handle_direct_message(self, chat_id: int, text: str):
         if self.loop and self.app:
@@ -7110,7 +7164,7 @@ class TelegramBotThread(QThread):
         self.app.add_handler(CommandHandler("stop_all", stop_all_command))
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(stop_all_callback, pattern="^stopall_"))
-        self.app.add_handler(CommandHandler("sell_all", sell_all_command))
+        self.app.add_handler(CommandHandler("sell_all", stop_all_command))
         self.app.add_handler(CommandHandler("balance", balance_command))
         self.app.add_handler(CommandHandler("status", status_command))
         self.app.add_handler(CommandHandler("staus", status_command))
