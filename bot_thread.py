@@ -7580,6 +7580,17 @@ class TelegramBotThread(BaseThread):
             id="biweekly_apex_brain_train_job"
         )
         
+        # 8-Hour VIP Executive Consolidated Report (Every 8 Hours at 00:00, 08:00, 16:00 UTC+7)
+        self.scheduler.add_job(
+            scheduler_tasks.vip_8hour_executive_report_job,
+            "cron",
+            hour="0,8,16",
+            minute=0,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id="vip_8hour_executive_report_job"
+        )
+        
 # 17. Infinity Grid Monitor
         self.scheduler.add_job(
             scheduler_tasks.infinity_grid_monitor,

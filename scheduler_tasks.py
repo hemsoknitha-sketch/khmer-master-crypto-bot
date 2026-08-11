@@ -4344,6 +4344,89 @@ async def biweekly_apex_brain_train_job(app: Application, ai_engine=None):
         print(f"❌ [SCHEDULER ERROR] Bi-Weekly Apex Brain Training failed: {e}")
 
 
+async def vip_8hour_executive_report_job(app: Application):
+    """
+    Super Smart 8-Hour VIP Executive Consolidated Report Generator.
+    Fires automatically every 8 hours (00:00, 08:00, 16:00 UTC+7).
+    Sends a beautifully structured summary report to VIP users.
+    """
+    try:
+        import database as db
+        import trading_engine
+        import asyncio
+        import time
+
+        vip_users = db.get_vip_users()
+        if not vip_users:
+            return
+
+        for chat_id in vip_users:
+            try:
+                f_keys = db.get_user_api(chat_id)
+                if not f_keys:
+                    continue
+
+                avail_bal = await asyncio.to_thread(trading_engine.get_futures_available_balance, f_keys[0], f_keys[1])
+                wallet_bal = await asyncio.to_thread(trading_engine.get_futures_wallet_balance, f_keys[0], f_keys[1], "USDT")
+                if not wallet_bal or wallet_bal <= 0:
+                    wallet_bal = avail_bal
+
+                user_bots = db.get_user_turbo_hedge_bots(chat_id)
+                now_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+                report_text = (
+                    f"🤖 **APEX SUPER AGI v9.8 | 8-HOUR VIP EXECUTIVE REPORT** 🤖\n"
+                    f"═══════════════════════════════\n"
+                    f"⏰ **កាលបរិច្ឆេទ ៖** `{now_str} (UTC+7)`\n"
+                    f"🛡️ **VIP CLEARANCE ៖** `VERIFIED` | 🚀 `REAL LIVE TRADING`\n"
+                    f"═══════════════════════════════\n\n"
+                )
+
+                if not user_bots:
+                    report_text += "🟢 **ស្ថានភាព Position ៖** `គ្មាន Position កំពុងត្រាំ - ទុនរៀបរយ ១០០%`\n\n"
+                else:
+                    report_text += "💼 **បញ្ជីកាក់កំពុងវិនិយោគ (ACTIVE PORTFOLIO) ៖**\n\n"
+                    for idx, b in enumerate(user_bots, 1):
+                        sym = b.get("symbol", "")
+                        side = b.get("side", "BUY")
+                        amt = float(b.get("amount", 0.0))
+                        lev = int(b.get("leverage", 10))
+
+                        entry_p = float(db.get_system_setting(f"turbo_hedge_{chat_id}_{sym}_entry_price", "0.0"))
+                        if entry_p <= 0:
+                            entry_p = await asyncio.to_thread(trading_engine.get_current_price, sym)
+
+                        pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, f_keys[0], f_keys[1], sym)
+                        pnl_val = float(pnl_info.get("unrealizedProfit", 0.0))
+                        roi_val = float(pnl_info.get("roi", 0.0)) if pnl_info.get("roi") else 0.0
+
+                        pnl_emoji = "🟩" if pnl_val >= 0 else "🟥"
+                        pos_type = "Spot Market" if side == "SPOT" else f"Futures {side} {lev}x"
+
+                        report_text += (
+                            f"**{idx}. {sym}** ({pos_type})\n"
+                            f"   💵 **Entry Price ៖** `${entry_p:,.4f}` | 💰 **Invest ៖** `${amt:,.2f}`\n"
+                            f"   {pnl_emoji} **Profit/Loss ៖** `${pnl_val:+,.2f} USDT` (`{roi_val:+,.1f}% ROI`)\n\n"
+                        )
+
+                report_text += (
+                    f"═══════════════════════════════\n"
+                    f"💰 **សមតុល្យទុនចុងក្រោយ (LIVE EQUITY SUMMARY)**\n"
+                    f"💵 **Wallet Balance ៖** `${wallet_bal:,.2f} USDT`\n"
+                    f"🏦 **Free Margin ៖** `${avail_bal:,.2f} USDT`\n"
+                    f"📊 **Active Portfolio ៖** `{len(user_bots)} Positions Active`\n"
+                    f"═══════════════════════════════\n"
+                    f"💡 _របាយការណ៍សរុបស្វ័យប្រវត្តិរៀងរាល់ ៨ ម៉ោងម្តង ជូន VIP Users!_"
+                )
+
+                if app and hasattr(app, "bot"):
+                    await app.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown")
+            except Exception as user_err:
+                print(f"Error sending 8h VIP report to {chat_id}: {user_err}")
+    except Exception as e:
+        print(f"Error in vip_8hour_executive_report_job: {e}")
+
+
 
 
 
