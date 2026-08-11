@@ -626,7 +626,8 @@ async def monitor_turbo_hedge_bots(app):
                 alert_sent_key = f"turbo_hedge_{target_chat_id}_recovery_alert_sent"
                 if db.get_system_setting(alert_sent_key, "0") != "1":
                     db.update_system_setting(alert_sent_key, "1")
-                    if app and hasattr(app, "bot"):
+                    is_quiet = db.get_system_setting(f"turbo_hedge_{target_chat_id}_quiet_mode", "1") == "1"
+                    if not is_quiet and app and hasattr(app, "bot"):
                         try:
                             msg_recovery = (
                                 f"🚨 **APEX AGI VIP PROFIT RECOVERY PROTOCOL ACTIVATED!** 🛡️⚡\n"
@@ -706,7 +707,8 @@ async def monitor_turbo_hedge_bots(app):
                         active_hedge_bots.append({"chat_id": target_chat_id, "symbol": c_cand, "amount": actual_trade_amount, "leverage": unit_leverage, "side": target_side, "target_tp": unit_tp})
                         print(f"🚀 [SUPER SMART HIGH-VELOCITY AUTO-ENTRY] User {target_chat_id} Live Balance ${avail_bal:.2f} -> Auto-entered {c_cand} ({target_side})! (Now {len(user_active_bots)+1}/10 Coins)")
 
-                        if app and hasattr(app, "bot"):
+                        is_quiet = db.get_system_setting(f"turbo_hedge_{target_chat_id}_quiet_mode", "1") == "1"
+                        if not is_quiet and app and hasattr(app, "bot"):
                             try:
                                 msg_expand = (
                                     f"🚀 **SUPER SMART TURBO HEDGE PERPETUAL AUTO-ENTRY!** 🛡️\n"
