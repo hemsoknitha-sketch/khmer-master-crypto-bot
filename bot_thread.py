@@ -5227,32 +5227,64 @@ class TelegramBotThread(BaseThread):
 
             user_side_input = "AUTO"
             target_tp = 2.5
-            try:
-                amount = float(args[1])
-                leverage = int(args[2])
-                
-                # Format A: /turbo_hedge TOP 5 10 AUTO 2.50 <PIN> (6 args)
-                if len(args) >= 6 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                    user_side_input = args[3].upper()
-                    target_tp = float(args[4]) if args[4].replace('.', '', 1).isdigit() else 2.5
-                    pin = str(args[5]).strip()
-                # Format B: /turbo_hedge TOP 5 10 AUTO <PIN> (5 args)
-                elif len(args) == 5 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                    user_side_input = args[3].upper()
-                    pin = str(args[4]).strip()
-                # Format C: /turbo_hedge TOP 5 10 2.50 <PIN> (5 args)
-                elif len(args) == 5 and args[3].replace('.', '', 1).isdigit():
-                    target_tp = float(args[3])
-                    pin = str(args[4]).strip()
-                # Format D: /turbo_hedge TOP 5 10 <PIN> (4 args)
-                elif len(args) == 4:
-                    pin = str(args[3]).strip()
+            max_coins = 10
+            leverage = 10
+
+            if symbol in ["TOP", "SCAN"]:
+                try:
+                    if len(args) >= 6:
+                        max_coins = int(args[1])
+                        amount = float(args[2])
+                        user_side_input = args[3].upper()
+                        target_tp = float(args[4]) if args[4].replace('.', '', 1).isdigit() else 2.5
+                        pin = str(args[5]).strip()
+                    elif len(args) == 5:
+                        max_coins = int(args[1])
+                        amount = float(args[2])
+                        if args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                            user_side_input = args[3].upper()
+                            pin = str(args[4]).strip()
+                        else:
+                            target_tp = float(args[3]) if args[3].replace('.', '', 1).isdigit() else 2.5
+                            pin = str(args[4]).strip()
+                    elif len(args) == 4:
+                        max_coins = int(args[1])
+                        amount = float(args[2])
+                        pin = str(args[3]).strip()
+                    else:
+                        amount = float(args[1]) if len(args) > 1 and args[1].replace('.', '', 1).isdigit() else 5.0
+                        pin = str(args[-1]).strip()
+                except ValueError:
+                    if msg_target:
+                        await msg_target.reply_text("❌ ចំនួនកាក់ ឬ ទុនមិនត្រឹមត្រូវ!")
+                    return
+
+                if user_side_input == "SPOT":
+                    leverage = 1
                 else:
-                    pin = str(args[-1]).strip()
-            except ValueError:
-                if msg_target:
-                    await msg_target.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
-                return
+                    leverage = 10
+            else:
+                try:
+                    amount = float(args[1])
+                    leverage = int(args[2])
+                    if len(args) >= 6 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                        user_side_input = args[3].upper()
+                        target_tp = float(args[4]) if args[4].replace('.', '', 1).isdigit() else 2.5
+                        pin = str(args[5]).strip()
+                    elif len(args) == 5 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                        user_side_input = args[3].upper()
+                        pin = str(args[4]).strip()
+                    elif len(args) == 5 and args[3].replace('.', '', 1).isdigit():
+                        target_tp = float(args[3])
+                        pin = str(args[4]).strip()
+                    elif len(args) == 4:
+                        pin = str(args[3]).strip()
+                    else:
+                        pin = str(args[-1]).strip()
+                except ValueError:
+                    if msg_target:
+                        await msg_target.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
+                    return
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin:
@@ -5278,6 +5310,7 @@ class TelegramBotThread(BaseThread):
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_leverage", str(leverage))
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_side", user_side_input)
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", str(target_tp))
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_max_coins", str(max_coins))
 
                 # ⚡ 1. Ultra-Fast Instant Ack Reply (<20ms) to Telegram User!
                 ack_msg = None
@@ -5287,9 +5320,10 @@ class TelegramBotThread(BaseThread):
                             f"⚡ **APEX TURBO HEDGE TOP SCANNER ACTIVATED!** 🚀\n"
                             f"───────────────────────────────\n\n"
                             f"🪙 Mode ៖ `{user_side_input}` (`{leverage}x Lev`)\n"
+                            f"📊 Portfolio Limit ៖ `{max_coins} Coins Max` (គ្រប់គ្រងអតិបរមា {max_coins} កាក់)\n"
                             f"💰 ដើមទុន / កាក់ ៖ `${amount:,.2f} USDT`\n"
                             f"🎯 Target TP ៖ `+{target_tp}%`\n"
-                            f"⚡ Status ៖ `កំពុងស្កេនទាញយកកាក់រត់លឿន 30 កាក់ភ្លាមៗ...`\n\n"
+                            f"⚡ Status ៖ `កំពុងស្កេនទាញយកកាក់រត់លឿន {max_coins} កាក់ភ្លាមៗ...`\n\n"
                             f"_ប្រព័ន្ធ AGI កំពុងរត់ស្កេន Binance API និងបើកកាក់ស្វ័យប្រវត្តិ 24/7!_",
                             parse_mode="Markdown"
                         )
@@ -5306,7 +5340,7 @@ class TelegramBotThread(BaseThread):
                         top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
 
                     avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
-                    num_coins = 10 if (avail_bal >= 5.0 or avail_bal <= 0) else max(1, min(10, int(avail_bal / max(2.5, amount))))
+                    num_coins = min(max_coins, 10 if (avail_bal >= 5.0 or avail_bal <= 0) else max(1, min(10, int(avail_bal / max(2.5, amount)))))
                     
                     success_count = 0
                     executed_syms = []
