@@ -748,18 +748,22 @@ async def monitor_turbo_hedge_bots(app):
                                 print(f"Error sending stagnant notification: {e}")
 
                     elif is_stop_loss_hit:
-                        # 🛡️ 15-Second Anti-Whipsaw Cooldown Protection:
-                        # If a flip occurred less than 15s ago, execute a clean Market Close to avoid whipsaw churn!
-                        if (now_ts - last_flip_ts) < 15:
-                            print(f"🛡️ [ANTI-WHIPSAW COOLDOWN] {symbol}: Flipped {now_ts - last_flip_ts}s ago (<15s). Executing clean Market Close to prevent whipsaw churn...")
+                        flip_count_key = f"turbo_hedge_{chat_id}_{symbol}_flip_count"
+                        flip_count = int(db.get_system_setting(flip_count_key, "0"))
+                        # 🛡️ Anti-Whipsaw Protection:
+                        # 1. If flipped < 15s ago OR 2. If max 2 flips reached -> Execute clean Market Close & 2-Hour Cooldown!
+                        if (now_ts - last_flip_ts) < 15 or flip_count >= 2:
+                            print(f"🛡️ [ANTI-WHIPSAW COOLDOWN] {symbol}: Flipped {flip_count} times / <15s ago. Executing clean Market Close to prevent whipsaw churn...")
                             close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                            db.update_system_setting(flip_count_key, "0")
                             db.remove_turbo_hedge_bot(chat_id, symbol)
-                            add_symbol_cooldown(symbol, 3600)
+                            add_symbol_cooldown(symbol, 7200)
                         else:
                             flip_side = "SELL" if current_side == "BUY" else "BUY"
                             _last_flip_timestamps[last_flip_key] = now_ts
-                            print(f"🛑 [TURBO HEDGE INSTANT REVERSE FLIP (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Flipped {current_side} ➔ {flip_side} (<15ms)!")
+                            db.update_system_setting(flip_count_key, str(flip_count + 1))
+                            print(f"🛑 [TURBO HEDGE INSTANT REVERSE FLIP (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Flipped {current_side} ➔ {flip_side} (Flip #{flip_count + 1})!")
                             
                             # Step 1 & 2: Instant Direct Reverse Flip (<30ms)
                             flip_res = await asyncio.to_thread(execute_direct_reverse_flip, keys[0], keys[1], symbol, amount, flip_side, dynamic_leverage, chat_id)
