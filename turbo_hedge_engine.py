@@ -627,11 +627,10 @@ async def monitor_turbo_hedge_bots(app):
                 db.update_system_setting(f"turbo_hedge_{target_chat_id}_recovery_alert_sent", "0")
 
             user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
-            custom_max_coins = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_max_coins", "0"))
-            if custom_max_coins > 0:
-                max_allowed_coins = custom_max_coins
-            else:
-                max_allowed_coins = 4 if wallet_bal < 100.0 else 10
+            # 🛡️ Small Capital Portfolio Cap Shield:
+            # Wallet < $100 USDT -> Cap to 4 Coins Max to guarantee 65% Free Margin Buffer!
+            # Wallet >= $100 USDT -> Cap to 10 Coins Max
+            max_allowed_coins = 4 if wallet_bal < 100.0 else 10
             if len(user_active_bots) >= max_allowed_coins:
                 continue
 
