@@ -499,7 +499,7 @@ async def monitor_turbo_hedge_bots(app):
             avail_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
             if avail_bal <= 0.0:
                 avail_bal = trading_engine.get_futures_free_margin(f_keys[0], f_keys[1])
-            wallet_bal = trading_engine.get_futures_wallet_balance(f_keys[0], f_keys[1]) or avail_bal
+            wallet_bal = trading_engine.get_futures_wallet_balance(f_keys[0], f_keys[1], "USDT") or avail_bal
 
             user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
             # 🛡️ Small Capital Portfolio Cap Shield:

@@ -458,6 +458,9 @@ def get_futures_balance(api_key: str, api_secret: str, asset: str = "USDT") -> f
     bal, _ = get_futures_balance_detailed(api_key, api_secret, asset)
     return bal
 
+def get_futures_wallet_balance(api_key: str, api_secret: str, asset: str = "USDT") -> float:
+    return get_futures_balance(api_key, api_secret, asset)
+
 def get_funding_balance(api_key: str, api_secret: str, asset: str = "USDT") -> float:
     """Fetches Binance Funding Wallet balance (P2P/Pay/Funding)."""
     try:
