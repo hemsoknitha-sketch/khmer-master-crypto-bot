@@ -73,6 +73,52 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
     return ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
 
 
+def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
+    """
+    Super Smart Real-Time High-Velocity Spot Market Coin Scanner:
+    Queries Binance Spot /api/v3/ticker/24hr dynamically across active USDT spot pairs.
+    Filters for high volume (>= $3,000,000 USDT 24h Volume) and active price momentum.
+    Excludes invalid/delisted pairs to prevent invalid symbol execution errors.
+    """
+    try:
+        url = f"{trading_engine.BASE_URL}/api/v3/ticker/24hr"
+        res = trading_engine.HFT_SESSION.get(url, timeout=5)
+        if res.status_code == 200:
+            tickers = res.json()
+            candidates = []
+            EXCLUDED_SYMBOLS = {"HFTUSDT", "GWEIUSDT", "EPICUSDT", "USD1USDT", "EURUSDT", "GBPUSDT", "AEURUSDT", "FDUSDUSDT", "TUSDUSDT", "USDCUSDT"}
+            for t in tickers:
+                sym = t.get("symbol", "")
+                if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS or not sym.isascii():
+                    continue
+                if is_symbol_in_cooldown(sym):
+                    continue
+                quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
+                price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
+                abs_change = abs(price_change_pct)
+                
+                sym_info = trading_engine.get_symbol_info(sym)
+                if sym_info and sym_info.get("status") != "TRADING":
+                    continue
+
+                if quote_vol >= 3000000.0:  # Include liquid spot pair >= $3M volume for high velocity
+                    candidates.append({
+                        "symbol": sym,
+                        "quote_volume": quote_vol,
+                        "abs_change": abs_change,
+                        "score": (abs_change * 20.0) + (math.log10(max(1.0, quote_vol)))
+                    })
+            
+            candidates.sort(key=lambda x: x["score"], reverse=True)
+            top_syms = [c["symbol"] for c in candidates[:limit]]
+            if top_syms:
+                return top_syms
+    except Exception as e:
+        print(f"Error in get_active_high_velocity_spot_coins: {e}")
+    
+    return ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT", "ACTUSDT", "0GUSDT", "PHAUSDT"]
+
+
 _eval_cache = {}
 _eval_cache_time = {}
 
@@ -599,7 +645,10 @@ async def monitor_turbo_hedge_bots(app):
 
                 if len(_failed_candidate_symbols) > 10:
                     _failed_candidate_symbols.clear()
-                top_coins = get_active_high_velocity_coins(limit=100)
+                if user_side_input == "SPOT":
+                    top_coins = get_active_high_velocity_spot_coins(limit=100)
+                else:
+                    top_coins = get_active_high_velocity_coins(limit=100)
 
                 user_active_syms = [b.get("symbol") for b in user_active_bots]
                 for c_cand in top_coins:
