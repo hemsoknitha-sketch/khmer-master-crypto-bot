@@ -187,33 +187,32 @@ class BotDashboard(QMainWindow):
         
         self.init_tray_icon()
         
-        import sys
-        if "--vps" in sys.argv:
-            from PyQt5.QtCore import QTimer
-            QTimer.singleShot(1000, self.start_system)
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(1000, self.start_system)
 
     def init_tray_icon(self):
-        import sys
-        if "--vps" in sys.argv:
-            self.tray_icon = None
-            return
+        try:
+            if not QSystemTrayIcon.isSystemTrayAvailable():
+                self.tray_icon = None
+                return
+            self.tray_icon = QSystemTrayIcon(self)
+            icon = self.style().standardIcon(QStyle.SP_ComputerIcon)
+            self.tray_icon.setIcon(icon)
             
-        self.tray_icon = QSystemTrayIcon(self)
-        icon = self.style().standardIcon(QStyle.SP_ComputerIcon)
-        self.tray_icon.setIcon(icon)
-        
-        tray_menu = QMenu()
-        show_action = QAction("Open Executive Dashboard", self)
-        show_action.triggered.connect(self.showNormal)
-        tray_menu.addAction(show_action)
-        
-        quit_action = QAction("Quit System", self)
-        quit_action.triggered.connect(self.quit_app)
-        tray_menu.addAction(quit_action)
-        
-        self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.activated.connect(self.tray_icon_activated)
-        self.tray_icon.show()
+            tray_menu = QMenu()
+            show_action = QAction("Open Executive Dashboard", self)
+            show_action.triggered.connect(self.showNormal)
+            tray_menu.addAction(show_action)
+            
+            quit_action = QAction("Quit System", self)
+            quit_action.triggered.connect(self.quit_app)
+            tray_menu.addAction(quit_action)
+            
+            self.tray_icon.setContextMenu(tray_menu)
+            self.tray_icon.activated.connect(self.tray_icon_activated)
+            self.tray_icon.show()
+        except Exception:
+            self.tray_icon = None
 
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.DoubleClick:
@@ -629,14 +628,16 @@ class BotDashboard(QMainWindow):
         if not self.is_quitting:
             event.ignore()
             self.hide()
-            import sys
-            if "--vps" not in sys.argv:
-                self.tray_icon.showMessage(
-                    "Apex AI Bot",
-                    "The system is still running in the background. Right-click the tray icon to quit.",
-                    QSystemTrayIcon.Information,
-                    2000
-                )
+            if self.tray_icon:
+                try:
+                    self.tray_icon.showMessage(
+                        "Apex AI Bot",
+                        "The system is still running in the background. Right-click the tray icon to quit.",
+                        QSystemTrayIcon.Information,
+                        2000
+                    )
+                except Exception:
+                    pass
         else:
             if self.bot_thread and self.bot_thread.isRunning():
                 self.append_log("⚠️ Shutting down system, please wait...")
@@ -677,11 +678,13 @@ class ApexVPSHeadlessEngine:
 
 if __name__ == "__main__":
     import signal
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtCore import QTimer
     
-    is_vps_mode = ("--vps" in sys.argv or "--headless" in sys.argv)
+    is_cli_mode = ("--cli" in sys.argv or "--no-gui" in sys.argv)
     
-    if is_vps_mode:
-        print("🚀 Initializing Apex Super AGI v9.8 (24/7 Pure Python Headless VPS Engine)...")
+    if is_cli_mode:
+        print("🚀 Initializing Apex Super AGI v9.8 (24/7 Pure Python Headless CLI Mode)...")
         db.init_db()
         import backup_manager
         backup_manager.perform_backup(is_boot=True)
@@ -713,9 +716,6 @@ if __name__ == "__main__":
         print("🛡️ [24/7 VPS ENGINE] Telegram Bot & AGI Engines active and running 24/7 in Pure Python!")
         bot_service.run()
     else:
-        from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import QTimer
-        
         app = QApplication(sys.argv)
         app.setQuitOnLastWindowClosed(False)
         
