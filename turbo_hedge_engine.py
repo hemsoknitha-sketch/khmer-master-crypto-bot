@@ -290,6 +290,12 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
 
     _active_executing_keys.add(exec_key)
     try:
+        # 🛒 Spot Mode Route Handler: Execute Spot Market Order when side == SPOT or leverage == 1
+        if side.upper() == "SPOT" or (leverage <= 1 and side.upper() != "SELL"):
+            print(f"🚀 [TURBO HEDGE SPOT ROUTE] Executing Binance Spot Market Buy for {symbol} (${amount_usdt:.2f} USDT)...")
+            spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "BUY", amount_usdt)
+            return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
+
         # 1. Bounded Margin & Leverage Safety Sizing based on AVAILABLE BALANCE
         avail_bal = trading_engine.get_futures_available_balance(api_key, api_secret)
         

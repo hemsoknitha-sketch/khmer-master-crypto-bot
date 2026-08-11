@@ -5207,12 +5207,12 @@ class TelegramBotThread(QThread):
                 leverage = int(args[2])
                 
                 # Format A: /turbo_hedge TOP 5 10 AUTO 2.50 <PIN> (6 args)
-                if len(args) >= 6 and args[3].upper() in ["BUY", "SELL", "AUTO"]:
+                if len(args) >= 6 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
                     user_side_input = args[3].upper()
                     target_tp = float(args[4]) if args[4].replace('.', '', 1).isdigit() else 2.5
                     pin = str(args[5]).strip()
                 # Format B: /turbo_hedge TOP 5 10 AUTO <PIN> (5 args)
-                elif len(args) == 5 and args[3].upper() in ["BUY", "SELL", "AUTO"]:
+                elif len(args) == 5 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
                     user_side_input = args[3].upper()
                     pin = str(args[4]).strip()
                 # Format C: /turbo_hedge TOP 5 10 2.50 <PIN> (5 args)
