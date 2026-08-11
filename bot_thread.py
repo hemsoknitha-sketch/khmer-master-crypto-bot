@@ -7624,8 +7624,16 @@ class TelegramBotThread(QThread):
         self.log_signal.emit("⏰ APScheduler started (Cron Jobs active).")
         self.log_signal.emit("🤖 Telegram Bot removed from Main Thread and is now running...")
         
+        async def run_bot_async():
+            await self.app.initialize()
+            await self.app.start()
+            if self.app.updater:
+                await self.app.updater.start_polling(drop_pending_updates=True)
+            while getattr(self.app, 'running', True):
+                await asyncio.sleep(1)
+
         try:
-            self.app.run_polling(drop_pending_updates=True, stop_signals=None)
+            self.loop.run_until_complete(run_bot_async())
         except Exception as e:
             import traceback
             error_msg = f"💥 CRITICAL QTHREAD ERROR: {e}\n{traceback.format_exc()}"
