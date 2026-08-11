@@ -888,7 +888,8 @@ async def monitor_turbo_hedge_bots(app):
                         db.remove_turbo_hedge_bot(chat_id, symbol)
                         add_symbol_cooldown(symbol, 7200)
 
-                        if app and hasattr(app, "bot"):
+                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"
+                        if not is_quiet and app and hasattr(app, "bot"):
                             try:
                                 msg_stagnant = (
                                     f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
@@ -970,7 +971,8 @@ async def monitor_turbo_hedge_bots(app):
                         db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
 
                         # Notify Telegram User
-                        if app and hasattr(app, "bot"):
+                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"
+                        if not is_quiet and app and hasattr(app, "bot"):
                             try:
                                 msg = (
                                     f"💰 **APEX TURBO HEDGE PROFIT HARVESTED!** 🚀\n"
