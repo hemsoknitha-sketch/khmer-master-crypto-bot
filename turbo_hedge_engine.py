@@ -136,7 +136,7 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
 _eval_cache = {}
 _eval_cache_time = {}
 
-def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_bal: float = 0.0) -> dict:
+def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_bal: float = 0.0, is_spot_mode: bool = False) -> dict:
     """
     Super Smart 84-Model AI Evaluation (Multi-Factor Scoring):
     Calculates 1m candle momentum, EMA 5/15 crossover, Price Velocity, and Volume Delta.
@@ -248,9 +248,21 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                 pass
 
             # 🧠 6. Anti-Peak Buying & Overbought/Oversold Rejection Decision Logic:
+            if is_spot_mode:
+                # In Spot Mode, only BUY entries are valid (no Futures SHORTing on Spot Market)
+                if rsi14 >= 85.0:
+                    side = "SKIP"
+                    confidence = 50.0
+                else:
+                    side = "BUY"
+                    base_conf = 88.0
+                    if 3.0 <= change_24h <= 30.0: base_conf += 6.0
+                    if 30.0 <= rsi14 <= 65.0: base_conf += 4.5
+                    if whale_bid_wall: base_conf += 5.0
+                    confidence = min(98.5, max(85.0, base_conf))
             # 🚫 RULE A: HYPER-PUMPED OVERBOUGHT TOP PEAK (24h Change >= 15% OR RSI > 68 OR Extension > 1.2% OR Top Rejection)
             # NEVER BUY AT THE PEAK! Force SHORT (SELL Peak Rejection) to catch the dump!
-            if change_24h >= 15.0 or rsi14 >= 68.0 or extension_pct >= 1.2 or (is_top_rejection and rsi14 > 55.0):
+            elif change_24h >= 15.0 or rsi14 >= 68.0 or extension_pct >= 1.2 or (is_top_rejection and rsi14 > 55.0):
                 side = "SELL"
                 base_conf = 88.0
                 if change_24h >= 25.0 or rsi14 >= 75.0: base_conf += 6.0
@@ -672,7 +684,8 @@ async def monitor_turbo_hedge_bots(app):
                     if c_cand in _failed_candidate_symbols or is_symbol_in_cooldown(c_cand):
                         continue
 
-                    eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal)
+                    is_spot = (user_side_input == "SPOT")
+                    eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
                     # 🎯 1. Sniper Ultra-Confluence Mode (Confidence Gate > 95.0% during VIP Recovery)
                     min_conf_threshold = 95.0 if is_recovery_mode else 85.0
                     if eval_res.get("confidence_pct", 0) < min_conf_threshold:
