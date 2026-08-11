@@ -699,6 +699,8 @@ async def monitor_turbo_hedge_bots(app):
                         print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
                         close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        db.remove_turbo_hedge_bot(chat_id, symbol)
+                        add_symbol_cooldown(symbol, 7200)
                         _last_flip_timestamps[last_flip_key] = now_ts
                         
                         if app and hasattr(app, "bot"):
@@ -756,11 +758,17 @@ async def monitor_turbo_hedge_bots(app):
                             flip_res = await asyncio.to_thread(execute_direct_reverse_flip, keys[0], keys[1], symbol, amount, flip_side, dynamic_leverage, chat_id)
                             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
                             
-                            if isinstance(flip_res, dict) and flip_res.get("status") == "success":
+                            if isinstance(flip_res, dict) and (flip_res.get("status") in ["success", "NEW", "FILLED"] or flip_res.get("orderId")):
                                 fresh_price = trading_engine.get_current_price(symbol) or mark_price
                                 db.update_turbo_hedge_side(chat_id, symbol, flip_side)
                                 db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(fresh_price))
+                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
                                 print(f"🚀 [INSTANT REVERSE FLIP SUCCESS (<30ms)] {symbol} Flipped to {flip_side} at {fresh_price:.4f} ({dynamic_leverage}x Lev)!")
+                            else:
+                                print(f"⚠️ [REVERSE FLIP FAILED] {symbol} flip to {flip_side} failed. Executing clean Market Close & Cooldown...")
+                                trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
+                                db.remove_turbo_hedge_bot(chat_id, symbol)
+                                add_symbol_cooldown(symbol, 3600)
 
                             if app and hasattr(app, "bot"):
                                 try:
