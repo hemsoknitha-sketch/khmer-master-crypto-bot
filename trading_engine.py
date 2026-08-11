@@ -1790,12 +1790,16 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
         
         # Super Smart APEX TURBO AGI Dynamic Margin Auto-Recovery (-2019 Margin is Insufficient)
         if "-2019" in res.text or "Margin is insufficient" in res.text:
-            print(f"🛡️ [SUPER SMART AGI MARGIN RECOVERY] Margin insufficient (-2019) for {symbol} {side}. Initiating Auto-Margin Recovery...")
-            p = get_current_price(symbol)
             free_margin = get_futures_free_margin(api_key, api_secret)
+            if free_margin <= 0.50:
+                print(f"🛑 [SUPER SMART AGI MARGIN SHIELD] Free margin (${free_margin:.2f}) exhausted for {symbol} {side}. Suppressing retries until margin frees up.")
+                return {"status": "skipped", "reason": "Margin locked in active positions", "error": res.text}
+
+            print(f"🛡️ [SUPER SMART AGI MARGIN RECOVERY] Margin insufficient (-2019) for {symbol} {side} (Free Margin: ${free_margin:.2f}). Initiating Auto-Margin Recovery...")
+            p = get_current_price(symbol)
             
             candidate_qtys = []
-            if free_margin > 0 and p > 0:
+            if free_margin > 0.50 and p > 0:
                 # Reserve 90% of free margin for safety buffer
                 safe_margin = free_margin * 0.90
                 scaled_qty = (safe_margin * leverage) / p
@@ -1809,8 +1813,8 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
                     if (esc_qty * p) >= 5.0:
                         candidate_qtys.append((esc_qty, esc_leverage))
             
-            # Step-Down Fallback Iterations (70%, 50%, 30% of original quantity down to min notional floor)
-            if p > 0:
+            # Step-Down Fallback Iterations (Only if candidate_qtys is empty and free_margin allows)
+            if p > 0 and len(candidate_qtys) == 0 and free_margin > 1.0:
                 for factor in [0.70, 0.50, 0.35, 0.20]:
                     sd_qty = get_futures_max_sellable_qty(symbol, quantity * factor)
                     if (sd_qty * p) >= 5.0 and sd_qty not in [c[0] for c in candidate_qtys]:
