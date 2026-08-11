@@ -749,7 +749,7 @@ async def monitor_turbo_hedge_bots(app):
                     # ⚡ Spot Mode 2-15m Micro TP Scaling Rules:
                     # For 1x Spot, scale target TP to +3.5% of trade amount so it hits within 2-15 mins!
                     if active_lev <= 1 or current_side == "SPOT":
-                        bot_amt = float(b_info.get("amount", 20.0))
+                        bot_amt = float(bot_info.get("amount", 20.0))
                         effective_tp = max(0.25, min(effective_tp, bot_amt * 0.035))
 
                     # High-Precision Dollar Peak PnL Lock ($ Peak Lock)
