@@ -5270,7 +5270,7 @@ class TelegramBotThread(QThread):
                     if success_count >= num_coins:
                         break
                     eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, c_sym, leverage, avail_bal)
-                    c_side = user_side_input if user_side_input in ["BUY", "SELL"] else eval_res.get("side", "BUY")
+                    c_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "BUY")
                     exec_res = await asyncio.to_thread(turbo_hedge_engine.execute_turbo_hedge_trade, keys[0], keys[1], c_sym, amount, c_side, leverage, chat_id)
                     
                     is_order_success = False

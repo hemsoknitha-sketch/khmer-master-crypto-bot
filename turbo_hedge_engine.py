@@ -616,7 +616,7 @@ async def monitor_turbo_hedge_bots(app):
                         print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                         continue
 
-                    target_side = user_side_input if user_side_input in ["BUY", "SELL"] else eval_res.get("side", "BUY")
+                    target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "BUY")
                     exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, unit_leverage, target_chat_id)
                     
                     if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
