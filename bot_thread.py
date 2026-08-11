@@ -7198,8 +7198,8 @@ class TelegramBotThread(QThread):
 
         job_defaults = {
             'coalesce': True,
-            'max_instances': 5,
-            'misfire_grace_time': 30
+            'max_instances': 1,
+            'misfire_grace_time': 10
         }
         self.scheduler = AsyncIOScheduler(event_loop=self.loop, job_defaults=job_defaults)
         
