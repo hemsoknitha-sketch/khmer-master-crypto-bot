@@ -5293,8 +5293,18 @@ class TelegramBotThread(BaseThread):
                             f"_ប្រព័ន្ធ AGI កំពុងរត់ស្កេន Binance API និងបើកកាក់ស្វ័យប្រវត្តិ 24/7!_",
                             parse_mode="Markdown"
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"Error sending ack_msg markdown, trying plain text: {e}")
+                        try:
+                            ack_msg = await msg_target.reply_text(
+                                f"⚡ APEX TURBO HEDGE TOP SCANNER ACTIVATED! 🚀\n"
+                                f"Mode: {user_side_input} ({leverage}x Lev)\n"
+                                f"Capital: ${amount:.2f} USDT/Coin\n"
+                                f"Target TP: +{target_tp}%\n"
+                                f"Status: Active & Scanning 24/7..."
+                            )
+                        except Exception:
+                            pass
 
                 # ⚡ 2. Launch background scanner so Telegram is 100% Non-Blocking & Instant!
                 async def _background_top_scanner():
@@ -5349,12 +5359,18 @@ class TelegramBotThread(BaseThread):
                         try:
                             await ack_msg.edit_text(final_msg, parse_mode="Markdown")
                         except Exception:
-                            pass
+                            try:
+                                await ack_msg.edit_text(final_msg)
+                            except Exception:
+                                pass
                     elif msg_target:
                         try:
                             await msg_target.reply_text(final_msg, parse_mode="Markdown")
                         except Exception:
-                            pass
+                            try:
+                                await msg_target.reply_text(final_msg)
+                            except Exception:
+                                pass
 
                 asyncio.create_task(_background_top_scanner())
                 return
