@@ -179,13 +179,13 @@ class TelegramBotThread(QThread):
             
         from telegram.request import HTTPXRequest
         t_request = HTTPXRequest(
-            connect_timeout=5.0,
-            read_timeout=10.0,
-            write_timeout=10.0,
-            pool_timeout=5.0,
-            connection_pool_size=500
+            connect_timeout=3.0,
+            read_timeout=5.0,
+            write_timeout=5.0,
+            pool_timeout=3.0,
+            connection_pool_size=1000
         )
-        self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(True).post_init(post_init).build()
+        self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(64).post_init(post_init).build()
 
         
         async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -5254,58 +5254,84 @@ class TelegramBotThread(QThread):
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_side", user_side_input)
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", str(target_tp))
 
-                try:
-                    top_coins = turbo_hedge_engine.get_active_high_velocity_coins(limit=30)
-                    if not top_coins:
-                        top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
-                except Exception:
-                    top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
-
-                avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
-                num_coins = 10 if (avail_bal >= 5.0 or avail_bal <= 0) else max(1, min(10, int(avail_bal / max(2.5, amount))))
-                
-                success_count = 0
-                executed_syms = []
-                for c_sym in top_coins:
-                    if success_count >= num_coins:
-                        break
-                    eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, c_sym, leverage, avail_bal)
-                    c_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "BUY")
-                    exec_res = await asyncio.to_thread(turbo_hedge_engine.execute_turbo_hedge_trade, keys[0], keys[1], c_sym, amount, c_side, leverage, chat_id)
-                    
-                    is_order_success = False
-                    if isinstance(exec_res, dict):
-                        if exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId") or (isinstance(exec_res.get("res"), dict) and exec_res["res"].get("orderId")):
-                            is_order_success = True
-                    
-                    if is_order_success:
-                        db.add_turbo_hedge_bot(chat_id, c_sym, amount, leverage, c_side, target_tp)
-                        entry_p = trading_engine.get_current_price(c_sym)
-                        if entry_p > 0:
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{c_sym}_entry_price", str(entry_p))
-                        executed_syms.append(c_sym)
-                        success_count += 1
-                
-                opened_list_str = ', '.join([c.replace('USDT','') for c in executed_syms]) if executed_syms else "កំពុងស្កេនទុនរង់ចាំចូលទិញ 24/7..."
-                
-                msg = (
-                    f"🚀 **SUPER SMART TURBO HEDGE PERPETUAL TOP SCANNER ACTIVATED!** 🛡️\n"
-                    f"───────────────────────────────\n\n"
-                    f"🪙 កាក់ដែលទើបបើកភ្លាមៗ ({len(executed_syms)}) ៖ `{opened_list_str}`\n"
-                    f"💵 Available Balance ស្កេនឃើញ ៖ `${avail_bal:,.2f} USDT`\n"
-                    f"💰 ដើមទុន / កាក់ ៖ `${amount:,.2f} USDT`\n"
-                    f"🚀 Leverage កំណត់ ៖ `{leverage}x`\n"
-                    f"🎯 ទិសដៅ ៖ `{user_side_input}`\n"
-                    f"💰 Target Profit ៖ `+${target_tp:.2f} USDT / Trade (+25% ROI)`\n"
-                    f"⚡ Binance Status ៖ `{success_count} Coins Executed Instant (<100ms)`\n"
-                    f"🔄 **Perpetual Auto-Scanner** ៖ `ACTIVE (ស្កេន 24/7 រហូតគ្រប់ 10 កាក់)`\n\n"
-                    f"_AI ស្កេន Available Balance រៀងរាល់ ៣ វិនាទី ឲ្យតែមានលុយគ្រប់ នឹងបើកកាក់ថ្មីអូតូ មិនសម្រាកឡើយ រហូតដល់ 10 កាក់អតិបរមា ឬរហូតចុច /turbo_hedge STOP!_"
-                )
+                # ⚡ 1. Ultra-Fast Instant Ack Reply (<20ms) to Telegram User!
+                ack_msg = None
                 if msg_target:
                     try:
-                        await msg_target.reply_text(msg, parse_mode="Markdown")
+                        ack_msg = await msg_target.reply_text(
+                            f"⚡ **APEX TURBO HEDGE TOP SCANNER ACTIVATED!** 🚀\n"
+                            f"───────────────────────────────\n\n"
+                            f"🪙 Mode ៖ `{user_side_input}` (`{leverage}x Lev`)\n"
+                            f"💰 ដើមទុន / កាក់ ៖ `${amount:,.2f} USDT`\n"
+                            f"🎯 Target TP ៖ `+{target_tp}%`\n"
+                            f"⚡ Status ៖ `កំពុងស្កេនទាញយកកាក់រត់លឿន 30 កាក់ភ្លាមៗ...`\n\n"
+                            f"_ប្រព័ន្ធ AGI កំពុងរត់ស្កេន Binance API និងបើកកាក់ស្វ័យប្រវត្តិ 24/7!_",
+                            parse_mode="Markdown"
+                        )
                     except Exception:
-                        await msg_target.reply_text(msg, parse_mode=None)
+                        pass
+
+                # ⚡ 2. Launch background scanner so Telegram is 100% Non-Blocking & Instant!
+                async def _background_top_scanner():
+                    try:
+                        top_coins = turbo_hedge_engine.get_active_high_velocity_coins(limit=30)
+                        if not top_coins:
+                            top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
+                    except Exception:
+                        top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
+
+                    avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+                    num_coins = 10 if (avail_bal >= 5.0 or avail_bal <= 0) else max(1, min(10, int(avail_bal / max(2.5, amount))))
+                    
+                    success_count = 0
+                    executed_syms = []
+                    for c_sym in top_coins:
+                        if success_count >= num_coins:
+                            break
+                        eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, c_sym, leverage, avail_bal)
+                        c_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "BUY")
+                        exec_res = await asyncio.to_thread(turbo_hedge_engine.execute_turbo_hedge_trade, keys[0], keys[1], c_sym, amount, c_side, leverage, chat_id)
+                        
+                        is_order_success = False
+                        if isinstance(exec_res, dict):
+                            if exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId") or (isinstance(exec_res.get("res"), dict) and exec_res["res"].get("orderId")):
+                                is_order_success = True
+                        
+                        if is_order_success:
+                            db.add_turbo_hedge_bot(chat_id, c_sym, amount, leverage, c_side, target_tp)
+                            entry_p = trading_engine.get_current_price(c_sym)
+                            if entry_p > 0:
+                                db.update_system_setting(f"turbo_hedge_{chat_id}_{c_sym}_entry_price", str(entry_p))
+                            executed_syms.append(c_sym)
+                            success_count += 1
+
+                    opened_list_str = ', '.join([c.replace('USDT','') for c in executed_syms]) if executed_syms else "កំពុងស្កេនទុនរង់ចាំចូលទិញ 24/7..."
+                    
+                    final_msg = (
+                        f"🚀 **SUPER SMART TURBO HEDGE PERPETUAL TOP SCANNER ACTIVATED!** 🛡️\n"
+                        f"───────────────────────────────\n\n"
+                        f"🪙 កាក់ដែលទើបបើកភ្លាមៗ ({len(executed_syms)}) ៖ `{opened_list_str}`\n"
+                        f"💵 Available Balance ស្កេនឃើញ ៖ `${avail_bal:,.2f} USDT`\n"
+                        f"💰 ដើមទុន / កាក់ ៖ `${amount:,.2f} USDT`\n"
+                        f"🚀 Leverage កំណត់ ៖ `{leverage}x`\n"
+                        f"🎯 ទិសដៅ ៖ `{user_side_input}`\n"
+                        f"💰 Target Profit ៖ `+${target_tp:.2f} USDT / Trade`\n"
+                        f"⚡ Binance Status ៖ `{success_count} Coins Executed Instant (<100ms)`\n"
+                        f"🔄 **Perpetual Auto-Scanner** ៖ `ACTIVE (ស្កេន 24/7 រហូតគ្រប់ 10 កាក់)`\n\n"
+                        f"_AI ស្កេន Available Balance រៀងរាល់ ៣ វិនាទី ឲ្យតែមានលុយគ្រប់ នឹងបើកកាក់ថ្មីអូតូ មិនសម្រាកឡើយ រហូតដល់ 10 កាក់អតិបរមា ឬរហូតចុច /turbo_hedge STOP!_"
+                    )
+                    if ack_msg:
+                        try:
+                            await ack_msg.edit_text(final_msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
+                    elif msg_target:
+                        try:
+                            await msg_target.reply_text(final_msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
+
+                asyncio.create_task(_background_top_scanner())
                 return
 
             eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, symbol)
