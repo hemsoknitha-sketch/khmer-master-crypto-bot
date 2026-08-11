@@ -801,7 +801,7 @@ async def monitor_turbo_hedge_bots(app):
                                     f"⚡ Binance Status ៖ `EMERGENCY MARKET CLOSED (<15ms)`\n\n"
                                     f"🛡️ _ប្រព័ន្ធកាត់ផ្តាច់ Position ភ្លាមៗ ធានាដាច់ខាតមិនឲ្យខាតជ្រុលហួស -15% ឡើយ!_"
                                 )
-                                await app.bot.send_message(chat_id=chat_id, text=msg_breaker, parse_mode="Markdown")
+                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_breaker, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                             except Exception as e:
                                 print(f"Error sending breaker notification: {e}")
 
@@ -823,7 +823,7 @@ async def monitor_turbo_hedge_bots(app):
                                     f"⚡ Binance Status ៖ `MARKET CLOSED (<30ms)`\n\n"
                                     f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
                                 )
-                                await app.bot.send_message(chat_id=chat_id, text=msg_stagnant, parse_mode="Markdown")
+                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_stagnant, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                             except Exception as e:
                                 print(f"Error sending stagnant notification: {e}")
 
@@ -872,7 +872,7 @@ async def monitor_turbo_hedge_bots(app):
                                         f"⚡ ល្បឿនផ្លាស់ប្តូរ ៖ `FLIPPED INSTANTLY (<30ms)`\n\n"
                                         f"🧠 AI Status ៖ `កំពុងកើបចំណេញដេញតាម Trend ផ្ទុយ 24/7 ស្វ័យប្រវត្តិ!`"
                                     )
-                                    await app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown")
+                                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                                 except Exception as e:
                                     print(f"Error sending SL flip notification: {e}")
 
@@ -904,7 +904,7 @@ async def monitor_turbo_hedge_bots(app):
                                     f"⚡ Binance Status ៖ `HARVESTED INSTANTLY (<50ms)`\n\n"
                                     f"_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
                                 )
-                                await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                             except Exception as e:
                                 print(f"Error sending harvest notification: {e}")
 
