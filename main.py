@@ -68,6 +68,9 @@ from dotenv import load_dotenv
 # Load Environment Variables from .env file BEFORE importing local modules
 load_dotenv()
 
+if "--vps" in sys.argv or "--headless" in sys.argv:
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QTextEdit, QVBoxLayout, QWidget, QLabel, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QRadioButton, QHBoxLayout, QMessageBox, QAbstractItemView, QSystemTrayIcon, QMenu, QAction, QStyle, QComboBox, QListWidget, QListWidgetItem)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
@@ -664,6 +667,7 @@ if __name__ == "__main__":
     timer.start(500)
     timer.timeout.connect(lambda: None)
     
-    window.show()
+    if "--vps" not in sys.argv and "--headless" not in sys.argv:
+        window.show()
     sys.exit(app.exec_())
 
