@@ -569,7 +569,7 @@ class TelegramBotThread(QThread):
                 
             elif action == "hard":
                 db.stop_all_active_bots(chat_id)
-             async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id
             if not await verify_user(update): return
             user_lang = db.get_user_language(chat_id) or 'km'
@@ -895,109 +895,6 @@ class TelegramBotThread(QThread):
                     await msg_target.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
                 except Exception:
                     await msg_target.reply_text(msg, parse_mode=None, reply_markup=reply_markup)
-            self.log_signal.emit(f'📊 VIP User {chat_id} checked their Super AGI portfolio cleanly.')�� ដើមទុន: `${current_layer:,.2f}` / `${target_cap:,.2f}` | PnL: `{pnl_pct:+.2f}%` (`${pnl:+.2f}`)\n\n'
-
-            # --- SMART DCA ---
-            for dca in smart_dcas:
-                dca_id, sym, base_amount, entry_price, drop_level = dca[:5]
-                sym = str(sym)
-                current_price = prices.get(sym, 0.0)
-                valid_trades_found = True
-                invested = base_amount * (drop_level + 1)
-                pnl, pnl_pct = (0.0, 0.0)
-                if entry_price > 0 and invested > 0:
-                    pnl, pnl_pct = trading_engine.calculate_net_pnl(entry_price, current_price, invested / entry_price if entry_price > 0 else 1.0)
-                total_invested += invested
-                total_profit += pnl
-                emoji = '🟩' if pnl >= 0 else '🟥'
-                msg += f'🎯 **Smart DCA: {sym}**\n'
-                msg += f'💰 ដើមទុន: `${invested:,.2f}` (ជុំទី {drop_level}) | PnL: `{pnl_pct:+.2f}%` (`${pnl:+.2f}`)\n\n'
-
-            # --- ACTIVE SUPER AGI ENGINES SUMMARY ---
-            hyper_cfg = db.get_hyper_trade_config(chat_id)
-            if hyper_cfg and hyper_cfg.get("enabled"):
-                valid_trades_found = True
-                h_amt = hyper_cfg.get("amount", 10.0)
-                msg += f"🚀 **Hyper-Trade HFT:** 🟢 `ACTIVE` (${h_amt:,.2f} USDT 5x Futures)\n"
-
-            arb_cfg = db.get_auto_arb_config(chat_id)
-            if arb_cfg and arb_cfg.get("enabled"):
-                valid_trades_found = True
-                a_amt = arb_cfg.get("amount", 50.0)
-                msg += f"⚡ **Delta-Neutral Arbitrage:** 🟢 `ACTIVE` (${a_amt:,.2f} USDT)\n"
-
-            matrix_bots = [b for b in db.get_active_infinity_matrix_bots() if b["chat_id"] == chat_id]
-            for m_bot in matrix_bots:
-                valid_trades_found = True
-                m_cap = m_bot.get("capital", 500.0)
-                m_pnl = m_bot.get("accumulated_pnl", 0.0)
-                m_symbol = str(m_bot.get("symbol", "PAXGUSDT"))
-                total_profit += m_pnl
-                total_invested += m_cap
-                msg += f"🎯 **Infinity Matrix Grid ({m_symbol}):** 🟢 `ACTIVE` (${m_cap:,.2f} USDT, Compounded: `+${m_pnl:,.4f}`)\n"
-
-            sweep_cfg = db.get_sweep_auto_config(chat_id)
-            if sweep_cfg and sweep_cfg.get("enabled"):
-                valid_trades_found = True
-                s_amt = sweep_cfg.get("amount", 50.0)
-                msg += f"🛡️ **Liquidity Sweep Sniper:** 🟢 `ACTIVE` (${s_amt:,.2f} USDT 5x Futures)\n"
-
-            funding_cfg = db.get_funding_harvester_config(chat_id)
-            if funding_cfg and funding_cfg.get("enabled"):
-                valid_trades_found = True
-                f_amt = funding_cfg.get("amount", 50.0)
-                msg += f"🌾 **Perpetual Funding Harvester:** 🟢 `ACTIVE` (${f_amt:,.2f} USDT Delta-Neutral)\n"
-
-            guard_cfg = db.get_trailing_guard_config(chat_id)
-            if guard_cfg and guard_cfg.get("enabled"):
-                valid_trades_found = True
-                msg += f"🛡️ **Auto-Liquidation Guard:** 🟢 `ACTIVE` (>50% Safety Distance)\n"
-
-            turbo_bots = [b for b in db.get_active_turbo_hedge_bots() if b.get("chat_id") == chat_id]
-            if turbo_bots or db.get_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0") == "1":
-                valid_trades_found = True
-                msg += f"🚀 **Turbo Hedge Auto-Scanner:** 🟢 `ACTIVE` ({len(turbo_bots)} Positions Active / 10 Max)\n"
-
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
-                    InlineKeyboardButton("🔄 Refresh Portfolio", callback_data="btn_menu_portfolio")
-                ],
-                [
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"),
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch")
-                ],
-                [
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("🛑 Soft Stop All", callback_data="btn_stop_all")
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            if not valid_trades_found and free_usdt <= 0 and futures_wallet_balance <= 0:
-                empty_msg = (
-                    "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | PORTFOLIO** 🤖\n"
-                    "═══════════════════════════════\n"
-                    "🤷‍♂️ **មិនទាន់មានទិន្នន័យវិនិយោគ ឬ API KEY ភ្ជាប់នៅឡើយ!**\n\n"
-                    "💡 *សូមភ្ជាប់ Binance API Key ឬបើកដំណើការ AI Engine (ដូចជា /hyper_trade ឬ /scan) ដើម្បីចាប់ផ្តើមជួញដូរ ៖*"
-                )
-                await update.message.reply_text(empty_msg, parse_mode='Markdown', reply_markup=reply_markup)
-                return
-
-            total_pct = (total_profit / total_invested) * 100 if total_invested > 0 else 0
-            emoji_total = '🟩' if total_profit >= 0 else '搁' if total_profit < 0 else '⬜'
-            pnl_usd_str = f"+${total_profit:,.2f}" if total_profit >= 0 else f"-${abs(total_profit):,.2f}"
-            
-            total_equity = total_invested + total_profit + free_usdt + futures_wallet_balance
-            msg += f'═══════════════════════════════\n'
-            msg += f'💵 **Spot Cash (Free USDT):** `${free_usdt:,.2f}`\n'
-            msg += f'📈 **Futures Wallet Balance:** `${futures_wallet_balance:,.2f}`\n'
-            msg += f'💎 **ទ្រព្យសរុប (Total Equity):** `${total_equity:,.2f}`\n\n'
-            msg += f'🏦 **សរុបទុនកំពុងជួញដូរ (Invested):** `${total_invested:,.2f}`\n'
-            msg += f'{emoji_total} **ចំណេញ/ខាតសរុប (Unrealized PnL):** `{total_pct:+.2f}%` (`{pnl_usd_str}`)'
-
-            await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
             self.log_signal.emit(f'📊 VIP User {chat_id} checked their Super AGI portfolio cleanly.')
 
         async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
