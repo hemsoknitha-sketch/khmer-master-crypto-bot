@@ -492,10 +492,6 @@ async def monitor_turbo_hedge_bots(app):
             if not top_mode_active:
                 continue
 
-            user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
-            if len(user_active_bots) >= 10:
-                continue
-
             f_keys = db.get_user_api(target_chat_id)
             if not f_keys:
                 continue
@@ -503,6 +499,15 @@ async def monitor_turbo_hedge_bots(app):
             avail_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
             if avail_bal <= 0.0:
                 avail_bal = trading_engine.get_futures_free_margin(f_keys[0], f_keys[1])
+            wallet_bal = trading_engine.get_futures_wallet_balance(f_keys[0], f_keys[1]) or avail_bal
+
+            user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
+            # 🛡️ Small Capital Portfolio Cap Shield:
+            # Wallet < $100 USDT -> Cap to 4 Coins Max to guarantee 65% Free Margin Buffer!
+            # Wallet >= $100 USDT -> Cap to 10 Coins Max
+            max_allowed_coins = 4 if wallet_bal < 100.0 else 10
+            if len(user_active_bots) >= max_allowed_coins:
+                continue
 
             unit_amount = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_amount", "20.0"))
             unit_leverage = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_leverage", "10"))
