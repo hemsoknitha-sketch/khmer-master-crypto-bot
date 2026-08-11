@@ -4,7 +4,7 @@ import hashlib
 import sys
 import os
 
-IS_HEADLESS_VPS = ("--vps" in sys.argv or "--headless" in sys.argv)
+IS_HEADLESS_VPS = ("--cli" in sys.argv or "--no-gui" in sys.argv or "--offscreen" in sys.argv)
 
 class PurePythonSignal:
     def __init__(self):
@@ -106,8 +106,7 @@ class TelegramBotThread(BaseThread):
             db.reconcile_and_adopt_active_positions()
 
     def start(self):
-        import sys
-        if "--vps" in sys.argv or "--headless" in sys.argv or not hasattr(super(), 'start'):
+        if IS_HEADLESS_VPS or not hasattr(super(), 'start'):
             import threading
             t = threading.Thread(target=self.run, daemon=True)
             t.start()

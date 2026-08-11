@@ -68,7 +68,7 @@ from dotenv import load_dotenv
 # Load Environment Variables from .env file BEFORE importing local modules
 load_dotenv()
 
-if "--vps" in sys.argv or "--headless" in sys.argv:
+if "--offscreen" in sys.argv:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QTextEdit, QVBoxLayout, QWidget, QLabel, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QRadioButton, QHBoxLayout, QMessageBox, QAbstractItemView, QSystemTrayIcon, QMenu, QAction, QStyle, QComboBox, QListWidget, QListWidgetItem)
