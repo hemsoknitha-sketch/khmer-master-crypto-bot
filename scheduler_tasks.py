@@ -4414,7 +4414,31 @@ async def vip_8hour_executive_report_job(app: Application):
                     f"💰 **សមតុល្យទុនចុងក្រោយ (LIVE EQUITY SUMMARY)**\n"
                     f"💵 **Wallet Balance ៖** `${wallet_bal:,.2f} USDT`\n"
                     f"🏦 **Free Margin ៖** `${avail_bal:,.2f} USDT`\n"
-                    f"📊 **Active Portfolio ៖** `{len(user_bots)} Positions Active`\n"
+                    f"📊 **Active Portfolio ៖** `{len(user_bots)} Positions Active`\n\n"
+                )
+
+                recent_trades = db.get_recent_harvested_trades(chat_id, hours=8)
+                if recent_trades:
+                    report_text += "🏆 **បញ្ជីកាក់បានកើបចំណេញក្នុង ៨ ម៉ោង (8-HOUR HARVESTED HISTORY) ៖**\n\n"
+                    tot_8h_pnl = 0.0
+                    for h_idx, t in enumerate(recent_trades, 1):
+                        h_sym = t.get("symbol", "")
+                        h_side = t.get("side", "BUY")
+                        h_entry = float(t.get("entry_price", 0.0))
+                        h_exit = float(t.get("exit_price", 0.0))
+                        h_pnl = float(t.get("pnl", 0.0))
+                        h_roi = float(t.get("pnl_percent", 0.0))
+                        tot_8h_pnl += h_pnl
+                        
+                        h_emoji = "🟩" if h_pnl >= 0 else "🟥"
+                        report_text += (
+                            f"**{h_idx}. {h_sym}** ({h_side})\n"
+                            f"   💵 **Entry ៖** `${h_entry:,.4f}` ➔ **Harvest ៖** `${h_exit:,.4f}`\n"
+                            f"   {h_emoji} **Harvested PnL ៖** `${h_pnl:+,.2f} USDT` (`{h_roi:+,.1f}% ROI`)\n\n"
+                        )
+                    report_text += f"💰 **សរុបផលចំណេញកើបបាន ៨ ម៉ោង ៖** `+${tot_8h_pnl:,.2f} USDT`\n"
+
+                report_text += (
                     f"═══════════════════════════════\n"
                     f"💡 _របាយការណ៍សរុបស្វ័យប្រវត្តិរៀងរាល់ ៨ ម៉ោងម្តង ជូន VIP Users!_"
                 )

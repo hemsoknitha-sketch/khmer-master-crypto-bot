@@ -949,6 +949,7 @@ async def monitor_turbo_hedge_bots(app):
                         tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).isdigit() else 0.0
                         tot_pnl += max(0.0, real_pnl_usdt)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+                        db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
 
                         # Notify Telegram User
                         if app and hasattr(app, "bot"):

@@ -1742,6 +1742,46 @@ def remove_active_trade(trade_id: int, exit_price: float = 0.0, exit_reason: str
     conn.commit()
     conn.close()
 
+def log_turbo_hedge_trade_history(chat_id: int, symbol: str, side: str, entry_price: float, exit_price: float, qty: float, pnl: float, pnl_percent: float, exit_reason: str = "TAKE_PROFIT"):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        query = "INSERT INTO trade_history (chat_id, symbol, side, entry_price, exit_price, qty, entry_time, exit_time, pnl, pnl_percent, exit_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        cursor.execute(query, (chat_id, symbol, side, entry_price, exit_price, qty, now_str, now_str, pnl, pnl_percent, exit_reason))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error in log_turbo_hedge_trade_history: {e}")
+
+def get_recent_harvested_trades(chat_id: int, hours: int = 8) -> list:
+    """Returns list of trades closed in trade_history within the last `hours` hours."""
+    trades = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        from datetime import datetime, timedelta
+        cutoff_time = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            "SELECT symbol, side, entry_price, exit_price, pnl, pnl_percent, exit_time FROM trade_history WHERE chat_id = ? AND exit_time >= ? ORDER BY id DESC",
+            (chat_id, cutoff_time)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        for r in rows:
+            trades.append({
+                "symbol": r[0],
+                "side": r[1],
+                "entry_price": r[2],
+                "exit_price": r[3],
+                "pnl": r[4],
+                "pnl_percent": r[5],
+                "exit_time": r[6]
+            })
+    except Exception as e:
+        print(f"Error in get_recent_harvested_trades: {e}")
+    return trades
+
 # --- SMART DCA FUNCTIONS ---
 
 def add_smart_dca(chat_id: int, symbol: str, base_amount: float, entry_price: float):
