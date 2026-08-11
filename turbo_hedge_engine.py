@@ -746,6 +746,12 @@ async def monitor_turbo_hedge_bots(app):
                     user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 2.5
                     effective_tp = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
 
+                    # ⚡ Spot Mode 2-15m Micro TP Scaling Rules:
+                    # For 1x Spot, scale target TP to +3.5% of trade amount so it hits within 2-15 mins!
+                    if active_lev <= 1 or current_side == "SPOT":
+                        bot_amt = float(b_info.get("amount", 20.0))
+                        effective_tp = max(0.25, min(effective_tp, bot_amt * 0.035))
+
                     # High-Precision Dollar Peak PnL Lock ($ Peak Lock)
                     peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
                     peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
