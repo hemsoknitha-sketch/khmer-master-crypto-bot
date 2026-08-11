@@ -102,11 +102,20 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                     continue
 
                 if quote_vol >= 3000000.0:  # Include liquid spot pair >= $3M volume for high velocity
+                    # Early Breakout & Dip Rebound Golden Zone: Prioritize coins in +1.5% to +25.0% pump momentum zone
+                    if 1.5 <= price_change_pct <= 25.0:
+                        momentum_score = price_change_pct * 25.0
+                    elif price_change_pct < -2.0: # Dip Rebound Zone
+                        momentum_score = abs_change * 15.0
+                    else:
+                        momentum_score = abs_change * 5.0
+                        
+                    score = momentum_score + (math.log10(max(1.0, quote_vol)) * 10.0)
                     candidates.append({
                         "symbol": sym,
                         "quote_volume": quote_vol,
                         "abs_change": abs_change,
-                        "score": (abs_change * 20.0) + (math.log10(max(1.0, quote_vol)))
+                        "score": score
                     })
             
             candidates.sort(key=lambda x: x["score"], reverse=True)
