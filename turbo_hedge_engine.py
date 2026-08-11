@@ -193,19 +193,21 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
 
             # ✅ RULE C: HEALTHY TREND CONTINUATION (RSI 32 - 68)
             else:
-                base_conf = 82.0
+                base_conf = 85.0
                 if ema5 < ema15 or closes[-1] < closes[0]:
                     side = "SELL"
                     if ema5 < ema15: base_conf += 4.0
-                    if vol_ratio > 1.25: base_conf += 4.0
-                    if price_change_1m < -0.10: base_conf += 4.0
+                    if vol_ratio > 1.5: base_conf += 5.0
+                    if vol_ratio > 2.5: base_conf += 3.5
+                    if price_change_1m < -0.15: base_conf += 5.0
                 else:
                     side = "BUY"
                     if ema5 > ema15: base_conf += 4.0
-                    if vol_ratio > 1.25: base_conf += 4.0
-                    if price_change_1m > 0.10: base_conf += 4.0
+                    if vol_ratio > 1.5: base_conf += 5.0
+                    if vol_ratio > 2.5: base_conf += 3.5
+                    if price_change_1m > 0.15: base_conf += 5.0
 
-                confidence = min(98.5, max(80.0, base_conf))
+                confidence = min(98.5, max(84.0, base_conf))
     except Exception as ex:
         print(f"⚠️ [SIGNAL EVALUATION NOTICE] {symbol}: {ex}")
         try:
