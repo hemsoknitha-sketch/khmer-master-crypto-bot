@@ -1472,6 +1472,15 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                                     return {"status": "success", "closed": True, "res": ord_res3.json()}
 
                             print(f"⚠️ [BINANCE MARKET CLOSE FAIL] {symbol}: {ord_res.text}")
+
+        # Fallback 3: If no Futures position found, check and execute Spot Market SELL for 100% full spot position
+        base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+        spot_bal = get_spot_balance(api_key, api_secret, base_asset)
+        if spot_bal > 0:
+            print(f"🚀 [TURBO HEDGE SPOT CLOSE ROUTE] Executing Spot Market Sell for {symbol} ({spot_bal} {base_asset})...")
+            spot_sell_res = execute_spot_trade(api_key, api_secret, symbol, "SELL")
+            return spot_sell_res
+
         return {"status": "success", "closed": False, "message": "No open position found"}
     except Exception as e:
         print(f"Error in close_futures_position_for_symbol: {e}")
