@@ -75,10 +75,10 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
 
 def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
     """
-    Super Smart Real-Time High-Velocity Spot Market Coin Scanner:
+    Super Smart High-Velocity Spot Moonshot Breakout Scanner (15-Min Surge Engine):
     Queries Binance Spot /api/v3/ticker/24hr dynamically across active USDT spot pairs.
-    Filters for high volume (>= $3,000,000 USDT 24h Volume) and active price momentum.
-    Excludes invalid/delisted pairs to prevent invalid symbol execution errors.
+    Prioritizes high volume momentum (+3.0% to +35.0% breakout zone) and explosive volume delta.
+    Excludes stablecoins and delisted pairs.
     """
     try:
         url = f"{trading_engine.BASE_URL}/api/v3/ticker/24hr"
@@ -101,16 +101,21 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                 if sym_info and sym_info.get("status") != "TRADING":
                     continue
 
-                if quote_vol >= 3000000.0:  # Include liquid spot pair >= $3M volume for high velocity
-                    # Early Breakout & Dip Rebound Golden Zone: Prioritize coins in +1.5% to +25.0% pump momentum zone
-                    if 1.5 <= price_change_pct <= 25.0:
-                        momentum_score = price_change_pct * 25.0
-                    elif price_change_pct < -2.0: # Dip Rebound Zone
-                        momentum_score = abs_change * 15.0
+                if quote_vol >= 1000000.0:  # Include liquid spot pairs >= $1M volume
+                    # Explosive Moonshot Breakout Scoring (+3.0% to +35.0% pump acceleration)
+                    if 3.0 <= price_change_pct <= 35.0:
+                        momentum_score = price_change_pct * 35.0
+                    elif price_change_pct > 35.0:
+                        momentum_score = price_change_pct * 15.0
+                    elif price_change_pct < -3.0: # Dip Rebound Reversal Zone
+                        momentum_score = abs_change * 20.0
                     else:
                         momentum_score = abs_change * 5.0
                         
-                    score = momentum_score + (math.log10(max(1.0, quote_vol)) * 10.0)
+                    # Volume Acceleration Multiplier
+                    vol_score = math.log10(max(1.0, quote_vol)) * 12.0
+                    score = momentum_score + vol_score
+
                     candidates.append({
                         "symbol": sym,
                         "quote_volume": quote_vol,
