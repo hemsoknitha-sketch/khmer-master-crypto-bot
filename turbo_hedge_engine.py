@@ -947,7 +947,7 @@ async def monitor_turbo_hedge_bots(app):
                         close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
                         db.remove_turbo_hedge_bot(chat_id, symbol)
-                        add_symbol_cooldown(symbol, 3600)
+                        add_symbol_cooldown(symbol, 14400)  # 4-Hour Anti-Repeat Rotation Shield
 
                         # Track accumulated profit
                         tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
