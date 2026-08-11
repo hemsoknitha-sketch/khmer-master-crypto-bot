@@ -161,9 +161,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
             is_top_rejection = (upper_wick > max(0.0001, body * 1.5))
             is_bottom_rejection = (lower_wick > max(0.0001, body * 1.5))
 
-            # Fetch 24h Price Change % and Funding Rate
+            # Fetch 24h Price Change %, Funding Rate, and Whale Orderbook Depth
             change_24h = 0.0
             funding_rate = 0.0
+            whale_bid_wall = False
+            whale_ask_wall = False
             try:
                 t_res = HFT_SESSION.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
                 if t_res.status_code == 200:
@@ -171,6 +173,17 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                 fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
                 if fr_res.status_code == 200:
                     funding_rate = float(fr_res.json().get("lastFundingRate", 0.0))
+                
+                # 🐋 Whale Orderbook Depth Radar (> $100,000 Orderbook Wall)
+                d_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit=20", timeout=2)
+                if d_res.status_code == 200:
+                    d_data = d_res.json()
+                    bids_val = sum([float(b[0]) * float(b[1]) for b in d_data.get("bids", [])])
+                    asks_val = sum([float(a[0]) * float(a[1]) for a in d_data.get("asks", [])])
+                    if bids_val >= 100000.0 and bids_val > 1.8 * max(1.0, asks_val):
+                        whale_bid_wall = True
+                    elif asks_val >= 100000.0 and asks_val > 1.8 * max(1.0, bids_val):
+                        whale_ask_wall = True
             except Exception:
                 pass
 
@@ -183,6 +196,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                 if change_24h >= 25.0 or rsi14 >= 75.0: base_conf += 6.0
                 if is_top_rejection: base_conf += 4.5
                 if funding_rate > 0.0001: base_conf += 3.5  # Positive funding: Shorts get paid!
+                if whale_ask_wall: base_conf += 5.0  # 🐋 Whale Shadow Resistance Alignment
                 confidence = min(98.5, max(85.0, base_conf))
                 print(f"🛑 [ANTI-PEAK PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% | RSI {rsi14:.1f} (Hyper-Pump Top) -> BLOCKED BUY! Forced SHORT (SELL) at Peak Rejection ({confidence:.1f}% Conf)!")
 
@@ -194,6 +208,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                 if rsi14 <= 25.0: base_conf += 6.0
                 if is_bottom_rejection: base_conf += 4.5
                 if funding_rate < -0.0001: base_conf += 3.5  # Negative funding: Longs get paid!
+                if whale_bid_wall: base_conf += 5.0  # 🐋 Whale Shadow Support Alignment
                 confidence = min(98.5, max(82.0, base_conf))
                 print(f"🛡️ [ANTI-BOTTOM PROTECTION] {symbol}: RSI {rsi14:.1f} (Oversold Dip) -> Blocked SELL, Forced BUY Long at Dip Rebound ({confidence:.1f}% Conf)!")
 
@@ -207,6 +222,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                     if vol_ratio > 2.5: base_conf += 3.5
                     if price_change_1m < -0.15: base_conf += 5.0
                     if funding_rate > 0.0001: base_conf += 3.5
+                    if whale_ask_wall: base_conf += 5.0
                 else:
                     side = "BUY"
                     if ema5 > ema15: base_conf += 4.0
@@ -214,6 +230,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                     if vol_ratio > 2.5: base_conf += 3.5
                     if price_change_1m > 0.15: base_conf += 5.0
                     if funding_rate < -0.0001: base_conf += 3.5
+                    if whale_bid_wall: base_conf += 5.0
 
                 confidence = min(98.5, max(84.0, base_conf))
     except Exception as ex:
@@ -565,9 +582,11 @@ async def monitor_turbo_hedge_bots(app):
             if avail_bal <= 0.0 or avail_bal < 100.0:
                 unit_leverage = min(unit_leverage, 10)
 
-            # Check if live balance has enough capital to fund next coin position (Dynamic Balance Sizing with 50% Safety Cushion)
+            # Check if live balance has enough capital to fund next coin position (Dynamic Balance Sizing with 50% / 80% Safety Cushion)
             if avail_bal >= 5.0:
-                actual_trade_amount = min(unit_amount, max(5.0, avail_bal * 0.50))
+                # 🛡️ Dynamic Recovery Margin Cushion (Free Balance 80% Cushion during VIP Recovery Mode)
+                margin_factor = 0.20 if is_recovery_mode else 0.50
+                actual_trade_amount = min(unit_amount, max(5.0, avail_bal * margin_factor))
                 if actual_trade_amount > avail_bal:
                     print(f"🛡️ [AGI MARGIN SHIELD] Free margin (${avail_bal:.2f}) insufficient for safe trade amount (${actual_trade_amount:.2f}). Pausing auto-expander.")
                     continue
@@ -585,7 +604,8 @@ async def monitor_turbo_hedge_bots(app):
                         continue
 
                     eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal)
-                    min_conf_threshold = 90.0 if is_recovery_mode else 85.0
+                    # 🎯 1. Sniper Ultra-Confluence Mode (Confidence Gate > 95.0% during VIP Recovery)
+                    min_conf_threshold = 95.0 if is_recovery_mode else 85.0
                     if eval_res.get("confidence_pct", 0) < min_conf_threshold:
                         print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                         continue
