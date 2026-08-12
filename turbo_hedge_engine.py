@@ -412,9 +412,10 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         if avail_bal > 0 and avail_bal < amount_usdt:
             amount_usdt = max(1.0, avail_bal * 0.25)
 
-        # Safe Margin Allocation: max 25% of available balance per coin
+        # Safe Margin Allocation: max 15% of available balance per coin for small accounts (<$100)
         if avail_bal > 0:
-            amount_usdt = min(amount_usdt, max(5.0, avail_bal * 0.25))
+            alloc_pct = 0.15 if avail_bal < 100.0 else 0.25
+            amount_usdt = min(amount_usdt, max(2.50, avail_bal * alloc_pct))
         amount_usdt = min(25.0, max(1.0, amount_usdt))
         
         # Enforce Safe $6.50 Minimum Notional to prevent -4164 error after LOT_SIZE step floor rounding
@@ -654,10 +655,10 @@ async def monitor_turbo_hedge_bots(app):
 
             user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
             # 🛡️ Small Capital Portfolio Cap Shield (Strict Sizing Tier Guard):
-            # Wallet < $50 USDT -> Cap to 1 Coin Max strictly to eliminate fee churn!
-            # Wallet $50 - $100 USDT -> Cap to 2 Coins Max
+            # Wallet < $35 USDT -> Cap to 1 Coin Max strictly!
+            # Wallet $35 - $100 USDT -> Cap to 2 Coins Max
             # Wallet >= $100 USDT -> Cap to 10 Coins Max
-            if wallet_bal < 50.0:
+            if wallet_bal < 35.0:
                 max_allowed_coins = 1
             elif wallet_bal < 100.0:
                 max_allowed_coins = 2
@@ -674,6 +675,11 @@ async def monitor_turbo_hedge_bots(app):
                 print(f"🛡️ [AGI ANTI-CHURN SHIELD] User {target_chat_id}: Position closed <10 mins ago. Pausing auto-entry scanner to prevent Binance fee churn.")
                 continue
 
+            # 🛡️ Mandatory 65% Free Margin Buffer Shield for Small Accounts (< $100 USDT)
+            if wallet_bal < 100.0 and avail_bal < (wallet_bal * 0.65):
+                print(f"🛡️ [AGI MARGIN BUFFER SHIELD] Free margin (${avail_bal:.2f}) < 65% of wallet equity (${wallet_bal:.2f}). Pausing auto-expander scanner to guarantee liquidation protection.")
+                continue
+
             unit_amount = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_amount", "20.0"))
             unit_leverage = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_leverage", "10"))
             user_side_input = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "AUTO")
@@ -683,11 +689,15 @@ async def monitor_turbo_hedge_bots(app):
             if avail_bal <= 0.0 or avail_bal < 100.0:
                 unit_leverage = min(unit_leverage, 10)
 
-            # Check if live balance has enough capital to fund next coin position (Dynamic Balance Sizing with 50% / 80% Safety Cushion)
+            # Check if live balance has enough capital to fund next coin position (Dynamic Balance Sizing with 65% Safety Cushion)
             if avail_bal >= 5.0:
-                # 🛡️ Dynamic Recovery Margin Cushion (Free Balance 80% Cushion during VIP Recovery Mode)
-                margin_factor = 0.20 if is_recovery_mode else 0.50
-                actual_trade_amount = min(unit_amount, max(5.0, avail_bal * margin_factor))
+                # 🛡️ Dynamic Small Capital Margin Cushion (15% per coin for accounts < $100 USDT, 10% during VIP Recovery Mode)
+                if wallet_bal < 100.0:
+                    margin_factor = 0.10 if is_recovery_mode else 0.15
+                else:
+                    margin_factor = 0.20 if is_recovery_mode else 0.25
+
+                actual_trade_amount = min(unit_amount, max(2.50, avail_bal * margin_factor))
                 if actual_trade_amount > avail_bal:
                     print(f"🛡️ [AGI MARGIN SHIELD] Free margin (${avail_bal:.2f}) insufficient for safe trade amount (${actual_trade_amount:.2f}). Pausing auto-expander.")
                     continue
