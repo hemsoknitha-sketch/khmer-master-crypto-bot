@@ -5328,7 +5328,9 @@ class TelegramBotThread(BaseThread):
                         if success_count >= num_coins:
                             break
                         eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, c_sym, leverage, avail_bal, is_spot_mode=is_spot)
-                        c_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "BUY")
+                        c_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "SKIP")
+                        if c_side == "SKIP" or c_side not in ["BUY", "SELL", "SPOT"]:
+                            continue
                         exec_res = await asyncio.to_thread(turbo_hedge_engine.execute_turbo_hedge_trade, keys[0], keys[1], c_sym, amount, c_side, leverage, chat_id)
                         
                         is_order_success = False
@@ -5383,10 +5385,15 @@ class TelegramBotThread(BaseThread):
             is_spot = (user_side_input == "SPOT")
             eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, symbol, leverage, avail_bal, is_spot_mode=is_spot)
             
-            if user_side_input in ["BUY", "SELL"]:
+            if user_side_input in ["BUY", "SELL", "SPOT"]:
                 side = user_side_input
             else:
-                side = eval_res.get("side", "BUY")
+                side = eval_res.get("side", "SKIP")
+
+            if side == "SKIP" or side not in ["BUY", "SELL", "SPOT"]:
+                if ack_msg:
+                    await ack_msg.edit_text(f"⚪ **[AGI CHOP SUPPRESSION]** `{symbol}` ត្រូវ បានរំលង (SKIP) ព្រោះ Trend 1m/5m មិនទាន់មាន Confluence ច្បាស់លាស់ ៖ {eval_res.get('reason')}")
+                return
 
             win_rate = eval_res.get("win_rate_pct", 88.5)
 

@@ -419,6 +419,10 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
     if symbol == "DODOUSDT":
         symbol = "DODOXUSDT"
 
+    side_str = side.upper().strip()
+    if side_str == "SKIP" or side_str not in ["BUY", "SELL", "SPOT"]:
+        return {"status": "skipped", "reason": f"AI recommended SKIP or invalid trade side ({side})"}
+
     exec_key = f"{chat_id}_{symbol}"
     # 🚫 Overtrade Guard: Prevent concurrent duplicate executions per user/symbol
     if exec_key in _active_executing_keys:
