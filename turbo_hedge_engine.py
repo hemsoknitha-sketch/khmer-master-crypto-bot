@@ -136,20 +136,24 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
 _eval_cache = {}
 _eval_cache_time = {}
 
-def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_bal: float = 0.0, is_spot_mode: bool = False) -> dict:
+def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_bal: float = 0.0, is_spot_mode: bool = False) -> dict:
     """
-    Super Smart 84-Model AI Evaluation (Multi-Factor Scoring):
-    Calculates 1m candle momentum, EMA 5/15 crossover, Price Velocity, and Volume Delta.
-    Returns AI Confidence Level (80.0% - 98.5%) and dynamic recommended leverage.
-    - Small Capital Shield: Capital < $100 USDT is strictly capped to 10x Max Leverage!
-    - If Confidence > 85%: Uses Max Allowed Leverage (75x/125x) to capture 3-second profit waves.
-    - If Confidence <= 85%: Auto-scales leverage down to 10x-20x to protect capital 100%!
+    Super Smart Multi-Timeframe Confluence AI Evaluation (1m + 5m + 15m Trend Alignment):
+    Calculates 1m candle momentum, 5m/15m EMA Trend Confluence, Price Velocity, and Volume Delta.
+    Returns AI Confidence Level (80.0% - 98.5%) and dynamic recommended leverage (Max 15x Ceiling).
+    - Hard Leverage Ceiling Clamp: Max 15x Leverage for Futures, 1x for Spot Mode strictly!
+    - Small Capital Shield: Balance < $100 USDT is strictly capped to 10x Max Leverage!
+    - Multi-Timeframe Filter: Requires 5m Trend Confluence (5m EMA 20/50) + 1m EMA 5/15 alignment.
+    - Suppresses choppy sideways signals and rejects counter-trend trades.
     """
     symbol = str(symbol).upper().strip()
     if not symbol.endswith("USDT"):
         symbol += "USDT"
     if symbol == "DODOUSDT":
         symbol = "DODOXUSDT"
+
+    # Enforce Hard Leverage Ceiling (Max 15x Futures, Max 1x Spot)
+    requested_leverage = 1 if is_spot_mode else min(15, max(1, requested_leverage))
 
     cache_key = f"{symbol}_{requested_leverage}_{avail_bal:.1f}"
     now = time.time()
@@ -170,58 +174,52 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
         except Exception:
             pass
 
-    side = "BUY"
-    confidence = 88.5
+    side = "SKIP"
+    confidence = 50.0
     try:
-        candles = trading_engine.get_klines(symbol, interval="1m", limit=25)
-        if candles and len(candles) >= 15:
-            closes = [float(c[4]) for c in candles]
-            volumes = [float(c[5]) for c in candles]
-            
-            # 1. EMA 5 & EMA 15 Calculation
-            ema5 = sum(closes[-5:]) / 5.0
-            ema15 = sum(closes[-15:]) / 15.0
-            
-            # 2. Volume Delta
-            vol_recent = sum(volumes[-3:])
-            vol_prev = sum(volumes[-6:-3])
-            vol_ratio = (vol_recent / max(1.0, vol_prev))
-            
-            # 3. 1m Price Velocity & Extension Distance from EMA15
-            price_change_1m = ((closes[-1] - closes[-2]) / closes[-2]) * 100.0 if len(closes) >= 2 else 0.0
-            extension_pct = ((closes[-1] - ema15) / ema15) * 100.0
+        # Fetch 1m candles for short-term entry momentum
+        candles_1m = trading_engine.get_klines(symbol, interval="1m", limit=25)
+        # Fetch 5m candles for higher timeframe trend confluence
+        candles_5m = trading_engine.get_klines(symbol, interval="5m", limit=30)
 
-            # 4. RSI 14 (Relative Strength Index) Calculation
-            gains = []
-            losses = []
-            for i in range(1, len(closes)):
-                diff = closes[i] - closes[i-1]
+        if candles_1m and len(candles_1m) >= 15 and candles_5m and len(candles_5m) >= 20:
+            closes_1m = [float(c[4]) for c in candles_1m]
+            volumes_1m = [float(c[5]) for c in candles_1m]
+            closes_5m = [float(c[4]) for c in candles_5m]
+
+            # 1. Short-Term 1m Indicators: EMA 5 & EMA 15
+            ema5_1m = sum(closes_1m[-5:]) / 5.0
+            ema15_1m = sum(closes_1m[-15:]) / 15.0
+
+            # 2. Multi-Timeframe Trend Confirmation (5m EMA 20 & EMA 50)
+            ema20_5m = sum(closes_5m[-20:]) / 20.0
+            ema50_5m = sum(closes_5m[-30:]) / 30.0 if len(closes_5m) >= 30 else sum(closes_5m[-20:]) / 20.0
+            is_5m_bullish = ema20_5m > ema50_5m
+            is_5m_bearish = ema20_5m < ema50_5m
+
+            # 3. Volume Delta & Price Velocity
+            vol_recent = sum(volumes_1m[-3:])
+            vol_prev = sum(volumes_1m[-6:-3])
+            vol_ratio = (vol_recent / max(1.0, vol_prev))
+            price_change_1m = ((closes_1m[-1] - closes_1m[-2]) / closes_1m[-2]) * 100.0 if len(closes_1m) >= 2 else 0.0
+
+            # 4. RSI 14 (Relative Strength Index) Calculation on 1m
+            gains, losses = [], []
+            for i in range(1, len(closes_1m)):
+                diff = closes_1m[i] - closes_1m[i-1]
                 if diff >= 0:
                     gains.append(diff)
                     losses.append(0.0)
                 else:
                     gains.append(0.0)
                     losses.append(abs(diff))
-            
+
             avg_gain = sum(gains[-14:]) / 14.0 if len(gains) >= 14 else 0.001
             avg_loss = sum(losses[-14:]) / 14.0 if len(losses) >= 14 else 0.001
             rs = avg_gain / max(0.00001, avg_loss)
             rsi14 = 100.0 - (100.0 / (1.0 + rs))
 
-            # 5. Top Rejection / Wick Rejection & 24h Hyper-Pump Detection
-            last_candle = candles[-1]
-            c_open = float(last_candle[1])
-            c_high = float(last_candle[2])
-            c_low = float(last_candle[3])
-            c_close = float(last_candle[4])
-            
-            upper_wick = c_high - max(c_open, c_close)
-            lower_wick = min(c_open, c_close) - c_low
-            body = abs(c_close - c_open)
-            is_top_rejection = (upper_wick > max(0.0001, body * 1.5))
-            is_bottom_rejection = (lower_wick > max(0.0001, body * 1.5))
-
-            # Fetch 24h Price Change %, Funding Rate, and Whale Orderbook Depth
+            # Fetch 24h Price Change %, Funding Rate, and Orderbook Depth
             change_24h = 0.0
             funding_rate = 0.0
             whale_bid_wall = False
@@ -233,8 +231,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                 fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
                 if fr_res.status_code == 200:
                     funding_rate = float(fr_res.json().get("lastFundingRate", 0.0))
-                
-                # 🐋 Whale Orderbook Depth Radar (> $100,000 Orderbook Wall)
+
                 d_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit=20", timeout=2)
                 if d_res.status_code == 200:
                     d_data = d_res.json()
@@ -247,92 +244,80 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
             except Exception:
                 pass
 
-            # 🧠 6. APEX AGI Super Brain Trend-Following & Safety Shield Decision Logic:
+            # 🧠 5. APEX AGI Multi-Timeframe Trend-Following Decision Logic:
             if is_spot_mode:
-                # In Spot Mode, only BUY entries are valid (no Futures SHORTing on Spot Market)
-                if rsi14 >= 80.0:
+                # In Spot Mode, only BUY entries are valid with Bullish 5m + 1m Confluence
+                if rsi14 >= 75.0 or not is_5m_bullish:
                     side = "SKIP"
                     confidence = 50.0
                 else:
                     side = "BUY"
                     base_conf = 88.0
-                    if 3.0 <= change_24h <= 30.0: base_conf += 6.0
-                    if 30.0 <= rsi14 <= 65.0: base_conf += 4.5
-                    if whale_bid_wall: base_conf += 5.0
+                    if 3.0 <= change_24h <= 30.0: base_conf += 4.0
+                    if vol_ratio > 1.3: base_conf += 3.5
+                    if whale_bid_wall: base_conf += 4.0
                     confidence = min(98.5, max(85.0, base_conf))
 
-            # 🛡️ RULE A: EXTREME OVERBOUGHT HIGH-RISK GUARD (RSI >= 75)
-            # NEVER FORCIBLY SHORT STRONG PUMPING ROCKETS!
-            # Only allow SHORT if there is confirmed bearish momentum & EMA reversal down. Otherwise, SKIP entry!
-            elif rsi14 >= 75.0 or (change_24h >= 25.0 and rsi14 >= 70.0):
-                if ema5 < ema15 and price_change_1m < -0.15 and is_top_rejection:
+            # 🛡️ EXTREME OVERBOUGHT / OVERSOLD SAFETY SHIELD (RSI >= 75 or RSI <= 25)
+            # Never blindly counter-trend short/buy! Require Multi-Timeframe Confluence.
+            elif rsi14 >= 75.0:
+                if is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.15:
                     side = "SELL"
                     base_conf = 86.0
-                    if funding_rate > 0.0001: base_conf += 3.5
-                    if whale_ask_wall: base_conf += 5.0
-                    confidence = min(94.0, max(82.0, base_conf))
-                    print(f"🛡️ [AGI TOP REVERSAL CONFIRMED] {symbol}: RSI {rsi14:.1f} + Bearish EMA Cross -> SHORT Entry ({confidence:.1f}% Conf)")
-                else:
-                    side = "SKIP"
-                    confidence = 50.0
-                    print(f"🛡️ [AGI OVERBOUGHT SAFETY SHIELD] {symbol}: RSI {rsi14:.1f} (Hyper-Pump Momentum) -> SKIPPED SHORT to avoid pumping rocket loss!")
-
-            # 🛡️ RULE B: EXTREME OVERSOLD HIGH-RISK GUARD (RSI <= 25)
-            # NEVER FORCIBLY BUY FALLING KNIVES!
-            # Only allow BUY Long if there is confirmed bullish rebound & EMA crossover up. Otherwise, SKIP entry!
-            elif rsi14 <= 25.0 or (change_24h <= -20.0 and rsi14 <= 30.0):
-                if ema5 > ema15 and price_change_1m > 0.15 and is_bottom_rejection:
-                    side = "BUY"
-                    base_conf = 86.0
-                    if funding_rate < -0.0001: base_conf += 3.5
-                    if whale_bid_wall: base_conf += 5.0
-                    confidence = min(94.0, max(82.0, base_conf))
-                    print(f"🛡️ [AGI BOTTOM REBOUND CONFIRMED] {symbol}: RSI {rsi14:.1f} + Bullish Rebound -> BUY Long Entry ({confidence:.1f}% Conf)")
-                else:
-                    side = "SKIP"
-                    confidence = 50.0
-                    print(f"🛡️ [AGI OVERSOLD SAFETY SHIELD] {symbol}: RSI {rsi14:.1f} (Cascading Dump) -> SKIPPED BUY to avoid falling knife loss!")
-
-            # ✅ RULE C: SMART HIGH-CONFLUENCE TREND FOLLOWING (RSI 25 - 75)
-            else:
-                base_conf = 85.0
-                if ema5 < ema15 or (closes[-1] < closes[0] and rsi14 < 50.0):
-                    side = "SELL"
-                    if ema5 < ema15: base_conf += 4.0
-                    if vol_ratio > 1.5: base_conf += 3.5
-                    if price_change_1m < -0.15: base_conf += 3.5
-                    if funding_rate > 0.0001: base_conf += 2.5
                     if whale_ask_wall: base_conf += 4.0
+                    confidence = min(94.0, max(84.0, base_conf))
                 else:
-                    side = "BUY"
-                    if ema5 > ema15: base_conf += 4.0
-                    if vol_ratio > 1.5: base_conf += 3.5
-                    if price_change_1m > 0.15: base_conf += 3.5
-                    if funding_rate < -0.0001: base_conf += 2.5
-                    if whale_bid_wall: base_conf += 4.0
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Overbought RSI {rsi14:.1f} without 5m Bearish Confluence -> SKIPPED SHORT!")
 
-                confidence = min(98.5, max(84.0, base_conf))
+            elif rsi14 <= 25.0:
+                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.15:
+                    side = "BUY"
+                    base_conf = 86.0
+                    if whale_bid_wall: base_conf += 4.0
+                    confidence = min(94.0, max(84.0, base_conf))
+                else:
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Oversold RSI {rsi14:.1f} without 5m Bullish Confluence -> SKIPPED BUY!")
+
+            # ✅ SMART MULTI-TIMEFRAME TREND FOLLOWING (RSI 25 - 75)
+            else:
+                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.05:
+                    side = "BUY"
+                    base_conf = 86.0
+                    if vol_ratio > 1.3: base_conf += 4.0
+                    if funding_rate < -0.0001: base_conf += 3.0
+                    if whale_bid_wall: base_conf += 4.0
+                    confidence = min(98.5, max(85.0, base_conf))
+
+                elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.05:
+                    side = "SELL"
+                    base_conf = 86.0
+                    if vol_ratio > 1.3: base_conf += 4.0
+                    if funding_rate > 0.0001: base_conf += 3.0
+                    if whale_ask_wall: base_conf += 4.0
+                    confidence = min(98.5, max(85.0, base_conf))
+
+                else:
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Trend Misaligned (5m Bull: {is_5m_bullish}, 1m EMA5>15: {ema5_1m > ema15_1m}) -> SKIPPED!")
+
     except Exception as ex:
         print(f"⚠️ [SIGNAL EVALUATION NOTICE] {symbol}: {ex}")
-        try:
-            # Quick price trend fallback if klines fail
-            p_now = trading_engine.get_current_price(symbol)
-            side = "SELL" if p_now > 0 and (p_now % 2 == 0) else "BUY"
-        except Exception:
-            side = "SELL"
-        confidence = 85.0
+        side = "SKIP"
+        confidence = 50.0
 
-    # Dynamic Confidence Leverage Scaling Rules:
-    if confidence > 85.0:
-        dynamic_leverage = requested_leverage
-    else:
-        dynamic_leverage = min(20, requested_leverage)
+    # Hard Leverage Ceiling Clamp across system (Max 15x Futures, Max 1x Spot)
+    dynamic_leverage = 1 if is_spot_mode else min(15, requested_leverage)
 
-    # Hard Small Capital Shield Clamp
+    # Small Capital Shield Clamp (< $100 USDT balance -> Max 10x)
     if avail_bal <= 0.0 or avail_bal < 100.0:
         dynamic_leverage = min(dynamic_leverage, 10)
 
-    recommended_route = "SPOT" if (confidence <= 82.0 or dynamic_leverage <= 1) else "FUTURES"
+    recommended_route = "SPOT" if (is_spot_mode or dynamic_leverage <= 1) else "FUTURES"
 
     res = {
         "symbol": symbol,
@@ -342,7 +327,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
         "recommended_leverage": dynamic_leverage,
         "recommended_route": recommended_route,
         "entry_price": price,
-        "reason": f"AI Confidence {confidence:.1f}% ({'MAX LEVERAGE >85%' if confidence > 85 else 'SAFE LEVERAGE <=85%'}) -> Route: {recommended_route} ({dynamic_leverage}x {side})"
+        "reason": f"AI Confidence {confidence:.1f}% -> Route: {recommended_route} ({dynamic_leverage}x {side})"
     }
     _eval_cache[cache_key] = res
     _eval_cache_time[cache_key] = now
@@ -949,53 +934,27 @@ async def monitor_turbo_hedge_bots(app):
                                 print(f"Error sending stagnant notification: {e}")
 
                     elif is_stop_loss_hit:
-                        flip_count_key = f"turbo_hedge_{chat_id}_{symbol}_flip_count"
-                        flip_count = int(db.get_system_setting(flip_count_key, "0"))
-                        # 🛡️ Anti-Whipsaw Protection:
-                        # 1. If flipped < 15s ago OR 2. If max 2 flips reached -> Execute clean Market Close & 2-Hour Cooldown!
-                        if (now_ts - last_flip_ts) < 15 or flip_count >= 2:
-                            print(f"🛡️ [ANTI-WHIPSAW COOLDOWN] {symbol}: Flipped {flip_count} times / <15s ago. Executing clean Market Close to prevent whipsaw churn...")
-                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
-                            db.update_system_setting(flip_count_key, "0")
-                            db.remove_turbo_hedge_bot(chat_id, symbol)
-                            add_symbol_cooldown(symbol, 7200)
-                        else:
-                            flip_side = "SELL" if current_side == "BUY" else "BUY"
-                            _last_flip_timestamps[last_flip_key] = now_ts
-                            db.update_system_setting(flip_count_key, str(flip_count + 1))
-                            print(f"🛑 [TURBO HEDGE INSTANT REVERSE FLIP (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Flipped {current_side} ➔ {flip_side} (Flip #{flip_count + 1})!")
-                            
-                            # Step 1 & 2: Instant Direct Reverse Flip (<30ms)
-                            flip_res = await asyncio.to_thread(execute_direct_reverse_flip, keys[0], keys[1], symbol, amount, flip_side, dynamic_leverage, chat_id)
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
-                            
-                            if isinstance(flip_res, dict) and (flip_res.get("status") in ["success", "NEW", "FILLED"] or flip_res.get("orderId")):
-                                fresh_price = trading_engine.get_current_price(symbol) or mark_price
-                                db.update_turbo_hedge_side(chat_id, symbol, flip_side)
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(fresh_price))
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
-                                print(f"🚀 [INSTANT REVERSE FLIP SUCCESS (<30ms)] {symbol} Flipped to {flip_side} at {fresh_price:.4f} ({dynamic_leverage}x Lev)!")
-                            else:
-                                print(f"⚠️ [REVERSE FLIP FAILED] {symbol} flip to {flip_side} failed. Executing clean Market Close & Cooldown...")
-                                trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
-                                db.remove_turbo_hedge_bot(chat_id, symbol)
-                                add_symbol_cooldown(symbol, 3600)
+                        print(f"🛡️ [STOP LOSS PROTECTOR] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Executing clean Market Close & 2-Hour Cooldown to prevent whipsaw losses...")
+                        close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
+                        db.remove_turbo_hedge_bot(chat_id, symbol)
+                        add_symbol_cooldown(symbol, 7200)
 
-                            if app and hasattr(app, "bot"):
-                                try:
-                                    msg_sl = (
-                                        f"⚡ **APEX TURBO HEDGE INSTANT REVERSE FLIP!** 🛡️\n"
-                                        f"───────────────────────────────\n\n"
-                                        f"🪙 កាក់ ៖ `{symbol}`\n"
-                                        f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (Hard Stop -10.0% / -$2.00)\n"
-                                        f"🔄 ផ្លាស់ប្តូរ Position ៖ `{current_side}` ➔ `{flip_side}`\n"
-                                        f"⚡ ល្បឿនផ្លាស់ប្តូរ ៖ `FLIPPED INSTANTLY (<30ms)`\n\n"
-                                        f"🧠 AI Status ៖ `កំពុងកើបចំណេញដេញតាម Trend ផ្ទុយ 24/7 ស្វ័យប្រវត្តិ!`"
-                                    )
-                                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                                except Exception as e:
-                                    print(f"Error sending SL flip notification: {e}")
+                        if app and hasattr(app, "bot"):
+                            try:
+                                msg_sl = (
+                                    f"🛡️ **APEX TURBO HEDGE STOP LOSS ACTIVATED!** 🛑\n"
+                                    f"───────────────────────────────\n\n"
+                                    f"🪙 កាក់ ៖ `{symbol}`\n"
+                                    f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (PnL: `-${abs(real_pnl_usdt):.2f} USDT`)\n"
+                                    f"🔒 Anti-Whipsaw Status ៖ `២ ម៉ោង Cooldown Applied`\n"
+                                    f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n\n"
+                                    f"🧠 AI Status ៖ `ការពារដើមទុន និងរង់ចាំស្កេនកាក់ថ្មីដែលមាន Trend Confluence 100%!`"
+                                )
+                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+                            except Exception as e:
+                                print(f"Error sending SL notification: {e}")
 
                     elif is_tp_harvested or is_peak_locked:
                         reason_tag = "PEAK LOCKED" if is_peak_locked else "DUAL-CHECK TP HARVESTED"

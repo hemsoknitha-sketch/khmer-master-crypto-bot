@@ -96,7 +96,7 @@ def scan_hft_opportunity(symbol: str = "BTCUSDT") -> dict:
         result["entry_price"] = current_price
         result["win_rate_pct"] = round(win_rate, 1)
         result["reason"] = reason
-        result["dynamic_leverage"] = 25 if win_rate >= 90.0 else 5
+        result["dynamic_leverage"] = 15 if win_rate >= 90.0 else 5
 
         if win_rate >= 85.0:
             # BTC Lead Impulse Guard check for altcoins (High-Conviction ≥ 92.0% AI Consensus Overrides Guard)
@@ -129,6 +129,7 @@ def execute_hft_order(api_key: str, api_secret: str, symbol: str, amount_usdt: f
     Executes instant HFT order on Binance Futures with specified leverage and amount.
     """
     try:
+        leverage = min(15, max(1, int(leverage)))
         trading_engine.set_futures_leverage(api_key, api_secret, symbol, leverage)
         price = trading_engine.get_current_price(symbol)
         if price <= 0:
