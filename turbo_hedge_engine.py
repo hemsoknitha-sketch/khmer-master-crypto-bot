@@ -25,6 +25,11 @@ def is_symbol_in_cooldown(symbol: str) -> bool:
         return True
     return False
 
+def is_close_successful(res) -> bool:
+    if not res or not isinstance(res, dict):
+        return False
+    return res.get("status") in ["success", "FILLED", "NEW"] or res.get("closed") is True or res.get("orderId") is not None
+
 def get_active_high_velocity_coins(limit: int = 30) -> list:
     """
     Super Smart Real-Time High-Velocity Futures Coin Scanner:
@@ -54,7 +59,7 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 if sym_info and sym_info.get("status") != "TRADING":
                     continue
 
-                if quote_vol >= 1000000.0:  # Include liquid futures pair >= $1M volume
+                if quote_vol >= 5000000.0:  # Include highly liquid futures pairs >= $5M volume to eliminate slippage
                     candidates.append({
                         "symbol": sym,
                         "quote_volume": quote_vol,
@@ -859,16 +864,9 @@ async def monitor_turbo_hedge_bots(app):
             if avail_bal <= 0.0 or avail_bal < 100.0:
                 dynamic_leverage = min(dynamic_leverage, 10)
 
-            # Live Position Leverage Sync: Ensure active Binance position leverage matches AI confidence level
+            # Fixed Initial Position Leverage Lock: Active positions preserve initial leverage to prevent initialMargin recalculation and false ROI spikes
             active_lev_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_active_leverage", str(leverage))
             active_lev = int(active_lev_str) if active_lev_str.isdigit() else leverage
-
-            if dynamic_leverage != active_lev:
-                sync_res = await asyncio.to_thread(trading_engine.set_futures_leverage, keys[0], keys[1], symbol, dynamic_leverage)
-                if isinstance(sync_res, dict) and sync_res.get("leverage"):
-                    active_lev = dynamic_leverage
-                    db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_active_leverage", str(dynamic_leverage))
-                    print(f"⚡ [AI LEVERAGE ADJUSTMENT] {symbol}: Confidence {ai_confidence}% -> Active Leverage Updated to {dynamic_leverage}x on Binance!")
 
             # 2. Check Live Real-Time Position Risk & PnL from Binance Spot or Futures API
             if current_side == "SPOT" or leverage <= 1:
@@ -1004,9 +1002,12 @@ async def monitor_turbo_hedge_bots(app):
                         else:
                             close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
-                        db.remove_turbo_hedge_bot(chat_id, symbol)
-                        add_symbol_cooldown(symbol, 7200)
                         _last_flip_timestamps[last_flip_key] = now_ts
+                        if is_close_successful(close_res):
+                            db.remove_turbo_hedge_bot(chat_id, symbol)
+                            add_symbol_cooldown(symbol, 7200)
+                        else:
+                            print(f"⚠️ [CIRCUIT BREAKER RETRY] Market close for {symbol} failed. Retrying on next loop...")
                         
                         if app and hasattr(app, "bot"):
                             try:
@@ -1030,8 +1031,9 @@ async def monitor_turbo_hedge_bots(app):
                         else:
                             close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
-                        db.remove_turbo_hedge_bot(chat_id, symbol)
-                        add_symbol_cooldown(symbol, 14400)
+                        if is_close_successful(close_res):
+                            db.remove_turbo_hedge_bot(chat_id, symbol)
+                            add_symbol_cooldown(symbol, 14400)
 
                         is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"
                         if not is_quiet and app and hasattr(app, "bot"):
@@ -1051,11 +1053,12 @@ async def monitor_turbo_hedge_bots(app):
 
                     elif is_stop_loss_hit:
                         # 🔄 INSTANT DIRECT REVERSE FLIP (<15ms): ROI <= -10.0% / PnL <= -$2.00 USDT
-                        # Flips position direction (BUY ↔ SELL) in 1 single transaction if not in anti-whipsaw cooldown (<15s)
-                        can_reverse_flip = (current_side != "SPOT" and (now_ts - last_flip_ts) >= 15)
+                        # Flips position direction (BUY ↔ SELL) in 1 single transaction if not in anti-whipsaw cooldown (<15s) AND 5m trend supports flip
+                        target_flip_side = "SELL" if current_side == "BUY" else "BUY"
+                        is_trend_supporting_flip = (ai_recommended_side == target_flip_side)
+                        can_reverse_flip = (current_side != "SPOT" and (now_ts - last_flip_ts) >= 15 and is_trend_supporting_flip)
                         if can_reverse_flip:
-                            target_flip_side = "SELL" if current_side == "BUY" else "BUY"
-                            print(f"🔄 [INSTANT DIRECT REVERSE FLIP (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Flipping {current_side} ➔ {target_flip_side}!")
+                            print(f"🔄 [INSTANT DIRECT REVERSE FLIP (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Flipping {current_side} ➔ {target_flip_side} (MTF Confluence Verified)!")
                             flip_res = await asyncio.to_thread(execute_direct_reverse_flip, keys[0], keys[1], symbol, amount, target_flip_side, leverage, chat_id)
                             
                             is_flip_success = False
@@ -1095,8 +1098,9 @@ async def monitor_turbo_hedge_bots(app):
                             else:
                                 close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                             db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
-                            db.remove_turbo_hedge_bot(chat_id, symbol)
-                            add_symbol_cooldown(symbol, 7200)
+                            if is_close_successful(close_res):
+                                db.remove_turbo_hedge_bot(chat_id, symbol)
+                                add_symbol_cooldown(symbol, 7200)
 
                             if app and hasattr(app, "bot"):
                                 try:
@@ -1122,15 +1126,19 @@ async def monitor_turbo_hedge_bots(app):
                             close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
                         else:
                             close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        db.remove_turbo_hedge_bot(chat_id, symbol)
-                        add_symbol_cooldown(symbol, 14400)  # 4-Hour Anti-Repeat Rotation Shield
+                        
+                        if is_close_successful(close_res):
+                            db.remove_turbo_hedge_bot(chat_id, symbol)
+                            add_symbol_cooldown(symbol, 14400)  # 4-Hour Anti-Repeat Rotation Shield
 
-                        # Track accumulated profit
-                        tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
-                        tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).isdigit() else 0.0
-                        tot_pnl += max(0.0, real_pnl_usdt)
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
-                        db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
+                            # Track accumulated profit
+                            tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
+                            tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).isdigit() else 0.0
+                            tot_pnl += max(0.0, real_pnl_usdt)
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+                            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
+                        else:
+                            print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
 
                         # Notify Telegram User
                         is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"

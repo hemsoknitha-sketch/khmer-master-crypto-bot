@@ -1891,7 +1891,8 @@ def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "
     }
 
     if side == "BUY":
-        amount_usdt = max(5.50, amount_usdt)
+        # Enforce Minimum $10.50 USDT Allocation to guarantee compliance with Binance Spot $10 MIN_NOTIONAL filter
+        amount_usdt = max(10.50, amount_usdt)
         params["quoteOrderQty"] = f"{amount_usdt:.2f}"
     else:
         # Fetch base asset spot balance to sell full position with LOT_SIZE precision
@@ -1902,6 +1903,19 @@ def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "
         formatted_qty = get_max_sellable_qty(symbol, raw_qty)
         if formatted_qty <= 0:
             formatted_qty = raw_qty
+        
+        # Pre-Flight Spot MIN_NOTIONAL Filter Shield
+        current_p = get_current_price(symbol)
+        notional_val = formatted_qty * current_p if current_p > 0 else 0.0
+        if 0.10 <= notional_val < 9.90 and current_p > 0:
+            # Small spot holding below $10 MIN_NOTIONAL -> Execute $10.50 top-up buy then instant 100% sell
+            topup_needed = max(10.50, 10.50 - notional_val)
+            print(f"🛡️ [SPOT MIN_NOTIONAL TOP-UP LIQUIDATOR] {symbol} value (${notional_val:.2f}) < $10.00 MIN_NOTIONAL -> Top-up buying ${topup_needed:.2f} USDT before 100% sell...")
+            execute_spot_trade(api_key, api_secret, symbol, "BUY", topup_needed)
+            time.sleep(0.3)
+            raw_qty = get_spot_balance(api_key, api_secret, base_asset)
+            formatted_qty = get_max_sellable_qty(symbol, raw_qty)
+
         params["quantity"] = f"{formatted_qty:.8f}".rstrip('0').rstrip('.')
 
     query_string = urlencode(params)
@@ -1915,6 +1929,24 @@ def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "
             print(f"🚀 [BINANCE SPOT MARKET SUCCESS (<20ms)] {symbol} {side} -> OrderId: {data.get('orderId')}")
             return {"status": "success", "res": data, "orderId": data.get("orderId")}
         else:
+            err_text = res.text
+            if side == "SELL" and ("-1013" in err_text or "MIN_NOTIONAL" in err_text):
+                print(f"⚠️ [SPOT MIN_NOTIONAL RETRY] {symbol} Spot Sell hit -1013 MIN_NOTIONAL. Executing emergency top-up buy then instant full sell...")
+                execute_spot_trade(api_key, api_secret, symbol, "BUY", 11.0)
+                time.sleep(0.3)
+                base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+                raw_qty = get_spot_balance(api_key, api_secret, base_asset)
+                formatted_qty = get_max_sellable_qty(symbol, raw_qty)
+                params["quantity"] = f"{formatted_qty:.8f}".rstrip('0').rstrip('.')
+                params["timestamp"] = int(time.time() * 1000)
+                query_string = urlencode(params)
+                signature = hmac.new(api_secret.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
+                res_retry = HFT_SESSION.post(f"{url}?{query_string}&signature={signature}", headers=headers, timeout=5)
+                if res_retry.status_code == 200:
+                    data_retry = res_retry.json()
+                    print(f"🚀 [BINANCE SPOT MARKET TOP-UP RETRY SUCCESS] {symbol} SELL -> OrderId: {data_retry.get('orderId')}")
+                    return {"status": "success", "res": data_retry, "orderId": data_retry.get("orderId")}
+            
             print(f"⚠️ [BINANCE SPOT MARKET FAIL] {symbol} {side}: {res.text}")
             return {"status": "error", "error": res.text}
     except Exception as e:
