@@ -652,11 +652,25 @@ async def monitor_turbo_hedge_bots(app):
                 db.update_system_setting(f"turbo_hedge_{target_chat_id}_recovery_alert_sent", "0")
 
             user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
-            # 🛡️ Small Capital Portfolio Cap Shield:
-            # Wallet < $100 USDT -> Cap to 4 Coins Max to guarantee 65% Free Margin Buffer!
+            # 🛡️ Small Capital Portfolio Cap Shield (Strict Sizing Tier Guard):
+            # Wallet < $50 USDT -> Cap to 1 Coin Max strictly to eliminate fee churn!
+            # Wallet $50 - $100 USDT -> Cap to 2 Coins Max
             # Wallet >= $100 USDT -> Cap to 10 Coins Max
-            max_allowed_coins = 4 if wallet_bal < 100.0 else 10
+            if wallet_bal < 50.0:
+                max_allowed_coins = 1
+            elif wallet_bal < 100.0:
+                max_allowed_coins = 2
+            else:
+                max_allowed_coins = 10
+
             if len(user_active_bots) >= max_allowed_coins:
+                continue
+
+            # 🛡️ Anti-Churn Post-Close Cooldown Buffer (10 Minutes Pause per User)
+            last_close_ts_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_last_close_timestamp", "0")
+            last_close_ts = int(last_close_ts_str) if last_close_ts_str.isdigit() else 0
+            if (int(time.time()) - last_close_ts) < 600:
+                print(f"🛡️ [AGI ANTI-CHURN SHIELD] User {target_chat_id}: Position closed <10 mins ago. Pausing auto-entry scanner to prevent Binance fee churn.")
                 continue
 
             unit_amount = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_amount", "20.0"))
@@ -857,13 +871,14 @@ async def monitor_turbo_hedge_bots(app):
                     last_flip_key = f"{chat_id}_{symbol}"
                     last_flip_ts = _last_flip_timestamps.get(last_flip_key, 0)
 
-                    # ⌛ 15-Minute Stagnant Position Auto-Pruner (Crab Market Exit):
+                    # ⌛ 4-Hour Stagnant Position Auto-Pruner (Crab Market Exit):
+                    # Positions need time to develop. Only prune after 4 hours (>14,400s) if PnL is completely flat.
                     entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
                     entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
                     if entry_ts == 0:
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
                         entry_ts = now_ts
-                    is_stagnant_timeout = ((now_ts - entry_ts) >= 900 and (-0.50 <= real_pnl_usdt <= 0.50))
+                    is_stagnant_timeout = ((now_ts - entry_ts) >= 14400 and (-0.50 <= real_pnl_usdt <= 0.50))
 
                     if is_hard_circuit_breaker:
                         # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
@@ -871,6 +886,7 @@ async def monitor_turbo_hedge_bots(app):
                         print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
                         close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
                         db.remove_turbo_hedge_bot(chat_id, symbol)
                         add_symbol_cooldown(symbol, 7200)
                         _last_flip_timestamps[last_flip_key] = now_ts
@@ -891,11 +907,12 @@ async def monitor_turbo_hedge_bots(app):
                                 print(f"Error sending breaker notification: {e}")
 
                     elif is_stagnant_timeout:
-                        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >15 mins with stagnant PnL (${real_pnl_usdt:.2f}). Market closing & applying 2-Hour Cooldown...")
+                        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >4 hours with stagnant PnL (${real_pnl_usdt:.2f}). Market closing & applying 4-Hour Cooldown...")
                         close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
                         db.remove_turbo_hedge_bot(chat_id, symbol)
-                        add_symbol_cooldown(symbol, 7200)
+                        add_symbol_cooldown(symbol, 14400)
 
                         is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"
                         if not is_quiet and app and hasattr(app, "bot"):
@@ -904,8 +921,8 @@ async def monitor_turbo_hedge_bots(app):
                                     f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
                                     f"───────────────────────────────\n\n"
                                     f"🪙 កាក់ ៖ `{symbol}`\n"
-                                    f"⏱️ រយៈពេលត្រាំ ៖ `> 15 នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
-                                    f"🔒 Cooldown Status ៖ `២ ម៉ោង (2-Hour Anti-Churn Blacklist)`\n"
+                                    f"⏱️ រយៈពេលត្រាំ ៖ `> ៤ ម៉ោង` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
+                                    f"🔒 Cooldown Status ៖ `៤ ម៉ោង (4-Hour Anti-Churn Blacklist)`\n"
                                     f"⚡ Binance Status ៖ `MARKET CLOSED (<30ms)`\n\n"
                                     f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
                                 )
