@@ -5379,7 +5379,9 @@ class TelegramBotThread(BaseThread):
                 asyncio.create_task(_background_top_scanner())
                 return
 
-            eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, symbol)
+            avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+            is_spot = (user_side_input == "SPOT")
+            eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, symbol, leverage, avail_bal, is_spot_mode=is_spot)
             
             if user_side_input in ["BUY", "SELL"]:
                 side = user_side_input

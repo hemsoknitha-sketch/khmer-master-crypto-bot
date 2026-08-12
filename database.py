@@ -2796,6 +2796,10 @@ def remove_turbo_hedge_bot(chat_id: int, symbol: str):
         cursor.execute("DELETE FROM system_settings WHERE key = ?", (f"turbo_hedge_{chat_id}_{symbol}",))
         conn.commit()
         conn.close()
+        # Explicit in-memory and state cleanup
+        for key_suffix in ["status", "amount", "leverage", "side", "target_tp", "entry_price", "entry_timestamp", "peak_roi", "peak_pnl", "initial_margin", "active_leverage", "liq_price", "entry_leverage"]:
+            cache_delete(f"turbo_hedge_{chat_id}_{symbol}_{key_suffix}")
+
 
 
 def get_active_turbo_hedge_bots() -> list:

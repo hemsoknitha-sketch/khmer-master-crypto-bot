@@ -1518,6 +1518,8 @@ def get_futures_position_pnl(api_key: str, api_secret: str, symbol: str) -> dict
                                 entry_p = float(pos.get("entryPrice", 0))
                                 mark_p = float(pos.get("markPrice", 0))
                                 liq_p = float(pos.get("liquidationPrice", 0))
+                                init_m = float(pos.get("positionInitialMargin", pos.get("isolatedMargin", 0)))
+                                lev = int(pos.get("leverage", 10))
                                 return {
                                     "has_position": True,
                                     "unrealizedProfit": pnl,
@@ -1525,6 +1527,8 @@ def get_futures_position_pnl(api_key: str, api_secret: str, symbol: str) -> dict
                                     "markPrice": mark_p,
                                     "liquidationPrice": liq_p,
                                     "positionAmt": amt,
+                                    "initialMargin": init_m,
+                                    "leverage": lev,
                                     "side": "BUY" if amt > 0 else "SELL"
                                 }
                     # Position is explicitly closed (qty = 0)

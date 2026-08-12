@@ -305,14 +305,14 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     confidence = 50.0
                     print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Trend Misaligned (5m Bull: {is_5m_bullish}, 1m EMA5>15: {ema5_1m > ema15_1m}) -> SKIPPED!")
 
-            # 🛡️ Anti-Peak Buying & Anti-Bottom Selling Protection (v9.8 / v10.0 Architecture)
+            # 🛡️ Anti-Peak Buying & Anti-Bottom Selling Protection (v10.0 Ultra Confluence Architecture)
             if not is_spot_mode and side != "SKIP":
                 if (change_24h >= 15.0 or rsi14 >= 68.0):
                     if side == "BUY":
                         side = "SKIP"
                         confidence = 50.0
                         print(f"🛡️ [ANTI-PEAK BUYING PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% or RSI {rsi14:.1f} >= 68 -> Blocked BUY 100%!")
-                    if (is_5m_bearish or ema5_1m < ema15_1m) and rsi14 >= 68.0:
+                    if is_5m_bearish and ema5_1m < ema15_1m and rsi14 >= 68.0:
                         side = "SELL"
                         base_conf = 88.0
                         if whale_ask_wall: base_conf += 4.0
@@ -323,7 +323,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                         side = "SKIP"
                         confidence = 50.0
                         print(f"🛡️ [ANTI-BOTTOM SELLING PROTECTION] {symbol}: RSI {rsi14:.1f} <= 32 -> Blocked SELL 100%!")
-                    if (is_5m_bullish or ema5_1m > ema15_1m) and rsi14 <= 32.0:
+                    if is_5m_bullish and ema5_1m > ema15_1m and rsi14 <= 32.0:
                         side = "BUY"
                         base_conf = 88.0
                         if whale_bid_wall: base_conf += 4.0
@@ -461,7 +461,18 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         # Automatic Binance LOT_SIZE precision handling
         qty = trading_engine.get_futures_max_sellable_qty(symbol, qty)
         if (qty * price) < 5.20:
-            qty = trading_engine.get_futures_max_sellable_qty(symbol, max(1.0, math.ceil(6.50 / price)))
+            target_notional = 6.50
+            raw_qty = target_notional / price
+            qty = trading_engine.get_futures_max_sellable_qty(symbol, raw_qty)
+            if qty <= 0:
+                sym_info = trading_engine.get_futures_symbol_info(symbol)
+                step_sz = 1.0
+                if sym_info:
+                    for f in sym_info.get("filters", []):
+                        if f.get("filterType") == "LOT_SIZE":
+                            step_sz = float(f.get("stepSize", 1.0))
+                            break
+                qty = step_sz
 
         res = trading_engine.execute_futures_order(api_key, api_secret, symbol, side, qty, leverage=effective_leverage)
         
@@ -470,7 +481,9 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
             err_str = str(res.get("error", ""))
             if "-4164" in err_str or "no smaller than 5" in err_str:
                 print(f"⚠️ [MIN_NOTIONAL RETRY] Order failed with -4164 for {symbol}. Recalculating qty to exceed $6.50 USDT notional...")
-                retry_qty = trading_engine.get_futures_max_sellable_qty(symbol, max(1.0, math.ceil(6.50 / price)))
+                retry_qty = trading_engine.get_futures_max_sellable_qty(symbol, 7.00 / price)
+                if retry_qty <= 0:
+                    retry_qty = qty * 1.5 if qty > 0 else 1.0
                 res = trading_engine.execute_futures_order(api_key, api_secret, symbol, side, retry_qty, leverage=effective_leverage)
 
             # Auto-Prune Non-Tradable / Closed / TradFi Agreement Symbols (Error -1121, -4141, -4140, -4411)
@@ -716,12 +729,7 @@ async def monitor_turbo_hedge_bots(app):
             if len(user_active_bots) >= max_allowed_coins:
                 continue
 
-            # 🛡️ Anti-Churn Post-Close Cooldown Buffer (10 Minutes Pause per User)
-            last_close_ts_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_last_close_timestamp", "0")
-            last_close_ts = int(last_close_ts_str) if last_close_ts_str.isdigit() else 0
-            if (int(time.time()) - last_close_ts) < 600:
-                print(f"🛡️ [AGI ANTI-CHURN SHIELD] User {target_chat_id}: Position closed <10 mins ago. Pausing auto-entry scanner to prevent Binance fee churn.")
-                continue
+            # Per-symbol 2-Hour Cooldown Blacklist handles fee protection per closed symbol (add_symbol_cooldown).
 
             # 🛡️ Mandatory Free Margin Buffer Shield across Accounts (> $100 USDT):
             if wallet_bal >= 100.0 and avail_bal < (wallet_bal * 0.50):
@@ -915,15 +923,18 @@ async def monitor_turbo_hedge_bots(app):
                     # Net Realized/Unrealized PnL in Hand
                     net_pnl_usdt = real_pnl_usdt - est_binance_fee
 
+                    api_init_margin = float(pnl_info.get("initialMargin", 0.0))
                     if current_side == "SPOT":
                         initial_margin = abs(position_amt * entry_price)
+                    elif api_init_margin > 0:
+                        initial_margin = api_init_margin
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", str(initial_margin))
                     else:
                         init_m_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", "0.0")
                         if float(init_m_str) > 0:
                             initial_margin = float(init_m_str)
                         else:
-                            entry_lev_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_leverage", str(leverage))
-                            entry_lev = float(entry_lev_str) if entry_lev_str.replace('.', '', 1).isdigit() else max(1.0, float(leverage))
+                            entry_lev = float(pnl_info.get("leverage", leverage))
                             initial_margin = abs(position_amt * entry_price) / max(1.0, entry_lev)
                             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", str(initial_margin))
 
