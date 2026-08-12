@@ -2793,8 +2793,10 @@ def remove_turbo_hedge_bot(chat_id: int, symbol: str):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"turbo_hedge_{chat_id}_{symbol}_%",))
+        cursor.execute("DELETE FROM system_settings WHERE key = ?", (f"turbo_hedge_{chat_id}_{symbol}",))
         conn.commit()
         conn.close()
+
 
 def get_active_turbo_hedge_bots() -> list:
     conn = get_db_connection()
