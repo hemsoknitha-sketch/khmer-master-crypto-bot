@@ -247,10 +247,10 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
             except Exception:
                 pass
 
-            # 🧠 6. Anti-Peak Buying & Overbought/Oversold Rejection Decision Logic:
+            # 🧠 6. APEX AGI Super Brain Trend-Following & Safety Shield Decision Logic:
             if is_spot_mode:
                 # In Spot Mode, only BUY entries are valid (no Futures SHORTing on Spot Market)
-                if rsi14 >= 85.0:
+                if rsi14 >= 80.0:
                     side = "SKIP"
                     confidence = 50.0
                 else:
@@ -260,49 +260,56 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 75, avail_ba
                     if 30.0 <= rsi14 <= 65.0: base_conf += 4.5
                     if whale_bid_wall: base_conf += 5.0
                     confidence = min(98.5, max(85.0, base_conf))
-            # 🚫 RULE A: HYPER-PUMPED OVERBOUGHT TOP PEAK (24h Change >= 15% OR RSI > 68 OR Extension > 1.2% OR Top Rejection)
-            # NEVER BUY AT THE PEAK! Force SHORT (SELL Peak Rejection) to catch the dump!
-            elif change_24h >= 15.0 or rsi14 >= 68.0 or extension_pct >= 1.2 or (is_top_rejection and rsi14 > 55.0):
-                side = "SELL"
-                base_conf = 88.0
-                if change_24h >= 25.0 or rsi14 >= 75.0: base_conf += 6.0
-                if is_top_rejection: base_conf += 4.5
-                if funding_rate > 0.0001: base_conf += 3.5  # Positive funding: Shorts get paid!
-                if whale_ask_wall: base_conf += 5.0  # 🐋 Whale Shadow Resistance Alignment
-                confidence = min(98.5, max(85.0, base_conf))
-                print(f"🛑 [ANTI-PEAK PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% | RSI {rsi14:.1f} (Hyper-Pump Top) -> BLOCKED BUY! Forced SHORT (SELL) at Peak Rejection ({confidence:.1f}% Conf)!")
 
-            # 🚫 RULE B: OVERSOLD BOTTOM DIP (RSI < 32 or Extension < -1.2% or Bottom Rejection)
-            # NEVER SELL AT THE BOTTOM! Force LONG (BUY Dip Rebound) to catch the bounce!
-            elif rsi14 <= 32.0 or extension_pct <= -1.2 or (is_bottom_rejection and rsi14 < 45.0):
-                side = "BUY"
-                base_conf = 88.0
-                if rsi14 <= 25.0: base_conf += 6.0
-                if is_bottom_rejection: base_conf += 4.5
-                if funding_rate < -0.0001: base_conf += 3.5  # Negative funding: Longs get paid!
-                if whale_bid_wall: base_conf += 5.0  # 🐋 Whale Shadow Support Alignment
-                confidence = min(98.5, max(82.0, base_conf))
-                print(f"🛡️ [ANTI-BOTTOM PROTECTION] {symbol}: RSI {rsi14:.1f} (Oversold Dip) -> Blocked SELL, Forced BUY Long at Dip Rebound ({confidence:.1f}% Conf)!")
-
-            # ✅ RULE C: HEALTHY TREND CONTINUATION (RSI 32 - 68)
-            else:
-                base_conf = 85.0
-                if ema5 < ema15 or closes[-1] < closes[0]:
+            # 🛡️ RULE A: EXTREME OVERBOUGHT HIGH-RISK GUARD (RSI >= 75)
+            # NEVER FORCIBLY SHORT STRONG PUMPING ROCKETS!
+            # Only allow SHORT if there is confirmed bearish momentum & EMA reversal down. Otherwise, SKIP entry!
+            elif rsi14 >= 75.0 or (change_24h >= 25.0 and rsi14 >= 70.0):
+                if ema5 < ema15 and price_change_1m < -0.15 and is_top_rejection:
                     side = "SELL"
-                    if ema5 < ema15: base_conf += 4.0
-                    if vol_ratio > 1.5: base_conf += 5.0
-                    if vol_ratio > 2.5: base_conf += 3.5
-                    if price_change_1m < -0.15: base_conf += 5.0
+                    base_conf = 86.0
                     if funding_rate > 0.0001: base_conf += 3.5
                     if whale_ask_wall: base_conf += 5.0
+                    confidence = min(94.0, max(82.0, base_conf))
+                    print(f"🛡️ [AGI TOP REVERSAL CONFIRMED] {symbol}: RSI {rsi14:.1f} + Bearish EMA Cross -> SHORT Entry ({confidence:.1f}% Conf)")
+                else:
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [AGI OVERBOUGHT SAFETY SHIELD] {symbol}: RSI {rsi14:.1f} (Hyper-Pump Momentum) -> SKIPPED SHORT to avoid pumping rocket loss!")
+
+            # 🛡️ RULE B: EXTREME OVERSOLD HIGH-RISK GUARD (RSI <= 25)
+            # NEVER FORCIBLY BUY FALLING KNIVES!
+            # Only allow BUY Long if there is confirmed bullish rebound & EMA crossover up. Otherwise, SKIP entry!
+            elif rsi14 <= 25.0 or (change_24h <= -20.0 and rsi14 <= 30.0):
+                if ema5 > ema15 and price_change_1m > 0.15 and is_bottom_rejection:
+                    side = "BUY"
+                    base_conf = 86.0
+                    if funding_rate < -0.0001: base_conf += 3.5
+                    if whale_bid_wall: base_conf += 5.0
+                    confidence = min(94.0, max(82.0, base_conf))
+                    print(f"🛡️ [AGI BOTTOM REBOUND CONFIRMED] {symbol}: RSI {rsi14:.1f} + Bullish Rebound -> BUY Long Entry ({confidence:.1f}% Conf)")
+                else:
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [AGI OVERSOLD SAFETY SHIELD] {symbol}: RSI {rsi14:.1f} (Cascading Dump) -> SKIPPED BUY to avoid falling knife loss!")
+
+            # ✅ RULE C: SMART HIGH-CONFLUENCE TREND FOLLOWING (RSI 25 - 75)
+            else:
+                base_conf = 85.0
+                if ema5 < ema15 or (closes[-1] < closes[0] and rsi14 < 50.0):
+                    side = "SELL"
+                    if ema5 < ema15: base_conf += 4.0
+                    if vol_ratio > 1.5: base_conf += 3.5
+                    if price_change_1m < -0.15: base_conf += 3.5
+                    if funding_rate > 0.0001: base_conf += 2.5
+                    if whale_ask_wall: base_conf += 4.0
                 else:
                     side = "BUY"
                     if ema5 > ema15: base_conf += 4.0
-                    if vol_ratio > 1.5: base_conf += 5.0
-                    if vol_ratio > 2.5: base_conf += 3.5
-                    if price_change_1m > 0.15: base_conf += 5.0
-                    if funding_rate < -0.0001: base_conf += 3.5
-                    if whale_bid_wall: base_conf += 5.0
+                    if vol_ratio > 1.5: base_conf += 3.5
+                    if price_change_1m > 0.15: base_conf += 3.5
+                    if funding_rate < -0.0001: base_conf += 2.5
+                    if whale_bid_wall: base_conf += 4.0
 
                 confidence = min(98.5, max(84.0, base_conf))
     except Exception as ex:
