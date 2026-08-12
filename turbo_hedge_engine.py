@@ -305,6 +305,33 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     confidence = 50.0
                     print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Trend Misaligned (5m Bull: {is_5m_bullish}, 1m EMA5>15: {ema5_1m > ema15_1m}) -> SKIPPED!")
 
+            # 🛡️ BTC Lead Impulse Guard & Funding Fee Penalty Guard
+            if side != "SKIP" and symbol != "BTCUSDT":
+                try:
+                    import btc_lead_guard
+                    btc_info = btc_lead_guard.get_btc_impulse_status()
+                    btc_status = btc_info.get("status", "STABLE")
+                    if btc_status == "DUMPING" and side == "BUY":
+                        side = "SKIP"
+                        confidence = 50.0
+                        print(f"🛡️ [BTC IMPULSE SHIELD] {symbol}: Suppressed BUY Long entry (BTC is DUMPING {btc_info.get('price_1m_change')}%)!")
+                    elif btc_status == "PUMPING" and side == "SELL":
+                        side = "SKIP"
+                        confidence = 50.0
+                        print(f"🛡️ [BTC IMPULSE SHIELD] {symbol}: Suppressed SHORT entry (BTC is PUMPING +{btc_info.get('price_1m_change')}%)!")
+                except Exception:
+                    pass
+
+            # Extreme Funding Rate Guard (Avoid holding positions with adverse funding rate bleed)
+            if side == "BUY" and funding_rate > 0.0005:
+                side = "SKIP"
+                confidence = 50.0
+                print(f"🛡️ [FUNDING RATE SHIELD] {symbol}: Suppressed BUY Long due to extreme positive funding rate ({funding_rate*100:.3f}%)!")
+            elif side == "SELL" and funding_rate < -0.0005:
+                side = "SKIP"
+                confidence = 50.0
+                print(f"🛡️ [FUNDING RATE SHIELD] {symbol}: Suppressed SHORT due to extreme negative funding rate ({funding_rate*100:.3f}%)!")
+
     except Exception as ex:
         print(f"⚠️ [SIGNAL EVALUATION NOTICE] {symbol}: {ex}")
         side = "SKIP"
