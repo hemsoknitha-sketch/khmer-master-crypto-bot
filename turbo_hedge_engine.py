@@ -639,14 +639,20 @@ async def monitor_turbo_hedge_bots(app):
                 db.update_system_setting(f"turbo_hedge_{target_chat_id}_recovery_alert_sent", "0")
 
             user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
-            # 🛡️ Small Capital Portfolio Cap Shield (Strict Sizing Tier Guard):
+            # 🛡️ Institutional Portfolio Cap Shield (Strict Sizing Tier Guard):
             # Wallet < $35 USDT -> Cap to 1 Coin Max strictly!
             # Wallet $35 - $100 USDT -> Cap to 2 Coins Max
-            # Wallet >= $100 USDT -> Cap to 10 Coins Max
+            # Wallet $100 - $250 USDT -> Cap to 4 Coins Max
+            # Wallet $250 - $500 USDT -> Cap to 6 Coins Max
+            # Wallet >= $500 USDT -> Cap to 10 Coins Max
             if wallet_bal < 35.0:
                 max_allowed_coins = 1
             elif wallet_bal < 100.0:
                 max_allowed_coins = 2
+            elif wallet_bal < 250.0:
+                max_allowed_coins = 4
+            elif wallet_bal < 500.0:
+                max_allowed_coins = 6
             else:
                 max_allowed_coins = 10
 
@@ -660,9 +666,9 @@ async def monitor_turbo_hedge_bots(app):
                 print(f"🛡️ [AGI ANTI-CHURN SHIELD] User {target_chat_id}: Position closed <10 mins ago. Pausing auto-entry scanner to prevent Binance fee churn.")
                 continue
 
-            # 🛡️ Mandatory 65% Free Margin Buffer Shield for Small Accounts (< $100 USDT)
-            if wallet_bal < 100.0 and avail_bal < (wallet_bal * 0.65):
-                print(f"🛡️ [AGI MARGIN BUFFER SHIELD] Free margin (${avail_bal:.2f}) < 65% of wallet equity (${wallet_bal:.2f}). Pausing auto-expander scanner to guarantee liquidation protection.")
+            # 🛡️ Mandatory 50% Free Margin Buffer Shield across ALL Accounts:
+            if avail_bal < (wallet_bal * 0.50):
+                print(f"🛡️ [AGI MARGIN BUFFER SHIELD] Free margin (${avail_bal:.2f}) < 50% of wallet equity (${wallet_bal:.2f}). Pausing auto-expander scanner to guarantee liquidation protection.")
                 continue
 
             unit_amount = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_amount", "20.0"))
