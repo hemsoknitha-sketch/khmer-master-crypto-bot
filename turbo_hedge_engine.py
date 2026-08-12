@@ -708,14 +708,21 @@ async def monitor_turbo_hedge_bots(app):
 
                     is_spot = (user_side_input == "SPOT")
                     eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
-                    # 🎯 1. Sniper Ultra-Confluence Mode (Confidence Gate > 95.0% during VIP Recovery)
-                    min_conf_threshold = 95.0 if is_recovery_mode else 85.0
+                    
+                    # Reject any symbol flagged as SKIP by safety shields
+                    eval_side = eval_res.get("side", "SKIP")
+                    if eval_side == "SKIP":
+                        continue
+
+                    # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 89.0% during VIP Recovery)
+                    min_conf_threshold = 89.0 if is_recovery_mode else 85.0
                     if eval_res.get("confidence_pct", 0) < min_conf_threshold:
                         print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                         continue
 
-                    target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "BUY")
-                    exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, unit_leverage, target_chat_id)
+                    target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side
+                    exec_leverage = min(unit_leverage, 10) if is_recovery_mode else unit_leverage
+                    exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
                     
                     if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
                         db.add_turbo_hedge_bot(target_chat_id, c_cand, actual_trade_amount, unit_leverage, target_side, unit_tp)
