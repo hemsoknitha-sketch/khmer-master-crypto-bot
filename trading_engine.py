@@ -1785,9 +1785,9 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
                 print(f"⚠️ [BINANCE FUTURES ORDER FAIL AFTER FALLBACK] {res_fb.text}")
                 return {"status": "error", "error": res_fb.text}
 
-        # Handling Delisted / Invalid Symbol Status (-4140, -4141, -1121)
-        elif any(code in res.text for code in ["-4140", "-4141", "-1121", "Invalid symbol status"]):
-            print(f"🧹 [AGI AUTO-PRUNING NON-TRADABLE SYMBOL] Deactivating non-tradable symbol {symbol} from system_settings...")
+        # Handling Delisted / Invalid Symbol / TradFi Agreement Status (-4140, -4141, -1121, -4411)
+        elif any(code in res.text for code in ["-4140", "-4141", "-1121", "-4411", "Invalid symbol status", "TradFi-Perps", "agreement contract"]):
+            print(f"🧹 [AGI AUTO-PRUNING NON-TRADABLE SYMBOL] Deactivating non-tradable/agreement symbol {symbol} from system_settings...")
             try:
                 import database as db
                 conn = db.get_db_connection()
@@ -1797,7 +1797,7 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
                 conn.close()
             except Exception:
                 pass
-            return {"status": "skipped", "reason": f"Symbol {symbol} is non-tradable", "code": -4140}
+            return {"status": "skipped", "reason": f"Symbol {symbol} is non-tradable or requires agreement", "code": -4411}
 
         
         # Super Smart APEX TURBO AGI Dynamic Margin Auto-Recovery (-2019 Margin is Insufficient)

@@ -436,10 +436,11 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                 retry_qty = trading_engine.get_futures_max_sellable_qty(symbol, max(1.0, math.ceil(6.50 / price)))
                 res = trading_engine.execute_futures_order(api_key, api_secret, symbol, side, retry_qty, leverage=effective_leverage)
 
-            # Auto-Prune Non-Tradable / Closed Symbols (Error -1121, -4141, -4140)
-            elif any(code in err_str for code in ["-1121", "-4141", "-4140", "Invalid symbol status", "Symbol is closed"]):
-                print(f"🧹 [AUTO-PRUNING NON-TRADABLE SYMBOL] Deactivating invalid symbol {symbol} from system_settings...")
+            # Auto-Prune Non-Tradable / Closed / TradFi Agreement Symbols (Error -1121, -4141, -4140, -4411)
+            elif any(code in err_str for code in ["-1121", "-4141", "-4140", "-4411", "Invalid symbol status", "Symbol is closed", "TradFi-Perps", "agreement contract"]):
+                print(f"🧹 [AUTO-PRUNING NON-TRADABLE SYMBOL] Deactivating invalid/agreement symbol {symbol} from system_settings & applying 24h Cooldown...")
                 _failed_candidate_symbols.add(symbol)
+                add_symbol_cooldown(symbol, 86400)
                 try:
                     conn = db.get_db_connection()
                     cursor = conn.cursor()
