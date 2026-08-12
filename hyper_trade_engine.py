@@ -71,7 +71,7 @@ def scan_hft_opportunity(symbol: str = "BTCUSDT") -> dict:
         # 5. Institutional Risk-Reward Scoring Model (85% Win Rate Threshold)
         win_rate = 70.0
         side = "BUY"
-        is_delisting_setup = "DELIST" in symbol.upper() or vol_ratio > 4.0
+        is_delisting_setup = "DELIST" in symbol.upper()
 
         # Reject choppy range market unless it's a High-Yield Delisting / Whale Breakout
         if not is_delisting_setup and (abs(price_change_1m) < 0.05 or vol_ratio < 1.15):
@@ -82,7 +82,7 @@ def scan_hft_opportunity(symbol: str = "BTCUSDT") -> dict:
             win_rate = min(98.0, 85.0 + (price_change_1m * 10.0) + (vol_ratio * 2.0))
             side = "BUY"
             reason = f"🟢 Institutional Bullish Trend Alignment (1m: +{price_change_1m:.2f}%, Vol: {vol_ratio:.1f}x, RSI: {rsi:.1f})"
-        elif (price_change_1m < -0.05 or is_delisting_setup) and rsi > 30.0 and is_bearish_trend:
+        elif price_change_1m < -0.05 and rsi > 30.0 and is_bearish_trend:
             win_rate = min(99.0, 88.0 + (abs(price_change_1m) * 12.0) + (vol_ratio * 3.0))
             side = "SELL" # SHORT
             reason = f"🔴 Turbo High-Yield Bearish Death-Dump Alignment (1m: {price_change_1m:.2f}%, Vol: {vol_ratio:.1f}x, RSI: {rsi:.1f})"

@@ -1887,14 +1887,18 @@ def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "
     }
 
     if side == "BUY":
+        amount_usdt = max(5.50, amount_usdt)
         params["quoteOrderQty"] = f"{amount_usdt:.2f}"
     else:
-        # Fetch base asset spot balance to sell full position
+        # Fetch base asset spot balance to sell full position with LOT_SIZE precision
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
-        qty = get_spot_balance(api_key, api_secret, base_asset)
-        if qty <= 0:
+        raw_qty = get_spot_balance(api_key, api_secret, base_asset)
+        if raw_qty <= 0:
             return {"status": "error", "error": f"No {base_asset} spot balance available to sell"}
-        params["quantity"] = f"{qty:.8f}".rstrip('0').rstrip('.')
+        formatted_qty = get_max_sellable_qty(symbol, raw_qty)
+        if formatted_qty <= 0:
+            formatted_qty = raw_qty
+        params["quantity"] = f"{formatted_qty:.8f}".rstrip('0').rstrip('.')
 
     query_string = urlencode(params)
     signature = hmac.new(api_secret.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()

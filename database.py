@@ -2750,6 +2750,8 @@ def add_turbo_hedge_bot(chat_id: int, symbol: str, amount: float = 20.0, leverag
     symbol = symbol.upper().strip()
     if not symbol.endswith("USDT"):
         symbol += "USDT"
+    # Thoroughly purge any previous stale symbol settings before activating new bot
+    remove_turbo_hedge_bot(chat_id, symbol)
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_status", "ACTIVE")
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_amount", str(amount))
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_leverage", str(leverage))

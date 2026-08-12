@@ -284,21 +284,21 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
             # ✅ SMART MULTI-TIMEFRAME TREND FOLLOWING (RSI 25 - 75)
             else:
-                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.05:
+                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.05 and rsi14 < 72.0:
                     side = "BUY"
-                    base_conf = 86.0
+                    base_conf = 88.0
                     if vol_ratio > 1.3: base_conf += 4.0
                     if funding_rate < -0.0001: base_conf += 3.0
                     if whale_bid_wall: base_conf += 4.0
-                    confidence = min(98.5, max(85.0, base_conf))
+                    confidence = min(98.5, max(88.0, base_conf))
 
-                elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.05:
+                elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.05 and rsi14 > 28.0:
                     side = "SELL"
-                    base_conf = 86.0
+                    base_conf = 88.0
                     if vol_ratio > 1.3: base_conf += 4.0
                     if funding_rate > 0.0001: base_conf += 3.0
                     if whale_ask_wall: base_conf += 4.0
-                    confidence = min(98.5, max(85.0, base_conf))
+                    confidence = min(98.5, max(88.0, base_conf))
 
                 else:
                     side = "SKIP"
@@ -577,13 +577,25 @@ async def monitor_turbo_hedge_bots(app):
                 user_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
                 for b in user_bots:
                     b_sym = b.get("symbol")
-                    if b_sym in EXCLUDED_SYMBOLS or (b_sym in live_sym_map and live_sym_map[b_sym] == 0):
-                        if b_sym in EXCLUDED_SYMBOLS and live_sym_map.get(b_sym, 0) != 0:
-                            trading_engine.close_futures_position_for_symbol(f_keys[0], f_keys[1], b_sym)
-                            print(f"🛑 [SUPER SMART PURGE] Market Closed delisted symbol {b_sym} for User {target_chat_id}!")
-                        db.remove_turbo_hedge_bot(target_chat_id, b_sym)
-                        active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
-                        print(f"🧹 [CLOSED POSITION PURGED FROM DB] User {target_chat_id} {b_sym} purged to free slot!")
+                    b_side = str(b.get("side", "BUY")).upper()
+                    b_lev = int(b.get("leverage", 10))
+                    
+                    if b_side == "SPOT" or b_lev <= 1:
+                        # Spot position check: verify spot asset balance
+                        base_asset = b_sym.replace("USDT", "").replace("DODOX", "DODO")
+                        spot_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], base_asset)
+                        if spot_bal <= 0:
+                            db.remove_turbo_hedge_bot(target_chat_id, b_sym)
+                            active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
+                            print(f"🧹 [CLOSED SPOT POSITION PURGED FROM DB] User {target_chat_id} {b_sym} purged!")
+                    else:
+                        if b_sym in EXCLUDED_SYMBOLS or (b_sym in live_sym_map and live_sym_map[b_sym] == 0):
+                            if b_sym in EXCLUDED_SYMBOLS and live_sym_map.get(b_sym, 0) != 0:
+                                trading_engine.close_futures_position_for_symbol(f_keys[0], f_keys[1], b_sym)
+                                print(f"🛑 [SUPER SMART PURGE] Market Closed delisted symbol {b_sym} for User {target_chat_id}!")
+                            db.remove_turbo_hedge_bot(target_chat_id, b_sym)
+                            active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
+                            print(f"🧹 [CLOSED FUTURES POSITION PURGED FROM DB] User {target_chat_id} {b_sym} purged to free slot!")
 
                 # 2. Auto-discover active positions on Binance and sync to DB
                 active_syms = [b.get("symbol") for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
@@ -830,8 +842,34 @@ async def monitor_turbo_hedge_bots(app):
                     db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_active_leverage", str(dynamic_leverage))
                     print(f"⚡ [AI LEVERAGE ADJUSTMENT] {symbol}: Confidence {ai_confidence}% -> Active Leverage Updated to {dynamic_leverage}x on Binance!")
 
-            # 2. Check Live Real-Time Position Risk & PnL from Binance Futures API
-            pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
+            # 2. Check Live Real-Time Position Risk & PnL from Binance Spot or Futures API
+            if current_side == "SPOT" or leverage <= 1:
+                mark_p = trading_engine.get_current_price(symbol)
+                entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
+                entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
+                if entry_p <= 0 and mark_p > 0:
+                    entry_p = mark_p
+                    db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
+
+                base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+                spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+                if spot_qty <= 0:
+                    db.remove_turbo_hedge_bot(chat_id, symbol)
+                    continue
+
+                spot_pnl = (mark_p - entry_p) * spot_qty if (entry_p > 0 and mark_p > 0) else 0.0
+                pnl_info = {
+                    "has_position": True,
+                    "unrealizedProfit": spot_pnl,
+                    "entryPrice": entry_p,
+                    "markPrice": mark_p,
+                    "liquidationPrice": 0.0,
+                    "positionAmt": spot_qty,
+                    "side": "SPOT"
+                }
+            else:
+                pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
+
             if pnl_info.get("has_position"):
                 real_pnl_usdt = float(pnl_info.get("unrealizedProfit", 0.0))
                 entry_price = float(pnl_info.get("entryPrice", 0.0))
@@ -852,12 +890,23 @@ async def monitor_turbo_hedge_bots(app):
                     # 📊 Binance Native Direct Net ROI & PnL Formula (Deducts 2-Way Trading Fees 100%)
                     position_amt = float(pnl_info.get("positionAmt", 0.0))
                     notional_val = abs(position_amt * mark_price)
-                    # Binance Futures 2-Way Taker Fee Deduction (0.05% Entry + 0.05% Exit = 0.10% total)
-                    est_binance_fee = notional_val * 0.0010
+                    # Binance 2-Way Taker Fee Deduction
+                    est_binance_fee = notional_val * (0.0015 if current_side == "SPOT" else 0.0010)
                     # Net Realized/Unrealized PnL in Hand
                     net_pnl_usdt = real_pnl_usdt - est_binance_fee
 
-                    initial_margin = abs(position_amt * entry_price) / max(1.0, float(active_lev))
+                    if current_side == "SPOT":
+                        initial_margin = abs(position_amt * entry_price)
+                    else:
+                        init_m_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", "0.0")
+                        if float(init_m_str) > 0:
+                            initial_margin = float(init_m_str)
+                        else:
+                            entry_lev_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_leverage", str(leverage))
+                            entry_lev = float(entry_lev_str) if entry_lev_str.replace('.', '', 1).isdigit() else max(1.0, float(leverage))
+                            initial_margin = abs(position_amt * entry_price) / max(1.0, entry_lev)
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", str(initial_margin))
+
                     if initial_margin > 0:
                         binance_real_roi = (net_pnl_usdt / initial_margin) * 100.0
                     else:
@@ -918,10 +967,11 @@ async def monitor_turbo_hedge_bots(app):
 
                     if is_hard_circuit_breaker:
                         # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
-                        # Guarantees floating loss NEVER passes -15.0% ROI under any market volatility!
                         print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
-                        close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        if current_side == "SPOT":
+                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+                        else:
+                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
                         db.remove_turbo_hedge_bot(chat_id, symbol)
                         add_symbol_cooldown(symbol, 7200)
@@ -944,8 +994,10 @@ async def monitor_turbo_hedge_bots(app):
 
                     elif is_stagnant_timeout:
                         print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >4 hours with stagnant PnL (${real_pnl_usdt:.2f}). Market closing & applying 4-Hour Cooldown...")
-                        close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        if current_side == "SPOT":
+                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+                        else:
+                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
                         db.remove_turbo_hedge_bot(chat_id, symbol)
                         add_symbol_cooldown(symbol, 14400)
@@ -968,8 +1020,10 @@ async def monitor_turbo_hedge_bots(app):
 
                     elif is_stop_loss_hit:
                         print(f"🛡️ [STOP LOSS PROTECTOR] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Executing clean Market Close & 2-Hour Cooldown to prevent whipsaw losses...")
-                        close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        if current_side == "SPOT":
+                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+                        else:
+                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
                         db.remove_turbo_hedge_bot(chat_id, symbol)
                         add_symbol_cooldown(symbol, 7200)
@@ -994,8 +1048,10 @@ async def monitor_turbo_hedge_bots(app):
                         print(f"💰 [TURBO HEDGE {reason_tag}] {symbol}: Real PnL +${real_pnl_usdt:.2f} USDT (ROI: +{roi_pct:.1f}%) -> Closing Position (<50ms)...")
                         
                         # Market Close Position on Binance (<50ms)
-                        close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
+                        if current_side == "SPOT":
+                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+                        else:
+                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                         db.remove_turbo_hedge_bot(chat_id, symbol)
                         add_symbol_cooldown(symbol, 14400)  # 4-Hour Anti-Repeat Rotation Shield
 
