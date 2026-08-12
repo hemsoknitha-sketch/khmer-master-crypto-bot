@@ -16,13 +16,30 @@ _cooldown_symbols = {}
 
 def add_symbol_cooldown(symbol: str, duration_seconds: int = 7200):
     symbol = str(symbol).upper().strip()
-    _cooldown_symbols[symbol] = time.time() + duration_seconds
+    exp_ts = time.time() + duration_seconds
+    _cooldown_symbols[symbol] = exp_ts
+    try:
+        db.update_system_setting(f"turbo_hedge_cooldown_{symbol}", str(exp_ts))
+    except Exception:
+        pass
 
 def is_symbol_in_cooldown(symbol: str) -> bool:
     symbol = str(symbol).upper().strip()
     exp = _cooldown_symbols.get(symbol, 0)
-    if time.time() < exp:
+    now = time.time()
+    if exp > 0 and now < exp:
         return True
+    
+    # DB Persistent Fallback Check
+    try:
+        db_exp_str = db.get_system_setting(f"turbo_hedge_cooldown_{symbol}", "0.0")
+        db_exp = float(db_exp_str) if db_exp_str.replace('.', '', 1).isdigit() else 0.0
+        if db_exp > 0 and now < db_exp:
+            _cooldown_symbols[symbol] = db_exp
+            return True
+    except Exception:
+        pass
+        
     return False
 
 def is_close_successful(res) -> bool:
@@ -317,7 +334,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                         side = "SKIP"
                         confidence = 50.0
                         print(f"🛡️ [ANTI-PEAK BUYING PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% or RSI {rsi14:.1f} >= 68 -> Blocked BUY 100%!")
-                    if is_5m_bearish and ema5_1m < ema15_1m and rsi14 >= 68.0:
+                    elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.10 and rsi14 >= 68.0:
                         side = "SELL"
                         base_conf = 88.0
                         if whale_ask_wall: base_conf += 4.0
@@ -328,7 +345,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                         side = "SKIP"
                         confidence = 50.0
                         print(f"🛡️ [ANTI-BOTTOM SELLING PROTECTION] {symbol}: RSI {rsi14:.1f} <= 32 -> Blocked SELL 100%!")
-                    if is_5m_bullish and ema5_1m > ema15_1m and rsi14 <= 32.0:
+                    elif is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.10 and rsi14 <= 32.0:
                         side = "BUY"
                         base_conf = 88.0
                         if whale_bid_wall: base_conf += 4.0

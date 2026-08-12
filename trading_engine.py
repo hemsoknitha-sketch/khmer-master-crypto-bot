@@ -129,16 +129,18 @@ def get_futures_symbol_info(symbol):
     if not isinstance(symbol, str):
         symbol = str(symbol)
     symbol_str = symbol.upper().strip()
-    if not FUTURES_INFO_CACHE:
+    
+    if not FUTURES_INFO_CACHE or symbol_str not in FUTURES_INFO_CACHE:
         try:
             import requests
-            r = requests.get('https://fapi.binance.com/fapi/v1/exchangeInfo')
+            r = requests.get('https://fapi.binance.com/fapi/v1/exchangeInfo', timeout=5)
             if r.status_code == 200:
                 data = r.json()
-                for s in data['symbols']:
+                for s in data.get('symbols', []):
                     FUTURES_INFO_CACHE[s['symbol']] = s
         except Exception as e:
             print(f"Failed to fetch futures exchangeInfo: {e}")
+            
     return FUTURES_INFO_CACHE.get(symbol_str)
 
 def get_futures_max_sellable_qty(symbol: str, raw_qty: float) -> float:
@@ -1602,6 +1604,33 @@ def get_futures_max_leverage(api_key: str, api_secret: str, symbol: str) -> int:
     if "SOL" in symbol: return 75
     return 20
 
+_ONEWAY_MODE_CACHE = set()
+
+def ensure_oneway_position_mode(api_key: str, api_secret: str) -> bool:
+    """
+    Ensures user account is set to One-Way Position Mode (dualSidePosition = False).
+    Prevents Error -4061 (Order's position side does not match user's setting) on Hedge Mode accounts.
+    """
+    global _ONEWAY_MODE_CACHE
+    if not api_key or not api_secret:
+        return False
+    cache_key = api_key[-6:]
+    if cache_key in _ONEWAY_MODE_CACHE:
+        return True
+    try:
+        endpoint = "/fapi/v1/positionSide/dual"
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = urlencode({"dualSidePosition": "false", "recvWindow": 60000, "timestamp": timestamp})
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
+        if res.status_code == 200 or "-4059" in res.text: # -4059: No need to change position side
+            _ONEWAY_MODE_CACHE.add(cache_key)
+            return True
+    except Exception:
+        pass
+    return False
+
 _SET_LEVERAGE_CACHE = {}
 
 def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: int = 25) -> dict:
@@ -1612,6 +1641,8 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
     global _SET_LEVERAGE_CACHE
     if not api_key or not api_secret:
         return {"status": "error", "error": "No API keys provided"}
+
+    ensure_oneway_position_mode(api_key, api_secret)
 
     symbol = symbol.upper().strip()
     if not symbol.endswith("USDT"):

@@ -20,7 +20,9 @@ Apex TURBO AGI Engine v10.0 គឺជាប្រព័ន្ធជួញដូ�
 • យន្តការ Lock Leverage ដើមថេរលើ Position កំពុងរត់ (Fixed Initial Margin ROI Protection)
 • យន្តការប្រមូលផលចំណេញសុទ្ធដកថ្លៃសេវា (Fee-Deducted Net Profit Harvesting Floor)
 • យន្តការការពារដើមទុន Spot ($10.50 Min Notional & Top-Up Liquidator Guard & 2-15 Min Micro TP Scaling)
-• យន្តការស្អាតស្អំសតិចាស់ចោល ១០០% ពេលបិទ (Clean State Re-entry Memory Purge)
+• យន្តការស្វ័យប្រវត្តប្តូរ Binance Futures ទៅ One-Way Mode (Prevent Error -4061 on Hedge Mode Accounts)
+• យន្តការរក្សាទុក Blacklist Cooldown ក្នុង SQLite DB (Survives Bot Restarts & VPS Updates)
+• យន្តការស្កេនទាញយកទិន្នន័យកាក់ថ្មីៗ និង Meme Coins (Auto-Refresh ExchangeInfo for PEPE, SHIB, BONK)
 
 --------------------------------------------------------------------------------
 ២. យន្តការជួញដូរស្វ័យប្រវត្តិ /turbo_hedge (APEX TURBO HEDGE ENGINES v10.0)
@@ -36,8 +38,8 @@ Apex TURBO AGI Engine v10.0 គឺជាប្រព័ន្ធជួញដូ�
 យន្តការនេះជួយឲ្យប្រព័ន្ធជ្រើសរើសតែកាក់ Altcoins ដែលមានល្បឿនបម្រែបម្រួលតម្លៃ 3% ទៅ 35% ក្នុងរយៈពេលខ្លី ដើម្បីកើបប្រាក់ចំណេញបានលឿនបំផុត!
 
 ២.៣ យន្តការ Multi-Timeframe Anti-Peak & Anti-Bottom Shield (1m + 5m Trend Confluence)
-• Anti-Peak Protection ៖ នៅពេលកាក់មួយរត់ឡើងខ្លាំង (24h Change >= +15% ឬ RSI 1m >= 68) ប្រព័ន្ធនឹង ទប់ស្កាត់ការទិញ (BUY/LONG) 100%។ ប្រព័ន្ធតម្រូវដាច់ខាតឱ្យមាន 5m Bearish Trend Confluence (EMA20 < EMA50) មុននឹងអនុញ្ញាតឱ្យចូល SHORT នៅចំណុចកំពូល ការពារមិនឱ្យ SHORT ឆៅពេលកាក់ PUMP ឡើយ!
-• Anti-Bottom Protection ៖ នៅពេលកាក់មួយធ្លាក់ចុះខ្លាំង (RSI 1m <= 32) ប្រព័ន្ធនឹង ទប់ស្កាត់ការលក់ (SELL/SHORT) 100%។ ប្រព័ន្ធតម្រូវដាច់ខាតឱ្យមាន 5m Bullish Trend Confluence មុននឹងអនុញ្ញាតឱ្យចូល LONG នៅបាត!
+• Anti-Peak Protection ៖ នៅពេលកាក់មួយរត់ឡើងខ្លាំង (24h Change >= +15% ឬ RSI 1m >= 68) ប្រព័ន្ធនឹង ទប់ស្កាត់ការទិញ (BUY/LONG) 100%។ ប្រព័ន្ធតម្រូវដាច់ខាតឱ្យមាន 5m Bearish Trend Confluence និង 1m Negative Velocity (price_change_1m < -0.10%) មុននឹងអនុញ្ញាតឱ្យចូល SHORT នៅចំណុចកំពូល ការពារមិនឱ្យ SHORT ឆៅពេលកាក់ PUMP ឡើយ!
+• Anti-Bottom Protection ៖ នៅពេលកាក់មួយធ្លាក់ចុះខ្លាំង (RSI 1m <= 32) ប្រព័ន្ធនឹង ទប់ស្កាត់ការលក់ (SELL/SHORT) 100%។ ប្រព័ន្ធតម្រូវដាច់ខាតឱ្យមាន 5m Bullish Trend Confluence និង 1m Positive Velocity មុននឹងអនុញ្ញាតឱ្យចូល LONG នៅបាត!
 
 ២.៤ យន្តការ Smart Direct Reverse Flip (<15ms execution)
 នៅពេល Position មួយមានការខាតបង់បណ្តោះអាសន្នដល់ -10.0% ROI (ឬ -$2.00 USDT) ប្រព័ន្ធនឹងពិនិត្យមើល Trend រលកធំ 5m/15m (MTF Confluence) ៖
