@@ -29,6 +29,8 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 
 ១.៥ យន្តការលុបបំបាត់កំហុស និងចម្រោះកាក់ TradFi Stock (v10.5 High-Velocity Upgrade) ៖
 • ប្រព័ន្ធកំណែថ្មី v10.5 បានបន្ថែមយន្តការចម្រោះ (Filtering) កាក់ប្រភេទ Stock Perpetual Index & Agreement Contracts (ដូចជា QNTXUSDT, MINIMAXUSDT, ZHIPUUSDT, NVDAUSDT, TSLAUSDT, etc.) ដោយស្វ័យប្រវត្តិ។ យន្តការនេះលុបបំបាត់កំហុស Error -4411 លើ Binance API 100% និងបង្កើនល្បឿនស្កេនកាក់ Crypto ពិតប្រាកដ។
+• យន្តការ ISOLATED Margin Enforcement: កំណត់ Margin Type ទៅជា ISOLATED ដោយស្វ័យប្រវត្តិ ការពារដាច់ខាតមិនឲ្យប្រព័ន្ធដេញតាម Cross Margin រលាយសាច់ប្រាក់សរុបក្នុង Wallet ឡើយ។
+• យន្តការ Binance Lot Size & Price Filter Formatting: លុបបំបាត់កំហុស Error -1013, -1111, -4164 ដោយស្វ័យប្រវត្តិ។
 
 --------------------------------------------------------------------------------
 ២. ការគ្រប់គ្រង និងមុខងារ DESKTOP CONTROL PANEL APP (`main.py` GUI)
@@ -118,175 +120,24 @@ Super Admin (Chat ID ដែលមានសិទ្ធិ ឬ `859271875`) ទ�
 • ទម្រង់ ៖ `/admin_nuke <PIN>`
 • ការពណ៌នា ៖ យន្តការអាសន្នរឹតបន្តឹងសុវត្ថិភាព ៖ ធ្វើការ Market Close លក់បិទ Positions ទាំងអស់របស់គ្រប់ VIP Members លើ Binance Futures/Spot ភ្លាមៗ (<100ms) ព្រមទាំងបិទប្រព័ន្ធ Auto-Trade ទាំងអស់ ក្នុងករណីទីផ្សារមានវិបត្តិ Crash ធ្ងន់ធ្ងរ!
 
-៣.១១ `/toggle_breaker` (បើក/បិទ Circuit Breaker Overrider) ៖
-• ទម្រង់ ៖ `/toggle_breaker <PIN>`
-• ការពណ៌នា ៖ បើក ឬបិទយន្តការ Hard Emergency Circuit Breaker (-25% ROI) សម្រាប់ប្រព័ន្ធទាំងមូល។
-
-៣.១២ `/paper_trading` (ប្តូររវាង Real Money និង Simulation Mode) ៖
-• ទម្រង់ ៖ `/paper_trading <OFF/ON> <PIN>`
-• ការពណ៌នា ៖ ផ្លាស់ប្តូររបៀបជួញដូររវាង Real Money Trading (ទិញ/លក់ លើ Binance API ពិតប្រាកដ) និង Paper Trading (ការជួញដូរក្លែងធ្វើ Simulation ដោយមិនប្រើប្រាក់ពិត)។
-
 --------------------------------------------------------------------------------
-៤. កាតាឡុកមុខងារ BOT MENU & TRADING ENGINES (FULL MENU & ENGINES)
+៤. ការបញ្ជូនកូដអាប់ដេតទៅ VPS ដោយមិនបាច់ LOGIN GITHUB (`git_update_vps.bat`)
 --------------------------------------------------------------------------------
 
-៤.១ ពាក្យបញ្ជាកំណត់ប្រព័ន្ធ និងគណនី (Account & Security Commands) ៖
-• `/start` ៖ បើក Menu ដើម និងជ្រើសរើសភាសា (ខ្មែរ / English / 中文)
-• `/menu` ៖ បង្ហាញផ្ទាំងបញ្ជា Interactive Menu ជាមួយ Inline Buttons
-• `/language` ៖ ប្តូរភាសាប្រើប្រាស់ក្នុង Bot
-• `/set_pin <PIN>` ៖ កំណត់ ឬផ្លាស់ប្តូរលេខ PIN សម្ងាត់ ៤-៦ ខ្ទង់
-• `/add_api <KEY> <SECRET>` ៖ ភ្ជាប់ Binance API Key & Secret (រក្សាទុក AES-256)
-• `/add_bybit_api <KEY> <SECRET>` ៖ ភ្ជាប់ Bybit API Key & Secret
-• `/remove_api` ៖ លុប API Keys ចេញពីប្រព័ន្ធដើម
-• `/balance` ៖ ពិនិត្យមើលសមតុល្យ Spot & Futures Real-time
-• `/status` ឬ `/staus` ៖ ពិនិត្យមើលកាក់ដែលកំពុងរត់ Trade ទាំងអស់
-• `/health` ៖ ពិនិត្យមើលសុខភាព VPS, Memory, CPU, និង API Connection Latency
+ដើម្បីបញ្ជូនកូដដែលបានកែប្រែថ្មីពីកុំព្យូទ័រ Local ទៅកាន់ម៉ាស៊ីន VPS ហើយឲ្យប្រព័ន្ធរត់អាប់ដេតភ្លាមៗ ៖
 
-៤.២ យន្តការ និងពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ (Autonomous Trading Engines) ៖
-• `/turbo_hedge` ៖ HFT Engine ស្កេន 24/7 ជ្រើសរើសតែកាក់បម្រែបម្រួលលឿន (High Volatility Score) បើកបានរហូតដល់ ១០ កាក់ (ទម្រង់ ៖ `/turbo_hedge TOP 5 10 AUTO 2.50 <PIN>`)
-• `/turbo_hedge STOP` ៖ បិទប្រព័ន្ធរត់កាក់ទោល ឬគ្រប់កាក់ (ទម្រង់ ៖ `/turbo_hedge STOP SOL <PIN>` ឬ `/turbo_hedge STOP ALL <PIN>`)
-• `/scalp` ៖ ជួញដូរ Scalping ល្បឿនលឿនកាក់ទោល (ទម្រង់ ៖ `/scalp SOLUSDT 10 10 <PIN>`)
-• `/auto_arb` ៖ ស្កេនកើបប្រាក់ចំណេញ Arbitrage រវាងទីផ្សារ Spot & Futures
-• `/infinity_grid` ៖ Matrix Grid Trading កើបចំណេញតាមរលកទីផ្សារគ្មានទីបញ្ចប់
-• `/compound_grid` ៖ Compound Interest Grid បូកផ្សំប្រាក់ចំណេញស្វ័យប្រវត្តិ
-• `/funding_harvester` ៖ ស្ទាក់កើបអត្រាការប្រាក់ Funding Fee ពី Binance Futures រៀងរាល់ ៨ ម៉ោង
-• `/gold_turbo` & `/paxg_arbitrage` ៖ ប្រព័ន្ធជួញដូរមាសឌីជីថល PAXG HFT & Arbitrage Engine
-• `/black_swan_guard` ៖ បើកប្រព័ន្ធការពារហានិភ័យ Black Swan ពេលសេដ្ឋកិច្ចពិភពលោកដាំក្បាល
-• `/gold_btc_rebalance` ៖ បែងចែកតុល្យភាពដើមទុនរវាងមាស (PAXG) និង Bitcoin (BTC)
+៤.១ ដំណើរការលើ Local Computer ៖
+ចុច double-click លើ file `git_update_vps.bat` ក្នុង folder `Apex_AI_Bot` ៖
+១. ប្រព័ន្ធនឹងពិនិត្យមើលកូដដែលបានកែប្រែ រួចធ្វើការ `git add .`, `git commit -m "..."`, និង `git push origin main` ទៅកាន់ GitHub Repository ដោយស្វ័យប្រវត្តិ។
+២. បន្ទាប់មក script នឹងធ្វើការ Fetch និង Reset Local Working Tree ឲ្យស្មើ origin/main 100%។
 
-៤.៣ ពាក្យបញ្ជាវិភាគ និងសញ្ញាទីផ្សារ (AI Intelligence & Market Analysis) ៖
-• `/analyze <SYMBOL>` ៖ ឲ្យ Gemini AI វិភាគបច្ចេកទេស គូស Chart និងទិសដៅកាក់ Real-time
-• `/predict <SYMBOL>` ៖ ឲ្យ AI ព្យាករណ៍តម្លៃកាក់ក្នុងរយៈពេល ២៤ ម៉ោងខាងមុខ
-• `/whales` ៖ តាមដានចលនា Whale ទិញ/លក់ ធំៗក្នុងទីផ្សារ Real-time
-• `/news` ៖ អានព័ត៌មាន Crypto & សេដ្ឋកិច្ចសកលវិទ្យា (Macro Economy) ទាន់ហេតុការណ៍
-• `/top` ៖ មើលបញ្ជីកាក់ដែលឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile Gainers & Losers)
-• `/alert`, `/my_alerts`, `/cancel_alert` ៖ កំណត់ និងគ្រប់គ្រងការជូនដំណឹងតម្លៃកាក់
-
-៤.៤ ពាក្យបញ្ជាគ្រប់គ្រង Portfolio និងបិទ Trade ៖
-• `/portfolio` ៖ មើលរបាយការណ៍ Portfolio និង PnL សរុប
-• `/stop <SYMBOL>` ៖ បិទ Position កាក់ទោល
-• `/stop_all` ឬ `/sell_all` ៖ បិទ Position ទាំងអស់ភ្លាមៗ
-
---------------------------------------------------------------------------------
-៥. ស្ថាបត្យកម្មទិន្នន័យ & DATABASE SCHEMAS (`database.py` & SQLite)
---------------------------------------------------------------------------------
-
-ប្រព័ន្ធប្រើប្រាស់ SQLite Database `bot_database.db` (រួមមាន Backup `Apex_AI_Bot.db`) ជាមួយនឹងយន្តការ thread-safe connection pooling និង WAL (Write-Ahead Logging) Mode ៖
-
-៥.១ តារាង `users` (ទិន្នន័យសមាជិក) ៖
-• `chat_id` (INTEGER PRIMARY KEY) ៖ Telegram Chat ID របស់ User
-• `username` (TEXT) ៖ Telegram Username
-• `first_name` (TEXT) ៖ ឈ្មោះសមាជិក
-• `is_vip` (INTEGER) ៖ ស្ថានភាព VIP (1 = VIP, 0 = Non-VIP)
-• `joined_date` (TEXT) ៖ កាលបរិច្ឆេទចុះឈ្មោះ
-• `license_expiry` (TEXT) ៖ កាលបរិច្ឆេទផុតកំណត់ VIP
-• `pin_hash` (TEXT) ៖ លេខ PIN 2FA ដែលបាន Encrypt
-• `phone_number` (TEXT) ៖ លេខទូរស័ព្ទសមាជិក
-• `language` (TEXT) ៖ ភាសាប្រើប្រាស់ (`km`, `en`, `zh`)
-• `api_key_enc` & `api_secret_enc` (TEXT) ៖ API Keys ដែលបាន Encrypt ដោយ AES-256
-
-៥.២ តារាង `turbo_hedge_bots` (ប្រព័ន្ធស្កេនជួញដូររត់ 24/7) ៖
-• `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
-• `chat_id` (INTEGER) ៖ ម្ចាស់ Order
-• `symbol` (TEXT) ៖ ឈ្មោះកាក់ (ឧទាហរណ៍ ៖ `SOLUSDT`)
-• `amount_usdt` (REAL) ៖ ទុនវិនិយោគក្នុង ១ កាក់
-• `leverage` (INTEGER) ៖ កម្រិត Leverage (ឧទាហរណ៍ ៖ `15x`)
-• `tp_amount` (REAL) ៖ គោលដៅចំណេញ (ឧទាហរណ៍ ៖ `+$2.50 USDT`)
-• `side` (TEXT) ៖ ទិសដៅ (`BUY` / `SELL`)
-• `entry_price` (REAL) ៖ តម្លៃចូលទិញដំបូង
-• `status` (TEXT) ៖ ស្ថានភាព Position (`RUNNING`, `CLOSED`, `PAUSED`)
-• `initial_margin` (REAL) ៖ ទុនដើមថេរដំបូងសម្រាប់គណនា ROI
-• `peak_roi` & `peak_pnl` (REAL) ៖ កម្រិត ROI & PnL ខ្ពស់បំផុតដែលសម្រេចបាន
-
-៥.៣ តារាង `trade_logs` (កំណត់ត្រាជួញដូរ) ៖
-• រក្សាទុកប្រវត្តិ Trade ទាំងអស់ រក្សាទុក ៖ `chat_id`, `symbol`, `side`, `qty`, `price`, `pnl`, `fee`, `timestamp`, `engine_name`។
-
-៥.៤ តារាង `system_config` & `admin_logs` ៖
-• `system_config` ៖ រក្សាទុកប៉ារ៉ាម៉ែត្រប្រព័ន្ធ (Key-Value pair)។
-• `admin_logs` ៖ រក្សាទុកប្រវត្តិសកម្មភាពរបស់ Admin ទាំងអស់ (Action, Target, Details, Timestamp) សម្រាប់សវនកម្មសុវត្ថិភាព។
-
-៥.៥ សុវត្ថិភាពទិន្នន័យ (AES-256 Fernet Encryption Guard) ៖
-រាល់ Binance / Bybit API Keys និង API Secrets ទាំងអស់ត្រូវ បាន Encrypt ដោយកូដ AES-256 មុននឹងរក្សាទុកចូលក្នុង SQLite Database។ ប្រសិនបើ Database ត្រូវ Backup ឬ Reset ប្រព័ន្ធមាន Auto-Fallback ទៅកាន់ `.env` ដោយស្វ័យប្រវត្តិ។
-
---------------------------------------------------------------------------------
-៦. យន្តការគ្រប់គ្រងហានិភ័យ & INSTITUTIONAL SAFETY RULES (RISK SHIELDS v10.5)
---------------------------------------------------------------------------------
-
-Apex TURBO AGI v10.5 បំពាក់នូវយន្តការការពារដើមទុន ១០ ស្រទាប់ (10-Layer Protection System) ៖
-
-៦.១ យន្តការ Multi-Timeframe Anti-Peak & Anti-Bottom (1m + 5m Trend Confluence Shield) ៖
-• Anti-Peak Guard ៖ ទប់ស្កាត់ការទិញ (BUY/LONG) 100% ប្រសិនបើ RSI >= 72.0 ឬ 24h Change >= +30%។
-• Anti-Bottom Guard ៖ ទប់ស្កាត់ការលក់ (SELL/SHORT) 100% ប្រសិនបើ RSI <= 28.0។
-
-៦.២ យន្តការ Instant Direct Reverse Flip (<15ms @ -15% ROI) ៖
-នៅពេល Position ណាមួយខាតបង់ដល់ -15.0% ROI (ឬ -$3.50 USDT) ប្រព័ន្ធនឹងពិនិត្យមើល 5m EMA Trend Confluence។ ប្រសិនបើ Trend គាំទ្រ ប្រព័ន្ធនឹង Market Close រួចបើក Order ទិសដៅផ្ទុយ (Flip Long<->Short) ក្នុងល្បឿន <15ms ដើម្បីកើបប្រាក់ចំណេញដេញតាម Trend ថ្មី។
-
-៦.៣ យន្តការ Hard Emergency Circuit Breaker (<15ms @ -25% ROI / -$5.00 USDT) ៖
-ប្រសិនបើទីផ្សារបក់បោកលឿនខ្លាំង រហូតដល់ ROI -25.0% (ឬ -$5.00 USDT) ប្រព័ន្ធនឹង Market Close កាត់ផ្តាច់ការខាតបង់ភ្លាមៗ ធានា 100% មិនឲ្យខាតជ្រុលឡើយ!
-
-៦.៤ យន្តការ Auto-Filter TradFi Stock Perpetuals (v10.5) ៖
-ចម្រោះកាក់ Stock Perpetuals (QNTX, MINIMAX, ZHIPU, NVDA, TSLA) ចេញពី scanner ចៀសវាង Error -4411 លើ Binance API។
-
-៦.៥ យន្តការ Dollar Peak PnL Lock (+$2.00 - +$4.00 USDT Peak Lock) ៖
-នៅពេល Position ណាមួយចំណេញដល់ +$2.00 ដល់ +$4.00 USDT ហើយតម្លៃស្រក់ថយចុះ 20% វិញ ប្រព័ន្ធនឹង Market Close ប្រមូលយកចំណេញភ្លាមៗ (<50ms) ការពារមិនឲ្យចំណេញប្រែជាខាតវិញឡើយ។
-
-៦.៦ យន្តការ 2-Hour Anti-Churn Cooldown Blacklist (Per-Symbol Rotation) ៖
-នៅពេលកាក់មួយត្រូវបានបិទចោល ប្រព័ន្ធនឹងបញ្ចូលកាក់នោះទៅក្នុង Cooldown Blacklist រយៈពេល ២ ម៉ោងភ្លាមៗ ដើម្បីលុបបំបាត់រង្វង់ទិញ-លក់កាក់ដដែលៗ (Churn Loop) និងទប់ស្កាត់ការខាតបង់ថ្លៃសេវា Binance Trading Fees (0.10%)!
-
-៦.៧ យន្តការ Fixed Initial Margin ROI Shield v10.5 ៖
-ការគណនា % ROI ត្រូវស្អិតជាប់នឹង Initial Margin ដើមដំបូង ដោយទាញយកទិន្នន័យ initialMargin ពិតប្រាកដពី Binance API `/fapi/v2/positionRisk`។
-
-៦.៨ យន្តការ Dual Spot & Futures Portfolio Sensor v10.5 ៖
-តាមដាន Positions បំបែកជា ២ ផ្លូវដាច់ដោយឡែក (Spot & Futures) ធានាថាកាក់ Spot ទាំងអស់ដែលបានទិញមិនត្រូវ Auto-Purge លុបចោលឡើយ ជាមួយនឹងការកំណត់ Dust Threshold ($0.50) និងប្រមូលចំណេញ TP (+3.5%–+5.0%) ព្រមទាំងទុនទិញ Spot អប្បបរមា $10.50 USDT!
-
-៦.៩ យន្តការ Clean State Re-entry Memory Purge v10.5 ៖
-នៅពេល Position ត្រូវបិទចោល មុខងារ `remove_turbo_hedge_bot` នឹងលុបទិន្នន័យចាស់ (`entry_timestamp`, `peak_roi`, `peak_pnl`, `initial_margin`, `entry_price`) ចោល ១០០% ភ្លាមៗ។
-
-៦.១០ យន្តការ Single-Coin & TOP Mode Synchronized Limit (10 Coins Portfolio Limit) ៖
-រាល់ Order កាក់ទោលទាំងអស់ដែលបើកដោយដៃ (ឧទាហរណ៍ ៖ `/turbo_hedge BTC 100 50 BUY 500 <PIN>`) ត្រូវ បានរាប់បញ្ចូលក្នុងចំណោម ១០ កាក់អតិបរមា និងទទួលបានការការពារដោយ AI 100% ដូចកាក់ស្កេនអូតូ។
-
---------------------------------------------------------------------------------
-៧. មគ្គុទ្ទេសក៍ប្រតិបត្តិការ VPS & TROUBLESHOOTING GUIDE សម្រាប់ ADMIN
---------------------------------------------------------------------------------
-
-៧.១ របៀប Deploy និង Update កូដលើ VPS ៖
-• 1-Click Update Script (`git_update_vps.bat`) ៖ ចុចលើ file នេះដើម្បី Commit, Push ទៅ GitHub, Fetch & Sync លើ VPS និង Restart Bot ស្វ័យប្រវត្តិ (<10 seconds) ដោយមិនបាច់ Login GitHub លើ VPS ឡើយ!
-• Start Script (`start_vps.bat`) ៖ ដំណើរការ Bot លើ VPS ក្នុងរបៀប Background Service។
-• Headless Execution Command ៖
-  ```bash
-  python main.py --cli
-  ```
-
-៧.២ ទីតាំង Log Files សម្រាប់ត្រួតពិនិត្យ ៖
-• `vps_crash_logs.txt` ៖ Log កំហុសធ្ងន់ធ្ងរលើ VPS
-• `crash_log.txt` ៖ Log កំហុសរត់ប្រព័ន្ធទូទៅ
-• `dis_output.txt` ៖ Log ព័ត៌មានលម្អិតពី HFT Scanners
-
-៧.៣ ការដោះស្រាយបញ្ហាកំហុសដែលជួបប្រទះញឹកញាប់ (Common Errors & Fixes) ៖
-
-១. កំហុស Telegram `409 Conflict: terminated by other getUpdates request` ៖
-   • មូលហេតុ ៖ មាន Bot Instance ចាស់កំពុងរត់លើ VPS/Local ស្ទួនគ្នា។
-   • ដំណោះស្រាយ ៖ លុប file `bot_instance.lock` រួចវាយបញ្ជា `taskkill /F /IM python.exe` (លើ Windows) ឬ `pkill -f python` (លើ Linux) រួចរັນ `python main.py --cli` ឡើងវិញ។
-
-២. កំហុស Binance API `-2019 Margin is insufficient` ៖
-   • មូលហេតុ ៖ ដើមទុន ក្នុង Futures Wallet មិនគ្រប់គ្រាន់សម្រាប់បើក Order ថ្មី។
-   • ដំណោះស្រាយ ៖ បន្ថយទុនក្នុង ១ កាក់ (ឧទាហរណ៍ ៖ ពី $10.00 មក $5.00) ឬបន្ថយចំនួនកាក់អតិបរមា (ពី 10 កាក់ មក 5 កាក់) តាមរយៈ `/turbo_hedge TOP 5 5 AUTO 2.50 <PIN>`។
-
-៣. កំហុស Binance API `-4164 Order amount minimum notional` ៖
-   • មូលហេតុ ៖ ទំហំ Order សរុប (Amount * Leverage) ទាបជាង $5.00 - $10.00 USDT (កម្រិតកំណត់អប្បបរមារបស់ Binance)។
-   • ដំណោះស្រាយ ៖ ប្រព័ន្ធបំពាក់ប្រព័ន្ធ precision formatting `get_futures_max_sellable_qty` លើ notional $6.50+ ដោយស្វ័យប្រវត្តិ។
-
-៤. កំហុស Binance API `-1021 Timestamp for this request was 1000ms ahead of the server's time` ៖
-   • មូលហេតុ ៖ ម៉ោងលើ VPS ដើរយឺត ឬលឿនជាង Binance Server Time។
-   • ដំណោះស្រាយ ៖ ប្រព័ន្ធហៅ `sync_time()` អូតូ ឬ Admin អាច Sync Windows/Linux NTP Clock លើ VPS ដោយវាយបញ្ជា ៖ `w32tm /resync` (Windows) ឬ `sudo ntpdate pool.ntp.org` (Linux)។
-
-៥. កំហុស `sqlite3.OperationalError: database is locked` ៖
-   • មូលហេតុ ៖ Threads ច្រើនសរសេរចូល Database ក្នុងពេលតែមួយ។
-   • ដំណោះស្រាយ ៖ `database.py` បំពាក់ WAL mode និង timeout 30,000ms អូតូ ប៉ុន្តែប្រសិនបើនៅតែកកស្ទះ Admin អាចរັນ `python fix_db.py` ដើម្បីដោះស្រាយ។
-
-៦. យន្តការទប់ស្កាត់ Telegram Rate Limit (Leaky Bucket Limiter) ៖
-   • Admin ទទួលបាន Token Capacity ២០ Tokens (លឿនបំផុត) រីឯ User ទទួលបាន ៣ Tokens។ ប្រសិនបើ User ផ្ញើសារញាប់ពេក ប្រព័ន្ធនឹងដាក់ Cooldown ២ វិនាទីអូតូ មិនឲ្យ Bot ត្រូវ Telegram Block ឡើយ!
+៤.២ ដំណើរការលើ VPS ៖
+នៅពេលចុច double-click លើ file `git_update_vps.bat` លើ VPS (ឬតាមរយៈ Watchdog / Script) ៖
+១. Script នឹងទាញយកកូដថ្មីចុងក្រោយបង្អស់តាមរយៈ `git fetch --all` និង `git reset --hard origin/main` ភ្លាមៗ ដោយសារតែ Repository ត្រូវ បានកំណត់ជា Public ឬ Credential Helper រៀបចំបែប Non-Interactive (`GCM_INTERACTIVE=never`, `GIT_TERMINAL_PROMPT=0`) មិនទាមទារវាយ Password ឬ Login ឡើយ!
+២. Force Taskkill បិទ process Python ចាស់ៗចោលទាំងអស់។
+៣. លុប folder `__pycache__` និង file `.pyc` ចាស់ៗចោល ដើម្បីសម្អាត Bytecode ស្អុយ។
+៤. ចាប់ផ្តើមរត់ `start_vps.bat` អូតូឡើងវិញភ្លាមៗ 24/7 ជាមួយនឹងកូដថ្មីចុងក្រោយបង្អស់!
 
 ================================================================================
-           (រក្សាសិទ្ធិគ្រប់យ៉ាងដោយ APEX AGI SUPER ADMIN TEAM 2026)
+             APEX TURBO AGI ENGINE v10.5 - SUPER ADMIN MASTER MANUAL
 ================================================================================

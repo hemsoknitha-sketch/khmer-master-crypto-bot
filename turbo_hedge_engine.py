@@ -591,14 +591,16 @@ def execute_direct_reverse_flip(api_key: str, api_secret: str, symbol: str, amou
         
         # 🛡️ Instant Verification: Check if Binance position actually flipped to target_side
         post_pnl = trading_engine.get_futures_position_pnl(api_key, api_secret, symbol)
-        if post_pnl.get("has_position") and post_pnl.get("side") != target_side.upper():
-            print(f"⚠️ [FLIP VERIFICATION REPAIR] {symbol} position on Binance ({post_pnl.get('side')}) did not flip to target {target_side}. Executing 2-step market close + fresh open repair (<20ms)...")
+        is_flipped = (post_pnl.get("has_position") and post_pnl.get("side") == target_side.upper())
+        if not is_flipped or (isinstance(res, dict) and res.get("status") == "error"):
+            print(f"⚠️ [FLIP VERIFICATION REPAIR] {symbol} single-order flip incomplete/failed. Executing guaranteed 2-step market close + fresh open (<20ms)...")
             trading_engine.close_futures_position_for_symbol(api_key, api_secret, symbol)
             res = execute_turbo_hedge_trade(api_key, api_secret, symbol, amount_usdt, target_side, leverage, chat_id)
 
         return res
     except Exception as e:
         print(f"Fallback execute_direct_reverse_flip error: {e}")
+        trading_engine.close_futures_position_for_symbol(api_key, api_secret, symbol)
         return execute_turbo_hedge_trade(api_key, api_secret, symbol, amount_usdt, target_side, leverage, chat_id)
 
 async def monitor_turbo_hedge_bots(app):

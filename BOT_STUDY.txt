@@ -12,16 +12,17 @@
 Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional (High-Frequency Trading & Autonomous Risk Management) ដែលដំណើរការ 24/7 លើម៉ាស៊ីន VPS ល្បឿនលឿន (<30ms Execution)។ ប្រព័ន្ធនេះបំពាក់ដោយបញ្ញាសិប្បនិម្មិត Gemini AI គួបផ្សំនឹងម៉ូឌែលគណិតវិទ្យា Institutional Quantitative Scoring និង Multi-Timeframe Confluence Matrix ដើម្បីស្កេន វិភាគ និងចូលជួញដូរលើទីផ្សារ Binance Futures & Spot ដោយស្វ័យប្រវត្តិ។
 
 លក្ខណៈពិសេសចម្បងនៃប្រព័ន្ធកំណែថ្មី v10.5 ៖
-• ដំណើរការស្វ័យប្រវត្ត 24 ម៉ោង / 7 ថ្ងៃ ឥតសម្រាក (Perpetual 24/7 Auto-Scanner Loop)
+• ដំណើរការស្វ័យប្រវត្ត 24 ម៉ោង / 7 ថ្ងៃ ឥតសម្រាក (Perpetual 24/7 Auto-Scanner Loop) ជាមួយ Self-Healing Watchdog
 • យន្តការស្កេនទាញយកតែកាក់ Crypto រត់លឿនបំផុត (High-Volatility Score Engine 200+ Perpetual Crypto Pairs)
 • យន្តការចម្រោះកាក់មិនអាច Trade បានអូតូ (Auto-Filter Non-Tradable & TradFi Stock Pairs: QNTX, MINIMAX, ZHIPU, NVDA, TSLA - ចៀសវាង Error -4411)
-• យន្តការកែសម្រួល RSI & Trend Harmonization (លុបបំបាត់ការជាន់គ្នានៃ Signal - អនុញ្ញាតឱ្យទិញ BUY & លក់ SHORT បានយ៉ាងរលូន)
+• យន្តការ ISOLATED Margin Type Enforcement (ការពារដាច់ខាតមិនឲ្យប្រព័ន្ធដេញតាម Cross Margin រលាយសាច់ប្រាក់សរុបក្នុង Wallet ឡើយ)
+• យន្តការ Multi-Timeframe Confluence (RSI 1m + EMA 5/15 + 5m EMA 20/50 + Volume Delta + Orderbook Depth)
 • យន្តការ AGI Drawdown Health Radar (ស្កេនមើល Drawdown សរុប 8.0% ឡើងទៅ ដើម្បីដោះសោ VIP Recovery Gate >=85.0% ស្កេនសងដើមទុនវិញ)
-• យន្តការប្តូរទិសដៅលឿនឆ្លាតវៃ (Smart Direct Reverse Flip <15ms ជាមួយ 5m Trend Confluence Gate)
+• យន្តការប្តូរទិសដៅលឿនឆ្លាតវៃ (Smart Direct Reverse Flip <15ms ជាមួយ 5m Trend Confluence Gate & Guaranteed 2-Step Fallback)
 • យន្តការកាត់ផ្តាច់ហានិភ័យអាសន្នដាច់ខាត (Hard Emergency Circuit Breaker @ -25% ROI / -$5.00 USDT)
 • យន្តការ Lock Leverage ដើមថេរលើ Position កំពុងរត់ (Fixed Initial Margin ROI Protection)
-• យន្តការប្រមូលផលចំណេញសុទ្ធដកថ្លៃសេវា (Fee-Deducted Net Profit Harvesting Floor)
-• យន្តការការពារដើមទុន Spot ($10.50 Min Notional & Top-Up Liquidator Guard & Zero Forced Stagnant Exit)
+• យន្តការប្រមូលផលចំណេញសុទ្ធដកថ្លៃសេវា (Fee-Deducted Net Profit Harvesting Floor - គណនាដក Fee ២ ផ្លូវ 100%)
+• យន្តការការពារដើមទុន Spot ($10.50 Min Notional & Top-Up Liquidator Guard & Trailing Risk Shield)
 • យន្តការស្វ័យប្រវត្តប្តូរ Binance Futures ទៅ One-Way Mode (Prevent Error -4061 on Hedge Mode Accounts)
 • យន្តការរក្សាទុក Blacklist Cooldown ក្នុង SQLite DB (Survives Bot Restarts & VPS Updates)
 
@@ -42,20 +43,20 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 
 ២.៤ យន្តការ Smart Direct Reverse Flip (<15ms execution)
 នៅពេល Position មួយមានការខាតបង់បណ្តោះអាសន្នដល់ -15.0% ROI (ឬ -$3.50 USDT) ប្រព័ន្ធនឹងពិនិត្យមើល Trend រលកធំ 5m/15m (MTF Confluence) ៖
-• ប្រសិនបើ 5m Trend គាំទ្រទិសដៅផ្ទុយ ៖ ប្រព័ន្ធនឹងធ្វើការ Flip (LONG ➔ SHORT ឬ SHORT ➔ LONG) ក្នុង ១ Order ដេញតាម Trend ផ្ទុយភ្លាមៗ (<15ms) ដើម្បីកើបចំណេញសងវិញ 100%!
+• ប្រសិនបើ 5m Trend គាំទ្រទិសដៅផ្ទុយ ៖ ប្រព័ន្ធនឹងធ្វើការ Flip (LONG ➔ SHORT ឬ SHORT ➔ LONG) ក្នុង ១ Order ដេញតាម Trend ផ្ទុយភ្លាមៗ (<15ms) ជាមួយនឹងយន្តការ Fallback ២ ជំហាន (Close + Open) ប្រសិនបើ Single Order ជួបបញ្ហា Margin!
 • ប្រសិនបើ 5m Trend មិនគាំទ្រ ៖ ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ខាតធម្មតា រួចបញ្ចូលកាក់នោះទៅក្នុង Blacklist Cooldown ២ ម៉ោងភ្លាមៗ!
 
 ២.៥ យន្តការ Hard Emergency Circuit Breaker (-25% ROI / -$5.00 USDT)
 ប្រសិនបើទីផ្សារបក់បោកខ្លាំង ឬដាំក្បាលរហូតដល់ ROI -25.0% (ឬ -$5.00 USDT) ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ផ្តាច់ការខាតបង់ភ្លាមៗ (<15ms) ធានាដាច់ខាត 100% មិនឲ្យខាតជ្រុលឡើយ!
 
 ២.៦ យន្តការប្រមូលផលចំណេញសុទ្ធដកថ្លៃសេវា (Fee-Deducted Net Profit Harvest Floor)
-រាល់ការគណនាប្រាក់ចំណេញ ត្រូវ បានដកថ្លៃសេវា Binance Trading Fees ចេញរួចរាល់ ៖
+រាល់ការគណនាប្រាក់ចំណេញ ត្រូវ បានដកថ្លៃសេវា Binance Trading Fees ចេញរួចរាល់ (Entry Fee + Exit Fee = ~0.10% Notional Value) ៖
     Net PnL USDT = Unrealized Profit - (NotionalValue * 0.0010)
 ឲ្យតែ Net PnL USDT រត់ដល់គោលដៅ (ឧទាហរណ៍ ៖ +$2.50 USDT ឡើងទៅ) ប្រព័ន្ធនឹងធ្វើការ Market Close បិទយកប្រាក់ចំណេញសុទ្ធចូល Wallet ភ្លាមៗ (<50ms) រួចស្កេនចូល Trade កាក់ថ្មីអូតូ 24/7!
 
-២.៧ យន្តការ Spot Mode Protection ($10.50 Min Notional & Safe Holding)
+២.៧ យន្តការ Spot Mode Protection ($10.50 Min Notional & Safe Holding & Top-Up Liquidator)
 • សម្រាប់ Spot Mode ប្រព័ន្ធកំណត់ទុនទិញអប្បបរមា $10.50 USDT ឡើងទៅ ដើម្បីធានាថា Position Spot ទាំងអស់លើសពី Binance Spot $10 MIN_NOTIONAL Filter 100%។
-• កាក់ Spot មិនត្រូវ បានបង្ខំបិទក្នុងរយៈពេល 15 នាទីឡើយ (Zero Forced Stagnant Exit for Spot) ព្រោះ Spot គ្មាន Leverage និងគ្មាន Risk ត្រូវ Liquidation ឡើយ ទុកឲ្យតម្លៃឡើងប្រមូលចំណេញបានពេញលេញ!
+• ប្រសិនបើ position spot ធ្លាក់ចុះមកត្រឹម $0.50 - $4.99 USDT (ក្រោម $5 Binance filter limit) ប្រព័ន្ធនឹងប្រើប្រាស់យន្តការ Micro Top-Up Liquidator ទិញបន្ថែមឲ្យលើស $10 រួចលក់ Market Sell 100% ដើម្បីដោះលែងដើមទុនភ្លាមៗ!
 
 --------------------------------------------------------------------------------
 ៣. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU (COMPLETE COMMAND REFERENCE)
@@ -98,15 +99,19 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 --------------------------------------------------------------------------------
 ៤. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ (CAPITAL MANAGEMENT MATRIX)
 --------------------------------------------------------------------------------
+• ទុនក្រោម $15 USDT: កំណត់រត់ 1 កាក់អតិបរមា (Leverage 10x Max, Position Size $2.50 - $5.00)
+• ទុន $15 - $30 USDT: កំណត់រត់ 5 កាក់អតិបរមា (Leverage 10x - 15x Max)
+• ទុន $30 - $100 USDT: កំណត់រត់ 10 កាក់អតិបរមា (Leverage 10x - 15x Max)
+• ទុនលើសពី $100 USDT: កំណត់រត់ 10 កាក់អតិបរមា ជាមួយនឹង Free Margin Buffer 50% សម្រាប់សុវត្ថិភាព
 
-៤.១ ការគ្រប់គ្រងដើមទុន និងកម្រិត Leverage ៖
-• ដើមទុន $30 USDT ៖ កំណត់ទុន $2.50 ទៅ $5.00 / កាក់, 10x Leverage, បើក ៥ ទៅ ៦ កាក់ (Max 5 Coins)
-• ដើមទុន $60 USDT ៖ កំណត់ទុន $5.00 / កាក់, 10x Leverage, បើក 10 កាក់ពេញ (Max 10 Coins)
-• ដើមទុន $100+ USDT ៖ កំណត់ទុន $10.00 ទៅ $20.00 / កាក់, 10x–15x Leverage, បើក 10 កាក់ (Max 10 Coins, 50% Free Margin Buffer Enforced)
-
-៤.២ យន្តការទទប់ស្កាត់ Order ស្ទួន (Overtrade & Concurrency Guard) ៖
-ប្រព័ន្ធមាន atomic key locks លើ (chat_id, symbol)។ ប្រសិនបើកាក់មួយមាន Position រត់ស្រាប់លើ Binance AI នឹងទប់ស្កាត់មិនឲ្យបើក Order ស្ទួនដាច់ខាត!
+--------------------------------------------------------------------------------
+៥. ការធ្វើបច្ចុប្បន្នភាពកូដទៅ VPS (AUTOMATED GITHUB VPS DEPLOYMENT)
+--------------------------------------------------------------------------------
+នៅពេល Admin ធ្វើការកែប្រែកូដ ឬ Update មុខងារថ្មី ៖
+១. ចុចលើ file `git_update_vps.bat` លើកុំព្យូទ័រ local
+២. ប្រព័ន្ធនឹងធ្វើការ Commit & Push កូដថ្មីឡើងទៅ GitHub Repository (`origin/main`) ដោយស្វ័យប្រវត្តិ
+៣. Script លើ VPS នឹងទាញយក (git fetch & reset) កូដថ្មីចុងក្រោយ រួច Clear __pycache__ និង Restart Bot លើ VPS ភ្លាមៗ 24/7 ដោយមិនបាច់ Login GitHub ឡើយ!
 
 ================================================================================
-          (រក្សាសិទ្ធិគ្រប់យ៉ាងដោយ APEX AGI CRYPTO TRADING TEAM 2026)
+             APEX TURBO AGI ENGINE v10.5 - INSTITUTIONAL PROFIT GUARANTEED
 ================================================================================

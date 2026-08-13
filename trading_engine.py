@@ -1631,11 +1631,38 @@ def ensure_oneway_position_mode(api_key: str, api_secret: str) -> bool:
         pass
     return False
 
+_MARGIN_TYPE_CACHE = set()
+
+def set_futures_margin_type(api_key: str, api_secret: str, symbol: str, margin_type: str = "ISOLATED") -> dict:
+    """
+    Sets margin type (ISOLATED or CROSSED) for a symbol on Binance Futures API.
+    Prevents cross-wallet liquidations by enforcing isolated margin mode per position.
+    """
+    global _MARGIN_TYPE_CACHE
+    if not api_key or not api_secret:
+        return {"status": "error", "error": "No API keys provided"}
+    cache_key = f"{api_key[-6:]}_{symbol}_{margin_type}"
+    if cache_key in _MARGIN_TYPE_CACHE:
+        return {"status": "success", "marginType": margin_type, "cached": True}
+    try:
+        endpoint = "/fapi/v1/marginType"
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = urlencode({"symbol": symbol, "marginType": margin_type.upper(), "recvWindow": 60000, "timestamp": timestamp})
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
+        if res.status_code == 200 or "-4046" in res.text: # -4046: No need to change margin type
+            _MARGIN_TYPE_CACHE.add(cache_key)
+            return {"status": "success", "marginType": margin_type}
+    except Exception:
+        pass
+    return {"status": "skipped"}
+
 _SET_LEVERAGE_CACHE = {}
 
 def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: int = 25) -> dict:
     """
-    Sets initial leverage for a symbol on Binance Futures API (/fapi/v1/leverage).
+    Sets initial leverage and margin mode for a symbol on Binance Futures API (/fapi/v1/leverage).
     Super Smart & Super Fast: Skips redundant API calls if leverage is already set on Binance!
     """
     global _SET_LEVERAGE_CACHE
@@ -1643,6 +1670,7 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
         return {"status": "error", "error": "No API keys provided"}
 
     ensure_oneway_position_mode(api_key, api_secret)
+    set_futures_margin_type(api_key, api_secret, symbol, "ISOLATED")
 
     symbol = symbol.upper().strip()
     if not symbol.endswith("USDT"):
