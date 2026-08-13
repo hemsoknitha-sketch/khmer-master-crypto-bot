@@ -1,5 +1,5 @@
 ================================================================================
-      📘 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ VIP ៖ APEX TURBO AGI CRYPTO TRADING ENGINE v10.0
+      📘 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ VIP ៖ APEX TURBO AGI CRYPTO TRADING ENGINE v10.5
              (ប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលបញ្ញាសិប្បនិម្មិត AGI - Institutional Profit Edition)
 ================================================================================
 
@@ -7,60 +7,55 @@
 ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងលម្អិត ម៉ត់ចត់ និងច្បាស់លាស់បំផុត ដោយបានប្រមូលផ្តុំរាល់មុខងារ ស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញពិតប្រាកដ និងពាក្យបញ្ជាទាំងអស់នៅក្នុង Bot Menu មកបកស្រាយយ៉ាងក្បោះក្បាយ ដើម្បីបង្រៀនសមាជិក VIP ឲ្យយល់ដឹង និងចេះប្រើប្រាស់ប្រព័ន្ធ Apex TURBO AGI Bot ឲ្យទទួលបានផលចំណេញអតិបរមា គ្មានការខាតបង់ដោយកំហុសប្រព័ន្ធ និងមានសុវត្ថិភាពដើមទុន 100%។
 
 --------------------------------------------------------------------------------
-១. សេចក្តីផ្តើម និងស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញ (PROFIT ENGINE ARCHITECTURE v10.0)
+១. សេចក្តីផ្តើម និងស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញ (PROFIT ENGINE ARCHITECTURE v10.5)
 --------------------------------------------------------------------------------
-Apex TURBO AGI Engine v10.0 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional (High-Frequency Trading & Autonomous Risk Management) ដែលដំណើរការ 24/7 លើម៉ាស៊ីន VPS ល្បឿនលឿន (<30ms Execution)។ ប្រព័ន្ធនេះបំពាក់ដោយបញ្ញាសិប្បនិម្មិត Gemini AI គួបផ្សំនឹងម៉ូឌែលគណិតវិទ្យា Institutional Quantitative Scoring និង Multi-Timeframe Confluence Matrix ដើម្បីស្កេន វិភាគ និងចូលជួញដូរលើទីផ្សារ Binance Futures & Spot ដោយស្វ័យប្រវត្តិ។
+Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional (High-Frequency Trading & Autonomous Risk Management) ដែលដំណើរការ 24/7 លើម៉ាស៊ីន VPS ល្បឿនលឿន (<30ms Execution)។ ប្រព័ន្ធនេះបំពាក់ដោយបញ្ញាសិប្បនិម្មិត Gemini AI គួបផ្សំនឹងម៉ូឌែលគណិតវិទ្យា Institutional Quantitative Scoring និង Multi-Timeframe Confluence Matrix ដើម្បីស្កេន វិភាគ និងចូលជួញដូរលើទីផ្សារ Binance Futures & Spot ដោយស្វ័យប្រវត្តិ។
 
-លក្ខណៈពិសេសចម្បងនៃប្រព័ន្ធកំណែថ្មី v10.0 ៖
+លក្ខណៈពិសេសចម្បងនៃប្រព័ន្ធកំណែថ្មី v10.5 ៖
 • ដំណើរការស្វ័យប្រវត្ត 24 ម៉ោង / 7 ថ្ងៃ ឥតសម្រាក (Perpetual 24/7 Auto-Scanner Loop)
-• យន្តការស្កេនទាញយកតែកាក់រត់លឿនបំផុត (High-Volatility Score Engine 200+ Perpetual Pairs)
-• យន្តការការពារទិញចំកំពូល និងលក់ចំបាត (Multi-Timeframe 1m+5m Anti-Peak & Anti-Bottom Shield)
+• យន្តការស្កេនទាញយកតែកាក់ Crypto រត់លឿនបំផុត (High-Volatility Score Engine 200+ Perpetual Crypto Pairs)
+• យន្តការចម្រោះកាក់មិនអាច Trade បានអូតូ (Auto-Filter Non-Tradable & TradFi Stock Pairs: QNTX, MINIMAX, ZHIPU, NVDA, TSLA - ចៀសវាង Error -4411)
+• យន្តការកែសម្រួល RSI & Trend Harmonization (លុបបំបាត់ការជាន់គ្នានៃ Signal - អនុញ្ញាតឱ្យទិញ BUY & លក់ SHORT បានយ៉ាងរលូន)
+• យន្តការ AGI Drawdown Health Radar (ស្កេនមើល Drawdown សរុប 8.0% ឡើងទៅ ដើម្បីដោះសោ VIP Recovery Gate >=85.0% ស្កេនសងដើមទុនវិញ)
 • យន្តការប្តូរទិសដៅលឿនឆ្លាតវៃ (Smart Direct Reverse Flip <15ms ជាមួយ 5m Trend Confluence Gate)
-• យន្តការកាត់ផ្តាច់ហានិភ័យអាសន្នដាច់ខាត (Hard Emergency Circuit Breaker @ -15% ROI / -$3.00 USDT)
+• យន្តការកាត់ផ្តាច់ហានិភ័យអាសន្នដាច់ខាត (Hard Emergency Circuit Breaker @ -25% ROI / -$5.00 USDT)
 • យន្តការ Lock Leverage ដើមថេរលើ Position កំពុងរត់ (Fixed Initial Margin ROI Protection)
 • យន្តការប្រមូលផលចំណេញសុទ្ធដកថ្លៃសេវា (Fee-Deducted Net Profit Harvesting Floor)
-• យន្តការការពារដើមទុន Spot ($10.50 Min Notional & Top-Up Liquidator Guard & 2-15 Min Micro TP Scaling)
+• យន្តការការពារដើមទុន Spot ($10.50 Min Notional & Top-Up Liquidator Guard & Zero Forced Stagnant Exit)
 • យន្តការស្វ័យប្រវត្តប្តូរ Binance Futures ទៅ One-Way Mode (Prevent Error -4061 on Hedge Mode Accounts)
 • យន្តការរក្សាទុក Blacklist Cooldown ក្នុង SQLite DB (Survives Bot Restarts & VPS Updates)
-• យន្តការស្កេនទាញយកទិន្នន័យកាក់ថ្មីៗ និង Meme Coins (Auto-Refresh ExchangeInfo for PEPE, SHIB, BONK)
 
 --------------------------------------------------------------------------------
-២. យន្តការជួញដូរស្វ័យប្រវត្តិ /turbo_hedge (APEX TURBO HEDGE ENGINES v10.0)
+២. យន្តការជួញដូរស្វ័យប្រវត្តិ /turbo_hedge (APEX TURBO HEDGE ENGINES v10.5)
 --------------------------------------------------------------------------------
 
 ២.១ យន្តការស្កេន 24/7 (Perpetual Auto-Scanner & Portfolio Expander)
 ប្រព័ន្ធនឹងធ្វើការស្កេនពិនិត្យមើលដើមទុនទំនេរ (Available Balance) ក្នុងកាបូប Binance របស់អ្នករៀងរាល់ ៣ វិនាទីម្តង។ ឲ្យតែមានដើមទុនទំនេរគ្រប់គ្រាន់ ($2.50+ USDT) ប្រព័ន្ធនឹងស្កេនទាញយកកាក់ដែលមាន Momentum ខ្លាំងបំផុត មកបើក Position ជួញដូរភ្លាមៗ រហូតដល់គ្រប់ចំនួនកាក់អតិបរមាដែលបានកំណត់ (ឧទាហរណ៍ ៖ ១០ កាក់)។
 
-២.២ យន្តការជ្រើសរើសកាក់រត់លឿន (High-Volatility & Spot Moonshot Acceleration)
-ប្រព័ន្ធមិនស្កេនទាញយកកាក់ស្ងាត់ ឬយឺតមកជួញដូរឡើយ។ AI គណនាពិន្ទុបម្រែបម្រួលតម្លៃ (Volatility & Volume Delta Score) ៖
-    Futures Score = (AbsPriceChangePercent * 15.0) + log10(QuoteVolume)
-    Spot Moonshot Score = (BreakoutMomentum * 35.0) + (log10(QuoteVolume) * 12.0)
-យន្តការនេះជួយឲ្យប្រព័ន្ធជ្រើសរើសតែកាក់ Altcoins ដែលមានល្បឿនបម្រែបម្រួលតម្លៃ 3% ទៅ 35% ក្នុងរយៈពេលខ្លី ដើម្បីកើបប្រាក់ចំណេញបានលឿនបំផុត!
+២.២ យន្តការជ្រើសរើសកាក់រត់លឿន និងចម្រោះកាក់ TradFi Stock (Crypto-Only High-Velocity Engine)
+ប្រព័ន្ធស្កេនទាញយកតែកាក់ Crypto ដើមដែលមាន Volume និង Volatility ខ្ពស់ ព្រមទាំងធ្វើការចម្រោះ (Filter) លុបចោលអូតូនូវកាក់ប្រភេទ TradFi Stock Perpetual Indices ឬ Agreement Contracts (ដូចជា QNTXUSDT, MINIMAXUSDT, ZHIPUUSDT, NVDAUSDT, TSLAUSDT) ដែលបណ្តាលឲ្យមាន Error -4411 លើ Binance API។
 
-២.៣ យន្តការ Multi-Timeframe Anti-Peak & Anti-Bottom Shield (1m + 5m Trend Confluence)
-• Anti-Peak Protection ៖ នៅពេលកាក់មួយរត់ឡើងខ្លាំង (24h Change >= +15% ឬ RSI 1m >= 68) ប្រព័ន្ធនឹង ទប់ស្កាត់ការទិញ (BUY/LONG) 100%។ ប្រព័ន្ធតម្រូវដាច់ខាតឱ្យមាន 5m Bearish Trend Confluence និង 1m Negative Velocity (price_change_1m < -0.10%) មុននឹងអនុញ្ញាតឱ្យចូល SHORT នៅចំណុចកំពូល ការពារមិនឱ្យ SHORT ឆៅពេលកាក់ PUMP ឡើយ!
-• Anti-Bottom Protection ៖ នៅពេលកាក់មួយធ្លាក់ចុះខ្លាំង (RSI 1m <= 32) ប្រព័ន្ធនឹង ទប់ស្កាត់ការលក់ (SELL/SHORT) 100%។ ប្រព័ន្ធតម្រូវដាច់ខាតឱ្យមាន 5m Bullish Trend Confluence និង 1m Positive Velocity មុននឹងអនុញ្ញាតឱ្យចូល LONG នៅបាត!
+២.៣ យន្តការ Multi-Timeframe Trend Confluence & Harmonized RSI Logic
+• Anti-Peak Protection ៖ នៅពេលកាក់មួយរត់ឡើងខ្លាំងពេក (24h Change >= +30.0% ឬ RSI 1m >= 72.0) ប្រព័ន្ធនឹងទប់ស្កាត់ការ BUY/LONG ដើម្បីការពារមិនឱ្យទិញចំកំពូល។
+• Anti-Bottom Protection ៖ នៅពេលកាក់មួយធ្លាក់ចុះខ្លាំងពេក (RSI 1m <= 28.0) ប្រព័ន្ធនឹងទប់ស្កាត់ការ SELL/SHORT ដើម្បីការពារមិនឱ្យលក់ចំបាត។
+• Trend Following Zone ៖ ក្នុងចន្លោះ RSI 22 ដល់ 78 ប្រព័ន្ធនឹងពិនិត្យមើល 1m EMA 5/15 និង 5m EMA 20/50 Trend Alignment ដើម្បីចូល BUY (ពេល 5m Bullish) ឬ SHORT (ពេល 5m Bearish) ដោយលុបបំបាត់ការជាន់គ្នា រត់បញ្ជាទិញបាន ១០០%!
 
 ២.៤ យន្តការ Smart Direct Reverse Flip (<15ms execution)
-នៅពេល Position មួយមានការខាតបង់បណ្តោះអាសន្នដល់ -10.0% ROI (ឬ -$2.00 USDT) ប្រព័ន្ធនឹងពិនិត្យមើល Trend រលកធំ 5m/15m (MTF Confluence) ៖
+នៅពេល Position មួយមានការខាតបង់បណ្តោះអាសន្នដល់ -15.0% ROI (ឬ -$3.50 USDT) ប្រព័ន្ធនឹងពិនិត្យមើល Trend រលកធំ 5m/15m (MTF Confluence) ៖
 • ប្រសិនបើ 5m Trend គាំទ្រទិសដៅផ្ទុយ ៖ ប្រព័ន្ធនឹងធ្វើការ Flip (LONG ➔ SHORT ឬ SHORT ➔ LONG) ក្នុង ១ Order ដេញតាម Trend ផ្ទុយភ្លាមៗ (<15ms) ដើម្បីកើបចំណេញសងវិញ 100%!
-• ប្រសិនបើ 5m Trend មិនគាំទ្រ (ទីផ្សារ Sideways Chop) ៖ ប្រព័ន្ធ មិន Flip ឆៅឡើយ ដើម្បីចៀសវាងការខាតបង់ពីរជាន់ (Whipsaw Loss)! ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ខាតធម្មតា រួចបញ្ចូលកាក់នោះទៅក្នុង Blacklist Cooldown ២ ម៉ោងភ្លាមៗ!
+• ប្រសិនបើ 5m Trend មិនគាំទ្រ ៖ ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ខាតធម្មតា រួចបញ្ចូលកាក់នោះទៅក្នុង Blacklist Cooldown ២ ម៉ោងភ្លាមៗ!
 
-២.៥ យន្តការ Hard Emergency Circuit Breaker (-15% ROI / -$3.00 USDT)
-ប្រសិនបើទីផ្សារបក់បោកខ្លាំង ឬដាំក្បាលរហូតដល់ ROI -15.0% (ឬ -$3.00 USDT) ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ផ្តាច់ការខាតបង់ភ្លាមៗ (<15ms) ធានាដាច់ខាត 100% មិនឲ្យខាតជ្រុលហួសពី -15% ឡើយ!
+២.៥ យន្តការ Hard Emergency Circuit Breaker (-25% ROI / -$5.00 USDT)
+ប្រសិនបើទីផ្សារបក់បោកខ្លាំង ឬដាំក្បាលរហូតដល់ ROI -25.0% (ឬ -$5.00 USDT) ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ផ្តាច់ការខាតបង់ភ្លាមៗ (<15ms) ធានាដាច់ខាត 100% មិនឲ្យខាតជ្រុលឡើយ!
 
 ២.៦ យន្តការប្រមូលផលចំណេញសុទ្ធដកថ្លៃសេវា (Fee-Deducted Net Profit Harvest Floor)
-រាល់ការគណនាប្រាក់ចំណេញ ត្រូវ បានដកថ្លៃសេវា Binance Trading Fees (0.10% Round-Trip Taker Fee) ចេញរួចរាល់ ៖
+រាល់ការគណនាប្រាក់ចំណេញ ត្រូវ បានដកថ្លៃសេវា Binance Trading Fees ចេញរួចរាល់ ៖
     Net PnL USDT = Unrealized Profit - (NotionalValue * 0.0010)
 ឲ្យតែ Net PnL USDT រត់ដល់គោលដៅ (ឧទាហរណ៍ ៖ +$2.50 USDT ឡើងទៅ) ប្រព័ន្ធនឹងធ្វើការ Market Close បិទយកប្រាក់ចំណេញសុទ្ធចូល Wallet ភ្លាមៗ (<50ms) រួចស្កេនចូល Trade កាក់ថ្មីអូតូ 24/7!
 
-២.៧ យន្តការ Spot Mode Protection ($10.50 Min Notional & Top-Up Liquidator)
+២.៧ យន្តការ Spot Mode Protection ($10.50 Min Notional & Safe Holding)
 • សម្រាប់ Spot Mode ប្រព័ន្ធកំណត់ទុនទិញអប្បបរមា $10.50 USDT ឡើងទៅ ដើម្បីធានាថា Position Spot ទាំងអស់លើសពី Binance Spot $10 MIN_NOTIONAL Filter 100%។
-• ប្រសិនបើតម្លៃកាក់ Spot ធ្លាក់ចុះធ្វើឲ្យតម្លៃ Position សរុបទាបជាង $10.00 USDT (ឧ. នៅសល់ $7.00) យន្តការ Spot Min Notional Top-Up Liquidator នឹងទិញបន្ថែម $10.50 USDT អូតូ រួចធ្វើការ លក់ចេញ 100% ភ្លាមៗ ដើម្បីធានាថា Spot position បិទដាច់ 100% គ្មានសល់កម្ទេច Dust ឡើយ!
-• គោលដៅចំណេញ (TP) សម្រាប់ Spot ត្រូវ បាន Scale មកត្រឹម +3.5% នៃទុនវិនិយោគ ដើម្បីឱ្យ Position អាចសម្រេច TP និងប្រមូលចំណេញបានលឿនក្នុងរង្វង់ ២ ទៅ ១៥ នាទី!
-
-២.៨ យន្តការ Fixed Initial Margin ROI Protection (v10.0)
-ប្រព័ន្ធរក្សាទុក Leverage ដើមដំបូងថេរ (Fixed Leverage) លើ Position កំពុងរត់ មិនអនុញ្ញាតឱ្យមានការផ្លាស់ប្តូរ Leverage dynamic ពាក់កណ្តាលផ្លូវឡើយ ការពារមិនឱ្យមានការ recalculate Initial Margin នាំឱ្យប៉ះ Circuit Breaker ខុសឡើយ!
+• កាក់ Spot មិនត្រូវ បានបង្ខំបិទក្នុងរយៈពេល 15 នាទីឡើយ (Zero Forced Stagnant Exit for Spot) ព្រោះ Spot គ្មាន Leverage និងគ្មាន Risk ត្រូវ Liquidation ឡើយ ទុកឲ្យតម្លៃឡើងប្រមូលចំណេញបានពេញលេញ!
 
 --------------------------------------------------------------------------------
 ៣. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU (COMPLETE COMMAND REFERENCE)

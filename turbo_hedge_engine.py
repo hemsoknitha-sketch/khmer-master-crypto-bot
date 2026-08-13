@@ -60,7 +60,17 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
         if res.status_code == 200:
             tickers = res.json()
             candidates = []
-            EXCLUDED_SYMBOLS = {"HFTUSDT", "GWEIUSDT", "EPICUSDT", "USD1USDT"}
+            TRADFI_STOCK_SYMBOLS = {
+                "QNTXUSDT", "CSOPSKHYNIX2LUSDT", "MINIMAXUSDT", "ZHIPUUSDT", "NOKUSDT", "SMCIUSDT", "DELLUSDT", "SNDKUSDT", 
+                "STXXUSDT", "INTWUSDT", "CBRSUSDT", "EWYUSDT", "MVLLUSDT", "GLWUSDT", "HK0700USDT", "HK1810USDT", "INTCUSDT", 
+                "CHIPUSDT", "METAUSDT", "AAOIUSDT", "MRVLUSDT", "CRWVUSDT", "ZAMAUSDT", "PLTRUSDT", "TSMUSDT", "AMDUSDT", 
+                "TQQQUSDT", "SQQQUSDT", "ARMUSDT", "TSLAUSDT", "NATGASUSDT", "INXUSDT", "AMZNUSDT", "AAPLUSDT", "MSFTUSDT", 
+                "NVDAUSDT", "MSTRUSDT", "BABAUSDT", "ROBOUSDT", "NBISUSDT", "SHAZUSDT", "KORUUSDT", "DRAMUSDT", "SNXXUSDT", 
+                "MUUUSDT", "BEUSDT", "SKHYUSDT", "SKHYNIXUSDT", "SAMSUNGUSDT", "WDCUSDT", "ORCLUSDT", "AIAUSDT", "MUBARAKUSDT", 
+                "HYPEUSDT", "LITEUSDT", "DEXEUSDT", "BZUSDT", "CLUSDT", "XAUUSDT", "XAGUSDT", "TRUMPUSDT", "HFTUSDT", "GWEIUSDT", 
+                "EPICUSDT", "USD1USDT"
+            }
+            EXCLUDED_SYMBOLS = TRADFI_STOCK_SYMBOLS
             for t in tickers:
                 sym = t.get("symbol", "")
                 if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS or not sym.isascii():
@@ -108,7 +118,16 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
         if res.status_code == 200:
             tickers = res.json()
             candidates = []
-            EXCLUDED_SYMBOLS = {"HFTUSDT", "GWEIUSDT", "EPICUSDT", "USD1USDT", "EURUSDT", "GBPUSDT", "AEURUSDT", "FDUSDUSDT", "TUSDUSDT", "USDCUSDT"}
+            EXCLUDED_SYMBOLS = {
+                "QNTXUSDT", "CSOPSKHYNIX2LUSDT", "MINIMAXUSDT", "ZHIPUUSDT", "NOKUSDT", "SMCIUSDT", "DELLUSDT", "SNDKUSDT", 
+                "STXXUSDT", "INTWUSDT", "CBRSUSDT", "EWYUSDT", "MVLLUSDT", "GLWUSDT", "HK0700USDT", "HK1810USDT", "INTCUSDT", 
+                "CHIPUSDT", "METAUSDT", "AAOIUSDT", "MRVLUSDT", "CRWVUSDT", "ZAMAUSDT", "PLTRUSDT", "TSMUSDT", "AMDUSDT", 
+                "TQQQUSDT", "SQQQUSDT", "ARMUSDT", "TSLAUSDT", "NATGASUSDT", "INXUSDT", "AMZNUSDT", "AAPLUSDT", "MSFTUSDT", 
+                "NVDAUSDT", "MSTRUSDT", "BABAUSDT", "ROBOUSDT", "NBISUSDT", "SHAZUSDT", "KORUUSDT", "DRAMUSDT", "SNXXUSDT", 
+                "MUUUSDT", "BEUSDT", "SKHYUSDT", "SKHYNIXUSDT", "SAMSUNGUSDT", "WDCUSDT", "ORCLUSDT", "AIAUSDT", "MUBARAKUSDT", 
+                "HYPEUSDT", "LITEUSDT", "DEXEUSDT", "BZUSDT", "CLUSDT", "XAUUSDT", "XAGUSDT", "TRUMPUSDT", "HFTUSDT", "GWEIUSDT", 
+                "EPICUSDT", "USD1USDT", "EURUSDT", "GBPUSDT", "AEURUSDT", "FDUSDUSDT", "TUSDUSDT", "USDCUSDT"
+            }
             for t in tickers:
                 sym = t.get("symbol", "")
                 if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS or not sym.isascii():
@@ -280,47 +299,47 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     if whale_bid_wall: base_conf += 4.0
                     confidence = min(98.5, max(85.0, base_conf))
 
-            # 🛡️ EXTREME OVERBOUGHT / OVERSOLD SAFETY SHIELD (RSI >= 75 or RSI <= 25)
+            # 🛡️ EXTREME OVERBOUGHT / OVERSOLD SAFETY SHIELD (RSI >= 78 or RSI <= 22)
             # Never blindly counter-trend short/buy! Require Multi-Timeframe Confluence.
-            elif rsi14 >= 75.0:
-                if is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.15:
+            elif rsi14 >= 78.0:
+                if is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.10:
                     side = "SELL"
-                    base_conf = 86.0
+                    base_conf = 88.0
                     if whale_ask_wall: base_conf += 4.0
-                    confidence = min(94.0, max(84.0, base_conf))
+                    confidence = min(96.0, max(85.0, base_conf))
                 else:
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Overbought RSI {rsi14:.1f} without 5m Bearish Confluence -> SKIPPED SHORT!")
 
-            elif rsi14 <= 25.0:
-                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.15:
+            elif rsi14 <= 22.0:
+                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.10:
                     side = "BUY"
-                    base_conf = 86.0
+                    base_conf = 88.0
                     if whale_bid_wall: base_conf += 4.0
-                    confidence = min(94.0, max(84.0, base_conf))
+                    confidence = min(96.0, max(85.0, base_conf))
                 else:
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Oversold RSI {rsi14:.1f} without 5m Bullish Confluence -> SKIPPED BUY!")
 
-            # ✅ SMART MULTI-TIMEFRAME TREND FOLLOWING (RSI 25 - 75)
+            # ✅ SMART MULTI-TIMEFRAME TREND FOLLOWING (RSI 22 - 78)
             else:
-                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.05 and rsi14 < 72.0:
+                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.02 and rsi14 < 72.0:
                     side = "BUY"
                     base_conf = 88.0
-                    if vol_ratio > 1.3: base_conf += 4.0
+                    if vol_ratio > 1.2: base_conf += 4.0
                     if funding_rate < -0.0001: base_conf += 3.0
                     if whale_bid_wall: base_conf += 4.0
-                    confidence = min(98.5, max(88.0, base_conf))
+                    confidence = min(98.5, max(86.0, base_conf))
 
-                elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.05 and rsi14 > 28.0:
+                elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.02 and rsi14 > 28.0:
                     side = "SELL"
                     base_conf = 88.0
-                    if vol_ratio > 1.3: base_conf += 4.0
+                    if vol_ratio > 1.2: base_conf += 4.0
                     if funding_rate > 0.0001: base_conf += 3.0
                     if whale_ask_wall: base_conf += 4.0
-                    confidence = min(98.5, max(88.0, base_conf))
+                    confidence = min(98.5, max(86.0, base_conf))
 
                 else:
                     side = "SKIP"
@@ -329,27 +348,15 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
             # 🛡️ Anti-Peak Buying & Anti-Bottom Selling Protection (v10.0 Ultra Confluence Architecture)
             if not is_spot_mode and side != "SKIP":
-                if (change_24h >= 15.0 or rsi14 >= 68.0):
-                    if side == "BUY":
-                        side = "SKIP"
-                        confidence = 50.0
-                        print(f"🛡️ [ANTI-PEAK BUYING PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% or RSI {rsi14:.1f} >= 68 -> Blocked BUY 100%!")
-                    elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.10 and rsi14 >= 68.0:
-                        side = "SELL"
-                        base_conf = 88.0
-                        if whale_ask_wall: base_conf += 4.0
-                        confidence = min(96.0, max(85.0, base_conf))
+                if side == "BUY" and (change_24h >= 30.0 or rsi14 >= 72.0):
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [ANTI-PEAK BUYING PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% or RSI {rsi14:.1f} >= 72 -> Blocked BUY!")
 
-                elif rsi14 <= 32.0:
-                    if side == "SELL":
-                        side = "SKIP"
-                        confidence = 50.0
-                        print(f"🛡️ [ANTI-BOTTOM SELLING PROTECTION] {symbol}: RSI {rsi14:.1f} <= 32 -> Blocked SELL 100%!")
-                    elif is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.10 and rsi14 <= 32.0:
-                        side = "BUY"
-                        base_conf = 88.0
-                        if whale_bid_wall: base_conf += 4.0
-                        confidence = min(96.0, max(85.0, base_conf))
+                elif side == "SELL" and rsi14 <= 28.0:
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [ANTI-BOTTOM SELLING PROTECTION] {symbol}: RSI {rsi14:.1f} <= 28 -> Blocked SELL!")
 
             # 🛡️ BTC Lead Impulse Guard & Funding Fee Penalty Guard
             if side != "SKIP" and symbol != "BTCUSDT":
@@ -715,9 +722,9 @@ async def monitor_turbo_hedge_bots(app):
                 drawdown_pct = ((peak_wallet - wallet_bal) / peak_wallet) * 100.0
 
             is_recovery_mode = False
-            if drawdown_pct >= 3.0:
+            if drawdown_pct >= 8.0:
                 is_recovery_mode = True
-                print(f"🚨 [AGI DRAWDOWN HEALTH RADAR] User {target_chat_id}: Equity Drawdown {drawdown_pct:.1f}% (Peak: ${peak_wallet:.2f} -> Current: ${wallet_bal:.2f}). ACTIVATING VIP EMERGENCY PROFIT RECOVERY PROTOCOL (High-Confluence Gate >90.0%)!")
+                print(f"🚨 [AGI DRAWDOWN HEALTH RADAR] User {target_chat_id}: Equity Drawdown {drawdown_pct:.1f}% (Peak: ${peak_wallet:.2f} -> Current: ${wallet_bal:.2f}). ACTIVATING VIP EMERGENCY PROFIT RECOVERY PROTOCOL (High-Confluence Gate >=85.0%)!")
 
                 alert_sent_key = f"turbo_hedge_{target_chat_id}_recovery_alert_sent"
                 if db.get_system_setting(alert_sent_key, "0") != "1":
@@ -729,7 +736,7 @@ async def monitor_turbo_hedge_bots(app):
                                 f"🚨 **APEX AGI VIP PROFIT RECOVERY PROTOCOL ACTIVATED!** 🛡️⚡\n"
                                 f"───────────────────────────────\n\n"
                                 f"📡 **Equity Drawdown Sensor ៖** `{drawdown_pct:.1f}%` (Peak: `${peak_wallet:.2f}` ➔ Current: `${wallet_bal:.2f}`)\n"
-                                f"🎯 **AGI Action ៖** `Switched to Ultra-High Precision Confluence Gate (>90.0% Conf)`\n"
+                                f"🎯 **AGI Action ៖** `Switched to Precision Confluence Gate (>=85.0% Conf)`\n"
                                 f"🐋 **Whale Radar & Funding Fee ៖** `x1000 Supercharged Precision Priority`\n"
                                 f"🔒 **Margin Protection ៖** `65% Free Margin Buffer Enforced`\n\n"
                                 f"💪 _ប្រព័ន្ធ AGI កំពុងជំរុញចំណេញសង្គ្រោះដើមទុន 24/7 ស្វ័យប្រវត្តិ ដោយសុវត្ថិភាព ១០០%!_"
@@ -809,8 +816,8 @@ async def monitor_turbo_hedge_bots(app):
                     if eval_side == "SKIP":
                         continue
 
-                    # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 89.0% during VIP Recovery)
-                    min_conf_threshold = 89.0 if is_recovery_mode else 85.0
+                    # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 85.0%)
+                    min_conf_threshold = 86.0 if is_recovery_mode else 85.0
                     if eval_res.get("confidence_pct", 0) < min_conf_threshold:
                         print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                         continue
@@ -997,23 +1004,22 @@ async def monitor_turbo_hedge_bots(app):
                     is_peak_locked = (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or (peak_pnl >= 2.00 and net_pnl_usdt <= (peak_pnl * 0.80))
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
-                    # Normal Flip: ROI <= -10.0% OR net loss <= -$2.00 USDT (with 15s Anti-Whipsaw Cooldown)
-                    # Emergency Hard Breaker: ROI <= -15.0% OR net loss <= -$3.00 USDT (Instant Emergency Close WITHOUT Cooldown)
-                    is_stop_loss_hit = (roi_pct <= -10.0 or net_pnl_usdt <= -2.0)
-                    is_hard_circuit_breaker = (roi_pct <= -15.0 or net_pnl_usdt <= -3.0)
+                    # Normal Flip: ROI <= -15.0% OR net loss <= -$3.50 USDT (with 15s Anti-Whipsaw Cooldown)
+                    # Emergency Hard Breaker: ROI <= -25.0% OR net loss <= -$5.00 USDT (Instant Emergency Close WITHOUT Cooldown)
+                    is_stop_loss_hit = (current_side != "SPOT" and (roi_pct <= -15.0 or net_pnl_usdt <= -3.50))
+                    is_hard_circuit_breaker = (current_side != "SPOT" and (roi_pct <= -25.0 or net_pnl_usdt <= -5.00))
 
                     now_ts = int(time.time())
                     last_flip_key = f"{chat_id}_{symbol}"
                     last_flip_ts = _last_flip_timestamps.get(last_flip_key, 0)
 
-                    # ⌛ 15-Minute Stagnant Position Auto-Pruner (<20ms Crab Market Exit):
-                    # Prunes flat non-moving positions after 15 minutes (900s) if PnL is flat (-$0.50 to +$0.50).
+                    # ⌛ Stagnant Position Auto-Pruner (Applied only to Futures positions > 60 mins):
                     entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
                     entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
                     if entry_ts == 0:
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
                         entry_ts = now_ts
-                    is_stagnant_timeout = ((now_ts - entry_ts) >= 900 and (-0.50 <= real_pnl_usdt <= 0.50))
+                    is_stagnant_timeout = (current_side != "SPOT" and (now_ts - entry_ts) >= 3600 and (-0.50 <= real_pnl_usdt <= 0.50))
 
                     if is_hard_circuit_breaker:
                         # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
