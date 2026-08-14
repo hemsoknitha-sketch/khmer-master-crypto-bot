@@ -183,3 +183,28 @@ def execute_hft_order(api_key: str, api_secret: str, symbol: str, amount_usdt: f
     except Exception as e:
         print(f"❌ [HFT EXECUTE ORDER ERROR]: {e}")
         return {"status": "error", "message": str(e)}
+
+def execute_hyper_trade(api_key: str, api_secret: str, symbol: str, amount_usdt: float = 10.0, leverage: int = 5, chat_id: int = 0, side: str = "AUTO") -> dict:
+    """
+    Super Smart Hyper-Trade Order Execution Engine (<20ms).
+    Executes instant HFT order on Binance Futures with specified leverage and amount.
+    """
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+    if symbol == "DODOUSDT":
+        symbol = "DODOXUSDT"
+
+    try:
+        if side.upper() == "AUTO":
+            scan_res = scan_hft_opportunity(symbol)
+            chosen_side = scan_res.get("side", "BUY")
+        else:
+            chosen_side = side.upper()
+            if chosen_side not in ["BUY", "SELL"]:
+                chosen_side = "BUY"
+
+        return execute_hft_order(api_key, api_secret, symbol, amount_usdt, chosen_side, leverage)
+    except Exception as e:
+        print(f"❌ [HYPER TRADE ENGINE ERROR]: {e}")
+        return {"status": "error", "message": str(e)}
