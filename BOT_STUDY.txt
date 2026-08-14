@@ -83,7 +83,18 @@ Apex TURBO AGI Engine v10.6 គឺជាប្រព័ន្ធជួញដូ�
 • `/health`       : ពិនិត្យមើលសុខភាព VPS, CPU/Memory Usage, និង API Latency
 
 ៤.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ (AUTONOMOUS TRADING ENGINES) ៖
-• `/turbo_hedge`  : ប្រព័ន្ធ HFT Auto-Scanner ស្កេនកើបចំណេញ 24/7 (ទម្រង់ ៖ `/turbo_hedge TOP 5 10 AUTO 2.50 <PIN>`)
+
+📐 រូបមន្តទីតាំងលេខរៀងនៃពាក្យបញ្ជា /turbo_hedge (POSITION FORMULA BREAKDOWN) ៖
+/turbo_hedge [ទីតាំង១: កាក់/របៀប] [ទីតាំង២: ទុន/កាក់] [ទីតាំង៣: Leverage] [ទីតាំង៤: ទិសដៅ] [ទីតាំង៥: គោលដៅចំណេញ] [ទីតាំង៦: PIN]
+
+• [ទីតាំងទី ១] ➔ កាក់/របៀប ៖ TOP (ស្កេនច្រើនកាក់អូតូ) ឬ SOL, BTC, ETH (កាក់ទោល) ឬ SPOT
+• [ទីតាំងទី ២] ➔ ដើមទុនក្នុង 1 កាក់ ៖ 20 ($20 USDT), 10 ($10 USDT), 50 ($50 USDT)
+• [ទីតាំងទី ៣] ➔ ចំនួន Leverage ៖ 10 (10x), 15 (15x) [សម្រាប់ Spot ដាក់ 1]
+• [ទីតាំងទី ៤] ➔ ទិសដៅជួញដូរ ៖ AUTO (AI សម្រេច), BUY (Long), SELL (Short), SPOT (ទិញ Spot)
+• [ទីតាំងទី ៥] ➔ គោលដៅចំណេញ (TP) ៖ 2.5 (+$2.50 USDT), 5.0 (+$5.00 USDT)
+• [ទីតាំងទី ៦] ➔ លេខកូដ PIN ៖ 1234 ឬ PIN សុវត្ថិភាពរបស់អ្នក
+
+• `/turbo_hedge`  : ប្រព័ន្ធ HFT Auto-Scanner ស្កេនកើបចំណេញ 24/7 (ទម្រង់ ៖ `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>`)
 • `/turbo_hedge STOP` : បិទការជួញដូរកាក់តែមួយ ឬគ្រប់កាក់ (ទម្រង់ ៖ `/turbo_hedge STOP SOL <PIN>` ឬ `/turbo_hedge STOP ALL <PIN>`)
 • `/scalp`        : បើកការជួញដូរ Scalping ល្បឿនលឿនលើកាក់មួយជាក់លាក់ (ទម្រង់ ៖ `/scalp SOLUSDT 10 10 <PIN>`)
 • `/auto_arb`     : បើកប្រព័ន្ធ Arbitrage ស្កេនកើបប្រាក់ចំណេញខុសគ្នារវាងទីផ្សារ (ទម្រង់ ៖ `/auto_arb 50 10 <PIN>`)
