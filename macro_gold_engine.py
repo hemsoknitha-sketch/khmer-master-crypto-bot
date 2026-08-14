@@ -35,7 +35,6 @@ def fetch_macro_gold_indicators() -> dict:
 
     # 2. Fetch Live DXY Index & US 10Y Yield from public stooq/yahoo endpoints
     try:
-        # Stooq public API for DXY
         dxy_url = "https://stooq.com/q/l/?s=dxy&f=sd2t2ohlc&h&e=csv"
         dxy_res = requests.get(dxy_url, timeout=5)
         if dxy_res.status_code == 200 and "dxy" in dxy_res.text.lower():
@@ -47,13 +46,12 @@ def fetch_macro_gold_indicators() -> dict:
     except Exception as e:
         print(f"⚠️ [MACRO GOLD ENGINE] Stooq DXY fetch fallback used: {e}")
 
-    # Calculate 10Y Real Yield Proxy = US10Y Nominal (4.25%) - CPI Inflation (2.90%) = 1.35%
     macro_data["real_yield_10y"] = round(macro_data["us10y_yield"] - macro_data["cpi_inflation"], 2)
     return macro_data
 
 def generate_gold_catalyst_report(user_lang: str = "khmer", ai_engine=None) -> str:
     """
-    Generates institutional Khmer Macro Gold Catalyst & PAXG Gold Radar Report.
+    Generates institutional Khmer Macro Gold Catalyst & PAXG Gold Radar Report in Executive 3-Section format.
     Calculates DXY, Real Yield, and SGE Central Bank Premium inverse correlation.
     """
     macro_info = fetch_macro_gold_indicators()
@@ -71,72 +69,74 @@ def generate_gold_catalyst_report(user_lang: str = "khmer", ai_engine=None) -> s
     
     # Quantitative Correlation Matrix Logic:
     if dxy < 103.5 or real_yield < 1.20 or sge_premium >= 20.0:
-        macro_signal = "🟢 BULLISH GOLD ACCUMULATION (ទិញស្ទាក់មាស)"
+        macro_signal = "🟢 BULLISH GOLD ACCUMULATION"
         confidence_pct = 94.5
         gold_bias = "Bullish"
     elif dxy > 105.5 or real_yield > 1.80:
-        macro_signal = "🔴 BEARISH / CONSOLIDATION (ប្រុងប្រយ័ត្ន)"
+        macro_signal = "🔴 BEARISH / CONSOLIDATION"
         confidence_pct = 88.0
         gold_bias = "Bearish"
     else:
-        macro_signal = "🟡 NEUTRAL ACCUMULATION (ជួញដូរក្នុងល្បឿន Range)"
+        macro_signal = "🟡 NEUTRAL ACCUMULATION"
         confidence_pct = 85.0
         gold_bias = "Neutral"
 
-    ai_analysis = ""
-    if ai_engine:
+    if ai_engine and hasattr(ai_engine, "chat_with_user"):
         prompt = (
-            f"You are Supreme Head of Quantitative Strategy for Apex Institutional Fund.\n"
-            f"Provide a 2-3 sentence Macro Gold Forecast in Khmer based on these metrics:\n"
+            f"Provide an Executive 3-Section Macro Gold Synthesis in Khmer (KM) based on:\n"
             f"PAXG/USDT Gold Price: ${paxg_price:,.2f} ({paxg_change:+.2f}%)\n"
-            f"DXY (US Dollar Index): {dxy:.2f}\n"
-            f"US 10Y Real Yield: {real_yield:.2f}%\n"
-            f"Shanghai SGE Premium: +${sge_premium:,.2f}/oz (Central Bank PBOC Accumulation)\n"
+            f"DXY Index: {dxy:.2f}, US 10Y Real Yield: {real_yield:.2f}%\n"
+            f"Shanghai SGE Premium: +${sge_premium:,.2f}/oz (Central Bank PBOC Accumulation: {pboc_status})\n"
             f"Macro Bias: {gold_bias} (Confidence: {confidence_pct:.1f}%)\n\n"
-            f"Highlight how DXY/Real Yield correlation and Central Bank SGE Premium create a high-winrate gold buying opportunity in Khmer."
+            f"Structure strictly in clean Khmer markdown:\n"
+            f"ផ្នែកទី ១ ៖ សេចក្តីសម្រេចចិត្ត និងសន្ទស្សន៍ម៉ាក្រូមាស (Executive Macro Gold Verdict)\n"
+            f"• ទ្រព្យសកម្មគោលដៅ ៖ PAXGUSDT (មាសសុទ្ធ 24/7)\n"
+            f"• ទិសដៅទីផ្សារ ៖ {gold_bias} (សញ្ញាម៉ាក្រូស្ថាប័ន)\n"
+            f"• អត្រាជោគជ័យនៃ AI (Win Rate Confidence) ៖ {confidence_pct:.1f}%\n"
+            f"• អនុសាសន៍សម្រាប់ Leverage ៖ 20x - 50x\n"
+            f"• ប៉ារ៉ាម៉ែត្រហានិភ័យ ៖ Stop-loss 1.0% និង Trailing Peak Lock\n\n"
+            f"ផ្នែកទី ២ ៖ ភស្តុតាងបរិមាណវិស័យ DXY, Real Yield & PBOC Premium (Quantitative Evidence)\n"
+            f"[ Detailed executive synthesis of DXY, US10Y Real Yields, and SGE Premium ]\n\n"
+            f"ផ្នែកទី ៣ ៖ បញ្ជាប្រតិបត្តិការ (Executive Action Command)\n"
+            f"`/turbo_hedge PAXG 20 10 BUY 2.5 1234`\n\n"
+            f"Respond ONLY in clean Khmer presentation text."
         )
         try:
-            ai_analysis = ai_engine.analyze_opportunity(prompt)
+            ai_analysis = ai_engine.chat_with_user(prompt, history=[])
+            if isinstance(ai_analysis, str) and len(ai_analysis.strip()) > 50:
+                header = (
+                    f"🏆 **APEX SUPER BRAIN — MACRO GOLD CATALYST RADAR** 🏆\n"
+                    f"*(ការវិភាគម៉ាក្រូសេដ្ឋកិច្ចមាស 24/7 តាម DXY, Real Yields & Central Bank SGE Premium)*\n\n"
+                    f"🪙 **PAXG/USDT (មាសសុទ្ធ 24/7) ៖** `${paxg_price:,.2f}` (`{paxg_change:+.2f}%`)\n"
+                    f"📊 **24H Volume ៖** `${paxg_vol/1e6:.2f}M USDT`\n\n"
+                    f"🌐 **MACRO METRICS MATRIX ៖**\n"
+                    f" 💵 **DXY Index ៖** `{dxy:.2f}` | 📈 **US 10Y Yield ៖** `{us10y:.2f}%`\n"
+                    f" ⚖️ **US 10Y Real Yield ៖** `{real_yield:.2f}%` | 🏦 **SGE Premium ៖** `+${sge_premium:,.2f}/oz`\n"
+                    f" 🏛️ **PBOC Accumulation ៖** {pboc_status}\n\n"
+                )
+                return header + ai_analysis.strip()
         except Exception as e:
-            ai_analysis = f"អត្រាការប្រាក់ពិត {real_yield}% និង DXY {dxy} ព្រមទាំង SGE Premium +${sge_premium:,.2f}/oz បញ្ជាក់ថាធនាគារកណ្តាល PBOC កំពុងប្រមូលទិញមាសរាប់រយតោនក្នុងទីផ្សារ OTC មុនពេលចេញរបាយការណ៍ផ្លូវការ។"
-    else:
-        ai_analysis = f"អត្រាការប្រាក់ពិត {real_yield}% និង DXY {dxy} ព្រមទាំង SGE Premium +${sge_premium:,.2f}/oz បញ្ជាក់ថាធនាគារកណ្តាល PBOC កំពុងប្រមូលទិញមាសរាប់រយតោនក្នុងទីផ្សារ OTC មុនពេលចេញរបាយការណ៍ផ្លូវការ។"
+            print(f"⚠️ [GOLD AI SYNTHESIS FALLBACK]: {e}")
 
-    if user_lang == 'khmer':
-        report = (
-            f"🏆 **APEX SUPER BRAIN — MACRO GOLD CATALYST RADAR** 🏆\n"
-            f"*(ការវិភាគម៉ាក្រូសេដ្ឋកិច្ចមាស 24/7 តាម DXY, Real Yields & Central Bank SGE Premium)*\n\n"
-            f"🪙 **PAXG/USDT (មាសសុទ្ធ 24/7):** `${paxg_price:,.2f}` (`{paxg_change:+.2f}%`)\n"
-            f"📊 **24H Volume:** `${paxg_vol/1e6:.2f}M USDT`\n\n"
-            f"🌐 **MACRO METRICS MATRIX:**\n"
-            f" 💵 **DXY (US Dollar Index):** `{dxy:.2f}`\n"
-            f" 📈 **US 10Y Nominal Yield:** `{us10y:.2f}%`\n"
-            f" ⚖️ **US 10Y Real Yield:** `{real_yield:.2f}%`\n"
-            f" 🏦 **Shanghai SGE Premium:** `+${sge_premium:,.2f}/oz`\n"
-            f" 🏛️ **PBOC Accumulation Status:** {pboc_status}\n"
-            f" 🎯 **AI MACRO SIGNAL:** {macro_signal}\n"
-            f" 🧠 **AI CONFIDENCE:** `{confidence_pct:.1f}%`\n\n"
-            f"💡 **AI QUANTITATIVE ANALYSIS (របាយការណ៍ស្ថាប័ន):**\n"
-            f"{ai_analysis}\n\n"
-            f"⚡ _ប្រើបញ្ជា `/cb_gold` ឬ `/scalp PAXGUSDT 100 1.5 <PIN>` ដើម្បីស្ទាក់ទិញមាសស្វ័យប្រវត្តិ!_"
-        )
-    else:
-        report = (
-            f"🏆 **APEX SUPER BRAIN — MACRO GOLD CATALYST RADAR** 🏆\n\n"
-            f"🪙 **PAXG/USDT (Tokenized Physical Gold):** `${paxg_price:,.2f}` (`{paxg_change:+.2f}%`)\n"
-            f"📊 **24H Volume:** `${paxg_vol/1e6:.2f}M USDT`\n\n"
-            f"🌐 **MACRO METRICS MATRIX:**\n"
-            f" 💵 **DXY (US Dollar Index):** `{dxy:.2f}`\n"
-            f" 📈 **US 10Y Nominal Yield:** `{us10y:.2f}%`\n"
-            f" ⚖️ **US 10Y Real Yield:** `{real_yield:.2f}%`\n"
-            f" 🏦 **Shanghai SGE Premium:** `+${sge_premium:,.2f}/oz`\n"
-            f" 🏛️ **PBOC Accumulation Status:** {pboc_status}\n"
-            f" 🎯 **AI MACRO SIGNAL:** {macro_signal}\n"
-            f" 🧠 **AI CONFIDENCE:** `{confidence_pct:.1f}%`\n\n"
-            f"💡 **AI QUANTITATIVE ANALYSIS:**\n"
-            f"{ai_analysis}\n\n"
-            f"⚡ _Use `/cb_gold` or `/scalp PAXGUSDT 100 1.5 <PIN>` to trade gold automatically!_"
-        )
-
+    # Clean Fallback Formatting
+    report = (
+        f"🏆 **APEX SUPER BRAIN — MACRO GOLD CATALYST RADAR** 🏆\n"
+        f"*(ការវិភាគម៉ាក្រូសេដ្ឋកិច្ចមាស 24/7 តាម DXY, Real Yields & Central Bank SGE Premium)*\n\n"
+        f"🪙 **PAXG/USDT (មាសសុទ្ធ 24/7) ៖** `${paxg_price:,.2f}` (`{paxg_change:+.2f}%`)\n"
+        f"📊 **24H Volume ៖** `${paxg_vol/1e6:.2f}M USDT`\n\n"
+        f"🌐 **MACRO METRICS MATRIX ៖**\n"
+        f" 💵 **DXY Index ៖** `{dxy:.2f}` | 📈 **US 10Y Yield ៖** `{us10y:.2f}%`\n"
+        f" ⚖️ **US 10Y Real Yield ៖** `{real_yield:.2f}%` | 🏦 **SGE Premium ៖** `+${sge_premium:,.2f}/oz`\n"
+        f" 🏛️ **PBOC Accumulation ៖** {pboc_status}\n\n"
+        f"ផ្នែកទី ១ ៖ សេចក្តីសម្រេចចិត្ត និងសន្ទស្សន៍ម៉ាក្រូមាស (Executive Macro Gold Verdict)\n"
+        f"• ទ្រព្យសកម្មគោលដៅ ៖ PAXGUSDT (មាសសុទ្ធ 24/7)\n"
+        f"• ទិសដៅទីផ្សារ ៖ {gold_bias} ({macro_signal})\n"
+        f"• អត្រាជោគជ័យនៃ AI (Win Rate Confidence) ៖ {confidence_pct:.1f}%\n"
+        f"• អនុសាសន៍សម្រាប់ Leverage ៖ 20x - 50x\n"
+        f"• ប៉ារ៉ាម៉ែត្រហានិភ័យ ៖ Stop-loss 1.0% និង Trailing Peak Lock\n\n"
+        f"ផ្នែកទី ២ ៖ ភស្តុតាងបរិមាណវិស័យ DXY, Real Yield & PBOC Premium (Quantitative Evidence)\n"
+        f"អត្រាការប្រាក់ពិត {real_yield}% និង DXY {dxy} ព្រមទាំង Shanghai SGE Premium +${sge_premium:,.2f}/oz បញ្ជាក់ថាធនាគារកណ្តាល PBOC កំពុងប្រមូលទិញមាសរាប់រយតោនក្នុងទីផ្សារ OTC មុនពេលចេញរបាយការណ៍ផ្លូវការ។\n\n"
+        f"ផ្នែកទី ៣ ៖ បញ្ជាប្រតិបត្តិការ (Executive Action Command)\n"
+        f"`/turbo_hedge PAXG 20 10 BUY 2.5 1234`"
+    )
     return report
-

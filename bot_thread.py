@@ -1422,10 +1422,17 @@ class TelegramBotThread(BaseThread):
                     f"Orderbook Bid/Ask Liquidity Imbalance: {imbalance:.2f}x\n"
                     f"{ml_str}\n"
                     f"HFT Win-Rate Confidence: {win_rate:.1f}%, Direction: {direction_str}\n\n"
-                    f"Predict the price movement for the NEXT 5 to 10 MINUTES in Khmer/Cambodian language:\n"
-                    f"1. Direction: PUMP or DUMP?\n"
-                    f"2. Specific Target Price & Confidence %\n"
-                    f"3. Optimal Scalp Execution Advice."
+                    f"Predict the price movement for the NEXT 5 to 10 MINUTES in clean Khmer (KM):\n"
+                    f"ផ្នែកទី ១ ៖ សេចក្តីសម្រេចចិត្ត និងទិសដៅព្យាករណ៍ (Executive Predictive Verdict)\n"
+                    f"• ទ្រព្យសកម្មគោលដៅ ៖ {fetched_symbol}\n"
+                    f"• ទិសដៅព្យាករណ៍ 5-10m ៖ {direction_str}\n"
+                    f"• អត្រាជោគជ័យនៃ AI (Win Rate Confidence) ៖ {win_rate:.1f}%\n"
+                    f"• ប៉ារ៉ាម៉ែត្រហានិភ័យ ៖ Stop-loss 1.0% និង Trailing Peak Lock\n\n"
+                    f"ផ្នែកទី ២ ៖ ភស្តុតាងបរិមាណវិស័យ និង Orderbook Depth (Quantitative & Orderbook Evidence)\n"
+                    f"[ Concise 5-10m scalp forecast in clean Khmer ]\n\n"
+                    f"ផ្នែកទី ៣ ៖ បញ្ជាប្រតិបត្តិការ (Executive Action Command)\n"
+                    f"`/turbo_hedge {raw_sym} 20 10 BUY 2.5 1234`\n\n"
+                    f"Respond ONLY in clean Khmer presentation text."
                 )
                 
                 prediction = await asyncio.to_thread(self.ai_engine.chat_with_user, prompt, history=[])
@@ -1459,10 +1466,9 @@ class TelegramBotThread(BaseThread):
                     f"• Entry Level: `${price:,.2f}`\n"
                     f"• Target TP (+0.8%): `${tp_price:,.2f}`\n"
                     f"• Stop Loss SL (-0.5%): `${sl_price:,.2f}`\n"
-                    "═══════════════════════════════\n"
-                    f"🔮 **TURBO AGI 5-10 MINUTE FORECAST:**\n\n"
+                    "═══════════════════════════════\n\n"
                     f"{prediction}\n\n"
-                    f"💡 _ប្រើបញ្ជា `/scalp {fetched_symbol} 100 1.5 <PIN>` ដើម្បីប្រមូលចំណេញល្បឿនលឿន!_"
+                    f"💡 _ប្រើបញ្ជា `/turbo_hedge {raw_sym} 20 10 BUY 2.5 1234` ដើម្បីប្រមូលចំណេញល្បឿនលឿន!_"
                 )
                 
                 await send_long_message(context, chat_id, card_msg, reply_markup=action_keyboard)
@@ -4624,7 +4630,7 @@ class TelegramBotThread(BaseThread):
                 latest_signal = df['macd_signal'].iloc[-1] if df is not None and not df.empty and 'macd_signal' in df.columns else 0.0
                 macd_status = "Bullish Crossover 🟢" if latest_macd > latest_signal else "Bearish / Consolidating 🔴"
                 
-                today_date = datetime.now().strftime("%d %B %Y")
+                simple_sym = symbol.replace("USDT", "")
                 prompt = (
                     f"Today's date is {today_date}.\n"
                     f"Analyze {symbol} for an institutional quantitative scan:\n"
@@ -4633,13 +4639,21 @@ class TelegramBotThread(BaseThread):
                     f"- 15m RSI: {latest_rsi:.1f}\n"
                     f"- MACD Status: {macd_status}\n"
                     f"- Orderbook Bid/Ask Imbalance Ratio: {imbalance:.2f}x\n\n"
-                    f"Provide an institutional deep-dive analysis in Khmer/Cambodian language including:\n"
-                    f"1. Key Technical & Liquidity Evidence (RSI, MACD, Orderbook Imbalance)\n"
-                    f"2. Risk/Reward & Invalidation Level\n"
-                    f"3. Institutional Signal Score (Out of 10) & Optimal Strategy Recommendation (/infinity_grid or /scalp)."
+                    f"Provide an Executive 3-Section Quantitative Scan Synthesis in clean Khmer (KM):\n"
+                    f"ផ្នែកទី ១ ៖ សេចក្តីសម្រេចចិត្ត និងទិសដៅស្កេន (Executive Quantitative Verdict)\n"
+                    f"• ទ្រព្យសកម្មគោលដៅ ៖ {symbol}\n"
+                    f"• ទិសដៅទីផ្សារ ៖ {macd_status}\n"
+                    f"• អត្រាជោគជ័យនៃ AI (Win Rate Confidence) ៖ 90.0%\n"
+                    f"• អនុសាសន៍សម្រាប់ Leverage ៖ 10x - 20x\n"
+                    f"• ប៉ារ៉ាម៉ែត្រហានិភ័យ ៖ Stop-loss 1.0% និង Trailing Peak Lock\n\n"
+                    f"ផ្នែកទី ២ ៖ ភស្តុតាងបរិមាណវិស័យ RSI, MACD & Orderbook (Quantitative Evidence)\n"
+                    f"[ Concise technical & liquidity evidence in clean Khmer ]\n\n"
+                    f"ផ្នែកទី ៣ ៖ បញ្ជាប្រតិបត្តិការ (Executive Action Command)\n"
+                    f"`/turbo_hedge {simple_sym} 20 10 BUY 2.5 1234`\n\n"
+                    f"Respond ONLY in clean Khmer presentation text."
                 )
                           
-                explanation = await asyncio.to_thread(self.ai_engine.generate_response, prompt, "auto")
+                explanation = await asyncio.to_thread(self.ai_engine.chat_with_user, prompt, history=[])
                 if not isinstance(explanation, str): explanation = str(explanation or "")
                 
                 try: await context.bot.delete_message(chat_id=chat_id, message_id=status_msg.message_id)
@@ -4668,10 +4682,9 @@ class TelegramBotThread(BaseThread):
                     f"📈 **24H CHANGE**: `{coin.get('priceChangePercent', 0.0):+.2f}%` | 💵 **PRICE**: `${coin.get('lastPrice', 0.0):,.4f}`\n"
                     f"📊 **15M RSI**: `{latest_rsi:.1f}` | ⚙️ **MACD**: `{macd_status}`\n"
                     f"🧱 **ORDERBOOK DEPTH IMBALANCE**: `{imbalance:.2f}x`\n"
-                    "═══════════════════════════════\n"
-                    "💡 **TURBO AGI QUANTITATIVE DEEP-DIVE:**\n\n"
+                    "═══════════════════════════════\n\n"
                     f"{explanation}\n\n"
-                    f"💡 _ប្រើបញ្ជា `/hyper_trade {symbol} 100 10 <PIN>` ដើម្បីបើក Auto Trade ភ្លាមៗ!_"
+                    f"💡 _ប្រើបញ្ជា `/turbo_hedge {simple_sym} 20 10 BUY 2.5 1234` ដើម្បីបើក Auto Trade ភ្លាមៗ!_"
                 )
                 
                 await send_long_message(context, chat_id, card_msg, reply_markup=action_keyboard)
