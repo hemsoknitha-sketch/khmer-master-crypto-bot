@@ -153,7 +153,7 @@ class AIInvestmentEngine:
     def _clean_response(self, text: str) -> str:
         """
         Strips internal system prompt reflections, role definitions, thinking processes,
-        and meta-instructions to output ONLY clean executive markdown.
+        English drafting notes, and meta-instructions to output ONLY clean executive markdown.
         """
         if not text:
             return ""
@@ -167,12 +167,25 @@ class AIInvestmentEngine:
         # 2. Remove (Self-Correction: ... ) blocks
         text = re.sub(r'\*?\s*\(Self-Correction:.*?\)\*?', '', text, flags=re.DOTALL | re.IGNORECASE)
 
+        # 3. Normalize & Replace English draft Section markers if Khmer is present
+        text = re.sub(r'Section\s*1\s*\([^)]*\)\s*:', 'ផ្នែកទី ១៖ សេចក្តីសម្រេចចិត្តរបស់ស្ថាប័ន (The Institutional Verdict)', text, flags=re.IGNORECASE)
+        text = re.sub(r'Section\s*2\s*\([^)]*\)\s*:', 'ផ្នែកទី ២៖ ភស្តុតាងបរិមាណវិស័យ និងម៉ាក្រូសេដ្ឋកិច្ច (Quantitative and Macro Evidence)', text, flags=re.IGNORECASE)
+        text = re.sub(r'Section\s*3\s*\([^)]*\)\s*:', 'ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (The Executive Action Command)', text, flags=re.IGNORECASE)
+
+        # If Khmer presentation section 'ផ្នែកទី ១' exists, slice starting from 'ផ្នែកទី ១' to eliminate English reflection headers
+        if "ផ្នែកទី ១" in text:
+            idx = text.find("ផ្នែកទី ១")
+            text = text[idx:]
+        elif "ផ្នែកទី១" in text:
+            idx = text.find("ផ្នែកទី១")
+            text = text[idx:]
+
         lines = text.split("\n")
         cleaned_lines = []
 
         for line in lines:
             stripped = line.strip()
-            # Skip Meta / Prompt / Reflection lines
+            # Skip Meta / Prompt / Reflection / Chain-of-Thought lines
             if any(stripped.startswith(prefix) for prefix in [
                 "*   User Input:", "* User Input:", "User Input:",
                 "*   Time:", "* Time:", "Time:",
@@ -188,8 +201,19 @@ class AIInvestmentEngine:
                 "*   Requirements:", "* Requirements:", "Requirements:",
                 "*   Contextual Reason", "* Opportunity:", "*   Strategy:", "*   Parameters:", "*   The Command:",
                 "*   Intro:", "*   Market Status:", "*   Analysis:", "*   Strategy Details:",
+                "Respond ONLY in clean", "Use the 3-section structure", "User's language preference:",
+                "Structure: Section", "No fluff/reasoning", "Win Rate: Let's estimate",
                 "Ensure the tone", "Check the 1-tap", "Self-Correction", "Drafting Command", "Use bolding", "Use Emojis",
                 "(Proceeding to generate", "(Drafting the Output"
+            ]) or any(kw in stripped for kw in [
+                "Respond ONLY in clean, executive",
+                "User's language preference: KM",
+                "Structure: Section 1, 2, 3",
+                "No fluff/reasoning",
+                "Win Rate: Let's estimate",
+                "Section 1: The Institutional Verdict",
+                "Section 2: Quantitative and Macro",
+                "Section 3: The Executive Action"
             ]):
                 continue
 
