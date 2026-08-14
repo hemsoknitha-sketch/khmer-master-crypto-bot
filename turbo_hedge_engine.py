@@ -478,14 +478,9 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         if price <= 0:
             return {"status": "error", "message": f"Failed to fetch price for {symbol}"}
 
+        # Respect user commanded trade amount strictly: Only cap to free margin if free margin < amount_usdt
         if avail_bal > 0 and avail_bal < amount_usdt:
-            amount_usdt = max(1.0, avail_bal * 0.25)
-
-        # Safe Margin Allocation: max 15% of available balance per coin for small accounts (<$100)
-        if avail_bal > 0:
-            alloc_pct = 0.15 if avail_bal < 100.0 else 0.25
-            amount_usdt = min(amount_usdt, max(2.50, avail_bal * alloc_pct))
-        amount_usdt = min(25.0, max(1.0, amount_usdt))
+            amount_usdt = avail_bal
         
         # Enforce Safe $6.50 Minimum Notional to prevent -4164 error after LOT_SIZE step floor rounding
         notional = max(6.50, amount_usdt * effective_leverage)
@@ -749,119 +744,95 @@ async def monitor_turbo_hedge_bots(app):
             elif drawdown_pct < 1.0:
                 db.update_system_setting(f"turbo_hedge_{target_chat_id}_recovery_alert_sent", "0")
 
-            user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
-            # 🛡️ Institutional Portfolio Cap Shield (v9.8 / v10.0 Architecture):
-            # Wallet < $15 USDT -> Cap to 1 Coin Max
-            # Wallet $15 - $30 USDT -> Cap to 5 Coins Max
-            # Wallet >= $30 USDT -> Cap to 10 Coins Max (Supports 10 coins for $60 capital!)
-            if wallet_bal < 15.0:
-                max_allowed_coins = 1
-            elif wallet_bal < 30.0:
-                max_allowed_coins = 5
-            else:
-                max_allowed_coins = 10
-
-            if len(user_active_bots) >= max_allowed_coins:
-                continue
-
-            # Per-symbol 2-Hour Cooldown Blacklist handles fee protection per closed symbol (add_symbol_cooldown).
-
-            # 🛡️ Mandatory Free Margin Buffer Shield across Accounts (> $100 USDT):
-            if wallet_bal >= 100.0 and avail_bal < (wallet_bal * 0.50):
-                print(f"🛡️ [AGI MARGIN BUFFER SHIELD] Free margin (${avail_bal:.2f}) < 50% of wallet equity (${wallet_bal:.2f}). Pausing auto-expander scanner to guarantee liquidation protection.")
-                continue
-
-            unit_amount = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_amount", "20.0"))
+            unit_amount = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_amount", "10.0"))
             unit_leverage = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_leverage", "10"))
             user_side_input = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "AUTO")
-            unit_tp = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "5.0"))
+            unit_tp = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5"))
 
-            # 🛡️ Small Capital Shield
-            if avail_bal <= 0.0 or avail_bal < 100.0:
-                unit_leverage = min(unit_leverage, 10)
+            # 🛡️ Strict Capital Cap & User Command Compliance:
+            # Trade amount and leverage strictly follow the user's explicit command.
+            # Max coins allowed is STRICTLY determined by Available Capital / User Commanded Amount.
+            # Example: Avail Bal = $25 USDT, User Amount = $10 USDT -> Max 2 coins strictly!
+            effective_amount = max(1.0, unit_amount)
+            if user_side_input == "SPOT":
+                effective_amount = max(10.50, effective_amount)
+            
+            max_coins_by_capital = max(1, math.floor(avail_bal / effective_amount)) if avail_bal >= effective_amount else 0
+            max_allowed_coins = min(10, max_coins_by_capital)
 
-            # Check if live balance has enough capital to fund next coin position
-            if avail_bal >= 2.50:
-                # 🛡️ Dynamic Small Capital Margin Cushion: $5.00/coin for small capital ($30-$60 USDT) to support 10 full coins!
-                if wallet_bal <= 60.0:
-                    actual_trade_amount = min(unit_amount, max(2.50, min(5.00, avail_bal)))
-                elif wallet_bal < 100.0:
-                    margin_factor = 0.10 if is_recovery_mode else 0.15
-                    actual_trade_amount = min(unit_amount, max(2.50, avail_bal * margin_factor))
-                else:
-                    margin_factor = 0.20 if is_recovery_mode else 0.25
-                    actual_trade_amount = min(unit_amount, max(2.50, avail_bal * margin_factor))
-                if actual_trade_amount > avail_bal:
-                    print(f"🛡️ [AGI MARGIN SHIELD] Free margin (${avail_bal:.2f}) insufficient for safe trade amount (${actual_trade_amount:.2f}). Pausing auto-expander.")
+            if len(user_active_bots) >= max_allowed_coins or avail_bal < effective_amount:
+                print(f"🛡️ [AGI CAPITAL CAP] Active coins ({len(user_active_bots)}) reached capital limit ({max_allowed_coins} coins max for ${avail_bal:.2f} USDT free margin at ${effective_amount:.2f}/coin). Pausing auto-expander.")
+                continue
+
+            actual_trade_amount = effective_amount
+            actual_leverage = unit_leverage
+
+            if len(_failed_candidate_symbols) > 10:
+                _failed_candidate_symbols.clear()
+            if user_side_input == "SPOT":
+                top_coins = get_active_high_velocity_spot_coins(limit=100)
+            else:
+                top_coins = get_active_high_velocity_coins(limit=100)
+
+            user_active_syms = [b.get("symbol") for b in user_active_bots]
+            for c_cand in top_coins:
+                if c_cand in user_active_syms:
+                    continue
+                
+                if c_cand in _failed_candidate_symbols or is_symbol_in_cooldown(c_cand):
                     continue
 
-                if len(_failed_candidate_symbols) > 10:
-                    _failed_candidate_symbols.clear()
-                if user_side_input == "SPOT":
-                    top_coins = get_active_high_velocity_spot_coins(limit=100)
+                is_spot = (user_side_input == "SPOT")
+                eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
+                
+                # Reject any symbol flagged as SKIP by safety shields
+                eval_side = eval_res.get("side", "SKIP")
+                if eval_side == "SKIP":
+                    continue
+
+                # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 85.0%)
+                min_conf_threshold = 86.0 if is_recovery_mode else 85.0
+                if eval_res.get("confidence_pct", 0) < min_conf_threshold:
+                    print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
+                    continue
+
+                target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side
+                exec_leverage = min(unit_leverage, 10) if is_recovery_mode else unit_leverage
+                exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
+                
+                if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
+                    db.add_turbo_hedge_bot(target_chat_id, c_cand, actual_trade_amount, unit_leverage, target_side, unit_tp)
+                    entry_p = trading_engine.get_current_price(c_cand)
+                    now_ts_entry = int(time.time())
+                    if entry_p > 0:
+                        db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_entry_price", str(entry_p))
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_entry_timestamp", str(now_ts_entry))
+                    
+                    active_hedge_bots.append({"chat_id": target_chat_id, "symbol": c_cand, "amount": actual_trade_amount, "leverage": unit_leverage, "side": target_side, "target_tp": unit_tp})
+                    print(f"🚀 [SUPER SMART HIGH-VELOCITY AUTO-ENTRY] User {target_chat_id} Live Balance ${avail_bal:.2f} -> Auto-entered {c_cand} ({target_side})!")
+
+                    is_quiet = db.get_system_setting(f"turbo_hedge_{target_chat_id}_quiet_mode", "1") == "1"
+                    if not is_quiet and app and hasattr(app, "bot"):
+                        try:
+                            msg_expand = (
+                                f"🚀 **SUPER SMART TURBO HEDGE PERPETUAL AUTO-ENTRY!** 🛡️\n"
+                                f"───────────────────────────────\n\n"
+                                f"🪙 កាក់បន្ថែមអូតូ ៖ `{c_cand}` ({target_side})\n"
+                                f"💵 Live Balance ស្កេនឃើញ ៖ `${avail_bal:,.2f} USDT`\n"
+                                f"💰 ទុនវិនិយោគ / កាក់ ៖ `${actual_trade_amount:,.2f} USDT` (`{unit_leverage}x Lev`)\n"
+                                f"📈 ទំហំ Portfolio ៖ `{len(user_active_bots)+1}/{max_allowed_coins} Coins Active`\n\n"
+                                f"_AI ស្កេន និងបើកកាក់ថ្មីអូតូ 24/7 តាមចំនួនដើមទុនកំណត់ដោយអ្នកប្រើប្រាស់!_"
+                            )
+                            asyncio.create_task(app.bot.send_message(chat_id=target_chat_id, text=msg_expand, parse_mode="Markdown"))
+                        except Exception as e:
+                            print(f"Error sending expansion notification: {e}")
                 else:
-                    top_coins = get_active_high_velocity_coins(limit=100)
-
-                user_active_syms = [b.get("symbol") for b in user_active_bots]
-                for c_cand in top_coins:
-                    if c_cand in user_active_syms:
-                        continue
-                    
-                    if c_cand in _failed_candidate_symbols or is_symbol_in_cooldown(c_cand):
-                        continue
-
-                    is_spot = (user_side_input == "SPOT")
-                    eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
-                    
-                    # Reject any symbol flagged as SKIP by safety shields
-                    eval_side = eval_res.get("side", "SKIP")
-                    if eval_side == "SKIP":
-                        continue
-
-                    # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 85.0%)
-                    min_conf_threshold = 86.0 if is_recovery_mode else 85.0
-                    if eval_res.get("confidence_pct", 0) < min_conf_threshold:
-                        print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
-                        continue
-
-                    target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side
-                    exec_leverage = min(unit_leverage, 10) if is_recovery_mode else unit_leverage
-                    exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
-                    
-                    if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
-                        db.add_turbo_hedge_bot(target_chat_id, c_cand, actual_trade_amount, unit_leverage, target_side, unit_tp)
-                        entry_p = trading_engine.get_current_price(c_cand)
-                        now_ts_entry = int(time.time())
-                        if entry_p > 0:
-                            db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_entry_price", str(entry_p))
-                        db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_entry_timestamp", str(now_ts_entry))
-                        
-                        active_hedge_bots.append({"chat_id": target_chat_id, "symbol": c_cand, "amount": actual_trade_amount, "leverage": unit_leverage, "side": target_side, "target_tp": unit_tp})
-                        print(f"🚀 [SUPER SMART HIGH-VELOCITY AUTO-ENTRY] User {target_chat_id} Live Balance ${avail_bal:.2f} -> Auto-entered {c_cand} ({target_side})! (Now {len(user_active_bots)+1}/10 Coins)")
-
-                        is_quiet = db.get_system_setting(f"turbo_hedge_{target_chat_id}_quiet_mode", "1") == "1"
-                        if not is_quiet and app and hasattr(app, "bot"):
-                            try:
-                                msg_expand = (
-                                    f"🚀 **SUPER SMART TURBO HEDGE PERPETUAL AUTO-ENTRY!** 🛡️\n"
-                                    f"───────────────────────────────\n\n"
-                                    f"🪙 កាក់បន្ថែមអូតូ ៖ `{c_cand}` ({target_side})\n"
-                                    f"💵 Live Balance ស្កេនឃើញ ៖ `${avail_bal:,.2f} USDT`\n"
-                                    f"💰 ทុនវិនិយោគ / កាក់ ៖ `${unit_amount:,.2f} USDT` (`{unit_leverage}x Lev`)\n"
-                                    f"📈 ទំហំ Portfolio ៖ `{len(user_active_bots)+1}/10 Coins Active`\n\n"
-                                    f"_AI ស្កេន និងបើកកាក់ថ្មីអូតូ 24/7 ឲ្យតែមានលុយគ្រប់ រហូតដល់ 10 កាក់អតិបរមា!_"
-                                )
-                                asyncio.create_task(app.bot.send_message(chat_id=target_chat_id, text=msg_expand, parse_mode="Markdown"))
-                            except Exception as e:
-                                print(f"Error sending expansion notification: {e}")
+                    _failed_candidate_symbols.add(c_cand)
+                    err_str = str(exec_res) if exec_res else ""
+                    if "-2019" in err_str or "insufficient" in err_str.lower() or "Margin locked" in err_str:
+                        print(f"🛡️ [AGI MARGIN SHIELD] Free margin exhausted for User {target_chat_id}. Pausing auto-expander scanner loop until margin frees up.")
                         break
-                    else:
-                        _failed_candidate_symbols.add(c_cand)
-                        err_str = str(exec_res) if exec_res else ""
-                        if "-2019" in err_str or "insufficient" in err_str.lower() or "Margin locked" in err_str:
-                            print(f"🛡️ [AGI MARGIN SHIELD] Free margin exhausted for User {target_chat_id}. Pausing auto-expander scanner loop until margin frees up.")
-                            break
-                        print(f"⚠️ [PERPETUAL AUTO-EXPANDER SKIP] {c_cand} failed execution. Skipping candidate symbol to next coin!")
+                    print(f"⚠️ [PERPETUAL AUTO-EXPANDER SKIP] {c_cand} failed execution. Skipping candidate symbol to next coin!")
 
         for bot_info in active_hedge_bots:
             chat_id = bot_info.get("chat_id")

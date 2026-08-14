@@ -5330,8 +5330,8 @@ class TelegramBotThread(BaseThread):
                     except Exception:
                         top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
 
-                    avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
-                    num_coins = 10 if (avail_bal >= 5.0 or avail_bal <= 0) else max(1, min(10, int(avail_bal / max(2.5, amount))))
+                    eff_amt = max(10.50 if is_spot else 1.0, amount)
+                    num_coins = max(1, min(10, int(avail_bal / eff_amt))) if avail_bal >= eff_amt else 1
                     
                     success_count = 0
                     executed_syms = []
