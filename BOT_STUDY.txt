@@ -1,5 +1,5 @@
 ================================================================================
-      📘 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ VIP ៖ APEX TURBO AGI CRYPTO TRADING ENGINE v10.5
+      📘 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ VIP ៖ APEX TURBO AGI CRYPTO TRADING ENGINE v10.6
              (ប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលបញ្ញាសិប្បនិម្មិត AGI - Institutional Profit Edition)
 ================================================================================
 
@@ -7,17 +7,57 @@
 ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងលម្អិត ម៉ត់ចត់ និងច្បាស់លាស់បំផុត ដោយបានប្រមូលផ្តុំរាល់មុខងារ ស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញពិតប្រាកដ និងពាក្យបញ្ជាទាំងអស់នៅក្នុង Bot Menu មកបកស្រាយយ៉ាងក្បោះក្បាយ ដើម្បីបង្រៀនសមាជិក VIP ឲ្យយល់ដឹង និងចេះប្រើប្រាស់ប្រព័ន្ធ Apex TURBO AGI Bot ឲ្យទទួលបានផលចំណេញអតិបរមា គ្មានការខាតបង់ដោយកំហុសប្រព័ន្ធ និងមានសុវត្ថិភាពដើមទុន 100%។
 
 --------------------------------------------------------------------------------
-១. សេចក្តីផ្តើម និងស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញ (PROFIT ENGINE ARCHITECTURE v10.5)
+១. សរុបរបាយការណ៍លម្អិតប្រតិបត្តិការពេញមួយយប់ (OVERNIGHT DETAILED TRADING REPORT v10.6)
 --------------------------------------------------------------------------------
-Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional (High-Frequency Trading & Autonomous Risk Management) ដែលដំណើរការ 24/7 លើម៉ាស៊ីន VPS ល្បឿនលឿន (<30ms Execution)។ ប្រព័ន្ធនេះបំពាក់ដោយបញ្ញាសិប្បនិម្មិត Gemini AI គួបផ្សំនឹងម៉ូឌែលគណិតវិទ្យា Institutional Quantitative Scoring និង Multi-Timeframe Confluence Matrix ដើម្បីស្កេន វិភាគ និងចូលជួញដូរលើទីផ្សារ Binance Futures & Spot ដោយស្វ័យប្រវត្តិ។
 
-លក្ខណៈពិសេសចម្បងនៃប្រព័ន្ធកំណែថ្មី v10.5 ៖
+១.១ តើកាក់ប៉ុន្មានវិនិយោគពេញមួយយប់នេះ? (How many coins were invested overnight?)
+• កាក់ដែលបានចូលជួញដូរ Order ពិតប្រាកដ (Active Traded Coins) ៖ សរុប ៧ កាក់ រួមមាន ៖ `GPSUSDT`, `BEATUSDT`, `BTWUSDT`, `TUTUSDT`, `COTIUSDT`, `BLESSUSDT`, `AVNTUSDT`។
+• កាក់ដែលត្រូវបានស្កេន និងទប់ស្កាត់សុវត្ថិភាព (Safety Suppressed/Filtered Coins) ៖ សរុប ៥+ កាក់ រួមមាន ៖ `QNTBUSDT`, `ACUUSDT`, `AVAAIUSDT`, `DOSUSDT`, `BSPUSDT` (ត្រូវប្រព័ន្ធ SKIPPED ដោយសារ Trend 1m/5m មិនស្របគ្នា ឬ RSI កើនឡើងខ្លាំង Overbought)។
+
+១.២ វិនិយោគកាក់ ១ ប៉ុន្មាននាទី? (How many minutes per coin trade?)
+• ក្នុងប្រព័ន្ធកំណែមុន Position ស្ងៀមស្ងាត់ត្រាំ PnL $0.00 ត្រូវបានមុខងារ `STAGNANT POSITION AUTO-PRUNER` កាត់ Order រៀងរាល់ ១៥ នាទី ទៅ ៦០ នាទី។
+• ក្នុងប្រព័ន្ធកំណែថ្មី v10.6 រយៈពេល Hold ត្រូវ បានដំឡើងដល់ ៩០ នាទី (ឬ > ៦០ នាទីលុះត្រាតែមាន Net Profit ដកសេវា fee រួច) ដើម្បីការពារមិនឲ្យកាត់ Order ឆៅៗដែលនាំឲ្យខាត fee Taker ឡើយ។
+
+១.៣ កាក់ ១ ចូលវិនិយោគប៉ុន្មានដង? (How many times did 1 coin enter trades?)
+• ប្រព័ន្ធធ្វើការស្កេនទីផ្សារជាបន្តបន្ទាប់ (Continuous Scanning Loop) រៀងរាល់ ១៥-៣០ វិនាទីម្តង។
+• កាក់សកម្មដូចជា `BTWUSDT`, `BLESSUSDT`, `AVNTUSDT`, `GPSUSDT` ត្រូវ BOT ស្កេនវាយតម្លៃរាប់សិបដង និងចូលជួញដូរ ២ ទៅ ៤ ដង/យប់ (នៅពេល Slot រំដោះស្អែកទទេរ)។
+
+--------------------------------------------------------------------------------
+២. វិភាគជជីករកបញ្ហាកំហុសឆ្គង និងដំណោះស្រាយសាងប្រាក់ចំណេញពិត (ROOT CAUSE ANALYSIS & PROFIT SOLUTIONS)
+--------------------------------------------------------------------------------
+
+២.១ កំហុសឆ្គងនាំទៅរកការខាតបង់ពិតប្រាកដក្នុងការវិនិយោគ Spot/Futures (Primary Causes of Loss) ៖
+១. កាត់ប្រាក់ចំណេញដោយសេវា Binance Market Taker Fee & Slippage (Fee Erosion) ៖
+   - ការប្រើប្រាស់ Market Order (BUY/SELL) ត្រូវបង់សេវា Taker Fee 0.05% ពេលចូល និង 0.05% ពេលចេញ (សរុប 0.10% Notional Value)។
+   - នៅ Leverage 10x សេវា 0.10% Notional ស្មើនឹង **1.0% នៃទុន Margin ក្នុង ១ Trade**! ប្រសិនបើ Position ត្រូវកាត់ចោលរៀងរាល់ ១៥ នាទី ពេល PnL $0.00 នោះ fee និង slippage នឹងកាត់បន្តិចម្តងៗ បណ្តាលឲ្យទុនថយចុះ (Drawdown 9.3% - 9.5%)។
+២. ការកាត់ Position លឿនពេក (Chop Churning from 15-min Stagnant Timeout) ៖
+   - តម្លៃកាក់ត្រូវការពេល ១ ទៅ ៤ ម៉ោងដើម្បីរត់ដល់ Take Profit (+2.5% ទៅ +5.0%)។ ការកាត់ចោលនៅនាទីទី ១៥ ធ្វើឲ្យខកខានរលកចំណេញ រួចទិញកាក់ថ្មីខាត fee ជាន់ fee។
+៣. Confluence Gate ចុះខ្សោយពេលជួប Drawdown Radar ៖
+   - ពេលទុនធ្លាក់ចុះ Radar បើក Recovery Mode ប៉ុន្តែប្រសិនបើត្រងសញ្ញាមិនត្រឹមត្រូវ វានឹងចូល Trade ក្នុងលក្ខខណ្ឌ Range Chop។
+
+២.២ ដំណោះស្រាយកំណែថ្មី v10.6 បាញ់ឆ្ពោះទៅជាប្រព័ន្ធសាងប្រាក់ចំណេញពិតប្រាកដ (v10.6 Profit Solutions) ៖
+១. Anti-Fee-Churn Stagnant Timeout Filter ( holding > 90 នាទី) ៖
+   - កែប្រែយន្តការ Stagnant Pruner ៖ លុបបំបាត់ដាច់ខាតការកាត់ Order ត្រឹម ១៥ នាទី។ Position ត្រូវ hold យ៉ាងតិច ៩០ នាទី (ឬ > ៦០ នាទី លុះត្រាតែមានប្រាក់ចំណេញសុទ្ធ > +$0.15 USDT ក្រោយដក Fee Taker រួច)។
+២. យន្តការ Fee-Deducted Net Profit Target Floor ៖
+   - គណនា Take Profit និង Trailing Stop ដោយបូកបន្ថែមសេវា Binance Fee 0.12% ចូល ធានាថាពេល TP Trigger គឺទទួលបានសាច់ប្រាក់ចំណេញសុទ្ធ ១០០%។
+៣. យន្តការ Multi-Timeframe Strict Confluence Matrix (1m + 5m + 15m Alignment) ៖
+   - ចូល Trade លុះត្រាតែ 1m EMA 5/15, 5m EMA 20/50, និង 15m Trend រត់ស្របគ្នា 100%។
+៤. យន្តការ 4-Hour Symbol Cooldown Blacklist ៖
+   - កាក់ណាដែលទើបតែបិទ Order នឹងត្រូវដាក់ចូល Blacklist រយៈពេល ៤ ម៉ោង មិនឲ្យទិញត្រលប់វិញភ្លាមៗឡើយ ដើម្បីការពារ Fee Churning។
+
+--------------------------------------------------------------------------------
+៣. ស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញ (PROFIT ENGINE ARCHITECTURE v10.6)
+--------------------------------------------------------------------------------
+
+Apex TURBO AGI Engine v10.6 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional (High-Frequency Trading & Autonomous Risk Management) ដែលដំណើរការ 24/7 លើម៉ាស៊ីន VPS ល្បឿនលឿន (<30ms Execution)។
+
+លក្ខណៈពិសេសចម្បងនៃប្រព័ន្ធកំណែថ្មី v10.6 ៖
 • ដំណើរការស្វ័យប្រវត្ត 24 ម៉ោង / 7 ថ្ងៃ ឥតសម្រាក (Perpetual 24/7 Auto-Scanner Loop) ជាមួយ Self-Healing Watchdog
 • យន្តការស្កេនទាញយកតែកាក់ Crypto រត់លឿនបំផុត (High-Volatility Score Engine 200+ Perpetual Crypto Pairs)
-• យន្តការចម្រោះកាក់មិនអាច Trade បានអូតូ (Auto-Filter Non-Tradable & TradFi Stock Pairs: QNTX, MINIMAX, ZHIPU, NVDA, TSLA - ចៀសវាង Error -4411)
+• យន្តការចម្រោះកាក់មិនអាច Trade បានអូតូ (Auto-Filter Non-Tradable & TradFi Stock Pairs: QNTX, MINIMAX, ZHIPU, NVDA, TSLA)
 • យន្តការ ISOLATED Margin Type Enforcement (ការពារដាច់ខាតមិនឲ្យប្រព័ន្ធដេញតាម Cross Margin រលាយសាច់ប្រាក់សរុបក្នុង Wallet ឡើយ)
 • យន្តការ Multi-Timeframe Confluence (RSI 1m + EMA 5/15 + 5m EMA 20/50 + Volume Delta + Orderbook Depth)
-• យន្តការ AGI Drawdown Health Radar (ស្កេនមើល Drawdown សរុប 8.0% ឡើងទៅ ដើម្បីដោះសោ VIP Recovery Gate >=85.0% ស្កេនសងដើមទុនវិញ)
+• យន្តការ AGI Drawdown Health Radar (ស្កេនមើល Drawdown សរុប 8.0% ឡើងទៅ ដើម្បីដោះសោ VIP Recovery Gate >=88.0% ស្កេនសងដើមទុនវិញ)
 • យន្តការប្តូរទិសដៅលឿនឆ្លាតវៃ (Smart Direct Reverse Flip <15ms ជាមួយ 5m Trend Confluence Gate & Guaranteed 2-Step Fallback)
 • យន្តការកាត់ផ្តាច់ហានិភ័យអាសន្នដាច់ខាត (Hard Emergency Circuit Breaker @ -25% ROI / -$5.00 USDT)
 • យន្តការ Lock Leverage ដើមថេរលើ Position កំពុងរត់ (Fixed Initial Margin ROI Protection)
@@ -27,42 +67,10 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 • យន្តការរក្សាទុក Blacklist Cooldown ក្នុង SQLite DB (Survives Bot Restarts & VPS Updates)
 
 --------------------------------------------------------------------------------
-២. យន្តការជួញដូរស្វ័យប្រវត្តិ /turbo_hedge (APEX TURBO HEDGE ENGINES v10.5)
+៤. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU (COMPLETE COMMAND REFERENCE)
 --------------------------------------------------------------------------------
 
-២.១ យន្តការស្កេន 24/7 (Perpetual Auto-Scanner & Portfolio Expander)
-ប្រព័ន្ធនឹងធ្វើការស្កេនពិនិត្យមើលដើមទុនទំនេរ (Available Balance) ក្នុងកាបូប Binance របស់អ្នករៀងរាល់ ៣ វិនាទីម្តង។ ឲ្យតែមានដើមទុនទំនេរគ្រប់គ្រាន់ ($2.50+ USDT) ប្រព័ន្ធនឹងស្កេនទាញយកកាក់ដែលមាន Momentum ខ្លាំងបំផុត មកបើក Position ជួញដូរភ្លាមៗ រហូតដល់គ្រប់ចំនួនកាក់អតិបរមាដែលបានកំណត់ (ឧទាហរណ៍ ៖ ១០ កាក់)។
-
-២.២ យន្តការជ្រើសរើសកាក់រត់លឿន និងចម្រោះកាក់ TradFi Stock (Crypto-Only High-Velocity Engine)
-ប្រព័ន្ធស្កេនទាញយកតែកាក់ Crypto ដើមដែលមាន Volume និង Volatility ខ្ពស់ ព្រមទាំងធ្វើការចម្រោះ (Filter) លុបចោលអូតូនូវកាក់ប្រភេទ TradFi Stock Perpetual Indices ឬ Agreement Contracts (ដូចជា QNTXUSDT, MINIMAXUSDT, ZHIPUUSDT, NVDAUSDT, TSLAUSDT) ដែលបណ្តាលឲ្យមាន Error -4411 លើ Binance API។
-
-២.៣ យន្តការ Multi-Timeframe Trend Confluence & Harmonized RSI Logic
-• Anti-Peak Protection ៖ នៅពេលកាក់មួយរត់ឡើងខ្លាំងពេក (24h Change >= +30.0% ឬ RSI 1m >= 72.0) ប្រព័ន្ធនឹងទប់ស្កាត់ការ BUY/LONG ដើម្បីការពារមិនឱ្យទិញចំកំពូល។
-• Anti-Bottom Protection ៖ នៅពេលកាក់មួយធ្លាក់ចុះខ្លាំងពេក (RSI 1m <= 28.0) ប្រព័ន្ធនឹងទប់ស្កាត់ការ SELL/SHORT ដើម្បីការពារមិនឱ្យលក់ចំបាត។
-• Trend Following Zone ៖ ក្នុងចន្លោះ RSI 22 ដល់ 78 ប្រព័ន្ធនឹងពិនិត្យមើល 1m EMA 5/15 និង 5m EMA 20/50 Trend Alignment ដើម្បីចូល BUY (ពេល 5m Bullish) ឬ SHORT (ពេល 5m Bearish) ដោយលុបបំបាត់ការជាន់គ្នា រត់បញ្ជាទិញបាន ១០០%!
-
-២.៤ យន្តការ Smart Direct Reverse Flip (<15ms execution)
-នៅពេល Position មួយមានការខាតបង់បណ្តោះអាសន្នដល់ -15.0% ROI (ឬ -$3.50 USDT) ប្រព័ន្ធនឹងពិនិត្យមើល Trend រលកធំ 5m/15m (MTF Confluence) ៖
-• ប្រសិនបើ 5m Trend គាំទ្រទិសដៅផ្ទុយ ៖ ប្រព័ន្ធនឹងធ្វើការ Flip (LONG ➔ SHORT ឬ SHORT ➔ LONG) ក្នុង ១ Order ដេញតាម Trend ផ្ទុយភ្លាមៗ (<15ms) ជាមួយនឹងយន្តការ Fallback ២ ជំហាន (Close + Open) ប្រសិនបើ Single Order ជួបបញ្ហា Margin!
-• ប្រសិនបើ 5m Trend មិនគាំទ្រ ៖ ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ខាតធម្មតា រួចបញ្ចូលកាក់នោះទៅក្នុង Blacklist Cooldown ២ ម៉ោងភ្លាមៗ!
-
-២.៥ យន្តការ Hard Emergency Circuit Breaker (-25% ROI / -$5.00 USDT)
-ប្រសិនបើទីផ្សារបក់បោកខ្លាំង ឬដាំក្បាលរហូតដល់ ROI -25.0% (ឬ -$5.00 USDT) ប្រព័ន្ធនឹងធ្វើការ Market Close កាត់ផ្តាច់ការខាតបង់ភ្លាមៗ (<15ms) ធានាដាច់ខាត 100% មិនឲ្យខាតជ្រុលឡើយ!
-
-២.៦ យន្តការប្រមូលផលចំណេញសុទ្ធដកថ្លៃសេវា (Fee-Deducted Net Profit Harvest Floor)
-រាល់ការគណនាប្រាក់ចំណេញ ត្រូវ បានដកថ្លៃសេវា Binance Trading Fees ចេញរួចរាល់ (Entry Fee + Exit Fee = ~0.10% Notional Value) ៖
-    Net PnL USDT = Unrealized Profit - (NotionalValue * 0.0010)
-ឲ្យតែ Net PnL USDT រត់ដល់គោលដៅ (ឧទាហរណ៍ ៖ +$2.50 USDT ឡើងទៅ) ប្រព័ន្ធនឹងធ្វើការ Market Close បិទយកប្រាក់ចំណេញសុទ្ធចូល Wallet ភ្លាមៗ (<50ms) រួចស្កេនចូល Trade កាក់ថ្មីអូតូ 24/7!
-
-២.៧ យន្តការ Spot Mode Protection ($10.50 Min Notional & Safe Holding & Top-Up Liquidator)
-• សម្រាប់ Spot Mode ប្រព័ន្ធកំណត់ទុនទិញអប្បបរមា $10.50 USDT ឡើងទៅ ដើម្បីធានាថា Position Spot ទាំងអស់លើសពី Binance Spot $10 MIN_NOTIONAL Filter 100%។
-• ប្រសិនបើ position spot ធ្លាក់ចុះមកត្រឹម $0.50 - $4.99 USDT (ក្រោម $5 Binance filter limit) ប្រព័ន្ធនឹងប្រើប្រាស់យន្តការ Micro Top-Up Liquidator ទិញបន្ថែមឲ្យលើស $10 រួចលក់ Market Sell 100% ដើម្បីដោះលែងដើមទុនភ្លាមៗ!
-
---------------------------------------------------------------------------------
-៣. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU (COMPLETE COMMAND REFERENCE)
---------------------------------------------------------------------------------
-
-៣.១ ពាក្យបញ្ជាកំណត់ប្រព័ន្ធ និងគណនី (SYSTEM & ACCOUNT COMMANDS) ៖
+៤.១ ពាក្យបញ្ជាកំណត់ប្រព័ន្ធ និងគណនី (SYSTEM & ACCOUNT COMMANDS) ៖
 • `/start`        : បើកផ្ទាំង Menu ដើម និងជ្រើសរើសភាសាប្រើប្រាស់ (ខ្មែរ / English / 中文)
 • `/menu`         : បង្ហាញផ្ទាំងបញ្ជា interactive ជាមួយ Inline Buttons ទាំងអស់របស់ Bot
 • `/add_api`      : ភ្ជាប់ Binance API Key និង API Secret (ទម្រង់ ៖ `/add_api <KEY> <SECRET>`)
@@ -74,7 +82,7 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 • `/status`       : ពិនិត្យមើលកាក់ដែលកំពុងរត់ Trade ទាំងអស់ និងស្ថានភាព PnL Real-time
 • `/health`       : ពិនិត្យមើលសុខភាព VPS, CPU/Memory Usage, និង API Latency
 
-៣.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ (AUTONOMOUS TRADING ENGINES) ៖
+៤.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ (AUTONOMOUS TRADING ENGINES) ៖
 • `/turbo_hedge`  : ប្រព័ន្ធ HFT Auto-Scanner ស្កេនកើបចំណេញ 24/7 (ទម្រង់ ៖ `/turbo_hedge TOP 5 10 AUTO 2.50 <PIN>`)
 • `/turbo_hedge STOP` : បិទការជួញដូរកាក់តែមួយ ឬគ្រប់កាក់ (ទម្រង់ ៖ `/turbo_hedge STOP SOL <PIN>` ឬ `/turbo_hedge STOP ALL <PIN>`)
 • `/scalp`        : បើកការជួញដូរ Scalping ល្បឿនលឿនលើកាក់មួយជាក់លាក់ (ទម្រង់ ៖ `/scalp SOLUSDT 10 10 <PIN>`)
@@ -83,7 +91,7 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 • `/compound_grid`: បើកប្រព័ន្ធ Grid ផ្សំប្រាក់ចំណេញ (Compound Interest) ស្វ័យប្រវត្តិ
 • `/funding_harvester`: បើកប្រព័ន្ធស្ទាក់កើបអត្រាការប្រាក់ Funding Fee ពី Binance Futures រៀងរាល់ ៨ ម៉ោង
 
-៣.៣ ពាក្យបញ្ជាវិភាគ និងសញ្ញាទីផ្សារ (AI INTELLIGENCE & MARKET ANALYSIS) ៖
+៤.៣ ពាក្យបញ្ជាវិភាគ និងសញ្ញាទីផ្សារ (AI INTELLIGENCE & MARKET ANALYSIS) ៖
 • `/analyze`      : ឲ្យ Gemini AI វិភាគបច្ចេកទេស និងទិសដៅកាក់ Real-time (ទម្រង់ ៖ `/analyze BTCUSDT`)
 • `/predict`      : ឲ្យ AI ព្យាករណ៍តម្លៃកាក់ក្នុងរយៈពេល ២៤ ម៉ោងខាងមុខ (ទម្រង់ ៖ `/predict SOLUSDT`)
 • `/whales`       : តាមដានចលនា Whale (ត្រីបាឡែន) ទិញ/លក់ ធំៗក្នុងទីផ្សារ Real-time
@@ -91,13 +99,13 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 • `/top`          : មើលបញ្ជីកាក់ដែលឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile Gainers & Losers)
 • `/alert`        : កំណត់ការជូនដំណឹងតម្លៃកាក់ (ទម្រង់ ៖ `/alert BTC 95000 ABOVE`)
 
-៣.៤ ពាក្យបញ្ជាការពារមាស និងសុវត្ថិភាព (GOLD & SAFETY GUARD COMMANDS) ៖
+៤.៤ ពាក្យបញ្ជាការពារមាស និងសុវត្ថិភាព (GOLD & SAFETY GUARD COMMANDS) ៖
 • `/gold_radar`         : ស្កេនពិនិត្យតម្លៃមាសឌីជីថល (PAXGUSDT) Real-time
 • `/black_swan_guard`   : បើកប្រព័ន្ធការពារហានិភ័យ Black Swan ពេលសេដ្ឋកិច្ចពិភពលោកដាំក្បាល
 • `/gold_btc_rebalance` : បើកប្រព័ន្ធបែងចែកតុល្យភាពទុនរវាងមាស (PAXG) និង Bitcoin (BTC)
 
 --------------------------------------------------------------------------------
-៤. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ (CAPITAL MANAGEMENT MATRIX)
+៥. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ (CAPITAL MANAGEMENT MATRIX)
 --------------------------------------------------------------------------------
 • ទុនក្រោម $15 USDT: កំណត់រត់ 1 កាក់អតិបរមា (Leverage 10x Max, Position Size $2.50 - $5.00)
 • ទុន $15 - $30 USDT: កំណត់រត់ 5 កាក់អតិបរមា (Leverage 10x - 15x Max)
@@ -105,13 +113,13 @@ Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូ�
 • ទុនលើសពី $100 USDT: កំណត់រត់ 10 កាក់អតិបរមា ជាមួយនឹង Free Margin Buffer 50% សម្រាប់សុវត្ថិភាព
 
 --------------------------------------------------------------------------------
-៥. ការធ្វើបច្ចុប្បន្នភាពកូដទៅ VPS (AUTOMATED GITHUB VPS DEPLOYMENT)
+៦. ការធ្វើបច្ចុប្បន្នភាពកូដទៅ VPS ដោយចុច 1-Click (`git_update_vps.bat`)
 --------------------------------------------------------------------------------
 នៅពេល Admin ធ្វើការកែប្រែកូដ ឬ Update មុខងារថ្មី ៖
-១. ចុចលើ file `git_update_vps.bat` លើកុំព្យូទ័រ local
-២. ប្រព័ន្ធនឹងធ្វើការ Commit & Push កូដថ្មីឡើងទៅ GitHub Repository (`origin/main`) ដោយស្វ័យប្រវត្តិ
-៣. Script លើ VPS នឹងទាញយក (git fetch & reset) កូដថ្មីចុងក្រោយ រួច Clear __pycache__ និង Restart Bot លើ VPS ភ្លាមៗ 24/7 ដោយមិនបាច់ Login GitHub ឡើយ!
+១. ចុច double click លើ file `git_update_vps.bat` លើកុំព្យូទ័រ local
+២. ប្រព័ន្ធនឹងធ្វើការ Commit & Push កូដថ្មីឡើងទៅ GitHub Repository (`origin/main`) ដោយស្វ័យប្រវត្តិ មិនចាំបាច់ វាយលេខកូដ Login ឡើយ។
+៣. Script លើ VPS នឹងទាញយក (git fetch & reset) កូដថ្មីចុងក្រោយ រួច Clear __pycache__ និង Restart Bot លើ VPS ភ្លាមៗ 24/7!
 
 ================================================================================
-             APEX TURBO AGI ENGINE v10.5 - INSTITUTIONAL PROFIT GUARANTEED
+             APEX TURBO AGI ENGINE v10.6 - INSTITUTIONAL PROFIT GUARANTEED
 ================================================================================

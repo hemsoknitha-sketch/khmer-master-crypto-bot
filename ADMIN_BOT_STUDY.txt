@@ -1,5 +1,5 @@
 ================================================================================
-  👑 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ SUPER ADMIN ៖ APEX TURBO AGI CRYPTO TRADING ENGINE v10.5
+  👑 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ SUPER ADMIN ៖ APEX TURBO AGI CRYPTO TRADING ENGINE v10.6
         (សៀវភៅដៃប្រតិបត្តិការ និងគ្រប់គ្រងប្រព័ន្ធជួញដូរ AGI សម្រាប់ SUPER ADMIN)
 ================================================================================
 
@@ -7,137 +7,144 @@
 ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងលម្អិត ម៉ត់ចត់ និងច្បាស់លាស់បំផុត ដើម្បីផ្តល់នូវចំណេះដឹងស៊ីជម្រៅ ស្ថាបត្យកម្មប្រព័ន្ធ មុខងារទាំងអស់នៃ Desktop Control Panel App (GUI) និង Telegram Bot Node ព្រមទាំងវិធីសាស្ត្រដោះស្រាយបញ្ហា (Troubleshooting) លើ VPS សម្រាប់ Admin ក្នុងការគ្រប់គ្រង Apex TURBO AGI Bot ឲ្យដំណើរការប្រកបដោយប្រសិទ្ធភាព និងសុវត្ថិភាពខ្ពស់បំផុត 100%។
 
 --------------------------------------------------------------------------------
-១. សេចក្តីផ្តើម និងស្ថាបត្យកម្មប្រព័ន្ធសរុប (COMPLETE SYSTEM ARCHITECTURE v10.5)
+១. សរុបរបាយការណ៍ប្រតិបត្តិការ និងការវិភាគបញ្ហាខាតបង់ (ADMIN SYSTEM AUDIT v10.6)
 --------------------------------------------------------------------------------
 
-Apex TURBO AGI Engine v10.5 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional (High-Frequency Trading & Autonomous Risk Management) ដែលដំណើរការ ២៤ម៉ោង/៧ថ្ងៃ ឥតសម្រាកលើម៉ាស៊ីន VPS ឬ Desktop Admin Server។
+១.១ របាយការណ៍សរុបពេញមួយយប់ (Overnight Performance Audit) ៖
+• ចំនួនកាក់ចូល Trade ពិតប្រាកដ (7 Active Coins) ៖ `GPSUSDT`, `BEATUSDT`, `BTWUSDT`, `TUTUSDT`, `COTIUSDT`, `BLESSUSDT`, `AVNTUSDT`។
+• ចំនួនកាក់ដែលត្រូវ Filtered (5+ Suppressed Coins) ៖ `QNTBUSDT`, `ACUUSDT`, `AVAAIUSDT`, `DOSUSDT`, `BSPUSDT` (ត្រូវ Skipped ដោយសារ 1m/5m Trend Misaligned)។
+• រយៈពេលនៃការ Hold Position ៖ កំណែមុនត្រាំ 15-60 នាទី ពេល PnL $0.00 ត្រូវកាត់។ កំណែ v10.6 តម្រូវឲ្យ Hold យ៉ាងតិច ៩០ នាទី ឬ > ៦០ នាទី លុះត្រាតែ Net Profit ក្រោយដក Fee វិជ្ជមាន។
+• ចំនួនដងនៃការចូល ៖ ស្កេនរៀងរាល់ ១៥-៣០ វិនាទី កាក់សកម្មចូលទិញ ២ ទៅ ៤ ដង/យប់ តាម Slot ទំនេរ។
 
-១.១ របៀបដំណើរការពីរផ្លូវ (Dual-Mode Execution Architecture) ៖
+១.២ ជជីករកមូលហេតុខាតបង់ពិតប្រាកដ និងដំណោះស្រាយកែប្រែប្រព័ន្ធ (Root Cause & Admin Solutions) ៖
+១. កំហុស Fee Erosion ៖ សេវា Taker Fee 0.10% Roundtrip ស្មើនឹង 1.0% Margin Loss ក្នុង Leverage 10x។ ការបិទ Order ឆៅៗពេល 15 នាទី PnL $0.00 ធ្វើឲ្យខាត fee Taker រាល់ដង។
+   - ដំណោះស្រាយ Admin v10.6 ៖ អនុវត្ត Anti-Fee-Churn Hold Time Filter (>= 90 នាទី) និងកំណត់ Take Profit Floor ឲ្យបូកបញ្ចូលសេវា Fee 0.12% ចូល ធានាថាពេល TP គឺទទួលបានចំណេញសុទ្ធ ១០០%។
+២. កំហុស Chop Churning ៖ ទីផ្សារ 1m/5m Range ធ្វើឲ្យ Bot ចូល-ចេញច្រើនដង។
+   - ដំណោះស្រាយ Admin v10.6 ៖ ពង្រឹង Multi-Timeframe Alignment (1m + 5m + 15m) ព្រមទាំង Enforce 4-Hour Symbol Cooldown Blacklist លើ SQLite DB។
+
+--------------------------------------------------------------------------------
+២. ស្ថាបត្យកម្មប្រព័ន្ធសរុប (COMPLETE SYSTEM ARCHITECTURE v10.6)
+--------------------------------------------------------------------------------
+
+Apex TURBO AGI Engine v10.6 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional (High-Frequency Trading & Autonomous Risk Management) ដែលដំណើរការ ២៤ម៉ោង/៧ថ្ងៃ ឥតសម្រាកលើម៉ាស៊ីន VPS ឬ Desktop Admin Server។
+
+២.១ របៀបដំណើរការពីរផ្លូវ (Dual-Mode Execution Architecture) ៖
 • Desktop Executive GUI Mode (`main.py`) ៖ ដំណើរការដោយមានផ្ទាំង Dashboard (PyQt5 Modern Dark Glassmorphic UI) សម្រាប់ Super Admin ប្រើប្រាស់លើកុំព្យូទ័រ Admin ដោយផ្ទាល់ ជាមួយនឹងមុខងារគ្រប់គ្រង User, Broadcast, AI Help Center, និង AI Settings។
 • Pure Headless VPS CLI Mode (`python main.py --cli` ឬ `--no-gui`) ៖ ដំណើរការលើ VPS 24/7 ដោយគ្មាន UI ប្រើប្រាស់ Resource (RAM/CPU) ទាបបំផុត លឿនបំផុត និងឆ្លើយតប HFT ក្រោម ៣០ មីលីវិនាទី (<30ms)។
 
-១.២ យន្តការការពារដំណើរការស្ទួន (Single-Instance Lock Guard) ៖
+២.២ យន្តការការពារដំណើរការស្ទួន (Single-Instance Lock Guard) ៖
 ប្រព័ន្ធប្រើប្រាស់ file `bot_instance.lock` និងពិនិត្យមើល PID (Process ID) តាមរយៈ `psutil` ដើម្បីធានាថា មានតែ Apex Bot Instance មួយគត់ដែលរត់លើ VPS/Server។ យន្តការនេះលុបបំបាត់ដាច់ខាតនូវកំហុស Telegram `409 Conflict: terminated by other getUpdates request`។
 
-១.៣ យន្តការ Smart DNS-over-HTTPS (DoH API Bypass) ៖
+២.៣ យន្តការ Smart DNS-over-HTTPS (DoH API Bypass) ៖
 ប្រព័ន្ធបំពាក់នូវ `new_getaddrinfo` Override ដែលទាញយក IP របស់ Binance ដោយផ្ទាល់តាម Google DoH (`https://dns.google/resolve?name=fapi.binance.com`)។ យន្តការនេះការពារការកកស្ទះ ឬការបិទបាំង DNS ពីក្រុមហ៊ុន ISP ក្នុងស្រុក ធានាការតភ្ជាប់ Binance API 100% ឥតរាំងស្ទះ។
 
-១.៤ ស្ថាបត្យកម្ម Threads និង Async Event Loop ៖
+២.៤ ស្ថាបត្យកម្ម Threads និង Async Event Loop ៖
 • GUI Main Thread ៖ គ្រប់គ្រង PyQt5 Interface និង System Tray Icon។
 • Telegram Bot Thread (`TelegramBotThread`) ៖ ដំណើរការ `asyncio` Event Loop សម្រាប់ទទួល command, inline button callbacks, និងការឆ្លើយតប Telegram សារ។
 • Autonomous Scanners & Background Workers ៖ Scanners រត់ក្នុង `asyncio.create_task` រួមមាន `monitor_turbo_hedge_bots`, `start_user_streams`, `websocket_engine`, `self_healing_watchdog`, និង `scheduler_tasks`។
 
-១.៥ យន្តការលុបបំបាត់កំហុស និងចម្រោះកាក់ TradFi Stock (v10.5 High-Velocity Upgrade) ៖
-• ប្រព័ន្ធកំណែថ្មី v10.5 បានបន្ថែមយន្តការចម្រោះ (Filtering) កាក់ប្រភេទ Stock Perpetual Index & Agreement Contracts (ដូចជា QNTXUSDT, MINIMAXUSDT, ZHIPUUSDT, NVDAUSDT, TSLAUSDT, etc.) ដោយស្វ័យប្រវត្តិ។ យន្តការនេះលុបបំបាត់កំហុស Error -4411 លើ Binance API 100% និងបង្កើនល្បឿនស្កេនកាក់ Crypto ពិតប្រាកដ។
+២.៥ យន្តការលុបបំបាត់កំហុស និងចម្រោះកាក់ TradFi Stock (v10.6 High-Velocity Upgrade) ៖
+• ប្រព័ន្ធកំណែថ្មី v10.6 បានបន្ថែមយន្តការចម្រោះ (Filtering) កាក់ប្រភេទ Stock Perpetual Index & Agreement Contracts (ដូចជា QNTXUSDT, MINIMAXUSDT, ZHIPUUSDT, NVDAUSDT, TSLAUSDT, etc.) ដោយស្វ័យប្រវត្តិ។ យន្តការនេះលុបបំបាត់កំហុស Error -4411 លើ Binance API 100% និងបង្កើនល្បឿនស្កេនកាក់ Crypto ពិតប្រាកដ។
 • យន្តការ ISOLATED Margin Enforcement: កំណត់ Margin Type ទៅជា ISOLATED ដោយស្វ័យប្រវត្តិ ការពារដាច់ខាតមិនឲ្យប្រព័ន្ធដេញតាម Cross Margin រលាយសាច់ប្រាក់សរុបក្នុង Wallet ឡើយ។
 • យន្តការ Binance Lot Size & Price Filter Formatting: លុបបំបាត់កំហុស Error -1013, -1111, -4164 ដោយស្វ័យប្រវត្តិ។
 
 --------------------------------------------------------------------------------
-២. ការគ្រប់គ្រង និងមុខងារ DESKTOP CONTROL PANEL APP (`main.py` GUI)
+៣. ការគ្រប់គ្រង និងមុខងារ DESKTOP CONTROL PANEL APP (`main.py` GUI)
 --------------------------------------------------------------------------------
 
 នៅពេល Admin ដំណើរការ `python main.py` លើ Desktop នោះ Admin នឹងទទួលបានផ្ទាំងគ្រប់គ្រងកម្រិត Executive ដែលមាន ៥ Tabs សំខាន់ៗ ៖
 
-២.១ 🖥️ Executive Control Console (ផ្ទាំងបញ្ជាប្រតិបត្តិការសំខាន់) ៖
+៣.១ 🖥️ Executive Control Console (ផ្ទាំងបញ្ជាប្រតិបត្តិការសំខាន់) ៖
 • Status Label ៖ បង្ហាញស្ថានភាពប្រព័ន្ធ Real-time (🟢 Operational / ⏸️ Standby / 🛑 Stopped)។
 • Live Log Output ៖ បង្ហាញ Log ប្រកាសអាសន្ន និងការជួញដូរ real-time (រក្សាទុកចុងក្រោយ 1000 បន្ទាត់)។
 • 🚀 Launch TURBO AGI Node ៖ ប៊ូតុងចាប់ផ្តើមដំណើរការ Telegram Bot Node និង AGI Trading Engines។
 • 🛑 Emergency Kill-Switch (All Bots) ៖ ប៊ូតុងអាសន្នសម្រាប់ផ្តាច់ការជួញដូរ និងបិទប្រព័ន្ធ Bot ទាំងអស់ភ្លាមៗ។
 
-២.២ 👥 User Management (ផ្ទាំងគ្រប់គ្រងសមាជិកប្រើប្រាស់) ៖
+៣.២ 👥 User Management (ផ្ទាំងគ្រប់គ្រងសមាជិកប្រើប្រាស់) ៖
 • User Table ៖ បង្ហាញបញ្ជី User ទាំងអស់ក្នុង Database (Chat ID, Username, Joined Date, VIP Status, License Expiry, Phone Number)។
 • 🔄 Refresh Users ៖ ទាញយកទិន្នន័យ User ថ្មីៗពី Database `bot_database.db`។
 • Select License Dropdown & Apply License ៖ ផ្តល់អាជ្ញាប័ណ្ណ VIP ទៅឲ្យ User តាមកំណត់ ៖ `1 Day`, `3 Days`, `1 Month`, `2 Months`, `3 Months`, `1 Year`, `2 Years`, `3 Years`, `Lifetime`, `Administrator`, ឬ `Revoke VIP` (ដក VIP)។
 • 🗑️ Delete User ៖ លុបទិន្នន័យ User និងកត់ត្រាជួញដូរទាំងអស់ចេញពី Database ទាំងស្រុង។
 
-២.៣ 📢 Broadcast Center (ផ្ទាំងប្រកាសអាសន្ន និងផ្ញើសារ) ៖
+៣.៣ 📢 Broadcast Center (ផ្ទាំងប្រកាសអាសន្ន និងផ្ញើសារ) ៖
 • Broadcast Text Editor ៖ ទីតាំងសរសេរសារប្រកាស ព័ត៌មាន ឬ Signal ជួញដូរ។
 • Target Audience Selection ៖ ជ្រើសរើសផ្ញើទៅកាន់ `All Users` (សមាជិកទាំងអស់) ឬ `VIPs Only` (តែកម្រិត VIP)។
 • 🚀 Send Broadcast ៖ ផ្ញើសារដំណឹងទៅកាន់ Telegram Chat របស់សមាជិករៀងៗខ្លួនអូតូ។
 
-២.៤ 💬 AI Help Center (ផ្ទាំងជំនួយការ និងឆ្លើយឆ្លងជាមួយ VIP) ៖
+៣.៤ 💬 AI Help Center (ផ្ទាំងជំនួយការ និងឆ្លើយឆ្លងជាមួយ VIP) ៖
 • User Selector List ៖ ជ្រើសរើសមើលឈ្មោះ ឬ Chat ID របស់សមាជិក VIP។
 • AI Activity Report & Chat History Display ៖ មើលប្រវត្តិសន្ទនា 20 សារចុងក្រោយ និងរបាយការណ៍សកម្មភាពជួញដូររបស់ User។
 • ✨ AI Draft Reply (Gemini AI Power) ៖ ចុចឲ្យ Gemini AI វិភាគទិន្នន័យ User រួចបង្កើតព្រាងសារឆ្លើយតបជាភាសាខ្មែរប្រកបដោយវិជ្ជាជីវៈខ្ពស់ (Billionaire-tier Expert) ដោយស្វ័យប្រវត្តិ!
 • 📤 Send Direct Message ៖ ផ្ញើសារឆ្លើយតប ឬការណែនាំដោយផ្ទាល់ពី Admin Desktop ទៅកាន់ Telegram User នោះ។
 
-២.៥ ⚙️ AI Settings (ផ្ទាំងកំណត់ System Prompt របស់ AI) ៖
+៣.៥ ⚙️ AI Settings (ផ្ទាំងកំណត់ System Prompt របស់ AI) ៖
 • `ai_prompt.txt` Live Editor ៖ កែប្រែកូដបញ្ជា System Prompt របស់ Gemini AI ក្នុង `ai_prompt.txt`។
 • 💾 Save & Apply System Prompt Real-Time ៖ រក្សាទុក និងដាក់ឲ្យអនុវត្ត Prompt ថ្មីភ្លាមៗដោយមិនបាច់ Restart Bot ឡើយ។
 
-២.៦ យន្តការ System Tray & Zero Data Loss Backup ៖
+៣.៦ យន្តការ System Tray & Zero Data Loss Backup ៖
 • Minimize to Tray ៖ នៅពេលចុចបិទបង្អួច (X) កម្មវិធីមិនបិទឡើយ គឺ Minimize ទៅរត់ក្នុង System Tray ខាងក្រោម ដើម្បីធានា Bot រត់ 24/7 រហូត។
 • Boot & Shutdown Auto Backup ៖ នៅពេល Admin ចុច Quit System ក្នុង Tray ឬបិទកម្មវិធី ប្រព័ន្ធនឹងធ្វើការ Backup Database `bot_database.db` ចូលក្នុង folder `backups/` ហើយផ្ញើ file backup នោះចូល Telegram Admin Chat (ID: 859271875) ដោយស្វ័យប្រវត្តិ ធានាទិន្នន័យ 100% គ្មានថ្ងៃបាត់បង់!
 
 --------------------------------------------------------------------------------
-៣. ពាក្យបញ្ជាគ្រប់គ្រងអំណាច SUPER ADMIN លើ TELEGRAM BOT (SUPER ADMIN COMMANDS)
+៤. ពាក្យបញ្ជាគ្រប់គ្រងអំណាច SUPER ADMIN លើ TELEGRAM BOT (SUPER ADMIN COMMANDS)
 --------------------------------------------------------------------------------
 
 Super Admin (Chat ID ដែលមានសិទ្ធិ ឬ `859271875`) ទទួលបាន menu ពិសេស និងពាក្យបញ្ជាបញ្ជាការសរុប ១២ សំខាន់ៗ ៖
 
-៣.១ `/admin_stats` (មើលស្ថិតិប្រព័ន្ធ និង PnL សរុប) ៖
+៤.១ `/admin_stats` (មើលស្ថិតិប្រព័ន្ធ និង PnL សរុប) ៖
 • ទម្រង់ ៖ `/admin_stats`
 • ការពណ៌នា ៖ បង្ហាញស្ថិតិប្រព័ន្ធរត់ real-time ៖ ចំនួនសមាជិកសរុប, ចំនួនសមាជិក VIP, ចំនួន Position ដែលកំពុងជួញដូររត់លើទីផ្សារ, ប្រាក់ចំណេញ PnL សរុប, Volume ជួញដូរ, និងស្ថានភាព Engine នីមួយៗ។
 
-៣.២ `/admin_users` (គ្រប់គ្រង និងមើលបញ្ជី User ទាំងអស់) ៖
+៤.២ `/admin_users` (គ្រប់គ្រង និងមើលបញ្ជី User ទាំងអស់) ៖
 • ទម្រង់ ៖ `/admin_users`
 • ការពណ៌នា ៖ បង្ហាញបញ្ជីឈ្មោះ Username, Chat ID, VIP Expiry, និងស្ថានភាពភ្ជាប់ Binance API Keys របស់សមាជិកទាំងអស់ ព្រមទាំងមាន Inline Buttons សម្រាប់ចុច Refresh និងគ្រប់គ្រងលឿន។
 
-៣.៣ `/admin_license` (ផ្តល់ ឬដក VIP Membership) ៖
+៤.៣ `/admin_license` (ផ្តល់ ឬដក VIP Membership) ៖
 • ទម្រង់ ៖ `/admin_license <CHAT_ID> <DURATION> <PIN>`
 • ឧទាហរណ៍ ៖ `/admin_license 123456789 1Month 1234`
 • ជម្រើស DURATION ៖ `1Day`, `3Days`, `1Month`, `2Months`, `3Months`, `1Year`, `2Years`, `3Years`, `Lifetime`, `Admin`, `Revoke`
 • ការពណ៌នា ៖ កំណត់ថិរវេលាប្រើប្រាស់ VIP ឲ្យសមាជិក ឬដកសិទ្ធិ VIP វិញភ្លាមៗ។
 
-៣.៤ `/admin_reset_pin` (Reset លេខ PIN របស់ User) ៖
+៤.៤ `/admin_reset_pin` (Reset លេខ PIN របស់ User) ៖
 • ទម្រង់ ៖ `/admin_reset_pin <CHAT_ID> <PIN>`
 • ការពណ៌នា ៖ ធ្វើការ Reset លេខ 2FA Security PIN របស់ User ក្នុងករណី User ភ្លេច PIN ដើម។
 
-៣.៥ `/admin_delete` (លុបទិន្នន័យ User ទាំងស្រុង) ៖
+៤.៥ `/admin_delete` (លុបទិន្នន័យ User ទាំងស្រុង) ៖
 • ទម្រង់ ៖ `/admin_delete <CHAT_ID> <PIN>`
 • ការពណ៌នា ៖ លុបគណនី, API Keys, ប្រវត្តិ Trade, និងកំណត់ត្រារបស់ User នោះចេញពី Database ដាច់ស្រឡះ។
 
-៣.៦ `/admin_view_portfolio` (ពិនិត្យមើលកាបូប VIP Member) ៖
-• ទម្រង់ ៖ `/admin_view_portfolio <CHAT_ID>`
-• ការពណ៌នា ៖ អនុញ្ញាតឲ្យ Admin ចូលមើលសមតុល្យ Balance ក្នុង Binance Futures/Spot និង Positions ដែលកំពុងរត់របស់សមាជិក VIP រូបនោះ ដោយមិនចាំបាច់សុំ Password ឬ API Secret ឡើយ!
+៤.៦ `/admin_view_portfolio` (ពិនិត្យមើលកាបូប VIP Member) ៖
+• ទម្រង់ ៖ `/admin_view_portfolio <CHAT_ID> <PIN>`
+• ការពណ៌នា ៖ លួចមើលកាបូប Spot & Futures Balance និង Position ដែលកំពុងរត់របស់ User នោះ Real-time ដើមី្បជួយពិនិត្យសុវត្ថិភាព។
 
-៣.៧ `/admin_config` (កែប្រែប៉ារ៉ាម៉ែត្រប្រព័ន្ធ Real-Time) ៖
-• ទម្រង់ ៖ `/admin_config <KEY> <VALUE>`
-• ឧទាហរណ៍ ៖ `/admin_config MAX_POSITIONS 10`
-• KEY អាចប្រើបាន ៖ `MAX_POSITIONS`, `DEFAULT_LEVERAGE`, `DEFAULT_TP_USDT`, `HARD_CIRCUIT_BREAKER_ROI`, `REVERSE_FLIP_ROI`
-• ការពណ៌នា ៖ ផ្លាស់ប្តូរកម្រិតកំណត់របស់ប្រព័ន្ធ trading ទាំងមូល real-time ដោយមិនបាច់ឈប់ Bot ឡើយ។
+៤.៧ `/admin_close_position` (បិទ Position ជំនួស User អាសន្ន) ៖
+• ទម្រង់ ៖ `/admin_close_position <CHAT_ID> <SYMBOL> <PIN>`
+• ការពណ៌នា ៖ បញ្ជា Market Close Position កាក់ណាមួយរបស់ User ភ្លាមៗ ពេលទីផ្សារមានអាសន្ន។
 
-៣.៨ `/admin_signal` (បញ្ជាទិញកាក់ស្វ័យប្រវត្តទូទាំងប្រព័ន្ធ) ៖
-• ទម្រង់ ៖ `/admin_signal <BUY/SELL> <SYMBOL> [AMOUNT_USDT] [LEVERAGE]`
-• ឧទាហរណ៍ ៖ `/admin_signal BUY BTCUSDT 50 20`
-• ការពណ៌នា ៖ ផ្ញើសញ្ញាបញ្ជាទិញ/លក់ បង្ខំឲ្យគ្រប់ VIP Bots ទាំងអស់ដែលកំពុងរត់ Auto-Trade បើក Order កាក់នោះភ្លាមៗ!
-
-៣.៩ `/admin_broadcast` (ផ្ញើសារប្រកាសអាសន្ន) ៖
+៤.៨ `/admin_broadcast` (ផ្ញើសារប្រកាសតាម Telegram Bot) ៖
 • ទម្រង់ ៖ `/admin_broadcast <MESSAGE>`
-• ការពណ៌នា ៖ ផ្ញើសារដំណឹងអាសន្ន ឬការអាប់គ្រេដទៅកាន់ Telegram Chat របស់សមាជិកទាំងអស់ក្នុងពេលតែមួយ។
+• ការពណ៌នា ៖ ផ្ញើសារដំណឹងទៅកាន់ Telegram សមាជិកទាំងអស់ក្នុងពេលតែមួយ។
 
-៣.១០ `/admin_nuke` (Emergency Global Nuke ផ្តាច់ប្រព័ន្ធអាសន្ន) ៖
-• ទម្រង់ ៖ `/admin_nuke <PIN>`
-• ការពណ៌នា ៖ យន្តការអាសន្នរឹតបន្តឹងសុវត្ថិភាព ៖ ធ្វើការ Market Close លក់បិទ Positions ទាំងអស់របស់គ្រប់ VIP Members លើ Binance Futures/Spot ភ្លាមៗ (<100ms) ព្រមទាំងបិទប្រព័ន្ធ Auto-Trade ទាំងអស់ ក្នុងករណីទីផ្សារមានវិបត្តិ Crash ធ្ងន់ធ្ងរ!
+៤.៩ `/admin_backup` (ទាញយក Database Backup ភ្លាមៗ) ៖
+• ទម្រង់ ៖ `/admin_backup`
+• ការពណ៌នា ៖ ផ្ញើ file `bot_database.db` Backup ចូល Telegram Chat របស់ Admin ភ្លាមៗ។
 
 --------------------------------------------------------------------------------
-៤. ការបញ្ជូនកូដអាប់ដេតទៅ VPS ដោយមិនបាច់ LOGIN GITHUB (`git_update_vps.bat`)
+៥. ការធ្វើបច្ចុប្បន្នភាពកូដទៅ VPS ដោយចុច 1-Click (`git_update_vps.bat`)
 --------------------------------------------------------------------------------
 
-ដើម្បីបញ្ជូនកូដដែលបានកែប្រែថ្មីពីកុំព្យូទ័រ Local ទៅកាន់ម៉ាស៊ីន VPS ហើយឲ្យប្រព័ន្ធរត់អាប់ដេតភ្លាមៗ ៖
-
-៤.១ ដំណើរការលើ Local Computer ៖
-ចុច double-click លើ file `git_update_vps.bat` ក្នុង folder `Apex_AI_Bot` ៖
-១. ប្រព័ន្ធនឹងពិនិត្យមើលកូដដែលបានកែប្រែ រួចធ្វើការ `git add .`, `git commit -m "..."`, និង `git push origin main` ទៅកាន់ GitHub Repository ដោយស្វ័យប្រវត្តិ។
-២. បន្ទាប់មក script នឹងធ្វើការ Fetch និង Reset Local Working Tree ឲ្យស្មើ origin/main 100%។
-
-៤.២ ដំណើរការលើ VPS ៖
-នៅពេលចុច double-click លើ file `git_update_vps.bat` លើ VPS (ឬតាមរយៈ Watchdog / Script) ៖
-១. Script នឹងទាញយកកូដថ្មីចុងក្រោយបង្អស់តាមរយៈ `git fetch --all` និង `git reset --hard origin/main` ភ្លាមៗ ដោយសារតែ Repository ត្រូវ បានកំណត់ជា Public ឬ Credential Helper រៀបចំបែប Non-Interactive (`GCM_INTERACTIVE=never`, `GIT_TERMINAL_PROMPT=0`) មិនទាមទារវាយ Password ឬ Login ឡើយ!
-២. Force Taskkill បិទ process Python ចាស់ៗចោលទាំងអស់។
-៣. លុប folder `__pycache__` និង file `.pyc` ចាស់ៗចោល ដើម្បីសម្អាត Bytecode ស្អុយ។
-៤. ចាប់ផ្តើមរត់ `start_vps.bat` អូតូឡើងវិញភ្លាមៗ 24/7 ជាមួយនឹងកូដថ្មីចុងក្រោយបង្អស់!
+៥.១ របៀបប្រើប្រាស់ 1-Click Update File `git_update_vps.bat` ៖
+១. នៅពេល Admin ធ្វើការកែប្រែកូដ ឬបន្ថែមមុខងារថ្មីលើ Local Machine
+២. ចុច Double-Click លើ file `git_update_vps.bat`
+៣. ប្រព័ន្ធនឹងធ្វើការ ៖
+   - `git config credential.helper store` (រក្សាទុក GitHub Token/Credentials មិនបាច់ Login)
+   - `git add .`
+   - `git commit -m "Auto Update Apex AI Super Brain Bot - Institutional Profit Edition v10.6"`
+   - `git push origin main`
+   - លើ VPS ប្រព័ន្ធនឹងទាញយក `git fetch --all` និង `git reset --hard origin/main`
+   - សម្អាត `__pycache__` និង `.pyc`
+   - Restart Bot លើ VPS ស្វ័យប្រវត្តតាម `start_vps.bat` (<10 វិនាទី)!
 
 ================================================================================
-             APEX TURBO AGI ENGINE v10.5 - SUPER ADMIN MASTER MANUAL
+   APEX TURBO AGI SUPER BRAIN BOT v10.6 - SUPER ADMIN MASTER GUIDE
 ================================================================================

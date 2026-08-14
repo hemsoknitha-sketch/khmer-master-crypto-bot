@@ -1015,13 +1015,19 @@ async def monitor_turbo_hedge_bots(app):
                     last_flip_key = f"{chat_id}_{symbol}"
                     last_flip_ts = _last_flip_timestamps.get(last_flip_key, 0)
 
-                    # ⌛ Stagnant Position Auto-Pruner (Applied only to Futures positions > 60 mins):
+                    # ⌛ Anti-Fee-Churn Stagnant Position Auto-Pruner (Applied to Futures positions > 90 mins OR > 60 mins with Net Profit):
                     entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
                     entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
                     if entry_ts == 0:
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
                         entry_ts = now_ts
-                    is_stagnant_timeout = (current_side != "SPOT" and (now_ts - entry_ts) >= 3600 and (-0.50 <= real_pnl_usdt <= 0.50))
+                    
+                    # Prevent fee churning: Only prune if trade is open >90 mins OR if open >60 mins AND net profit after fees is positive (> $0.15 USDT)
+                    holding_seconds = now_ts - entry_ts
+                    is_stagnant_timeout = (current_side != "SPOT" and (
+                        (holding_seconds >= 5400 and -0.30 <= real_pnl_usdt <= 0.30) or
+                        (holding_seconds >= 3600 and real_pnl_usdt > 0.15)
+                    ))
 
                     if is_hard_circuit_breaker:
                         # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
@@ -1054,7 +1060,8 @@ async def monitor_turbo_hedge_bots(app):
                                 print(f"Error sending breaker notification: {e}")
 
                     elif is_stagnant_timeout:
-                        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >15 mins with stagnant PnL (${real_pnl_usdt:.2f}). Market closing & freeing capital...")
+                        holding_mins = holding_seconds // 60
+                        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >{holding_mins} mins with PnL (${real_pnl_usdt:.2f}). Market closing & freeing capital...")
                         if current_side == "SPOT":
                             close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
                         else:
@@ -1071,7 +1078,7 @@ async def monitor_turbo_hedge_bots(app):
                                     f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
                                     f"───────────────────────────────\n\n"
                                     f"🪙 កាក់ ៖ `{symbol}`\n"
-                                    f"⏱️ រយៈពេលត្រាំ ៖ `> ១៥ នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
+                                    f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
                                     f"🔒 Cooldown Status ៖ `៤ ម៉ោង (4-Hour Anti-Churn Blacklist)`\n"
                                     f"⚡ Binance Status ៖ `MARKET CLOSED (<20ms)`\n\n"
                                     f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
