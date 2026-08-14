@@ -1003,7 +1003,8 @@ async def monitor_turbo_hedge_bots(app):
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
                     is_tp_harvested = (net_pnl_usdt >= effective_tp)
-                    is_peak_locked = (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or (peak_pnl >= 2.00 and net_pnl_usdt <= (peak_pnl * 0.80))
+                    # Guaranteed Profit Locking Shield: Lock profit early if peak ROI >= 8.0% or peak PnL >= $0.80 USDT
+                    is_peak_locked = (peak_roi >= 8.0 and roi_pct <= (peak_roi * 0.65)) or (peak_pnl >= 0.80 and net_pnl_usdt <= (peak_pnl * 0.70))
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
                     # Normal Flip: ROI <= -15.0% OR net loss <= -$3.50 USDT (with 15s Anti-Whipsaw Cooldown)
