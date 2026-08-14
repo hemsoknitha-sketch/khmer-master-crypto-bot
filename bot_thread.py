@@ -5221,34 +5221,45 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
                 return
 
-            symbol = args[0].upper().strip()
+            # 🧠 Super Smart Poly-Format Argument Parser for Futures & Spot Modes:
+            raw_args = [a.strip() for a in args]
+            is_spot_prefix = (raw_args[0].upper() == "SPOT")
+            if is_spot_prefix:
+                raw_args.pop(0)
+
+            if not raw_args or len(raw_args) < 2:
+                if msg_target:
+                    await msg_target.reply_text("❌ សូមបញ្ជាក់ព័ត៌មានទុន និង PIN (ឧទាហរណ៍ ៖ `/turbo_hedge TOP 20 10 1234` ឬ `/turbo_hedge SPOT TOP 50 1234`)", parse_mode="Markdown")
+                return
+
+            symbol = raw_args[0].upper().strip()
             if symbol not in ["TOP", "SCAN"] and not symbol.endswith("USDT"):
                 symbol += "USDT"
 
-            user_side_input = "AUTO"
+            user_side_input = "SPOT" if is_spot_prefix else "AUTO"
             target_tp = 2.5
+            amount = 10.0
+            leverage = 1 if is_spot_prefix else 10
+
             try:
-                amount = float(args[1])
-                leverage = int(args[2])
+                amount = float(raw_args[1]) if raw_args[1].replace('.', '', 1).isdigit() else 10.0
                 
-                # Format A: /turbo_hedge TOP 5 10 AUTO 2.50 <PIN> (6 args)
-                if len(args) >= 6 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                    user_side_input = args[3].upper()
-                    target_tp = float(args[4]) if args[4].replace('.', '', 1).isdigit() else 2.5
-                    pin = str(args[5]).strip()
-                # Format B: /turbo_hedge TOP 5 10 AUTO <PIN> (5 args)
-                elif len(args) == 5 and args[3].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                    user_side_input = args[3].upper()
-                    pin = str(args[4]).strip()
-                # Format C: /turbo_hedge TOP 5 10 2.50 <PIN> (5 args)
-                elif len(args) == 5 and args[3].replace('.', '', 1).isdigit():
-                    target_tp = float(args[3])
-                    pin = str(args[4]).strip()
-                # Format D: /turbo_hedge TOP 5 10 <PIN> (4 args)
-                elif len(args) == 4:
-                    pin = str(args[3]).strip()
-                else:
-                    pin = str(args[-1]).strip()
+                idx = 2
+                if len(raw_args) > 2 and raw_args[2].isdigit() and not is_spot_prefix:
+                    leverage = int(raw_args[2])
+                    idx = 3
+                elif is_spot_prefix:
+                    leverage = 1
+
+                if len(raw_args) > idx and raw_args[idx].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                    user_side_input = raw_args[idx].upper()
+                    idx += 1
+
+                if len(raw_args) > idx and raw_args[idx].replace('.', '', 1).isdigit():
+                    target_tp = float(raw_args[idx])
+                    idx += 1
+
+                pin = str(raw_args[-1]).strip()
             except ValueError:
                 if msg_target:
                     await msg_target.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
