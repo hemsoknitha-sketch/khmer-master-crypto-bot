@@ -5402,8 +5402,22 @@ class TelegramBotThread(BaseThread):
                 side = eval_res.get("side", "SKIP")
 
             if side == "SKIP" or side not in ["BUY", "SELL", "SPOT"]:
-                if ack_msg:
-                    await ack_msg.edit_text(f"⚪ **[AGI CHOP SUPPRESSION]** `{symbol}` ត្រូវ បានរំលង (SKIP) ព្រោះ Trend 1m/5m មិនទាន់មាន Confluence ច្បាស់លាស់ ៖ {eval_res.get('reason')}")
+                # Always register in DB so background scanner continuously monitors and enters when signal aligns!
+                db.add_turbo_hedge_bot(chat_id, symbol, amount, leverage, user_side_input, target_tp)
+                msg_skip = (
+                    f"📡 **APEX TURBO HEDGE REGISTERED & AUTO-SCANNING 24/7!** 🛡️\n"
+                    f"───────────────────────────────\n\n"
+                    f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
+                    f"💰 ទុនវិនិយោគ ៖ `${amount:,.2f} USDT` (`{leverage}x Lev`)\n"
+                    f"🎯 របៀបកំណត់ ៖ `{user_side_input}` (Target TP: `+${target_tp:.2f}`)\n"
+                    f"⚪ ស្ថានភាពសញ្ញា ៖ `[AGI CHOP SUPPRESSION] {eval_res.get('reason', '1m/5m Trend Misaligned')}`\n\n"
+                    f"🛡️ _ប្រព័ន្ធ AGI បានចុះឈ្មោះកាក់ {symbol} រួចរាល់! ម៉ាស៊ីនស្កេន 24/7 កំពុងរត់តាមដាន real-time ឲ្យតែ Trend 1m/5m រត់ស្របគ្នាមកដល់ វានឹងបើក Order អូតូភ្លាមៗ!_"
+                )
+                if msg_target:
+                    try:
+                        await msg_target.reply_text(msg_skip, parse_mode="Markdown")
+                    except Exception:
+                        await msg_target.reply_text(msg_skip)
                 return
 
             win_rate = eval_res.get("win_rate_pct", 88.5)
@@ -5419,7 +5433,7 @@ class TelegramBotThread(BaseThread):
                 db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
 
             exec_status = exec_res.get("status") if isinstance(exec_res, dict) else "unknown"
-            if exec_status == "success":
+            if exec_status in ["success", "NEW", "FILLED"] or (isinstance(exec_res, dict) and (exec_res.get("orderId") or (isinstance(exec_res.get("res"), dict) and exec_res["res"].get("orderId")))):
                 msg = (
                     f"🚀 **APEX TURBO HEDGE INSTANT POSITION OPENED!** 🛡️\n"
                     f"───────────────────────────────\n\n"
@@ -5427,25 +5441,25 @@ class TelegramBotThread(BaseThread):
                     f"💰 ទុនវិនិយោគ ៖ `${amount:,.2f} USDT`\n"
                     f"🚀 Dynamic Leverage ៖ `{leverage}x`\n"
                     f"🎯 ទិសដៅជួញដូរ ៖ `{side}` (Win Rate: {win_rate}%)\n"
-                    f"💰 គោលដៅប្រមូលចំណេញ ៖ `+${target_tp:.0f}.00 USDT / Trade`\n"
+                    f"💰 គោលដៅប្រមូលចំណេញ ៖ `+${target_tp:.2f} USDT / Trade`\n"
                     f"⚡ Binance Status ៖ `EXECUTED INSTANTLY (<100ms)`\n"
                     f"🔄 Auto-Harvest & Flip ៖ `ACTIVE (3s Scan & Re-Analysis)`\n\n"
-                    f"_Bot កំពុងកើបផលចំណេញ ${target_tp:.0f} និងស្កេន Auto-Flip 24/7 ស្វ័យប្រវត្តិ!_"
+                    f"_Bot កំពុងកើបផលចំណេញ ${target_tp:.2f} និងស្កេន Auto-Flip 24/7 ស្វ័យប្រវត្តិ!_"
                 )
             else:
-                err_msg = exec_res.get("error") or exec_res.get("message") or "Unknown error"
+                err_msg = exec_res.get("error") or exec_res.get("message") or str(exec_res)
                 msg = (
                     f"⚠️ **APEX TURBO HEDGE NOTICE (BINANCE API):**\n\n"
                     f"🪙 Symbol: `{symbol}`\n"
-                    f"❌ Info: `{err_msg}`\n\n"
-                    f"👉 Bot ត្រូវបានចុះឈ្មោះក្នុងប្រព័ន្ធស្កេន Auto-Flip ស្វ័យប្រវត្ត!"
+                    f"❌ Binance Result: `{err_msg}`\n\n"
+                    f"👉 Bot ត្រូវបានចុះឈ្មោះក្នុងប្រព័ន្ធស្កេន Auto-Flip ស្វ័យប្រវត្តិ 24/7!"
                 )
 
             if msg_target:
                 try:
                     await msg_target.reply_text(msg, parse_mode="Markdown")
                 except Exception:
-                    await msg_target.reply_text(msg, parse_mode=None)
+                    await msg_target.reply_text(msg)
             await delete_sensitive_message(context, chat_id, update, user_lang)
 
         async def compound_grid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
