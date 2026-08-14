@@ -248,24 +248,23 @@ def fetch_top_gainers(limit: int = 5):
             top_losers = usdt_pairs[-limit:]
             top_losers.reverse()
             
-            summary = "🔥 **24H MARKET VOLATILITY RADAR** 🔥\n\n"
-            summary += "🚀 **Top Gainers (Momentum Pump Radar):**\n"
+            summary = "🔥 **បញ្ជីកាក់ឡើងថ្លៃខ្លាំងបំផុត (TOP 5 GAINERS - MOMENTUM PUMP):**\n"
             for i, coin in enumerate(top_gainers):
                 full_sym = coin['symbol']
                 symbol = full_sym.replace("USDT", "")
                 change = float(coin['priceChangePercent'])
                 price = float(coin['lastPrice'])
                 volume = float(coin['quoteVolume'])
-                summary += f"{i+1}. **{full_sym}**: +{change:.2f}% (${price:,.4f} | Vol: ${volume/1e6:.2f}M)\n   ⚡ `/scalp {full_sym} 100 1.5 <PIN>`\n"
+                summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (តម្លៃ ៖ ${price:,.4f} | Vol: ${volume/1e6:.2f}M)\n   ⚡ 1-Tap Command ៖ `/turbo_hedge {symbol} 20 10 BUY 2.5 1234`\n"
                 
-            summary += "\n🔻 **Top Losers (Dip Rebound Radar):**\n"
+            summary += "\n🔻 **បញ្ជីកាក់ធ្លាក់ចុះខ្លាំងបំផុត (TOP 5 LOSERS - DIP REBOUND):**\n"
             for i, coin in enumerate(top_losers):
                 full_sym = coin['symbol']
                 symbol = full_sym.replace("USDT", "")
                 change = float(coin['priceChangePercent'])
                 price = float(coin['lastPrice'])
                 volume = float(coin['quoteVolume'])
-                summary += f"{i+1}. **{full_sym}**: {change:.2f}% (${price:,.4f} | Vol: ${volume/1e6:.2f}M)\n   ⚡ `/infinity_grid {full_sym} 10 1.0 100 <PIN>`\n"
+                summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (តម្លៃ ៖ ${price:,.4f} | Vol: ${volume/1e6:.2f}M)\n   ⚡ 1-Tap Command ៖ `/turbo_hedge {symbol} 20 10 BUY 2.5 1234`\n"
                 
             return summary
 

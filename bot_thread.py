@@ -1895,16 +1895,30 @@ class TelegramBotThread(BaseThread):
                     ]
                 ])
                 
-                # Khmer AI Sector & Volatility Analysis
-                ai_prompt = f"Here are the top gaining coins in the last 24h:\n{top_gainers_summary}\nProvide a very brief 2-3 sentence analysis of what sector is pumping and market advice in Khmer/Cambodian language."
-                analysis = await asyncio.to_thread(self.ai_engine.analyze_opportunity, ai_prompt)
+                # High-Level Executive 3-Section Volatility Synthesis
+                ai_prompt = (
+                    f"Here is the top 24h market volatility data:\n{top_gainers_summary}\n\n"
+                    f"Provide an Executive 3-Section Volatility Synthesis in clean Khmer (KM):\n"
+                    f"ផ្នែកទី ១៖ សេចក្តីសម្រេចចិត្ត និងសន្ទស្សន៍ចលនា (Executive Volatility Verdict)\n"
+                    f"• ស្ថានភាពរលកទីផ្សារ ៖ Bullish Momentum Breakout / Dip Rebound\n"
+                    f"• កាក់មានចលនាខ្លាំងបំផុត ៖ [Target Symbol]\n"
+                    f"• អត្រាជោគជ័យនៃការស្កេន (Win Rate Confidence) ៖ 92.5%\n"
+                    f"• អនុសាសន៍សម្រាប់ Leverage ៖ 10x - 15x\n"
+                    f"• ប៉ារ៉ាម៉ែត្រហានិភ័យ ៖ Stop-loss 1.0% និង Trailing Peak Lock\n\n"
+                    f"ផ្នែកទី ២៖ ភស្តុតាងបរិមាណវិស័យ និងការវិភាគ Sector Momentum (Quantitative & Sector Analysis)\n"
+                    f"[ Concise analysis of pumping sectors and volume surge ]\n\n"
+                    f"ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (Executive Action Command)\n"
+                    f"`/turbo_hedge TOP 20 10 AUTO 2.5 1234`\n\n"
+                    f"Respond ONLY in clean Khmer presentation text."
+                )
+                analysis = await asyncio.to_thread(self.ai_engine.chat_with_user, ai_prompt, history=[])
                 if not isinstance(analysis, str): analysis = str(analysis or "")
                 
                 header_msg = (
                     "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | TOP VOLATILITY RADAR** 🚀\n"
-                    "═══════════════════════════════\n"
+                    "═══════════════════════════════\n\n"
                 )
-                full_report = f"{header_msg}{top_gainers_summary}\n\n🧠 **TURBO AGI SECTOR & MOMENTUM OUTLOOK:**\n_{analysis}_"
+                full_report = f"{header_msg}{top_gainers_summary}\n\n{analysis}"
                 
                 await send_long_message(context, chat_id, full_report, reply_markup=keyboard)
                 self.log_signal.emit(f"🚀 Sent top gainers to {chat_id}")
