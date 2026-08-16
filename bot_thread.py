@@ -766,94 +766,6 @@ class TelegramBotThread(BaseThread):
                     futures_section_msg += f"📈 Mark Price: `${mark_p:,.4f}`\n"
                     futures_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT`\n\n"
 
-            if futures_section_msg:
-                msg += "⚡️ **FUTURES & TURBO HEDGE POSITIONS** ⚡️\n"
-                msg += "───────────────────────────────\n"
-                msg += futures_section_msg
-
-            # --- 3. UNIFIED SMART GRID POSITIONS GROUP ---
-            ai_engines_msg = ""
-            for grid in infinity_grids:
-                grid_id, sym, amt_per_layer, step_pct, max_inv, current_inv, last_price = grid[:7]
-                sym = str(sym)
-                current_price = prices.get(sym, 0.0)
-                valid_trades_found = True
-                pnl, pnl_pct = (0.0, 0.0)
-                if current_price > 0 and last_price > 0 and current_inv > 0:
-                    pnl, pnl_pct = trading_engine.calculate_net_pnl(last_price, current_price, current_inv / last_price)
-                total_invested += current_inv
-                total_profit += pnl
-                ai_engines_msg += f"📐 **Unified Smart Grid: {sym}**\n"
-                ai_engines_msg += f"💰 ដើមទុន: `${current_inv:,.2f}` / `${max_inv:,.2f}` | PnL: `{pnl_pct:+.2f}%` (`${pnl:+.2f}`)\n\n"
-
-            funding_cfg = db.get_funding_harvester_config(chat_id) if hasattr(db, 'get_funding_harvester_config') else None
-            if funding_cfg and funding_cfg.get("enabled"):
-                valid_trades_found = True
-                f_amt = funding_cfg.get("amount", 50.0)
-                ai_engines_msg += f"🌾 **8-Hour Funding Harvester:** 🟢 `ACTIVE` (${f_amt:,.2f} USDT Delta-Neutral)\n"
-
-            if user_turbo_bots or db.get_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0") == "1":
-                valid_trades_found = True
-                ai_engines_msg += f"🚀 **Turbo Hedge Auto-Scanner v11.0:** 🟢 `ACTIVE` ({len(user_turbo_bots)} Positions Active / 10 Max)\n"
-
-            if ai_engines_msg:
-                msg += "🤖 **FLAGSHIP AI ENGINES & STRATEGIES v11.0** 🤖\n"
-                msg += "───────────────────────────────\n"
-                msg += ai_engines_msg
-
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [
-                    InlineKeyboardButton("🔄 Refresh Portfolio", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ],
-                [
-                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch")
-                ],
-                [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            if not valid_trades_found and free_usdt <= 0 and futures_wallet_balance <= 0:
-                empty_msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | PORTFOLIO** 🤖\n"
-                    "═══════════════════════════════\n"
-                    "🤷‍♂️ **មិនទាន់មានទិន្នន័យវិនិយោគ ឬ API Key ភ្ជាប់នៅឡើយ!**\n\n"
-                    "💡 *សូមភ្ជាប់ Binance API Key ឬបើកដំណើការ AI Engine (ដូចជា /turbo_hedge ឬ /snipe) ដើម្បីចាប់ផ្តើមជួញដូរ ៖*"
-                )
-                if msg_target:
-                    await msg_target.reply_text(empty_msg, parse_mode='Markdown', reply_markup=reply_markup)
-                return
-
-            total_pct = (total_profit / total_invested) * 100 if total_invested > 0 else 0
-            emoji_total = '🟩' if total_profit >= 0 else '🟥'
-            pnl_usd_str = f"+${total_profit:,.2f}" if total_profit >= 0 else f"-${abs(total_profit):,.2f}"
-            
-            total_equity = total_invested + total_profit + free_usdt + futures_wallet_balance
-            msg += f"═══════════════════════════════\n"
-            msg += f"💵 **Spot Cash (Free USDT):** `${free_usdt:,.2f}`\n"
-            msg += f"📈 **Futures Wallet Balance:** `${futures_wallet_balance:,.2f}`\n"
-            msg += f"💎 **ទ្រព្យសរុប (Total Net Equity):** `${total_equity:,.2f}`\n\n"
-            msg += f"🏦 **សរុបទុនកំពុងជួញដូរ (Invested Margin):** `${total_invested:,.2f}`\n"
-            msg += f"{emoji_total} **ចំណេញ/ខាតសរុប (Unrealized PnL):** `{total_pct:+.2f}%` (`{pnl_usd_str}`)"
-
-            if msg_target:
-                try:
-                    await msg_target.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
-                except Exception:
-                    await msg_target.reply_text(msg, parse_mode=None, reply_markup=reply_markup)
-            self.log_signal.emit(f'📊 VIP User {chat_id} checked their v11.0 portfolio cleanly.')
-
-        async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
-            if not await verify_user(update): return
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-
             import psutil
             import os
             import time
@@ -6709,7 +6621,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🏥 **APEX SUPER AGI TURBO BRAIN v9.5 | SYSTEM HEALTH DIAGNOSTIC** ⚡\n"
+                    "🏥 **KHMER MASTER CRYPTO / APEX TURBO AGI v11.0 | VPS SYSTEM HEALTH DIAGNOSTICS** ⚡\n"
                     "═══════════════════════════════\n\n"
                     "🖥️ **VPS HARDWARE PERFORMANCE:**\n"
                     f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
