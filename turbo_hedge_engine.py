@@ -763,7 +763,13 @@ async def monitor_turbo_hedge_bots(app):
             max_allowed_coins = min(10, max_coins_by_capital)
 
             if len(user_active_bots) >= max_allowed_coins or avail_bal < effective_amount:
-                print(f"🛡️ [AGI CAPITAL CAP] Active coins ({len(user_active_bots)}) reached capital limit ({max_allowed_coins} coins max for ${avail_bal:.2f} USDT free margin at ${effective_amount:.2f}/coin). Pausing auto-expander.")
+                now_t = time.time()
+                if not hasattr(monitor_turbo_hedge_bots, '_last_cap_notice_time'):
+                    monitor_turbo_hedge_bots._last_cap_notice_time = {}
+                last_t = monitor_turbo_hedge_bots._last_cap_notice_time.get(target_chat_id, 0)
+                if now_t - last_t > 60:
+                    monitor_turbo_hedge_bots._last_cap_notice_time[target_chat_id] = now_t
+                    print(f"🛡️ [AGI CAPITAL CAP] User {target_chat_id}: Active coins ({len(user_active_bots)}) reached capital limit ({max_allowed_coins} coins max for ${avail_bal:.2f} USDT free margin at ${effective_amount:.2f}/coin). Pausing auto-expander.")
                 continue
 
             actual_trade_amount = effective_amount
