@@ -846,6 +846,11 @@ async def monitor_turbo_hedge_bots(app):
                 exec_leverage = min(unit_leverage, 10) if is_recovery_mode else unit_leverage
                 exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
                 
+                if isinstance(exec_res, dict) and (exec_res.get("reason") == "FUTURES_PERMISSION_DISABLED" or exec_res.get("code") == -2015):
+                    print(f"🛑 [FUTURES DISABLED BREAK] Pausing candidate auto-expander for User {target_chat_id} due to missing Futures permission (-2015).")
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_mode", "0")
+                    break
+
                 if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
                     db.add_turbo_hedge_bot(target_chat_id, c_cand, actual_trade_amount, unit_leverage, target_side, unit_tp)
                     entry_p = trading_engine.get_current_price(c_cand)
