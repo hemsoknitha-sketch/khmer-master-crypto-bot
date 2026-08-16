@@ -19,9 +19,11 @@ echo [GIT] Code successfully pushed to GitHub repository!
 echo =========================================================
 echo   2. Closing Active Bot Instances & Cleaning Processes...
 echo =========================================================
-taskkill /F /FI "WINDOWTITLE eq Apex AI Bot - 24/7 VPS Server*" /T >nul 2>&1
+wmic process where "name='cmd.exe' and commandline like '%%start_vps.bat%%'" call terminate >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Apex AI Bot*" /T >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Administrator: Apex AI Bot*" /T >nul 2>&1
 taskkill /F /IM python.exe /T >nul 2>&1
-timeout /t 2 >nul
+timeout /t 3 >nul
 
 echo =========================================================
 echo   3. Fetching & Force-Syncing Latest Code from GitHub...
