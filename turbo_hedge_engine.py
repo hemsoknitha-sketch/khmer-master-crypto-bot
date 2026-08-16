@@ -1035,19 +1035,17 @@ async def monitor_turbo_hedge_bots(app):
                         peak_roi = roi_pct
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", str(peak_roi))
 
-                    # Dynamic Trailing Peak Profit Lock: Keep 90% of peak gains for >200% ROI, 85% for >50% ROI
-                    retain_ratio = 0.90 if peak_roi >= 200.0 else (0.85 if peak_roi >= 50.0 else 0.80)
+                    # 🚀 AGI Dynamic Moonshot Profit Rider:
+                    # Default net target TP floor is +15.0% net profit after fees.
+                    # As price surges (+20%, +50%, +100%+), trailing profit rider follows peak upward,
+                    # locking 90% of peak for >=100% ROI, 85% for >=50% ROI, and 80% for >=15% ROI!
+                    user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
+                    user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
+                    effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
+                    if effective_tp_pct <= 0: effective_tp_pct = 15.0
 
-                    # 💰 2. Dual-Check Target Profit Trigger (Net Profit After Fees)
-                    user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "2.5")
-                    user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 2.5
-                    effective_tp = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
-
-                    # ⚡ Spot Mode 2-15m Micro TP Scaling Rules:
-                    # For 1x Spot, scale target TP to +3.5% of trade amount so it hits within 2-15 mins!
-                    if active_lev <= 1 or current_side == "SPOT":
-                        bot_amt = float(bot_info.get("amount", 20.0))
-                        effective_tp = max(0.25, min(effective_tp, bot_amt * 0.035))
+                    bot_amt = float(bot_info.get("amount", 10.0))
+                    target_dollar_tp = max(0.50, bot_amt * (effective_tp_pct / 100.0))
 
                     # High-Precision Dollar Peak PnL Lock ($ Peak Lock)
                     peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
@@ -1056,9 +1054,11 @@ async def monitor_turbo_hedge_bots(app):
                         peak_pnl = net_pnl_usdt
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
-                    is_tp_harvested = (net_pnl_usdt >= effective_tp)
-                    # Guaranteed Profit Locking Shield: Lock profit early if peak ROI >= 8.0% or peak PnL >= $0.80 USDT
-                    is_peak_locked = (peak_roi >= 8.0 and roi_pct <= (peak_roi * 0.65)) or (peak_pnl >= 0.80 and net_pnl_usdt <= (peak_pnl * 0.70))
+                    retain_ratio = 0.90 if peak_roi >= 100.0 else (0.85 if peak_roi >= 50.0 else 0.80)
+
+                    # Dynamic Trailing Trigger: Lock peak profit when price pulls back slightly from maximum surge peak
+                    is_peak_locked = (peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio))
+                    is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
                     # Normal Flip: ROI <= -15.0% OR net loss <= -$3.50 USDT (with 15s Anti-Whipsaw Cooldown)

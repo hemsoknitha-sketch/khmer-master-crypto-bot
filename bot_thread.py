@@ -5044,7 +5044,7 @@ class TelegramBotThread(BaseThread):
                 symbol += "USDT"
 
             user_side_input = "SPOT" if is_spot_prefix else "AUTO"
-            target_tp = 2.5
+            target_tp = 15.0
             amount = 10.0
             leverage = 1 if is_spot_prefix else 10
 
