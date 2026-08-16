@@ -681,7 +681,7 @@ if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtCore import QTimer
     
-    is_cli_mode = ("--cli" in sys.argv or "--no-gui" in sys.argv)
+    is_cli_mode = ("--cli" in sys.argv or "--no-gui" in sys.argv or "--vps" in sys.argv or "--headless" in sys.argv or "-vps" in sys.argv)
     
     if is_cli_mode:
         print("🚀 Initializing Apex Super AGI v9.8 (24/7 Pure Python Headless CLI Mode)...")
