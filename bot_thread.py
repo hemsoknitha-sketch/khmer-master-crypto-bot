@@ -5059,7 +5059,8 @@ class TelegramBotThread(BaseThread):
                     leverage = 1
 
                 if len(raw_args) > idx and raw_args[idx].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                    user_side_input = raw_args[idx].upper()
+                    if not is_spot_prefix:
+                        user_side_input = raw_args[idx].upper()
                     idx += 1
 
                 if len(raw_args) > idx and raw_args[idx].replace('.', '', 1).isdigit():
@@ -5087,6 +5088,15 @@ class TelegramBotThread(BaseThread):
                 if msg_target:
                     await msg_target.reply_text("❌ **មិនទាន់មាន API Key!** សូមប្រើប្រាស់ពាក្យបញ្ជា `` `/add_api` `` ដើម្បភ្ជាប់ Binance API ជាមុនសិន។", parse_mode="Markdown")
                 return
+
+            # 🛡️ Dynamic API Permission Check: Auto-fallback to SPOT if Futures permission is disabled on Binance
+            if user_side_input != "SPOT":
+                spot_ok, fut_ok = await asyncio.to_thread(trading_engine.check_user_api_permissions, keys[0], keys[1])
+                if spot_ok and not fut_ok:
+                    user_side_input = "SPOT"
+                    leverage = 1
+                    if msg_target:
+                        await msg_target.reply_text("⚠️ **Binance API Key របស់អ្នកមិនទាន់បើកសិទ្ធិ Futures Trading ទេ។**\n\n💡 ប្រព័ន្ធបានកំណត់រត់ជា **Spot Mode (1x)** ដោយស្វ័យប្រវត្តិ!", parse_mode="Markdown")
 
             import turbo_hedge_engine
 
@@ -5129,12 +5139,18 @@ class TelegramBotThread(BaseThread):
                     try:
                         is_spot = (user_side_input == "SPOT")
                         if is_spot:
+                            avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
                             top_coins = turbo_hedge_engine.get_active_high_velocity_spot_coins(limit=30)
                         else:
+                            avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+                            if avail_bal <= 0.0:
+                                avail_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
                             top_coins = turbo_hedge_engine.get_active_high_velocity_coins(limit=30)
                         if not top_coins:
                             top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
                     except Exception:
+                        is_spot = (user_side_input == "SPOT")
+                        avail_bal = 0.0
                         top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
 
                     eff_amt = max(10.50 if is_spot else 1.0, amount)
@@ -5199,8 +5215,11 @@ class TelegramBotThread(BaseThread):
                 asyncio.create_task(_background_top_scanner())
                 return
 
-            avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
             is_spot = (user_side_input == "SPOT")
+            if is_spot:
+                avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
+            else:
+                avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
             eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, symbol, leverage, avail_bal, is_spot_mode=is_spot)
             
             if user_side_input in ["BUY", "SELL", "SPOT"]:

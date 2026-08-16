@@ -13,14 +13,15 @@
 Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional ដែលត្រូវបានធ្វើបច្ចុប្បន្នភាពកាត់បន្ថយមុខងារជាន់គ្នា (Overlapping Features) និងលុបបំបាត់ការខាតបង់សេវា Taker Fee ឥតប្រយោជន៍ (Fee Erosion) ទាំងស្រុង ៖
 
 • 🟢 [១. មុខងារស្នូល - Core Flagship Engines] ៖
-  - Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ប្រព័ន្ធស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Isolated Margin Enforcement, និង Net Profit TP Floor គណនាបូកសេវា fee Taker 0.12% ចូល ធានាចំណេញសុទ្ធ ១០០%។
+  - Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ប្រព័ន្ធស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំងទម្រង់ Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield (ទុន < $100 លីមីត 10x Max), និង Net Profit TP Floor គណនាបូកសេវា fee Taker ចូល ធានាចំណេញសុទ្ធ ១០០%។
+  - Spot 15-Min Surge Engine ៖ ស្កេន 200+ កាក់ Spot USDT លើ Binance ដោយទាញយកកាក់ដែលមាន Breakout Volume Surge (+3.0% ទៅ +35.0%) ព្រមទាំង Auto-Filter រំលងរាល់ Stablecoins (USDC, FDUSD, TUSD, etc.)។
   - Listing & Volatility Sniper (`/snipe`, `/auto_snipe`) ៖ ប្រព័ន្ធស្ទាក់ទិញកាក់ថ្មីដែលទើបតែចុះបញ្ជីលើ Binance ឬកាក់ដែលមាន Volume Spike (RVOL) ខ្ពស់។
   - 8-Hour Funding Yield Harvester (`/funding_harvester`) ៖ ប្រព័ន្ធស្ទាក់កើបអត្រាការប្រាក់ Funding Rate ពី Binance Futures រៀងរាល់ ៨ ម៉ោង ដោយសុវត្ថិភាព។
   - AI Advisory & Market Intelligence (`/analyze`, `/predict`, `/news`, `/whales`, `/top`, `/alert`) ៖ ឧបករណ៍វិភាគទីផ្សារ និងទាយទិសដៅតម្លៃដោយ Gemini AI ដោយគ្មានផលប៉ះពាល់លើការបញ្ជា Trade។
 
 • 🟡 [២. មុខងារបូកបញ្ចូលគ្នា - Super Smart Consolidated Engines] ៖
   - Unified Smart Grid Engine (`/infinity_grid`, `/compound_grid`, `/grid_bot`, `/infinity_matrix`) ៖ បង្រួមប្រព័ន្ធ Grid ទាំង ៤ មកជាប្រព័ន្ធ Grid ស្វ័យប្រវត្តតែមួយ ដែលគណនាចន្លោះ Grid តាម 24h ATR Volatility និងការពារ MIN_NOTIONAL ($5.05 USDT) សម្រាប់ទុនតូច។
-  - Momentum & Single-Coin Scalper (`/scalp`, `/hyper_trade`, `/wave_rider`, `/sweep_sniper`) ៖ បង្រួមការ Trade កាក់ទោលទាំងអស់ចូលក្នុង `Turbo Hedge (Single-Coin Mode)` ដើម្បីការពារមិនឲ្យ Engine ផ្សេងគ្នាទិញ/លក់ជាន់គ្នារលាយ Account។
+  - Momentum & Single-Coin Scalper ៖ បង្រួមការ Trade កាក់ទោលទាំងអស់ចូលក្នុង `Turbo Hedge (Single-Coin Mode)` ដើម្បីការពារមិនឲ្យ Engine ផ្សេងគ្នាទិញ/លក់ជាន់គ្នារលាយ Account។
   - Gold Guard & Macro Radar (`/gold_radar`, `/cb_gold`, `/paxg_arbitrage`, `/black_swan_guard`, `/gold_btc_rebalance`) ៖ បង្រួមប្រព័ន្ធមាសឌីជីថល (PAXGUSDT) ទាំងអស់មកជា AI Gold Guard តែមួយ។
 
 • 🔴 [៣. មុខងារហានិភ័យ/ឥតបានការ - Deactivated Retail Arbitrage] ៖
@@ -42,23 +43,30 @@ Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរប�
 • `/status`       : ពិនិត្យមើលកាក់ដែលកំពុងរត់ Trade ទាំងអស់ និងស្ថានភាព PnL Real-time
 • `/health`       : ពិនិត្យមើលសុខភាព VPS, CPU/Memory Usage, និង API Latency
 
-២.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ (AUTONOMOUS TRADING ENGINES) ៖
+២.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ TURBO HEDGE (AUTONOMOUS TURBO HEDGE ENGINES) ៖
 
 📐 រូបមន្តទីតាំងលេខរៀងនៃពាក្យបញ្ជា /turbo_hedge (POSITION FORMULA BREAKDOWN) ៖
 /turbo_hedge [ទីតាំង១: កាក់/របៀប] [ទីតាំង២: ទុន/កាក់] [ទីតាំង៣: Leverage] [ទីតាំង៤: ទិសដៅ] [ទីតាំង៥: គោលដៅចំណេញ] [ទីតាំង៦: PIN]
 
-• [ទីតាំងទី ១] ➔ កាក់/របៀប ៖ TOP (ស្កេនច្រើនកាក់អូតូ) ឬ SOL, BTC, ETH (កាក់ទោល) ឬ SPOT
-• [ទីតាំងទី ២] ➔ ដើមទុនក្នុង 1 កាក់ ៖ 20 ($20 USDT), 10 ($10 USDT), 50 ($50 USDT)
-• [ទីតាំងទី ៣] ➔ ចំនួន Leverage ៖ 10 (10x), 15 (15x) [សម្រាប់ Spot ដាក់ 1]
-• [ទីតាំងទី ៤] ➔ ទិសដៅជួញដូរ ៖ AUTO (AI សម្រេច), BUY (Long), SELL (Short), SPOT (ទិញ Spot)
+• [ទីតាំងទី ១] ➔ កាក់/របៀប ៖ SPOT (ទិញ/លក់ Spot), TOP (ស្កេនច្រើនកាក់ Futures អូតូ), ឬ SOL, BTC, ETH (កាក់ទោល)
+• [ទីតាំងទី ២] ➔ ដើមទុនក្នុង 1 កាក់ ៖ 10 ($10 USDT), 20 ($20 USDT), 50 ($50 USDT)
+• [ទីតាំងទី ៣] ➔ ចំនួន Leverage ៖ 1 (សម្រាប់ Spot), 10 (10x), 15 (15x Max Dynamic)
+• [ទីតាំងទី ៤] ➔ ទិសដៅជួញដូរ ៖ AUTO (AI សម្រេច), SPOT (Spot Buy), BUY (Long), SELL (Short)
 • [ទីតាំងទី ៥] ➔ គោលដៅចំណេញ (TP) ៖ 2.5 (+$2.50 USDT), 5.0 (+$5.00 USDT)
 • [ទីតាំងទី ៦] ➔ លេខកូដ PIN ៖ 1234 ឬ PIN សុវត្ថិភាពរបស់អ្នក
 
-• `/turbo_hedge`  : ប្រព័ន្ធ HFT Auto-Scanner ស្កេនកើបចំណេញ 24/7 (ទម្រង់ ៖ `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>`)
-• `/turbo_hedge STOP` : បិទការជួញដូរកាក់តែមួយ ឬគ្រប់កាក់ (ទម្រង់ ៖ `/turbo_hedge STOP SOL <PIN>` ឬ `/turbo_hedge STOP ALL <PIN>`)
-• `/snipe`        : បើកប្រព័ន្ធស្ទាក់ទិញកាក់ Listing ថ្មី ឬកាក់ Volume Surge High RVOL
-• `/infinity_grid`: បើកប្រព័ន្ធ Unified Smart Grid Matrix សម្រួលតាមទីផ្សារ range
-• `/funding_harvester`: បើកប្រព័ន្ធស្ទាក់កើបអត្រាការប្រាក់ Funding Fee ពី Binance Futures រៀងរាល់ ៨ ម៉ោង
+📋 ពាក្យបញ្ជា TURBO HEDGE ជាក់ស្តែង (COMMAND EXAMPLES) ៖
+👉 **Spot Multi-Coin TOP Scanner** ៖
+   `/turbo_hedge SPOT TOP 50 1234` ➔ បើកស្កេនទិញកាក់ Spot Breakout (+3% ទៅ +35%) អូតូ 24/7 ដោយប្រើទុន $50/កាក់ (Leverage 1x)។
+👉 **Spot Single-Coin Mode** ៖
+   `/turbo_hedge SPOT SOL 50 1234` ➔ បើកទិញ Spot កាក់ SOL ដោយប្រើទុន $50 (Leverage 1x) និងកើបចំណេញអូតូ។
+👉 **Futures Multi-Coin TOP Scanner** ៖
+   `/turbo_hedge TOP 20 10 BUY 5 1234` ➔ បើកស្កេន 5-10 កាក់ Futures Volatile រត់ 24/7 ដោយប្រើទុន $20/កាក់ (Leverage 10x, Target TP $5)។
+👉 **Futures Single-Coin Mode** ៖
+   `/turbo_hedge SOL 40 10 BUY 5 1234` ➔ បើកកាក់ SOL Futures ទិសដៅ BUY (Long) ទុន $40 (Leverage 10x, Target TP $5)។
+👉 **Stop & Liquidate Commands** ៖
+   `/turbo_hedge STOP SOL 1234` ➔ បិទ និង Market Close/Sell កាក់ SOL (ទាំង Spot ឬ Futures) ភ្លាមៗ (<30ms)។
+   `/turbo_hedge STOP ALL 1234` ➔ បិទ និង Market Close/Sell គ្រប់កាក់ទាំងអស់ (Spot & Futures) លើ Binance ភ្លាមៗ (<30ms)។
 
 ២.៣ ពាក្យបញ្ជាវិភាគ និងសញ្ញាទីផ្សារ (AI INTELLIGENCE & MARKET ANALYSIS) ៖
 • `/analyze`      : ឲ្យ Gemini AI វិភាគបច្ចេកទេស និងទិសដៅកាក់ Real-time (ទម្រង់ ៖ `/analyze BTCUSDT`)

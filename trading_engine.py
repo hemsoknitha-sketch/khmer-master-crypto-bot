@@ -249,6 +249,31 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
     except Exception as e:
         return False, "❌ **បរាជ័យ:** ប្រព័ន្ធអ៊ិនធឺណិតរបស់ម៉ាស៊ីន (VPS Network) កំពុងមានបញ្ហាក្នុងការតភ្ជាប់ទៅកាន់ Binance។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្តងទៀត!"
 
+def check_user_api_permissions(api_key: str, api_secret: str) -> tuple[bool, bool]:
+    """
+    Checks real-time Binance API key permissions.
+    Returns: (spot_enabled, futures_enabled)
+    """
+    if PAPER_TRADING:
+        return True, True
+    try:
+        timestamp = (int(time.time() * 1000) + TIME_OFFSET)
+        query_string = f"recvWindow=60000&timestamp={timestamp}"
+        signature = generate_signature(api_secret, query_string)
+        headers = {"X-MBX-APIKEY": api_key}
+
+        spot_url = f"{BASE_URL}/api/v3/account?{query_string}&signature={signature}"
+        spot_res = requests.get(spot_url, headers=headers, timeout=5)
+        spot_enabled = (spot_res.status_code == 200)
+
+        futures_url = f"{FUTURES_URL}/fapi/v2/balance?{query_string}&signature={signature}"
+        futures_res = requests.get(futures_url, headers=headers, timeout=5)
+        futures_enabled = (futures_res.status_code == 200)
+
+        return spot_enabled, futures_enabled
+    except Exception:
+        return False, False
+
 def get_all_spot_balances(api_key: str, api_secret: str) -> dict:
     """Returns a dictionary of all assets with total (free + locked) balance > 0."""
     try:
@@ -316,8 +341,9 @@ def get_spot_balance(api_key: str, api_secret: str, asset: str = "USDT") -> floa
     current_time = time.time()
     if cache_key in BALANCE_CACHE:
         cached = BALANCE_CACHE[cache_key]
-        if current_time - cached["timestamp"] < 30:
-            return cached["amount"]
+        ttl = 3.0 if cached.get("amount", 0.0) <= 0.0 else 10.0
+        if current_time - cached.get("timestamp", 0) < ttl:
+            return cached.get("amount", 0.0)
             
     try:
         endpoint = "/api/v3/account"

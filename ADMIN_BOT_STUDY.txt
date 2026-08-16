@@ -12,7 +12,8 @@
 
 ១.១ ស្ថាបត្យកម្មបង្រួមមុខងារប្រព័ន្ធ (Streamlined Architecture Overhaul) ៖
 • 🟢 [១. មុខងារស្នូល - Core Flagship Engines] ៖
-  - Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Anti-Fee-Churn Hold Time Filter (>= 90 នាទី), ISOLATED Margin Enforcement, និង Net Profit Take Profit Floor (+0.12% Taker fee offset)។
+  - Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំង Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield (ទុន < $100 លីមីត 10x Max), ISOLATED Margin Enforcement, និង Net Profit Take Profit Floor (+0.12% Taker fee offset)។
+  - Spot 15-Min Surge Engine ៖ ស្កេន 200+ កាក់ Spot USDT លើ Binance ដោយទាញយកកាក់ដែលមាន Breakout Volume Surge (+3.0% ទៅ +35.0%) ព្រមទាំង Auto-Filter រំលងរាល់ Stablecoins (USDC, FDUSD, TUSD, EUR...)។
   - Listing & Volatility Sniper (`/snipe`) ៖ ស្ទាក់ទិញកាក់ Listing ថ្មី និង Volume Surge Spikes (RVOL)។
   - Funding Rate Harvester (`/funding_harvester`) ៖ កើបអត្រាការប្រាក់ Funding Fee ពី Binance Futures រៀងរាល់ ៨ ម៉ោង។
   - Gemini AI Advisory System (`/analyze`, `/predict`, `/news`, `/whales`, `/top`, `/alert`) ៖ ប្រព័ន្ធវិភាគទីផ្សារបញ្ញាសិប្បនិម្មិត។
@@ -26,7 +27,7 @@
   - Retail Auto Arbitrage (`/auto_arb`) ៖ បានបិទ និងតម្រង់ទិសទៅកាន់ `/funding_harvester` និង `/turbo_hedge` ដើម្បីការពារទុន VIP ពីការខាត fee Taker 0.10%។
 
 ១.២ ដំណោះស្រាយ APScheduler Thread Optimization ៖
-• ក្នុងកំណែ v11.0 មុខងារ Background Scheduled Loops ត្រូវ បានបង្រួមពី ២០+ Loops មកត្រឹម ៥ Loops ស្នូល (Turbo Hedge, Unified Grid, Gold Radar, Listing Sniper, Funding Harvester) ព្រមទាំង Background Briefings/Alerts។
+• ក្នុងកំណែ v11.0 មុខងារ Background Scheduled Loops ត្រូវបានបង្រួមពី ២០+ Loops មកត្រឹម ៥ Loops ស្នូល (Turbo Hedge, Unified Grid, Gold Radar, Listing Sniper, Funding Harvester) ព្រមទាំង Background Briefings/Alerts។
 • យន្តការនេះកាត់បន្ថយ Binance API Rate-Limit Hits ដល់ទៅ ៧៥% និងលុបបំបាត់ចោលទាំងស្រុងនូវកំហុស 429 Too Many Requests / IP Ban លើ VPS!
 
 --------------------------------------------------------------------------------
@@ -102,7 +103,7 @@ Super Admin (Chat ID ដែលមានសិទ្ធិ ឬ `859271875`) ទ�
 • ទម្រង់ ៖ `/admin_stats`
 • ការពណ៌នា ៖ បង្ហាញស្ថិតិប្រព័ន្ធរត់ real-time ៖ ចំនួនសមាជិកសរុប, ចំនួនសមាជិក VIP, ចំនួន Position ដែលកំពុងជួញដូររត់លើទីផ្សារ, ប្រាក់ចំណេញ PnL សរុប, Volume ជួញដូរ, និងស្ថានភាព Engine នីមួយៗ។
 
-<ctrl42>៤.២ `/admin_users` (គ្រប់គ្រង និងមើលបញ្ជី User ទាំងអស់) ៖
+៤.២ `/admin_users` (គ្រប់គ្រង និងមើលបញ្ជី User ទាំងអស់) ៖
 • ទម្រង់ ៖ `/admin_users`
 • ការពណ៌នា ៖ បង្ហាញបញ្ជីឈ្មោះ Username, Chat ID, VIP Expiry, និងស្ថានភាពភ្ជាប់ Binance API Keys របស់សមាជិកទាំងអស់ ព្រមទាំងមាន Inline Buttons សម្រាប់ចុច Refresh និងគ្រប់គ្រងលឿន។
 
@@ -130,11 +131,15 @@ Super Admin (Chat ID ដែលមានសិទ្ធិ ឬ `859271875`) ទ�
 ៥. ការធ្វើបច្ចុប្បន្នភាពកូដទៅ VPS ដោយចុច 1-Click (`git_update_vps.bat`)
 --------------------------------------------------------------------------------
 
-៥.១ របៀបប្រើប្រាស់ 1-Click Update File `git_update_vps.bat` ៖
+៥.១ យន្តការការពារទិន្នន័យ VIP Member & API Keys (Zero Data Loss Protection) ៖
+• រាល់ឯកសារទិន្នន័យសំខាន់ៗទាំងអស់ រួមមាន ៖ Database (`bot_database.db`, `apex_bot.db`, `*.db`), ឯកសារ API Keys (`.env`), និង Folder Backups (`backups/`) ត្រូវបានដាក់បញ្ចូលក្នុង `.gitignore` ទាំងអស់។
+• យន្តការនេះធានាថា រាល់ពេល Admin ចុច `git_update_vps.bat` ឬរត់កូដ Git Push/Pull លើ VPS គឺប្រព័ន្ធ **ធ្វើបច្ចុប្បន្នភាពតែឯកសារកូដ Python (*.py) ប៉ុណ្ណោះ** ដោយ **ដាច់ខាតមិនប៉ះពាល់ ឬលុបទិន្នន័យ VIP User, API Keys ឬប្រវត្តិ Trade លើ VPS ឡើយ 100%**!
+
+៥.២ របៀបប្រើប្រាស់ 1-Click Update File `git_update_vps.bat` ៖
 ១. នៅពេល Admin ធ្វើការកែប្រែកូដ ឬបន្ថែមមុខងារថ្មីលើ Local Machine
 ២. ចុច Double-Click លើ file `git_update_vps.bat`
 ៣. ប្រព័ន្ធនឹងធ្វើការ ៖
-   - `git config credential.helper store` (រក្សាទុក GitHub Token/Credentials មិនបាច់ Login)
+   - `git config credential.helper store` (រក្សាទុក GitHub Token/Credentials ដោយស្វ័យប្រវត្តិ មិនទារ Login)
    - `git add .`
    - `git commit -m "Auto Update Khmer Master Crypto v11.0 AGI Super Brain Edition"`
    - `git push origin main`

@@ -439,9 +439,13 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
     _active_executing_keys.add(exec_key)
     try:
         # 🛒 Spot Mode Route Handler: Execute Spot Market Order when side == SPOT or leverage == 1
-        if side.upper() == "SPOT" or (leverage <= 1 and side.upper() != "SELL"):
+        if side.upper() == "SPOT" or (leverage <= 1 and side.upper() in ["SPOT", "BUY"]):
             print(f"🚀 [TURBO HEDGE SPOT ROUTE] Executing Binance Spot Market Buy for {symbol} (${amount_usdt:.2f} USDT)...")
             spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "BUY", amount_usdt)
+            return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
+        elif leverage <= 1 and side.upper() == "SELL":
+            print(f"🚀 [TURBO HEDGE SPOT ROUTE] Executing Binance Spot Market Sell for {symbol}...")
+            spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "SELL")
             return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
 
         # 1. Bounded Margin & Leverage Safety Sizing based on AVAILABLE BALANCE
@@ -648,10 +652,12 @@ async def monitor_turbo_hedge_bots(app):
                     b_lev = int(b.get("leverage", 10))
                     
                     if b_side == "SPOT" or b_lev <= 1:
-                        # Spot position check: verify spot asset balance
+                        # Spot position check: verify spot asset balance and notional value
                         base_asset = b_sym.replace("USDT", "").replace("DODOX", "DODO")
                         spot_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], base_asset)
-                        if spot_bal <= 0:
+                        mark_p = trading_engine.get_current_price(b_sym)
+                        notional_val = spot_bal * mark_p if mark_p > 0 else spot_bal
+                        if spot_bal <= 0 or notional_val < 1.0:
                             db.remove_turbo_hedge_bot(target_chat_id, b_sym)
                             active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
                             print(f"🧹 [CLOSED SPOT POSITION PURGED FROM DB] User {target_chat_id} {b_sym} purged!")
@@ -701,10 +707,32 @@ async def monitor_turbo_hedge_bots(app):
 
             user_active_bots = [b for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
 
-            avail_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
-            if avail_bal <= 0.0:
-                avail_bal = trading_engine.get_futures_free_margin(f_keys[0], f_keys[1])
-            wallet_bal = trading_engine.get_futures_wallet_balance(f_keys[0], f_keys[1], "USDT") or avail_bal
+            user_side_input = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "AUTO")
+            
+            # 🛡️ Dynamic Binance API Permission Sensor:
+            # If user disabled Futures API permission on Binance, automatically fallback to SPOT mode!
+            if user_side_input != "SPOT":
+                fut_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
+                if fut_bal <= 0.0:
+                    spot_ok, fut_ok = trading_engine.check_user_api_permissions(f_keys[0], f_keys[1])
+                    if spot_ok and not fut_ok:
+                        print(f"💡 [API SENSOR] User {target_chat_id} disabled Futures permission on Binance API. Auto-switching top_side to SPOT mode!")
+                        db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "SPOT")
+                        db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_leverage", "1")
+                        user_side_input = "SPOT"
+
+            if user_side_input == "SPOT":
+                avail_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], "USDT")
+                if avail_bal <= 0.0:
+                    avail_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
+                wallet_bal = avail_bal
+            else:
+                avail_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
+                if avail_bal <= 0.0:
+                    avail_bal = trading_engine.get_futures_free_margin(f_keys[0], f_keys[1])
+                if avail_bal <= 0.0:
+                    avail_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], "USDT")
+                wallet_bal = trading_engine.get_futures_wallet_balance(f_keys[0], f_keys[1], "USDT") or avail_bal
 
             # 🧠 1️⃣ AGI VIP Retention & Autonomous Profit Supercharger (v10.0 Architecture):
             # Autonomous Equity Sensing: Track peak wallet balance per user.
@@ -767,9 +795,12 @@ async def monitor_turbo_hedge_bots(app):
                 if not hasattr(monitor_turbo_hedge_bots, '_last_cap_notice_time'):
                     monitor_turbo_hedge_bots._last_cap_notice_time = {}
                 last_t = monitor_turbo_hedge_bots._last_cap_notice_time.get(target_chat_id, 0)
-                if now_t - last_t > 60:
+                if now_t - last_t > 300:
                     monitor_turbo_hedge_bots._last_cap_notice_time[target_chat_id] = now_t
-                    print(f"🛡️ [AGI CAPITAL CAP] User {target_chat_id}: Active coins ({len(user_active_bots)}) reached capital limit ({max_allowed_coins} coins max for ${avail_bal:.2f} USDT free margin at ${effective_amount:.2f}/coin). Pausing auto-expander.")
+                    if avail_bal <= 0.0 and len(user_active_bots) == 0:
+                        print(f"📡 [AGI CAPITAL RADAR] User {target_chat_id}: Free margin is $0.00 USDT. Top-mode auto-scanner standing by 24/7 for available capital...")
+                    else:
+                        print(f"🛡️ [AGI CAPITAL CAP] User {target_chat_id}: Active coins ({len(user_active_bots)}) reached capital limit ({max_allowed_coins} coins max for ${avail_bal:.2f} USDT free margin at ${effective_amount:.2f}/coin). Pausing auto-expander.")
                 continue
 
             actual_trade_amount = effective_amount
@@ -855,9 +886,16 @@ async def monitor_turbo_hedge_bots(app):
                 continue
 
             # 🛡️ Small Capital Leverage Shield & Multi-Tiered Balance Fallback
-            avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
-            if avail_bal <= 0.0:
-                avail_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
+            if current_side == "SPOT" or leverage <= 1:
+                avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
+                if avail_bal <= 0.0:
+                    avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+            else:
+                avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+                if avail_bal <= 0.0:
+                    avail_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
+                if avail_bal <= 0.0:
+                    avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
                 
             if avail_bal <= 0.0 or avail_bal < 100.0:
                 leverage = min(leverage, 10)
@@ -1203,8 +1241,29 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
     total_pnl_realized = 0.0
 
     try:
+        active_bots = db.get_active_turbo_hedge_bots() or []
+        user_bots = [b for b in active_bots if b.get("chat_id") == chat_id]
+
         if symbol == "ALL":
-            # 1. Fetch live Binance positions for user
+            # 1. Liquidate any active Spot mode bots on Binance Spot API
+            for b in user_bots:
+                b_sym = b.get("symbol")
+                b_side = str(b.get("side", "BUY")).upper()
+                b_lev = int(b.get("leverage", 10))
+                if b_side == "SPOT" or b_lev <= 1:
+                    base_asset = b_sym.replace("USDT", "").replace("DODOX", "DODO")
+                    spot_bal = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+                    if spot_bal > 0:
+                        close_res = trading_engine.execute_spot_trade(keys[0], keys[1], b_sym, "SELL")
+                        mark_p = trading_engine.get_current_price(b_sym)
+                        entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{b_sym}_entry_price", "0.0")
+                        entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
+                        spot_pnl = (mark_p - entry_p) * spot_bal if (entry_p > 0 and mark_p > 0) else 0.0
+                        total_pnl_realized += spot_pnl
+                        closed_details.append({"symbol": b_sym, "amt": spot_bal, "pnl": spot_pnl, "res": close_res})
+                        print(f"🛑 [SUPER SMART STOP ALL SPOT] Market Sold {b_sym} Spot (Qty: {spot_bal}, PnL: ${spot_pnl:.2f})!")
+
+            # 2. Fetch live Binance Futures positions for user and close them
             positions = trading_engine.get_futures_positions(keys[0], keys[1])
             if isinstance(positions, list):
                 for pos in positions:
@@ -1216,22 +1275,41 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
                         # Market Close Position on Binance (<30ms)
                         close_res = trading_engine.close_futures_position_for_symbol(keys[0], keys[1], p_sym)
                         closed_details.append({"symbol": p_sym, "amt": p_amt, "pnl": pnl, "res": close_res})
-                        print(f"🛑 [SUPER SMART STOP ALL] Market Closed {p_sym} (Qty: {p_amt}, PnL: ${pnl:.2f})!")
+                        print(f"🛑 [SUPER SMART STOP ALL FUTURES] Market Closed {p_sym} (Qty: {p_amt}, PnL: ${pnl:.2f})!")
 
-            # 2. Deactivate DB records & reset top_mode
+            # 3. Deactivate DB records & reset top_mode
             db.stop_turbo_hedge_bot(chat_id, "ALL")
             db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
         else:
             # Single coin stop
-            pos_info = trading_engine.get_futures_position_pnl(keys[0], keys[1], symbol)
-            if pos_info.get("has_position"):
-                pnl = float(pos_info.get("unrealizedProfit", 0))
-                total_pnl_realized += pnl
-                close_res = trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
-                closed_details.append({"symbol": symbol, "amt": pos_info.get("positionAmt"), "pnl": pnl, "res": close_res})
-                print(f"🛑 [SUPER SMART STOP SINGLE] Market Closed {symbol} (PnL: ${pnl:.2f})!")
+            target_bot = next((b for b in user_bots if b.get("symbol") == symbol), None)
+            is_spot_bot = target_bot and (str(target_bot.get("side")).upper() == "SPOT" or int(target_bot.get("leverage", 10)) <= 1)
+            
+            if is_spot_bot:
+                base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+                spot_bal = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+                if spot_bal > 0:
+                    close_res = trading_engine.execute_spot_trade(keys[0], keys[1], symbol, "SELL")
+                    mark_p = trading_engine.get_current_price(symbol)
+                    entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
+                    entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
+                    spot_pnl = (mark_p - entry_p) * spot_bal if (entry_p > 0 and mark_p > 0) else 0.0
+                    total_pnl_realized += spot_pnl
+                    closed_details.append({"symbol": symbol, "amt": spot_bal, "pnl": spot_pnl, "res": close_res})
+                    print(f"🛑 [SUPER SMART STOP SINGLE SPOT] Market Sold {symbol} (Qty: {spot_bal}, PnL: ${spot_pnl:.2f})!")
+                else:
+                    trading_engine.execute_spot_trade(keys[0], keys[1], symbol, "SELL")
             else:
-                trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
+                pos_info = trading_engine.get_futures_position_pnl(keys[0], keys[1], symbol)
+                if pos_info.get("has_position"):
+                    pnl = float(pos_info.get("unrealizedProfit", 0))
+                    total_pnl_realized += pnl
+                    close_res = trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
+                    closed_details.append({"symbol": symbol, "amt": pos_info.get("positionAmt"), "pnl": pnl, "res": close_res})
+                    print(f"🛑 [SUPER SMART STOP SINGLE FUTURES] Market Closed {symbol} (PnL: ${pnl:.2f})!")
+                else:
+                    trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
+
             db.stop_turbo_hedge_bot(chat_id, symbol)
 
         return {
