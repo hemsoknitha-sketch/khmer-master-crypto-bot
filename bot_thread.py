@@ -5089,14 +5089,21 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text("❌ **មិនទាន់មាន API Key!** សូមប្រើប្រាស់ពាក្យបញ្ជា `` `/add_api` `` ដើម្បភ្ជាប់ Binance API ជាមុនសិន។", parse_mode="Markdown")
                 return
 
-            # 🛡️ Dynamic API Permission Check: Auto-fallback to SPOT if Futures permission is disabled on Binance
+            # 🛡️ Strict API Permission Guard: Reject & Pause Futures commands if API Key lacks Futures permission
             if user_side_input != "SPOT":
                 spot_ok, fut_ok = await asyncio.to_thread(trading_engine.check_user_api_permissions, keys[0], keys[1])
-                if spot_ok and not fut_ok:
-                    user_side_input = "SPOT"
-                    leverage = 1
+                if not fut_ok:
+                    db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
                     if msg_target:
-                        await msg_target.reply_text("⚠️ **Binance API Key របស់អ្នកមិនទាន់បើកសិទ្ធិ Futures Trading ទេ។**\n\n💡 ប្រព័ន្ធបានកំណត់រត់ជា **Spot Mode (1x)** ដោយស្វ័យប្រវត្តិ!", parse_mode="Markdown")
+                        msg_err = (
+                            "🛑 **បរាជ័យ ៖ Binance API Key របស់អ្នកមិនទាន់បានបើកសិទ្ធិ Futures Trading ទេ។**\n\n"
+                            "⚠️ **ប្រព័ន្ធបានផ្អាកមុខងារ Futures សម្រាប់ Account របស់អ្នកដើម្បីការពារសុវត្ថិភាពដើមទុន!**\n"
+                            "*(ការពារដាច់ខាតមិនឲ្យយក Logic ឬ Margin របស់ Futures ទៅរត់ក្នុងការវិនិយោគ Spot ឡើយ)*\n\n"
+                            "💡 _ប្រសិនបើលោកអ្នកចង់វិនិយោគ Spot ដោយផ្ទាល់ សូមប្រើប្រាស់ពាក្យបញ្ជា Spot ៖_\n"
+                            "👉 `` `/turbo_hedge SPOT TOP 50 1234` ``"
+                        )
+                        await msg_target.reply_text(msg_err, parse_mode="Markdown")
+                    return
 
             import turbo_hedge_engine
 

@@ -460,11 +460,9 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
 
         lev_res = trading_engine.set_futures_leverage(api_key, api_secret, symbol, leverage)
         if isinstance(lev_res, dict) and lev_res.get("error") and ("-2015" in str(lev_res.get("error")) or "Invalid API-key" in str(lev_res.get("error"))):
-            print(f"💡 [API SENSOR - AUTO SPOT FALLBACK] User {chat_id} API key lacks Futures permission (-2015). Auto-routing {symbol} to Spot Market Buy...")
-            db.update_system_setting(f"turbo_hedge_{chat_id}_top_side", "SPOT")
-            db.update_system_setting(f"turbo_hedge_{chat_id}_top_leverage", "1")
-            spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "BUY", amount_usdt)
-            return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
+            print(f"🛑 [FUTURES DISABLED] User {chat_id} API key lacks Futures permission (-2015). Pausing Futures engine for User {chat_id}...")
+            db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
+            return {"status": "error", "reason": "FUTURES_PERMISSION_DISABLED", "code": -2015}
 
         effective_leverage = leverage
         if isinstance(lev_res, dict) and lev_res.get("leverage"):
@@ -526,11 +524,9 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                 res = trading_engine.execute_futures_order(api_key, api_secret, symbol, side, retry_qty, leverage=effective_leverage)
 
             elif "-2015" in err_str or "Invalid API-key" in err_str or "permissions" in err_str:
-                print(f"💡 [API SENSOR - AUTO SPOT FALLBACK] User {chat_id} API key lacks Futures permission (-2015). Auto-routing {symbol} to Spot Market Buy...")
-                db.update_system_setting(f"turbo_hedge_{chat_id}_top_side", "SPOT")
-                db.update_system_setting(f"turbo_hedge_{chat_id}_top_leverage", "1")
-                spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "BUY", amount_usdt)
-                return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
+                print(f"🛑 [FUTURES DISABLED] User {chat_id} API key lacks Futures permission (-2015). Pausing Futures engine for User {chat_id}...")
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
+                return {"status": "error", "reason": "FUTURES_PERMISSION_DISABLED", "code": -2015}
 
             # Auto-Prune Non-Tradable / Closed / TradFi Agreement Symbols (Error -1121, -4141, -4140, -4411)
             elif any(code in err_str for code in ["-1121", "-4141", "-4140", "-4411", "Invalid symbol status", "Symbol is closed", "TradFi-Perps", "agreement contract"]):
@@ -724,16 +720,13 @@ async def monitor_turbo_hedge_bots(app):
             user_side_input = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "AUTO")
             
             # 🛡️ Dynamic Binance API Permission Sensor:
-            # If user disabled Futures API permission on Binance, automatically fallback to SPOT mode!
+            # If user disabled Futures API permission on Binance, PAUSE Futures mode completely!
             if user_side_input != "SPOT":
-                fut_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
-                if fut_bal <= 0.0:
-                    spot_ok, fut_ok = trading_engine.check_user_api_permissions(f_keys[0], f_keys[1])
-                    if spot_ok and not fut_ok:
-                        print(f"💡 [API SENSOR] User {target_chat_id} disabled Futures permission on Binance API. Auto-switching top_side to SPOT mode!")
-                        db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "SPOT")
-                        db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_leverage", "1")
-                        user_side_input = "SPOT"
+                spot_ok, fut_ok = trading_engine.check_user_api_permissions(f_keys[0], f_keys[1])
+                if not fut_ok:
+                    print(f"🛑 [API SENSOR] User {target_chat_id} API key lacks Futures permission on Binance. Pausing Futures mode for User {target_chat_id}!")
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_mode", "0")
+                    continue
 
             if user_side_input == "SPOT":
                 avail_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], "USDT")
