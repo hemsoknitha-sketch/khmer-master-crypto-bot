@@ -459,6 +459,13 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
             leverage = min(leverage, 15)
 
         lev_res = trading_engine.set_futures_leverage(api_key, api_secret, symbol, leverage)
+        if isinstance(lev_res, dict) and lev_res.get("error") and ("-2015" in str(lev_res.get("error")) or "Invalid API-key" in str(lev_res.get("error"))):
+            print(f"💡 [API SENSOR - AUTO SPOT FALLBACK] User {chat_id} API key lacks Futures permission (-2015). Auto-routing {symbol} to Spot Market Buy...")
+            db.update_system_setting(f"turbo_hedge_{chat_id}_top_side", "SPOT")
+            db.update_system_setting(f"turbo_hedge_{chat_id}_top_leverage", "1")
+            spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "BUY", amount_usdt)
+            return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
+
         effective_leverage = leverage
         if isinstance(lev_res, dict) and lev_res.get("leverage"):
             try:
@@ -517,6 +524,13 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                 if retry_qty <= 0:
                     retry_qty = qty * 1.5 if qty > 0 else 1.0
                 res = trading_engine.execute_futures_order(api_key, api_secret, symbol, side, retry_qty, leverage=effective_leverage)
+
+            elif "-2015" in err_str or "Invalid API-key" in err_str or "permissions" in err_str:
+                print(f"💡 [API SENSOR - AUTO SPOT FALLBACK] User {chat_id} API key lacks Futures permission (-2015). Auto-routing {symbol} to Spot Market Buy...")
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_side", "SPOT")
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_leverage", "1")
+                spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "BUY", amount_usdt)
+                return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
 
             # Auto-Prune Non-Tradable / Closed / TradFi Agreement Symbols (Error -1121, -4141, -4140, -4411)
             elif any(code in err_str for code in ["-1121", "-4141", "-4140", "-4411", "Invalid symbol status", "Symbol is closed", "TradFi-Perps", "agreement contract"]):
