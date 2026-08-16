@@ -5052,18 +5052,18 @@ class TelegramBotThread(BaseThread):
                 amount = float(raw_args[1]) if raw_args[1].replace('.', '', 1).isdigit() else 10.0
                 
                 idx = 2
-                if len(raw_args) > 2 and raw_args[2].isdigit() and not is_spot_prefix:
+                if len(raw_args) > 2 and idx < len(raw_args) - 1 and raw_args[2].isdigit() and not is_spot_prefix:
                     leverage = int(raw_args[2])
                     idx = 3
                 elif is_spot_prefix:
                     leverage = 1
 
-                if len(raw_args) > idx and raw_args[idx].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                if idx < len(raw_args) - 1 and raw_args[idx].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
                     if not is_spot_prefix:
                         user_side_input = raw_args[idx].upper()
                     idx += 1
 
-                if len(raw_args) > idx and raw_args[idx].replace('.', '', 1).isdigit():
+                if idx < len(raw_args) - 1 and raw_args[idx].replace('.', '', 1).isdigit():
                     target_tp = float(raw_args[idx])
                     idx += 1
 
