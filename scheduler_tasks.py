@@ -239,12 +239,18 @@ async def check_crypto_news(app: Application, ai_engine):
                 print(f"News: '{title}' - Impact Score: {score}/10")
                 if score >= 7:
                     def get_news_text(lang):
-                        user_lang = lang if lang in texts else 'khmer'
-                        alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n\n"
+                        raw_l = str(lang or 'khmer').lower()
+                        if raw_l in ['km', 'khmer']: user_l = 'khmer'
+                        elif raw_l in ['zh', 'chinese', 'cn']: user_l = 'chinese'
+                        else: user_l = 'english'
+
+                        alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
+                        alert_msg += "═══════════════════════════════\n\n"
                         alert_msg += f"📰 **{title}**\n\n"
-                        header = loc.get_text(user_lang, 'ai_analysis_header')
-                        alert_msg += f"{header}{texts[user_lang]}\n\n"
-                        alert_msg += f"🔗 [Read Full Article]({link})"
+                        header = loc.get_text(user_l, 'ai_analysis_header')
+                        alert_msg += f"{header}\n{texts[user_l]}\n\n"
+                        alert_msg += f"🔗 [Read Full Article]({link})\n\n"
+                        alert_msg += "👉 **1-Tap Action Execution** ៖\n`` `/turbo_hedge TOP 20 10 AUTO 2.5 1234` ``"
                         return alert_msg
                         
                     await parallel_broadcast(app, vip_users_lang, get_news_text)

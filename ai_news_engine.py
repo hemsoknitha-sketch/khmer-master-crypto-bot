@@ -151,7 +151,7 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             ai_res = ai_engine.chat_with_user(ai_prompt, history=[])
             if isinstance(ai_res, str) and len(ai_res.strip()) > 50:
                 header = (
-                    f"📰 **APEX SUPER AGI TURBO BRAIN v9.5 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
+                    f"📰 **KHMER MASTER CRYPTO / APEX TURBO AGI v11.0 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
                     "═══════════════════════════════\n\n"
                 )
                 return header + ai_res.strip()
@@ -160,7 +160,7 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
 
     # Clean Fallback Formatting if AI is not available
     msg = (
-        f"📰 **APEX SUPER AGI TURBO BRAIN v9.5 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
+        f"📰 **KHMER MASTER CRYPTO / APEX TURBO AGI v11.0 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
         "═══════════════════════════════\n\n"
         "📊 **EXECUTIVE SENTIMENT INDEX:**\n"
         f"• **AI Sentiment Score**: `{sentiment_badge}`\n"
