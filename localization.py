@@ -449,20 +449,35 @@ MESSAGES = {
     }
 }
 
+LANG_MAP = {
+    'km': 'khmer',
+    'khmer': 'khmer',
+    'en': 'english',
+    'english': 'english',
+    'zh': 'chinese',
+    'chinese': 'chinese',
+    'auto': 'khmer'
+}
+
+def normalize_lang(language: str) -> str:
+    if not language:
+        return DEFAULT_LANG
+    clean = str(language).lower().strip()
+    return LANG_MAP.get(clean, DEFAULT_LANG)
+
 def get_text(language: str, key: str, **kwargs) -> str:
-    if not language or language not in MESSAGES:
-        language = DEFAULT_LANG
+    lang_key = normalize_lang(language)
     
-    if key not in MESSAGES[language]:
+    if lang_key not in MESSAGES or key not in MESSAGES[lang_key]:
         # Fallback to English, then Khmer
         if key in MESSAGES.get('english', {}):
-            language = 'english'
+            lang_key = 'english'
         elif key in MESSAGES.get('khmer', {}):
-            language = 'khmer'
+            lang_key = 'khmer'
         else:
             return f"[{key} NOT FOUND]"
             
-    text = MESSAGES[language][key]
+    text = MESSAGES[lang_key][key]
     
     if kwargs:
         try:
@@ -471,3 +486,4 @@ def get_text(language: str, key: str, **kwargs) -> str:
             pass # Ignore if formatting fails
             
     return text
+

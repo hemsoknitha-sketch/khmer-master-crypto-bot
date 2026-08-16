@@ -85,8 +85,7 @@ def generate_central_bank_report(user_lang: str = "khmer", ai_engine=None) -> st
             ai_analysis = f"ភាគរយ SGE Premium +${premium:,.2f}/oz លើទីផ្សារសៀងហៃ បញ្ជាក់ថាធនាគារកណ្តាល PBOC កំពុងលួចប្រមូលទិញមាសរូបវន្តយ៉ាងច្រើនក្នុងទីផ្សារ OTC មុនពេលប្រកាសរបាយការណ៍ផ្លូវការ។"
     else:
         ai_analysis = f"ភាគរយ SGE Premium +${premium:,.2f}/oz លើទីផ្សារសៀងហៃ បញ្ជាក់ថាធនាគារកណ្តាល PBOC កំពុងលួចប្រមូលទិញមាសរូបវន្តយ៉ាងច្រើនក្នុងទីផ្សារ OTC មុនពេលប្រកាសរបាយការណ៍ផ្លូវការ។"
-
-    if user_lang == 'khmer':
+    if user_lang in ['km', 'khmer']:
         report = (
             f"🏦 **APEX SUPER BRAIN — CENTRAL BANK GOLD ACCUMULATION RADAR** 🏦\n"
             f"*(ការតាមដានការទិញមាសរបស់ធនាគារកណ្តាល PBOC/RBI/CBR 24/7)*\n\n"

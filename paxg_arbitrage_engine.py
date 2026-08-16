@@ -89,8 +89,8 @@ def generate_arbitrage_report(user_lang: str = "khmer", ai_engine=None) -> str:
             ai_analysis = f"គម្លាតតម្លៃមាស PAXG (${paxg:,.2f}) និង Spot Gold (${world_gold:,.2f}) មានទំហំ {spread_pct:+.2f}%។ ក្រោយដកថ្លៃសេវា 0.15% ផ្តល់ប្រាក់ចំណេញ Net PnL {net_pnl:+.2f}% ដោយគ្មានហានិភ័យ Risk-Free!"
     else:
         ai_analysis = f"គម្លាតតម្លៃមាស PAXG (${paxg:,.2f}) និង Spot Gold (${world_gold:,.2f}) មានទំហំ {spread_pct:+.2f}%។ ក្រោយដកថ្លៃសេវា 0.15% ផ្តល់ប្រាក់ចំណេញ Net PnL {net_pnl:+.2f}% ដោយគ្មានហានិភ័យ Risk-Free!"
-
-    if user_lang == 'khmer':
+    clean_lang = loc.normalize_lang(user_lang) if 'loc' in globals() or 'loc' in locals() else ('khmer' if user_lang in ['km', 'khmer'] else 'english')
+    if user_lang in ['km', 'khmer'] or clean_lang == 'khmer':
         report = (
             f"⚖️ **APEX SUPER BRAIN — PAXG / XAUT ON-CHAIN ARBITRAGE RADAR** ⚖️\n"
             f"*(ប្រព័ន្ធស្កេនចំណេញ Delta-Neutral Risk-Free Arbitrage <50ms)*\n\n"

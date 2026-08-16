@@ -421,73 +421,62 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
             
             menu_text = (
-                "🤖 **APEX SUPER AGI TURBO BRAIN v9.5** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0** 🤖\n"
                 "═══════════════════════════════\n"
-                "⚡ **SYSTEM STATUS**: `🟢 ONLINE` | `Latency: <25ms`\n"
-                "🧠 **AI CONSENSUS**: `84+ Gemini Models Active`\n"
-                f"🛡️ **SECURITY GUARD**: `ACTIVE` | `{mode_badge}`\n"
+                "⚡ **SYSTEM STATUS**: `🟢 ONLINE` | `Latency: <15ms`\n"
+                "🧠 **SUPER BRAIN AGI**: `Active Multi-Timeframe Alignment`\n"
+                f"🛡️ **SECURITY GUARD**: `ISOLATED MARGIN` | `{mode_badge}`\n"
                 "═══════════════════════════════\n"
-                "សូមស្វាគមន៍មកកាន់ **Super Smart AGI Navigation Dashboard**! 📊\n\n"
-                "💼 **1. PORTFOLIO & CAPITAL ANALYTICS**\n"
-                "• `/portfolio` - មើលតុល្យភាពកាបូប PnL ទាំងអស់\n"
-                "• `/balance` - សារពើភ័ណ្ឌ USDT & Coin Allocation\n"
-                "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-time\n"
-                "• `/stop_all` - បិទ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
-                "🔮 **2. SUPER AGI RADAR & CONSENSUS**\n"
-                "• `/scan` - AI ស៊ើបអង្កេតឱកាសចំណេញទីផ្សារទាំងមូល\n"
-                "• `/predict <COIN>` - ព្យាករណ៍ទិសដៅ K-line & Win-rate\n"
+                "សូមស្វាគមន៍មកកាន់ **v11.0 Executive AGI Navigation Dashboard**! 📊\n\n"
+                "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
+                "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
+                "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
+                "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time\n"
+                "• `/stop_all` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
+                "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
+                "• `/turbo_hedge` - 🟢 Core HFT Multi/Single-Coin Scanner 24/7\n"
+                "• `/snipe` - 🎯 Listing & Volatility (High RVOL) Sniper\n"
+                "• `/funding_harvester` - 🌾 8-Hour Funding Yield Harvester\n"
+                "• `/infinity_grid` - 📐 Unified Smart Grid Matrix Engine\n\n"
+                "🔮 **3. AI INTELLIGENCE & MARKET ADVISORY**\n"
                 "• `/analyze <COIN>` - AI វិភាគទិន្នន័យបច្ចេកទេស 360°\n"
-                "• `/pre_pump` - ចាប់សញ្ញាកាក់ត្រៀមផ្ទុះតម្លៃ (Pre-Pump Spike)\n"
-                "• `/news` - អានសារព័ត៌មានកាត់បន្ថយហានិភ័យដោយ AI\n\n"
-                "🎯 **3. SPOT & FUTURES AI ENGINES**\n"
-                "• `/hyper_trade` - Super AGI Auto Trading Engine (Spot/Futures)\n"
-                "• `/scalp <COIN> <USDT> <LEV>` - Dynamic HFT Scalping Engine\n"
-                "• `/funding_harvester` - ច្រូតកាត់ការប្រាក់ Funding Rate ឥតខាត\n"
-                "• `/sweep_auto` - ស្ទាក់ទិញ Liquidity Sweep Bottom/Top\n"
-                "• `/auto_arb` - Cross-Exchange Triangular Arbitrage Engine\n"
-                "• `/smart_dca` • `/infinity_matrix` • `/delta_neutral`\n\n"
-                "🥇 **4. GOLD & MACRO INSTITUTIONAL RADAR**\n"
-                "• `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Macro Pivot\n"
-                "• `/cb_gold` - តាមដានធនាគារកណ្តាលបម្រុងមាស (Central Bank)\n"
-                "• `/gold_btc_rebalance` - យុទ្ធសាស្ត្ររៀបចំទុន មាស 🤝 BTC\n\n"
-                "🛡️ **5. RISK DEFENDER & LIQUIDATION SHIELD**\n"
-                "• `/trailing_guard` - Profit Lock & Trailing Stop\n"
-                "• `/defender` - យុទ្ធសាស្ត្រការពារ Liquidation 100%\n"
-                "• `/sell_all` - Panic Sell យក USDT សុទ្ធភ្លាមៗ\n\n"
-                "⚙️ **6. SYSTEM CONTROL & SECURITY**\n"
+                "• `/predict <COIN>` - ព្យាករណ៍ទិសដៅ K-Line & Win-Rate 24h\n"
+                "• `/news` - ព័ត៌មាន Crypto Real-Time វិភាគដោយ AI\n"
+                "• `/whales` - តាមដានចលនា Whale ធំៗក្នុងទីផ្សារ\n"
+                "• `/top` - កាក់ឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile)\n"
+                "• `/alert` - កំណត់ការជូនដំណឹងតម្លៃកាក់ Real-Time\n\n"
+                "🥇 **4. GOLD & MACRO RISK SHIELD**\n"
+                "• `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Central Bank Radar\n\n"
+                "⚙️ **5. SYSTEM CONTROL & SECURITY**\n"
                 "• `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
-                "• `/paper_trading` - ប្តូររវាង Real ↔️ Demo Simulation\n"
-                "• `/language` - ផ្លាស់ប្តូរភាសា (Khmer / English)\n"
+                "• `/set_pin` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
+                "• `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n"
             )
             
             if is_admin:
                 menu_text += (
                     "\n👑 **SUPER ADMIN CONTROL PANEL**:\n"
-                    "• `/admin_config` • `/admin_signal` • `/admin_nuke` • `/toggle_breaker`\n"
+                    "• `/admin_stats` • `/admin_users` • `/admin_broadcast` • `/admin_backup`\n"
                 )
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             
             keyboard = [
                 [
-                    InlineKeyboardButton("💼 Portfolio", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Hyper Trade Engine", callback_data="btn_hyper_trade_launch"),
+                    InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch"),
                     InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
                 ],
                 [
-                    InlineKeyboardButton("🔥 Pre-Pump Radar", callback_data="btn_pre_pump_radar"),
+                    InlineKeyboardButton("📐 Unified Smart Grid", callback_data="btn_infinity_grid_launch"),
                     InlineKeyboardButton("🥇 Gold & PAXG Radar", callback_data="btn_gold_radar")
                 ],
                 [
-                    InlineKeyboardButton("📰 AI News Scanner", callback_data="btn_news_refresh"),
-                    InlineKeyboardButton("🛡️ Liquidation Defender", callback_data="btn_defender_status")
-                ],
-                [
-                    InlineKeyboardButton("⚙️ Toggle Paper/Real", callback_data="btn_menu_papertrade"),
-                    InlineKeyboardButton("🔑 API Setup", callback_data="btn_menu_api")
+                    InlineKeyboardButton("📰 AI News Radar", callback_data="btn_news_refresh"),
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
                 ],
                 [
                     InlineKeyboardButton("❓ User Manual", callback_data="btn_menu_help"),
@@ -497,8 +486,8 @@ class TelegramBotThread(BaseThread):
             
             if is_admin:
                 keyboard.append([
-                    InlineKeyboardButton("⚙️ Admin Config", callback_data="btn_admin_config"),
-                    InlineKeyboardButton("☢️ Emergency Nuke", callback_data="btn_admin_nuke")
+                    InlineKeyboardButton("⚙️ Admin Dashboard", callback_data="btn_admin_config"),
+                    InlineKeyboardButton("📊 System Stats", callback_data="btn_admin_stats")
                 ])
                 
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -623,10 +612,11 @@ class TelegramBotThread(BaseThread):
             elif action == "hard":
                 db.stop_all_active_bots(chat_id)
         async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
             if not await verify_user(update): return
-            user_lang = db.get_user_language(chat_id) or 'km'
-            
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
+
             msg_target = update.message if update.message else (update.callback_query.message if update.callback_query else None)
             if update.callback_query:
                 try:
@@ -634,11 +624,8 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
 
-            trades = db.get_active_trades_by_user(chat_id)
+            trades = db.get_active_trades_by_user(chat_id) if hasattr(db, 'get_active_trades_by_user') else []
             infinity_grids = db.get_active_infinity_grids_by_user(chat_id) if hasattr(db, 'get_active_infinity_grids_by_user') else []
-            compound_grids = db.get_active_compound_grids_by_user(chat_id) if hasattr(db, 'get_active_compound_grids_by_user') else []
-            scalpers = db.get_active_scalpers_by_user(chat_id) if hasattr(db, 'get_active_scalpers_by_user') else []
-            smart_dcas = db.get_active_smart_dca_by_user(chat_id) if hasattr(db, 'get_active_smart_dca_by_user') else []
             turbo_bots = db.get_active_turbo_hedge_bots() or []
             user_turbo_bots = [b for b in turbo_bots if b.get("chat_id") == chat_id]
             
@@ -653,13 +640,6 @@ class TelegramBotThread(BaseThread):
                 if len(t) > 1 and t[1]: symbols.add(str(t[1]))
             for g in infinity_grids:
                 if len(g) > 1 and g[1]: symbols.add(str(g[1]))
-            for g in compound_grids:
-                if len(g) >= 8 and g[2]: symbols.add(str(g[2]))
-                elif len(g) >= 2 and g[1]: symbols.add(str(g[1]))
-            for s in scalpers:
-                if len(s) > 1 and s[1]: symbols.add(str(s[1]))
-            for d in smart_dcas:
-                if len(d) > 1 and d[1]: symbols.add(str(d[1]))
             for sn in user_snipers: 
                 if sn.get('symbol'): symbols.add(str(sn.get('symbol')))
             for tb in user_turbo_bots:
@@ -698,7 +678,7 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
 
             msg = (
-                "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | UNIFIED PORTFOLIO** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | UNIFIED PORTFOLIO** 🤖\n"
                 "═══════════════════════════════\n"
                 f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
                 "═══════════════════════════════\n\n"
@@ -755,7 +735,7 @@ class TelegramBotThread(BaseThread):
                     spot_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT` (`{pnl_pct:+.2f}%`)\n\n"
 
             if spot_section_msg:
-                msg += "🟡 **SPOT MARKET INVESTMENTS** 🟡\n"
+                msg += "🟡 **SPOT MARKET HOLDINGS** 🟡\n"
                 msg += "───────────────────────────────\n"
                 msg += spot_section_msg
 
@@ -781,8 +761,8 @@ class TelegramBotThread(BaseThread):
                     
                     emoji = '🟩' if unRealizedProfit >= 0 else '🟥'
                     pnl_str = f"+${unRealizedProfit:,.2f}" if unRealizedProfit >= 0 else f"-${abs(unRealizedProfit):,.2f}"
-                    futures_section_msg += f"⚡️ **{sym}** (Futures {side} {leverage}x)\n"
-                    futures_section_msg += f"💰 ប្រាក់កក់ (Margin): `${margin:,.2f}` | 💵 Entry: `${entry_p:,.4f}`\n"
+                    futures_section_msg += f"⚡️ **{sym}** (Futures {side} {leverage}x ISOLATED)\n"
+                    futures_section_msg += f"💰 Margin: `${margin:,.2f}` | 💵 Entry: `${entry_p:,.4f}`\n"
                     futures_section_msg += f"📈 Mark Price: `${mark_p:,.4f}`\n"
                     futures_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT`\n\n"
 
@@ -791,7 +771,7 @@ class TelegramBotThread(BaseThread):
                 msg += "───────────────────────────────\n"
                 msg += futures_section_msg
 
-            # --- 3. OTHER ACTIVE AI ENGINE STRATEGIES ---
+            # --- 3. UNIFIED SMART GRID POSITIONS GROUP ---
             ai_engines_msg = ""
             for grid in infinity_grids:
                 grid_id, sym, amt_per_layer, step_pct, max_inv, current_inv, last_price = grid[:7]
@@ -803,129 +783,47 @@ class TelegramBotThread(BaseThread):
                     pnl, pnl_pct = trading_engine.calculate_net_pnl(last_price, current_price, current_inv / last_price)
                 total_invested += current_inv
                 total_profit += pnl
-                emoji = '🟩' if pnl >= 0 else '🟥'
-                ai_engines_msg += f"🕸️ **Infinity Grid: {sym}**\n"
+                ai_engines_msg += f"📐 **Unified Smart Grid: {sym}**\n"
                 ai_engines_msg += f"💰 ដើមទុន: `${current_inv:,.2f}` / `${max_inv:,.2f}` | PnL: `{pnl_pct:+.2f}%` (`${pnl:+.2f}`)\n\n"
 
-            for scalper in scalpers:
-                scalper_id, sym, inv_amt, target_pct, current_state, entry_price = scalper[:6]
-                sym = str(sym)
-                current_price = prices.get(sym, 0.0)
-                valid_trades_found = True
-                pnl, pnl_pct = (0.0, 0.0)
-                actual_invested = 0.0
-                if current_state == 'BOUGHT' and entry_price > 0:
-                    pnl, pnl_pct = trading_engine.calculate_net_pnl(entry_price, current_price, inv_amt / entry_price if entry_price > 0 else 1.0)
-                    actual_invested = inv_amt
-                total_invested += actual_invested
-                total_profit += pnl
-                emoji = '🟩' if pnl >= 0 else '🟥'
-                ai_engines_msg += f"⚡ **AI Scalper: {sym}**\n"
-                ai_engines_msg += f"💰 ដើមទុន: `${inv_amt:,.2f}` | PnL: `{pnl_pct:+.2f}%` (`${pnl:+.2f}`)\n\n"
-
-            for grid in compound_grids:
-                if len(grid) >= 8:
-                    grid_id, c_id, sym, current_layer, step_pct, target_cap, total_coins, last_price = grid[:8]
-                else:
-                    grid_id, sym, current_layer, step_pct, target_cap, total_coins, last_price = grid[:7]
-                sym = str(sym)
-                current_price = prices.get(sym, 0.0)
-                valid_trades_found = True
-                pnl, pnl_pct = (0.0, 0.0)
-                if current_price > 0 and last_price > 0 and current_layer > 0:
-                    pnl, pnl_pct = trading_engine.calculate_net_pnl(last_price, current_price, current_layer / last_price)
-                total_invested += current_layer
-                total_profit += pnl
-                emoji = '🟩' if pnl >= 0 else '🟥'
-                ai_engines_msg += f"⛄ **Compound Grid: {sym}**\n"
-                ai_engines_msg += f"💰 ដើមទុន: `${current_layer:,.2f}` / `${target_cap:,.2f}` | PnL: `{pnl_pct:+.2f}%` (`${pnl:+.2f}`)\n\n"
-
-            for dca in smart_dcas:
-                dca_id, sym, base_amount, entry_price, drop_level = dca[:5]
-                sym = str(sym)
-                current_price = prices.get(sym, 0.0)
-                valid_trades_found = True
-                invested = base_amount * (drop_level + 1)
-                pnl, pnl_pct = (0.0, 0.0)
-                if entry_price > 0 and invested > 0:
-                    pnl, pnl_pct = trading_engine.calculate_net_pnl(entry_price, current_price, invested / entry_price if entry_price > 0 else 1.0)
-                total_invested += invested
-                total_profit += pnl
-                emoji = '🟩' if pnl >= 0 else '🟥'
-                ai_engines_msg += f"🎯 **Smart DCA: {sym}**\n"
-                ai_engines_msg += f"💰 ដើមទុន: `${invested:,.2f}` (ជុំទី {drop_level}) | PnL: `{pnl_pct:+.2f}%` (`${pnl:+.2f}`)\n\n"
-
-            hyper_cfg = db.get_hyper_trade_config(chat_id)
-            if hyper_cfg and hyper_cfg.get("enabled"):
-                valid_trades_found = True
-                h_amt = hyper_cfg.get("amount", 10.0)
-                ai_engines_msg += f"🚀 **Hyper-Trade HFT:** 🟢 `ACTIVE` (${h_amt:,.2f} USDT 5x Futures)\n"
-
-            arb_cfg = db.get_auto_arb_config(chat_id)
-            if arb_cfg and arb_cfg.get("enabled"):
-                valid_trades_found = True
-                a_amt = arb_cfg.get("amount", 50.0)
-                ai_engines_msg += f"⚡ **Delta-Neutral Arbitrage:** 🟢 `ACTIVE` (${a_amt:,.2f} USDT)\n"
-
-            matrix_bots = [b for b in db.get_active_infinity_matrix_bots() if b["chat_id"] == chat_id]
-            for m_bot in matrix_bots:
-                valid_trades_found = True
-                m_cap = m_bot.get("capital", 500.0)
-                m_pnl = m_bot.get("accumulated_pnl", 0.0)
-                m_symbol = str(m_bot.get("symbol", "PAXGUSDT"))
-                total_profit += m_pnl
-                total_invested += m_cap
-                ai_engines_msg += f"🎯 **Infinity Matrix Grid ({m_symbol}):** 🟢 `ACTIVE` (${m_cap:,.2f} USDT, Compounded: `+${m_pnl:,.4f}`)\n"
-
-            sweep_cfg = db.get_sweep_auto_config(chat_id)
-            if sweep_cfg and sweep_cfg.get("enabled"):
-                valid_trades_found = True
-                s_amt = sweep_cfg.get("amount", 50.0)
-                ai_engines_msg += f"🛡️ **Liquidity Sweep Sniper:** 🟢 `ACTIVE` (${s_amt:,.2f} USDT 5x Futures)\n"
-
-            funding_cfg = db.get_funding_harvester_config(chat_id)
+            funding_cfg = db.get_funding_harvester_config(chat_id) if hasattr(db, 'get_funding_harvester_config') else None
             if funding_cfg and funding_cfg.get("enabled"):
                 valid_trades_found = True
                 f_amt = funding_cfg.get("amount", 50.0)
-                ai_engines_msg += f"🌾 **Perpetual Funding Harvester:** 🟢 `ACTIVE` (${f_amt:,.2f} USDT Delta-Neutral)\n"
-
-            guard_cfg = db.get_trailing_guard_config(chat_id)
-            if guard_cfg and guard_cfg.get("enabled"):
-                valid_trades_found = True
-                ai_engines_msg += f"🛡️ **Auto-Liquidation Guard:** 🟢 `ACTIVE` (>50% Safety Distance)\n"
+                ai_engines_msg += f"🌾 **8-Hour Funding Harvester:** 🟢 `ACTIVE` (${f_amt:,.2f} USDT Delta-Neutral)\n"
 
             if user_turbo_bots or db.get_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0") == "1":
                 valid_trades_found = True
-                ai_engines_msg += f"🚀 **Turbo Hedge Auto-Scanner:** 🟢 `ACTIVE` ({len(user_turbo_bots)} Positions Active / 10 Max)\n"
+                ai_engines_msg += f"🚀 **Turbo Hedge Auto-Scanner v11.0:** 🟢 `ACTIVE` ({len(user_turbo_bots)} Positions Active / 10 Max)\n"
 
             if ai_engines_msg:
-                msg += "🤖 **ACTIVE AI ENGINE STRATEGIES** 🤖\n"
+                msg += "🤖 **FLAGSHIP AI ENGINES & STRATEGIES v11.0** 🤖\n"
                 msg += "───────────────────────────────\n"
                 msg += ai_engines_msg
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
-                    InlineKeyboardButton("🔄 Refresh Portfolio", callback_data="btn_menu_portfolio")
+                    InlineKeyboardButton("🔄 Refresh Portfolio", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ],
                 [
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"),
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch")
+                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch")
                 ],
                 [
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("🛑 Soft Stop All", callback_data="btn_stop_all")
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if not valid_trades_found and free_usdt <= 0 and futures_wallet_balance <= 0:
                 empty_msg = (
-                    "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | PORTFOLIO** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | PORTFOLIO** 🤖\n"
                     "═══════════════════════════════\n"
-                    "🤷‍♂️ **មិនទាន់មានទិន្នន័យវិនិយោគ ឬ API KEY ភ្ជាប់នៅឡើយ!**\n\n"
-                    "💡 *សូមភ្ជាប់ Binance API Key ឬបើកដំណើការ AI Engine (ដូចជា /turbo_hedge ឬ /hyper_trade) ដើម្បីចាប់ផ្តើមជួញដូរ ៖*"
+                    "🤷‍♂️ **មិនទាន់មានទិន្នន័យវិនិយោគ ឬ API Key ភ្ជាប់នៅឡើយ!**\n\n"
+                    "💡 *សូមភ្ជាប់ Binance API Key ឬបើកដំណើការ AI Engine (ដូចជា /turbo_hedge ឬ /snipe) ដើម្បីចាប់ផ្តើមជួញដូរ ៖*"
                 )
                 if msg_target:
                     await msg_target.reply_text(empty_msg, parse_mode='Markdown', reply_markup=reply_markup)
@@ -939,8 +837,8 @@ class TelegramBotThread(BaseThread):
             msg += f"═══════════════════════════════\n"
             msg += f"💵 **Spot Cash (Free USDT):** `${free_usdt:,.2f}`\n"
             msg += f"📈 **Futures Wallet Balance:** `${futures_wallet_balance:,.2f}`\n"
-            msg += f"💎 **ទ្រព្យសរុប (Total Equity):** `${total_equity:,.2f}`\n\n"
-            msg += f"🏦 **សរុបទុនកំពុងជួញដូរ (Invested):** `${total_invested:,.2f}`\n"
+            msg += f"💎 **ទ្រព្យសរុប (Total Net Equity):** `${total_equity:,.2f}`\n\n"
+            msg += f"🏦 **សរុបទុនកំពុងជួញដូរ (Invested Margin):** `${total_invested:,.2f}`\n"
             msg += f"{emoji_total} **ចំណេញ/ខាតសរុប (Unrealized PnL):** `{total_pct:+.2f}%` (`{pnl_usd_str}`)"
 
             if msg_target:
@@ -948,12 +846,13 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
                 except Exception:
                     await msg_target.reply_text(msg, parse_mode=None, reply_markup=reply_markup)
-            self.log_signal.emit(f'📊 VIP User {chat_id} checked their Super AGI portfolio cleanly.')
+            self.log_signal.emit(f'📊 VIP User {chat_id} checked their v11.0 portfolio cleanly.')
 
         async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
             if not await verify_user(update): return
-            user_lang = db.get_user_language(chat_id) or 'km'
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
 
             import psutil
             import os
@@ -997,15 +896,12 @@ class TelegramBotThread(BaseThread):
             defender_on = db.is_defender_active() if hasattr(db, 'is_defender_active') else False
             paper_on = getattr(trading_engine, "PAPER_TRADING", False)
 
-            dyn_lev_on = db.get_user_setting(chat_id, "dynamic_leverage") == "true" if hasattr(db, "get_user_setting") else True
-            
-            hyper_users = db.get_active_hyper_trade_users() if hasattr(db, 'get_active_hyper_trade_users') else []
-            hyper_active = any(u.get('chat_id') == chat_id for u in hyper_users)
-            
-            auto_arb_users = db.get_active_auto_arb_users() if hasattr(db, 'get_active_auto_arb_users') else []
-            auto_arb_active = any(u.get('chat_id') == chat_id for u in auto_arb_users)
-            
-            funding_active = db.get_user_setting(chat_id, "funding_harvester") == "true" if hasattr(db, 'get_user_setting') else False
+            turbo_bots = db.get_active_turbo_hedge_bots() or []
+            user_turbo_bots = [b for b in turbo_bots if b.get("chat_id") == chat_id]
+            turbo_active = len(user_turbo_bots) > 0 or db.get_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0") == "1"
+
+            funding_cfg = db.get_funding_harvester_config(chat_id) if hasattr(db, 'get_funding_harvester_config') else None
+            funding_active = bool(funding_cfg and funding_cfg.get("enabled"))
 
             keys = db.get_user_api(chat_id)
             avail_usdt = 0.0
@@ -1018,61 +914,77 @@ class TelegramBotThread(BaseThread):
             status_icon = "🟢 Normal" if cpu_usage < 75.0 else ("🟡 Heavy Load" if cpu_usage < 90.0 else "🔴 Critical Load")
 
             msg = (
-                f"📊 **SUPER SMART SYSTEM & AI DIAGNOSTICS** 📊\n"
+                f"📊 **KHMER MASTER CRYPTO v11.0 | SYSTEM & AGI DIAGNOSTICS** 📊\n"
                 f"───────────────────────────────\n\n"
-                f"🖥️ **VPS HEALTH & HARDWARE STATUS**\n"
+                f"🖥️ **VPS HARDWARE & SYSTEM HEALTH**\n"
                 f"⏳ Uptime: `{uptime_str}`\n"
-                f"🧠 CPU Load: `{cpu_usage:.1f}%`\n"
+                f"🧠 CPU Load: `{cpu_usage:.1f}%` (Multi-Core Dynamic)\n"
                 f"📊 RAM Usage: `{ram_usage_mb} MB / {ram_total_mb} MB ({ram_pct:.1f}%)`\n"
-                f"💽 Disk Space: `{disk_used_gb} GB / {disk_total_gb} GB ({disk_pct:.1f}%)`\n"
-                f"💾 Database Size: `{db_size_mb:.2f} MB`\n"
+                f"💽 SSD Storage: `{disk_used_gb} GB / {disk_total_gb} GB ({disk_pct:.1f}%)`\n"
+                f"💾 Database Size: `{db_size_mb:.2f} MB` (WAL Mode Optimized)\n"
                 f"🚦 System Status: {status_icon}\n\n"
-                f"🛡️ **AI STRATEGY MATRIX (CHAT ID: `{chat_id}`)**\n"
-                f"💵 Mode: {'🟡 PAPER TRADING' if paper_on else '🟢 REAL MONEY'}\n"
-                f"🛡️ Liquidation Defender: {'🔴 OFF (TRADING ACTIVE)' if not defender_on else '🛡️ ON (POSITIONS PAUSED)'}\n"
-                f"⚡ Dynamic Leverage: {'🟢 ACTIVE (1x-20x)' if dyn_lev_on else '🔴 INACTIVE'}\n"
-                f"🚀 Hyper-Trade HFT: {'🟢 ACTIVE' if hyper_active else '🔴 INACTIVE'}\n"
-                f"⚡ Delta-Neutral Auto-Arb: {'🟢 ACTIVE' if auto_arb_active else '🔴 INACTIVE'}\n"
-                f"🌾 Perpetual Funding Harvester: {'🟢 ACTIVE' if funding_active else '🔴 INACTIVE'}\n\n"
+                f"🛡️ **AGI CORE ENGINES MATRIX v11.0 (CHAT ID: `{chat_id}`)**\n"
+                f"💵 Mode: {'🟡 PAPER TRADING' if paper_on else '🚀 REAL MONEY LIVE'}\n"
+                f"🛡️ Liquidation Defender: {'🟢 ACTIVE (2% Max Drawdown Breaker)' if defender_on else '🟡 READY'}\n"
+                f"🚀 Turbo Hedge HFT Node: {'🟢 ACTIVE (' + str(len(user_turbo_bots)) + ' Positions)' if turbo_active else '🔴 STANDBY'}\n"
+                f"🎯 Listing & RVOL Sniper: {'🟢 STANDBY (Scanning New Listings 24/7)'}\n"
+                f"🌾 8-Hour Funding Harvester: {'🟢 ACTIVE' if funding_active else '🔴 STANDBY'}\n\n"
                 f"💰 **CAPITAL & BALANCE SUMMARY**\n"
-                f"💵 Available USDT Capital: `${avail_usdt:,.2f} USDT`\n\n"
+                f"💵 Available Spot Cash: `${avail_usdt:,.2f} USDT`\n\n"
                 f"📋 **QUICK CONTROL COMMANDS (SINGLE-TAP COPY)**\n"
-                f"👉 បើក/បិទ ខែលការពារ ៖ `/defender OFF`\n"
-                f"👉 បើក Trailing Guard ៖ `/trailing_guard ON 1.5 0.5 50 <PIN>`\n"
                 f"👉 ពិនិត្យ Portfolio ៖ `/portfolio`\n"
-                f"👉 ពិនិត្យ Funding Radar ៖ `/funding_harvester`\n"
-                f"👉 ផ្ដាច់យុទ្ធសាស្រ្តទាំងអស់ ៖ `/stop_all`"
+                f"👉 ពិនិត្យ Balance ៖ `/balance`\n"
+                f"👉 Launch HFT Turbo Hedge ៖ `/turbo_hedge`\n"
+                f"👉 Launch Listing Sniper ៖ `/snipe`\n"
+                f"👉 ផ្ដាច់ប្រព័ន្ធទាំងអស់ ៖ `/stop_all`"
             )
 
-            await update.message.reply_text(msg, parse_mode="Markdown")
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
+                ]
+            ])
+
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
         async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
             if not await verify_user(update): return
-            user_lang = db.get_user_language(chat_id) or 'km'
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
             
             keys = db.get_user_api(chat_id)
             
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
-                    InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_menu_balance_refresh")
+                    InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_menu_balance_refresh"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ],
                 [
                     InlineKeyboardButton("💼 Unified Portfolio", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
+                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge")
                 ],
                 [
                     InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch")
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if not keys:
                 empty_msg = (
-                    "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | LIVE BALANCE** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | LIVE BALANCE** 🤖\n"
                     "═══════════════════════════════\n"
                     "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
                     "💡 *សូមចុចប៊ូតុង **[🔑 Add Binance API]** ខាងក្រោមដើម្បីភ្ជាប់ API Keys របស់អ្នកជាមុនសិន ៖*"
@@ -1116,7 +1028,7 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE API"
                 
             msg = (
-                "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | LIVE BALANCE** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | LIVE BALANCE** 🤖\n"
                 "═══════════════════════════════\n"
                 f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
                 "═══════════════════════════════\n\n"
@@ -1131,7 +1043,7 @@ class TelegramBotThread(BaseThread):
             )
                 
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
-            self.log_signal.emit(f"💳 VIP User {chat_id} checked their Super AGI live balance.")
+            self.log_signal.emit(f"💳 VIP User {chat_id} checked their v11.0 live balance.")
 
 
 
@@ -1289,40 +1201,7 @@ class TelegramBotThread(BaseThread):
 
 
 
-        async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            chat_id = update.effective_chat.id
-            if not await verify_user(update): return
-            user_lang = db.get_user_language(chat_id)
-            
-            # Fetch statuses
-            auto_trade = db.get_auto_trade_config(chat_id)
-            auto_trade_status = '✅ ON' if auto_trade and auto_trade.get('enabled') else '❌ OFF'
-            
-            hedge_mode = db.get_hedge_mode_config(chat_id)
-            hedge_status = '✅ ON' if hedge_mode and hedge_mode.get('enabled') else '❌ OFF'
-            
-            api_info = db.get_user_api(chat_id)
-            api_status = '✅ Connected' if api_info else '❌ Not Connected'
-            
-            dca_configs = db.get_active_smart_dca()
-            user_dca = [d for d in dca_configs if d[1] == chat_id]
-            dca_status = f'✅ ON ({len(user_dca)} pairs)' if user_dca else '❌ OFF'
-            
-            msg = '📊 **System Status:**\n\n' if user_lang == 'english' else '📊 **ស្ថានភាពប្រព័ន្ធរបស់អ្នក:**\n\n'
-            
-            if user_lang == 'english':
-                msg += f'🔌 **API Status:** {api_status}\n'
-                msg += f'🤖 **Auto Trade:** {auto_trade_status}\n'
-                msg += f'🛡️ **Hedge Mode:** {hedge_status}\n'
-                msg += f'📉 **Smart DCA:** {dca_status}\n'
-            else:
-                msg += f'🔌 **ការតភ្ជាប់ API:** {api_status}\n'
-                msg += f'🤖 **ទិញលក់ស្វ័យប្រវត្តិ (Auto Trade):** {auto_trade_status}\n'
-                msg += f'🛡️ **ការពារហានិភ័យ (Hedge Mode):** {hedge_status}\n'
-                msg += f'📉 **ប្រព័ន្ធ DCA:** {dca_status}\n'
-            
-            await update.message.reply_text(msg, parse_mode='Markdown')
-            
+
         async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
@@ -1718,45 +1597,34 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
             
             help_card = (
-                "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | USER MANUAL** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | USER MANUAL** 🤖\n"
                 "═══════════════════════════════\n"
-                "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE)**\n"
-                f"🛡️ **TRADING ENGINE**: `{mode_badge}`\n"
+                "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE v11.0)**\n"
+                f"🛡️ **TRADING ENGINE**: `{mode_badge}` | `ISOLATED MARGIN`\n"
                 "═══════════════════════════════\n\n"
                 "💼 **1. គ្រប់គ្រងគណនី និងទុន (ACCOUNT & PORTFOLIO)**\n"
-                "👉 `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និងកាក់ដែលកំពុងកាន់\n"
-                "👉 `/balance` - ឆែកសមតុល្យលុយក្នុងកាបូប Binance/Bybit\n"
+                "👉 `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
+                "👉 `/balance` - ឆែកសមតុល្យលុយក្នុងកាបូប Binance Spot & Futures\n"
                 "👉 `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time\n"
                 "👉 `/stop_all` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft Stop / Hard Stop)\n\n"
-                "🔮 **2. AI វិភាគទីផ្សារ & RADAR (MARKET ANALYTICS)**\n"
-                "👉 `/scan` - ស្កេនរកកាក់ដែលមានឱកាសចំណេញខ្ពស់ក្នុងទីផ្សារ\n"
-                "👉 `/predict <COIN>` - ទស្សន៍ទាយ K-line Trend & Win Rate\n"
-                "👉 `/analyze <COIN>` - AI វិភាគទិន្នន័យបច្ចេកទេស 360°\n"
-                "👉 `/pre_pump` - ចាប់សញ្ញាកាក់ត្រៀម ផ្ទុះតម្លៃ (Pre-Pump Detector)\n"
-                "👉 `/news` - ព័ត៌មាន Crypto Real-Time វិភាគដោយ AI\n\n"
-                "🎯 **3. SPOT & FUTURES AUTO ENGINES (VIP STRATEGIES)**\n"
-                "👉 `/hyper_trade ON <USDT> <LEV> <PIN>` - Super AGI Auto Trade Engine\n"
-                "👉 `/scalp <COIN> <USDT> <LEV> <PIN>` - AI High-Frequency Scalping\n"
-                "👉 `/funding_harvester ON <USDT> <PIN>` - ច្រូតកាត់ Funding Yield ឥតខាត\n"
-                "👉 `/sweep_auto ON <USDT> <PIN>` - ស្ទាក់ទិញ Liquidity Sweep Rebound\n"
-                "👉 `/auto_arb ON <USDT> <PIN>` - Triangular Arbitrage Engine\n"
-                "👉 `/smart_dca <COIN> <USDT> <PIN>` - Smart DCA Accumulator\n"
-                "👉 `/infinity_grid <COIN> <USDT> <GRIDS> <PROFIT> <PIN>` - Infinity Grid\n"
-                "👉 `/compound_grid <COIN> <USDT> <GRIDS> <PROFIT> <PIN>` - Compound Grid\n\n"
-                "🥇 **4. GOLD & MACRO INSTITUTIONAL RADAR**\n"
-                "👉 `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Macro Pivots\n"
-                "👉 `/cb_gold` - តាមដានធនាគារកណ្តាលទិញបម្រុងមាស\n"
-                "👉 `/paxg_arbitrage` - ស្កេនរក Spreads មាស Spot/Futures\n"
-                "👉 `/black_swan_guard` - ខែលការពារមហន្តរាយទីផ្សារ Black Swan\n"
-                "👉 `/gold_btc_rebalance` - យុទ្ធសាស្ត្ររៀបចំទុន មាស 🤝 BTC\n\n"
-                "🛡️ **5. RISK DEFENDER & LIQUIDATION SHIELD**\n"
-                "👉 `/trailing_guard ON <PIN>` - Profit Lock (+1.5%) & Trailing Stop\n"
-                "👉 `/defender ON` - ខែលការពារឆេះគណនី (Liquidation Defender)\n"
-                "👉 `/sell_all <PIN>` - Panic Sell លក់កាក់ទាំងអស់យក USDT វិញភ្លាមៗ\n\n"
-                "⚙️ **6. SYSTEM SECURITY & API SETTINGS**\n"
+                "🚀 **2. មុខងារជួញដូរស្វ័យប្រវត្តស្នូល (FLAGSHIP AUTONOMOUS ENGINES)**\n"
+                "👉 `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>` - 🟢 HFT Auto-Scanner 24/7\n"
+                "👉 `/snipe` - 🎯 Listing & Volatility (High RVOL) Sniper\n"
+                "👉 `/funding_harvester` - 🌾 8-Hour Funding Yield Harvester\n"
+                "👉 `/infinity_grid` - 📐 Unified Smart Grid Matrix Engine\n\n"
+                "🔮 **3. AI វិភាគទីផ្សារ & RADAR (AI INTELLIGENCE & ADVISORY)**\n"
+                "👉 `/analyze <COIN>` - AI វិភាគទិន្នន័យបច្ចេកទេស 360° Real-Time\n"
+                "👉 `/predict <COIN>` - ទស្សន៍ទាយ K-Line Trend & Win Rate 24h\n"
+                "👉 `/news` - ព័ត៌មាន Crypto Real-Time វិភាគដោយ Gemini AI\n"
+                "👉 `/whales` - តាមដានចលនា Whale ធំៗក្នុងទីផ្សារ Real-Time\n"
+                "👉 `/top` - មើលបញ្ជីកាក់ឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ\n"
+                "👉 `/alert <COIN> <PRICE> ABOVE/BELOW` - កំណត់ការជូនដំណឹងតម្លៃ\n\n"
+                "🥇 **4. GOLD & MACRO RISK SHIELD**\n"
+                "👉 `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Central Bank Radar\n\n"
+                "⚙️ **5. SYSTEM SECURITY & API SETTINGS**\n"
                 "👉 `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
-                "👉 `/paper_trading` - ប្តូររវាង Real ↔️ Demo Trading Simulation\n"
-                "👉 `/language` - ផ្លាស់ប្តូរភាសា (Khmer / English)\n\n"
+                "👉 `/set_pin <PIN>` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
+                "👉 `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n\n"
                 "💡 *របៀបប្រើប្រាស់ ៖ ចុចលើពាក្យបញ្ជាខាងលើ ឬចុចប៊ូតុងខាងក្រោម ដើម្បីបើក Master Navigation Menu!*"
             )
             
@@ -1767,8 +1635,8 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ],
                 [
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"),
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch")
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch")
                 ],
                 [
                     InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
@@ -6109,51 +5977,32 @@ class TelegramBotThread(BaseThread):
             chat_id = update.effective_chat.id
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
-            args = context.args
-            cfg = db.get_auto_arb_config(chat_id)
-            is_enabled = bool(cfg.get("enabled", False)) if isinstance(cfg, dict) else False
-            amount = float(cfg.get("amount", 50.0)) if isinstance(cfg, dict) else 50.0
-            current_status = "🟢 ACTIVE (24/7 Sub-50ms Delta-Neutral)" if is_enabled else "🔴 INACTIVE (បិទ)"
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("🛡️ Turbo Hedge Node", callback_data="btn_turbo_hedge")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
 
-            if not args or len(args) == 0:
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                
-                toggle_btn = (
-                    InlineKeyboardButton("🔴 Turn OFF Auto-Arb", callback_data="btn_auto_arb_off_prompt")
-                    if is_enabled else
-                    InlineKeyboardButton("🟢 Turn ON Auto-Arb", callback_data="btn_auto_arb_on_prompt")
-                )
-                
-                keyboard = InlineKeyboardMarkup([
-                    [toggle_btn, InlineKeyboardButton("⚖️ PAXG Arbitrage Radar", callback_data="btn_paxg_arb_refresh")],
-                    [
-                        InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                    ]
-                ])
-
-                msg = (
-                    "⚖️ **APEX SUPER AGI TURBO BRAIN v9.5 | DELTA-NEUTRAL AUTO-ARBITRAGE** 🌾\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE AUTO-ARBITRAGE CONFIGURATION:**\n"
-                    f"• **System Status**: {current_status}\n"
-                    f"• **Trade Capital / Order**: `${amount:,.2f} USDT`\n"
-                    "• **Arbitrage Strategy**: `PAXG/USDT vs Spot Gold Spread & Spot/Futures Rate Harvest`\n"
-                    "• **Execution Speed**: `Sub-50ms Delta-Neutral Risk-Free Execution`\n"
-                    "• **Fee Protection**: `BNB Discount 25% Fee Deduction Clamping`\n"
-                    "• **Risk Exposure**: `Zero Directional Risk (100% Delta-Neutral)`\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/auto_arb ON 100 1234` ``\n\n"
-                    "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/auto_arb OFF 1234` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
+            msg = (
+                "🛡️ **KHMER MASTER CRYPTO v11.0 AGI | CAPITAL PROTECTION NOTICE** 🛡️\n"
+                "═══════════════════════════════\n\n"
+                "⚠️ **ការធ្វើបច្ចុប្បន្នភាពសុវត្ថិភាពដើមទុន v11.0 ៖**\n"
+                "មុខងារ `/auto_arb` ត្រូវ បានធ្វើបច្ចុប្បន្នភាពបង្រួមចូលទៅក្នុង **`Funding Harvester`** និង **`Turbo Hedge Engine`** ដើម្បីការពារប្រាក់ដើមទុនសមាជិក VIP ពីការខាតបង់ Binance Taker Fee (0.10% Roundtrip)។\n\n"
+                "💡 **អនុសាសន៍យុទ្ធសាស្ត្រ v11.0 ៖**\n"
+                "• ប្រសិនបើអ្នកចង់ប្រមូលផលចំណេញពីអត្រាការប្រាក់ ៖ ប្រើប្រាស់ `/funding_harvester`\n"
+                "• ប្រសិនបើអ្នកចង់ស្កេនកើបចំណេញ 24/7 ៖ ប្រើប្រាស់ `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>`\n\n"
+                "✅ _ប្រព័ន្ធកំណែថ្មី v11.0 ការពារ Fee Erosion ១០០% និងធានាប្រាក់ចំណេញសុទ្ធ!_"
+            )
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            return
 
             action = str(args[0]).upper().strip()
             if action == "OFF":
@@ -6301,198 +6150,15 @@ class TelegramBotThread(BaseThread):
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
-            args = context.args
-            cfg = db.get_sweep_auto_config(chat_id)
-            is_enabled = bool(cfg.get("enabled", False)) if isinstance(cfg, dict) else False
-            amount = float(cfg.get("amount", 50.0)) if isinstance(cfg, dict) else 50.0
-            current_status = "🟢 ACTIVE (24/7 Sub-50ms Liquidity Sweep)" if is_enabled else "🔴 INACTIVE (បិទ)"
-
-            if not args or len(args) == 0:
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                
-                toggle_btn = (
-                    InlineKeyboardButton("🔴 Turn OFF Sweep Auto", callback_data="btn_sweep_auto_off_prompt")
-                    if is_enabled else
-                    InlineKeyboardButton("🟢 Turn ON Sweep Auto", callback_data="btn_sweep_auto_on_prompt")
-                )
-                
-                keyboard = InlineKeyboardMarkup([
-                    [toggle_btn, InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")],
-                    [
-                        InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                    ]
-                ])
-
-                msg = (
-                    "🧹 **APEX SUPER AGI TURBO BRAIN v9.5 | LIQUIDITY SWEEP SNIPER** 🎯\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE SWEEP CONFIGURATION:**\n"
-                    f"• **System Status**: {current_status}\n"
-                    f"• **Trade Capital / Order**: `${amount:,.2f} USDT`\n"
-                    "• **Strategy Architecture**: `Sub-50ms Micro-Orderbook Stop-Loss Liquidity Hunt`\n"
-                    "• **Target Assets**: `Binance Top 10 Volatile Futures & High-Leverage Alts`\n"
-                    "• **Risk Mitigation**: `Instant Reverse Trap & Micro Stop-Loss (-0.8%)`\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/sweep_auto ON 100 1234` ``\n\n"
-                    "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/sweep_auto OFF 1234` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-
-            action = str(args[0]).upper().strip()
-            if action == "OFF":
-                pin = str(args[1]).strip() if len(args) >= 2 else ""
-                stored_pin = db.get_user_pin(chat_id)
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                    return
-                db.set_sweep_auto_config(chat_id, enabled=False, amount=0.0)
-                await update.message.reply_text("🛑 **Liquidity Sweep Sniper ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-
-            if action == "ON":
-                if len(args) < 3:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/sweep_auto ON 100 <PIN>` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                    return
-                try:
-                    sweep_amt = float(args[1])
-                    pin = str(args[2]).strip()
-                except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
-                    return
-
-                stored_pin = db.get_user_pin(chat_id)
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                    return
-
-                db.set_sweep_auto_config(chat_id, enabled=True, amount=sweep_amt)
-                msg = (
-                    "🎯 **Liquidity Sweep Sniper ត្រូវបានបើកដំណើរការ!** 🧹\n\n"
-                    f"💵 **ទុនជួញដូរ/Order** ៖ `${sweep_amt:,.2f} USDT`\n"
-                    "⚡ **យុទ្ធសាស្រ្ត** ៖ `Sub-50ms Stop-Loss Sweep & Reversal Sniping`\n"
-                    "🛡️ **Risk Protection** ៖ `Micro Stop-Loss (-0.8%) Clamping Active`\n\n"
-                    "_Bot នឹងស្កេន និងស្ទាក់ទិញចំណុច Liquidity Hunt 24/7 ស្វ័យប្រវត្តិ!_"
-                )
-                self.log_signal.emit(f"🛡️ Liquidity Sweep Sniper activated for {chat_id} with ${sweep_amt} USDT.")
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-
-        async def funding_harvester_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
-
-            args = context.args
-            if not args or len(args) == 0:
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                
-                import funding_harvester_engine
-                scan_res = await asyncio.to_thread(funding_harvester_engine.scan_top_funding_rates)
-                
-                cfg = db.get_funding_harvester_config(chat_id)
-                is_active = bool(cfg.get("is_enabled", False)) if isinstance(cfg, dict) else False
-                amount = float(cfg.get("amount_per_trade", 0.0)) if isinstance(cfg, dict) else 0.0
-                status_str = f"🟢 ACTIVE (`${amount:.2f} USDT`)" if is_active else "🔴 INACTIVE (បិទ)"
-                
-                top_items = scan_res.get("top_opportunities", []) if isinstance(scan_res, dict) else []
-                lines = []
-                for item in top_items[:4]:
-                    sym = item.get("symbol", "N/A")
-                    rate = item.get("funding_rate_pct", 0.0)
-                    mins = item.get("seconds_to_settlement", 0) // 60
-                    lines.append(f"• `{sym}`: `{rate:+.4f}%` (Settlement in `{mins}m`)")
-                
-                table_text = "\n".join(lines) if lines else "_កំពុងស្កេន Binance Premium Index..._"
-                
-                toggle_btn = (
-                    InlineKeyboardButton("🔴 Turn OFF Harvester", callback_data="btn_funding_harvester_off_prompt")
-                    if is_active else
-                    InlineKeyboardButton("🟢 Turn ON Harvester", callback_data="btn_funding_harvester_on_prompt")
-                )
-
-                keyboard = InlineKeyboardMarkup([
-                    [toggle_btn, InlineKeyboardButton("🔄 Refresh Funding Rates", callback_data="btn_funding_harvester")],
-                    [
-                        InlineKeyboardButton("⚖️ Auto Arbitrage", callback_data="btn_auto_arb_on_prompt"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                    ]
-                ])
-
-                msg = (
-                    "🌾 **APEX SUPER AGI TURBO BRAIN v9.5 | 8-HOUR FUNDING YIELD HARVESTER** 🌾\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
-                    f"• **Current Status**: {status_str}\n"
-                    "• **Strategy Architecture**: `1:1 Delta-Neutral (0% Risk-Free Yield Harvest)`\n"
-                    "• **Settlement Frequency**: `Every 8 Hours (Binance Funding Cycle)`\n\n"
-                    "🔥 **TOP BINANCE 8-HOUR FUNDING YIELD RADAR:**\n"
-                    f"{table_text}\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើក Harvester ៖**\n`` `/funding_harvester ON 50 1234` ``\n\n"
-                    "👉 **ដើម្បីបិទ Harvester ៖**\n`` `/funding_harvester OFF 1234` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-
-            action = str(args[0]).upper().strip()
-            if action == "OFF":
-                pin = str(args[1]).strip() if len(args) >= 2 else ""
-                stored_pin = db.get_user_pin(chat_id)
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                    return
-                db.save_funding_harvester_config(chat_id, enabled=False, amount=0.0)
-                await update.message.reply_text("🛑 **8-Hour Perpetual Funding Yield Harvester ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-
-            if action == "ON":
-                if len(args) < 3:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/funding_harvester ON 50 <PIN>` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                    return
-                try:
-                    harvest_amt = float(args[1])
-                    pin = str(args[2]).strip()
-                except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
-                    return
-
-                stored_pin = db.get_user_pin(chat_id)
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                    return
-
-                db.save_funding_harvester_config(chat_id, enabled=True, amount=harvest_amt)
-                msg = (
-                    "🌾 **8-Hour Perpetual Funding Yield Harvester ត្រូវបានបើកដំណើរការ!** 🌾\n\n"
-                    f"💵 **ទុនជួញដូរ/Order** ៖ `${harvest_amt:,.2f} USDT`\n"
-                    "⚡ **យុទ្ធសាស្រ្ត** ៖ `1:1 Delta-Neutral 8-Hour Settlement Harvest`\n"
-                    "🛡️ **Risk Exposure** ៖ `0% Directional Risk`\n\n"
-                    "_Bot នឹងស្កេន និងច្រូតកាត់ប្រាក់ការ Funding Rate 24/7 ស្វ័យប្រវត្តិ!_"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
+            notice = (
+                "ℹ️ **NOTICE: APEX ENGINE CONSOLIDATION v11.0** ℹ️\n"
+                "═══════════════════════════════\n"
+                "មុខងារ **Liquidity Sweep Sniper** ត្រូវបានរួមបញ្ចូលគ្នាជាមួយ **Turbo Hedge Engine (Single-Coin Mode)** "
+                "ដើម្បីប្រតិបត្តិការជួញដូរមានល្បឿនលឿនជាងមុន និងការពារហានិភ័យកុំឲ្យ Order ជាន់គ្នា។\n\n"
+                "👉 សូមប្រើប្រាស់ពាក្យបញ្ជា ៖ `/turbo_hedge <COIN> <USDT> <LEV> <PIN>`"
+            )
+            await update.message.reply_text(notice, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
 
         async def pre_pump_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -7322,120 +6988,57 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CallbackQueryHandler(admin_nuke_callback, pattern="^nuke_confirm$"))
         self.app.add_handler(CallbackQueryHandler(gold_button_callback, pattern="^btn_"))
         
-        # --- SCHEDULER SETUP ---
+        # --- KHMER MASTER CRYPTO v11.0 AGI SUPER BRAIN SCHEDULER ---
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        import apscheduler.events
         import scheduler_tasks
         import capital_orchestrator
 
         job_defaults = {
             'coalesce': True,
             'max_instances': 1,
-            'misfire_grace_time': 10
+            'misfire_grace_time': 15
         }
         self.scheduler = AsyncIOScheduler(event_loop=self.loop, job_defaults=job_defaults)
         
-        # 1. Price Alerts Check (Every 5 minutes)
-        self.scheduler.add_job(
-            scheduler_tasks.check_price_alerts, 
-            'interval', 
-            minutes=5, 
-            args=[self.app],
-            id='check_price_alerts'
-        )
+        # 🟢 CORE FLAGSHIP TRADING ENGINE LOOPS (5 STREAMLINED ENGINE LOOPS)
         
-        # 1.5 Trailing Stop Engine (Every 6 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.trailing_stop_engine_job, 
-            'interval', 
-            seconds=6, 
-            args=[self.app],
-            id='trailing_stop_engine'
-        )
-
-        # 1.5.1 Trailing Guard Engine (Every 6 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.trailing_guard_monitor, 
-            'interval', 
-            seconds=6, 
-            args=[self.app],
-            id='trailing_guard_monitor'
-        )
-
-        
-        # 1.5.2 Super Smart Hedge Mode Monitor (Every 10 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.smart_hedge_mode_monitor, 
-            'interval', 
-            seconds=10, 
-            args=[self.app],
-            id='smart_hedge_mode_monitor'
-        )
-
-        # 1.6 AI Auto Trade Execution Loop (Every 1 minute)
-        self.scheduler.add_job(
-            scheduler_tasks.ai_order_execution_job,
-            'interval',
-            minutes=1,
-            args=[self.app],
-            id='ai_order_execution_job'
-        )
-
-        # 1.7 Apex Hyper-Trade HFT Monitor (Every 8 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.hyper_trade_monitor,
-            'interval',
-            seconds=8,
-            args=[self.app],
-            id='hyper_trade_monitor'
-        )
-
-        # 1.7.5 Apex Gold Turbo Monitor (Every 10 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.gold_turbo_monitor,
-            'interval',
-            seconds=10,
-            args=[self.app],
-            id='gold_turbo_monitor'
-        )
-
-        # 1.7.6 Apex Turbo Hedge Monitor (Every 6 seconds)
+        # 1. Flagship Turbo Hedge HFT Monitor (Every 10 seconds)
         self.scheduler.add_job(
             scheduler_tasks.turbo_hedge_monitor,
             'interval',
-            seconds=6,
+            seconds=10,
             args=[self.app],
             id='turbo_hedge_monitor'
         )
 
-        # 1.8 Delta-Neutral Arbitrage Auto-Harvester (Every 10 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.auto_arb_monitor,
-            'interval',
-            seconds=10,
-            args=[self.app],
-            id='auto_arb_monitor'
-        )
-
-        # 1.9 AI Dynamic Auto-Compounding Grid Matrix (Every 8 seconds)
+        # 2. Unified Smart Grid Matrix Monitor (Every 15 seconds)
         self.scheduler.add_job(
             scheduler_tasks.infinity_matrix_monitor,
             'interval',
-            seconds=8,
-            args=[self.app],
+            seconds=15,
+            args=[self.app, self.ai_engine],
             id='infinity_matrix_monitor'
         )
 
-        # 2.0 Apex AI Liquidity Sweep Sniper (Every 6 seconds)
+        # 3. Gold Guard & Macro Radar Monitor (Every 15 seconds)
         self.scheduler.add_job(
-            scheduler_tasks.sweep_auto_monitor,
+            scheduler_tasks.gold_turbo_monitor,
             'interval',
-            seconds=6,
+            seconds=15,
             args=[self.app],
-            id='sweep_auto_monitor'
+            id='gold_turbo_monitor'
         )
 
-        # 2.05 8-Hour Perpetual Funding Yield Harvester (Every 60 seconds)
+        # 4. Smart Listing & Volatility Sniper (Every 15 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.smart_sniper_engine,
+            'interval',
+            seconds=15,
+            args=[self.app, self.ai_engine],
+            id='smart_sniper_engine'
+        )
+
+        # 5. 8-Hour Perpetual Funding Yield Harvester (Every 60 seconds)
         self.scheduler.add_job(
             scheduler_tasks.funding_harvester_monitor,
             'interval',
@@ -7444,7 +7047,40 @@ class TelegramBotThread(BaseThread):
             id='funding_harvester_monitor'
         )
 
-        # 2.06 24-Hour Executive Summary Report (Every day at 08:00 AM)
+        # 🔵 POSITION & RISK MANAGEMENT LOOPS
+        self.scheduler.add_job(
+            scheduler_tasks.trailing_stop_engine_job, 
+            'interval', 
+            seconds=6, 
+            args=[self.app],
+            id='trailing_stop_engine'
+        )
+
+        self.scheduler.add_job(
+            scheduler_tasks.trailing_guard_monitor, 
+            'interval', 
+            seconds=6, 
+            args=[self.app],
+            id='trailing_guard_monitor'
+        )
+
+        self.scheduler.add_job(
+            scheduler_tasks.liquidation_defender_task,
+            'interval',
+            seconds=15,
+            args=[self.app, self.ai_engine],
+            id='liquidation_defender_task'
+        )
+
+        # 🌐 ADVISORY, BRIEFINGS & SYSTEM RESILIENCE JOOPS
+        self.scheduler.add_job(
+            scheduler_tasks.check_price_alerts, 
+            'interval', 
+            minutes=5, 
+            args=[self.app],
+            id='check_price_alerts'
+        )
+
         self.scheduler.add_job(
             scheduler_tasks.daily_executive_summary_report,
             'cron',
@@ -7453,8 +7089,7 @@ class TelegramBotThread(BaseThread):
             args=[self.app],
             id='daily_executive_summary_report'
         )
-        
-        # 2. Daily Market Brief (Every day at 07:00 AM)
+
         self.scheduler.add_job(
             scheduler_tasks.daily_market_brief,
             'cron',
@@ -7463,305 +7098,63 @@ class TelegramBotThread(BaseThread):
             args=[self.app, self.ai_engine],
             id='daily_market_brief'
         )
-        
-        # 3. AI News Filter & Broadcaster (Every 5 minutes)
-        self.scheduler.add_job(
-            scheduler_tasks.check_crypto_news,
-            'interval',
-            minutes=5,
-            args=[self.app, self.ai_engine],
-            id='check_crypto_news'
-        )
-        
-        # 4. Economic Calendar Radar (Every 5 minutes)
-        self.scheduler.add_job(
-            scheduler_tasks.check_economic_calendar,
-            'interval',
-            minutes=5,
-            args=[self.app, self.ai_engine],
-            id='check_economic_calendar'
-        )
-        
-        # 5. Whale Alert Anomaly Detection (Every 5 minutes)
-        self.scheduler.add_job(
-            scheduler_tasks.check_whale_trades,
-            'interval',
-            minutes=5,
-            args=[self.app],
-            id='check_whale_trades'
-        )
-        
-        # 6. Futures Funding Rate Monitor (Every 10 minutes)
-        self.scheduler.add_job(
-            scheduler_tasks.check_funding_rates,
-            'interval',
-            minutes=10,
-            args=[self.app],
-            id='check_funding_rates'
-        )
-        
-        # 7. Smart Money Tracker (Every 5 minutes)
-        self.scheduler.add_job(
-            scheduler_tasks.check_smart_money,
-            'interval',
-            minutes=5,
-            args=[self.app],
-            id='check_smart_money'
-        )
-        
-        # 8. Sentiment Sniper / Flash News (Every 1 minute)
-        self.scheduler.add_job(
-            scheduler_tasks.sentiment_sniper,
-            'interval',
-            minutes=1,
-            args=[self.app, self.ai_engine],
-            id='sentiment_sniper'
-        )
-        
-        # 9. Trailing Stop-Loss Monitor (Every 1 minute)
-        self.scheduler.add_job(
-            scheduler_tasks.trailing_stop_monitor,
-            'interval',
-            minutes=1,
-            args=[self.app, self.ai_engine],
-            id='trailing_stop_monitor'
-        )
-        
-        if hasattr(scheduler_tasks, 'auto_reentry_monitor'):
-            self.scheduler.add_job(
-                scheduler_tasks.auto_reentry_monitor,
-                'interval',
-                minutes=1,
-                args=[self.app],
-                id='auto_reentry_monitor'
-            )
-        
-        self.scheduler.add_job(
-            scheduler_tasks.smart_dca_monitor,
-            'interval',
-            minutes=15,
-            args=[self.app, self.ai_engine],
-            id='smart_dca_monitor'
-        )
-        
-        self.scheduler.add_job(
-            scheduler_tasks.grid_bot_monitor,
-            'interval',
-            minutes=1,
-            args=[self.app, self.ai_engine],
-            id='grid_bot_monitor'
-        )
-        
-        # 10. Order Book Sniper (Liquidity Sniping)
-        self.scheduler.add_job(
-            scheduler_tasks.order_book_sniper,
-            'interval',
-            minutes=1,
-            args=[self.app, self.ai_engine],
-            id='order_book_sniper'
-        )
-        
-        # 11. Triangular Arbitrage Monitor
-        self.scheduler.add_job(
-            scheduler_tasks.triangular_arbitrage_monitor,
-            'interval',
-            minutes=1,
-            args=[self.app, self.ai_engine],
-            id='triangular_arbitrage_monitor'
-        )
-        
-        # 12. Liquidation Wick Sniper (Flash Crash Catcher)
-        # 12. Liquidation Wick Sniper (Flash Crash Catcher)
-        self.scheduler.add_job(
-            scheduler_tasks.wick_sniper,
-            "interval",
-            minutes=1,
-            args=[self.app, self.ai_engine],
-            id="wick_sniper"
-        )
-        
-        # 13. Hedge Short Monitor
-        self.scheduler.add_job(
-            scheduler_tasks.hedge_short_monitor,
-            "interval",
-            minutes=1,
-            args=[self.app],
-            id="hedge_short_monitor"
-        )
-        
-        # 14. Hourly Database Backup (Sent to Admin)
-        self.scheduler.add_job(
-            scheduler_tasks.hourly_database_backup,
-            "interval",
-            hours=1,
-            args=[self.app],
-            id="hourly_database_backup"
-        )
-        
-        # 15. Bi-weekly AI Retraining
-        self.scheduler.add_job(
-            scheduler_tasks.retrain_super_brain_task,
-            "interval",
-            days=14,
-            args=[self.app, self.ai_engine],
-            id="retrain_super_brain_task"
-        )
-        
-        # 20. Smart Listing Sniper Engine (Every 8 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.smart_sniper_engine,
-            "interval",
-            seconds=8,
-            args=[self.app, self.ai_engine],
-            id="smart_sniper_engine"
-        )
-        
-# 19. Binance Listing Monitor (Every 30 mins)
-        self.scheduler.add_job(
-            scheduler_tasks.binance_listing_monitor,
-            "interval",
-            minutes=30,
-            args=[self.app, self.ai_engine],
-            id="binance_listing_monitor"
-        )
-        
-# 18. Opportunity Sniper (Every 5 mins)
-        self.scheduler.add_job(
-            scheduler_tasks.opportunity_sniper_monitor,
-            "interval",
-            minutes=5,
-            args=[self.app, self.ai_engine],
-            id="opportunity_sniper_monitor"
-        )
-        
-        self.scheduler.add_job(
-            scheduler_tasks.pre_pump_sniper_monitor,
-            "interval",
-            seconds=15,
-            args=[self.app, self.ai_engine],
-            id="pre_pump_sniper_monitor"
-        )
-        
-        self.scheduler.add_job(
-            scheduler_tasks.pre_pump_daily_train_job,
-            "cron",
-            hour=2,
-            minute=0,
-            timezone="Asia/Phnom_Penh",
-            args=[self.app],
-            id="pre_pump_daily_train_job"
-        )
 
-        # Bi-Weekly Apex Super Brain AI Models Retraining Job (Every 2 Weeks)
-        self.scheduler.add_job(
-            scheduler_tasks.biweekly_apex_brain_train_job,
-            "interval",
-            weeks=2,
-            args=[self.app, self.ai_engine],
-            id="biweekly_apex_brain_train_job"
-        )
-        
-        # 8-Hour VIP Executive Consolidated Report (Every 8 Hours at 00:00, 08:00, 16:00 UTC+7)
         self.scheduler.add_job(
             scheduler_tasks.vip_8hour_executive_report_job,
-            "cron",
+            'cron',
             hour="0,8,16",
             minute=0,
             timezone="Asia/Phnom_Penh",
             args=[self.app],
             id="vip_8hour_executive_report_job"
         )
-        
-# 17. Infinity Grid Monitor
+
         self.scheduler.add_job(
-            scheduler_tasks.infinity_grid_monitor,
-            "interval",
-            seconds=10,
+            scheduler_tasks.check_crypto_news,
+            'interval',
+            minutes=15,
             args=[self.app, self.ai_engine],
-            id="infinity_grid_monitor"
+            id='check_crypto_news'
         )
-        
-        # 17.5 Compound Grid Monitor
+
         self.scheduler.add_job(
-            scheduler_tasks.compound_grid_monitor,
-            "interval",
-            seconds=10,
+            scheduler_tasks.check_economic_calendar,
+            'interval',
+            minutes=30,
             args=[self.app, self.ai_engine],
-            id="compound_grid_monitor"
+            id='check_economic_calendar'
         )
-        
-        # 16. AI Scalper Monitor (Ping-Pong)
+
         self.scheduler.add_job(
-            scheduler_tasks.ai_scalper_monitor,
-            "interval",
-            seconds=10,
-            args=[self.app, self.ai_engine],
-            id="ai_scalper_monitor"
+            scheduler_tasks.check_whale_trades,
+            'interval',
+            minutes=15,
+            args=[self.app],
+            id='check_whale_trades'
         )
-        
-                # 17. AI Smart Liquidation Defender
+
         self.scheduler.add_job(
-            scheduler_tasks.liquidation_defender_task,
-            "interval",
-            seconds=15,
-            args=[self.app, self.ai_engine],
-            id="liquidation_defender_task"
+            scheduler_tasks.check_funding_rates,
+            'interval',
+            minutes=30,
+            args=[self.app],
+            id='check_funding_rates'
         )
-        
-        
-        # 21. Smart Portfolio Rebalancer (Every 3 mins)
+
         self.scheduler.add_job(
-            capital_orchestrator.run_ico_cycle,
-            "interval",
-            minutes=3,
-            args=[self.app, self.ai_engine],
-            id="smart_portfolio_rebalancer"
+            scheduler_tasks.hourly_database_backup,
+            'interval',
+            hours=1,
+            args=[self.app],
+            id='hourly_database_backup'
         )
-        
-        # 22. Background VPS Health Monitor (Every 5 mins)
+
         self.scheduler.add_job(
             scheduler_tasks.vps_health_monitor_job,
-            "interval",
-            minutes=5,
+            'interval',
+            minutes=15,
             args=[self.app],
-            id="vps_health_monitor_job"
-        )
-        
-        # 22.5. Autonomous Resilience: Database Backup (Every 1 hour)
-        self.scheduler.add_job(
-            scheduler_tasks.database_backup_job,
-            "interval",
-            hours=1,
-            args=[self.app],
-            id="database_backup_job"
-        )
-        
-        # 22.6. Real-time P&L Attribution & Dynamic Capital Allocation (Every 1 hour)
-        import dynamic_allocator
-        self.scheduler.add_job(
-            dynamic_allocator.run_allocation_cycle,
-            "interval",
-            hours=1,
-            args=[self.app],
-            id="dynamic_capital_allocation_job"
-        )
-        
-        # 23. Cross-Venue Arbitrage (Every 6 seconds for speed)
-        self.scheduler.add_job(
-            scheduler_tasks.cross_venue_arbitrage_job,
-            "interval",
-            seconds=6,
-            args=[self.app],
-            id="cross_venue_arbitrage_job"
-        )
-        
-        # 24. Volatility Trading & Systematic Hedging (Every 60 seconds)
-        self.scheduler.add_job(
-            scheduler_tasks.systematic_hedging_job,
-            "interval",
-            seconds=60,
-            args=[self.app, self.ai_engine],
-            id="systematic_hedging_job"
+            id='vps_health_monitor_job'
         )
 
         self.log_signal.emit("⚙️ Pre-Pump Daily Train job scheduled at 2:00 AM (UTC+7).")

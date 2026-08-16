@@ -78,8 +78,22 @@ class AIInvestmentEngine:
     def generate_response(self, user_input: str, user_lang: str = "auto") -> str:
         """Alias for background tasks that might pass lang"""
         prompt = user_input
-        if user_lang and user_lang != "auto":
-            prompt += f"\n\nPlease reply in {user_lang} language."
+        lang_clean = str(user_lang or "auto").lower().strip()
+        
+        target_lang_instructions = {
+            "km": "\n\nPlease reply STRICTLY in 100% Khmer language. DO NOT output internal thoughts, sentence-count checks, drafting steps, self-evaluations, or English notes.",
+            "khmer": "\n\nPlease reply STRICTLY in 100% Khmer language. DO NOT output internal thoughts, sentence-count checks, drafting steps, self-evaluations, or English notes.",
+            "en": "\n\nPlease reply STRICTLY in 100% English language. DO NOT output internal thoughts, sentence-count checks, drafting steps, self-evaluations, or English notes.",
+            "english": "\n\nPlease reply STRICTLY in 100% English language. DO NOT output internal thoughts, sentence-count checks, drafting steps, self-evaluations, or English notes.",
+            "zh": "\n\nPlease reply STRICTLY in 100% Simplified Chinese language. DO NOT output internal thoughts, sentence-count checks, drafting steps, self-evaluations, or English notes.",
+            "chinese": "\n\nPlease reply STRICTLY in 100% Simplified Chinese language. DO NOT output internal thoughts, sentence-count checks, drafting steps, self-evaluations, or English notes."
+        }
+        
+        if lang_clean in target_lang_instructions:
+            prompt += target_lang_instructions[lang_clean]
+        elif lang_clean != "auto":
+            prompt += f"\n\nPlease reply in {user_lang} language. Output ONLY clean presentation text with no reasoning or thought steps."
+            
         return self.analyze_opportunity(prompt)
 
     def predict(self, symbol: str) -> dict:
@@ -153,16 +167,17 @@ class AIInvestmentEngine:
     def _clean_response(self, text: str) -> str:
         """
         Strips internal system prompt reflections, role definitions, thinking processes,
-        English drafting notes, and meta-instructions to output ONLY clean executive markdown.
+        English drafting notes, sentence checks, and meta-instructions to output ONLY clean executive markdown.
         """
         if not text:
             return ""
 
         import re
         
-        # 1. Remove thinking/reflection blocks wrapped in <thought>...</thought> or ```thought...```
+        # 1. Remove thinking/reflection blocks wrapped in tags or code fences
         text = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'```thought.*?```', '', text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'\[THINKING\].*?\[/THINKING\]', '', text, flags=re.DOTALL | re.IGNORECASE)
         
         # 2. Remove (Self-Correction: ... ) blocks
         text = re.sub(r'\*?\s*\(Self-Correction:.*?\)\*?', '', text, flags=re.DOTALL | re.IGNORECASE)
@@ -172,20 +187,26 @@ class AIInvestmentEngine:
         text = re.sub(r'Section\s*2\s*\([^)]*\)\s*:', 'ផ្នែកទី ២៖ ភស្តុតាងបរិមាណវិស័យ និងម៉ាក្រូសេដ្ឋកិច្ច (Quantitative and Macro Evidence)', text, flags=re.IGNORECASE)
         text = re.sub(r'Section\s*3\s*\([^)]*\)\s*:', 'ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (The Executive Action Command)', text, flags=re.IGNORECASE)
 
-        # If Khmer presentation section 'ផ្នែកទី ១' exists, slice starting from 'ផ្នែកទី ១' to eliminate English reflection headers
+        # 4. Slice off drafting headers if present
         if "ផ្នែកទី ១" in text:
             idx = text.find("ផ្នែកទី ១")
             text = text[idx:]
         elif "ផ្នែកទី១" in text:
             idx = text.find("ផ្នែកទី១")
             text = text[idx:]
+        elif "Drafting final Khmer text:" in text:
+            idx = text.find("Drafting final Khmer text:")
+            text = text[idx + len("Drafting final Khmer text:"):]
+        elif "Final Text:" in text:
+            idx = text.find("Final Text:")
+            text = text[idx + len("Final Text:"):]
 
         lines = text.split("\n")
         cleaned_lines = []
 
         for line in lines:
             stripped = line.strip()
-            # Skip Meta / Prompt / Reflection / Chain-of-Thought lines
+            # Skip Meta / Prompt / Reflection / Chain-of-Thought / Sentence-Check lines
             if any(stripped.startswith(prefix) for prefix in [
                 "*   User Input:", "* User Input:", "User Input:",
                 "*   Time:", "* Time:", "Time:",
@@ -201,19 +222,24 @@ class AIInvestmentEngine:
                 "*   Requirements:", "* Requirements:", "Requirements:",
                 "*   Contextual Reason", "* Opportunity:", "*   Strategy:", "*   Parameters:", "*   The Command:",
                 "*   Intro:", "*   Market Status:", "*   Analysis:", "*   Strategy Details:",
+                "*   Sentence 1:", "*   Sentence 2:", "Sentence 1:", "Sentence 2:",
+                "*   Does it meet", "*   Is it in", "*   Is it executive", "*   Are there any",
+                "*   Self-Correction", "*   Final Polish", "*   Wait, checking",
                 "Respond ONLY in clean", "Use the 3-section structure", "User's language preference:",
                 "Structure: Section", "No fluff/reasoning", "Win Rate: Let's estimate",
                 "Ensure the tone", "Check the 1-tap", "Self-Correction", "Drafting Command", "Use bolding", "Use Emojis",
-                "(Proceeding to generate", "(Drafting the Output"
+                "(Proceeding to generate", "(Drafting the Output", "Drafting final", "Final Polish:", "Wait, checking"
             ]) or any(kw in stripped for kw in [
                 "Respond ONLY in clean, executive",
-                "User's language preference: KM",
+                "User's language preference:",
                 "Structure: Section 1, 2, 3",
                 "No fluff/reasoning",
                 "Win Rate: Let's estimate",
                 "Section 1: The Institutional Verdict",
                 "Section 2: Quantitative and Macro",
-                "Section 3: The Executive Action"
+                "Section 3: The Executive Action",
+                "2-sentence rule",
+                "Self-Correction during drafting"
             ]):
                 continue
 

@@ -86,8 +86,7 @@ def generate_rebalancer_report(user_lang: str = "khmer", ai_engine=None) -> str:
             ai_analysis = f"ផលធៀប BTC/Gold Ratio គឺ {ratio:.2f}x (អោនស៍មាសក្នុង ១ BTC)។ ការបែងចែកទុន {alloc_btc:.0f}% BTC និង {alloc_gold:.0f}% PAXG ធានានូវការកើនឡើងនៃដើមទុនជាពហុគុណទាំងមាស និង Bitcoin!"
     else:
         ai_analysis = f"ផលធៀប BTC/Gold Ratio គឺ {ratio:.2f}x (អោនស៍មាសក្នុង ១ BTC)។ ការបែងចែកទុន {alloc_btc:.0f}% BTC និង {alloc_gold:.0f}% PAXG ធានានូវការកើនឡើងនៃដើមទុនជាពហុគុណទាំងមាស និង Bitcoin!"
-
-    if user_lang == 'khmer':
+    if user_lang in ['km', 'khmer']:
         report = (
             f"💎 **APEX SUPER BRAIN — GOLD / BTC DYNAMIC REBALANCER** 💎\n"
             f"*(ការបែងចែកទុនរវាងមាសរូបវន្ត PAXG និងមាសឌីជីថល BTC)*\n\n"

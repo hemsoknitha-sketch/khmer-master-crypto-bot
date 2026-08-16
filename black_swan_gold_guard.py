@@ -92,8 +92,7 @@ def generate_black_swan_report(user_lang: str = "khmer", ai_engine=None) -> str:
             ai_analysis = f"សន្ទស្សន៍ហានិភ័យភូមិសាស្ត្រនយោបាយ {severity:.1f}% បញ្ជាក់ថាយន្តការ Flight-to-Safety កំពុងការពារទ្រព្យសកម្ម និងប្រមូលទិញមាស PAXG មុនពេលទីផ្សារមាន Panic Sell។"
     else:
         ai_analysis = f"សន្ទស្សន៍ហានិភ័យភូមិសាស្ត្រនយោបាយ {severity:.1f}% បញ្ជាក់ថាយន្តការ Flight-to-Safety កំពុងការពារទ្រព្យសកម្ម និងប្រមូលទិញមាស PAXG មុនពេលទីផ្សារមាន Panic Sell។"
-
-    if user_lang == 'khmer':
+    if user_lang in ['km', 'khmer']:
         report = (
             f"🛡️ **APEX SUPER BRAIN — GEOPOLITICAL BLACK-SWAN GUARD** 🛡️\n"
             f"*(ប្រព័ន្ធការពារសង្គ្រាម & វិបត្តិ Real-Time NLP Gold Accumulation)*\n\n"

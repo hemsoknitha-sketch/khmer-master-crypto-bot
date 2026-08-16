@@ -1,5 +1,5 @@
 @echo off
-title Apex AI Super Brain Bot - Git & VPS Deployer v10.6
+title Khmer Master Crypto / Apex AGI Engine - Git & VPS Deployer v11.0
 cd /d "%~dp0"
 
 set GIT_TERMINAL_PROMPT=0
@@ -12,7 +12,7 @@ echo =========================================================
 echo   1. Auto-Staging & Auto-Pushing Code Changes to GitHub...
 echo =========================================================
 git add .
-git commit -m "Auto Update Apex AI Super Brain Bot - Institutional Profit Edition v10.6" >nul 2>&1
+git commit -m "Auto Update Khmer Master Crypto v11.0 AGI Super Brain Edition" >nul 2>&1
 git push origin main >nul 2>&1
 echo [GIT] Code successfully pushed to GitHub repository!
 
@@ -36,7 +36,7 @@ for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
 del /f /q *.pyc >nul 2>&1
 
 echo =========================================================
-echo   5. Relaunching Apex AI Bot with Updated High-Velocity Code...
+echo   5. Relaunching Khmer Master Crypto v11.0 AGI Node...
 echo =========================================================
 start start_vps.bat
 echo =========================================================
@@ -44,6 +44,3 @@ echo [SUCCESS] 🚀 Clean Git Push, Fetch & VPS Update Complete!
 echo Bot successfully updated and restarted on VPS without login.
 echo =========================================================
 pause
-
-
-

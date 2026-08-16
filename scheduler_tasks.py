@@ -1726,7 +1726,8 @@ async def order_book_sniper(app: Application, ai_engine):
                     print(f"🐋 WHALE WALL DETECTED: {symbol} at ${target_price:,.4f} (Value: ${whale_usdt:,.0f})")
                     
                     def get_whale_wall_text(lang):
-                        if lang == 'khmer':
+                        clean_lang = loc.normalize_lang(lang)
+                        if clean_lang == 'khmer':
                             return (
                                 f"🐋 **ប្រព័ន្ធស្ទាក់ចាប់ត្រីបាឡែន (WHALE WALL DETECTED)!**\n\n"
                                 f"🪙 **{symbol}**\n"
@@ -1736,6 +1737,17 @@ async def order_book_sniper(app: Application, ai_engine):
                                 f"• AI បានស្ទាក់ទិញមុនត្រីបាឡែននៅ: `${front_run_price:,.4f}` (+0.05% Limit)\n"
                                 f"• គោលដៅប្រមូលចំណេញ: `+5%` ទៅ `+20%` តាម Peak-Lock Trailing\n\n"
                                 f"💡 _ចំណាំ: ចលនា Whale Pump កើតឡើងលឿនកម្រិត Millisecond (<50ms)។ បើក /pre_pump & /auto_trade ដើម្បីឲ្យ AI ប្រតិបត្តិការទិញ-លក់ស្វ័យប្រវត្តិ ជំនួសការចូលទិញដោយដៃ!_"
+                            )
+                        elif clean_lang == 'chinese':
+                            return (
+                                f"🐋 **检测到巨鲸买单墙 (WHALE WALL DETECTED)!**\n\n"
+                                f"🪙 **{symbol}**\n"
+                                f"💵 巨鲸挂单买价: `${target_price:,.4f}`\n"
+                                f"💰 资金规模: `${whale_usdt:,.0f} USDT`\n\n"
+                                f"⚡ **AI 抢跑执行 (Front-Run Execution):**\n"
+                                f"• AI 已提前挂单抢跑: `${front_run_price:,.4f}` (+0.05% Limit)\n"
+                                f"• 目标止盈: `+5%` 至 `+20%` 动态追盈\n\n"
+                                f"💡 _提示: 开启 /pre_pump 和 /auto_trade 可实现毫秒级自动抢跑跟单!_"
                             )
                         else:
                             return (
