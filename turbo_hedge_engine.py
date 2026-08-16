@@ -146,15 +146,14 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                 abs_change = abs(price_change_pct)
                 
                 sym_info = trading_engine.get_symbol_info(sym)
-                if sym_info:
-                    if sym_info.get("status") != "TRADING":
-                        continue
-                    tags = [str(tg).upper() for tg in sym_info.get("tags", [])]
-                    if any(tag_item in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for tag_item in tags):
-                        print(f"🧹 [SPOT MONITORING/DELIST FILTER] Excluded {sym} (Tagged as {tags})")
-                        continue
-                    if not sym_info.get("isSpotTradingAllowed", True):
-                        continue
+                if not sym_info or sym_info.get("status") != "TRADING":
+                    continue
+                tags = [str(tg).upper() for tg in sym_info.get("tags", [])]
+                if any(tag_item in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for tag_item in tags):
+                    print(f"🧹 [SPOT MONITORING/DELIST FILTER] Excluded {sym} (Tagged as {tags})")
+                    continue
+                if not sym_info.get("isSpotTradingAllowed", True):
+                    continue
 
                 if quote_vol >= 1000000.0:  # Include liquid spot pairs >= $1M volume
                     # Explosive Moonshot Breakout Scoring (+3.0% to +35.0% pump acceleration)
@@ -210,13 +209,13 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
     # 🛡️ Binance Spot Monitoring & Delisting Risk Safety Shield
     if is_spot_mode:
         sym_info = trading_engine.get_symbol_info(symbol)
-        if sym_info:
-            if sym_info.get("status") != "TRADING":
-                return {"side": "SKIP", "confidence_pct": 0.0, "reason": "NOT_TRADING"}
-            tags = [str(tg).upper() for tg in sym_info.get("tags", [])]
-            if any(t in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for t in tags):
-                print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Binance Monitoring/Delisting Tag: {tags})")
-                return {"side": "SKIP", "confidence_pct": 0.0, "reason": "MONITORING_OR_DELISTING_TAGGED"}
+        if not sym_info or sym_info.get("status") != "TRADING" or not sym_info.get("isSpotTradingAllowed", True):
+            print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Delisted or Not Trading on Binance)")
+            return {"side": "SKIP", "confidence_pct": 0.0, "reason": "DELISTED_OR_NOT_TRADING"}
+        tags = [str(tg).upper() for tg in sym_info.get("tags", [])]
+        if any(t in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for t in tags):
+            print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Binance Monitoring/Delisting Tag: {tags})")
+            return {"side": "SKIP", "confidence_pct": 0.0, "reason": "MONITORING_OR_DELISTING_TAGGED"}
 
     # Enforce Hard Leverage Ceiling (Max 15x Futures, Max 1x Spot)
     requested_leverage = 1 if is_spot_mode else min(15, max(1, requested_leverage))
@@ -854,6 +853,12 @@ async def monitor_turbo_hedge_bots(app):
                     continue
 
                 is_spot = (user_side_input == "SPOT")
+                c_info = trading_engine.get_symbol_info(c_cand)
+                if not c_info or c_info.get("status") != "TRADING" or (is_spot and not c_info.get("isSpotTradingAllowed", True)):
+                    print(f"🚫 [SPOT DELIST GUARD] Rejected candidate {c_cand}: Symbol is delisted or not trading on Binance!")
+                    _failed_candidate_symbols.add(c_cand)
+                    continue
+
                 eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
                 
                 # Reject any symbol flagged as SKIP by safety shields
