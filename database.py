@@ -1339,9 +1339,9 @@ def get_user_api(chat_id: int):
             dec_secret = ""
 
         # Seamless auto-encrypt legacy unencrypted keys if decrypt returns empty
-        if not dec_key and raw_key and len(raw_key) >= 20:
+        if not dec_key and raw_key and not raw_key.startswith("gAAAAA") and len(raw_key) >= 20:
             dec_key = raw_key
-        if not dec_secret and raw_secret and len(raw_secret) >= 20:
+        if not dec_secret and raw_secret and not raw_secret.startswith("gAAAAA") and len(raw_secret) >= 20:
             dec_secret = raw_secret
 
         if dec_key and dec_secret:
