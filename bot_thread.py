@@ -7124,7 +7124,7 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.infinity_matrix_monitor,
             'interval',
             seconds=15,
-            args=[self.app, self.ai_engine],
+            args=[self.app],
             id='infinity_matrix_monitor'
         )
 

@@ -684,7 +684,7 @@ if __name__ == "__main__":
     is_cli_mode = ("--cli" in sys.argv or "--no-gui" in sys.argv or "--vps" in sys.argv or "--headless" in sys.argv or "-vps" in sys.argv)
     
     if is_cli_mode:
-        print("🚀 Initializing Apex Super AGI v9.8 (24/7 Pure Python Headless CLI Mode)...")
+        print("🚀 Initializing Khmer Master Crypto / Apex TURBO AGI Engine v11.0 Super Brain Edition (24/7 Pure Python Headless CLI Mode)...")
         db.init_db()
         import backup_manager
         backup_manager.perform_backup(is_boot=True)
