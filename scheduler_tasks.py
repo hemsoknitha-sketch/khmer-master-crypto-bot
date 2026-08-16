@@ -211,26 +211,46 @@ async def check_crypto_news(app: Application, ai_engine):
             db.mark_news_seen(link)
             
             prompt = (
-                f"Analyze this breaking crypto news.\n"
+                f"You are Super Brain AGI News Analyst. Analyze this breaking crypto news article:\n"
                 f"Title: {title}\n"
                 f"Description: {description}\n\n"
-                f"Give it an impact score from 1 to 10 based on how much it will affect the overall cryptocurrency market. "
-                f"You MUST include the exact text 'SCORE: X' (where X is your number) in your response. "
-                f"Also provide a 2-sentence summary of why it matters.\n\n"
-                f"[CRITICAL INSTRUCTION: You MUST output the exact same summary in 3 languages, formatted EXACTLY like this:\n"
-                f"[ENGLISH]\n...\n===LANG_SEP===\n[KHMER]\n...\n===LANG_SEP===\n[CHINESE]\n...]"
+                f"Provide an Impact Score (1 to 10) based on market influence. Include 'SCORE: X'.\n"
+                f"Then provide a sharp, 2-sentence expert market impact analysis.\n\n"
+                f"[CRITICAL FORMAT INSTRUCTION: You MUST format your response in 3 language sections separated EXACTLY by ===LANG_SEP===]:\n"
+                f"[ENGLISH]\n(Expert 2-sentence analysis in English)\n"
+                f"===LANG_SEP===\n"
+                f"[KHMER]\n(Expert 2-sentence analysis in Khmer language, translated clearly and professional)\n"
+                f"===LANG_SEP===\n"
+                f"[CHINESE]\n(Expert 2-sentence analysis in Simplified Chinese)\n"
             )
             
             analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
             
-            # Parse Polyglot Output
+            # Clean and Parse Polyglot Output
             parts = analysis.split('===LANG_SEP===')
-            texts = {'english': analysis, 'khmer': analysis, 'chinese': analysis, 'auto': analysis}
+            
+            def clean_lang_text(txt):
+                if not txt: return ""
+                txt = re.sub(r"SCORE:\s*\d+", "", txt, flags=re.IGNORECASE)
+                txt = re.sub(r"\[(ENGLISH|KHMER|CHINESE)\]", "", txt, flags=re.IGNORECASE)
+                txt = txt.replace('`', '').strip()
+                return txt.strip(' ,:\n\r')
+
+            texts = {'english': '', 'khmer': '', 'chinese': '', 'auto': ''}
             if len(parts) >= 3:
-                texts['english'] = parts[0].replace('[ENGLISH]', '').strip()
-                texts['khmer'] = parts[1].replace('[KHMER]', '').strip()
-                texts['chinese'] = parts[2].replace('[CHINESE]', '').strip()
-                texts['auto'] = texts['khmer']
+                texts['english'] = clean_lang_text(parts[0])
+                texts['khmer'] = clean_lang_text(parts[1])
+                texts['chinese'] = clean_lang_text(parts[2])
+            else:
+                cleaned_full = clean_lang_text(analysis)
+                texts['english'] = cleaned_full
+                texts['khmer'] = cleaned_full
+                texts['chinese'] = cleaned_full
+
+            if not texts['khmer']: texts['khmer'] = clean_lang_text(analysis)
+            if not texts['english']: texts['english'] = clean_lang_text(analysis)
+            if not texts['chinese']: texts['chinese'] = clean_lang_text(analysis)
+            texts['auto'] = texts['khmer']
             
             # Extract score (search across the whole analysis block)
             match = re.search(r"SCORE:\s*(\d+)", analysis, re.IGNORECASE)
@@ -250,7 +270,9 @@ async def check_crypto_news(app: Application, ai_engine):
                         header = loc.get_text(user_l, 'ai_analysis_header')
                         alert_msg += f"{header}\n{texts[user_l]}\n\n"
                         alert_msg += f"🔗 [Read Full Article]({link})\n\n"
-                        alert_msg += "👉 **1-Tap Action Execution** ៖\n`` `/turbo_hedge TOP 20 10 AUTO 2.5 1234` ``"
+                        alert_msg += "👉 **1-Tap Action Execution** ៖\n"
+                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``\n"
+                        alert_msg += f"*(ឬ Futures ៖ `` `/turbo_hedge TOP 20 10 AUTO 15 1234` ``)*"
                         return alert_msg
                         
                     await parallel_broadcast(app, vip_users_lang, get_news_text)
