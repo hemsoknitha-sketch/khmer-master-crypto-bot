@@ -126,7 +126,14 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                 "NVDAUSDT", "MSTRUSDT", "BABAUSDT", "ROBOUSDT", "NBISUSDT", "SHAZUSDT", "KORUUSDT", "DRAMUSDT", "SNXXUSDT", 
                 "MUUUSDT", "BEUSDT", "SKHYUSDT", "SKHYNIXUSDT", "SAMSUNGUSDT", "WDCUSDT", "ORCLUSDT", "AIAUSDT", "MUBARAKUSDT", 
                 "HYPEUSDT", "LITEUSDT", "DEXEUSDT", "BZUSDT", "CLUSDT", "XAUUSDT", "XAGUSDT", "TRUMPUSDT", "HFTUSDT", "GWEIUSDT", 
-                "EPICUSDT", "USD1USDT", "EURUSDT", "GBPUSDT", "AEURUSDT", "FDUSDUSDT", "TUSDUSDT", "USDCUSDT"
+                "EPICUSDT", "USD1USDT", "EURUSDT", "GBPUSDT", "AEURUSDT", "FDUSDUSDT", "TUSDUSDT", "USDCUSDT",
+                "HARDUSDT", "BONDUSDT", "UNFIUSDT", "WRXUSDT", "FORUSDT", "OXTUSDT", "STPTUSDT", "CREAMUSDT", 
+                "REEFUSDT", "AMBUSDT", "BLZUSDT", "CLVUSDT", "CVXUSDT", "DOCKUSDT", "EPXUSDT", "FORTHUSDT", 
+                "GFTUSDT", "IRISUSDT", "KEYUSDT", "LINAUSDT", "LOOMUSDT", "LTOUSDT", "MBLUSDT", "MDTUSDT", 
+                "MDXUSDT", "NKNUSDT", "NMRUSDT", "PDAUSDT", "PERPUSDT", "PROMUSDT", "PROSUSDT", "QUICKUSDT", 
+                "RENUSDT", "RSRUSDT", "SLPUSDT", "SPELLUSDT", "STMXUSDT", "SUNUSDT", "TORNUSDT", "VGXUSDT", 
+                "VOXELUSDT", "WINGUSDT", "WNXMUSDT", "YFIIUSDT", "ZECUSDT", "FTTUSDT", "LUNCUSDT", "USTCUSDT",
+                "BALUSDT", "FIROUSDT", "FISUSDT", "IDRTUSDT", "KP3RUSDT", "OAXUSDT"
             }
             for t in tickers:
                 sym = t.get("symbol", "")
@@ -139,8 +146,15 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                 abs_change = abs(price_change_pct)
                 
                 sym_info = trading_engine.get_symbol_info(sym)
-                if sym_info and sym_info.get("status") != "TRADING":
-                    continue
+                if sym_info:
+                    if sym_info.get("status") != "TRADING":
+                        continue
+                    tags = [str(tg).upper() for tg in sym_info.get("tags", [])]
+                    if any(tag_item in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for tag_item in tags):
+                        print(f"🧹 [SPOT MONITORING/DELIST FILTER] Excluded {sym} (Tagged as {tags})")
+                        continue
+                    if not sym_info.get("isSpotTradingAllowed", True):
+                        continue
 
                 if quote_vol >= 1000000.0:  # Include liquid spot pairs >= $1M volume
                     # Explosive Moonshot Breakout Scoring (+3.0% to +35.0% pump acceleration)
@@ -192,6 +206,17 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
         symbol += "USDT"
     if symbol == "DODOUSDT":
         symbol = "DODOXUSDT"
+
+    # 🛡️ Binance Spot Monitoring & Delisting Risk Safety Shield
+    if is_spot_mode:
+        sym_info = trading_engine.get_symbol_info(symbol)
+        if sym_info:
+            if sym_info.get("status") != "TRADING":
+                return {"side": "SKIP", "confidence_pct": 0.0, "reason": "NOT_TRADING"}
+            tags = [str(tg).upper() for tg in sym_info.get("tags", [])]
+            if any(t in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for t in tags):
+                print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Binance Monitoring/Delisting Tag: {tags})")
+                return {"side": "SKIP", "confidence_pct": 0.0, "reason": "MONITORING_OR_DELISTING_TAGGED"}
 
     # Enforce Hard Leverage Ceiling (Max 15x Futures, Max 1x Spot)
     requested_leverage = 1 if is_spot_mode else min(15, max(1, requested_leverage))
