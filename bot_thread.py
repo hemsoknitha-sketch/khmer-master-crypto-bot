@@ -6160,6 +6160,114 @@ class TelegramBotThread(BaseThread):
             await update.message.reply_text(notice, parse_mode="Markdown")
             await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
 
+        async def funding_harvester_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
+            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+
+            args = context.args
+            if not args or len(args) == 0:
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                
+                import funding_harvester_engine
+                scan_res = await asyncio.to_thread(funding_harvester_engine.scan_top_funding_rates)
+                
+                cfg = db.get_funding_harvester_config(chat_id) if hasattr(db, 'get_funding_harvester_config') else {}
+                is_active = bool(cfg.get("is_enabled", False)) if isinstance(cfg, dict) else False
+                amount = float(cfg.get("amount_per_trade", 0.0)) if isinstance(cfg, dict) else 0.0
+                status_str = f"🟢 ACTIVE (`${amount:.2f} USDT`)" if is_active else "🔴 INACTIVE (បិទ)"
+                
+                top_items = scan_res.get("top_opportunities", []) if isinstance(scan_res, dict) else []
+                lines = []
+                for item in top_items[:4]:
+                    sym = item.get("symbol", "N/A")
+                    rate = item.get("funding_rate_pct", 0.0)
+                    mins = item.get("seconds_to_settlement", 0) // 60
+                    lines.append(f"• `{sym}`: `{rate:+.4f}%` (Settlement in `{mins}m`)")
+                
+                table_text = "\n".join(lines) if lines else "_កំពុងស្កេន Binance Premium Index..._"
+                
+                toggle_btn = (
+                    InlineKeyboardButton("🔴 Turn OFF Harvester", callback_data="btn_funding_harvester_off_prompt")
+                    if is_active else
+                    InlineKeyboardButton("🟢 Turn ON Harvester", callback_data="btn_funding_harvester_on_prompt")
+                )
+
+                keyboard = InlineKeyboardMarkup([
+                    [toggle_btn, InlineKeyboardButton("🔄 Refresh Funding Rates", callback_data="btn_funding_harvester")],
+                    [
+                        InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    ]
+                ])
+
+                msg = (
+                    "🌾 **KHMER MASTER CRYPTO v11.0 | 8-HOUR FUNDING YIELD HARVESTER** 🌾\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
+                    f"• **Current Status**: {status_str}\n"
+                    "• **Strategy Architecture**: `1:1 Delta-Neutral (0% Risk-Free Yield Harvest)`\n"
+                    "• **Settlement Frequency**: `Every 8 Hours (Binance Funding Cycle)`\n\n"
+                    "🔥 **TOP BINANCE 8-HOUR FUNDING YIELD RADAR:**\n"
+                    f"{table_text}\n\n"
+                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                    "👉 **ដើម្បីបើក Harvester ៖**\n`` `/funding_harvester ON 50 <PIN>` ``\n\n"
+                    "👉 **ដើម្បីបិទ Harvester ៖**\n`` `/funding_harvester OFF <PIN>` ``"
+                )
+                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                return
+
+            action = str(args[0]).upper().strip()
+            if action == "OFF":
+                pin = str(args[1]).strip() if len(args) >= 2 else ""
+                stored_pin = db.get_user_pin(chat_id)
+                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
+                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    return
+                if hasattr(db, 'save_funding_harvester_config'):
+                    db.save_funding_harvester_config(chat_id, enabled=False, amount=0.0)
+                await update.message.reply_text("🛑 **8-Hour Perpetual Funding Yield Harvester ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                return
+
+            if action == "ON":
+                if len(args) < 3:
+                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/funding_harvester ON 50 <PIN>` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    return
+                try:
+                    harvest_amt = float(args[1])
+                    pin = str(args[2]).strip()
+                except ValueError:
+                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                    return
+
+                stored_pin = db.get_user_pin(chat_id)
+                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
+                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    return
+
+                if hasattr(db, 'save_funding_harvester_config'):
+                    db.save_funding_harvester_config(chat_id, enabled=True, amount=harvest_amt)
+                msg = (
+                    "🌾 **8-Hour Perpetual Funding Yield Harvester ត្រូវបានបើកដំណើរការ!** 🌾\n\n"
+                    f"💵 **ទុនជួញដូរ/Order** ៖ `${harvest_amt:,.2f} USDT`\n"
+                    "⚡ **យុទ្ធសាស្រ្ត** ៖ `1:1 Delta-Neutral 8-Hour Settlement Harvest`\n"
+                    "🛡️ **Risk Exposure** ៖ `0% Directional Risk`\n\n"
+                    "_Bot នឹងស្កេន និងច្រូតកាត់ប្រាក់ការ Funding Rate 24/7 ស្វ័យប្រវត្តិ!_"
+                )
+                await update.message.reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                return
+
         async def pre_pump_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
@@ -7166,8 +7274,26 @@ class TelegramBotThread(BaseThread):
             await self.app.initialize()
             await self.app.start()
             if self.app.updater:
-                await self.app.updater.start_polling(drop_pending_updates=True)
-            while getattr(self.app, 'running', True):
+                try:
+                    await self.app.updater.start_polling(drop_pending_updates=True)
+                except Exception as poll_err:
+                    print(f"⚠️ [TELEGRAM POLLING INITIAL NOTICE]: {poll_err}. Retrying polling in 5s...")
+                    await asyncio.sleep(5)
+                    try:
+                        await self.app.updater.start_polling(drop_pending_updates=True)
+                    except Exception:
+                        pass
+            
+            self._is_bot_running = True
+            while getattr(self, '_is_bot_running', True):
+                try:
+                    if self.app and self.app.updater and not getattr(self.app.updater, 'running', False):
+                        print("⚠️ [TELEGRAM UPDATER AUTO-RECOVERY]: Restoring polling connection...")
+                        await asyncio.sleep(3)
+                        await self.app.updater.start_polling(drop_pending_updates=True)
+                except Exception as recovery_err:
+                    print(f"⚠️ [UPDATER RECOVERY NOTICE]: {recovery_err}")
+                    await asyncio.sleep(5)
                 await asyncio.sleep(1)
 
         try:
