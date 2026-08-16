@@ -1746,6 +1746,22 @@ def log_turbo_hedge_trade_history(chat_id: int, symbol: str, side: str, entry_pr
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trade_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER,
+                symbol TEXT,
+                side TEXT,
+                entry_price REAL,
+                exit_price REAL,
+                qty REAL,
+                entry_time TEXT,
+                exit_time TEXT,
+                pnl REAL,
+                pnl_percent REAL,
+                exit_reason TEXT
+            )
+        """)
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         query = "INSERT INTO trade_history (chat_id, symbol, side, entry_price, exit_price, qty, entry_time, exit_time, pnl, pnl_percent, exit_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         cursor.execute(query, (chat_id, symbol, side, entry_price, exit_price, qty, now_str, now_str, pnl, pnl_percent, exit_reason))
