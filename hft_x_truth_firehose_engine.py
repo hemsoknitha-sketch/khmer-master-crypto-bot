@@ -2,9 +2,9 @@
 ⚡ APEX AGI HIGH-FREQUENCY ULTRA-LOW LATENCY X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE
 ========================================================================================
 Architecture: 2ms In-Memory Zero-Copy Event Pipeline with Anti-Spoofing, IOC Slippage Guard, 
-              Deterministic GC Controls & Self-Healing Stream Watchdog
+              Deterministic GC Controls & Super Smart Languages v11.00 (KM / EN / ZH)
 Server Location: Tokyo, Japan (Primary) + Singapore (Secondary Redundant Node)
-Author: Khmer Master Crypto - AGI Apex Super Brain v11.0 (Master Engineer Edition)
+Author: Khmer Master Crypto - AGI Apex Super Brain v11.0
 """
 
 import os
@@ -179,10 +179,14 @@ EVENT_RAM_BUFFER = EventRingBuffer()
 
 
 # ==============================================================================
-# 📢 3. VIP TELEGRAM NOTIFICATION FORMATTER (HIGH IMPACT EVENT ALERTS)
+# 🌐 3. SUPER SMART LANGUAGES v11.00 VIP TELEGRAM NOTIFICATION FORMATTER
 # ==============================================================================
-def format_vip_telegram_notification(event: dict) -> str:
-    """Formats ultra-clear high-impact Telegram alert for VIP users."""
+def format_vip_telegram_notification(event: dict, lang: str = "khmer") -> str:
+    """Formats ultra-clear high-impact Telegram alert in target language (KM / EN / ZH)."""
+    lang_clean = str(lang or 'khmer').lower()
+    is_khmer = (lang_clean in ['khmer', 'km'])
+    is_chinese = (lang_clean in ['zh', 'chinese'])
+    
     sentiment = event.get("sentiment", "NEUTRAL")
     sentiment_badge = "🟢 STRONG BULLISH 🚀" if sentiment == "STRONG_BULLISH" else (
         "🟢 BULLISH 📈" if sentiment == "BULLISH" else (
@@ -190,24 +194,56 @@ def format_vip_telegram_notification(event: dict) -> str:
         )
     )
     
-    trade_action = "🟢 AUTO BUY (Long)" if "BULLISH" in sentiment else "🔴 AUTO SELL (Short)"
     symbols_str = ", ".join(event.get("target_symbols", ["BTCUSDT"]))
     kws = event.get("bull_keywords", []) + event.get("bear_keywords", [])
     kws_str = ", ".join([f"`{k}`" for k in kws]) if kws else "`Market Momentum`"
+    latency_str = f"{event.get('total_pipeline_latency_ms', 0.044):.3f} ms"
 
-    msg = (
-        f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
-        f"───────────────────────────────\n\n"
-        f"📡 **ប្រភព (Source) ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
-        f"📝 **សារដើម (Breaking Post) ៖**\n"
-        f"_{event.get('text', '')}_\n\n"
-        f"🧠 **ការវិភាគ AI Sentiment ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` Index)\n"
-        f"🔑 **ពាក្យគន្លឹះសំខាន់ៗ ៖** {kws_str}\n"
-        f"🪙 **កាក់គោលដៅ ៖** `{symbols_str}`\n"
-        f"🚀 **សកម្មភាព AGI Trade ៖** `{trade_action}` (10x-15x Lev)\n"
-        f"⚡ **ល្បឿនដំណើរការ (HFT Latency) ៖** `{event.get('total_pipeline_latency_ms', 0.044):.3f} ms` (In-Memory Tokyo Node)\n\n"
-        f"🛡️ _ប្រព័ន្ធ AGI បានបើកបញ្ជា Trade លើ Binance/Bybit ស្វ័យប្រវត្ត មុនទីផ្សាររាយរាប់ម៉ឺនដង!_"
-    )
+    if is_khmer:
+        trade_action = "🟢 AUTO BUY (Long)" if "BULLISH" in sentiment else "🔴 AUTO SELL (Short)"
+        msg = (
+            f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
+            f"───────────────────────────────\n\n"
+            f"📡 **ប្រភព (Source) ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
+            f"📝 **សារដើម (Breaking Post) ៖**\n"
+            f"_{event.get('text', '')}_\n\n"
+            f"🧠 **ការវិភាគ AI Sentiment ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` Index)\n"
+            f"🔑 **ពាក្យគន្លឹះសំខាន់ៗ ៖** {kws_str}\n"
+            f"🪙 **កាក់គោលដៅ ៖** `{symbols_str}`\n"
+            f"🚀 **សកម្មភាព AGI Trade ៖** `{trade_action}` (10x-15x Lev)\n"
+            f"⚡ **ល្បឿនដំណើរការ (HFT Latency) ៖** `{latency_str}` (In-Memory Tokyo Node)\n\n"
+            f"🛡️ _ប្រព័ន្ធ AGI បានបើកបញ្ជា Trade លើ Binance/Bybit ស្វ័យប្រវត្ត មុនទីផ្សាររាយរាប់ម៉ឺនដង!_"
+        )
+    elif is_chinese:
+        trade_action = "🟢 自动买入 (Long)" if "BULLISH" in sentiment else "🔴 自动卖出 (Short)"
+        msg = (
+            f"⚡ **APEX AGI 极速新闻事件预警!** 🚨\n"
+            f"───────────────────────────────\n\n"
+            f"📡 **消息来源 ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
+            f"📝 **原始帖子 ៖**\n"
+            f"_{event.get('text', '')}_\n\n"
+            f"🧠 **AI 情绪分析 ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` 指数)\n"
+            f"🔑 **关键触发词 ៖** {kws_str}\n"
+            f"🪙 **目标代币 ៖** `{symbols_str}`\n"
+            f"🚀 **AGI 交易指令 ៖** `{trade_action}` (10x-15x 杠杆)\n"
+            f"⚡ **处理延迟 (HFT Latency) ៖** `{latency_str}` (东京内存节点)\n\n"
+            f"🛡️ _AGI 系统已自动在 Binance/Bybit 抢先散户毫秒级下单！_"
+        )
+    else: # English
+        trade_action = "🟢 AUTO BUY (Long)" if "BULLISH" in sentiment else "🔴 AUTO SELL (Short)"
+        msg = (
+            f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
+            f"───────────────────────────────\n\n"
+            f"📡 **Source ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
+            f"📝 **Breaking Post ៖**\n"
+            f"_{event.get('text', '')}_\n\n"
+            f"🧠 **AI Sentiment Analysis ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` Index)\n"
+            f"🔑 **Key Keywords ៖** {kws_str}\n"
+            f"🪙 **Target Symbol ៖** `{symbols_str}`\n"
+            f"🚀 **AGI Trade Action ៖** `{trade_action}` (10x-15x Lev)\n"
+            f"⚡ **HFT Latency ៖** `{latency_str}` (In-Memory Tokyo Node)\n\n"
+            f"🛡️ _AGI system automatically executed order on Binance/Bybit ahead of retail markets!_"
+        )
     return msg
 
 
@@ -373,5 +409,7 @@ if __name__ == "__main__":
     res = HFTEventProcessor.process_incoming_post("X_FIREHOSE", "realDonaldTrump", sample_tweet, time.time_ns(), author_id="25073877")
     print("\n--- ⚡ BENCHMARK RESULT ---")
     print(json.dumps(res, indent=2))
-    print("\n--- 📢 SAMPLE TELEGRAM VIP NOTIFICATION CARD ---")
-    print(format_vip_telegram_notification(res))
+    print("\n--- 📢 SAMPLE TELEGRAM VIP NOTIFICATION CARDS (KM / EN / ZH) ---")
+    print("\n[ 🇰🇭 KHMER ]:\n" + format_vip_telegram_notification(res, "khmer"))
+    print("\n[ 🇺🇸 ENGLISH ]:\n" + format_vip_telegram_notification(res, "english"))
+    print("\n[ 🇨🇳 CHINESE ]:\n" + format_vip_telegram_notification(res, "chinese"))
