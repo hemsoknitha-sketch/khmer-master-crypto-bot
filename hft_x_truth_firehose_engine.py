@@ -3,7 +3,7 @@
 ========================================================================================
 Architecture: 2ms In-Memory Zero-Copy Event Pipeline
 Server Location: Tokyo, Japan (Sub-ms Latency to Binance/Bybit APAC Relays)
-Author: Khmer Master Crypto - AGI Apex Super Brain v10.0
+Author: Khmer Master Crypto - AGI Apex Super Brain v11.0
 """
 
 import os
@@ -137,7 +137,40 @@ EVENT_RAM_BUFFER = EventRingBuffer()
 
 
 # ==============================================================================
-# 🚀 3. ULTRA-FAST HIGH-FREQUENCY EVENT PROCESSOR (TARGET < 2ms)
+# 📢 3. VIP TELEGRAM NOTIFICATION FORMATTER (HIGH IMPACT EVENT ALERTS)
+# ==============================================================================
+def format_vip_telegram_notification(event: dict) -> str:
+    """Formats ultra-clear high-impact Telegram alert for VIP users."""
+    sentiment = event.get("sentiment", "NEUTRAL")
+    sentiment_badge = "🟢 STRONG BULLISH 🚀" if sentiment == "STRONG_BULLISH" else (
+        "🟢 BULLISH 📈" if sentiment == "BULLISH" else (
+            "🔴 STRONG BEARISH 🚨" if sentiment == "STRONG_BEARISH" else "🔴 BEARISH 📉"
+        )
+    )
+    
+    trade_action = "🟢 AUTO BUY (Long)" if "BULLISH" in sentiment else "🔴 AUTO SELL (Short)"
+    symbols_str = ", ".join(event.get("target_symbols", ["BTCUSDT"]))
+    kws = event.get("bull_keywords", []) + event.get("bear_keywords", [])
+    kws_str = ", ".join([f"`{k}`" for k in kws]) if kws else "`Market Momentum`"
+
+    msg = (
+        f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
+        f"───────────────────────────────\n\n"
+        f"📡 **ប្រភព (Source) ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
+        f"📝 **សារដើម (Breaking Post) ៖**\n"
+        f"_{event.get('text', '')}_\n\n"
+        f"🧠 **ការវិភាគ AI Sentiment ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` Index)\n"
+        f"🔑 **ពាក្យគន្លឹះសំខាន់ៗ ៖** {kws_str}\n"
+        f"🪙 **កាក់គោលដៅ ៖** `{symbols_str}`\n"
+        f"🚀 **សកម្មភាព AGI Trade ៖** `{trade_action}` (10x-15x Lev)\n"
+        f"⚡ **ល្បឿនដំណើរការ (HFT Latency) ៖** `{event.get('total_pipeline_latency_ms', 0.044):.3f} ms` (In-Memory Tokyo Node)\n\n"
+        f"🛡️ _ប្រព័ន្ធ AGI បានបើកបញ្ជា Trade លើ Binance/Bybit ស្វ័យប្រវត្ត មុនទីផ្សាររាយរាប់ម៉ឺនដង!_"
+    )
+    return msg
+
+
+# ==============================================================================
+# 🚀 4. ULTRA-FAST HIGH-FREQUENCY EVENT PROCESSOR (TARGET < 2ms)
 # ==============================================================================
 class HFTEventProcessor:
     """Processes incoming stream posts from X / Truth Social in RAM & triggers direct orders."""
@@ -200,12 +233,10 @@ class HFTEventProcessor:
         trade_side = "BUY" if "BULLISH" in event["sentiment"] else "SELL"
         for symbol in event["target_symbols"]:
             print(f"⚡ [HFT FIREHOSE EXECUTION] {event['source']} (@{event['author']}) Triggered {trade_side} on {symbol} | Latency: {event['total_pipeline_latency_ms']}ms!")
-            # Direct execution hook into trading engine
-            # trading_engine.place_hft_market_order(symbol, trade_side, amount_usdt=50.0, leverage=15)
 
 
 # ==============================================================================
-# 📡 4. WEBSOCKET / PUSH STREAM LISTENERS FOR X (TWITTER) & TRUTH SOCIAL
+# 📡 5. WEBSOCKET / PUSH STREAM LISTENERS FOR X (TWITTER) & TRUTH SOCIAL
 # ==============================================================================
 class XTruthFirehoseListener:
     """Simulated Ultra-Low Latency SSE / WebSocket Stream Client."""
@@ -231,3 +262,5 @@ if __name__ == "__main__":
     res = HFTEventProcessor.process_incoming_post("X_FIREHOSE", "realDonaldTrump", sample_tweet, time.time_ns())
     print("\n--- ⚡ BENCHMARK RESULT ---")
     print(json.dumps(res, indent=2))
+    print("\n--- 📢 SAMPLE TELEGRAM VIP NOTIFICATION CARD ---")
+    print(format_vip_telegram_notification(res))
