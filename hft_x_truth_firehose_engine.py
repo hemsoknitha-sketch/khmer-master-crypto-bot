@@ -1,7 +1,7 @@
 """
 ⚡ APEX AGI HIGH-FREQUENCY ULTRA-LOW LATENCY X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE
 ========================================================================================
-Architecture: 2ms In-Memory Zero-Copy Event Pipeline with IOC Slippage Guard
+Architecture: 2ms In-Memory Zero-Copy Event Pipeline with Anti-Spoofing & IOC Slippage Guard
 Server Location: Tokyo, Japan (Primary) + Singapore (Secondary Redundant Node)
 Author: Khmer Master Crypto - AGI Apex Super Brain v11.0
 """
@@ -33,6 +33,14 @@ import trading_engine
 # ==============================================================================
 # 🎯 1. IN-MEMORY NANO-NLP & AHO-CORASICK FAST KEYWORD TRIE (< 0.05ms)
 # ==============================================================================
+# Immutable Official Account Numeric User IDs to block Fake Account Spoofing
+VERIFIED_NUMERIC_USER_IDS = {
+    "25073877": "realDonaldTrump",
+    "44196397": "elonmusk",
+    "14886361": "federalreserve",
+    "7592462": "SECGov"
+}
+
 HIGH_IMPACT_ENTITIES = {
     "TRUMP": ["donald trump", "realdonaldtrump", "potus", "president trump", "trump"],
     "ELON": ["elon musk", "elonmusk", "doge father"],
@@ -201,8 +209,13 @@ class HFTEventProcessor:
     """Processes incoming stream posts from X / Truth Social in RAM & triggers direct orders."""
     
     @staticmethod
-    def process_incoming_post(source: str, author: str, raw_text: str, timestamp_ns: int) -> dict:
+    def process_incoming_post(source: str, author: str, raw_text: str, timestamp_ns: int, author_id: str = "") -> dict:
         t0 = time.perf_counter()
+
+        # Step 0: Immutable Author Account Verification (Block Fake Account Spoofing)
+        if author_id and author_id not in VERIFIED_NUMERIC_USER_IDS:
+            print(f"🛡️ [ANTI-SPOOFING SHIELD] Blocked unverified author ID: {author_id} (@{author})")
+            return {"status": "REJECTED_UNVERIFIED_AUTHOR"}
         
         # Step 1: Fast Nano NLP Trie Sentiment Analysis (In-Memory)
         analysis = NANO_TRIE.analyze(raw_text)
@@ -285,7 +298,7 @@ HFT_ENGINE = XTruthFirehoseListener()
 if __name__ == "__main__":
     # Self-test benchmark
     sample_tweet = "Donald Trump announces Executive Order establishing a US Strategic Bitcoin Reserve with ZERO capital gains tax!"
-    res = HFTEventProcessor.process_incoming_post("X_FIREHOSE", "realDonaldTrump", sample_tweet, time.time_ns())
+    res = HFTEventProcessor.process_incoming_post("X_FIREHOSE", "realDonaldTrump", sample_tweet, time.time_ns(), author_id="25073877")
     print("\n--- ⚡ BENCHMARK RESULT ---")
     print(json.dumps(res, indent=2))
     print("\n--- 📢 SAMPLE TELEGRAM VIP NOTIFICATION CARD ---")
