@@ -1,7 +1,7 @@
 """
 ⚡ APEX AGI HIGH-FREQUENCY ULTRA-LOW LATENCY X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE
 ========================================================================================
-Architecture: 2ms In-Memory Zero-Copy Event Pipeline with Anti-Spoofing & IOC Slippage Guard
+Architecture: 2ms In-Memory Zero-Copy Event Pipeline with Anti-Spoofing, IOC Slippage Guard & Deduplication
 Server Location: Tokyo, Japan (Primary) + Singapore (Secondary Redundant Node)
 Author: Khmer Master Crypto - AGI Apex Super Brain v11.0
 """
@@ -11,6 +11,7 @@ import sys
 import time
 import json
 import re
+import hashlib
 import asyncio
 import threading
 from collections import deque
@@ -60,8 +61,10 @@ BEARISH_TRIGGERS = [
     "binance ban", "illegal asset", "bearish crash"
 ]
 
+NEGATION_WORDS = ["not", "never", "no", "deny", "denies", "false", "fake", "untrue", "without"]
+
 class FastSentimentTrie:
-    """Ultra-Fast In-Memory Keyword Matcher with Aho-Corasick O(N) Complexity."""
+    """Ultra-Fast In-Memory Keyword Matcher with Aho-Corasick O(N) Complexity & Negation Filter."""
     def __init__(self):
         self.trie = None
         self._build_trie()
@@ -78,7 +81,7 @@ class FastSentimentTrie:
             self.trie = None
 
     def analyze(self, text: str) -> Dict[str, Any]:
-        """Analyzes text in < 0.05 milliseconds using RAM-cached Trie."""
+        """Analyzes text in < 0.05 milliseconds using RAM-cached Trie with Negation Filter."""
         t_start = time.perf_counter()
         text_lower = text.lower()
         
@@ -86,19 +89,24 @@ class FastSentimentTrie:
         bear_matches = []
 
         if self.trie:
-            for _, (sentiment, kw) in self.trie.iter(text_lower):
-                if sentiment == "BULLISH":
-                    bull_matches.append(kw)
-                elif sentiment == "BEARISH":
-                    bear_matches.append(kw)
+            for idx, (sentiment, kw) in self.trie.iter(text_lower):
+                # Negation Filter: Check 25 characters preceding the trigger word
+                pre_text = text_lower[max(0, idx - len(kw) - 25): idx - len(kw)]
+                has_negation = any(neg in pre_text.split() for neg in NEGATION_WORDS)
+
+                if has_negation:
+                    # Invert sentiment if negation word detected
+                    if sentiment == "BULLISH": bear_matches.append(f"NOT_{kw}")
+                    elif sentiment == "BEARISH": bull_matches.append(f"NOT_{kw}")
+                else:
+                    if sentiment == "BULLISH": bull_matches.append(kw)
+                    elif sentiment == "BEARISH": bear_matches.append(kw)
         else:
             # Fallback regex search
             for kw in BULLISH_TRIGGERS:
-                if kw in text_lower:
-                    bull_matches.append(kw)
+                if kw in text_lower: bull_matches.append(kw)
             for kw in BEARISH_TRIGGERS:
-                if kw in text_lower:
-                    bear_matches.append(kw)
+                if kw in text_lower: bear_matches.append(kw)
 
         latency_ms = (time.perf_counter() - t_start) * 1000.0
 
@@ -125,13 +133,30 @@ NANO_TRIE = FastSentimentTrie()
 
 
 # ==============================================================================
-# ⚡ 2. ZERO-COPY LOCK-FREE IN-MEMORY RING BUFFER (RAM PIPELINE)
+# ⚡ 2. ZERO-COPY LOCK-FREE IN-MEMORY RING BUFFER WITH DEDUPLICATION (RAM PIPELINE)
 # ==============================================================================
 class EventRingBuffer:
-    """Pre-allocated circular RAM deque for zero-disk latency processing."""
+    """Pre-allocated circular RAM deque for zero-disk latency processing with 60s Hash Deduplication."""
     def __init__(self, maxlen: int = 1000):
         self.buffer = deque(maxlen=maxlen)
+        self.seen_hashes = {}  # { event_hash: timestamp }
         self.lock = threading.Lock()
+
+    def is_duplicate(self, text: str, author: str) -> bool:
+        now = time.time()
+        event_str = f"{author.lower()}_{text.strip().lower()}"
+        event_hash = hashlib.md5(event_str.encode('utf-8')).hexdigest()
+        
+        with self.lock:
+            # Purge hashes older than 60 seconds
+            expired_keys = [k for k, t in self.seen_hashes.items() if now - t > 60.0]
+            for k in expired_keys:
+                del self.seen_hashes[k]
+
+            if event_hash in self.seen_hashes:
+                return True
+            self.seen_hashes[event_hash] = now
+            return False
 
     def push(self, event: dict):
         with self.lock:
@@ -212,7 +237,12 @@ class HFTEventProcessor:
     def process_incoming_post(source: str, author: str, raw_text: str, timestamp_ns: int, author_id: str = "") -> dict:
         t0 = time.perf_counter()
 
-        # Step 0: Immutable Author Account Verification (Block Fake Account Spoofing)
+        # Step 0: Event Deduplication Check (Block Multi-Stream Duplicate Orders)
+        if EVENT_RAM_BUFFER.is_duplicate(raw_text, author):
+            print(f"🛡️ [DEDUPLICATION SHIELD] Ignored duplicate event stream from @{author}")
+            return {"status": "REJECTED_DUPLICATE_EVENT"}
+
+        # Step 0.5: Immutable Author Account Verification (Block Fake Account Spoofing)
         if author_id and author_id not in VERIFIED_NUMERIC_USER_IDS:
             print(f"🛡️ [ANTI-SPOOFING SHIELD] Blocked unverified author ID: {author_id} (@{author})")
             return {"status": "REJECTED_UNVERIFIED_AUTHOR"}
