@@ -4490,6 +4490,15 @@ async def vip_8hour_executive_report_job(app: Application):
     except Exception as e:
         print(f"Error in vip_8hour_executive_report_job: {e}")
 
+async def ping_hf_space_job():
+    """Keep-Alive job running every 12 minutes to prevent Hugging Face Space from sleeping."""
+    try:
+        from hf_client import hf_ai_client
+        await hf_ai_client.ping_health(timeout_sec=5)
+    except Exception:
+        pass
+
+
 
 
 

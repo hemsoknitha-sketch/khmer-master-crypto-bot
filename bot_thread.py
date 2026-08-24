@@ -7203,7 +7203,16 @@ class TelegramBotThread(BaseThread):
             id='vps_health_monitor_job'
         )
 
+        # 🤗 Hugging Face Space Keep-Alive Ping (Every 12 minutes)
+        self.scheduler.add_job(
+            scheduler_tasks.ping_hf_space_job,
+            'interval',
+            minutes=12,
+            id='ping_hf_space_job'
+        )
+
         self.log_signal.emit("⚙️ Pre-Pump Daily Train job scheduled at 2:00 AM (UTC+7).")
+
         self.scheduler.start()
         self.log_signal.emit("⏰ APScheduler started (Cron Jobs active).")
         self.log_signal.emit("🤖 Telegram Bot removed from Main Thread and is now running...")
