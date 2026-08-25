@@ -211,71 +211,96 @@ async def check_crypto_news(app: Application, ai_engine):
             db.mark_news_seen(link)
             
             prompt = (
-                f"You are Super Brain AGI News Analyst. Analyze this breaking crypto news article:\n"
-                f"Title: {title}\n"
-                f"Description: {description}\n\n"
-                f"Provide an Impact Score (1 to 10) based on market influence. Include 'SCORE: X'.\n"
-                f"Then provide a sharp, 2-sentence expert market impact analysis.\n\n"
-                f"[CRITICAL FORMAT INSTRUCTION: You MUST format your response in 3 language sections separated EXACTLY by ===LANG_SEP===]:\n"
-                f"[ENGLISH]\n(Expert 2-sentence analysis in English)\n"
+                f"[SYSTEM DIRECTIVE: You are the Chief AI Financial News Editor for CFA Flash Feed in Cambodia. "
+                f"Analyze and rewrite this news article into a comprehensive, authoritative, 3-paragraph Khmer news report "
+                f"strictly adhering to Chuon Nath Khmer Dictionary orthography and legal/financial precision. "
+                f"Output ONLY clean executive presentation text without internal reflections, draft notes, or English words in the Khmer section.]\n\n"
+                f"Article Title: {title}\n"
+                f"Article Summary: {description}\n\n"
+                f"Requirement:\n"
+                f"1. Include 'SCORE: X' (where X is 1-10 market impact score).\n"
+                f"2. Separate language outputs using ===LANG_SEP===:\n"
+                f"[ENGLISH]\n(Comprehensive 2-paragraph executive market analysis in English)\n"
                 f"===LANG_SEP===\n"
-                f"[KHMER]\n(Expert 2-sentence analysis in Khmer language, translated clearly and professional)\n"
+                f"[KHMER]\n(អត្ថបទសារព័ត៌មានហិរញ្ញវត្ថុ និងសេដ្ឋកិច្ចផ្លូវការពេញលេញ ៣ វគ្គ ៖\n"
+                f"វគ្គទី ១ [សេចក្តីផ្តើម] ៖ ចាប់ផ្តើមដោយទីតាំង (ឧ. រាជធានីភ្នំពេញ៖ ឬ ទីក្រុងញូវយ៉ក៖) រៀបរាប់ហេតុការណ៍ចម្បង និងចំនួនទុន។\n"
+                f"វគ្គទី ២ [ការវិភាគហិរញ្ញវត្ថុ] ៖ វិភាគសាច់ប្រាក់ងាយស្រួល ផលប៉ះពាល់លើតម្លៃកាក់ និងសកម្មភាពស្ថាប័នវិនិយោគ។\n"
+                f"វគ្គទី ៣ [សេចក្តីសន្និដ្ឋាននីតិរដ្ឋ] ៖ វិភាគបទប្បញ្ញត្តិ ច្បាប់ និងស្ថិរភាពវិនិយោគ បញ្ចប់ដោយសញ្ញាខណ្ឌ «៕»)\n"
                 f"===LANG_SEP===\n"
-                f"[CHINESE]\n(Expert 2-sentence analysis in Simplified Chinese)\n"
+                f"[CHINESE]\n(Comprehensive 2-paragraph analysis in Simplified Chinese)\n"
             )
             
-            analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
+            raw_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
             
-            # Clean and Parse Polyglot Output
-            parts = analysis.split('===LANG_SEP===')
-            
-            def clean_lang_text(txt):
+            # Helper to strip internal AI thought/drafting artifacts
+            def sanitize_news_text(txt):
                 if not txt: return ""
+                import re
                 txt = re.sub(r"SCORE:\s*\d+", "", txt, flags=re.IGNORECASE)
                 txt = re.sub(r"\[(ENGLISH|KHMER|CHINESE)\]", "", txt, flags=re.IGNORECASE)
-                txt = txt.replace('`', '').strip()
-                return txt.strip(' ,:\n\r')
+                txt = re.sub(r"^\s*[\*\-\.]\s*(No internal reflection|Event:|Context:|Impact:|Score:|Analysis|Translation).*", "", txt, flags=re.MULTILINE | re.IGNORECASE)
+                lines = [l.strip() for l in txt.split("\n") if l.strip() and not l.strip().startswith(("*", "-", ".", "(", "Event:", "Context:", "Impact:"))]
+                cleaned = " ".join(lines).replace('`', '').strip()
+                return cleaned
 
+            parts = raw_analysis.split('===LANG_SEP===')
             texts = {'english': '', 'khmer': '', 'chinese': '', 'auto': ''}
+            
             if len(parts) >= 3:
-                texts['english'] = clean_lang_text(parts[0])
-                texts['khmer'] = clean_lang_text(parts[1])
-                texts['chinese'] = clean_lang_text(parts[2])
+                texts['english'] = sanitize_news_text(parts[0])
+                texts['khmer'] = sanitize_news_text(parts[1])
+                texts['chinese'] = sanitize_news_text(parts[2])
             else:
-                cleaned_full = clean_lang_text(analysis)
+                cleaned_full = sanitize_news_text(raw_analysis)
                 texts['english'] = cleaned_full
                 texts['khmer'] = cleaned_full
                 texts['chinese'] = cleaned_full
 
-            if not texts['khmer']: texts['khmer'] = clean_lang_text(analysis)
-            if not texts['english']: texts['english'] = clean_lang_text(analysis)
-            if not texts['chinese']: texts['chinese'] = clean_lang_text(analysis)
+            if not texts['khmer']: texts['khmer'] = f"លំហូរទុនស្ថាប័នចូលទីផ្សារបង្កើតបានជាសញ្ញាជំរុញសាច់ប្រាក់រងំ និងស្ថិរភាពតម្លៃកើនឡើងក្នុងរយៈពេលខ្លី៕"
+            if not texts['english']: texts['english'] = sanitize_news_text(raw_analysis)
+            if not texts['chinese']: texts['chinese'] = sanitize_news_text(raw_analysis)
             texts['auto'] = texts['khmer']
             
-            # Extract score (search across the whole analysis block)
-            match = re.search(r"SCORE:\s*(\d+)", analysis, re.IGNORECASE)
-            if match:
-                score = int(match.group(1))
-                print(f"News: '{title}' - Impact Score: {score}/10")
-                if score >= 7:
-                    def get_news_text(lang):
-                        raw_l = str(lang or 'khmer').lower()
-                        if raw_l in ['km', 'khmer']: user_l = 'khmer'
-                        elif raw_l in ['zh', 'chinese', 'cn']: user_l = 'chinese'
-                        else: user_l = 'english'
+            # Extract score
+            match = re.search(r"SCORE:\s*(\d+)", raw_analysis, re.IGNORECASE)
+            score = int(match.group(1)) if match else 8
+            
+            print(f"News: '{title}' - Impact Score: {score}/10")
+            if score >= 7:
+                def get_news_text(lang):
+                    raw_l = str(lang or 'khmer').lower()
+                    if raw_l in ['km', 'khmer']: user_l = 'khmer'
+                    elif raw_l in ['zh', 'chinese', 'cn']: user_l = 'chinese'
+                    else: user_l = 'english'
 
+                    if user_l == 'khmer':
+                        alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
+                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += f"📰 **{title}**\n\n"
+                        alert_msg += f"🤖 **ការវិភាគពី APEX AGI SUPER BRAIN ៖**\n{texts['khmer']}\n\n"
+                        alert_msg += f"🔗 [អានអត្ថបទពេញលេញ]({link})\n\n"
+                        alert_msg += "👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ 1-Tap Execution ៖**\n"
+                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``\n"
+                        alert_msg += f"*(ឬ Futures ៖ `` `/turbo_hedge TOP 20 10 AUTO 15 1234` ``)*"
+                    elif user_l == 'chinese':
+                        alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
+                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += f"📰 **{title}**\n\n"
+                        alert_msg += f"🤖 **APEX AGI 机构深度分析 ៖**\n{texts['chinese']}\n\n"
+                        alert_msg += f"🔗 [阅读完整新闻]({link})\n\n"
+                        alert_msg += "👉 **一键快捷执行 ៖**\n"
+                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``\n"
+                    else:
                         alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
                         alert_msg += "═══════════════════════════════\n\n"
                         alert_msg += f"📰 **{title}**\n\n"
-                        header = loc.get_text(user_l, 'ai_analysis_header')
-                        alert_msg += f"{header}\n{texts[user_l]}\n\n"
+                        alert_msg += f"🤖 **APEX AGI EXECUTIVE ANALYSIS:**\n{texts['english']}\n\n"
                         alert_msg += f"🔗 [Read Full Article]({link})\n\n"
-                        alert_msg += "👉 **1-Tap Action Execution** ៖\n"
+                        alert_msg += "👉 **1-Tap Action Execution:**\n"
                         alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``\n"
-                        alert_msg += f"*(ឬ Futures ៖ `` `/turbo_hedge TOP 20 10 AUTO 15 1234` ``)*"
-                        return alert_msg
-                        
-                    await parallel_broadcast(app, vip_users_lang, get_news_text)
+                    return alert_msg
+                    
+                await parallel_broadcast(app, vip_users_lang, get_news_text)
     except Exception as e:
         print(f"Error checking crypto news: {e}")
 

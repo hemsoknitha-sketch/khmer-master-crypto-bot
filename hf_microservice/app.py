@@ -256,5 +256,5 @@ def api_sentiment(req: SentimentRequest):
 # Respects Hugging Face Node.js SSR reverse proxy running on Port 7860
 # ------------------------------------------------------------------------------
 
-target_port = int(os.environ.get("GRADIO_SERVER_PORT", os.environ.get("PORT", 7861)))
+target_port = int(os.environ.get("GRADIO_SERVER_PORT", os.environ.get("PORT", 7860)))
 demo.launch(server_name="0.0.0.0", server_port=target_port)

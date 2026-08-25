@@ -1,0 +1,32 @@
+name: Super Brain Hugging Face Auto-Trainer Pipeline
+
+on:
+  schedule:
+    # Runs every 14 days at 3:00 AM UTC
+    - cron: '0 3 */14 * *'
+  workflow_dispatch: # Allows manual 1-click trigger anytime from GitHub Actions tab
+
+jobs:
+  train-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python Environment (3.11)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Machine Learning Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn xgboost tensorflow hmmlearn yfinance requests joblib huggingface_hub
+
+      - name: Execute Super Brain Machine Learning Training & Upload to HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_MODEL_REPO: "hemsinath/apex-ai-brain-models"
+        run: |
+          python hf_cloud_trainer.py

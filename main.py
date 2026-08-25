@@ -68,12 +68,17 @@ from dotenv import load_dotenv
 # Load Environment Variables from .env file BEFORE importing local modules
 load_dotenv()
 
-if "--offscreen" in sys.argv:
-    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+is_cli_mode = ("--cli" in sys.argv or "--no-gui" in sys.argv or "--vps" in sys.argv or "--headless" in sys.argv or "-vps" in sys.argv)
 
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QTextEdit, QVBoxLayout, QWidget, QLabel, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QRadioButton, QHBoxLayout, QMessageBox, QAbstractItemView, QSystemTrayIcon, QMenu, QAction, QStyle, QComboBox, QListWidget, QListWidgetItem)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QIcon
+try:
+    from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QTextEdit, QVBoxLayout, QWidget, QLabel, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QRadioButton, QHBoxLayout, QMessageBox, QAbstractItemView, QSystemTrayIcon, QMenu, QAction, QStyle, QComboBox, QListWidget, QListWidgetItem)
+    from PyQt5.QtCore import Qt, QThread, pyqtSignal
+    from PyQt5.QtGui import QIcon
+except ImportError:
+    class QThread: pass
+    def pyqtSignal(*args, **kwargs): return lambda: None
+    QApplication = QMainWindow = QWidget = object
+
 from ai_engine import AIInvestmentEngine
 from bot_thread import TelegramBotThread
 import database as db
@@ -678,9 +683,7 @@ class ApexVPSHeadlessEngine:
 
 if __name__ == "__main__":
     import signal
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtCore import QTimer
-    
+
     is_cli_mode = ("--cli" in sys.argv or "--no-gui" in sys.argv or "--vps" in sys.argv or "--headless" in sys.argv or "-vps" in sys.argv)
     
     if is_cli_mode:
@@ -716,6 +719,13 @@ if __name__ == "__main__":
         print("🛡️ [24/7 VPS ENGINE] Telegram Bot & AGI Engines active and running 24/7 in Pure Python!")
         bot_service.run()
     else:
+        try:
+            from PyQt5.QtWidgets import QApplication
+            from PyQt5.QtCore import QTimer
+        except ImportError:
+            print("❌ Error: PyQt5 is not installed. Run with --cli for Headless VPS Mode.")
+            sys.exit(1)
+
         app = QApplication(sys.argv)
         app.setQuitOnLastWindowClosed(False)
         

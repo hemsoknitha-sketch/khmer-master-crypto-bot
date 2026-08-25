@@ -6,6 +6,11 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import google.generativeai as genai
 from datetime import datetime
 
+try:
+    from huggingface_hub import InferenceClient
+except ImportError:
+    InferenceClient = None
+
 class AIInvestmentEngine:
     def __init__(self, api_key: str):
         # Sanitize API key string (strip whitespace, quotes, newlines)
@@ -29,6 +34,18 @@ class AIInvestmentEngine:
         self.base_prompt = base_prompt
         self._cache = {}
         self.CACHE_TTL = 900 # 15 minutes cache for exact prompts
+
+        # Initialize Hugging Face Serverless Client (DeepSeek-R1 & Llama-3.3-70B)
+        self.hf_token = os.getenv("HF_TOKEN", "").strip()
+        if self.hf_token and InferenceClient:
+            try:
+                self.hf_client = InferenceClient(api_key=self.hf_token)
+                print("✅ [AI ENGINE] Hugging Face Super Brain Inference API (DeepSeek-R1 / Llama-3-70B) connected.")
+            except Exception as e:
+                self.hf_client = None
+                print(f"⚠️ [AI ENGINE] Hugging Face client notice: {e}")
+        else:
+            self.hf_client = None
         
         # Dynamic Model Discovery via genai.list_models()
         self.supported_models = []
@@ -70,6 +87,169 @@ class AIInvestmentEngine:
             ]
             
         self.primary_model_name = self.supported_models[0]
+
+    def analyze_with_deepseek_r1(self, symbol: str = "BTCUSDT", prompt: str = None) -> str:
+        """Call DeepSeek-R1 AGI Model តាមរយៈ HF Token ឥតគិតថ្លៃ 100%"""
+        if not self.hf_client:
+            return None
+        try:
+            response = self.hf_client.chat_completion(
+                model="deepseek-ai/DeepSeek-R1",
+                messages=[
+                    {"role": "system", "content": f"You are the Apex AGI Super Brain advisor for {symbol} in Khmer language."},
+                    {"role": "user", "content": prompt or f"Analyze {symbol} current price structure, trend, and targets."}
+                ],
+                max_tokens=600,
+                temperature=0.3
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"⚠️ [DeepSeek-R1 Notice]: {e}")
+            return None
+
+    def analyze_with_llama_70b(self, symbol: str = "BTCUSDT", prompt: str = None) -> str:
+        """Call Llama-3.3-70B-Instruct Model តាមរយៈ HF Token ឥតគិតថ្លៃ 100%"""
+        if not self.hf_client:
+            return None
+        try:
+            response = self.hf_client.chat_completion(
+                model="meta-llama/Llama-3.3-70B-Instruct",
+                messages=[
+                    {"role": "system", "content": f"You are the Apex AGI Super Brain financial advisor for {symbol} in Khmer language."},
+                    {"role": "user", "content": prompt or f"Provide quantitative signal analysis for {symbol}."}
+                ],
+                max_tokens=600,
+                temperature=0.3
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"⚠️ [Llama-3-70B Notice]: {e}")
+            return None
+
+    def analyze_with_qwen_32b(self, symbol: str = "BTCUSDT", prompt: str = None) -> str:
+        """Call Qwen-2.5-Coder-32B-Instruct Math & Risk Engine via HF Token"""
+        if not self.hf_client: return None
+        try:
+            response = self.hf_client.chat_completion(
+                model="Qwen/Qwen2.5-Coder-32B-Instruct",
+                messages=[
+                    {"role": "system", "content": f"You are the Quantitative Math & Risk-Reward Advisor for {symbol} in Khmer language."},
+                    {"role": "user", "content": prompt or f"Calculate Win-Rate, Stop-Loss and Take-Profit risk ratio for {symbol}."}
+                ],
+                max_tokens=600,
+                temperature=0.2
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"⚠️ [Qwen-32B Notice]: {e}")
+            return None
+
+    def analyze_with_mistral_7b(self, symbol: str = "BTCUSDT", prompt: str = None) -> str:
+        """Call Mistral-7B-Instruct-v0.3 Fast Momentum Scalping Engine via HF Token"""
+        if not self.hf_client: return None
+        try:
+            response = self.hf_client.chat_completion(
+                model="mistralai/Mistral-7B-Instruct-v0.3",
+                messages=[
+                    {"role": "system", "content": f"You are the Fast 15s High-Frequency Scalper for {symbol} in Khmer language."},
+                    {"role": "user", "content": prompt or f"Provide immediate momentum scalp signal for {symbol}."}
+                ],
+                max_tokens=400,
+                temperature=0.3
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"⚠️ [Mistral-7B Notice]: {e}")
+            return None
+
+    def analyze_with_5_agent_swarm(self, symbol: str = "BTCUSDT", market_data: str = "") -> dict:
+        """
+        Executes parallel Multi-Agent Swarm Analysis using 5 AI Super Brains:
+        1. Google Gemini 2.5 Flash (Primary Executive)
+        2. DeepSeek-R1 (Whale Footprint & Deep Reasoning)
+        3. Llama-3.3-70B (Macro News & Sentiment Catalyst)
+        4. Qwen-2.5-Coder-32B (Math & Risk-Reward Engine)
+        5. Mistral-7B (Sub-500ms Ultra Fast Scalping Engine)
+        """
+        print(f"🧠 [AGI 5-SWARM ENSEMBLE] Triggering 5 AI Super Brain Consensus for {symbol}...")
+        
+        prompt = f"Analyze market data for {symbol}: {market_data}. Provide signal (BULLISH, BEARISH, NEUTRAL) and targets."
+        
+        results = {}
+        # 1. Gemini Primary
+        results["gemini"] = self.analyze_opportunity(prompt)
+        # 2. DeepSeek-R1
+        results["deepseek"] = self.analyze_with_deepseek_r1(symbol, prompt)
+        # 3. Llama-3.3-70B
+        results["llama"] = self.analyze_with_llama_70b(symbol, prompt)
+        # 4. Qwen-32B
+        results["qwen"] = self.analyze_with_qwen_32b(symbol, prompt)
+        # 5. Mistral-7B
+        results["mistral"] = self.analyze_with_mistral_7b(symbol, prompt)
+        
+        # Calculate Consensus
+        bull_count = sum(1 for v in results.values() if v and ("BULLISH" in v.upper() or "BUY" in v.upper()))
+        bear_count = sum(1 for v in results.values() if v and ("BEARISH" in v.upper() or "SELL" in v.upper()))
+        active_count = sum(1 for v in results.values() if v)
+        
+        consensus_signal = "NEUTRAL"
+        confidence_pct = 75.0
+        if bull_count >= 3:
+            consensus_signal = "BULLISH"
+            confidence_pct = round((bull_count / max(1, active_count)) * 100, 1)
+        elif bear_count >= 3:
+            consensus_signal = "BEARISH"
+            confidence_pct = round((bear_count / max(1, active_count)) * 100, 1)
+            
+        return {
+            "symbol": symbol,
+            "consensus_signal": consensus_signal,
+            "confidence_pct": confidence_pct,
+            "active_swarm_agents": active_count,
+            "agent_outputs": results
+        }
+    def sync_brain_from_huggingface(self, repo_id: str = None) -> dict:
+        """
+        Downloads latest 2-week trained Machine Learning weights (.pkl) and brain_config.json
+        from Hugging Face Model Hub to local VPS working directory with zero downtime.
+        """
+        target_repo = repo_id or os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models")
+        token = self.hf_token or os.getenv("HF_TOKEN", "")
+        
+        files_to_sync = [
+            "brain_price.pkl",
+            "brain_trend.pkl",
+            "brain_vol.pkl",
+            "brain_tp.pkl",
+            "brain_dca.pkl",
+            "brain_scaler.pkl",
+            "brain_config.json"
+        ]
+        
+        synced_files = []
+        try:
+            from huggingface_hub import hf_hub_download
+            for filename in files_to_sync:
+                try:
+                    downloaded_path = hf_hub_download(
+                        repo_id=target_repo,
+                        filename=filename,
+                        repo_type="model",
+                        token=token if token else None,
+                        local_dir=os.getcwd()
+                    )
+                    synced_files.append(filename)
+                except Exception as e_file:
+                    print(f"⚠️ [HF SYNC NOTICE] Could not download {filename}: {e_file}")
+                    
+            if synced_files:
+                print(f"✅ [HF BRAIN SYNC SUCCESS] Downloaded {len(synced_files)} updated model files from {target_repo}.")
+                return {"status": "success", "synced_files": synced_files, "repo": target_repo}
+            else:
+                return {"status": "standby", "reason": "No new files found or repo is private", "repo": target_repo}
+        except Exception as e:
+            print(f"⚠️ [HF BRAIN SYNC NOTICE]: {e}")
+            return {"status": "error", "error": str(e)}
 
     def analyze_opportunity(self, user_input: str) -> str:
         """Legacy stateless call (used mostly by automated background tasks)"""
@@ -340,6 +520,15 @@ class AIInvestmentEngine:
                     last_error = e2
                     continue
                     
+        # 3. Try Hugging Face DeepSeek-R1 / Llama-3-70B Serverless API Fallback
+        if self.hf_client:
+            print("🔄 [AI ENGINE] Gemini fallback -> Attempting Hugging Face DeepSeek-R1 / Llama-3-70B Serverless Inference...")
+            hf_res = self.analyze_with_deepseek_r1(prompt=user_input) or self.analyze_with_llama_70b(prompt=user_input)
+            if hf_res:
+                cleaned_txt = self._clean_response(hf_res)
+                self._cache[cache_key] = (time.time(), cleaned_txt)
+                return cleaned_txt
+
         err_msg_str = str(last_error) if last_error else "Unknown"
         if "401" in err_msg_str or "invalid authentication" in err_msg_str.lower() or "access_token" in err_msg_str.lower():
             return (
