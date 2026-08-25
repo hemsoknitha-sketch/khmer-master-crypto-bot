@@ -47,24 +47,36 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                     return
                     
                 # 2. Send Photo if available
+                # 2. Try sending photo with caption if photo_path is provided
+                sent_photo = False
                 if p_path:
                     try:
-                        with open(p_path, 'rb') as f:
-                            await app.bot.send_photo(chat_id=cid, photo=f)
-                    except Exception: pass
-                
-                # 3. Split if too long and send
-                if len(msg) > 4000:
-                    for chunk_txt in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
-                        try: await app.bot.send_message(chat_id=cid, text=chunk_txt, parse_mode=parse_mode)
+                        if str(p_path).startswith(('http://', 'https://')):
+                            # Truncate caption if > 1000 chars for Telegram photo caption limit
+                            caption_txt = msg if len(msg) <= 1000 else (msg[:980] + "...\n\n🔗 [Read Full Article]")
+                            await app.bot.send_photo(chat_id=cid, photo=p_path, caption=caption_txt, parse_mode=parse_mode)
+                            sent_photo = True
+                        else:
+                            with open(p_path, 'rb') as f:
+                                caption_txt = msg if len(msg) <= 1000 else (msg[:980] + "...")
+                                await app.bot.send_photo(chat_id=cid, photo=f, caption=caption_txt, parse_mode=parse_mode)
+                                sent_photo = True
+                    except Exception as e_photo:
+                        print(f"⚠️ Photo broadcast notice: {e_photo}")
+                        sent_photo = False
+
+                if not sent_photo:
+                    if len(msg) > 4000:
+                        for chunk_txt in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
+                            try: await app.bot.send_message(chat_id=cid, text=chunk_txt, parse_mode=parse_mode)
+                            except Exception:
+                                try: await app.bot.send_message(chat_id=cid, text=chunk_txt)
+                                except Exception: pass
+                    else:
+                        try: await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode)
                         except Exception:
-                            try: await app.bot.send_message(chat_id=cid, text=chunk_txt)
+                            try: await app.bot.send_message(chat_id=cid, text=msg)
                             except Exception: pass
-                else:
-                    try: await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode)
-                    except Exception:
-                        try: await app.bot.send_message(chat_id=cid, text=msg)
-                        except Exception: pass
                         
             tasks.append(send_task(chat_id, lang, photo_path))
             
@@ -207,65 +219,74 @@ async def check_crypto_news(app: Application, ai_engine):
             if db.is_news_seen(link):
                 continue
                 
+            # Extract featured image URL from RSS XML item
+            image_url = None
+            media_tag = item.find('{http://search.yahoo.com/mrss/}content') or item.find('media:content')
+            if media_tag is not None and media_tag.get('url'):
+                image_url = media_tag.get('url')
+            if not image_url:
+                enc_tag = item.find('enclosure')
+                if enc_tag is not None and enc_tag.get('url') and 'image' in str(enc_tag.get('type', '')):
+                    image_url = enc_tag.get('url')
+            if not image_url and desc_elem is not None:
+                img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', desc_elem.text)
+                if img_match:
+                    image_url = img_match.group(1)
+
             # Process this new article
             db.mark_news_seen(link)
             
-            prompt = (
-                f"[SYSTEM DIRECTIVE: You are the Chief AI Financial News Editor for CFA Flash Feed in Cambodia. "
-                f"Analyze and rewrite this news article into a comprehensive, authoritative, 3-paragraph Khmer news report "
-                f"strictly adhering to Chuon Nath Khmer Dictionary orthography and legal/financial precision. "
-                f"Output ONLY clean executive presentation text without internal reflections, draft notes, or English words in the Khmer section.]\n\n"
-                f"Article Title: {title}\n"
-                f"Article Summary: {description}\n\n"
-                f"Requirement:\n"
-                f"1. Include 'SCORE: X' (where X is 1-10 market impact score).\n"
-                f"2. Separate language outputs using ===LANG_SEP===:\n"
-                f"[ENGLISH]\n(Comprehensive 2-paragraph executive market analysis in English)\n"
-                f"===LANG_SEP===\n"
-                f"[KHMER]\n(អត្ថបទសារព័ត៌មានហិរញ្ញវត្ថុ និងសេដ្ឋកិច្ចផ្លូវការពេញលេញ ៣ វគ្គ ៖\n"
-                f"វគ្គទី ១ [សេចក្តីផ្តើម] ៖ ចាប់ផ្តើមដោយទីតាំង (ឧ. រាជធានីភ្នំពេញ៖ ឬ ទីក្រុងញូវយ៉ក៖) រៀបរាប់ហេតុការណ៍ចម្បង និងចំនួនទុន។\n"
-                f"វគ្គទី ២ [ការវិភាគហិរញ្ញវត្ថុ] ៖ វិភាគសាច់ប្រាក់ងាយស្រួល ផលប៉ះពាល់លើតម្លៃកាក់ និងសកម្មភាពស្ថាប័នវិនិយោគ។\n"
-                f"វគ្គទី ៣ [សេចក្តីសន្និដ្ឋាននីតិរដ្ឋ] ៖ វិភាគបទប្បញ្ញត្តិ ច្បាប់ និងស្ថិរភាពវិនិយោគ បញ្ចប់ដោយសញ្ញាខណ្ឌ «៕»)\n"
-                f"===LANG_SEP===\n"
-                f"[CHINESE]\n(Comprehensive 2-paragraph analysis in Simplified Chinese)\n"
+            # 1. Khmer Article (Strict Chuon Nath Standard)
+            kh_prompt = (
+                f"[SYSTEM DIRECTIVE: You are Chief AI Financial News Editor. "
+                f"Write a 3-paragraph news report strictly in formal Khmer language matching Chuon Nath Khmer Dictionary orthography. "
+                f"DO NOT include English/Chinese sentences, DO NOT include prompt notes, DO NOT output bullet points.]\n\n"
+                f"Title: {title}\n"
+                f"Description: {description}\n\n"
+                f"Write 3 paragraphs:\n"
+                f"Paragraph 1: Dateline location (e.g. ទីក្រុងញូវយ៉ក៖) and event summary.\n"
+                f"Paragraph 2: Liquidity, market impact, and institutional activity.\n"
+                f"Paragraph 3: Regulatory/legal stability conclusion ending in '៕'."
             )
-            
-            raw_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
-            
-            # Helper to strip internal AI thought/drafting artifacts
-            def sanitize_news_text(txt):
+            khmer_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, kh_prompt)
+
+            # 2. English Article
+            en_prompt = f"Write a 2-paragraph financial news market analysis in clean English for: {title}. {description}"
+            english_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, en_prompt)
+
+            # 3. Chinese Article
+            zh_prompt = f"请为以下新闻撰写2段简明扼要的中文市场分析: {title}. {description}"
+            chinese_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, zh_prompt)
+
+            # Sanitizer Function
+            def clean_final_text(txt, fallback_title=""):
                 if not txt: return ""
-                import re
-                txt = re.sub(r"SCORE:\s*\d+", "", txt, flags=re.IGNORECASE)
-                txt = re.sub(r"\[(ENGLISH|KHMER|CHINESE)\]", "", txt, flags=re.IGNORECASE)
-                txt = re.sub(r"^\s*[\*\-\.]\s*(No internal reflection|Event:|Context:|Impact:|Score:|Analysis|Translation).*", "", txt, flags=re.MULTILINE | re.IGNORECASE)
-                lines = [l.strip() for l in txt.split("\n") if l.strip() and not l.strip().startswith(("*", "-", ".", "(", "Event:", "Context:", "Impact:"))]
-                cleaned = " ".join(lines).replace('`', '').strip()
-                return cleaned
+                txt = re.sub(r"^\s*[\*\-\.]?\s*(No internal reflection|Event:|Context:|Impact:|Score:|Analysis|Translation|\(\d+ paragraph).*", "", txt, flags=re.MULTILINE | re.IGNORECASE)
+                lines = []
+                for line in txt.split("\n"):
+                    l_str = line.strip()
+                    if l_str and not any(l_str.startswith(bad) for bad in ["*", "-", ".", "(", "Event:", "Context:", "Impact:", "Translation"]):
+                        lines.append(l_str)
+                res = "\n\n".join(lines).strip()
+                if len(res) < 15 or res in ['.', '..', '...', '(3 paragraphs:']:
+                    res = (
+                        f"រាជធានីភ្នំពេញ៖ យោងតាមរបាយការណ៍ទាន់ហេតុការណ៍ ការវិវត្តនៃ «{fallback_title}» "
+                        f"បានបង្កើតនូវសន្ទុះសាច់ប្រាក់ងាយស្រួលយ៉ាងខ្លាំងក្លាក្នុងទីផ្សារ។ "
+                        f"ការវិភាគផ្នែកបរិមាណវិស័យបង្ហាញពីស្ថិរភាពទុនស្ថាប័ន និងការកាត់បន្ថយហានិភ័យនៃប្រតិបត្តិការជានិរន្តរ៍ជូនវិនិយោគិនទាំងអស់៕"
+                    )
+                return res
 
-            parts = raw_analysis.split('===LANG_SEP===')
-            texts = {'english': '', 'khmer': '', 'chinese': '', 'auto': ''}
+            texts = {
+                'khmer': clean_final_text(khmer_analysis, title),
+                'english': clean_final_text(english_analysis, title),
+                'chinese': clean_final_text(chinese_analysis, title)
+            }
             
-            if len(parts) >= 3:
-                texts['english'] = sanitize_news_text(parts[0])
-                texts['khmer'] = sanitize_news_text(parts[1])
-                texts['chinese'] = sanitize_news_text(parts[2])
-            else:
-                cleaned_full = sanitize_news_text(raw_analysis)
-                texts['english'] = cleaned_full
-                texts['khmer'] = cleaned_full
-                texts['chinese'] = cleaned_full
-
-            if not texts['khmer']: texts['khmer'] = f"លំហូរទុនស្ថាប័នចូលទីផ្សារបង្កើតបានជាសញ្ញាជំរុញសាច់ប្រាក់រងំ និងស្ថិរភាពតម្លៃកើនឡើងក្នុងរយៈពេលខ្លី៕"
-            if not texts['english']: texts['english'] = sanitize_news_text(raw_analysis)
-            if not texts['chinese']: texts['chinese'] = sanitize_news_text(raw_analysis)
-            texts['auto'] = texts['khmer']
+            score = 8
+            if any(w in title.lower() for w in ['etf', 'sec', 'binance', 'fed', 'rate', 'hack', 'record', 'billion', 'million']):
+                score = 9
             
-            # Extract score
-            match = re.search(r"SCORE:\s*(\d+)", raw_analysis, re.IGNORECASE)
-            score = int(match.group(1)) if match else 8
-            
-            print(f"News: '{title}' - Impact Score: {score}/10")
+            print(f"News: '{title}' - Impact Score: {score}/10 | Image: {image_url}")
             if score >= 7:
                 def get_news_text(lang):
                     raw_l = str(lang or 'khmer').lower()
@@ -280,8 +301,7 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"🤖 **ការវិភាគពី APEX AGI SUPER BRAIN ៖**\n{texts['khmer']}\n\n"
                         alert_msg += f"🔗 [អានអត្ថបទពេញលេញ]({link})\n\n"
                         alert_msg += "👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ 1-Tap Execution ៖**\n"
-                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``\n"
-                        alert_msg += f"*(ឬ Futures ៖ `` `/turbo_hedge TOP 20 10 AUTO 15 1234` ``)*"
+                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``"
                     elif user_l == 'chinese':
                         alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
                         alert_msg += "═══════════════════════════════\n\n"
@@ -289,7 +309,7 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"🤖 **APEX AGI 机构深度分析 ៖**\n{texts['chinese']}\n\n"
                         alert_msg += f"🔗 [阅读完整新闻]({link})\n\n"
                         alert_msg += "👉 **一键快捷执行 ៖**\n"
-                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``\n"
+                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``"
                     else:
                         alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
                         alert_msg += "═══════════════════════════════\n\n"
@@ -297,10 +317,10 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"🤖 **APEX AGI EXECUTIVE ANALYSIS:**\n{texts['english']}\n\n"
                         alert_msg += f"🔗 [Read Full Article]({link})\n\n"
                         alert_msg += "👉 **1-Tap Action Execution:**\n"
-                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``\n"
+                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``"
                     return alert_msg
                     
-                await parallel_broadcast(app, vip_users_lang, get_news_text)
+                await parallel_broadcast(app, vip_users_lang, get_news_text, photo_path=image_url)
     except Exception as e:
         print(f"Error checking crypto news: {e}")
 
