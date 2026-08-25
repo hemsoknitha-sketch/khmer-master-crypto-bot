@@ -1582,7 +1582,8 @@ class TelegramBotThread(BaseThread):
 
         async def alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
@@ -1591,41 +1592,70 @@ class TelegramBotThread(BaseThread):
                 return
 
             try:
-                args = context.args
+                args = context.args if hasattr(context, 'args') else []
                 if not args or len(args) == 0:
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("📋 My Active Alerts", callback_data="btn_my_alerts"), InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")],
+                        [InlineKeyboardButton("📋 My Active Alerts", callback_data="btn_my_alerts"), InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")],
                         [
-                            InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                            InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
                             InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                         ]
                     ])
 
-                    msg = (
-                        "⏰ **APEX SUPER AGI TURBO BRAIN v9.5 | PRICE ALERT SYSTEM** 🔔\n"
-                        "═══════════════════════════════\n\n"
-                        "📊 **EXECUTIVE PRICE ALERT CONFIGURATION:**\n"
-                        "• **Execution Engine**: `Sub-Second Binance WebSocket Real-Time Ticker Monitor`\n"
-                        "• **Trigger Condition**: `Real-Time Market Price Crossing (> Above or < Below)`\n"
-                        "• **Delivery Channel**: `High-Priority Telegram Instant Push Notification`\n\n"
-                        "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                        "👉 **រំលឹកពេលថ្លៃហក់ឡើងលើ ៖**\n`` `/alert BTCUSDT > 95000` ``\n\n"
-                        "👉 **រំលឹកពេលថ្លៃធ្លាក់ចុះក្រោម ៖**\n`` `/alert BTCUSDT < 85000` ``"
-                    )
-                    await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    if user_lang == 'en':
+                        msg = (
+                            "⏰ **APEX SUPER AGI v12.00 | REAL-TIME PRICE ALERT SYSTEM** 🔔\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **EXECUTIVE PRICE ALERT ENGINE CONFIGURATION:**\n"
+                            "• **Monitoring Engine**: `Sub-Second Binance WebSocket Real-Time Ticker Monitor`\n"
+                            "• **Trigger Condition**: `Real-Time Market Price Crossing (> Above or < Below)`\n"
+                            "• **Delivery Channel**: `High-Priority Telegram Instant Push Notification`\n\n"
+                            "📋 **1-TAP QUICK COMMAND EXECUTIONS:**\n"
+                            "👉 **Alert When Price Crosses Above ៖**\n`` `/alert BTCUSDT > 95000` ``\n\n"
+                            "👉 **Alert When Price Drops Below ៖**\n`` `/alert BTCUSDT < 85000` ``"
+                        )
+                    elif user_lang == 'zh':
+                        msg = (
+                            "⏰ **APEX SUPER AGI v12.00 | 实时价格预警系统** 🔔\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **高级价格预警引擎配置：**\n"
+                            "• **监控引擎**: `毫秒级 Binance WebSocket 实时行情监听器`\n"
+                            "• **触发条件**: `实时市场价格穿透 (> 突破上涨 或 < 跌破下行)`\n"
+                            "• **推送通道**: `高优先级 Telegram 秒级即时推送通知`\n\n"
+                            "📋 **一键复制指令：**\n"
+                            "👉 **突破上涨预警 ៖**\n`` `/alert BTCUSDT > 95000` ``\n\n"
+                            "👉 **跌破下行预警 ៖**\n`` `/alert BTCUSDT < 85000` ``"
+                        )
+                    else:
+                        msg = (
+                            "⏰ **APEX SUPER AGI v12.00 | REAL-TIME PRICE ALERT SYSTEM** 🔔\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **EXECUTIVE PRICE ALERT ENGINE CONFIGURATION:**\n"
+                            "• **Monitoring Engine**: `Sub-Second Binance WebSocket Real-Time Ticker Monitor`\n"
+                            "• **Trigger Condition**: `Real-Time Market Price Crossing (> Above or < Below)`\n"
+                            "• **Delivery Channel**: `High-Priority Telegram Instant Push Notification`\n\n"
+                            "📋 **1-TAP QUICK COMMAND EXECUTIONS:**\n"
+                            "👉 **រំលឹកពេលថ្លៃហក់ឡើងលើ ៖**\n`` `/alert BTCUSDT > 95000` ``\n\n"
+                            "👉 **រំលឹកពេលថ្លៃធ្លាក់ចុះក្រោម ៖**\n`` `/alert BTCUSDT < 85000` ``"
+                        )
+                    if update.callback_query:
+                        await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    else:
+                        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
                     return
 
                 if len(args) != 3:
-                    usage = (
-                        "⚠️ **របៀបកំណត់ AI Price Alert:**\n\n"
-                        "`` `/alert <កាក់> <លក្ខខណ្ឌ > ឬ <> <តម្លៃ>` ``\n\n"
-                        "ឧទាហរណ៍ ៖ `` `/alert XRP > 2.50` `` ឬ `` `/alert BTC < 85000` ``"
-                    )
+                    if user_lang == 'en':
+                        usage = "⚠️ **Syntax ៖** `` `/alert <SYMBOL> > or < <PRICE>` ``\n\nExample ៖ `` `/alert XRP > 2.50` `` or `` `/alert BTC < 85000` ``"
+                    elif user_lang == 'zh':
+                        usage = "⚠️ **格式 ៖** `` `/alert <币种> > 或 < <价格>` ``\n\n示例 ៖ `` `/alert XRP > 2.50` `` 或 `` `/alert BTC < 85000` ``"
+                    else:
+                        usage = "⚠️ **របៀបកំណត់ AI Price Alert ៖** `` `/alert <កាក់> > ឬ < <តម្លៃ>` ``\n\nឧទាហរណ៍ ៖ `` `/alert XRP > 2.50` `` ឬ `` `/alert BTC < 85000` ``"
                     await update.message.reply_text(usage, parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
                     return
 
                 symbol = str(args[0]).upper().strip()
@@ -1636,31 +1666,48 @@ class TelegramBotThread(BaseThread):
                 try:
                     price = float(args[2])
                 except ValueError:
-                    await update.message.reply_text("❌ សូមបញ្ចូលចំនួនតម្លៃជាលេខឲ្យបានត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    err_num = "❌ Invalid price number." if user_lang == 'en' else ("❌ 价格数值格式不正确。" if user_lang == 'zh' else "❌ សូមបញ្ចូលចំនួនតម្លៃជាលេខឲ្យបានត្រឹមត្រូវ។")
+                    await update.message.reply_text(err_num)
+                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
                     return
 
                 if condition_sign in [">", "above"]:
                     condition = "above"
-                    localized_cond = "កើនឡើងលើ"
+                    localized_cond = "Climbs Above" if user_lang == 'en' else ("突破上涨至" if user_lang == 'zh' else "កើនឡើងលើ")
                 elif condition_sign in ["<", "below"]:
                     condition = "below"
-                    localized_cond = "ធ្លាក់ចុះក្រោម"
+                    localized_cond = "Drops Below" if user_lang == 'en' else ("跌破下行至" if user_lang == 'zh' else "ធ្លាក់ចុះក្រោម")
                 else:
-                    await update.message.reply_text("❌ លក្ខខណ្ឌមិនត្រឹមត្រូវ! សូមប្រើសញ្ញា `>` (Above) ឬ `<` (Below)។", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    err_cond = "❌ Invalid condition! Use `>` (Above) or `<` (Below)." if user_lang == 'en' else ("❌ 条件无效！请使用 `>` (高于) 或 `<` (低于)。" if user_lang == 'zh' else "❌ លក្ខខណ្ឌមិនត្រឹមត្រូវ! សូមប្រើសញ្ញា `>` (Above) ឬ `<` (Below)។")
+                    await update.message.reply_text(err_cond, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
                     return
 
                 db.add_price_alert(chat_id, symbol, price, condition)
 
-                msg = (
-                    "✅ **AI Price Alert ត្រូវបានកំណត់រួចរាល់!** ⏰\n\n"
-                    f"🪙 **កាក់** ៖ `{symbol}`\n"
-                    f"🎯 **លក្ខខណ្ឌរំលឹក** ៖ `{localized_cond} ${price:,.4f} USDT`\n\n"
-                    "_Bot នឹងផ្ញើសារជូនដំណឹងភ្លាមៗ ពេលតម្លៃទីផ្សារដើរដល់គោលដៅ 24/7!_"
-                )
+                if user_lang == 'en':
+                    msg = (
+                        "✅ **APEX SUPER AGI v12.00 | PRICE ALERT CONFIGURED!** ⏰\n\n"
+                        f"🪙 **Target Pair**: `{symbol}`\n"
+                        f"🎯 **Alert Trigger**: `{localized_cond} ${price:,.4f} USDT`\n\n"
+                        "_Bot WebSocket Watchdog will push instant notification when price hits target 24/7!_"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "✅ **APEX SUPER AGI v12.00 | 价格预警已成功设置！** ⏰\n\n"
+                        f"🪙 **目标交易对**: `{symbol}`\n"
+                        f"🎯 **触发条件**: `{localized_cond} ${price:,.4f} USDT`\n\n"
+                        "_看门狗 WebSocket 将在市场价格触及目标时第一时间 24/7 发送推送！_"
+                    )
+                else:
+                    msg = (
+                        "✅ **APEX SUPER AGI v12.00 | PRICE ALERT CONFIGURED!** ⏰\n\n"
+                        f"🪙 **កាក់** ៖ `{symbol}`\n"
+                        f"🎯 **លក្ខខណ្ឌរំលឹក** ៖ `{localized_cond} ${price:,.4f} USDT`\n\n"
+                        "_Bot នឹងផ្ញើសារជូនដំណឹងភ្លាមៗ ពេលតម្លៃទីផ្សារដើរដល់គោលដៅ 24/7!_"
+                    )
                 await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
                 self.log_signal.emit(f"⏰ Alert set for {chat_id}: {symbol} {condition} {price}")
             finally:
                 self.active_tasks.discard(chat_id)
