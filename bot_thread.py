@@ -4996,35 +4996,76 @@ class TelegramBotThread(BaseThread):
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 keyboard = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("🚀 Launch TOP Scanner Mode", callback_data="btn_turbo_hedge_top_launch"),
-                        InlineKeyboardButton("🛑 STOP ALL Turbo Hedge", callback_data="btn_turbo_hedge_stop_all")
+                        InlineKeyboardButton("🚀 Launch Futures TOP Scanner", callback_data="btn_turbo_hedge_top_launch"),
+                        InlineKeyboardButton("🎯 Launch Spot Breakout Scanner", callback_data="btn_turbo_hedge_spot_launch")
                     ],
                     [
-                        InlineKeyboardButton("🏓 Scalp BTC/USDT", callback_data="btn_scalp_BTCUSDT"),
+                        InlineKeyboardButton("🛑 STOP ALL Turbo Hedge", callback_data="btn_turbo_hedge_stop_all"),
+                        InlineKeyboardButton("🏓 Scalp BTC/USDT", callback_data="btn_scalp_BTCUSDT")
+                    ],
+                    [
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                     ]
                 ])
 
-                msg = (
-                    "⚡ **APEX SUPER AGI TURBO BRAIN v9.5 | TURBO HEDGE ENGINE** 🛡️\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **INSTITUTIONAL TURBO HEDGE ARCHITECTURE:**\n"
-                    "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL ភ្លាមៗ (Zero Loss Past -15%)\n"
-                    "• 💰 **Dual-Check Profit Lock** ៖ +$5.00 USDT / +25% ROI ➔ Instant Market Close & Re-Entry 24/7\n"
-                    "• 📊 **2-Way Price-Based ROI** ៖ គណនា ROI 100% ដូច Binance App\n"
-                    "• 🛡️ **Small Capital Shield** ៖ ទុនក្រោម $100 USDT ត្រូវ Clamp ត្រឹម 10x Max Leverage\n"
-                    "• 🔍 **Live Position Auto-Sync** ៖ ស្កេន Binance `/fapi/v2/positionRisk` រៀងរាល់ ៣ វិនាទី 100% គ្មានរំលង\n"
-                    "• 🚫 **Overtrade Guard** ៖ ការពារការទិញ Order ស្ទួនជាន់គ្នា\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **បើកដំណើរការ single-coin ៖**\n`` `/turbo_hedge SOL 20 75 1234` ``\n"
-                    "👉 **កំណត់ BUY/SELL + VIP TP ($5+) ៖**\n`` `/turbo_hedge SOL 40 10 BUY 5 1234` ``\n"
-                    "👉 **Top Scanner Mode (5-10 កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
-                    "👉 **បិទដំណើរការ ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                    "`` `/turbo_hedge STOP ALL 1234` ``"
-                )
+                if user_lang == 'en':
+                    msg = (
+                        "⚡ **APEX SUPER AGI TURBO BRAIN v12.00 | TURBO HEDGE HFT ENGINE** 🛡️\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **INSTITUTIONAL TURBO HEDGE ARCHITECTURE:**\n"
+                        "• 🚀 **Dual Market Support (Spot & Futures)** ៖ Execute Spot (1x) or Futures (1x-15x/75x) with zero collision\n"
+                        "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL Instant Reversal\n"
+                        "• 💰 **Dual-Check Profit Lock** ៖ +$5.00 USDT / +25% ROI ➔ Instant Market Close & Re-Entry 24/7\n"
+                        "• 🛡️ **Small Capital Shield** ៖ Capital <$100 USDT automatically clamped to 10x Max Leverage\n"
+                        "• 🔍 **Live Position Auto-Sync** ៖ Scans Binance `/fapi/v2/positionRisk` every 3 seconds with 0% miss\n"
+                        "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) 94.5% win-rate\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "👉 **Spot Multi-Coin Breakout Scanner ៖**\n`` `/turbo_hedge SPOT TOP 50 1234` ``\n"
+                        "👉 **Spot Single-Coin Mode ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n"
+                        "👉 **Futures Multi-Coin TOP Scanner (5-10 coins) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
+                        "👉 **Futures Single-Coin Mode ៖**\n`` `/turbo_hedge SOL 40 10 BUY 5 1234` ``\n\n"
+                        "👉 **Stop & Close Commands ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
+                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "⚡ **APEX SUPER AGI TURBO BRAIN v12.00 | TURBO HEDGE 高频对冲引擎** 🛡️\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **机构级 TURBO HEDGE 架构：**\n"
+                        "• 🚀 **现货与合约双市场支持** ៖ 零冲突支持 Spot (1x) 或 Futures (1x-15x/75x) 自动建仓\n"
+                        "• 🔄 **极速反向翻单 (<30ms)** ៖ 触发 -10.0% ROI / -$2.00 USDT 硬止损 ➔ 立即 BUY ↔ SELL 翻单\n"
+                        "• 💰 **双重锁定止盈** ៖ +$5.00 USDT / +25% ROI ➔ 24/7 极速平仓并重入\n"
+                        "• 🛡️ **小资金杠杆防护** ៖ 资金低于 $100 USDT 自动钳制在 10x 杠杆以内\n"
+                        "• 🔍 **实时持仓同步** ៖ 每 3 秒同步 Binance `/fapi/v2/positionRisk` 零漏单\n"
+                        "• 🧠 **5-Swarm 与华尔街 ML** ៖ 三重集成 (XGBoost + CatBoost + LightGBM) 94.5% 胜率\n\n"
+                        "📋 **一键复制指令：**\n"
+                        "👉 **现货多币突破扫描 ៖**\n`` `/turbo_hedge SPOT TOP 50 1234` ``\n"
+                        "👉 **现货单币模式 ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n"
+                        "👉 **合约多币 TOP 扫描模式 (5-10 币) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
+                        "👉 **合约单币模式 ៖**\n`` `/turbo_hedge SOL 40 10 BUY 5 1234` ``\n\n"
+                        "👉 **停止与平仓指令 ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
+                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                    )
+                else:
+                    msg = (
+                        "⚡ **APEX SUPER AGI TURBO BRAIN v12.00 | TURBO HEDGE ENGINE** 🛡️\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **INSTITUTIONAL TURBO HEDGE ARCHITECTURE:**\n"
+                        "• 🚀 **គាំទ្រទីផ្សារពីរ (Spot & Futures)** ៖ រត់ Spot (1x) និង Futures (1x-15x/75x) ដោយគ្មានការទង្គិចគ្នា\n"
+                        "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL ភ្លាមៗ (Zero Loss Past -15%)\n"
+                        "• 💰 **Dual-Check Profit Lock** ៖ +$5.00 USDT / +25% ROI ➔ Instant Market Close & Re-Entry 24/7\n"
+                        "• 🛡️ **Small Capital Shield** ៖ ទុនក្រោម $100 USDT ត្រូវ Clamp ត្រឹម 10x Max Leverage\n"
+                        "• 🔍 **Live Position Auto-Sync** ៖ ស្កេន Binance `/fapi/v2/positionRisk` រៀងរាល់ ៣ វិនាទី 100% គ្មានរំលង\n"
+                        "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) Win-Rate 94.5%\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "👉 **ស្កេន Spot Multi-Coin Breakout ៖**\n`` `/turbo_hedge SPOT TOP 50 1234` ``\n"
+                        "👉 **Spot Single-Coin Mode ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n"
+                        "👉 **Futures Multi-Coin TOP Scanner (5-10 កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
+                        "👉 **Futures Single-Coin Mode ៖**\n`` `/turbo_hedge SOL 40 10 BUY 5 1234` ``\n\n"
+                        "👉 **បិទ និង Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
+                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                    )
                 msg_target = update.effective_message or update.message
                 if msg_target:
                     await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
