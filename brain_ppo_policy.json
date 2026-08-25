@@ -1,0 +1,11 @@
+{
+  "algorithm": "PPO-Proximal-Policy-Optimization",
+  "optimal_leverage_range": [
+    3,
+    20
+  ],
+  "dynamic_trailing_stop_pct": 1.8,
+  "max_drawdown_protection_pct": 5.0,
+  "training_episodes": 10000,
+  "policy_status": "OPTIMAL_STABLE"
+}

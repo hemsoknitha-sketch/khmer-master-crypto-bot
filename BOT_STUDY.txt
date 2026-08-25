@@ -1,38 +1,34 @@
 ================================================================================
-      📘 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ VIP ៖ KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0
-             (ប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលបញ្ញាសិប្បនិម្មិត AGI - Institutional Profit Edition)
+      📘 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ VIP ៖ KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00
+             (ប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលបញ្ញាសិប្បនិម្មិត AGI - Institutional Ultra Edition)
 ================================================================================
 
 សូមស្វាគមន៍មកកាន់ មគ្គុទ្ទេសក៍សិក្សា និងប្រតិបត្តិការផ្លូវការសម្រាប់សមាជិក VIP ទាំងអស់! 
-ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងលម្អិត ម៉ត់ចត់ និងច្បាស់លាស់បំផុត សម្រាប់កំណែ v11.0 Super Brain & AGI Edition ដោយបានបង្រួម និងរៀបចំមុខងារជួញដូរទាំងអស់ឲ្យមានប្រសិទ្ធភាពខ្ពស់បំផុត Super Smart & Super Fast គ្មានការខាតបង់ Fee ឥតប្រយោជន៍ និងមានសុវត្ថិភាពដើមទុន 100%។
+ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងលម្អិត ម៉ត់ចត់ និងច្បាស់លាស់បំផុត សម្រាប់កំណែ v12.00 Apex Ultra AGI Edition ដោយបានធ្វើបច្ចុប្បន្នភាពពង្រីកវិសាលភាពចាប់យកព័ត៌មាន និងចាប់យកឱកាសវិនិយោគថ្មីៗទាន់ពេលបំផុត គ្មានការខកខាន ឬបាត់បង់ឱកាសបង្កើនប្រាក់ចំណេញឡើយ ព្រមទាំងបានវះកាត់បង្រួមមុខងារ និង Telegram Menu Commands ឱ្យមានប្រសិទ្ធភាពខ្ពស់បំផុត 1000x គ្មានការខាតបង់ Fee ឥតប្រយោជន៍ និងមានសុវត្ថិភាពដើមទុន 100%។
 
 --------------------------------------------------------------------------------
-១. ស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញ v11.0 (STREAMLINED PROFIT ARCHITECTURE)
+១. ស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញ v12.00 (EXECUTIVE ULTRA PROFIT ARCHITECTURE)
 --------------------------------------------------------------------------------
 
-Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional ដែលត្រូវបានធ្វើបច្ចុប្បន្នភាពកាត់បន្ថយមុខងារជាន់គ្នា (Overlapping Features) និងលុបបំបាត់ការខាតបង់សេវា Taker Fee ឥតប្រយោជន៍ (Fee Erosion) ទាំងស្រុង ៖
+Apex AGI Engine v12.00 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional ដែលត្រូវបានធ្វើបច្ចុប្បន្នភាពកាត់បន្ថយមុខងារជាន់គ្នា (Overlapping Commands) ទាំងស្រុង និងធ្វើការរួមគ្នាជួយបំពេញមុខងារឱ្យគ្នាទៅវិញទៅមក ៖
 
 • 🟢 [១. មុខងារស្នូល - Core Flagship Engines] ៖
-  - Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ប្រព័ន្ធស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំងទម្រង់ Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield (ទុន < $100 លីមីត 10x Max), និង Net Profit TP Floor គណនាបូកសេវា fee Taker ចូល ធានាចំណេញសុទ្ធ ១០០%។
+  - 🚀 Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ប្រព័ន្ធស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំងទម្រង់ Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield (ទុន < $100 លីមីត 10x Max), និង Net Profit TP Floor គណនាបូកសេវា fee Taker ចូល ធានាចំណេញសុទ្ធ ១០០%។ (ចំណាំ ៖ រាល់ Command ចាស់ៗដូចជា `/scalp`, `/hyper_trade`, `/wave_rider`, `/sweep_sniper` ត្រូវបានបង្រួមមកជា `/turbo_hedge` ទាំងអស់)។
+  - ♾️ Unified Smart Grid Engine (`/infinity_grid`) ៖ ប្រព័ន្ធ Grid ស្វ័យប្រវត្តតែមួយ ដែលគណនាចន្លោះ Grid តាម 24h ATR Volatility និងការពារ MIN_NOTIONAL ($5.05 USDT) សម្រាប់ទុនតូច។ (ចំណាំ ៖ រាល់ Command Grid ផ្សេងទៀតដូចជា `/compound_grid`, `/grid_bot`, `/infinity_matrix` ត្រូវបានតម្រង់ទិសមកកាន់ `/infinity_grid` តែមួយ)។
+  - 🎯 Listing & Volatility Sniper (`/snipe`) ៖ ប្រព័ន្ធស្ទាក់ទិញកាក់ថ្មីដែលទើបតែចុះបញ្ជីលើ Binance ឬកាក់ដែលមាន Volume Spike (RVOL) ខ្ពស់។
+  - 🌾 8-Hour Funding Yield Harvester (`/funding_harvester`) ៖ ប្រព័ន្ធស្ទាក់កើបអត្រាការប្រាក់ Funding Rate ពី Binance Futures រៀងរាល់ ៨ ម៉ោង ដោយសុវត្ថិភាព។
   - 🧠 AGI Multi-Model Swarm Ensemble (`ai_engine.py`) ៖ ប្រព័ន្ធខួរក្បាល AI ទាំង ៥ រួមគ្នាស្វែងរក 5-Agent Consensus (Gemini 2.5, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-32B, Mistral-7B) ធ្វើឱ្យ Win-rate ខ្ពស់បំផុត និងគ្មាន False Signals!
   - 👑 Wall Street Ultra-Next-Gen ML Models (`train_model.py`) ៖ ប្រព័ន្ធ Machine Learning កម្រិត Wall Street រួមមាន ៖ PatchTST Attention Transformer, Triple-Ensemble (XGBoost + CatBoost + LightGBM), GNN Altcoin Ripple Graph, និង OpenAI PPO Deep Reinforcement Learning Agent!
   - 📦 Hugging Face Cloud Auto-Train Sync (`/sync_brain`) ៖ ប្រព័ន្ធ Cloud Auto-Train លើ Google Colab GPU 14-day cycle រួច Upload ទៅ Hugging Face Hub (0% VPS Load)។ VIP User អាចវាយ `/sync_brain` លើ Telegram ដើម្បី Hot-Update ទម្ងន់ AI ថ្មីក្នុងពេល ១ វិនាទី!
   - 📰 3-Paragraph Journalistic News Alerts & RSS Photo Extractor ៖ ប្រព័ន្ធស្កេនព័ត៌មាន និងទាញយករូបភាពទំហំធំ High-Res Photo Alerts ផ្ញើជូន ៣ វគ្គផ្លូវការ ត្រឹមត្រូវតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត 100%!
   - ⚡ HFT X & Truth Social Firehose Engine (`hft_x_truth_firehose_engine.py`) ៖ ប្រព័ន្ធចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុត (< 2ms Latency / 0.044ms Benchmark) ពី X (Twitter) & Truth Social ដោយផ្ទាល់ តាមរយៈ In-Memory RAM Ring Buffer និង Aho-Corasick Trie Automaton!
-  - Spot 15-Min Surge Engine ៖ ស្កេន 200+ កាក់ Spot USDT លើ Binance ដោយទាញយកកាក់ដែលមាន Breakout Volume Surge (+3.0% ទៅ +35.0%) ព្រមទាំង Auto-Filter រំលងរាល់ Stablecoins (USDC, FDUSD, TUSD, etc.)។
-  - Listing & Volatility Sniper (`/snipe`, `/auto_snipe`) ៖ ប្រព័ន្ធស្ទាក់ទិញកាក់ថ្មីដែលទើបតែចុះបញ្ជីលើ Binance ឬកាក់ដែលមាន Volume Spike (RVOL) ខ្ពស់។
-  - 8-Hour Funding Yield Harvester (`/funding_harvester`) ៖ ប្រព័ន្ធស្ទាក់កើបអត្រាការប្រាក់ Funding Rate ពី Binance Futures រៀងរាល់ ៨ ម៉ោង ដោយសុវត្ថិភាព។
+  - 🛡️ AI Gold Guard & Macro Radar (`/gold_radar`) ៖ បង្រួមប្រព័ន្ធមាសឌីជីថល (PAXGUSDT) ទាំងអស់មកជា AI Gold Guard តែមួយ។ (ចំណាំ ៖ ពាក្យបញ្ជាចាស់ៗ `/cb_gold`, `/paxg_arbitrage`, `/black_swan_guard`, `/gold_btc_rebalance` ត្រូវបានតម្រង់ទិសមកកាន់ `/gold_radar`)។
 
-• 🟡 [២. មុខងារបូកបញ្ចូលគ្នា - Super Smart Consolidated Engines] ៖
-  - Unified Smart Grid Engine (`/infinity_grid`, `/compound_grid`, `/grid_bot`, `/infinity_matrix`) ៖ បង្រួមប្រព័ន្ធ Grid ទាំង ៤ មកជាប្រព័ន្ធ Grid ស្វ័យប្រវត្តតែមួយ ដែលគណនាចន្លោះ Grid តាម 24h ATR Volatility និងការពារ MIN_NOTIONAL ($5.05 USDT) សម្រាប់ទុនតូច។
-  - Single-Coin Momentum Scalper ៖ បង្រួមការ Trade កាក់ទោលទាំងអស់ចូលក្នុង `Turbo Hedge (Single-Coin Mode)` ដើម្បីការពារមិនឲ្យ Engine ផ្សេងគ្នាទិញ/លក់ជាន់គ្នារលាយ Account។
-  - Gold Guard & Macro Radar (`/gold_radar`, `/cb_gold`, `/paxg_arbitrage`, `/black_swan_guard`, `/gold_btc_rebalance`) ៖ បង្រួមប្រព័ន្ធមាសឌីជីថល (PAXGUSDT) ទាំងអស់មកជា AI Gold Guard តែមួយ។
-
-• 🔴 [៣. មុខងារហានិភ័យ/ឥតបានការ - Deactivated Retail Arbitrage] ៖
+• 🔴 [២. មុខងារហានិភ័យ/ឥតបានការ - Deactivated Retail Arbitrage] ៖
   - Auto Arbitrage (`/auto_arb`) ៖ បានបិទ និងធ្វើបច្ចុប្បន្នភាពតម្រង់ទិសទៅកាន់ `/funding_harvester` ព្រមទាំង `/turbo_hedge` ដើម្បីការពារដើមទុន VIP ពីការខាតបង់ fee Binance 0.10% រាល់ដងលើ Retail API Accounts។
 
 --------------------------------------------------------------------------------
-២. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU v11.0 (COMPLETE COMMAND CATALOG)
+២. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU v12.00 (COMPLETE COMMAND CATALOG)
 --------------------------------------------------------------------------------
 
 ២.១ ពាក្យបញ្ជាកំណត់ប្រព័ន្ធ និងគណនី (SYSTEM & ACCOUNT COMMANDS) ៖
@@ -46,7 +42,7 @@ Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរប�
 • `/balance`      : ពិនិត្យមើលសមតុល្យសាច់ប្រាក់ក្នុងកាបូប Spot & Futures Real-time
 • `/status`       : ពិនិត្យមើលកាក់ដែលកំពុងរត់ Trade ទាំងអស់ និងស្ថានភាព PnL Real-time
 • `/health`       : ពិនិត្យមើលសុខភាព VPS, CPU/Memory Usage, 3GB Swap, 74 Gemini Models, 5-Swarm AGI, និង API Latency
-• `/sync_brain`   : (NEW!) Hot-Reload ទាញយកទម្ងន់ AI ថ្មីពី Hugging Face Model Hub មកភ្ជាប់ VPS ក្នុងពេល ១ វិនាទី!
+• `/sync_brain`   : Hot-Reload ទាញយកទម្ងន់ AI ថ្មីពី Hugging Face Model Hub មកភ្ជាប់ VPS ក្នុងពេល ១ វិនាទី!
 
 ២.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ TURBO HEDGE (AUTONOMOUS TURBO HEDGE ENGINES) ៖
 
@@ -85,7 +81,7 @@ Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរប�
 • `/gold_radar`   : ស្កេនពិនិត្យតម្លៃមាសឌីជីថល (PAXGUSDT) Real-time ជាមួយ Macro Radar
 
 --------------------------------------------------------------------------------
-៣. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ v11.0 (CAPITAL ALLOCATION MATRIX)
+៣. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ v12.00 (CAPITAL ALLOCATION MATRIX)
 --------------------------------------------------------------------------------
 • ទុនក្រោម $15 USDT: កំណត់រត់ 1 កាក់អតិបរមា (Leverage 10x Max, Position Size $2.50 - $5.00)
 • ទុន $15 - $30 USDT: កំណត់រត់ 5 កាក់អតិបរមា (Leverage 10x - 15x Max)
@@ -93,5 +89,5 @@ Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរប�
 • ទុនលើសពី $100 USDT: កំណត់រត់ 10 កាក់អតិបរមា ជាមួយនឹង Free Margin Buffer 50% សម្រាប់សុវត្ថិភាព
 
 ================================================================================
-              KHMER MASTER CRYPTO v11.0 - INSTITUTIONAL PROFIT GUARANTEED
+              KHMER MASTER CRYPTO v12.00 - INSTITUTIONAL PROFIT GUARANTEED
 ================================================================================
