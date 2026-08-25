@@ -45,6 +45,11 @@ try:
         "brain_tp.pkl",
         "brain_dca.pkl",
         "brain_scaler.pkl",
+        "brain_catboost.pkl",
+        "brain_lightgbm.pkl",
+        "brain_graph.pkl",
+        "brain_patchtst.h5",
+        "brain_ppo_policy.json",
         "brain_config.json"
     ]
     

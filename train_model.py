@@ -349,12 +349,12 @@ def create_lstm_feature(df, sequence_len=SEQUENCE_LEN):
     df['lstm_pred'] = df['lstm_pred'].fillna(0)
     return df
 
-# ==================== 5. Causal Feature Selection ====================
 def causal_feature_selection(df, target_col, feature_cols):
     print("កំពុងរកមូលហេតុ (Causal Discovery)...")
     data = df[feature_cols + [target_col]].dropna()
     try:
-        cg = pc(data.values, 0.05, 'fisherz', True, -1, -1)
+        # Limit max_combination_size to 2 to prevent exponential depth freeze (Depth > 3 takes hours)
+        cg = pc(data.values, 0.05, 'fisherz', True, 0, 2)
         edges = cg.G.graph
         target_idx = len(feature_cols)
         causal_features = []
@@ -362,9 +362,9 @@ def causal_feature_selection(df, target_col, feature_cols):
             if edges[i][target_idx] == 1 or edges[target_idx][i] == -1:
                 causal_features.append(f)
         print(f"  Causal features selected: {len(causal_features)} / {len(feature_cols)}")
-        return causal_features if causal_features else feature_cols
-    except:
-        print("  Causal selection failed or too slow, using all initial features.")
+        return causal_features if len(causal_features) >= 5 else feature_cols
+    except Exception as e:
+        print(f"  Causal selection skipped ({e}), using all initial features.")
         return feature_cols
 
 # ==================== 6. Genetic Optimization ====================
