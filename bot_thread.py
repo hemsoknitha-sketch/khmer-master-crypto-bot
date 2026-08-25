@@ -415,43 +415,111 @@ class TelegramBotThread(BaseThread):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
             is_admin = db.is_admin(chat_id)
+            user_lang = db.get_user_language(chat_id)
             
             import trading_engine
             is_paper = getattr(trading_engine, "PAPER_TRADING", False)
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
             
-            menu_text = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0** 🤖\n"
-                "═══════════════════════════════\n"
-                "⚡ **SYSTEM STATUS**: `🟢 ONLINE` | `Latency: <15ms`\n"
-                "🧠 **SUPER BRAIN AGI**: `Active Multi-Timeframe Alignment`\n"
-                f"🛡️ **SECURITY GUARD**: `ISOLATED MARGIN` | `{mode_badge}`\n"
-                "═══════════════════════════════\n"
-                "សូមស្វាគមន៍មកកាន់ **v11.0 Executive AGI Navigation Dashboard**! 📊\n\n"
-                "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
-                "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
-                "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
-                "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time\n"
-                "• `/stop_all` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
-                "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
-                "• `/turbo_hedge` - 🟢 Core HFT Multi/Single-Coin Scanner 24/7\n"
-                "• `/snipe` - 🎯 Listing & Volatility (High RVOL) Sniper\n"
-                "• `/funding_harvester` - 🌾 8-Hour Funding Yield Harvester\n"
-                "• `/infinity_grid` - 📐 Unified Smart Grid Matrix Engine\n\n"
-                "🔮 **3. AI INTELLIGENCE & MARKET ADVISORY**\n"
-                "• `/analyze <COIN>` - AI វិភាគទិន្នន័យបច្ចេកទេស 360°\n"
-                "• `/predict <COIN>` - ព្យាករណ៍ទិសដៅ K-Line & Win-Rate 24h\n"
-                "• `/news` - ព័ត៌មាន Crypto Real-Time វិភាគដោយ AI\n"
-                "• `/whales` - តាមដានចលនា Whale ធំៗក្នុងទីផ្សារ\n"
-                "• `/top` - កាក់ឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile)\n"
-                "• `/alert` - កំណត់ការជូនដំណឹងតម្លៃកាក់ Real-Time\n\n"
-                "🥇 **4. GOLD & MACRO RISK SHIELD**\n"
-                "• `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Central Bank Radar\n\n"
-                "⚙️ **5. SYSTEM CONTROL & SECURITY**\n"
-                "• `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
-                "• `/set_pin` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
-                "• `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n"
-            )
+            if user_lang == 'en':
+                menu_text = (
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00** 🤖\n"
+                    "═══════════════════════════════\n"
+                    "⚡ **SYSTEM STATUS**: `🟢 ONLINE` | `Latency: <15ms`\n"
+                    "🧠 **AGI SUPER BRAIN**: `5-Model Swarm + 12 Wall Street ML Active`\n"
+                    f"🛡️ **SECURITY GUARD**: `ISOLATED MARGIN` | `{mode_badge}`\n"
+                    "═══════════════════════════════\n"
+                    "Welcome to **v12.00 Executive AGI Navigation Dashboard**! 📊\n\n"
+                    "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
+                    "• `/portfolio` - View total PnL and all active positions\n"
+                    "• `/balance` - Check Real-Time Spot & Futures Balances\n"
+                    "• `/status` - View 24/7 Engine Execution Status\n"
+                    "• `/stop_all` - Emergency Stop All Active Trading Engines\n\n"
+                    "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
+                    "• `/turbo_hedge` - 🟢 HFT Multi/Single-Coin Autonomous Scanner 24/7\n"
+                    "• `/snipe` - 🎯 Listing & High RVOL Volatility Sniper\n"
+                    "• `/funding_harvester` - 🌾 8-Hour Perpetual Funding Yield Harvester\n"
+                    "• `/infinity_grid` - ♾️ Unified Smart 24h ATR Grid Engine\n\n"
+                    "🔮 **3. AI INTELLIGENCE & MARKET ADVISORY**\n"
+                    "• `/analyze <COIN>` - 5-Model Swarm AGI Technical Analysis\n"
+                    "• `/predict <COIN>` - Wall Street ML 24h Price & Trend Forecast\n"
+                    "• `/news` - 3-Paragraph Journalistic Crypto News & Photos\n"
+                    "• `/whales` - Track Real-Time On-Chain Whale Movements\n"
+                    "• `/top` - Top Volatile Gainers & Losers Daily\n"
+                    "• `/alert` - Set Real-Time Price Target Alerts\n\n"
+                    "🛡️ **4. GOLD & MACRO RISK SHIELD**\n"
+                    "• `/gold_radar` - Digital Gold (PAXG/USDT) & Macro Radar\n\n"
+                    "⚙️ **5. SYSTEM CONTROL & SECURITY**\n"
+                    "• `/add_api` - Connect Binance API Keys (RSA / HMAC)\n"
+                    "• `/set_pin` - Set 4-6 Digit Security PIN\n"
+                    "• `/language` - Choose System Language (Khmer / English / Chinese)\n"
+                )
+            elif user_lang == 'zh':
+                menu_text = (
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00** 🤖\n"
+                    "═══════════════════════════════\n"
+                    "⚡ **系统状态**: `🟢 在线` | `延迟: <15ms`\n"
+                    "🧠 **AGI 超级大脑**: `5模型 Swarm + 12 Wall Street ML 激活`\n"
+                    f"🛡️ **安全防护**: `隔离保证金` | `{mode_badge}`\n"
+                    "═══════════════════════════════\n"
+                    "欢迎使用 **v12.00 机构级 AGI 导航控制台**！📊\n\n"
+                    "💼 **1. 投资组合与资金分析**\n"
+                    "• `/portfolio` - 查看总 PnL 及所有持仓\n"
+                    "• `/balance` - 实时查询 Spot 与 Futures 余额\n"
+                    "• `/status` - 查看 24/7 交易引擎运行状态\n"
+                    "• `/stop_all` - 紧急一键停止所有运行引擎\n\n"
+                    "🚀 **2. 核心自主交易引擎**\n"
+                    "• `/turbo_hedge` - 🟢 24/7 HFT 多币/单币高频对冲扫描器\n"
+                    "• `/snipe` - 🎯 Binance 新币上市与 RVOL 突破狙击手\n"
+                    "• `/funding_harvester` - 🌾 8小时永续合约资金费率套利引擎\n"
+                    "• `/infinity_grid` - ♾️ 统一智能 24h ATR 网格矩阵引擎\n\n"
+                    "🔮 **3. AI 智能与市场顾问**\n"
+                    "• `/analyze <币种>` - 5-Agent AGI 360° 全方位技术分析\n"
+                    "• `/predict <币种>` - 华尔街 ML 24小时 K线与趋势预测\n"
+                    "• `/news` - 3段式新闻简报与高分辨率图片提醒\n"
+                    "• `/whales` - 实时追踪链上巨鲸资金流向\n"
+                    "• `/top` - 每日最大涨跌幅与波动率排行榜\n"
+                    "• `/alert` - 设置实时价格预警提醒\n\n"
+                    "🛡️ **4. 黄金与宏观避险雷达**\n"
+                    "• `/gold_radar` - 数字黄金 (PAXG/USDT) 与央行宏观雷达\n\n"
+                    "⚙️ **5. 系统控制与安全**\n"
+                    "• `/add_api` - 绑定 Binance API Keys\n"
+                    "• `/set_pin` - 设置 4-6 位安全 PIN 码\n"
+                    "• `/language` - 切换系统语言 (高棉语 / 英语 / 中文)\n"
+                )
+            else:
+                menu_text = (
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00** 🤖\n"
+                    "═══════════════════════════════\n"
+                    "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE` | `Latency: <15ms`\n"
+                    "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
+                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
+                    "═══════════════════════════════\n"
+                    "សូមស្វាគមន៍មកកាន់ **v12.00 Executive AGI Navigation Dashboard**! 📊\n\n"
+                    "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
+                    "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
+                    "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
+                    "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time 24/7\n"
+                    "• `/stop_all` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
+                    "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
+                    "• `/turbo_hedge` - 🟢 Core HFT Multi/Single-Coin Scanner 24/7\n"
+                    "• `/snipe` - 🎯 Listing & Volatility (High RVOL) Sniper\n"
+                    "• `/funding_harvester` - 🌾 8-Hour Funding Yield Harvester\n"
+                    "• `/infinity_grid` - ♾️ Unified Smart 24h ATR Grid Engine\n\n"
+                    "🔮 **3. AI INTELLIGENCE & MARKET ADVISORY**\n"
+                    "• `/analyze <COIN>` - AI វិភាគទិន្នន័យបច្ចេកទេស 5-Swarm 360°\n"
+                    "• `/predict <COIN>` - Wall Street ML ព្យាករណ៍តម្លៃ & Trend 24h\n"
+                    "• `/news` - ព័ត៌មាន ៣ វគ្គផ្លូវការ & រូបភាពទំហំធំ High-Res\n"
+                    "• `/whales` - តាមដានចលនា Whale ធំៗក្នុងទីផ្សារ Real-Time\n"
+                    "• `/top` - កាក់ឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile)\n"
+                    "• `/alert` - កំណត់ការជូនដំណឹងតម្លៃកាក់ Real-Time\n\n"
+                    "🛡️ **4. GOLD & MACRO RISK SHIELD**\n"
+                    "• `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Central Bank Radar\n\n"
+                    "⚙️ **5. SYSTEM CONTROL & SECURITY**\n"
+                    "• `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
+                    "• `/set_pin` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
+                    "• `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n"
+                )
             
             if is_admin:
                 menu_text += (
@@ -471,8 +539,8 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
                 ],
                 [
-                    InlineKeyboardButton("📐 Unified Smart Grid", callback_data="btn_infinity_grid_launch"),
-                    InlineKeyboardButton("🥇 Gold & PAXG Radar", callback_data="btn_gold_radar")
+                    InlineKeyboardButton("♾️ Unified Smart Grid", callback_data="btn_infinity_grid_launch"),
+                    InlineKeyboardButton("🛡️ Gold & PAXG Radar", callback_data="btn_gold_radar")
                 ],
                 [
                     InlineKeyboardButton("📰 AI News Radar", callback_data="btn_news_refresh"),
@@ -498,7 +566,7 @@ class TelegramBotThread(BaseThread):
                 parse_mode="Markdown",
                 reply_markup=reply_markup
             )
-            self.log_signal.emit(f"🎛️ Sent Super Smart AGI Menu to {chat_id}")
+            self.log_signal.emit(f"🎛️ Sent Super Smart v12.00 Master Control Panel to {chat_id}")
 
         async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else None
