@@ -963,12 +963,27 @@ class TelegramBotThread(BaseThread):
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if not keys:
-                empty_msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | LIVE BALANCE** 🤖\n"
-                    "═══════════════════════════════\n"
-                    "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
-                    "💡 *សូមចុចប៊ូតុង **[🔑 Add Binance API]** ខាងក្រោមដើម្បីភ្ជាប់ API Keys របស់អ្នកជាមុនសិន ៖*"
-                )
+                if user_lang == 'en':
+                    empty_msg = (
+                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                        "═══════════════════════════════\n"
+                        "❌ **No Binance API Keys connected yet!**\n\n"
+                        "💡 *Please tap **[🔑 Add Binance API]** below to bind your API Keys first:*"
+                    )
+                elif user_lang == 'zh':
+                    empty_msg = (
+                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | 实时资金余额** 🤖\n"
+                        "═══════════════════════════════\n"
+                        "❌ **尚未绑定 Binance API Keys！**\n\n"
+                        "💡 *请点击下方 **[🔑 Add Binance API]** 按钮绑定您的 API 密钥：*"
+                    )
+                else:
+                    empty_msg = (
+                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                        "═══════════════════════════════\n"
+                        "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
+                        "💡 *សូមចុចប៊ូតុង **[🔑 Add Binance API]** ខាងក្រោមដើម្បីភ្ជាប់ API Keys របស់អ្នកជាមុនសិន ៖*"
+                    )
                 await update.message.reply_text(empty_msg, parse_mode="Markdown", reply_markup=reply_markup)
                 return
                 
@@ -992,7 +1007,8 @@ class TelegramBotThread(BaseThread):
                     val_usdt = float(info.get('value_usdt', 0.0) if isinstance(info, dict) else 0.0)
                     coins_str_list.append(f"{coin_str} (${val_usdt:,.2f})")
                 if coins_str_list:
-                    trading_details = f"\n   └ _កាក់កំពុងជួញដូរ:_ `{', '.join(coins_str_list)}`"
+                    sub_txt = "Trading Position:" if user_lang == 'en' else ("持仓中:" if user_lang == 'zh' else "កាក់កំពុងជួញដូរ:")
+                    trading_details = f"\n   └ _{sub_txt}_ `{', '.join(coins_str_list)}`"
                 
             funding_str = f"👛 **Funding Wallet (P2P/Pay):** `${funding_balance:,.2f} USDT`\n" if funding_balance > 0 else ""
             earn_str = f"🌾 **Simple Earn Balance:** `${earn_balance:,.2f} USDT`\n" if earn_balance > 0 else ""
@@ -1000,27 +1016,59 @@ class TelegramBotThread(BaseThread):
             if futures_balance > 0:
                 futures_str = f"📈 **Futures Wallet Balance:** `${futures_balance:,.2f} USDT`\n"
             elif futures_status == "API_PERM_ERROR":
-                futures_str = "📈 **Futures Wallet:** `$0.00 USDT` ⚠️ *(API Key មិនទាន់បើកសិទ្ធិ Enable Futures)*\n"
+                err_lbl = "(Enable Futures API permission required)" if user_lang == 'en' else ("(需开启合约 API 权限)" if user_lang == 'zh' else "(API Key មិនទាន់បើកសិទ្ធិ Enable Futures)")
+                futures_str = f"📈 **Futures Wallet:** `$0.00 USDT` ⚠️ *{err_lbl}*\n"
             else:
                 futures_str = f"📈 **Futures Wallet Balance:** `${futures_balance:,.2f} USDT`\n"
 
             is_paper = getattr(trading_engine, "PAPER_TRADING", False)
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE API"
                 
-            msg = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | LIVE BALANCE** 🤖\n"
-                "═══════════════════════════════\n"
-                f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
-                "═══════════════════════════════\n\n"
-                f"💰 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
-                f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
-                f"{futures_str}"
-                f"{funding_str}"
-                f"{earn_str}"
-                f"🏦 **Portfolio / Margin Wallet:** `${margin_balance:,.2f} USDT`\n"
-                "═══════════════════════════════\n"
-                f"💎 **ទ្រព្យសកម្មសរុប (Binance Total Net Equity):** `${total_net_equity:,.2f} USDT`"
-            )
+            if user_lang == 'en':
+                msg = (
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                    "═══════════════════════════════\n"
+                    f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
+                    "═══════════════════════════════\n\n"
+                    f"💰 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
+                    f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
+                    f"{futures_str}"
+                    f"{funding_str}"
+                    f"{earn_str}"
+                    f"🏦 **Portfolio / Margin Wallet:** `${margin_balance:,.2f} USDT`\n"
+                    "═══════════════════════════════\n"
+                    f"💎 **Total Net Equity (Binance Assets):** `${total_net_equity:,.2f} USDT`"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | 实时资金余额** 🤖\n"
+                    "═══════════════════════════════\n"
+                    f"🛡️ **安全认证**: `VERIFIED` | `{mode_badge}`\n"
+                    "═══════════════════════════════\n\n"
+                    f"💰 **现货可用余额 (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
+                    f"📊 **现货持仓敞口:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
+                    f"{futures_str}"
+                    f"{funding_str}"
+                    f"{earn_str}"
+                    f"🏦 **杠杆/组合保证金:** `${margin_balance:,.2f} USDT`\n"
+                    "═══════════════════════════════\n"
+                    f"💎 **Binance 总资产净值:** `${total_net_equity:,.2f} USDT`"
+                )
+            else:
+                msg = (
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                    "═══════════════════════════════\n"
+                    f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
+                    "═══════════════════════════════\n\n"
+                    f"💰 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
+                    f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
+                    f"{futures_str}"
+                    f"{funding_str}"
+                    f"{earn_str}"
+                    f"🏦 **Portfolio / Margin Wallet:** `${margin_balance:,.2f} USDT`\n"
+                    "═══════════════════════════════\n"
+                    f"💎 **ទ្រព្យសកម្មសរុប (Binance Total Net Equity):** `${total_net_equity:,.2f} USDT`"
+                )
                 
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
             self.log_signal.emit(f"💳 VIP User {chat_id} checked their v11.0 live balance.")
