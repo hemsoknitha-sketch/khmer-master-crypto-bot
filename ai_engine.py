@@ -212,11 +212,14 @@ class AIInvestmentEngine:
     def sync_brain_from_huggingface(self, repo_id: str = None) -> dict:
         """
         Downloads latest 2-week trained Machine Learning weights (.pkl) and brain_config.json
-        from Hugging Face Model Hub to local VPS working directory with zero downtime.
+        from Hugging Face Model Hub directly into dedicated local models/ directory with zero downtime.
         """
         target_repo = repo_id or os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models")
         token = self.hf_token or os.getenv("HF_TOKEN", "")
         
+        models_dir = os.path.join(os.getcwd(), "models")
+        os.makedirs(models_dir, exist_ok=True)
+
         files_to_sync = [
             "brain_price.pkl",
             "brain_trend.pkl",
@@ -237,19 +240,20 @@ class AIInvestmentEngine:
             from huggingface_hub import hf_hub_download
             for filename in files_to_sync:
                 try:
+                    # Download to models/ directory
                     downloaded_path = hf_hub_download(
                         repo_id=target_repo,
                         filename=filename,
                         repo_type="model",
                         token=token if token else None,
-                        local_dir=os.getcwd()
+                        local_dir=models_dir
                     )
                     synced_files.append(filename)
                 except Exception as e_file:
                     print(f"⚠️ [HF SYNC NOTICE] Could not download {filename}: {e_file}")
                     
             if synced_files:
-                print(f"✅ [HF BRAIN SYNC SUCCESS] Downloaded {len(synced_files)} updated model files from {target_repo}.")
+                print(f"✅ [HF BRAIN SYNC SUCCESS] Downloaded {len(synced_files)} updated model files to models/ folder from {target_repo}.")
                 self.load_trained_brain_models()
                 return {"status": "success", "synced_files": synced_files, "repo": target_repo}
             else:
@@ -260,29 +264,50 @@ class AIInvestmentEngine:
 
     def load_trained_brain_models(self):
         """
-        Loads newly trained Machine Learning models (.pkl) from local directory
-        (downloaded via Hugging Face Hub sync). Extremely light memory usage (<15MB RAM).
+        Loads newly trained Machine Learning models (.pkl) from dedicated models/ directory
+        or root fallback with zero downtime. Extremely light memory usage (<15MB RAM).
         """
         import joblib
         import json
+        import shutil
+
         self.ml_models = {}
         self.brain_config = {}
+        
+        models_dir = os.path.join(os.getcwd(), "models")
+        os.makedirs(models_dir, exist_ok=True)
+
+        # Helper to get file path with automatic migration from root -> models/
+        def resolve_model_path(filename: str) -> str:
+            sub_path = os.path.join(models_dir, filename)
+            root_path = os.path.join(os.getcwd(), filename)
+            if os.path.exists(root_path) and not os.path.exists(sub_path):
+                try:
+                    shutil.move(root_path, sub_path)
+                except Exception:
+                    pass
+            if os.path.exists(sub_path):
+                return sub_path
+            elif os.path.exists(root_path):
+                return root_path
+            return ""
+
         try:
-            config_path = os.path.join(os.getcwd(), "brain_config.json")
-            if os.path.exists(config_path):
+            config_path = resolve_model_path("brain_config.json")
+            if config_path and os.path.exists(config_path):
                 with open(config_path, "r", encoding="utf-8") as f:
                     self.brain_config = json.load(f)
                     
                 model_keys = ["price", "trend", "volatility", "tp", "dca", "scaler", "catboost", "lightgbm", "graph"]
                 for key in model_keys:
                     pkl_name = f"brain_{key}.pkl"
-                    pkl_path = os.path.join(os.getcwd(), pkl_name)
-                    if os.path.exists(pkl_path):
+                    pkl_path = resolve_model_path(pkl_name)
+                    if pkl_path and os.path.exists(pkl_path):
                         self.ml_models[key] = joblib.load(pkl_path)
                 
-                print(f"✅ [AI ML BRAIN] Loaded {len(self.ml_models)} newly trained Wall Street ML models from Hugging Face Hub sync!")
+                print(f"✅ [AI ML BRAIN] Loaded {len(self.ml_models)} newly trained Wall Street ML models from models/ directory!")
             else:
-                print("ℹ️ [AI ML BRAIN] brain_config.json not found locally. Running with Cloud LLM Super Brains & Quantitative Indicator fallbacks.")
+                print("ℹ️ [AI ML BRAIN] brain_config.json not found locally in models/. Running with Cloud LLM Super Brains & Quantitative Indicator fallbacks.")
         except Exception as e:
             print(f"⚠️ [AI ML BRAIN NOTICE] Could not load .pkl models: {e}")
 
