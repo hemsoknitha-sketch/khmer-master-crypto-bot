@@ -2244,18 +2244,22 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🇨🇳 中文", callback_data="btn_lang_zh")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ],
+                [
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("🩺 System Health", callback_data="btn_menu_health")
                 ]
             ])
 
             if user_lang == 'en':
                 lang_display = "🇬🇧 English"
                 msg = (
-                    "🌐 **APEX SUPER AGI TURBO BRAIN v9.5 | LANGUAGE SETTINGS** 🎯\n"
+                    "🌐 **APEX SUPER AGI TURBO BRAIN v12.00 | LANGUAGE & SYSTEM SETUP** 🎯\n"
                     "═══════════════════════════════\n\n"
                     f"📊 **Active System Language**: `{lang_display}`\n\n"
-                    "💡 **Select your preferred language below or use 1-tap copy commands:**\n"
+                    "💡 **Select your preferred language below or tap 1-click commands:**\n"
                     "👉 Khmer: `` `/language km` ``\n"
                     "👉 English: `` `/language en` ``\n"
                     "👉 Chinese: `` `/language zh` ``"
@@ -2263,7 +2267,7 @@ class TelegramBotThread(BaseThread):
             elif user_lang == 'zh':
                 lang_display = "🇨🇳 中文 (Chinese)"
                 msg = (
-                    "🌐 **APEX SUPER AGI TURBO BRAIN v9.5 | 语言设置** 🎯\n"
+                    "🌐 **APEX SUPER AGI TURBO BRAIN v12.00 | 语言与系统设置** 🎯\n"
                     "═══════════════════════════════\n\n"
                     f"📊 **当前系统语言**: `{lang_display}`\n\n"
                     "💡 **请在下方选择您的首选语言或使用一键复制命令：**\n"
@@ -2274,10 +2278,10 @@ class TelegramBotThread(BaseThread):
             else:
                 lang_display = "🇰🇭 ភាសាខ្មែរ (Khmer)"
                 msg = (
-                    "🌐 **APEX SUPER AGI TURBO BRAIN v9.5 | LANGUAGE SETTINGS** 🎯\n"
+                    "🌐 **APEX SUPER AGI TURBO BRAIN v12.00 | LANGUAGE & SYSTEM SETUP** 🎯\n"
                     "═══════════════════════════════\n\n"
                     f"📊 **ភាសាប្រព័ន្ធបច្ចុប្បន្ន ៖** `{lang_display}`\n\n"
-                    "💡 **សូមជ្រើសរើសភាសាដែលអ្នកពេញចិត្តខាងក្រោម ឬប្រើប្រាស់បញ្ជា ១-Tap:**\n"
+                    "💡 **សូមជ្រើសរើសភាសាដែលអ្នកពេញចិត្តខាងក្រោម ឬប្រើប្រាស់បញ្ជា ១-Tap ៖**\n"
                     "👉 ភាសាខ្មែរ: `` `/language km` ``\n"
                     "👉 English: `` `/language en` ``\n"
                     "👉 中文 (Chinese): `` `/language zh` ``"
