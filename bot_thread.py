@@ -7089,9 +7089,38 @@ class TelegramBotThread(BaseThread):
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(admin_license_callback, pattern="^lic_"))
         self.app.add_handler(CallbackQueryHandler(admin_nuke_callback, pattern="^nuke_confirm$"))
-        self.app.add_handler(CallbackQueryHandler(gold_button_callback, pattern="^btn_"))
-        
-        # --- KHMER MASTER CRYPTO v11.0 AGI SUPER BRAIN SCHEDULER ---
+        # Register v12.00 Clean Telegram Popup Command Menu
+        async def post_init_set_commands(application):
+            try:
+                from telegram import BotCommand
+                commands = [
+                    BotCommand("start", "🚀 Start Bot & Choose Language"),
+                    BotCommand("menu", "🎛️ Interactive Master Control Panel"),
+                    BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
+                    BotCommand("infinity_grid", "♾️ Unified Smart Grid Engine"),
+                    BotCommand("snipe", "🎯 Listing & Volatility Sniper"),
+                    BotCommand("funding_harvester", "🌾 8-Hour Funding Yield Harvester"),
+                    BotCommand("gold_radar", "🛡️ AI Gold Guard & Macro Radar"),
+                    BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
+                    BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
+                    BotCommand("balance", "💰 Check Spot & Futures Balance"),
+                    BotCommand("status", "📊 View Active Trades & PnL"),
+                    BotCommand("health", "🩺 Check VPS & Engine Diagnostics"),
+                    BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
+                    BotCommand("whales", "🐋 Track On-Chain Whale Movements"),
+                    BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
+                    BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
+                    BotCommand("alert", "🔔 Set Price Alert"),
+                    BotCommand("stop", "🛑 Stop Trading / Market Close"),
+                ]
+                await application.bot.set_my_commands(commands)
+                print("✅ [TELEGRAM MENU UI] Synchronized v12.00 Telegram Bot Command Popup Menu with Telegram Servers!")
+            except Exception as e_cmd:
+                print(f"⚠️ [TELEGRAM MENU UI NOTICE] Could not sync Telegram menu: {e_cmd}")
+
+        self.app.post_init = post_init_set_commands
+
+        # --- KHMER MASTER CRYPTO v12.00 AGI SUPER BRAIN SCHEDULER ---
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
         import scheduler_tasks
         import capital_orchestrator
