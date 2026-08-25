@@ -6933,7 +6933,7 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if paper_on else "🚀 REAL LIVE TRADING"
 
             msg = (
-                "📊 **APEX SUPER AGI TURBO BRAIN v9.5 | SYSTEM & STRATEGY RADAR** ⚡\n"
+                "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | SYSTEM & STRATEGY RADAR** ⚡\n"
                 "═══════════════════════════════\n\n"
                 "🖥️ **VPS HEALTH & HARDWARE DIAGNOSTICS:**\n"
                 f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
