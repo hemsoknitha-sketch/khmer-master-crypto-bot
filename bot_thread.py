@@ -7092,7 +7092,13 @@ class TelegramBotThread(BaseThread):
         # Register v12.00 Clean Telegram Popup Command Menu
         async def post_init_set_commands(application):
             try:
-                from telegram import BotCommand
+                from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats
+                try:
+                    await application.bot.delete_my_commands(scope=BotCommandScopeDefault())
+                    await application.bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats())
+                except Exception:
+                    pass
+
                 commands = [
                     BotCommand("start", "🚀 Start Bot & Choose Language"),
                     BotCommand("menu", "🎛️ Interactive Master Control Panel"),
@@ -7113,7 +7119,8 @@ class TelegramBotThread(BaseThread):
                     BotCommand("alert", "🔔 Set Price Alert"),
                     BotCommand("stop", "🛑 Stop Trading / Market Close"),
                 ]
-                await application.bot.set_my_commands(commands)
+                await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
+                await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
                 print("✅ [TELEGRAM MENU UI] Synchronized v12.00 Telegram Bot Command Popup Menu with Telegram Servers!")
             except Exception as e_cmd:
                 print(f"⚠️ [TELEGRAM MENU UI NOTICE] Could not sync Telegram menu: {e_cmd}")
