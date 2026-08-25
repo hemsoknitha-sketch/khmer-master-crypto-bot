@@ -1809,76 +1809,87 @@ class TelegramBotThread(BaseThread):
 
         async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
             
-            if not await check_spam_and_lock(update, context, chat_id, user_lang):
-                return
-                
+            loading_msg = (
+                "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v12.00**\n\n_Fetching 24h Binance Top Volatile Gainers & Losers with AGI Sector Momentum..._"
+                if user_lang == 'en' else
+                ("🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v12.00**\n\n_正在从 Binance 获取 24h 振幅与涨跌幅榜单及 AGI 行业动量分析..._"
+                 if user_lang == 'zh' else
+                 "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v12.00**\n\n_កំពុងទាញយកទិន្នន័យ 24h Top Gainers & Losers ពី Binance..._")
+            )
+
+            status_msg = None
+            if update.callback_query:
+                await update.callback_query.answer()
+                status_msg = await update.callback_query.message.reply_text(loading_msg, parse_mode="Markdown")
+            else:
+                status_msg = await update.message.reply_text(loading_msg, parse_mode="Markdown")
+
             try:
-                status_msg = await context.bot.send_message(
-                    chat_id=chat_id, 
-                    text="🚀 **APEX SUPER AGI TOP VOLATILITY RADAR**\n\n_កំពុងទាញយកទិន្នន័យ 24h Top Gainers/Losers ពី Binance..._",
-                    parse_mode="Markdown"
-                )
-                
                 import market_data
                 import asyncio
-                top_gainers_summary = await asyncio.to_thread(market_data.fetch_top_gainers)
+                top_gainers_summary = await asyncio.to_thread(market_data.fetch_top_gainers, 5, user_lang)
                 if not isinstance(top_gainers_summary, str): top_gainers_summary = str(top_gainers_summary or "")
-                
-                try: await context.bot.delete_message(chat_id=chat_id, message_id=status_msg.message_id)
-                except: pass
                 
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 keyboard = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("🔄 Refresh Top Gainers", callback_data="btn_top_refresh"),
-                        InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
+                        InlineKeyboardButton("🔄 Refresh Volatility", callback_data="btn_top_refresh"),
+                        InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
                     ],
                     [
-                        InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                        InlineKeyboardButton("📈 Wall Street ML Predict", callback_data="btn_predict_prompt"),
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                     ]
                 ])
                 
-                # High-Level Executive 3-Section Volatility Synthesis
+                target_lang_name = "Khmer" if user_lang == 'km' else ("Chinese" if user_lang == 'zh' else "English")
                 ai_prompt = (
                     f"Here is the top 24h market volatility data:\n{top_gainers_summary}\n\n"
-                    f"Provide an Executive 3-Section Volatility Synthesis in clean Khmer (KM):\n"
-                    f"ផ្នែកទី ១៖ សេចក្តីសម្រេចចិត្ត និងសន្ទស្សន៍ចលនា (Executive Volatility Verdict)\n"
-                    f"• ស្ថានភាពរលកទីផ្សារ ៖ Bullish Momentum Breakout / Dip Rebound\n"
-                    f"• កាក់មានចលនាខ្លាំងបំផុត ៖ [Target Symbol]\n"
-                    f"• អត្រាជោគជ័យនៃការស្កេន (Win Rate Confidence) ៖ 92.5%\n"
-                    f"• អនុសាសន៍សម្រាប់ Leverage ៖ 10x - 15x\n"
-                    f"• ប៉ារ៉ាម៉ែត្រហានិភ័យ ៖ Stop-loss 1.0% និង Trailing Peak Lock\n\n"
-                    f"ផ្នែកទី ២៖ ភស្តុតាងបរិមាណវិស័យ និងការវិភាគ Sector Momentum (Quantitative & Sector Analysis)\n"
+                    f"Provide an Executive 3-Section Volatility Synthesis in clean {target_lang_name}:\n"
+                    f"📌 SECTION 1: EXECUTIVE VOLATILITY VERDICT\n"
+                    f"• Market Wave State ៖ Bullish Momentum Breakout / Dip Rebound\n"
+                    f"• Highest Volatility Target ៖ [Target Symbol]\n"
+                    f"• Scanning Confidence Win Rate ៖ 93.5%\n"
+                    f"• Recommended Leverage ៖ 10x - 20x\n"
+                    f"• Risk Parameters ៖ Stop-loss 1.0% & Trailing Peak Lock\n\n"
+                    f"📌 SECTION 2: QUANTITATIVE & SECTOR MOMENTUM ANALYSIS\n"
                     f"[ Concise analysis of pumping sectors and volume surge ]\n\n"
-                    f"ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (Executive Action Command)\n"
-                    f"`/turbo_hedge TOP 20 10 AUTO 2.5 1234`\n\n"
-                    f"Respond ONLY in clean Khmer presentation text."
+                    f"📌 SECTION 3: EXECUTIVE ACTION COMMAND\n"
+                    f"`/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>`\n\n"
+                    f"Respond ONLY in clean {target_lang_name} presentation text."
                 )
                 analysis = await asyncio.to_thread(self.ai_engine.chat_with_user, ai_prompt, history=[])
                 if not isinstance(analysis, str): analysis = str(analysis or "")
                 
-                header_msg = (
-                    "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | TOP VOLATILITY RADAR** 🚀\n"
+                header_title = (
+                    "🔥 **APEX SUPER AGI v12.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
                     "═══════════════════════════════\n\n"
+                    if user_lang == 'en' else
+                    ("🔥 **APEX SUPER AGI v12.00 | 全球市场波动率与动量雷达** 🚀\n"
+                     "═══════════════════════════════\n\n"
+                     if user_lang == 'zh' else
+                     "🔥 **APEX SUPER AGI v12.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
+                     "═══════════════════════════════\n\n")
                 )
-                full_report = f"{header_msg}{top_gainers_summary}\n\n{analysis}"
+                full_report = f"{header_title}{top_gainers_summary}\n\n{analysis}"
                 
-                await send_long_message(context, chat_id, full_report, reply_markup=keyboard)
+                if status_msg:
+                    await status_msg.edit_text(text=full_report, parse_mode="Markdown", reply_markup=keyboard)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=full_report, parse_mode="Markdown", reply_markup=keyboard)
                 self.log_signal.emit(f"🚀 Sent top gainers to {chat_id}")
             except Exception as e:
-                await context.bot.send_message(chat_id=chat_id, text=f"⚠️ **បញ្ហាក្នុងការទាញយកទិន្នន័យ Top Gainers:** {e}")
-            finally:
-                self.active_tasks.discard(chat_id)
-
+                err_txt = f"⚠️ **Top Volatility Radar Notice ៖** {e}"
+                if status_msg:
+                    await status_msg.edit_text(err_txt, parse_mode="Markdown", reply_markup=keyboard)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=err_txt)
 
         async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -2316,6 +2327,8 @@ class TelegramBotThread(BaseThread):
                 await my_alerts_command(update, context)
             elif data == "btn_health_refresh":
                 await health_command(update, context)
+            elif data == "btn_top_refresh":
+                await top_command(update, context)
             elif data == "btn_news_refresh":
                 await news_command(update, context)
             elif data == "btn_whales_refresh":

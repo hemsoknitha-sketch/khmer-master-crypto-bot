@@ -215,9 +215,9 @@ def generate_chart(df: pd.DataFrame, symbol: str, filepath: str = "chart.png"):
     
     return filepath
 
-def fetch_top_gainers(limit: int = 5):
+def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
     """
-    Fetches the top gaining crypto assets in the last 24 hours from Binance.
+    Fetches the top gaining and losing crypto assets in the last 24 hours from Binance (v12.00 Apex Ultra AGI).
     """
     base_urls = [
         "https://data-api.binance.vision",
@@ -227,6 +227,9 @@ def fetch_top_gainers(limit: int = 5):
         "https://api3.binance.com"
     ]
     
+    lang_clean = str(lang or 'km').lower()
+    user_lang = 'en' if lang_clean in ['en', 'english'] else ('zh' if lang_clean in ['zh', 'chinese'] else 'km')
+    
     last_error = ""
     for base_url in base_urls:
         url = f"{base_url}/api/v3/ticker/24hr"
@@ -235,7 +238,6 @@ def fetch_top_gainers(limit: int = 5):
             response.raise_for_status()
             data = response.json()
             
-            # Filter for active USDT pairs with liquid 24h volume (>= $1M USDT)
             usdt_pairs = [item for item in data if item['symbol'].endswith('USDT')
                           and float(item.get('lastPrice', 0)) > 0
                           and float(item.get('bidPrice', 0)) > 0
@@ -248,23 +250,60 @@ def fetch_top_gainers(limit: int = 5):
             top_losers = usdt_pairs[-limit:]
             top_losers.reverse()
             
-            summary = "🔥 **បញ្ជីកាក់ឡើងថ្លៃខ្លាំងបំផុត (TOP 5 GAINERS - MOMENTUM PUMP):**\n"
-            for i, coin in enumerate(top_gainers):
-                full_sym = coin['symbol']
-                symbol = full_sym.replace("USDT", "")
-                change = float(coin['priceChangePercent'])
-                price = float(coin['lastPrice'])
-                volume = float(coin['quoteVolume'])
-                summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (តម្លៃ ៖ ${price:,.4f} | Vol: ${volume/1e6:.2f}M)\n   ⚡ 1-Tap Command ៖ `/turbo_hedge {symbol} 20 10 BUY 2.5 1234`\n"
-                
-            summary += "\n🔻 **បញ្ជីកាក់ធ្លាក់ចុះខ្លាំងបំផុត (TOP 5 LOSERS - DIP REBOUND):**\n"
-            for i, coin in enumerate(top_losers):
-                full_sym = coin['symbol']
-                symbol = full_sym.replace("USDT", "")
-                change = float(coin['priceChangePercent'])
-                price = float(coin['lastPrice'])
-                volume = float(coin['quoteVolume'])
-                summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (តម្លៃ ៖ ${price:,.4f} | Vol: ${volume/1e6:.2f}M)\n   ⚡ 1-Tap Command ៖ `/turbo_hedge {symbol} 20 10 BUY 2.5 1234`\n"
+            if user_lang == 'en':
+                summary = "🔥 **TOP 5 VOLATILE GAINERS (MOMENTUM PUMP):**\n"
+                for i, coin in enumerate(top_gainers):
+                    full_sym = coin['symbol']
+                    symbol = full_sym.replace("USDT", "")
+                    change = float(coin['priceChangePercent'])
+                    price = float(coin['lastPrice'])
+                    volume = float(coin['quoteVolume'])
+                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (Price: `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ Launch Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    
+                summary += "\n🔻 **TOP 5 VOLATILE LOSERS (DIP REBOUND):**\n"
+                for i, coin in enumerate(top_losers):
+                    full_sym = coin['symbol']
+                    symbol = full_sym.replace("USDT", "")
+                    change = float(coin['priceChangePercent'])
+                    price = float(coin['lastPrice'])
+                    volume = float(coin['quoteVolume'])
+                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (Price: `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ Launch Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+            elif user_lang == 'zh':
+                summary = "🔥 **24小时涨幅榜 TOP 5 (动量拉盘):**\n"
+                for i, coin in enumerate(top_gainers):
+                    full_sym = coin['symbol']
+                    symbol = full_sym.replace("USDT", "")
+                    change = float(coin['priceChangePercent'])
+                    price = float(coin['lastPrice'])
+                    volume = float(coin['quoteVolume'])
+                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (价格: `${price:,.4f}` | 成交额: `${volume/1e6:.2f}M`)\n   ⚡ 一键启动 ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    
+                summary += "\n🔻 **24小时跌幅榜 TOP 5 (抄底反弹):**\n"
+                for i, coin in enumerate(top_losers):
+                    full_sym = coin['symbol']
+                    symbol = full_sym.replace("USDT", "")
+                    change = float(coin['priceChangePercent'])
+                    price = float(coin['lastPrice'])
+                    volume = float(coin['quoteVolume'])
+                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (价格: `${price:,.4f}` | 成交额: `${volume/1e6:.2f}M`)\n   ⚡ 一键启动 ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+            else:
+                summary = "🔥 **បញ្ជីកាក់ឡើងថ្លៃខ្លាំងបំផុត (TOP 5 GAINERS - MOMENTUM PUMP):**\n"
+                for i, coin in enumerate(top_gainers):
+                    full_sym = coin['symbol']
+                    symbol = full_sym.replace("USDT", "")
+                    change = float(coin['priceChangePercent'])
+                    price = float(coin['lastPrice'])
+                    volume = float(coin['quoteVolume'])
+                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (តម្លៃ ៖ `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ 1-Tap Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    
+                summary += "\n🔻 **បញ្ជីកាក់ធ្លាក់ចុះខ្លាំងបំផុត (TOP 5 LOSERS - DIP REBOUND):**\n"
+                for i, coin in enumerate(top_losers):
+                    full_sym = coin['symbol']
+                    symbol = full_sym.replace("USDT", "")
+                    change = float(coin['priceChangePercent'])
+                    price = float(coin['lastPrice'])
+                    volume = float(coin['quoteVolume'])
+                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (តម្លៃ ៖ `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ 1-Tap Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
                 
             return summary
 
