@@ -7232,34 +7232,64 @@ class TelegramBotThread(BaseThread):
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_defender_status"),
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
-                ],
-                [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ],
-                [
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
 
             mode_badge = "🧪 PAPER TRADING" if paper_on else "🚀 REAL LIVE TRADING"
 
-            msg = (
-                "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | SYSTEM & STRATEGY RADAR** ⚡\n"
-                "═══════════════════════════════\n\n"
-                "🖥️ **VPS HEALTH & HARDWARE DIAGNOSTICS:**\n"
-                f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
-                f"• **CPU Load**: `{cpu_usage:.1f}%` | **RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
-                f"• **Database Size**: `{db_size_mb:.2f} MB` | **Disk**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
-                f"• **Trading Engine Mode**: `{mode_badge}`\n"
-                f"• **Available USDT Capital**: `${avail_usdt:,.2f} USDT`\n\n"
-                "🟢 **ACTIVE TRADING ENGINES:**\n"
-                f"{active_str}\n\n"
-                "🔴 **INACTIVE TRADING ENGINES (1-TAP COPY TO ACTIVATE):**\n"
-                f"{inactive_str}\n\n"
-                "💡 _ចុចលើពាក្យបញ្ជាខាងលើតែម្តងដើម្បី Copy ចូល Telegram ភ្លាមៗ!_"
-            )
+            if user_lang == 'en':
+                msg = (
+                    "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | SYSTEM & STRATEGY RADAR** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    "🖥️ **VPS HEALTH & HARDWARE DIAGNOSTICS:**\n"
+                    f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
+                    f"• **CPU Load**: `{cpu_usage:.1f}%` | **RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
+                    f"• **Database Size**: `{db_size_mb:.2f} MB` | **Disk**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
+                    f"• **Trading Engine Mode**: `{mode_badge}`\n"
+                    f"• **Available USDT Capital**: `${avail_usdt:,.2f} USDT`\n\n"
+                    "🟢 **ACTIVE TRADING ENGINES:**\n"
+                    f"{active_str}\n\n"
+                    "🔴 **INACTIVE TRADING ENGINES (1-TAP COPY TO ACTIVATE):**\n"
+                    f"{inactive_str}\n\n"
+                    "💡 _Tap any command above to copy directly into Telegram!_"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | 系统与策略雷达** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    "🖥️ **VPS 运行状态与硬件诊断：**\n"
+                    f"• **系统运行时间**: `{uptime_str}` | 状态: {status_icon}\n"
+                    f"• **CPU 负载**: `{cpu_usage:.1f}%` | **内存**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
+                    f"• **数据库体积**: `{db_size_mb:.2f} MB` | **磁盘**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
+                    f"• **交易引擎模式**: `{mode_badge}`\n"
+                    f"• **可用 USDT 资金**: `${avail_usdt:,.2f} USDT`\n\n"
+                    "🟢 **运行中的交易引擎：**\n"
+                    f"{active_str}\n\n"
+                    "🔴 **未激活的交易引擎 (一键复制开启)：**\n"
+                    f"{inactive_str}\n\n"
+                    "💡 _点击上方任意指令即可一键复制到 Telegram 框！_"
+                )
+            else:
+                msg = (
+                    "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | SYSTEM & STRATEGY RADAR** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    "🖥️ **VPS HEALTH & HARDWARE DIAGNOSTICS:**\n"
+                    f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
+                    f"• **CPU Load**: `{cpu_usage:.1f}%` | **RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
+                    f"• **Database Size**: `{db_size_mb:.2f} MB` | **Disk**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
+                    f"• **Trading Engine Mode**: `{mode_badge}`\n"
+                    f"• **Available USDT Capital**: `${avail_usdt:,.2f} USDT`\n\n"
+                    "🟢 **ACTIVE TRADING ENGINES:**\n"
+                    f"{active_str}\n\n"
+                    "🔴 **INACTIVE TRADING ENGINES (1-TAP COPY TO ACTIVATE):**\n"
+                    f"{inactive_str}\n\n"
+                    "💡 _ចុចលើពាក្យបញ្ជាខាងលើតែម្តងដើម្បី Copy ចូល Telegram ភ្លាមៗ!_"
+                )
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
             await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
             return
