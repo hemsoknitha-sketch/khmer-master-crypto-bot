@@ -14,19 +14,22 @@ Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរប�
 
 • 🟢 [១. មុខងារស្នូល - Core Flagship Engines] ៖
   - Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ប្រព័ន្ធស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំងទម្រង់ Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield (ទុន < $100 លីមីត 10x Max), និង Net Profit TP Floor គណនាបូកសេវា fee Taker ចូល ធានាចំណេញសុទ្ធ ១០០%។
-  - ⚡ HFT X & Truth Social Firehose Engine (`hft_x_truth_firehose_engine.py`) ៖ ប្រព័ន្ធចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុត (< 2ms Latency / 0.044ms Benchmark) ពី X (Twitter) & Truth Social ដោយផ្ទាល់ (ជាពិសេសពីលោក Donald Trump, Elon Musk, FED, SEC) តាមរយៈ Direct Push Stream, In-Memory RAM Ring Buffer, និង Aho-Corasick Trie Automaton ដើម្បីបាញ់ Order ទិញ/លក់ លើ Binance/Bybit មុនទីផ្សាររាយរាប់ម៉ឺនដង!
+  - 🧠 AGI Multi-Model Swarm Ensemble (`ai_engine.py`) ៖ ប្រព័ន្ធខួរក្បាល AI ទាំង ៥ រួមគ្នាស្វែងរក 5-Agent Consensus (Gemini 2.5, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-32B, Mistral-7B) ធ្វើឱ្យ Win-rate ខ្ពស់បំផុត និងគ្មាន False Signals!
+  - 👑 Wall Street Ultra-Next-Gen ML Models (`train_model.py`) ៖ ប្រព័ន្ធ Machine Learning កម្រិត Wall Street រួមមាន ៖ PatchTST Attention Transformer, Triple-Ensemble (XGBoost + CatBoost + LightGBM), GNN Altcoin Ripple Graph, និង OpenAI PPO Deep Reinforcement Learning Agent!
+  - 📦 Hugging Face Cloud Auto-Train Sync (`/sync_brain`) ៖ ប្រព័ន្ធ Cloud Auto-Train លើ Google Colab GPU 14-day cycle រួច Upload ទៅ Hugging Face Hub (0% VPS Load)។ VIP User អាចវាយ `/sync_brain` លើ Telegram ដើម្បី Hot-Update ទម្ងន់ AI ថ្មីក្នុងពេល ១ វិនាទី!
+  - 📰 3-Paragraph Journalistic News Alerts & RSS Photo Extractor ៖ ប្រព័ន្ធស្កេនព័ត៌មាន និងទាញយករូបភាពទំហំធំ High-Res Photo Alerts ផ្ញើជូន ៣ វគ្គផ្លូវការ ត្រឹមត្រូវតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត 100%!
+  - ⚡ HFT X & Truth Social Firehose Engine (`hft_x_truth_firehose_engine.py`) ៖ ប្រព័ន្ធចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុត (< 2ms Latency / 0.044ms Benchmark) ពី X (Twitter) & Truth Social ដោយផ្ទាល់ តាមរយៈ In-Memory RAM Ring Buffer និង Aho-Corasick Trie Automaton!
   - Spot 15-Min Surge Engine ៖ ស្កេន 200+ កាក់ Spot USDT លើ Binance ដោយទាញយកកាក់ដែលមាន Breakout Volume Surge (+3.0% ទៅ +35.0%) ព្រមទាំង Auto-Filter រំលងរាល់ Stablecoins (USDC, FDUSD, TUSD, etc.)។
   - Listing & Volatility Sniper (`/snipe`, `/auto_snipe`) ៖ ប្រព័ន្ធស្ទាក់ទិញកាក់ថ្មីដែលទើបតែចុះបញ្ជីលើ Binance ឬកាក់ដែលមាន Volume Spike (RVOL) ខ្ពស់។
   - 8-Hour Funding Yield Harvester (`/funding_harvester`) ៖ ប្រព័ន្ធស្ទាក់កើបអត្រាការប្រាក់ Funding Rate ពី Binance Futures រៀងរាល់ ៨ ម៉ោង ដោយសុវត្ថិភាព។
-  - AI Advisory & Market Intelligence (`/analyze`, `/predict`, `/news`, `/whales`, `/top`, `/alert`) ៖ ឧបករណ៍វិភាគទីផ្សារ និងទាយទិសដៅតម្លៃដោយ Gemini AI ដោយគ្មានផលប៉ះពាល់លើការបញ្ជា Trade។
 
 • 🟡 [២. មុខងារបូកបញ្ចូលគ្នា - Super Smart Consolidated Engines] ៖
   - Unified Smart Grid Engine (`/infinity_grid`, `/compound_grid`, `/grid_bot`, `/infinity_matrix`) ៖ បង្រួមប្រព័ន្ធ Grid ទាំង ៤ មកជាប្រព័ន្ធ Grid ស្វ័យប្រវត្តតែមួយ ដែលគណនាចន្លោះ Grid តាម 24h ATR Volatility និងការពារ MIN_NOTIONAL ($5.05 USDT) សម្រាប់ទុនតូច។
-  - Momentum & Single-Coin Scalper ៖ បង្រួមការ Trade កាក់ទោលទាំងអស់ចូលក្នុង `Turbo Hedge (Single-Coin Mode)` ដើម្បីការពារមិនឲ្យ Engine ផ្សេងគ្នាទិញ/លក់ជាន់គ្នារលាយ Account។
+  - Single-Coin Momentum Scalper ៖ បង្រួមការ Trade កាក់ទោលទាំងអស់ចូលក្នុង `Turbo Hedge (Single-Coin Mode)` ដើម្បីការពារមិនឲ្យ Engine ផ្សេងគ្នាទិញ/លក់ជាន់គ្នារលាយ Account។
   - Gold Guard & Macro Radar (`/gold_radar`, `/cb_gold`, `/paxg_arbitrage`, `/black_swan_guard`, `/gold_btc_rebalance`) ៖ បង្រួមប្រព័ន្ធមាសឌីជីថល (PAXGUSDT) ទាំងអស់មកជា AI Gold Guard តែមួយ។
 
 • 🔴 [៣. មុខងារហានិភ័យ/ឥតបានការ - Deactivated Retail Arbitrage] ៖
-  - Auto Arbitrage (`/auto_arb`) ៖ បានបិទ និងធ្វើបច្ចុប្បន្នភាពតម្រង់ទិសទៅកាន់ `/funding_harvester` ព្រមទាំង `/turbo_hedge` ដើម្បការពារដើមទុន VIP ពីការខាតបង់ fee Binance 0.10% រាល់ដងលើ Retail API Accounts។
+  - Auto Arbitrage (`/auto_arb`) ៖ បានបិទ និងធ្វើបច្ចុប្បន្នភាពតម្រង់ទិសទៅកាន់ `/funding_harvester` ព្រមទាំង `/turbo_hedge` ដើម្បីការពារដើមទុន VIP ពីការខាតបង់ fee Binance 0.10% រាល់ដងលើ Retail API Accounts។
 
 --------------------------------------------------------------------------------
 ២. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU v11.0 (COMPLETE COMMAND CATALOG)
@@ -42,7 +45,8 @@ Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរប�
 • `/language`     : ផ្លាស់ប្តូរភាសាប្រើប្រាស់ក្នុង Bot (ខ្មែរ / English / 中文)
 • `/balance`      : ពិនិត្យមើលសមតុល្យសាច់ប្រាក់ក្នុងកាបូប Spot & Futures Real-time
 • `/status`       : ពិនិត្យមើលកាក់ដែលកំពុងរត់ Trade ទាំងអស់ និងស្ថានភាព PnL Real-time
-• `/health`       : ពិនិត្យមើលសុខភាព VPS, CPU/Memory Usage, និង API Latency
+• `/health`       : ពិនិត្យមើលសុខភាព VPS, CPU/Memory Usage, 3GB Swap, 74 Gemini Models, 5-Swarm AGI, និង API Latency
+• `/sync_brain`   : (NEW!) Hot-Reload ទាញយកទម្ងន់ AI ថ្មីពី Hugging Face Model Hub មកភ្ជាប់ VPS ក្នុងពេល ១ វិនាទី!
 
 ២.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ TURBO HEDGE (AUTONOMOUS TURBO HEDGE ENGINES) ៖
 
@@ -70,10 +74,10 @@ Apex AGI Engine v11.0 គឺជាប្រព័ន្ធជួញដូរប�
    `/turbo_hedge STOP ALL 1234` ➔ បិទ និង Market Close/Sell គ្រប់កាក់ទាំងអស់ (Spot & Futures) លើ Binance ភ្លាមៗ (<30ms)។
 
 ២.៣ ពាក្យបញ្ជាវិភាគ និងសញ្ញាទីផ្សារ (AI INTELLIGENCE & MARKET ANALYSIS) ៖
-• `/analyze`      : ឲ្យ Gemini AI វិភាគបច្ចេកទេស និងទិសដៅកាក់ Real-time (ទម្រង់ ៖ `/analyze BTCUSDT`)
-• `/predict`      : ឲ្យ AI ព្យាករណ៍តម្លៃកាក់ក្នុងរយៈពេល ២៤ ម៉ោងខាងមុខ (ទម្រង់ ៖ `/predict SOLUSDT`)
+• `/analyze`      : ឲ្យ 5-Agent AGI Swarm Ensemble វិភាគបច្ចេកទេស និងទិសដៅកាក់ Real-time (ទម្រង់ ៖ `/analyze BTCUSDT`)
+• `/predict`      : ឲ្យ ML Brain (`predict_quant_ml`) ព្យាករណ៍តម្លៃ និង Trend ក្នុងរយៈពេល ២៤ ម៉ោង (ទម្រង់ ៖ `/predict SOLUSDT`)
 • `/whales`       : តាមដានចលនា Whale (ត្រីបាឡែន) ទិញ/លក់ ធំៗក្នុងទីផ្សារ Real-time
-• `/news`         : អានព័ត៌មានទាន់ហេតុការណ៍ Crypto & សេដ្ឋកិច្ចសកលវិទ្យា (Macro Economy) ព្រមទាំង HFT Stream Event Signal
+• `/news`         : អានព័ត៌មានទាន់ហេតុការណ៍ Crypto & សេដ្ឋកិច្ចសកលវិទ្យា (Macro Economy) ព្រមទាំង High-Res Photo Alerts ៣ វគ្គផ្លូវការ
 • `/top`          : មើលបញ្ជីកាក់ដែលឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile Gainers & Losers)
 • `/alert`        : កំណត់ការជូនដំណឹងតម្លៃកាក់ (ទម្រង់ ៖ `/alert BTC 95000 ABOVE`)
 
