@@ -1,7 +1,15 @@
 import os
+import sys
 import asyncio
 from dotenv import load_dotenv
 from telegram import Bot, BotCommand
+
+# Force UTF-8 encoding for stdout on Windows
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 load_dotenv()
 
@@ -9,7 +17,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 
 async def set_menu_commands():
     if not TOKEN:
-        print("❌ TELEGRAM_BOT_TOKEN missing in .env!")
+        print("[ERROR] TELEGRAM_BOT_TOKEN missing in .env!")
         return
 
     bot = Bot(token=TOKEN)
@@ -35,9 +43,9 @@ async def set_menu_commands():
     ]
     try:
         await bot.set_my_commands(commands)
-        print("✅ [SUCCESS] Telegram Bot Menu updated to 18 clean v12.00 Flagship Commands on Telegram Cloud Servers!")
+        print("[SUCCESS] Telegram Bot Menu updated to 18 clean v12.00 Flagship Commands on Telegram Cloud Servers!")
     except Exception as e:
-        print(f"❌ Error setting commands: {e}")
+        print(f"[ERROR] Error setting commands: {e}")
 
 if __name__ == "__main__":
     asyncio.run(set_menu_commands())
