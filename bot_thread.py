@@ -4602,9 +4602,9 @@ class TelegramBotThread(BaseThread):
                 )
 
                 keyboard = InlineKeyboardMarkup([
-                    [toggle_btn, InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")],
+                    [toggle_btn, InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge")],
                     [
-                        InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                        InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"),
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ],
                     [
@@ -4612,22 +4612,57 @@ class TelegramBotThread(BaseThread):
                     ]
                 ])
 
-                msg = (
-                    "🔫 **APEX SUPER AGI TURBO BRAIN v9.5 | AUTO LISTING & DUMP SNIPER** 🎯\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE AUTO-SNIPE CONFIGURATION:**\n"
-                    f"• **System Status**: {current_status}\n"
-                    f"• **Allocated Capital**: `${alloc_amt:,.2f} USDT` (Per New Listing)\n"
-                    "• **Snipe Filters**: `Sub-Second Airdrop Dump (-25% Dip Buy)`\n"
-                    "• **Protection**: `Hard SL (-2.5%) & Trailing Peak Lock (+5.0%)`\n\n"
-                    "📡 **MULTI-EXCHANGE LISTING RADAR (SCANNING LIVE):**\n"
-                    "• **Binance Launchpool**: `SCANNING LIVE 24/7`\n"
-                    "• **Bybit Spot/Futures**: `RADAR ACTIVE`\n"
-                    "• **OKX Innovation Zone**: `MONITORING`\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/auto_snipe ON 50 1234` ``\n\n"
-                    "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/auto_snipe OFF 50 1234` ``"
-                )
+                if user_lang == 'en':
+                    msg = (
+                        "🔫 **APEX SUPER AGI TURBO BRAIN v12.00 | LISTING & VOLATILITY SNIPER** 🎯\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **EXECUTIVE AUTO-SNIPE & RVOL VOLATILITY CONFIGURATION:**\n"
+                        f"• **System Status**: {current_status}\n"
+                        f"• **Allocated Capital**: `${alloc_amt:,.2f} USDT` (Per New Listing / Volatility Surge)\n"
+                        "• **Snipe Filters**: `Sub-Second Airdrop Dump (-25% Dip Buy) & RVOL >3.0x Breakout`\n"
+                        "• **Protection**: `Hard SL (-2.5%) & Trailing Peak Lock (+5.0%)`\n\n"
+                        "📡 **MULTI-EXCHANGE LISTING RADAR (SCANNING LIVE 24/7):**\n"
+                        "• **Binance Launchpool & Spot/Futures**: `ACTIVE (<10ms WebSocket)`\n"
+                        "• **Bybit Innovation & Spot**: `RADAR ACTIVE`\n"
+                        "• **OKX New Listing Engine**: `MONITORING LIVE`\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "👉 **To Turn ON Auto Snipe ៖**\n`` `/snipe ON 50 1234` ``\n\n"
+                        "👉 **To Turn OFF Auto Snipe ៖**\n`` `/snipe OFF 50 1234` ``"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "🔫 **APEX SUPER AGI TURBO BRAIN v12.00 | 新币与波动率狙击手** 🎯\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **机构级自动狙击与 RVOL 波动率配置：**\n"
+                        f"• **系统状态**: {current_status}\n"
+                        f"• **单次分配资金**: `${alloc_amt:,.2f} USDT` (每次新币/突破狙击)\n"
+                        "• **狙击过滤器**: `毫秒级空投抛盘抄底 (-25%) & RVOL >3.0x 暴增突破`\n"
+                        "• **风险防护**: `硬止损 (-2.5%) & 追踪锁定止盈 (+5.0%)`\n\n"
+                        "📡 **多交易所新币雷达 (24/7 实时扫描)：**\n"
+                        "• **Binance Launchpool & 现货/合约**: `激活 (<10ms 毫秒 WebSocket)`\n"
+                        "• **Bybit 创新区与现货**: `雷达激活`\n"
+                        "• **OKX 新币上线引擎**: `实时监控中`\n\n"
+                        "📋 **一键复制指令：**\n"
+                        "👉 **开启自动狙击 ៖**\n`` `/snipe ON 50 1234` ``\n\n"
+                        "👉 **关闭自动狙击 ៖**\n`` `/snipe OFF 50 1234` ``"
+                    )
+                else:
+                    msg = (
+                        "🔫 **APEX SUPER AGI TURBO BRAIN v12.00 | LISTING & VOLATILITY SNIPER** 🎯\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **EXECUTIVE AUTO-SNIPE & RVOL VOLATILITY CONFIGURATION:**\n"
+                        f"• **ស្ថានភាពប្រព័ន្ធ ៖** {current_status}\n"
+                        f"• **Allocated Capital ៖** `${alloc_amt:,.2f} USDT` (Per New Listing / Volatility Surge)\n"
+                        "• **Snipe Filters ៖** `Sub-Second Airdrop Dump (-25% Dip Buy) & RVOL >3.0x Breakout`\n"
+                        "• **Protection ៖** `Hard SL (-2.5%) & Trailing Peak Lock (+5.0%)`\n\n"
+                        "📡 **MULTI-EXCHANGE LISTING RADAR (SCANNING LIVE 24/7):**\n"
+                        "• **Binance Launchpool & Spot/Futures ៖** `ACTIVE (<10ms WebSocket)`\n"
+                        "• **Bybit Innovation & Spot ៖** `RADAR ACTIVE`\n"
+                        "• **OKX New Listing Engine ៖** `MONITORING LIVE`\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/snipe ON 50 1234` ``\n\n"
+                        "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/snipe OFF 50 1234` ``"
+                    )
                 await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
                 return
