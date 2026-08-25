@@ -1858,11 +1858,17 @@ class TelegramBotThread(BaseThread):
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
-            
             try:
+                if user_lang == 'en':
+                    loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v12.00**\n\n_Fetching DXY Index, US 10Y Real Yields & PAXG Gold Analysis..._"
+                elif user_lang == 'zh':
+                    loading_txt = "🏆 **APEX SUPER AGI 黄金与宏观避险雷达 v12.00**\n\n_正在获取 DXY 美元指数、美债 10 年期收益率及 PAXG 黄金分析..._"
+                else:
+                    loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v12.00**\n\n_កំពុងទាញយកទិន្នន័យ DXY Index, US 10Y Real Yields & វិភាគតម្លៃមាស PAXG..._"
+
                 status_msg = await context.bot.send_message(
                     chat_id=chat_id, 
-                    text="🏆 **APEX SUPER AGI MACRO GOLD RADAR**\n\n_កំពុងទាញយកទិន្នន័យ DXY Index, US 10Y Real Yields & វិភាគតម្លៃមាស PAXG..._", 
+                    text=loading_txt, 
                     parse_mode="Markdown"
                 )
                 
