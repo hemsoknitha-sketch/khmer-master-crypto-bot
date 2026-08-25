@@ -6964,43 +6964,95 @@ class TelegramBotThread(BaseThread):
                 keyboard = InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton("🔄 Refresh Health", callback_data="btn_health_refresh"),
-                        InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
-                    ],
-                    [
-                        InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ],
-                    [
                         InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    ],
+                    [
+                        InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
 
-                msg = (
-                    "🏥 **KHMER MASTER CRYPTO / APEX TURBO AGI v11.0 | GOOGLE CLOUD 24/7 SYSTEM HEALTH** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "🖥️ **VPS HARDWARE PERFORMANCE & CLOUD NODE:**\n"
-                    f"• **Cloud Platform**: `Google Cloud Platform (GCP VPS)`\n"
-                    f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
-                    f"• **CPU Load**: `{cpu_pct:.1f}%` (Multi-Core Dynamic Tracking)\n"
-                    f"• **RAM Memory Allocation**: `{ram_used_mb} MB` / `{ram_total_mb} MB` (`{ram_pct:.1f}%` Used)\n"
-                    f"• **SSD Storage**: `{disk_used_gb} GB` Used / `{disk_free_gb} GB` Free (`{disk_pct:.1f}%` Used)\n"
-                    f"• **Process ID (PID)**: `{os.getpid()}` (`🟢 Healthy & Single-Instance Lock Active`)\n\n"
-                    "🧠 **HYBRID AGI BRAIN & EXCHANGE LATENCY:**\n"
-                    "• **Primary AGI Engine**: `Google Gemini 2.5 Flash (74 Models Discovered)`\n"
-                    f"• **Secondary AGI Engine**: `{hf_status}`\n"
-                    f"• **Binance HFT Latency**: `{time_offset_ms} ms` (`🟢 Synchronized & Sub-10ms Execution`)\n"
-                    f"• **Trading Engine Mode**: `{mode_badge}`\n\n"
-                    "⚡ **WATCHDOG & SYSTEM INTEGRITY:**\n"
-                    "• **APScheduler Cron Engine**: `⏰ ACTIVE (Daily Pre-Pump Train at 2:00 AM UTC+7)`\n"
-                    "• **Self-Healing Watchdog**: `🟢 ACTIVE (24/7 VPS Auto-Restart & Crash Shield)`\n"
-                    f"• **SQLite Database**: `{db_size_mb:.2f} MB` (`🟢 Connected & WAL Mode Optimized`)\n"
-                    f"• **Circuit Breaker Status**: `{defender_status}`\n"
-                    f"• **Active VIP Members**: `{vips_count} Users` | **Active Position Orders**: `{total_active_trades}`\n\n"
-                    "📋 **1-TAP QUICK COMMANDS:**\n"
-                    "👉 **ដើម្បីឆែកស្ថានភាព ៖** `` `/status` ``\n"
-                    "👉 **ដើម្បីឆែក Portfolio ៖** `` `/portfolio` ``\n\n"
-                    "💡 _ម៉ាស៊ីន Google Cloud VPS របស់អ្នកកំពុងដំណើរការ 24/7/365 ប្រកបដោយស្ថិរភាព និងសុវត្ថិភាព 100%!_"
-                )
+                if user_lang == 'en':
+                    msg = (
+                        "🏥 **APEX SUPER AGI TURBO BRAIN v12.00 | CLOUD VPS DIAGNOSTICS** ⚡\n"
+                        "═══════════════════════════════\n\n"
+                        "🖥️ **VPS HARDWARE PERFORMANCE & CLOUD NODE:**\n"
+                        "• **Cloud Platform**: `Google Cloud Platform (GCP VPS)`\n"
+                        f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
+                        f"• **CPU Load**: `{cpu_pct:.1f}%` (Multi-Core Dynamic Tracking)\n"
+                        f"• **RAM Memory Allocation**: `{ram_used_mb} MB` / `{ram_total_mb} MB` (`{ram_pct:.1f}%` Used)\n"
+                        f"• **SSD Storage**: `{disk_used_gb} GB` Used / `{disk_free_gb} GB` Free (`{disk_pct:.1f}%` Used)\n"
+                        f"• **Process ID (PID)**: `{os.getpid()}` (`🟢 Healthy & Single-Instance Lock Active`)\n\n"
+                        "🧠 **HYBRID AGI BRAIN & EXCHANGE LATENCY:**\n"
+                        "• **Primary AGI Engine**: `Google Gemini 2.5 Flash (Swarm Active)`\n"
+                        f"• **Secondary AGI Engine**: `{hf_status}`\n"
+                        f"• **Binance HFT Latency**: `{time_offset_ms} ms` (`🟢 Synchronized & Sub-10ms Execution`)\n"
+                        f"• **Trading Engine Mode**: `{mode_badge}`\n\n"
+                        "⚡ **WATCHDOG & SYSTEM INTEGRITY:**\n"
+                        "• **APScheduler Cron Engine**: `⏰ ACTIVE (Daily Pre-Pump Train at 2:00 AM UTC+7)`\n"
+                        "• **Self-Healing Watchdog**: `🟢 ACTIVE (24/7 VPS Auto-Restart & Crash Shield)`\n"
+                        f"• **SQLite Database**: `{db_size_mb:.2f} MB` (`🟢 Connected & WAL Mode Optimized`)\n"
+                        f"• **Circuit Breaker Status**: `{defender_status}`\n"
+                        f"• **Active VIP Members**: `{vips_count} Users` | **Active Position Orders**: `{total_active_trades}`\n\n"
+                        "📋 **1-TAP QUICK COMMANDS:**\n"
+                        "👉 **To Check System Status ៖** `` `/status` ``\n"
+                        "👉 **To Check Portfolio ៖** `` `/portfolio` ``\n\n"
+                        "💡 _Your Cloud VPS is operating smoothly 24/7/365 with 100% stability!_"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "🏥 **APEX SUPER AGI TURBO BRAIN v12.00 | 云服务器与引擎诊断** ⚡\n"
+                        "═══════════════════════════════\n\n"
+                        "🖥️ **VPS 硬件性能与云节点：**\n"
+                        "• **云平台**: `Google Cloud Platform (GCP VPS)`\n"
+                        f"• **系统运行时间**: `{uptime_str}` | 状态: {status_icon}\n"
+                        f"• **CPU 负载**: `{cpu_pct:.1f}%` (多核动态追踪)\n"
+                        f"• **内存分配**: `{ram_used_mb} MB` / `{ram_total_mb} MB` (`{ram_pct:.1f}%` 已用)\n"
+                        f"• **SSD 存储空间**: `{disk_used_gb} GB` 已用 / `{disk_free_gb} GB` 剩余 (`{disk_pct:.1f}%` 已用)\n"
+                        f"• **进程 ID (PID)**: `{os.getpid()}` (`🟢 运行健康且单实例锁激活`)\n\n"
+                        "🧠 **混合 AGI 大脑与交易所延迟：**\n"
+                        "• **主 AGI 引擎**: `Google Gemini 2.5 Flash (Swarm 集群激活)`\n"
+                        f"• **副 AGI 引擎**: `{hf_status}`\n"
+                        f"• **Binance HFT 延迟**: `{time_offset_ms} ms` (`🟢 同步成功，毫秒级执行`)\n"
+                        f"• **交易引擎模式**: `{mode_badge}`\n\n"
+                        "⚡ **看门狗与系统完整性：**\n"
+                        "• **APScheduler 定时引擎**: `⏰ 激活 (每日凌晨 2:00 UTC+7 模型训练)`\n"
+                        "• **自愈看门狗 (Watchdog)**: `🟢 激活 (24/7 VPS 自动重启与崩溃防护)`\n"
+                        f"• **SQLite 数据库**: `{db_size_mb:.2f} MB` (`🟢 已连接且 WAL 模式优化`)\n"
+                        f"• **熔断器状态 (Circuit Breaker)**: `{defender_status}`\n"
+                        f"• **活跃 VIP 会员**: `{vips_count} Users` | **活跃持仓订单**: `{total_active_trades}`\n\n"
+                        "📋 **一键复制指令：**\n"
+                        "👉 **查看系统状态 ៖** `` `/status` ``\n"
+                        "👉 **查看投资组合 ៖** `` `/portfolio` ``\n\n"
+                        "💡 _您的云端 VPS 正在 24/7/365 稳定高效安全运行中！_"
+                    )
+                else:
+                    msg = (
+                        "🏥 **KHMER MASTER CRYPTO / APEX TURBO AGI v12.00 | GOOGLE CLOUD 24/7 SYSTEM HEALTH** ⚡\n"
+                        "═══════════════════════════════\n\n"
+                        "🖥️ **VPS HARDWARE PERFORMANCE & CLOUD NODE:**\n"
+                        "• **Cloud Platform**: `Google Cloud Platform (GCP VPS)`\n"
+                        f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
+                        f"• **CPU Load**: `{cpu_pct:.1f}%` (Multi-Core Dynamic Tracking)\n"
+                        f"• **RAM Memory Allocation**: `{ram_used_mb} MB` / `{ram_total_mb} MB` (`{ram_pct:.1f}%` Used)\n"
+                        f"• **SSD Storage**: `{disk_used_gb} GB` Used / `{disk_free_gb} GB` Free (`{disk_pct:.1f}%` Used)\n"
+                        f"• **Process ID (PID)**: `{os.getpid()}` (`🟢 Healthy & Single-Instance Lock Active`)\n\n"
+                        "🧠 **HYBRID AGI BRAIN & EXCHANGE LATENCY:**\n"
+                        "• **Primary AGI Engine**: `Google Gemini 2.5 Flash (74 Models Discovered)`\n"
+                        f"• **Secondary AGI Engine**: `{hf_status}`\n"
+                        f"• **Binance HFT Latency**: `{time_offset_ms} ms` (`🟢 Synchronized & Sub-10ms Execution`)\n"
+                        f"• **Trading Engine Mode**: `{mode_badge}`\n\n"
+                        "⚡ **WATCHDOG & SYSTEM INTEGRITY:**\n"
+                        "• **APScheduler Cron Engine**: `⏰ ACTIVE (Daily Pre-Pump Train at 2:00 AM UTC+7)`\n"
+                        "• **Self-Healing Watchdog**: `🟢 ACTIVE (24/7 VPS Auto-Restart & Crash Shield)`\n"
+                        f"• **SQLite Database**: `{db_size_mb:.2f} MB` (`🟢 Connected & WAL Mode Optimized`)\n"
+                        f"• **Circuit Breaker Status**: `{defender_status}`\n"
+                        f"• **Active VIP Members**: `{vips_count} Users` | **Active Position Orders**: `{total_active_trades}`\n\n"
+                        "📋 **1-TAP QUICK COMMANDS:**\n"
+                        "👉 **ដើម្បីឆែកស្ថានភាព ៖** `` `/status` ``\n"
+                        "👉 **ដើម្បីឆែក Portfolio ៖** `` `/portfolio` ``\n\n"
+                        "💡 _ម៉ាស៊ីន Google Cloud VPS របស់អ្នកកំពុងដំណើរការ 24/7/365 ប្រកបដោយស្ថិរភាព និងសុវត្ថិភាព 100%!_"
+                    )
 
                 if update.callback_query:
                     await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
