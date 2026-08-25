@@ -1363,24 +1363,51 @@ class TelegramBotThread(BaseThread):
                             InlineKeyboardButton("🔍 Analyze PAXG (Gold)", callback_data="btn_analyze_PAXGUSDT")
                         ],
                         [
-                            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
-                            InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                            InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                         ]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
-                    usage_msg = (
-                        "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | DEEP MARKET ANALYZER** 🤖\n"
-                        "═══════════════════════════════\n"
-                        "💡 **របៀបវិភាគកាក់ជាមួយ AGI (AGI ANALYZER GUIDE)** ៖\n\n"
-                        "👉 **1. វិភាគកាក់បច្ចេកទេស & ML Prediction ៖**\n"
-                        "• `/analyze BTCUSDT` - វិភាគកាក់ BTC រួមជាមួយ Chart ផ្កាយ 4-Hour\n"
-                        "• `/analyze SOL` - វិភាគកាក់ Solana ជាមួយ indicator បច្ចេកទេសពេញលេញ\n\n"
-                        "👉 **2. វិភាគកាក់ជាមួយសំណួរផ្ទាល់ខ្លួន ៖**\n"
-                        "• `/analyze BTCUSDT Should I buy Long or Short now?` - វិភាគ និងឆ្លើយសំណួរ\n"
-                        "═══════════════════════════════\n"
-                        "💡 *ឬចុចលើប៊ូតុងកាក់ Quick-Scan ខាងក្រោមដើម្បីវិភាគភ្លាមៗ ៖*"
-                    )
+                    if user_lang == 'en':
+                        usage_msg = (
+                            "🧠 **APEX SUPER AGI TURBO BRAIN v12.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
+                            "═══════════════════════════════\n"
+                            "💡 **AGI MARKET ANALYZER USER GUIDE:**\n\n"
+                            "👉 **1. Deep Technical & 12 ML Models Analysis ៖**\n"
+                            "• `/analyze BTCUSDT` - Analyze BTC with Real-Time 4H Technical Chart\n"
+                            "• `/analyze SOL` - Full 5-Agent Swarm Analysis on Solana\n\n"
+                            "👉 **2. Custom Strategy & Question Analysis ៖**\n"
+                            "• `/analyze BTCUSDT Should I buy Long or Short now?` - Custom AGI Advisory\n"
+                            "═══════════════════════════════\n"
+                            "💡 *Or tap any Quick-Scan coin button below for instant 360° AGI analysis:*"
+                        )
+                    elif user_lang == 'zh':
+                        usage_msg = (
+                            "🧠 **APEX SUPER AGI TURBO BRAIN v12.00 | 5-Agent AGI 智能市场分析师** 🧠\n"
+                            "═══════════════════════════════\n"
+                            "💡 **AGI 市场分析指南：**\n\n"
+                            "👉 **1. 深度技术面与 12 种 ML 模型分析 ៖**\n"
+                            "• `/analyze BTCUSDT` - 结合 4 小时实时 K 线图深度分析 BTC\n"
+                            "• `/analyze SOL` - 5-Agent Swarm 全方位 Solana 市场研判\n\n"
+                            "👉 **2. 自定义策略与问题研判 ៖**\n"
+                            "• `/analyze BTCUSDT 现在应该做多还是做空？` - 智能 AGI 咨询\n"
+                            "═══════════════════════════════\n"
+                            "💡 *或点击下方一键快搜按钮获取 360° AGI 实时分析：*"
+                        )
+                    else:
+                        usage_msg = (
+                            "🧠 **APEX SUPER AGI TURBO BRAIN v12.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
+                            "═══════════════════════════════\n"
+                            "💡 **របៀបវិភាគកាក់ជាមួយ AGI (AGI ANALYZER GUIDE) ៖**\n\n"
+                            "👉 **1. វិភាគកាក់បច្ចេកទេស & ML Prediction ៖**\n"
+                            "• `/analyze BTCUSDT` - វិភាគកាក់ BTC រួមជាមួយ Chart ផ្កាយ 4-Hour\n"
+                            "• `/analyze SOL` - វិភាគកាក់ Solana ជាមួយ 5-Swarm Agents ពេញលេញ\n\n"
+                            "👉 **2. វិភាគកាក់ជាមួយសំណួរផ្ទាល់ខ្លួន ៖**\n"
+                            "• `/analyze BTCUSDT Should I buy Long or Short now?` - វិភាគ និងឆ្លើយសំណួរ\n"
+                            "═══════════════════════════════\n"
+                            "💡 *ឬចុចលើប៊ូតុងកាក់ Quick-Scan ខាងក្រោមដើម្បីវិភាគភ្លាមៗ ៖*"
+                        )
                     await update.message.reply_text(usage_msg, parse_mode="Markdown", reply_markup=reply_markup)
                     return
                     
