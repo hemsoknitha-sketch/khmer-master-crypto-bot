@@ -1882,56 +1882,59 @@ class TelegramBotThread(BaseThread):
 
         async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
             target_symbol = None
             if args and len(args) > 0:
                 raw_sym = str(args[0]).upper().strip()
                 if raw_sym and raw_sym not in ['NONE', 'ALL']:
                     target_symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
 
-            status_msg = await context.bot.send_message(
-                chat_id=chat_id,
-                text="📰 **APEX SUPER AGI GLOBAL NEWS RADAR**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងវិភាគ Sentiment ដោយ AI Engine 24/7..._",
-                parse_mode="Markdown"
+            loading_text = (
+                "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v12.00**\n\n_Fetching real-time breaking crypto news & performing 3-paragraph AGI sentiment synthesis..._"
+                if user_lang == 'en' else
+                ("📰 **APEX SUPER AGI GLOBAL NEWS RADAR v12.00**\n\n_正在获取实时加密行业突发新闻并由 AGI 引擎撰写三段式深度报告..._"
+                 if user_lang == 'zh' else
+                 "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v12.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងវិភាគ Sentiment ដោយ AI Engine 24/7..._")
             )
+
+            status_msg = None
+            if update.callback_query:
+                await update.callback_query.answer()
+                status_msg = await update.callback_query.message.reply_text(loading_text, parse_mode="Markdown")
+            else:
+                status_msg = await update.message.reply_text(loading_text, parse_mode="Markdown")
 
             import ai_news_engine
             report = await asyncio.to_thread(ai_news_engine.generate_news_report, target_symbol, user_lang, self.ai_engine)
             if not isinstance(report, str): report = str(report or "")
 
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=status_msg.message_id)
-            except Exception:
-                pass
-
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🔄 Refresh News", callback_data="btn_news_refresh"),
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
+                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                    InlineKeyboardButton("📈 Wall Street ML Predict", callback_data="btn_predict_prompt"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ],
-                [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=report,
-                parse_mode="Markdown",
-                reply_markup=keyboard,
-                disable_web_page_preview=True
-            )
-            self.log_signal.emit(f"📰 Sent Super Smart AI News to {chat_id}")
+            if status_msg:
+                try:
+                    await status_msg.edit_text(text=report, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=report, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=report, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
+
+            self.log_signal.emit(f"📰 Sent Super Smart AI News v12.00 to {chat_id}")
             return
 
         async def send_gold_message_safe(context, chat_id, text, keyboard=None):
@@ -2313,6 +2316,8 @@ class TelegramBotThread(BaseThread):
                 await my_alerts_command(update, context)
             elif data == "btn_health_refresh":
                 await health_command(update, context)
+            elif data == "btn_news_refresh":
+                await news_command(update, context)
             elif data == "btn_whales_refresh":
                 await whales_command(update, context)
             elif data == "btn_sync_brain":
