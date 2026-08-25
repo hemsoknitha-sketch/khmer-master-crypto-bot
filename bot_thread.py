@@ -6324,19 +6324,48 @@ class TelegramBotThread(BaseThread):
                     ]
                 ])
 
-                msg = (
-                    "🌾 **KHMER MASTER CRYPTO v11.0 | 8-HOUR FUNDING YIELD HARVESTER** 🌾\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
-                    f"• **Current Status**: {status_str}\n"
-                    "• **Strategy Architecture**: `1:1 Delta-Neutral (0% Risk-Free Yield Harvest)`\n"
-                    "• **Settlement Frequency**: `Every 8 Hours (Binance Funding Cycle)`\n\n"
-                    "🔥 **TOP BINANCE 8-HOUR FUNDING YIELD RADAR:**\n"
-                    f"{table_text}\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើក Harvester ៖**\n`` `/funding_harvester ON 50 <PIN>` ``\n\n"
-                    "👉 **ដើម្បីបិទ Harvester ៖**\n`` `/funding_harvester OFF <PIN>` ``"
-                )
+                if user_lang == 'en':
+                    msg = (
+                        "🌾 **APEX SUPER AGI TURBO BRAIN v12.00 | 8-HOUR FUNDING YIELD HARVESTER** 🌾\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
+                        f"• **Current Status**: {status_str}\n"
+                        "• **Strategy Architecture**: `1:1 Delta-Neutral (0% Risk-Free Yield Harvest)`\n"
+                        "• **Settlement Cycle**: `Every 8 Hours (Binance Perpetual Funding)`\n\n"
+                        "🔥 **TOP BINANCE 8-HOUR FUNDING YIELD RADAR:**\n"
+                        f"{table_text}\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "👉 **To Turn ON Harvester ៖**\n`` `/funding_harvester ON 50 <PIN>` ``\n\n"
+                        "👉 **To Turn OFF Harvester ៖**\n`` `/funding_harvester OFF <PIN>` ``"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "🌾 **APEX SUPER AGI TURBO BRAIN v12.00 | 8小时资金费率套利引擎** 🌾\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **机构级资金费率收割器配置：**\n"
+                        f"• **当前状态**: {status_str}\n"
+                        "• **策略架构**: `1:1 Delta-Neutral 现货+合约无风险对冲套利`\n"
+                        "• **结算周期**: `每 8 小时 (Binance 永续合约资金费率)`\n\n"
+                        "🔥 **Binance 8小时资金费率实时收益雷达：**\n"
+                        f"{table_text}\n\n"
+                        "📋 **一键复制指令：**\n"
+                        "👉 **开启资金费率收割器 ៖**\n`` `/funding_harvester ON 50 <PIN>` ``\n\n"
+                        "👉 **关闭资金费率收割器 ៖**\n`` `/funding_harvester OFF <PIN>` ``"
+                    )
+                else:
+                    msg = (
+                        "🌾 **APEX SUPER AGI TURBO BRAIN v12.00 | 8-HOUR FUNDING YIELD HARVESTER** 🌾\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
+                        f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
+                        "• **Strategy Architecture ៖** `1:1 Delta-Neutral (0% Risk-Free Yield Harvest)`\n"
+                        "• **Settlement Cycle ៖** `Every 8 Hours (Binance Perpetual Funding)`\n\n"
+                        "🔥 **TOP BINANCE 8-HOUR FUNDING YIELD RADAR:**\n"
+                        f"{table_text}\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "👉 **ដើម្បីបើក Harvester ៖**\n`` `/funding_harvester ON 50 <PIN>` ``\n\n"
+                        "👉 **ដើម្បីបិទ Harvester ៖**\n`` `/funding_harvester OFF <PIN>` ``"
+                    )
                 await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
                 return
