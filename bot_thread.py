@@ -5616,34 +5616,66 @@ class TelegramBotThread(BaseThread):
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
                 keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"), InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch")],
-                    [InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"), InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")]
+                    [
+                        InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                        InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
+                    ],
+                    [
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
                 ])
 
                 grid_lines = []
                 if has_active:
                     for g in active_grids[:5]:
-                        # g columns schema: id, chat_id, symbol, amt_per_layer, step_pct, max_inv, entry_price...
                         sym = str(g[2]) if len(g) > 2 else "N/A"
                         amt = float(g[3]) if len(g) > 3 else 0.0
                         step = float(g[4]) if len(g) > 4 else 0.0
                         max_i = float(g[5]) if len(g) > 5 else 0.0
                         grid_lines.append(f"• `{sym}`: Layer `${amt:,.2f}` | Step `{step:.1f}%` | Max Capital `${max_i:,.2f}`")
 
-                list_text = "\n".join(grid_lines) if grid_lines else "_គ្មាន Infinity Grid ដែលកំពុងដំណើរការនៅឡើយទេ..._"
+                list_text = "\n".join(grid_lines) if grid_lines else ("_No active Infinity Grids running..._" if user_lang == 'en' else ("_无运行中的无限网格..._" if user_lang == 'zh' else "_គ្មាន Infinity Grid ដែលកំពុងដំណើរការនៅឡើយទេ..._"))
 
-                msg = (
-                    "🕸️ **APEX SUPER AGI TURBO BRAIN v9.5 | INFINITY GRID ENGINE** 🕸️\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE INFINITY GRID CONFIGURATION & POSITIONS:**\n"
-                    f"• **System Status**: {status_str}\n"
-                    "• **Grid Strategy**: `Uncapped Dynamic Grid Spacing & Auto-Rebalancing`\n"
-                    "• **Execution Engine**: `Binance API Sub-Second Market Execution`\n\n"
-                    "📋 **ACTIVE INFINITY GRID POSITIONS:**\n"
-                    f"{list_text}\n\n"
-                    "📋 **1-TAP COMMAND EXECUTION:**\n"
-                    "👉 **ដើម្បីបង្កើត Infinity Grid ៖**\n`` `/infinity_grid XRP 10 1.0 100 1234` ``"
-                )
+                if user_lang == 'en':
+                    msg = (
+                        "♾️ **APEX SUPER AGI TURBO BRAIN v12.00 | UNIFIED SMART GRID ENGINE** ♾️\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **EXECUTIVE UNIFIED SMART GRID CONFIGURATION:**\n"
+                        f"• **System Status**: {status_str}\n"
+                        "• **Grid Strategy**: `24h ATR Dynamic Spacing & Min-Notional Shield ($5.05)`\n"
+                        "• **Execution Engine**: `Binance API Sub-Second Market Rebalancing`\n\n"
+                        "📋 **ACTIVE UNIFIED SMART GRID POSITIONS:**\n"
+                        f"{list_text}\n\n"
+                        "📋 **1-TAP COMMAND EXECUTION:**\n"
+                        "👉 **To Launch Unified Smart Grid ៖**\n`` `/infinity_grid XRP 10 1.0 100 1234` ``"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "♾️ **APEX SUPER AGI TURBO BRAIN v12.00 | 统一智能网格引擎** ♾️\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **机构级统一智能网格配置：**\n"
+                        f"• **系统状态**: {status_str}\n"
+                        "• **网格策略**: `24h ATR 动态间距与 Min-Notional 防护 ($5.05)`\n"
+                        "• **执行引擎**: `Binance API 毫秒级自动再平衡`\n\n"
+                        "📋 **运行中的统一智能网格持仓：**\n"
+                        f"{list_text}\n\n"
+                        "📋 **一键复制指令：**\n"
+                        "👉 **启动统一智能网格 ៖**\n`` `/infinity_grid XRP 10 1.0 100 1234` ``"
+                    )
+                else:
+                    msg = (
+                        "♾️ **APEX SUPER AGI TURBO BRAIN v12.00 | UNIFIED SMART GRID ENGINE** ♾️\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **EXECUTIVE UNIFIED SMART GRID CONFIGURATION:**\n"
+                        f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
+                        "• **Grid Strategy ៖** `24h ATR Dynamic Spacing & Min-Notional Shield ($5.05)`\n"
+                        "• **Execution Engine ៖** `Binance API Sub-Second Market Rebalancing`\n\n"
+                        "📋 **ACTIVE UNIFIED SMART GRID POSITIONS:**\n"
+                        f"{list_text}\n\n"
+                        "📋 **1-TAP COMMAND EXECUTION:**\n"
+                        "👉 **ដើម្បីបង្កើត Unified Smart Grid ៖**\n`` `/infinity_grid XRP 10 1.0 100 1234` ``"
+                    )
                 await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
                 return
