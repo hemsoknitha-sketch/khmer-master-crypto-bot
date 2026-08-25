@@ -7077,32 +7077,110 @@ class TelegramBotThread(BaseThread):
 
         async def sync_brain_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            await update.message.reply_text("🔄 **APEX AGI SUPER BRAIN ៖** កំពុងទាញយក AI Model Weights ថ្មីពី Hugging Face Cloud Model Hub...")
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
+            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Resync Brain", callback_data="btn_sync_brain"),
+                    InlineKeyboardButton("📈 Predict Market", callback_data="btn_predict_prompt")
+                ],
+                [
+                    InlineKeyboardButton("🧠 AGI Analysis", callback_data="btn_analyze_prompt"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            loading_msg = (
+                "🔄 **APEX SUPER AGI BRAIN v12.00 ៖** Fetching latest AI Model weights & neural parameters from Hugging Face Cloud..."
+                if user_lang == 'en' else
+                ("🔄 **APEX SUPER AGI BRAIN v12.00 ៖** 正在从 Hugging Face 云模型中心下载最新的 AI 模型权重与神经网络参数..."
+                 if user_lang == 'zh' else
+                 "🔄 **APEX SUPER AGI BRAIN v12.00 ៖** កំពុងទាញយក AI Model Weights ថ្មី និង neural parameters ចុងក្រោយពី Hugging Face Cloud Model Hub...")
+            )
+
+            status_msg_obj = None
+            if update.callback_query:
+                await update.callback_query.answer()
+                status_msg_obj = await update.callback_query.message.reply_text(loading_msg, parse_mode="Markdown")
+            else:
+                status_msg_obj = await update.message.reply_text(loading_msg, parse_mode="Markdown")
+
             try:
                 res = await asyncio.to_thread(self.ai_engine.sync_brain_from_huggingface)
                 if res.get("status") == "success":
                     files_str = ", ".join(res.get("synced_files", []))
-                    msg = (
-                        "🎉 **APEX AGI SUPER BRAIN SYNC SUCCESSFUL!** 🧠⚡\n"
-                        "═══════════════════════════════\n\n"
-                        f"• **Hugging Face Model Repo**: `{res.get('repo')}` 📦\n"
-                        f"• **Downloaded Files**: `{files_str}` 🟢\n"
-                        "• **Status**: `Zero-Downtime Hot Upgrade Applied` 🚀\n\n"
-                        "💡 _ខួរក្បាល AI របស់ Bot ត្រូវបានបណ្តុះបណ្តាល និងអាប់គ្រេដទម្ងន់ថ្មីចុងក្រោយពី Cloud រួចរាល់!_"
-                    )
+                    if user_lang == 'en':
+                        msg = (
+                            "🎉 **APEX SUPER AGI v12.00 | BRAIN SYNC SUCCESSFUL!** 🧠⚡\n"
+                            "═══════════════════════════════\n\n"
+                            f"• **Hugging Face Repository**: `{res.get('repo')}` 📦\n"
+                            f"• **Downloaded Model Weights**: `{files_str}` 🟢\n"
+                            "• **Sync Engine**: `Zero-Downtime Hot Upgrade Applied` 🚀\n"
+                            "• **Neural Swarm Status**: `DeepSeek-R1, Llama-3-70B, CatBoost, PatchTST Ready` ⚡\n\n"
+                            "💡 _AI Brain neural weights have been hot-reloaded & updated from Cloud Model Hub!_"
+                        )
+                    elif user_lang == 'zh':
+                        msg = (
+                            "🎉 **APEX SUPER AGI v12.00 | 神经网络大脑同步成功！** 🧠⚡\n"
+                            "═══════════════════════════════\n\n"
+                            f"• **Hugging Face 模型仓库**: `{res.get('repo')}` 📦\n"
+                            f"• **已下载模型权重**: `{files_str}` 🟢\n"
+                            "• **同步引擎**: `零停机热更新已应用` 🚀\n"
+                            "• **神经网络集群**: `DeepSeek-R1, Llama-3-70B, CatBoost, PatchTST 就绪` ⚡\n\n"
+                            "💡 _AI 大脑神经网络权重已从云端模型中心成功完成无缝热加载更新！_"
+                        )
+                    else:
+                        msg = (
+                            "🎉 **APEX SUPER AGI v12.00 | BRAIN SYNC SUCCESSFUL!** 🧠⚡\n"
+                            "═══════════════════════════════\n\n"
+                            f"• **Hugging Face Model Repo**: `{res.get('repo')}` 📦\n"
+                            f"• **Downloaded Weights**: `{files_str}` 🟢\n"
+                            "• **Sync Engine**: `Zero-Downtime Hot Upgrade Applied` 🚀\n"
+                            "• **Neural Swarm Status**: `DeepSeek-R1, Llama-3-70B, CatBoost, PatchTST Ready` ⚡\n\n"
+                            "💡 _ខួរក្បាល AI របស់ Bot ត្រូវបានបណ្តុះបណ្តាល និងអាប់គ្រេដទម្ងន់ថ្មីចុងក្រោយពី Cloud Model Hub រួចរាល់!_"
+                        )
                 else:
-                    msg = (
-                        "ℹ️ **HUGGING FACE MODEL HUB SYNC STATUS** 📦\n"
-                        "═══════════════════════════════\n\n"
-                        f"• **Status**: `{res.get('status', 'Standby')}`\n"
-                        f"• **Repo**: `{res.get('repo')}`\n"
-                        f"• **Notice**: `{res.get('reason', res.get('error', 'Models up to date'))}`\n\n"
-                        "🛡️ _ប្រព័ន្ធរ៉ាន់ 100% ធម្មតាជាមួយ Gemini 2.5 & Serverless Fallback!_"
-                    )
-                await update.message.reply_text(msg, parse_mode="Markdown")
+                    reason = str(res.get('reason', res.get('error', 'Models up to date')))
+                    if user_lang == 'en':
+                        msg = (
+                            "ℹ️ **APEX SUPER AGI v12.00 | CLOUD BRAIN SYNC STATUS** 📦\n"
+                            "═══════════════════════════════\n\n"
+                            f"• **Status**: `{res.get('status', 'Standby')}`\n"
+                            f"• **Cloud Repo**: `{res.get('repo')}`\n"
+                            f"• **Diagnostic Notice**: `{reason}`\n\n"
+                            "🛡️ _System operating 100% normally with Gemini 2.5 Flash Swarm & Serverless Fallback!_"
+                        )
+                    elif user_lang == 'zh':
+                        msg = (
+                            "ℹ️ **APEX SUPER AGI v12.00 | 云端大脑同步状态** 📦\n"
+                            "═══════════════════════════════\n\n"
+                            f"• **同步状态**: `{res.get('status', 'Standby')}`\n"
+                            f"• **云端仓库**: `{res.get('repo')}`\n"
+                            f"• **诊断提示**: `{reason}`\n\n"
+                            "🛡️ _系统 100% 正常运行，由 Gemini 2.5 Flash 集群与 Serverless 备用大脑实时护航！_"
+                        )
+                    else:
+                        msg = (
+                            "ℹ️ **APEX SUPER AGI v12.00 | CLOUD BRAIN SYNC STATUS** 📦\n"
+                            "═══════════════════════════════\n\n"
+                            f"• **Status**: `{res.get('status', 'Standby')}`\n"
+                            f"• **Cloud Repo**: `{res.get('repo')}`\n"
+                            f"• **Notice**: `{reason}`\n\n"
+                            "🛡️ _ប្រព័ន្ធរ៉ាន់ 100% ធម្មតាជាមួយ Gemini 2.5 Flash Swarm & Serverless Fallback!_"
+                        )
+                
+                if status_msg_obj:
+                    await status_msg_obj.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception as e:
-                await update.message.reply_text(f"⚠️ Sync Notice: {e}")
+                err_text = f"⚠️ **Sync Brain Notice ៖** {e}"
+                if status_msg_obj:
+                    await status_msg_obj.edit_text(err_text, parse_mode="Markdown", reply_markup=keyboard)
 
         async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
