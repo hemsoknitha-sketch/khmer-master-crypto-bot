@@ -139,18 +139,27 @@ class TelegramBotThread(BaseThread):
         asyncio.set_event_loop(self.loop)
             
         async def post_init(application):
-            from telegram import BotCommand, BotCommandScopeChat, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
+            from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats, BotCommandScopeChat
             import database as db
 
-            # Force clear any cached old commands from all scopes first
+            # Force clear any cached old commands from all scopes & admin chat scopes first
             try:
                 await application.bot.delete_my_commands(scope=BotCommandScopeDefault())
                 await application.bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats())
                 await application.bot.delete_my_commands(scope=BotCommandScopeAllGroupChats())
+                try:
+                    admins = db.get_all_admins()
+                    for admin_id in admins:
+                        try:
+                            await application.bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=admin_id))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             except Exception as e_del:
                 print(f"⚠️ [MENU CLEANUP] Delete notice: {e_del}")
 
-            # 18 Clean Flagship v12.00 Commands
+            # 18 Clean Flagship v12.00 Commands for EVERYONE
             commands = [
                 BotCommand("start", "🚀 Start Bot & Choose Language"),
                 BotCommand("menu", "🎛️ Interactive Master Control Panel"),
@@ -175,45 +184,10 @@ class TelegramBotThread(BaseThread):
             try:
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
                 await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
+                print("✅ [MENU SYNC] 18 v12.00 Flagship commands set for all users!")
             except Exception as e_set:
                 print(f"⚠️ [MENU SET] Error setting default commands: {e_set}")
-            
-            # Set secret commands ONLY for Super Admin Menu (BotCommandScopeChat)
-            admin_commands = [
-                # 👑 SUPER ADMIN SYSTEM CONTROL
-                BotCommand("admin_stats", "📊 [Admin Stats] មើលស្ថិតិ & PnL ទូទាំងប្រព័ន្ធ"),
-                BotCommand("admin_view_portfolio", "💼 [View Portfolio] មើលគណនី & ទ្រព្យ VIP"),
-                BotCommand("admin_config", "⚙️ [System Config] កែប្រែប៉ារ៉ាម៉ែត្រ Real-Time"),
-                BotCommand("admin_signal", "🚨 [Signal Broadcast] បញ្ជាទិញកាក់ស្វ័យប្រវត្តិ"),
-                BotCommand("admin_nuke", "☢️ [Panic Nuke] ផ្តាច់ប្រព័ន្ធ & លក់កាក់ Emergency"),
-                BotCommand("toggle_breaker", "🛡️ [Circuit Breaker] បិទ/បើក ប្រព័ន្ធការពារអាសន្ន"),
-                BotCommand("toggle_rebalance", "⚖️ [Smart Rebalance] បិទ/បើក Rebalance"),
-                
-                # 👥 USER & VIP MANAGEMENT
-                BotCommand("admin_license", "👑 [VIP License] ផ្តល់/ដក VIP Membership"),
-                BotCommand("admin_users", "👥 [User Registry] បង្ហាញបញ្ជី User ទាំងអស់"),
-                BotCommand("admin_reset_pin", "🔓 [Reset PIN] Reset លេខ 2FA PIN របស់ User"),
-                BotCommand("admin_delete", "🗑️ [Delete User] លុបទិន្នន័យ User ទាំងស្រុង"),
-                BotCommand("admin_broadcast", "📢 [Broadcast Alert] ផ្ញើសារប្រកាសអាសន្ន"),
-                BotCommand("health", "🏥 [VPS Health] ស្កេនសុខភាព VPS CPU/RAM/DB")
-            ]
 
-            
-            try:
-                admins = db.get_all_admins()
-                for admin_id in admins:
-                    try:
-                        await application.bot.set_my_commands(
-                            commands + admin_commands, 
-                            scope=BotCommandScopeChat(chat_id=admin_id)
-                        )
-                    except Exception:
-                        pass # Chat ID might not exist yet
-            except Exception:
-                pass
-                
-            self.log_signal.emit("✅ Bot Menu Commands registered successfully.")
-            
         from telegram.request import HTTPXRequest
         t_request = HTTPXRequest(
             connect_timeout=3.0,

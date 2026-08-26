@@ -2,7 +2,8 @@ import os
 import sys
 import asyncio
 from dotenv import load_dotenv
-from telegram import Bot, BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
+from telegram import Bot, BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats, BotCommandScopeChat
+import database as db
 
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
     try:
@@ -21,12 +22,25 @@ async def force_reset_menu():
 
     bot = Bot(token=TOKEN)
     
-    print("🧹 [1/3] Deleting old cached commands from all Telegram scopes...")
+    print("🧹 [1/3] Deleting old cached commands from all Telegram scopes & Admin chat scopes...")
     try:
         await bot.delete_my_commands(scope=BotCommandScopeDefault())
         await bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats())
         await bot.delete_my_commands(scope=BotCommandScopeAllGroupChats())
-        print("  └─ Cleaned default, private, and group command scopes!")
+        
+        # Crucial: Purge custom chat scope commands for all admin chat IDs
+        try:
+            admins = db.get_all_admins()
+            for admin_id in admins:
+                try:
+                    await bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=admin_id))
+                    print(f"  └─ Purged custom BotCommandScopeChat for Admin: {admin_id}")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+            
+        print("  └─ Cleaned default, private, group, and admin chat command scopes!")
     except Exception as e_del:
         print(f"  └─ Delete notice: {e_del}")
 
