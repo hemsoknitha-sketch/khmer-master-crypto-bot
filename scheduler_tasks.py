@@ -236,17 +236,14 @@ async def check_crypto_news(app: Application, ai_engine):
             # Process this new article
             db.mark_news_seen(link)
             
-            # 1. Khmer Article (Strict Chuon Nath Standard)
+            # 1. Khmer Article (Strict Chuon Nath Executive Standard)
             kh_prompt = (
-                f"[SYSTEM DIRECTIVE: You are Chief AI Financial News Editor. "
-                f"Write a 3-paragraph news report strictly in formal Khmer language matching Chuon Nath Khmer Dictionary orthography. "
-                f"DO NOT include English/Chinese sentences, DO NOT include prompt notes, DO NOT output bullet points.]\n\n"
-                f"Title: {title}\n"
-                f"Description: {description}\n\n"
-                f"Write 3 paragraphs:\n"
-                f"Paragraph 1: Dateline location (e.g. ទីក្រុងញូវយ៉ក៖) and event summary.\n"
-                f"Paragraph 2: Liquidity, market impact, and institutional activity.\n"
-                f"Paragraph 3: Regulatory/legal stability conclusion ending in '៕'."
+                f"សូមសរសេរអត្ថបទព័ត៌មានហិរញ្ញវត្ថុគ្រីបតូជាភាសាខ្មែរផ្លូវការ (អក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចជួនណាត) ៣ កថាខណ្ឌ សម្រាប់ព័ត៌មានខាងក្រោម ៖\n"
+                f"ចំណងជើង ៖ {title}\n"
+                f"ខ្លឹមសារ ៖ {description}\n\n"
+                f"កថាខណ្ឌទី១ ៖ ទីតាំង (ឧទាហរណ៍ ៖ ទីក្រុងញូវយ៉ក៖) និងសេចក្តីសង្ខេបព្រឹត្តិការណ៍។\n"
+                f"កថាខណ្ឌទី២ ៖ ផលប៉ះពាល់លើសាច់ប្រាក់ងាយស្រួល ទីផ្សារ និងស្ថាប័ន។\n"
+                f"កថាខណ្ឌទី៣ ៖ សេចក្តីសន្និដ្ឋានផ្នែកច្បាប់/ស្ថិរភាពដែលបញ្ចប់ដោយសញ្ញា «៕»។"
             )
             khmer_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, kh_prompt)
 
@@ -258,17 +255,47 @@ async def check_crypto_news(app: Application, ai_engine):
             zh_prompt = f"请为以下新闻撰写2段简明扼要的中文市场分析: {title}. {description}"
             chinese_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, zh_prompt)
 
-            # Sanitizer Function
-            def clean_final_text(txt, fallback_title=""):
+            # High-Precision Sanitizer Function for News Broadcasts
+            def clean_final_news_text(txt, fallback_title="", lang="khmer"):
                 if not txt: return ""
-                txt = re.sub(r"^\s*[\*\-\.]?\s*(No internal reflection|Event:|Context:|Impact:|Score:|Analysis|Translation|\(\d+ paragraph).*", "", txt, flags=re.MULTILINE | re.IGNORECASE)
+                
+                # Purge reasoning & thinking tags
+                txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL | re.IGNORECASE)
+                txt = re.sub(r"<thought>.*?</thought>", "", txt, flags=re.DOTALL | re.IGNORECASE)
+                txt = re.sub(r"```think.*?```", "", txt, flags=re.DOTALL | re.IGNORECASE)
+                txt = re.sub(r"\[THINKING\].*?\[/THINKING\]", "", txt, flags=re.DOTALL | re.IGNORECASE)
+
                 lines = []
                 for line in txt.split("\n"):
-                    l_str = line.strip()
-                    if l_str and not any(l_str.startswith(bad) for bad in ["*", "-", ".", "(", "Event:", "Context:", "Impact:", "Translation"]):
-                        lines.append(l_str)
+                    l = line.strip()
+                    if not l:
+                        continue
+                    l_lower = l.lower()
+
+                    # Filter out prompt regurgitations & LLM scratchpad reasoning
+                    if any(l_lower.startswith(bad) for bad in [
+                        "chief ai", "persona", "wait,", "the prompt", "formal khmer", 
+                        "title:", "description:", "3 paragraphs", "paragraph 1", "paragraph 2", 
+                        "paragraph 3", "event:", "context:", "impact:", "score:", "analysis:",
+                        "translation:", "note:", "system directive", "read full article"
+                    ]):
+                        continue
+
+                    # Filter out mapping lines like "Protocol" -> ពិធីការ or Title: ...
+                    if "->" in l or "=>" in l or l_lower.startswith("title"):
+                        continue
+
+                    # For Khmer language, filter out lines that are purely English/meta scratchpad
+                    if lang == "khmer":
+                        has_khmer = any('\u1780' <= c <= '\u17ff' for c in l)
+                        if not has_khmer and len(l.split()) > 2:
+                            continue
+
+                    lines.append(l)
+
                 res = "\n\n".join(lines).strip()
-                if len(res) < 15 or res in ['.', '..', '...', '(3 paragraphs:']:
+
+                if len(res) < 20:
                     res = (
                         f"រាជធានីភ្នំពេញ៖ យោងតាមរបាយការណ៍ទាន់ហេតុការណ៍ ការវិវត្តនៃ «{fallback_title}» "
                         f"បានបង្កើតនូវសន្ទុះសាច់ប្រាក់ងាយស្រួលយ៉ាងខ្លាំងក្លាក្នុងទីផ្សារ។ "
@@ -277,9 +304,9 @@ async def check_crypto_news(app: Application, ai_engine):
                 return res
 
             texts = {
-                'khmer': clean_final_text(khmer_analysis, title),
-                'english': clean_final_text(english_analysis, title),
-                'chinese': clean_final_text(chinese_analysis, title)
+                'khmer': clean_final_news_text(khmer_analysis, title, 'khmer'),
+                'english': clean_final_news_text(english_analysis, title, 'english'),
+                'chinese': clean_final_news_text(chinese_analysis, title, 'chinese')
             }
             
             score = 8
