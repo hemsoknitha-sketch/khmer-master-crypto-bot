@@ -3197,27 +3197,39 @@ class TelegramBotThread(BaseThread):
 
         async def admin_nuke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🛡️ Defender Status", callback_data="btn_defender_status"),
-                    InlineKeyboardButton("📊 System Status", callback_data="btn_admin_stats_refresh")
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ],
                 [
@@ -3226,34 +3238,76 @@ class TelegramBotThread(BaseThread):
             ])
 
             if not args or len(args) == 0:
-                msg = (
-                    "☢️ **APEX SUPER AGI TURBO BRAIN v9.5 | GLOBAL EMERGENCY PANIC NUKE** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "⚠️ **PANIC LIQUIDATION SPECIFICATIONS:**\n"
-                    "• **Execution Action**: `Emergency Close All Positions & Sell 100% Assets to USDT`\n"
-                    "• **Target Scope**: `All Active VIP Accounts & Trading Engines System-Wide`\n"
-                    "• **Security Guard**: `Super Admin PIN Authentication Required`\n"
-                    "• **Speed Engine**: `Sub-50ms Parallel Execution Engine`\n\n"
-                    "📋 **1-TAP COMMAND SYNTAX:**\n"
-                    "👉 **ដំណើរការ Global Emergency Nuke ៖**\n"
-                    "`` `/admin_nuke 1234` ``\n\n"
-                    "👉 **ពិនិត្យ System Health ៖**\n"
-                    "`` `/health` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if user_lang == 'en':
+                    guide_card = (
+                        "☢️ **APEX SUPER AGI v12.00 | EMERGENCY SYSTEM PANIC NUKE** ☢️\n"
+                        "═══════════════════════════════\n\n"
+                        "⚠️ **PANIC LIQUIDATION SPECIFICATIONS:**\n"
+                        "• **Execution Action**: `Emergency Close All Positions & Sell 100% Spot/Futures Assets to USDT`\n"
+                        "• **Target Scope**: `All Active VIP Accounts & AI Trading Engines System-Wide`\n"
+                        "• **Security Guard**: `Super Admin 2FA PIN Authentication Required`\n"
+                        "• **Speed Engine**: `Sub-100ms Parallel Liquidation & Auto-Trade Kill Switch`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX:**\n"
+                        "👉 **Initiate Global Emergency Nuke (Requires 2FA PIN):**\n"
+                        "`` `/admin_nuke <YOUR_2FA_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin Panic Nuke liquidates all active market positions & secures funds into USDT!_"
+                    )
+                elif user_lang == 'zh':
+                    guide_card = (
+                        "☢️ **APEX SUPER AGI v12.00 | 全球紧急熔断清仓控制台** ☢️\n"
+                        "═══════════════════════════════\n\n"
+                        "⚠️ **紧急熔断清仓规范：**\n"
+                        "• **清仓操作**: `紧急平仓所有 Spot/Futures 持仓，并 100% 变现为 USDT 稳定币`\n"
+                        "• **影响范围**: `全网所有活跃 VIP 账户及 AI 交易引擎`\n"
+                        "• **安全防线**: `必须通过 Super Admin 2FA PIN 码身份验证`\n"
+                        "• **执行速度**: `毫秒级多线程并行清仓与全网机器人一键一键熔断`\n\n"
+                        "📋 **1-TAP 命令格式：**\n"
+                        "👉 **启动全球紧急熔断清仓 (需验证 2FA PIN):**\n"
+                        "`` `/admin_nuke <你的_2FA_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin 紧急清仓将立即平仓所有市场持仓并将资金安全划转为 USDT！_"
+                    )
+                else:
+                    guide_card = (
+                        "☢️ **APEX SUPER AGI v12.00 | EMERGENCY SYSTEM PANIC NUKE** ☢️\n"
+                        "═══════════════════════════════\n\n"
+                        "⚠️ **PANIC LIQUIDATION SPECIFICATIONS ៖**\n"
+                        "• **Execution Action** ៖ `Emergency Close All Positions & Sell 100% Assets to USDT`\n"
+                        "• **Target Scope** ៖ `All Active VIP Accounts & Trading Engines System-Wide`\n"
+                        "• **Security Guard** ៖ `Super Admin 2FA PIN Authentication Required`\n"
+                        "• **Speed Engine** ៖ `Sub-100ms Parallel Execution Engine`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX ៖**\n"
+                        "👉 **ដំណើរការ Global Emergency Nuke ៖**\n"
+                        "`` `/admin_nuke <YOUR_2FA_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _ប្រព័ន្ធ Panic Nuke នឹងលក់កាក់ទាំងអស់ជា USDT និងបិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ក្នុងប្រព័ន្ធ!_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
             pin = str(args[0]).strip()
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ **លេខកូដ PIN មិនត្រឹមត្រូវ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                bad_pin_msg = "❌ Invalid Security 2FA PIN!" if user_lang == 'en' else ("❌ 安全 2FA PIN 码不正确！" if user_lang == 'zh' else "❌ លេខកូដ 2FA PIN មិនត្រឹមត្រូវ!")
+                await update.effective_message.reply_text(bad_pin_msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
             vip_users = db.get_all_vip_users() if hasattr(db, 'get_all_vip_users') else []
             all_symbols = set()
-            for uid in vip_users:
+            for u in vip_users:
+                uid = u.get("chat_id") if isinstance(u, dict) else u[0]
                 symbols = db.get_all_active_symbols(uid) if hasattr(db, 'get_all_active_symbols') else []
                 all_symbols.update(symbols)
 
@@ -3262,35 +3316,72 @@ class TelegramBotThread(BaseThread):
                 [InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
             ])
 
-            msg = (
-                "☢️ **GLOBAL EMERGENCY NUKE INITIATED** ☢️\n"
-                "═══════════════════════════════\n\n"
-                f"• **Target Accounts**: `{len(vip_users)} Active VIP Users`\n"
-                f"• **Affected Asset Pairs**: `{len(all_symbols)} Active Symbols`\n"
-                "• **Action Impact**: `100% Market Sell to USDT & Stop All Trading Bots`\n\n"
-                "⚠️ _សូមចុចប៊ូតុងក្រហមខាងក្រោម ដើម្បីបញ្ជាក់ការទម្លាក់គ្រាប់បែកអាសន្ន!_"
-            )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=nuke_confirm_keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if user_lang == 'en':
+                confirm_card = (
+                    "☢️ **GLOBAL EMERGENCY PANIC NUKE INITIATED** ☢️\n"
+                    "═══════════════════════════════\n\n"
+                    f"• **Target VIP Accounts**: `{len(vip_users)} Active VIP Users` 👑\n"
+                    f"• **Active Asset Pairs**: `{len(all_symbols)} Active Symbols`\n"
+                    "• **Emergency Action**: `100% Market Sell to USDT & Stop All Trading Engines`\n\n"
+                    "⚠️ _Tap the red button below to execute global emergency panic liquidation immediately!_"
+                )
+            elif user_lang == 'zh':
+                confirm_card = (
+                    "☢️ **全球紧急熔断清仓程序已就绪** ☢️\n"
+                    "═══════════════════════════════\n\n"
+                    f"• **受影响 VIP 账户**: `{len(vip_users)} 个活跃 VIP 账户` 👑\n"
+                    f"• **覆盖交易对**: `{len(all_symbols)} 个活跃币种`\n"
+                    "• **熔断指令**: `100% 市价平仓变现为 USDT 稳定币，并一键停止所有 AI 机器人`\n\n"
+                    "⚠️ _点击下方红色确认按钮即可立即全网执行紧急清仓指令！_"
+                )
+            else:
+                confirm_card = (
+                    "☢️ **GLOBAL EMERGENCY NUKE INITIATED** ☢️\n"
+                    "═══════════════════════════════\n\n"
+                    f"• **Target Accounts** ៖ `{len(vip_users)} Active VIP Users` 👑\n"
+                    f"• **Affected Asset Pairs** ៖ `{len(all_symbols)} Active Symbols`\n"
+                    "• **Action Impact** ៖ `100% Market Sell to USDT & Stop All Trading Bots`\n\n"
+                    "⚠️ _សូមចុចប៊ូតុងក្រហមខាងក្រោម ដើម្បីបញ្ជាក់ការទម្លាក់គ្រាប់បែកអាសន្ន!_"
+                )
+
+            if update.effective_message:
+                await update.effective_message.reply_text(confirm_card, parse_mode="Markdown", reply_markup=nuke_confirm_keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=confirm_card, parse_mode="Markdown", reply_markup=nuke_confirm_keyboard)
             return
 
         async def admin_nuke_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             query = update.callback_query
             if not query: return
             chat_id = query.message.chat.id
-            if not db.is_admin(chat_id):
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
                 await query.answer("Unauthorized!", show_alert=True)
                 return
 
             await query.answer("Global Emergency Nuke Confirmed!", show_alert=True)
-            await query.edit_message_text("☢️ **GLOBAL NUKE EXECUTING...**\n⚡ _កំពុងផ្តាច់ប្រព័ន្ធ និងលក់កាក់ទាំងអស់ជា USDT..._", parse_mode="Markdown")
+            exec_text = "☢️ **GLOBAL NUKE EXECUTING...**\n⚡ _Liquidating all positions & stopping all trading engines..._" if user_lang == 'en' else ("☢️ **全球紧急熔断清仓正在执行中...**\n⚡ _正在清仓所有持仓并将资金转换为 USDT..._" if user_lang == 'zh' else "☢️ **GLOBAL NUKE EXECUTING...**\n⚡ _កំពុងផ្តាច់ប្រព័ន្ធ និងលក់កាក់ទាំងអស់ជា USDT..._")
+            await query.edit_message_text(exec_text, parse_mode="Markdown")
 
             vip_users = db.get_all_vip_users() if hasattr(db, 'get_all_vip_users') else []
             total_sold = 0
 
             import trading_engine
 
-            for uid in vip_users:
+            for u in vip_users:
+                uid = u.get("chat_id") if isinstance(u, dict) else u[0]
                 keys = db.get_user_api(uid) if hasattr(db, 'get_user_api') else None
                 if hasattr(db, 'deactivate_all_bots'):
                     db.deactivate_all_bots(uid)
@@ -3332,58 +3423,6 @@ class TelegramBotThread(BaseThread):
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("📊 System Status", callback_data="btn_admin_stats_refresh"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ]
-            ])
-
-            msg = (
-                "✅ **GLOBAL EMERGENCY NUKE DISPATCH COMPLETED!** ⚡\n"
-                "═══════════════════════════════\n\n"
-                f"• **Secured VIP Accounts**: `{len(vip_users)} Accounts` 🟢\n"
-                f"• **Total Liquidated Positions**: `{total_sold} Positions`\n"
-                "• **Auto-Trading Systems**: `100% PAUSED & STOPPED`\n"
-                "• **Capital Status**: `100% SECURED IN STABLE USDT` 💵"
-            )
-            await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            self.log_signal.emit(f"☢️ Admin {chat_id} EXECUTED GLOBAL NUKE. Sold {total_sold} positions.")
-            return
-
-        async def admin_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
-            if not chat_id: return
-
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km').lower().strip()
-            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
-                user_lang = 'km'
-            elif user_lang in ['en', 'english']:
-                user_lang = 'en'
-            elif user_lang in ['zh', 'chinese']:
-                user_lang = 'zh'
-            else:
-                user_lang = 'km'
-
-            if not (chat_id == 859271875 or db.is_admin(chat_id)):
-                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
-                if update.callback_query:
-                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
-                else:
-                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
-                return
-
-            args = context.args if hasattr(context, 'args') else []
-            vip_users = db.get_all_vip_users() if hasattr(db, 'get_all_vip_users') else []
-
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"),
-                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
-                ],
-                [
                     InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
                     InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
                 ],
@@ -3393,183 +3432,36 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            if not args or len(args) < 2:
-                if user_lang == 'en':
-                    guide_card = (
-                        "🚨 **APEX SUPER AGI v12.00 | MASTER SIGNAL BROADCAST AUTO-TRADER** 🚨\n"
-                        "═══════════════════════════════\n\n"
-                        "📊 **SIGNAL DISPATCH SPECIFICATIONS:**\n"
-                        f"• **Active Target VIP Members**: `{len(vip_users)} Active VIPs` 👑\n"
-                        "• **Execution Engine**: `Parallel Multi-Thread Order Dispatcher`\n"
-                        "• **Supported Signals**: `BUY (Long Entry) | SELL / CLOSE (Exit)`\n"
-                        "• **Risk Protection**: `Auto Stop-Loss & Dynamic Trailing Profit Guard`\n\n"
-                        "📋 **1-TAP SIGNAL COMMAND SYNTAX:**\n"
-                        "👉 **Dispatch Buy Signal for BTCUSDT:**\n"
-                        "`` `/admin_signal BUY BTCUSDT` ``\n\n"
-                        "👉 **Dispatch Sell Signal for BTCUSDT:**\n"
-                        "`` `/admin_signal SELL BTCUSDT` ``\n\n"
-                        "👉 **Dispatch Buy Signal for SOLUSDT:**\n"
-                        "`` `/admin_signal BUY SOLUSDT` ``\n"
-                        "═══════════════════════════════\n"
-                        "💡 _Super Admin signal will automatically execute orders across all connected VIP Binance accounts!_"
-                    )
-                elif user_lang == 'zh':
-                    guide_card = (
-                        "🚨 **APEX SUPER AGI v12.00 | 信号广播跟单自动交易引擎** 🚨\n"
-                        "═══════════════════════════════\n\n"
-                        "📊 **信号分发引擎规范：**\n"
-                        f"• **目标跟单 VIP 会员**: `{len(vip_users)} 个 VIP 账户` 👑\n"
-                        "• **执行引擎**: `高频多线程并行挂单分发`\n"
-                        "• **支持信号类型**: `BUY (做多进场) | SELL / CLOSE (平仓离场)`\n"
-                        "• **风控风闸**: `自动止损与动态追踪止盈`\n\n"
-                        "📋 **1-TAP 信号发送命令：**\n"
-                        "👉 **发送 BTC 买入信号给全体 VIP：**\n"
-                        "`` `/admin_signal BUY BTCUSDT` ``\n\n"
-                        "👉 **发送 BTC 平仓卖出信号：**\n"
-                        "`` `/admin_signal SELL BTCUSDT` ``\n\n"
-                        "👉 **发送 SOL 买入信号：**\n"
-                        "`` `/admin_signal BUY SOLUSDT` ``\n"
-                        "═══════════════════════════════\n"
-                        "💡 _Super Admin 发出的信号将自动在所有已绑定 Binance API 的 VIP 账户中跟单执行！_"
-                    )
-                else:
-                    guide_card = (
-                        "🚨 **APEX SUPER AGI v12.00 | MASTER SIGNAL BROADCAST AUTO-TRADER** 🚨\n"
-                        "═══════════════════════════════\n\n"
-                        "📊 **SIGNAL DISPATCH SPECIFICATIONS ៖**\n"
-                        f"• **Active Target VIP Members** ៖ `{len(vip_users)} Active VIPs` 👑\n"
-                        "• **Execution Engine** ៖ `Parallel Multi-Thread Order Dispatcher`\n"
-                        "• **Supported Signals** ៖ `BUY (ទិញចូល) | SELL / CLOSE (លក់ចេញ)`\n"
-                        "• **Risk Protection** ៖ `Auto Margin Guard & Dynamic Trailing Guard`\n\n"
-                        "📋 **1-TAP SIGNAL COMMAND SYNTAX ៖**\n"
-                        "👉 **បាញ់សញ្ញាទិញ BTC ទៅកាន់ VIP ទាំងអស់ ៖**\n"
-                        "`` `/admin_signal BUY BTCUSDT` ``\n\n"
-                        "👉 **បាញ់សញ្ញាលក់ BTC ពី VIP ទាំងអស់ ៖**\n"
-                        "`` `/admin_signal SELL BTCUSDT` ``\n\n"
-                        "👉 **បាញ់សញ្ញាទិញ SOL ទៅកាន់ VIP ទាំងអស់ ៖**\n"
-                        "`` `/admin_signal BUY SOLUSDT` ``\n"
-                        "═══════════════════════════════\n"
-                        "💡 _រាល់ Signal ដែលចេញដោយ Super Admin នឹងទិញ-លក់លើ Binance របស់ VIP ទាំងអស់ស្វ័យប្រវត្តិ!_"
-                    )
-
-                if update.callback_query:
-                    try:
-                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
-                    except Exception:
-                        await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
-                elif update.effective_message:
-                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
-                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                else:
-                    await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
-                return
-
-            action = str(args[0]).upper().strip()
-            raw_sym = str(args[1]).upper().strip()
-            symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
-
-            if action not in ["BUY", "SELL", "CLOSE"]:
-                bad_act_err = "❌ Only BUY, SELL, or CLOSE signals allowed." if user_lang == 'en' else ("❌ 仅支持 BUY, SELL 或 CLOSE 信号。" if user_lang == 'zh' else "❌ អនុញ្ញាតតែសញ្ញា BUY, SELL ឬ CLOSE ប៉ុណ្ណោះ! (ឧទាហរណ៍ ៖ `/admin_signal BUY BTCUSDT`)")
-                await update.effective_message.reply_text(bad_act_err)
-                return
-
-            status_text = (
-                f"🚀 **Executing Master Signal {action} {symbol} across {len(vip_users)} VIP Members...**" if user_lang == 'en' else
-                (f"🚀 **正在向 {len(vip_users)} 名 VIP 会员执行 Master Signal {action} {symbol}...**" if user_lang == 'zh' else
-                f"🚀 **កំពុងអនុវត្ត Master Signal {action} {symbol} លើ VIP Members {len(vip_users)} នាក់...**")
-            )
-            status_msg = await update.effective_message.reply_text(status_text, parse_mode="Markdown")
-
-            count = 0
-            import trading_engine
-
-            if action == "BUY":
-                for u in vip_users:
-                    uid = u.get("chat_id") if isinstance(u, dict) else u[0]
-                    config = db.get_auto_trade_config(uid) if hasattr(db, 'get_auto_trade_config') else {}
-                    is_enabled = bool(config.get("enabled", True)) if isinstance(config, dict) else True
-                    if not is_enabled: continue
-                    if hasattr(db, 'can_user_buy') and not db.can_user_buy(uid): continue
-
-                    keys = db.get_user_api(uid) if hasattr(db, 'get_user_api') else None
-                    if not keys: continue
-                    api_key, api_secret = keys
-
-                    trade_amount = float(config.get("amount", 30.0)) if isinstance(config, dict) else 30.0
-                    trailing_pct = float(config.get("trailing_pct", 3.0)) if isinstance(config, dict) else 3.0
-
-                    try:
-                        current_price = await asyncio.to_thread(trading_engine.get_current_price, symbol)
-                        if current_price and current_price > 0:
-                            qty = round(trade_amount / current_price, 5)
-                            res = await asyncio.to_thread(trading_engine.place_market_buy, api_key, api_secret, symbol, trade_amount)
-                            if isinstance(res, dict) and "error" not in res and "code" not in res:
-                                db.add_active_trade(uid, symbol, qty, current_price, trailing_pct)
-                                count += 1
-                    except Exception:
-                        pass
-                    await asyncio.sleep(0.02)
-            else:
-                # SELL or CLOSE logic
-                for u in vip_users:
-                    uid = u.get("chat_id") if isinstance(u, dict) else u[0]
-                    keys = db.get_user_api(uid) if hasattr(db, 'get_user_api') else None
-                    if not keys: continue
-                    try:
-                        res = await asyncio.to_thread(trading_engine.market_sell_entire_position, keys[0], keys[1], symbol)
-                        if isinstance(res, dict) and res.get("status") == "success":
-                            count += 1
-                    except Exception:
-                        pass
-                    await asyncio.sleep(0.02)
-
-            if hasattr(db, 'log_admin_action'):
-                db.log_admin_action(chat_id, "SUPER_SIGNAL", symbol, f"Executed {action} for {count}/{len(vip_users)} users.")
-
-            total_vips = len(vip_users)
-            success_rate = (count / total_vips * 100) if total_vips > 0 else 100.0
-
             if user_lang == 'en':
-                report_msg = (
-                    "🎯 **APEX MASTER SIGNAL EXECUTION COMPLETED!** ⚡\n"
+                msg = (
+                    "✅ **GLOBAL EMERGENCY PANIC NUKE COMPLETED!** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    f"🪙 **Target Symbol**: `{symbol}`\n"
-                    f"⚡ **Action**: `{action}` Order Broadcast\n"
-                    f"👥 **VIP Accounts Executed**: `{count} / {total_vips} Accounts` 🟢\n"
-                    f"📈 **Execution Success Rate**: `{success_rate:.1f}%`\n"
-                    "═══════════════════════════════\n"
-                    "💡 _All target VIP Binance accounts have processed the Signal order!_"
+                    f"• **Secured VIP Accounts**: `{len(vip_users)} Accounts` 👑\n"
+                    f"• **Total Liquidated Positions**: `{total_sold} Positions`\n"
+                    "• **AI Trading Engines**: `100% PAUSED & KILLED`\n"
+                    "• **Capital Security**: `100% SECURED IN STABLE USDT` 💵"
                 )
             elif user_lang == 'zh':
-                report_msg = (
-                    "🎯 **MASTER SIGNAL 跟单信号广播执行完成！** ⚡\n"
+                msg = (
+                    "✅ **全球紧急熔断清仓顺利完成！** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    f"🪙 **目标币种**: `{symbol}`\n"
-                    f"⚡ **跟单指令**: `{action}` 信号广播\n"
-                    f"👥 **VIP 成功执行账户**: `{count} / {total_vips} 个` 🟢\n"
-                    f"📈 **跟单成功率**: `{success_rate:.1f}%`\n"
-                    "═══════════════════════════════\n"
-                    "💡 _所有目标 VIP 会员的 Binance 账户已成功跟单下发指令！_"
+                    f"• **受保护 VIP 账户**: `{len(vip_users)} 个` 👑\n"
+                    f"• **已平仓清仓持仓**: `{total_sold} 个持仓`\n"
+                    "• **AI 交易机器人引擎**: `100% 已紧急停止`\n"
+                    "• **资金安全状态**: `100% 变现并安全存入 USDT` 💵"
                 )
             else:
-                report_msg = (
-                    "🎯 **APEX MASTER SIGNAL EXECUTION COMPLETED!** ⚡\n"
+                msg = (
+                    "✅ **GLOBAL EMERGENCY NUKE DISPATCH COMPLETED!** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    f"🪙 **Target Symbol** ៖ `{symbol}`\n"
-                    f"⚡ **Action** ៖ `{action}` Order Broadcast\n"
-                    f"👥 **VIP Accounts Executed** ៖ `{count} / {total_vips} Accounts` 🟢\n"
-                    f"📈 **Execution Success Rate** ៖ `{success_rate:.1f}%`\n"
-                    "═══════════════════════════════\n"
-                    "💡 _គណនី VIP Binance ដែលបានភ្ជាប់ទាំងអស់ បានអនុវត្តការទិញ-លក់តាម Signal ជោគជ័យ!_"
+                    f"• **Secured VIP Accounts** ៖ `{len(vip_users)} Accounts` 🟢\n"
+                    f"• **Total Liquidated Positions** ៖ `{total_sold} Positions`\n"
+                    "• **Auto-Trading Systems** ៖ `100% PAUSED & STOPPED`\n"
+                    "• **Capital Status** ៖ `100% SECURED IN STABLE USDT` 💵"
                 )
 
-            try:
-                await status_msg.edit_text(report_msg, parse_mode="Markdown", reply_markup=keyboard)
-            except Exception:
-                await update.effective_message.reply_text(report_msg, parse_mode="Markdown", reply_markup=keyboard)
-
-            await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-            self.log_signal.emit(f"🎯 Admin {chat_id} executed MASTER SIGNAL {action} {symbol} for {count} VIPs.")
+            await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            self.log_signal.emit(f"☢️ Admin {chat_id} EXECUTED GLOBAL NUKE. Sold {total_sold} positions.")
             return
 
         async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
