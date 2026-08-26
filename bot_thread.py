@@ -1352,17 +1352,29 @@ class TelegramBotThread(BaseThread):
 
         async def toggle_breaker_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
             current_status = db.is_circuit_breaker_active() if hasattr(db, 'is_circuit_breaker_active') else False
 
             if args and len(args) > 0:
@@ -1390,43 +1402,78 @@ class TelegramBotThread(BaseThread):
             )
 
             keyboard = InlineKeyboardMarkup([
-                [toggle_btn, InlineKeyboardButton("🛡️ Defender Status", callback_data="btn_defender_status")],
+                [toggle_btn, InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config")],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
                 ],
                 [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
-            status_badge = "🛡️ ACTIVATED (Circuit Breaker Protection ACTIVE)" if new_status else "🔴 DEACTIVATED (Unrestricted Trading)"
+            status_badge = "🛡️ ACTIVATED (Circuit Breaker Protection ACTIVE 2% Loss Guard)" if new_status else "🔴 DEACTIVATED (Unrestricted High-Risk Mode)"
 
-            msg = (
-                "🛡️ **APEX SUPER AGI TURBO BRAIN v9.5 | GLOBAL CIRCUIT BREAKER** ⚡\n"
-                "═══════════════════════════════\n\n"
-                "📊 **EXECUTIVE CIRCUIT BREAKER STATUS:**\n"
-                f"• **System Status**: `{status_badge}`\n"
-                "• **Daily Drawdown Shield**: `2.0% Maximum Loss Threshold Guard`\n"
-                "• **Emergency Protection**: `Sub-10ms Margin Safeguard & Position Pause`\n"
-                "• **Flash Crash Defense**: `24/7 Real-Time Market Volatility Radar`\n\n"
-                "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                "👉 **ដើម្បីបើក Circuit Breaker ៖**\n`` `/toggle_breaker ON` ``\n\n"
-                "👉 **ដើម្បីបិទ Circuit Breaker ៖**\n`` `/toggle_breaker OFF` ``"
-            )
+            if user_lang == 'en':
+                msg = (
+                    "🛡️ **APEX SUPER AGI v12.00 | EMERGENCY CIRCUIT BREAKER SYSTEM** 🛡️\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **EXECUTIVE CIRCUIT BREAKER STATUS:**\n"
+                    f"• **System Shield Status**: `{status_badge}`\n"
+                    "• **Daily Drawdown Shield**: `2.0% Maximum Loss Threshold Guard`\n"
+                    "• **Emergency Safeguard**: `Sub-10ms Margin Protection & Position Freeze`\n"
+                    "• **Flash Crash Defense**: `24/7 Real-Time High-Volatility Radar`\n\n"
+                    "📋 **1-TAP COMMAND SYNTAX:**\n"
+                    "👉 **Turn ON Emergency Circuit Breaker:**\n`` `/toggle_breaker ON` ``\n\n"
+                    "👉 **Turn OFF Emergency Circuit Breaker:**\n`` `/toggle_breaker OFF` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Tap the toggle button below to instantly enable or disable circuit breaker:_"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "🛡️ **APEX SUPER AGI v12.00 | 全球紧急熔断断路器系统** 🛡️\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **熔断保护机制运行状态：**\n"
+                    f"• **系统保护状态**: `{status_badge}`\n"
+                    f"• **日度回撤阀门**: `2.0% 最大亏损上限保护门槛`\n"
+                    "• **紧急风控阀门**: `毫秒级保证金冻结与持仓保护`\n"
+                    "• **闪崩防御雷达**: `24/7 实时极端行情波动雷达`\n\n"
+                    "📋 **1-TAP 命令格式：**\n"
+                    "👉 **开启紧急熔断保护：**\n`` `/toggle_breaker ON` ``\n\n"
+                    "👉 **关闭紧急熔断保护：**\n`` `/toggle_breaker OFF` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _点击下方开关按钮即可实时切换熔断保护状态：_"
+                )
+            else:
+                msg = (
+                    "🛡️ **APEX SUPER AGI v12.00 | EMERGENCY CIRCUIT BREAKER SYSTEM** 🛡️\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **EXECUTIVE CIRCUIT BREAKER STATUS ៖**\n"
+                    f"• **System Shield Status** ៖ `{status_badge}`\n"
+                    "• **Daily Drawdown Shield** ៖ `2.0% Maximum Loss Threshold Guard`\n"
+                    "• **Emergency Safeguard** ៖ `Sub-10ms Margin Protection & Position Freeze`\n"
+                    "• **Flash Crash Defense** ៖ `24/7 Real-Time High-Volatility Radar`\n\n"
+                    "📋 **1-TAP COMMAND SYNTAX ៖**\n"
+                    "👉 **ដើម្បីបើក Circuit Breaker ៖**\n`` `/toggle_breaker ON` ``\n\n"
+                    "👉 **ដើម្បីបិទ Circuit Breaker ៖**\n`` `/toggle_breaker OFF` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _ចុចប៊ូតុងខាងក្រោម ដើម្បីបើក/បិទប្រព័ន្ធ Circuit Breaker ភ្លាមៗ Real-Time ៖_"
+                )
 
             if update.callback_query:
-                await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                try:
+                    await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             else:
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
 
             self.log_signal.emit(f"🛡️ Admin {chat_id} toggled Circuit Breaker to {new_status}.")
             return
-
-
-
-
 
         async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
