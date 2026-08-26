@@ -5013,15 +5013,26 @@ class TelegramBotThread(BaseThread):
                     await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
-            target_raw = str(args[0]).strip()
-            duration = " ".join([str(a) for a in args[1:]]).strip()
+            import re
+            full_input = " ".join([str(a) for a in args]).strip()
+            digits = re.findall(r'\d{5,15}', full_input)
 
-            if not target_raw.isdigit():
+            if not digits:
                 bad_id = "❌ Invalid User Chat ID." if user_lang == 'en' else ("❌ 用户 Chat ID 格式不正确。" if user_lang == 'zh' else "❌ ទម្រង់ Chat ID មិនត្រឹមត្រូវ! (ឧទាហរណ៍ ៖ `/admin_license 12345678 1 Month`)")
-                await update.effective_message.reply_text(bad_id)
+                if update.effective_message:
+                    await update.effective_message.reply_text(bad_id)
+                elif update.callback_query:
+                    await update.callback_query.message.reply_text(bad_id)
                 return
 
-            target_id = int(target_raw)
+            target_id = int(digits[0])
+
+            duration_raw = full_input.replace(digits[0], '')
+            duration_raw = re.sub(r'(?i)\bID\b:?', '', duration_raw)
+            duration_raw = duration_raw.replace('<', '').replace('>', '').replace(':', '').replace('#', '').strip()
+
+            duration = duration_raw if duration_raw else "Lifetime"
+
             db.set_user_license(target_id, duration)
 
             if hasattr(db, 'log_admin_action'):
