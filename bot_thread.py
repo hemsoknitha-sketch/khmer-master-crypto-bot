@@ -7947,12 +7947,14 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "🌾 **APEX SUPER AGI TURBO BRAIN v12.00 | 8-HOUR FUNDING YIELD HARVESTER** 🌾\n"
+                        "🌾 **INSTITUTIONAL DELTA-NEUTRAL FUNDING RATE HARVESTER v12.00** 🌾\n"
                         "═══════════════════════════════\n\n"
                         "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
                         f"• **Current Status**: {status_str}\n"
-                        "• **Strategy Architecture**: `1:1 Delta-Neutral (0% Risk-Free Yield Harvest)`\n"
-                        "• **Settlement Cycle**: `Every 8 Hours (Binance Perpetual Funding)`\n\n"
+                        "• **AI Ensemble Models**: `HMM Market Regime` + `RL Dynamic PPO Agent`\n"
+                        "• **Strategy Architecture**: `100% Spot Buy + 1x Futures Short Paired (Delta-Neutral / Zero Price Risk)`\n"
+                        "• **Target Yield**: `Passive Income APY 30% - 120%/Year (99% Risk-Free)`\n"
+                        "• **Settlement Cycle**: `Every 8 Hours (or 4 Hours Perpetual Funding)`\n\n"
                         "🔥 **TOP BINANCE 8-HOUR FUNDING YIELD RADAR:**\n"
                         f"{table_text}\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n"
@@ -7961,12 +7963,14 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "🌾 **APEX SUPER AGI TURBO BRAIN v12.00 | 8小时资金费率套利引擎** 🌾\n"
+                        "🌾 **机构级 1:1 Delta-Neutral 资金费率无风险套利引擎 v12.00** 🌾\n"
                         "═══════════════════════════════\n\n"
                         "📊 **机构级资金费率收割器配置：**\n"
                         f"• **当前状态**: {status_str}\n"
-                        "• **策略架构**: `1:1 Delta-Neutral 现货+合约无风险对冲套利`\n"
-                        "• **结算周期**: `每 8 小时 (Binance 永续合约资金费率)`\n\n"
+                        "• **AI 模型协同**: `HMM Market Regime` + `RL Dynamic PPO Agent`\n"
+                        "• **策略架构**: `100% 现货买入 + 1x 合约做空 (Delta-Neutral 零价格波动风险)`\n"
+                        "• **目标年化收益率**: `被动收入 APY 30% - 120%/年 (99% 无风险套利)`\n"
+                        "• **结算周期**: `每 8 小时 (或 4 小时 永续合约资金费率)`\n\n"
                         "🔥 **Binance 8小时资金费率实时收益雷达：**\n"
                         f"{table_text}\n\n"
                         "📋 **一键复制指令：**\n"
@@ -7975,12 +7979,14 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "🌾 **APEX SUPER AGI TURBO BRAIN v12.00 | 8-HOUR FUNDING YIELD HARVESTER** 🌾\n"
+                        "🌾 **INSTITUTIONAL DELTA-NEUTRAL FUNDING RATE HARVESTER v12.00** 🌾\n"
                         "═══════════════════════════════\n\n"
                         "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
                         f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
-                        "• **Strategy Architecture ៖** `1:1 Delta-Neutral (0% Risk-Free Yield Harvest)`\n"
-                        "• **Settlement Cycle ៖** `Every 8 Hours (Binance Perpetual Funding)`\n\n"
+                        "• **AI Models សហការ ៖** `HMM Market Regime` + `RL Dynamic PPO Agent`\n"
+                        "• **យុទ្ធសាស្ត្រប្រតិបត្តិ ៖** `ទិញ Spot 100% + Short Futures 1x ស្មើគ្នា (Delta-Neutral / Zero Price Fluctuation Risk)`\n"
+                        "• **គោលដៅប្រាក់ចំណេញ ៖** `Passive Income APY 30% - 120%/ឆ្នាំ (ប្រមូលលុយការប្រាក់ 99% Risk-Free)`\n"
+                        "• **Settlement Cycle ៖** `រៀងរាល់ ៨ ម៉ោងម្តង (ឬ ៤ ម៉ោងម្តង)`\n\n"
                         "🔥 **TOP BINANCE 8-HOUR FUNDING YIELD RADAR:**\n"
                         f"{table_text}\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n"
