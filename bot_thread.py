@@ -2528,7 +2528,9 @@ class TelegramBotThread(BaseThread):
 
         async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km').lower().strip()
             if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
@@ -2537,8 +2539,19 @@ class TelegramBotThread(BaseThread):
                 user_lang = 'en'
             elif user_lang in ['zh', 'chinese']:
                 user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
-            args = context.args
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            nav_keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ]
+            ])
+
+            args = context.args if hasattr(context, 'args') else []
             if args and len(args) > 0:
                 arg_lang = str(args[0]).lower().strip()
                 if arg_lang in ['km', 'khmer']:
@@ -2556,89 +2569,99 @@ class TelegramBotThread(BaseThread):
                 if new_lang:
                     db.set_user_language(chat_id, new_lang)
                     if new_lang == 'km':
-                        confirm_msg = f"🌐 **ភាសាប្រព័ន្ធត្រូវបានកំណត់ទៅ ៖** `{lang_name}` 🇰🇭\n\n_គ្រប់ការជូនដំណឹង និងការជួញដូរ AGI នឹងត្រូវបានបង្ហាញជាភាសាខ្មែរយ៉ាងច្បាស់លាស់!_"
+                        confirm_msg = (
+                            "🌐 **APEX SUPER AGI v12.00 | LANGUAGE SWITCHED** 🇰🇭\n"
+                            "═══════════════════════════════\n\n"
+                            f"✅ **ភាសាប្រព័ន្ធត្រូវបានកំណត់ទៅ ៖** `{lang_name}` 🟢\n\n"
+                            "💡 _គ្រប់ការជូនដំណឹង AGI និងប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់នឹងបង្ហាញជាភាសាខ្មែរយ៉ាងច្បាស់លាស់!_"
+                        )
                     elif new_lang == 'en':
-                        confirm_msg = f"🌐 **System Language Set To:** `{lang_name}` 🇬🇧\n\n_All AGI trading alerts and reports will now be delivered in English!_"
+                        confirm_msg = (
+                            "🌐 **APEX SUPER AGI v12.00 | LANGUAGE SWITCHED** 🇬🇧\n"
+                            "═══════════════════════════════\n\n"
+                            f"✅ **System Language Updated To:** `{lang_name}` 🟢\n\n"
+                            "💡 _All AGI trading alerts, market reports & dashboards will now be delivered in English!_"
+                        )
                     else:
-                        confirm_msg = f"🌐 **系统语言已设置为：** `{lang_name}` 🇨🇳\n\n_所有 AGI 交易提醒和报告现在将以中文传递！_"
+                        confirm_msg = (
+                            "🌐 **APEX SUPER AGI v12.00 | 语言切换成功** 🇨🇳\n"
+                            "═══════════════════════════════\n\n"
+                            f"✅ **系统语言已成功设置为：** `{lang_name}` 🟢\n\n"
+                            "💡 _所有 AGI 交易提醒、市场报告和控制台现在将以中文显示！_"
+                        )
 
-                    target_msg = update.effective_message or (update.callback_query.message if update.callback_query else None)
-                    if update.callback_query and update.callback_query.message:
+                    if update.callback_query:
                         try:
-                            await update.callback_query.edit_message_text(confirm_msg, parse_mode="Markdown")
+                            await update.callback_query.edit_message_text(confirm_msg, parse_mode="Markdown", reply_markup=nav_keyboard)
                         except Exception:
-                            await context.bot.send_message(chat_id=chat_id, text=confirm_msg, parse_mode="Markdown")
-                    elif target_msg:
-                        await target_msg.reply_text(confirm_msg, parse_mode="Markdown")
-                        await delete_sensitive_message(context, chat_id, target_msg.message_id, new_lang)
+                            await context.bot.send_message(chat_id=chat_id, text=confirm_msg, parse_mode="Markdown", reply_markup=nav_keyboard)
+                    elif update.effective_message:
+                        await update.effective_message.reply_text(confirm_msg, parse_mode="Markdown", reply_markup=nav_keyboard)
                     else:
-                        await context.bot.send_message(chat_id=chat_id, text=confirm_msg, parse_mode="Markdown")
+                        await context.bot.send_message(chat_id=chat_id, text=confirm_msg, parse_mode="Markdown", reply_markup=nav_keyboard)
 
-                    self.log_signal.emit(f"🌐 User {chat_id} changed language to {new_lang}")
+                    self.log_signal.emit(f"🌐 User {chat_id} updated system language to {new_lang}")
                     return
-
-            # Display Language Dashboard card in user's current language only
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🇰🇭 ភាសាខ្មែរ", callback_data="btn_lang_km"),
+                    InlineKeyboardButton("🇰🇭 ភាសាខ្មែរ (Khmer)", callback_data="btn_lang_km"),
                     InlineKeyboardButton("🇬🇧 English", callback_data="btn_lang_en"),
-                    InlineKeyboardButton("🇨🇳 中文", callback_data="btn_lang_zh")
+                    InlineKeyboardButton("🇨🇳 中文 (Chinese)", callback_data="btn_lang_zh")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ],
-                [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("🩺 System Health", callback_data="btn_menu_health")
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
             if user_lang == 'en':
                 lang_display = "🇬🇧 English"
                 msg = (
-                    "🌐 **APEX SUPER AGI TURBO BRAIN v12.00 | LANGUAGE & SYSTEM SETUP** 🎯\n"
+                    "🌐 **APEX SUPER AGI v12.00 | SYSTEM LANGUAGE CONTROL** 🌐\n"
                     "═══════════════════════════════\n\n"
-                    f"📊 **Active System Language**: `{lang_display}`\n\n"
-                    "💡 **Select your preferred language below or tap 1-click commands:**\n"
-                    "👉 Khmer: `` `/language km` ``\n"
-                    "👉 English: `` `/language en` ``\n"
-                    "👉 Chinese: `` `/language zh` ``"
+                    f"📊 **Active System Language**: `{lang_display}` 🟢\n\n"
+                    "💡 **Select your preferred language below or use 1-tap commands:**\n"
+                    "• Khmer 🇰🇭 ៖ `` `/language km` ``\n"
+                    "• English 🇬🇧 ៖ `` `/language en` ``\n"
+                    "• Chinese 🇨🇳 ៖ `` `/language zh` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Tap any language button below to instantly update your system language:_"
                 )
             elif user_lang == 'zh':
                 lang_display = "🇨🇳 中文 (Chinese)"
                 msg = (
-                    "🌐 **APEX SUPER AGI TURBO BRAIN v12.00 | 语言与系统设置** 🎯\n"
+                    "🌐 **APEX SUPER AGI v12.00 | 系统语言控制中心** 🌐\n"
                     "═══════════════════════════════\n\n"
-                    f"📊 **当前系统语言**: `{lang_display}`\n\n"
-                    "💡 **请在下方选择您的首选语言或使用一键复制命令：**\n"
-                    "👉 高棉语: `` `/language km` ``\n"
-                    "👉 英语: `` `/language en` ``\n"
-                    "👉 中文: `` `/language zh` ``"
+                    f"📊 **当前系统语言**: `{lang_display}` 🟢\n\n"
+                    "💡 **请在下方选择您的首选语言或使用一键命令：**\n"
+                    "• 高棉语 🇰🇭 ៖ `` `/language km` ``\n"
+                    "• 英语 🇬🇧 ៖ `` `/language en` ``\n"
+                    "• 中文 🇨🇳 ៖ `` `/language zh` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _点击下方语言按钮即可立即切换系统语言：_"
                 )
             else:
                 lang_display = "🇰🇭 ភាសាខ្មែរ (Khmer)"
                 msg = (
-                    "🌐 **APEX SUPER AGI TURBO BRAIN v12.00 | LANGUAGE & SYSTEM SETUP** 🎯\n"
+                    "🌐 **APEX SUPER AGI v12.00 | SYSTEM LANGUAGE CONTROL** 🌐\n"
                     "═══════════════════════════════\n\n"
-                    f"📊 **ភាសាប្រព័ន្ធបច្ចុប្បន្ន ៖** `{lang_display}`\n\n"
+                    f"📊 **ភាសាប្រព័ន្ធបច្ចុប្បន្ន ៖** `{lang_display}` 🟢\n\n"
                     "💡 **សូមជ្រើសរើសភាសាដែលអ្នកពេញចិត្តខាងក្រោម ឬប្រើប្រាស់បញ្ជា ១-Tap ៖**\n"
-                    "👉 ភាសាខ្មែរ: `` `/language km` ``\n"
-                    "👉 English: `` `/language en` ``\n"
-                    "👉 中文 (Chinese): `` `/language zh` ``"
+                    "• ភាសាខ្មែរ 🇰🇭 ៖ `` `/language km` ``\n"
+                    "• English 🇬🇧 ៖ `` `/language en` ``\n"
+                    "• 中文 (Chinese) 🇨🇳 ៖ `` `/language zh` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _ចុចប៊ូតុងភាសាខាងក្រោម ដើម្បីផ្លាស់ប្តូរភាសាប្រព័ន្ធភ្លាមៗ ៖_"
                 )
 
-            target_msg = update.effective_message or (update.callback_query.message if update.callback_query else None)
-            if update.callback_query and update.callback_query.message:
+            if update.callback_query:
                 try:
                     await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 except Exception:
                     await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
-            elif target_msg:
-                await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, target_msg.message_id, user_lang)
+            elif update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
             else:
                 await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
             return
