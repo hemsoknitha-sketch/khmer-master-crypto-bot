@@ -159,8 +159,8 @@ class TelegramBotThread(BaseThread):
             except Exception as e_del:
                 print(f"⚠️ [MENU CLEANUP] Delete notice: {e_del}")
 
-            # 18 Clean Flagship v12.00 Commands for EVERYONE
-            commands = [
+            # Public VIP User Command List (Excludes health & sync_brain from public menu)
+            public_commands = [
                 BotCommand("start", "🚀 Start Bot & Choose Language"),
                 BotCommand("menu", "🎛️ Interactive Master Control Panel"),
                 BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
@@ -172,8 +172,6 @@ class TelegramBotThread(BaseThread):
                 BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
                 BotCommand("balance", "💰 Check Spot & Futures Balance"),
                 BotCommand("status", "📊 View Active Trades & PnL"),
-                BotCommand("health", "🩺 Check VPS & Engine Diagnostics"),
-                BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
                 BotCommand("whales", "🐋 Track On-Chain Whale Movements"),
                 BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
                 BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
@@ -181,10 +179,20 @@ class TelegramBotThread(BaseThread):
                 BotCommand("stop", "🛑 Stop Trading / Market Close"),
             ]
 
+            # Full Super Admin Command List (Includes admin, health, sync_brain)
+            admin_commands = [
+                BotCommand("admin", "👑 Open Super Admin Control Panel"),
+                BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
+                BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
+            ] + public_commands
+
             try:
-                await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
-                await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
-                print("✅ [MENU SYNC] 18 v12.00 Flagship commands set for all users!")
+                await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
+                await application.bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())
+                try:
+                    await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
+                except Exception: pass
+                print("✅ [MENU SYNC] Public VIP & Super Admin command menus synchronized!")
             except Exception as e_set:
                 print(f"⚠️ [MENU SET] Error setting default commands: {e_set}")
 
@@ -9254,10 +9262,8 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | SYSTEM & STRATEGY RADAR** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    "🖥️ **VPS HEALTH & HARDWARE DIAGNOSTICS:**\n"
+                    "🖥️ **SYSTEM ENGINE STATUS:**\n"
                     f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
-                    f"• **CPU Load**: `{cpu_usage:.1f}%` | **RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
-                    f"• **Database Size**: `{db_size_mb:.2f} MB` | **Disk**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
                     f"• **Trading Engine Mode**: `{mode_badge}`\n"
                     f"• **Available USDT Capital**: `${avail_usdt:,.2f} USDT`\n\n"
                     "🟢 **ACTIVE TRADING ENGINES:**\n"
@@ -9270,10 +9276,8 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | 系统与策略雷达** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    "🖥️ **VPS 运行状态与硬件诊断：**\n"
+                    "🖥️ **系统引擎状态：**\n"
                     f"• **系统运行时间**: `{uptime_str}` | 状态: {status_icon}\n"
-                    f"• **CPU 负载**: `{cpu_usage:.1f}%` | **内存**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
-                    f"• **数据库体积**: `{db_size_mb:.2f} MB` | **磁盘**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
                     f"• **交易引擎模式**: `{mode_badge}`\n"
                     f"• **可用 USDT 资金**: `${avail_usdt:,.2f} USDT`\n\n"
                     "🟢 **运行中的交易引擎：**\n"
@@ -9286,15 +9290,13 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     "📊 **APEX SUPER AGI TURBO BRAIN v12.00 | SYSTEM & STRATEGY RADAR** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    "🖥️ **VPS HEALTH & HARDWARE DIAGNOSTICS:**\n"
-                    f"• **System Uptime**: `{uptime_str}` | Status: {status_icon}\n"
-                    f"• **CPU Load**: `{cpu_usage:.1f}%` | **RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
-                    f"• **Database Size**: `{db_size_mb:.2f} MB` | **Disk**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
-                    f"• **Trading Engine Mode**: `{mode_badge}`\n"
-                    f"• **Available USDT Capital**: `${avail_usdt:,.2f} USDT`\n\n"
-                    "🟢 **ACTIVE TRADING ENGINES:**\n"
+                    "🖥️ **SYSTEM ENGINE STATUS ៖**\n"
+                    f"• **System Uptime** ៖ `{uptime_str}` | Status ៖ {status_icon}\n"
+                    f"• **Trading Engine Mode** ៖ `{mode_badge}`\n"
+                    f"• **Available USDT Capital** ៖ `${avail_usdt:,.2f} USDT`\n\n"
+                    "🟢 **ACTIVE TRADING ENGINES ៖**\n"
                     f"{active_str}\n\n"
-                    "🔴 **INACTIVE TRADING ENGINES (1-TAP COPY TO ACTIVATE):**\n"
+                    "🔴 **INACTIVE TRADING ENGINES (1-TAP COPY TO ACTIVATE) ៖**\n"
                     f"{inactive_str}\n\n"
                     "💡 _ចុចលើពាក្យបញ្ជាខាងលើតែម្តងដើម្បី Copy ចូល Telegram ភ្លាមៗ!_"
                 )
@@ -9522,7 +9524,8 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
 
-                commands = [
+                from telegram import BotCommandScopeChat
+                public_commands = [
                     BotCommand("start", "🚀 Start Bot & Choose Language"),
                     BotCommand("menu", "🎛️ Interactive Master Control Panel"),
                     BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
@@ -9534,17 +9537,24 @@ class TelegramBotThread(BaseThread):
                     BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
                     BotCommand("balance", "💰 Check Spot & Futures Balance"),
                     BotCommand("status", "📊 View Active Trades & PnL"),
-                    BotCommand("health", "🩺 Check VPS & Engine Diagnostics"),
-                    BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
                     BotCommand("whales", "🐋 Track On-Chain Whale Movements"),
                     BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
                     BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
                     BotCommand("alert", "🔔 Set Price Alert"),
                     BotCommand("stop", "🛑 Stop Trading / Market Close"),
                 ]
-                await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
-                await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
-                print("✅ [TELEGRAM MENU UI] Synchronized v12.00 Telegram Bot Command Popup Menu with Telegram Servers!")
+                admin_commands = [
+                    BotCommand("admin", "👑 Open Super Admin Control Panel"),
+                    BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
+                    BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
+                ] + public_commands
+
+                await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
+                await application.bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())
+                try:
+                    await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
+                except Exception: pass
+                print("✅ [TELEGRAM MENU UI] Synchronized v12.00 Public VIP & Super Admin Command Menus!")
             except Exception as e_cmd:
                 print(f"⚠️ [TELEGRAM MENU UI NOTICE] Could not sync Telegram menu: {e_cmd}")
 
