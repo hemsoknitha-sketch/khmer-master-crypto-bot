@@ -545,7 +545,7 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton("📰 Journalistic News", callback_data="btn_news_refresh"),
-                    InlineKeyboardButton("🩺 VPS Diagnostics", callback_data="btn_health_refresh")
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
                 ],
                 [
                     InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km"),
@@ -557,6 +557,10 @@ class TelegramBotThread(BaseThread):
                 keyboard.append([
                     InlineKeyboardButton("👑 Super Admin Control Panel", callback_data="btn_admin_panel"),
                     InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
+                ])
+                keyboard.append([
+                    InlineKeyboardButton("🩺 VPS Diagnostics", callback_data="btn_health_refresh"),
+                    InlineKeyboardButton("📦 Sync AI Brain", callback_data="btn_sync_brain")
                 ])
                 keyboard.append([
                     InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
@@ -7123,6 +7127,15 @@ class TelegramBotThread(BaseThread):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
+            
+            # Restrict exclusively to Super Admin ID 859271875
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin ID 859271875."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.message.reply_text(err_msg, parse_mode="Markdown")
+                return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
@@ -7306,6 +7319,15 @@ class TelegramBotThread(BaseThread):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
+            
+            # Restrict exclusively to Super Admin ID 859271875
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin ID 859271875."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.message.reply_text(err_msg, parse_mode="Markdown")
+                return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
