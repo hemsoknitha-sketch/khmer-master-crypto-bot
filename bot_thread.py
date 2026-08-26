@@ -3412,56 +3412,117 @@ class TelegramBotThread(BaseThread):
 
         async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
             vip_users = db.get_all_vip_users() if hasattr(db, 'get_all_vip_users') else []
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-            if not args or len(args) == 0:
-                keyboard = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("📊 System Status", callback_data="btn_defender_status"),
-                        InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")
-                    ],
-                    [
-                        InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                    ]
-                ])
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
+                ],
+                [
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ],
+                [
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ]
+            ])
 
-                msg = (
-                    "📢 **APEX SUPER AGI TURBO BRAIN v9.5 | ADMIN BROADCAST RADAR** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **BROADCAST AUDIENCE METRICS:**\n"
-                    f"• **Targeted VIP Members**: `{len(vip_users)} Active Users`\n"
-                    "• **Delivery Mechanism**: `Sub-50ms Multi-Threaded Telegram Dispatcher`\n"
-                    "• **Formatting Engine**: `GitHub Markdown & System Alert Cards`\n\n"
-                    "📋 **1-TAP BROADCAST COMMAND SYNTAX:**\n"
-                    "👉 **ផ្ញើសារប្រកាសអាសន្នទីផ្សារ ៖**\n"
-                    "`` `/admin_broadcast 🚨 MARKET ALERT: High volatility expected around CPI report!` ``\n\n"
-                    "👉 **ផ្ញើសារដំណឹងអាប់គ្រេដប្រព័ន្ធ ៖**\n"
-                    "`` `/admin_broadcast 🚀 APEX TURBO AGI v9.5 updates are live! Enjoy 0% slippage!` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if not args or len(args) == 0:
+                if user_lang == 'en':
+                    guide_card = (
+                        "📢 **APEX SUPER AGI v12.00 | GLOBAL EMERGENCY BROADCAST RADAR** 📢\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **BROADCAST AUDIENCE METRICS:**\n"
+                        f"• **Targeted VIP Members**: `{len(vip_users)} Active VIP Users` 👑\n"
+                        "• **Delivery Engine**: `Sub-Second Multi-Threaded Telegram Dispatcher`\n"
+                        "• **Formatting Engine**: `GitHub Markdown Alert Cards`\n\n"
+                        "📋 **1-TAP BROADCAST COMMAND SYNTAX:**\n"
+                        "👉 **Dispatch Market Alert:**\n"
+                        "`` `/admin_broadcast 🚨 MARKET ALERT: Extreme volatility expected!` ``\n\n"
+                        "👉 **Dispatch System Upgrade Notice:**\n"
+                        "`` `/admin_broadcast 🚀 APEX v12.00 AGI engines are live!` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin emergency broadcast messages are dispatched to all active VIP Telegram chats immediately!_"
+                    )
+                elif user_lang == 'zh':
+                    guide_card = (
+                        "📢 **APEX SUPER AGI v12.00 | 全球紧急广播控制台** 📢\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **广播受众与受众指标：**\n"
+                        f"• **目标 VIP 会员**: `{len(vip_users)} 个活跃 VIP 账户` 👑\n"
+                        "• **分发引擎**: `高频多线程 Telegram 消息分发器`\n"
+                        "• **排版引擎**: `GitHub Markdown 紧急公告卡片`\n\n"
+                        "📋 **1-TAP 广播发送命令：**\n"
+                        "👉 **发送市场紧急警报：**\n"
+                        "`` `/admin_broadcast 🚨 市场警报：预计 CPI 数据公布将引发劇烈波动！` ``\n\n"
+                        "👉 **发送系统升级公告：**\n"
+                        "`` `/admin_broadcast 🚀 APEX v12.00 AGI 引擎已上线！` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin 发出的紧急广播消息将立即推送到所有 VIP 会员的 Telegram 聊天窗口中！_"
+                    )
+                else:
+                    guide_card = (
+                        "📢 **APEX SUPER AGI v12.00 | GLOBAL EMERGENCY BROADCAST RADAR** 📢\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **BROADCAST AUDIENCE METRICS ៖**\n"
+                        f"• **Targeted VIP Members** ៖ `{len(vip_users)} Active VIP Users` 👑\n"
+                        "• **Delivery Engine** ៖ `Sub-Second Multi-Threaded Telegram Dispatcher`\n"
+                        "• **Formatting Engine** ៖ `GitHub Markdown Alert Cards`\n\n"
+                        "📋 **1-TAP BROADCAST COMMAND SYNTAX ៖**\n"
+                        "👉 **ផ្ញើសារប្រកាសអាសន្នទីផ្សារ ៖**\n"
+                        "`` `/admin_broadcast 🚨 MARKET ALERT: High volatility expected around CPI report!` ``\n\n"
+                        "👉 **ផ្ញើសារដំណឹងអាប់គ្រេដប្រព័ន្ធ ៖**\n"
+                        "`` `/admin_broadcast 🚀 APEX TURBO AGI v12.00 updates are live!` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _សារប្រកាសអាសន្ន Super Admin នឹងត្រូវបាញ់ផ្ញើទៅកាន់ VIP Telegram Chats ទាំងអស់ភ្លាមៗ!_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
             broadcast_text = " ".join([str(a) for a in args]).strip()
-            
-            status_msg = await update.message.reply_text(f"🚀 **កំពុងផ្ញើសារប្រកាសទៅកាន់ VIP Members {len(vip_users)} នាក់...**", parse_mode="Markdown")
+
+            status_text = (
+                f"🚀 **Dispatching Global Emergency Broadcast to {len(vip_users)} VIP Members...**" if user_lang == 'en' else
+                (f"🚀 **正在向 {len(vip_users)} 名 VIP 会员分发紧急广播消息...**" if user_lang == 'zh' else
+                f"🚀 **កំពុងផ្ញើសារប្រកាសទៅកាន់ VIP Members {len(vip_users)} នាក់...**")
+            )
+            status_msg = await update.effective_message.reply_text(status_text, parse_mode="Markdown")
 
             success_count = 0
             failed_count = 0
@@ -3471,38 +3532,67 @@ class TelegramBotThread(BaseThread):
                 "═══════════════════════════════\n\n"
                 f"{broadcast_text}\n\n"
                 "═══════════════════════════════\n"
-                "🛡️ _សារផ្លូវការចេញពី APEX VIP Admin Engine 24/7_"
+                "🛡️ _Official Announcement from Super Admin Engine 24/7_"
             )
 
-            for uid in vip_users:
+            for u in vip_users:
+                uid = u.get("chat_id") if isinstance(u, dict) else u[0]
                 try:
                     await context.bot.send_message(chat_id=uid, text=broadcast_card, parse_mode="Markdown")
                     success_count += 1
                 except Exception:
                     failed_count += 1
-                await asyncio.sleep(0.03)  # Anti-flood limit guard
+                await asyncio.sleep(0.03)
 
             if hasattr(db, 'log_admin_action'):
                 db.log_admin_action(chat_id, "BROADCAST", "VIP_BROADCAST", f"Sent: {success_count}/{len(vip_users)}")
 
-            report_msg = (
-                "✅ **APEX ADMIN BROADCAST DISPATCH COMPLETED!** ⚡\n"
-                "═══════════════════════════════\n\n"
-                f"📊 **TRANSMISSION STATISTICS:**\n"
-                f"• **Total VIP Targets**: `{len(vip_users)} Users`\n"
-                f"• **Successfully Delivered**: `{success_count}` 🟢\n"
-                f"• **Failed / Blocked**: `{failed_count}` 🔴\n"
-                f"• **Success Delivery Rate**: `{(success_count / len(vip_users) * 100) if vip_users else 100:.1f}%`\n\n"
-                "📝 **BROADCAST CONTENT PREVIEW:**\n"
-                f"_{broadcast_text[:150]}{'...' if len(broadcast_text) > 150 else ''}_"
-            )
+            total_target = len(vip_users)
+            success_rate = (success_count / total_target * 100) if total_target > 0 else 100.0
+
+            if user_lang == 'en':
+                report_msg = (
+                    "✅ **APEX ADMIN BROADCAST DISPATCH COMPLETED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **TRANSMISSION STATISTICS:**\n"
+                    f"• **Total VIP Targets**: `{total_target} Users`\n"
+                    f"• **Successfully Delivered**: `{success_count}` 🟢\n"
+                    f"• **Failed / Blocked**: `{failed_count}` 🔴\n"
+                    f"• **Success Delivery Rate**: `{success_rate:.1f}%`\n\n"
+                    "📝 **BROADCAST CONTENT PREVIEW:**\n"
+                    f"_{broadcast_text[:150]}{'...' if len(broadcast_text) > 150 else ''}_"
+                )
+            elif user_lang == 'zh':
+                report_msg = (
+                    "✅ **ADMIN 紧急广播消息分发完成！** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **消息分发统计指标：**\n"
+                    f"• **目标 VIP 会员总数**: `{total_target} 个`\n"
+                    f"• **成功送达**: `{success_count}` 🟢\n"
+                    f"• **发送失败 / 拦截**: `{failed_count}` 🔴\n"
+                    f"• **送达成功率**: `{success_rate:.1f}%`\n\n"
+                    "📝 **广播内容预览：**\n"
+                    f"_{broadcast_text[:150]}{'...' if len(broadcast_text) > 150 else ''}_"
+                )
+            else:
+                report_msg = (
+                    "✅ **APEX ADMIN BROADCAST DISPATCH COMPLETED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **TRANSMISSION STATISTICS ៖**\n"
+                    f"• **Total VIP Targets** ៖ `{total_target} Users`\n"
+                    f"• **Successfully Delivered** ៖ `{success_count}` 🟢\n"
+                    f"• **Failed / Blocked** ៖ `{failed_count}` 🔴\n"
+                    f"• **Success Delivery Rate** ៖ `{success_rate:.1f}%`\n\n"
+                    "📝 **BROADCAST CONTENT PREVIEW ៖**\n"
+                    f"_{broadcast_text[:150]}{'...' if len(broadcast_text) > 150 else ''}_"
+                )
 
             try:
-                await status_msg.edit_text(report_msg, parse_mode="Markdown")
+                await status_msg.edit_text(report_msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception:
-                await update.message.reply_text(report_msg, parse_mode="Markdown")
+                await update.effective_message.reply_text(report_msg, parse_mode="Markdown", reply_markup=keyboard)
 
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             self.log_signal.emit(f"📢 Admin {chat_id} dispatched broadcast to {success_count} VIPs.")
             return
 
