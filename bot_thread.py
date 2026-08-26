@@ -2627,32 +2627,45 @@ class TelegramBotThread(BaseThread):
             data = str(query.data or '')
             chat_id = query.message.chat.id if (query.message and query.message.chat) else update.effective_chat.id
 
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit(): user_lang = 'km'
+            elif user_lang in ['en', 'english']: user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']: user_lang = 'zh'
+            else: user_lang = 'km'
+
             if data == "btn_menu_refresh":
                 await menu_command(update, context)
-            elif data == "btn_admin_panel":
-                await admin_panel_command(update, context)
-            elif data == "btn_admin_users_refresh":
-                await admin_users_command(update, context)
-            elif data in ["btn_admin_license_prompt", "btn_admin_license"]:
-                await admin_license_command(update, context)
-            elif data in ["btn_admin_portfolio_prompt", "btn_admin_portfolio"]:
-                await admin_view_portfolio_command(update, context)
-            elif data == "btn_admin_broadcast_prompt":
-                await admin_broadcast_command(update, context)
-            elif data in ["btn_admin_stats_refresh", "btn_admin_stats"]:
-                await admin_stats_command(update, context)
-            elif data == "btn_admin_config":
-                await admin_config_command(update, context)
-            elif data == "btn_toggle_breaker_toggle":
-                await toggle_breaker_command(update, context)
-            elif data == "btn_toggle_rebalance_toggle":
-                await toggle_rebalance_command(update, context)
-            elif data == "btn_set_pin_prompt":
-                await set_pin_command(update, context)
+            elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
+                await turbo_hedge_command(update, context)
+            elif data in ["btn_infinity_grid_launch", "btn_infinity_grid"]:
+                await infinity_grid_command(update, context)
+            elif data in ["btn_snipe_launch", "btn_snipe"]:
+                await smart_listing_sniper_command(update, context)
+            elif data == "btn_funding_harvester":
+                await funding_harvester_command(update, context)
+            elif data in ["btn_gold_radar", "btn_gold_radar_refresh"]:
+                await gold_radar_command(update, context)
+            elif data == "btn_analyze_prompt":
+                context.args = ["BTCUSDT"]
+                await analyze_command(update, context)
+            elif data.startswith("btn_analyze_"):
+                sym = data.replace("btn_analyze_", "")
+                context.args = [sym]
+                await analyze_command(update, context)
+            elif data == "btn_predict_prompt":
+                context.args = ["BTCUSDT"]
+                await predict_command(update, context)
+            elif data.startswith("btn_predict_"):
+                sym = data.replace("btn_predict_", "")
+                context.args = [sym]
+                await predict_command(update, context)
+            elif data in ["btn_whales_refresh", "btn_whales"]:
+                await whales_command(update, context)
+            elif data in ["btn_news_refresh", "btn_news"]:
+                await news_command(update, context)
             elif data in ["btn_add_api_prompt", "btn_menu_api"]:
                 await add_api_command(update, context)
-            elif data == "btn_balance_refresh":
-                await balance_command(update, context)
             elif data == "btn_lang_km":
                 context.args = ["km"]
                 await language_command(update, context)
@@ -2662,12 +2675,38 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_lang_zh":
                 context.args = ["zh"]
                 await language_command(update, context)
-            elif data == "btn_menu_portfolio":
+            elif data == "btn_admin_panel":
+                await admin_panel_command(update, context)
+            elif data in ["btn_admin_stats_refresh", "btn_admin_stats"]:
+                await admin_stats_command(update, context)
+            elif data == "btn_health_refresh":
+                await health_command(update, context)
+            elif data == "btn_sync_brain":
+                await sync_brain_command(update, context)
+            elif data == "btn_admin_users_refresh":
+                await admin_users_command(update, context)
+            elif data in ["btn_admin_license_prompt", "btn_admin_license"]:
+                await admin_license_command(update, context)
+            elif data == "btn_admin_config":
+                await admin_config_command(update, context)
+            elif data == "btn_admin_broadcast_prompt":
+                await admin_broadcast_command(update, context)
+            elif data == "btn_toggle_breaker_toggle":
+                await toggle_breaker_command(update, context)
+            elif data == "btn_admin_nuke":
+                await admin_nuke_command(update, context)
+            elif data in ["btn_menu_portfolio", "btn_portfolio"]:
                 await portfolio_command(update, context)
+            elif data == "btn_balance_refresh":
+                await balance_command(update, context)
+            elif data == "btn_toggle_rebalance_toggle":
+                await toggle_rebalance_command(update, context)
+            elif data in ["btn_admin_portfolio_prompt", "btn_admin_portfolio"]:
+                await admin_view_portfolio_command(update, context)
+            elif data == "btn_set_pin_prompt":
+                await set_pin_command(update, context)
             elif data in ["btn_scan_all", "btn_top_refresh", "btn_top_gainers"]:
                 await top_command(update, context)
-            elif data in ["btn_gold_radar", "btn_gold_radar_refresh"]:
-                await gold_radar_command(update, context)
             elif data == "btn_cb_gold_refresh":
                 await cb_gold_command(update, context)
             elif data == "btn_paxg_arb_refresh":
@@ -2676,34 +2715,12 @@ class TelegramBotThread(BaseThread):
                 await black_swan_guard_command(update, context)
             elif data == "btn_gold_btc_refresh":
                 await gold_btc_rebalance_command(update, context)
-            elif data == "btn_health_refresh":
-                await health_command(update, context)
-            elif data == "btn_news_refresh":
-                await news_command(update, context)
-            elif data == "btn_whales_refresh":
-                await whales_command(update, context)
-            elif data == "btn_sync_brain":
-                await sync_brain_command(update, context)
             elif data == "btn_menu_help":
                 await help_command(update, context)
             elif data == "btn_defender_status":
                 await defender_command(update, context)
-            elif data == "btn_hyper_trade_launch":
-                await query.message.reply_text("🚀 **HYPER TRADE AGI ENGINE**\n\nដើម្បីដំណើការ Super AGI Auto Trade ប្រើបញ្ជា ៖\n`/hyper_trade BTCUSDT 100 10 <PIN>`", parse_mode="Markdown")
-            elif data == "btn_admin_nuke":
-                await query.message.reply_text("☢️ **APEX GLOBAL EMERGENCY NUKE**\n\nដើម្បីដំណើការ Emergency Global Nuke ប្រើបញ្ជា ៖\n`` `/admin_nuke <PIN>` ``", parse_mode="Markdown")
-            elif data.startswith("btn_predict_"):
-                sym = data.replace("btn_predict_", "")
-                context.args = [sym]
-                await predict_command(update, context)
-            elif data.startswith("btn_analyze_"):
-                sym = data.replace("btn_analyze_", "")
-                context.args = [sym]
-                await analyze_command(update, context)
             elif data == "btn_menu_papertrade":
                 await paper_trading_command(update, context)
-            elif data == "btn_funding_harvester":
-                await funding_harvester_command(update, context)
             elif data == "btn_pre_pump_radar":
                 await pre_pump_command(update, context)
             elif data == "btn_my_alerts":
