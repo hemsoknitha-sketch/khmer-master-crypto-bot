@@ -91,7 +91,7 @@ class AIInvestmentEngine:
         if self.hf_token:
             try:
                 print("🔄 [HF AUTO-INSTALLER ENGINE] Initiating Hugging Face Model Sync via Access Token...")
-                self.sync_models_from_huggingface_hub()
+                self.sync_brain_from_huggingface()
             except Exception as e_sync:
                 print(f"⚠️ [HF AUTO-INSTALLER] Sync notice: {e_sync}")
                 self.load_trained_brain_models()
@@ -270,6 +270,8 @@ class AIInvestmentEngine:
         except Exception as e:
             print(f"⚠️ [HF BRAIN SYNC NOTICE]: {e}")
             return {"status": "error", "error": str(e)}
+
+    sync_models_from_huggingface_hub = sync_brain_from_huggingface
 
     def load_trained_brain_models(self):
         """
