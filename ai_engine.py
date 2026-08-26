@@ -292,6 +292,28 @@ class AIInvestmentEngine:
                 return root_path
             return ""
 
+        # Auto-installer Failsafe for missing VPS ML packages
+        def ensure_ml_packages():
+            packages = ["xgboost", "catboost", "lightgbm", "scikit-learn", "joblib"]
+            missing = []
+            for pkg in packages:
+                import_name = "sklearn" if pkg == "scikit-learn" else pkg
+                try:
+                    __import__(import_name)
+                except ImportError:
+                    missing.append(pkg)
+            
+            if missing:
+                print(f"🔄 [AI ML BRAIN AUTO-INSTALLER] Missing ML packages detected: {missing}. Auto-installing on VPS...")
+                try:
+                    import subprocess, sys
+                    subprocess.run([sys.executable, "-m", "pip", "install"] + missing, check=True)
+                    print(f"✅ [AI ML BRAIN AUTO-INSTALLER] Successfully auto-installed {missing}!")
+                except Exception as err:
+                    print(f"⚠️ [AI ML BRAIN AUTO-INSTALLER] Auto-install attempt notice: {err}")
+
+        ensure_ml_packages()
+
         try:
             config_path = resolve_model_path("brain_config.json")
             if config_path and os.path.exists(config_path):
