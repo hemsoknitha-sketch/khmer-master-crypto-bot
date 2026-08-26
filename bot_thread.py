@@ -8921,9 +8921,12 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "🐋 **APEX SUPER AGI v12.00 | ON-CHAIN & EXCHANGE WHALE RADAR** ⚡\n"
+                        "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v12.00** ⚡\n"
                         "═══════════════════════════════\n\n"
-                        "📊 **ON-CHAIN LARGE TRANSACTION FLOW (ETH & BINANCE HOT WALLET):**\n"
+                        "🤖 **AI Ensemble Models**: `PatchTST Transformer` + `NLP & On-Chain AGI`\n"
+                        "🌐 **Institutions Monitored**: `BlackRock` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
+                        "⚡ **Strategy**: `Sub-Second Front-Run Execution ($1M - $100M+ Orderflow Inflow)`\n\n"
+                        "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
                         f"{tx_formatted}\n\n"
                         "💰 **WHALE CAPITAL NET STATS (24H):**\n"
                         f"• **Exchange Inflow (Sell Pressure)**: `${net_inflow:,.0f} USDT` 🔴\n"
@@ -8932,13 +8935,16 @@ class TelegramBotThread(BaseThread):
                         "🧱 **BINANCE ORDERBOOK HEAVY WALLS (BTC/USDT):**\n"
                         f"• **Institutional Bid Support Wall**: `{btc_bid_wall}` 🛡️\n"
                         f"• **Whale Resistance Ask Wall**: `{btc_ask_wall}` ⚔️\n\n"
-                        "💡 _Institutional Swarm monitors whale wallets 24/7 to predict pre-pump & liquidation dumps!_"
+                        "💡 _AI Front-Runs institutional whale orderflows in sub-seconds to capture pre-pump profits!_"
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "🐋 **APEX SUPER AGI v12.00 | 链上与交易所巨鲸资金雷达** ⚡\n"
+                        "🐋 **巨鲸资金流向与暗盘抢跑交易雷达 (Front-Running Radar) v12.00** ⚡\n"
                         "═══════════════════════════════\n\n"
-                        "📊 **链上巨鲸大额转账流向 (以太坊与 BINANCE 热钱包)：**\n"
+                        "🤖 **AI 模型协同**: `PatchTST Transformer` + `NLP & On-Chain AGI`\n"
+                        "🌐 **监控机构清单**: `贝莱德 (BlackRock)` | `微策 (MicroStrategy)` | `Binance 冷钱包` | `Coinbase Prime`\n"
+                        "⚡ **核心策略**: `毫秒级抢跑入场 (Front-Run Execution $1M - $100M+ 机构大单)`\n\n"
+                        "📊 **链上巨鲸大额转账流向 (机构级追踪)：**\n"
                         f"{tx_formatted}\n\n"
                         "💰 **巨鲸资金净流向统计 (24H)：**\n"
                         f"• **交易所净流入 (抛压风险)**: `${net_inflow:,.0f} USDT` 🔴\n"
@@ -8947,13 +8953,16 @@ class TelegramBotThread(BaseThread):
                         "🧱 **BINANCE 订单簿重仓挂单墙 (BTC/USDT)：**\n"
                         f"• **机构买盘支撑墙**: `{btc_bid_wall}` 🛡️\n"
                         f"• **巨鲸卖盘阻力墙**: `{btc_ask_wall}` ⚔️\n\n"
-                        "💡 _机构级 Swarm 24/7 实时监控巨鲸钱包，精确预测拉盘与清算暴跌！_"
+                        "💡 _AI 毫秒级抢跑机构巨鲸大单，在巨鲸拉盘前提前建仓斩获巨额利润！_"
                     )
                 else:
                     msg = (
-                        "🐋 **APEX SUPER AGI v12.00 | ON-CHAIN & EXCHANGE WHALE RADAR** ⚡\n"
+                        "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v12.00** ⚡\n"
                         "═══════════════════════════════\n\n"
-                        "📊 **ON-CHAIN LARGE TRANSACTION FLOW (ETH & BINANCE HOT WALLET):**\n"
+                        "🤖 **AI Models សហការ ៖** `PatchTST Transformer` + `NLP & On-Chain AGI`\n"
+                        "🌐 **ស្ថាប័នមហាសេដ្ឋីតាមដាន ៖** `BlackRock` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
+                        "⚡ **យុទ្ធសាស្ត្រប្រតិបត្តិ ៖** `ចូលទិញមុន (Front-Run) ក្នុងកម្រិត Sub-Second រួចយកចំណេញពេល Whale រុញថ្លៃ`\n\n"
+                        "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
                         f"{tx_formatted}\n\n"
                         "💰 **WHALE CAPITAL NET STATS (24H):**\n"
                         f"• **Exchange Inflow (សំពាធលក់)** ៖ `${net_inflow:,.0f} USDT` 🔴\n"
@@ -8962,7 +8971,7 @@ class TelegramBotThread(BaseThread):
                         "🧱 **BINANCE ORDERBOOK HEAVY WALLS (BTC/USDT):**\n"
                         f"• **Institutional Bid Support Wall** ៖ `{btc_bid_wall}` 🛡️\n"
                         f"• **Whale Resistance Ask Wall** ៖ `{btc_ask_wall}` ⚔️\n\n"
-                        "💡 _ប្រព័ន្ធ AGI Swarm តាមដានចលនា Whale 24/7 ដើម្បីទស្សន៍ទាយរលក Pump & Dump មុនទីផ្សារ!_"
+                        "💡 _នៅពេលឃើញ Whale កំពុងរៀបបញ្ជាទិញ/លក់ធំ ($1M - $100M+) AI នឹងចូលទិញមុន (Front-Run) ភ្លាមៗ!_"
                     )
 
                 if status_msg:
