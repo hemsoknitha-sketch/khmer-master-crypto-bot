@@ -139,60 +139,44 @@ class TelegramBotThread(BaseThread):
         asyncio.set_event_loop(self.loop)
             
         async def post_init(application):
-            from telegram import BotCommand, BotCommandScopeChat
+            from telegram import BotCommand, BotCommandScopeChat, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats
             import database as db
 
+            # Force clear any cached old commands from all scopes first
+            try:
+                await application.bot.delete_my_commands(scope=BotCommandScopeDefault())
+                await application.bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats())
+                await application.bot.delete_my_commands(scope=BotCommandScopeAllGroupChats())
+            except Exception as e_del:
+                print(f"⚠️ [MENU CLEANUP] Delete notice: {e_del}")
+
+            # 18 Clean Flagship v12.00 Commands
             commands = [
-                # 1. 🎛️ MAIN CONTROL & DASHBOARDS
-                BotCommand("start", "🎛️ [Main Menu] ផ្ទាំងបញ្ជាដើម TURBO AGI"),
-                BotCommand("menu", "🎛️ [Master Menu] បង្ហាញ Menu បញ្ជារួម"),
-                BotCommand("status", "📊 [AGI Status] ពិនិត្យស្ថានភាពប្រព័ន្ធ Real-Time"),
-                BotCommand("balance", "💰 [Live Balance] ពិនិត្យសមតុល្យទុន Live Real-Time"),
-                BotCommand("portfolio", "💼 [Portfolio PnL] មើលគណនីទុន & ចំណេញ PnL"),
-                BotCommand("health", "🏥 [System Health] ស្កេនសុខភាព VPS CPU/RAM/DB"),
-
-                # 2. 🧠 AI MARKET INTELLIGENCE & RADAR
-                BotCommand("analyze", "📊 [AI Analyze] វិភាគបច្ចេកទេស និងទិន្នន័យកាក់"),
-                BotCommand("predict", "🔮 [AI Predict] ទស្សន៍ទាយនិន្នាការកាក់"),
-                BotCommand("scan", "🎯 [AI Scanner] ស្កេនរកកាក់ Volume Surge ឡើង/ចុះ"),
-                BotCommand("top", "📈 [Top Ranking] បង្ហាញកាក់មានទំហំជួញដូរខ្លាំង"),
-                BotCommand("pre_pump", "🚀 [Pre-Pump Sniper] ស្ទាក់ទិញកាក់ត្រៀម ផ្ទុះតម្លៃ"),
-                BotCommand("news", "📰 [Market News] សង្ខេបព័ត៌មានទីផ្សារ Crypto"),
-
-                # 3. 🥇 GOLD & MACRO MATRIX (PAXG / DXY)
-                BotCommand("gold_turbo", "🥇 [Gold Turbo] ជួញដូរមាស High-Yield 25x-50x"),
-                BotCommand("gold_radar", "🏆 [Macro Gold] វិភាគសេដ្ឋកិច្ចមាស DXY & Yields"),
-                BotCommand("cb_gold", "🏦 [Central Bank Gold] តាមដានធនាគារកណ្តាលទិញមាស"),
-                BotCommand("paxg_arbitrage", "⚖️ [Gold Arbitrage] ជួញដូរមាស Risk-Free"),
-                BotCommand("black_swan_guard", "🛡️ [Black-Swan Guard] ការពារវិបត្តិសង្គ្រាម & ទីផ្សារ"),
-                BotCommand("gold_btc_rebalance", "💎 [Gold/BTC Ratio] ប្រព័ន្ធបែងចែកទុន មាស/BTC"),
-
-                # 4. 🚀 AUTOMATED TRADING & HIGH-YIELD ENGINES
-                BotCommand("auto_trade", "⚙️ [Auto Trade] បើក/បិទ ការទិញ-លក់ស្វ័យប្រវត្តិ"),
-                BotCommand("turbo_yield", "🚀 [Turbo Yield] Trailing Peak Lock (+2,500%+ ROI)"),
-                BotCommand("hyper_trade", "⚡ [Hyper Scalper] HFT 15s/1m Scalper (Win Rate ≥ 85%)"),
-                BotCommand("turbo_hedge", "🛡️ [Turbo Hedge] Auto-Hedge Shorts (1x-75x)"),
-                BotCommand("infinity_matrix", "🎯 [Matrix Grid] Dynamic 100-200 Grid Matrix"),
-                BotCommand("infinity_grid", "🕸️ [Infinity Grid] សំណាញ់ចាប់ចំណេញ អមតៈ"),
-                BotCommand("compound_grid", "⛄ [Compound Grid] សំណាញ់បូកដើមស្វ័យប្រវត្តិ"),
-                BotCommand("scalp", "🏓 [AI Scalper] យុទ្ធសាស្ត្រ Ping-Pong Trading"),
-                BotCommand("funding_harvester", "🌾 [Funding Harvester] ប្រមូលផល Funding Rates"),
-
-                # 5. 🛡️ RISK MANAGEMENT & DISASTER DEFENDER
-                BotCommand("defender", "🛡️ [Liquidation Guard] ខែលការពារការឆេះគណនី"),
-                BotCommand("hedge_mode", "🛡️ [Hedge Mode] ការពារហានិភ័យ (Auto-Short)"),
-                BotCommand("stop", "🛑 [Stop Trading] បញ្ឈប់ការជួញដូរ (Single Coin)"),
-                BotCommand("stop_all", "🚨 [Global Shutdown] បិទគ្រប់ Bot ទាំងអស់ 100%"),
-                BotCommand("sell_all", "🔴 [Panic Sell] លក់កាក់ទាំងអស់ និងបិទប្រព័ន្ធ"),
-
-                # 6. ⚙️ SECURITY & USER CONFIGURATION
-                BotCommand("add_api", "🔑 [Binance API] ភ្ជាប់ Binance API Keys Secure"),
-                BotCommand("set_pin", "🔒 [2FA PIN] កំណត់កូដ PIN សម្ងាត់ ៤ ខ្ទង់"),
-                BotCommand("language", "🌐 [Language] ផ្លាស់ប្តូរភាសាប្រព័ន្ធ (Khmer/En/Zh)"),
-                BotCommand("alert", "🔔 [Price Alert] កំណត់រំលឹកតម្លៃកាក់"),
-                BotCommand("my_alerts", "📋 [Alert List] បញ្ជីរំលឹកតម្លៃទាំងអស់")
+                BotCommand("start", "🚀 Start Bot & Choose Language"),
+                BotCommand("menu", "🎛️ Interactive Master Control Panel"),
+                BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
+                BotCommand("infinity_grid", "♾️ Unified Smart Grid Engine"),
+                BotCommand("snipe", "🎯 Listing & Volatility Sniper"),
+                BotCommand("funding_harvester", "🌾 8-Hour Funding Yield Harvester"),
+                BotCommand("gold_radar", "🛡️ AI Gold Guard & Macro Radar"),
+                BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
+                BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
+                BotCommand("balance", "💰 Check Spot & Futures Balance"),
+                BotCommand("status", "📊 View Active Trades & PnL"),
+                BotCommand("health", "🩺 Check VPS & Engine Diagnostics"),
+                BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
+                BotCommand("whales", "🐋 Track On-Chain Whale Movements"),
+                BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
+                BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
+                BotCommand("alert", "🔔 Set Price Alert"),
+                BotCommand("stop", "🛑 Stop Trading / Market Close"),
             ]
-            await application.bot.set_my_commands(commands)
+
+            try:
+                await application.bot.set_my_commands(commands, scope=BotCommandScopeDefault())
+                await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
+            except Exception as e_set:
+                print(f"⚠️ [MENU SET] Error setting default commands: {e_set}")
             
             # Set secret commands ONLY for Super Admin Menu (BotCommandScopeChat)
             admin_commands = [
