@@ -469,22 +469,20 @@ class AIInvestmentEngine:
             }
         
     def _clean_response(self, text: str) -> str:
-        """
-        Strips internal system prompt reflections, role definitions, thinking processes,
-        English drafting notes, sentence checks, and meta-instructions to output ONLY clean executive markdown.
-        """
-        if not text:
-            return ""
-
+        if not text: return ""
         import re
         
         # 1. Remove thinking/reflection blocks wrapped in tags or code fences
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'```think.*?```', '', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'```thought.*?```', '', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'\[THINKING\].*?\[/THINKING\]', '', text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'\[REASONING\].*?\[/REASONING\]', '', text, flags=re.DOTALL | re.IGNORECASE)
         
         # 2. Remove (Self-Correction: ... ) blocks
         text = re.sub(r'\*?\s*\(Self-Correction:.*?\)\*?', '', text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'\*?\s*\(Fact Check:.*?\)\*?', '', text, flags=re.DOTALL | re.IGNORECASE)
 
         # 3. Normalize & Replace English draft Section markers if Khmer is present
         text = re.sub(r'Section\s*1\s*\([^)]*\)\s*:', 'ផ្នែកទី ១៖ សេចក្តីសម្រេចចិត្តរបស់ស្ថាប័ន (The Institutional Verdict)', text, flags=re.IGNORECASE)
@@ -504,36 +502,59 @@ class AIInvestmentEngine:
         elif "Final Text:" in text:
             idx = text.find("Final Text:")
             text = text[idx + len("Final Text:"):]
+        elif "Final Output Generation:" in text:
+            idx = text.find("Final Output Generation:")
+            text = text[idx + len("Final Output Generation:"):]
 
         lines = text.split("\n")
         cleaned_lines = []
 
+        scratchpad_prefixes = [
+            "*   User Question", "* User Question", "User Question",
+            "*   System Context", "* System Context", "System Context",
+            "*   Goal", "* Goal", "Goal:",
+            "*   Fact Check", "* Fact Check", "Fact Check",
+            "*   Contextual", "* Contextual", "Contextual",
+            "*   Strategic Response", "* Strategic Response", "Strategic Response",
+            "*   Refined Logic", "* Refined Logic", "Refined Logic",
+            "*   Correction", "* Correction", "Correction:",
+            "*   Actually", "* Actually", "Actually:",
+            "*   Information", "* Information", "Information:",
+            "*   Decision", "* Decision", "Decision:",
+            "*   Executive Response", "* Executive Response", "Executive Response",
+            "*   Khmer Translation", "* Khmer Translation", "Khmer Translation",
+            "*   Refining to be", "* Refining to be", "Refining to be",
+            "*   Final check", "* Final check", "Final check",
+            "*   One detail", "* One detail", "One detail",
+            "*   Final Output", "* Final Output", "Final Output",
+            "*   User Input:", "* User Input:", "User Input:",
+            "*   Time:", "* Time:", "Time:",
+            "*   Constraint", "Constraint 1:", "Constraint 2:", "Constraint 3:",
+            "*   Persona:", "* Persona:", "Persona:",
+            "*   Command:", "*   Asset:", "*   Direction:", "*   Leverage:",
+            "*   Heading:", "*   Status:", "*   Execution Details:", "*   Risk Management:",
+            "*   Header:", "*   Body:", "*   Table/List:", "*   Warning:",
+            "*   Drafting", "*   Role:", "* Role:", "Role:",
+            "*   Context:", "* Context:", "Context:",
+            "*   Task:", "* Task:", "Task:",
+            "*   Tone:", "* Tone:", "Tone:",
+            "*   Requirements:", "* Requirements:", "Requirements:",
+            "*   Contextual Reason", "* Opportunity:", "*   Strategy:", "*   Parameters:", "*   The Command:",
+            "*   Intro:", "*   Market Status:", "*   Analysis:", "*   Strategy Details:",
+            "*   Sentence 1:", "*   Sentence 2:", "Sentence 1:", "Sentence 2:",
+            "*   Does it meet", "*   Is it in", "*   Is it executive", "*   Are there any",
+            "*   Self-Correction", "*   Final Polish", "*   Wait, checking",
+            "Respond ONLY in clean", "Use the 3-section structure", "User's language preference:",
+            "Structure: Section", "No fluff/reasoning", "Win Rate: Let's estimate",
+            "Ensure the tone", "Check the 1-tap", "Self-Correction", "Drafting Command", "Use bolding", "Use Emojis",
+            "(Proceeding to generate", "(Drafting the Output", "Drafting final", "Final Polish:", "Wait, checking"
+        ]
+
         for line in lines:
             stripped = line.strip()
-            # Skip Meta / Prompt / Reflection / Chain-of-Thought / Sentence-Check lines
-            if any(stripped.startswith(prefix) for prefix in [
-                "*   User Input:", "* User Input:", "User Input:",
-                "*   Time:", "* Time:", "Time:",
-                "*   Constraint", "Constraint 1:", "Constraint 2:", "Constraint 3:",
-                "*   Persona:", "* Persona:", "Persona:",
-                "*   Command:", "*   Asset:", "*   Direction:", "*   Leverage:",
-                "*   Heading:", "*   Status:", "*   Execution Details:", "*   Risk Management:",
-                "*   Header:", "*   Body:", "*   Table/List:", "*   Warning:",
-                "*   Drafting", "*   Role:", "* Role:", "Role:",
-                "*   Context:", "* Context:", "Context:",
-                "*   Task:", "* Task:", "Task:",
-                "*   Tone:", "* Tone:", "Tone:",
-                "*   Requirements:", "* Requirements:", "Requirements:",
-                "*   Contextual Reason", "* Opportunity:", "*   Strategy:", "*   Parameters:", "*   The Command:",
-                "*   Intro:", "*   Market Status:", "*   Analysis:", "*   Strategy Details:",
-                "*   Sentence 1:", "*   Sentence 2:", "Sentence 1:", "Sentence 2:",
-                "*   Does it meet", "*   Is it in", "*   Is it executive", "*   Are there any",
-                "*   Self-Correction", "*   Final Polish", "*   Wait, checking",
-                "Respond ONLY in clean", "Use the 3-section structure", "User's language preference:",
-                "Structure: Section", "No fluff/reasoning", "Win Rate: Let's estimate",
-                "Ensure the tone", "Check the 1-tap", "Self-Correction", "Drafting Command", "Use bolding", "Use Emojis",
-                "(Proceeding to generate", "(Drafting the Output", "Drafting final", "Final Polish:", "Wait, checking"
-            ]) or any(kw in stripped for kw in [
+            if any(stripped.startswith(prefix) for prefix in scratchpad_prefixes):
+                continue
+            if any(kw in stripped for kw in [
                 "Respond ONLY in clean, executive",
                 "User's language preference:",
                 "Structure: Section 1, 2, 3",
@@ -543,7 +564,12 @@ class AIInvestmentEngine:
                 "Section 2: Quantitative and Macro",
                 "Section 3: The Executive Action",
                 "2-sentence rule",
-                "Self-Correction during drafting"
+                "Self-Correction during drafting",
+                "Fact Check (Real World vs. Context)",
+                "Contextual Interpretation:",
+                "Strategic Response:",
+                "Executive Response Strategy:",
+                "Final Output Generation:"
             ]):
                 continue
 
