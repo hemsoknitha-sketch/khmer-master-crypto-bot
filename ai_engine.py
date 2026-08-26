@@ -87,7 +87,16 @@ class AIInvestmentEngine:
             ]
             
         self.primary_model_name = self.supported_models[0]
-        self.load_trained_brain_models()
+        # Hugging Face Auto-Sync & ML Brain Initializer
+        if self.hf_token:
+            try:
+                print("🔄 [HF AUTO-INSTALLER ENGINE] Initiating Hugging Face Model Sync via Access Token...")
+                self.sync_models_from_huggingface_hub()
+            except Exception as e_sync:
+                print(f"⚠️ [HF AUTO-INSTALLER] Sync notice: {e_sync}")
+                self.load_trained_brain_models()
+        else:
+            self.load_trained_brain_models()
 
     def analyze_with_deepseek_r1(self, symbol: str = "BTCUSDT", prompt: str = None) -> str:
         """Call DeepSeek-R1 AGI Model តាមរយៈ HF Token ឥតគិតថ្លៃ 100%"""
