@@ -503,7 +503,7 @@ class TelegramBotThread(BaseThread):
 
             if is_admin:
                 menu_text += (
-                    "\n👑 **SUPER ADMIN MASTER CONTROL SUITE (ID: 859271875)** 👑\n"
+                    "\n👑 **SUPER ADMIN MASTER CONTROL SUITE** 👑\n"
                     "═══════════════════════════════\n"
                     "• `/admin_stats` - System Stats & Total PnL\n"
                     "• `/admin_view_portfolio` - View All VIP Portfolios\n"
@@ -593,7 +593,7 @@ class TelegramBotThread(BaseThread):
             if not chat_id: return
             
             if not (chat_id == 859271875 or db.is_admin(chat_id)):
-                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin ID 859271875."
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
                 if update.callback_query:
                     await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
                 else:
@@ -3752,7 +3752,7 @@ class TelegramBotThread(BaseThread):
                     "═══════════════════════════════\n\n"
                     "⚠️ **ACCOUNT PURGE SAFETY RULES:**\n"
                     "• **Action Impact**: `100% Complete Wipe of User Profile, API Keys, Active Bots, & Trade History`\n"
-                    "• **Protection Shield**: `Super Admin ID (859271875) cannot be deleted`\n"
+                    "• **Protection Shield**: `Super Admin Account cannot be deleted`\n"
                     "• **Execution Engine**: `Sub-10ms Relational Database Purge`\n\n"
                     "📋 **1-TAP COMMAND SYNTAX:**\n"
                     "👉 **លុបទិន្នន័យ User ទាំងស្រុង ៖**\n"
@@ -3773,7 +3773,7 @@ class TelegramBotThread(BaseThread):
             target_id = int(target_raw)
 
             if target_id == 859271875:
-                await update.message.reply_text("❌ **មិនអាចលុបទិន្នន័យ Super Admin (859271875) បានឡើយ!**", parse_mode="Markdown")
+                await update.message.reply_text("❌ **មិនអាចលុបទិន្នន័យ Super Admin បានឡើយ!**", parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
                 return
 
@@ -7130,7 +7130,7 @@ class TelegramBotThread(BaseThread):
             
             # Restrict exclusively to Super Admin ID 859271875
             if not (chat_id == 859271875 or db.is_admin(chat_id)):
-                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin ID 859271875."
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
                 if update.callback_query:
                     await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
                 else:
@@ -7322,7 +7322,7 @@ class TelegramBotThread(BaseThread):
             
             # Restrict exclusively to Super Admin ID 859271875
             if not (chat_id == 859271875 or db.is_admin(chat_id)):
-                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin ID 859271875."
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
                 if update.callback_query:
                     await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
                 else:
