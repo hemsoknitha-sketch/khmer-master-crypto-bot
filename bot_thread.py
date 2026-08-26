@@ -4096,19 +4096,32 @@ class TelegramBotThread(BaseThread):
 
         async def admin_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
             users = db.get_all_users() if hasattr(db, 'get_all_users') else []
             if not users:
-                await update.message.reply_text("ℹ️ **មិនទាន់មានទិន្នន័យគណនីកើតឡើងក្នុងប្រព័ន្ធនៅឡើយទេ។**", parse_mode="Markdown")
+                no_usr = "ℹ️ **No registered accounts found in system database.**" if user_lang == 'en' else ("ℹ️ **数据库中暂无已注册账户。**" if user_lang == 'zh' else "ℹ️ **មិនទាន់មានទិន្នន័យគណនីកើតឡើងក្នុងប្រព័ន្ធនៅឡើយទេ។**")
+                await update.effective_message.reply_text(no_usr, parse_mode="Markdown")
                 return
 
             vip_count = sum(1 for u in users if bool(u[2])) if users else 0
@@ -4119,14 +4132,15 @@ class TelegramBotThread(BaseThread):
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🔄 Refresh Users", callback_data="btn_admin_users_refresh"),
-                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                    InlineKeyboardButton("👑 License Manager", callback_data="btn_admin_license_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                    InlineKeyboardButton("👻 VIP Portfolio Audit", callback_data="btn_admin_portfolio_prompt"),
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
+                ],
+                [
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ],
-                [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
@@ -4139,39 +4153,81 @@ class TelegramBotThread(BaseThread):
                 expiry = str(u[4]) if u[4] else "N/A"
                 phone = str(u[5]) if len(u) > 5 and u[5] else "No Phone"
 
-                vip_badge = "⭐ VIP" if is_vip else "👤 FREE"
+                vip_badge = "⭐ VIP Member" if is_vip else "👤 Free User"
                 username_str = f"@{uname}" if uname != "N/A" else "No Username"
 
                 user_lines.append(
                     f"• `ID: {c_id}` | {username_str}\n"
                     f"  ├ Status: `{vip_badge}` | Expiry: `{expiry}`\n"
-                    f"  └ Joined: `{joined}` | Phone: `{phone}`"
+                    f"  └ Joined: `{joined}` | Contact: `{phone}`"
                 )
 
             formatted_user_list = "\n\n".join(user_lines[:30])
 
-            msg = (
-                "👑 **APEX SUPER AGI TURBO BRAIN v9.5 | EXECUTIVE USER MANAGEMENT** ⚡\n"
-                "═══════════════════════════════\n\n"
-                "📊 **GLOBAL USER BASE METRICS:**\n"
-                f"• **Total Registered Users**: `{len(users)} Accounts`\n"
-                f"• **Active VIP Members**: `{vip_count} Users` 👑\n"
-                f"• **Standard Free Members**: `{free_count} Users` 👤\n\n"
-                "👥 **REGISTERED ACCOUNTS DIRECTORY (TOP 30):**\n"
-                f"{formatted_user_list}\n\n"
-                "📋 **ADMIN 1-TAP LICENSE CONTROL SYNTAX:**\n"
-                "👉 **ផ្តល់ VIP 1 ខែ ៖** `` `/admin_license <CHAT_ID> 1 Month` ``\n"
-                "👉 **ផ្តល់ VIP Lifetime ៖** `` `/admin_license <CHAT_ID> Lifetime` ``\n"
-                "👉 **ដក VIP ៖** `` `/admin_license <CHAT_ID> Revoke VIP` ``"
-            )
+            if user_lang == 'en':
+                msg = (
+                    "👑 **APEX SUPER AGI v12.00 | EXECUTIVE USER DIRECTORY** 👑\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **GLOBAL USER BASE METRICS:**\n"
+                    f"• **Total Registered Accounts**: `{len(users)} Users`\n"
+                    f"• **Active VIP Members**: `{vip_count} Users` 👑\n"
+                    f"• **Standard Free Accounts**: `{free_count} Users` 👤\n\n"
+                    "👥 **REGISTERED USER DIRECTORY (TOP 30):**\n"
+                    f"{formatted_user_list}\n\n"
+                    "📋 **ADMIN 1-TAP LICENSE COMMAND SYNTAX:**\n"
+                    "👉 **Grant 1-Month VIP**: `` `/admin_license <USER_ID> 1 Month` ``\n"
+                    "👉 **Grant Lifetime VIP**: `` `/admin_license <USER_ID> Lifetime` ``\n"
+                    "👉 **Revoke VIP Access**: `` `/admin_license <USER_ID> Revoke VIP` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Tap License Manager or VIP Portfolio Audit below for account management:_"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "👑 **APEX SUPER AGI v12.00 | 全球用户名录与状态** 👑\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **全球用户基数指标：**\n"
+                    f"• **总注册账户数**: `{len(users)} 个`\n"
+                    f"• **活跃 VIP 会员**: `{vip_count} 个` 👑\n"
+                    f"• **标准免费用户**: `{free_count} 个` 👤\n\n"
+                    "👥 **已注册账户名录 (前 30 名)：**\n"
+                    f"{formatted_user_list}\n\n"
+                    "📋 **1-TAP 授权管理命令：**\n"
+                    "👉 **授予 1 个月 VIP**: `` `/admin_license <USER_ID> 1 Month` ``\n"
+                    "👉 **授予 永久 VIP**: `` `/admin_license <USER_ID> Lifetime` ``\n"
+                    "👉 **撤销 VIP 权限**: `` `/admin_license <USER_ID> Revoke VIP` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _点击下方授权管理器或 VIP 隐身审计即可快速管理目标账户：_"
+                )
+            else:
+                msg = (
+                    "👑 **APEX SUPER AGI v12.00 | EXECUTIVE USER DIRECTORY** 👑\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **GLOBAL USER BASE METRICS ៖**\n"
+                    f"• **Total Registered Accounts** ៖ `{len(users)} Accounts`\n"
+                    f"• **Active VIP Members** ៖ `{vip_count} Users` 👑\n"
+                    f"• **Standard Free Members** ៖ `{free_count} Users` 👤\n\n"
+                    "👥 **REGISTERED ACCOUNTS DIRECTORY (TOP 30) ៖**\n"
+                    f"{formatted_user_list}\n\n"
+                    "📋 **ADMIN 1-TAP LICENSE CONTROL SYNTAX ៖**\n"
+                    "👉 **ផ្តល់ VIP 1 ខែ ៖** `` `/admin_license <CHAT_ID> 1 Month` ``\n"
+                    "👉 **ផ្តល់ VIP Lifetime ៖** `` `/admin_license <CHAT_ID> Lifetime` ``\n"
+                    "👉 **ដក VIP ៖** `` `/admin_license <CHAT_ID> Revoke VIP` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _ចុច License Manager ឬ VIP Portfolio Audit ខាងក្រោម ដើម្បីគ្រប់គ្រងគណនី ៖_"
+                )
 
             if update.callback_query:
-                await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                try:
+                    await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await send_long_message(context, chat_id, msg)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             else:
                 await send_long_message(context, chat_id, msg)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
             return
-            
+
         async def admin_license_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
