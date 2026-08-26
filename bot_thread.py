@@ -753,32 +753,130 @@ class TelegramBotThread(BaseThread):
 
         async def stop_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             query = update.callback_query
+            if not query: return
             data = query.data
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id) or 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else query.message.chat.id
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
             
             if not data.startswith("stopall_"):
                 return
                 
-            await query.answer()
+            try:
+                await query.answer()
+            except Exception:
+                pass
             
             parts = data.split("_")
             if len(parts) != 3: return
             _, action, target_id = parts
             
-            if str(chat_id) != target_id:
+            if str(chat_id) != target_id and not db.is_admin(chat_id):
                 await query.message.reply_text("⚠️ មិនមានសិទ្ធិទេ!")
                 return
-                
-            await query.edit_message_reply_markup(reply_markup=None)
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            nav_keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ]
+            ])
             
+            db.stop_all_active_bots(chat_id)
+            db.set_auto_snipe(chat_id, False, 0)
+            db.set_delta_neutral_config(chat_id, False, 0)
+
             if action == "soft":
-                db.stop_all_active_bots(chat_id)
-                msg = "✅ **SOFT STOP COMPLETED!**\n\nរាល់ AI Engines ទាំងអស់ (/hyper_trade, /auto_arb, /infinity_matrix, /sweep_auto, /funding_harvester, /trailing_guard, /auto_trade) ត្រូវបានកាត់ផ្តាច់ និងបិទដំណើរការស្វ័យប្រវត្តិ 100% ស្អាតបាត!\n\n_កាក់ និងប្រាក់ដែលមានស្រាប់ ត្រូវបានរក្សាទុកក្នុងកាបូបដោយសុវត្ថិភាព។_"
-                await query.message.reply_text(msg, parse_mode="Markdown")
+                if user_lang == 'en':
+                    soft_card = (
+                        "✅ **APEX SUPER AGI v12.00 | SOFT STOP COMPLETED** 🟢\n"
+                        "═══════════════════════════════\n"
+                        "• All Trading Engines & AI Bots: `DEACTIVATED 100%`\n"
+                        "• Existing Wallet Assets & Coins: `SAFELY HELD IN WALLET`\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Your trading bots have been paused. No active position was market closed._"
+                    )
+                elif user_lang == 'zh':
+                    soft_card = (
+                        "✅ **APEX SUPER AGI v12.00 | 软停止已完成** 🟢\n"
+                        "═══════════════════════════════\n"
+                        "• 所有交易引擎与 AI 机器人: `100% 已暂停运行`\n"
+                        "• 钱包原有资产与币种: `安全保存在钱包中`\n"
+                        "═══════════════════════════════\n"
+                        "💡 _机器人已成功暂停，原有持仓已被保留，未进行强行平仓。_"
+                    )
+                else:
+                    soft_card = (
+                        "✅ **APEX SUPER AGI v12.00 | SOFT STOP COMPLETED** 🟢\n"
+                        "═══════════════════════════════\n"
+                        "• គ្រប់ AI Engines & Trading Bots ទាំងអស់ ៖ `បិទដំណើរការ 100%`\n"
+                        "• កាក់ និងប្រាក់ទុនក្នុង Wallet ៖ `រក្សាទុកដោយសុវត្ថិភាព`\n"
+                        "═══════════════════════════════\n"
+                        "💡 _រាល់ Bot ទាំងអស់ត្រូវបានផ្អាក។ កាក់ដែលកំពុងកាន់ត្រូវបានរក្សាទុកជាធម្មតា។_"
+                    )
+                try:
+                    await query.edit_message_text(soft_card, parse_mode="Markdown", reply_markup=nav_keyboard)
+                except Exception:
+                    await query.message.reply_text(soft_card, parse_mode="Markdown", reply_markup=nav_keyboard)
+                self.log_signal.emit(f"🟢 Soft Stop executed for user {chat_id}.")
                 
             elif action == "hard":
-                db.stop_all_active_bots(chat_id)
+                keys = db.get_user_api(chat_id)
+                closed_count = 0
+                if keys:
+                    try:
+                        import trading_engine
+                        res = await asyncio.to_thread(trading_engine.close_all_futures_positions, keys[0], keys[1])
+                        if isinstance(res, dict):
+                            closed_count = res.get("closed_count", 0)
+                    except Exception as e:
+                        print(f"Error executing hard stop position close: {e}")
+
+                if user_lang == 'en':
+                    hard_card = (
+                        "🔴 **APEX SUPER AGI v12.00 | HARD STOP & PANIC SELL COMPLETED** 🛑\n"
+                        "═══════════════════════════════\n"
+                        "• All Trading Engines & AI Bots: `SHUTDOWN 100%`\n"
+                        f"• Cancelled Orders & Liquidated Positions: `{closed_count}`\n"
+                        "• Binance Futures Positions: `ALL CLOSED TO USDT` 💵\n"
+                        "═══════════════════════════════\n"
+                        "💡 _All positions have been market closed and funds returned to USDT._"
+                    )
+                elif user_lang == 'zh':
+                    hard_card = (
+                        "🔴 **APEX SUPER AGI v12.00 | 强平硬停止已完成** 🛑\n"
+                        "═══════════════════════════════\n"
+                        "• 所有交易引擎与 AI 机器人: `100% 已关闭`\n"
+                        f"• 撤销挂单与市场平仓持仓: `{closed_count}` 个\n"
+                        "• Binance 合约持仓: `已全部平仓为 USDT` 💵\n"
+                        "═══════════════════════════════\n"
+                        "💡 _所有合约持仓已成功平仓，资金已安全转换回 USDT！_"
+                    )
+                else:
+                    hard_card = (
+                        "🔴 **APEX SUPER AGI v12.00 | HARD STOP & PANIC SELL COMPLETED** 🛑\n"
+                        "═══════════════════════════════\n"
+                        "• គ្រប់ AI Engines & Trading Bots ទាំងអស់ ៖ `បិទបញ្ចប់ 100%`\n"
+                        f"• ចំនួន Positions ដែលបានបិទ & ភ្នាល់ ៖ `{closed_count}`\n"
+                        "• Binance Futures Positions ៖ `លក់ដូរជា USDT ទាំងអស់` 💵\n"
+                        "═══════════════════════════════\n"
+                        "💡 _គ្រប់ Position ទាំងអស់ត្រូវបាន Market Close និងប្រែជា USDT ក្នុង Wallet!_"
+                    )
+                try:
+                    await query.edit_message_text(hard_card, parse_mode="Markdown", reply_markup=nav_keyboard)
+                except Exception:
+                    await query.message.reply_text(hard_card, parse_mode="Markdown", reply_markup=nav_keyboard)
+                self.log_signal.emit(f"🔴 Hard Stop executed for user {chat_id} ({closed_count} positions closed).")
+
         async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
             if not await verify_user(update): return
@@ -7100,18 +7198,28 @@ class TelegramBotThread(BaseThread):
 
         async def stop_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id) or 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
             if args and len(args) >= 1:
                 pin = str(args[0]).strip()
                 stored_pin = db.get_user_pin(chat_id)
                 if stored_pin and not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    bad_pin = "❌ Invalid PIN code." if user_lang == 'en' else ("❌ PIN 码不正确。" if user_lang == 'zh' else "❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await update.effective_message.reply_text(bad_pin)
                     return
 
-            # Deactivate all bots in DB
             db.stop_all_active_bots(chat_id)
             db.set_auto_snipe(chat_id, False, 0)
             db.set_delta_neutral_config(chat_id, False, 0)
@@ -7130,8 +7238,8 @@ class TelegramBotThread(BaseThread):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [
-                    InlineKeyboardButton("🟢 Soft Stop (បិទ Bot តែរក្សាកាក់)", callback_data=f"stopall_soft_{chat_id}"),
-                    InlineKeyboardButton("🔴 Hard Stop (បិទ Bot & លក់កាក់ជា USDT)", callback_data=f"stopall_hard_{chat_id}")
+                    InlineKeyboardButton("🟢 Soft Stop (Pause Bots)", callback_data=f"stopall_soft_{chat_id}"),
+                    InlineKeyboardButton("🔴 Hard Stop (Panic Close)", callback_data=f"stopall_hard_{chat_id}")
                 ],
                 [
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
@@ -7140,20 +7248,59 @@ class TelegramBotThread(BaseThread):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            stop_all_card = (
-                "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | EMERGENCY KILL-SWITCH** 🛑\n"
-                "═══════════════════════════════\n"
-                "✅ **DEACTIVATED ALL TRADING ENGINES 100%:**\n"
-                "• Futures Auto-Trade & Hyper-Trade HFT: `OFF`\n"
-                "• Infinity Matrix & Auto Arbitrage: `OFF`\n"
-                "• Perpetual Funding Harvester & Delta-Neutral: `OFF`\n"
-                "• Auto Snipe & Pre-Pump Sniper: `OFF`\n\n"
-                "🛡️ **REAL BINANCE FUTURES AUTO-CLOSE:**\n"
-                f"• Cancelled Open Orders & Market Closed Positions: `{closed_positions_count}`\n"
-                "═══════════════════════════════\n"
-                "💡 _សូមជ្រើសរើស ៖ **Soft Stop** (បិទ Bot រក្សាកាក់) ឬ **Hard Stop** (បិទ Bot លក់កាក់យក USDT វិញ)!_"
-            )
-            await update.message.reply_text(stop_all_card, parse_mode="Markdown", reply_markup=reply_markup)
+            if user_lang == 'en':
+                stop_all_card = (
+                    "🛑 **APEX SUPER AGI v12.00 | GLOBAL EMERGENCY KILL-SWITCH** 🛑\n"
+                    "═══════════════════════════════\n"
+                    "✅ **DEACTIVATED ALL TRADING ENGINES 100%:**\n"
+                    "• Futures HFT & Spot Auto-Trader: `OFF`\n"
+                    "• Infinity Grid & Compound Matrix: `OFF`\n"
+                    "• Perpetual Funding Harvester & Delta-Neutral: `OFF`\n"
+                    "• Auto Snipe & Pre-Pump Sniper: `OFF`\n\n"
+                    "🛡️ **REAL BINANCE FUTURES AUTO-CLOSE:**\n"
+                    f"• Cancelled Open Orders & Market Closed Positions: `{closed_positions_count}`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Select **Soft Stop** (Pause Bots, Hold Coins) or **Hard Stop** (Panic Close All Positions to USDT):_"
+                )
+            elif user_lang == 'zh':
+                stop_all_card = (
+                    "🛑 **APEX SUPER AGI v12.00 | 全局紧急关机控制台** 🛑\n"
+                    "═══════════════════════════════\n"
+                    "✅ **100% 已关闭所有交易引擎：**\n"
+                    "• 合约高频对冲与现货自动交易: `已关闭`\n"
+                    "• 无限网格与复利网格: `已关闭`\n"
+                    "• 资金费率收割与 Delta 中性: `已关闭`\n"
+                    "• 自动抢购与暴涨猎手: `已关闭`\n\n"
+                    "🛡️ **BINANCE 合约实时平仓报告：**\n"
+                    f"• 已撤销挂单与平仓持仓总数: `{closed_positions_count}` 个\n"
+                    "═══════════════════════════════\n"
+                    "💡 _请选择 **Soft Stop** (暂停机器人，保留代币) 或 **Hard Stop** (强行平仓变现为 USDT)：_"
+                )
+            else:
+                stop_all_card = (
+                    "🛑 **APEX SUPER AGI v12.00 | GLOBAL EMERGENCY KILL-SWITCH** 🛑\n"
+                    "═══════════════════════════════\n"
+                    "✅ **DEACTIVATED ALL TRADING ENGINES 100% ៖**\n"
+                    "• Futures Auto-Trade & Hyper-Trade HFT ៖ `OFF`\n"
+                    "• Infinity Matrix & Auto Arbitrage ៖ `OFF`\n"
+                    "• Perpetual Funding Harvester & Delta-Neutral ៖ `OFF`\n"
+                    "• Auto Snipe & Pre-Pump Sniper ៖ `OFF`\n\n"
+                    "🛡️ **REAL BINANCE FUTURES AUTO-CLOSE ៖**\n"
+                    f"• Cancelled Open Orders & Market Closed Positions ៖ `{closed_positions_count}`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _សូមជ្រើសរើស ៖ **Soft Stop** (បិទ Bot រក្សាកាក់) ឬ **Hard Stop** (បិទ Bot លក់កាក់យក USDT វិញ)!_"
+                )
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(stop_all_card, parse_mode="Markdown", reply_markup=reply_markup)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=stop_all_card, parse_mode="Markdown", reply_markup=reply_markup)
+            elif update.effective_message:
+                await update.effective_message.reply_text(stop_all_card, parse_mode="Markdown", reply_markup=reply_markup)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=stop_all_card, parse_mode="Markdown", reply_markup=reply_markup)
+
             self.log_signal.emit(f"🛑 Emergency Kill-Switch executed for {chat_id} (All bots deactivated).")
 
         async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
