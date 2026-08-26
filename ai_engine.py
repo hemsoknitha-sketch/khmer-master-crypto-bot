@@ -292,7 +292,7 @@ class AIInvestmentEngine:
                 return root_path
             return ""
 
-        # Auto-installer Failsafe for missing VPS ML packages
+        # Auto-installer Failsafe for missing VPS ML packages (Disk-Safe & PEP 668 Protected)
         def ensure_ml_packages():
             packages = ["xgboost", "catboost", "lightgbm", "scikit-learn", "joblib"]
             missing = []
@@ -307,10 +307,14 @@ class AIInvestmentEngine:
                 print(f"🔄 [AI ML BRAIN AUTO-INSTALLER] Missing ML packages detected: {missing}. Auto-installing on VPS...")
                 try:
                     import subprocess, sys
-                    subprocess.run([sys.executable, "-m", "pip", "install", "--break-system-packages"] + missing, check=True)
+                    # Purge pip cache first to free up disk space on VPS
+                    subprocess.run([sys.executable, "-m", "pip", "cache", "purge"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    # Install with --no-cache-dir and --break-system-packages to prevent disk space exhaustion
+                    cmd = [sys.executable, "-m", "pip", "install", "--no-cache-dir", "--break-system-packages"] + missing
+                    subprocess.run(cmd, check=True)
                     print(f"✅ [AI ML BRAIN AUTO-INSTALLER] Successfully auto-installed {missing}!")
                 except Exception as err:
-                    print(f"⚠️ [AI ML BRAIN AUTO-INSTALLER] Auto-install attempt notice: {err}")
+                    print(f"⚠️ [AI ML BRAIN AUTO-INSTALLER] Disk/PEP668 Notice: {err}")
 
         ensure_ml_packages()
 
