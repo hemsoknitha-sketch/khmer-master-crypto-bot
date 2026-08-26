@@ -8829,58 +8829,126 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("predict", predict_command))
         async def paper_trading_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id)
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not check_user_pin(chat_id, user_lang, update, context):
-                return
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
             import trading_engine
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-            if not args:
-                status_text = "🟢 **PAPER TRADING (SIMULATION)**" if trading_engine.PAPER_TRADING else "🔴 **REAL MONEY TRADING (LIVE BINANCE)**"
-                msg = (
-                    f"⚙️ **TRADING MODE STATUS**\n"
-                    f"───────────────────────────────\n"
-                    f"Current Mode: {status_text}\n\n"
-                    f"💡 **Usage:**\n"
-                    f"• `/paper_trading OFF <PIN>` - Switch to **REAL MONEY TRADING** (Live Binance Orders)\n"
-                    f"• `/paper_trading ON <PIN>` - Switch to **PAPER TRADING** (Simulation)\n"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown")
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔒 Security 2FA PIN", callback_data="btn_set_pin_prompt"),
+                    InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ]
+            ])
+
+            if not args or len(args) == 0:
+                is_paper = getattr(trading_engine, 'PAPER_TRADING', True)
+                status_badge = "🟢 PAPER TRADING (SIMULATION DEMO MODE)" if is_paper else "🔴 REAL MONEY TRADING (LIVE BINANCE EXECUTIONS)"
+
+                if user_lang == 'en':
+                    msg = (
+                        "⚙️ **APEX SUPER AGI v12.00 | TRADING MODE CONTROL VAULT** ⚡\n"
+                        "═══════════════════════════════\n\n"
+                        f"📊 **CURRENT TRADING MODE**: `{status_badge}`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX:**\n"
+                        "👉 **Switch to LIVE REAL MONEY TRADING (Requires 2FA PIN):**\n"
+                        "`` `/paper_trading OFF <YOUR_2FA_PIN>` ``\n\n"
+                        "👉 **Switch to SAFE PAPER TRADING SIMULATION:**\n"
+                        "`` `/paper_trading ON <YOUR_2FA_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Switching to LIVE Binance Trading requires valid 2FA PIN authentication!_"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "⚙️ **APEX SUPER AGI v12.00 | 交易模式安全金库** ⚡\n"
+                        "═══════════════════════════════\n\n"
+                        f"📊 **当前交易模式状态**: `{status_badge}`\n\n"
+                        "📋 **1-TAP 命令格式：**\n"
+                        "👉 **切换至 实盘真实资金交易 (需验证 2FA PIN):**\n"
+                        "`` `/paper_trading OFF <你的_2FA_PIN>` ``\n\n"
+                        "👉 **切换至 安全模拟盘交易 (Paper Trading):**\n"
+                        "`` `/paper_trading ON <你的_2FA_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _切换至 Binance 真实实盘交易必须通过 2FA PIN 码安全验证！_"
+                    )
+                else:
+                    msg = (
+                        "⚙️ **APEX SUPER AGI v12.00 | TRADING MODE CONTROL VAULT** ⚡\n"
+                        "═══════════════════════════════\n\n"
+                        f"📊 **CURRENT TRADING MODE** ៖ `{status_badge}`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX ៖**\n"
+                        "👉 **ប្តូរទៅជាទិញ-លក់លុយពិតលើ Binance (ទាមទារ 2FA PIN) ៖**\n"
+                        "`` `/paper_trading OFF <YOUR_2FA_PIN>` ``\n\n"
+                        "👉 **ប្តូរទៅជាទិញ-លក់ Demo/Paper Trading ៖**\n"
+                        "`` `/paper_trading ON <YOUR_2FA_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _ការប្តូរទៅកាន់ប្រព័ន្ធលុយពិត Binance ទាមទារការផ្ទៀងផ្ទាត់ 2FA PIN សុវត្ថិភាព!_"
+                    )
+
+                if update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
-            subcmd = args[0].upper()
-            input_pin = args[1] if len(args) > 1 else ""
+            subcmd = str(args[0]).upper().strip()
+            input_pin = str(args[1]).strip() if len(args) > 1 else ""
 
             user_pin = db.get_user_pin(chat_id)
-            if user_pin and user_pin != input_pin:
-                await update.message.reply_text("❌ Security Error: Invalid PIN! Usage: `/paper_trading OFF <PIN>`", parse_mode="Markdown")
+            if user_pin and not security.verify_pin(input_pin, chat_id, user_pin):
+                bad_pin = "❌ Security Error: Invalid 2FA PIN! Usage: `/paper_trading OFF <PIN>`" if user_lang == 'en' else ("❌ 安全错误：2FA PIN 码不正确！格式：`/paper_trading OFF <PIN>`" if user_lang == 'zh' else "❌ កំហុសសុវត្ថិភាព ៖ លេខកូដ 2FA PIN មិនត្រឹមត្រូវ! (ទម្រង់ ៖ `/paper_trading OFF <PIN>`)")
+                await update.effective_message.reply_text(bad_pin, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
             if subcmd in ["OFF", "FALSE", "REAL", "LIVE"]:
-                trading_engine.set_paper_trading(False)
+                if hasattr(trading_engine, 'set_paper_trading'):
+                    trading_engine.set_paper_trading(False)
+                else:
+                    trading_engine.PAPER_TRADING = False
                 try:
                     from dotenv import set_key
                     set_key(".env", "PAPER_TRADING", "False")
                 except Exception:
                     pass
-                await update.message.reply_text("🚀 **REAL MONEY TRADING ACTIVATED!**\n\nAll HFT, Auto-Arb, and Matrix Bot engines will execute LIVE orders on Binance.", parse_mode="Markdown")
+                success_live = "🚀 **REAL MONEY TRADING ACTIVATED!**\n\nAll HFT, Auto-Arb, and Matrix Bot engines will execute LIVE orders on Binance." if user_lang == 'en' else ("🚀 **实盘真实资金交易已激活！**\n\n所有 AI 机器人与高频引擎将在 Binance 执行真实订单。" if user_lang == 'zh' else "🚀 **REAL MONEY TRADING ACTIVATED!**\n\nរាល់ការរ៉ាន់ Bot ទាំងអស់នឹងទិញ-លក់លើគណនីលុយពិត Binance ជាក់ស្តែង។")
+                await update.effective_message.reply_text(success_live, parse_mode="Markdown", reply_markup=keyboard)
                 self.log_signal.emit(f"🚀 User {chat_id} switched trading mode to REAL MONEY TRADING.")
             elif subcmd in ["ON", "TRUE", "SIMULATION", "DEMO"]:
-                trading_engine.set_paper_trading(True)
+                if hasattr(trading_engine, 'set_paper_trading'):
+                    trading_engine.set_paper_trading(True)
+                else:
+                    trading_engine.PAPER_TRADING = True
                 try:
                     from dotenv import set_key
                     set_key(".env", "PAPER_TRADING", "True")
                 except Exception:
                     pass
-                await update.message.reply_text("🟢 **PAPER TRADING (SIMULATION) ACTIVATED!**\n\nAll trade executions will be simulated safely.", parse_mode="Markdown")
+                success_demo = "🟢 **PAPER TRADING (SIMULATION) ACTIVATED!**\n\nAll trade executions will be simulated safely." if user_lang == 'en' else ("🟢 **模拟盘交易 (Paper Trading) 已激活！**\n\n所有交易指令将以无风险模拟盘安全运行。" if user_lang == 'zh' else "🟢 **PAPER TRADING (SIMULATION) ACTIVATED!**\n\nរាល់ការរ៉ាន់ Bot ទាំងអស់នឹងដំណើរការក្នុងទម្រង់ Simulation សុវត្ថិភាព 100%។")
+                await update.effective_message.reply_text(success_demo, parse_mode="Markdown", reply_markup=keyboard)
                 self.log_signal.emit(f"🟢 User {chat_id} switched trading mode to PAPER TRADING.")
             else:
-                await update.message.reply_text("⚠️ Invalid option! Usage: `/paper_trading OFF <PIN>` or `/paper_trading ON <PIN>`", parse_mode="Markdown")
+                bad_opt = "⚠️ Invalid option! Usage: `/paper_trading OFF <PIN>` or `/paper_trading ON <PIN>`"
+                await update.effective_message.reply_text(bad_opt, parse_mode="Markdown")
 
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            return
 
         self.app.add_handler(CommandHandler("trailing_stop", trailing_stop_command))
         self.app.add_handler(CommandHandler("trailing_guard", trailing_guard_command))
