@@ -2694,59 +2694,111 @@ class TelegramBotThread(BaseThread):
 
         async def add_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🔒 Security PIN", callback_data="btn_set_pin_prompt"),
-                    InlineKeyboardButton("📊 System Status", callback_data="btn_defender_status")
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ],
-                [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
             # Security Check: Must be in Private Chat
             if update.effective_chat and update.effective_chat.type != 'private':
-                await update.effective_message.reply_text("⚠️ **ដើម្បីសុវត្ថិភាព ៖** ការភ្ជាប់ Binance API Key អាចធ្វើបានតែក្នុង Private Chat ជាមួយ Bot ប៉ុណ្ណោះ!", parse_mode="Markdown")
+                priv_err = (
+                    "⚠️ **PRIVACY & SECURITY NOTICE:** Binance API Key integration is restricted strictly to Private Chat!" if user_lang == 'en' else
+                    ("⚠️ **隐私与安全提示：** Binance API 密钥绑定仅限在与 Bot 的私聊中进行！" if user_lang == 'zh' else
+                    "⚠️ **ដើម្បីសុវត្ថិភាព ៖** ការភ្ជាប់ Binance API Key អាចធ្វើបានតែក្នុង Private Chat ជាមួយ Bot ប៉ុណ្ណោះ!")
+                )
+                await update.effective_message.reply_text(priv_err, parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
             raw_args = [str(a).strip() for a in context.args] if (context and context.args) else []
-            
-            # Smart filter optional 'binance' prefix
             args = [a for a in raw_args if a]
             if args and args[0].lower() in ["binance", "binance_spot", "spot", "ex"]:
                 args = args[1:]
 
             if len(args) != 3:
-                msg = (
-                    "🔑 **APEX SUPER AGI TURBO BRAIN v9.5 | BINANCE API KEY INTEGRATION** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "🛡️ **SECURITY & PERMISSION REQUIREMENTS:**\n"
-                    "• **Enable Reading**: `REQUIRED (To check account balance & positions)`\n"
-                    "• **Enable Spot & Margin Trading**: `REQUIRED (To execute auto-trades)`\n"
-                    "• **Enable Withdrawals**: `PROHIBITED ❌ (Never enable withdrawal permission!)`\n"
-                    "• **Encryption**: `AES-256 Multi-Layer Encrypted Storage`\n\n"
-                    "📋 **1-TAP COMMAND SYNTAX:**\n"
-                    "👉 **ភ្ជាប់ Binance API Keys ៖**\n"
-                    "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                    "👉 **ភ្ជាប់ជាមួយពាក្យ Binance ៖**\n"
-                    "`` `/add_api Binance <API_KEY> <API_SECRET> <PIN>` ``"
-                )
-                if update.callback_query:
-                    await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                if user_lang == 'en':
+                    guide_card = (
+                        "🔑 **APEX SUPER AGI v12.00 | BINANCE API KEY INTEGRATION** 🔑\n"
+                        "═══════════════════════════════\n\n"
+                        "🛡️ **SECURITY & PERMISSION REQUIREMENTS:**\n"
+                        "• **Enable Reading**: `REQUIRED` (Account balance & active position sync)\n"
+                        "• **Enable Futures & Spot Trading**: `REQUIRED` (Autonomous HFT & Grid execution)\n"
+                        "• **Enable Withdrawals**: `PROHIBITED ❌ (Never grant withdrawal permissions!)`\n"
+                        "• **Key Encryption**: `AES-256 Multi-Layer Encrypted Vault`\n"
+                        "• **Key Format Support**: `HMAC-SHA256 & RSA Public/Private Key Pairs`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX:**\n"
+                        "👉 **Connect Binance API Keys:**\n"
+                        "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
+                        "👉 **Connect with Binance Prefix:**\n"
+                        "`` `/add_api Binance <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Your sensitive API Secret & PIN message will be automatically purged from Telegram chat after verification._"
+                    )
+                elif user_lang == 'zh':
+                    guide_card = (
+                        "🔑 **APEX SUPER AGI v12.00 | BINANCE API 密钥绑定** 🔑\n"
+                        "═══════════════════════════════\n\n"
+                        "🛡️ **安全与权限要求：**\n"
+                        "• **允许读取 (Reading)**: `必须勾选` (用于同步账户余额与持仓)\n"
+                        "• **允许现货与合约交易**: `必须勾选` (用于自动高频对冲与网格执行)\n"
+                        "• **允许提现 (Withdrawals)**: `严格禁止 ❌ (切勿开启提现权限！)`\n"
+                        "• **密钥加密**: `AES-256 多重算法加密存储`\n"
+                        "• **支持密钥类型**: `HMAC-SHA256 与 RSA 公私钥对`\n\n"
+                        "📋 **1-TAP 命令格式：**\n"
+                        "👉 **绑定 Binance API 密钥：**\n"
+                        "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
+                        "👉 **带 Binance 前缀绑定：**\n"
+                        "`` `/add_api Binance <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _验证成功后，包含 API Secret 和 PIN 的消息将被系统自动从聊天记录中删除！_"
+                    )
                 else:
-                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    guide_card = (
+                        "🔑 **APEX SUPER AGI v12.00 | BINANCE API KEY INTEGRATION** 🔑\n"
+                        "═══════════════════════════════\n\n"
+                        "🛡️ **SECURITY & PERMISSION REQUIREMENTS:**\n"
+                        "• **Enable Reading**: `REQUIRED` (ឆែកមើលសមតុល្យទុន & Position ទាំងអស់)\n"
+                        "• **Enable Futures & Spot Trading**: `REQUIRED` (ដើម្បីទិញ-លក់ស្វ័យប្រវត្តិ 24/7)\n"
+                        "• **Enable Withdrawals**: `PROHIBITED ❌ (ដាច់ខាតកុំបើកសិទ្ធិដកប្រាក់!)`\n"
+                        "• **Encryption Vault**: `AES-256 Multi-Layer Safe Storage`\n"
+                        "• **Key Format Support**: `HMAC-SHA256 & RSA Key Pairs`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX:**\n"
+                        "👉 **ភ្ជាប់ Binance API Keys ៖**\n"
+                        "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
+                        "👉 **ភ្ជាប់ជាមួយពាក្យ Binance ៖**\n"
+                        "`` `/add_api Binance <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _សារដែលមាន API Secret & PIN របស់អ្នកនឹងត្រូវលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await update.callback_query.message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                else:
+                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
                     await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
@@ -2756,19 +2808,30 @@ class TelegramBotThread(BaseThread):
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin:
-                await update.effective_message.reply_text("🔒 **សូមកំណត់លេខកូដ PIN សម្ងាត់ជាមុនសិន!** (ប្រើបញ្ជា ៖ `/set_pin <PIN>`)", parse_mode="Markdown", reply_markup=keyboard)
+                no_pin_err = (
+                    "🔒 **Please set your security PIN first!** (Use: `/set_pin <PIN>`)" if user_lang == 'en' else
+                    ("🔒 **请先设置安全 PIN 码！** (使用命令：`/set_pin <PIN>`)" if user_lang == 'zh' else
+                    "🔒 **សូមកំណត់លេខកូដ PIN សម្ងាត់ជាមុនសិន!** (ប្រើបញ្ជា ៖ `/set_pin <PIN>`)")
+                )
+                await update.effective_message.reply_text(no_pin_err, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
             if not security.verify_pin(pin_input, chat_id, stored_pin):
-                await update.effective_message.reply_text("❌ **លេខកូដ PIN មិនត្រឹមត្រូវ!** សូមពិនិត្យមើលម្ដងទៀត។", parse_mode="Markdown", reply_markup=keyboard)
+                bad_pin_err = (
+                    "❌ **Invalid Security PIN code!** Please verify and try again." if user_lang == 'en' else
+                    ("❌ **PIN 码不正确！** 请检查后重试。" if user_lang == 'zh' else
+                    "❌ **លេខកូដ PIN មិនត្រឹមត្រូវ!** សូមពិនិត្យមើលម្ដងទៀត។")
+                )
+                await update.effective_message.reply_text(bad_pin_err, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
             import trading_engine as te
             is_valid, reason = te.validate_api_keys(api_key, api_secret)
             if not is_valid:
-                await update.effective_message.reply_text(f"📊 **ស្ថានភាពភ្ជាប់ BINANCE API ៖**\n\n{reason}", parse_mode="Markdown", reply_markup=keyboard)
+                val_err = f"📊 **BINANCE API KEY VERIFICATION FAILED ៖**\n\n{reason}"
+                await update.effective_message.reply_text(val_err, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
@@ -2777,12 +2840,31 @@ class TelegramBotThread(BaseThread):
             if hasattr(db, 'log_admin_action'):
                 db.log_admin_action(chat_id, "ADD_API", "BINANCE", "Binance API keys connected & verified.")
 
-            success_msg = (
-                "✅ **APEX BINANCE API CONNECTED SUCCESSFULLY!** 🟢\n"
-                "═══════════════════════════════\n\n"
-                f"{reason}\n\n"
-                "💡 _សារដែលមាន API Secret & PIN របស់អ្នកត្រូវបានលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព។_"
-            )
+            if user_lang == 'en':
+                success_msg = (
+                    "✅ **APEX BINANCE API CONNECTED SUCCESSFULLY!** 🟢\n"
+                    "═══════════════════════════════\n\n"
+                    f"{reason}\n\n"
+                    "🛡️ **ENCRYPTION VAULT**: `AES-256 Multi-Layer Active`\n"
+                    "💡 _Your sensitive API Secret & PIN message has been automatically purged from Chat for security._"
+                )
+            elif user_lang == 'zh':
+                success_msg = (
+                    "✅ **BINANCE API 密钥成功连接验证！** 🟢\n"
+                    "═══════════════════════════════\n\n"
+                    f"{reason}\n\n"
+                    "🛡️ **安全加密金库**: `AES-256 多层加密激活`\n"
+                    "💡 _包含 API Secret 与 PIN 的敏感消息已被系统从聊天记录中自动删除。_"
+                )
+            else:
+                success_msg = (
+                    "✅ **APEX BINANCE API CONNECTED SUCCESSFULLY!** 🟢\n"
+                    "═══════════════════════════════\n\n"
+                    f"{reason}\n\n"
+                    "🛡️ **ENCRYPTION VAULT**: `AES-256 Multi-Layer Safe Storage`\n"
+                    "💡 _សារដែលមាន API Secret & PIN របស់អ្នកត្រូវបានលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
+                )
+
             await update.effective_message.reply_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
             await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             self.log_signal.emit(f"✅ VIP User {chat_id} updated their Binance API keys.")
