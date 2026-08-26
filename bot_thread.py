@@ -3409,14 +3409,25 @@ class TelegramBotThread(BaseThread):
 
         async def admin_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
             import os
@@ -3466,12 +3477,27 @@ class TelegramBotThread(BaseThread):
             scalpers = len(db.get_active_scalpers()) if hasattr(db, 'get_active_scalpers') else 0
 
             total_active_positions = len(trades) + infinity_grids + compound_grids + scalpers
-            free_users_count = len(all_users) - len(vip_users)
+            free_users_count = max(0, len(all_users) - len(vip_users))
+
+            # Calculate Global System Volume & Total PnL across active trades
+            total_system_pnl = 0.0
+            total_trading_vol = 0.0
+            for t in trades:
+                try:
+                    if len(t) > 7 and t[7] is not None:
+                        total_system_pnl += float(t[7])
+                    if len(t) > 4 and t[4] is not None:
+                        total_trading_vol += float(t[4])
+                except Exception:
+                    pass
+
+            pnl_badge = f"+${total_system_pnl:.2f}" if total_system_pnl >= 0 else f"-${abs(total_system_pnl):.2f}"
+            pnl_icon = "🟢" if total_system_pnl >= 0 else "🔴"
 
             paper_on = getattr(trading_engine, "PAPER_TRADING", False)
             defender_on = db.is_defender_active() if hasattr(db, 'is_defender_active') else False
             mode_badge = "🧪 PAPER TRADING" if paper_on else "🚀 REAL LIVE TRADING"
-            status_icon = "🟢 Smooth" if cpu_usage < 75.0 else ("🟡 Heavy" if cpu_usage < 90.0 else "🔴 Critical")
+            status_icon = "🟢 OPTIMAL" if cpu_usage < 75.0 else ("🟡 HEAVY" if cpu_usage < 90.0 else "🔴 CRITICAL")
             defender_status = "🛡️ ACTIVE (2% Circuit Breaker)" if defender_on else "🟢 NORMAL"
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -3479,45 +3505,101 @@ class TelegramBotThread(BaseThread):
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🔄 Refresh Stats", callback_data="btn_admin_stats_refresh"),
-                    InlineKeyboardButton("👥 User Directory", callback_data="btn_admin_users_refresh")
+                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh")
                 ],
                 [
-                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt"),
+                    InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config"),
+                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                ],
+                [
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ],
-                [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
-            msg = (
-                "📊 **APEX SUPER AGI TURBO BRAIN v9.5 | GLOBAL METRICS RADAR** ⚡\n"
-                "═══════════════════════════════\n\n"
-                "👑 **GLOBAL USER BASE SUMMARY:**\n"
-                f"• **Total Registered Accounts**: `{len(all_users)} Users`\n"
-                f"• **Active VIP Members**: `{len(vip_users)} Users` 👑\n"
-                f"• **Standard Free Accounts**: `{free_users_count} Users` 👤\n\n"
-                "📈 **SYSTEM TRADING & POSITION METRICS:**\n"
-                f"• **Total Active Positions**: `{total_active_positions} Positions` 🚀\n"
-                f"• **Spot & Futures Orders**: `{len(trades)} Orders`\n"
-                f"• **Running Grid & Scalper Bots**: `{infinity_grids + compound_grids + scalpers} Bots`\n"
-                f"• **Trading Engine Mode**: `{mode_badge}`\n"
-                f"• **Circuit Breaker Status**: `{defender_status}`\n\n"
-                "🖥️ **INFRASTRUCTURE & VPS HARDWARE DIAGNOSTICS:**\n"
-                f"• **System Uptime**: `{uptime_str}` | Hardware Status: {status_icon}\n"
-                f"• **CPU Multi-Core Load**: `{cpu_usage:.1f}%` | **RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
-                f"• **Database Storage File**: `{db_size_mb:.2f} MB` | **SSD Disk**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n\n"
-                "📋 **1-TAP ADMIN QUICK COMMANDS:**\n"
-                "👉 **ពិនិត្យបញ្ជី User ទាំងអស់ ៖** `` `/admin_users` ``\n"
-                "👉 **ផ្ញើសារប្រកាសទៅ VIP ៖** `` `/admin_broadcast 🚨 MARKET ALERT` ``\n"
-                "👉 **ពិនិត្យ Portfolio របស់ User ៖** `` `/admin_view_portfolio <CHAT_ID>` ``"
-            )
+            if user_lang == 'en':
+                msg = (
+                    "📊 **APEX SUPER AGI v12.00 | SYSTEM METRICS & TOTAL PNL** 📊\n"
+                    "═══════════════════════════════\n\n"
+                    "👑 **GLOBAL USER BASE SUMMARY:**\n"
+                    f"• **Total Registered Accounts**: `{len(all_users)} Users`\n"
+                    f"• **Active VIP Members**: `{len(vip_users)} Users` 👑\n"
+                    f"• **Standard Free Accounts**: `{free_users_count} Users` 👤\n\n"
+                    "💰 **GLOBAL SYSTEM PNL & VOLUME:**\n"
+                    f"• **Global System PnL**: `{pnl_icon} {pnl_badge}`\n"
+                    f"• **Active Trading Volume**: `${total_trading_vol:,.2f}`\n\n"
+                    "📈 **TRADING ENGINES & POSITIONS:**\n"
+                    f"• **Total Active Positions**: `{total_active_positions} Positions` 🚀\n"
+                    f"• **Futures HFT & Spot Orders**: `{len(trades)} Active`\n"
+                    f"• **Running Grid & Scalper Bots**: `{infinity_grids + compound_grids + scalpers} Active`\n"
+                    f"• **Engine Operating Mode**: `{mode_badge}`\n"
+                    f"• **Circuit Breaker Status**: `{defender_status}`\n\n"
+                    "🖥️ **INFRASTRUCTURE & VPS HARDWARE DIAGNOSTICS:**\n"
+                    f"• **System Uptime**: `{uptime_str}` | Hardware Status: `{status_icon}`\n"
+                    f"• **CPU Multi-Core Load**: `{cpu_usage:.1f}%` | **RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
+                    f"• **Database Storage File**: `{db_size_mb:.2f} MB` | **SSD Disk**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Tap the action buttons below for real-time admin management & configuration:_"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "📊 **APEX SUPER AGI v12.00 | 系统数据统计与总 PNL** 📊\n"
+                    "═══════════════════════════════\n\n"
+                    "👑 **全球用户基数总览：**\n"
+                    f"• **总注册用户数**: `{len(all_users)} Users`\n"
+                    f"• **活跃 VIP 会员**: `{len(vip_users)} Users` 👑\n"
+                    f"• **标准免费用户**: `{free_users_count} Users` 👤\n\n"
+                    "💰 **系统总 PNL 与交易量：**\n"
+                    f"• **系统全局总 PnL**: `{pnl_icon} {pnl_badge}`\n"
+                    f"• **活跃交易量 (Volume)**: `${total_trading_vol:,.2f}`\n\n"
+                    "📈 **交易引擎与持仓数据：**\n"
+                    f"• **总活跃持仓**: `{total_active_positions} Positions` 🚀\n"
+                    f"• **合约高频与现货挂单**: `{len(trades)} 个`\n"
+                    f"• **运行中网格与 Scalper 机器人**: `{infinity_grids + compound_grids + scalpers} 个`\n"
+                    f"• **交易引擎运行模式**: `{mode_badge}`\n"
+                    f"• **熔断保护机制**: `{defender_status}`\n\n"
+                    "🖥️ **VPS 硬件与底层架构诊断：**\n"
+                    f"• **系统运行时间**: `{uptime_str}` | 硬件状态: `{status_icon}`\n"
+                    f"• **CPU 多核负载**: `{cpu_usage:.1f}%` | **内存 RAM**: `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
+                    f"• **数据库存储容量**: `{db_size_mb:.2f} MB` | **SSD 硬盘**: `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _点击下方按钮即可进行实时 Super Admin 管理与参数配置：_"
+                )
+            else:
+                msg = (
+                    "📊 **APEX SUPER AGI v12.00 | SYSTEM METRICS & TOTAL PNL** 📊\n"
+                    "═══════════════════════════════\n\n"
+                    "👑 **GLOBAL USER BASE SUMMARY ៖**\n"
+                    f"• **Total Registered Accounts** ៖ `{len(all_users)} Users`\n"
+                    f"• **Active VIP Members** ៖ `{len(vip_users)} Users` 👑\n"
+                    f"• **Standard Free Accounts** ៖ `{free_users_count} Users` 👤\n\n"
+                    "💰 **GLOBAL SYSTEM PNL & VOLUME ៖**\n"
+                    f"• **Global System PnL** ៖ `{pnl_icon} {pnl_badge}`\n"
+                    f"• **Active Trading Volume** ៖ `${total_trading_vol:,.2f}`\n\n"
+                    "📈 **TRADING ENGINES & POSITIONS ៖**\n"
+                    f"• **Total Active Positions** ៖ `{total_active_positions} Positions` 🚀\n"
+                    f"• **Futures HFT & Spot Orders** ៖ `{len(trades)} Active`\n"
+                    f"• **Running Grid & Scalper Bots** ៖ `{infinity_grids + compound_grids + scalpers} Active`\n"
+                    f"• **Engine Operating Mode** ៖ `{mode_badge}`\n"
+                    f"• **Circuit Breaker Status** ៖ `{defender_status}`\n\n"
+                    "🖥️ **INFRASTRUCTURE & VPS HARDWARE DIAGNOSTICS ៖**\n"
+                    f"• **System Uptime** ៖ `{uptime_str}` | Hardware Status ៖ `{status_icon}`\n"
+                    f"• **CPU Multi-Core Load** ៖ `{cpu_usage:.1f}%` | **RAM** ៖ `{ram_usage_mb}MB / {ram_total_mb}MB ({ram_pct:.1f}%)`\n"
+                    f"• **Database Storage File** ៖ `{db_size_mb:.2f} MB` | **SSD Disk** ៖ `{disk_used_gb}GB / {disk_total_gb}GB ({disk_pct:.1f}%)`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _ចុចប៊ូតុងបញ្ជាខាងក្រោម ដើម្បីគ្រប់គ្រង និងកំណត់ប្រព័ន្ធរ៉ាន់ Super Admin ៖_"
+                )
 
             if update.callback_query:
-                await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                try:
+                    await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             else:
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
             return
 
         async def admin_config_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
