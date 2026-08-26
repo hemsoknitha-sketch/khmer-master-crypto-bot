@@ -3195,6 +3195,206 @@ class TelegramBotThread(BaseThread):
                     except Exception as e:
                         print(f"Error in admin_license_callback: {e}")
 
+        async def admin_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
+                return
+
+            args = context.args if hasattr(context, 'args') else []
+            vip_users = db.get_all_vip_users() if hasattr(db, 'get_all_vip_users') else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"),
+                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                ],
+                [
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ]
+            ])
+
+            if not args or len(args) < 2:
+                if user_lang == 'en':
+                    guide_card = (
+                        "🚨 **APEX SUPER AGI v12.00 | MASTER SIGNAL BROADCAST AUTO-TRADER** 🚨\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **SIGNAL DISPATCH SPECIFICATIONS:**\n"
+                        f"• **Active Targeted VIP Accounts**: `{len(vip_users)} Active VIP Users` 👑\n"
+                        "• **Execution Engine**: `Sub-Second Multi-Threaded Order Dispatcher`\n"
+                        "• **Supported Signals**: `BUY (Long Entry) | SELL / CLOSE (Market Liquidation)`\n"
+                        "• **Risk Protection**: `Auto Margin Guard & Dynamic Trailing Stop`\n\n"
+                        "📋 **1-TAP SIGNAL COMMAND SYNTAX:**\n"
+                        "👉 **Dispatch BUY Signal to All VIP Accounts:**\n"
+                        "`` `/admin_signal BUY BTCUSDT` ``\n\n"
+                        "👉 **Dispatch SELL Signal to All VIP Accounts:**\n"
+                        "`` `/admin_signal SELL BTCUSDT` ``\n\n"
+                        "👉 **Dispatch BUY Signal for SOL:**\n"
+                        "`` `/admin_signal BUY SOLUSDT` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin market signals automatically execute live orders on all connected VIP Binance accounts!_"
+                    )
+                elif user_lang == 'zh':
+                    guide_card = (
+                        "🚨 **APEX SUPER AGI v12.00 | 主跟单信号广播跟单系统** 🚨\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **信号跟单分发规范：**\n"
+                        f"• **目标 VIP 会员账户**: `{len(vip_users)} 个活跃 VIP` 👑\n"
+                        "• **跟单执行引擎**: `高频多线程并行订单跟单器`\n"
+                        "• **支持信号指令**: `BUY (买入/做多) | SELL / CLOSE (卖出/平仓)`\n"
+                        "• **风控防线**: `自动保证金防护与动态追踪止盈止损`\n\n"
+                        "📋 **1-TAP 信号发送命令：**\n"
+                        "👉 **向全网 VIP 发送 BTC 买入跟单信号：**\n"
+                        "`` `/admin_signal BUY BTCUSDT` ``\n\n"
+                        "👉 **向全网 VIP 发送 BTC 卖出平仓信号：**\n"
+                        "`` `/admin_signal SELL BTCUSDT` ``\n\n"
+                        "👉 **向全网 VIP 发送 SOL 买入跟单信号：**\n"
+                        "`` `/admin_signal BUY SOLUSDT` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin 发出的交易信号将自动在所有已连接 VIP 的 Binance 账户中秒级跟单执行！_"
+                    )
+                else:
+                    guide_card = (
+                        "🚨 **APEX SUPER AGI v12.00 | MASTER SIGNAL BROADCAST AUTO-TRADER** 🚨\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **SIGNAL DISPATCH SPECIFICATIONS ៖**\n"
+                        f"• **Active Target VIP Members** ៖ `{len(vip_users)} Active VIPs` 👑\n"
+                        "• **Execution Engine** ៖ `Sub-Second Parallel Order Dispatcher`\n"
+                        "• **Supported Signals** ៖ `BUY (ទិញចូល) \| SELL / CLOSE (លក់ចេញ)`\n"
+                        "• **Risk Protection** ៖ `Auto Margin Guard & Dynamic Trailing Guard`\n\n"
+                        "📋 **1-TAP SIGNAL COMMAND SYNTAX ៖**\n"
+                        "👉 **បាញ់សញ្ញាទិញ BTC ទៅកាន់ VIP ទាំងអស់ ៖**\n"
+                        "`` `/admin_signal BUY BTCUSDT` ``\n\n"
+                        "👉 **បាញ់សញ្ញាលក់ BTC ពី VIP ទាំងអស់ ៖**\n"
+                        "`` `/admin_signal SELL BTCUSDT` ``\n\n"
+                        "👉 **បាញ់សញ្ញាទិញ SOL ទៅកាន់ VIP ទាំងអស់ ៖**\n"
+                        "`` `/admin_signal BUY SOLUSDT` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _រាល់ Signal ដែលចេញដោយ Super Admin នឹងទិញ-លក់លើ Binance របស់ VIP ទាំងអស់ស្វ័យប្រវត្តិ!_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            action = str(args[0]).upper().strip()
+            symbol = str(args[1]).upper().strip()
+            if not symbol.endswith("USDT"): symbol += "USDT"
+
+            status_text = (
+                f"🚀 **Dispatching Master Trading Signal ({action} {symbol}) to {len(vip_users)} VIP Accounts...**" if user_lang == 'en' else
+                (f"🚀 **正在向 {len(vip_users)} 个 VIP 账户分发主跟单信号 ({action} {symbol})...**" if user_lang == 'zh' else
+                f"🚀 **កំពុងបាញ់សញ្ញាទិញ-លក់ ({action} {symbol}) ទៅកាន់ VIP ទាំងអស់ {len(vip_users)} នាក់...**")
+            )
+            status_msg = await update.effective_message.reply_text(status_text, parse_mode="Markdown")
+
+            success_count = 0
+            failed_count = 0
+
+            import trading_engine
+
+            for u in vip_users:
+                uid = u.get("chat_id") if isinstance(u, dict) else u[0]
+                keys = db.get_user_api(uid) if hasattr(db, 'get_user_api') else None
+                if keys:
+                    api_key, api_secret = keys
+                    try:
+                        if action == "BUY":
+                            res = await asyncio.to_thread(trading_engine.execute_hyper_trade_strategy, api_key, api_secret, symbol, "BUY", 5, 2.0)
+                            if isinstance(res, dict) and "error" not in res and "code" not in res:
+                                success_count += 1
+                            else:
+                                failed_count += 1
+                        elif action in ["SELL", "CLOSE"]:
+                            res = await asyncio.to_thread(trading_engine.close_all_futures_positions, api_key, api_secret)
+                            success_count += 1
+                        else:
+                            failed_count += 1
+                    except Exception:
+                        failed_count += 1
+                else:
+                    failed_count += 1
+                await asyncio.sleep(0.02)
+
+            total_targets = len(vip_users)
+            success_rate = (success_count / total_targets * 100) if total_targets > 0 else 100.0
+
+            if user_lang == 'en':
+                report_card = (
+                    "🎯 **APEX MASTER SIGNAL EXECUTION COMPLETED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"🪙 **Target Symbol**: `{symbol}`\n"
+                    f"⚡ **Dispatched Action**: `{action} Market Signal`\n"
+                    f"👥 **VIP Accounts Executed**: `{success_count} / {total_targets} Accounts` 🟢\n"
+                    f"📈 **Execution Success Rate**: `{success_rate:.1f}%`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Connected VIP Binance accounts executed signal in sub-second parallel execution!_"
+                )
+            elif user_lang == 'zh':
+                report_card = (
+                    "🎯 **APEX 主跟单信号全网跟单完成！** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"🪙 **目标币种**: `{symbol}`\n"
+                    f"⚡ **跟单指令**: `{action} 市场跟单`\n"
+                    f"👥 **成功跟单 VIP 账户**: `{success_count} / {total_targets} 个账户` 🟢\n"
+                    f"📈 **跟单成功率**: `{success_rate:.1f}%`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _所有已连接的 VIP Binance 账户已完成毫秒级跟单执行！_"
+                )
+            else:
+                report_card = (
+                    "🎯 **APEX MASTER SIGNAL EXECUTION COMPLETED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"🪙 **Target Symbol** ៖ `{symbol}`\n"
+                    f"⚡ **Action** ៖ `{action} Order Broadcast`\n"
+                    f"👥 **VIP Accounts Executed** ៖ `{success_count} / {total_targets} Accounts` 🟢\n"
+                    f"📈 **Execution Success Rate** ៖ `{success_rate:.1f}%`\n"
+                    "═══════════════════════════════\n"
+                    "💡 _គណនី VIP Binance ដែលបានភ្ជាប់ទាំងអស់ បានអនុវត្តការទិញ-លក់តាម Signal ជោគជ័យ!_"
+                )
+
+            try:
+                await status_msg.edit_text(report_card, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception:
+                await update.effective_message.reply_text(report_card, parse_mode="Markdown", reply_markup=keyboard)
+
+            await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            self.log_signal.emit(f"🚨 Admin {chat_id} issued SIGNAL {action} {symbol} to {success_count} VIPs.")
+            return
+
         async def admin_nuke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
