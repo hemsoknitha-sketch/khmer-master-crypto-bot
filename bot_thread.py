@@ -1337,18 +1337,133 @@ class TelegramBotThread(BaseThread):
             await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
             return
 
-        async def toggle_rebalance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-            user_id = update.effective_user.id
-            import database as db
-            if not db.is_admin(user_id):
-                await update.message.reply_text("❌ អ្នកគ្មានសិទ្ធិប្រើប្រាស់បញ្ជានេះទេ (Admin Only)។")
-                return
-            current = db.is_global_rebalance_enabled()
-            db.set_global_rebalance(not current)
-            if not current:
-                await update.message.reply_text("✅ មុខងារ Global Smart Portfolio Rebalancing ត្រូវបានបើក។")
+        async def toggle_rebalance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
             else:
-                await update.message.reply_text("❌ មុខងារ Global Smart Portfolio Rebalancing ត្រូវបានបិទ។")
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
+                return
+
+            args = context.args if hasattr(context, 'args') else []
+            current_status = db.is_global_rebalance_enabled() if hasattr(db, 'is_global_rebalance_enabled') else True
+
+            if args and len(args) > 0:
+                action = str(args[0]).upper().strip()
+                if action in ["ON", "ENABLE", "TRUE", "1"]:
+                    new_status = True
+                elif action in ["OFF", "DISABLE", "FALSE", "0"]:
+                    new_status = False
+                else:
+                    new_status = not current_status
+            else:
+                new_status = not current_status
+
+            if hasattr(db, 'set_global_rebalance'):
+                db.set_global_rebalance(new_status)
+            else:
+                db.update_system_setting("global_rebalance", "1" if new_status else "0")
+
+            if hasattr(db, 'log_admin_action'):
+                db.log_admin_action(chat_id, "REBALANCE_TOGGLE", "GLOBAL", f"Set to {new_status}")
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            toggle_btn = (
+                InlineKeyboardButton("🔴 Turn OFF Rebalance", callback_data="btn_toggle_rebalance_toggle")
+                if new_status else
+                InlineKeyboardButton("🟢 Turn ON Rebalance", callback_data="btn_toggle_rebalance_toggle")
+            )
+
+            keyboard = InlineKeyboardMarkup([
+                [toggle_btn, InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config")],
+                [
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ]
+            ])
+
+            status_badge = "🟢 ACTIVATED (Global Dynamic Capital Rebalance ON)" if new_status else "🔴 DEACTIVATED (Static Capital Allocation)"
+
+            if user_lang == 'en':
+                msg = (
+                    "⚖️ **APEX SUPER AGI v12.00 | DYNAMIC CAPITAL REBALANCE ENGINE** ⚖️\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **GLOBAL REBALANCE ENGINE STATUS:**\n"
+                    f"• **Rebalance Status**: `{status_badge}`\n"
+                    "• **Asset Allocation Guard**: `Real-Time Portfolio Skew Correction`\n"
+                    "• **Rebalance Speed**: `Sub-Second Multi-Account Capital Equalizer`\n"
+                    "• **Yield Optimization**: `24/7 Profit Harvest & Dynamic Reinvestment`\n\n"
+                    "📋 **1-TAP COMMAND SYNTAX:**\n"
+                    "👉 **Turn ON Capital Rebalancing:**\n`` `/toggle_rebalance ON` ``\n\n"
+                    "👉 **Turn OFF Capital Rebalancing:**\n`` `/toggle_rebalance OFF` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Tap the toggle button below to instantly enable or disable global capital rebalancing:_"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "⚖️ **APEX SUPER AGI v12.00 | 动态资金再平衡控制台** ⚖️\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **全局资金再平衡状态：**\n"
+                    f"• **再平衡运行状态**: `{status_badge}`\n"
+                    "• **资产配置阀门**: `实时持仓倾斜校正与再平衡`\n"
+                    "• **再平衡速度**: `毫秒级多账户资金均衡器`\n"
+                    "• **收益最大化**: `24/7 利润收割与动态复利再投资`\n\n"
+                    "📋 **1-TAP 命令格式：**\n"
+                    "👉 **开启全局资金再平衡：**\n`` `/toggle_rebalance ON` ``\n\n"
+                    "👉 **关闭全局资金再平衡：**\n`` `/toggle_rebalance OFF` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _点击下方开关按钮即可实时切换全局资金再平衡状态：_"
+                )
+            else:
+                msg = (
+                    "⚖️ **APEX SUPER AGI v12.00 | DYNAMIC CAPITAL REBALANCE ENGINE** ⚖️\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **GLOBAL REBALANCE ENGINE STATUS ៖**\n"
+                    f"• **Rebalance Status** ៖ `{status_badge}`\n"
+                    "• **Asset Allocation Guard** ៖ `Real-Time Portfolio Skew Correction`\n"
+                    "• **Rebalance Speed** ៖ `Sub-Second Multi-Account Capital Equalizer`\n"
+                    "• **Yield Optimization** ៖ `24/7 Profit Harvest & Dynamic Reinvestment`\n\n"
+                    "📋 **1-TAP COMMAND SYNTAX ៖**\n"
+                    "👉 **ដើម្បីបើក Capital Rebalancing ៖**\n`` `/toggle_rebalance ON` ``\n\n"
+                    "👉 **ដើម្បីបិទ Capital Rebalancing ៖**\n`` `/toggle_rebalance OFF` ``\n"
+                    "═══════════════════════════════\n"
+                    "💡 _ចុចប៊ូតុងខាងក្រោម ដើម្បីបើក/បិទប្រព័ន្ធ Smart Rebalance ភ្លាមៗ Real-Time ៖_"
+                )
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+
+            self.log_signal.emit(f"⚖️ Admin {chat_id} toggled Global Rebalance to {new_status}.")
+            return
 
         async def toggle_breaker_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
