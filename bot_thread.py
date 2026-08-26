@@ -2616,148 +2616,43 @@ class TelegramBotThread(BaseThread):
                 import traceback
                 traceback.print_exc()
 
-        async def gold_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def master_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             query = update.callback_query
-            await query.answer()
-            data = query.data
-            if data in ["btn_gold_radar", "btn_gold_radar_refresh"]:
-                await gold_radar_command(update, context)
-            elif data == "btn_cb_gold_refresh":
-                await cb_gold_command(update, context)
-            elif data == "btn_paxg_arb_refresh":
-                await paxg_arbitrage_command(update, context)
-            elif data == "btn_black_swan_refresh":
-                await black_swan_guard_command(update, context)
-            elif data == "btn_gold_btc_refresh":
-                await gold_btc_rebalance_command(update, context)
-            elif data == "btn_scalp_paxg":
-                await query.message.reply_text("💡 ប្រើបញ្ជា `/scalp PAXGUSDT 100 1.5 <PIN>` ដើម្បីធ្វើ Scalping លើមាស!", parse_mode="Markdown")
-            elif data == "btn_gold_turbo_on_prompt":
-                await query.message.reply_text("🥇 **APEX GOLD TURBO ENGINE ACTIVATION**\n\nដើម្បីបើកដំណើរការ Auto High-Yield Gold Turbo ប្រើបញ្ជា ៖\n`` `/gold_turbo ON <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_gold_turbo_off_prompt":
-                await query.message.reply_text("🛑 **APEX GOLD TURBO ENGINE DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Gold Turbo ប្រើបញ្ជា ៖\n`` `/gold_turbo OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_turbo_hedge_top_launch":
-                await query.message.reply_text("🚀 **APEX TURBO HEDGE TOP SCANNER ACTIVATION**\n\nដើម្បីបើក 5-10 Multi-Coin VIP Scanner ប្រើបញ្ជា ៖\n`` `/turbo_hedge TOP 20 10 BUY 5 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_turbo_hedge_stop_all":
-                await query.message.reply_text("🛑 **APEX TURBO HEDGE EMERGENCY STOP ALL**\n\nដើម្បីបិទ និង Market Close គ្រប់ Positions ប្រើបញ្ជា ៖\n`` `/turbo_hedge STOP ALL <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_confirm_flight_safety":
-                await query.message.reply_text("🚨 **Flight-to-Safety Gold Buy Confirmation**\n\nដើម្បីស្ទាក់ទិញមាស PAXG ប្រើបញ្ជា:\n`/scalp PAXGUSDT 100 1.5 <PIN>`", parse_mode="Markdown")
-            elif data == "btn_menu_portfolio":
-                await portfolio_command(update, context)
-            elif data.startswith("btn_predict_"):
-                sym = data.replace("btn_predict_", "")
-                context.args = [sym]
-                await predict_command(update, context)
-            elif data.startswith("btn_analyze_"):
-                sym = data.replace("btn_analyze_", "")
-                context.args = [sym]
-                await analyze_command(update, context)
-            elif data.startswith("btn_scalp_"):
-                sym = data.replace("btn_scalp_", "")
-                await query.message.reply_text(f"💡 ប្រើបញ្ជា `/scalp {sym} 100 1.5 <PIN>` ដើម្បីធ្វើ Scalping លើកាក់ {sym}!", parse_mode="Markdown")
-            elif data in ["btn_scan_all", "btn_top_refresh", "btn_top_gainers"]:
-                await top_command(update, context)
-            elif data == "btn_auto_trade_on_prompt":
-                await query.message.reply_text("⚙️ **APEX VIP AUTO-TRADE ACTIVATION**\n\nដើម្បីបើកដំណើរការ Auto Trade ប្រើបញ្ជា ៖\n`` `/auto_trade ON 50 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_auto_trade_off_prompt":
-                await query.message.reply_text("🛑 **APEX VIP AUTO-TRADE DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Auto Trade ប្រើបញ្ជា ៖\n`` `/auto_trade OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_auto_snipe_on_prompt":
-                await query.message.reply_text("🔫 **APEX AUTO LISTING SNIPER ACTIVATION**\n\nដើម្បីបើកដំណើរការ Auto Snipe ប្រើបញ្ជា ៖\n`` `/auto_snipe ON 50 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_auto_snipe_off_prompt":
-                await query.message.reply_text("🛑 **APEX AUTO LISTING SNIPER DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Auto Snipe ប្រើបញ្ជា ៖\n`` `/auto_snipe OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_sweep_auto_on_prompt":
-                await query.message.reply_text("🧹 **APEX LIQUIDITY SWEEP ACTIVATION**\n\nដើម្បីបើកដំណើរការ Sweep Sniper ប្រើបញ្ជា ៖\n`` `/sweep_auto ON 100 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_sweep_auto_off_prompt":
-                await query.message.reply_text("🛑 **APEX LIQUIDITY SWEEP DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Sweep Sniper ប្រើបញ្ជា ៖\n`` `/sweep_auto OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_infinity_matrix_on_prompt":
-                await query.message.reply_text("♾️ **APEX INFINITY MATRIX ACTIVATION**\n\nដើម្បីបើកដំណើរការ Infinity Matrix Grid ប្រើបញ្ជា ៖\n`` `/infinity_matrix ON 100 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_infinity_matrix_off_prompt":
-                await query.message.reply_text("🛑 **APEX INFINITY MATRIX DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Infinity Matrix Grid ប្រើបញ្ជា ៖\n`` `/infinity_matrix OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_auto_arb_on_prompt":
-                await query.message.reply_text("⚖️ **APEX AUTO-ARBITRAGE ACTIVATION**\n\nដើម្បីបើកដំណើរការ Auto Arbitrage ប្រើបញ្ជា ៖\n`` `/auto_arb ON 100 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_auto_arb_off_prompt":
-                await query.message.reply_text("🛑 **APEX AUTO-ARBITRAGE DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Auto Arbitrage ប្រើបញ្ជា ៖\n`` `/auto_arb OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_turbo_yield_on_prompt":
-                await query.message.reply_text("🚀 **APEX TURBO HIGH-YIELD ACTIVATION**\n\nដើម្បីបើកដំណើរការ High-Yield Engine ប្រើបញ្ជា ៖\n`` `/turbo_yield ON <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_turbo_yield_off_prompt":
-                await query.message.reply_text("🛑 **APEX TURBO HIGH-YIELD DEACTIVATION**\n\nដើម្បីបិទដំណើរការ High-Yield Engine ប្រើបញ្ជា ៖\n`` `/turbo_yield OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_hyper_trade_on_prompt":
-                await query.message.reply_text("🚀 **APEX HYPER-TRADE HFT ACTIVATION**\n\nដើម្បីបើកដំណើរការ Auto HFT 24/7 ប្រើបញ្ជា ៖\n`` `/hyper_trade ON 100 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_hyper_trade_off_prompt":
-                await query.message.reply_text("🛑 **APEX HYPER-TRADE HFT DEACTIVATION**\n\nដើម្បីបិទដំណើរការ HFT ប្រើបញ្ជា ៖\n`` `/hyper_trade OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_hyper_trade_launch":
-                await query.message.reply_text("🚀 **HYPER TRADE AGI ENGINE**\n\nដើម្បីដំណើការ Super AGI Auto Trade ប្រើបញ្ជា ៖\n`/hyper_trade BTCUSDT 100 10 <PIN>`", parse_mode="Markdown")
-            elif data == "btn_funding_harvester_on_prompt":
-                await query.message.reply_text("🌾 **APEX FUNDING HARVESTER ACTIVATION**\n\nដើម្បីបើកដំណើរការ Harvester ប្រើបញ្ជា ៖\n`` `/funding_harvester ON 50 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_funding_harvester_off_prompt":
-                await query.message.reply_text("🛑 **APEX FUNDING HARVESTER DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Harvester ប្រើបញ្ជា ៖\n`` `/funding_harvester OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_funding_harvester":
-                await funding_harvester_command(update, context)
-            elif data == "btn_pre_pump_on_prompt":
-                await query.message.reply_text("🚀 **APEX PRE-PUMP SPIKE SNIPER ACTIVATION**\n\nដើម្បីបើកដំណើរការ Pre-Pump Sniper ប្រើបញ្ជា ៖\n`` `/pre_pump ON 50` ``", parse_mode="Markdown")
-            elif data == "btn_pre_pump_off_prompt":
-                await query.message.reply_text("🛑 **APEX PRE-PUMP SPIKE SNIPER DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Pre-Pump Sniper ប្រើបញ្ជា ៖\n`` `/pre_pump OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_pre_pump_radar":
-                await pre_pump_command(update, context)
-            elif data == "btn_wave_rider_on":
-                context.args = ["ON"]
-                await wave_rider_command(update, context)
-            elif data == "btn_wave_rider_off":
-                context.args = ["OFF"]
-                await wave_rider_command(update, context)
-            elif data == "btn_dyn_lev_on":
-                context.args = ["ON"]
-                await dynamic_leverage_command(update, context)
-            elif data == "btn_dyn_lev_off":
-                context.args = ["OFF"]
-                await dynamic_leverage_command(update, context)
-            elif data == "btn_defender_on":
-                context.args = ["ON"]
-                await defender_command(update, context)
-            elif data == "btn_defender_off":
-                context.args = ["OFF"]
-                await defender_command(update, context)
-            elif data == "btn_defender_status":
-                await defender_command(update, context)
-            elif data == "btn_hedge_mode_on_prompt":
-                await query.message.reply_text("🛡️ **APEX CRASH HEDGE MODE ACTIVATION**\n\nដើម្បីបើកដំណើរការ Hedge Mode ប្រើបញ្ជា ៖\n`` `/hedge_mode ON 50 <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_hedge_mode_off_prompt":
-                await query.message.reply_text("🛑 **APEX CRASH HEDGE MODE DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Hedge Mode ប្រើបញ្ជា ៖\n`` `/hedge_mode OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_trailing_guard_on_prompt":
-                await query.message.reply_text("🛡️ **APEX TRAILING PROFIT GUARD ACTIVATION**\n\nដើម្បីបើកដំណើរការ Trailing Guard ប្រើបញ្ជា ៖\n`` `/trailing_guard ON <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_trailing_guard_off_prompt":
-                await query.message.reply_text("🛑 **APEX TRAILING PROFIT GUARD DEACTIVATION**\n\nដើម្បីបិទដំណើរការ Trailing Guard ប្រើបញ្ជា ៖\n`` `/trailing_guard OFF <PIN>` ``", parse_mode="Markdown")
-            elif data == "btn_opt_rebalance_toggle":
-                db.toggle_user_rebalance_opt_in(chat_id)
-                await opt_rebalance_command(update, context)
-            elif data == "btn_my_alerts":
-                await my_alerts_command(update, context)
-            elif data == "btn_health_refresh":
-                await health_command(update, context)
-            elif data == "btn_top_refresh":
-                await top_command(update, context)
-            elif data == "btn_news_refresh":
-                await news_command(update, context)
-            elif data == "btn_whales_refresh":
-                await whales_command(update, context)
-            elif data == "btn_sync_brain":
-                await sync_brain_command(update, context)
+            if not query: return
+            try:
+                await query.answer()
+            except Exception:
+                pass
+
+            data = str(query.data or '')
+            chat_id = query.message.chat.id if (query.message and query.message.chat) else update.effective_chat.id
+
+            if data == "btn_menu_refresh":
+                await menu_command(update, context)
             elif data == "btn_admin_panel":
                 await admin_panel_command(update, context)
             elif data == "btn_admin_users_refresh":
                 await admin_users_command(update, context)
+            elif data in ["btn_admin_license_prompt", "btn_admin_license"]:
+                await admin_license_command(update, context)
+            elif data in ["btn_admin_portfolio_prompt", "btn_admin_portfolio"]:
+                await admin_view_portfolio_command(update, context)
             elif data == "btn_admin_broadcast_prompt":
                 await admin_broadcast_command(update, context)
-            elif data == "btn_admin_stats_refresh":
+            elif data in ["btn_admin_stats_refresh", "btn_admin_stats"]:
                 await admin_stats_command(update, context)
             elif data == "btn_admin_config":
                 await admin_config_command(update, context)
             elif data == "btn_toggle_breaker_toggle":
                 await toggle_breaker_command(update, context)
-            elif data == "btn_admin_nuke":
-                await update.effective_message.reply_text("☢️ **APEX GLOBAL EMERGENCY NUKE**\n\nដើម្បីដំណើការ Emergency Global Nuke ប្រើបញ្ជា ៖\n`` `/admin_nuke <PIN>` ``", parse_mode="Markdown")
+            elif data == "btn_toggle_rebalance_toggle":
+                await toggle_rebalance_command(update, context)
             elif data == "btn_set_pin_prompt":
                 await set_pin_command(update, context)
+            elif data in ["btn_add_api_prompt", "btn_menu_api"]:
+                await add_api_command(update, context)
+            elif data == "btn_balance_refresh":
+                await balance_command(update, context)
             elif data == "btn_lang_km":
                 context.args = ["km"]
                 await language_command(update, context)
@@ -2767,24 +2662,54 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_lang_zh":
                 context.args = ["zh"]
                 await language_command(update, context)
-            elif data == "btn_menu_papertrade":
-                import trading_engine
-                new_state = not trading_engine.PAPER_TRADING
-                trading_engine.set_paper_trading(new_state)
-                msg = "🧪 **PAPER TRADING MODE ACTIVATED!** (Simulated Trades)" if new_state else "🚀 **REAL LIVE TRADING MODE ACTIVATED!** (Binance API Orders)"
-                await query.message.reply_text(msg, parse_mode="Markdown")
-            elif data == "btn_menu_api":
-                await add_api_command(update, context)
+            elif data == "btn_menu_portfolio":
+                await portfolio_command(update, context)
+            elif data in ["btn_scan_all", "btn_top_refresh", "btn_top_gainers"]:
+                await top_command(update, context)
+            elif data in ["btn_gold_radar", "btn_gold_radar_refresh"]:
+                await gold_radar_command(update, context)
+            elif data == "btn_cb_gold_refresh":
+                await cb_gold_command(update, context)
+            elif data == "btn_paxg_arb_refresh":
+                await paxg_arbitrage_command(update, context)
+            elif data == "btn_black_swan_refresh":
+                await black_swan_guard_command(update, context)
+            elif data == "btn_gold_btc_refresh":
+                await gold_btc_rebalance_command(update, context)
+            elif data == "btn_health_refresh":
+                await health_command(update, context)
+            elif data == "btn_news_refresh":
+                await news_command(update, context)
+            elif data == "btn_whales_refresh":
+                await whales_command(update, context)
+            elif data == "btn_sync_brain":
+                await sync_brain_command(update, context)
             elif data == "btn_menu_help":
                 await help_command(update, context)
-            elif data == "btn_menu_refresh":
-                await menu_command(update, context)
+            elif data == "btn_defender_status":
+                await defender_command(update, context)
+            elif data == "btn_hyper_trade_launch":
+                await query.message.reply_text("🚀 **HYPER TRADE AGI ENGINE**\n\nដើម្បីដំណើការ Super AGI Auto Trade ប្រើបញ្ជា ៖\n`/hyper_trade BTCUSDT 100 10 <PIN>`", parse_mode="Markdown")
+            elif data == "btn_admin_nuke":
+                await query.message.reply_text("☢️ **APEX GLOBAL EMERGENCY NUKE**\n\nដើម្បីដំណើការ Emergency Global Nuke ប្រើបញ្ជា ៖\n`` `/admin_nuke <PIN>` ``", parse_mode="Markdown")
+            elif data.startswith("btn_predict_"):
+                sym = data.replace("btn_predict_", "")
+                context.args = [sym]
+                await predict_command(update, context)
+            elif data.startswith("btn_analyze_"):
+                sym = data.replace("btn_analyze_", "")
+                context.args = [sym]
+                await analyze_command(update, context)
+            elif data == "btn_menu_papertrade":
+                await paper_trading_command(update, context)
+            elif data == "btn_funding_harvester":
+                await funding_harvester_command(update, context)
+            elif data == "btn_pre_pump_radar":
+                await pre_pump_command(update, context)
+            elif data == "btn_my_alerts":
+                await my_alerts_command(update, context)
 
-
-
-
-
-
+        gold_button_callback = master_button_callback
 
         async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -9356,6 +9281,7 @@ class TelegramBotThread(BaseThread):
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(admin_license_callback, pattern="^lic_"))
         self.app.add_handler(CallbackQueryHandler(admin_nuke_callback, pattern="^nuke_confirm$"))
+        self.app.add_handler(CallbackQueryHandler(master_button_callback))
         # Register v12.00 Clean Telegram Popup Command Menu
         async def post_init_set_commands(application):
             try:
