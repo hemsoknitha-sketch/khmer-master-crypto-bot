@@ -7819,14 +7819,15 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | INFINITY MATRIX GRID** ♾️\n"
+                    "📈 **AI DYNAMIC COMPOUND INFINITY MATRIX v12.00** 📈\n"
                     "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE INFINITY MATRIX CONFIGURATION:**\n"
-                    f"• **Current Status**: {status_str}\n"
-                    "• **Default Target Asset**: `PAXGUSDT` (Tokenized Physical Gold 24/7)\n"
-                    "• **Grid Resolution**: `100 Dynamic Fibonacci Grids`\n"
-                    "• **Yield Strategy**: `100% Auto-Compound + Dynamic Band Adjustment`\n"
-                    "• **Risk Protection**: `Zero-Margin Liquidation Clamping`\n\n"
+                    "📊 **EXECUTIVE COMPOUND MATRIX CONFIGURATION:**\n"
+                    f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
+                    "• **AI Models សហការ ៖** `LSTM Neural Net` + `RL Dynamic PPO Agent`\n"
+                    "• **យុទ្ធសាស្ត្របង្កើតចំណូល ៖** `Compound Grid Network + Automated Capital Rebalance`\n"
+                    "• **ក្បួនលុយបង្កើតលុយ ៖** `រាល់ពេលបានចំណេញ AI យកទៅទិញកាក់បន្ថែមធ្វើ Compound Interest (ការប្រាក់លើការប្រាក់) ២៤/៧`\n"
+                    "• **Default Target Asset ៖** `PAXGUSDT` (Tokenized Physical Gold 24/7)\n"
+                    "• **Grid Resolution ៖** `100 Dynamic Fibonacci Grids`\n\n"
                     "📋 **1-TAP COMMAND EXECUTIONS:**\n"
                     "👉 **ដើម្បីបើកដំណើរការ (ON) ៖**\n`` `/infinity_matrix ON 100 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ (OFF) ៖**\n`` `/infinity_matrix OFF 1234` ``"
