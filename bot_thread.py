@@ -3684,61 +3684,132 @@ class TelegramBotThread(BaseThread):
 
         async def admin_view_portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
-
-            args = context.args
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("👥 User Directory", callback_data="btn_admin_users_refresh"),
-                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
+                    InlineKeyboardButton("👑 License Manager", callback_data="btn_admin_license_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
                 ],
                 [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
+            args = context.args if hasattr(context, 'args') else []
+
+            # Mode A: No Arguments Provided -> Summary of All VIP Portfolios
             if not args or len(args) == 0:
-                msg = (
-                    "👻 **APEX SUPER AGI TURBO BRAIN v9.5 | ADMIN GHOST PORTFOLIO INSPECTION** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **GHOST AUDIT SPECIFICATIONS:**\n"
-                    "• **Audit Scope**: `Real-Time Binance Spot, Futures, Active Bots, & Balance`\n"
-                    "• **Privacy Shield**: `Zero Notification Dispatch to Target User`\n"
-                    "• **Execution Latency**: `Sub-50ms Multi-Engine Portfolio Scanner`\n\n"
-                    "📋 **1-TAP COMMAND SYNTAX:**\n"
-                    "👉 **ពិនិត្យ Portfolio របស់ User ៖**\n"
-                    "`` `/admin_view_portfolio 12345678` ``\n\n"
-                    "👉 **ពិនិត្យបញ្ជី User ទាំងអស់ ៖**\n"
-                    "`` `/admin_users` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                vip_users = db.get_all_vip_users() if hasattr(db, 'get_all_vip_users') else []
+                total_vip_count = len(vip_users)
+                
+                vip_lines = []
+                total_active_bots_all = 0
+                for u in vip_users[:10]: # Top 10 VIP Users for overview
+                    uid = u.get("chat_id") if isinstance(u, dict) else u[0]
+                    uname = u.get("username", "N/A") if isinstance(u, dict) else (u[1] if len(u)>1 else "N/A")
+                    trades = db.get_active_trades_by_user(uid) if hasattr(db, 'get_active_trades_by_user') else []
+                    grids = db.get_user_grid_bots(uid) if hasattr(db, 'get_user_grid_bots') else []
+                    active_cnt = len(trades) + len(grids)
+                    total_active_bots_all += active_cnt
+                    vip_lines.append(f"• User ID `{uid}` (@{uname}) ៖ `{active_cnt} Active Positions/Bots`")
+
+                vip_overview = "\n".join(vip_lines) if vip_lines else "ℹ️ _No active VIP users currently running trading engines._"
+
+                if user_lang == 'en':
+                    summary_msg = (
+                        "👑 **APEX SUPER AGI v12.00 | ALL VIP PORTFOLIOS OVERVIEW** 👻\n"
+                        "═══════════════════════════════\n\n"
+                        f"📊 **Total Active VIP Members**: `{total_vip_count} VIP Accounts` 👑\n"
+                        f"🚀 **Total Running VIP Bots & Positions**: `{total_active_bots_all} Active`\n"
+                        "🛡️ **Privacy Protocol**: `Ghost Audit Mode (0% Target User Notification)`\n\n"
+                        "📋 **ACTIVE VIP USERS OVERVIEW (TOP 10):**\n"
+                        f"{vip_overview}\n\n"
+                        "📋 **1-TAP AUDIT SYNTAX:**\n"
+                        "👉 **Audit Specific VIP Account Portfolio:**\n"
+                        "`` `/admin_view_portfolio <USER_ID>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Tap User Registry or License Manager below to inspect individual accounts:_"
+                    )
+                elif user_lang == 'zh':
+                    summary_msg = (
+                        "👑 **APEX SUPER AGI v12.00 | 全体 VIP 用户持仓总览** 👻\n"
+                        "═══════════════════════════════\n\n"
+                        f"📊 **活跃 VIP 会员总数**: `{total_vip_count} 个 VIP 账户` 👑\n"
+                        f"🚀 **VIP 运行中机器人与持仓总数**: `{total_active_bots_all} 个`\n"
+                        "🛡️ **隐身审计协议**: `Ghost 隐身审计 (目标用户 0% 通知)`\n\n"
+                        "📋 **活跃 VIP 用户简报 (前 10 名)：**\n"
+                        f"{vip_overview}\n\n"
+                        "📋 **1-TAP 隐身审计命令：**\n"
+                        "👉 **审计指定 VIP 用户持仓详情：**\n"
+                        "`` `/admin_view_portfolio <USER_ID>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _点击下方用户目录或授权管理器可进一步管理特定账户：_"
+                    )
+                else:
+                    summary_msg = (
+                        "👑 **APEX SUPER AGI v12.00 | ALL VIP PORTFOLIOS OVERVIEW** 👻\n"
+                        "═══════════════════════════════\n\n"
+                        f"📊 **សមាជិក VIP សរុប** ៖ `{total_vip_count} VIP Accounts` 👑\n"
+                        f"🚀 **Positions & Bots កំពុងរ៉ាន់សរុប** ៖ `{total_active_bots_all} Active`\n"
+                        "🛡️ **Privacy Protocol** ៖ `Ghost Audit Mode (0% User Notification)`\n\n"
+                        "📋 **ACTIVE VIP USERS OVERVIEW (TOP 10) ៖**\n"
+                        f"{vip_overview}\n\n"
+                        "📋 **1-TAP AUDIT SYNTAX ៖**\n"
+                        "👉 **ពិនិត្យ Portfolio របស់ VIP ជាក់លាក់មួយ ៖**\n"
+                        "`` `/admin_view_portfolio <USER_ID>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _ចុច User Registry ឬ License Manager ខាងក្រោម ដើម្បីពិនិត្យគណនីលម្អិត ៖_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(summary_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=summary_msg, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(summary_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=summary_msg, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
+            # Mode B: Specific Target User ID Provided
             target_raw = str(args[0]).strip()
             if not target_raw.isdigit():
-                await update.message.reply_text("❌ **ទម្រង់ Chat ID មិនត្រឹមត្រូវ!** (ឧទាហរណ៍ ៖ `/admin_view_portfolio 12345678`)", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                bad_id_err = "❌ Invalid User Chat ID." if user_lang == 'en' else ("❌ 用户 Chat ID 格式不正确。" if user_lang == 'zh' else "❌ ទម្រង់ Chat ID មិនត្រឹមត្រូវ! (ឧទាហរណ៍ ៖ `/admin_view_portfolio 12345678`)")
+                await update.effective_message.reply_text(bad_id_err)
                 return
 
             target_id = int(target_raw)
 
-            # Query target user's active positions & bots
             trades = db.get_active_trades_by_user(target_id) if hasattr(db, 'get_active_trades_by_user') else []
             dca_bots = db.get_user_smart_dcas(target_id) if hasattr(db, 'get_user_smart_dcas') else []
             grid_bots = db.get_user_grid_bots(target_id) if hasattr(db, 'get_user_grid_bots') else []
@@ -3748,7 +3819,7 @@ class TelegramBotThread(BaseThread):
             avail_usdt = 0.0
             api_status = "❌ Not Connected"
             if keys:
-                api_status = "🟢 Connected (Binance API)"
+                api_status = "🟢 Connected (Binance API Verified)"
                 try:
                     import trading_engine
                     avail_usdt = await asyncio.to_thread(trading_engine.get_available_usdt_balance, keys[0], keys[1])
@@ -3766,7 +3837,7 @@ class TelegramBotThread(BaseThread):
                     buy_price = float(t.get('buy_price', 0)) if isinstance(t, dict) else float(t[4])
                     trade_lines.append(f"  • `{sym}` ៖ `{qty}` @ `${buy_price:,.4f}`")
 
-            trade_summary = "\n".join(trade_lines) if trade_lines else "  ℹ️ _គ្មានសកម្មភាពទិញកាន់កាប់ Spot ឡើយ_"
+            trade_summary = "\n".join(trade_lines) if trade_lines else "  ℹ️ _No active Spot/Futures position held_"
 
             bot_summary = (
                 f"  ├ Smart DCA Bots: `{len(dca_bots)} Active`\n"
@@ -3774,21 +3845,56 @@ class TelegramBotThread(BaseThread):
                 f"  └ AI Scalper Bots: `{len(scalp_bots)} Active`"
             )
 
-            msg = (
-                "👻 **APEX ADMIN GHOST PORTFOLIO REPORT** ⚡\n"
-                "═══════════════════════════════\n\n"
-                f"👤 **TARGET USER ID**: `{target_id}` | `{vip_str}`\n"
-                f"🔑 **Binance API Status**: `{api_status}`\n"
-                f"💵 **Available USDT Capital**: `${avail_usdt:,.2f} USDT`\n\n"
-                "🪙 **ACTIVE SPOT POSITIONS:**\n"
-                f"{trade_summary}\n\n"
-                "🤖 **ACTIVE TRADING BOTS:**\n"
-                f"{bot_summary}\n\n"
-                "💡 _របាយការណ៍នេះសម្រាប់ការពិនិត្យ Admin ដោយសម្ងាត់ (Ghost Mode 0% User Notification)_"
-            )
+            if user_lang == 'en':
+                msg = (
+                    "👻 **APEX SUPER AGI v12.00 | TARGET VIP GHOST PORTFOLIO REPORT** 👻\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **TARGET USER ID**: `{target_id}` | `{vip_str}`\n"
+                    f"🔑 **Binance API Status**: `{api_status}`\n"
+                    f"💵 **Available USDT Capital**: `${avail_usdt:,.2f} USDT`\n\n"
+                    "🪙 **ACTIVE SPOT/FUTURES POSITIONS:**\n"
+                    f"{trade_summary}\n\n"
+                    "🤖 **ACTIVE TRADING ENGINES:**\n"
+                    f"{bot_summary}\n\n"
+                    "💡 _This Ghost Audit is strictly confidential for Super Admin (0% User Notification)._"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "👻 **APEX SUPER AGI v12.00 | VIP 用户持仓隐身审计报告** 👻\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **目标用户 ID**: `{target_id}` | `{vip_str}`\n"
+                    f"🔑 **Binance API 状态**: `{api_status}`\n"
+                    f"💵 **可用 USDT 资金**: `${avail_usdt:,.2f} USDT`\n\n"
+                    "🪙 **活跃现货与合约持仓：**\n"
+                    f"{trade_summary}\n\n"
+                    "🤖 **运行中交易机器人：**\n"
+                    f"{bot_summary}\n\n"
+                    "💡 _本报告仅供 Super Admin 隐身审计使用 (目标用户 0% 通知)。_"
+                )
+            else:
+                msg = (
+                    "👻 **APEX SUPER AGI v12.00 | TARGET VIP GHOST PORTFOLIO REPORT** 👻\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **TARGET USER ID** ៖ `{target_id}` | `{vip_str}`\n"
+                    f"🔑 **Binance API Status** ៖ `{api_status}`\n"
+                    f"💵 **Available USDT Capital** ៖ `${avail_usdt:,.2f} USDT`\n\n"
+                    "🪙 **ACTIVE SPOT/FUTURES POSITIONS ៖**\n"
+                    f"{trade_summary}\n\n"
+                    "🤖 **ACTIVE TRADING ENGINES ៖**\n"
+                    f"{bot_summary}\n\n"
+                    "💡 _របាយការណ៍នេះសម្រាប់ការពិនិត្យ Admin ដោយសម្ងាត់ (Ghost Mode 0% User Notification)!_"
+                )
 
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
             self.log_signal.emit(f"👻 Admin {chat_id} viewed GHOST portfolio for user {target_id}.")
             return
 
