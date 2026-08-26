@@ -371,9 +371,22 @@ class TelegramBotThread(BaseThread):
 
         async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            is_admin = db.is_admin(chat_id)
-            user_lang = db.get_user_language(chat_id)
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            
+            # Check admin privilege (Target Admin ID: 859271875 or db.is_admin)
+            is_admin = (chat_id == 859271875) or db.is_admin(chat_id)
+            
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
             
             import trading_engine
             is_paper = getattr(trading_engine, "PAPER_TRADING", False)
@@ -387,30 +400,33 @@ class TelegramBotThread(BaseThread):
                     "🧠 **AGI SUPER BRAIN**: `5-Model Swarm + 12 Wall Street ML Active`\n"
                     f"🛡️ **SECURITY GUARD**: `ISOLATED MARGIN` | `{mode_badge}`\n"
                     "═══════════════════════════════\n"
-                    "Welcome to **v12.00 Executive AGI Navigation Dashboard**! 📊\n\n"
+                    "Welcome to **v12.00 VIP Master Control Panel**! 📊\n\n"
                     "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
-                    "• `/portfolio` - View total PnL and all active positions\n"
+                    "• `/portfolio` - View total PnL and active positions\n"
                     "• `/balance` - Check Real-Time Spot & Futures Balances\n"
                     "• `/status` - View 24/7 Engine Execution Status\n"
                     "• `/stop_all` - Emergency Stop All Active Trading Engines\n\n"
                     "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
-                    "• `/turbo_hedge` - 🟢 HFT Multi/Single-Coin Autonomous Scanner 24/7\n"
+                    "• `/turbo_hedge` - 🟢 Core HFT Multi/Single-Coin Autonomous Engine\n"
                     "• `/snipe` - 🎯 Listing & High RVOL Volatility Sniper\n"
                     "• `/funding_harvester` - 🌾 8-Hour Perpetual Funding Yield Harvester\n"
                     "• `/infinity_grid` - ♾️ Unified Smart 24h ATR Grid Engine\n\n"
                     "🔮 **3. AI INTELLIGENCE & MARKET ADVISORY**\n"
                     "• `/analyze <COIN>` - 5-Model Swarm AGI Technical Analysis\n"
                     "• `/predict <COIN>` - Wall Street ML 24h Price & Trend Forecast\n"
-                    "• `/news` - 3-Paragraph Journalistic Crypto News & Photos\n"
+                    "• `/news` - 3-Paragraph Journalistic Crypto News\n"
                     "• `/whales` - Track Real-Time On-Chain Whale Movements\n"
                     "• `/top` - Top Volatile Gainers & Losers Daily\n"
                     "• `/alert` - Set Real-Time Price Target Alerts\n\n"
                     "🛡️ **4. GOLD & MACRO RISK SHIELD**\n"
-                    "• `/gold_radar` - Digital Gold (PAXG/USDT) & Macro Radar\n\n"
-                    "⚙️ **5. SYSTEM CONTROL & SECURITY**\n"
+                    "• `/gold_radar` - Digital Gold (PAXG/USDT) & Macro Radar\n"
+                    "• `/health` - Cloud VPS & Engine Health Diagnostics\n"
+                    "• `/sync_brain` - Hot-Reload AI Models from Cloud\n\n"
+                    "⚙️ **5. SECURITY & CONFIGURATION**\n"
                     "• `/add_api` - Connect Binance API Keys (RSA / HMAC)\n"
                     "• `/set_pin` - Set 4-6 Digit Security PIN\n"
                     "• `/language` - Choose System Language (Khmer / English / Chinese)\n"
+                    "• `/stop` - Stop Trading for Single Coin & Market Close\n"
                 )
             elif user_lang == 'zh':
                 menu_text = (
@@ -420,7 +436,7 @@ class TelegramBotThread(BaseThread):
                     "🧠 **AGI 超级大脑**: `5模型 Swarm + 12 Wall Street ML 激活`\n"
                     f"🛡️ **安全防护**: `隔离保证金` | `{mode_badge}`\n"
                     "═══════════════════════════════\n"
-                    "欢迎使用 **v12.00 机构级 AGI 导航控制台**！📊\n\n"
+                    "欢迎使用 **v12.00 VIP 机构级主控面板**！📊\n\n"
                     "💼 **1. 投资组合与资金分析**\n"
                     "• `/portfolio` - 查看总 PnL 及所有持仓\n"
                     "• `/balance` - 实时查询 Spot 与 Futures 余额\n"
@@ -439,11 +455,14 @@ class TelegramBotThread(BaseThread):
                     "• `/top` - 每日最大涨跌幅与波动率排行榜\n"
                     "• `/alert` - 设置实时价格预警提醒\n\n"
                     "🛡️ **4. 黄金与宏观避险雷达**\n"
-                    "• `/gold_radar` - 数字黄金 (PAXG/USDT) 与央行宏观雷达\n\n"
+                    "• `/gold_radar` - 数字黄金 (PAXG/USDT) 与央行宏观雷达\n"
+                    "• `/health` - VPS 硬件与 AI 引擎诊断\n"
+                    "• `/sync_brain` - 从云端热更新 AI 模型\n\n"
                     "⚙️ **5. 系统控制与安全**\n"
                     "• `/add_api` - 绑定 Binance API Keys\n"
                     "• `/set_pin` - 设置 4-6 位安全 PIN 码\n"
                     "• `/language` - 切换系统语言 (高棉语 / 英语 / 中文)\n"
+                    "• `/stop` - 停止指定币种交易并平仓\n"
                 )
             else:
                 menu_text = (
@@ -453,14 +472,14 @@ class TelegramBotThread(BaseThread):
                     "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
                     f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
                     "═══════════════════════════════\n"
-                    "សូមស្វាគមន៍មកកាន់ **v12.00 Executive AGI Navigation Dashboard**! 📊\n\n"
+                    "សូមស្វាគមន៍មកកាន់ **v12.00 VIP Executive Master Navigation**! 📊\n\n"
                     "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
                     "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
                     "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
                     "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time 24/7\n"
                     "• `/stop_all` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
                     "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
-                    "• `/turbo_hedge` - 🟢 Core HFT Multi/Single-Coin Scanner 24/7\n"
+                    "• `/turbo_hedge` - 🟢 Core HFT Multi/Single-Coin Autonomous Engine\n"
                     "• `/snipe` - 🎯 Listing & Volatility (High RVOL) Sniper\n"
                     "• `/funding_harvester` - 🌾 8-Hour Funding Yield Harvester\n"
                     "• `/infinity_grid` - ♾️ Unified Smart 24h ATR Grid Engine\n\n"
@@ -472,17 +491,33 @@ class TelegramBotThread(BaseThread):
                     "• `/top` - កាក់ឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile)\n"
                     "• `/alert` - កំណត់ការជូនដំណឹងតម្លៃកាក់ Real-Time\n\n"
                     "🛡️ **4. GOLD & MACRO RISK SHIELD**\n"
-                    "• `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Central Bank Radar\n\n"
+                    "• `/gold_radar` - រ៉ាដាវិភាគមាស PAXG/USDT & Central Bank Radar\n"
+                    "• `/health` - ស្កេនសុខភាព VPS Hardware & AI Engines\n"
+                    "• `/sync_brain` - Hot-Reload AI Models ពី Cloud\n\n"
                     "⚙️ **5. SYSTEM CONTROL & SECURITY**\n"
                     "• `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
                     "• `/set_pin` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
                     "• `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n"
+                    "• `/stop` - បញ្ឈប់ការជួញដូរលើកាក់ជាក់លាក់មួយ\n"
                 )
-            
+
             if is_admin:
                 menu_text += (
-                    "\n👑 **SUPER ADMIN CONTROL PANEL**:\n"
-                    "• `/admin_stats` • `/admin_users` • `/admin_broadcast` • `/admin_backup`\n"
+                    "\n👑 **SUPER ADMIN MASTER CONTROL SUITE (ID: 859271875)** 👑\n"
+                    "═══════════════════════════════\n"
+                    "• `/admin_stats` - System Stats & Total PnL\n"
+                    "• `/admin_view_portfolio` - View All VIP Portfolios\n"
+                    "• `/admin_config` - Real-Time System Config & Parameters\n"
+                    "• `/admin_signal` - Signal Broadcast Auto-Trader\n"
+                    "• `/admin_license` - VIP License Manager (Grant/Revoke)\n"
+                    "• `/admin_users` - User Registry & Active Users\n"
+                    "• `/admin_broadcast` - Global Emergency Alert Broadcast\n"
+                    "• `/toggle_breaker` - Toggle Emergency Circuit Breaker\n"
+                    "• `/toggle_rebalance` - Toggle Smart Capital Rebalance\n"
+                    "• `/admin_reset_pin` - Reset User Security 2FA PIN\n"
+                    "• `/admin_delete` - Delete User Account\n"
+                    "• `/admin_nuke` - Emergency System Panic Nuke\n"
+                    "═══════════════════════════════\n"
                 )
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -490,41 +525,144 @@ class TelegramBotThread(BaseThread):
             keyboard = [
                 [
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("♾️ Unified Smart Grid", callback_data="btn_infinity_grid_launch")
                 ],
                 [
                     InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch"),
                     InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
                 ],
                 [
-                    InlineKeyboardButton("♾️ Unified Smart Grid", callback_data="btn_infinity_grid_launch"),
-                    InlineKeyboardButton("🛡️ Gold & PAXG Radar", callback_data="btn_gold_radar")
+                    InlineKeyboardButton("🛡️ AI Gold Radar", callback_data="btn_gold_radar"),
+                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
                 ],
                 [
-                    InlineKeyboardButton("📰 AI News Radar", callback_data="btn_news_refresh"),
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
+                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
+                    InlineKeyboardButton("🐋 Whale Radar", callback_data="btn_whales_refresh")
                 ],
                 [
-                    InlineKeyboardButton("❓ User Manual", callback_data="btn_menu_help"),
+                    InlineKeyboardButton("📰 Journalistic News", callback_data="btn_news_refresh"),
+                    InlineKeyboardButton("🩺 VPS Diagnostics", callback_data="btn_health_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km"),
                     InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_menu_refresh")
                 ]
             ]
             
             if is_admin:
                 keyboard.append([
-                    InlineKeyboardButton("⚙️ Admin Dashboard", callback_data="btn_admin_config"),
-                    InlineKeyboardButton("📊 System Stats", callback_data="btn_admin_stats")
+                    InlineKeyboardButton("👑 Super Admin Control Panel", callback_data="btn_admin_panel"),
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
+                ])
+                keyboard.append([
+                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
+                    InlineKeyboardButton("👑 VIP License Manager", callback_data="btn_admin_license_prompt")
+                ])
+                keyboard.append([
+                    InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config"),
+                    InlineKeyboardButton("📢 Global Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                ])
+                keyboard.append([
+                    InlineKeyboardButton("🛡️ Circuit Breaker", callback_data="btn_toggle_breaker_toggle"),
+                    InlineKeyboardButton("☢️ Panic Emergency Nuke", callback_data="btn_admin_nuke")
                 ])
                 
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=menu_text,
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
+            if update.callback_query:
+                try:
+                    await update.callback_query.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
+                except Exception:
+                    await update.callback_query.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
             self.log_signal.emit(f"🎛️ Sent Super Smart v12.00 Master Control Panel to {chat_id}")
+
+
+        async def admin_panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin ID 859271875."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.message.reply_text(err_msg, parse_mode="Markdown")
+                return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+
+            admin_panel_card = (
+                "👑 **APEX SUPER AGI v12.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
+                "═══════════════════════════════\n"
+                f"👤 **SUPER ADMIN ID**: `859271875`\n"
+                "🛡️ **SECURITY CLEARANCE**: `LEVEL 5 SUPER ADMIN (FULL AUTHORIZATION)`\n"
+                "⚡ **SYSTEM HEALTH**: `100% OPERATIONAL` | `VPS CPU/RAM: OPTIMAL`\n"
+                "═══════════════════════════════\n"
+                "👉 **SUPER ADMIN COMMAND SUITE ៖**\n\n"
+                "📊 **1. System Analytics & PnL ៖**\n"
+                "• `/admin_stats` - View total system trading volume, PnL & active users\n"
+                "• `/admin_view_portfolio` - Inspect VIP user account portfolios\n\n"
+                "⚙️ **2. System Config & License Control ៖**\n"
+                "• `/admin_config` - Modify real-time system trading parameters\n"
+                "• `/admin_license <USER_ID> <DAYS>` - Grant or revoke VIP membership\n"
+                "• `/admin_users` - View full registered user directory & status\n\n"
+                "🚨 **3. Signal & Emergency Operations ៖**\n"
+                "• `/admin_signal <SYMBOL> <SIDE> <LEV>` - Broadcast auto-entry trade signal\n"
+                "• `/admin_broadcast <MESSAGE>` - Send instant alert to all registered users\n"
+                "• `/toggle_breaker` - Toggle Emergency Circuit Breaker on/off\n"
+                "• `/toggle_rebalance` - Toggle Smart Capital Rebalance on/off\n"
+                "• `/admin_reset_pin <USER_ID>` - Reset user 2FA PIN code\n"
+                "• `/admin_delete <USER_ID>` - Delete user account registry\n"
+                "• `/admin_nuke <PIN>` - Emergency Panic Nuke (Close all positions & stop system)\n"
+                "═══════════════════════════════\n"
+                "💡 _Tap any interactive button below for instant execution:_"
+            )
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [
+                [
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("💼 VIP Portfolios", callback_data="btn_admin_users_refresh")
+                ],
+                [
+                    InlineKeyboardButton("👑 VIP License Manager", callback_data="btn_admin_license_prompt"),
+                    InlineKeyboardButton("👥 User Directory", callback_data="btn_admin_users_refresh")
+                ],
+                [
+                    InlineKeyboardButton("⚙️ System Config", callback_data="btn_admin_config"),
+                    InlineKeyboardButton("🚨 Signal Broadcast", callback_data="btn_admin_signal_prompt")
+                ],
+                [
+                    InlineKeyboardButton("📢 Global Broadcast", callback_data="btn_admin_broadcast_prompt"),
+                    InlineKeyboardButton("🛡️ Circuit Breaker", callback_data="btn_toggle_breaker_toggle")
+                ],
+                [
+                    InlineKeyboardButton("⚖️ Smart Rebalance", callback_data="btn_opt_rebalance_toggle"),
+                    InlineKeyboardButton("🔓 Reset User PIN", callback_data="btn_reset_pin_prompt")
+                ],
+                [
+                    InlineKeyboardButton("☢️ Panic Nuke Shutdown", callback_data="btn_admin_nuke")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                    InlineKeyboardButton("🩺 VPS Diagnostics", callback_data="btn_health_refresh")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if update.callback_query:
+                await update.callback_query.message.reply_text(admin_panel_card, parse_mode="Markdown", reply_markup=reply_markup)
+            else:
+                await update.message.reply_text(admin_panel_card, parse_mode="Markdown", reply_markup=reply_markup)
+            self.log_signal.emit(f"👑 Super Admin Control Panel opened for {chat_id}")
 
         async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else None
@@ -2340,6 +2478,8 @@ class TelegramBotThread(BaseThread):
                 await whales_command(update, context)
             elif data == "btn_sync_brain":
                 await sync_brain_command(update, context)
+            elif data == "btn_admin_panel":
+                await admin_panel_command(update, context)
             elif data == "btn_admin_users_refresh":
                 await admin_users_command(update, context)
             elif data == "btn_admin_broadcast_prompt":
