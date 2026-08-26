@@ -327,6 +327,10 @@ class AIInvestmentEngine:
 
         ensure_ml_packages()
 
+        import warnings
+        warnings.filterwarnings("ignore", category=UserWarning)
+        warnings.filterwarnings("ignore", message=".*unpickle.*")
+
         try:
             config_path = resolve_model_path("brain_config.json")
             if config_path and os.path.exists(config_path):
