@@ -944,7 +944,7 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
 
             msg = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | UNIFIED PORTFOLIO** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | UNIFIED PORTFOLIO** 🤖\n"
                 "═══════════════════════════════\n"
                 f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
                 "═══════════════════════════════\n\n"
@@ -1092,7 +1092,7 @@ class TelegramBotThread(BaseThread):
             status_icon = "🟢 Normal" if cpu_usage < 75.0 else ("🟡 Heavy Load" if cpu_usage < 90.0 else "🔴 Critical Load")
 
             msg = (
-                f"📊 **KHMER MASTER CRYPTO v11.0 | SYSTEM & AGI DIAGNOSTICS** 📊\n"
+                f"📊 **KHMER MASTER CRYPTO v12.00 | SYSTEM & AGI DIAGNOSTICS** 📊\n"
                 f"───────────────────────────────\n\n"
                 f"🖥️ **VPS HARDWARE & SYSTEM HEALTH**\n"
                 f"⏳ Uptime: `{uptime_str}`\n"
@@ -1101,7 +1101,7 @@ class TelegramBotThread(BaseThread):
                 f"💽 SSD Storage: `{disk_used_gb} GB / {disk_total_gb} GB ({disk_pct:.1f}%)`\n"
                 f"💾 Database Size: `{db_size_mb:.2f} MB` (WAL Mode Optimized)\n"
                 f"🚦 System Status: {status_icon}\n\n"
-                f"🛡️ **AGI CORE ENGINES MATRIX v11.0 (CHAT ID: `{chat_id}`)**\n"
+                f"🛡️ **AGI CORE ENGINES MATRIX v12.00 (CHAT ID: `{chat_id}`)**\n"
                 f"💵 Mode: {'🟡 PAPER TRADING' if paper_on else '🚀 REAL MONEY LIVE'}\n"
                 f"🛡️ Liquidation Defender: {'🟢 ACTIVE (2% Max Drawdown Breaker)' if defender_on else '🟡 READY'}\n"
                 f"🚀 Turbo Hedge HFT Node: {'🟢 ACTIVE (' + str(len(user_turbo_bots)) + ' Positions)' if turbo_active else '🔴 STANDBY'}\n"
@@ -1269,7 +1269,7 @@ class TelegramBotThread(BaseThread):
                 )
                 
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
-            self.log_signal.emit(f"💳 VIP User {chat_id} checked their v11.0 live balance.")
+            self.log_signal.emit(f"💳 VIP User {chat_id} checked their v12.00 live balance.")
 
 
 
@@ -2082,9 +2082,9 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
             
             help_card = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v11.0 | USER MANUAL** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | USER MANUAL** 🤖\n"
                 "═══════════════════════════════\n"
-                "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE v11.0)**\n"
+                "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE v12.00)**\n"
                 f"🛡️ **TRADING ENGINE**: `{mode_badge}` | `ISOLATED MARGIN`\n"
                 "═══════════════════════════════\n\n"
                 "💼 **1. គ្រប់គ្រងគណនី និងទុន (ACCOUNT & PORTFOLIO)**\n"
@@ -7613,14 +7613,14 @@ class TelegramBotThread(BaseThread):
             ])
 
             msg = (
-                "🛡️ **KHMER MASTER CRYPTO v11.0 AGI | CAPITAL PROTECTION NOTICE** 🛡️\n"
+                "🛡️ **KHMER MASTER CRYPTO v12.00 AGI | CAPITAL PROTECTION NOTICE** 🛡️\n"
                 "═══════════════════════════════\n\n"
-                "⚠️ **ការធ្វើបច្ចុប្បន្នភាពសុវត្ថិភាពដើមទុន v11.0 ៖**\n"
+                "⚠️ **ការធ្វើបច្ចុប្បន្នភាពសុវត្ថិភាពដើមទុន v12.00 ៖**\n"
                 "មុខងារ `/auto_arb` ត្រូវ បានធ្វើបច្ចុប្បន្នភាពបង្រួមចូលទៅក្នុង **`Funding Harvester`** និង **`Turbo Hedge Engine`** ដើម្បីការពារប្រាក់ដើមទុនសមាជិក VIP ពីការខាតបង់ Binance Taker Fee (0.10% Roundtrip)។\n\n"
-                "💡 **អនុសាសន៍យុទ្ធសាស្ត្រ v11.0 ៖**\n"
+                "💡 **អនុសាសន៍យុទ្ធសាស្ត្រ v12.00 ៖**\n"
                 "• ប្រសិនបើអ្នកចង់ប្រមូលផលចំណេញពីអត្រាការប្រាក់ ៖ ប្រើប្រាស់ `/funding_harvester`\n"
                 "• ប្រសិនបើអ្នកចង់ស្កេនកើបចំណេញ 24/7 ៖ ប្រើប្រាស់ `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>`\n\n"
-                "✅ _ប្រព័ន្ធកំណែថ្មី v11.0 ការពារ Fee Erosion ១០០% និងធានាប្រាក់ចំណេញសុទ្ធ!_"
+                "✅ _ប្រព័ន្ធកំណែថ្មី v12.00 ការពារ Fee Erosion ១០០% និងធានាប្រាក់ចំណេញសុទ្ធ!_"
             )
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
             await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
@@ -7773,7 +7773,7 @@ class TelegramBotThread(BaseThread):
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
             notice = (
-                "ℹ️ **NOTICE: APEX ENGINE CONSOLIDATION v11.0** ℹ️\n"
+                "ℹ️ **NOTICE: APEX ENGINE CONSOLIDATION v12.00** ℹ️\n"
                 "═══════════════════════════════\n"
                 "មុខងារ **Liquidity Sweep Sniper** ត្រូវបានរួមបញ្ចូលគ្នាជាមួយ **Turbo Hedge Engine (Single-Coin Mode)** "
                 "ដើម្បីប្រតិបត្តិការជួញដូរមានល្បឿនលឿនជាងមុន និងការពារហានិភ័យកុំឲ្យ Order ជាន់គ្នា។\n\n"
