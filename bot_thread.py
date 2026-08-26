@@ -4702,63 +4702,120 @@ class TelegramBotThread(BaseThread):
 
         async def admin_delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("👥 User Directory", callback_data="btn_admin_users_refresh"),
-                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
+                    InlineKeyboardButton("👑 License Manager", callback_data="btn_admin_license_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
                 ],
                 [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
             if not args or len(args) == 0:
-                msg = (
-                    "🗑️ **APEX SUPER AGI TURBO BRAIN v9.5 | ADMIN ACCOUNT WIPE ENGINE** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "⚠️ **ACCOUNT PURGE SAFETY RULES:**\n"
-                    "• **Action Impact**: `100% Complete Wipe of User Profile, API Keys, Active Bots, & Trade History`\n"
-                    "• **Protection Shield**: `Super Admin Account cannot be deleted`\n"
-                    "• **Execution Engine**: `Sub-10ms Relational Database Purge`\n\n"
-                    "📋 **1-TAP COMMAND SYNTAX:**\n"
-                    "👉 **លុបទិន្នន័យ User ទាំងស្រុង ៖**\n"
-                    "`` `/admin_delete 12345678` ``\n\n"
-                    "👉 **ពិនិត្យបញ្ជី User សរុប ៖**\n"
-                    "`` `/admin_users` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if user_lang == 'en':
+                    guide_card = (
+                        "🗑️ **APEX SUPER AGI v12.00 | ADMIN ACCOUNT PURGE ENGINE** 🗑️\n"
+                        "═══════════════════════════════\n\n"
+                        "⚠️ **ACCOUNT PURGE SAFETY PROTOCOLS:**\n"
+                        "• **Action Impact**: `100% Complete Wipe of User Profile, Binance API Keys, Active Bots & PIN`\n"
+                        "• **Protection Shield**: `Super Admin ID (859271875) is immune from deletion`\n"
+                        "• **Execution Engine**: `Sub-10ms Relational Vault Purge & Engine Deactivation`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX:**\n"
+                        "👉 **Permanently Purge Target User Account:**\n"
+                        "`` `/admin_delete <USER_ID>` ``\n\n"
+                        "👉 **View Registered User Registry:**\n"
+                        "`` `/admin_users` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin account purges take effect immediately and remove user from database vault!_"
+                    )
+                elif user_lang == 'zh':
+                    guide_card = (
+                        "🗑️ **APEX SUPER AGI v12.00 | ADMIN 账户彻底注销控制台** 🗑️\n"
+                        "═══════════════════════════════\n\n"
+                        "⚠️ **账户注销安全防范协议：**\n"
+                        "• **操作影响**: `100% 彻底清除用户资料、Binance API 密钥、运行中 AI 机器人及 PIN 码`\n"
+                        "• **免疫防线**: `Super Admin 主账户禁止被任何指令注销`\n"
+                        "• **执行引擎**: `毫秒级数据库金库关联抹除与引擎停止`\n\n"
+                        "📋 **1-TAP 注销命令格式：**\n"
+                        "👉 **永久抹除目标账户及其所有数据：**\n"
+                        "`` `/admin_delete <USER_ID>` ``\n\n"
+                        "👉 **查看已注册用户列表：**\n"
+                        "`` `/admin_users` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin 注销指令将立即生效并彻底从数据库金库中移除该账户！_"
+                    )
+                else:
+                    guide_card = (
+                        "🗑️ **APEX SUPER AGI v12.00 | ADMIN ACCOUNT PURGE ENGINE** 🗑️\n"
+                        "═══════════════════════════════\n\n"
+                        "⚠️ **ACCOUNT PURGE SAFETY RULES ៖**\n"
+                        "• **Action Impact** ៖ `100% Complete Wipe of User Profile, API Keys, Active Bots & Trade History`\n"
+                        "• **Protection Shield** ៖ `Super Admin ID មិនអាចត្រូវបានលុបចេញពីប្រព័ន្ធឡើយ`\n"
+                        "• **Execution Engine** ៖ `Sub-10ms Relational Database Vault Purge`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX ៖**\n"
+                        "👉 **លុបទិន្នន័យ User ទាំងស្រុង ៖**\n"
+                        "`` `/admin_delete <USER_ID>` ``\n\n"
+                        "👉 **ពិនិត្យបញ្ជី User សរុប ៖**\n"
+                        "`` `/admin_users` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _ការលុបទិន្នន័យ នឹងបិទ Bot ទាំងអស់ និងលុបទិន្នន័យ User ចេញពីប្រព័ន្ធ Real-Time!_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
             target_raw = str(args[0]).strip()
             if not target_raw.isdigit():
-                await update.message.reply_text("❌ **ទម្រង់ Chat ID មិនត្រឹមត្រូវ!** សូមបញ្ចូលជាលេខ ID (ឧទាហរណ៍ ៖ `/admin_delete 12345678`)", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                bad_id = "❌ Invalid User Chat ID." if user_lang == 'en' else ("❌ 用户 Chat ID 格式不正确。" if user_lang == 'zh' else "❌ ទម្រង់ Chat ID មិនត្រឹមត្រូវ! (ឧទាហរណ៍ ៖ `/admin_delete 12345678`)")
+                await update.effective_message.reply_text(bad_id)
                 return
 
             target_id = int(target_raw)
 
-            if target_id == 859271875:
-                await update.message.reply_text("❌ **មិនអាចលុបទិន្នន័យ Super Admin បានឡើយ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if target_id == 859271875 or (hasattr(db, 'is_admin') and db.is_admin(target_id)):
+                no_admin_del = "❌ Super Admin Account cannot be deleted!" if user_lang == 'en' else ("❌ 无法注销 Super Admin 主账户！" if user_lang == 'zh' else "❌ មិនអាចលុបទិន្នន័យ Super Admin បានឡើយ!")
+                await update.effective_message.reply_text(no_admin_del)
                 return
 
             # Stop user bots in DB first
@@ -4775,16 +4832,45 @@ class TelegramBotThread(BaseThread):
             if hasattr(db, 'log_admin_action'):
                 db.log_admin_action(chat_id, "USER_PURGE", str(target_id), "Account and associated data completely wiped.")
 
-            msg = (
-                "🗑️ **APEX ACCOUNT PURGE COMPLETED!** ⚡\n"
-                "═══════════════════════════════\n\n"
-                f"👤 **Target User ID**: `{target_id}`\n"
-                "⚡ **Purge Status**: `100% WIPED FROM DATABASE` 🟢\n"
-                "🛡️ **Associated Bots**: `Stopped & Deactivated`\n"
-                "🔑 **API Credentials**: `Permanently Wiped`"
-            )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if user_lang == 'en':
+                msg = (
+                    "🗑️ **APEX ACCOUNT PURGE COMPLETED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **Target User ID**: `{target_id}`\n"
+                    "⚡ **Purge Status**: `100% WIPED FROM DATABASE VAULT` 🟢\n"
+                    "🛡️ **Associated Bots**: `Stopped & Deactivated`\n"
+                    "🔑 **API Credentials & PIN**: `Permanently Erased`"
+                )
+            elif user_lang == 'zh':
+                msg = (
+                    "🗑️ **ADMIN 账户彻底注销完成！** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **目标用户 ID**: `{target_id}`\n"
+                    "⚡ **注销状态**: `已 100% 从数据库金库中抹除` 🟢\n"
+                    "🛡️ **关联机器人**: `已全部停止并注销`\n"
+                    "🔑 **API 密钥与 PIN 码**: `已永久物理擦除`"
+                )
+            else:
+                msg = (
+                    "🗑️ **APEX ACCOUNT PURGE COMPLETED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **Target User ID** <ctrl42> `{target_id}`\n"
+                    "⚡ **Purge Status** ៖ `100% WIPED FROM DATABASE VAULT` 🟢\n"
+                    "🛡️ **Associated Bots** ៖ `Stopped & Deactivated`\n"
+                    "🔑 **API Credentials & PIN** ៖ `Permanently Erased`"
+                )
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+
             self.log_signal.emit(f"🗑️ Admin {chat_id} completely WIPED user {target_id}.")
             return
 
