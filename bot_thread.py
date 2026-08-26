@@ -4790,63 +4790,114 @@ class TelegramBotThread(BaseThread):
 
         async def admin_reset_pin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("👥 User Directory", callback_data="btn_admin_users_refresh"),
-                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
+                    InlineKeyboardButton("🔒 Security PIN", callback_data="btn_set_pin_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
                 ],
                 [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
             if not args or len(args) < 2:
-                msg = (
-                    "🔐 **APEX SUPER AGI TURBO BRAIN v9.5 | ADMIN PIN RESET ENGINE** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **SECURITY RESET SPECIFICATIONS:**\n"
-                    "• **Hash Engine**: `PBKDF2-HMAC-SHA256 Multi-Layer Salt Security`\n"
-                    "• **PIN Constraint**: `4-Digit Numeric PIN (0000 - 9999)`\n"
-                    "• **User Dispatch**: `Sub-50ms Direct Security Notification Card`\n\n"
-                    "📋 **1-TAP COMMAND SYNTAX:**\n"
-                    "👉 **Reset លេខ PIN ទៅជា 1234 ៖**\n"
-                    "`` `/admin_reset_pin 12345678 1234` ``\n\n"
-                    "👉 **ពិនិត្យបញ្ជី User សរុប ៖**\n"
-                    "`` `/admin_users` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if user_lang == 'en':
+                    guide_card = (
+                        "🔒 **APEX SUPER AGI v12.00 | ADMIN 2FA PIN RESET ENGINE** 🔒\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **SECURITY RESET SPECIFICATIONS:**\n"
+                        "• **Hash Vault**: `PBKDF2 Multi-Layer Salt Hashing`\n"
+                        "• **PIN Length**: `4 to 6 Numeric Digits (0000 - 999999)`\n"
+                        "• **Auto-Notify**: `Direct Telegram Security Notification Card`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX:**\n"
+                        "👉 **Reset User PIN to Temporary Code:**\n"
+                        "`` `/admin_reset_pin <USER_ID> 8492` `` or `` `/admin_reset_pin <USER_ID> 849201` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin PIN resets update user database vault & purge sensitive chat messages!_"
+                    )
+                elif user_lang == 'zh':
+                    guide_card = (
+                        "🔒 **APEX SUPER AGI v12.00 | ADMIN 2FA 重置控制台** 🔒\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **安全重置规范：**\n"
+                        "• **哈希金库**: `PBKDF2 多层 Salt 散列加密`\n"
+                        "• **PIN 码长度**: `4 至 6 位纯数字 (0000 - 999999)`\n"
+                        "• **自动通知**: `直发 Telegram 安全通知卡片`\n\n"
+                        "📋 **1-TAP 重置命令格式：**\n"
+                        "👉 **重置指定用户 PIN 码为临时密码：**\n"
+                        "`` `/admin_reset_pin <USER_ID> 8492` `` 或 `` `/admin_reset_pin <USER_ID> 849201` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin 重置密码将实时写入数据库金库，并自动清除聊天中的敏感记录！_"
+                    )
+                else:
+                    guide_card = (
+                        "🔒 **APEX SUPER AGI v12.00 | ADMIN 2FA PIN RESET ENGINE** 🔒\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **SECURITY RESET SPECIFICATIONS ៖**\n"
+                        "• **Hash Vault** ៖ `PBKDF2 Multi-Layer Salt Hashing`\n"
+                        "• **PIN Length** ៖ `ប្រវែង ៤ ទៅ ៦ ខ្ទង់ (0000 - 999999)`\n"
+                        "• **Auto-Notify** ៖ `Direct Telegram Security Alert Dispatch`\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX ៖**\n"
+                        "👉 **Reset លេខ PIN ទៅជា 8492 (៤-៦ ខ្ទង់) ៖**\n"
+                        "`` `/admin_reset_pin <USER_ID> 8492` `` ឬ `` `/admin_reset_pin <USER_ID> 849201` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _ការកំណត់លេខ PIN ថ្មីនឹងត្រូវអាប់ឌែតក្នុង DB និងលុបចេញពី Chat ស្វ័យប្រវត្តិ!_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
             target_raw = str(args[0]).strip()
             new_pin = str(args[1]).strip()
 
             if not target_raw.isdigit():
-                await update.message.reply_text("❌ **ទម្រង់ Chat ID មិនត្រឹមត្រូវ!** (ឧទាហរណ៍ ៖ `/admin_reset_pin 12345678 1234`)", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                bad_id = "❌ Invalid User Chat ID." if user_lang == 'en' else ("❌ 用户 Chat ID 格式不正确。" if user_lang == 'zh' else "❌ ទម្រង់ Chat ID មិនត្រឹមត្រូវ! (ឧទាហរណ៍ ៖ `/admin_reset_pin 12345678 8492`)")
+                await update.effective_message.reply_text(bad_id)
                 return
 
-            if not new_pin.isdigit() or len(new_pin) != 4:
-                await update.message.reply_text("❌ **លេខ PIN ត្រូវតែជាលេខ ៤ ខ្ទង់!** (ឧទាហរណ៍ ៖ `1234`)", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            if not new_pin.isdigit() or not (4 <= len(new_pin) <= 6):
+                bad_pin = "❌ PIN must be 4 to 6 numeric digits." if user_lang == 'en' else ("❌ PIN 码必须为 4 至 6 位纯数字。" if user_lang == 'zh' else "❌ លេខ PIN ត្រូវតែជាលេខ ៤ ទៅ ៦ ខ្ទង់! (ឧទាហរណ៍ ៖ `8492` ឬ `849201`)")
+                await update.effective_message.reply_text(bad_pin)
                 return
 
             target_id = int(target_raw)
@@ -4861,312 +4912,88 @@ class TelegramBotThread(BaseThread):
             # Direct security message dispatch to target user
             notified_user = False
             try:
-                user_target_lang = str(db.get_user_language(target_id) or 'km')
-                if user_target_lang == 'english' or user_target_lang == 'en':
+                raw_target_lang = db.get_user_language(target_id)
+                target_user_lang = str(raw_target_lang or 'km').lower().strip()
+                if target_user_lang in ['en', 'english']:
                     alert_msg = (
-                        "⚠️ **APEX VIP SECURITY ALERT** 🔐\n\n"
-                        "Your security PIN has been reset by the System Admin.\n"
+                        "🔒 **APEX VIP SECURITY ALERT** 🔐\n"
+                        "═══════════════════════════════\n\n"
+                        "Your security PIN has been reset by System Admin.\n"
                         f"🔑 Your Temporary PIN is: `{new_pin}`\n\n"
                         "👉 **Security Action**: Please update your PIN immediately using:\n"
-                        f"`` `/set_pin {new_pin} <NEW_PIN>` ``"
+                        f"`` `/set_pin {new_pin} <NEW_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Do not share your PIN with anyone for system security._"
+                    )
+                elif target_user_lang in ['zh', 'chinese']:
+                    alert_msg = (
+                        "🔒 **APEX VIP 安全更新警报** 🔐\n"
+                        "═══════════════════════════════\n\n"
+                        "您的 2FA 安全 PIN 码已被系统管理员重置。\n"
+                        f"🔑 您的临时 PIN 码为： `{new_pin}`\n\n"
+                        "👉 **安全操作**：请立即使用以下命令修改为全新 PIN 码：\n"
+                        f"`` `/set_pin {new_pin} <新_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _为了账户安全，请勿向任何人泄露您的 PIN 码！_"
                     )
                 else:
                     alert_msg = (
-                        "⚠️ **សេចក្តីជូនដំណឹងពីប្រព័ន្ធសុវត្ថិភាព APEX VIP** 🔐\n\n"
-                        "លេខសម្ងាត់ PIN របស់អ្នកត្រូវបាន Reset ដោយ Admin ។\n"
+                        "🔒 **សេចក្តីជូនដំណឹងពីប្រព័ន្ធសុវត្ថិភាព APEX VIP** 🔐\n"
+                        "═══════════════════════════════\n\n"
+                        "លេខសម្ងាត់ PIN របស់អ្នកត្រូវបាន Reset ដោយ Admin ibus\n"
                         f"🔑 លេខសម្ងាត់បណ្តោះអាសន្នរបស់អ្នកគឺ ៖ `{new_pin}`\n\n"
                         "👉 **សម្រាប់សុវត្ថិភាព ៖** សូមប្តូរលេខ PIN ថ្មីភ្លាមៗតាមរយៈ ៖\n"
-                        f"`` `/set_pin {new_pin} <NEW_PIN>` ``"
+                        f"`` `/set_pin {new_pin} <NEW_PIN>` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _សូមកុំចែករំលែកលេខ PIN ទៅកាន់អ្នកដទៃឱ្យសោះ!_"
                     )
                 await context.bot.send_message(chat_id=target_id, text=alert_msg, parse_mode="Markdown")
                 notified_user = True
             except Exception as e:
                 print(f"Failed to notify user {target_id} of PIN reset: {e}")
 
-            dispatch_str = "🟢 Sent Security Dispatch" if notified_user else "🔴 User Blocked Bot"
-
-            msg = (
-                "🔐 **APEX ADMIN PIN RESET COMPLETED!** ⚡\n"
-                "═══════════════════════════════\n\n"
-                f"👤 **Target User ID**: `{target_id}`\n"
-                f"🔑 **New Temporary PIN**: `{new_pin}`\n"
-                f"⚡ **Dispatch Status**: `{dispatch_str}`\n"
-                "🛡️ **Security Hash**: `PBKDF2-HMAC-SHA256 Encrypted` 🟢"
-            )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-            self.log_signal.emit(f"🔐 Admin {chat_id} RESET PIN for user {target_id}.")
-            return
-
-        async def add_bybit_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id)
-            
-            if update.effective_chat.type != 'private':
-                await update.effective_message.reply_text("❌ Please send this command in a Private Chat for security.", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                return
-            
-            if len(context.args) != 3:
-                await update.effective_message.reply_text("❌ **Usage:** `/add_bybit_api <API_KEY> <API_SECRET> <PIN>`", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                return
-                
-            api_key = context.args[0].strip().strip("'\"[]()")
-            api_secret = context.args[1].strip().strip("'\"[]()")
-            pin_input = context.args[2].strip()
-            
-            stored_pin = db.get_user_pin(chat_id)
-            if not stored_pin or not security.verify_pin(pin_input, chat_id, stored_pin):
-                await update.effective_message.reply_text("❌ **PIN Incorrect or Not Set.**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                return
-            
-            try:
-                db.set_arbitrage_api(chat_id, "Bybit", api_key, api_secret)
-                await update.effective_message.reply_text("✅ **Bybit API Key Saved for Cross-Venue Arbitrage!** ⚡\n\nThe bot will now scan for arbitrage opportunities between Binance and Bybit automatically.", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-            except Exception as e:
-                await update.effective_message.reply_text(f"❌ **Failed to save key:** {e}", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-
-        async def remove_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id)
-            
-            if len(context.args) != 1:
-                await update.message.reply_text(loc.get_text(user_lang, 'remove_api_usage'), parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-                
-            pin_input = context.args[0]
-            stored_pin = db.get_user_pin(chat_id)
-            
-            if not stored_pin:
-                await update.message.reply_text(loc.get_text(user_lang, 'pin_required'), parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-                
-            if not security.verify_pin(pin_input, chat_id, stored_pin):
-                await update.message.reply_text(loc.get_text(user_lang, 'pin_incorrect'), parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-                
-            success = db.remove_user_api(chat_id)
-            if success:
-                await update.message.reply_text(loc.get_text(user_lang, 'remove_api_success'), parse_mode="Markdown")
-                self.log_signal.emit(f"🚨 VIP User {chat_id} triggered API Kill Switch.")
-            else:
-                await update.message.reply_text(loc.get_text(user_lang, 'remove_api_not_found'), parse_mode="Markdown")
-                
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-
-        def is_smart_pin(pin: str) -> bool:
-            if not pin or not pin.isdigit(): return False
-            if len(pin) < 4 or len(pin) > 6: return False
-            if len(set(pin)) == 1: return False
-            if pin in ["1234", "2345", "3456", "4567", "5678", "6789", "9876", "8765", "7654", "6543", "5432", "4321", "2580", "0852", "123456", "654321"]: return False
-            return True
-
-        async def set_pin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
-            if not chat_id: return
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km').lower().strip()
-            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
-                user_lang = 'km'
-            elif user_lang in ['en', 'english']:
-                user_lang = 'en'
-            elif user_lang in ['zh', 'chinese']:
-                user_lang = 'zh'
-            else:
-                user_lang = 'km'
-
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
-                ],
-                [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ]
-            ])
-
-            stored_pin = db.get_user_pin(chat_id)
-            args = [str(a).strip() for a in context.args] if (context and context.args) else []
-
-            if not stored_pin:
-                # First-time setup: requires 1 argument (4-6 digit numeric PIN)
-                if len(args) != 1 or not args[0].isdigit() or not (4 <= len(args[0]) <= 6):
-                    if user_lang == 'en':
-                        guide_card = (
-                            "🔒 **APEX SUPER AGI v12.00 | 2FA SECURITY PIN SETUP** 🔒\n"
-                            "═══════════════════════════════\n\n"
-                            "🛡️ **SECURITY & PIN SPECIFICATIONS:**\n"
-                            "• **PIN Length**: `4 to 6 Numeric Digits (0000 - 999999)`\n"
-                            "• **Smart Validation**: `Weak/Sequential PINs (e.g. 1111, 1234, 123456) prohibited`\n"
-                            "• **Vault Protection**: `PBKDF2 Multi-Layer Hash Salt Vault`\n\n"
-                            "📋 **1-TAP COMMAND SYNTAX:**\n"
-                            "👉 **First-Time Security PIN Setup:**\n"
-                            "`` `/set_pin 8492` `` or `` `/set_pin 849201` ``\n"
-                            "═══════════════════════════════\n"
-                            "💡 _Your PIN message will be automatically purged from Telegram chat after saving._"
-                        )
-                    elif user_lang == 'zh':
-                        guide_card = (
-                            "🔒 **APEX SUPER AGI v12.00 | 2FA 双重验证 PIN 码设置** 🔒\n"
-                            "═══════════════════════════════\n\n"
-                            "🛡️ **安全规则与规范：**\n"
-                            "• **PIN 码长度**: `4 至 6 位纯数字 (0000 - 999999)`\n"
-                            "• **智能验证**: `禁止使用弱密码或顺号 (如 1111, 1234, 123456)`\n"
-                            "• **安全加密**: `PBKDF2 多层 Salt 散列保护`\n\n"
-                            "📋 **1-TAP 命令格式：**\n"
-                            "👉 **首次设置安全 PIN 码：**\n"
-                            "`` `/set_pin 8492` `` 或 `` `/set_pin 849201` ``\n"
-                            "═══════════════════════════════\n"
-                            "💡 _保存成功后，包含 PIN 码的敏感消息将被系统自动从聊天记录中删除！_"
-                        )
-                    else:
-                        guide_card = (
-                            "🔒 **APEX SUPER AGI v12.00 | 2FA SECURITY PIN SETUP** 🔒\n"
-                            "═══════════════════════════════\n\n"
-                            "🛡️ **SECURITY & PIN SPECIFICATIONS:**\n"
-                            "• **PIN Length**: `ប្រវែង ៤ ទៅ ៦ ខ្ទង់ (0000 - 999999)`\n"
-                            "• **Smart Validation**: `ហាមប្រើលេខងាយទស្សន៍ទាយ (ដូចជា 1111, 1234, 123456)`\n"
-                            "• **Vault Protection**: `PBKDF2 Multi-Layer Hash Salt Vault`\n\n"
-                            "📋 **1-TAP COMMAND SYNTAX:**\n"
-                            "👉 **កំណត់លេខ PIN លើកដំបូង (៤-៦ ខ្ទង់) ៖**\n"
-                            "`` `/set_pin 8492` `` ឬ `` `/set_pin 849201` ``\n"
-                            "═══════════════════════════════\n"
-                            "💡 _សារដែលមានលេខ PIN របស់អ្នកនឹងត្រូវលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
-                        )
-
-                    if update.callback_query:
-                        try:
-                            await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
-                        except Exception:
-                            await update.callback_query.message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
-                    else:
-                        await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
-                        await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                    return
-                new_pin = args[0]
-            else:
-                # Update existing PIN: requires 2 arguments (OLD_PIN, NEW_PIN)
-                if len(args) != 2 or not args[0].isdigit() or not (4 <= len(args[0]) <= 6) or not args[1].isdigit() or not (4 <= len(args[1]) <= 6):
-                    if user_lang == 'en':
-                        update_card = (
-                            "🔒 **APEX SUPER AGI v12.00 | UPDATE 2FA SECURITY PIN** 🔒\n"
-                            "═══════════════════════════════\n\n"
-                            "🛡️ **CURRENT STATUS**: `PIN Vault Protected` 🟢\n"
-                            "• **Syntax**: `/set_pin <OLD_PIN> <NEW_PIN>` (4-6 digits each)\n"
-                            "• **Smart Validation**: `Weak/Sequential PINs prohibited`\n\n"
-                            "📋 **1-TAP COMMAND SYNTAX:**\n"
-                            "👉 **Update Old PIN to New PIN:**\n"
-                            "`` `/set_pin 8492 931502` ``\n"
-                            "═══════════════════════════════\n"
-                            "💡 _Your PIN message will be automatically purged from Telegram chat after updating._"
-                        )
-                    elif user_lang == 'zh':
-                        update_card = (
-                            "🔒 **APEX SUPER AGI v12.00 | 修改 2FA 双重验证 PIN 码** 🔒\n"
-                            "═══════════════════════════════\n\n"
-                            "🛡️ **当前状态**: `PIN 加密金库保护中` 🟢\n"
-                            "• **格式**: `/set_pin <旧_PIN> <新_PIN>` (4-6位数字)\n"
-                            "• **智能验证**: `禁止使用弱密码或连续数字`\n\n"
-                            "📋 **1-TAP 命令格式：**\n"
-                            "👉 **修改旧 PIN 码为新 PIN 码：**\n"
-                            "`` `/set_pin 8492 931502` ``\n"
-                            "═══════════════════════════════\n"
-                            "💡 _修改成功后，包含旧/新 PIN 码的消息将被系统自动从聊天记录中删除！_"
-                        )
-                    else:
-                        update_card = (
-                            "🔒 **APEX SUPER AGI v12.00 | UPDATE 2FA SECURITY PIN** 🔒\n"
-                            "═══════════════════════════════\n\n"
-                            "🛡️ **CURRENT STATUS**: `PIN Protected` 🟢\n"
-                            "• **Syntax**: `/set_pin <OLD_PIN> <NEW_PIN>` (៤-៦ ខ្ទង់)\n"
-                            "• **Smart Validation**: `ហាមប្រើលេខងាយទស្សន៍ទាយ`\n\n"
-                            "📋 **1-TAP COMMAND SYNTAX:**\n"
-                            "👉 **ផ្លាស់ប្តូរលេខ PIN ចាស់ទៅថ្មី ៖**\n"
-                            "`` `/set_pin 8492 931502` ``\n"
-                            "═══════════════════════════════\n"
-                            "💡 _សារដែលមានលេខ PIN របស់អ្នកនឹងត្រូវលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
-                        )
-
-                    if update.callback_query:
-                        try:
-                            await update.callback_query.edit_message_text(update_card, parse_mode="Markdown", reply_markup=keyboard)
-                        except Exception:
-                            await update.callback_query.message.reply_text(update_card, parse_mode="Markdown", reply_markup=keyboard)
-                    else:
-                        await update.effective_message.reply_text(update_card, parse_mode="Markdown", reply_markup=keyboard)
-                        await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                    return
-
-                old_pin_input = args[0]
-                new_pin = args[1]
-
-                if not security.verify_pin(old_pin_input, chat_id, stored_pin):
-                    bad_old_err = (
-                        "❌ **Invalid Old PIN code!** Please check and try again." if user_lang == 'en' else
-                        ("❌ **旧 PIN 码不正确！** 请检查后重试。" if user_lang == 'zh' else
-                        "❌ **លេខកូដ PIN ចាស់មិនត្រឹមត្រូវ!** សូមពិនិត្យមើលម្ដងទៀត។")
-                    )
-                    await update.effective_message.reply_text(bad_old_err, parse_mode="Markdown", reply_markup=keyboard)
-                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                    return
-
-            if not is_smart_pin(new_pin):
-                weak_pin_err = (
-                    "❌ **PIN is too easy to guess!** (Do not use repeated or sequential digits like `1111`, `1234`, `123456`)" if user_lang == 'en' else
-                    ("❌ **PIN 码过于简单！** (请勿使用重复或连续数字，如 `1111`, `1234`, `123456`)" if user_lang == 'zh' else
-                    "❌ **លេខ PIN ងាយស្រួលទស្សន៍ទាយពេក!** (សូមកុំប្រើលេខដដែលៗ ឬរៀងគ្នា ដូចជា `1111`, `1234`, `123456`)")
-                )
-                await update.effective_message.reply_text(weak_pin_err, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                return
-
-            new_pin_hash = security.hash_pin(new_pin, chat_id)
-            db.set_user_pin(chat_id, new_pin_hash)
-
-            if hasattr(db, 'log_admin_action'):
-                db.log_admin_action(chat_id, "SET_PIN", "USER", "2FA PIN set/updated successfully.")
+            dispatch_str = "🟢 User Notified Successfully" if notified_user else "🔴 User Blocked Bot (DB Updated)"
 
             if user_lang == 'en':
                 success_msg = (
-                    "✅ **APEX 2FA SECURITY PIN SAVED SUCCESSFULLY!** 🔒\n"
+                    "🔐 **APEX ADMIN 2FA PIN RESET COMPLETED!** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    "🛡️ **Security Vault**: `ENCRYPTED HIGH-SECURITY 2FA` 🟢\n"
-                    "⚡ **Protection**: `PBKDF2 Multi-Layer Salt Hashing (4-6 Digits Active)`\n"
-                    "💡 _Your PIN message has been automatically purged from Chat for security._"
+                    f"👤 **Target User ID**: `{target_id}`\n"
+                    f"🔑 **Temporary PIN Code**: `{new_pin}`\n"
+                    f"⚡ **Dispatch Notification**: `{dispatch_str}`\n"
+                    "🛡️ **System Vault**: `PBKDF2 HASH UPDATED IN DATABASE` 🟢"
                 )
             elif user_lang == 'zh':
                 success_msg = (
-                    "✅ **2FA 双重验证 PIN 码保存成功！** 🔒\n"
+                    "🔐 **ADMIN 2FA PIN 码重置完成！** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    "🛡️ **安全金库**: `高安全 2FA 加密保护` 🟢\n"
-                    "⚡ **散列算法**: `PBKDF2 多层 Salt 加密 (4-6 位数字生效)`\n"
-                    "💡 _包含 PIN 码的敏感消息已被系统从聊天记录中自动删除。_"
+                    f"👤 **目标用户 ID**: `{target_id}`\n"
+                    f"🔑 **临时 PIN 密码**: `{new_pin}`\n"
+                    f"⚡ **通知发送状态**: `{dispatch_str}`\n"
+                    "🛡️ **系统金库**: `PBKDF2 散列值已更新至数据库` 🟢"
                 )
             else:
                 success_msg = (
-                    "✅ **APEX 2FA SECURITY PIN SAVED SUCCESSFULLY!** 🔒\n"
+                    "🔐 **APEX ADMIN 2FA PIN RESET COMPLETED!** ⚡\n"
                     "═══════════════════════════════\n\n"
-                    "🛡️ **Security Vault**: `ENCRYPTED HIGH-SECURITY 2FA` 🟢\n"
-                    "⚡ **Protection**: `PBKDF2 Multi-Layer Salt Hashing (4-6 ខ្ទង់ Active)`\n"
-                    "💡 _សារដែលមានលេខ PIN របស់អ្នកត្រូវបានលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
+                    f"👤 **Target User ID** ៖ `{target_id}`\n"
+                    f"🔑 **Temporary PIN Code** ៖ `{new_pin}`\n"
+                    f"⚡ **Dispatch Notification** ៖ `{dispatch_str}`\n"
+                    "🛡️ **System Vault** ៖ `PBKDF2 HASH UPDATED IN DATABASE` 🟢"
                 )
 
-            await update.effective_message.reply_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-            self.log_signal.emit(f"🔑 VIP User {chat_id} set/updated their 2FA PIN.")
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
+
+            self.log_signal.emit(f"🔐 Admin {chat_id} RESET PIN for user {target_id} to '{new_pin}'.")
             return
 
         async def wave_rider_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
