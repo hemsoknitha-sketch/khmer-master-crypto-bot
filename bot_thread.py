@@ -4174,68 +4174,136 @@ class TelegramBotThread(BaseThread):
             
         async def admin_license_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
 
-            if not db.is_admin(chat_id):
-                await update.message.reply_text("❌ **ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
                 return
 
-            args = context.args
+            args = context.args if hasattr(context, 'args') else []
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("👥 User Directory", callback_data="btn_admin_users_refresh"),
-                    InlineKeyboardButton("📢 Broadcast Alert", callback_data="btn_admin_broadcast_prompt")
+                    InlineKeyboardButton("👥 VIP User Registry", callback_data="btn_admin_users_refresh"),
+                    InlineKeyboardButton("👻 VIP Portfolio Audit", callback_data="btn_admin_portfolio_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
                 ],
                 [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ]
             ])
 
             if not args or len(args) < 2:
-                msg = (
-                    "👑 **APEX SUPER AGI TURBO BRAIN v9.5 | ADMIN VIP LICENSE ENGINE** ⚡\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **LICENSE DURATION TIERS:**\n"
-                    "• `1 Month` (30 Days VIP Pass)\n"
-                    "• `3 Months` (90 Days VIP Pass)\n"
-                    "• `6 Months` (180 Days VIP Pass)\n"
-                    "• `1 Year` (365 Days VIP Pass)\n"
-                    "• `Lifetime` (Permanent VIP Access)\n"
-                    "• `Revoke VIP` (Downgrade to Standard Free User)\n"
-                    "• `Administrator` (Grant Super Admin Console Access)\n\n"
-                    "📋 **1-TAP COMMAND SYNTAX:**\n"
-                    "👉 **ផ្តល់ VIP 1 ខែ ៖**\n"
-                    "`` `/admin_license 12345678 1 Month` ``\n\n"
-                    "👉 **ផ្តល់ VIP Lifetime ៖**\n"
-                    "`` `/admin_license 12345678 Lifetime` ``\n\n"
-                    "👉 **ដក VIP Access ៖**\n"
-                    "`` `/admin_license 12345678 Revoke VIP` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if user_lang == 'en':
+                    guide_card = (
+                        "👑 **APEX SUPER AGI v12.00 | VIP LICENSE MANAGER** 👑\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **LICENSE DURATION TIERS:**\n"
+                        "• `1 Month` (30 Days VIP Pass)\n"
+                        "• `3 Months` (90 Days VIP Pass)\n"
+                        "• `6 Months` (180 Days VIP Pass)\n"
+                        "• `1 Year` (365 Days VIP Pass)\n"
+                        "• `Lifetime` (Permanent VIP Access)\n"
+                        "• `Revoke VIP` (Downgrade to Standard Free User)\n"
+                        "• `Administrator` (Grant Full Super Admin Access)\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX:**\n"
+                        "👉 **Grant 1-Month VIP Pass:**\n"
+                        "`` `/admin_license 12345678 1 Month` ``\n\n"
+                        "👉 **Grant Lifetime VIP Pass:**\n"
+                        "`` `/admin_license 12345678 Lifetime` ``\n\n"
+                        "👉 **Revoke VIP Access:**\n"
+                        "`` `/admin_license 12345678 Revoke VIP` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin license grants take effect immediately and auto-notify target users!_"
+                    )
+                elif user_lang == 'zh':
+                    guide_card = (
+                        "👑 **APEX SUPER AGI v12.00 | VIP 授权管理控制台** 👑\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **VIP 授权时长等级：**\n"
+                        "• `1 Month` (30 天 VIP 权限)\n"
+                        "• `3 Months` (90 天 VIP 权限)\n"
+                        "• `6 Months` (180 天 VIP 权限)\n"
+                        "• `1 Year` (365 天 VIP 权限)\n"
+                        "• `Lifetime` (永久 VIP 会员权限)\n"
+                        "• `Revoke VIP` (撤销 VIP 降级为普通免费用户)\n"
+                        "• `Administrator` (授予 Super Admin 完全控制权限)\n\n"
+                        "📋 **1-TAP 授权命令格式：**\n"
+                        "👉 **授予 1 个月 VIP 权限：**\n"
+                        "`` `/admin_license 12345678 1 Month` ``\n\n"
+                        "👉 **授予 永久 VIP 权限：**\n"
+                        "`` `/admin_license 12345678 Lifetime` ``\n\n"
+                        "👉 **撤销 VIP 权限：**\n"
+                        "`` `/admin_license 12345678 Revoke VIP` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _Super Admin 授权修改将立即生效并自动向目标用户下发通知！_"
+                    )
+                else:
+                    guide_card = (
+                        "👑 **APEX SUPER AGI v12.00 | VIP LICENSE MANAGER** 👑\n"
+                        "═══════════════════════════════\n\n"
+                        "📊 **LICENSE DURATION TIERS ៖**\n"
+                        "• `1 Month` (30 Days VIP Pass)\n"
+                        "• `3 Months` (90 Days VIP Pass)\n"
+                        "• `6 Months` (180 Days VIP Pass)\n"
+                        "• `1 Year` (365 Days VIP Pass)\n"
+                        "• `Lifetime` (Permanent VIP Access)\n"
+                        "• `Revoke VIP` (Downgrade to Standard Free User)\n"
+                        "• `Administrator` (Grant Full Super Admin Access)\n\n"
+                        "📋 **1-TAP COMMAND SYNTAX ៖**\n"
+                        "👉 **ផ្តល់ VIP 1 ខែ ៖**\n"
+                        "`` `/admin_license 12345678 1 Month` ``\n\n"
+                        "👉 **ផ្តល់ VIP Lifetime ៖**\n"
+                        "`` `/admin_license 12345678 Lifetime` ``\n\n"
+                        "👉 **ដក VIP Access ៖**\n"
+                        "`` `/admin_license 12345678 Revoke VIP` ``\n"
+                        "═══════════════════════════════\n"
+                        "💡 _ការកំណត់ VIP នឹងត្រូវអាប់ឌែតក្នុងប្រព័ន្ធ និងផ្ញើសារប្រាប់ User ដោយស្វ័យប្រវត្តិ!_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(guide_card, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=guide_card, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
             target_raw = str(args[0]).strip()
             duration = " ".join([str(a) for a in args[1:]]).strip()
 
             if not target_raw.isdigit():
-                await update.message.reply_text("❌ **ទម្រង់ Chat ID មិនត្រឹមត្រូវ!** (ឧទាហរណ៍ ៖ `/admin_license 12345678 1 Month`)", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                bad_id = "❌ Invalid User Chat ID." if user_lang == 'en' else ("❌ 用户 Chat ID 格式不正确。" if user_lang == 'zh' else "❌ ទម្រង់ Chat ID មិនត្រឹមត្រូវ! (ឧទាហរណ៍ ៖ `/admin_license 12345678 1 Month`)")
+                await update.effective_message.reply_text(bad_id)
                 return
 
             target_id = int(target_raw)
-
             db.set_user_license(target_id, duration)
 
             if hasattr(db, 'log_admin_action'):
@@ -4243,11 +4311,18 @@ class TelegramBotThread(BaseThread):
 
             notified_user = False
             try:
-                if duration in ["Revoke VIP", "Revoke"]:
+                if duration in ["Revoke VIP", "Revoke", "0", "0 Days"]:
                     alert_msg = (
-                        "🛑 **សេចក្តីជូនដំណឹងពីប្រព័ន្ធ APEX VIP**\n\n"
-                        "សិទ្ធិប្រើប្រាស់ VIP របស់អ្នកត្រូវបានបញ្ចប់ដោយ Admin ៕\n"
-                        "គណនីរបស់អ្នកឥឡូវនេះស្ថិតក្នុង Standard Free Member ធម្មតា។"
+                        "🛑 **APEX VIP STATUS UPDATE**\n\n"
+                        "Your VIP membership access has been revoked or expired.\n"
+                        "Your account status is now reset to Standard Free User."
+                        if user_lang == 'en' else
+                        ("🛑 **APEX VIP 会员状态更新**\n\n"
+                         "您的 VIP 会员权限已被管理员撤销或已到期。\n"
+                         "您的账户现已恢复为普通免费用户。" if user_lang == 'zh' else
+                         "🛑 **សេចក្តីជូនដំណឹងពីប្រព័ន្ធ APEX VIP**\n\n"
+                         "សិទ្ធិប្រើប្រាស់ VIP របស់អ្នកត្រូវបានបញ្ចប់ដោយ Admin <ctrl42>\n"
+                         "គណនីរបស់អ្នកឥឡូវនេះស្ថិតក្នុង Standard Free Member ធម្មតា។")
                     )
                 else:
                     alert_msg = (
@@ -4255,54 +4330,68 @@ class TelegramBotThread(BaseThread):
                         "═══════════════════════════════\n\n"
                         f"✨ **License Duration**: `{duration}`\n"
                         "⚡ **Status**: `VIP UNLOCKED (All Trading Engines Active)` 🟢\n\n"
-                        "👉 **ដើម្បីចាប់ផ្តើម ៖** វាយបញ្ជា `` `/menu` `` ឬ `` `/status` ``"
+                        "👉 **To begin trading:** Type `` `/menu` `` or `` `/status` ``"
+                        if user_lang == 'en' else
+                        ("🎉 **APEX SUPER AGI VIP 会员权限已成功激活！** 👑\n"
+                         "═══════════════════════════════\n\n"
+                         f"✨ **VIP 授权时长**: `{duration}`\n"
+                         "⚡ **状态**: `VIP 解锁 (所有 AI 交易引擎就绪)` 🟢\n\n"
+                         "👉 **立即开始交易：** 输入命令 `` `/menu` `` 或 `` `/status` ``" if user_lang == 'zh' else
+                         "🎉 **APEX SUPER AGI VIP ACCESS GRANTED!** 👑\n"
+                         "═══════════════════════════════\n\n"
+                         f"✨ **License Duration** ៖ `{duration}`\n"
+                         "⚡ **Status** ៖ `VIP UNLOCKED (All Trading Engines Active)` 🟢\n\n"
+                         "👉 **ដើម្បីចាប់ផ្តើម ៖** វាយបញ្ជា `` `/menu` `` ឬ `` `/status` ``")
                     )
                 await context.bot.send_message(chat_id=target_id, text=alert_msg, parse_mode="Markdown")
                 notified_user = True
             except Exception as e:
                 print(f"Failed to notify user {target_id} of license update: {e}")
 
-            # Dynamically push Admin commands menu if made Administrator
-            if duration == "Administrator":
+            dispatch_str = "🟢 User Notified Successfully" if notified_user else "🔴 User Blocked Bot (DB Updated)"
+
+            if user_lang == 'en':
+                success_msg = (
+                    "👑 **APEX ADMIN VIP LICENSE UPDATED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **Target User ID**: `{target_id}`\n"
+                    f"✨ **Granted License Tier**: `{duration}`\n"
+                    f"⚡ **Dispatch Notification**: `{dispatch_str}`\n"
+                    "🛡️ **System Status**: `PERSISTED IN DATABASE VAULT` 🟢"
+                )
+            elif user_lang == 'zh':
+                success_msg = (
+                    "👑 **VIP 授权成功更新！** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **目标用户 ID**: `{target_id}`\n"
+                    f"✨ **最新授权时长**: `{duration}`\n"
+                    f"⚡ **通知发送状态**: `{dispatch_str}`\n"
+                    "🛡️ **系统状态**: `已实时保存至数据库金库` 🟢"
+                )
+            else:
+                success_msg = (
+                    "👑 **APEX ADMIN VIP LICENSE UPDATED!** ⚡\n"
+                    "═══════════════════════════════\n\n"
+                    f"👤 **Target User ID** ៖ `{target_id}`\n"
+                    f"✨ **Granted License Tier** ៖ `{duration}`\n"
+                    f"⚡ **Dispatch Notification** ៖ `{dispatch_str}`\n"
+                    "🛡️ **System Status** ៖ `PERSISTED IN DATABASE VAULT` 🟢"
+                )
+
+            if update.callback_query:
                 try:
-                    from telegram import BotCommand, BotCommandScopeChat
-                    admin_cmds = [
-                        BotCommand("start", "🚀 ចាប់ផ្តើម Bot (Start Bot)"),
-                        BotCommand("menu", "🎛️ Master Menu"),
-                        BotCommand("status", "📊 ពិនិត្យស្ថានភាពប្រព័ន្ធ"),
-                        BotCommand("admin_config", "⚙️ [CONFIG] កែប្រែប៉ារ៉ាម៉ែត្រ Real-Time"),
-                        BotCommand("admin_signal", "🚨 [SIGNAL] បញ្ជាទិញកាក់ស្វ័យប្រវត្តិ"),
-                        BotCommand("admin_nuke", "☢️ [PANIC] លក់កាក់និងបិទ Auto-Trade (<100ms)"),
-                        BotCommand("toggle_breaker", "🛡️ [BREAKER] បិទ/បើកប្រព័ន្ធការពារអាសន្ន"),
-                        BotCommand("admin_license", "👑 [LICENSE] ផ្តល់/ដក VIP License"),
-                        BotCommand("admin_broadcast", "📢 [BROADCAST] ផ្ញើសារប្រកាសអាសន្ន"),
-                        BotCommand("health", "🖥️ [VPS] ពិនិត្យសុខភាពម៉ាស៊ីន VPS"),
-                        BotCommand("admin_users", "👑 [USERS] បង្ហាញបញ្ជី User ទាំងអស់"),
-                        BotCommand("admin_delete", "👑 [DELETE] លុបទិន្នន័យ User ទាំងស្រុង"),
-                        BotCommand("admin_reset_pin", "👑 [RESET] Reset លេខកូដ PIN របស់ User"),
-                        BotCommand("admin_stats", "📊 [STATS] មើលទិន្នន័យរួមនៃប្រព័ន្ធ"),
-                        BotCommand("admin_view_portfolio", "👻 [GHOST] មើលគណនី VIP")
-                    ]
-                    await context.bot.set_my_commands(admin_cmds, scope=BotCommandScopeChat(chat_id=target_id))
-                    self.log_signal.emit(f"👑 Super Admin Menu pushed to {target_id}")
+                    await update.callback_query.edit_message_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
                 except Exception:
-                    pass
+                    await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
 
-            dispatch_str = "🟢 User Notified" if notified_user else "🔴 User Blocked Bot"
-
-            msg = (
-                "👑 **APEX ADMIN LICENSE UPDATED!** ⚡\n"
-                "═══════════════════════════════\n\n"
-                f"👤 **Target User ID**: `{target_id}`\n"
-                f"✨ **Granted Duration**: `{duration}`\n"
-                f"⚡ **Dispatch Status**: `{dispatch_str}`\n"
-                "🛡️ **System Status**: `UPDATED IN DATABASE` 🟢"
-            )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
             self.log_signal.emit(f"👑 Admin {chat_id} set LICENSE for {target_id} to '{duration}'.")
             return
-                
+
         async def admin_delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
