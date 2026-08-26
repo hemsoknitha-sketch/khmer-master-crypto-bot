@@ -307,7 +307,7 @@ class AIInvestmentEngine:
                 print(f"🔄 [AI ML BRAIN AUTO-INSTALLER] Missing ML packages detected: {missing}. Auto-installing on VPS...")
                 try:
                     import subprocess, sys
-                    subprocess.run([sys.executable, "-m", "pip", "install"] + missing, check=True)
+                    subprocess.run([sys.executable, "-m", "pip", "install", "--break-system-packages"] + missing, check=True)
                     print(f"✅ [AI ML BRAIN AUTO-INSTALLER] Successfully auto-installed {missing}!")
                 except Exception as err:
                     print(f"⚠️ [AI ML BRAIN AUTO-INSTALLER] Auto-install attempt notice: {err}")

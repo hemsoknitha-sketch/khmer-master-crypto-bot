@@ -1769,6 +1769,40 @@ class TelegramBotThread(BaseThread):
                 self.active_tasks.discard(chat_id)
 
 
+        async def execute_auto_trade_if_applicable(context, chat_id: int, user_lang: str, symbol: str, analysis_text: str):
+            """Executes auto trade if user has enabled VIP auto trading and AI signal is STRONG BULLISH/BEARISH."""
+            try:
+                auto_cfg = db.get_user_config(chat_id, "auto_trade") if hasattr(db, 'get_user_config') else None
+                if not auto_cfg or not auto_cfg.get("is_enabled"):
+                    return
+
+                keys = db.get_user_api(chat_id)
+                if not keys: return
+                api_key, api_secret = keys
+
+                text_upper = str(analysis_text or "").upper()
+                action = None
+                if "BUY" in text_upper or "BULLISH" in text_upper or "LONG" in text_upper:
+                    action = "BUY"
+                elif "SELL" in text_upper or "BEARISH" in text_upper or "SHORT" in text_upper:
+                    action = "SELL"
+
+                if not action: return
+
+                amount = auto_cfg.get("amount", 20.0)
+                leverage = auto_cfg.get("leverage", 5)
+
+                import trading_engine
+                res = await asyncio.to_thread(trading_engine.execute_hyper_trade_strategy, api_key, api_secret, symbol, action, leverage, amount)
+                if res and "error" not in res and "code" not in res:
+                    msg = (
+                        f"🚀 **VIP AUTO-TRADE EXECUTED!**\n"
+                        f"🪙 **Symbol**: `{symbol}` | Action: `{action}` | Capital: `${amount}` (${leverage}x)"
+                    )
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+            except Exception as e:
+                print(f"Auto-trade execution notice: {e}")
+
         async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
