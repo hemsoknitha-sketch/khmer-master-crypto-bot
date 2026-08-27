@@ -488,7 +488,10 @@ def get_futures_balance_detailed(api_key: str, api_secret: str, asset: str = "US
                 url_v2 = f"{f_base}/fapi/v2/balance?{query_string}&signature={signature}"
                 res = requests.get(url_v2, headers=headers, timeout=5)
                 if res.status_code == 200:
-                    data = res.json()
+                    try:
+                        data = res.json()
+                    except Exception:
+                        continue
                     if isinstance(data, list):
                         for b in data:
                             if b.get('asset') == asset:
@@ -507,7 +510,10 @@ def get_futures_balance_detailed(api_key: str, api_secret: str, asset: str = "US
                 url_acc = f"{f_base}/fapi/v2/account?{query_string}&signature={signature}"
                 res_acc = requests.get(url_acc, headers=headers, timeout=5)
                 if res_acc.status_code == 200:
-                    acc_data = res_acc.json()
+                    try:
+                        acc_data = res_acc.json()
+                    except Exception:
+                        continue
                     if isinstance(acc_data, dict):
                         total_bal = float(acc_data.get('totalWalletBalance', 0.0) or 0.0)
                         total_margin = float(acc_data.get('totalMarginBalance', 0.0) or 0.0)

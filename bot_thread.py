@@ -1402,7 +1402,9 @@ class TelegramBotThread(BaseThread):
                         "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
                         "💡 *សូមចុចប៊ូតុង **[🔑 Add Binance API]** ខាងក្រោមដើម្បីភ្ជាប់ API Keys របស់អ្នកជាមុនសិន ៖*"
                     )
-                await update.message.reply_text(empty_msg, parse_mode="Markdown", reply_markup=reply_markup)
+                target_msg = update.message if update.message else (update.callback_query.message if update.callback_query else None)
+                if target_msg:
+                    await target_msg.reply_text(empty_msg, parse_mode="Markdown", reply_markup=reply_markup)
                 return
                 
             import trading_engine
@@ -1491,7 +1493,9 @@ class TelegramBotThread(BaseThread):
                     f"💎 **ទ្រព្យសកម្មសរុប (Binance Total Net Equity):** `${total_net_equity:,.2f} USDT`"
                 )
                 
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+            target_msg = update.message if update.message else (update.callback_query.message if update.callback_query else None)
+            if target_msg:
+                await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
             self.log_signal.emit(f"💳 VIP User {chat_id} checked their v12.00 live balance.")
 
 
