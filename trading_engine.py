@@ -38,12 +38,16 @@ def sync_time():
         print(f"Failed to sync Binance time: {e}")
 
 BINANCE_SPOT_URLS = [
+    os.getenv("BINANCE_SPOT_URL", "").rstrip("/"),
     "https://api.binance.com",
+    "https://api.binance.info",
+    "https://api-gcp.binance.com",
     "https://api1.binance.com",
     "https://api2.binance.com",
     "https://api3.binance.com",
     "https://api4.binance.com"
 ]
+BINANCE_SPOT_URLS = [u for u in BINANCE_SPOT_URLS if u]
 
 def get_working_spot_url():
     """Smart Fallback: Finds a working Binance endpoint to bypass DNS issues."""
@@ -56,7 +60,7 @@ def get_working_spot_url():
             continue
     return BINANCE_SPOT_URLS[0]
 
-BASE_URL = get_working_spot_url()
+BASE_URL = os.getenv("BINANCE_SPOT_URL", get_working_spot_url()).rstrip("/")
 sync_time()
 FUTURES_URL = os.getenv("BINANCE_FUTURES_URL", "https://fapi.binance.com").rstrip("/")
 import math
