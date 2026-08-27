@@ -5,11 +5,19 @@ import re
 
 # RSS Feed Endpoints for Live Breaking Crypto & Financial News
 RSS_FEEDS = [
-    "https://cointelegraph.com/rss",
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "https://cointelegraph.com/rss",
     "https://cryptopotato.com/feed/",
-    "https://news.bitcoin.com/feed/"
+    "https://news.bitcoin.com/feed/",
+    "https://decrypt.co/feed"
 ]
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache"
+}
 
 BULLISH_KEYWORDS = ["surge", "jump", "soar", "gain", "bull", "breakout", "rally", "buy", "adoption", "approval", "record", "high", "upgrade", "partnership", "inflow", "boost", "soaring"]
 BEARISH_KEYWORDS = ["drop", "fall", "plummet", "crash", "bear", "hack", "exploit", "ban", "lawsuit", "sec", "dump", "outflow", "decline", "crackdown", "risk", "warn", "threat"]
@@ -73,7 +81,7 @@ def fetch_live_news(symbol: str = None, limit: int = 5) -> list:
         if len(news_items) >= limit * 2:
             break
         try:
-            res = requests.get(feed_url, timeout=5, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            res = requests.get(feed_url, timeout=(3.0, 5.0), headers=HEADERS, verify=False)
             if res.status_code == 200:
                 root = ET.fromstring(res.content)
                 for item in root.findall("./channel/item"):
@@ -91,13 +99,15 @@ def fetch_live_news(symbol: str = None, limit: int = 5) -> list:
                     sentiment = evaluate_headline_sentiment(title)
                     news_items.append({
                         "title": title.strip(),
-                        "link": link.strip() if link else "https://cointelegraph.com",
+                        "link": link.strip() if link else "https://coindesk.com",
                         "pub_date": pub_date.strip() if pub_date else "Recently",
                         "sentiment": sentiment,
                         "image_url": image_url
                     })
                     if len(news_items) >= limit:
                         break
+        except Exception:
+            continue
         except Exception:
             continue
 

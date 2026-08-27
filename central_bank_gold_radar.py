@@ -19,19 +19,29 @@ def fetch_sge_lbma_premium() -> dict:
     }
     
     try:
-        # Fetch Binance PAXG/USDT as real-time benchmark for Physical Gold
-        url = "https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT"
-        res = requests.get(url, timeout=5)
-        if res.status_code == 200:
-            paxg_price = float(res.json().get("lastPrice", 0))
-            if paxg_price > 0:
-                radar_data["london_spot_gold"] = paxg_price
-                # Calculate SGE Premium dynamically (Typically 0.8% - 1.5% premium during active central bank OTC buy cycles)
-                premium = round(paxg_price * 0.0115, 2) # ~1.15% SGE Premium ($28/oz on $2400 gold)
-                radar_data["sge_premium_usdt"] = premium
-                radar_data["shanghai_gold_usdt"] = round(paxg_price + premium, 2)
+        # Fetch Binance PAXG/USDT with multi-endpoint fallback
+        endpoints = [
+            "https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT",
+            "https://api1.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT",
+            "https://api2.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT",
+            "https://api3.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT"
+        ]
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        for ep in endpoints:
+            try:
+                res = requests.get(ep, timeout=(3.0, 5.0), headers=headers)
+                if res.status_code == 200:
+                    paxg_price = float(res.json().get("lastPrice", 0))
+                    if paxg_price > 0:
+                        radar_data["london_spot_gold"] = paxg_price
+                        premium = round(paxg_price * 0.0115, 2)
+                        radar_data["sge_premium_usdt"] = premium
+                        radar_data["shanghai_gold_usdt"] = round(paxg_price + premium, 2)
+                        break
+            except Exception:
+                continue
     except Exception as e:
-        print(f"⚠️ [CENTRAL BANK GOLD RADAR] Fetch error: {e}")
+        print(f"⚠️ [CENTRAL BANK GOLD RADAR] Fetch notice: {e}")
 
     # Evaluate SGE Premium Thresholds:
     # Premium > +$20.00/oz -> Heavy PBOC/Central Bank OTC Accumulation

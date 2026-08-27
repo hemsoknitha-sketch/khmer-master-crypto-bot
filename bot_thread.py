@@ -9625,15 +9625,19 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.infinity_matrix_monitor,
             'interval',
             seconds=15,
+            max_instances=3,
+            coalesce=True,
             args=[self.app],
             id='infinity_matrix_monitor'
         )
 
-        # 3. Gold Guard & Macro Radar Monitor (Every 15 seconds)
+        # 3. Gold Guard & Macro Radar Monitor (Every 30 seconds)
         self.scheduler.add_job(
             scheduler_tasks.gold_turbo_monitor,
             'interval',
-            seconds=15,
+            seconds=30,
+            max_instances=3,
+            coalesce=True,
             args=[self.app],
             id='gold_turbo_monitor'
         )
@@ -9643,6 +9647,8 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.smart_sniper_engine,
             'interval',
             seconds=15,
+            max_instances=3,
+            coalesce=True,
             args=[self.app, self.ai_engine],
             id='smart_sniper_engine'
         )
@@ -9652,6 +9658,8 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.funding_harvester_monitor,
             'interval',
             seconds=60,
+            max_instances=3,
+            coalesce=True,
             args=[self.app],
             id='funding_harvester_monitor'
         )

@@ -23,15 +23,30 @@ def fetch_macro_gold_indicators() -> dict:
     
     # 1. Fetch Binance Live PAXG/USDT Ticker
     try:
-        url = "https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT"
-        res = requests.get(url, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            macro_data["paxg_price"] = float(data.get("lastPrice", 0))
-            macro_data["paxg_change_24h"] = float(data.get("priceChangePercent", 0))
-            macro_data["paxg_volume_24h"] = float(data.get("quoteVolume", 0))
+        endpoints = [
+            "https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT",
+            "https://api1.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT",
+            "https://api2.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT",
+            "https://api3.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT"
+        ]
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        for ep in endpoints:
+            try:
+                res = requests.get(ep, timeout=(3.0, 5.0), headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    paxg_price = float(data.get("lastPrice", 0))
+                    change_24h = float(data.get("priceChangePercent", 0))
+                    volume = float(data.get("quoteVolume", 0))
+                    if paxg_price > 0:
+                        macro_data["paxg_price"] = paxg_price
+                        macro_data["paxg_change_24h"] = change_24h
+                        macro_data["paxg_volume_24h"] = volume
+                        break
+            except Exception:
+                continue
     except Exception as e:
-        print(f"⚠️ [MACRO GOLD ENGINE] Binance PAXG fetch error: {e}")
+        print(f"⚠️ [MACRO GOLD ENGINE] Binance PAXG fetch notice: {e}")
 
     # 2. Fetch Live DXY Index & US 10Y Yield from public stooq/yahoo endpoints
     try:
