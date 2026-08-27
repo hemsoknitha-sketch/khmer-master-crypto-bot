@@ -1436,6 +1436,9 @@ class TelegramBotThread(BaseThread):
             elif futures_status == "API_PERM_ERROR":
                 err_lbl = "(Enable Futures API permission required)" if user_lang == 'en' else ("(需开启合约 API 权限)" if user_lang == 'zh' else "(API Key មិនទាន់បើកសិទ្ធិ Enable Futures)")
                 futures_str = f"📈 **Futures Wallet:** `$0.00 USDT` ⚠️ *{err_lbl}*\n"
+            elif futures_status == "RESTRICTED_LOCATION":
+                err_lbl = "(VPS Location Restricted for Binance Futures - Change VPS Region to Asia)" if user_lang == 'en' else ("(合约受限地区 - 请切换 VPS 至亚洲节点)" if user_lang == 'zh' else "(VPS IP ស្ថិតក្នុងតំបន់ហាមឃាត់របស់ Binance Futures - សូមប្តូរ Server ទៅតំបន់អាស៊ី/Tokyo/Taiwan)")
+                futures_str = f"📈 **Futures Wallet:** `$0.00 USDT` 🚨 *{err_lbl}*\n"
             else:
                 futures_str = f"📈 **Futures Wallet Balance:** `${futures_balance:,.2f} USDT`\n"
 

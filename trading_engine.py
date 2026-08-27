@@ -58,7 +58,7 @@ def get_working_spot_url():
 
 BASE_URL = get_working_spot_url()
 sync_time()
-FUTURES_URL = "https://fapi.binance.com"
+FUTURES_URL = os.getenv("BINANCE_FUTURES_URL", "https://fapi.binance.com").rstrip("/")
 import math
 
 SYMBOL_INFO_CACHE = {}
@@ -489,7 +489,9 @@ def get_futures_balance_detailed(api_key: str, api_secret: str, asset: str = "US
             err_msg = err_json.get('msg', res.text)
             print(f"⚠️ [FUTURES API V2 FAIL]: Code {err_code} - {err_msg}")
             
-            if err_code in [-2015, 2015]:
+            if "restricted location" in str(err_msg).lower() or "eligibility" in str(err_msg).lower():
+                return 0.0, "RESTRICTED_LOCATION"
+            elif err_code in [-2015, 2015]:
                 return 0.0, "API_PERM_ERROR"
             elif err_code in [-1021, 1021]:
                 return 0.0, "TIMESTAMP_ERROR"
