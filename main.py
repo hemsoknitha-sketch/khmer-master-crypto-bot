@@ -37,27 +37,57 @@ def new_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
 
 socket.getaddrinfo = new_getaddrinfo
 
-# Institutional Single-Instance Lock Guard
+# Institutional Super-Smart Single-Instance Lock Guard (POSIX Kernel & Fallback)
 LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_instance.lock")
+_lock_fp = None
 
 def acquire_single_instance_lock():
     """Guarantees only ONE instance of Apex AI Bot runs to prevent Telegram Conflict errors."""
+    global _lock_fp
     try:
-        if os.path.exists(LOCK_FILE):
-            with open(LOCK_FILE, "r") as f:
-                old_pid_str = f.read().strip()
-                if old_pid_str.isdigit():
-                    old_pid = int(old_pid_str)
-                    if old_pid != os.getpid():
-                        try:
-                            import psutil
-                            if psutil.pid_exists(old_pid):
-                                print(f"⚠️ [SINGLE INSTANCE GUARD] Bot instance PID {old_pid} is already running. Exiting new duplicate process to prevent Telegram Conflict Error.")
-                                sys.exit(0)
-                        except Exception:
-                            pass
-        with open(LOCK_FILE, "w") as f:
-            f.write(str(os.getpid()))
+        if os.name == 'posix':
+            import fcntl
+            _lock_fp = open(LOCK_FILE, "w")
+            try:
+                fcntl.flock(_lock_fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _lock_fp.write(str(os.getpid()))
+                _lock_fp.flush()
+            except (IOError, OSError):
+                print(f"🚨 [SUPER SMART GUARD] Another bot instance is already running on this server!")
+                print(f"🛑 Exiting process PID {os.getpid()} to prevent duplicate instance / Telegram conflict.")
+                sys.exit(1)
+        else:
+            if os.path.exists(LOCK_FILE):
+                with open(LOCK_FILE, "r") as f:
+                    old_pid_str = f.read().strip()
+                    if old_pid_str.isdigit():
+                        old_pid = int(old_pid_str)
+                        if old_pid != os.getpid():
+                            try:
+                                import psutil
+                                if psutil.pid_exists(old_pid):
+                                    print(f"⚠️ [SINGLE INSTANCE GUARD] Bot instance PID {old_pid} is already running. Exiting new duplicate process.")
+                                    sys.exit(1)
+                            except Exception:
+                                pass
+            with open(LOCK_FILE, "w") as f:
+                f.write(str(os.getpid()))
+
+        import atexit
+        def _cleanup():
+            global _lock_fp
+            try:
+                if _lock_fp and os.name == 'posix':
+                    import fcntl
+                    fcntl.flock(_lock_fp, fcntl.LOCK_UN)
+                    _lock_fp.close()
+                if os.path.exists(LOCK_FILE):
+                    os.remove(LOCK_FILE)
+            except Exception:
+                pass
+        atexit.register(_cleanup)
+    except SystemExit:
+        raise
     except Exception as e:
         print(f"Single instance lock check notice: {e}")
 
