@@ -2535,13 +2535,19 @@ class TelegramBotThread(BaseThread):
             ])
 
             photo_sent = False
-            if image_url and len(report_text) <= 1020:
+            if image_url:
                 try:
+                    caption_txt = report_text if len(report_text) <= 1000 else (report_text[:950] + "...\n\n🔗 [Read Full Article]")
                     if status_msg:
                         try: await status_msg.delete()
                         except Exception: pass
-                    await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=report_text, parse_mode="Markdown", reply_markup=keyboard)
-                    photo_sent = True
+                    try:
+                        await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=caption_txt, parse_mode="Markdown", reply_markup=keyboard)
+                        photo_sent = True
+                    except Exception:
+                        clean_cap = caption_txt.replace('*', '').replace('`', '').replace('_', '')
+                        await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=clean_cap, reply_markup=keyboard)
+                        photo_sent = True
                 except Exception as e_ph:
                     print(f"⚠️ Photo dispatch fallback: {e_ph}")
 

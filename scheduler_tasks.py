@@ -52,15 +52,24 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                 if p_path:
                     try:
                         if str(p_path).startswith(('http://', 'https://')):
-                            # Truncate caption if > 1000 chars for Telegram photo caption limit
-                            caption_txt = msg if len(msg) <= 1000 else (msg[:980] + "...\n\n🔗 [Read Full Article]")
-                            await app.bot.send_photo(chat_id=cid, photo=p_path, caption=caption_txt, parse_mode=parse_mode)
-                            sent_photo = True
+                            caption_txt = msg if len(msg) <= 1000 else (msg[:950] + "...\n\n🔗 [Read Full Article]")
+                            try:
+                                await app.bot.send_photo(chat_id=cid, photo=p_path, caption=caption_txt, parse_mode=parse_mode)
+                                sent_photo = True
+                            except Exception:
+                                clean_caption = caption_txt.replace('*', '').replace('`', '').replace('_', '')
+                                await app.bot.send_photo(chat_id=cid, photo=p_path, caption=clean_caption)
+                                sent_photo = True
                         else:
                             with open(p_path, 'rb') as f:
-                                caption_txt = msg if len(msg) <= 1000 else (msg[:980] + "...")
-                                await app.bot.send_photo(chat_id=cid, photo=f, caption=caption_txt, parse_mode=parse_mode)
-                                sent_photo = True
+                                caption_txt = msg if len(msg) <= 1000 else (msg[:950] + "...")
+                                try:
+                                    await app.bot.send_photo(chat_id=cid, photo=f, caption=caption_txt, parse_mode=parse_mode)
+                                    sent_photo = True
+                                except Exception:
+                                    clean_caption = caption_txt.replace('*', '').replace('`', '').replace('_', '')
+                                    await app.bot.send_photo(chat_id=cid, photo=f, caption=clean_caption)
+                                    sent_photo = True
                     except Exception as e_photo:
                         print(f"⚠️ Photo broadcast notice: {e_photo}")
                         sent_photo = False
