@@ -53,12 +53,13 @@ echo "📍 Working directory: $BOT_WORKING_DIR"
 
 # 4. Setup Python Virtual Environment
 echo "🐍 Creating Python Virtual Environment..."
+export TMPDIR=/var/tmp
 python3 -m venv venv
 source venv/bin/activate
-pip install --upgrade pip
+pip install --no-cache-dir --upgrade pip
 if [ -f "requirements.txt" ]; then
     pip install --no-cache-dir -r requirements.txt
-    pip install aiohttp httpx
+    pip install --no-cache-dir aiohttp httpx
 fi
 
 # 5. Check .env File
