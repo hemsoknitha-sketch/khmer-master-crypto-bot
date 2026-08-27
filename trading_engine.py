@@ -482,42 +482,45 @@ def get_futures_balance_detailed(api_key: str, api_secret: str, asset: str = "US
         signature = generate_signature(api_secret, query_string)
         headers = {"X-MBX-APIKEY": api_key}
         
-        # 1. Try USDT-M Futures /fapi/v2/balance
-        url_v2 = f"{FUTURES_URL}/fapi/v2/balance?{query_string}&signature={signature}"
-        res = requests.get(url_v2, headers=headers, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            if isinstance(data, list):
-                for b in data:
-                    if b.get('asset') == asset:
-                        bal = float(b.get('balance', 0.0) or 0.0)
-                        cross = float(b.get('crossWalletBalance', 0.0) or 0.0)
-                        avail = float(b.get('availableBalance', 0.0) or 0.0)
-                        max_val = max(bal, cross, avail)
-                        if max_val > 0:
-                            return max_val, "OK"
-                return 0.0, "OK"
-        else:
-            err_json = {}
+        futures_endpoints = [FUTURES_URL, "https://fapi.binance.info", "https://fapi-gcp.binance.com", "https://fapi1.binance.com"]
+        for f_base in futures_endpoints:
             try:
-                err_json = res.json()
-            except:
-                pass
-            err_code = err_json.get('code', res.status_code)
-            err_msg = err_json.get('msg', res.text)
-            print(f"⚠️ [FUTURES API V2 FAIL]: Code {err_code} - {err_msg}")
-            
-            if "restricted location" in str(err_msg).lower() or "eligibility" in str(err_msg).lower():
-                return 0.0, "RESTRICTED_LOCATION"
-            elif err_code in [-2015, 2015]:
-                return 0.0, "API_PERM_ERROR"
-            elif err_code in [-1021, 1021]:
-                return 0.0, "TIMESTAMP_ERROR"
-            elif err_code in [-2014, 2014]:
-                return 0.0, "INVALID_KEY_ERROR"
+                url_v2 = f"{f_base}/fapi/v2/balance?{query_string}&signature={signature}"
+                res = requests.get(url_v2, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    if isinstance(data, list):
+                        for b in data:
+                            if b.get('asset') == asset:
+                                bal = float(b.get('balance', 0.0) or 0.0)
+                                cross = float(b.get('crossWalletBalance', 0.0) or 0.0)
+                                avail = float(b.get('availableBalance', 0.0) or 0.0)
+                                max_val = max(bal, cross, avail)
+                                return max_val, "OK"
+                        return 0.0, "OK"
+            except Exception:
+                continue
 
         # 2. Try USDT-M Futures Account Summary /fapi/v2/account
-        url_acc = f"{FUTURES_URL}/fapi/v2/account?{query_string}&signature={signature}"
+        for f_base in futures_endpoints:
+            try:
+                url_acc = f"{f_base}/fapi/v2/account?{query_string}&signature={signature}"
+                res_acc = requests.get(url_acc, headers=headers, timeout=5)
+                if res_acc.status_code == 200:
+                    acc_data = res_acc.json()
+                    if isinstance(acc_data, dict):
+                        total_bal = float(acc_data.get('totalWalletBalance', 0.0) or 0.0)
+                        total_margin = float(acc_data.get('totalMarginBalance', 0.0) or 0.0)
+                        max_acc = max(total_bal, total_margin)
+                        if max_acc > 0:
+                            return max_acc, "OK"
+                        for a in acc_data.get('assets', []):
+                            if a.get('asset') == asset:
+                                a_bal = float(a.get('walletBalance', 0.0) or a.get('marginBalance', 0.0) or 0.0)
+                                if a_bal > 0:
+                                    return a_bal, "OK"
+            except Exception:
+                continue
         res_acc = requests.get(url_acc, headers=headers, timeout=5)
         if res_acc.status_code == 200:
             acc_data = res_acc.json()
