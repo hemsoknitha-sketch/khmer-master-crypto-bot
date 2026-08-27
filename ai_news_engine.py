@@ -14,12 +14,21 @@ RSS_FEEDS = [
 BULLISH_KEYWORDS = ["surge", "jump", "soar", "gain", "bull", "breakout", "rally", "buy", "adoption", "approval", "record", "high", "upgrade", "partnership", "inflow", "boost", "soaring"]
 BEARISH_KEYWORDS = ["drop", "fall", "plummet", "crash", "bear", "hack", "exploit", "ban", "lawsuit", "sec", "dump", "outflow", "decline", "crackdown", "risk", "warn", "threat"]
 
+class NewsReportResult(str):
+    """
+    String subclass that carries text and cover image_url for Telegram media dispatching.
+    """
+    def __new__(cls, text: str, image_url: str = ""):
+        obj = super().__new__(cls, text)
+        obj.text = text
+        obj.image_url = image_url
+        return obj
+
 def evaluate_headline_sentiment(title: str) -> str:
-    """Evaluates sentiment based on financial NLP keywords."""
     title_lower = title.lower()
     bull_count = sum(1 for kw in BULLISH_KEYWORDS if kw in title_lower)
     bear_count = sum(1 for kw in BEARISH_KEYWORDS if kw in title_lower)
-    
+
     if bull_count > bear_count:
         return "BULLISH"
     elif bear_count > bull_count:
@@ -27,114 +36,185 @@ def evaluate_headline_sentiment(title: str) -> str:
     else:
         return "NEUTRAL"
 
+def extract_image_from_rss_item(item) -> str:
+    """Extracts high-resolution news thumbnail image URL from RSS item."""
+    try:
+        # 1. Check enclosure tag
+        enclosure = item.find("enclosure")
+        if enclosure is not None:
+            url = enclosure.get("url")
+            if url and ("jpg" in url.lower() or "png" in url.lower() or "jpeg" in url.lower() or "webp" in url.lower()):
+                return url
+
+        # 2. Check media:content or media:thumbnail
+        namespaces = {'media': 'http://search.yahoo.com/mrss/'}
+        for tag in ["media:content", "media:thumbnail", "{http://search.yahoo.com/mrss/}content", "{http://search.yahoo.com/mrss/}thumbnail"]:
+            elem = item.find(tag, namespaces)
+            if elem is not None and elem.get("url"):
+                return elem.get("url")
+
+        # 3. Check description for <img> src
+        desc = item.findtext("description") or ""
+        img_match = re.search(r'<img[^>]+src=["\']([^"\']+\.(?:jpg|jpeg|png|webp)[^"\']*)["\']', desc, re.IGNORECASE)
+        if img_match:
+            return img_match.group(1)
+    except Exception:
+        pass
+    return ""
+
 def fetch_live_news(symbol: str = None, limit: int = 5) -> list:
     """
-    Fetches real live breaking news items from RSS feeds / Public APIs.
+    Fetches real live breaking news items with headlines, links, pub_date, sentiment, and image_urls.
     """
     news_items = []
     symbol_filter = str(symbol).upper().replace("USDT", "").strip() if symbol else None
-    
+
     for feed_url in RSS_FEEDS:
         if len(news_items) >= limit * 2:
             break
         try:
-            res = requests.get(feed_url, timeout=4, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            res = requests.get(feed_url, timeout=5, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
             if res.status_code == 200:
                 root = ET.fromstring(res.content)
                 for item in root.findall("./channel/item"):
                     title = item.findtext("title")
                     link = item.findtext("link")
                     pub_date = item.findtext("pubDate")
-                    
+                    image_url = extract_image_from_rss_item(item)
+
                     if not title:
                         continue
-                        
+
                     if symbol_filter and symbol_filter not in title.upper():
                         continue
-                        
+
                     sentiment = evaluate_headline_sentiment(title)
                     news_items.append({
                         "title": title.strip(),
-                        "link": link.strip() if link else "https://coindesk.com",
+                        "link": link.strip() if link else "https://cointelegraph.com",
                         "pub_date": pub_date.strip() if pub_date else "Recently",
-                        "sentiment": sentiment
+                        "sentiment": sentiment,
+                        "image_url": image_url
                     })
                     if len(news_items) >= limit:
                         break
         except Exception:
             continue
-            
-    # Fallback default news if RSS network is unreachable
+
     if not news_items:
         fallback_titles = [
-            ("Bitcoin Breaks Resistance as Institutional Inflows Hit Record High", "BULLISH"),
-            ("Ethereum Network Activity Surge Following Major Layer-2 Scaling Upgrade", "BULLISH"),
-            ("Federal Reserve Signals Cautious Rate Policy Amid Cooling Inflation", "NEUTRAL"),
-            ("Solana Ecosystem Gains Momentum with Increased Decentralized Volume", "BULLISH"),
-            ("Global Crypto Market Capitalization Holds Strong Above Support Levels", "NEUTRAL")
+            ("Bitcoin Breaks Resistance as Institutional Inflows Hit Record High", "BULLISH", "https://images.cointelegraph.com/images/840_aHR0cHM6Ly9zMy5jb2ludGVsZWdyYXBoLmNvbS91cGxvYWRzLzIwMjQtMDIvYnRjX25ld3MuanBn.jpg"),
+            ("Ethereum Network Activity Surge Following Major Layer-2 Scaling Upgrade", "BULLISH", "https://images.cointelegraph.com/images/840_aHR0cHM6Ly9zMy5jb2ludGVsZWdyYXBoLmNvbS91cGxvYWRzLzIwMjQtMDIvZXRoX25ld3MuanBn.jpg"),
+            ("Federal Reserve Signals Cautious Rate Policy Amid Cooling Inflation", "NEUTRAL", ""),
+            ("Solana Ecosystem Gains Momentum with Increased Decentralized Volume", "BULLISH", ""),
+            ("Global Crypto Market Capitalization Holds Strong Above Support Levels", "NEUTRAL", "")
         ]
-        for title, s in fallback_titles:
+        for title, s, img in fallback_titles:
             if symbol_filter and symbol_filter not in title.upper():
                 continue
             news_items.append({
                 "title": title,
-                "link": "https://coindesk.com",
+                "link": "https://cointelegraph.com",
                 "pub_date": "Just Now",
-                "sentiment": s
+                "sentiment": s,
+                "image_url": img
             })
             if len(news_items) >= limit:
                 break
-                
+
     return news_items[:limit]
 
 def calculate_news_sentiment_score(news_items: list) -> tuple[float, str]:
-    """Calculates overall sentiment score (0-100) and badge."""
     if not news_items:
         return 50.0, "⚪ Neutral (50/100)"
-        
+
     bulls = sum(1 for n in news_items if n["sentiment"] == "BULLISH")
     bears = sum(1 for n in news_items if n["sentiment"] == "BEARISH")
     total = len(news_items)
-    
+
     score = round(((bulls * 1.0 + (total - bulls - bears) * 0.5) / total) * 100.0, 1)
-    
+
     if score >= 65.0:
         badge = f"🟢 Strong Bullish ({score:.0f}/100)"
     elif score <= 40.0:
         badge = f"🔴 Bearish Risk ({score:.0f}/100)"
     else:
         badge = f"⚪ Neutral Consolidation ({score:.0f}/100)"
-        
+
     return score, badge
 
-def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = None) -> str:
+def clean_ai_news_output(raw_text: str) -> str:
+    """
+    Strips out Gemini internal thinking, scratchpad notes, structure checklists, and prompt leaks.
+    Returns clean 3-paragraph executive journalistic Khmer/English/Chinese markdown text.
+    """
+    if not raw_text:
+        return ""
+
+    # Remove <thinking>...</thinking> or <thought>...</thought>
+    raw_text = re.sub(r'(?s)<thinking>.*?</thinking>', '', raw_text)
+    raw_text = re.sub(r'(?s)<thought>.*?</thought>', '', raw_text)
+
+    lines = raw_text.splitlines()
+    cleaned_lines = []
+
+    skip_keywords = [
+        "structure:", "confirm structure:", "khmer translation/refinement:",
+        "para 1:", "para 2:", "para 3:", "location:", "refinement:",
+        "translated title", "location in p1", "impact in p2", "stability in p3",
+        "ending with ៕", "p3: legal", "confirm structure"
+    ]
+
+    for line in lines:
+        line_lower = line.strip().lower()
+        if any(kw in line_lower for kw in skip_keywords):
+            continue
+        cleaned_lines.append(line)
+
+    result = "\n".join(cleaned_lines).strip()
+
+    # If duplicated draft outputs exist, take the clean final iteration
+    header_matches = [m.start() for m in re.finditer(r'(📰 \*\*APEX SUPER AGI|🚨 ព័ត៌មានទាន់ហេតុការណ៍)', result)]
+    if len(header_matches) > 1:
+        result = result[header_matches[-1]:].strip()
+
+    return result
+
+def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = None) -> NewsReportResult:
     """
     Generates a 3-Paragraph Journalistic Crypto News & AI Sentiment Report in target language (KM/EN/ZH) v12.00 Apex Ultra AGI.
+    Returns NewsReportResult containing formatted markdown text and primary article image_url.
     """
     sym_str = str(symbol).upper().strip() if symbol else ""
     sym_title = f" [{sym_str}]" if sym_str else ""
     news_list = fetch_live_news(symbol, limit=5)
     score, sentiment_badge = calculate_news_sentiment_score(news_list)
-    
+
+    top_image_url = ""
+    for item in news_list:
+        if item.get("image_url"):
+            top_image_url = item["image_url"]
+            break
+
     lang_clean = str(lang or 'khmer').lower()
     user_lang = 'en' if lang_clean in ['en', 'english'] else ('zh' if lang_clean in ['zh', 'chinese'] else 'km')
 
     headlines_raw = "\n".join([f"{i+1}. {item['title']} (URL: {item['link']})" for i, item in enumerate(news_list)])
-    
+
     if ai_engine and hasattr(ai_engine, "chat_with_user"):
         try:
             target_lang_name = "Khmer" if user_lang == 'km' else ("Chinese" if user_lang == 'zh' else "English")
             ai_prompt = (
-                f"You are an Executive Financial Journalist & Quantitative Crypto News Analyst.\n"
+                f"You are Executive Financial News Editor for Apex AGI News Network.\n"
                 f"Here are top breaking crypto news headlines:\n{headlines_raw}\n\n"
-                f"CRITICAL INSTRUCTION:\n"
-                f"Format the output strictly as a 3-Paragraph Executive Journalistic Report in {target_lang_name}:\n\n"
+                f"STRICT FORMAT INSTRUCTION:\n"
+                f"DO NOT include any internal thoughts, draft notes, or structure checklists like 'Confirm structure:' or 'Khmer translation:'.\n"
+                f"Output ONLY the final 3-paragraph executive journalistic report in {target_lang_name}:\n\n"
                 f"📰 **APEX SUPER AGI v12.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
                 f"═══════════════════════════════\n\n"
                 f"🔥 **TOP BREAKING HEADLINES:**\n"
                 f"1. 🟢 [ Translated Title 1 ](URL)\n"
-                f"2. 🔴 [ Translated Title 2 ](URL)\n"
-                f"...\n\n"
+                f"2. 🔴 [ Translated Title 2 ](URL)\n\n"
                 f"📌 **PARAGRAPH 1: EXECUTIVE VERDICT & AGI SENTIMENT INDEX**\n"
                 f"• Target Asset ៖ {sym_str or 'GLOBAL CRYPTO MARKET'}\n"
                 f"• Sentiment Index ៖ {sentiment_badge}\n"
@@ -144,11 +224,13 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
                 f"[ In-depth journalistic synthesis of macro policy, liquidity flows, exchange volume, and on-chain catalysts ]\n\n"
                 f"📌 **PARAGRAPH 3: EXECUTIVE ACTION COMMAND**\n"
                 f"`/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>`\n\n"
-                f"Respond ONLY in clean {target_lang_name} markdown text without internal thinking."
+                f"Respond ONLY with the final report in clean {target_lang_name} markdown."
             )
             ai_res = ai_engine.chat_with_user(ai_prompt, history=[])
             if isinstance(ai_res, str) and len(ai_res.strip()) > 50:
-                return ai_res.strip()
+                cleaned_text = clean_ai_news_output(ai_res.strip())
+                if cleaned_text:
+                    return NewsReportResult(cleaned_text, top_image_url)
         except Exception as e:
             print(f"⚠️ [NEWS AI TRANSLATION FALLBACK]: {e}")
 
@@ -216,4 +298,5 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             "📌 **ផ្នែកទី ៣ ៖ បញ្ជាប្រតិបត្តិការ (EXECUTIVE ACTION COMMAND)**\n"
             "👉 **អនុសាសន៍ប្រតិបត្តិការ ៖** `` `/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>` ``"
         )
-    return msg
+
+    return NewsReportResult(msg, top_image_url)

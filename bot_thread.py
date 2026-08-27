@@ -2519,7 +2519,8 @@ class TelegramBotThread(BaseThread):
 
             import ai_news_engine
             report = await asyncio.to_thread(ai_news_engine.generate_news_report, target_symbol, user_lang, self.ai_engine)
-            if not isinstance(report, str): report = str(report or "")
+            report_text = str(report or "")
+            image_url = getattr(report, "image_url", "")
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = InlineKeyboardMarkup([
@@ -2533,13 +2534,25 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            if status_msg:
+            photo_sent = False
+            if image_url and len(report_text) <= 1020:
                 try:
-                    await status_msg.edit_text(text=report, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
-                except Exception:
-                    await context.bot.send_message(chat_id=chat_id, text=report, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
-            else:
-                await context.bot.send_message(chat_id=chat_id, text=report, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
+                    if status_msg:
+                        try: await status_msg.delete()
+                        except Exception: pass
+                    await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=report_text, parse_mode="Markdown", reply_markup=keyboard)
+                    photo_sent = True
+                except Exception as e_ph:
+                    print(f"⚠️ Photo dispatch fallback: {e_ph}")
+
+            if not photo_sent:
+                if status_msg:
+                    try:
+                        await status_msg.edit_text(text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
 
             self.log_signal.emit(f"📰 Sent Super Smart AI News v12.00 to {chat_id}")
             return
