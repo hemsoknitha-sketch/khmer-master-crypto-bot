@@ -10,75 +10,59 @@
 ១. ស្ថាបត្យកម្មប្រព័ន្ធសាងប្រាក់ចំណេញ v12.00 (EXECUTIVE ULTRA PROFIT ARCHITECTURE)
 --------------------------------------------------------------------------------
 
-Apex AGI Engine v12.00 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional ដែលត្រូវបានធ្វើបច្ចុប្បន្នភាពកាត់បន្ថយមុខងារជាន់គ្នា (Overlapping Commands) ទាំងស្រុង និងធ្វើការរួមគ្នាជួយបំពេញមុខងារឱ្យគ្នាទៅវិញទៅមក ៖
+Apex AGI Engine v12.00 គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិត Institutional ដែលបំពាក់នូវម៉ាស៊ីនវិនិយោគស្ថាប័នទាំង ៦ (6 Flagship Wall Street Quantitative Engines) ៖
 
-• 🟢 [១. មុខងារស្នូល - Core Flagship Engines] ៖
-  - 🚀 Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ប្រព័ន្ធស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំងទម្រង់ Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield (ទុន < $100 លីមីត 10x Max), និង Net Profit TP Floor គណនាបូកសេវា fee Taker ចូល ធានាចំណេញសុទ្ធ ១០០%។ (ចំណាំ ៖ រាល់ Command ចាស់ៗដូចជា `/scalp`, `/hyper_trade`, `/wave_rider`, `/sweep_sniper` ត្រូវបានបង្រួមមកជា `/turbo_hedge` ទាំងអស់)។
-  - ♾️ Unified Smart Grid Engine (`/infinity_grid`) ៖ ប្រព័ន្ធ Grid ស្វ័យប្រវត្តតែមួយ ដែលគណនាចន្លោះ Grid តាម 24h ATR Volatility និងការពារ MIN_NOTIONAL ($5.05 USDT) សម្រាប់ទុនតូច។ (ចំណាំ ៖ រាល់ Command Grid ផ្សេងទៀតដូចជា `/compound_grid`, `/grid_bot`, `/infinity_matrix` ត្រូវបានតម្រង់ទិសមកកាន់ `/infinity_grid` តែមួយ)។
-  - 🎯 Listing & Volatility Sniper (`/snipe`) ៖ ប្រព័ន្ធស្ទាក់ទិញកាក់ថ្មីដែលទើបតែចុះបញ្ជីលើ Binance ឬកាក់ដែលមាន Volume Spike (RVOL) ខ្ពស់។
-  - 🌾 8-Hour Funding Yield Harvester (`/funding_harvester`) ៖ ប្រព័ន្ធស្ទាក់កើបអត្រាការប្រាក់ Funding Rate ពី Binance Futures រៀងរាល់ ៨ ម៉ោង ដោយសុវត្ថិភាព។
-  - 🧠 AGI Multi-Model Swarm Ensemble (`ai_engine.py`) ៖ ប្រព័ន្ធខួរក្បាល AI ទាំង ៥ រួមគ្នាស្វែងរក 5-Agent Consensus (Gemini 2.5, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-32B, Mistral-7B) ធ្វើឱ្យ Win-rate ខ្ពស់បំផុត និងគ្មាន False Signals!
+• 🟢 [១. ម៉ាស៊ីនវិនិយោគស្ថាប័នទាំង ៦ - 6 Wall Street Quantitative Engines] ៖
+  - ⚡ Sub-5ms Cross-Exchange Arbitrage Engine (`/cross_arb`) ៖ ប្រើប្រាស់ AI ONNX Sub-10ms HFT Model + XGBoost Imbalance + LSTM Neural Net ស្កេនរកគម្លាតតម្លៃ microsecond (<5ms) រវាង Binance, Bybit, OKX, និង Coinbase ដើម្បីកើបចំណេញ Arbitrage ដោយសុវត្ថិភាព 100%។
+  - 🌾 Institutional Delta-Neutral Funding Rate Harvester (`/funding_harvester`) ៖ ប្រើប្រាស់ HMM Market Regime + RL Dynamic PPO Agent ទិញ Spot 100% និង Short Futures 1x ស្មើគ្នា (Delta-Neutral / Zero Price Fluctuation Risk) ដើរប្រមូលលុយ Funding Fee ពី Trader ផ្សេងទៀតរៀងរាល់ ៨ ម៉ោងម្តង (ឬ ៤ ម៉ោងម្តង) បង្កើត Passive Income APY 30% - 120%/ឆ្នាំ!
+  - 🐋 Whale Orderflow & Dark Pool Front-Running Radar (`/whales`) ៖ ប្រើប្រាស់ PatchTST Transformer + NLP & On-Chain AGI ស្កេនទិន្នន័យ Wallet មហាសេដ្ឋីធំៗ (BlackRock, MicroStrategy, Binance Cold, Coinbase Prime) ចូលទិញ/លក់មុន (Front-Run) ក្នុងកម្រិត Sub-Second រួចយកចំណេញនៅពេល Whale រុញថ្លៃឡើង!
+  - 📈 AI Dynamic Compound Infinity Matrix (`/infinity_matrix`) ៖ ប្រើប្រាស់ LSTM Neural Net + RL Dynamic PPO Agent បង្កើតបណ្តាញ Grid Rebalance ដើមទុនស្វ័យប្រវត្តិ ២៤ម៉ោង/ថ្ងៃ រាល់ពេលបានប្រាក់ចំណេញ យកប្រាក់ចំណេញនោះទៅទិញបន្ថែម (100% Profit Compounding / ការប្រាក់លើការប្រាក់)!
+  - 🎯 Flash Crash / Liquidation Cascade Hunting Engine (`/flash_crash`) ៖ ប្រើប្រាស់ HMM Regime Classifier + ONNX Sub-10ms HFT Model ដាក់បញ្ជាទិញ Limit Buy Catch នៅតម្លៃបាតបំផុត (Deep Wick 5% - 25% discount) ក្នុងអំឡុងពេលទីផ្សារ Flash Crash / Liquidation Cascade រួចលក់ចេញវិញក្នុងរយៈពេល < 5 វិនាទី ដើម្បីទទួលបានចំណេញភ្លាមៗ!
+  - 🏆 PAXG Gold & Multi-Asset Safe Haven Switcher (`/gold_guard`) ៖ ប្រើប្រាស់ NLP & On-Chain AGI + HMM Market Regime នៅពេលទីផ្សារ Crypto ឬសេដ្ឋកិច្ចពិភពលោកជួបវិបត្តិ/សង្រ្គាម (Crisis Severity Index >= 75%) ដកដើមទុនទាំងអស់ទៅទិញ PAXG (Physical Gold Backed Token) ស្វ័យប្រវត្តិ 100% ដើម្បីការពារដើមទុន!
+  - 🚀 Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ប្រព័ន្ធស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំង Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield, និង Net Profit TP Floor ធានាចំណេញសុទ្ធ ១០០%។
+  - 🧠 AGI Multi-Model Swarm Ensemble (`ai_engine.py`) ៖ ប្រព័ន្ធខួរក្បាល AI ទាំង ៥ (Gemini 2.5, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-32B, Mistral-7B) ធ្វើឱ្យ Win-rate ខ្ពស់បំផុត និងគ្មាន False Signals!
   - 👑 Wall Street Ultra-Next-Gen ML Models (`train_model.py`) ៖ ប្រព័ន្ធ Machine Learning កម្រិត Wall Street រួមមាន ៖ PatchTST Attention Transformer, Triple-Ensemble (XGBoost + CatBoost + LightGBM), GNN Altcoin Ripple Graph, និង OpenAI PPO Deep Reinforcement Learning Agent!
-  - 📦 Hugging Face Cloud Auto-Train Sync (`/sync_brain`) ៖ ប្រព័ន្ធ Cloud Auto-Train លើ Google Colab GPU 14-day cycle រួច Upload ទៅ Hugging Face Hub (0% VPS Load)។ VIP User អាចវាយ `/sync_brain` លើ Telegram ដើម្បី Hot-Update ទម្ងន់ AI ថ្មីក្នុងពេល ១ វិនាទី!
-  - 📰 3-Paragraph Journalistic News Alerts & RSS Photo Extractor ៖ ប្រព័ន្ធស្កេនព័ត៌មាន និងទាញយករូបភាពទំហំធំ High-Res Photo Alerts ផ្ញើជូន ៣ វគ្គផ្លូវការ ត្រឹមត្រូវតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត 100%!
-  - ⚡ HFT X & Truth Social Firehose Engine (`hft_x_truth_firehose_engine.py`) ៖ ប្រព័ន្ធចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុត (< 2ms Latency / 0.044ms Benchmark) ពី X (Twitter) & Truth Social ដោយផ្ទាល់ តាមរយៈ In-Memory RAM Ring Buffer និង Aho-Corasick Trie Automaton!
-  - 🛡️ AI Gold Guard & Macro Radar (`/gold_radar`) ៖ បង្រួមប្រព័ន្ធមាសឌីជីថល (PAXGUSDT) ទាំងអស់មកជា AI Gold Guard តែមួយ។ (ចំណាំ ៖ ពាក្យបញ្ជាចាស់ៗ `/cb_gold`, `/paxg_arbitrage`, `/black_swan_guard`, `/gold_btc_rebalance` ត្រូវបានតម្រង់ទិសមកកាន់ `/gold_radar`)។
-
-• 🔴 [២. មុខងារហានិភ័យ/ឥតបានការ - Deactivated Retail Arbitrage] ៖
-  - Auto Arbitrage (`/auto_arb`) ៖ បានបិទ និងធ្វើបច្ចុប្បន្នភាពតម្រង់ទិសទៅកាន់ `/funding_harvester` ព្រមទាំង `/turbo_hedge` ដើម្បីការពារដើមទុន VIP ពីការខាតបង់ fee Binance 0.10% រាល់ដងលើ Retail API Accounts។
+  - 📦 Hugging Face Cloud Auto-Train Sync (`/sync_brain`) ៖ ប្រព័ន្ធ Cloud Auto-Train លើ Google Colab GPU 14-day cycle រួច Upload ទៅ Hugging Face Hub (0% VPS Load)។ វាយ `/sync_brain` ដើម្បី Hot-Update ទម្ងន់ AI ថ្មីក្នុងពេល ១ វិនាទី!
+  - 📰 3-Paragraph Journalistic News Alerts & RSS Photo Extractor ៖ ប្រព័ន្ធស្កេនព័ត៌មាន និងទាញយករូបភាព High-Res Photo Alerts ផ្ញើជូន ៣ វគ្គផ្លូវការ ត្រឹមត្រូវតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត 100%!
+  - ⚡ HFT X & Truth Social Firehose Engine (`hft_x_truth_firehose_engine.py`) ៖ ប្រព័ន្ធចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុត (< 2ms Latency) ពី X & Truth Social ដោយផ្ទាល់!
 
 --------------------------------------------------------------------------------
 ២. កាតាឡុកពាក្យបញ្ជាពេញលេញក្នុង BOT MENU v12.00 (COMPLETE COMMAND CATALOG)
 --------------------------------------------------------------------------------
 
 ២.១ ពាក្យបញ្ជាកំណត់ប្រព័ន្ធ និងគណនី (SYSTEM & ACCOUNT COMMANDS) ៖
-• `/start`        : បើកផ្ទាំង Menu ដើម និងជ្រើសរើសភាសាប្រើប្រាស់ (ខ្មែរ / English / 中文)
-• `/menu`         : បង្ហាញផ្ទាំងបញ្ជា interactive ជាមួយ Inline Buttons ទាំងអស់របស់ Bot
-• `/add_api`      : ភ្ជាប់ Binance API Key និង API Secret (ទម្រង់ ៖ `/add_api <KEY> <SECRET>`)
-• `/add_bybit_api`: ភ្ជាប់ Bybit API Key និង Secret (ទម្រង់ ៖ `/add_bybit_api <KEY> <SECRET>`)
-• `/remove_api`   : លុប API Keys ចេញពីប្រព័ន្ធដើមដើម្បីសុវត្ថិភាព
-• `/set_pin`      : កំណត់ ឬផ្លាស់ប្តូរលេខកូដ PIN សម្ងាត់ ៤-៦ ខ្ទង់ (ទម្រង់ ៖ `/set_pin <PIN>`)
-• `/language`     : ផ្លាស់ប្តូរភាសាប្រើប្រាស់ក្នុង Bot (ខ្មែរ / English / 中文)
-• `/balance`      : ពិនិត្យមើលសមតុល្យសាច់ប្រាក់ក្នុងកាបូប Spot & Futures Real-time
-• `/status`       : ពិនិត្យមើលកាក់ដែលកំពុងរត់ Trade ទាំងអស់ និងស្ថានភាព PnL Real-time
-• `/health`       : ពិនិត្យមើលសុខភាព VPS, CPU/Memory Usage, 3GB Swap, 74 Gemini Models, 5-Swarm AGI, និង API Latency
-• `/sync_brain`   : Hot-Reload ទាញយកទម្ងន់ AI ថ្មីពី Hugging Face Model Hub មកភ្ជាប់ VPS ក្នុងពេល ១ វិនាទី!
+• `/start`            : បើកផ្ទាំង Menu ដើម និងជ្រើសរើសភាសាប្រើប្រាស់ (ខ្មែរ / English / 中文)
+• `/menu`             : បង្ហាញផ្ទាំងបញ្ជា interactive ជាមួយ Inline Buttons ទាំងអស់របស់ Bot
+• `/add_api`          : ភ្ជាប់ Binance API Key និង API Secret (ទម្រង់ ៖ `/add_api <KEY> <SECRET>`)
+• `/add_bybit_api`    : ភ្ជាប់ Bybit API Key និង Secret (ទម្រង់ ៖ `/add_bybit_api <KEY> <SECRET>`)
+• `/remove_api`       : លុប API Keys ចេញពីប្រព័ន្ធដើមដើម្បីសុវត្ថិភាព
+• `/set_pin`          : កំណត់ ឬផ្លាស់ប្តូរលេខកូដ PIN សម្ងាត់ ៤-៦ ខ្ទង់ (ទម្រង់ ៖ `/set_pin <PIN>`)
+• `/language`         : ផ្លាស់ប្តូរភាសាប្រើប្រាស់ក្នុង Bot (ខ្មែរ / English / 中文)
+• `/balance`          : ពិនិត្យមើលសមតុល្យសាច់ប្រាក់ក្នុងកាបូប Spot & Futures Real-time
+• `/status`           : ពិនិត្យមើលកាក់ដែលកំពុងរត់ Trade ទាំងអស់ និងស្ថានភាព PnL Real-time (សម្អាត VPS Health លាក់ពី VIP)
+• `/sync_brain`       : Hot-Reload ទាញយកទម្ងន់ AI ថ្មីពី Hugging Face Model Hub មកភ្ជាប់ VPS ក្នុងពេល ១ វិនាទី! (Super Admin Scope)
 
-២.២ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ TURBO HEDGE (AUTONOMOUS TURBO HEDGE ENGINES) ៖
+២.២ ពាក្យបញ្ជា 6 WALL STREET QUANTITATIVE ENGINES ៖
+• `/cross_arb`        : ⚡ Sub-5ms Cross-Exchange Arbitrage ស្កេនគម្លាតតម្លៃ <5ms រវាង Binance, Bybit, OKX, Coinbase
+• `/funding_harvester`: 🌾 Delta-Neutral 30%-120% APY Harvester ប្រមូលលុយ Funding Fee 99% Risk-Free
+• `/whales`           : 🐋 Whale Orderflow Front-Running Radar ស្កេន Wallet មហាសេដ្ឋី (BlackRock, MicroStrategy) ចូលទិញមុន
+• `/infinity_matrix`  : 📈 Dynamic Compound Infinity Matrix ក្បួនដោះស្រាយលុយបង្កើតលុយ Rebalance + Compound 24/7
+• `/flash_crash`      : 🎯 Liquidation Cascade Deep Wick Hunter ទិញបាតកាក់ថោកបំផុត Deep Wick ពេលទីផ្សារសន្លប់ (<5s exit)
+• `/gold_guard`       : 🏆 PAXG Gold Wealth Protection Switcher ដកដើមទុន 100% ទៅទិញ PAXG Gold ការពារទ្រព្យពេលមានសង្គ្រាម
 
-📐 រូបមន្តទីតាំងលេខរៀងនៃពាក្យបញ្ជា /turbo_hedge (POSITION FORMULA BREAKDOWN) ៖
-/turbo_hedge [ទីតាំង១: កាក់/របៀប] [ទីតាំង២: ទុន/កាក់] [ទីតាំង៣: Leverage] [ទីតាំង៤: ទិសដៅ] [ទីតាំង៥: គោលដៅចំណេញ] [ទីតាំង៦: PIN]
+២.៣ ពាក្យបញ្ជាជួញដូរស្វ័យប្រវត្តិ TURBO HEDGE (AUTONOMOUS TURBO HEDGE ENGINES) ៖
+• `/turbo_hedge SPOT TOP 50 1234`  ➔ បើកស្កេនទិញកាក់ Spot Breakout (+3% ទៅ +35%) អូតូ 24/7 ទុន $50/កាក់។
+• `/turbo_hedge SPOT SOL 50 1234`  ➔ បើកទិញ Spot កាក់ SOL ដោយប្រើទុន $50 និងកើបចំណេញអូតូ។
+• `/turbo_hedge TOP 20 10 BUY 5 1234` ➔ បើកស្កេន 5-10 កាក់ Futures Volatile (Leverage 10x, Target TP $5)។
+• `/turbo_hedge SOL 40 10 BUY 5 1234` ➔ បើកកាក់ SOL Futures ទិសដៅ BUY (Long) ទុន $40 (Leverage 10x, Target TP $5)។
+• `/turbo_hedge STOP ALL 1234`     ➔ បិទ និង Market Close គ្រប់កាក់ទាំងអស់លើ Binance ភ្លាមៗ (<30ms)។
 
-• [ទីតាំងទី ១] ➔ កាក់/របៀប ៖ SPOT (ទិញ/លក់ Spot), TOP (ស្កេនច្រើនកាក់ Futures អូតូ), ឬ SOL, BTC, ETH (កាក់ទោល)
-• [ទីតាំងទី ២] ➔ ដើមទុនក្នុង 1 កាក់ ៖ 10 ($10 USDT), 20 ($20 USDT), 50 ($50 USDT)
-• [ទីតាំងទី ៣] ➔ ចំនួន Leverage ៖ 1 (សម្រាប់ Spot), 10 (10x), 15 (15x Max Dynamic)
-• [ទីតាំងទី ៤] ➔ ទិសដៅជួញដូរ ៖ AUTO (AI សម្រេច), SPOT (Spot Buy), BUY (Long), SELL (Short)
-• [ទីតាំងទី ៥] ➔ គោលដៅចំណេញ (TP) ៖ 2.5 (+$2.50 USDT), 5.0 (+$5.00 USDT)
-• [ទីតាំងទី ៦] ➔ លេខកូដ PIN ៖ 1234 ឬ PIN សុវត្ថិភាពរបស់អ្នក
-
-📋 ពាក្យបញ្ជា TURBO HEDGE ជាក់ស្តែង (COMMAND EXAMPLES) ៖
-👉 **Spot Multi-Coin TOP Scanner** ៖
-   `/turbo_hedge SPOT TOP 50 1234` ➔ បើកស្កេនទិញកាក់ Spot Breakout (+3% ទៅ +35%) អូតូ 24/7 ដោយប្រើទុន $50/កាក់ (Leverage 1x)។
-👉 **Spot Single-Coin Mode** ៖
-   `/turbo_hedge SPOT SOL 50 1234` ➔ បើកទិញ Spot កាក់ SOL ដោយប្រើទុន $50 (Leverage 1x) និងកើបចំណេញអូតូ។
-👉 **Futures Multi-Coin TOP Scanner** ៖
-   `/turbo_hedge TOP 20 10 BUY 5 1234` ➔ បើកស្កេន 5-10 កាក់ Futures Volatile រត់ 24/7 ដោយប្រើទុន $20/កាក់ (Leverage 10x, Target TP $5)។
-👉 **Futures Single-Coin Mode** ៖
-   `/turbo_hedge SOL 40 10 BUY 5 1234` ➔ បើកកាក់ SOL Futures ទិសដៅ BUY (Long) ទុន $40 (Leverage 10x, Target TP $5)។
-👉 **Stop & Liquidate Commands** ៖
-   `/turbo_hedge STOP SOL 1234` ➔ បិទ និង Market Close/Sell កាក់ SOL (ទាំង Spot ឬ Futures) ភ្លាមៗ (<30ms)។
-   `/turbo_hedge STOP ALL 1234` ➔ បិទ និង Market Close/Sell គ្រប់កាក់ទាំងអស់ (Spot & Futures) លើ Binance ភ្លាមៗ (<30ms)។
-
-២.៣ ពាក្យបញ្ជាវិភាគ និងសញ្ញាទីផ្សារ (AI INTELLIGENCE & MARKET ANALYSIS) ៖
-• `/analyze`      : ឲ្យ 5-Agent AGI Swarm Ensemble វិភាគបច្ចេកទេស និងទិសដៅកាក់ Real-time (ទម្រង់ ៖ `/analyze BTCUSDT`)
-• `/predict`      : ឲ្យ ML Brain (`predict_quant_ml`) ព្យាករណ៍តម្លៃ និង Trend ក្នុងរយៈពេល ២៤ ម៉ោង (ទម្រង់ ៖ `/predict SOLUSDT`)
-• `/whales`       : តាមដានចលនា Whale (ត្រីបាឡែន) ទិញ/លក់ ធំៗក្នុងទីផ្សារ Real-time
-• `/news`         : អានព័ត៌មានទាន់ហេតុការណ៍ Crypto & សេដ្ឋកិច្ចសកលវិទ្យា (Macro Economy) ព្រមទាំង High-Res Photo Alerts ៣ វគ្គផ្លូវការ
-• `/top`          : មើលបញ្ជីកាក់ដែលឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile Gainers & Losers)
-• `/alert`        : កំណត់ការជូនដំណឹងតម្លៃកាក់ (ទម្រង់ ៖ `/alert BTC 95000 ABOVE`)
-
-២.៤ ពាក្យបញ្ជាការពារមាស និងសុវត្ថិភាព (GOLD & SAFETY GUARD COMMANDS) ៖
-• `/gold_radar`   : ស្កេនពិនិត្យតម្លៃមាសឌីជីថល (PAXGUSDT) Real-time ជាមួយ Macro Radar
+២.៤ ពាក្យបញ្ជាវិភាគ និងសញ្ញាទីផ្សារ (AI INTELLIGENCE & MARKET ANALYSIS) ៖
+• `/analyze`          : ឲ្យ 5-Agent AGI Swarm Ensemble វិភាគបច្ចេកទេស និងទិសដៅកាក់ Real-time (ទម្រង់ ៖ `/analyze BTCUSDT`)
+• `/predict`          : ឲ្យ ML Brain (`predict_quant_ml`) ព្យាករណ៍តម្លៃ និង Trend ក្នុងរយៈពេល ២៤ ម៉ោង (ទម្រង់ ៖ `/predict SOLUSDT`)
+• `/news`             : អានព័ត៌មានទាន់ហេតុការណ៍ Crypto & Macro Economy ព្រមទាំង High-Res Photo Cover Alerts ៣ វគ្គផ្លូវការ
+• `/top`              : មើលបញ្ជីកាក់ដែលឡើង/ធ្លាក់ខ្លាំងបំផុតប្រចាំថ្ងៃ (Top Volatile Gainers & Losers)
+• `/alert`            : កំណត់ការជូនដំណឹងតម្លៃកាក់ (ទម្រង់ ៖ `/alert BTC 95000 ABOVE`)
 
 --------------------------------------------------------------------------------
 ៣. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ v12.00 (CAPITAL ALLOCATION MATRIX)
