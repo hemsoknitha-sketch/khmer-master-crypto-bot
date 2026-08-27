@@ -521,20 +521,6 @@ def get_futures_balance_detailed(api_key: str, api_secret: str, asset: str = "US
                                     return a_bal, "OK"
             except Exception:
                 continue
-        res_acc = requests.get(url_acc, headers=headers, timeout=5)
-        if res_acc.status_code == 200:
-            acc_data = res_acc.json()
-            if isinstance(acc_data, dict):
-                total_bal = float(acc_data.get('totalWalletBalance', 0.0) or 0.0)
-                total_margin = float(acc_data.get('totalMarginBalance', 0.0) or 0.0)
-                max_acc = max(total_bal, total_margin)
-                if max_acc > 0:
-                    return max_acc, "OK"
-                for a in acc_data.get('assets', []):
-                    if a.get('asset') == asset:
-                        a_bal = float(a.get('walletBalance', 0.0) or a.get('marginBalance', 0.0) or 0.0)
-                        if a_bal > 0:
-                            return a_bal, "OK"
 
         # 3. Try COIN-M Futures /dapi/v1/balance as additional fallback
         url_dapi = f"https://dapi.binance.com/dapi/v1/balance?{query_string}&signature={signature}"
