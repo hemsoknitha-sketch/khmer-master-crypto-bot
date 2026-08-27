@@ -762,33 +762,93 @@ class TelegramBotThread(BaseThread):
 
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
-            admin_panel_card = (
-                "👑 **APEX SUPER AGI v12.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
-                "═══════════════════════════════\n"
-                f"👤 **SUPER ADMIN ID**: `859271875`\n"
-                "🛡️ **SECURITY CLEARANCE**: `LEVEL 5 SUPER ADMIN (FULL AUTHORIZATION)`\n"
-                "⚡ **SYSTEM HEALTH**: `100% OPERATIONAL` | `VPS CPU/RAM: OPTIMAL`\n"
-                "═══════════════════════════════\n"
-                "👉 **SUPER ADMIN COMMAND SUITE ៖**\n\n"
-                "📊 **1. System Analytics & PnL ៖**\n"
-                "• `/admin_stats` - View total system trading volume, PnL & active users\n"
-                "• `/admin_view_portfolio` - Inspect VIP user account portfolios\n\n"
-                "⚙️ **2. System Config & License Control ៖**\n"
-                "• `/admin_config` - Modify real-time system trading parameters\n"
-                "• `/admin_license <USER_ID> <DAYS>` - Grant or revoke VIP membership\n"
-                "• `/admin_users` - View full registered user directory & status\n\n"
-                "🚨 **3. Signal & Emergency Operations ៖**\n"
-                "• `/admin_signal <SYMBOL> <SIDE> <LEV>` - Broadcast auto-entry trade signal\n"
-                "• `/admin_broadcast <MESSAGE>` - Send instant alert to all registered users\n"
-                "• `/toggle_breaker` - Toggle Emergency Circuit Breaker on/off\n"
-                "• `/toggle_rebalance` - Toggle Smart Capital Rebalance on/off\n"
-                "• `/admin_reset_pin <USER_ID>` - Reset user 2FA PIN code\n"
-                "• `/admin_delete <USER_ID>` - Delete user account registry\n"
-                "• `/admin_nuke <PIN>` - Emergency Panic Nuke (Close all positions & stop system)\n"
-                "═══════════════════════════════\n"
-                "💡 _Tap any interactive button below for instant execution:_"
-            )
+            if user_lang == 'en':
+                admin_panel_card = (
+                    "👑 **APEX SUPER AGI v12.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
+                    "═══════════════════════════════\n"
+                    "🛡️ **SECURITY CLEARANCE**: `LEVEL 5 SUPER ADMIN (FULL AUTHORIZATION)`\n"
+                    "⚡ **SYSTEM HEALTH**: `100% OPERATIONAL` | `VPS CPU/RAM: OPTIMAL`\n"
+                    "═══════════════════════════════\n"
+                    "👉 **SUPER ADMIN COMMAND SUITE:**\n\n"
+                    "📊 **1. System Analytics & PnL:**\n"
+                    "• `/admin_stats` - View total system trading volume, PnL & active users\n"
+                    "• `/admin_view_portfolio` - Inspect VIP user account portfolios\n\n"
+                    "⚙️ **2. System Config & License Control:**\n"
+                    "• `/admin_config` - Modify real-time system trading parameters\n"
+                    "• `/admin_license <USER_ID> <DAYS>` - Grant or revoke VIP membership\n"
+                    "• `/admin_users` - View full registered user directory & status\n\n"
+                    "🚨 **3. Signal & Emergency Operations:**\n"
+                    "• `/admin_signal <SYMBOL> <SIDE> <LEV>` - Broadcast auto-entry trade signal\n"
+                    "• `/admin_broadcast <MESSAGE>` - Send instant alert to all registered users\n"
+                    "• `/toggle_breaker` - Toggle Emergency Circuit Breaker on/off\n"
+                    "• `/toggle_rebalance` - Toggle Smart Capital Rebalance on/off\n"
+                    "• `/admin_reset_pin <USER_ID>` - Reset user 2FA PIN code\n"
+                    "• `/admin_delete <USER_ID>` - Delete user account registry\n"
+                    "• `/admin_nuke <PIN>` - Emergency Panic Nuke (Close all positions & stop system)\n"
+                    "═══════════════════════════════\n"
+                    "💡 _Tap any interactive button below for instant execution:_"
+                )
+            elif user_lang == 'zh':
+                admin_panel_card = (
+                    "👑 **APEX SUPER AGI v12.00 | 超级管理员控制面板** 👑\n"
+                    "═══════════════════════════════\n"
+                    "🛡️ **安全权限**: `5级超级管理员 (最高全权授权)`\n"
+                    "⚡ **系统状态**: `100% 正常运行` | `VPS CPU/RAM: 最佳`\n"
+                    "═══════════════════════════════\n"
+                    "👉 **超级管理员指令套件：**\n\n"
+                    "📊 **1. 系统分析与盈亏统计：**\n"
+                    "• `/admin_stats` - 查看总交易量、盈亏与活跃用户\n"
+                    "• `/admin_view_portfolio` - 审查 VIP 用户投资组合\n\n"
+                    "⚙️ **2. 系统配置与授权管理：**\n"
+                    "• `/admin_config` - 实时修改系统交易参数\n"
+                    "• `/admin_license <用户ID> <天数>` - 授予或撤销 VIP 授权\n"
+                    "• `/admin_users` - 查看完整注册用户名录与状态\n\n"
+                    "🚨 **3. 信号与紧急操作：**\n"
+                    "• `/admin_signal <币种> <方向> <杠杆>` - 广播自动跟随交易信号\n"
+                    "• `/admin_broadcast <消息>` - 向所有用户发送紧急广播\n"
+                    "• `/toggle_breaker` - 开启/关闭熔断开关\n"
+                    "• `/toggle_rebalance` - 开启/关闭智能再平衡\n"
+                    "• `/admin_reset_pin <用户ID>` - 重置用户 2FA PIN 码\n"
+                    "• `/admin_delete <用户ID>` - 删除用户账户记录\n"
+                    "• `/admin_nuke <PIN>` - 紧急一键平仓并关闭系统\n"
+                    "═══════════════════════════════\n"
+                    "💡 _点击下方交互式按钮立即执行：_"
+                )
+            else:
+                admin_panel_card = (
+                    "👑 **APEX SUPER AGI v12.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
+                    "═══════════════════════════════\n"
+                    "🛡️ **SECURITY CLEARANCE** ៖ `LEVEL 5 SUPER ADMIN (FULL AUTHORIZATION)`\n"
+                    "⚡ **SYSTEM HEALTH** ៖ `100% OPERATIONAL` | `VPS CPU/RAM: OPTIMAL`\n"
+                    "═══════════════════════════════\n"
+                    "👉 **SUPER ADMIN COMMAND SUITE ៖**\n\n"
+                    "📊 **1. System Analytics & PnL ៖**\n"
+                    "• `/admin_stats` - មើលទំហំជួញដូរសរុប PnL & សមាជិកសកម្ម\n"
+                    "• `/admin_view_portfolio` - ពិនិត្យមើល Portfolio របស់ VIP Users\n\n"
+                    "⚙️ **2. System Config & License Control ៖**\n"
+                    "• `/admin_config` - កែប្រែប៉ារ៉ាម៉ែត្រជួញដូរប្រព័ន្ធ Real-time\n"
+                    "• `/admin_license <USER_ID> <DAYS>` - ផ្តល់ ឬដក VIP Membership\n"
+                    "• `/admin_users` - មើលបញ្ជីឈ្មោះសមាជិកចុះឈ្មោះទាំងអស់\n\n"
+                    "🚨 **3. Signal & Emergency Operations ៖**\n"
+                    "• `/admin_signal <SYMBOL> <SIDE> <LEV>` - បាញ់ Signal ជួញដូរស្វ័យប្រវត្តិ\n"
+                    "• `/admin_broadcast <MESSAGE>` - ផ្ញើសារដំណឹងអាសន្នទៅកាន់គ្រប់ User\n"
+                    "• `/toggle_breaker` - បើក/បិទ ស្វិតអាសន្ន Circuit Breaker\n"
+                    "• `/toggle_rebalance` - បើក/បិទ យន្តការ Capital Rebalance\n"
+                    "• `/admin_reset_pin <USER_ID>` - កំណត់ PIN 2FA ឡើងវិញជូន User\n"
+                    "• `/admin_delete <USER_ID>` - លុបទិន្នន័យ User ចេញពីប្រព័ន្ធ\n"
+                    "• `/admin_nuke <PIN>` - បិទ និង Market Close គ្រប់ Positions ទាំងអស់អាសន្ន\n"
+                    "═══════════════════════════════\n"
+                    "💡 _ចុចលើប៊ូតុងបញ្ជាខាងក្រោមដើម្បីប្រតិបត្តិការភ្លាមៗ ៖_"
+                )
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
@@ -9331,6 +9391,8 @@ class TelegramBotThread(BaseThread):
 
         self.app.add_handler(CommandHandler("menu", menu_command))
         self.app.add_handler(CommandHandler("start", start_command))
+        self.app.add_handler(CommandHandler("admin", admin_panel_command))
+        self.app.add_handler(CommandHandler("admin_panel", admin_panel_command))
 
         self.app.add_handler(CommandHandler("admin_users", admin_users_command))
         self.app.add_handler(CommandHandler("admin_license", admin_license_command))
