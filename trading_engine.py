@@ -202,7 +202,7 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
         headers = {"X-MBX-APIKEY": api_key}
 
         # Alternative endpoints for GCP and Non-US routing
-        spot_endpoints = [BASE_URL, "https://api-gcp.binance.com", "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com"]
+        spot_endpoints = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.info", "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"]
         futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
         
         spot_enabled = False
@@ -399,15 +399,21 @@ def get_spot_balance(api_key: str, api_secret: str, asset: str = "USDT") -> floa
         query_string = f"recvWindow=60000&timestamp={timestamp}"
         signature = generate_signature(api_secret, query_string)
         headers = {"X-MBX-APIKEY": api_key}
-        url = f"{BASE_URL}{endpoint}?{query_string}&signature={signature}"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            balances = res.json().get('balances', [])
-            for b in balances:
-                if b['asset'] == asset:
-                    amt = float(b['free'])
-                    BALANCE_CACHE[cache_key] = {"amount": amt, "timestamp": current_time}
-                    return amt
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.info", "https://api1.binance.com", "https://api2.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{query_string}&signature={signature}"
+                res = requests.get(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    balances = res.json().get('balances', [])
+                    for b in balances:
+                        if b['asset'] == asset:
+                            amt = float(b['free'])
+                            BALANCE_CACHE[cache_key] = {"amount": amt, "timestamp": current_time}
+                            return amt
+                    return 0.0
+            except Exception:
+                continue
     except Exception as e:
         print(f"Error getting spot balance: {e}")
     return 0.0
