@@ -197,13 +197,18 @@ class TelegramBotThread(BaseThread):
             except Exception as e_set:
                 print(f"⚠️ [MENU SET] Error setting default commands: {e_set}")
 
+        import logging
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        logging.getLogger("telegram.ext._utils.networkloop").setLevel(logging.ERROR)
+
         from telegram.request import HTTPXRequest
         t_request = HTTPXRequest(
-            connect_timeout=3.0,
-            read_timeout=5.0,
-            write_timeout=5.0,
-            pool_timeout=3.0,
-            connection_pool_size=1000
+            connect_timeout=10.0,
+            read_timeout=30.0,
+            write_timeout=10.0,
+            pool_timeout=10.0,
+            connection_pool_size=500
         )
         self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(64).post_init(post_init).build()
 
