@@ -191,7 +191,7 @@ def generate_signature(api_secret: str, query_string: str) -> str:
     ).hexdigest()
 
 def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
-    """Tests if the API keys are valid by checking Spot and Futures endpoints (Dual-Check)."""
+    """Tests if the API keys are valid by checking Spot and Futures endpoints (Dual-Check with GCP Fallback)."""
     if PAPER_TRADING:
         return True, "✅ ភ្ជាប់ API ជោគជ័យ! (Paper Trading / Demo Mode)"
         
@@ -199,18 +199,49 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
         timestamp = (int(time.time() * 1000) + TIME_OFFSET)
         query_string = f"recvWindow=60000&timestamp={timestamp}"
         signature = generate_signature(api_secret, query_string)
-        
         headers = {"X-MBX-APIKEY": api_key}
+
+        # Alternative endpoints for GCP and Non-US routing
+        spot_endpoints = [BASE_URL, "https://api-gcp.binance.com", "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com"]
+        futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
         
-        # Check Spot
-        spot_url = f"{BASE_URL}/api/v3/account?{query_string}&signature={signature}"
-        spot_res = requests.get(spot_url, headers=headers, timeout=5)
-        spot_enabled = (spot_res.status_code == 200)
-        
-        # Check Futures
-        futures_url = f"{FUTURES_URL}/fapi/v2/balance?{query_string}&signature={signature}"
-        futures_res = requests.get(futures_url, headers=headers, timeout=5)
-        futures_enabled = (futures_res.status_code == 200)
+        spot_enabled = False
+        futures_enabled = False
+        last_error_msg = ""
+        is_restricted_loc = False
+
+        # 1. Try Spot Verification
+        for s_base in spot_endpoints:
+            try:
+                spot_url = f"{s_base}/api/v3/account?{query_string}&signature={signature}"
+                spot_res = requests.get(spot_url, headers=headers, timeout=5)
+                if spot_res.status_code == 200:
+                    spot_enabled = True
+                    break
+                else:
+                    err_txt = spot_res.text
+                    if "restricted location" in err_txt.lower() or "b. eligibility" in err_txt.lower():
+                        is_restricted_loc = True
+                    last_error_msg = err_txt
+            except Exception:
+                continue
+
+        # 2. Try Futures Verification
+        for f_base in futures_endpoints:
+            try:
+                futures_url = f"{f_base}/fapi/v2/balance?{query_string}&signature={signature}"
+                futures_res = requests.get(futures_url, headers=headers, timeout=5)
+                if futures_res.status_code == 200:
+                    futures_enabled = True
+                    break
+                else:
+                    err_txt = futures_res.text
+                    if "restricted location" in err_txt.lower() or "b. eligibility" in err_txt.lower():
+                        is_restricted_loc = True
+                    if not last_error_msg:
+                        last_error_msg = err_txt
+            except Exception:
+                continue
         
         if spot_enabled or futures_enabled:
             spot_status = "🟢 ដំណើរការ (Enabled)" if spot_enabled else "🔴 មិនទាន់បើកសិទ្ធិ (Disabled)"
@@ -224,10 +255,27 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
                 "*(បញ្ជាក់: សូមប្រាកដថាអ្នកបានបើកសិទ្ធិត្រឹមត្រូវនៅលើ Binance App)*"
             )
             return True, msg
+
+        if is_restricted_loc or "restricted location" in last_error_msg.lower():
+            restricted_card = (
+                "❌ **បរាជ័យ ៖ Binance API មិនអនុញ្ញាតតភ្ជាប់ពី IP អាមេរិក (US Restricted IP Location)**\n"
+                "═══════════════════════════════\n\n"
+                "💡 **មូលហេតុបច្ចេកទេស (Root Cause) ៖**\n"
+                "ម៉ាស៊ីន VPS របស់អ្នកស្ថិតក្នុងតំបន់សហរដ្ឋអាមេរិក (US Region) ដែល Binance.com ច្បាប់កំណត់មិនអនុញ្ញាតឲ្យតភ្ជាប់ API ពី US IP Address ឡើយ។\n\n"
+                "🚀 **វិធីសាស្ត្រដោះស្រាយងាយៗ ៣ យ៉ាង (3 Instant Solutions) ៖**\n\n"
+                "1️⃣ **ជម្រើសទី ១ [ណែនាំ ១០០%] ៖ ប្តូរ Region VPS ទៅ Singapore/Tokyo**\n"
+                "• បង្កើត/ប្តូរម៉ាស៊ីន GCP VPS របស់អ្នកទៅតំបន់អាស៊ី ៖ `asia-southeast1` (Singapore) ឬ `asia-east1` (Taiwan) ដើមី្បតភ្ជាប់ Binance API លឿនបំផុត (<5ms) និងគ្មានការបិទបាំង IP ឡើយ!\n\n"
+                "2️⃣ **ជម្រើសទី ២ ៖ ប្រើប្រាស់ Bybit API ជំនួស**\n"
+                "• ប្រព័ន្ធគាំទ្រ Bybit API ដែលគ្មានការកម្រិត IP អាមេរិក ដោយវាយបញ្ជា ៖\n"
+                "`` `/add_bybit_api <BYBIT_KEY> <BYBIT_SECRET> <PIN>` ``\n\n"
+                "3️⃣ **ជម្រើសទី ៣ ៖ ភ្ជាប់ VPN / Proxy លើ VPS**\n"
+                "• ដំឡើង Proxy លើ VPS និងកំណត់ `HTTP_PROXY` ក្នុង `.env`។"
+            )
+            return False, restricted_card
             
         try:
-            # Both failed, let's parse the error from Futures (or Spot)
-            err_data = futures_res.json() if futures_res.status_code != 200 else spot_res.json()
+            import json
+            err_data = json.loads(last_error_msg)
             code = err_data.get('code', 0)
             msg = err_data.get('msg', '')
             
@@ -241,13 +289,13 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
                 return False, "❌ បរាជ័យ: ម៉ោង (VPS Time) ដើរលឿន ឬយឺតជាង Binance។ សូម Update ម៉ោង VPS។"
             else:
                 return False, f"❌ បរាជ័យ: {msg} (Code: {code})"
-        except:
-            return False, f"❌ បរាជ័យ: Binance ឆ្លើយតប {futures_res.status_code} - {futures_res.text}"
+        except Exception:
+            return False, f"❌ បរាជ័យ: {last_error_msg if last_error_msg else 'Binance API Connection Error'}"
             
     except requests.exceptions.RequestException:
         return False, "❌ **បរាជ័យ:** ប្រព័ន្ធអ៊ិនធឺណិតរបស់ម៉ាស៊ីន (VPS Network) កំពុងមានបញ្ហាក្នុងការតភ្ជាប់ទៅកាន់ Binance។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្តងទៀត!"
     except Exception as e:
-        return False, "❌ **បរាជ័យ:** ប្រព័ន្ធអ៊ិនធឺណិតរបស់ម៉ាស៊ីន (VPS Network) កំពុងមានបញ្ហាក្នុងការតភ្ជាប់ទៅកាន់ Binance។ សូមរង់ចាំបន្តិច រួចសាកល្បងម្តងទៀត!"
+        return False, f"❌ **បរាជ័យ:** {e}"
 
 def check_user_api_permissions(api_key: str, api_secret: str) -> tuple[bool, bool]:
     """
