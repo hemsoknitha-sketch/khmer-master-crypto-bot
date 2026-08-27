@@ -9345,7 +9345,13 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("cancel_alert", cancel_alert_command))
         self.app.add_handler(CommandHandler("top", top_command))
         self.app.add_handler(CommandHandler("news", news_command))
-        # v12.00 Apex Ultra AGI Streamlined Command Handlers
+        # v12.00 6 Flagship Quantitative Engines & Gold Radar Handlers
+        self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
+        self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
+        self.app.add_handler(CommandHandler("whales", whales_command))
+        self.app.add_handler(CommandHandler("infinity_matrix", infinity_grid_command))
+        self.app.add_handler(CommandHandler("flash_crash", flash_crash_command))
+        self.app.add_handler(CommandHandler("gold_guard", gold_radar_command))
         self.app.add_handler(CommandHandler("gold_radar", gold_radar_command))
         self.app.add_handler(CommandHandler("cb_gold", gold_radar_command))
         self.app.add_handler(CommandHandler("paxg_arbitrage", gold_radar_command))
@@ -9537,14 +9543,24 @@ class TelegramBotThread(BaseThread):
         # Register v12.00 Clean Telegram Popup Command Menu
         async def post_init_set_commands(application):
             try:
-                from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats
+                from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats, BotCommandScopeAllChatAdministrators, BotCommandScopeChat
                 try:
                     await application.bot.delete_my_commands(scope=BotCommandScopeDefault())
                     await application.bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats())
+                    await application.bot.delete_my_commands(scope=BotCommandScopeAllGroupChats())
+                    await application.bot.delete_my_commands(scope=BotCommandScopeAllChatAdministrators())
+                    try:
+                        all_vip_users = db.get_vip_users_with_lang()
+                        for u in all_vip_users:
+                            u_id = u[0] if isinstance(u, (tuple, list)) else u
+                            if int(u_id) != 859271875:
+                                try:
+                                    await application.bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=int(u_id)))
+                                except Exception: pass
+                    except Exception: pass
                 except Exception:
                     pass
 
-                from telegram import BotCommandScopeChat
                 public_commands = [
                     BotCommand("start", "🚀 Start Bot & Choose Language"),
                     BotCommand("menu", "🎛️ Interactive Master Control Panel"),

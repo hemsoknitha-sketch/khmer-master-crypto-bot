@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 from dotenv import load_dotenv
-from telegram import Bot, BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats, BotCommandScopeChat
+from telegram import Bot, BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats, BotCommandScopeAllChatAdministrators, BotCommandScopeChat
 import database as db
 
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
@@ -27,49 +27,59 @@ async def force_reset_menu():
         await bot.delete_my_commands(scope=BotCommandScopeDefault())
         await bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats())
         await bot.delete_my_commands(scope=BotCommandScopeAllGroupChats())
+        await bot.delete_my_commands(scope=BotCommandScopeAllChatAdministrators())
         
-        # Crucial: Purge custom chat scope commands for all admin chat IDs
         try:
-            admins = db.get_all_admins()
-            for admin_id in admins:
-                try:
-                    await bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=admin_id))
-                    print(f"  └─ Purged custom BotCommandScopeChat for Admin: {admin_id}")
-                except Exception:
-                    pass
+            all_users = db.get_vip_users_with_lang()
+            for u in all_users:
+                u_id = u[0] if isinstance(u, (tuple, list)) else u
+                if u_id != 859271875:
+                    try:
+                        await bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=int(u_id)))
+                    except Exception:
+                        pass
         except Exception:
             pass
             
-        print("  └─ Cleaned default, private, group, and admin chat command scopes!")
+        print("  └─ Cleaned default, private, group, and VIP chat command scopes!")
     except Exception as e_del:
         print(f"  └─ Delete notice: {e_del}")
 
-    commands = [
+    public_commands = [
         BotCommand("start", "🚀 Start Bot & Choose Language"),
         BotCommand("menu", "🎛️ Interactive Master Control Panel"),
+        BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
+        BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
+        BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
+        BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
+        BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
+        BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
         BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
-        BotCommand("infinity_grid", "♾️ Unified Smart Grid Engine"),
-        BotCommand("snipe", "🎯 Listing & Volatility Sniper"),
-        BotCommand("funding_harvester", "🌾 8-Hour Funding Yield Harvester"),
-        BotCommand("gold_radar", "🛡️ AI Gold Guard & Macro Radar"),
         BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
         BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
         BotCommand("balance", "💰 Check Spot & Futures Balance"),
         BotCommand("status", "📊 View Active Trades & PnL"),
-        BotCommand("health", "🩺 Check VPS & Engine Diagnostics"),
-        BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
-        BotCommand("whales", "🐋 Track On-Chain Whale Movements"),
         BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
         BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
         BotCommand("alert", "🔔 Set Price Alert"),
         BotCommand("stop", "🛑 Stop Trading / Market Close"),
     ]
-    
-    print("✨ [2/3] Registering 18 clean v12.00 Flagship Commands...")
+
+    admin_commands = [
+        BotCommand("admin", "👑 Open Super Admin Control Panel"),
+        BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
+        BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
+    ] + public_commands
+
+    print("✨ [2/3] Registering v12.00 Public VIP Commands (with 6 Flagship Engines)...")
     try:
-        await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
-        await bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
-        print("  └─ Registered for Default and All Private Chats scopes!")
+        await bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
+        await bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())
+        try:
+            await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
+        except Exception:
+            pass
+        print("  └─ Registered for Default and All Private Chats scopes + Super Admin Scope!")
     except Exception as e_set:
         print(f"  └─ Error setting commands: {e_set}")
 
