@@ -7107,15 +7107,35 @@ class TelegramBotThread(BaseThread):
                     eff_amt = max(10.50 if is_spot else 1.0, amount)
                     num_coins = max(1, min(10, int(avail_bal / eff_amt))) if avail_bal >= eff_amt else 1
                     
-                    success_count = 0
-                    executed_syms = []
                     for c_sym in top_coins:
                         if success_count >= num_coins:
                             break
                         eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, c_sym, leverage, avail_bal, is_spot_mode=is_spot)
-                        c_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_res.get("side", "SKIP")
-                        if c_side == "SKIP" or c_side not in ["BUY", "SELL", "SPOT"]:
-                            continue
+                        ai_side = eval_res.get("side", "SKIP") if isinstance(eval_res, dict) else "SKIP"
+                        ai_conf = float(eval_res.get("confidence_pct", 50.0) if isinstance(eval_res, dict) else 50.0)
+
+                        # 🛡️ Strict AI Trend-Matching & Risk Filter Guard:
+                        # Never force BUY on crashing/bearish coins, never force SELL on pumping/bullish coins!
+                        if user_side_input == "BUY":
+                            if ai_side not in ["BUY", "SPOT"] or ai_conf < 60.0:
+                                print(f"🛡️ [STRICT TOP BUY RISK GUARD] Skipped {c_sym}: User requested BUY, but AI predicted {ai_side} ({ai_conf:.1f}% conf)")
+                                continue
+                            c_side = "BUY"
+                        elif user_side_input == "SELL":
+                            if ai_side != "SELL" or ai_conf < 60.0:
+                                print(f"🛡️ [STRICT TOP SELL RISK GUARD] Skipped {c_sym}: User requested SELL, but AI predicted {ai_side} ({ai_conf:.1f}% conf)")
+                                continue
+                            c_side = "SELL"
+                        elif user_side_input == "SPOT":
+                            if ai_side not in ["BUY", "SPOT"] or ai_conf < 60.0:
+                                print(f"🛡️ [STRICT TOP SPOT RISK GUARD] Skipped {c_sym}: Spot AI predicted {ai_side} ({ai_conf:.1f}% conf)")
+                                continue
+                            c_side = "SPOT"
+                        else: # AUTO
+                            if ai_side == "SKIP" or ai_side not in ["BUY", "SELL", "SPOT"] or ai_conf < 60.0:
+                                continue
+                            c_side = ai_side
+
                         exec_res = await asyncio.to_thread(turbo_hedge_engine.execute_turbo_hedge_trade, keys[0], keys[1], c_sym, amount, c_side, leverage, chat_id)
                         
                         is_order_success = False
