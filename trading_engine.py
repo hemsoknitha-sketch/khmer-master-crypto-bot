@@ -563,16 +563,24 @@ def get_funding_balance(api_key: str, api_secret: str, asset: str = "USDT") -> f
         })
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
-        url = f"{BASE_URL}{endpoint}?{payload}&signature={signature}"
-        res = requests.post(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            if isinstance(data, list):
-                for item in data:
-                    if item.get('asset') == asset:
-                        free_amt = float(item.get('free', 0.0) or 0.0)
-                        locked_amt = float(item.get('locked', 0.0) or 0.0)
-                        return free_amt + locked_amt
+        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{payload}&signature={signature}"
+                res = requests.post(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    try:
+                        data = res.json()
+                    except Exception:
+                        continue
+                    if isinstance(data, list):
+                        for item in data:
+                            if item.get('asset') == asset:
+                                free_amt = float(item.get('free', 0.0) or 0.0)
+                                locked_amt = float(item.get('locked', 0.0) or 0.0)
+                                return free_amt + locked_amt
+            except Exception:
+                continue
         return 0.0
     except Exception as e:
         print(f"⚠️ [GET FUNDING BALANCE ERROR]: {e}")
@@ -589,16 +597,24 @@ def get_earn_balance(api_key: str, api_secret: str, asset: str = "USDT") -> floa
         })
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
-        url = f"{BASE_URL}{endpoint}?{payload}&signature={signature}"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            rows = data.get('rows', [])
-            total = 0.0
-            for r in rows:
-                if r.get('asset') == asset:
-                    total += float(r.get('totalAmount', 0.0) or 0.0)
-            return total
+        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{payload}&signature={signature}"
+                res = requests.get(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    try:
+                        data = res.json()
+                    except Exception:
+                        continue
+                    rows = data.get('rows', []) if isinstance(data, dict) else []
+                    total = 0.0
+                    for r in rows:
+                        if r.get('asset') == asset:
+                            total += float(r.get('totalAmount', 0.0) or 0.0)
+                    return total
+            except Exception:
+                continue
         return 0.0
     except Exception as e:
         print(f"⚠️ [GET EARN BALANCE ERROR]: {e}")
@@ -607,20 +623,23 @@ def get_earn_balance(api_key: str, api_secret: str, asset: str = "USDT") -> floa
 def get_futures_positions(api_key: str, api_secret: str) -> list:
     if PAPER_TRADING:
         return []
-    for attempt in range(3):
+    futures_endpoints = [FUTURES_URL, "https://fapi.binance.info", "https://fapi-gcp.binance.com", "https://fapi1.binance.com"]
+    for f_base in futures_endpoints:
         try:
             endpoint = "/fapi/v2/positionRisk"
             timestamp = (int(time.time() * 1000) + TIME_OFFSET)
             query_string = f"recvWindow=60000&timestamp={timestamp}"
             signature = generate_signature(api_secret, query_string)
             headers = {"X-MBX-APIKEY": api_key}
-            url = f"{FUTURES_URL}{endpoint}?{query_string}&signature={signature}"
+            url = f"{f_base}{endpoint}?{query_string}&signature={signature}"
             res = HFT_SESSION.get(url, headers=headers, timeout=5)
             if res.status_code == 200:
-                return res.json()
-            time.sleep(0.1)
+                try:
+                    return res.json()
+                except Exception:
+                    continue
         except Exception:
-            time.sleep(0.1)
+            continue
     return []
 
 def emergency_reduce_position(api_key: str, api_secret: str, symbol: str, side: str, qty: float) -> dict:
