@@ -209,6 +209,7 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
         futures_enabled = False
         last_error_msg = ""
         is_restricted_loc = False
+        spot_err_detail = ""
 
         # 1. Try Spot Verification
         for s_base in spot_endpoints:
@@ -217,13 +218,20 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
                 spot_res = requests.get(spot_url, headers=headers, timeout=5)
                 if spot_res.status_code == 200:
                     spot_enabled = True
+                    spot_err_detail = ""
                     break
                 else:
                     err_txt = spot_res.text
+                    try:
+                        ej = spot_res.json()
+                        spot_err_detail = f"Code {ej.get('code')}: {ej.get('msg')}"
+                    except Exception:
+                        spot_err_detail = f"HTTP {spot_res.status_code}: {err_txt[:100]}"
                     if "restricted location" in err_txt.lower() or "b. eligibility" in err_txt.lower():
                         is_restricted_loc = True
                     last_error_msg = err_txt
-            except Exception:
+            except Exception as ex:
+                spot_err_detail = str(ex)
                 continue
 
         # 2. Try Futures Verification
@@ -244,7 +252,7 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
                 continue
         
         if spot_enabled or futures_enabled:
-            spot_status = "🟢 ដំណើរការ (Enabled)" if spot_enabled else "🔴 មិនទាន់បើកសិទ្ធិ (Disabled)"
+            spot_status = "🟢 ដំណើរការ (Enabled)" if spot_enabled else f"🔴 មិនទាន់បើកសិទ្ធិ ({spot_err_detail})"
             futures_status = "🟢 ដំណើរការ (Enabled)" if futures_enabled else "🔴 មិនទាន់បើកសិទ្ធិ (Disabled)"
             
             msg = (
