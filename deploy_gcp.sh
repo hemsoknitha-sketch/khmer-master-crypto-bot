@@ -12,7 +12,9 @@ echo "🚀 Starting Khmer Master Crypto APEX AGI Engine v11.0 VPS Setup..."
 # 1. Update OS Packages & Install Prerequisites
 echo "📦 Updating OS packages and installing system tools..."
 sudo apt-get update -y && sudo apt-get upgrade -y
-sudo apt-get install -y python3 python3-pip python3-venv git curl htop systemd
+sudo apt-get install -y python3 python3-pip python3-venv git curl htop systemd cloud-guest-utils
+sudo growpart /dev/sda 1 2>/dev/null || sudo growpart /dev/vda 1 2>/dev/null || true
+sudo resize2fs /dev/sda1 2>/dev/null || sudo resize2fs /dev/vda1 2>/dev/null || true
 
 # 2. Configure 2GB Swapfile (Prevents OS RAM Spikes on 1GB VPS)
 if [ ! -f /swapfile ]; then
