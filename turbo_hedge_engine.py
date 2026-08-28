@@ -1152,7 +1152,7 @@ async def monitor_turbo_hedge_bots(app):
                     retain_ratio = 0.90 if peak_roi >= 100.0 else (0.85 if peak_roi >= 50.0 else 0.80)
 
                     # Dynamic Trailing Trigger: Lock peak profit when price pulls back slightly from maximum surge peak
-                    is_peak_locked = (peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio))
+                    is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and ((peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)))
                     is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:

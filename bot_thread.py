@@ -7113,6 +7113,8 @@ class TelegramBotThread(BaseThread):
                     else:
                         num_coins = min(10, max(1, int(safe_avail_bal / eff_amt)))
                     
+                    executed_syms = []
+                    success_count = 0
                     for c_sym in top_coins:
                         if success_count >= num_coins:
                             break
@@ -9786,6 +9788,8 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.liquidation_defender_task,
             'interval',
             seconds=15,
+            max_instances=3,
+            coalesce=True,
             args=[self.app, self.ai_engine],
             id='liquidation_defender_task'
         )

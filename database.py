@@ -2773,6 +2773,10 @@ def add_turbo_hedge_bot(chat_id: int, symbol: str, amount: float = 20.0, leverag
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_leverage", str(leverage))
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_side", side)
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_target_tp", str(target_tp))
+    import time
+    update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0.0")
+    update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
+    update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(int(time.time())))
 
 def update_turbo_hedge_side(chat_id: int, symbol: str, new_side: str):
     symbol = symbol.upper().strip()
