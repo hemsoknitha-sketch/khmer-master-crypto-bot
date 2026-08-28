@@ -2918,6 +2918,9 @@ class TelegramBotThread(BaseThread):
                 await menu_command(update, context)
             elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
                 await turbo_hedge_command(update, context)
+            elif data == "btn_turbo_hedge_stop_all":
+                context.args = ["STOP", "ALL"]
+                await turbo_hedge_command(update, context)
             elif data in ["btn_infinity_grid_launch", "btn_infinity_grid"]:
                 await infinity_grid_command(update, context)
             elif data in ["btn_snipe_launch", "btn_snipe"]:
@@ -6905,16 +6908,37 @@ class TelegramBotThread(BaseThread):
 
             action = str(args[0]).upper().strip()
             if action in ["STOP", "OFF"]:
-                if len(args) >= 3 and args[1].upper() != "ALL":
+                if len(args) >= 3:
                     symbol = str(args[1]).upper().strip()
                     pin = str(args[2]).strip()
+                elif len(args) == 2:
+                    if args[1].isdigit():
+                        symbol = "ALL"
+                        pin = str(args[1]).strip()
+                    else:
+                        symbol = str(args[1]).upper().strip()
+                        pin = ""
                 else:
                     symbol = "ALL"
-                    pin = str(args[1]).strip() if len(args) >= 2 else ""
+                    pin = ""
 
+                is_admin = db.is_admin(chat_id) or (chat_id in [859271875, 1744387717])
                 stored_pin = db.get_user_pin(chat_id)
                 msg_target = update.effective_message or update.message
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
+
+                if not stored_pin and pin:
+                    db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                    stored_pin = db.get_user_pin(chat_id)
+                elif is_admin and pin:
+                    db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                    stored_pin = db.get_user_pin(chat_id)
+
+                if stored_pin and pin and not security.verify_pin(pin, chat_id, stored_pin) and not is_admin:
+                    if msg_target:
+                        await msg_target.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+                elif not stored_pin and not is_admin:
                     if msg_target:
                         await msg_target.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
                     await delete_sensitive_message(context, chat_id, update, user_lang)
@@ -7017,12 +7041,17 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
                 return
 
+            is_admin = db.is_admin(chat_id) or (chat_id in [859271875, 1744387717])
             stored_pin = db.get_user_pin(chat_id)
-            if not stored_pin or chat_id in [859271875, 1744387717]:
+
+            if not stored_pin and pin:
+                db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                stored_pin = db.get_user_pin(chat_id)
+            elif is_admin and pin:
                 db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
                 stored_pin = db.get_user_pin(chat_id)
 
-            if not security.verify_pin(pin, chat_id, stored_pin):
+            if stored_pin and pin and not security.verify_pin(pin, chat_id, stored_pin) and not is_admin:
                 if msg_target:
                     await msg_target.reply_text(f"❌ **លេខកូដ PIN មិនត្រឹមត្រូវ!** (PIN របស់អ្នក ៖ `{pin}` មិនត្រូវគ្នានឹង PIN ក្នុងប្រព័ន្ធឡើយ)", parse_mode="Markdown")
                 return

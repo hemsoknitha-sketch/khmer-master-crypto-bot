@@ -1138,6 +1138,8 @@ def set_user_pin(chat_id: int, pin_hash: str):
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET pin_code = ? WHERE chat_id = ?", (pin_hash, chat_id))
+    if cursor.rowcount == 0:
+        cursor.execute("INSERT INTO users (chat_id, pin_code) VALUES (?, ?)", (chat_id, pin_hash))
     conn.commit()
     conn.close()
 
@@ -1156,6 +1158,8 @@ def set_user_language(chat_id: int, language: str):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET language = ? WHERE chat_id = ?", (language, chat_id))
+    if cursor.rowcount == 0:
+        cursor.execute("INSERT INTO users (chat_id, language) VALUES (?, ?)", (chat_id, language))
     conn.commit()
     conn.close()
 
