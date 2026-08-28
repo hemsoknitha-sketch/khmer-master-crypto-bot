@@ -6922,7 +6922,7 @@ class TelegramBotThread(BaseThread):
                     symbol = "ALL"
                     pin = ""
 
-                is_admin = db.is_admin(chat_id) or (chat_id in [859271875, 1744387717])
+                is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
                 stored_pin = db.get_user_pin(chat_id)
                 msg_target = update.effective_message or update.message
 
@@ -7041,7 +7041,7 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
                 return
 
-            is_admin = db.is_admin(chat_id) or (chat_id in [859271875, 1744387717])
+            is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
             stored_pin = db.get_user_pin(chat_id)
 
             if not stored_pin and pin:
