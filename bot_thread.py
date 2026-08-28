@@ -7104,8 +7104,14 @@ class TelegramBotThread(BaseThread):
                         avail_bal = 0.0
                         top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
 
-                    eff_amt = max(10.50 if is_spot else 1.0, amount)
-                    num_coins = max(1, min(10, int(avail_bal / eff_amt))) if avail_bal >= eff_amt else 1
+                    eff_amt = max(10.50 if is_spot else 5.0, amount)
+                    # 🛡️ Reserve 35% Free Margin Safety Buffer to prevent liquidation / over-leveraging
+                    safe_avail_bal = avail_bal * 0.65
+                    if safe_avail_bal < eff_amt or avail_bal < eff_amt:
+                        print(f"🛡️ [CAPITAL SAFETY GUARD] Free margin (${avail_bal:.2f} USDT) or safe buffer (${safe_avail_bal:.2f} USDT) is less than required per-coin amount (${eff_amt:.2f} USDT). Aborting new coin placement.")
+                        num_coins = 0
+                    else:
+                        num_coins = min(10, max(1, int(safe_avail_bal / eff_amt)))
                     
                     for c_sym in top_coins:
                         if success_count >= num_coins:

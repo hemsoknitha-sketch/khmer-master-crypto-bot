@@ -147,3 +147,7 @@ def execute_funding_harvest_exit(api_key: str, api_secret: str, symbol: str, cap
         return {"status": "success", "symbol": symbol}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+def is_pre_settlement_window(secs_left: int) -> bool:
+    """Checks if current time is within 15 minutes before Binance Funding Settlement (00:00, 08:00, 16:00 UTC)."""
+    return 0 < secs_left <= 900

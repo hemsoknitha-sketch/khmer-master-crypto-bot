@@ -594,10 +594,17 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         if price <= 0:
             return {"status": "error", "message": f"Failed to fetch price for {symbol}"}
 
-        # Respect user commanded trade amount strictly: Only cap to free margin if free margin < amount_usdt
-        if avail_bal > 0 and avail_bal < amount_usdt:
-            amount_usdt = avail_bal
-        
+        # 🛡️ Strict Margin Safety Shield:
+        # Require available free margin to be at least amount_usdt AND at least $10.00 USDT safety buffer.
+        # NEVER force-shrink trade amount to squeeze extra trades into tiny remaining margins ($2-$5)!
+        if avail_bal < amount_usdt or avail_bal < 10.0:
+            print(f"🛑 [STRICT MARGIN GUARD] Free margin (${avail_bal:.2f} USDT) is less than required capital (${amount_usdt:.2f} USDT) or $10.00 safety buffer. Aborted order to prevent liquidation.")
+            return {
+                "status": "error",
+                "reason": "INSUFFICIENT_MARGIN_SAFETY_BUFFER",
+                "msg": f"Available free margin (${avail_bal:.2f} USDT) is below required ${amount_usdt:.2f} USDT or $10.00 safety buffer."
+            }
+
         # Enforce Safe $6.50 Minimum Notional to prevent -4164 error after LOT_SIZE step floor rounding
         notional = max(6.50, amount_usdt * effective_leverage)
         qty = notional / price
