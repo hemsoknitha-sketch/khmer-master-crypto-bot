@@ -872,10 +872,9 @@ async def monitor_turbo_hedge_bots(app):
             is_recovery_mode = False
             if drawdown_pct >= 8.0:
                 is_recovery_mode = True
-                print(f"🚨 [AGI DRAWDOWN HEALTH RADAR] User {target_chat_id}: Equity Drawdown {drawdown_pct:.1f}% (Peak: ${peak_wallet:.2f} -> Current: ${wallet_bal:.2f}). ACTIVATING VIP EMERGENCY PROFIT RECOVERY PROTOCOL (High-Confluence Gate >=85.0%)!")
-
                 alert_sent_key = f"turbo_hedge_{target_chat_id}_recovery_alert_sent"
                 if db.get_system_setting(alert_sent_key, "0") != "1":
+                    print(f"🚨 [AGI DRAWDOWN HEALTH RADAR] User {target_chat_id}: Equity Drawdown {drawdown_pct:.1f}% (Peak: ${peak_wallet:.2f} -> Current: ${wallet_bal:.2f}). ACTIVATING VIP EMERGENCY PROFIT RECOVERY PROTOCOL (High-Confluence Gate >=85.0%)!")
                     db.update_system_setting(alert_sent_key, "1")
                     is_quiet = db.get_system_setting(f"turbo_hedge_{target_chat_id}_quiet_mode", "1") == "1"
                     if not is_quiet and app and hasattr(app, "bot"):
