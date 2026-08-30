@@ -395,7 +395,20 @@ class TelegramBotThread(BaseThread):
             self.active_tasks.add(chat_id)
             return True
 
+        async def send_reply_or_edit(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, **kwargs):
+            if update and update.callback_query and update.callback_query.message:
+                try:
+                    return await update.callback_query.message.edit_text(text, **kwargs)
+                except Exception:
+                    return await update.callback_query.message.reply_text(text, **kwargs)
+            elif update and update.effective_message:
+                return await update.effective_message.reply_text(text, **kwargs)
+            elif update and update.effective_chat:
+                return await context.bot.send_message(chat_id=update.effective_chat.id, text=text, **kwargs)
+            return None
+
         async def flash_crash_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
             user_lang = db.get_user_language(chat_id)
@@ -2560,16 +2573,26 @@ class TelegramBotThread(BaseThread):
                 full_report = f"{header_title}{top_gainers_summary}\n\n{analysis}"
                 
                 if status_msg:
-                    await status_msg.edit_text(text=full_report, parse_mode="Markdown", reply_markup=keyboard)
+                    try:
+                        await status_msg.edit_text(text=full_report, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await status_msg.edit_text(text=full_report, reply_markup=keyboard)
                 else:
-                    await context.bot.send_message(chat_id=chat_id, text=full_report, parse_mode="Markdown", reply_markup=keyboard)
+                    try:
+                        await context.bot.send_message(chat_id=chat_id, text=full_report, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=full_report, reply_markup=keyboard)
                 self.log_signal.emit(f"🚀 Sent top gainers to {chat_id}")
             except Exception as e:
                 err_txt = f"⚠️ **Top Volatility Radar Notice ៖** {e}"
                 if status_msg:
-                    await status_msg.edit_text(err_txt, parse_mode="Markdown", reply_markup=keyboard)
+                    try:
+                        await status_msg.edit_text(err_txt, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await status_msg.edit_text(err_txt, reply_markup=keyboard)
                 else:
                     await context.bot.send_message(chat_id=chat_id, text=err_txt)
+
 
         async def news_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -9120,10 +9143,14 @@ class TelegramBotThread(BaseThread):
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
-            import psutil
+            try:
+                import psutil
+            except ImportError:
+                psutil = None
             import os
             import time
             import trading_engine
+
 
             start_time = getattr(self, "start_time", time.time())
             uptime_sec = int(time.time() - start_time)
