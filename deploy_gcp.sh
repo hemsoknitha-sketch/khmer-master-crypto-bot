@@ -81,7 +81,7 @@ echo "⚙️ Creating Systemd service at $SERVICE_FILE..."
 
 sudo tee $SERVICE_FILE > /dev/null <<EOT
 [Unit]
-Description=Khmer Master Crypto APEX AGI Engine v11.0 Service
+Description=Khmer Master Crypto APEX AGI Engine v13.00 Service
 After=network.target
 
 [Service]
@@ -105,7 +105,7 @@ sudo systemctl restart khmer-master-crypto-bot.service
 
 echo ""
 echo "========================================================================="
-echo "🎉 DEPLOYMENT COMPLETE! APEX AGI ENGINE v11.0 IS NOW ACTIVE 24/7/365!"
+echo "🎉 DEPLOYMENT COMPLETE! APEX AGI ENGINE v13.00 IS NOW ACTIVE 24/7/365!"
 echo "========================================================================="
 echo "📊 Check Service Status: sudo systemctl status khmer-master-crypto-bot"
 echo "📜 View Real-time Logs:   sudo journalctl -u khmer-master-crypto-bot -f"

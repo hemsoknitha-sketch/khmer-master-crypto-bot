@@ -132,7 +132,7 @@ class DraftReplyWorker(QThread):
 class BotDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("⚡ APEX TURBO AGI v9.8 | INSTITUTIONAL ADMIN DESKTOP EXECUTIVE DASHBOARD 🚀")
+        self.setWindowTitle("⚡ APEX TURBO AGI v13.00 | INSTITUTIONAL ADMIN DESKTOP EXECUTIVE DASHBOARD 🚀")
         self.setGeometry(100, 100, 1100, 750)
         
         # Apply Modern Dark Mode & Glassmorphic Theme QSS Styling
@@ -681,7 +681,7 @@ class BotDashboard(QMainWindow):
 
 class ApexVPSHeadlessEngine:
     def __init__(self):
-        print("🚀 Initializing Apex Super AGI v9.8 (24/7 Pure Headless VPS Engine)...")
+        print("🚀 Initializing Apex Super AGI v13.00 (24/7 Pure Headless VPS Engine)...")
         db.init_db()
         import backup_manager
         backup_manager.perform_backup(is_boot=True)

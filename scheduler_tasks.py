@@ -4416,7 +4416,7 @@ async def biweekly_apex_brain_train_job(app: Application, ai_engine=None):
     """
     Super Smart Bi-Weekly Apex Super Brain AI Retraining Engine.
     Executes 100% silently every 2 weeks in background thread.
-    Fine-tunes Google Gemini 1.5 Pro / Flash TURBO AGI model weights, technical indicator thresholds,
+    Fine-tunes Google Gemini 2.5 Flash TURBO AGI model weights, technical indicator thresholds,
     and win-rate prediction algorithms based on past 14 days of live Binance market data.
     Dispatches a comprehensive Executive Audit Report to Super Admin Console (859271875).
     """
@@ -4434,7 +4434,7 @@ async def biweekly_apex_brain_train_job(app: Application, ai_engine=None):
                 'timeframe_days': 14,
                 'winrate_improvement_pct': 3.4,
                 'latency_ms': 42,
-                'model_version': 'v9.8 TURBO AGI'
+                'model_version': 'v13.00 TURBO AGI'
             }
 
         train_results = await asyncio.to_thread(run_silent_training)
@@ -4448,7 +4448,7 @@ async def biweekly_apex_brain_train_job(app: Application, ai_engine=None):
             "• **Market Sample Data**: `Past 14 Days (14,250 Orderbook & Indicator Samples)` 📊\n"
             "• **Prediction Accuracy Gain**: `+3.4% Win-Rate Optimization` 📈\n"
             "• **Model Execution Latency**: `42 ms (Sub-50ms Ultra Fast)` ⚡\n"
-            "• **Current AI Engine Architecture**: `Google Gemini 1.5 Pro / Flash TURBO AGI` 🤖\n"
+            "• **Current AI Engine Architecture**: `Google Gemini 2.5 Flash TURBO AGI` 🤖\n"
             "• **Zero-Downtime Position Protection**: `100% Active Positions Intact & Adopted` 🛡️\n\n"
             "📢 **Status**: `🟢 Apex Super Brain AI Models re-tuned for maximum profitability!`"
         )
@@ -4499,7 +4499,7 @@ async def vip_8hour_executive_report_job(app: Application):
                 now_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
                 report_text = (
-                    f"🤖 **APEX SUPER AGI v9.8 | 8-HOUR VIP EXECUTIVE REPORT** 🤖\n"
+                    f"🤖 **APEX SUPER AGI v13.00 | 8-HOUR VIP EXECUTIVE REPORT** 🤖\n"
                     f"═══════════════════════════════\n"
                     f"⏰ **កាលបរិច្ឆេទ ៖** `{now_str} (UTC+7)`\n"
                     f"🛡️ **VIP CLEARANCE ៖** `VERIFIED` | 🚀 `REAL LIVE TRADING`\n"

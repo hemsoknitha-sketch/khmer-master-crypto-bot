@@ -1576,7 +1576,7 @@ class TelegramBotThread(BaseThread):
             ])
 
             msg = (
-                "⚖️ **APEX SUPER AGI TURBO BRAIN v9.5 | SMART PORTFOLIO REBALANCER** 📈\n"
+                "⚖️ **APEX SUPER AGI TURBO BRAIN v13.00 | SMART PORTFOLIO REBALANCER** 📈\n"
                 "═══════════════════════════════\n\n"
                 "📊 **EXECUTIVE REBALANCE CONFIGURATION:**\n"
                 f"• **System Status**: {status_str}\n"
@@ -1997,7 +1997,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 card_msg = (
-                    "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | PREDICTIVE FORECAST** 🔮\n"
+                    "🤖 **APEX SUPER AGI TURBO BRAIN v13.00 | PREDICTIVE FORECAST** 🔮\n"
                     "═══════════════════════════════\n"
                     f"🪙 **TICKER**: `{fetched_symbol}`\n"
                     f"💵 **CURRENT PRICE**: `${price:,.2f} USDT`\n"
@@ -2444,7 +2444,7 @@ class TelegramBotThread(BaseThread):
 
             if not alerts or len(alerts) == 0:
                 msg = (
-                    "📋 **APEX SUPER AGI TURBO BRAIN v9.5 | ACTIVE ALERTS LIST** 🔔\n"
+                    "📋 **APEX SUPER AGI TURBO BRAIN v13.00 | ACTIVE ALERTS LIST** 🔔\n"
                     "═══════════════════════════════\n\n"
                     "⚠️ _អ្នកមិនទាន់មានការកំណត់ Alert ណាមួយកំពុងរត់នៅឡើយទេ!_\n\n"
                     "👉 **ដើម្បីបង្កើត Alert ថ្មី ៖**\n`` `/alert XRP > 2.50` ``"
@@ -2462,7 +2462,7 @@ class TelegramBotThread(BaseThread):
             list_text = "\n".join(alert_lines)
 
             msg = (
-                "📋 **APEX SUPER AGI TURBO BRAIN v9.5 | ACTIVE ALERTS LIST** 🔔\n"
+                "📋 **APEX SUPER AGI TURBO BRAIN v13.00 | ACTIVE ALERTS LIST** 🔔\n"
                 "═══════════════════════════════\n\n"
                 f"{list_text}\n\n"
                 "📋 **1-TAP CANCEL EXECUTIONS:**\n"
@@ -5675,7 +5675,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🏄‍♂️ **APEX SUPER AGI TURBO BRAIN v9.5 | DYNAMIC WAVE RIDER** 🌊\n"
+                    "🏄‍♂️ **APEX SUPER AGI TURBO BRAIN v13.00 | DYNAMIC WAVE RIDER** 🌊\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE WAVE RIDER CONFIGURATION:**\n"
                     f"• **System Status**: {status_str}\n"
@@ -5751,7 +5751,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🐋 **APEX SUPER AGI TURBO BRAIN v9.5 | LIQUIDITY SWEEP SNIPER** 🧹\n"
+                    "🐋 **APEX SUPER AGI TURBO BRAIN v13.00 | LIQUIDITY SWEEP SNIPER** 🧹\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE SWEEP SNIPER CONFIGURATION:**\n"
                     f"• **System Status**: {status_str}\n"
@@ -5840,7 +5840,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "⚖️ **APEX SUPER AGI TURBO BRAIN v9.5 | DYNAMIC LEVERAGE ENGINE** 🎯\n"
+                    "⚖️ **APEX SUPER AGI TURBO BRAIN v13.00 | DYNAMIC LEVERAGE ENGINE** 🎯\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE DYNAMIC LEVERAGE CONFIGURATION:**\n"
                     f"• **System Status**: {status_str}\n"
@@ -5914,7 +5914,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🛡️ **APEX SUPER AGI TURBO BRAIN v9.5 | LIQUIDATION DEFENDER** ⚡\n"
+                    "🛡️ **APEX SUPER AGI TURBO BRAIN v13.00 | LIQUIDATION DEFENDER** ⚡\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE DEFENDER CONFIGURATION:**\n"
                     f"• **System Status**: {status_str}\n"
@@ -5991,7 +5991,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🛡️ **APEX SUPER AGI TURBO BRAIN v9.5 | CRASH HEDGE MODE** 📉\n"
+                    "🛡️ **APEX SUPER AGI TURBO BRAIN v13.00 | CRASH HEDGE MODE** 📉\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE HEDGE MODE CONFIGURATION:**\n"
                     f"• **System Status**: {status_str}\n"
@@ -6092,7 +6092,7 @@ class TelegramBotThread(BaseThread):
                 list_text = "\n".join(dca_lines) if dca_lines else "_គ្មាន Smart DCA ដែលកំពុងដំណើរការនៅឡើយទេ..._"
 
                 msg = (
-                    "📉 **APEX SUPER AGI TURBO BRAIN v9.5 | SMART DCA ACCUMULATION** 📈\n"
+                    "📉 **APEX SUPER AGI TURBO BRAIN v13.00 | SMART DCA ACCUMULATION** 📈\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE DCA CONFIGURATION & POSITIONS:**\n"
                     f"• **System Status**: {status_str}\n"
@@ -6187,7 +6187,7 @@ class TelegramBotThread(BaseThread):
                 list_text = "\n".join(scalp_lines) if scalp_lines else "_គ្មាន Scalp Orders ដែលកំពុងដំណើរការនៅឡើយទេ..._"
 
                 msg = (
-                    "🏓 **APEX SUPER AGI TURBO BRAIN v9.5 | HIGH-PRECISION SCALPER** ⚡\n"
+                    "🏓 **APEX SUPER AGI TURBO BRAIN v13.00 | HIGH-PRECISION SCALPER** ⚡\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE SCALPER CONFIGURATION & POSITIONS:**\n"
                     f"• **System Status**: {status_str}\n"
@@ -6363,7 +6363,7 @@ class TelegramBotThread(BaseThread):
                 ])
                 
                 card_msg = (
-                    "🤖 **APEX SUPER AGI TURBO BRAIN v9.5 | QUANTITATIVE MARKET SCAN** 🎯\n"
+                    "🤖 **APEX SUPER AGI TURBO BRAIN v13.00 | QUANTITATIVE MARKET SCAN** 🎯\n"
                     "═══════════════════════════════\n"
                     f"🪙 **TARGET ASSET**: `{symbol}`\n"
                     f"📈 **24H CHANGE**: `{coin.get('priceChangePercent', 0.0):+.2f}%` | 💵 **PRICE**: `${coin.get('lastPrice', 0.0):,.4f}`\n"
@@ -6609,7 +6609,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "💸 **APEX SUPER AGI TURBO BRAIN v9.5 | DELTA-NEUTRAL ARBITRAGE** ⚡\n"
+                    "💸 **APEX SUPER AGI TURBO BRAIN v13.00 | DELTA-NEUTRAL ARBITRAGE** ⚡\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE DELTA-NEUTRAL CONFIGURATION:**\n"
                     f"• **System Status**: {current_status}\n"
@@ -6798,7 +6798,7 @@ class TelegramBotThread(BaseThread):
                 ])
                 
                 msg = (
-                    "🥇 **APEX SUPER AGI TURBO BRAIN v9.5 | GOLD TURBO ENGINE** 🥇\n"
+                    "🥇 **APEX SUPER AGI TURBO BRAIN v13.00 | GOLD TURBO ENGINE** 🥇\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE GOLD TURBO CONFIGURATION:**\n"
                     f"• **System Status**: {current_status}\n"
@@ -7647,7 +7647,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "⚙️ **APEX SUPER AGI TURBO BRAIN v9.5 | VIP AUTO-TRADE ENGINE** 🤖\n"
+                    "⚙️ **APEX SUPER AGI TURBO BRAIN v13.00 | VIP AUTO-TRADE ENGINE** 🤖\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE AUTO-TRADE CONFIGURATION:**\n"
                     f"• **System Status**: {current_status}\n"
@@ -7748,7 +7748,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🚀 **APEX SUPER AGI TURBO BRAIN v9.5 | HYPER-TRADE HFT ENGINE** ⚡\n"
+                    "🚀 **APEX SUPER AGI TURBO BRAIN v13.00 | HYPER-TRADE HFT ENGINE** ⚡\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE HYPER-TRADE CONFIGURATION:**\n"
                     f"• **System Status**: {current_status}\n"
@@ -8221,7 +8221,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🚀 **APEX SUPER AGI TURBO BRAIN v9.5 | PRE-PUMP SPIKE SNIPER** 🔥\n"
+                    "🚀 **APEX SUPER AGI TURBO BRAIN v13.00 | PRE-PUMP SPIKE SNIPER** 🔥\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE PRE-PUMP CONFIGURATION:**\n"
                     f"• **System Status**: {current_status}\n"
@@ -8340,7 +8340,7 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🛡️ **APEX SUPER AGI TURBO BRAIN v9.5 | TRAILING PROFIT GUARD** ⚡\n"
+                    "🛡️ **APEX SUPER AGI TURBO BRAIN v13.00 | TRAILING PROFIT GUARD** ⚡\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE TRAILING GUARD CONFIGURATION:**\n"
                     f"• **System Status**: {status_str}\n"

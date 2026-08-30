@@ -1,6 +1,6 @@
 # Hugging Face Space Deployment Guide for `khmer-master-crypto-bot`
 
-This directory contains the AI Super Brain Microservice for **APEX AGI ENGINE v11.0**.
+This directory contains the AI Super Brain Microservice for **APEX AGI ENGINE v13.00**.
 
 ## 🚀 Steps to Deploy on Hugging Face (100% Free):
 
@@ -16,7 +16,7 @@ This directory contains the AI Super Brain Microservice for **APEX AGI ENGINE v1
    cp -r hf_microservice/* khmer-master-crypto-bot/
    cd khmer-master-crypto-bot
    git add .
-   git commit -m "Deploy APEX AGI Super Brain Microservice v11.0"
+   git commit -m "Deploy APEX AGI Super Brain Microservice v13.00"
    git push origin main
    ```
 8. Optional: Set Environment Variable `GEMINI_API_KEY` in Hugging Face Space **Settings -> Variables and secrets**.
