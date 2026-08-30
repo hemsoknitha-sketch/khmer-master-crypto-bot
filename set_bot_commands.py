@@ -22,38 +22,39 @@ async def set_menu_commands():
     bot = Bot(token=TOKEN)
     public_commands = [
         # 1. Navigation & Account
-        BotCommand("start", "🚀 Start Bot & Select Language"),
-        BotCommand("menu", "🎛️ Master Control Panel & Interactive Menu"),
-        BotCommand("balance", "💰 Check Spot & Futures Balance"),
-        BotCommand("portfolio", "💼 View Active Positions & PnL"),
+        BotCommand("start", "🚀 Start v13.00 AGI Super Brain Control"),
+        BotCommand("menu", "🎛️ v13.00 Interactive Control Keyboard"),
+        BotCommand("balance", "💰 Spot, Futures & Gold Vault Balance"),
+        BotCommand("portfolio", "💼 Active Positions & Delta-Neutral PnL"),
 
-        # 2. 5 Super Smart Engines
-        BotCommand("hyper_trade", "🚀 Hyper-Trade HFT Sub-Second Scalper"),
+        # 2. 6 Super Smart Wall Street Engines
+        BotCommand("hyper_trade", "🚀 Sub-5ms HFT Orderbook CVD Scalper"),
         BotCommand("auto_arb", "⚡ Delta-Neutral 0% Risk Arbitrage"),
         BotCommand("sweep_auto", "🛡️ Liquidity Sweep Bottom Wick Sniper"),
         BotCommand("funding_harvester", "🌾 30%-120% APY Perpetual Funding Yield"),
         BotCommand("trailing_guard", "🛡️ Auto-Liquidation Guard & Trailing Lock"),
 
         # 3. AI Quant Trading Strategies
-        BotCommand("turbo_hedge", "🚀 Turbo Hedge Futures 5x Engine"),
-        BotCommand("infinity_matrix", "♾️ Unified Smart Grid Strategy"),
-        BotCommand("smart_dca", "🎯 Smart DCA Martingale Ladder"),
-        BotCommand("grid_bot", "📊 24/7 Grid Trading Engine"),
+        BotCommand("turbo_hedge", "🚀 Turbo Hedge Futures 5x/15x Engine"),
+        BotCommand("infinity_matrix", "♾️ Smart Grid 100% Profit Compounding"),
+        BotCommand("smart_dca", "🎯 HMM Regime Smart DCA Martingale"),
+        BotCommand("grid_bot", "📊 24/7 Smart Grid Trading Engine"),
 
-        # 4. AI Analytics & Market Intelligence
-        BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
-        BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
+        # 4. 16-Model AI Super Brain & Market Intel
+        BotCommand("analyze", "🧠 5-Agent AGI Swarm Market Analysis"),
+        BotCommand("predict", "📈 Wall Street 16-Model ML Prediction"),
+        BotCommand("moe_route", "🔀 MoE Router Dynamic AI Classifier"),
         BotCommand("gold_radar", "🏆 PAXG Gold Wealth Protection Radar"),
-        BotCommand("whales", "🐋 On-Chain Whale Inflow/Outflow Tracker"),
-        BotCommand("news", "📰 AI Journalistic Crypto News & Impact"),
+        BotCommand("whales", "🐋 On-Chain Whale Front-Running Radar"),
+        BotCommand("news", "📰 Nano-NLP Firehose & News Impact Alerts"),
 
-        # 5. Emergency Stop
-        BotCommand("stop", "🛑 Emergency Stop All Active Trading"),
+        # 5. Emergency Stop & Circuit Breaker
+        BotCommand("stop", "🛑 Emergency Circuit Breaker & Close All"),
     ]
 
     admin_commands = [
-        BotCommand("admin", "👑 Open Super Admin Control Panel"),
-        BotCommand("health", "🩺 VPS Hardware & Engine Diagnostics"),
+        BotCommand("admin", "👑 Super Admin v13.00 Control Panel"),
+        BotCommand("health", "🩺 VPS Hardware, RAM & Engine Diagnostics"),
         BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
     ] + public_commands
 
