@@ -68,6 +68,15 @@ def run_cloud_training_and_upload():
         "brain_tp.pkl",
         "brain_dca.pkl",
         "brain_scaler.pkl",
+        "brain_catboost.pkl",
+        "brain_lightgbm.pkl",
+        "brain_graph.pkl",
+        "brain_patchtst.h5",
+        "brain_ppo_policy.json",
+        "brain_moe_router.pkl",
+        "brain_tgat_graph.pkl",
+        "brain_actor_critic_allocator.json",
+        "brain_pinn_jump_diff.pkl",
         "brain_config.json"
     ]
     

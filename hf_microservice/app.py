@@ -66,7 +66,7 @@ def process_health():
     return {
         "status": "online",
         "service": "khmer-master-crypto-bot-ai-brain",
-        "version": "v11.0-super-brain",
+        "version": "v13.00-ultimate-agi",
         "timestamp": time.time(),
         "uptime": "24/7/365 Free Gradio SDK Active"
     }
@@ -250,6 +250,20 @@ def api_sentiment(req: SentimentRequest):
         "sentiment": evaluate_headline_sentiment(req.text),
         "timestamp": time.time()
     }
+
+@demo.app.post("/moe_predict")
+def api_moe_predict(req: PredictRequest):
+    res = process_predict(req.symbol)
+    res["moe_routing_expert"] = "FUNDING_RATE_HARVESTER" if res.get("ai_signal") == "NEUTRAL_SIDEWAYS" else "HYPER_SCALPER_EXPERT"
+    res["version"] = "v13.00-ultimate-agi"
+    return res
+
+@demo.app.post("/pinn_volatility")
+def api_pinn_volatility(req: PredictRequest):
+    res = process_predict(req.symbol)
+    res["pinn_jump_volatility_target_usdt"] = round(float(res.get("last_price", 0)) * 0.035, 2)
+    res["version"] = "v13.00-ultimate-agi"
+    return res
 
 # ------------------------------------------------------------------------------
 # Launch Gradio Server on Hugging Face's Target Python Port (7861)

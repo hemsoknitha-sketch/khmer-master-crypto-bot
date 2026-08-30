@@ -83,7 +83,7 @@ async def force_reset_menu():
         BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
     ] + public_commands
 
-    print("✨ [2/3] Registering v12.00 Public VIP Commands (with 6 Flagship Engines)...")
+    print("✨ [2/3] Registering v13.00 Absolute Ultimate AGI Public VIP Commands...")
     try:
         await bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
         await bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())

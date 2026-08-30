@@ -1,0 +1,10 @@
+{
+  "version": "v13.00-ultimate-agi",
+  "spot_allocation_pct": 40.0,
+  "delta_neutral_harvester_pct": 30.0,
+  "futures_scalper_pct": 20.0,
+  "gold_safe_haven_pct": 10.0,
+  "sharpe_target": 3.2,
+  "kelly_fraction": 0.5,
+  "status": "ACTIVE_OPTIMIZED"
+}

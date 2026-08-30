@@ -1,13 +1,13 @@
 #!/bin/bash
 # ==============================================================================
-# 🚀 APEX AGI ENGINE v11.0 - GOOGLE CLOUD VPS AUTOMATED DEPLOYMENT SCRIPT
+# 🚀 APEX AGI ENGINE v13.00 - GOOGLE CLOUD VPS AUTOMATED DEPLOYMENT SCRIPT
 # Instance Target: Google Cloud Compute Engine e2-micro (1GB RAM, 30GB Disk, 24/7/365 Free)
 # App Name: khmer-master-crypto-bot
 # ==============================================================================
 
 set -e
 
-echo "🚀 Starting Khmer Master Crypto APEX AGI Engine v11.0 VPS Setup..."
+echo "🚀 Starting Khmer Master Crypto APEX AGI Engine v13.00 VPS Setup..."
 
 # 1. Update OS Packages & Install Prerequisites
 echo "📦 Updating OS packages and installing system tools..."

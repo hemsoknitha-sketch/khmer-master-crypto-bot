@@ -94,5 +94,37 @@ class HuggingFaceAIClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    async def predict_moe_routing(self, symbol: str = "BTCUSDT", timeout_sec: int = 10) -> Dict[str, Any]:
+        """Asynchronously calls Hugging Face Space /moe_predict endpoint (v13.00 Absolute Ultimate AGI)."""
+        url = f"{self.base_url}/moe_predict"
+        payload = {"symbol": symbol}
+        timeout = aiohttp.ClientTimeout(total=timeout_sec)
+        
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, json=payload, headers=self.headers) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    else:
+                        return {"success": False, "error": f"HF Space HTTP {resp.status}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def predict_pinn_volatility(self, symbol: str = "BTCUSDT", timeout_sec: int = 10) -> Dict[str, Any]:
+        """Asynchronously calls Hugging Face Space /pinn_volatility endpoint (v13.00 PINN Model)."""
+        url = f"{self.base_url}/pinn_volatility"
+        payload = {"symbol": symbol}
+        timeout = aiohttp.ClientTimeout(total=timeout_sec)
+        
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, json=payload, headers=self.headers) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    else:
+                        return {"success": False, "error": f"HF Space HTTP {resp.status}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
 # Global Singleton Client Instance
 hf_ai_client = HuggingFaceAIClient()

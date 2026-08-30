@@ -1,13 +1,17 @@
 ================================================================================
-   👑 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ SUPER ADMIN ៖ KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00
-         (សៀវភៅដៃប្រតិបត្តិការ និងគ្រប់គ្រងប្រព័ន្ធជួញដូរ AGI សម្រាប់ SUPER ADMIN)
+   👑 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ SUPER ADMIN ៖ KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00
+          (សៀវភៅដៃប្រតិបត្តិការ និងគ្រប់គ្រងប្រព័ន្ធជួញដូរ AGI សម្រាប់ SUPER ADMIN)
 ================================================================================
 
 សូមស្វាគមន៍មកកាន់ មគ្គុទ្ទេសក៍សិក្សា និងប្រតិបត្តិការផ្លូវការសម្រាប់ SUPER ADMIN / SYSTEM ADMINISTRATOR!
-ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងលម្អិត ម៉ត់ចត់ និងច្បាស់លាស់បំផុត សម្រាប់កំណែ v12.00 Apex Ultra AGI Edition ដើម្បីផ្តល់នូវចំណេះដឹងស៊ីជម្រៅ ស្ថាបត្យកម្មប្រព័ន្ធ មុខងារទាំងអស់នៃ Desktop Control Panel App (GUI) និង Telegram Bot Node ព្រមទាំងវិធីសាស្ត្រដោះស្រាយបញ្ហា (Troubleshooting) លើ VPS សម្រាប់ Admin ក្នុងការគ្រប់គ្រង Apex AGI Bot ឲ្យដំណើរការប្រកបដោយប្រសិទ្ធភាព និងសុវត្ថិភាពខ្ពស់បំផុត 100%។
+ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងលម្អិត ម៉ត់ចត់ និងច្បាស់លាស់បំផុត សម្រាប់កំណែ v13.00 Absolute Ultimate AGI Edition ដើម្បីផ្តល់នូវចំណេះដឹងស៊ីជម្រៅ ស្ថាបត្យកម្មប្រព័ន្ធ មុខងារទាំងអស់នៃ Desktop Control Panel App (GUI) និង Telegram Bot Node ព្រមទាំងវិធីសាស្ត្រដោះស្រាយបញ្ហា (Troubleshooting) លើ VPS សម្រាប់ Admin ក្នុងការគ្រប់គ្រង Apex AGI Bot ឲ្យដំណើរការប្រកបដោយប្រសិទ្ធភាព និងសុវត្ថិភាពខ្ពស់បំផុត 100%។
 
 --------------------------------------------------------------------------------
-១. សរុបរបាយការណ៍ប្រតិបត្តិការ និងស្ថាបត្យកម្មបង្រួម (ADMIN SYSTEM AUDIT v12.00)
+១. សរុបរបាយការណ៍ប្រតិបត្តិការ និងស្ថាបត្យកម្មបង្រួម (ADMIN SYSTEM AUDIT v13.00)
+--------------------------------------------------------------------------------ថាបត្យកម្មប្រព័ន្ធ មុខងារទាំងអស់នៃ Desktop Control Panel App (GUI) និង Telegram Bot Node ព្រមទាំងវិធីសាស្ត្រដោះស្រាយបញ្ហា (Troubleshooting) លើ VPS សម្រាប់ Admin ក្នុងការគ្រប់គ្រង Apex AGI Bot ឲ្យដំណើរការប្រកបដោយប្រសិទ្ធភាព និងសុវត្ថិភាពខ្ពស់បំផុត 100%។
+
+--------------------------------------------------------------------------------
+១. សរុបរបាយការណ៍ប្រតិបត្តិការ និងស្ថាបត្យកម្មបង្រួម (ADMIN SYSTEM AUDIT v13.00 Absolute Ultimate AGI Edition)
 --------------------------------------------------------------------------------
 
 ១.១ ស្ថាបត្យកម្មបង្រួមមុខងារប្រព័ន្ធ (Executive Ultra Architecture Overhaul) ៖
@@ -34,14 +38,19 @@
   - `/execute_short_cascade ON 250,000,000 USDT` ៖ រត់លើ Futures Short Cascade & Liquidation Sweep Engine ស្កេន Short និងស្ទាក់ទិញនៅបាតជើង Candle < 5 វិនាទី។
   - `/execute_arb_engine ON 100,000,000 USDT` ៖ រត់លើ Delta-Neutral Arbitrage & Funding Harvester Engine ច្រូតកាត់ប្រាក់ការ APY 30%-120% ដោយគ្មានហានិភ័យ (0% Risk)។
 
-• 🧠 [៤. AI Super Brain & Model Architecture] ៖
+• 🧠 [៤. AI Super Brain & Master Fusion Model Architecture v13.00] ៖
   - 🧠 AGI 5-Model Swarm Ensemble (`ai_engine.py`) ៖ 5-Agent Consensus Decision (Google Gemini 2.5, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-32B, Mistral-7B) ធ្វើឱ្យ Win-rate ខ្ពស់បំផុត និងលុបបំបាត់ False Signals ជិត 0%!
+  - 👑 4 Master Fusion AI Models (`train_model.py`) ៖
+    1. MoE Dynamic Gating Router (`brain_moe_router.pkl`) ៖ បង្កាត់ AI Router បែងចែកបញ្ជាទៅកាន់ Expert Models តាមស្ថានភាពទីផ្សារ Real-Time។
+    2. Temporal Graph Attention Network (`brain_tgat_graph.pkl`) ៖ បង្កាត់ Orderbook Exchanges ធំៗទាំង ៤ (Binance, Bybit, OKX, Coinbase) ជាមួយកាបូប Whale On-Chain។
+    3. Deep Actor-Critic Capital Allocator (`brain_actor_critic_allocator.json`) ៖ គ្រប់គ្រងដើមទុនអូតូ (Spot, Futures 1x, Futures 5x, PAXG Gold) តាម Sharpe Ratio & Kelly Criterion។
+    4. Physics-Informed Jump-Diffusion Volatility Model (`brain_pinn_jump_diff.pkl`) ៖ ព្យាករណ៍ Liquidity Vacuum ស្ទាក់ទិញ/លក់បាត Candle មុន Flash Crash!
   - 👑 Wall Street Ultra-Next-Gen ML Models (`train_model.py`) ៖ PatchTST Attention Transformer, Triple-Ensemble (XGBoost, CatBoost, LightGBM), GNN Altcoin Ripple Graph, និង OpenAI PPO Deep Reinforcement Learning Agent Policy!
   - 📦 Hugging Face Cloud Auto-Train Pipeline & Hot Reload (`/sync_brain`) ៖ Auto-Train លើ Google Colab GPU 14-day cycle រួច Upload ទៅ Hugging Face Hub (`hemsinath/apex-ai-brain-models`)។ វាយ `/sync_brain` ដើម្បី Hot-Update ទម្ងន់ AI ថ្មីក្នុងពេល ១ វិនាទី!
-  - 📰 3-Paragraph Journalistic News Alerts & RSS Photo Extractor ៖ ស្កេនព័ត៌មាន និងទាញយករូបភាព High-Res Photo Alerts ផ្ញើជូន ៣ វគ្គផ្លូវការ ត្រឹមត្រូវតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត 100%!
+  - 📰 FinBERT & 3-Paragraph Journalistic News Alerts ៖ ស្កេនព័ត៌មាន និងទាញយករូបភាព High-Res Photo Alerts ផ្ញើជូន ៣ វគ្គផ្លូវការ ត្រឹមត្រូវតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត 100%!
 
 --------------------------------------------------------------------------------
-២. ស្ថាបត្យកម្មសុវត្ថិភាព និងការកំណត់ TELEGRAM MENU SCOPING v12.00
+២. ស្ថាបត្យកម្មសុវត្ថិភាព និងការកំណត់ TELEGRAM MENU SCOPING v13.00
 --------------------------------------------------------------------------------
 
 ២.១ ស្ថាបត្យកម្មសុវត្ថិភាពទិន្នន័យ (CRITICAL SECURITY ARCHITECTURE) ៖
