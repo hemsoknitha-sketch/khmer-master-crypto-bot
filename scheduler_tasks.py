@@ -614,7 +614,7 @@ async def systematic_hedging_job(app: Application, ai_engine):
     to hedge systemic risk during Extreme Risk-Off environments (Panic Selling).
     """
     import trading_engine
-    import asyncio
+# import asyncio # removed local shadowing
     import requests
     
     # Check Fear & Greed Index
@@ -724,7 +724,7 @@ async def cross_venue_arbitrage_job(app: Application):
     """
     import bybit_engine
     import trading_engine
-    import asyncio
+# import asyncio # removed local shadowing
     
     # Get all users with Bybit API keys
     conn = db.get_db_connection()
@@ -1193,7 +1193,7 @@ async def process_single_trailing_stop(app, ai_engine, trade):
     import database as db
     import security
     import localization as loc
-    import asyncio
+# import asyncio # removed local shadowing
     import time
     
     trade_id = trade.get('id')
@@ -1366,7 +1366,7 @@ async def process_single_trailing_stop(app, ai_engine, trade):
 
 async def trailing_stop_monitor(app: Application, ai_engine):
     import database as db
-    import asyncio
+# import asyncio # removed local shadowing
     try:
         # Circuit Breaker Persistence Guard: Halt active trading monitoring when active
         if hasattr(db, 'is_circuit_breaker_active') and db.is_circuit_breaker_active():
@@ -1384,7 +1384,7 @@ async def trailing_stop_monitor(app: Application, ai_engine):
 
 async def auto_reentry_monitor(app: Application):
     import time
-    import asyncio
+# import asyncio # removed local shadowing
     import trading_engine
     import market_data
     import database as db
@@ -1470,7 +1470,7 @@ async def orderbook_micro_imbalance_monitor(app: Application):
     import database as db
     import dynamic_ranking
     import time
-    import asyncio
+# import asyncio # removed local shadowing
 
     try:
         top_coins = dynamic_ranking.get_top_500_coins()
@@ -1797,7 +1797,7 @@ async def order_book_sniper(app: Application, ai_engine):
         if not vip_users: return
         
         import market_data
-        import asyncio
+# import asyncio # removed local shadowing
         
         # Fetch Top 15 volatile coins asynchronously offloaded to worker thread
         volatile_coins = await asyncio.to_thread(market_data.fetch_top_volatile_coins, 15, 3.0)
@@ -1887,7 +1887,7 @@ async def triangular_arbitrage_monitor(app: Application, ai_engine):
         if not vip_users: return
         
         import market_data
-        import asyncio
+# import asyncio # removed local shadowing
         prices = await asyncio.to_thread(market_data.get_triangular_prices)
         
         if "BTCUSDT" in prices and "ETHBTC" in prices and "ETHUSDT" in prices:
@@ -1924,7 +1924,7 @@ async def execute_stealth_twap_buy(api_key: str, api_secret: str, symbol: str, t
     to eliminate market slippage during liquidity sweeps.
     """
     import trading_engine
-    import asyncio
+# import asyncio # removed local shadowing
     
     if total_amount < 50.0:
         return await asyncio.to_thread(trading_engine.place_market_buy, api_key, api_secret, symbol, total_amount)
@@ -1949,7 +1949,7 @@ async def wick_sniper(app: Application, ai_engine):
         if not vip_users: return
         
         import market_data
-        import asyncio
+# import asyncio # removed local shadowing
         symbol = "BTCUSDT"
         df, _, _ = await asyncio.to_thread(market_data.fetch_binance_data, symbol, interval="1m", limit=2)
         if df is None or len(df) < 2: return
@@ -2409,7 +2409,7 @@ async def opportunity_sniper_monitor(app: Application, ai_engine):
                   f"Provide a 2-sentence executive financial analysis in Khmer explaining why this volatility "
                   f"creates a prime opportunity for trading. Output ONLY clean Khmer text. No system instructions, no role headers.")
                   
-        import asyncio
+# import asyncio # removed local shadowing
         explanation = await asyncio.to_thread(ai_engine.generate_response, prompt, "km")
         explanation = ai_engine._clean_response(explanation).replace('_', '\\_')
         
@@ -2475,7 +2475,7 @@ Cover these 5 points clearly:
 
 Keep it exciting and professional.
 """
-            import asyncio
+# import asyncio # removed local shadowing
             analysis = await asyncio.to_thread(ai_engine.generate_response, prompt, "auto")
             analysis = analysis.replace('_', '\\_')
             
@@ -2513,7 +2513,7 @@ async def smart_sniper_engine(app: Application, ai_engine):
     import market_data
     import trading_engine
     import sys
-    import asyncio
+# import asyncio # removed local shadowing
     import database as db
     
     active_snipers = db.get_active_smart_snipers()
@@ -2944,7 +2944,7 @@ async def liquidation_defender_task(app, ai_engine):
     try:
         import database as db
         import trading_engine
-        import asyncio
+# import asyncio # removed local shadowing
         active_defenders = db.get_all_active_defenders()
         if not active_defenders:
             return
@@ -3033,7 +3033,7 @@ async def delta_neutral_monitor(app):
     import database as db
     import market_data
     import trading_engine
-    import asyncio
+# import asyncio # removed local shadowing
     
     # Check current active bots to close them if funding rate drops
     active_bots = db.get_active_delta_neutral_bots()
@@ -3230,7 +3230,7 @@ async def trailing_stop_engine_job(app: Application):
 
     import trading_engine
 
-    import asyncio
+# import asyncio # removed local shadowing
 
     from datetime import datetime
 
@@ -3456,7 +3456,7 @@ async def trailing_stop_engine_job(app: Application):
 async def ai_order_execution_job(app: Application):
     import trading_engine
     import hft_inference
-    import asyncio
+# import asyncio # removed local shadowing
     import dynamic_ranking
     
     auto_trade_users = db.get_auto_trade_users()
@@ -3513,7 +3513,7 @@ async def ai_order_execution_job(app: Application):
 async def smart_portfolio_rebalancer(app: Application, ai_engine):
     import database as db
     import binance_api as bapi
-    import asyncio
+# import asyncio # removed local shadowing
     
     try:
         if not db.is_global_rebalance_enabled():
@@ -3563,7 +3563,7 @@ async def pre_pump_daily_train_job(app: Application):
     """
     from pre_pump_engine import pre_pump_engine
     import database as db
-    import asyncio
+# import asyncio # removed local shadowing
     
     print("⚙️ [SCHEDULER 02:00 AM UTC+7] Triggering Super Smart Daily Pre-Pump Sniper Training...")
     try:
@@ -3632,7 +3632,7 @@ async def vps_health_monitor_job(app: Application):
             import psutil
         except ImportError:
             return
-        import asyncio
+# import asyncio # removed local shadowing
         import gc
         
         cpu_usage = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
@@ -3714,7 +3714,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
     import trading_engine
     import dynamic_ranking
     from pre_pump_engine import pre_pump_engine
-    import asyncio
+# import asyncio # removed local shadowing
     
     pre_pump_users = await asyncio.to_thread(db.get_pre_pump_users)
     if not pre_pump_users:
@@ -4421,7 +4421,7 @@ async def biweekly_apex_brain_train_job(app: Application, ai_engine=None):
     Dispatches a comprehensive Executive Audit Report to Super Admin Console (859271875).
     """
     import database as db
-    import asyncio
+# import asyncio # removed local shadowing
     import time
     
     print("⚙️ [SCHEDULER BI-WEEKLY] Initiating 100% Silent Deep-Learning Retraining Cycle for Apex Super Brain AI Models...")
@@ -4477,7 +4477,7 @@ async def vip_8hour_executive_report_job(app: Application):
     try:
         import database as db
         import trading_engine
-        import asyncio
+# import asyncio # removed local shadowing
         import time
 
         vip_users = db.get_vip_users()

@@ -2527,7 +2527,7 @@ class TelegramBotThread(BaseThread):
 
             try:
                 import market_data
-                import asyncio
+# import asyncio # removed local shadowing
                 top_gainers_summary = await asyncio.to_thread(market_data.fetch_top_gainers, 5, user_lang)
                 if not isinstance(top_gainers_summary, str): top_gainers_summary = str(top_gainers_summary or "")
                 
@@ -7278,7 +7278,7 @@ class TelegramBotThread(BaseThread):
                     return
 
                 import requests
-                import asyncio
+# import asyncio # removed local shadowing
                 try:
                     url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
                     res = await asyncio.to_thread(requests.get, url, timeout=5)
@@ -7351,7 +7351,7 @@ class TelegramBotThread(BaseThread):
                     return
 
                 import requests
-                import asyncio
+# import asyncio # removed local shadowing
                 try:
                     url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
                     res = await asyncio.to_thread(requests.get, url, timeout=5)
@@ -9029,7 +9029,7 @@ class TelegramBotThread(BaseThread):
 
             try:
                 import requests
-                import asyncio
+# import asyncio # removed local shadowing
                 binance_hot_wallet = "0x28C6c06298d514Db089934071355E5743bf21d60"
                 url = f"https://eth.blockscout.com/api?module=account&action=tokentx&address={binance_hot_wallet}&page=1&offset=25&sort=desc"
 
@@ -9938,7 +9938,7 @@ class TelegramBotThread(BaseThread):
                         except Exception:
                             pass
                     
-                    import asyncio
+# import asyncio # removed local shadowing
                     tasks = [t for t in asyncio.all_tasks(self.loop) if t is not asyncio.current_task()]
                     for task in tasks:
                         task.cancel()
@@ -9947,7 +9947,7 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
 
-            import asyncio
+# import asyncio # removed local shadowing
             future = asyncio.run_coroutine_threadsafe(shutdown(), self.loop)
             try:
                 future.result(timeout=5.0)

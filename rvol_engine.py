@@ -49,7 +49,7 @@ async def _process_rvol_spike(symbol, rvol_multiplier, projected_vol, taker_rati
     import database as db
     import orderbook_engine
     import trading_engine
-    import asyncio
+# import asyncio # removed local shadowing
     
     # --- INSTITUTIONAL FILTER 1: Adverse Event Learning ---
     failed_count = db.get_failed_pump_count(symbol)
