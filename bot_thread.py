@@ -1036,9 +1036,11 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
             
-            db.stop_all_active_bots(chat_id)
-            db.set_auto_snipe(chat_id, False, 0)
-            db.set_delta_neutral_config(chat_id, False, 0)
+            target_chat_id = int(target_id)
+            db.stop_all_active_bots(target_chat_id)
+            db.set_auto_snipe(target_chat_id, False, 0)
+            db.set_delta_neutral_config(target_chat_id, False, 0)
+
 
             if action == "soft":
                 if user_lang == 'en':
