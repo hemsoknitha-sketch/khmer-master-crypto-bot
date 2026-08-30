@@ -9439,10 +9439,15 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
         self.app.add_handler(CommandHandler("auto_arb", funding_harvester_command))
         self.app.add_handler(CommandHandler("turbo_yield", funding_harvester_command))
+        self.app.add_handler(CommandHandler("execute_top_tier_accumulation", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("monitor_all_streams", whales_command))
+        self.app.add_handler(CommandHandler("execute_short_cascade", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("execute_arb_engine", funding_harvester_command))
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
         self.app.add_handler(CommandHandler("stop_all", stop_all_command))
+
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(stop_all_callback, pattern="^stopall_"))
         self.app.add_handler(CommandHandler("sell_all", stop_all_command))
