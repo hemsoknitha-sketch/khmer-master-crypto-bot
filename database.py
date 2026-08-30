@@ -1312,22 +1312,8 @@ def get_user_api(chat_id: int):
     cursor = conn.cursor()
     cursor.execute("SELECT api_key, api_secret FROM user_api_keys WHERE chat_id = ?", (chat_id,))
     result = cursor.fetchone()
-    
-    if not result:
-        # Fallback for single-user system or admin chat ID mapping
-        try:
-            cursor.execute("SELECT api_key, api_secret FROM user_api_keys LIMIT 1")
-            result = cursor.fetchone()
-        except Exception:
-            result = None
-
-    if not result:
-        env_k = os.environ.get("BINANCE_API_KEY", "").strip()
-        env_s = os.environ.get("BINANCE_API_SECRET", "").strip()
-        if env_k and env_s:
-            result = (env_k, env_s)
-
     conn.close()
+
     
     if result:
         raw_key, raw_secret = str(result[0] or "").strip(), str(result[1] or "").strip()
