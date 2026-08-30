@@ -129,7 +129,7 @@ def generate_black_swan_report(user_lang: str = "khmer", ai_engine=None) -> str:
 
     if user_lang in ['km', 'khmer']:
         return (
-            f"🏆 **PAXG GOLD & MULTI-ASSET SAFE HAVEN SWITCHER v12.00** 🏆\n"
+            f"🏆 **PAXG GOLD & MULTI-ASSET SAFE HAVEN SWITCHER v13.00** 🏆\n"
             f"*(ប្រព័ន្ធការពារទ្រព្យសម្បត្តិមហាសេដ្ឋី 100% Flight-to-Safety)*\n\n"
             f"🤖 **AI Models សហការ ៖** `NLP & On-Chain AGI` + `HMM Market Regime`\n"
             f"📊 **GEOPOLITICAL CRISIS SEVERITY INDEX ៖** `{severity:.1f}%`\n"
@@ -142,7 +142,7 @@ def generate_black_swan_report(user_lang: str = "khmer", ai_engine=None) -> str:
         )
     else:
         return (
-            f"🏆 **PAXG GOLD & MULTI-ASSET SAFE HAVEN SWITCHER v12.00** 🏆\n\n"
+            f"🏆 **PAXG GOLD & MULTI-ASSET SAFE HAVEN SWITCHER v13.00** 🏆\n\n"
             f"🤖 **AI Models Ensemble**: `NLP & On-Chain AGI` + `HMM Market Regime`\n"
             f"📊 **GEOPOLITICAL CRISIS SEVERITY INDEX**: `{severity:.1f}%`\n"
             f"🏛️ **HMM REGIME**: `{info['hmm_regime']}`\n"

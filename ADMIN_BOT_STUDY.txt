@@ -127,5 +127,5 @@ sudo journalctl -u khmer-master-crypto-bot -f -n 30
 ```
 
 ================================================================================
-             SUPER ADMIN MANUAL v12.00 - ALL SYSTEMS 100% OPERATIONAL
+             SUPER ADMIN MANUAL v13.00 - ALL SYSTEMS 100% OPERATIONAL
 ================================================================================

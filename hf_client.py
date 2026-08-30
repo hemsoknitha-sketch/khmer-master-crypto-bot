@@ -1,5 +1,5 @@
 """
-Async Hugging Face Microservice Client for APEX AGI ENGINE v11.0.
+Async Hugging Face Microservice Client for APEX AGI ENGINE v13.00.
 Handles non-blocking REST API calls from GCP VPS Node to Hugging Face AI Super Brain Node.
 """
 

@@ -370,7 +370,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     confidence = 50.0
                     print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Trend Misaligned (5m Bull: {is_5m_bullish}, 1m EMA5>15: {ema5_1m > ema15_1m}) -> SKIPPED!")
 
-            # 🛡️ Anti-Peak Buying & Anti-Bottom Selling Protection (v10.0 Ultra Confluence Architecture)
+            # 🛡️ Anti-Peak Buying & Anti-Bottom Selling Protection (v13.00 Ultra Confluence Architecture)
             if not is_spot_mode and side != "SKIP":
                 if side == "BUY" and (change_24h >= 30.0 or rsi14 >= 72.0):
                     side = "SKIP"
@@ -855,7 +855,7 @@ async def monitor_turbo_hedge_bots(app):
                     avail_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], "USDT")
                 wallet_bal = trading_engine.get_futures_wallet_balance(f_keys[0], f_keys[1], "USDT") or avail_bal
 
-            # 🧠 1️⃣ AGI VIP Retention & Autonomous Profit Supercharger (v10.0 Architecture):
+            # 🧠 1️⃣ AGI VIP Retention & Autonomous Profit Supercharger (v13.00 Architecture):
             # Autonomous Equity Sensing: Track peak wallet balance per user.
             # If 24h Drawdown > 3.0%, activate VIP Emergency Profit Recovery Protocol (High-Confluence Gate >90.0%)!
             peak_wallet_key = f"turbo_hedge_{target_chat_id}_peak_wallet"

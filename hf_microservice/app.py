@@ -1,6 +1,6 @@
 """
 FastAPI + Gradio Microservice Server for Hugging Face Space: khmer-master-crypto-bot
-Serves as the AI Super Brain Node for APEX AGI ENGINE v11.0.
+Serves as the AI Super Brain Node for APEX AGI ENGINE v13.00.
 Supports 100% Free Gradio Space SDK on Hugging Face!
 """
 
@@ -200,7 +200,7 @@ def process_news(symbol: str = None, limit: int = 5):
 # ------------------------------------------------------------------------------
 
 with gr.Blocks(title="APEX AGI Super Brain Microservice") as demo:
-    gr.Markdown("# ⚡ APEX AGI ENGINE v11.0 - AI SUPER BRAIN MICROSERVICE 🚀")
+    gr.Markdown("# ⚡ APEX AGI ENGINE v13.00 - AI SUPER BRAIN MICROSERVICE 🚀")
     gr.Markdown("🟢 **STATUS: ONLINE 24/7/365** | Microservice Node for Khmer Master Crypto Bot")
     
     with gr.Row():

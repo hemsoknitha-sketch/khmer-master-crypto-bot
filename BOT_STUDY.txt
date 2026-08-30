@@ -65,7 +65,7 @@ Apex AGI Engine v13.00 Absolute Ultimate AGI Edition គឺជាប្រព័
 • `/alert`            : កំណត់ការជូនដំណឹងតម្លៃកាក់ (ទម្រង់ ៖ `/alert BTC 95000 ABOVE`)
 
 --------------------------------------------------------------------------------
-៣. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ v12.00 (CAPITAL ALLOCATION MATRIX)
+៣. មគ្គុទ្ទេសក៍គ្រប់គ្រងដើមទុន និងហានិភ័យ v13.00 (CAPITAL ALLOCATION MATRIX)
 --------------------------------------------------------------------------------
 • ទុនក្រោម $15 USDT: កំណត់រត់ 1 កាក់អតិបរមា (Leverage 10x Max, Position Size $2.50 - $5.00)
 • ទុន $15 - $30 USDT: កំណត់រត់ 5 កាក់អតិបរមា (Leverage 10x - 15x Max)
@@ -73,5 +73,5 @@ Apex AGI Engine v13.00 Absolute Ultimate AGI Edition គឺជាប្រព័
 • ទុនលើសពី $100 USDT: កំណត់រត់ 10 កាក់អតិបរមា ជាមួយនឹង Free Margin Buffer 50% សម្រាប់សុវត្ថិភាព
 
 ================================================================================
-              KHMER MASTER CRYPTO v12.00 - INSTITUTIONAL PROFIT GUARANTEED
+              KHMER MASTER CRYPTO v13.00 - INSTITUTIONAL PROFIT GUARANTEED
 ================================================================================
