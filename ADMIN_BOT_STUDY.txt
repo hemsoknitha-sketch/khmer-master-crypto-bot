@@ -17,33 +17,62 @@
   - 🐋 Whale Orderflow & Dark Pool Front-Running Radar (`/whales`) ៖ PatchTST Transformer + NLP & On-Chain AGI ស្កេន Wallet មហាសេដ្ឋី (BlackRock, MicroStrategy, Binance Cold, Coinbase Prime) ចូលទិញមុន ក្នុងកម្រិត Sub-Second!
   - 📈 AI Dynamic Compound Infinity Matrix (`/infinity_matrix`) ៖ LSTM Neural Net + RL Dynamic PPO Agent (Rebalance + 100% Profit Compounding 24/7)!
   - 🎯 Flash Crash / Liquidation Cascade Hunting Engine (`/flash_crash`) ៖ HMM Regime Classifier + ONNX Sub-10ms HFT Model ដាក់បញ្ជាទិញ Limit Buy Catch នៅតម្លៃបាតបំផុត (Deep Wick 5% - 25% discount) រួច exit < 5 វិនាទី!
-  - 🏆 PAXG Gold & Multi-Asset Safe Haven Switcher (`/gold_guard`) ៖ NLP & On-Chain AGI + HMM Market Regime ដកដើមទុន 100% ទៅទិញ PAXG Physical Gold Backed Token ពេលមានសង្គ្រាម/វិបត្តិ!
-  - Turbo Hedge HFT Engine (`/turbo_hedge`) ៖ ស្កេនកើបចំណេញ 24/7 លើកាក់ Crypto 200+ ទាំង Spot (1x) និង Futures (1x-15x/75x) ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m), Dynamic Leverage Shield, ISOLATED Margin Enforcement, និង Net Profit TP Floor (+0.12% Taker fee offset)។
+  - 🏆 PAXG Gold & Multi-Asset Safe Haven Switcher (`/gold_guard` / `/gold_radar`) ៖ NLP & On-Chain AGI + HMM Market Regime ដកដើមទុន 100% ទៅទិញ PAXG Physical Gold Backed Token ពេលមានសង្គ្រាម/វិបត្តិ!
+
+• 🚀 [២. ម៉ាស៊ីនជួញដូរស្វ័យប្រវត្តិល្បឿនលឿន - HFT & Quant Trading Engines] ៖
+  - 🚀 Hyper-Trade HFT Sub-Second Scalper (`/hyper_trade`) ៖ ម៉ាស៊ីនស្កេនទិញលក់ល្បឿន Sub-Second លើកាក់ Crypto 200+ ជាមួយ Multi-Timeframe Alignment (1m + 5m + 15m)។
+  - ⚡ Delta-Neutral 0% Risk Arbitrage (`/auto_arb`) ៖ យុទ្ធសាស្ត្រកើបចំណេញ 0% Risk ដោយទិញ Spot និង Short Futures 1x ស្មើគ្នា។
+  - 🛡️ Liquidity Sweep Bottom Wick Sniper (`/sweep_auto`) ៖ ស្ទាក់ទិញនៅបាតជើង Candle វែងៗ ពេលទីផ្សារជ្រុះខ្លាំង (Liquidation Cascade)។
+  - 🛡️ Auto-Liquidation Guard & Trailing Lock (`/trailing_guard`) ៖ ប្រព័ន្ធការពារសាច់ប្រាក់ Futures & រំកិល Stop-Profit ដេញតាម Peak ស្វ័យប្រវត្តិ។
+  - 🚀 Turbo Hedge Futures 5x Engine (`/turbo_hedge`) ៖ យុទ្ធសាស្ត្រ Futures 5x Long/Short ស្កេនប្រមូលចំណេញ 24/7 ជាមួយ Dynamic Leverage Shield និង Net Profit TP Floor (+0.12% Taker fee offset)។
+  - 🎯 Smart DCA Martingale Ladder (`/smart_dca`) ៖ យុទ្ធសាស្ត្រគុណលុយទិញជាកាំជណ្តើរស្វ័យប្រវត្តិ តាមដានតម្លៃបាតកាក់។
+  - 📊 24/7 Grid Trading Engine (`/grid_bot`) ៖ រាយសំណាញ់ទិញថោក លក់ថ្លៃ 24/7 តាមចន្លោះតម្លៃទីផ្សារ។
+
+• 🏛️ [៣. ពាក្យបញ្ជាស្ថាប័នជាន់ខ្ពស់ - Institutional 4-Tap Aliased Commands] ៖
+  - `/execute_top_tier_accumulation ON 500,000,000 USDT` ៖ រត់លើ Smart DCA & HFT Top Accumulation Engine ស្កេនទិញបាតកាក់ និងប្រមូលសាច់ប្រាក់ Dark Pool ស្វ័យប្រវត្តិ។
+  - `/monitor_all_streams ON ALL_NODES` ៖ រត់លើ Whale Stream & Multi-Exchange Orderbook Engine តាមដានទិន្នន័យ Orderflow Real-Time ពី Binance, Bybit, OKX & Coinbase។
+  - `/execute_short_cascade ON 250,000,000 USDT` ៖ រត់លើ Futures Short Cascade & Liquidation Sweep Engine ស្កេន Short និងស្ទាក់ទិញនៅបាតជើង Candle < 5 វិនាទី។
+  - `/execute_arb_engine ON 100,000,000 USDT` ៖ រត់លើ Delta-Neutral Arbitrage & Funding Harvester Engine ច្រូតកាត់ប្រាក់ការ APY 30%-120% ដោយគ្មានហានិភ័យ (0% Risk)។
+
+• 🧠 [៤. AI Super Brain & Model Architecture] ៖
   - 🧠 AGI 5-Model Swarm Ensemble (`ai_engine.py`) ៖ 5-Agent Consensus Decision (Google Gemini 2.5, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-32B, Mistral-7B) ធ្វើឱ្យ Win-rate ខ្ពស់បំផុត និងលុបបំបាត់ False Signals ជិត 0%!
   - 👑 Wall Street Ultra-Next-Gen ML Models (`train_model.py`) ៖ PatchTST Attention Transformer, Triple-Ensemble (XGBoost, CatBoost, LightGBM), GNN Altcoin Ripple Graph, និង OpenAI PPO Deep Reinforcement Learning Agent Policy!
   - 📦 Hugging Face Cloud Auto-Train Pipeline & Hot Reload (`/sync_brain`) ៖ Auto-Train លើ Google Colab GPU 14-day cycle រួច Upload ទៅ Hugging Face Hub (`hemsinath/apex-ai-brain-models`)។ វាយ `/sync_brain` ដើម្បី Hot-Update ទម្ងន់ AI ថ្មីក្នុងពេល ១ វិនាទី!
   - 📰 3-Paragraph Journalistic News Alerts & RSS Photo Extractor ៖ ស្កេនព័ត៌មាន និងទាញយករូបភាព High-Res Photo Alerts ផ្ញើជូន ៣ វគ្គផ្លូវការ ត្រឹមត្រូវតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត 100%!
-  - ⚡ HFT X (Twitter) & Truth Social Firehose Engine (`hft_x_truth_firehose_engine.py`) ៖ ចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុតកម្រិត HFT (< 2ms Target / 0.044ms Benchmark) ពី X & Truth Social ដោយផ្ទាល់!
 
 --------------------------------------------------------------------------------
-២. ស្ថាបត្យកម្មប្រព័ន្ធ និងការកំណត់ TELEGRAM MENU SCOPING v12.00
+២. ស្ថាបត្យកម្មសុវត្ថិភាព និងការកំណត់ TELEGRAM MENU SCOPING v12.00
 --------------------------------------------------------------------------------
 
-២.១ TELEGRAM BOT COMMAND MENU SCOPING & PRIVACY ៖
+២.១ ស្ថាបត្យកម្មសុវត្ថិភាពទិន្នន័យ (CRITICAL SECURITY ARCHITECTURE) ៖
+• 🔐 Isolated User API Key Session ៖
+  - `get_user_api(chat_id)` ត្រូវបានចាក់សោស្វែងរក **ដាច់ខាតតែតាម `chat_id` ផ្ទាល់ខ្លួនរបស់អ្នកប្រើប្រាស់ម្នាក់ៗប៉ុណ្ណោះ** (លុបចោល `LIMIT 1` និង `.env` fallback ទាំងស្រុង)។ គ្មាន User VIP ណាអាចមើលឃើញសមតុល្យ ឬ Keys របស់ Admin ឬ User ផ្សេងបានឡើយ!
+• 👑 Super Admin Access Guard ៖
+  - គ្រប់ Commands រដ្ឋបាលទាំងអស់ (`/admin`, `/health`, `/sync_brain`, `/admin_users`, `/admin_license`, `/admin_view_portfolio`...) ត្រូវបានការពារដោយ `if not (chat_id == 859271875 or db.is_admin(chat_id)): return`។ User ធម្មតាមិនអាចចូលប្រើបានដាច់ខាត (Access Denied)!
+• 🔑 Military-Grade AES-256 Encryption & Sub-Second Message Destruction ៖
+  - រាល់ API Keys និង PIN ត្រូវបាន Encrypted ដោយ AES-256 Fernet Key។ សារដែលមាន PIN ឬ Keys ត្រូវបានលុបចេញពី Telegram Chat ស្វ័យប្រវត្តិក្នុងរយៈពេល < 500ms។
+• 🛡️ Telegram Markdown Parse Fallback 🛡️ ៖
+  - រាល់ការផ្ញើសារ AI ឬ Volatility Radar ត្រូវបានការពារដោយ **Automatic Plain Text Fallback** ពេល Telegram Markdown Parsing មាន Error ដោយសារនិមិត្តសញ្ញាពី AI output។
+
+២.២ TELEGRAM BOT COMMAND MENU SCOPING & PRIVACY ៖
 • 👥 VIP Public Users Menu Scope (`BotCommandScopeDefault` & `BotCommandScopeAllPrivateChats`) ៖
-  - រួមបញ្ចូលពាក្យបញ្ជាវិនិយោគទាំង ៦ (`/cross_arb`, `/funding_harvester`, `/whales`, `/infinity_matrix`, `/flash_crash`, `/gold_guard`) + ពាក្យបញ្ជាទូទៅ (`/start`, `/menu`, `/turbo_hedge`, `/analyze`, `/predict`, `/balance`, `/status`, `/news`, `/top`, `/alert`, `/stop`)។
+  - រៀបចំតាមលំដាប់លំដោយ ៥ កម្រិត Super Smart & Beautiful Menu Structure ៖
+    ១. 🚀 Navigation & Accounts (`/start`, `/menu`, `/balance`, `/portfolio`)
+    ២. 🤖 5 Super Smart Engines (`/hyper_trade`, `/auto_arb`, `/sweep_auto`, `/funding_harvester`, `/trailing_guard`)
+    ៣. 📈 Quant Trading Strategies (`/turbo_hedge`, `/infinity_matrix`, `/smart_dca`, `/grid_bot`)
+    ៤. 🧠 AI Analytics & Market Intel (`/analyze`, `/predict`, `/gold_radar`, `/whales`, `/news`)
+    ៥. 🛑 Emergency Controls (`/stop`)
   - **លាក់បាំង `/admin`, `/health`, និង `/sync_brain` មិនឲ្យ VIP Users មើលឃើញឡើយ!**
-  - មុខងារ `/status` សម្រាប់ VIP Users បង្ហាញតែ System Engine Status & Active Trades ដោយ **លាក់បាំង VPS Hardware Details ទាំងអស់!**
 
 • 👑 Super Admin Menu Scope (`BotCommandScopeChat(chat_id=859271875)`) ៖
   - រួមបញ្ចូលពាក្យបញ្ជា VIP ទាំងអស់ **បូករួមទាំងពាក្យបញ្ជាសម្ងាត់ Super Admin ៖**
     - `/admin`     : 👑 Open Super Admin Control Panel
-    - `/health`    : 🩺 Check VPS Hardware (CPU, RAM, 3GB Swap, DB Size, Gemini Models, API Latency) Diagnostics
+    - `/health`    : 🩺 Check VPS Hardware (CPU, RAM, Disk Size, Gemini Models, API Latency) Diagnostics
     - `/sync_brain`: 📦 Hot-Reload AI Models from Cloud Hub
 
-២.២ យន្តការ SMART CHAT ID REGEX CLEANER FOR `/admin_license` ៖
+២.៣ យន្តការ SMART CHAT ID REGEX CLEANER FOR `/admin_license` ៖
 • ជំនួយការ Admin វាយបញ្ជាផ្ដល់អាជ្ញាប័ណ្ណ ៖ `/admin_license <CHAT_ID> <DURATION>`
-• ប្រព័ន្ធសម្អាតនិមិត្តសញ្ញាអូតូ ៖ លុបចេញនូវអក្សរ `ID:`, `id:`, `< >`, `:`, `#` ស្វ័យប្រវត្តិ។ ឧទាហរណ៍ ៖ `/admin_license ID: 537186806 Lifetime` នឹងទាញយក Chat ID `537186806` និង Duration `Lifetime` ដោយជោគជ័យ ១០០%!
+• ប្រព័ន្ធសម្អាតនិមិត្តសញ្ញាអូតូ ៖ លុបចេញនូវអក្សរ `ID:`, `id:`, `< >`, `:`, `#` ស្វ័យប្រវត្តិ (ឧទាហរណ៍ ៖ `/admin_license ID: 537186806 Lifetime` នឹងទាញយក Chat ID `537186806` និង Duration `Lifetime` ដោយជោគជ័យ ១០០%)!
 
 --------------------------------------------------------------------------------
 ៣. ការគ្រប់គ្រង DESKTOP CONTROL PANEL APP (`main.py` GUI) & TELEGRAM COMMANDS
@@ -57,6 +86,36 @@
 • `/admin_broadcast`   : ផ្ញើសារដំណឹងអាសន្នទៅកាន់ VIPs ទាំងអស់ (ទម្រង់ ៖ `/admin_broadcast <MESSAGE>`)
 • `/health`            : ពិនិត្យមើលសុខភាពផ្នែករឹង VPS, CPU Load, RAM Memory, Database Size, និង Exchange Latency
 • `/sync_brain`        : Hot-Reload ទាញយកទម្ងន់ AI ថ្មីពី Hugging Face Model Hub
+• `/admin_view_portfolio`: ពិនិត្យមើល Portfolio និងកាបូបវិនិយោគរបស់សមាជិក VIP (ឧទាហរណ៍ ៖ `/admin_view_portfolio 537186806`)
+
+--------------------------------------------------------------------------------
+៤. របៀបប្រតិបត្តិការ និងអាប់ដេតលើ VPS (VPS MAINTENANCE & COMMANDS)
+--------------------------------------------------------------------------------
+
+៤.១ ទីតាំងកូដពិតប្រាកដលើ VPS ៖
+• Path ៖ `/opt/khmer-master-crypto-bot`
+• Virtual Environment ៖ `/opt/khmer-master-crypto-bot/venv`
+
+៤.២ បញ្ជាប្រតិបត្តិការផ្លូវការលើ VPS ៖
+```bash
+# ១. ចូលទៅកាន់ Folder កូដរបស់ Bot លើ VPS
+cd /opt/khmer-master-crypto-bot
+
+# ២. ទាញយកកូដអាប់ដេតថ្មីៗពី GitHub
+git pull origin main
+
+# ៣. ដំឡើង Requirements ឬ Libraries (ដូចជា psutil)
+venv/bin/pip install -r requirements.txt
+
+# ៤. កំណត់រចនាសម្ព័ន្ធ Menu ថ្មីទៅកាន់ Telegram API ភ្លាមៗ
+venv/bin/python3 force_clear_and_set_commands.py
+
+# ៥. Restart សេវាកម្ម Bot 
+sudo systemctl restart khmer-master-crypto-bot
+
+# ៦. ពិនិត្យមើល Log ដំណើរការ Real-Time
+sudo journalctl -u khmer-master-crypto-bot -f -n 30
+```
 
 ================================================================================
              SUPER ADMIN MANUAL v12.00 - ALL SYSTEMS 100% OPERATIONAL
