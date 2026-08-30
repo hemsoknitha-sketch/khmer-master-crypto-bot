@@ -159,33 +159,45 @@ class TelegramBotThread(BaseThread):
             except Exception as e_del:
                 print(f"⚠️ [MENU CLEANUP] Delete notice: {e_del}")
 
-            # Public VIP User Command List (Includes 6 Flagship Quantitative Engines, Excludes health & sync_brain)
+            # Public VIP User Command List (Categorized Super Smart Menu)
             public_commands = [
-                BotCommand("start", "🚀 Start Bot & Choose Language"),
-                BotCommand("menu", "🎛️ Interactive Master Control Panel"),
-                BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
-                BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
-                BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
-                BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
-                BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-                BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
-                BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
+                # 1. Navigation & Account
+                BotCommand("start", "🚀 Start Bot & Select Language"),
+                BotCommand("menu", "🎛️ Master Control Panel & Interactive Menu"),
+                BotCommand("balance", "💰 Check Spot & Futures Balance"),
+                BotCommand("portfolio", "💼 View Active Positions & PnL"),
+
+                # 2. 5 Super Smart Engines
+                BotCommand("hyper_trade", "🚀 Hyper-Trade HFT Sub-Second Scalper"),
+                BotCommand("auto_arb", "⚡ Delta-Neutral 0% Risk Arbitrage"),
+                BotCommand("sweep_auto", "🛡️ Liquidity Sweep Bottom Wick Sniper"),
+                BotCommand("funding_harvester", "🌾 30%-120% APY Perpetual Funding Yield"),
+                BotCommand("trailing_guard", "🛡️ Auto-Liquidation Guard & Trailing Lock"),
+
+                # 3. AI Quant Trading Strategies
+                BotCommand("turbo_hedge", "🚀 Turbo Hedge Futures 5x Engine"),
+                BotCommand("infinity_matrix", "♾️ Unified Smart Grid Strategy"),
+                BotCommand("smart_dca", "🎯 Smart DCA Martingale Ladder"),
+                BotCommand("grid_bot", "📊 24/7 Grid Trading Engine"),
+
+                # 4. AI Analytics & Market Intelligence
                 BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
                 BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
-                BotCommand("balance", "💰 Check Spot & Futures Balance"),
-                BotCommand("status", "📊 View Active Trades & PnL"),
-                BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
-                BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
-                BotCommand("alert", "🔔 Set Price Alert"),
-                BotCommand("stop", "🛑 Stop Trading / Market Close"),
+                BotCommand("gold_radar", "🏆 PAXG Gold Wealth Protection Radar"),
+                BotCommand("whales", "🐋 On-Chain Whale Inflow/Outflow Tracker"),
+                BotCommand("news", "📰 AI Journalistic Crypto News & Impact"),
+
+                # 5. Emergency Stop
+                BotCommand("stop", "🛑 Emergency Stop All Active Trading"),
             ]
 
-            # Full Super Admin Command List (Includes admin, health, sync_brain)
+            # Full Super Admin Command List
             admin_commands = [
-                BotCommand("admin", "👑 Open Super Admin Control Panel"),
-                BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
+                BotCommand("admin", "👑 Super Admin Control Panel"),
+                BotCommand("health", "🩺 VPS Hardware & Engine Diagnostics"),
                 BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
             ] + public_commands
+
 
             try:
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
@@ -7220,131 +7232,6 @@ class TelegramBotThread(BaseThread):
                             except Exception:
                                 pass
 
-                asyncio.create_task(_background_top_scanner())
-                return
-
-            is_spot = (user_side_input == "SPOT")
-            if is_spot:
-                avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
-            else:
-                avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
-            eval_res = await asyncio.to_thread(turbo_hedge_engine.scan_and_evaluate_symbol, symbol, leverage, avail_bal, is_spot_mode=is_spot)
-            
-            if user_side_input in ["BUY", "SELL", "SPOT"]:
-                side = user_side_input
-            else:
-                side = eval_res.get("side", "SKIP")
-
-            if side == "SKIP" or side not in ["BUY", "SELL", "SPOT"]:
-                # Always register in DB so background scanner continuously monitors and enters when signal aligns!
-                db.add_turbo_hedge_bot(chat_id, symbol, amount, leverage, user_side_input, target_tp)
-                msg_skip = (
-                    f"📡 **APEX TURBO HEDGE REGISTERED & AUTO-SCANNING 24/7!** 🛡️\n"
-                    f"───────────────────────────────\n\n"
-                    f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
-                    f"💰 ទុនវិនិយោគ ៖ `${amount:,.2f} USDT` (`{leverage}x Lev`)\n"
-                    f"🎯 របៀបកំណត់ ៖ `{user_side_input}` (Target TP: `+${target_tp:.2f}`)\n"
-                    f"⚪ ស្ថានភាពសញ្ញា ៖ `[AGI CHOP SUPPRESSION] {eval_res.get('reason', '1m/5m Trend Misaligned')}`\n\n"
-                    f"🛡️ _ប្រព័ន្ធ AGI បានចុះឈ្មោះកាក់ {symbol} រួចរាល់! ម៉ាស៊ីនស្កេន 24/7 កំពុងរត់តាមដាន real-time ឲ្យតែ Trend 1m/5m រត់ស្របគ្នាមកដល់ វានឹងបើក Order អូតូភ្លាមៗ!_"
-                )
-                if msg_target:
-                    try:
-                        await msg_target.reply_text(msg_skip, parse_mode="Markdown")
-                    except Exception:
-                        await msg_target.reply_text(msg_skip)
-                return
-
-            win_rate = eval_res.get("win_rate_pct", 88.5)
-
-            # 1. Execute Instant Order on Binance Futures (<100ms)
-            exec_res = await asyncio.to_thread(turbo_hedge_engine.execute_turbo_hedge_trade, keys[0], keys[1], symbol, amount, side, leverage, chat_id)
-
-            # 2. Add to active DB tracking
-            db.add_turbo_hedge_bot(chat_id, symbol, amount, leverage, side, target_tp)
-
-            entry_p = trading_engine.get_current_price(symbol)
-            if entry_p > 0:
-                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
-
-            exec_status = exec_res.get("status") if isinstance(exec_res, dict) else "unknown"
-            if exec_status in ["success", "NEW", "FILLED"] or (isinstance(exec_res, dict) and (exec_res.get("orderId") or (isinstance(exec_res.get("res"), dict) and exec_res["res"].get("orderId")))):
-                msg = (
-                    f"🚀 **APEX TURBO HEDGE INSTANT POSITION OPENED!** 🛡️\n"
-                    f"───────────────────────────────\n\n"
-                    f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
-                    f"💰 ទុនវិនិយោគ ៖ `${amount:,.2f} USDT`\n"
-                    f"🚀 Dynamic Leverage ៖ `{leverage}x`\n"
-                    f"🎯 ទិសដៅជួញដូរ ៖ `{side}` (Win Rate: {win_rate}%)\n"
-                    f"💰 គោលដៅប្រមូលចំណេញ ៖ `+${target_tp:.2f} USDT / Trade`\n"
-                    f"⚡ Binance Status ៖ `EXECUTED INSTANTLY (<100ms)`\n"
-                    f"🔄 Auto-Harvest & Flip ៖ `ACTIVE (3s Scan & Re-Analysis)`\n\n"
-                    f"_Bot កំពុងកើបផលចំណេញ ${target_tp:.2f} និងស្កេន Auto-Flip 24/7 ស្វ័យប្រវត្តិ!_"
-                )
-            else:
-                err_msg = exec_res.get("error") or exec_res.get("message") or str(exec_res)
-                msg = (
-                    f"⚠️ **APEX TURBO HEDGE NOTICE (BINANCE API):**\n\n"
-                    f"🪙 Symbol: `{symbol}`\n"
-                    f"❌ Binance Result: `{err_msg}`\n\n"
-                    f"👉 Bot ត្រូវបានចុះឈ្មោះក្នុងប្រព័ន្ធស្កេន Auto-Flip ស្វ័យប្រវត្តិ 24/7!"
-                )
-
-            if msg_target:
-                try:
-                    await msg_target.reply_text(msg, parse_mode="Markdown")
-                except Exception:
-                    await msg_target.reply_text(msg)
-            await delete_sensitive_message(context, chat_id, update, user_lang)
-
-        async def compound_grid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
-
-            args = context.args
-            active_grids = db.get_user_compound_grids(chat_id)
-            has_active = len(active_grids) > 0 if isinstance(active_grids, list) else False
-            status_str = f"🟢 ACTIVE ({len(active_grids)} Active Compound Grid Bots)" if has_active else "🔴 INACTIVE (គ្មាន Compound Grid ដំណើរការទេ)"
-
-            if not args or len(args) == 0:
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"), InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch")],
-                    [InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"), InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")]
-                ])
-
-                grid_lines = []
-                if has_active:
-                    for g in active_grids[:5]:
-                        # g columns schema: id, chat_id, symbol, amt_per_layer, step_pct, target_capital, total_coins, entry_price...
-                        sym = str(g[2]) if len(g) > 2 else "N/A"
-                        amt = float(g[3]) if len(g) > 3 else 0.0
-                        step = float(g[4]) if len(g) > 4 else 0.0
-                        target = float(g[5]) if len(g) > 5 else 0.0
-                        grid_lines.append(f"• `{sym}`: Layer `${amt:,.2f}` | Step `{step:.1f}%` | Target `${target:,.2f}`")
-
-                list_text = "\n".join(grid_lines) if grid_lines else "_គ្មាន Compound Grid ដែលកំពុងដំណើរការនៅឡើយទេ..._"
-
-                msg = (
-                    "⛄ **APEX SUPER AGI TURBO BRAIN v9.5 | COMPOUND GRID ENGINE** 📈\n"
-                    "═══════════════════════════════\n\n"
-                    "📊 **EXECUTIVE COMPOUND GRID CONFIGURATION & POSITIONS:**\n"
-                    f"• **System Status**: {status_str}\n"
-                    "• **Yield Strategy**: `Snowball Interest Compounding (Re-invest Profit into Base)`\n"
-                    "• **Execution Engine**: `Binance API Sub-Second Market Execution`\n\n"
-                    "📋 **ACTIVE COMPOUND GRID POSITIONS:**\n"
-                    f"{list_text}\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **AI Smart Auto 3X Compound ៖**\n`` `/compound_grid XRP 100 1234` ``\n\n"
-                    "👉 **Custom Step Compound ៖**\n`` `/compound_grid XRP 10 1.0 100 1234` ``"
-                )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
-                return
-
             symbol = str(args[0]).upper().strip()
             if not symbol.endswith("USDT"):
                 symbol += "USDT"
@@ -8389,16 +8276,18 @@ class TelegramBotThread(BaseThread):
         async def trailing_guard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
+            target_msg = update.effective_message
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
             if not db.is_vip(chat_id):
-                await update.message.reply_text("❌ **មុខងារនេះសម្រាប់តែ VIP ឡើងទៅប៉ុណ្ណោះ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if target_msg:
+                    await target_msg.reply_text("❌ **មុខងារនេះសម្រាប់តែ VIP ឡើងទៅប៉ុណ្ណោះ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
-            args = context.args
+            args = context.args if (context and context.args is not None) else []
             cfg = db.get_trailing_guard_config(chat_id) if hasattr(db, 'get_trailing_guard_config') else {}
             is_enabled = bool(cfg.get("enabled", False)) if isinstance(cfg, dict) else False
             min_profit = float(cfg.get("min_profit_pct", 1.5)) if isinstance(cfg, dict) else 1.5
@@ -8438,22 +8327,25 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/trailing_guard ON 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/trailing_guard OFF 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if target_msg:
+                    await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
             action = str(args[0]).upper().strip()
             pin = str(args[1]).strip() if len(args) >= 2 else ""
 
             if action not in ["ON", "OFF"]:
-                await update.message.reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/trailing_guard ON 1234` `` ឬ `` `/trailing_guard OFF 1234` ``", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if target_msg:
+                    await target_msg.reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/trailing_guard ON 1234` `` ឬ `` `/trailing_guard OFF 1234` ``", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if target_msg:
+                    await target_msg.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
             if action == "ON":
@@ -8463,18 +8355,21 @@ class TelegramBotThread(BaseThread):
                     "_ប្រព័ន្ធនឹងបើក Profit Lock ស្វ័យប្រវត្តិពេលចំណេញបាន +1.5% និងរំកិល Stop-Profit ដេញតាម Peak 0.5% "
                     "ដើម្បីសង្កត់ប្រមូលចំណេញខ្ពស់បំផុត 24/7!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if target_msg:
+                    await target_msg.reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 self.log_signal.emit(f"🛡️ VIP User {chat_id} ENABLED Trailing Guard & Auto-Liquidation Guard.")
                 return
 
             if action == "OFF":
                 db.set_trailing_guard_config(chat_id, enabled=False)
                 msg = "🛑 **AI Dynamic Trailing Profit Guard ត្រូវបានបិទ!**"
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                if target_msg:
+                    await target_msg.reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Trailing Guard.")
                 return
+
 
         async def stop_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return

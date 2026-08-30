@@ -208,7 +208,10 @@ VPS_STRIKE_COUNT = 0
 async def vps_health_monitor_job(app: Application):
     global VPS_STRIKE_COUNT
     try:
-        import psutil
+        try:
+            import psutil
+        except ImportError:
+            return
         import asyncio
         import gc
         
