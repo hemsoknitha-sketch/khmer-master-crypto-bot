@@ -7,7 +7,7 @@ import database as db
 
 class FlashCrashLiquidationHunterEngine:
     """
-    🎯 Flash Crash / Liquidation Cascade Hunting Engine v12.00
+    🎯 Flash Crash / Liquidation Cascade Hunting Engine v13.00
     ------------------------------------------------------------
     AI Models Ensemble: HMM Regime Classifier + ONNX Sub-10ms HFT Model
     Strategy: Places Limit Buy Catch orders at deep wicks (5% - 25% discount) during liquidation cascades.

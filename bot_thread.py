@@ -420,7 +420,7 @@ class TelegramBotThread(BaseThread):
                 targets = await asyncio.to_thread(flash_crash_sniper_engine.flash_crash_engine.scan_flash_crash_targets)
 
                 if user_lang == 'khmer':
-                    msg = "🎯 **FLASH CRASH / LIQUIDATION CASCADE HUNTING ENGINE v12.00** 🎯\n"
+                    msg = "🎯 **FLASH CRASH / LIQUIDATION CASCADE HUNTING ENGINE v13.00** 🎯\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models សហការ ៖** `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model`\n"
                     msg += "⚡ **យុទ្ធសាស្ត្រប្រតិបត្តិ ៖** `Limit Buy Catch (ទិញបាត Deep Wick) រួច Exit ក្នុងរយៈពេល < 5 វិនាទី`\n"
@@ -439,7 +439,7 @@ class TelegramBotThread(BaseThread):
                     
                     msg += "💡 _នៅពេលសមាជិកផ្សេងទៀតត្រូវ Margin Call / Liquidate AI នឹងចូលទិញបាតកាក់ថោកបំផុតភ្លាមៗ!_"
                 else:
-                    msg = "🎯 **FLASH CRASH / LIQUIDATION CASCADE HUNTING ENGINE v12.00** 🎯\n"
+                    msg = "🎯 **FLASH CRASH / LIQUIDATION CASCADE HUNTING ENGINE v13.00** 🎯\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models Ensemble:** `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model`\n"
                     msg += "⚡ **Execution Strategy:** `Limit Buy Catch (Deep Wick Discount) with <5s Instant Exit`\n"
@@ -483,7 +483,7 @@ class TelegramBotThread(BaseThread):
                 results = await cross_exchange_arb_engine.arb_engine.scan_top_cross_arbitrage_matrix()
 
                 if user_lang == 'khmer':
-                    msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v12.00** ⚡️\n"
+                    msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v13.00** ⚡️\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models សហការ ៖** `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
                     msg += "🌐 **Exchanges ភ្ជាប់ ៖** `Binance` | `Bybit` | `OKX` | `Coinbase`\n"
@@ -512,7 +512,7 @@ class TelegramBotThread(BaseThread):
                     
                     msg += "💡 _ប្រព័ន្ធទិញពី Exchange A ហើយលក់លើ Exchange B ភ្លាមៗក្នុងពេលដំណាលគ្នា (Zero Market Risk Arbitrage)!_"
                 else:
-                    msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v12.00** ⚡️\n"
+                    msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v13.00** ⚡️\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models Ensemble:** `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
                     msg += "🌐 **Connected Exchanges:** `Binance` | `Bybit` | `OKX` | `Coinbase`\n"
@@ -579,13 +579,13 @@ class TelegramBotThread(BaseThread):
             
             if user_lang == 'en':
                 menu_text = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🤖\n"
                     "═══════════════════════════════\n"
                     "⚡ **SYSTEM STATUS**: `🟢 ONLINE` | `Latency: <15ms`\n"
                     "🧠 **AGI SUPER BRAIN**: `5-Model Swarm + 12 Wall Street ML Active`\n"
                     f"🛡️ **SECURITY GUARD**: `ISOLATED MARGIN` | `{mode_badge}`\n"
                     "═══════════════════════════════\n"
-                    "Welcome to **v12.00 VIP Master Control Panel**! 📊\n\n"
+                    "Welcome to **v13.00 VIP Master Control Panel**! 📊\n\n"
                     "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
                     "• `/portfolio` - View total PnL and active positions\n"
                     "• `/balance` - Check Real-Time Spot & Futures Balances\n"
@@ -615,13 +615,13 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 menu_text = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🤖\n"
                     "═══════════════════════════════\n"
                     "⚡ **系统状态**: `🟢 在线` | `延迟: <15ms`\n"
                     "🧠 **AGI 超级大脑**: `5模型 Swarm + 12 Wall Street ML 激活`\n"
                     f"🛡️ **安全防护**: `隔离保证金` | `{mode_badge}`\n"
                     "═══════════════════════════════\n"
-                    "欢迎使用 **v12.00 VIP 机构级主控面板**！📊\n\n"
+                    "欢迎使用 **v13.00 VIP 机构级主控面板**！📊\n\n"
                     "💼 **1. 投资组合与资金分析**\n"
                     "• `/portfolio` - 查看总 PnL 及所有持仓\n"
                     "• `/balance` - 实时查询 Spot 与 Futures 余额\n"
@@ -651,13 +651,13 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 menu_text = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🤖\n"
                     "═══════════════════════════════\n"
                     "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE` | `Latency: <15ms`\n"
                     "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
                     f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
                     "═══════════════════════════════\n"
-                    "សូមស្វាគមន៍មកកាន់ **v12.00 VIP Executive Master Navigation**! 📊\n\n"
+                    "សូមស្វាគមន៍មកកាន់ **v13.00 VIP Executive Master Navigation**! 📊\n\n"
                     "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
                     "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
                     "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
@@ -769,7 +769,7 @@ class TelegramBotThread(BaseThread):
                     await update.callback_query.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
             else:
                 await update.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
-            self.log_signal.emit(f"🎛️ Sent Super Smart v12.00 Master Control Panel to {chat_id}")
+            self.log_signal.emit(f"🎛️ Sent Super Smart v13.00 Master Control Panel to {chat_id}")
 
 
         async def admin_panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -798,7 +798,7 @@ class TelegramBotThread(BaseThread):
 
             if user_lang == 'en':
                 admin_panel_card = (
-                    "👑 **APEX SUPER AGI v12.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
+                    "👑 **APEX SUPER AGI v13.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
                     "═══════════════════════════════\n"
                     "🛡️ **SECURITY CLEARANCE**: `LEVEL 5 SUPER ADMIN (FULL AUTHORIZATION)`\n"
                     "⚡ **SYSTEM HEALTH**: `100% OPERATIONAL` | `VPS CPU/RAM: OPTIMAL`\n"
@@ -824,7 +824,7 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 admin_panel_card = (
-                    "👑 **APEX SUPER AGI v12.00 | 超级管理员控制面板** 👑\n"
+                    "👑 **APEX SUPER AGI v13.00 | 超级管理员控制面板** 👑\n"
                     "═══════════════════════════════\n"
                     "🛡️ **安全权限**: `5级超级管理员 (最高全权授权)`\n"
                     "⚡ **系统状态**: `100% 正常运行` | `VPS CPU/RAM: 最佳`\n"
@@ -850,7 +850,7 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 admin_panel_card = (
-                    "👑 **APEX SUPER AGI v12.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
+                    "👑 **APEX SUPER AGI v13.00 | SUPER ADMIN MASTER CONTROL** 👑\n"
                     "═══════════════════════════════\n"
                     "🛡️ **SECURITY CLEARANCE** ៖ `LEVEL 5 SUPER ADMIN (FULL AUTHORIZATION)`\n"
                     "⚡ **SYSTEM HEALTH** ៖ `100% OPERATIONAL` | `VPS CPU/RAM: OPTIMAL`\n"
@@ -1045,7 +1045,7 @@ class TelegramBotThread(BaseThread):
             if action == "soft":
                 if user_lang == 'en':
                     soft_card = (
-                        "✅ **APEX SUPER AGI v12.00 | SOFT STOP COMPLETED** 🟢\n"
+                        "✅ **APEX SUPER AGI v13.00 | SOFT STOP COMPLETED** 🟢\n"
                         "═══════════════════════════════\n"
                         "• All Trading Engines & AI Bots: `DEACTIVATED 100%`\n"
                         "• Existing Wallet Assets & Coins: `SAFELY HELD IN WALLET`\n"
@@ -1054,7 +1054,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     soft_card = (
-                        "✅ **APEX SUPER AGI v12.00 | 软停止已完成** 🟢\n"
+                        "✅ **APEX SUPER AGI v13.00 | 软停止已完成** 🟢\n"
                         "═══════════════════════════════\n"
                         "• 所有交易引擎与 AI 机器人: `100% 已暂停运行`\n"
                         "• 钱包原有资产与币种: `安全保存在钱包中`\n"
@@ -1063,7 +1063,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     soft_card = (
-                        "✅ **APEX SUPER AGI v12.00 | SOFT STOP COMPLETED** 🟢\n"
+                        "✅ **APEX SUPER AGI v13.00 | SOFT STOP COMPLETED** 🟢\n"
                         "═══════════════════════════════\n"
                         "• គ្រប់ AI Engines & Trading Bots ទាំងអស់ ៖ `បិទដំណើរការ 100%`\n"
                         "• កាក់ និងប្រាក់ទុនក្នុង Wallet ៖ `រក្សាទុកដោយសុវត្ថិភាព`\n"
@@ -1090,7 +1090,7 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     hard_card = (
-                        "🔴 **APEX SUPER AGI v12.00 | HARD STOP & PANIC SELL COMPLETED** 🛑\n"
+                        "🔴 **APEX SUPER AGI v13.00 | HARD STOP & PANIC SELL COMPLETED** 🛑\n"
                         "═══════════════════════════════\n"
                         "• All Trading Engines & AI Bots: `SHUTDOWN 100%`\n"
                         f"• Cancelled Orders & Liquidated Positions: `{closed_count}`\n"
@@ -1100,7 +1100,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     hard_card = (
-                        "🔴 **APEX SUPER AGI v12.00 | 强平硬停止已完成** 🛑\n"
+                        "🔴 **APEX SUPER AGI v13.00 | 强平硬停止已完成** 🛑\n"
                         "═══════════════════════════════\n"
                         "• 所有交易引擎与 AI 机器人: `100% 已关闭`\n"
                         f"• 撤销挂单与市场平仓持仓: `{closed_count}` 个\n"
@@ -1110,7 +1110,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     hard_card = (
-                        "🔴 **APEX SUPER AGI v12.00 | HARD STOP & PANIC SELL COMPLETED** 🛑\n"
+                        "🔴 **APEX SUPER AGI v13.00 | HARD STOP & PANIC SELL COMPLETED** 🛑\n"
                         "═══════════════════════════════\n"
                         "• គ្រប់ AI Engines & Trading Bots ទាំងអស់ ៖ `បិទបញ្ចប់ 100%`\n"
                         f"• ចំនួន Positions ដែលបានបិទ & ភ្នាល់ ៖ `{closed_count}`\n"
@@ -1191,7 +1191,7 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
 
             msg = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | UNIFIED PORTFOLIO** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | UNIFIED PORTFOLIO** 🤖\n"
                 "═══════════════════════════════\n"
                 f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
                 "═══════════════════════════════\n\n"
@@ -1339,7 +1339,7 @@ class TelegramBotThread(BaseThread):
             status_icon = "🟢 Normal" if cpu_usage < 75.0 else ("🟡 Heavy Load" if cpu_usage < 90.0 else "🔴 Critical Load")
 
             msg = (
-                f"📊 **KHMER MASTER CRYPTO v12.00 | SYSTEM & AGI DIAGNOSTICS** 📊\n"
+                f"📊 **KHMER MASTER CRYPTO v13.00 | SYSTEM & AGI DIAGNOSTICS** 📊\n"
                 f"───────────────────────────────\n\n"
                 f"🖥️ **VPS HARDWARE & SYSTEM HEALTH**\n"
                 f"⏳ Uptime: `{uptime_str}`\n"
@@ -1348,7 +1348,7 @@ class TelegramBotThread(BaseThread):
                 f"💽 SSD Storage: `{disk_used_gb} GB / {disk_total_gb} GB ({disk_pct:.1f}%)`\n"
                 f"💾 Database Size: `{db_size_mb:.2f} MB` (WAL Mode Optimized)\n"
                 f"🚦 System Status: {status_icon}\n\n"
-                f"🛡️ **AGI CORE ENGINES MATRIX v12.00 (CHAT ID: `{chat_id}`)**\n"
+                f"🛡️ **AGI CORE ENGINES MATRIX v13.00 (CHAT ID: `{chat_id}`)**\n"
                 f"💵 Mode: {'🟡 PAPER TRADING' if paper_on else '🚀 REAL MONEY LIVE'}\n"
                 f"🛡️ Liquidation Defender: {'🟢 ACTIVE (2% Max Drawdown Breaker)' if defender_on else '🟡 READY'}\n"
                 f"🚀 Turbo Hedge HFT Node: {'🟢 ACTIVE (' + str(len(user_turbo_bots)) + ' Positions)' if turbo_active else '🔴 STANDBY'}\n"
@@ -1410,21 +1410,21 @@ class TelegramBotThread(BaseThread):
             if not keys:
                 if user_lang == 'en':
                     empty_msg = (
-                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
                         "═══════════════════════════════\n"
                         "❌ **No Binance API Keys connected yet!**\n\n"
                         "💡 *Please tap **[🔑 Add Binance API]** below to bind your API Keys first:*"
                     )
                 elif user_lang == 'zh':
                     empty_msg = (
-                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | 实时资金余额** 🤖\n"
+                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 🤖\n"
                         "═══════════════════════════════\n"
                         "❌ **尚未绑定 Binance API Keys！**\n\n"
                         "💡 *请点击下方 **[🔑 Add Binance API]** 按钮绑定您的 API 密钥：*"
                     )
                 else:
                     empty_msg = (
-                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
                         "═══════════════════════════════\n"
                         "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
                         "💡 *សូមចុចប៊ូតុង **[🔑 Add Binance API]** ខាងក្រោមដើម្បីភ្ជាប់ API Keys របស់អ្នកជាមុនសិន ៖*"
@@ -1476,7 +1476,7 @@ class TelegramBotThread(BaseThread):
                 
             if user_lang == 'en':
                 msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
                     "═══════════════════════════════\n"
                     f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
@@ -1491,7 +1491,7 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | 实时资金余额** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 🤖\n"
                     "═══════════════════════════════\n"
                     f"🛡️ **安全认证**: `VERIFIED` | `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
@@ -1506,7 +1506,7 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | LIVE BALANCE** 🤖\n"
+                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
                     "═══════════════════════════════\n"
                     f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
@@ -1523,7 +1523,7 @@ class TelegramBotThread(BaseThread):
             target_msg = update.message if update.message else (update.callback_query.message if update.callback_query else None)
             if target_msg:
                 await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
-            self.log_signal.emit(f"💳 VIP User {chat_id} checked their v12.00 live balance.")
+            self.log_signal.emit(f"💳 VIP User {chat_id} checked their v13.00 live balance.")
 
 
 
@@ -1661,7 +1661,7 @@ class TelegramBotThread(BaseThread):
 
             if user_lang == 'en':
                 msg = (
-                    "⚖️ **APEX SUPER AGI v12.00 | DYNAMIC CAPITAL REBALANCE ENGINE** ⚖️\n"
+                    "⚖️ **APEX SUPER AGI v13.00 | DYNAMIC CAPITAL REBALANCE ENGINE** ⚖️\n"
                     "═══════════════════════════════\n\n"
                     "📊 **GLOBAL REBALANCE ENGINE STATUS:**\n"
                     f"• **Rebalance Status**: `{status_badge}`\n"
@@ -1676,7 +1676,7 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 msg = (
-                    "⚖️ **APEX SUPER AGI v12.00 | 动态资金再平衡控制台** ⚖️\n"
+                    "⚖️ **APEX SUPER AGI v13.00 | 动态资金再平衡控制台** ⚖️\n"
                     "═══════════════════════════════\n\n"
                     "📊 **全局资金再平衡状态：**\n"
                     f"• **再平衡运行状态**: `{status_badge}`\n"
@@ -1691,7 +1691,7 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 msg = (
-                    "⚖️ **APEX SUPER AGI v12.00 | DYNAMIC CAPITAL REBALANCE ENGINE** ⚖️\n"
+                    "⚖️ **APEX SUPER AGI v13.00 | DYNAMIC CAPITAL REBALANCE ENGINE** ⚖️\n"
                     "═══════════════════════════════\n\n"
                     "📊 **GLOBAL REBALANCE ENGINE STATUS ៖**\n"
                     f"• **Rebalance Status** ៖ `{status_badge}`\n"
@@ -1786,7 +1786,7 @@ class TelegramBotThread(BaseThread):
 
             if user_lang == 'en':
                 msg = (
-                    "🛡️ **APEX SUPER AGI v12.00 | EMERGENCY CIRCUIT BREAKER SYSTEM** 🛡️\n"
+                    "🛡️ **APEX SUPER AGI v13.00 | EMERGENCY CIRCUIT BREAKER SYSTEM** 🛡️\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE CIRCUIT BREAKER STATUS:**\n"
                     f"• **System Shield Status**: `{status_badge}`\n"
@@ -1801,7 +1801,7 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 msg = (
-                    "🛡️ **APEX SUPER AGI v12.00 | 全球紧急熔断断路器系统** 🛡️\n"
+                    "🛡️ **APEX SUPER AGI v13.00 | 全球紧急熔断断路器系统** 🛡️\n"
                     "═══════════════════════════════\n\n"
                     "📊 **熔断保护机制运行状态：**\n"
                     f"• **系统保护状态**: `{status_badge}`\n"
@@ -1816,7 +1816,7 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 msg = (
-                    "🛡️ **APEX SUPER AGI v12.00 | EMERGENCY CIRCUIT BREAKER SYSTEM** 🛡️\n"
+                    "🛡️ **APEX SUPER AGI v13.00 | EMERGENCY CIRCUIT BREAKER SYSTEM** 🛡️\n"
                     "═══════════════════════════════\n\n"
                     "📊 **EXECUTIVE CIRCUIT BREAKER STATUS ៖**\n"
                     f"• **System Shield Status** ៖ `{status_badge}`\n"
@@ -1877,7 +1877,7 @@ class TelegramBotThread(BaseThread):
                     
                     if user_lang == 'en':
                         usage_card = (
-                            "📈 **APEX SUPER AGI TURBO BRAIN v12.00 | WALL STREET ML 24H PREDICTOR** 📈\n"
+                            "📈 **APEX SUPER AGI TURBO BRAIN v13.00 | WALL STREET ML 24H PREDICTOR** 📈\n"
                             "═══════════════════════════════\n"
                             "💡 **WALL STREET ML PREDICTION USER GUIDE:**\n\n"
                             "👉 **12 Wall Street Machine Learning Forecast (24h Trend & Win-Rate %) ៖**\n"
@@ -1888,7 +1888,7 @@ class TelegramBotThread(BaseThread):
                         )
                     elif user_lang == 'zh':
                         usage_card = (
-                            "📈 **APEX SUPER AGI TURBO BRAIN v12.00 | 华尔街 ML 24小时预测引擎** 📈\n"
+                            "📈 **APEX SUPER AGI TURBO BRAIN v13.00 | 华尔街 ML 24小时预测引擎** 📈\n"
                             "═══════════════════════════════\n\n"
                             "💡 **华尔街 ML 价格预测指南：**\n\n"
                             "👉 **12 种华尔街机器学习模型 K 线与胜率预测 ៖**\n"
@@ -1899,7 +1899,7 @@ class TelegramBotThread(BaseThread):
                         )
                     else:
                         usage_card = (
-                            "📈 **APEX SUPER AGI TURBO BRAIN v12.00 | WALL STREET ML 24H PREDICTOR** 📈\n"
+                            "📈 **APEX SUPER AGI TURBO BRAIN v13.00 | WALL STREET ML 24H PREDICTOR** 📈\n"
                             "═══════════════════════════════\n"
                             "💡 **របៀបទស្សន៍ទាយចលនាតម្លៃ (WALL STREET ML PREDICT GUIDE) ៖**\n\n"
                             "👉 **ទស្សន៍ទាយចលនាតម្លៃតាម 12 Wall Street ML Models ៖**\n"
@@ -2090,7 +2090,7 @@ class TelegramBotThread(BaseThread):
                     
                     if user_lang == 'en':
                         usage_msg = (
-                            "🧠 **APEX SUPER AGI TURBO BRAIN v12.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
+                            "🧠 **APEX SUPER AGI TURBO BRAIN v13.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
                             "═══════════════════════════════\n"
                             "💡 **AGI MARKET ANALYZER USER GUIDE:**\n\n"
                             "👉 **1. Deep Technical & 12 ML Models Analysis ៖**\n"
@@ -2103,7 +2103,7 @@ class TelegramBotThread(BaseThread):
                         )
                     elif user_lang == 'zh':
                         usage_msg = (
-                            "🧠 **APEX SUPER AGI TURBO BRAIN v12.00 | 5-Agent AGI 智能市场分析师** 🧠\n"
+                            "🧠 **APEX SUPER AGI TURBO BRAIN v13.00 | 5-Agent AGI 智能市场分析师** 🧠\n"
                             "═══════════════════════════════\n"
                             "💡 **AGI 市场分析指南：**\n\n"
                             "👉 **1. 深度技术面与 12 种 ML 模型分析 ៖**\n"
@@ -2116,7 +2116,7 @@ class TelegramBotThread(BaseThread):
                         )
                     else:
                         usage_msg = (
-                            "🧠 **APEX SUPER AGI TURBO BRAIN v12.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
+                            "🧠 **APEX SUPER AGI TURBO BRAIN v13.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
                             "═══════════════════════════════\n"
                             "💡 **របៀបវិភាគកាក់ជាមួយ AGI (AGI ANALYZER GUIDE) ៖**\n\n"
                             "👉 **1. វិភាគកាក់បច្ចេកទេស & ML Prediction ៖**\n"
@@ -2254,7 +2254,7 @@ class TelegramBotThread(BaseThread):
 
                     if user_lang == 'en':
                         msg = (
-                            "⏰ **APEX SUPER AGI v12.00 | REAL-TIME PRICE ALERT SYSTEM** 🔔\n"
+                            "⏰ **APEX SUPER AGI v13.00 | REAL-TIME PRICE ALERT SYSTEM** 🔔\n"
                             "═══════════════════════════════\n\n"
                             "📊 **EXECUTIVE PRICE ALERT ENGINE CONFIGURATION:**\n"
                             "• **Monitoring Engine**: `Sub-Second Binance WebSocket Real-Time Ticker Monitor`\n"
@@ -2266,7 +2266,7 @@ class TelegramBotThread(BaseThread):
                         )
                     elif user_lang == 'zh':
                         msg = (
-                            "⏰ **APEX SUPER AGI v12.00 | 实时价格预警系统** 🔔\n"
+                            "⏰ **APEX SUPER AGI v13.00 | 实时价格预警系统** 🔔\n"
                             "═══════════════════════════════\n\n"
                             "📊 **高级价格预警引擎配置：**\n"
                             "• **监控引擎**: `毫秒级 Binance WebSocket 实时行情监听器`\n"
@@ -2278,7 +2278,7 @@ class TelegramBotThread(BaseThread):
                         )
                     else:
                         msg = (
-                            "⏰ **APEX SUPER AGI v12.00 | REAL-TIME PRICE ALERT SYSTEM** 🔔\n"
+                            "⏰ **APEX SUPER AGI v13.00 | REAL-TIME PRICE ALERT SYSTEM** 🔔\n"
                             "═══════════════════════════════\n\n"
                             "📊 **EXECUTIVE PRICE ALERT ENGINE CONFIGURATION:**\n"
                             "• **Monitoring Engine**: `Sub-Second Binance WebSocket Real-Time Ticker Monitor`\n"
@@ -2335,21 +2335,21 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "✅ **APEX SUPER AGI v12.00 | PRICE ALERT CONFIGURED!** ⏰\n\n"
+                        "✅ **APEX SUPER AGI v13.00 | PRICE ALERT CONFIGURED!** ⏰\n\n"
                         f"🪙 **Target Pair**: `{symbol}`\n"
                         f"🎯 **Alert Trigger**: `{localized_cond} ${price:,.4f} USDT`\n\n"
                         "_Bot WebSocket Watchdog will push instant notification when price hits target 24/7!_"
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "✅ **APEX SUPER AGI v12.00 | 价格预警已成功设置！** ⏰\n\n"
+                        "✅ **APEX SUPER AGI v13.00 | 价格预警已成功设置！** ⏰\n\n"
                         f"🪙 **目标交易对**: `{symbol}`\n"
                         f"🎯 **触发条件**: `{localized_cond} ${price:,.4f} USDT`\n\n"
                         "_看门狗 WebSocket 将在市场价格触及目标时第一时间 24/7 发送推送！_"
                     )
                 else:
                     msg = (
-                        "✅ **APEX SUPER AGI v12.00 | PRICE ALERT CONFIGURED!** ⏰\n\n"
+                        "✅ **APEX SUPER AGI v13.00 | PRICE ALERT CONFIGURED!** ⏰\n\n"
                         f"🪙 **កាក់** ៖ `{symbol}`\n"
                         f"🎯 **លក្ខខណ្ឌរំលឹក** ៖ `{localized_cond} ${price:,.4f} USDT`\n\n"
                         "_Bot នឹងផ្ញើសារជូនដំណឹងភ្លាមៗ ពេលតម្លៃទីផ្សារដើរដល់គោលដៅ 24/7!_"
@@ -2370,9 +2370,9 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
             
             help_card = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v12.00 | USER MANUAL** 🤖\n"
+                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | USER MANUAL** 🤖\n"
                 "═══════════════════════════════\n"
-                "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE v12.00)**\n"
+                "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE v13.00)**\n"
                 f"🛡️ **TRADING ENGINE**: `{mode_badge}` | `ISOLATED MARGIN`\n"
                 "═══════════════════════════════\n\n"
                 "💼 **1. គ្រប់គ្រងគណនី និងទុន (ACCOUNT & PORTFOLIO)**\n"
@@ -2511,11 +2511,11 @@ class TelegramBotThread(BaseThread):
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
             
             loading_msg = (
-                "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v12.00**\n\n_Fetching 24h Binance Top Volatile Gainers & Losers with AGI Sector Momentum..._"
+                "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v13.00**\n\n_Fetching 24h Binance Top Volatile Gainers & Losers with AGI Sector Momentum..._"
                 if user_lang == 'en' else
-                ("🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v12.00**\n\n_正在从 Binance 获取 24h 振幅与涨跌幅榜单及 AGI 行业动量分析..._"
+                ("🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v13.00**\n\n_正在从 Binance 获取 24h 振幅与涨跌幅榜单及 AGI 行业动量分析..._"
                  if user_lang == 'zh' else
-                 "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v12.00**\n\n_កំពុងទាញយកទិន្នន័យ 24h Top Gainers & Losers ពី Binance..._")
+                 "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v13.00**\n\n_កំពុងទាញយកទិន្នន័យ 24h Top Gainers & Losers ពី Binance..._")
             )
 
             status_msg = None
@@ -2563,13 +2563,13 @@ class TelegramBotThread(BaseThread):
                 if not isinstance(analysis, str): analysis = str(analysis or "")
                 
                 header_title = (
-                    "🔥 **APEX SUPER AGI v12.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
+                    "🔥 **APEX SUPER AGI v13.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
                     "═══════════════════════════════\n\n"
                     if user_lang == 'en' else
-                    ("🔥 **APEX SUPER AGI v12.00 | 全球市场波动率与动量雷达** 🚀\n"
+                    ("🔥 **APEX SUPER AGI v13.00 | 全球市场波动率与动量雷达** 🚀\n"
                      "═══════════════════════════════\n\n"
                      if user_lang == 'zh' else
-                     "🔥 **APEX SUPER AGI v12.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
+                     "🔥 **APEX SUPER AGI v13.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
                      "═══════════════════════════════\n\n")
                 )
                 full_report = f"{header_title}{top_gainers_summary}\n\n{analysis}"
@@ -2612,11 +2612,11 @@ class TelegramBotThread(BaseThread):
                     target_symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
 
             loading_text = (
-                "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v12.00**\n\n_Fetching real-time breaking crypto news & performing 3-paragraph AGI sentiment synthesis..._"
+                "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v13.00**\n\n_Fetching real-time breaking crypto news & performing 3-paragraph AGI sentiment synthesis..._"
                 if user_lang == 'en' else
-                ("📰 **APEX SUPER AGI GLOBAL NEWS RADAR v12.00**\n\n_正在获取实时加密行业突发新闻并由 AGI 引擎撰写三段式深度报告..._"
+                ("📰 **APEX SUPER AGI GLOBAL NEWS RADAR v13.00**\n\n_正在获取实时加密行业突发新闻并由 AGI 引擎撰写三段式深度报告..._"
                  if user_lang == 'zh' else
-                 "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v12.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងវិភាគ Sentiment ដោយ AI Engine 24/7..._")
+                 "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v13.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងវិភាគ Sentiment ដោយ AI Engine 24/7..._")
             )
 
             status_msg = None
@@ -2669,7 +2669,7 @@ class TelegramBotThread(BaseThread):
                 else:
                     await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
 
-            self.log_signal.emit(f"📰 Sent Super Smart AI News v12.00 to {chat_id}")
+            self.log_signal.emit(f"📰 Sent Super Smart AI News v13.00 to {chat_id}")
             return
 
         async def send_gold_message_safe(context, chat_id, text, keyboard=None):
@@ -2696,11 +2696,11 @@ class TelegramBotThread(BaseThread):
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
             try:
                 if user_lang == 'en':
-                    loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v12.00**\n\n_Fetching DXY Index, US 10Y Real Yields & PAXG Gold Analysis..._"
+                    loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v13.00**\n\n_Fetching DXY Index, US 10Y Real Yields & PAXG Gold Analysis..._"
                 elif user_lang == 'zh':
-                    loading_txt = "🏆 **APEX SUPER AGI 黄金与宏观避险雷达 v12.00**\n\n_正在获取 DXY 美元指数、美债 10 年期收益率及 PAXG 黄金分析..._"
+                    loading_txt = "🏆 **APEX SUPER AGI 黄金与宏观避险雷达 v13.00**\n\n_正在获取 DXY 美元指数、美债 10 年期收益率及 PAXG 黄金分析..._"
                 else:
-                    loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v12.00**\n\n_កំពុងទាញយកទិន្នន័យ DXY Index, US 10Y Real Yields & វិភាគតម្លៃមាស PAXG..._"
+                    loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v13.00**\n\n_កំពុងទាញយកទិន្នន័យ DXY Index, US 10Y Real Yields & វិភាគតម្លៃមាស PAXG..._"
 
                 status_msg = await context.bot.send_message(
                     chat_id=chat_id, 
@@ -3092,21 +3092,21 @@ class TelegramBotThread(BaseThread):
                     db.set_user_language(chat_id, new_lang)
                     if new_lang == 'km':
                         confirm_msg = (
-                            "🌐 **APEX SUPER AGI v12.00 | LANGUAGE SWITCHED** 🇰🇭\n"
+                            "🌐 **APEX SUPER AGI v13.00 | LANGUAGE SWITCHED** 🇰🇭\n"
                             "═══════════════════════════════\n\n"
                             f"✅ **ភាសាប្រព័ន្ធត្រូវបានកំណត់ទៅ ៖** `{lang_name}` 🟢\n\n"
                             "💡 _គ្រប់ការជូនដំណឹង AGI និងប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់នឹងបង្ហាញជាភាសាខ្មែរយ៉ាងច្បាស់លាស់!_"
                         )
                     elif new_lang == 'en':
                         confirm_msg = (
-                            "🌐 **APEX SUPER AGI v12.00 | LANGUAGE SWITCHED** 🇬🇧\n"
+                            "🌐 **APEX SUPER AGI v13.00 | LANGUAGE SWITCHED** 🇬🇧\n"
                             "═══════════════════════════════\n\n"
                             f"✅ **System Language Updated To:** `{lang_name}` 🟢\n\n"
                             "💡 _All AGI trading alerts, market reports & dashboards will now be delivered in English!_"
                         )
                     else:
                         confirm_msg = (
-                            "🌐 **APEX SUPER AGI v12.00 | 语言切换成功** 🇨🇳\n"
+                            "🌐 **APEX SUPER AGI v13.00 | 语言切换成功** 🇨🇳\n"
                             "═══════════════════════════════\n\n"
                             f"✅ **系统语言已成功设置为：** `{lang_name}` 🟢\n\n"
                             "💡 _所有 AGI 交易提醒、市场报告和控制台现在将以中文显示！_"
@@ -3140,7 +3140,7 @@ class TelegramBotThread(BaseThread):
             if user_lang == 'en':
                 lang_display = "🇬🇧 English"
                 msg = (
-                    "🌐 **APEX SUPER AGI v12.00 | SYSTEM LANGUAGE CONTROL** 🌐\n"
+                    "🌐 **APEX SUPER AGI v13.00 | SYSTEM LANGUAGE CONTROL** 🌐\n"
                     "═══════════════════════════════\n\n"
                     f"📊 **Active System Language**: `{lang_display}` 🟢\n\n"
                     "💡 **Select your preferred language below or use 1-tap commands:**\n"
@@ -3153,7 +3153,7 @@ class TelegramBotThread(BaseThread):
             elif user_lang == 'zh':
                 lang_display = "🇨🇳 中文 (Chinese)"
                 msg = (
-                    "🌐 **APEX SUPER AGI v12.00 | 系统语言控制中心** 🌐\n"
+                    "🌐 **APEX SUPER AGI v13.00 | 系统语言控制中心** 🌐\n"
                     "═══════════════════════════════\n\n"
                     f"📊 **当前系统语言**: `{lang_display}` 🟢\n\n"
                     "💡 **请在下方选择您的首选语言或使用一键命令：**\n"
@@ -3166,7 +3166,7 @@ class TelegramBotThread(BaseThread):
             else:
                 lang_display = "🇰🇭 ភាសាខ្មែរ (Khmer)"
                 msg = (
-                    "🌐 **APEX SUPER AGI v12.00 | SYSTEM LANGUAGE CONTROL** 🌐\n"
+                    "🌐 **APEX SUPER AGI v13.00 | SYSTEM LANGUAGE CONTROL** 🌐\n"
                     "═══════════════════════════════\n\n"
                     f"📊 **ភាសាប្រព័ន្ធបច្ចុប្បន្ន ៖** `{lang_display}` 🟢\n\n"
                     "💡 **សូមជ្រើសរើសភាសាដែលអ្នកពេញចិត្តខាងក្រោម ឬប្រើប្រាស់បញ្ជា ១-Tap ៖**\n"

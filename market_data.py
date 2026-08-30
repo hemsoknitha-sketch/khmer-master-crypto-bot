@@ -217,7 +217,7 @@ def generate_chart(df: pd.DataFrame, symbol: str, filepath: str = "chart.png"):
 
 def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
     """
-    Fetches the top gaining and losing crypto assets in the last 24 hours from Binance (v12.00 Apex Ultra AGI).
+    Fetches the top gaining and losing crypto assets in the last 24 hours from Binance (v13.00 Apex Ultra AGI).
     """
     base_urls = [
         "https://data-api.binance.vision",

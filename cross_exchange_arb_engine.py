@@ -8,7 +8,7 @@ EXCHANGES = ["Binance", "Bybit", "OKX", "Coinbase"]
 
 class CrossExchangeArbitrageEngine:
     """
-    ⚡ Sub-Millisecond Cross-Exchange Arbitrage Engine v12.00
+    ⚡ Sub-Millisecond Cross-Exchange Arbitrage Engine v13.00
     ----------------------------------------------------------
     AI Ensemble Models: ONNX HFT Model + XGBoost Imbalance + LSTM Neural Net
     Operation: Scans price spreads & orderbook imbalance across Binance, Bybit, OKX, Coinbase

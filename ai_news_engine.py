@@ -192,7 +192,7 @@ def clean_ai_news_output(raw_text: str) -> str:
 
 def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = None) -> NewsReportResult:
     """
-    Generates a 3-Paragraph Journalistic Crypto News & AI Sentiment Report in target language (KM/EN/ZH) v12.00 Apex Ultra AGI.
+    Generates a 3-Paragraph Journalistic Crypto News & AI Sentiment Report in target language (KM/EN/ZH) v13.00 Apex Ultra AGI.
     Returns NewsReportResult containing formatted markdown text and primary article image_url.
     """
     sym_str = str(symbol).upper().strip() if symbol else ""
@@ -220,7 +220,7 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
                 f"STRICT FORMAT INSTRUCTION:\n"
                 f"DO NOT include any internal thoughts, draft notes, or structure checklists like 'Confirm structure:' or 'Khmer translation:'.\n"
                 f"Output ONLY the final 3-paragraph executive journalistic report in {target_lang_name}:\n\n"
-                f"📰 **APEX SUPER AGI v12.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
+                f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
                 f"═══════════════════════════════\n\n"
                 f"🔥 **TOP BREAKING HEADLINES:**\n"
                 f"1. 🟢 [ Translated Title 1 ](URL)\n"
@@ -247,7 +247,7 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
     # Fallback 3-Paragraph Journalistic News
     if user_lang == 'en':
         msg = (
-            f"📰 **APEX SUPER AGI v12.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
+            f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
             "═══════════════════════════════\n\n"
             "🔥 **TOP BREAKING HEADLINES:**\n"
         )
@@ -268,7 +268,7 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
         )
     elif user_lang == 'zh':
         msg = (
-            f"📰 **APEX SUPER AGI v12.00 | 全球加密新闻雷达{sym_title}** 🌐\n"
+            f"📰 **APEX SUPER AGI v13.00 | 全球加密新闻雷达{sym_title}** 🌐\n"
             "═══════════════════════════════\n\n"
             "🔥 **最新突发新闻头条：**\n"
         )
@@ -289,7 +289,7 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
         )
     else:
         msg = (
-            f"📰 **APEX SUPER AGI v12.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
+            f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
             "═══════════════════════════════\n\n"
             "🔥 **ព័ត៌មានក្តៅៗចុងក្រោយ (TOP BREAKING HEADLINES):**\n"
         )

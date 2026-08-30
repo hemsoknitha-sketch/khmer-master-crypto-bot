@@ -6,7 +6,7 @@ import database as db
 
 class AIDynamicCompoundInfinityMatrix:
     """
-    📈 AI Dynamic Compound Infinity Matrix v12.00
+    📈 AI Dynamic Compound Infinity Matrix v13.00
     ----------------------------------------------
     AI Ensemble Models: LSTM Neural Net + RL Dynamic PPO Agent
     Strategy: Automated Compound Grid Network with Capital Rebalancing

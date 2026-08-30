@@ -16,7 +16,7 @@ WHALE_DUMPING_RISK_LOCKOUTS = {}
 
 class WhaleOrderflowFrontRunEngine:
     """
-    🐋 Whale Orderflow & Dark Pool Front-Running Radar v12.00
+    🐋 Whale Orderflow & Dark Pool Front-Running Radar v13.00
     ----------------------------------------------------------
     AI Ensemble Models: PatchTST Transformer + NLP & On-Chain AGI
     Operation: Scans BlackRock, MicroStrategy, Binance Cold Wallets, Coinbase Prime.

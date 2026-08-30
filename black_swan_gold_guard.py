@@ -14,7 +14,7 @@ GEOPOLITICAL_CRISIS_KEYWORDS = [
 
 class PAXGGoldSafeHavenSwitcherEngine:
     """
-    🏆 PAXG Gold & Multi-Asset Safe Haven Switcher v12.00
+    🏆 PAXG Gold & Multi-Asset Safe Haven Switcher v13.00
     ------------------------------------------------------
     AI Ensemble Models: NLP & On-Chain AGI + HMM Market Regime
     Billionaire Capital Protection: Automatically shifts 100% capital into PAXG Gold during wars/crises,

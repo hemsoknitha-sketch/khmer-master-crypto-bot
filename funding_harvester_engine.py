@@ -7,7 +7,7 @@ import database as db
 
 class InstitutionalFundingHarvesterEngine:
     """
-    🌾 Institutional Delta-Neutral Funding Rate Harvester v12.00
+    🌾 Institutional Delta-Neutral Funding Rate Harvester v13.00
     --------------------------------------------------------------
     AI Models Ensemble: HMM Market Regime + RL Dynamic PPO Agent
     Strategy: 100% Spot Buy + 1x Futures Short Paired Position (Delta-Neutral)
