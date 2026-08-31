@@ -7028,16 +7028,18 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
                 return
 
-            # 🧠 Super Smart Poly-Format Argument Parser for Futures & Spot Modes:
+            # 🧠 Super Smart Poly-Format Argument Parser for Futures, Spot & Hedge Modes:
             raw_args = [a.strip() for a in args]
             is_spot_prefix = (raw_args[0].upper() == "SPOT")
-            if is_spot_prefix:
+            is_hedge_prefix = (raw_args[0].upper() == "HEDGE")
+            if is_spot_prefix or is_hedge_prefix:
                 raw_args.pop(0)
 
             if not raw_args or len(raw_args) < 2:
                 if msg_target:
                     await msg_target.reply_text(
                         "❌ **សូមបញ្ជាក់ព័ត៌មានទុន និង PIN**\n\n"
+                        "🛡️ **Delta-Neutral Hedge** ៖ `` `/turbo_hedge HEDGE BTC 100 1234` ``\n"
                         "🛒 **Spot Single Coin** ៖ `` `/turbo_hedge SPOT SOL 50 1234` ``\n"
                         "🛒 **Spot Auto Scanner** ៖ `` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
                         "🚀 **Futures Long (BUY)** ៖ `` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
@@ -7055,10 +7057,10 @@ class TelegramBotThread(BaseThread):
             else:
                 symbol = symbol_raw
 
-            user_side_input = "SPOT" if is_spot_prefix else "AUTO"
+            user_side_input = "SPOT" if is_spot_prefix else ("HEDGE" if is_hedge_prefix else "AUTO")
             target_tp = 15.0
             amount = 5.0
-            leverage = 1 if is_spot_prefix else 10
+            leverage = 1 if (is_spot_prefix or is_hedge_prefix) else 10
             top_count = 20
 
             pin = str(raw_args[-1]).strip()
@@ -7074,6 +7076,16 @@ class TelegramBotThread(BaseThread):
                         amount = 50.0
                 else:
                     amount = 50.0
+            elif is_hedge_prefix:
+                leverage = 1
+                user_side_input = "HEDGE"
+                if inner_args:
+                    try:
+                        amount = float(inner_args[0])
+                    except ValueError:
+                        amount = 100.0
+                else:
+                    amount = 100.0
             else:
                 # FUTURES MODE
                 if symbol == "TOP":
