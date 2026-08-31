@@ -21,40 +21,28 @@ async def set_menu_commands():
 
     bot = Bot(token=TOKEN)
     public_commands = [
-        # 1. Navigation & Account
-        BotCommand("start", "🚀 Start v13.00 AGI Super Brain Control"),
-        BotCommand("menu", "🎛️ v13.00 Interactive Control Keyboard"),
-        BotCommand("balance", "💰 Spot, Futures & Gold Vault Balance"),
-        BotCommand("portfolio", "💼 Active Positions & Delta-Neutral PnL"),
-
-        # 2. 6 Super Smart Wall Street Engines
-        BotCommand("hyper_trade", "🚀 Sub-5ms HFT Orderbook CVD Scalper"),
-        BotCommand("auto_arb", "⚡ Delta-Neutral 0% Risk Arbitrage"),
-        BotCommand("sweep_auto", "🛡️ Liquidity Sweep Bottom Wick Sniper"),
-        BotCommand("funding_harvester", "🌾 30%-120% APY Perpetual Funding Yield"),
-        BotCommand("trailing_guard", "🛡️ Auto-Liquidation Guard & Trailing Lock"),
-
-        # 3. AI Quant Trading Strategies
-        BotCommand("turbo_hedge", "🚀 Turbo Hedge Futures 5x/15x Engine"),
-        BotCommand("infinity_matrix", "♾️ Smart Grid 100% Profit Compounding"),
-        BotCommand("smart_dca", "🎯 HMM Regime Smart DCA Martingale"),
-        BotCommand("grid_bot", "📊 24/7 Smart Grid Trading Engine"),
-
-        # 4. 16-Model AI Super Brain & Market Intel
-        BotCommand("analyze", "🧠 5-Agent AGI Swarm Market Analysis"),
-        BotCommand("predict", "📈 Wall Street 16-Model ML Prediction"),
-        BotCommand("moe_route", "🔀 MoE Router Dynamic AI Classifier"),
-        BotCommand("gold_radar", "🏆 PAXG Gold Wealth Protection Radar"),
-        BotCommand("whales", "🐋 On-Chain Whale Front-Running Radar"),
-        BotCommand("news", "📰 Nano-NLP Firehose & News Impact Alerts"),
-
-        # 5. Emergency Stop & Circuit Breaker
-        BotCommand("stop", "🛑 Emergency Circuit Breaker & Close All"),
+        BotCommand("start", "🚀 Start Bot & Choose Language"),
+        BotCommand("menu", "🎛️ Interactive Master Control Panel"),
+        BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
+        BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
+        BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
+        BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
+        BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
+        BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
+        BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
+        BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
+        BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
+        BotCommand("balance", "💰 Check Spot & Futures Balance"),
+        BotCommand("status", "📊 View Active Trades & PnL"),
+        BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
+        BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
+        BotCommand("alert", "🔔 Set Price Alert"),
+        BotCommand("stop", "🛑 Stop Trading / Market Close"),
     ]
 
     admin_commands = [
-        BotCommand("admin", "👑 Super Admin v13.00 Control Panel"),
-        BotCommand("health", "🩺 VPS Hardware, RAM & Engine Diagnostics"),
+        BotCommand("admin", "👑 Open Super Admin Control Panel"),
+        BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
         BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
     ] + public_commands
 
