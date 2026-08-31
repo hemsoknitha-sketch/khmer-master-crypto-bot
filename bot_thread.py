@@ -2687,42 +2687,58 @@ class TelegramBotThread(BaseThread):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
+            
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔥 Refresh Volatility Radar", callback_data="btn_top_refresh"),
+                    InlineKeyboardButton("🚀 Futures TOP Scanner", callback_data="btn_turbo_hedge_top_launch")
+                ],
+                [
+                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
+                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
+                ],
+                [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ])
             
             loading_msg = (
-                "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v13.00**\n\n_Fetching 24h Binance Top Volatile Gainers & Losers with AGI Sector Momentum..._"
+                "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00**\n\n_Scanning Binance Top Gainers, Losers & RVOL Volume Surge (>2.5x)..._"
                 if user_lang == 'en' else
-                ("🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v13.00**\n\n_正在从 Binance 获取 24h 振幅与涨跌幅榜单及 AGI 行业动量分析..._"
+                ("🔥 **KHMER MASTER CRYPTO | Top 振幅与 RVOL 异常雷达 v13.00**\n\n_正在获取 Binance 24h 涨跌幅榜、暴跌反弹榜及 RVOL 成交量异常榜 (>2.5x)..._"
                  if user_lang == 'zh' else
-                 "🚀 **APEX SUPER AGI TOP VOLATILITY RADAR v13.00**\n\n_កំពុងទាញយកទិន្នន័យ 24h Top Gainers & Losers ពី Binance..._")
+                 "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00**\n\n_កំពុងស្កេនកាក់ដែលឡើង/ចុះខ្លាំងជាងគេ 24h និងកាក់មាន RVOL Volume Surge ខ្ពស់បំផុត (>2.5x)..._")
             )
 
             status_msg = None
             if update.callback_query:
-                await update.callback_query.answer()
+                try: await update.callback_query.answer()
+                except Exception: pass
                 status_msg = await update.callback_query.message.reply_text(loading_msg, parse_mode="Markdown")
             else:
                 status_msg = await update.message.reply_text(loading_msg, parse_mode="Markdown")
 
             try:
                 import market_data
-# import asyncio # removed local shadowing
                 top_gainers_summary = await asyncio.to_thread(market_data.fetch_top_gainers, 5, user_lang)
                 if not isinstance(top_gainers_summary, str): top_gainers_summary = str(top_gainers_summary or "")
-                
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                keyboard = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🔄 Refresh Volatility", callback_data="btn_top_refresh"),
-                        InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
-                    ],
-                    [
-                        InlineKeyboardButton("📈 Wall Street ML Predict", callback_data="btn_predict_prompt"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ]
-                ])
                 
                 target_lang_name = "Khmer" if user_lang == 'km' else ("Chinese" if user_lang == 'zh' else "English")
                 ai_prompt = (
@@ -2737,23 +2753,42 @@ class TelegramBotThread(BaseThread):
                     f"📌 SECTION 2: QUANTITATIVE & SECTOR MOMENTUM ANALYSIS\n"
                     f"[ Concise analysis of pumping sectors and volume surge ]\n\n"
                     f"📌 SECTION 3: EXECUTIVE ACTION COMMAND\n"
-                    f"`/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>`\n\n"
+                    f"`/turbo_hedge TOP 20 10 BUY 5 <PIN>`\n\n"
                     f"Respond ONLY in clean {target_lang_name} presentation text."
                 )
                 analysis = await asyncio.to_thread(self.ai_engine.chat_with_user, ai_prompt, history=[])
                 if not isinstance(analysis, str): analysis = str(analysis or "")
                 
                 header_title = (
-                    "🔥 **APEX SUPER AGI v13.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
+                    "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
                     "═══════════════════════════════\n\n"
                     if user_lang == 'en' else
-                    ("🔥 **APEX SUPER AGI v13.00 | 全球市场波动率与动量雷达** 🚀\n"
+                    ("🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
                      "═══════════════════════════════\n\n"
                      if user_lang == 'zh' else
-                     "🔥 **APEX SUPER AGI v13.00 | TOP VOLATILITY & MOMENTUM RADAR** 🚀\n"
+                     "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
                      "═══════════════════════════════\n\n")
                 )
-                full_report = f"{header_title}{top_gainers_summary}\n\n{analysis}"
+
+                # Append 1-Tap Copy Command syntaxes!
+                command_syntaxes = (
+                    "\n\n📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                    "👉 **Scan Top Gainers, Losers & RVOL Volume Surge ៖**\n`` `/top 10` ``\n\n"
+                    "👉 **Futures Scalp Top 20 Gainers LONG (BUY) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
+                    "👉 **Futures Scalp Top 20 Dumpers SHORT (SELL) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``"
+                    if user_lang == 'en' else
+                    ("\n\n📋 **一键复制指令：**\n\n"
+                     "👉 **扫描 24h 涨跌幅榜与 RVOL 异常币种 ៖**\n`` `/top 10` ``\n\n"
+                     "👉 **合约做多 24h 涨幅榜 TOP 20 (BUY) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
+                     "👉 **合约做空 24h 跌幅榜 TOP 20 (SELL) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``"
+                     if user_lang == 'zh' else
+                     "\n\n📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                     "👉 **ស្កេន Top Gainers, Losers & RVOL Surge ៖**\n`` `/top 10` ``\n\n"
+                     "👉 ** Futures Scalp Top 20 Gainers LONG (BUY 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
+                     "👉 ** Futures Scalp Top 20 Dumpers SHORT (SELL 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``")
+                )
+
+                full_report = f"{header_title}{top_gainers_summary}\n\n{analysis}{command_syntaxes}"
                 
                 if status_msg:
                     try:
