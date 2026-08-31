@@ -2831,6 +2831,24 @@ def get_active_turbo_hedge_bots() -> list:
             bots.append({"chat_id": cid, "symbol": sym, "amount": amt, "leverage": lev, "side": side, "target_tp": target_tp})
     return bots
 
+def get_user_turbo_hedge_bots(chat_id: int) -> list:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE ? AND value = 'ACTIVE'", (f"turbo_hedge_{chat_id}_%_status",))
+    rows = cursor.fetchall()
+    conn.close()
+    bots = []
+    for r in rows:
+        parts = r[0].split("_")
+        if len(parts) >= 4:
+            sym = parts[3]
+            amt = float(get_system_setting(f"turbo_hedge_{chat_id}_{sym}_amount", "20.0"))
+            lev = int(get_system_setting(f"turbo_hedge_{chat_id}_{sym}_leverage", "75"))
+            side = get_system_setting(f"turbo_hedge_{chat_id}_{sym}_side", "BUY")
+            target_tp = float(get_system_setting(f"turbo_hedge_{chat_id}_{sym}_target_tp", "10.0"))
+            bots.append({"chat_id": chat_id, "symbol": sym, "amount": amt, "leverage": lev, "side": side, "target_tp": target_tp})
+    return bots
+
 def get_pre_pump_users():
     conn = get_db_connection()
     cursor = conn.cursor()
