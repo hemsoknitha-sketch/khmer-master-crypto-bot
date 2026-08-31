@@ -461,20 +461,102 @@ class TelegramBotThread(BaseThread):
 
         async def cross_arb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id)
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
+            args = context.args or []
+            msg_target = update.effective_message or update.message
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⚡ Scan Live Cross-Arb Matrix", callback_data="btn_cross_arb"),
+                    InlineKeyboardButton("🌾 Funding Yield Harvester", callback_data="btn_funding_harvester")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            # If no args provided and not callback query, send Master Help Card!
+            if not args and not update.callback_query:
+                if user_lang == 'en':
+                    msg = (
+                        "⚡️ **KHMER MASTER CRYPTO | SUB-5MS CROSS-EXCHANGE ARBITRAGE v13.00** ⚡️\n"
+                        "═════════════════════════════════════════\n\n"
+                        "📊 **INSTITUTIONAL ARBITRAGE ARCHITECTURE:**\n"
+                        "• 🤖 **AI Model Swarm** ៖ `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
+                        "• 🌐 **Connected Exchanges** ៖ `Binance` ↔ `Bybit` \| `OKX` \| `Coinbase`\n"
+                        "• ⚡ **Execution Speed** ៖ `< 5ms (Sub-Millisecond Multi-Exchange Order Routing)`\n"
+                        "• 🛡️ **Risk Level** ៖ `0.0% Directional Risk (Simultaneous Buy Low on Ex A & Sell High on Ex B)`\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **Scan Live Arbitrage Spreads Matrix ៖**\n`` `/cross_arb SCAN` ``\n\n"
+                        "👉 **Auto Scan & Execute Arbitrage ($100 USDT) ៖**\n`` `/cross_arb AUTO 100 1234` ``\n\n"
+                        "👉 **Single-Coin Arbitrage (SOL / BTC) ៖**\n`` `/cross_arb SOL 100 1234` ``\n"
+                        "`` `/cross_arb BTC 200 1234` ``"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "⚡️ **KHMER MASTER CRYPTO | 亚毫秒级跨交易所套利引擎 v13.00** ⚡️\n"
+                        "═════════════════════════════════════════\n\n"
+                        "📊 **机构级套利架构：**\n"
+                        "• 🤖 **AI 模型集成** ៖ `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
+                        "• 🌐 **已连接交易所** ៖ `Binance` ↔ `Bybit` \| `OKX` \| `Coinbase`\n"
+                        "• ⚡ **执行速度** ៖ `< 5ms (亚毫秒级多交易所路由)`\n"
+                        "• 🛡️ **风险等级** ៖ `0.0% 单向市场风险 (A交易所买入同时B交易所卖出)`\n\n"
+                        "📋 **一键复制指令：**\n\n"
+                        "👉 **扫描实时跨交易所价差矩阵 ៖**\n`` `/cross_arb SCAN` ``\n\n"
+                        "👉 **自动扫描并套利 ($100 USDT) ៖**\n`` `/cross_arb AUTO 100 1234` ``\n\n"
+                        "👉 **单币种套利 (SOL / BTC) ៖**\n`` `/cross_arb SOL 100 1234` ``\n"
+                        "`` `/cross_arb BTC 200 1234` ``"
+                    )
+                else:
+                    msg = (
+                        "⚡️ **KHMER MASTER CRYPTO | SUB-5MS CROSS-EXCHANGE ARBITRAGE v13.00** ⚡️\n"
+                        "═════════════════════════════════════════\n\n"
+                        "📊 **INSTITUTIONAL ARBITRAGE ARCHITECTURE (ស្ថាបត្យកម្មវិនិយោគ 0% RISK) ៖**\n"
+                        "• 🤖 **AI Models សហការ** ៖ `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
+                        "• 🌐 **Exchanges ភ្ជាប់** ៖ `Binance` ↔ `Bybit` \| `OKX` \| `Coinbase`\n"
+                        "• ⚡ **ល្បឿនស្កេន & បញ្ជា** ៖ `< 5ms (Sub-Millisecond Order Routing)`\n"
+                        "• 🛡️ **កម្រិតហានិភ័យ** ៖ `0.0% Directional Risk (ទិញថោកលើ Ex A & លក់ថ្លៃលើ Ex B ក្នុងពេលតែមួយ)`\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 **ស្កេនរកគម្លាតតម្លៃ Live Spreads Matrix ៖**\n`` `/cross_arb SCAN` ``\n\n"
+                        "👉 **Auto Scan & Execute Arbitrage ស្វ័យប្រវត្តិ (ទុន $100) ៖**\n`` `/cross_arb AUTO 100 1234` ``\n\n"
+                        "👉 **ស្កេនទិញ-លក់លើកាក់ទោល (SOL / BTC) ៖**\n`` `/cross_arb SOL 100 1234` ``\n"
+                        "`` `/cross_arb BTC 200 1234` ``"
+                    )
+                if msg_target:
+                    await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            # Execute Scan Matrix
             sent_msg = await send_reply_or_edit(update, context, "⚡ **Scanning Cross-Exchange Arbitrage Matrix (<5ms ONNX HFT Engine)...**")
             
             try:
                 import cross_exchange_arb_engine
                 results = await cross_exchange_arb_engine.arb_engine.scan_top_cross_arbitrage_matrix()
 
-                if user_lang == 'khmer':
+                if user_lang == 'km':
                     msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v13.00** ⚡️\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models សហការ ៖** `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
-                    msg += "🌐 **Exchanges ភ្ជាប់ ៖** `Binance` | `Bybit` | `OKX` | `Coinbase`\n"
+                    msg += "🌐 **Exchanges ភ្ជាប់ ៖** `Binance` \| `Bybit` \| `OKX` \| `Coinbase`\n"
                     msg += "⚡ **ល្បឿនស្កេន (Execution Latency) ៖** `< 5ms (Sub-Millisecond)`\n\n"
                     
                     found_any = False
@@ -503,7 +585,7 @@ class TelegramBotThread(BaseThread):
                     msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v13.00** ⚡️\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models Ensemble:** `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
-                    msg += "🌐 **Connected Exchanges:** `Binance` | `Bybit` | `OKX` | `Coinbase`\n"
+                    msg += "🌐 **Connected Exchanges:** `Binance` \| `Bybit` \| `OKX` \| `Coinbase`\n"
                     msg += "⚡ **Execution Speed:** `< 5ms (Sub-Millisecond)`\n\n"
                     
                     found_any = False
@@ -528,11 +610,6 @@ class TelegramBotThread(BaseThread):
                         msg += "⚖️ **Market Balanced (Tight Spreads < 0.05%)**: Scanning every second automatically!\n\n"
                     
                     msg += "💡 _Executes simultaneous paired orders on Exchange A & B with zero market directional risk!_"
-
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⚡ Scan Cross-Arb Matrix", callback_data="btn_cross_arb")],
-                    [InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
-                ])
 
                 if sent_msg:
                     try: await sent_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
