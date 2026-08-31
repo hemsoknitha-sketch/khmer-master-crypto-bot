@@ -7180,10 +7180,11 @@ class TelegramBotThread(BaseThread):
                         ack_msg = await msg_target.reply_text(
                             f"⚡ **APEX TURBO HEDGE TOP SCANNER ACTIVATED!** 🚀\n"
                             f"───────────────────────────────\n\n"
-                            f"🪙 Mode ៖ `{user_side_input}` (`{leverage}x Lev`)\n"
+                            f"🪙 Mode / Side ៖ `{user_side_input}` (`{leverage}x Lev`)\n"
+                            f"🎯 Top Coins Scan ៖ `Top 1-{top_count} Gainers`\n"
                             f"💰 ដើមទុន / កាក់ ៖ `${amount:,.2f} USDT`\n"
                             f"🎯 Target TP ៖ `+{target_tp}%`\n"
-                            f"⚡ Status ៖ `កំពុងស្កេនទាញយកកាក់រត់លឿន 30 កាក់ភ្លាមៗ...`\n\n"
+                            f"⚡ Status ៖ `កំពុងស្កេនទាញយកកាក់រត់លឿន Top {top_count} កាក់ភ្លាមៗ...`\n\n"
                             f"_ប្រព័ន្ធ AGI កំពុងរត់ស្កេន Binance API និងបើកកាក់ស្វ័យប្រវត្តិ 24/7!_",
                             parse_mode="Markdown"
                         )
@@ -7193,6 +7194,7 @@ class TelegramBotThread(BaseThread):
                             ack_msg = await msg_target.reply_text(
                                 f"⚡ APEX TURBO HEDGE TOP SCANNER ACTIVATED! 🚀\n"
                                 f"Mode: {user_side_input} ({leverage}x Lev)\n"
+                                f"Scanning: Top 1-{top_count} Gainers\n"
                                 f"Capital: ${amount:.2f} USDT/Coin\n"
                                 f"Target TP: +{target_tp}%\n"
                                 f"Status: Active & Scanning 24/7..."
@@ -7204,14 +7206,15 @@ class TelegramBotThread(BaseThread):
                 async def _background_top_scanner():
                     try:
                         is_spot = (user_side_input == "SPOT")
+                        scan_limit = max(1, min(50, top_count))
                         if is_spot:
                             avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
-                            top_coins = turbo_hedge_engine.get_active_high_velocity_spot_coins(limit=30)
+                            top_coins = turbo_hedge_engine.get_active_high_velocity_spot_coins(limit=scan_limit)
                         else:
                             avail_bal = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
                             if avail_bal <= 0.0:
                                 avail_bal = await asyncio.to_thread(trading_engine.get_futures_free_margin, keys[0], keys[1])
-                            top_coins = turbo_hedge_engine.get_active_high_velocity_coins(limit=30)
+                            top_coins = turbo_hedge_engine.get_active_high_velocity_coins(limit=scan_limit)
                         if not top_coins:
                             top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
                     except Exception:
