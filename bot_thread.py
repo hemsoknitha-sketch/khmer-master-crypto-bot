@@ -3041,10 +3041,10 @@ class TelegramBotThread(BaseThread):
                 try:
                     report = await asyncio.wait_for(
                         asyncio.to_thread(macro_gold_engine.generate_gold_catalyst_report, user_lang, self.ai_engine),
-                        timeout=8.0
+                        timeout=12.0
                     )
                 except asyncio.TimeoutError:
-                    print("⚠️ [GOLD RADAR] AI call timed out (>8s), generating instant quantitative report...")
+                    print("⚠️ [GOLD RADAR] AI call timed out (>12s), generating instant quantitative report...")
                     report = macro_gold_engine.generate_gold_catalyst_report(user_lang, ai_engine=None)
                 
                 if not isinstance(report, str): report = str(report or "")
@@ -3098,10 +3098,10 @@ class TelegramBotThread(BaseThread):
                 try:
                     report = await asyncio.wait_for(
                         asyncio.to_thread(central_bank_gold_radar.generate_central_bank_report, user_lang, self.ai_engine),
-                        timeout=8.0
+                        timeout=12.0
                     )
                 except asyncio.TimeoutError:
-                    print("⚠️ [CB GOLD] AI call timed out (>8s), generating instant quantitative report...")
+                    print("⚠️ [CB GOLD] AI call timed out (>12s), generating instant quantitative report...")
                     report = central_bank_gold_radar.generate_central_bank_report(user_lang, ai_engine=None)
                 
                 if not isinstance(report, str): report = str(report or "")
