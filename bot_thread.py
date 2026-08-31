@@ -2911,16 +2911,26 @@ class TelegramBotThread(BaseThread):
             photo_sent = False
             if image_url:
                 try:
-                    caption_txt = report_text if len(report_text) <= 1000 else (report_text[:950] + "...\n\n🔗 [Read Full Article]")
                     if status_msg:
                         try: await status_msg.delete()
                         except Exception: pass
-                    try:
-                        await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=caption_txt, parse_mode="Markdown", reply_markup=keyboard)
-                        photo_sent = True
-                    except Exception:
-                        clean_cap = caption_txt.replace('*', '').replace('`', '').replace('_', '')
-                        await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=clean_cap, reply_markup=keyboard)
+
+                    if len(report_text) <= 1000:
+                        try:
+                            await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=report_text, parse_mode="Markdown", reply_markup=keyboard)
+                            photo_sent = True
+                        except Exception:
+                            clean_cap = report_text.replace('*', '').replace('`', '').replace('_', '')
+                            await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=clean_cap[:1000], reply_markup=keyboard)
+                            photo_sent = True
+                    else:
+                        # Full original image first, followed by FULL untruncated 3-paragraph news report!
+                        try:
+                            await context.bot.send_photo(chat_id=chat_id, photo=image_url)
+                        except Exception as e_img:
+                            print(f"⚠️ Photo send notice: {e_img}")
+                        
+                        await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
                         photo_sent = True
                 except Exception as e_ph:
                     print(f"⚠️ Photo dispatch fallback: {e_ph}")
