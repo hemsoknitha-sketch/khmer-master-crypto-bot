@@ -2218,50 +2218,63 @@ class TelegramBotThread(BaseThread):
                             InlineKeyboardButton("🔍 Analyze PAXG (Gold)", callback_data="btn_analyze_PAXGUSDT")
                         ],
                         [
-                            InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
-                            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                            InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
+                            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                        ],
+                        [
+                            InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                            InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                         ]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     if user_lang == 'en':
                         usage_msg = (
-                            "🧠 **APEX SUPER AGI TURBO BRAIN v13.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
-                            "═══════════════════════════════\n"
-                            "💡 **AGI MARKET ANALYZER USER GUIDE:**\n\n"
-                            "👉 **1. Deep Technical & 12 ML Models Analysis ៖**\n"
-                            "• `/analyze BTCUSDT` - Analyze BTC with Real-Time 4H Technical Chart\n"
-                            "• `/analyze SOL` - Full 5-Agent Swarm Analysis on Solana\n\n"
-                            "👉 **2. Custom Strategy & Question Analysis ៖**\n"
-                            "• `/analyze BTCUSDT Should I buy Long or Short now?` - Custom AGI Advisory\n"
-                            "═══════════════════════════════\n"
-                            "💡 *Or tap any Quick-Scan coin button below for instant 360° AGI analysis:*"
+                            "🧠 **KHMER MASTER CRYPTO | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **5-AGENT AGI SWARM ARCHITECTURE:**\n"
+                            "• 1️⃣ **Trend Agent** ៖ EMA 20/50/200 Cross, Supertrend, Market Structure\n"
+                            "• 2️⃣ **Volatility Agent** ៖ ATR Band Expansion, Bollinger Squeeze\n"
+                            "• 3️⃣ **Momentum Agent** ៖ RSI Divergence, MACD Momentum\n"
+                            "• 4️⃣ **Orderbook Agent** ៖ Bid/Ask Imbalance & Liquidity Depth Walls\n"
+                            "• 5️⃣ **Macro Agent** ៖ Global Sentiment, BTC Dominance & DXY Correlation\n\n"
+                            "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                            "👉 **Analyze Single-Coin 360° Technicals + 4H Chart ៖**\n`` `/analyze BTCUSDT` ``\n"
+                            "`` `/analyze SOL` ``\n"
+                            "`` `/analyze PAXG` ``\n\n"
+                            "👉 **Analyze with Custom Question ៖**\n`` `/analyze BTCUSDT Should I Buy Long or Short now?` ``"
                         )
                     elif user_lang == 'zh':
                         usage_msg = (
-                            "🧠 **APEX SUPER AGI TURBO BRAIN v13.00 | 5-Agent AGI 智能市场分析师** 🧠\n"
-                            "═══════════════════════════════\n"
-                            "💡 **AGI 市场分析指南：**\n\n"
-                            "👉 **1. 深度技术面与 12 种 ML 模型分析 ៖**\n"
-                            "• `/analyze BTCUSDT` - 结合 4 小时实时 K 线图深度分析 BTC\n"
-                            "• `/analyze SOL` - 5-Agent Swarm 全方位 Solana 市场研判\n\n"
-                            "👉 **2. 自定义策略与问题研判 ៖**\n"
-                            "• `/analyze BTCUSDT 现在应该做多还是做空？` - 智能 AGI 咨询\n"
-                            "═══════════════════════════════\n"
-                            "💡 *或点击下方一键快搜按钮获取 360° AGI 实时分析：*"
+                            "🧠 **KHMER MASTER CRYPTO | 5-Agent AGI 360° 智能市场分析师 v13.00** 🧠\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **5-AGENT AGI 蜂群研判架构：**\n"
+                            "• 1️⃣ **趋势 Agent** ៖ EMA 20/50/200 交叉、Supertrend 结构\n"
+                            "• 2️⃣ **波动率 Agent** ៖ ATR 扩张、布林带挤压状态\n"
+                            "• 3️⃣ **动量 Agent** ៖ RSI 背离、MACD 柱状图动量\n"
+                            "• 4️⃣ **订单簿 Agent** ៖ 买卖盘深度挂单墙与不平衡度\n"
+                            "• 5️⃣ **宏观 Agent** ៖ 市场情绪、BTC 市占率及 DXY 关联度\n\n"
+                            "📋 **一键复制指令：**\n\n"
+                            "👉 **360° 深度技术面 + 4小时 K 线图分析 ៖**\n`` `/analyze BTCUSDT` ``\n"
+                            "`` `/analyze SOL` ``\n"
+                            "`` `/analyze PAXG` ``\n\n"
+                            "👉 **自定义策略提问分析 ៖**\n`` `/analyze BTCUSDT 现在应该做多还是做空？` ``"
                         )
                     else:
                         usage_msg = (
-                            "🧠 **APEX SUPER AGI TURBO BRAIN v13.00 | 5-AGENT AGI MARKET ANALYZER** 🧠\n"
-                            "═══════════════════════════════\n"
-                            "💡 **របៀបវិភាគកាក់ជាមួយ AGI (AGI ANALYZER GUIDE) ៖**\n\n"
-                            "👉 **1. វិភាគកាក់បច្ចេកទេស & ML Prediction ៖**\n"
-                            "• `/analyze BTCUSDT` - វិភាគកាក់ BTC រួមជាមួយ Chart ផ្កាយ 4-Hour\n"
-                            "• `/analyze SOL` - វិភាគកាក់ Solana ជាមួយ 5-Swarm Agents ពេញលេញ\n\n"
-                            "👉 **2. វិភាគកាក់ជាមួយសំណួរផ្ទាល់ខ្លួន ៖**\n"
-                            "• `/analyze BTCUSDT Should I buy Long or Short now?` - វិភាគ និងឆ្លើយសំណួរ\n"
-                            "═══════════════════════════════\n"
-                            "💡 *ឬចុចលើប៊ូតុងកាក់ Quick-Scan ខាងក្រោមដើម្បីវិភាគភ្លាមៗ ៖*"
+                            "🧠 **KHMER MASTER CRYPTO | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **5-AGENT AGI SWARM ARCHITECTURE (ស្ថាបត្យកម្ម AI វិភាគ ៥ ជំនាញ) ៖**\n"
+                            "• 1️⃣ **Trend Agent** ៖ វិភាគនិន្នាការ EMA 20/50/200 Cross & Market Structure\n"
+                            "• 2️⃣ **Volatility Agent** ៖ វិភាគភាពប្រែប្រួល ATR & Bollinger Band Squeeze\n"
+                            "• 3️⃣ **Momentum Agent** ៖ វិភាគកម្លាំងទិញ/លក់ RSI Divergence & MACD\n"
+                            "• 4️⃣ **Orderbook Agent** ៖ វិភាគ Orderbook Depth Walls & Inflow/Outflow\n"
+                            "• 5️⃣ **Macro Agent** ៖ វិភាគសេដ្ឋកិច្ចសកល BTC Dominance & DXY\n\n"
+                            "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                            "👉 **វិភាគកាក់បច្ចេកទេស 360° + Chart ផ្កាយ 4-Hour ៖**\n`` `/analyze BTCUSDT` ``\n"
+                            "`` `/analyze SOL` ``\n"
+                            "`` `/analyze PAXG` ``\n\n"
+                            "👉 **វិភាគកាក់ជាមួយសំណួរផ្ទាល់ខ្លួន ៖**\n`` `/analyze BTCUSDT Should I Buy Long or Short now?` ``"
                         )
                     await update.message.reply_text(usage_msg, parse_mode="Markdown", reply_markup=reply_markup)
                     return
