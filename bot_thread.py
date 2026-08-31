@@ -159,45 +159,33 @@ class TelegramBotThread(BaseThread):
             except Exception as e_del:
                 print(f"⚠️ [MENU CLEANUP] Delete notice: {e_del}")
 
-            # Public VIP User Command List (Categorized Super Smart Menu)
+            # Public VIP User Command List (Super Smart & Super Beautiful Menu)
             public_commands = [
-                # 1. Navigation & Account
-                BotCommand("start", "🚀 Start Bot & Select Language"),
-                BotCommand("menu", "🎛️ Master Control Panel & Interactive Menu"),
-                BotCommand("balance", "💰 Check Spot & Futures Balance"),
-                BotCommand("portfolio", "💼 View Active Positions & PnL"),
-
-                # 2. 5 Super Smart Engines
-                BotCommand("hyper_trade", "🚀 Hyper-Trade HFT Sub-Second Scalper"),
-                BotCommand("auto_arb", "⚡ Delta-Neutral 0% Risk Arbitrage"),
-                BotCommand("sweep_auto", "🛡️ Liquidity Sweep Bottom Wick Sniper"),
-                BotCommand("funding_harvester", "🌾 30%-120% APY Perpetual Funding Yield"),
-                BotCommand("trailing_guard", "🛡️ Auto-Liquidation Guard & Trailing Lock"),
-
-                # 3. AI Quant Trading Strategies
-                BotCommand("turbo_hedge", "🚀 Turbo Hedge Futures 5x Engine"),
-                BotCommand("infinity_matrix", "♾️ Unified Smart Grid Strategy"),
-                BotCommand("smart_dca", "🎯 Smart DCA Martingale Ladder"),
-                BotCommand("grid_bot", "📊 24/7 Grid Trading Engine"),
-
-                # 4. AI Analytics & Market Intelligence
+                BotCommand("start", "🚀 Start Bot & Choose Language"),
+                BotCommand("menu", "🎛️ Interactive Master Control Panel"),
+                BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
+                BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
+                BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
+                BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
+                BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
+                BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
+                BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
                 BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
                 BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
-                BotCommand("gold_radar", "🏆 PAXG Gold Wealth Protection Radar"),
-                BotCommand("whales", "🐋 On-Chain Whale Inflow/Outflow Tracker"),
-                BotCommand("news", "📰 AI Journalistic Crypto News & Impact"),
-
-                # 5. Emergency Stop
-                BotCommand("stop", "🛑 Emergency Stop All Active Trading"),
+                BotCommand("balance", "💰 Check Spot & Futures Balance"),
+                BotCommand("status", "📊 View Active Trades & PnL"),
+                BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
+                BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
+                BotCommand("alert", "🔔 Set Price Alert"),
+                BotCommand("stop", "🛑 Stop Trading / Market Close"),
             ]
 
             # Full Super Admin Command List
             admin_commands = [
-                BotCommand("admin", "👑 Super Admin Control Panel"),
-                BotCommand("health", "🩺 VPS Hardware & Engine Diagnostics"),
+                BotCommand("admin", "👑 Open Super Admin Control Panel"),
+                BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
                 BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
             ] + public_commands
-
 
             try:
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
