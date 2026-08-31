@@ -9757,12 +9757,19 @@ class TelegramBotThread(BaseThread):
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_defender_status"),
+                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_health_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
+                ],
+                [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ])
 
