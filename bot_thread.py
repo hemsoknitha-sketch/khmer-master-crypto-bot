@@ -1521,24 +1521,36 @@ class TelegramBotThread(BaseThread):
         async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
             if not await verify_user(update): return
+            
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
             
             keys = db.get_user_api(chat_id)
             
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [
-                    InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_menu_balance_refresh"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_balance_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ],
                 [
-                    InlineKeyboardButton("💼 Unified Portfolio", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge")
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar")
                 ],
                 [
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1546,21 +1558,21 @@ class TelegramBotThread(BaseThread):
             if not keys:
                 if user_lang == 'en':
                     empty_msg = (
-                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
+                        "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                         "═══════════════════════════════\n"
                         "❌ **No Binance API Keys connected yet!**\n\n"
                         "💡 *Please tap **[🔑 Add Binance API]** below to bind your API Keys first:*"
                     )
                 elif user_lang == 'zh':
                     empty_msg = (
-                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 🤖\n"
+                        "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 💰\n"
                         "═══════════════════════════════\n"
                         "❌ **尚未绑定 Binance API Keys！**\n\n"
                         "💡 *请点击下方 **[🔑 Add Binance API]** 按钮绑定您的 API 密钥：*"
                     )
                 else:
                     empty_msg = (
-                        "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
+                        "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                         "═══════════════════════════════\n"
                         "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
                         "💡 *សូមចុចប៊ូតុង **[🔑 Add Binance API]** ខាងក្រោមដើម្បីភ្ជាប់ API Keys របស់អ្នកជាមុនសិន ៖*"
@@ -1582,6 +1594,7 @@ class TelegramBotThread(BaseThread):
             total_spot_val = spot_cash_usdt + spot_trading_exposure
             total_net_equity = total_spot_val + futures_balance + margin_balance + funding_balance + earn_balance
             
+            paxg_vault_str = ""
             trading_details = ""
             if spot_breakdown and isinstance(spot_breakdown, dict):
                 coins_str_list = []
@@ -1589,12 +1602,15 @@ class TelegramBotThread(BaseThread):
                     coin_str = str(coin)
                     val_usdt = float(info.get('value_usdt', 0.0) if isinstance(info, dict) else 0.0)
                     coins_str_list.append(f"{coin_str} (${val_usdt:,.2f})")
+                    if "PAXG" in coin_str:
+                        qty = float(info.get('amount', 0.0) if isinstance(info, dict) else 0.0)
+                        paxg_vault_str = f"🥇 **PAXG Gold Vault (LBMA 24/7):** `{qty:.4f} PAXG` (`${val_usdt:,.2f} USDT`)\n"
                 if coins_str_list:
-                    sub_txt = "Trading Position:" if user_lang == 'en' else ("持仓中:" if user_lang == 'zh' else "កាក់កំពុងជួញដូរ:")
+                    sub_txt = "Trading Positions:" if user_lang == 'en' else ("持仓中:" if user_lang == 'zh' else "កាក់កំពុងជួញដូរ:")
                     trading_details = f"\n   └ _{sub_txt}_ `{', '.join(coins_str_list)}`"
                 
             funding_str = f"👛 **Funding Wallet (P2P/Pay):** `${funding_balance:,.2f} USDT`\n" if funding_balance > 0 else ""
-            earn_str = f"🌾 **Simple Earn Balance:** `${earn_balance:,.2f} USDT`\n" if earn_balance > 0 else ""
+            earn_str = f"🌾 **Simple Earn Yield Wallet:** `${earn_balance:,.2f} USDT`\n" if earn_balance > 0 else ""
             
             if futures_balance > 0:
                 futures_str = f"📈 **Futures Wallet Balance:** `${futures_balance:,.2f} USDT`\n"
@@ -1612,12 +1628,13 @@ class TelegramBotThread(BaseThread):
                 
             if user_lang == 'en':
                 msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
+                    "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                     "═══════════════════════════════\n"
-                    f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
+                    f"🛡️ **SECURITY CLEARANCE** ៖ `VERIFIED` \| `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
-                    f"💰 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
+                    f"💵 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
                     f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
+                    f"{paxg_vault_str}"
                     f"{futures_str}"
                     f"{funding_str}"
                     f"{earn_str}"
@@ -1627,12 +1644,13 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 🤖\n"
+                    "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 💰\n"
                     "═══════════════════════════════\n"
-                    f"🛡️ **安全认证**: `VERIFIED` | `{mode_badge}`\n"
+                    f"🛡️ **安全认证** ៖ `VERIFIED` \| `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
-                    f"💰 **现货可用余额 (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
+                    f"💵 **现货可用余额 (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
                     f"📊 **现货持仓敞口:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
+                    f"{paxg_vault_str}"
                     f"{futures_str}"
                     f"{funding_str}"
                     f"{earn_str}"
@@ -1642,12 +1660,13 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 msg = (
-                    "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 🤖\n"
+                    "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                     "═══════════════════════════════\n"
-                    f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
+                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `VERIFIED` \| `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
-                    f"💰 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
+                    f"💵 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
                     f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
+                    f"{paxg_vault_str}"
                     f"{futures_str}"
                     f"{funding_str}"
                     f"{earn_str}"
