@@ -396,10 +396,91 @@ class TelegramBotThread(BaseThread):
             return None
 
         async def flash_crash_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
-            user_lang = db.get_user_language(chat_id)
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            args = context.args or []
+            msg_target = update.effective_message or update.message
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🎯 Scan Live Deep Wick Targets", callback_data="btn_flash_crash"),
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                ],
+                [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
+                ],
+                [
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            # If no args and not callback query, send Master Help Card!
+            if not args and not update.callback_query:
+                if user_lang == 'en':
+                    msg = (
+                        "🎯 **KHMER MASTER CRYPTO | LIQUIDATION CASCADE DEEP WICK HUNTER v13.00** 🎯\n"
+                        "═════════════════════════════════════════\n\n"
+                        "📊 **EXECUTIVE WICK HUNTER ARCHITECTURE:**\n"
+                        "• 🤖 **AI Ensemble Models** ៖ `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model` + `RVOL Spike Scanner`\n"
+                        "• ⚡ **Execution Strategy** ៖ `Limit Buy Catch (3%-15% Deep Wick Discount) with <5s Instant Exit`\n"
+                        "• 💰 **Target Rebound Yield** ៖ `5% - 30% Instant Profit Harvest`\n"
+                        "• 🛡️ **Risk Protection** ៖ `Stop loss clamped at hard -10% ROI with tight trailing profit lock`\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **Scan Live Deep Wick Liquidation Radar ៖**\n`` `/flash_crash SCAN` ``\n\n"
+                        "👉 **Auto Snipe Deep Wicks (10x Leverage, $100 USDT) ៖**\n`` `/flash_crash AUTO 10 100 1234` ``\n\n"
+                        "👉 **Single-Coin Deep Wick Hunter (SOL / BTC) ៖**\n`` `/flash_crash SOL 10 50 1234` ``\n"
+                        "`` `/flash_crash BTC 10 100 1234` ``"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "🎯 **KHMER MASTER CRYPTO | 爆仓瀑布插针捕手 (Deep Wick Hunter) v13.00** 🎯\n"
+                        "═════════════════════════════════════════\n\n"
+                        "📊 **机构级插针捕手架构：**\n"
+                        "• 🤖 **AI 模型协同** ៖ `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model` + `RVOL Spike Scanner`\n"
+                        "• ⚡ **执行策略** ៖ `限价抄底买入 (3%-15% 深度插针折扣) 并于 <5秒 内快速止盈平仓`\n"
+                        "• 💰 **目标反弹收益** ៖ `5% - 30% 瞬间反弹利润收割`\n"
+                        "• 🛡️ **风控保护** ៖ `硬止损锁死在 -10% ROI，动态移动止盈锁住利润`\n\n"
+                        "📋 **一键复制指令：**\n\n"
+                        "👉 **扫描实时爆仓插针目标雷达 ៖**\n`` `/flash_crash SCAN` ``\n\n"
+                        "👉 **自动狙击爆仓插针 (10x 杠杆, $100 USDT) ៖**\n`` `/flash_crash AUTO 10 100 1234` ``\n\n"
+                        "👉 **单币种插针捕手 (SOL / BTC) ៖**\n`` `/flash_crash SOL 10 50 1234` ``\n"
+                        "`` `/flash_crash BTC 10 100 1234` ``"
+                    )
+                else:
+                    msg = (
+                        "🎯 **KHMER MASTER CRYPTO | LIQUIDATION CASCADE DEEP WICK HUNTER v13.00** 🎯\n"
+                        "═════════════════════════════════════════\n\n"
+                        "📊 **EXECUTIVE WICK HUNTER ARCHITECTURE (ស្ថាបត្យកម្មទិញបាត DEEP WICK) ៖**\n"
+                        "• 🤖 **AI Models សហការ** ៖ `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model` + `RVOL Spike Scanner`\n"
+                        "• ⚡ **យុទ្ធសាស្ត្រប្រតិបត្តិ** ៖ `Limit Buy Catch (ទិញបាតផ្លែម្ជុល 3%-15% Discount) រួច Exit ក្នុងរយៈពេល < 5 វិនាទី`\n"
+                        "• 💰 **ប្រាក់ចំណេញរំពឹងទុក** ៖ `5% - 30% Instant Profit Catch`\n"
+                        "• 🛡️ **យន្តការសុវត្ថិភាព** ៖ `Hard Stop -10% ROI ជាមួយ Dual-Check Profit Lock 24/7`\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 **ស្កេនរកកាក់ដែលកំពុងជ្រុះ Liquidation Deep Wick ៖**\n`` `/flash_crash SCAN` ``\n\n"
+                        "👉 **Auto Snipe Deep Wick ស្វ័យប្រវត្តិ (10x Leverage, ទុន $100) ៖**\n`` `/flash_crash AUTO 10 100 1234` ``\n\n"
+                        "👉 **ទិញបាត Deep Wick លើកាក់ទោល (SOL / BTC) ៖**\n`` `/flash_crash SOL 10 50 1234` ``\n"
+                        "`` `/flash_crash BTC 10 100 1234` ``"
+                    )
+                if msg_target:
+                    await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                return
 
             sent_msg = await send_reply_or_edit(update, context, "🎯 **Scanning Flash Crash & Liquidation Cascade Targets (<10ms ONNX HFT)...**")
 
@@ -407,7 +488,7 @@ class TelegramBotThread(BaseThread):
                 import flash_crash_sniper_engine
                 targets = await asyncio.to_thread(flash_crash_sniper_engine.flash_crash_engine.scan_flash_crash_targets)
 
-                if user_lang == 'khmer':
+                if user_lang == 'km':
                     msg = "🎯 **FLASH CRASH / LIQUIDATION CASCADE HUNTING ENGINE v13.00** 🎯\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models សហការ ៖** `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model`\n"
@@ -422,7 +503,7 @@ class TelegramBotThread(BaseThread):
                         wp = item.get("deep_wick_buy_target", 0.0)
                         exp_p = item.get("expected_profit_pct", 0.0)
                         msg += f"• `{sym}` (Regime: `{reg}`)\n"
-                        msg += f"  - តម្លៃបច្ចុប្បន្ន ៖ `${cp:,.2f}` | Deep Wick Target ៖ `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
+                        msg += f"  - តម្លៃបច្ចុប្បន្ន ៖ `${cp:,.2f}` \| Deep Wick Target ៖ `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
                         msg += f"  - Instant Rebound Target ៖ `+{exp_p}% Profit` (< 5s Exit)\n\n"
                     
                     msg += "💡 _នៅពេលសមាជិកផ្សេងទៀតត្រូវ Margin Call / Liquidate AI នឹងចូលទិញបាតកាក់ថោកបំផុតភ្លាមៗ!_"
@@ -441,15 +522,10 @@ class TelegramBotThread(BaseThread):
                         wp = item.get("deep_wick_buy_target", 0.0)
                         exp_p = item.get("expected_profit_pct", 0.0)
                         msg += f"• `{sym}` (Regime: `{reg}`)\n"
-                        msg += f"  - Current Price: `${cp:,.2f}` | Deep Wick Target: `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
+                        msg += f"  - Current Price: `${cp:,.2f}` \| Deep Wick Target: `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
                         msg += f"  - Instant Rebound Target: `+{exp_p}% Profit` (< 5s Exit)\n\n"
                     
                     msg += "💡 _Catches bottom deep wicks during retail liquidation cascades and exits within <5 seconds!_"
-
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🎯 Scan Deep Wick Targets", callback_data="btn_flash_crash")],
-                    [InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
-                ])
 
                 if sent_msg:
                     try: await sent_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
