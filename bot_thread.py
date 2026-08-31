@@ -2426,10 +2426,20 @@ class TelegramBotThread(BaseThread):
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("📋 My Active Alerts", callback_data="btn_my_alerts"), InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")],
                         [
-                            InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
-                            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                            InlineKeyboardButton("📋 My Active Alerts", callback_data="btn_my_alerts"),
+                            InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
+                        ],
+                        [
+                            InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
+                            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                        ],
+                        [
+                            InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                            InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                        ],
+                        [
+                            InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                         ]
                     ])
 
