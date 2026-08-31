@@ -2781,28 +2781,57 @@ class TelegramBotThread(BaseThread):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
+            
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
             args = context.args if hasattr(context, 'args') else []
             target_symbol = None
             if args and len(args) > 0:
                 raw_sym = str(args[0]).upper().strip()
-                if raw_sym and raw_sym not in ['NONE', 'ALL']:
+                if raw_sym and raw_sym not in ['NONE', 'ALL', 'SCAN']:
                     target_symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
 
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh Breaking News", callback_data="btn_news_refresh"),
+                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
+                ],
+                [
+                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
+                    InlineKeyboardButton("🐋 Whale Radar", callback_data="btn_whales_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ])
+
             loading_text = (
-                "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v13.00**\n\n_Fetching real-time breaking crypto news & performing 3-paragraph AGI sentiment synthesis..._"
+                "📰 **KHMER MASTER CRYPTO | GLOBAL NEWS SYNTHESIS v13.00**\n\n_Fetching real-time breaking news & compiling 3-paragraph AGI journalistic impact report..._"
                 if user_lang == 'en' else
-                ("📰 **APEX SUPER AGI GLOBAL NEWS RADAR v13.00**\n\n_正在获取实时加密行业突发新闻并由 AGI 引擎撰写三段式深度报告..._"
+                ("📰 **KHMER MASTER CRYPTO | 3段式加密行业新闻简报 v13.00**\n\n_正在获取实时突发新闻并由 AGI 撰写三段式新闻深度分析..._"
                  if user_lang == 'zh' else
-                 "📰 **APEX SUPER AGI GLOBAL NEWS RADAR v13.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងវិភាគ Sentiment ដោយ AI Engine 24/7..._")
+                 "📰 **KHMER MASTER CRYPTO | GLOBAL NEWS SYNTHESIS v13.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងសង្ខេប ៣ កថាខណ្ឌ អមជាមួយការវាយតម្លៃផលប៉ះពាល់..._")
             )
 
             status_msg = None
             if update.callback_query:
-                await update.callback_query.answer()
+                try: await update.callback_query.answer()
+                except Exception: pass
                 status_msg = await update.callback_query.message.reply_text(loading_text, parse_mode="Markdown")
             else:
                 status_msg = await update.message.reply_text(loading_text, parse_mode="Markdown")
@@ -2810,19 +2839,29 @@ class TelegramBotThread(BaseThread):
             import ai_news_engine
             report = await asyncio.to_thread(ai_news_engine.generate_news_report, target_symbol, user_lang, self.ai_engine)
             report_text = str(report or "")
-            image_url = getattr(report, "image_url", "")
 
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🔄 Refresh News", callback_data="btn_news_refresh"),
-                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
-                ],
-                [
-                    InlineKeyboardButton("📈 Wall Street ML Predict", callback_data="btn_predict_prompt"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ]
-            ])
+            # Append 1-Tap Execution Commands to news report!
+            if user_lang == 'en':
+                report_text += (
+                    "\n\n📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                    "👉 **Scan Global Breaking News Synthesis ៖**\n`` `/news SCAN` ``\n\n"
+                    "👉 **Single-Coin News & Impact (BTC / SOL / ETH) ៖**\n`` `/news BTC` ``\n"
+                    "`` `/news SOL` ``"
+                )
+            elif user_lang == 'zh':
+                report_text += (
+                    "\n\n📋 **一键复制指令：**\n\n"
+                    "👉 **扫描全球加密行业新闻简报 ៖**\n`` `/news SCAN` ``\n\n"
+                    "👉 **单币种新闻与市场影响 (BTC / SOL / ETH) ៖**\n`` `/news BTC` ``\n"
+                    "`` `/news SOL` ``"
+                )
+            else:
+                report_text += (
+                    "\n\n📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                    "👉 **ស្កេនព័ត៌មាន Crypto ក្តៅៗ ៣ កថាខណ្ឌ ៖**\n`` `/news SCAN` ``\n\n"
+                    "👉 **ស្កេនព័ត៌មានលើកាក់ទោល (BTC / SOL / ETH) ៖**\n`` `/news BTC` ``\n"
+                    "`` `/news SOL` ``"
+                )
 
             photo_sent = False
             if image_url:
