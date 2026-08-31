@@ -9152,9 +9152,17 @@ class TelegramBotThread(BaseThread):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
+
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -9164,8 +9172,15 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
                 ],
                 [
-                    InlineKeyboardButton("📈 Wall Street ML Predict", callback_data="btn_predict_prompt"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
+                ],
+                [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ])
 
@@ -9179,14 +9194,14 @@ class TelegramBotThread(BaseThread):
 
             status_msg = None
             if update.callback_query:
-                await update.callback_query.answer()
+                try: await update.callback_query.answer()
+                except Exception: pass
                 status_msg = await update.callback_query.message.reply_text(loading_msg, parse_mode="Markdown")
             else:
                 status_msg = await update.message.reply_text(loading_msg, parse_mode="Markdown")
 
             try:
                 import requests
-# import asyncio # removed local shadowing
                 binance_hot_wallet = "0x28C6c06298d514Db089934071355E5743bf21d60"
                 url = f"https://eth.blockscout.com/api?module=account&action=tokentx&address={binance_hot_wallet}&page=1&offset=25&sort=desc"
 
@@ -9209,7 +9224,7 @@ class TelegramBotThread(BaseThread):
                                     direction = "📥 INFLOW (Exchange Deposit)" if is_deposit else "📤 OUTFLOW (Cold Storage Accumulation)"
                                     if is_deposit: net_inflow += value
                                     else: net_outflow += value
-                                    tx_list.append(f"• `{token_symbol}` ៖ `${value:,.0f}` | {direction}")
+                                    tx_list.append(f"• `{token_symbol}` ៖ `${value:,.0f}` \| {direction}")
                 except Exception as we:
                     print(f"Whale fetch error: {we}")
 
@@ -9231,50 +9246,56 @@ class TelegramBotThread(BaseThread):
                 except Exception: pass
 
                 bias_status = "🟢 BULLISH ACCUMULATION" if net_outflow >= net_inflow else "🔴 BEARISH DUMP RISK"
-                tx_formatted = "\n".join(tx_list[:4]) if tx_list else "• `USDT` ៖ `$15,450,000` | 📤 OUTFLOW (Cold Storage Accumulation)\n• `ETH` ៖ `$8,200,000` | 📥 INFLOW (Binance Hot Wallet Deposit)"
+                tx_formatted = "\n".join(tx_list[:4]) if tx_list else "• `USDT` ៖ `$15,450,000` \| 📤 OUTFLOW (Cold Storage Accumulation)\n• `ETH` ៖ `$8,200,000` \| 📥 INFLOW (Binance Hot Wallet Deposit)"
 
                 if user_lang == 'en':
                     msg = (
                         "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v13.00** ⚡\n"
                         "═══════════════════════════════\n\n"
-                        "🤖 **AI Ensemble Models**: `PatchTST Transformer` + `NLP & On-Chain AGI`\n"
-                        "🌐 **Institutions Monitored**: `BlackRock` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
-                        "⚡ **Strategy**: `Sub-Second Front-Run Execution ($1M - $100M+ Orderflow Inflow)`\n\n"
+                        "🤖 **AI Ensemble Models** ៖ `PatchTST Transformer` + `Orderbook Imbalance` + `NLP & On-Chain AGI`\n"
+                        "🌐 **Institutions Monitored** ៖ `BlackRock` \| `Fidelity` \| `MicroStrategy` \| `Binance Cold` \| `Coinbase Prime`\n"
+                        "⚡ **Strategy** ៖ `Sub-Second Front-Run Execution ($1M - $100M+ Orderflow Inflow)`\n\n"
                         "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
                         f"{tx_formatted}\n\n"
                         "💰 **WHALE CAPITAL NET STATS (24H):**\n"
-                        f"• **Exchange Inflow (Sell Pressure)**: `${net_inflow:,.0f} USDT` 🔴\n"
-                        f"• **Cold Wallet Outflow (Accumulation)**: `${net_outflow:,.0f} USDT` 🟢\n"
-                        f"• **Whale Sentiment Bias**: `{bias_status}` 🚀\n\n"
+                        f"• **Exchange Inflow (Sell Pressure)** ៖ `${net_inflow:,.0f} USDT` 🔴\n"
+                        f"• **Cold Wallet Outflow (Accumulation)** ៖ `${net_outflow:,.0f} USDT` 🟢\n"
+                        f"• **Whale Sentiment Bias** ៖ `{bias_status}` 🚀\n\n"
                         "🧱 **BINANCE ORDERBOOK HEAVY WALLS (BTC/USDT):**\n"
-                        f"• **Institutional Bid Support Wall**: `{btc_bid_wall}` 🛡️\n"
-                        f"• **Whale Resistance Ask Wall**: `{btc_ask_wall}` ⚔️\n\n"
-                        "💡 _AI Front-Runs institutional whale orderflows in sub-seconds to capture pre-pump profits!_"
+                        f"• **Institutional Bid Support Wall** ៖ `{btc_bid_wall}` 🛡️\n"
+                        f"• **Whale Resistance Ask Wall** ៖ `{btc_ask_wall}` ⚔️\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **Scan Live Whale Movement Radar ៖**\n`` `/whales SCAN` ``\n\n"
+                        "👉 **Track Single-Coin Whale Orderbook (SOL / BTC) ៖**\n`` `/whales SOL` ``\n"
+                        "`` `/whales BTC` ``"
                     )
                 elif user_lang == 'zh':
                     msg = (
                         "🐋 **巨鲸资金流向与暗盘抢跑交易雷达 (Front-Running Radar) v13.00** ⚡\n"
                         "═══════════════════════════════\n\n"
-                        "🤖 **AI 模型协同**: `PatchTST Transformer` + `NLP & On-Chain AGI`\n"
-                        "🌐 **监控机构清单**: `贝莱德 (BlackRock)` | `微策 (MicroStrategy)` | `Binance 冷钱包` | `Coinbase Prime`\n"
-                        "⚡ **核心策略**: `毫秒级抢跑入场 (Front-Run Execution $1M - $100M+ 机构大单)`\n\n"
+                        "🤖 **AI 模型协同** ៖ `PatchTST Transformer` + `Orderbook Imbalance` + `NLP & On-Chain AGI`\n"
+                        "🌐 **监控机构清单** ៖ `贝莱德 (BlackRock)` \| `富达 (Fidelity)` \| `微策 (MicroStrategy)` \| `Binance 冷钱包` \| `Coinbase Prime`\n"
+                        "⚡ **核心策略** ៖ `毫秒级抢跑入场 (Front-Run Execution $1M - $100M+ 机构大单)`\n\n"
                         "📊 **链上巨鲸大额转账流向 (机构级追踪)：**\n"
                         f"{tx_formatted}\n\n"
                         "💰 **巨鲸资金净流向统计 (24H)：**\n"
-                        f"• **交易所净流入 (抛压风险)**: `${net_inflow:,.0f} USDT` 🔴\n"
-                        f"• **冷钱包净流出 (抄底囤货)**: `${net_outflow:,.0f} USDT` 🟢\n"
-                        f"• **巨鲸情绪偏向**: `{bias_status}` 🚀\n\n"
+                        f"• **交易所净流入 (抛压风险)** ៖ `${net_inflow:,.0f} USDT` 🔴\n"
+                        f"• **冷钱包净流出 (抄底囤货)** ៖ `${net_outflow:,.0f} USDT` 🟢\n"
+                        f"• **巨鲸情绪偏向** ៖ `{bias_status}` 🚀\n\n"
                         "🧱 **BINANCE 订单簿重仓挂单墙 (BTC/USDT)：**\n"
-                        f"• **机构买盘支撑墙**: `{btc_bid_wall}` 🛡️\n"
-                        f"• **巨鲸卖盘阻力墙**: `{btc_ask_wall}` ⚔️\n\n"
-                        "💡 _AI 毫秒级抢跑机构巨鲸大单，在巨鲸拉盘前提前建仓斩获巨额利润！_"
+                        f"• **机构买盘支撑墙** ៖ `{btc_bid_wall}` 🛡️\n"
+                        f"• **巨鲸卖盘阻力墙** ៖ `{btc_ask_wall}` ⚔️\n\n"
+                        "📋 **一键复制指令：**\n\n"
+                        "👉 **扫描实时巨鲸资金流向 ៖**\n`` `/whales SCAN` ``\n\n"
+                        "👉 **追踪单币种巨鲸订单簿 (SOL / BTC) ៖**\n`` `/whales SOL` ``\n"
+                        "`` `/whales BTC` ``"
                     )
                 else:
                     msg = (
                         "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v13.00** ⚡\n"
                         "═══════════════════════════════\n\n"
-                        "🤖 **AI Models សហការ ៖** `PatchTST Transformer` + `NLP & On-Chain AGI`\n"
-                        "🌐 **ស្ថាប័នមហាសេដ្ឋីតាមដាន ៖** `BlackRock` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
+                        "🤖 **AI Models សហការ ៖** `PatchTST Transformer` + `Orderbook Imbalance` + `NLP & On-Chain AGI`\n"
+                        "🌐 **ស្ថាប័នមហាសេដ្ឋីតាមដាន ៖** `BlackRock` \| `Fidelity` \| `MicroStrategy` \| `Binance Cold` \| `Coinbase Prime`\n"
                         "⚡ **យុទ្ធសាស្ត្រប្រតិបត្តិ ៖** `ចូលទិញមុន (Front-Run) ក្នុងកម្រិត Sub-Second រួចយកចំណេញពេល Whale រុញថ្លៃ`\n\n"
                         "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
                         f"{tx_formatted}\n\n"
@@ -9285,7 +9306,10 @@ class TelegramBotThread(BaseThread):
                         "🧱 **BINANCE ORDERBOOK HEAVY WALLS (BTC/USDT):**\n"
                         f"• **Institutional Bid Support Wall** ៖ `{btc_bid_wall}` 🛡️\n"
                         f"• **Whale Resistance Ask Wall** ៖ `{btc_ask_wall}` ⚔️\n\n"
-                        "💡 _នៅពេលឃើញ Whale កំពុងរៀបបញ្ជាទិញ/លក់ធំ ($1M - $100M+) AI នឹងចូលទិញមុន (Front-Run) ភ្លាមៗ!_"
+                        "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 **ស្កេនតាមដានចលនា Whale ធំៗ Real-Time ៖**\n`` `/whales SCAN` ``\n\n"
+                        "👉 **តាមដាន Orderbook Imbalance លើកាក់ទោល (SOL / BTC) ៖**\n`` `/whales SOL` ``\n"
+                        "`` `/whales BTC` ``"
                     )
 
                 if status_msg:
