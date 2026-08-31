@@ -4285,6 +4285,19 @@ async def daily_executive_summary_report(app: Application):
                     except Exception:
                         pass
 
+                if user_lang == 'en':
+                    lbl_copy = "1-Tap Copy to Activate"
+                elif user_lang == 'zh':
+                    lbl_copy = "一键复制开启"
+                else:
+                    lbl_copy = "1-Tap Copy ដើម្បបើកដំណើរការ"
+
+                hyper_txt = "🟢 ACTIVE" if is_hyper else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/hyper_trade ON 10 1234` ``"
+                arb_txt = "🟢 ACTIVE" if is_arb else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/auto_arb ON 50 1234` ``"
+                sweep_txt = "🟢 ACTIVE" if is_sweep else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/sweep_auto ON 50 1234` ``"
+                funding_txt = "🟢 ACTIVE" if is_funding else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/funding_harvester ON 1234` ``"
+                guard_txt = "🟢 ACTIVE" if is_guard else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/trailing_guard ON 1234` ``"
+
                 msg = loc.get_text(
                     user_lang,
                     'daily_executive_summary_report',
@@ -4293,11 +4306,11 @@ async def daily_executive_summary_report(app: Application):
                     total_pnl=total_pnl,
                     trades_24h=total_trades,
                     win_rate=win_rate,
-                    hyper_status="🟢 ACTIVE" if is_hyper else "🔴 OFF",
-                    arb_status="🟢 ACTIVE" if is_arb else "🔴 OFF",
-                    sweep_status="🟢 ACTIVE" if is_sweep else "🔴 OFF",
-                    funding_status="🟢 ACTIVE" if is_funding else "🔴 OFF",
-                    guard_status="🟢 ACTIVE" if is_guard else "🔴 OFF"
+                    hyper_status=hyper_txt,
+                    arb_status=arb_txt,
+                    sweep_status=sweep_txt,
+                    funding_status=funding_txt,
+                    guard_status=guard_txt
                 )
 
                 await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
