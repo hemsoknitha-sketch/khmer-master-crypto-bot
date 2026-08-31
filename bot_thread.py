@@ -9014,48 +9014,64 @@ class TelegramBotThread(BaseThread):
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 keyboard = [
                     [
-                        InlineKeyboardButton("🛑 Soft Stop All Bots", callback_data=f"stopall_soft_{chat_id}"),
-                        InlineKeyboardButton("🔴 Hard Stop All (Panic Sell)", callback_data=f"stopall_hard_{chat_id}")
+                        InlineKeyboardButton("🟢 Soft Stop (Pause Bots)", callback_data=f"stopall_soft_{chat_id}"),
+                        InlineKeyboardButton("🔴 Hard Stop (Panic Sell)", callback_data=f"stopall_hard_{chat_id}")
                     ],
                     [
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+                        InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
                         InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    ],
+                    [
+                        InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                        InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                     ]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 if user_lang == 'en':
                     usage_card = (
-                        "🛑 **APEX SUPER AGI v13.00 | EMERGENCY STOP CONTROLLER** 🛑\n"
+                        "🛑 **KHMER MASTER CRYPTO | EMERGENCY STOP CONTROLLER v13.00** 🛑\n"
                         "═══════════════════════════════\n\n"
-                        "👉 **1. Stop Single Trading Pair (Specific Coin) ៖**\n"
-                        "• `/stop BTCUSDT` or `/stop SOL` - Deactivates bots & closes position for target symbol\n\n"
-                        "👉 **2. Global System Shutdown (All AI Engines) ៖**\n"
-                        "• `/stop_all` - Shuts down all active trading bots 100% (Soft Stop / Hard Stop)\n"
-                        "═══════════════════════════════\n"
-                        "💡 _Tap the interactive buttons below to execute instant emergency stop or return to menu:_"
+                        "⚡ **SUB-30MS CIRCUIT BREAKER ARCHITECTURE:**\n"
+                        "• 🎯 **Single-Coin Stop** ៖ Market Close & stop trading engine for specific symbol\n"
+                        "• 🛑 **Global Shutdown** ៖ Deactivate 100% of AI trading engines & Market Close all positions\n"
+                        "• 🔐 **2FA PIN Security** ៖ Protected by 4-digit PIN verification against accidental execution\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **Stop Single-Coin Trading Engine & Market Close ៖**\n`` `/stop SOL 1234` ``\n"
+                        "`` `/stop BTC 1234` ``\n\n"
+                        "👉 **Global Emergency Kill-Switch (All Trading Engines) ៖**\n`` `/stop ALL 1234` ``\n"
+                        "`` `/stop_all` ``"
                     )
                 elif user_lang == 'zh':
                     usage_card = (
-                        "🛑 **APEX SUPER AGI v13.00 | 紧急平仓与停止控制台** 🛑\n"
+                        "🛑 **KHMER MASTER CRYPTO | 紧急平仓与停止控制台 v13.00** 🛑\n"
                         "═══════════════════════════════\n\n"
-                        "👉 **1. 停止单个交易对 (指定币种) ៖**\n"
-                        "• `/stop BTCUSDT` 或 `/stop SOL` - 停止目标币种机器人并平仓\n\n"
-                        "👉 **2. 全局系统关机 (所有 AI 引擎) ៖**\n"
-                        "• `/stop_all` - 100% 停止所有运行中的机器人 (软停止 / 强平硬停止)\n"
-                        "═══════════════════════════════\n"
-                        "💡 _点击下方按钮立即执行紧急停止或返回主菜单：_"
+                        "⚡ **毫秒级断路器与极速平仓架构：**\n"
+                        "• 🎯 **单币种停止** ៖ 极速平仓并停止目标币种的 AI 交易引擎\n"
+                        "• 🛑 **全局系统关机** ៖ 100% 停止所有 AI 交易引擎并市价平仓全部持仓\n"
+                        "• 🔐 **2FA PIN 码防护** ៖ 4 位 PIN 码二次确认，防止误操作\n\n"
+                        "📋 **一键复制指令：**\n\n"
+                        "👉 **停止单币种交易引擎与市价平仓 ៖**\n`` `/stop SOL 1234` ``\n"
+                        "`` `/stop BTC 1234` ``\n\n"
+                        "👉 **全局紧急关机断路器 (所有交易引擎) ៖**\n`` `/stop ALL 1234` ``\n"
+                        "`` `/stop_all` ``"
                     )
                 else:
                     usage_card = (
-                        "🛑 **APEX SUPER AGI v13.00 | EMERGENCY STOP CONTROLLER** 🛑\n"
+                        "🛑 **KHMER MASTER CRYPTO | EMERGENCY STOP CONTROLLER v13.00** 🛑\n"
                         "═══════════════════════════════\n\n"
-                        "👉 **1. បញ្ឈប់ការជួញដូរលើកាក់ជាក់លាក់មួយ (Stop Single Coin) ៖**\n"
-                        "• `/stop BTCUSDT` ឬ `/stop SOL` - បិទការទិញ-លក់កាក់ដែលបានចាក់ចោទ\n\n"
-                        "👉 **2. បញ្ឈប់គ្រប់ AI Engines ទាំងអស់ (Global Shutdown) ៖**\n"
-                        "• `/stop_all` - បិទគ្រប់ Bot ទាំងអស់ 100% (Soft Stop / Hard Stop)\n"
-                        "═══════════════════════════════\n"
-                        "💡 _ចុចប៊ូតុងខាងក្រោម ដើម្បីអនុវត្តការបញ្ឈប់ ឬត្រឡប់ទៅកាន់ Master Menu ៖_"
+                        "⚡ **SUB-30MS CIRCUIT BREAKER ARCHITECTURE (ស្ថាបត្យកម្មបិទអាសន្ន <30ms) ៖**\n"
+                        "• 🎯 **Single-Coin Stop** ៖ Market Close (<30ms) និងបិទ Bot លើកាក់ជាក់លាក់\n"
+                        "• 🛑 **Global Shutdown** ៖ បិទ 100% នៃ AI Trading Engines ទាំងអស់ និង Market Close រាល់ Position\n"
+                        "• 🔐 **2FA PIN Security** ៖ ការពារដោយលេខកូដ PIN 4 ខ្ទង់ចុងក្រោយ ការពារការចុចច្រឡំ 100%\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 **បញ្ឈប់ការជួញដូរលើកាក់ជាក់លាក់ & Market Close ៖**\n`` `/stop SOL 1234` ``\n"
+                        "`` `/stop BTC 1234` ``\n\n"
+                        "👉 **បញ្ឈប់គ្រប់ AI Engines ទាំងអស់ (Global Shutdown) ៖**\n`` `/stop ALL 1234` ``\n"
+                        "`` `/stop_all` ``"
                     )
                 if update.callback_query:
                     await update.callback_query.message.reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
