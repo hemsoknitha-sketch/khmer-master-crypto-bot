@@ -18,7 +18,13 @@ if exist ".env" copy /y ".env" "vps_db_backup\" >nul 2>&1
 echo [SAFEGUARD] All VIP SQLite Databases & .env API credentials backed up to vps_db_backup\
 
 echo =========================================================
-echo   2. Auto-Staging & Auto-Pushing Code Changes to GitHub...
+echo   🤗 2. Syncing AI Models with Hugging Face Hub (HF_TOKEN)...
+echo =========================================================
+if exist "sync_local_models.py" python sync_local_models.py
+echo [HF SYNC] Hugging Face Hub AI Brain Models synchronized!
+
+echo =========================================================
+echo   3. Auto-Staging & Auto-Pushing Code Changes to GitHub...
 echo =========================================================
 git add .
 git commit -m "Auto Update Khmer Master Crypto v13.00 Absolute Ultimate AGI Engine" >nul 2>&1

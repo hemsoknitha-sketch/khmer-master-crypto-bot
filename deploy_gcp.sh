@@ -75,6 +75,8 @@ EOT
     echo "❗ Please edit $BOT_WORKING_DIR/.env with your actual Telegram Token and API keys!"
 fi
 
+chmod +x "$BOT_WORKING_DIR/auto_update_vps.sh" 2>/dev/null || true
+
 # 6. Configure Systemd 24/7 Daemon Service
 SERVICE_FILE="/etc/systemd/system/khmer-master-crypto-bot.service"
 echo "⚙️ Creating Systemd service at $SERVICE_FILE..."
@@ -97,11 +99,15 @@ Environment=PYTHONUNBUFFERED=1
 WantedBy=multi-user.target
 EOT
 
-# 7. Enable and Start Service
+# 7. Enable and Start Service & Auto-Update Cron
 echo "🚀 Enabling and starting khmer-master-crypto-bot service..."
 sudo systemctl daemon-reload
 sudo systemctl enable khmer-master-crypto-bot.service
 sudo systemctl restart khmer-master-crypto-bot.service
+
+# 8. Setup Auto-Sync Cron Job (Checks GitHub & HF every 5 minutes)
+echo "⏰ Setting up 5-minute Auto-Update Cron Job for GitHub & Hugging Face..."
+(crontab -l 2>/dev/null | grep -v "auto_update_vps.sh" ; echo "*/5 * * * * bash $BOT_WORKING_DIR/auto_update_vps.sh > /dev/null 2>&1") | crontab -
 
 echo ""
 echo "========================================================================="
@@ -109,4 +115,6 @@ echo "🎉 DEPLOYMENT COMPLETE! APEX AGI ENGINE v13.00 IS NOW ACTIVE 24/7/365!"
 echo "========================================================================="
 echo "📊 Check Service Status: sudo systemctl status khmer-master-crypto-bot"
 echo "📜 View Real-time Logs:   sudo journalctl -u khmer-master-crypto-bot -f"
+echo "🔄 Auto-Update Script:   bash $BOT_WORKING_DIR/auto_update_vps.sh"
 echo "========================================================================="
+
