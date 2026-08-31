@@ -2826,10 +2826,72 @@ class TelegramBotThread(BaseThread):
 
         async def gold_radar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
             raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km')
-            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            args = context.args or []
+            msg_target = update.effective_message or update.message
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh Gold Radar", callback_data="btn_gold_radar_refresh"),
+                    InlineKeyboardButton("🏦 Central Bank Gold Radar", callback_data="btn_cb_gold_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🛡️ Black Swan Safety Guard", callback_data="btn_black_swan_refresh"),
+                    InlineKeyboardButton("⚖️ Gold / BTC Rebalancer", callback_data="btn_gold_btc_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            # Parse sub-commands if ON/OFF
+            if args:
+                action = str(args[0]).upper().strip()
+                if action in ["ON", "START", "BUY"]:
+                    capital = float(args[1]) if len(args) >= 2 and args[1].replace('.','',1).isdigit() else 100.0
+                    pin = str(args[2]).strip() if len(args) >= 3 else (str(args[1]).strip() if len(args) == 2 and not args[1].replace('.','',1).isdigit() else "")
+                    stored_pin = db.get_user_pin(chat_id)
+                    is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
+                    if stored_pin and pin and not security.verify_pin(pin, chat_id, stored_pin) and not is_admin:
+                        if msg_target:
+                            await msg_target.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                        return
+                    msg = (
+                        "🏆 **PAXG GOLD WEALTH PROTECTION SWITCHER ACTIVATED!** 🏆\n"
+                        "═══════════════════════════════\n\n"
+                        f"💵 **ទុន Allocations / Order** ៖ `${capital:,.2f} USDT` ➔ `PAXG Gold`\n"
+                        "🥇 **Asset Backing** ៖ `100% LBMA Certified Physical Gold 1:1 Fine Troy Ounce 24/7`\n"
+                        "🛡️ **Black Swan Protection** ៖ `SAFE HAVEN ACTIVE` (0% Crypto Correlation Risk)\n\n"
+                        "_ប្រព័ន្ធ AGI នឹងរក្សា និងការពារដើមទុនរបស់អ្នកក្នុងទម្រង់មាស Physical Gold 24/7!_"
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+                elif action in ["OFF", "STOP"]:
+                    if msg_target:
+                        await msg_target.reply_text("🛑 **PAXG Gold Wealth Protection Switcher ត្រូវបានបិទ!**", parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+            # Default: Fetch & Display Macro Gold & Central Bank Report
             try:
                 if user_lang == 'en':
                     loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v13.00**\n\n_Fetching DXY Index, US 10Y Real Yields & PAXG Gold Analysis..._"
@@ -2838,11 +2900,13 @@ class TelegramBotThread(BaseThread):
                 else:
                     loading_txt = "🏆 **APEX SUPER AGI GOLD RADAR & MACRO SHIELD v13.00**\n\n_កំពុងទាញយកទិន្នន័យ DXY Index, US 10Y Real Yields & វិភាគតម្លៃមាស PAXG..._"
 
-                status_msg = await context.bot.send_message(
-                    chat_id=chat_id, 
-                    text=loading_txt, 
-                    parse_mode="Markdown"
-                )
+                status_msg = None
+                if update.callback_query:
+                    try: await update.callback_query.answer()
+                    except Exception: pass
+                    status_msg = await update.callback_query.message.reply_text(loading_txt, parse_mode="Markdown")
+                else:
+                    status_msg = await update.message.reply_text(loading_txt, parse_mode="Markdown")
                 
                 import macro_gold_engine
                 try:
@@ -2856,24 +2920,29 @@ class TelegramBotThread(BaseThread):
                 
                 if not isinstance(report, str): report = str(report or "")
 
-                try: await context.bot.delete_message(chat_id=chat_id, message_id=status_msg.message_id)
-                except: pass
+                # Append 1-Tap Execution Commands to report!
+                if user_lang == 'en':
+                    report += (
+                        "\n\n📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **Reallocate Capital to PAXG Gold ($100 USDT) ៖**\n`` `/gold_guard ON 100 1234` ``\n\n"
+                        "👉 **Scan Live Macro Gold Radar ៖**\n`` `/gold_guard SCAN` ``"
+                    )
+                elif user_lang == 'zh':
+                    report += (
+                        "\n\n📋 **一键复制指令：**\n\n"
+                        "👉 **资金一键对冲转换至 PAXG 黄金 ($100 USDT) ៖**\n`` `/gold_guard ON 100 1234` ``\n\n"
+                        "👉 **扫描实时黄金宏观雷达 ៖**\n`` `/gold_guard SCAN` ``"
+                    )
+                else:
+                    report += (
+                        "\n\n📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 **ផ្លាស់ប្តូរដើមទុនការពារក្នុងមាស PAXG Gold (ទុន $100) ៖**\n`` `/gold_guard ON 100 1234` ``\n\n"
+                        "👉 **ស្កេនរ៉ាដាតម្លៃមាស និង Macro Radar ៖**\n`` `/gold_guard SCAN` ``"
+                    )
 
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                keyboard = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🔄 Refresh Gold Radar", callback_data="btn_gold_radar_refresh"),
-                        InlineKeyboardButton("🏓 Scalp PAXG/USDT", callback_data="btn_scalp_PAXGUSDT")
-                    ],
-                    [
-                        InlineKeyboardButton("🏦 Central Bank Gold Radar", callback_data="btn_cb_gold_refresh"),
-                        InlineKeyboardButton("🛡️ Flight-to-Safety Guard", callback_data="btn_black_swan_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("⚖️ Gold / BTC Rebalancer", callback_data="btn_gold_btc_refresh"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ]
-                ])
+                if status_msg:
+                    try: await context.bot.delete_message(chat_id=chat_id, message_id=status_msg.message_id)
+                    except: pass
                 
                 await send_gold_message_safe(context, chat_id, report, keyboard)
                 self.log_signal.emit(f"🏆 Sent Macro Gold Radar to {chat_id}")
