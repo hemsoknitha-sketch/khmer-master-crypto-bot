@@ -2005,44 +2005,57 @@ class TelegramBotThread(BaseThread):
                             InlineKeyboardButton("🔮 Predict PAXG (Gold)", callback_data="btn_predict_PAXGUSDT")
                         ],
                         [
-                            InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
-                            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                            InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt"),
+                            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                        ],
+                        [
+                            InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                            InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                         ]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     if user_lang == 'en':
                         usage_card = (
-                            "📈 **APEX SUPER AGI TURBO BRAIN v13.00 | WALL STREET ML 24H PREDICTOR** 📈\n"
-                            "═══════════════════════════════\n"
-                            "💡 **WALL STREET ML PREDICTION USER GUIDE:**\n\n"
-                            "👉 **12 Wall Street Machine Learning Forecast (24h Trend & Win-Rate %) ៖**\n"
-                            "• `/predict BTCUSDT` - Predict BTC K-Line Trend & Win-Rate %\n"
-                            "• `/predict SOL` - Predict Solana using 12 Wall Street ML Models\n\n"
-                            "═══════════════════════════════\n"
-                            "💡 *Or tap any Quick-Predict coin button below for instant 12-Model forecast:*"
+                            "📈 **KHMER MASTER CRYPTO | WALL STREET ML 24H PREDICTOR v13.00** 📈\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **12 WALL STREET MACHINE LEARNING ENSEMBLE:**\n"
+                            "• 🤖 **Tree Ensembles** ៖ `XGBoost` + `CatBoost` + `LightGBM` + `RandomForest` + `ExtraTrees`\n"
+                            "• 🧠 **Neural Transformers** ៖ `LSTM Deep Net` + `PatchTST Transformer` + `Temporal Fusion (TFT)`\n"
+                            "• 📐 **Quantitative Regressors** ៖ `Ridge` + `ElasticNet` + `GradientBoosting` + `SVR`\n"
+                            "• 🎯 **Output Metrics** ៖ 24h K-Line Direction, Price High/Low Targets & ML Win-Rate (%)\n\n"
+                            "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                            "👉 **Predict 24h K-Line Trend & ML Win-Rate (%) ៖**\n`` `/predict BTCUSDT` ``\n"
+                            "`` `/predict SOL` ``\n"
+                            "`` `/predict PAXG` ``"
                         )
                     elif user_lang == 'zh':
                         usage_card = (
-                            "📈 **APEX SUPER AGI TURBO BRAIN v13.00 | 华尔街 ML 24小时预测引擎** 📈\n"
+                            "📈 **KHMER MASTER CRYPTO | 华尔街 ML 24小时 K 线预测引擎 v13.00** 📈\n"
                             "═══════════════════════════════\n\n"
-                            "💡 **华尔街 ML 价格预测指南：**\n\n"
-                            "👉 **12 种华尔街机器学习模型 K 线与胜率预测 ៖**\n"
-                            "• `/predict BTCUSDT` - 预测 BTC K线走势与胜率 %\n"
-                            "• `/predict SOL` - 结合 12 种华尔街模型预测 Solana 走势\n\n"
-                            "═══════════════════════════════\n"
-                            "💡 *或点击下方一键预测按钮获取 12 模型实时预测：*"
+                            "📊 **12 种华尔街机器学习集成模型：**\n"
+                            "• 🤖 **树状集成** ៖ `XGBoost` + `CatBoost` + `LightGBM` + `RandomForest` + `ExtraTrees`\n"
+                            "• 🧠 **深度神经网络** ៖ `LSTM Deep Net` + `PatchTST Transformer` + `Temporal Fusion (TFT)`\n"
+                            "• 📐 **量化回归模型** ៖ `Ridge` + `ElasticNet` + `GradientBoosting` + `SVR`\n"
+                            "• 🎯 **预测输出** ៖ 24h K线走势、预测最高/最低价位及 AI 胜率 (%)\n\n"
+                            "📋 **一键复制指令：**\n\n"
+                            "👉 **预测 24小时 K线走势与 AI 胜率 (%) ៖**\n`` `/predict BTCUSDT` ``\n"
+                            "`` `/predict SOL` ``\n"
+                            "`` `/predict PAXG` ``"
                         )
                     else:
                         usage_card = (
-                            "📈 **APEX SUPER AGI TURBO BRAIN v13.00 | WALL STREET ML 24H PREDICTOR** 📈\n"
-                            "═══════════════════════════════\n"
-                            "💡 **របៀបទស្សន៍ទាយចលនាតម្លៃ (WALL STREET ML PREDICT GUIDE) ៖**\n\n"
-                            "👉 **ទស្សន៍ទាយចលនាតម្លៃតាម 12 Wall Street ML Models ៖**\n"
-                            "• `/predict BTCUSDT` - ទស្សន៍ទាយទិសដៅ K-Line & Win-Rate % របស់ BTC\n"
-                            "• `/predict SOL` - ទស្សន៍ទាយ Solana ជាមួយ 12 ML Models & Orderbook\n\n"
-                            "═══════════════════════════════\n"
-                            "💡 *ឬចុចលើប៊ូតុង Quick-Predict ខាងក្រោមដើម្បីទស្សន៍ទាយភ្លាមៗ ៖*"
+                            "📈 **KHMER MASTER CRYPTO | WALL STREET ML 24H PREDICTOR v13.00** 📈\n"
+                            "═══════════════════════════════\n\n"
+                            "📊 **12 WALL STREET MACHINE LEARNING ENSEMBLE (ស្ថាបត្យកម្ម ML 12 Models) ៖**\n"
+                            "• 🤖 **Tree Ensembles** ៖ `XGBoost` + `CatBoost` + `LightGBM` + `RandomForest` + `ExtraTrees`\n"
+                            "• 🧠 **Neural Transformers** ៖ `LSTM Deep Net` + `PatchTST Transformer` + `Temporal Fusion (TFT)`\n"
+                            "• 📐 **Quantitative Regressors** ៖ `Ridge` + `ElasticNet` + `GradientBoosting` + `SVR`\n"
+                            "• 🎯 **Output Metrics** ៖ ព្យាករណ៍ទិសដៅ K-Line 24h, តម្លៃ Target ខ្ពស់/ទាប & ML Win-Rate (%)\n\n"
+                            "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                            "👉 **ទស្សន៍ទាយទិសដៅ K-Line 24h & ML Win-Rate (%) ៖**\n`` `/predict BTCUSDT` ``\n"
+                            "`` `/predict SOL` ``\n"
+                            "`` `/analyze PAXG` ``"
                         )
                     await update.message.reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
                     return
