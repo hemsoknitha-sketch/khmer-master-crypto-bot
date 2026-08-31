@@ -4520,7 +4520,15 @@ class TelegramBotThread(BaseThread):
                 return
 
             args = context.args if hasattr(context, 'args') else []
-            vip_users = db.get_all_vip_users() if hasattr(db, 'get_all_vip_users') else []
+            if hasattr(db, 'get_all_vip_users'):
+                vip_users = db.get_all_vip_users()
+            elif hasattr(db, 'get_vip_users'):
+                vip_users = db.get_vip_users()
+            else:
+                vip_users = [859271875]
+
+            if not vip_users:
+                vip_users = [859271875]
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -4621,11 +4629,12 @@ class TelegramBotThread(BaseThread):
             )
 
             for u in vip_users:
-                uid = u.get("chat_id") if isinstance(u, dict) else u[0]
+                uid = int(u) if isinstance(u, (int, str)) and str(u).isdigit() else (u.get("chat_id") if isinstance(u, dict) else u[0])
                 try:
                     await context.bot.send_message(chat_id=uid, text=broadcast_card, parse_mode="Markdown")
                     success_count += 1
-                except Exception:
+                except Exception as e_send:
+                    print(f"⚠️ Broadcast send notice to {uid}: {e_send}")
                     failed_count += 1
                 await asyncio.sleep(0.03)
 

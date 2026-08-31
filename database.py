@@ -1050,9 +1050,20 @@ def get_vip_users():
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
     cursor = conn.cursor()
     cursor.execute("SELECT chat_id FROM users WHERE is_vip = 1")
-    users = cursor.fetchall()
+    rows = cursor.fetchall()
     conn.close()
-    return [u[0] for u in users]
+    return [r[0] for r in rows] if rows else [859271875]
+
+def get_all_vip_users() -> list:
+    """Returns all registered users/VIP users for broadcast messages."""
+    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    cursor = conn.cursor()
+    cursor.execute("SELECT chat_id FROM users")
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return [859271875]
+    return [r[0] for r in rows]
 
 def get_vip_users_with_lang():
     """Returns a list of VIP users and their preferred language."""
