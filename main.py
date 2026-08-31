@@ -45,16 +45,43 @@ def acquire_single_instance_lock():
     """Guarantees only ONE instance of Apex AI Bot runs to prevent Telegram Conflict errors."""
     global _lock_fp
     try:
+        current_pid = os.getpid()
         if os.name == 'posix':
             import fcntl
-            _lock_fp = open(LOCK_FILE, "w")
+            if os.path.exists(LOCK_FILE):
+                try:
+                    with open(LOCK_FILE, "r") as f:
+                        old_pid_str = f.read().strip()
+                        if old_pid_str.isdigit():
+                            old_pid = int(old_pid_str)
+                            if old_pid != current_pid:
+                                is_running = False
+                                if os.path.exists(f"/proc/{old_pid}"):
+                                    is_running = True
+                                else:
+                                    try:
+                                        import psutil
+                                        if psutil.pid_exists(old_pid):
+                                            is_running = True
+                                    except Exception:
+                                        pass
+                                if not is_running:
+                                    print(f"⚠️ [SINGLE INSTANCE GUARD] Stale lockfile detected (PID {old_pid} is dead). Purging lock.")
+                                    try: os.remove(LOCK_FILE)
+                                    except Exception: pass
+                except Exception:
+                    pass
+
+            _lock_fp = open(LOCK_FILE, "a+")
             try:
                 fcntl.flock(_lock_fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                _lock_fp.write(str(os.getpid()))
+                _lock_fp.seek(0)
+                _lock_fp.truncate()
+                _lock_fp.write(str(current_pid))
                 _lock_fp.flush()
             except (IOError, OSError):
                 print(f"🚨 [SUPER SMART GUARD] Another bot instance is already running on this server!")
-                print(f"🛑 Exiting process PID {os.getpid()} to prevent duplicate instance / Telegram conflict.")
+                print(f"🛑 Exiting process PID {current_pid} to prevent duplicate instance / Telegram conflict.")
                 sys.exit(1)
         else:
             if os.path.exists(LOCK_FILE):
@@ -62,7 +89,7 @@ def acquire_single_instance_lock():
                     old_pid_str = f.read().strip()
                     if old_pid_str.isdigit():
                         old_pid = int(old_pid_str)
-                        if old_pid != os.getpid():
+                        if old_pid != current_pid:
                             try:
                                 import psutil
                                 if psutil.pid_exists(old_pid):
@@ -71,7 +98,7 @@ def acquire_single_instance_lock():
                             except Exception:
                                 pass
             with open(LOCK_FILE, "w") as f:
-                f.write(str(os.getpid()))
+                f.write(str(current_pid))
 
         import atexit
         def _cleanup():
@@ -79,10 +106,13 @@ def acquire_single_instance_lock():
             try:
                 if _lock_fp and os.name == 'posix':
                     import fcntl
-                    fcntl.flock(_lock_fp, fcntl.LOCK_UN)
-                    _lock_fp.close()
+                    try: fcntl.flock(_lock_fp, fcntl.LOCK_UN)
+                    except Exception: pass
+                    try: _lock_fp.close()
+                    except Exception: pass
                 if os.path.exists(LOCK_FILE):
-                    os.remove(LOCK_FILE)
+                    try: os.remove(LOCK_FILE)
+                    except Exception: pass
             except Exception:
                 pass
         atexit.register(_cleanup)
