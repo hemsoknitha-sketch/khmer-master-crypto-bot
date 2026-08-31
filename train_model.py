@@ -362,7 +362,7 @@ def add_technical_features(df):
 
 def add_regime_feature(df, n_states=3):
     print("គណនា Market Regime (HMM)...")
-        return pd.Series(0, index=df.index).to_frame('regime')
+    return pd.Series(0, index=df.index).to_frame('regime')
 
 # ==================== 4. LSTM Feature ====================
 def create_lstm_feature(df, sequence_len=SEQUENCE_LEN):

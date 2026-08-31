@@ -982,7 +982,7 @@ class TelegramBotThread(BaseThread):
                         await context.bot.send_message(chat_id=chat_id, text=loc.get_text(user_lang, 'hedge_short_start', symbol=symbol), parse_mode="Markdown")
                         import trading_engine
                         import ml_predictor
-                        vol_tgt = ml_predictor.get_vol_target(symbol)
+                        vol_tgt = await asyncio.to_thread(ml_predictor.get_vol_target, symbol)
                         res = trading_engine.place_futures_short(keys[0], keys[1], symbol, config["amount"], config["leverage"], vol_target=vol_tgt)
                         if "error" not in res and res.get("status") == "FILLED":
                             db.add_active_short(chat_id, symbol, config["amount"], config["leverage"], res['price'])
@@ -1935,7 +1935,7 @@ class TelegramBotThread(BaseThread):
                     return
                     
                 imbalance = await asyncio.to_thread(orderbook_engine.get_imbalance, fetched_symbol)
-                ml_dict = ml_predictor.predict_price_dict(fetched_symbol) if hasattr(ml_predictor, "predict_price_dict") else {}
+                ml_dict = await asyncio.to_thread(ml_predictor.predict_price_dict, fetched_symbol) if hasattr(ml_predictor, "predict_price_dict") else {}
                 
                 price = await asyncio.to_thread(trading_engine.get_current_price, fetched_symbol)
                 if price <= 0: price = 64500.0
@@ -2151,7 +2151,7 @@ class TelegramBotThread(BaseThread):
                 
                 import ml_predictor
                 import orderbook_engine
-                ml_summary = ml_predictor.predict_price(fetched_symbol)
+                ml_summary = await asyncio.to_thread(ml_predictor.predict_price, fetched_symbol)
                 imbalance = await asyncio.to_thread(orderbook_engine.get_imbalance, fetched_symbol)
                 summary += f"\n\n{ml_summary}\n\n[INSTITUTIONAL ORDERBOOK METRICS]\nBid/Ask Depth Imbalance Ratio: {imbalance:.2f}x"
 
@@ -6133,7 +6133,7 @@ class TelegramBotThread(BaseThread):
             import requests
             try:
                 url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-                res = requests.get(url, timeout=5)
+                res = await asyncio.to_thread(requests.get, url, timeout=5)
                 entry_price = float(res.json()['price'])
             except Exception:
                 await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃបច្ចុប្បន្នសម្រាប់កាក់ `{symbol}`")
@@ -6235,7 +6235,7 @@ class TelegramBotThread(BaseThread):
             import requests
             try:
                 url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-                res = requests.get(url, timeout=5)
+                res = await asyncio.to_thread(requests.get, url, timeout=5)
                 entry_price = float(res.json()['price'])
             except Exception:
                 await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
@@ -6244,7 +6244,7 @@ class TelegramBotThread(BaseThread):
             keys = db.get_user_api(chat_id)
             if keys:
                 import trading_engine
-                trading_engine.place_market_buy(keys[0], keys[1], symbol, amount)
+                await asyncio.to_thread(trading_engine.place_market_buy, keys[0], keys[1], symbol, amount)
 
             db.add_scalper(chat_id, symbol, amount, profit_pct, entry_price)
 
@@ -7159,9 +7159,9 @@ class TelegramBotThread(BaseThread):
                             avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
                             top_coins = turbo_hedge_engine.get_active_high_velocity_spot_coins(limit=30)
                         else:
-                            avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+                            avail_bal = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
                             if avail_bal <= 0.0:
-                                avail_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
+                                avail_bal = await asyncio.to_thread(trading_engine.get_futures_free_margin, keys[0], keys[1])
                             top_coins = turbo_hedge_engine.get_active_high_velocity_coins(limit=30)
                         if not top_coins:
                             top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
@@ -7219,7 +7219,7 @@ class TelegramBotThread(BaseThread):
                         
                         if is_order_success:
                             db.add_turbo_hedge_bot(chat_id, c_sym, amount, leverage, c_side, target_tp)
-                            entry_p = trading_engine.get_current_price(c_sym)
+                            entry_p = await asyncio.to_thread(trading_engine.get_current_price, c_sym)
                             if entry_p > 0:
                                 db.update_system_setting(f"turbo_hedge_{chat_id}_{c_sym}_entry_price", str(entry_p))
                             executed_syms.append(c_sym)
@@ -7307,7 +7307,7 @@ class TelegramBotThread(BaseThread):
                 executed_qty = 0.0
                 if keys:
                     import trading_engine
-                    res_buy = trading_engine.place_market_buy(keys[0], keys[1], symbol, amt_to_invest)
+                    res_buy = await asyncio.to_thread(trading_engine.place_market_buy, keys[0], keys[1], symbol, amt_to_invest)
                     if res_buy.get('status') == 'FILLED':
                         executed_qty = float(res_buy.get('executedQty', amt_to_invest / entry_price))
                     else:
@@ -7366,7 +7366,7 @@ class TelegramBotThread(BaseThread):
                 total_coins = 0.0
                 if keys:
                     import trading_engine
-                    res = trading_engine.place_market_buy(keys[0], keys[1], symbol, amt_per_layer)
+                    res = await asyncio.to_thread(trading_engine.place_market_buy, keys[0], keys[1], symbol, amt_per_layer)
                     if res.get("status") == "FILLED":
                         trade_status = f"✅ **អនុម័តដោយ Binance:** បានទិញ {res.get('executedQty')} {symbol} រួចរាល់!"
                         total_coins = float(res.get('executedQty'))
@@ -7509,7 +7509,7 @@ class TelegramBotThread(BaseThread):
             import requests
             try:
                 url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-                res = requests.get(url, timeout=5)
+                res = await asyncio.to_thread(requests.get, url, timeout=5)
                 entry_price = float(res.json()['price'])
             except Exception:
                 await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
@@ -7520,7 +7520,7 @@ class TelegramBotThread(BaseThread):
             keys = db.get_user_api(chat_id)
             if keys:
                 import trading_engine
-                res = trading_engine.place_market_buy(keys[0], keys[1], symbol, amt_per_layer)
+                res = await asyncio.to_thread(trading_engine.place_market_buy, keys[0], keys[1], symbol, amt_per_layer)
                 if res.get("status") == "FILLED":
                     trade_status = f"✅ **អនុម័តដោយ Binance:** បានទិញ {res.get('executedQty')} {symbol} រួចរាល់!"
                 else:
@@ -7584,7 +7584,7 @@ class TelegramBotThread(BaseThread):
             import requests
             try:
                 url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-                res = requests.get(url, timeout=5)
+                res = await asyncio.to_thread(requests.get, url, timeout=5)
                 current_price = float(res.json()['price'])
             except:
                 await update.message.reply_text(f"❌ Failed to fetch price for {symbol}")
