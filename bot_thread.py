@@ -3610,6 +3610,26 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
+                    InlineKeyboardButton("🔒 Security PIN", callback_data="btn_set_pin_prompt")
+                ],
+                [
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ])
+
             raw_args = [str(a).strip() for a in context.args] if (context and context.args) else []
             args = [a for a in raw_args if a]
             if args and args[0].lower() in ["binance", "binance_spot", "spot", "ex"]:
@@ -3618,55 +3638,64 @@ class TelegramBotThread(BaseThread):
             if len(args) != 3:
                 if user_lang == 'en':
                     guide_card = (
-                        "🔑 **APEX SUPER AGI v13.00 | BINANCE API KEY INTEGRATION** 🔑\n"
+                        "🔑 **KHMER MASTER CRYPTO | MULTI-EXCHANGE API MANAGER v13.00** 🔑\n"
                         "═══════════════════════════════\n\n"
-                        "🛡️ **SECURITY & PERMISSION REQUIREMENTS:**\n"
-                        "• **Enable Reading**: `REQUIRED` (Account balance & active position sync)\n"
-                        "• **Enable Futures & Spot Trading**: `REQUIRED` (Autonomous HFT & Grid execution)\n"
-                        "• **Enable Withdrawals**: `PROHIBITED ❌ (Never grant withdrawal permissions!)`\n"
-                        "• **Key Encryption**: `AES-256 Multi-Layer Encrypted Vault`\n"
-                        "• **Key Format Support**: `HMAC-SHA256 & RSA Public/Private Key Pairs`\n\n"
-                        "📋 **1-TAP COMMAND SYNTAX:**\n"
-                        "👉 **Connect Binance API Keys:**\n"
+                        "🛡️ **SECURITY & PERMISSION GUIDELINES:**\n"
+                        "• **Enable Reading**: `REQUIRED` (Sync balances & active positions)\n"
+                        "• **Enable Spot & Futures Trading**: `REQUIRED` (Execute HFT, Arbitrage & Grid)\n"
+                        "• **Enable Withdrawals**: `PROHIBITED ❌ (Never enable withdrawal permissions!)`\n"
+                        "• **Encryption Vault**: `AES-256 Multi-Layer Encrypted Safe Storage`\n\n"
+                        "🌐 **SUPPORTED EXCHANGE API SYNTAXES:**\n\n"
+                        "👉 **1. BINANCE API (Primary Spot, Futures, HFT & PAXG Gold) ៖**\n"
                         "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **Connect with Binance Prefix:**\n"
-                        "`` `/add_api Binance <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "👉 **2. OKX API (Sub-5ms Cross-Exchange Arbitrage & Hedging) ៖**\n"
+                        "`` `/add_api OKX <API_KEY> <API_SECRET> <PASSPHRASE> <PIN>` ``\n\n"
+                        "👉 **3. BYBIT API (Futures Hedging & Orderflow) ៖**\n"
+                        "`` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``\n\n"
+                        "👉 **4. GATE.IO API (Auto Listing Sniper & Altcoin Arb) ៖**\n"
+                        "`` `/add_api GATE <API_KEY> <API_SECRET> <PIN>` ``\n"
                         "═══════════════════════════════\n"
-                        "💡 _Your sensitive API Secret & PIN message will be automatically purged from Telegram chat after verification._"
+                        "💡 _Your API Secret & PIN will be automatically purged from Telegram chat after verification!_"
                     )
                 elif user_lang == 'zh':
                     guide_card = (
-                        "🔑 **APEX SUPER AGI v13.00 | BINANCE API 密钥绑定** 🔑\n"
+                        "🔑 **KHMER MASTER CRYPTO | 多交易所 API 管理器 v13.00** 🔑\n"
                         "═══════════════════════════════\n\n"
-                        "🛡️ **安全与权限要求：**\n"
-                        "• **允许读取 (Reading)**: `必须勾选` (用于同步账户余额与持仓)\n"
-                        "• **允许现货与合约交易**: `必须勾选` (用于自动高频对冲与网格执行)\n"
+                        "🛡️ **安全与权限指南：**\n"
+                        "• **允许读取 (Reading)**: `必须勾选` (同步账户余额与持仓)\n"
+                        "• **允许现货与合约交易**: `必须勾选` (执行高频对冲、套利与网格)\n"
                         "• **允许提现 (Withdrawals)**: `严格禁止 ❌ (切勿开启提现权限！)`\n"
-                        "• **密钥加密**: `AES-256 多重算法加密存储`\n"
-                        "• **支持密钥类型**: `HMAC-SHA256 与 RSA 公私钥对`\n\n"
-                        "📋 **1-TAP 命令格式：**\n"
-                        "👉 **绑定 Binance API 密钥：**\n"
+                        "• **密钥加密**: `AES-256 多重算法加密存储`\n\n"
+                        "🌐 **支持的交易所 API 绑定格式：**\n\n"
+                        "👉 **1. BINANCE API (现货、合约、高频对冲与 PAXG 黄金) ៖**\n"
                         "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **带 Binance 前缀绑定：**\n"
-                        "`` `/add_api Binance <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "👉 **2. OKX API (毫秒级跨所套利与对冲) ៖**\n"
+                        "`` `/add_api OKX <API_KEY> <API_SECRET> <PASSPHRASE> <PIN>` ``\n\n"
+                        "👉 **3. BYBIT API (合约对冲与订单流) ៖**\n"
+                        "`` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``\n\n"
+                        "👉 **4. GATE.IO API (自动抢购与山寨套利) ៖**\n"
+                        "`` `/add_api GATE <API_KEY> <API_SECRET> <PIN>` ``\n"
                         "═══════════════════════════════\n"
-                        "💡 _验证成功后，包含 API Secret 和 PIN 的消息将被系统自动从聊天记录中删除！_"
+                        "💡 _验证成功后，包含 API Secret 与 PIN 的敏感消息将被系统自动删除！_"
                     )
                 else:
                     guide_card = (
-                        "🔑 **APEX SUPER AGI v13.00 | BINANCE API KEY INTEGRATION** 🔑\n"
+                        "🔑 **KHMER MASTER CRYPTO | MULTI-EXCHANGE API MANAGER v13.00** 🔑\n"
                         "═══════════════════════════════\n\n"
-                        "🛡️ **SECURITY & PERMISSION REQUIREMENTS:**\n"
-                        "• **Enable Reading**: `REQUIRED` (ឆែកមើលសមតុល្យទុន & Position ទាំងអស់)\n"
-                        "• **Enable Futures & Spot Trading**: `REQUIRED` (ដើម្បីទិញ-លក់ស្វ័យប្រវត្តិ 24/7)\n"
+                        "🛡️ **SECURITY & PERMISSION GUIDELINES (លក្ខខណ្ឌសុវត្ថិភាព) ៖**\n"
+                        "• **Enable Reading**: `REQUIRED` (ឆែកមើលសមតុល្យ & Position ទាំងអស់)\n"
+                        "• **Enable Spot & Futures Trading**: `REQUIRED` (ដើម្បីទិញ-លក់ស្វ័យប្រវត្តិ 24/7)\n"
                         "• **Enable Withdrawals**: `PROHIBITED ❌ (ដាច់ខាតកុំបើកសិទ្ធិដកប្រាក់!)`\n"
-                        "• **Encryption Vault**: `AES-256 Multi-Layer Safe Storage`\n"
-                        "• **Key Format Support**: `HMAC-SHA256 & RSA Key Pairs`\n\n"
-                        "📋 **1-TAP COMMAND SYNTAX:**\n"
-                        "👉 **ភ្ជាប់ Binance API Keys ៖**\n"
+                        "• **Encryption Vault**: `AES-256 Multi-Layer Safe Storage`\n\n"
+                        "🌐 **SUPPORTED EXCHANGE API SYNTAXES (ទម្រង់ភ្ជាប់ API) ៖**\n\n"
+                        "👉 **1. BINANCE API (Primary Spot, Futures, HFT & PAXG Gold) ៖**\n"
                         "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **ភ្ជាប់ជាមួយពាក្យ Binance ៖**\n"
-                        "`` `/add_api Binance <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "👉 **2. OKX API (Sub-5ms Cross-Exchange Arbitrage & Hedging) ៖**\n"
+                        "`` `/add_api OKX <API_KEY> <API_SECRET> <PASSPHRASE> <PIN>` ``\n\n"
+                        "👉 **3. BYBIT API (Futures Hedging & Orderflow) ៖**\n"
+                        "`` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``\n\n"
+                        "👉 **4. GATE.IO API (Auto Listing Sniper & Altcoin Arb) ៖**\n"
+                        "`` `/add_api GATE <API_KEY> <API_SECRET> <PIN>` ``\n"
                         "═══════════════════════════════\n"
                         "💡 _សារដែលមាន API Secret & PIN របស់អ្នកនឹងត្រូវលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
                     )
