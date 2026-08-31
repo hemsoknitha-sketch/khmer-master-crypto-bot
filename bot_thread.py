@@ -7002,22 +7002,29 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
-            if len(args) < 4:
+            if len(args) < 3:
                 msg = (
-                    "🚀 **APEX TURBO HEDGE VIP ENGINE MENU** 🛡️\n"
-                    "───────────────────────────────\n\n"
-                    "🔥 **Top 5-10 Multi-Coin VIP Scanner Mode (កើបចំណេញ 5-10 កាក់ស្វ័យប្រវត្តិ) ៖**\n"
-                    "`` `/turbo_hedge TOP 40 50 BUY 10 1986` ``\n\n"
-                    "👉 **ស្វ័យប្រវត្តកាក់ទោល (AI Single-Coin Auto Side) ៖**\n"
-                    "`` `/turbo_hedge SOL 20 75 1986` ``\n\n"
-                    "👉 **កំណត់ BUY/SELL + VIP Target Profit ($5+) ៖**\n"
-                    "`` `/turbo_hedge SOL 40 50 BUY 5 1986` ``\n"
-                    "`` `/turbo_hedge SOL 40 50 SELL 15 1986` ``\n\n"
-                    "🛑 **បិទដំណើរការ & Market Close ៖**\n"
-                    "`` `/turbo_hedge STOP ALL 1986` ``\n"
-                    "`` `/turbo_hedge STOP SOL 1986` ``"
+                    "⚡ **APEX SUPER AGI TURBO BRAIN v13.00 | TURBO HEDGE ENGINE** 🛡️\n"
+                    "═══════════════════════════════\n\n"
+                    "📊 **INSTITUTIONAL TURBO HEDGE ARCHITECTURE:**\n"
+                    "• 🛒 **Spot Mode (1x 0% Liquidation Risk)** ៖ វិនិយោគ Spot ផ្ទាល់ គ្មានហានិភ័យ Liquidation ឡើយ\n"
+                    "• 🚀 **Futures Mode (1x-15x Leverage)** ៖ វិនិយោគ Futures ជាមួយ AI Trailing Lock & Auto-Flip Protection\n"
+                    "• 💰 **Amount Parameter ($5 / 5%)** ៖ កំណត់ទុន $5 USDT ឬ 5% នៃសមតុល្យក្នុងមួយកាក់ (អប្បបរមា $5 USDT)\n"
+                    "• 🛡️ **2FA PIN Protection** ៖ ទាមទារការផ្ទៀងផ្ទាត់ PIN 4 ខ្ទង់ចុងក្រោយ ដើម្បីធានាសុវត្ថិភាព 100%\n\n"
+                    "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                    "🛒 **[SPOT MODE EXECUTIONS]:**\n"
+                    "👉 **Spot Single Coin Buy ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n"
+                    "👉 **Spot Auto Momentum Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
+                    "🚀 **[FUTURES MODE EXECUTIONS]:**\n"
+                    "👉 **Futures Top 20 Gainers LONG (BUY) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
+                    "👉 **Futures Top 20 Dumpers SHORT (SELL) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n"
+                    "👉 **Futures Top 20 AGI Auto Decision ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
+                    "🛑 **[STOP & MARKET CLOSE COMMANDS]:**\n"
+                    "👉 `` `/turbo_hedge STOP SOL 1234` ``\n"
+                    "👉 `` `/turbo_hedge STOP ALL 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
+                if msg_target:
+                    await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
                 return
 
@@ -7029,42 +7036,96 @@ class TelegramBotThread(BaseThread):
 
             if not raw_args or len(raw_args) < 2:
                 if msg_target:
-                    await msg_target.reply_text("❌ សូមបញ្ជាក់ព័ត៌មានទុន និង PIN (ឧទាហរណ៍ ៖ `/turbo_hedge TOP 20 10 1234` ឬ `/turbo_hedge SPOT TOP 50 1234`)", parse_mode="Markdown")
+                    await msg_target.reply_text(
+                        "❌ **សូមបញ្ជាក់ព័ត៌មានទុន និង PIN**\n\n"
+                        "🛒 **Spot Single Coin** ៖ `` `/turbo_hedge SPOT SOL 50 1234` ``\n"
+                        "🛒 **Spot Auto Scanner** ៖ `` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
+                        "🚀 **Futures Long (BUY)** ៖ `` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
+                        "🚀 **Futures Short (SELL)** ៖ `` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n"
+                        "🚀 **Futures Auto AGI** ៖ `` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``",
+                        parse_mode="Markdown"
+                    )
                 return
 
-            symbol = raw_args[0].upper().strip()
-            if symbol not in ["TOP", "SCAN"] and not symbol.endswith("USDT"):
-                symbol += "USDT"
+            symbol_raw = raw_args[0].upper().strip()
+            if symbol_raw in ["AUTO", "SCAN", "TOP"]:
+                symbol = "TOP"
+            elif not symbol_raw.endswith("USDT"):
+                symbol = symbol_raw + "USDT"
+            else:
+                symbol = symbol_raw
 
             user_side_input = "SPOT" if is_spot_prefix else "AUTO"
             target_tp = 15.0
-            amount = 10.0
+            amount = 5.0
             leverage = 1 if is_spot_prefix else 10
+            top_count = 20
 
-            try:
-                amount = float(raw_args[1]) if raw_args[1].replace('.', '', 1).isdigit() else 10.0
-                
-                idx = 2
-                if len(raw_args) > 2 and idx < len(raw_args) - 1 and raw_args[2].isdigit() and not is_spot_prefix:
-                    leverage = int(raw_args[2])
-                    idx = 3
-                elif is_spot_prefix:
-                    leverage = 1
+            pin = str(raw_args[-1]).strip()
+            inner_args = raw_args[1:-1]
 
-                if idx < len(raw_args) - 1 and raw_args[idx].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                    if not is_spot_prefix:
-                        user_side_input = raw_args[idx].upper()
-                    idx += 1
-
-                if idx < len(raw_args) - 1 and raw_args[idx].replace('.', '', 1).isdigit():
-                    target_tp = float(raw_args[idx])
-                    idx += 1
-
-                pin = str(raw_args[-1]).strip()
-            except ValueError:
-                if msg_target:
-                    await msg_target.reply_text("❌ ចំនួនទុន ឬ Leverage មិនត្រឹមត្រូវ!")
-                return
+            if is_spot_prefix:
+                leverage = 1
+                user_side_input = "SPOT"
+                if inner_args:
+                    try:
+                        amount = float(inner_args[0])
+                    except ValueError:
+                        amount = 50.0
+                else:
+                    amount = 50.0
+            else:
+                # FUTURES MODE
+                if symbol == "TOP":
+                    if len(inner_args) >= 4:
+                        try: top_count = int(inner_args[0])
+                        except ValueError: top_count = 20
+                        try: leverage = int(inner_args[1])
+                        except ValueError: leverage = 10
+                        side_tok = inner_args[2].upper()
+                        if side_tok in ["BUY", "SELL", "AUTO", "SPOT"]:
+                            user_side_input = side_tok
+                        try: amount = float(inner_args[3])
+                        except ValueError: amount = 5.0
+                    elif len(inner_args) == 3:
+                        try: top_count = int(inner_args[0])
+                        except ValueError: top_count = 20
+                        try: leverage = int(inner_args[1])
+                        except ValueError: leverage = 10
+                        if inner_args[2].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                            user_side_input = inner_args[2].upper()
+                            amount = 5.0
+                        else:
+                            try: amount = float(inner_args[2])
+                            except ValueError: amount = 5.0
+                    elif len(inner_args) == 2:
+                        try: top_count = int(inner_args[0])
+                        except ValueError: top_count = 20
+                        try: leverage = int(inner_args[1])
+                        except ValueError: leverage = 10
+                    elif len(inner_args) == 1:
+                        try: amount = float(inner_args[0])
+                        except ValueError: amount = 5.0
+                else:
+                    if len(inner_args) >= 3:
+                        try: leverage = int(inner_args[0])
+                        except ValueError: leverage = 10
+                        if inner_args[1].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                            user_side_input = inner_args[1].upper()
+                        try: amount = float(inner_args[2])
+                        except ValueError: amount = 5.0
+                    elif len(inner_args) == 2:
+                        try: leverage = int(inner_args[0])
+                        except ValueError: leverage = 10
+                        if inner_args[1].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
+                            user_side_input = inner_args[1].upper()
+                            amount = 5.0
+                        else:
+                            try: amount = float(inner_args[1])
+                            except ValueError: amount = 5.0
+                    elif len(inner_args) == 1:
+                        try: amount = float(inner_args[0])
+                        except ValueError: amount = 5.0
 
             is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
             stored_pin = db.get_user_pin(chat_id)
