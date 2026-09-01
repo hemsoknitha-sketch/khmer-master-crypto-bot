@@ -1474,16 +1474,23 @@ class TelegramBotThread(BaseThread):
 
             status_icon = "🟢 Normal" if cpu_usage < 75.0 else ("🟡 Heavy Load" if cpu_usage < 90.0 else "🔴 Critical Load")
 
+            is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
+            vps_hardware_block = ""
+            if is_admin:
+                vps_hardware_block = (
+                    f"🖥️ **VPS HARDWARE & SYSTEM HEALTH**\n"
+                    f"⏳ Uptime: `{uptime_str}`\n"
+                    f"🧠 CPU Load: `{cpu_usage:.1f}%` (Multi-Core Dynamic)\n"
+                    f"📊 RAM Usage: `{ram_usage_mb} MB / {ram_total_mb} MB ({ram_pct:.1f}%)`\n"
+                    f"💽 SSD Storage: `{disk_used_gb} GB / {disk_total_gb} GB ({disk_pct:.1f}%)`\n"
+                    f"💾 Database Size: `{db_size_mb:.2f} MB` (WAL Mode Optimized)\n"
+                    f"🚦 System Status: {status_icon}\n\n"
+                )
+
             msg = (
                 f"📊 **KHMER MASTER CRYPTO v13.00 | SYSTEM & AGI DIAGNOSTICS** 📊\n"
                 f"───────────────────────────────\n\n"
-                f"🖥️ **VPS HARDWARE & SYSTEM HEALTH**\n"
-                f"⏳ Uptime: `{uptime_str}`\n"
-                f"🧠 CPU Load: `{cpu_usage:.1f}%` (Multi-Core Dynamic)\n"
-                f"📊 RAM Usage: `{ram_usage_mb} MB / {ram_total_mb} MB ({ram_pct:.1f}%)`\n"
-                f"💽 SSD Storage: `{disk_used_gb} GB / {disk_total_gb} GB ({disk_pct:.1f}%)`\n"
-                f"💾 Database Size: `{db_size_mb:.2f} MB` (WAL Mode Optimized)\n"
-                f"🚦 System Status: {status_icon}\n\n"
+                f"{vps_hardware_block}"
                 f"🛡️ **AGI CORE ENGINES MATRIX v13.00 (CHAT ID: `{chat_id}`)**\n"
                 f"💵 Mode: {'🟡 PAPER TRADING' if paper_on else '🚀 REAL MONEY LIVE'}\n"
                 f"🛡️ Liquidation Defender: {'🟢 ACTIVE (2% Max Drawdown Breaker)' if defender_on else '🟡 READY'}\n"
