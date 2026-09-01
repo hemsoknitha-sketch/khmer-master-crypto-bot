@@ -7236,6 +7236,7 @@ class TelegramBotThread(BaseThread):
                 return
 
         async def turbo_hedge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            import trading_engine
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
             msg_target = update.effective_message or update.message
