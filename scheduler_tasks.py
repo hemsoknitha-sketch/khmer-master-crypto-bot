@@ -120,7 +120,7 @@ async def daily_market_brief(app: Application, ai_engine):
     summary += f"\n- Fear & Greed Index: {fg_value} ({fg_class})"
     
     import ml_predictor
-    ml_summary = await asyncio.to_thread(ml_predictor.predict_price(symbol))
+    ml_summary = await asyncio.to_thread(ml_predictor.predict_price, symbol)
     summary += f"\n\n{ml_summary}"
     
     # Analyze with AI (Polyglot)
@@ -484,11 +484,11 @@ async def check_economic_calendar(app: Application, ai_engine=None):
                         api_secret = config.get("api_secret")
                         if api_key and api_secret:
                             try:
-                                current_price = await asyncio.to_thread(trading_engine.get_current_price(symbol))
+                                current_price = await asyncio.to_thread(trading_engine.get_current_price, symbol)
                                 qty = round(trade_amount / current_price, 5)
                                 
                                 if sentiment == "BULLISH":
-                                    res = await asyncio.to_thread(trading_engine.place_market_buy(api_key, api_secret, symbol, trade_amount))
+                                    res = await asyncio.to_thread(trading_engine.place_market_buy, api_key, api_secret, symbol, trade_amount)
                                     if "error" not in res:
                                         # Extract actual spent amount
                                         buy_price = float(res.get("price", current_price))
@@ -1122,7 +1122,7 @@ async def sentiment_sniper(app: Application, ai_engine):
                                     auto_trade_msg += f"\n_AI Size:_ `${amount_to_trade:,.2f}` (Confidence: {confidence}%)"
                                     msgs.append(auto_trade_msg)
                                     
-                                    result = await asyncio.to_thread(trading_engine.place_market_buy(api_key, api_secret, symbol_to_trade, amount_to_trade))
+                                    result = await asyncio.to_thread(trading_engine.place_market_buy, api_key, api_secret, symbol_to_trade, amount_to_trade)
                                     
                                     if result.get("status") == "FILLED":
                                         buy_price = float(result['fills'][0]['price']) if 'fills' in result and result['fills'] else float(result.get("price", 0))
@@ -1154,7 +1154,7 @@ async def sentiment_sniper(app: Application, ai_engine):
                                     
                                     import trading_engine
                                     import ml_predictor
-                                    vol_tgt = await asyncio.to_thread(ml_predictor.get_vol_target(symbol_to_trade))
+                                    vol_tgt = await asyncio.to_thread(ml_predictor.get_vol_target, symbol_to_trade)
                                     result = await asyncio.to_thread(trading_engine.place_futures_short, api_key, api_secret, symbol_to_trade, margin_usdt=hedge_config["amount"], leverage=dynamic_leverage, vol_target=vol_tgt)
                                     
                                     if "error" not in result and result.get("status") == "FILLED":
@@ -2050,7 +2050,7 @@ async def ai_scalper_monitor(app, ai_engine):
             
         for scalper in active_scalpers:
             scalp_id, chat_id, symbol, amount, profit_target_pct, current_state, entry_price = scalper
-            current_price = await asyncio.to_thread(trading_engine.get_current_price(symbol))
+            current_price = await asyncio.to_thread(trading_engine.get_current_price, symbol)
             if not current_price or current_price == 0: continue
             
             keys = db.get_user_api(chat_id)
@@ -2729,7 +2729,7 @@ async def flash_crash_defender(app: Application, ai_engine=None):
         import trading_engine
         
         symbol = "BTCUSDT"
-        current_price = await asyncio.to_thread(trading_engine.get_current_price(symbol))
+        current_price = await asyncio.to_thread(trading_engine.get_current_price, symbol)
         
         if current_price <= 0:
             return
