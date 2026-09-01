@@ -7331,6 +7331,17 @@ class TelegramBotThread(BaseThread):
                 return
 
             action = str(args[0]).upper().strip()
+
+            # 🚀 Smart Shortcut: Automatically expand `/turbo_hedge auto [PIN]` or `/turbo_hedge start [PIN]` to full TOP scanner format
+            if action in ["AUTO", "START", "RUN", "ON"] and len(args) <= 2:
+                user_pin = str(args[1]).strip() if len(args) == 2 else ""
+                stored_pin = db.get_user_pin(chat_id)
+                eff_pin = user_pin if user_pin else ("1234" if (not stored_pin and (db.is_admin(chat_id) or chat_id == 859271875)) else "")
+                if eff_pin:
+                    args = ["TOP", "20", "10", "AUTO", "5", eff_pin]
+                else:
+                    args = ["TOP", "20", "10", "AUTO", "5"]
+
             if action in ["STOP", "OFF"]:
                 if len(args) >= 3:
                     symbol = str(args[1]).upper().strip()

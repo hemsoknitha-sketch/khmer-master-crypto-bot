@@ -48,55 +48,63 @@ def acquire_single_instance_lock():
         current_pid = os.getpid()
         if os.name == 'posix':
             import fcntl
-            if os.path.exists(LOCK_FILE):
-                try:
-                    with open(LOCK_FILE, "r") as f:
-                        old_pid_str = f.read().strip()
-                        if old_pid_str.isdigit():
-                            old_pid = int(old_pid_str)
-                            if old_pid != current_pid:
-                                is_running = False
-                                if os.path.exists(f"/proc/{old_pid}"):
-                                    is_running = True
-                                else:
-                                    try:
-                                        import psutil
-                                        if psutil.pid_exists(old_pid):
-                                            is_running = True
-                                    except Exception:
-                                        pass
-                                if not is_running:
-                                    print(f"⚠️ [SINGLE INSTANCE GUARD] Stale lockfile detected (PID {old_pid} is dead). Purging lock.")
-                                    try: os.remove(LOCK_FILE)
-                                    except Exception: pass
-                except Exception:
-                    pass
-
+            
+            # Open file for appending/reading (do NOT unlink existing file to avoid flock inode split-brain)
             _lock_fp = open(LOCK_FILE, "a+")
+            
+            # Set FD_CLOEXEC flag so child processes/subprocesses don't inherit the lock descriptor
             try:
+                flags = fcntl.fcntl(_lock_fp, fcntl.F_GETFD)
+                fcntl.fcntl(_lock_fp, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
+            except Exception:
+                pass
+
+            try:
+                # Attempt non-blocking exclusive flock
                 fcntl.flock(_lock_fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 _lock_fp.seek(0)
                 _lock_fp.truncate()
                 _lock_fp.write(str(current_pid))
                 _lock_fp.flush()
             except (IOError, OSError):
-                print(f"🚨 [SUPER SMART GUARD] Another bot instance is already running on this server!")
-                print(f"🛑 Exiting process PID {current_pid} to prevent duplicate instance / Telegram conflict.")
-                sys.exit(1)
+                # Lock is held by an active process on this server
+                old_pid_info = "Unknown"
+                try:
+                    with open(LOCK_FILE, "r") as f:
+                        old_pid_info = f.read().strip() or "Unknown"
+                except Exception:
+                    pass
+
+                print(f"🚨 [SUPER SMART GUARD] Another bot instance (PID/Info: {old_pid_info}) is already running on this server!")
+                print(f"🛑 Exiting process PID {current_pid} cleanly to prevent duplicate instance / Telegram conflict.")
+                # Exit cleanly with status 0 so Systemd (with Restart=on-failure) does not enter a 5-second restart loop
+                sys.exit(0)
         else:
+            # Non-POSIX (Windows) single-instance check
             if os.path.exists(LOCK_FILE):
-                with open(LOCK_FILE, "r") as f:
-                    old_pid_str = f.read().strip()
+                try:
+                    with open(LOCK_FILE, "r") as f:
+                        old_pid_str = f.read().strip()
                     if old_pid_str.isdigit():
                         old_pid = int(old_pid_str)
                         if old_pid != current_pid:
                             try:
                                 import psutil
                                 if psutil.pid_exists(old_pid):
-                                    print(f"⚠️ [SINGLE INSTANCE GUARD] Bot instance PID {old_pid} is already running. Exiting new duplicate process.")
-                                    sys.exit(1)
+                                    proc = psutil.Process(old_pid)
+                                    cmdline = " ".join(proc.cmdline()) if hasattr(proc, 'cmdline') else ""
+                                    if "python" in cmdline.lower() or "main.py" in cmdline.lower() or proc.name().lower().startswith("python"):
+                                        print(f"⚠️ [SINGLE INSTANCE GUARD] Bot instance PID {old_pid} is already running. Exiting duplicate process.")
+                                        sys.exit(0)
+                            except SystemExit:
+                                raise
                             except Exception:
                                 pass
+                except SystemExit:
+                    raise
+                except Exception:
+                    pass
+
             with open(LOCK_FILE, "w") as f:
                 f.write(str(current_pid))
 
@@ -111,8 +119,13 @@ def acquire_single_instance_lock():
                     try: _lock_fp.close()
                     except Exception: pass
                 if os.path.exists(LOCK_FILE):
-                    try: os.remove(LOCK_FILE)
-                    except Exception: pass
+                    try:
+                        with open(LOCK_FILE, "r") as f:
+                            pid_in_file = f.read().strip()
+                        if pid_in_file == str(current_pid):
+                            os.remove(LOCK_FILE)
+                    except Exception:
+                        pass
             except Exception:
                 pass
         atexit.register(_cleanup)

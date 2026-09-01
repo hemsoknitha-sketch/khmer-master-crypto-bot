@@ -91,8 +91,9 @@ Type=simple
 User=$USER
 WorkingDirectory=$BOT_WORKING_DIR
 ExecStart=$BOT_WORKING_DIR/venv/bin/python main.py --cli
-Restart=always
+Restart=on-failure
 RestartSec=5
+SuccessExitStatus=0
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
