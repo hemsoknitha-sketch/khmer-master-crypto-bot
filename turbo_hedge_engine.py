@@ -898,17 +898,17 @@ async def monitor_turbo_hedge_bots(app):
             unit_leverage = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_leverage", "10"))
             user_side_input = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "AUTO")
             unit_tp = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5"))
+            user_top_count = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_count", "10"))
 
             # 🛡️ Strict Capital Cap & User Command Compliance:
             # Trade amount and leverage strictly follow the user's explicit command.
-            # Max coins allowed is STRICTLY determined by Available Capital / User Commanded Amount.
-            # Example: Avail Bal = $25 USDT, User Amount = $10 USDT -> Max 2 coins strictly!
+            # Max coins allowed is STRICTLY determined by min(User Specified Top Count, Available Capital / User Amount).
             effective_amount = max(1.0, unit_amount)
             if user_side_input == "SPOT":
                 effective_amount = max(10.50, effective_amount)
             
             max_coins_by_capital = max(1, math.floor(avail_bal / effective_amount)) if avail_bal >= effective_amount else 0
-            max_allowed_coins = min(10, max_coins_by_capital)
+            max_allowed_coins = max(1, min(user_top_count, max_coins_by_capital))
 
             if len(user_active_bots) >= max_allowed_coins or avail_bal < effective_amount:
                 now_t = time.time()
@@ -933,8 +933,14 @@ async def monitor_turbo_hedge_bots(app):
             else:
                 top_coins = get_active_high_velocity_coins(limit=100)
 
-            user_active_syms = [b.get("symbol") for b in user_active_bots]
             for c_cand in top_coins:
+                # 🛡️ STRICT IN-LOOP CAP CHECK: Re-evaluate active bot count before opening new trade
+                fresh_active = db.get_turbo_hedge_bots(target_chat_id)
+                if len(fresh_active) >= max_allowed_coins:
+                    print(f"🛡️ [AGI CAPITAL CAP IN-LOOP] User {target_chat_id}: Reached strict max_allowed_coins limit ({max_allowed_coins}). Stopping candidate loop.")
+                    break
+
+                user_active_syms = [b.get("symbol") for b in fresh_active]
                 if c_cand in user_active_syms:
                     continue
                 

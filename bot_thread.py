@@ -7591,6 +7591,7 @@ class TelegramBotThread(BaseThread):
 
             if symbol in ["TOP", "SCAN"]:
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "1")
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_count", str(top_count))
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_amount", str(amount))
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_leverage", str(leverage))
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_side", user_side_input)
