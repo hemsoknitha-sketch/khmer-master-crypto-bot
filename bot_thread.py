@@ -717,14 +717,39 @@ class TelegramBotThread(BaseThread):
             is_paper = getattr(trading_engine, "PAPER_TRADING", False)
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
             
+            admin_header = ""
+            if is_admin:
+                if user_lang == 'en':
+                    admin_header = (
+                        "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
+                        "═══════════════════════════════\n"
+                        "⚡ **SYSTEM STATUS** ៖ `🟢 ONLINE 24/7` \| `Latency: <15ms`\n"
+                        "🧠 **AGI SUPER BRAIN** ៖ `5-Agent Swarm + 12 Wall Street ML Active`\n"
+                        f"🛡️ **SECURITY GUARD** ៖ `ISOLATED MARGIN` \| `{mode_badge}`\n"
+                        "═══════════════════════════════\n"
+                    )
+                elif user_lang == 'zh':
+                    admin_header = (
+                        "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
+                        "═══════════════════════════════\n"
+                        "⚡ **系统状态** ៖ `🟢 24/7 在线` \| `延迟: <15ms`\n"
+                        "🧠 **AGI 超级大脑** ៖ `5模型 Swarm + 12 Wall Street ML 激活`\n"
+                        f"🛡️ **安全防护** ៖ `隔离保证金` \| `{mode_badge}`\n"
+                        "═══════════════════════════════\n"
+                    )
+                else:
+                    admin_header = (
+                        "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
+                        "═══════════════════════════════\n"
+                        "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` \| `Latency: <15ms`\n"
+                        "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
+                        f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` \| `{mode_badge}`\n"
+                        "═══════════════════════════════\n"
+                    )
+
             if user_lang == 'en':
                 menu_text = (
-                    "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
-                    "═══════════════════════════════\n"
-                    "⚡ **SYSTEM STATUS** ៖ `🟢 ONLINE 24/7` \| `Latency: <15ms`\n"
-                    "🧠 **AGI SUPER BRAIN** ៖ `5-Agent Swarm + 12 Wall Street ML Active`\n"
-                    f"🛡️ **SECURITY GUARD** ៖ `ISOLATED MARGIN` \| `{mode_badge}`\n"
-                    "═══════════════════════════════\n"
+                    f"{admin_header}"
                     "Welcome to **v13.00 VIP Master Control Panel**! 📊\n\n"
                     "💼 **1. PORTFOLIO & BALANCE ANALYTICS**\n"
                     "• `/portfolio` - View total PnL and active trading positions\n"
@@ -753,12 +778,7 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 menu_text = (
-                    "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
-                    "═══════════════════════════════\n"
-                    "⚡ **系统状态** ៖ `🟢 24/7 在线` \| `延迟: <15ms`\n"
-                    "🧠 **AGI 超级大脑** ៖ `5模型 Swarm + 12 Wall Street ML 激活`\n"
-                    f"🛡️ **安全防护** ៖ `隔离保证金` \| `{mode_badge}`\n"
-                    "═══════════════════════════════\n"
+                    f"{admin_header}"
                     "欢迎使用 **v13.00 VIP 机构级主控面板**！📊\n\n"
                     "💼 **1. 投资组合与资金分析**\n"
                     "• `/portfolio` - 查看总 PnL 及所有持仓\n"
@@ -787,12 +807,7 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 menu_text = (
-                    "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
-                    "═══════════════════════════════\n"
-                    "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` \| `Latency: <15ms`\n"
-                    "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
-                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` \| `{mode_badge}`\n"
-                    "═══════════════════════════════\n"
+                    f"{admin_header}"
                     "សូមស្វាគមន៍មកកាន់ **v13.00 VIP Master Control Panel**! 📊\n\n"
                     "💼 **១. PORTFOLIO & BALANCE ANALYTICS (គ្រប់គ្រងសមតុល្យ និង PnL)**\n"
                     "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
