@@ -4234,10 +4234,14 @@ async def trailing_guard_monitor(app: Application):
                                 old_distance=liq_dist_pct,
                                 new_distance=new_liq_dist
                             )
-                            try:
-                                await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                            except Exception as e:
-                                print(f"Failed to send liquidation guard alert to {chat_id}: {e}")
+                            is_quiet = (db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1")
+                            if not is_quiet:
+                                try:
+                                    await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                                except Exception as e:
+                                    print(f"Failed to send liquidation guard alert to {chat_id}: {e}")
+                            else:
+                                print(f"🛡️ [AUTO-LIQUIDATION GUARD SILENT] {symbol} {side} De-leveraged 30% silently for Chat ID {chat_id}")
 
     except asyncio.CancelledError:
         pass

@@ -8955,6 +8955,37 @@ class TelegramBotThread(BaseThread):
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Trailing Guard.")
                 return
 
+        async def quiet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id: return
+            target_msg = update.effective_message or update.message
+            args = context.args or []
+            if not args or len(args) == 0:
+                is_quiet = (db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1")
+                status_str = "🟢 **ON (រត់ដោយស្ងៀមស្ងាត់ 100% Silent Mode)**" if is_quiet else "🔴 **OFF (បើកសារជូនដំណឹង)**"
+                msg = (
+                    f"🤫 **APEX AGI QUIET / SILENT MODE SYSTEM**\n"
+                    f"───────────────────────────────\n\n"
+                    f"📊 ស្ថានភាពបច្ចុប្បន្ន ៖ {status_str}\n\n"
+                    f"💡 _របៀបបើក/បិទ ៖_\n"
+                    f"👉 `` `/quiet ON` `` ៖ បើកមុខងារ Silent (ប្រព័ន្ធរត់ការពារ 24/7 និងប្រមូលចំណេញស្ងៀមស្ងាត់មិនផ្ញើសាររំខាន)\n"
+                    f"👉 `` `/quiet OFF` `` ៖ បិទមុខងារ Silent (បើកសារជូនដំណឹង Telegram ធម្មតា)"
+                )
+                if target_msg:
+                    await target_msg.reply_text(msg, parse_mode="Markdown")
+                return
+
+            action = str(args[0]).upper().strip()
+            if action in ["ON", "ENABLE", "1"]:
+                db.update_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1")
+                if target_msg:
+                    await target_msg.reply_text("🤫 **Quiet Silent Mode បានបើក!** ប្រព័ន្ធនឹងការពារគណនី និងរត់ស្កេន 24/7 ដោយស្ងៀមស្ងាត់មិនផ្ញើសាររំខានឡើយ។", parse_mode="Markdown")
+            elif action in ["OFF", "DISABLE", "0"]:
+                db.update_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0")
+                if target_msg:
+                    await target_msg.reply_text("🔔 **Quiet Silent Mode ត្រូវបានបិទ!** ប្រព័ន្ធនឹងផ្ញើសារជូនដំណឹង Telegram ជាធម្មតា។", parse_mode="Markdown")
+
 
         async def stop_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -10022,6 +10053,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("gold_btc_rebalance", gold_radar_command))
 
         self.app.add_handler(CommandHandler("language", language_command))
+        self.app.add_handler(CommandHandler("quiet", quiet_command))
+        self.app.add_handler(CommandHandler("silent", quiet_command))
         self.app.add_handler(CommandHandler("set_pin", set_pin_command))
         self.app.add_handler(CommandHandler("add_api", add_api_command))
         self.app.add_handler(CommandHandler("add_bybit_api", add_bybit_api_command))
