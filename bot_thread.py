@@ -503,7 +503,7 @@ class TelegramBotThread(BaseThread):
                         wp = item.get("deep_wick_buy_target", 0.0)
                         exp_p = item.get("expected_profit_pct", 0.0)
                         msg += f"• `{sym}` (Regime: `{reg}`)\n"
-                        msg += f"  - តម្លៃបច្ចុប្បន្ន ៖ `${cp:,.2f}` \| Deep Wick Target ៖ `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
+                        msg += f"  - តម្លៃបច្ចុប្បន្ន ៖ `${cp:,.2f}` | Deep Wick Target ៖ `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
                         msg += f"  - Instant Rebound Target ៖ `+{exp_p}% Profit` (< 5s Exit)\n\n"
                     
                     msg += "💡 _នៅពេលសមាជិកផ្សេងទៀតត្រូវ Margin Call / Liquidate AI នឹងចូលទិញបាតកាក់ថោកបំផុតភ្លាមៗ!_"
@@ -522,7 +522,7 @@ class TelegramBotThread(BaseThread):
                         wp = item.get("deep_wick_buy_target", 0.0)
                         exp_p = item.get("expected_profit_pct", 0.0)
                         msg += f"• `{sym}` (Regime: `{reg}`)\n"
-                        msg += f"  - Current Price: `${cp:,.2f}` \| Deep Wick Target: `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
+                        msg += f"  - Current Price: `${cp:,.2f}` | Deep Wick Target: `${wp:,.2f}` (`-{item.get('discount_pct')}%`)\n"
                         msg += f"  - Instant Rebound Target: `+{exp_p}% Profit` (< 5s Exit)\n\n"
                     
                     msg += "💡 _Catches bottom deep wicks during retail liquidation cascades and exits within <5 seconds!_"
@@ -578,7 +578,7 @@ class TelegramBotThread(BaseThread):
                         "═════════════════════════════════════════\n\n"
                         "📊 **INSTITUTIONAL ARBITRAGE ARCHITECTURE:**\n"
                         "• 🤖 **AI Model Swarm** ៖ `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
-                        "• 🌐 **Connected Exchanges** ៖ `Binance` ↔ `Bybit` \| `OKX` \| `Coinbase`\n"
+                        "• 🌐 **Connected Exchanges** ៖ `Binance` ↔ `Bybit` | `OKX` | `Coinbase`\n"
                         "• ⚡ **Execution Speed** ៖ `< 5ms (Sub-Millisecond Multi-Exchange Order Routing)`\n"
                         "• 🛡️ **Risk Level** ៖ `0.0% Directional Risk (Simultaneous Buy Low on Ex A & Sell High on Ex B)`\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
@@ -593,7 +593,7 @@ class TelegramBotThread(BaseThread):
                         "═════════════════════════════════════════\n\n"
                         "📊 **机构级套利架构：**\n"
                         "• 🤖 **AI 模型集成** ៖ `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
-                        "• 🌐 **已连接交易所** ៖ `Binance` ↔ `Bybit` \| `OKX` \| `Coinbase`\n"
+                        "• 🌐 **已连接交易所** ៖ `Binance` ↔ `Bybit` | `OKX` | `Coinbase`\n"
                         "• ⚡ **执行速度** ៖ `< 5ms (亚毫秒级多交易所路由)`\n"
                         "• 🛡️ **风险等级** ៖ `0.0% 单向市场风险 (A交易所买入同时B交易所卖出)`\n\n"
                         "📋 **一键复制指令：**\n\n"
@@ -608,7 +608,7 @@ class TelegramBotThread(BaseThread):
                         "═════════════════════════════════════════\n\n"
                         "📊 **INSTITUTIONAL ARBITRAGE ARCHITECTURE (ស្ថាបត្យកម្មវិនិយោគ 0% RISK) ៖**\n"
                         "• 🤖 **AI Models សហការ** ៖ `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
-                        "• 🌐 **Exchanges ភ្ជាប់** ៖ `Binance` ↔ `Bybit` \| `OKX` \| `Coinbase`\n"
+                        "• 🌐 **Exchanges ភ្ជាប់** ៖ `Binance` ↔ `Bybit` | `OKX` | `Coinbase`\n"
                         "• ⚡ **ល្បឿនស្កេន & បញ្ជា** ៖ `< 5ms (Sub-Millisecond Order Routing)`\n"
                         "• 🛡️ **កម្រិតហានិភ័យ** ៖ `0.0% Directional Risk (ទិញថោកលើ Ex A & លក់ថ្លៃលើ Ex B ក្នុងពេលតែមួយ)`\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
@@ -632,7 +632,7 @@ class TelegramBotThread(BaseThread):
                     msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v13.00** ⚡️\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models សហការ ៖** `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
-                    msg += "🌐 **Exchanges ភ្ជាប់ ៖** `Binance` \| `Bybit` \| `OKX` \| `Coinbase`\n"
+                    msg += "🌐 **Exchanges ភ្ជាប់ ៖** `Binance` | `Bybit` | `OKX` | `Coinbase`\n"
                     msg += "⚡ **ល្បឿនស្កេន (Execution Latency) ៖** `< 5ms (Sub-Millisecond)`\n\n"
                     
                     found_any = False
@@ -661,7 +661,7 @@ class TelegramBotThread(BaseThread):
                     msg = "⚡️ **SUB-MILLISECOND CROSS-EXCHANGE ARBITRAGE MATRIX v13.00** ⚡️\n"
                     msg += "═════════════════════════════════════════\n\n"
                     msg += "🤖 **AI Models Ensemble:** `ONNX HFT Model` + `XGBoost Imbalance` + `LSTM Neural Net`\n"
-                    msg += "🌐 **Connected Exchanges:** `Binance` \| `Bybit` \| `OKX` \| `Coinbase`\n"
+                    msg += "🌐 **Connected Exchanges:** `Binance` | `Bybit` | `OKX` | `Coinbase`\n"
                     msg += "⚡ **Execution Speed:** `< 5ms (Sub-Millisecond)`\n\n"
                     
                     found_any = False
@@ -723,27 +723,27 @@ class TelegramBotThread(BaseThread):
                     admin_header = (
                         "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
                         "═══════════════════════════════\n"
-                        "⚡ **SYSTEM STATUS** ៖ `🟢 ONLINE 24/7` \| `Latency: <15ms`\n"
+                        "⚡ **SYSTEM STATUS** ៖ `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
                         "🧠 **AGI SUPER BRAIN** ៖ `5-Agent Swarm + 12 Wall Street ML Active`\n"
-                        f"🛡️ **SECURITY GUARD** ៖ `ISOLATED MARGIN` \| `{mode_badge}`\n"
+                        f"🛡️ **SECURITY GUARD** ៖ `ISOLATED MARGIN` | `{mode_badge}`\n"
                         "═══════════════════════════════\n"
                     )
                 elif user_lang == 'zh':
                     admin_header = (
                         "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
                         "═══════════════════════════════\n"
-                        "⚡ **系统状态** ៖ `🟢 24/7 在线` \| `延迟: <15ms`\n"
+                        "⚡ **系统状态** ៖ `🟢 24/7 在线` | `延迟: <15ms`\n"
                         "🧠 **AGI 超级大脑** ៖ `5模型 Swarm + 12 Wall Street ML 激活`\n"
-                        f"🛡️ **安全防护** ៖ `隔离保证金` \| `{mode_badge}`\n"
+                        f"🛡️ **安全防护** ៖ `隔离保证金` | `{mode_badge}`\n"
                         "═══════════════════════════════\n"
                     )
                 else:
                     admin_header = (
                         "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
                         "═══════════════════════════════\n"
-                        "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` \| `Latency: <15ms`\n"
+                        "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
                         "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
-                        f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` \| `{mode_badge}`\n"
+                        f"🛡️ **យន្តការសុវត្ថិភាព ៖** `ISOLATED MARGIN` | `{mode_badge}`\n"
                         "═══════════════════════════════\n"
                     )
 
@@ -1652,7 +1652,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                     "═══════════════════════════════\n"
-                    f"🛡️ **SECURITY CLEARANCE** ៖ `VERIFIED` \| `{mode_badge}`\n"
+                    f"🛡️ **SECURITY CLEARANCE** ៖ `VERIFIED` | `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
                     f"💵 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
                     f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
@@ -1668,7 +1668,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 💰\n"
                     "═══════════════════════════════\n"
-                    f"🛡️ **安全认证** ៖ `VERIFIED` \| `{mode_badge}`\n"
+                    f"🛡️ **安全认证** ៖ `VERIFIED` | `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
                     f"💵 **现货可用余额 (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
                     f"📊 **现货持仓敞口:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
@@ -1684,7 +1684,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                     "═══════════════════════════════\n"
-                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `VERIFIED` \| `{mode_badge}`\n"
+                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `VERIFIED` | `{mode_badge}`\n"
                     "═══════════════════════════════\n\n"
                     f"💵 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
                     f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
@@ -8675,7 +8675,7 @@ class TelegramBotThread(BaseThread):
                 "✅ **AI DYNAMIC COMPOUND INFINITY MATRIX ACTIVATED!** ♾️\n"
                 "═══════════════════════════════\n\n"
                 f"🪙 **កាក់** ៖ `{target_coin}`\n"
-                f"💵 **ទុន** ៖ `${capital:,.2f} USDT` \| 📐 **Grids** ៖ `100 Dynamic Fibonacci Grids`\n"
+                f"💵 **ទុន** ៖ `${capital:,.2f} USDT` | 📐 **Grids** ៖ `100 Dynamic Fibonacci Grids`\n"
                 f"📊 **Price Band Range** ៖ `${matrix_calc['lower_price']:,.2f}` ➔ `${matrix_calc['upper_price']:,.2f}`\n"
                 "🔄 **Compounding Engine** ៖ `Reinvesting 100% Profits 24/7`\n\n"
                 "_Bot នឹងស្កេន និង Auto-Compound ប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
@@ -8739,7 +8739,7 @@ class TelegramBotThread(BaseThread):
                     rate = item.get("funding_rate_pct", 0.0)
                     apy = rate * 3 * 365
                     mins = item.get("seconds_to_settlement", 0) // 60
-                    lines.append(f"• `{sym}` ៖ Rate `{rate:+.4f}%` (Est APY: `+{apy:.1f}%` \| Settlement in `{mins}m`)")
+                    lines.append(f"• `{sym}` ៖ Rate `{rate:+.4f}%` (Est APY: `+{apy:.1f}%` | Settlement in `{mins}m`)")
                 
                 table_text = "\n".join(lines) if lines else "_កំពុងស្កេន Binance Premium Index..._"
                 
@@ -9791,7 +9791,7 @@ class TelegramBotThread(BaseThread):
                                     direction = "📥 INFLOW (Exchange Deposit)" if is_deposit else "📤 OUTFLOW (Cold Storage Accumulation)"
                                     if is_deposit: net_inflow += value
                                     else: net_outflow += value
-                                    tx_list.append(f"• `{token_symbol}` ៖ `${value:,.0f}` \| {direction}")
+                                    tx_list.append(f"• `{token_symbol}` ៖ `${value:,.0f}` | {direction}")
                 except Exception as we:
                     print(f"Whale fetch error: {we}")
 
@@ -9813,14 +9813,14 @@ class TelegramBotThread(BaseThread):
                 except Exception: pass
 
                 bias_status = "🟢 BULLISH ACCUMULATION" if net_outflow >= net_inflow else "🔴 BEARISH DUMP RISK"
-                tx_formatted = "\n".join(tx_list[:4]) if tx_list else "• `USDT` ៖ `$15,450,000` \| 📤 OUTFLOW (Cold Storage Accumulation)\n• `ETH` ៖ `$8,200,000` \| 📥 INFLOW (Binance Hot Wallet Deposit)"
+                tx_formatted = "\n".join(tx_list[:4]) if tx_list else "• `USDT` ៖ `$15,450,000` | 📤 OUTFLOW (Cold Storage Accumulation)\n• `ETH` ៖ `$8,200,000` | 📥 INFLOW (Binance Hot Wallet Deposit)"
 
                 if user_lang == 'en':
                     msg = (
                         "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v13.00** ⚡\n"
                         "═══════════════════════════════\n\n"
                         "🤖 **AI Ensemble Models** ៖ `PatchTST Transformer` + `Orderbook Imbalance` + `NLP & On-Chain AGI`\n"
-                        "🌐 **Institutions Monitored** ៖ `BlackRock` \| `Fidelity` \| `MicroStrategy` \| `Binance Cold` \| `Coinbase Prime`\n"
+                        "🌐 **Institutions Monitored** ៖ `BlackRock` | `Fidelity` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
                         "⚡ **Strategy** ៖ `Sub-Second Front-Run Execution ($1M - $100M+ Orderflow Inflow)`\n\n"
                         "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
                         f"{tx_formatted}\n\n"
@@ -9841,7 +9841,7 @@ class TelegramBotThread(BaseThread):
                         "🐋 **巨鲸资金流向与暗盘抢跑交易雷达 (Front-Running Radar) v13.00** ⚡\n"
                         "═══════════════════════════════\n\n"
                         "🤖 **AI 模型协同** ៖ `PatchTST Transformer` + `Orderbook Imbalance` + `NLP & On-Chain AGI`\n"
-                        "🌐 **监控机构清单** ៖ `贝莱德 (BlackRock)` \| `富达 (Fidelity)` \| `微策 (MicroStrategy)` \| `Binance 冷钱包` \| `Coinbase Prime`\n"
+                        "🌐 **监控机构清单** ៖ `贝莱德 (BlackRock)` | `富达 (Fidelity)` | `微策 (MicroStrategy)` | `Binance 冷钱包` | `Coinbase Prime`\n"
                         "⚡ **核心策略** ៖ `毫秒级抢跑入场 (Front-Run Execution $1M - $100M+ 机构大单)`\n\n"
                         "📊 **链上巨鲸大额转账流向 (机构级追踪)：**\n"
                         f"{tx_formatted}\n\n"
@@ -9862,7 +9862,7 @@ class TelegramBotThread(BaseThread):
                         "🐋 **WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR v13.00** ⚡\n"
                         "═══════════════════════════════\n\n"
                         "🤖 **AI Models សហការ ៖** `PatchTST Transformer` + `Orderbook Imbalance` + `NLP & On-Chain AGI`\n"
-                        "🌐 **ស្ថាប័នមហាសេដ្ឋីតាមដាន ៖** `BlackRock` \| `Fidelity` \| `MicroStrategy` \| `Binance Cold` \| `Coinbase Prime`\n"
+                        "🌐 **ស្ថាប័នមហាសេដ្ឋីតាមដាន ៖** `BlackRock` | `Fidelity` | `MicroStrategy` | `Binance Cold` | `Coinbase Prime`\n"
                         "⚡ **យុទ្ធសាស្ត្រប្រតិបត្តិ ៖** `ចូលទិញមុន (Front-Run) ក្នុងកម្រិត Sub-Second រួចយកចំណេញពេល Whale រុញថ្លៃ`\n\n"
                         "📊 **ON-CHAIN LARGE TRANSACTION FLOW (INSTITUTIONAL RADAR):**\n"
                         f"{tx_formatted}\n\n"
