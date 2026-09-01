@@ -7552,15 +7552,16 @@ class TelegramBotThread(BaseThread):
                         "🛡️ **Delta-Neutral Hedge** ៖ `` `/turbo_hedge HEDGE BTC 100 1234` ``\n"
                         "🛒 **Spot Single Coin** ៖ `` `/turbo_hedge SPOT SOL 50 1234` ``\n"
                         "🛒 **Spot Auto Scanner** ៖ `` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
-                        "🚀 **Futures Long (BUY)** ៖ `` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
-                        "🚀 **Futures Short (SELL)** ៖ `` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n"
-                        "🚀 **Futures Auto AGI** ៖ `` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``",
+                        "🚀 **Futures Auto Top Scanner (ON)** ៖ `` `/turbo_hedge ON 5 10 AUTO 2.5 1234` ``\n"
+                        "🚀 **Futures Top Gainers LONG** ៖ `` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n"
+                        "🚀 **Futures Top Dumpers SHORT** ៖ `` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n"
+                        "🚀 **Futures Auto AGI Decision** ៖ `` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``",
                         parse_mode="Markdown"
                     )
                 return
 
             symbol_raw = raw_args[0].upper().strip()
-            if symbol_raw in ["AUTO", "SCAN", "TOP"]:
+            if symbol_raw in ["AUTO", "SCAN", "TOP", "ON", "START", "RUN"]:
                 symbol = "TOP"
             elif not symbol_raw.endswith("USDT"):
                 symbol = symbol_raw + "USDT"
@@ -7568,7 +7569,7 @@ class TelegramBotThread(BaseThread):
                 symbol = symbol_raw
 
             user_side_input = "SPOT" if is_spot_prefix else ("HEDGE" if is_hedge_prefix else "AUTO")
-            target_tp = 15.0
+            target_tp = 2.5
             amount = 5.0
             leverage = 1 if (is_spot_prefix or is_hedge_prefix) else 10
             top_count = 20
@@ -7580,74 +7581,80 @@ class TelegramBotThread(BaseThread):
                 leverage = 1
                 user_side_input = "SPOT"
                 if inner_args:
-                    try:
-                        amount = float(inner_args[0])
-                    except ValueError:
-                        amount = 50.0
-                else:
-                    amount = 50.0
+                    try: amount = float(inner_args[0])
+                    except ValueError: amount = 50.0
             elif is_hedge_prefix:
                 leverage = 1
                 user_side_input = "HEDGE"
                 if inner_args:
-                    try:
-                        amount = float(inner_args[0])
-                    except ValueError:
-                        amount = 100.0
-                else:
-                    amount = 100.0
+                    try: amount = float(inner_args[0])
+                    except ValueError: amount = 100.0
             else:
                 # FUTURES MODE
                 if symbol == "TOP":
-                    if len(inner_args) >= 4:
-                        try: top_count = int(inner_args[0])
-                        except ValueError: top_count = 20
-                        try: leverage = int(inner_args[1])
-                        except ValueError: leverage = 10
-                        side_tok = inner_args[2].upper()
-                        if side_tok in ["BUY", "SELL", "AUTO", "SPOT"]:
-                            user_side_input = side_tok
-                        try: amount = float(inner_args[3])
-                        except ValueError: amount = 5.0
-                    elif len(inner_args) == 3:
-                        try: top_count = int(inner_args[0])
-                        except ValueError: top_count = 20
-                        try: leverage = int(inner_args[1])
-                        except ValueError: leverage = 10
-                        if inner_args[2].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                            user_side_input = inner_args[2].upper()
-                            amount = 5.0
+                    # Extract side token and numeric tokens intelligently
+                    nums = []
+                    for tok in inner_args:
+                        u = tok.upper()
+                        if u in ["BUY", "SELL", "AUTO", "SPOT"]:
+                            user_side_input = u
                         else:
-                            try: amount = float(inner_args[2])
-                            except ValueError: amount = 5.0
-                    elif len(inner_args) == 2:
-                        try: top_count = int(inner_args[0])
-                        except ValueError: top_count = 20
-                        try: leverage = int(inner_args[1])
-                        except ValueError: leverage = 10
-                    elif len(inner_args) == 1:
-                        try: amount = float(inner_args[0])
-                        except ValueError: amount = 5.0
+                            try:
+                                val = float(tok)
+                                nums.append(val)
+                            except ValueError:
+                                pass
+                    
+                    if len(nums) >= 4:
+                        # Format: [count, leverage, amount, tp]
+                        top_count = int(nums[0])
+                        leverage = int(nums[1])
+                        amount = float(nums[2])
+                        target_tp = float(nums[3])
+                    elif len(nums) == 3:
+                        # Format 1: [amount=5, leverage=10, tp=2.5]
+                        # Format 2: [count=20, leverage=10, amount=5]
+                        if nums[0] > 15:
+                            top_count = int(nums[0])
+                            leverage = int(nums[1])
+                            amount = float(nums[2])
+                        else:
+                            amount = float(nums[0])
+                            leverage = int(nums[1])
+                            target_tp = float(nums[2])
+                            top_count = 10
+                    elif len(nums) == 2:
+                        # Format: [amount/count, leverage]
+                        if nums[0] > 15:
+                            top_count = int(nums[0])
+                            leverage = int(nums[1])
+                        else:
+                            amount = float(nums[0])
+                            leverage = int(nums[1])
+                    elif len(nums) == 1:
+                        amount = float(nums[0])
                 else:
-                    if len(inner_args) >= 3:
-                        try: leverage = int(inner_args[0])
-                        except ValueError: leverage = 10
-                        if inner_args[1].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                            user_side_input = inner_args[1].upper()
-                        try: amount = float(inner_args[2])
-                        except ValueError: amount = 5.0
-                    elif len(inner_args) == 2:
-                        try: leverage = int(inner_args[0])
-                        except ValueError: leverage = 10
-                        if inner_args[1].upper() in ["BUY", "SELL", "AUTO", "SPOT"]:
-                            user_side_input = inner_args[1].upper()
-                            amount = 5.0
+                    # Single coin
+                    nums = []
+                    for tok in inner_args:
+                        u = tok.upper()
+                        if u in ["BUY", "SELL", "AUTO", "SPOT"]:
+                            user_side_input = u
                         else:
-                            try: amount = float(inner_args[1])
-                            except ValueError: amount = 5.0
-                    elif len(inner_args) == 1:
-                        try: amount = float(inner_args[0])
-                        except ValueError: amount = 5.0
+                            try:
+                                val = float(tok)
+                                nums.append(val)
+                            except ValueError:
+                                pass
+                    if len(nums) >= 3:
+                        leverage = int(nums[0])
+                        amount = float(nums[1])
+                        target_tp = float(nums[2])
+                    elif len(nums) == 2:
+                        leverage = int(nums[0])
+                        amount = float(nums[1])
+                    elif len(nums) == 1:
+                        amount = float(nums[0])
 
             is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
             stored_pin = db.get_user_pin(chat_id)
@@ -7746,13 +7753,24 @@ class TelegramBotThread(BaseThread):
                         top_coins = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "PEPEUSDT", "WIFUSDT", "BONKUSDT", "XRPUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "SUIUSDT", "LINKUSDT", "DOTUSDT"]
 
                     eff_amt = max(10.50 if is_spot else 5.0, amount)
-                    # 🛡️ Reserve 35% Free Margin Safety Buffer to prevent liquidation / over-leveraging
-                    safe_avail_bal = avail_bal * 0.65
+                    # 🛡️ Reserve 40% Free Margin Safety Buffer to prevent liquidation / over-leveraging
+                    safe_avail_bal = avail_bal * (0.95 if is_spot else 0.60)
+
+                    # Tiered Active Coin Clamping based on Total Balance:
+                    if avail_bal < 20.0:
+                        tiered_cap = 1
+                    elif avail_bal < 50.0:
+                        tiered_cap = 2
+                    elif avail_bal < 100.0:
+                        tiered_cap = 3
+                    else:
+                        tiered_cap = min(10, top_count)
+
                     if safe_avail_bal < eff_amt or avail_bal < eff_amt:
                         print(f"🛡️ [CAPITAL SAFETY GUARD] Free margin (${avail_bal:.2f} USDT) or safe buffer (${safe_avail_bal:.2f} USDT) is less than required per-coin amount (${eff_amt:.2f} USDT). Aborting new coin placement.")
                         num_coins = 0
                     else:
-                        num_coins = min(10, max(1, int(safe_avail_bal / eff_amt)))
+                        num_coins = max(1, min(tiered_cap, int(safe_avail_bal / eff_amt)))
                     
                     executed_syms = []
                     success_count = 0
@@ -9033,7 +9051,7 @@ class TelegramBotThread(BaseThread):
                 return
 
             if action == "ON":
-                db.set_trailing_guard_config(chat_id, enabled=True, min_profit_pct=1.5, trailing_step_pct=0.5, min_liq_distance_pct=50.0)
+                db.set_trailing_guard_config(chat_id, enabled=True, min_profit_pct=1.5, trailing_step_pct=0.5, min_liq_distance_pct=3.0)
                 msg = (
                     "🛡️ **AI Dynamic Trailing Profit Guard ត្រូវបានបើកដំណើរការ!** ⚡\n\n"
                     "_ប្រព័ន្ធនឹងបើក Profit Lock ស្វ័យប្រវត្តិពេលចំណេញបាន +1.5% និងរំកិល Stop-Profit ដេញតាម Peak 0.5% "

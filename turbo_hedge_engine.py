@@ -904,17 +904,31 @@ async def monitor_turbo_hedge_bots(app):
             unit_tp = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5"))
             user_top_count = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_count", "10"))
 
-            # 🛡️ Strict Capital Cap & User Command Compliance:
-            # Trade amount and leverage strictly follow the user's explicit command.
-            # Max coins allowed is STRICTLY determined by min(User Specified Top Count, Available Capital / User Amount).
+            # 🛡️ Super Smart Margin Cushion & Capital Allocation Shield:
+            # Reserving at least 40% of available margin prevents free margin exhaustion and keeps liquidation distance far.
             effective_amount = max(1.0, unit_amount)
             if user_side_input == "SPOT":
                 effective_amount = max(10.50, effective_amount)
-            
-            max_coins_by_capital = max(1, math.floor(avail_bal / effective_amount)) if avail_bal >= effective_amount else 0
-            max_allowed_coins = max(1, min(user_top_count, max_coins_by_capital))
+                safe_avail_bal = avail_bal * 0.95
+            else:
+                safe_avail_bal = avail_bal * 0.60 # Reserve 40% margin cushion for safe Cross Margin buffer
 
-            if len(user_active_bots) >= max_allowed_coins or avail_bal < effective_amount:
+            max_coins_by_capital = max(1, math.floor(safe_avail_bal / effective_amount)) if safe_avail_bal >= effective_amount else 0
+
+            # Tiered Active Coin Clamping based on Total Wallet Balance:
+            # Prevents small accounts (<$50) from over-allocating into 5-10 coins.
+            if wallet_bal < 20.0:
+                tiered_cap = 1
+            elif wallet_bal < 50.0:
+                tiered_cap = 2
+            elif wallet_bal < 100.0:
+                tiered_cap = 3
+            else:
+                tiered_cap = user_top_count
+
+            max_allowed_coins = max(1, min(user_top_count, max_coins_by_capital, tiered_cap))
+
+            if len(user_active_bots) >= max_allowed_coins or safe_avail_bal < effective_amount:
                 now_t = time.time()
                 if not hasattr(monitor_turbo_hedge_bots, '_last_cap_notice_time'):
                     monitor_turbo_hedge_bots._last_cap_notice_time = {}
@@ -924,7 +938,7 @@ async def monitor_turbo_hedge_bots(app):
                     if avail_bal <= 0.0 and len(user_active_bots) == 0:
                         print(f"📡 [AGI CAPITAL RADAR] User {target_chat_id}: Free margin is $0.00 USDT. Top-mode auto-scanner standing by 24/7 for available capital...")
                     else:
-                        print(f"🛡️ [AGI CAPITAL CAP] User {target_chat_id}: Active coins ({len(user_active_bots)}) reached capital limit ({max_allowed_coins} coins max for ${avail_bal:.2f} USDT free margin at ${effective_amount:.2f}/coin). Pausing auto-expander.")
+                        print(f"🛡️ [AGI CAPITAL CAP] User {target_chat_id}: Active coins ({len(user_active_bots)}) reached safe capital limit ({max_allowed_coins} coins max for ${avail_bal:.2f} USDT balance, 40% margin buffer reserved at ${effective_amount:.2f}/coin). Standing by.")
                 continue
 
             actual_trade_amount = effective_amount
@@ -1192,11 +1206,11 @@ async def monitor_turbo_hedge_bots(app):
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
                         entry_ts = now_ts
                     
-                    # Prevent fee churning: Only prune if trade is open >90 mins OR if open >60 mins AND net profit after fees is positive (> $0.15 USDT)
+                    # Prevent fee churning: Only prune if trade is open >120 mins with dead volume/zero PnL OR if open >60 mins AND net profit after fees is positive (> $0.25 USDT)
                     holding_seconds = now_ts - entry_ts
                     is_stagnant_timeout = (current_side != "SPOT" and (
-                        (holding_seconds >= 5400 and -0.30 <= real_pnl_usdt <= 0.30) or
-                        (holding_seconds >= 3600 and real_pnl_usdt > 0.15)
+                        (holding_seconds >= 7200 and -0.15 <= real_pnl_usdt <= 0.15) or
+                        (holding_seconds >= 3600 and real_pnl_usdt > 0.25)
                     ))
 
                     if is_hard_circuit_breaker:
@@ -1220,10 +1234,10 @@ async def monitor_turbo_hedge_bots(app):
                                     f"🚨 **APEX TURBO HEDGE HARD CIRCUIT BREAKER ACTIVATED!** 🛡️\n"
                                     f"───────────────────────────────\n\n"
                                     f"🪙 កាក់ ៖ `{symbol}`\n"
-                                    f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker -15.0% Max Limit)\n"
+                                    f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker -25.0% Max Limit)\n"
                                     f"💵 PnL ៖ `-${abs(real_pnl_usdt):.2f} USDT`\n"
                                     f"⚡ Binance Status ៖ `EMERGENCY MARKET CLOSED (<15ms)`\n\n"
-                                    f"🛡️ _ប្រព័ន្ធកាត់ផ្តាច់ Position ភ្លាមៗ ធានាដាច់ខាតមិនឲ្យខាតជ្រុលហួស -15% ឡើយ!_"
+                                    f"🛡️ _ប្រព័ន្ធកាត់ផ្តាច់ Position ភ្លាមៗ ធានាដាច់ខាតមិនឲ្យខាតជ្រុលឡើយ!_"
                                 )
                                 asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_breaker, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                             except Exception as e:
@@ -1258,11 +1272,11 @@ async def monitor_turbo_hedge_bots(app):
                                 print(f"Error sending stagnant notification: {e}")
 
                     elif is_stop_loss_hit:
-                        # 🔄 INSTANT DIRECT REVERSE FLIP (<15ms): ROI <= -10.0% / PnL <= -$2.00 USDT
-                        # Flips position direction (BUY ↔ SELL) in 1 single transaction if not in anti-whipsaw cooldown (<15s) AND 5m trend supports flip
+                        # 🔄 INSTANT DIRECT REVERSE FLIP (<15ms): ROI <= -15.0% / PnL <= -$3.50 USDT
+                        # Flips position direction (BUY ↔ SELL) ONLY IF verified 5m/15m trend supports flip AND confidence >= 88.0% AND cooldown >= 60s
                         target_flip_side = "SELL" if current_side == "BUY" else "BUY"
-                        is_trend_supporting_flip = (ai_recommended_side == target_flip_side)
-                        can_reverse_flip = (current_side != "SPOT" and (now_ts - last_flip_ts) >= 15 and is_trend_supporting_flip)
+                        is_trend_supporting_flip = (ai_recommended_side == target_flip_side and ai_confidence >= 88.0)
+                        can_reverse_flip = (current_side != "SPOT" and (now_ts - last_flip_ts) >= 60 and is_trend_supporting_flip)
                         if can_reverse_flip:
                             print(f"🔄 [INSTANT DIRECT REVERSE FLIP (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Flipping {current_side} ➔ {target_flip_side} (MTF Confluence Verified)!")
                             flip_res = await asyncio.to_thread(execute_direct_reverse_flip, keys[0], keys[1], symbol, amount, target_flip_side, leverage, chat_id)

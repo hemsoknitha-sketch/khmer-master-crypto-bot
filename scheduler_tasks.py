@@ -2939,12 +2939,16 @@ async def check_social_hype(app: Application, ai_engine=None):
     except Exception as e:
         print(f"Error checking social hype: {e}")
 
+_last_defender_action_timestamps = {}
+_last_trailing_guard_deleveraged = {}
+_trailing_guard_deleveraged_count = {}
+
 async def liquidation_defender_task(app, ai_engine):
-    """Monitors VIP futures positions and acts on near-liquidation risks."""
+    """Monitors VIP futures positions and acts on genuine near-liquidation risks (<30% remaining buffer)."""
     try:
         import database as db
         import trading_engine
-# import asyncio # removed local shadowing
+        import time
         active_defenders = db.get_all_active_defenders()
         if not active_defenders:
             return
@@ -2956,6 +2960,8 @@ async def liquidation_defender_task(app, ai_engine):
                 
             api_key, api_secret = keys[0], keys[1]
             positions = await asyncio.to_thread(trading_engine.get_futures_positions, api_key, api_secret)
+            if not positions:
+                continue
             
             for pos in positions:
                 amt = float(pos.get("positionAmt", 0))
@@ -2965,14 +2971,27 @@ async def liquidation_defender_task(app, ai_engine):
                 symbol = pos.get("symbol")
                 mark_price = float(pos.get("markPrice", 0))
                 liq_price = float(pos.get("liquidationPrice", 0))
+                leverage = float(pos.get("leverage", 10.0) or 10.0)
                 
                 if liq_price <= 0 or mark_price <= 0:
                     continue
                     
                 diff_pct = abs(mark_price - liq_price) / mark_price
                 
-                # 🚀 SUPER SMART: AI-Powered Liquidation Defender
-                if diff_pct < 0.08: # Widened trigger zone to 8% for earlier defense
+                # 🚀 SUPER SMART: Leverage-Aware Liquidation Defender Threshold
+                # Dynamically scales with leverage: e.g. 10x lev (10% total buffer) -> triggers only when < 3.0% remaining
+                # 20x lev (5% total buffer) -> triggers only when < 1.5% remaining
+                effective_danger_threshold = max(0.012, min(0.06, (1.0 / max(1.0, leverage)) * 0.30))
+                
+                if diff_pct < effective_danger_threshold:
+                    def_key = (chat_id, symbol)
+                    now_ts = time.time()
+                    last_act = _last_defender_action_timestamps.get(def_key, 0)
+                    
+                    # Enforce strict 300s (5-minute) anti-churn cooldown per position
+                    if now_ts - last_act < 300.0:
+                        continue
+                    
                     side = "LONG" if amt > 0 else "SHORT"
                     
                     # 1. Consult AI Engine for immediate market direction
@@ -3010,12 +3029,13 @@ async def liquidation_defender_task(app, ai_engine):
                     
                     if reduce_qty > 0:
                         res = await asyncio.to_thread(trading_engine.emergency_reduce_position, api_key, api_secret, symbol, side, reduce_qty)
+                        _last_defender_action_timestamps[def_key] = now_ts
                         
                         user_lang = db.get_user_language(chat_id)
                         msg = (f"🚨 **LIQUIDATION DEFENDER TRIGGERED!** 🚨\n\n"
                                f"🪙 **កាក់:** `{symbol}`\n"
-                               f"⚠️ **ហានិភ័យ:** តម្លៃទីផ្សារ (${mark_price}) ខិតជិតតម្លៃ Liquidation (${liq_price}) ណាស់!\n"
-                               f"🛡️ **សកម្មភាពសង្គ្រោះ:** ប្រព័ន្ធទើបតែកាត់បន្ថយ Position ចំនួន 25% ({reduce_qty} គ្រាប់) ដោយស្វ័យប្រវត្តិ ដើម្បីជៀសវាងការឆេះគណនីទាំងមូល។\n\n"
+                               f"⚠️ **ហានិភ័យ:** តម្លៃទីផ្សារ (${mark_price}) ខិតជិតតម្លៃ Liquidation (${liq_price}) ណាស់ (នៅសល់ {diff_pct*100:.1f}%)!\n"
+                               f"🛡️ **សកម្មភាពសង្គ្រោះ:** ប្រព័ន្ធទើបតែកាត់បន្ថយ Position ({reduce_qty} គ្រាប់) ដោយស្វ័យប្រវត្តិ ដើម្បីជៀសវាងការឆេះគណនីទាំងមូល។\n\n"
                                f"_(សូមពិនិត្យមើលគណនី Futures របស់អ្នកជាបន្ទាន់!)_")
                         try:
                             await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
@@ -4136,7 +4156,7 @@ async def trailing_guard_monitor(app: Application):
             chat_id = user_cfg["chat_id"]
             min_profit_pct = user_cfg.get("min_profit_pct", 1.5)
             trailing_step_pct = user_cfg.get("trailing_step_pct", 0.5)
-            min_liq_distance_pct = user_cfg.get("min_liq_distance_pct", 50.0)
+            min_liq_distance_pct = user_cfg.get("min_liq_distance_pct", 3.0)
 
             keys = await asyncio.to_thread(db.get_user_api, chat_id)
             if not keys:
@@ -4209,7 +4229,7 @@ async def trailing_guard_monitor(app: Application):
                     await asyncio.to_thread(db.clear_trailing_guard_peak, chat_id, symbol)
 
                 # -------------------------------------------------------------
-                # 🛡️ Part 2: Auto-Liquidation Guard (>50% Safety Buffer)
+                # 🛡️ Part 2: Super Smart Leverage-Aware Auto-Liquidation Guard
                 # -------------------------------------------------------------
                 if liq_price > 0 and mark_price > 0:
                     if side == "LONG":
@@ -4217,31 +4237,49 @@ async def trailing_guard_monitor(app: Application):
                     else:
                         liq_dist_pct = ((liq_price - mark_price) / mark_price) * 100.0
 
-                    if liq_dist_pct < min_liq_distance_pct:
-                        # De-leverage by 30% reduction to restore safety distance
-                        reduce_qty = trading_engine.get_futures_max_sellable_qty(symbol, abs_qty * 0.30)
-                        if reduce_qty > 0:
-                            res = await asyncio.to_thread(
-                                trading_engine.emergency_reduce_position,
-                                api_key, api_secret, symbol, side, reduce_qty
-                            )
-                            new_liq_dist = min(99.9, liq_dist_pct + 25.0) # Estimated safe zone expansion
-                            msg = loc.get_text(
-                                user_lang,
-                                'liquidation_guard_alert',
-                                symbol=symbol,
-                                side=side,
-                                old_distance=liq_dist_pct,
-                                new_distance=new_liq_dist
-                            )
-                            is_quiet = (db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1")
-                            if not is_quiet:
-                                try:
-                                    await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                                except Exception as e:
-                                    print(f"Failed to send liquidation guard alert to {chat_id}: {e}")
-                            else:
-                                print(f"🛡️ [AUTO-LIQUIDATION GUARD SILENT] {symbol} {side} De-leveraged 30% silently for Chat ID {chat_id}")
+                    # Leverage-Aware Dynamic Liquidation Safety Threshold
+                    # Mathematically: Protection triggers ONLY when < 30% of total leverage buffer remains (<40% dynamic cap).
+                    # 5x -> 3.0%, 10x -> 3.0%, 15x -> 2.0%, 20x -> 1.5%, 50x -> 0.6%, 75x -> 0.4%
+                    max_theoretical_dist = 100.0 / max(1.0, leverage)
+                    dynamic_cap = max_theoretical_dist * 0.40
+                    base_thresh = max_theoretical_dist * 0.30
+                    effective_liq_threshold = max(0.4, min(dynamic_cap, base_thresh))
+                    if 0.2 <= min_liq_distance_pct <= dynamic_cap:
+                        effective_liq_threshold = min_liq_distance_pct
+
+                    if liq_dist_pct < effective_liq_threshold:
+                        guard_key = (chat_id, symbol)
+                        now_ts = time.time()
+                        last_act = _last_trailing_guard_deleveraged.get(guard_key, 0)
+                        act_count = _trailing_guard_deleveraged_count.get(guard_key, 0)
+
+                        # Enforce 300s (5-minute) anti-churn cooldown and max 2 de-leveraging cuts per position lifecycle
+                        if (now_ts - last_act >= 300.0) and act_count < 2:
+                            reduce_qty = trading_engine.get_futures_max_sellable_qty(symbol, abs_qty * 0.30)
+                            if reduce_qty > 0:
+                                res = await asyncio.to_thread(
+                                    trading_engine.emergency_reduce_position,
+                                    api_key, api_secret, symbol, side, reduce_qty
+                                )
+                                _last_trailing_guard_deleveraged[guard_key] = now_ts
+                                _trailing_guard_deleveraged_count[guard_key] = act_count + 1
+                                new_liq_dist = min(99.9, liq_dist_pct + 15.0) # Safe zone expansion
+                                msg = loc.get_text(
+                                    user_lang,
+                                    'liquidation_guard_alert',
+                                    symbol=symbol,
+                                    side=side,
+                                    old_distance=liq_dist_pct,
+                                    new_distance=new_liq_dist
+                                )
+                                is_quiet = (db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1")
+                                if not is_quiet:
+                                    try:
+                                        await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                                    except Exception as e:
+                                        print(f"Failed to send liquidation guard alert to {chat_id}: {e}")
+                                else:
+                                    print(f"🛡️ [AUTO-LIQUIDATION GUARD SILENT] {symbol} {side} (Lev {leverage}x, LiqDist {liq_dist_pct:.1f}%) De-leveraged 30% safely for Chat ID {chat_id}")
 
     except asyncio.CancelledError:
         pass

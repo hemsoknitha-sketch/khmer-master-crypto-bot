@@ -128,10 +128,10 @@ MESSAGES = {
         'sweep_auto_enabled': "🛡️ **Apex AI Liquidity Sweep Sniper ត្រូវបានបើក (Wick Sniper Active)!**\n\n💵 ទំហំទុនស្ទាក់ទិញ: ${amount} USDT\n🎯 គោលដៅ: Liquidation Dumps & Sudden Wicks (≥ 0.4% Drop)\n⚡ Rebound Target: 5 - 10 Seconds V-Shape Exit\n⚙️ Dynamic Leverage: 5x Futures\n\n*AI នឹងស្កេនស្ទាក់ទិញនៅបាតជើង Candle វែងៗ និងលក់កាត់ចំណេញស្វ័យប្រវត្តិ!*",
         'sweep_auto_disabled': "🚫 **Apex AI Liquidity Sweep Sniper ត្រូវបានបិទ。**",
         'trailing_guard_usage': "❌ របៀបប្រើប្រាស់: `/trailing_guard ON <PIN>` ឬ `/trailing_guard OFF <PIN>`\nឧទាហរណ៍: `/trailing_guard ON 1234`",
-        'trailing_guard_enabled': "🛡️ **Dynamic Trailing Profit & Auto-Liquidation Guard ត្រូវបានបើក!**\n\n🎯 Dynamic Trailing Threshold: +1.5% Profit Trigger\n📈 Max Profit Ride: Trailing Stop តាមពីក្រោយ 0.5%\n🛡️ Auto-Liquidation Safety: រក្សា Liquidation Distance > 50.0% ជានិច្ច\n\n*ប្រព័ន្ធនឹងការពារគណនី Futures របស់អ្នកពី Liquidation និងប្រមូលចំណេញខ្ពស់បំផុត!*",
-        'trailing_guard_disabled': "🚫 **Dynamic Trailing Profit & Auto-Liquidation Guard ត្រូវបានបិទ。**",
+        'trailing_guard_enabled': "🛡️ **Dynamic Trailing Profit & Auto-Liquidation Guard ត្រូវបានបើក!**\n\n🎯 Dynamic Trailing Threshold: +1.5% Profit Trigger\n📈 Max Profit Ride: Trailing Stop តាមពីក្រោយ 0.5%\n🛡️ Auto-Liquidation Safety: គណនាតាម Leverage ជាក់ស្តែង (<30% Buffer Guard)\n\n*ប្រព័ន្ធនឹងការពារគណនី Futures របស់អ្នកពី Liquidation និងប្រមូលចំណេញខ្ពស់បំផុត!*",
+        'trailing_guard_disabled': "🚫 **Dynamic Trailing Profit & Auto-Liquidation Guard ត្រូវបានបិទ។**",
         'trailing_guard_tp_triggered': "💎 **TRAILING GUARD PROFIT LOCKED!** 💎\n\n🪙 **{symbol}**\n📈 **Peak PnL:** +{peak_pnl:.2f}%\n💰 **Locked PnL:** +{locked_pnl:.2f}%\n💵 **Exit Price:** ${exit_price:,.2f}\n\n*Apex AI នឹងការពារចំណេញ និងមិនបណ្តោយឱ្យចំណេញប្រែជាខាតឡើយ!*",
-        'liquidation_guard_alert': "🛡️ **AUTO-LIQUIDATION GUARD TRIGGERED!** 🛡️\n\n🪙 **{symbol}** ({side})\n📉 **Prev Liquidation Distance:** {old_distance:.2f}% (<50% Buffer)\n⚡ **Action Taken:** De-leveraged / Reduced position size by 30%\n✅ **New Liquidation Distance:** {new_distance:.2f}% (>50% Safe Zone)\n\n*គណនី Futures របស់អ្នកត្រូវបានការពារពី Liquidation ដោយសុវត្ថិភាព!*",
+        'liquidation_guard_alert': "🛡️ **AUTO-LIQUIDATION GUARD TRIGGERED!** 🛡️\n\n🪙 **{symbol}** ({side})\n📉 **Prev Liquidation Distance:** {old_distance:.2f}%\n⚡ **Action Taken:** De-leveraged / Reduced position size by 30%\n✅ **New Liquidation Distance:** {new_distance:.2f}% (Safe Zone Extended)\n\n*គណនី Futures របស់អ្នកត្រូវបានការពារពី Liquidation ដោយសុវត្ថិភាព!*",
         'daily_executive_summary_report': (
             "📊 **APEX AI 24-HOUR EXECUTIVE SUMMARY REPORT** 📊\n"
             "───────────────────────────────\n"
@@ -282,10 +282,10 @@ MESSAGES = {
         'auto_trade_enabled': "✅ Auto-Trade enabled!\n💵 Amount: ${amount} USDT\n🛡️ Trailing Stop-Loss: {trailing}%\n\n*Note: Bot will auto-buy whenever AI outputs a BUY signal!*",
         'auto_trade_disabled': "🚫 Auto-Trade has been disabled.",
         'trailing_guard_usage': "❌ Usage: `/trailing_guard ON <PIN>` or `/trailing_guard OFF <PIN>`\nExample: `/trailing_guard ON 1234`",
-        'trailing_guard_enabled': "🛡️ **Dynamic Trailing Profit & Auto-Liquidation Guard ENABLED!**\n\n🎯 Dynamic Trailing Threshold: +1.5% Profit Trigger\n📈 Max Profit Ride: 0.5% Trailing Step\n🛡️ Auto-Liquidation Safety: Maintains >50.0% Liquidation Distance Buffer\n\n*AI will continuously ride profits and shield your Futures account from liquidation!*",
+        'trailing_guard_enabled': "🛡️ **Dynamic Trailing Profit & Auto-Liquidation Guard ENABLED!**\n\n🎯 Dynamic Trailing Threshold: +1.5% Profit Trigger\n📈 Max Profit Ride: 0.5% Trailing Step\n🛡️ Auto-Liquidation Safety: Leverage-Calibrated (<30% Buffer Guard)\n\n*AI will continuously ride profits and shield your Futures account from liquidation!*",
         'trailing_guard_disabled': "🚫 **Dynamic Trailing Profit & Auto-Liquidation Guard DISABLED.**",
         'trailing_guard_tp_triggered': "💎 **TRAILING GUARD PROFIT LOCKED!** 💎\n\n🪙 **{symbol}**\n📈 **Peak PnL:** +{peak_pnl:.2f}%\n💰 **Locked PnL:** +{locked_pnl:.2f}%\n💵 **Exit Price:** ${exit_price:,.2f}\n\n*Apex AI secured your maximum profit run!*",
-        'liquidation_guard_alert': "🛡️ **AUTO-LIQUIDATION GUARD TRIGGERED!** 🛡️\n\n🪙 **{symbol}** ({side})\n📉 **Prev Liquidation Distance:** {old_distance:.2f}% (<50% Buffer)\n⚡ **Action Taken:** De-leveraged / Reduced position by 30%\n✅ **New Liquidation Distance:** {new_distance:.2f}% (>50% Safe Zone)\n\n*Your Futures position is completely safe from liquidation!*",
+        'liquidation_guard_alert': "🛡️ **AUTO-LIQUIDATION GUARD TRIGGERED!** 🛡️\n\n🪙 **{symbol}** ({side})\n📉 **Prev Liquidation Distance:** {old_distance:.2f}%\n⚡ **Action Taken:** De-leveraged / Reduced position by 30%\n✅ **New Liquidation Distance:** {new_distance:.2f}% (Safe Zone Extended)\n\n*Your Futures position is completely safe from liquidation!*",
         'daily_executive_summary_report': (
             "📊 **APEX AI 24-HOUR EXECUTIVE SUMMARY REPORT** 📊\n"
             "───────────────────────────────\n"

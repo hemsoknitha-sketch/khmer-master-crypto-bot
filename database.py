@@ -328,10 +328,16 @@ def init_db():
             is_enabled BOOLEAN NOT NULL DEFAULT 0,
             min_profit_pct REAL DEFAULT 1.5,
             trailing_step_pct REAL DEFAULT 0.5,
-            min_liq_distance_pct REAL DEFAULT 50.0,
+            min_liq_distance_pct REAL DEFAULT 3.0,
             updated_at TEXT
         )
     ''')
+
+    # Auto-migrate legacy 50.0 default to safe leverage-calibrated 3.0
+    try:
+        cursor.execute("UPDATE trailing_guard_config SET min_liq_distance_pct = 3.0 WHERE min_liq_distance_pct >= 20.0")
+    except Exception:
+        pass
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS trailing_guard_peaks (
@@ -3199,7 +3205,7 @@ def get_active_funding_harvester_users() -> list:
         })
     return results
 
-def set_trailing_guard_config(chat_id: int, enabled: bool, min_profit_pct: float = 1.5, trailing_step_pct: float = 0.5, min_liq_distance_pct: float = 50.0):
+def set_trailing_guard_config(chat_id: int, enabled: bool, min_profit_pct: float = 1.5, trailing_step_pct: float = 0.5, min_liq_distance_pct: float = 3.0):
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().isoformat()
@@ -3223,7 +3229,7 @@ def get_trailing_guard_config(chat_id: int) -> dict:
             "trailing_step_pct": float(row[2]),
             "min_liq_distance_pct": float(row[3])
         }
-    return {"enabled": False, "min_profit_pct": 1.5, "trailing_step_pct": 0.5, "min_liq_distance_pct": 50.0}
+    return {"enabled": False, "min_profit_pct": 1.5, "trailing_step_pct": 0.5, "min_liq_distance_pct": 3.0}
 
 def is_trailing_guard_enabled(chat_id: int) -> bool:
     cfg = get_trailing_guard_config(chat_id)
