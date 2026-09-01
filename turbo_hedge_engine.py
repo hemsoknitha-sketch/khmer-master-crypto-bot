@@ -370,17 +370,21 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     confidence = 50.0
                     print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Trend Misaligned (5m Bull: {is_5m_bullish}, 1m EMA5>15: {ema5_1m > ema15_1m}) -> SKIPPED!")
 
-            # 🛡️ Anti-Peak Buying & Anti-Bottom Selling Protection (v13.00 Ultra Confluence Architecture)
+            # 🛡️ Anti-Peak Buying, Anti-FOMO & Pullback Entry Guard
             if not is_spot_mode and side != "SKIP":
-                if side == "BUY" and (change_24h >= 30.0 or rsi14 >= 72.0):
+                if side == "BUY" and (change_24h >= 25.0 or rsi14 >= 70.0):
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [ANTI-PEAK BUYING PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% or RSI {rsi14:.1f} >= 72 -> Blocked BUY!")
-
-                elif side == "SELL" and rsi14 <= 28.0:
+                    print(f"🛡️ [ANTI-PEAK BUYING PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% or RSI {rsi14:.1f} >= 70 -> Blocked BUY!")
+                elif side == "BUY" and price > ema5_1m * 1.004:
+                    # Price extended > 0.4% above 1m EMA5 -> Wait for Pullback Retracement!
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [ANTI-BOTTOM SELLING PROTECTION] {symbol}: RSI {rsi14:.1f} <= 28 -> Blocked SELL!")
+                    print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.4% above EMA5 -> Waiting for Pullback!")
+                elif side == "SELL" and (rsi14 <= 30.0 or price < ema5_1m * 0.996):
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [ANTI-BOTTOM SELLING PROTECTION] {symbol}: RSI {rsi14:.1f} <= 30 or extended below EMA5 -> Blocked SELL!")
 
             # 🛡️ BTC Lead Impulse Guard & Funding Fee Penalty Guard
             if side != "SKIP" and symbol != "BTCUSDT":
@@ -962,15 +966,25 @@ async def monitor_turbo_hedge_bots(app):
                 if eval_side == "SKIP":
                     continue
 
-                # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 85.0%)
-                min_conf_threshold = 86.0 if is_recovery_mode else 85.0
+                # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 88.0%)
+                min_conf_threshold = 89.0 if is_recovery_mode else 88.0
                 if eval_res.get("confidence_pct", 0) < min_conf_threshold:
                     print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                     continue
 
+                # ⏱️ 2. Staggered Entry Shield: Enforce 15-second delay between entries to prevent simultaneous slippage
+                now_t = time.time()
+                last_t = getattr(monitor_turbo_hedge_bots, '_last_stagger_entry', 0)
+                if now_t - last_t < 15.0:
+                    print(f"⏱️ [STAGGERED ENTRY SHIELD] User {target_chat_id}: Pausing candidate loop (15s staggered delay).")
+                    break
+
                 target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side
                 exec_leverage = min(unit_leverage, 10) if is_recovery_mode else unit_leverage
                 exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
+                
+                if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
+                    monitor_turbo_hedge_bots._last_stagger_entry = time.time()
                 
                 if isinstance(exec_res, dict) and (exec_res.get("reason") == "FUTURES_PERMISSION_DISABLED" or exec_res.get("code") == -2015):
                     print(f"🛑 [FUTURES DISABLED BREAK] Pausing candidate auto-expander for User {target_chat_id} due to missing Futures permission (-2015).")
