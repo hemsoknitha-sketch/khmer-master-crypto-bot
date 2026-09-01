@@ -3411,6 +3411,83 @@ class TelegramBotThread(BaseThread):
                 await pre_pump_command(update, context)
             elif data == "btn_my_alerts":
                 await my_alerts_command(update, context)
+            elif data == "btn_stop_all":
+                await stop_all_command(update, context)
+            elif data in ["btn_flash_crash", "btn_flash_crash_refresh"]:
+                await flash_crash_command(update, context)
+            elif data in ["btn_black_swan_guard", "btn_black_swan_refresh", "btn_confirm_flight_safety"]:
+                await black_swan_guard_command(update, context)
+            elif data in ["btn_defender_on", "btn_defender_off"]:
+                context.args = ["ON"] if data == "btn_defender_on" else ["OFF"]
+                await defender_command(update, context)
+            elif data in ["btn_wave_rider_on", "btn_wave_rider_off"]:
+                context.args = ["ON"] if data == "btn_wave_rider_on" else ["OFF"]
+                await turbo_hedge_command(update, context)
+            elif data in ["btn_dyn_lev_on", "btn_dyn_lev_off"]:
+                context.args = ["ON"] if data == "btn_dyn_lev_on" else ["OFF"]
+                await dynamic_leverage_command(update, context)
+            elif data == "btn_turbo_hedge_spot_launch":
+                context.args = ["SPOT", "AUTO"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_turbo_hedge_top_launch":
+                context.args = ["TOP", "20", "10", "AUTO", "5"]
+                await turbo_hedge_command(update, context)
+            elif data.startswith("btn_scalp_"):
+                sym = data.replace("btn_scalp_", "")
+                context.args = [sym]
+                await scalp_command(update, context)
+            elif data.startswith("btn_auto_trade_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await auto_trade_command(update, context)
+            elif data.startswith("btn_hyper_trade_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await hyper_trade_command(update, context)
+            elif data.startswith("btn_auto_arb_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await auto_arb_command(update, context)
+            elif data.startswith("btn_auto_snipe_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await auto_snipe_command(update, context)
+            elif data.startswith("btn_funding_harvester_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await funding_harvester_command(update, context)
+            elif data.startswith("btn_gold_turbo_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await gold_turbo_command(update, context)
+            elif data.startswith("btn_hedge_mode_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await hedge_mode_command(update, context)
+            elif data.startswith("btn_infinity_matrix_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await infinity_grid_command(update, context)
+            elif data.startswith("btn_pre_pump_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await pre_pump_command(update, context)
+            elif data.startswith("btn_sweep_auto_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await sweep_auto_command(update, context)
+            elif data.startswith("btn_trailing_guard_"):
+                act = "ON" if "on" in data else "OFF"
+                context.args = [act]
+                await trailing_guard_command(update, context)
+            elif data == "btn_admin_signal_prompt":
+                await admin_signal_command(update, context)
+            elif data in ["btn_opt_rebalance_toggle", "btn_toggle_rebalance_toggle"]:
+                await toggle_rebalance_command(update, context)
+            elif data == "btn_reset_pin_prompt":
+                await set_pin_command(update, context)
+            elif data == "nuke_confirm":
+                await admin_nuke_command(update, context)
 
         gold_button_callback = master_button_callback
 
