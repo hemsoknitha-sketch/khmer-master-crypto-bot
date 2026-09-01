@@ -935,7 +935,8 @@ async def monitor_turbo_hedge_bots(app):
 
             for c_cand in top_coins:
                 # 🛡️ STRICT IN-LOOP CAP CHECK: Re-evaluate active bot count before opening new trade
-                fresh_active = db.get_turbo_hedge_bots(target_chat_id)
+                fresh_all = db.get_active_turbo_hedge_bots()
+                fresh_active = [b for b in fresh_all if b.get("chat_id") == target_chat_id]
                 if len(fresh_active) >= max_allowed_coins:
                     print(f"🛡️ [AGI CAPITAL CAP IN-LOOP] User {target_chat_id}: Reached strict max_allowed_coins limit ({max_allowed_coins}). Stopping candidate loop.")
                     break
