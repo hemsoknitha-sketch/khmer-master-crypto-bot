@@ -919,7 +919,7 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     await update.callback_query.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
             else:
-                await update.message.reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
+                await (update.effective_message or update.message).reply_text(text=menu_text, parse_mode="Markdown", reply_markup=reply_markup)
             self.log_signal.emit(f"🎛️ Sent Super Smart v13.00 Master Control Panel to {chat_id}")
 
 
@@ -933,7 +933,7 @@ class TelegramBotThread(BaseThread):
                 if update.callback_query:
                     await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
                 else:
-                    await update.message.reply_text(err_msg, parse_mode="Markdown")
+                    await (update.effective_message or update.message).reply_text(err_msg, parse_mode="Markdown")
                 return
 
             raw_lang = db.get_user_language(chat_id)
@@ -1061,7 +1061,7 @@ class TelegramBotThread(BaseThread):
             if update.callback_query:
                 await update.callback_query.message.reply_text(admin_panel_card, parse_mode="Markdown", reply_markup=reply_markup)
             else:
-                await update.message.reply_text(admin_panel_card, parse_mode="Markdown", reply_markup=reply_markup)
+                await (update.effective_message or update.message).reply_text(admin_panel_card, parse_mode="Markdown", reply_markup=reply_markup)
             self.log_signal.emit(f"👑 Super Admin Control Panel opened for {chat_id}")
 
         async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1538,7 +1538,7 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
         async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
@@ -1715,8 +1715,8 @@ class TelegramBotThread(BaseThread):
             is_vip_status = db.is_vip(chat_id)
             is_admin = db.is_admin(chat_id)
             if not is_vip_status and not is_admin:
-                await update.message.reply_text("❌ មុខងារ Smart Portfolio Rebalancing នេះសម្រាប់តែ VIP ឡើងទៅប៉ុណ្ណោះ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ មុខងារ Smart Portfolio Rebalancing នេះសម្រាប់តែ VIP ឡើងទៅប៉ុណ្ណោះ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             args = context.args
@@ -1764,8 +1764,8 @@ class TelegramBotThread(BaseThread):
                 "📋 **1-TAP COMMAND EXECUTIONS:**\n"
                 "👉 **ដើម្បីផ្លាស់ប្តូរស្ថានភាព ៖**\n`` `/opt_rebalance` ``"
             )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def toggle_rebalance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2098,7 +2098,7 @@ class TelegramBotThread(BaseThread):
                             "`` `/predict SOL` ``\n"
                             "`` `/analyze PAXG` ``"
                         )
-                    await update.message.reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
+                    await (update.effective_message or update.message).reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
                     return
                     
                 raw_sym = str(context.args[0]).upper().strip()
@@ -2330,7 +2330,7 @@ class TelegramBotThread(BaseThread):
                             "`` `/analyze PAXG` ``\n\n"
                             "👉 **វិភាគកាក់ជាមួយសំណួរផ្ទាល់ខ្លួន ៖**\n`` `/analyze BTCUSDT Should I Buy Long or Short now?` ``"
                         )
-                    await update.message.reply_text(usage_msg, parse_mode="Markdown", reply_markup=reply_markup)
+                    await (update.effective_message or update.message).reply_text(usage_msg, parse_mode="Markdown", reply_markup=reply_markup)
                     return
                     
                 symbol = str(context.args[0]).upper().strip()
@@ -2504,8 +2504,8 @@ class TelegramBotThread(BaseThread):
                     if update.callback_query:
                         await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                     else:
-                        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
+                        await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None) if update.message else 0, user_lang)
                     return
 
                 if len(args) != 3:
@@ -2515,8 +2515,8 @@ class TelegramBotThread(BaseThread):
                         usage = "⚠️ **格式 ៖** `` `/alert <币种> > 或 < <价格>` ``\n\n示例 ៖ `` `/alert XRP > 2.50` `` 或 `` `/alert BTC < 85000` ``"
                     else:
                         usage = "⚠️ **របៀបកំណត់ AI Price Alert ៖** `` `/alert <កាក់> > ឬ < <តម្លៃ>` ``\n\nឧទាហរណ៍ ៖ `` `/alert XRP > 2.50` `` ឬ `` `/alert BTC < 85000` ``"
-                    await update.message.reply_text(usage, parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
+                    await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None) if update.message else 0, user_lang)
                     return
 
                 symbol = str(args[0]).upper().strip()
@@ -2528,8 +2528,8 @@ class TelegramBotThread(BaseThread):
                     price = float(args[2])
                 except ValueError:
                     err_num = "❌ Invalid price number." if user_lang == 'en' else ("❌ 价格数值格式不正确。" if user_lang == 'zh' else "❌ សូមបញ្ចូលចំនួនតម្លៃជាលេខឲ្យបានត្រឹមត្រូវ។")
-                    await update.message.reply_text(err_num)
-                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
+                    await (update.effective_message or update.message).reply_text(err_num)
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None) if update.message else 0, user_lang)
                     return
 
                 if condition_sign in [">", "above"]:
@@ -2540,8 +2540,8 @@ class TelegramBotThread(BaseThread):
                     localized_cond = "Drops Below" if user_lang == 'en' else ("跌破下行至" if user_lang == 'zh' else "ធ្លាក់ចុះក្រោម")
                 else:
                     err_cond = "❌ Invalid condition! Use `>` (Above) or `<` (Below)." if user_lang == 'en' else ("❌ 条件无效！请使用 `>` (高于) 或 `<` (低于)。" if user_lang == 'zh' else "❌ លក្ខខណ្ឌមិនត្រឹមត្រូវ! សូមប្រើសញ្ញា `>` (Above) ឬ `<` (Below)។")
-                    await update.message.reply_text(err_cond, parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
+                    await (update.effective_message or update.message).reply_text(err_cond, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None) if update.message else 0, user_lang)
                     return
 
                 db.add_price_alert(chat_id, symbol, price, condition)
@@ -2567,8 +2567,8 @@ class TelegramBotThread(BaseThread):
                         f"🎯 **លក្ខខណ្ឌរំលឹក** ៖ `{localized_cond} ${price:,.4f} USDT`\n\n"
                         "_Bot នឹងផ្ញើសារជូនដំណឹងភ្លាមៗ ពេលតម្លៃទីផ្សារដើរដល់គោលដៅ 24/7!_"
                     )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id if update.message else 0, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None) if update.message else 0, user_lang)
                 self.log_signal.emit(f"⏰ Alert set for {chat_id}: {symbol} {condition} {price}")
             finally:
                 self.active_tasks.discard(chat_id)
@@ -2662,8 +2662,8 @@ class TelegramBotThread(BaseThread):
                     "⚠️ _អ្នកមិនទាន់មានការកំណត់ Alert ណាមួយកំពុងរត់នៅឡើយទេ!_\n\n"
                     "👉 **ដើម្បីបង្កើត Alert ថ្មី ៖**\n`` `/alert XRP > 2.50` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             alert_lines = []
@@ -2681,8 +2681,8 @@ class TelegramBotThread(BaseThread):
                 "📋 **1-TAP CANCEL EXECUTIONS:**\n"
                 "👉 **ដើម្បីលុប Alert ណាមួយ ៖**\n`` `/cancel_alert <ID>` ``"
             )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def cancel_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2694,25 +2694,25 @@ class TelegramBotThread(BaseThread):
 
             args = context.args
             if not args or len(args) == 0:
-                await update.message.reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/cancel_alert <ID>` ``\n(ប្រើប្រាស់បញ្ជា `/my_alerts` ដើម្បីមើល ID)", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/cancel_alert <ID>` ``\n(ប្រើប្រាស់បញ្ជា `/my_alerts` ដើម្បីមើល ID)", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             try:
                 alert_id = int(str(args[0]).strip())
             except ValueError:
-                await update.message.reply_text("❌ ID ត្រូវតែជាលេខ។ ឧទាហរណ៍ ៖ `` `/cancel_alert 12` ``", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ ID ត្រូវតែជាលេខ។ ឧទាហរណ៍ ៖ `` `/cancel_alert 12` ``", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             success = db.delete_alert(alert_id, chat_id)
             if success:
-                await update.message.reply_text(f"✅ **Price Alert ID `{alert_id}` ត្រូវបានលុបចេញដោយជោគជ័យ!**", parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text(f"✅ **Price Alert ID `{alert_id}` ត្រូវបានលុបចេញដោយជោគជ័យ!**", parse_mode="Markdown")
                 self.log_signal.emit(f"🗑️ Alert {alert_id} cancelled by user {chat_id}")
             else:
-                await update.message.reply_text(f"❌ មិនបានរកឃើញ Alert ID `{alert_id}` នៅក្នុងគណនីរបស់អ្នកទេ។", parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text(f"❌ មិនបានរកឃើញ Alert ID `{alert_id}` នៅក្នុងគណនីរបស់អ្នកទេ។", parse_mode="Markdown")
 
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2765,7 +2765,7 @@ class TelegramBotThread(BaseThread):
                 except Exception: pass
                 status_msg = await update.callback_query.message.reply_text(loading_msg, parse_mode="Markdown")
             else:
-                status_msg = await update.message.reply_text(loading_msg, parse_mode="Markdown")
+                status_msg = await (update.effective_message or update.message).reply_text(loading_msg, parse_mode="Markdown")
 
             try:
                 import market_data
@@ -2901,7 +2901,7 @@ class TelegramBotThread(BaseThread):
                 except Exception: pass
                 status_msg = await update.callback_query.message.reply_text(loading_text, parse_mode="Markdown")
             else:
-                status_msg = await update.message.reply_text(loading_text, parse_mode="Markdown")
+                status_msg = await (update.effective_message or update.message).reply_text(loading_text, parse_mode="Markdown")
 
             import ai_news_engine
             report = await asyncio.to_thread(ai_news_engine.generate_news_report, target_symbol, user_lang, self.ai_engine)
@@ -3067,7 +3067,7 @@ class TelegramBotThread(BaseThread):
                     except Exception: pass
                     status_msg = await update.callback_query.message.reply_text(loading_txt, parse_mode="Markdown")
                 else:
-                    status_msg = await update.message.reply_text(loading_txt, parse_mode="Markdown")
+                    status_msg = await (update.effective_message or update.message).reply_text(loading_txt, parse_mode="Markdown")
                 
                 import macro_gold_engine
                 try:
@@ -3658,7 +3658,7 @@ class TelegramBotThread(BaseThread):
                 elif hasattr(message_id_or_update, 'effective_message') and message_id_or_update.effective_message:
                     msg_id = message_id_or_update.effective_message.message_id
                 elif hasattr(message_id_or_update, 'message') and message_id_or_update.message:
-                    msg_id = message_id_or_update.message.message_id
+                    msg_id = message_id_or_(update.effective_message.message_id if update.effective_message else None)
                 elif hasattr(message_id_or_update, 'message_id'):
                     msg_id = message_id_or_update.message_id
             except Exception:
@@ -6168,8 +6168,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/wave_rider ON` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/wave_rider OFF` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -6180,22 +6180,22 @@ class TelegramBotThread(BaseThread):
                     "_AI នឹងមិនប្រញាប់លក់បិទបញ្ជាទេ ពេលកាក់កំពុងឡើងខ្លាំង។ វាវិភាគ Technical Momentum ជាបន្តបន្ទាប់ "
                     "ហើយនឹងរុញ Trailing Stop ឱ្យកាន់តែទូលាយដើម្បីជិះរលកយកចំណេញឱ្យបានច្រើនបំផុត 24/7!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🏄‍♂️ VIP User {chat_id} ENABLED Wave Riding.")
                 return
 
             if action == "OFF":
                 db.set_wave_rider_config(chat_id, False)
                 msg = "🛑 **AI Dynamic Wave Riding ត្រូវបានបិទ!** (ប្រព័ន្ធត្រឡប់មកប្រើ Trailing Stop ធម្មតា)"
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Wave Riding.")
                 return
 
             # Invalid prompt
-            await update.message.reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/wave_rider ON` `` ឬ `` `/wave_rider OFF` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/wave_rider ON` `` ឬ `` `/wave_rider OFF` ``", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def sweep_sniper_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -6244,21 +6244,21 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/sweep_sniper ON 100` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/sweep_sniper OFF` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
             if action == "ON":
                 if len(args) < 2:
-                    await update.message.reply_text("⚠️ សូមបញ្ជាក់ចំនួនទុន! ឧទាហរណ៍ ៖ `` `/sweep_sniper ON 100` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("⚠️ សូមបញ្ជាក់ចំនួនទុន! ឧទាហរណ៍ ៖ `` `/sweep_sniper ON 100` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 try:
                     trade_amt = float(args[1])
                     if trade_amt < 10:
-                        await update.message.reply_text("⚠️ ទុនអប្បបរមាគឺ **$10 USDT**", parse_mode="Markdown")
-                        await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                        await (update.effective_message or update.message).reply_text("⚠️ ទុនអប្បបរមាគឺ **$10 USDT**", parse_mode="Markdown")
+                        await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                         return
 
                     db.set_sweep_sniper_config(chat_id, True, trade_amt)
@@ -6268,25 +6268,25 @@ class TelegramBotThread(BaseThread):
                         "⚡ **យុទ្ធសាស្រ្ត** ៖ `Whale Liquidation Hunting & Instant Rebound Lock`\n\n"
                         "_AI នឹងអង្គុយរង់ចាំចាប់ត្រីបាឡែនបោកទម្លាក់តម្លៃ (Liquidity Sweep) ហើយចូលទិញក្នុងតម្លៃបាតយ៉ាងល្អឥតខ្ចោះ 24/7!_"
                     )
-                    await update.message.reply_text(msg, parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     self.log_signal.emit(f"🐋 VIP User {chat_id} ENABLED Sweep Sniper (Amount: {trade_amt}).")
                     return
                 except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
             if action == "OFF":
                 db.set_sweep_sniper_config(chat_id, False, 50.0)
-                await update.message.reply_text("🛑 **Smart Liquidity Sweep Sniper ត្រូវបានបិទ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Smart Liquidity Sweep Sniper ត្រូវបានបិទ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Sweep Sniper.")
                 return
 
             # Invalid prompt
-            await update.message.reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/sweep_sniper ON 100` `` ឬ `` `/sweep_sniper OFF` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/sweep_sniper ON 100` `` ឬ `` `/sweep_sniper OFF` ``", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def dynamic_leverage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -6333,8 +6333,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/dynamic_leverage ON` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/dynamic_leverage OFF` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -6345,22 +6345,22 @@ class TelegramBotThread(BaseThread):
                     "_AI នឹងប្តូរអានុភាព (Leverage) ស្វ័យប្រវត្តិតាមការប្រែប្រួលទីផ្សារ (ATR Volatility & Depth) "
                     "ដើម្បីការពារហានិភ័យ និងពង្រីកចំណេញពេលទីផ្សារមានទំនុកចិត្តខ្ពស់ 24/7!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"⚖️ VIP User {chat_id} ENABLED Dynamic Leverage.")
                 return
 
             if action == "OFF":
                 db.set_dynamic_leverage(chat_id, False)
                 msg = "🛑 **AI Dynamic Leverage ត្រូវបានបិទ!** (ប្រព័ន្ធនឹងប្រើប្រាស់ Leverage ថេរ)"
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Dynamic Leverage.")
                 return
 
             # Invalid prompt
-            await update.message.reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/dynamic_leverage ON` `` ឬ `` `/dynamic_leverage OFF` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/dynamic_leverage ON` `` ឬ `` `/dynamic_leverage OFF` ``", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def defender_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -6407,8 +6407,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/defender ON` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/defender OFF` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -6419,22 +6419,22 @@ class TelegramBotThread(BaseThread):
                     "_ប្រព័ន្ធនឹងជួយកាត់ Position របស់អ្នក ២៥% ដោយស្វ័យប្រវត្តិ ប្រសិនបើវាខិតជិតដល់តម្លៃ Liquidation (<៥%) "
                     "ដើម្បីការពារគណនីមិនឱ្យឆេះ 24/7!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🛡️ VIP User {chat_id} ENABLED Liquidation Defender.")
                 return
 
             if action == "OFF":
                 db.set_liquidation_defender(chat_id, False)
                 msg = "🛑 **AI Smart Liquidation Defender ត្រូវបានបិទ!**"
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Liquidation Defender.")
                 return
 
             # Invalid prompt
-            await update.message.reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/defender ON` `` ឬ `` `/defender OFF` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/defender ON` `` ឬ `` `/defender OFF` ``", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def hedge_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -6484,8 +6484,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/hedge_mode ON 50 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/hedge_mode OFF 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -6493,12 +6493,12 @@ class TelegramBotThread(BaseThread):
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_hedge_mode_config(chat_id, False, 50.0, 5)
-                await update.message.reply_text("🛑 **Super Smart Crash Hedge Mode ត្រូវបានបិទ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Super Smart Crash Hedge Mode ត្រូវបានបិទ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🛡️ Super Smart Hedge Mode DISABLED for {chat_id}")
                 return
 
@@ -6512,18 +6512,18 @@ class TelegramBotThread(BaseThread):
                         trade_amt = float(args[1])
                         pin = str(args[2]).strip()
                     except ValueError:
-                        await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
-                        await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                        await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                        await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                         return
                 else:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/hedge_mode ON 50 1234` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/hedge_mode ON 50 1234` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 leverage = 5
@@ -6534,14 +6534,14 @@ class TelegramBotThread(BaseThread):
                     f"⚙️ **Hedge Leverage** ៖ `{leverage}x Futures Short`\n\n"
                     "_AI Market Crash Monitor នឹងបើក 5x Futures Short ស្វ័យប្រវត្តិ ប្រសិនបើ BTC/Market ធ្លាក់ > -1.0% ដើម្បីការពារ Spot Portfolio!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🛡️ Super Smart Hedge Mode ENABLED for {chat_id}")
                 return
 
             # Invalid prompt
-            await update.message.reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/hedge_mode ON 50 1234` `` ឬ `` `/hedge_mode OFF 1234` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/hedge_mode ON 50 1234` `` ឬ `` `/hedge_mode OFF 1234` ``", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def smart_dca_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -6584,13 +6584,13 @@ class TelegramBotThread(BaseThread):
                     "📋 **1-TAP COMMAND EXECUTION:**\n"
                     "👉 **ដើម្បីបង្កើត Smart DCA ៖**\n`` `/smart_dca BTCUSDT 50 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if len(args) < 3:
-                await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/smart_dca <កាក់> <ចំនួនលុយទិញ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/smart_dca BTCUSDT 50 1234` ``", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/smart_dca <កាក់> <ចំនួនលុយទិញ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/smart_dca BTCUSDT 50 1234` ``", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             symbol = str(args[0]).upper().strip()
@@ -6601,14 +6601,14 @@ class TelegramBotThread(BaseThread):
                 base_amount = float(args[1])
                 pin = str(args[2]).strip()
             except ValueError:
-                await update.message.reply_text("❌ ចំនួនទុនទិញ ឬ PIN មិនត្រឹមត្រូវ!")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនទិញ ឬ PIN មិនត្រឹមត្រូវ!")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             import requests
@@ -6617,7 +6617,7 @@ class TelegramBotThread(BaseThread):
                 res = await asyncio.to_thread(requests.get, url, timeout=5)
                 entry_price = float(res.json()['price'])
             except Exception:
-                await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃបច្ចុប្បន្នសម្រាប់កាក់ `{symbol}`")
+                await (update.effective_message or update.message).reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃបច្ចុប្បន្នសម្រាប់កាក់ `{symbol}`")
                 return
 
             db.add_smart_dca(chat_id, symbol, base_amount, entry_price)
@@ -6630,8 +6630,8 @@ class TelegramBotThread(BaseThread):
                 "⚡ **យុទ្ធសាស្រ្ត** ៖ `Smart Dip Buying (1.5x Martingale @ -3%, -6%, -10% Dips)`\n\n"
                 "_Bot នឹងស្កេន និងទិញបន្ថែមពេលទីផ្សារធ្លាក់ចុះ 24/7 ស្វ័យប្រវត្តិ!_"
             )
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             self.log_signal.emit(f"📉 Smart DCA Activated for {chat_id}: {symbol} at ${entry_price}")
             return
 
@@ -6679,14 +6679,14 @@ class TelegramBotThread(BaseThread):
                     "📋 **1-TAP COMMAND EXECUTION:**\n"
                     "👉 **ដើម្បីបើក AI Scalper ៖**\n`` `/scalp XRP 100 1.5 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if len(args) < 4:
                 usage = "⚠️ **របៀបប្រើប្រាស់ AI Scalper:**\n\n`/scalp <កាក់> <ចំនួនលុយទិញ> <ភាគរយចំណេញ> <លេខកូដ PIN>`\n\nឧទាហរណ៍៖ `/scalp XRP 100 1.5 1234`\n(ទិញ XRP ចំនួន $100 និងលក់ចេញពេលចំណេញបាន 1.5%)"
-                await update.message.reply_text(usage, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             symbol = str(args[0]).upper().strip()
@@ -6698,19 +6698,19 @@ class TelegramBotThread(BaseThread):
                 profit_pct = float(args[2])
                 pin = str(args[3]).strip()
             except ValueError:
-                await update.message.reply_text("❌ សូមបញ្ចូលចំនួនលុយ និងភាគរយចំណេញជាលេខឲ្យបានត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ សូមបញ្ចូលចំនួនលុយ និងភាគរយចំណេញជាលេខឲ្យបានត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if profit_pct < 0.5:
-                await update.message.reply_text("⚠️ សូមបញ្ចូលភាគរយចំណេញចាប់ពី **0.5%** ឡើងទៅ ដើម្បីជៀសវាងការខាតបង់ដោយសារថ្លៃសេវា (Trading Fees)។", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("⚠️ សូមបញ្ចូលភាគរយចំណេញចាប់ពី **0.5%** ឡើងទៅ ដើម្បីជៀសវាងការខាតបង់ដោយសារថ្លៃសេវា (Trading Fees)។", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             import requests
@@ -6719,7 +6719,7 @@ class TelegramBotThread(BaseThread):
                 res = await asyncio.to_thread(requests.get, url, timeout=5)
                 entry_price = float(res.json()['price'])
             except Exception:
-                await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
+                await (update.effective_message or update.message).reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
                 return
 
             keys = db.get_user_api(chat_id)
@@ -6737,8 +6737,8 @@ class TelegramBotThread(BaseThread):
                 f"🚀 **តម្លៃទិញចូល (Entry Price)** ៖ `${entry_price:,.4f} USDT`\n\n"
                 "_Bot កំពុងតាមដានតម្លៃដើម្បីលក់យកចំណេញដោយស្វ័យប្រវត្តិ 24/7!_"
             )
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             self.log_signal.emit(f"🏓 AI Scalper Activated for {chat_id}: {symbol} at ${entry_price}")
             return
 
@@ -6869,8 +6869,8 @@ class TelegramBotThread(BaseThread):
             
             args = context.args
             if len(args) < 3:
-                await update.message.reply_text("❌ ប្រើប្រាស់ខុស! ទម្រង់ត្រូវ: `/smart_listing_sniper <SYMBOL> <INVEST_AMOUNT> <PIN>`\nឧទាហរណ៍: `/smart_listing_sniper TONUSDT 100 1234`", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ ប្រើប្រាស់ខុស! ទម្រង់ត្រូវ: `/smart_listing_sniper <SYMBOL> <INVEST_AMOUNT> <PIN>`\nឧទាហរណ៍: `/smart_listing_sniper TONUSDT 100 1234`", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
                 
             symbol = str(args[0]).upper().strip()
@@ -6879,20 +6879,20 @@ class TelegramBotThread(BaseThread):
             try:
                 invest_amount = float(args[1])
             except ValueError:
-                await update.message.reply_text("❌ ចំនួនលុយមិនត្រឹមត្រូវ!")
+                await (update.effective_message or update.message).reply_text("❌ ចំនួនលុយមិនត្រឹមត្រូវ!")
                 return
                 
             pin = args[2]
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
                 
             db.add_smart_sniper(chat_id, symbol, invest_amount)
             
-            await update.message.reply_text(f"🧠 **Smart Listing Sniper ដំណើរការ!**\n\n🪙 **កាក់:** {symbol}\n💰 **ទុនត្រៀម:** `${invest_amount}`\n⏳ **ស្ថានភាព:** កំពុងរង់ចាំទីផ្សារបញ្ចេញកំហឹងលក់ (Airdrop Dump) ចប់សិន ទើបរកសញ្ញាទិញផ្អែកលើ EMA-9 Breakout...", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(f"🧠 **Smart Listing Sniper ដំណើរការ!**\n\n🪙 **កាក់:** {symbol}\n💰 **ទុនត្រៀម:** `${invest_amount}`\n⏳ **ស្ថានភាព:** កំពុងរង់ចាំទីផ្សារបញ្ចេញកំហឹងលក់ (Airdrop Dump) ចប់សិន ទើបរកសញ្ញាទិញផ្អែកលើ EMA-9 Breakout...", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             self.log_signal.emit(f"🧠 Smart Listing Sniper Activated for {chat_id}: {symbol} with ${invest_amount}")
 
         async def auto_snipe_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -6979,8 +6979,8 @@ class TelegramBotThread(BaseThread):
                         "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/snipe ON 50 1234` ``\n\n"
                         "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/snipe OFF 50 1234` ``"
                     )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -6988,29 +6988,29 @@ class TelegramBotThread(BaseThread):
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_auto_snipe(chat_id, False, 0)
-                await update.message.reply_text("🛑 **Auto Listing & Dump Sniper ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Auto Listing & Dump Sniper ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if action == "ON":
                 if len(args) < 3:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_snipe ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_snipe ON 50 1234` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_snipe ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_snipe ON 50 1234` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 try:
                     amount = float(args[1])
                     pin = str(args[2]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
                     return
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_auto_snipe(chat_id, True, amount)
                 msg = (
@@ -7019,8 +7019,8 @@ class TelegramBotThread(BaseThread):
                     "🎯 **យុទ្ធសាស្រ្ត** ៖ `Sub-Second Airdrop Dip Buy + Trailing Lock (+5.0%)`\n\n"
                     "_Bot នឹងស្កេន Binance/Bybit/OKX 24/7 និងទិញកាក់ថ្មីភ្លាមៗពេលចុះបញ្ជី!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             # Legacy numeric amount support: /auto_snipe <Amount> <PIN>
@@ -7028,13 +7028,13 @@ class TelegramBotThread(BaseThread):
                 amount = float(args[0])
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
             except ValueError:
-                await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_snipe ON <ទុន> <PIN>` ``", parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_snipe ON <ទុន> <PIN>` ``", parse_mode="Markdown")
                 return
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if amount > 0:
@@ -7044,8 +7044,8 @@ class TelegramBotThread(BaseThread):
                 db.set_auto_snipe(chat_id, False, 0)
                 msg = "🛑 **Auto Listing Sniper ត្រូវបានបិទ!**"
 
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def delta_neutral_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -7106,8 +7106,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/delta_neutral ON 50 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/delta_neutral OFF 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -7115,32 +7115,32 @@ class TelegramBotThread(BaseThread):
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_delta_neutral_config(chat_id, False, 0)
-                await update.message.reply_text("🛑 **Delta-Neutral Arbitrage Engine ត្រូវបានបិទ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Delta-Neutral Arbitrage Engine ត្រូវបានបិទ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Delta-Neutral Arbitrage.")
                 return
 
             if action == "ON":
                 if len(args) < 3:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/delta_neutral ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/delta_neutral ON 50 1234` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់ ៖ `` `/delta_neutral ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/delta_neutral ON 50 1234` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 try:
                     trade_amt = float(args[1])
                     pin = str(args[2]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 db.set_delta_neutral_config(chat_id, True, trade_amt)
@@ -7150,8 +7150,8 @@ class TelegramBotThread(BaseThread):
                     "🎯 **យុទ្ធសាស្រ្ត** ៖ `0% Market Risk (1x Spot LONG + 1x Futures SHORT)`\n\n"
                     "_Bot នឹងប្រមូលការប្រាក់ Funding Yield ស្វ័យប្រវត្ត 24/7 ដោយគ្មានហានិភ័យ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"💸 VIP User {chat_id} ENABLED Delta-Neutral Arbitrage (Amount: {trade_amt}).")
                 return
 
@@ -7160,14 +7160,14 @@ class TelegramBotThread(BaseThread):
                 trade_amt = float(args[0])
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
             except (ValueError, IndexError):
-                await update.message.reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/delta_neutral ON 50 1234` ``", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("💡 របៀបប្រើប្រាស់ ៖ `` `/delta_neutral ON 50 1234` ``", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if trade_amt > 0:
@@ -7177,8 +7177,8 @@ class TelegramBotThread(BaseThread):
                 db.set_delta_neutral_config(chat_id, False, 0)
                 msg = "🛑 **Delta-Neutral Arbitrage ត្រូវបានបិទ!**"
 
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def turbo_yield_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -7205,35 +7205,35 @@ class TelegramBotThread(BaseThread):
                     f"👉 បើកដំណើរការ ៖ `` `/turbo_yield ON <PIN>` ``\n"
                     f"👉 បិទដំណើរការ ៖ `` `/turbo_yield OFF <PIN>` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
             if action == "OFF":
                 if len(args) < 2:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/turbo_yield OFF <PIN>` ``", parse_mode="Markdown")
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/turbo_yield OFF <PIN>` ``", parse_mode="Markdown")
                     return
                 pin = args[1]
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_turbo_yield_config(chat_id, False, 5)
-                await update.message.reply_text("🛑 **Apex Turbo High-Yield Mode ត្រូវបានបិទ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Apex Turbo High-Yield Mode ត្រូវបានបិទ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if action == "ON":
                 if len(args) < 2:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/turbo_yield ON <PIN>` ``", parse_mode="Markdown")
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/turbo_yield ON <PIN>` ``", parse_mode="Markdown")
                     return
                 pin = args[1]
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_turbo_yield_config(chat_id, True, 25)
                 msg = (
@@ -7242,12 +7242,12 @@ class TelegramBotThread(BaseThread):
                     f"💀 Delisting Radar ៖ `Binance Death-Dump Short Sniper Active`\n\n"
                     f"_Bot នឹងចាប់យកឱកាសចំណេញខ្ពស់បំផុត និងរត់ Trailing Lock រហូតដល់ទីផ្សារផ្លាស់ប្តូរនិន្នាការ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
 
         async def gold_turbo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -7292,35 +7292,35 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/gold_turbo ON 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/gold_turbo OFF 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
             if action == "OFF":
                 if len(args) < 2:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/gold_turbo OFF <PIN>` ``", parse_mode="Markdown")
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/gold_turbo OFF <PIN>` ``", parse_mode="Markdown")
                     return
                 pin = str(args[1]).strip()
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_gold_turbo_config(chat_id, False, 15.0)
-                await update.message.reply_text("🛑 **Apex Gold Turbo Engine ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Apex Gold Turbo Engine ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if action == "ON":
                 if len(args) < 2:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/gold_turbo ON <PIN>` ``", parse_mode="Markdown")
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/gold_turbo ON <PIN>` ``", parse_mode="Markdown")
                     return
                 pin = str(args[1]).strip()
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_gold_turbo_config(chat_id, True, 15.0)
                 msg = (
@@ -7330,8 +7330,8 @@ class TelegramBotThread(BaseThread):
                     "📊 **Macro Radar** ៖ `DXY Index + Shanghai SGE Premium Active`\n\n"
                     "⚡ _Bot នឹងស្កេន និងប្រមូលផលចំណេញលើមាស 24/7 ស្វ័យប្រវត្តិ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
         async def turbo_hedge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -7535,7 +7535,7 @@ class TelegramBotThread(BaseThread):
                 )
                 if msg_target:
                     await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             # 🧠 Super Smart Poly-Format Argument Parser for Futures, Spot & Hedge Modes:
@@ -7842,14 +7842,14 @@ class TelegramBotThread(BaseThread):
                     amt_to_invest = float(args[1])
                     pin = str(args[2]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ សូមបញ្ចូលចំនួនលុយ និង PIN ឲ្យបានត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ សូមបញ្ចូលចំនួនលុយ និង PIN ឲ្យបានត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 import requests
@@ -7859,10 +7859,10 @@ class TelegramBotThread(BaseThread):
                     res = await asyncio.to_thread(requests.get, url, timeout=5)
                     entry_price = float(res.json()['price'])
                 except Exception:
-                    await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
+                    await (update.effective_message or update.message).reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
                     return
 
-                analyzing_msg = await update.message.reply_text("🧠 AI កំពុងវិភាគសន្ទុះទីផ្សារ និងទំហំគម្លាតល្អបំផុត...", parse_mode="Markdown")
+                analyzing_msg = await (update.effective_message or update.message).reply_text("🧠 AI កំពុងវិភាគសន្ទុះទីផ្សារ និងទំហំគម្លាតល្អបំផុត...", parse_mode="Markdown")
 
                 import market_data
                 df, _, _ = await asyncio.to_thread(market_data.fetch_binance_data, symbol, "1h", 24)
@@ -7903,7 +7903,7 @@ class TelegramBotThread(BaseThread):
                     "_AI នឹងលក់បូកចំណេញចូលដើមដើម្បីពង្រីកទំហំទិញរហូតដល់សម្រេចគោលដៅ 24/7 ស្វ័យប្រវត្តិ!_"
                 )
                 await analyzing_msg.edit_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"⛄ Super Smart Compound Grid Activated for {chat_id}: {symbol}")
                 return
 
@@ -7915,14 +7915,14 @@ class TelegramBotThread(BaseThread):
                     target_capital = float(args[3])
                     pin = str(args[4]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ សូមបញ្ចូលចំនួនលុយ និងភាគរយជាលេខឲ្យបានត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ សូមបញ្ចូលចំនួនលុយ និងភាគរយជាលេខឲ្យបានត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 import requests
@@ -7932,7 +7932,7 @@ class TelegramBotThread(BaseThread):
                     res = await asyncio.to_thread(requests.get, url, timeout=5)
                     entry_price = float(res.json()['price'])
                 except Exception:
-                    await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
+                    await (update.effective_message or update.message).reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
                     return
 
                 # Initially buy the first layer
@@ -7960,8 +7960,8 @@ class TelegramBotThread(BaseThread):
                     f"{trade_status}\n\n"
                     "_Bot នឹងប្រមូលចំណេញបូកដើម (Snowball Compound) 24/7 ស្វ័យប្រវត្តិ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"⛄ Compound Grid Activated for {chat_id}: {symbol}")
                 return
 
@@ -7971,8 +7971,8 @@ class TelegramBotThread(BaseThread):
                 "👉 **AI Smart Auto 3X Compound:**\n`` `/compound_grid <កាក់> <ទំហំលុយវិនិយោគ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 100 1234` ``\n\n"
                 "👉 **Custom Step Compound:**\n`` `/compound_grid <កាក់> <ទំហំទិញ១ជាន់> <ភាគរយគម្លាត> <ដើមទុនគោលដៅ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 10 1.0 100 1234` ``"
             )
-            await update.message.reply_text(usage, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def infinity_grid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -8051,14 +8051,14 @@ class TelegramBotThread(BaseThread):
                         "📋 **1-TAP COMMAND EXECUTION:**\n"
                         "👉 **ដើម្បីបង្កើត Unified Smart Grid ៖**\n`` `/infinity_grid XRP 10 1.0 100 1234` ``"
                     )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if len(args) < 5:
                 usage = "⚠️ **របៀបប្រើប្រាស់ Infinity Grid:**\n\n`/infinity_grid <កាក់> <ទំហំលុយ១ជាន់> <ភាគរយគម្លាត> <Max_Invest> <PIN>`\n\nឧទាហរណ៍៖ `/infinity_grid XRP 10 1.0 100 1234`\n(វិនិយោគសរុប $100, ទិញ/លក់ ម្តង $10 រាល់ពេលខុសគ្នា 1.0%)"
-                await update.message.reply_text(usage, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             symbol = str(args[0]).upper().strip()
@@ -8071,14 +8071,14 @@ class TelegramBotThread(BaseThread):
                 max_inv = float(args[3])
                 pin = str(args[4]).strip()
             except (ValueError, IndexError):
-                await update.message.reply_text("❌ សូមបញ្ចូលចំនួនលុយ និងភាគរយជាលេខឲ្យបានត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ សូមបញ្ចូលចំនួនលុយ និងភាគរយជាលេខឲ្យបានត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             import requests
@@ -8087,7 +8087,7 @@ class TelegramBotThread(BaseThread):
                 res = await asyncio.to_thread(requests.get, url, timeout=5)
                 entry_price = float(res.json()['price'])
             except Exception:
-                await update.message.reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
+                await (update.effective_message or update.message).reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
                 return
 
             # Initially buy the first layer
@@ -8113,8 +8113,8 @@ class TelegramBotThread(BaseThread):
                 f"{trade_status}\n\n"
                 "_Bot នឹងប្រមូលចំណេញគ្មានដែនកំណត់ 24/7 ស្វ័យប្រវត្តិ!_"
             )
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             self.log_signal.emit(f"🕸️ Infinity Grid Activated for {chat_id}: {symbol}")
             return
 
@@ -8125,8 +8125,8 @@ class TelegramBotThread(BaseThread):
             
             args = context.args
             if len(args) != 6:
-                await update.message.reply_text(loc.get_text(user_lang, 'grid_bot_usage'), parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(loc.get_text(user_lang, 'grid_bot_usage'), parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
                 
             symbol = str(args[0]).upper().strip()
@@ -8140,20 +8140,20 @@ class TelegramBotThread(BaseThread):
                 total_inv = float(args[4])
                 pin = args[5]
             except ValueError:
-                await update.message.reply_text(loc.get_text(user_lang, 'grid_bot_usage'), parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(loc.get_text(user_lang, 'grid_bot_usage'), parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
                 
             stored_pin = db.get_user_pin(chat_id)
             if not stored_pin:
-                await update.message.reply_text(loc.get_text(user_lang, 'pin_required'), parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(loc.get_text(user_lang, 'pin_required'), parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
                 
             import hashlib
             if not security.verify_pin(pin, chat_id, stored_pin):
-                await update.message.reply_text(loc.get_text(user_lang, 'pin_incorrect'))
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(loc.get_text(user_lang, 'pin_incorrect'))
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
                 
             import requests
@@ -8162,11 +8162,11 @@ class TelegramBotThread(BaseThread):
                 res = await asyncio.to_thread(requests.get, url, timeout=5)
                 current_price = float(res.json()['price'])
             except:
-                await update.message.reply_text(f"❌ Failed to fetch price for {symbol}")
+                await (update.effective_message or update.message).reply_text(f"❌ Failed to fetch price for {symbol}")
                 return
                 
             if lower_price >= upper_price or grids < 2:
-                await update.message.reply_text("❌ Invalid grid parameters.")
+                await (update.effective_message or update.message).reply_text("❌ Invalid grid parameters.")
                 return
                 
             grid_step = (upper_price - lower_price) / grids
@@ -8182,8 +8182,8 @@ class TelegramBotThread(BaseThread):
                     db.add_grid_order(bot_id, 'SELL', target_price)
             
             msg = loc.get_text(user_lang, 'grid_bot_set', grids=grids, symbol=symbol, lower=lower_price, upper=upper_price)
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             self.log_signal.emit(f"🕸️ Grid Bot Activated for {chat_id}: {symbol} ({grids} grids)")
 
         async def auto_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -8235,8 +8235,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/auto_trade ON 50 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/auto_trade OFF 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -8244,31 +8244,31 @@ class TelegramBotThread(BaseThread):
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_auto_trade_config(chat_id, False, 30.0, 4.0, 10)
-                await update.message.reply_text("🛑 **VIP Auto-Trade Engine ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **VIP Auto-Trade Engine ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Auto-Trade.")
                 return
 
             if action == "ON":
                 if len(args) < 3:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_trade ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_trade ON 50 1234` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_trade ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_trade ON 50 1234` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 try:
                     trade_amt = float(args[1])
                     pin = str(args[2]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 db.set_auto_trade_config(chat_id, True, trade_amt, 4.0, 10)
@@ -8279,14 +8279,14 @@ class TelegramBotThread(BaseThread):
                     "⚡ **យុទ្ធសាស្រ្ត** ៖ `Sub-Second AI Consensus Signal Execution`\n\n"
                     "_Bot នឹងស្កេន និងអនុវត្តការទិញលក់ 24/7 ស្វ័យប្រវត្តិ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🤖 VIP User {chat_id} ENABLED Auto-Trade (Amount: {trade_amt}, Max: 10).")
                 return
 
             # Invalid usage prompt
-            await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_trade ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_trade ON 50 1234` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_trade ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_trade ON 50 1234` ``", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def hyper_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -8337,8 +8337,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើក Trade កាក់ទោល (Single Coin) ៖**\n`` `/hyper_trade BTCUSDT 100 10 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/hyper_trade OFF 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -8348,30 +8348,30 @@ class TelegramBotThread(BaseThread):
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_hyper_trade_config(chat_id, enabled=False, amount=0.0)
-                await update.message.reply_text("🛑 **Hyper-Trade HFT 24/7 ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Hyper-Trade HFT 24/7 ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if action == "ON":
                 if len(args) < 3:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/hyper_trade ON 100 <PIN>` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/hyper_trade ON 100 <PIN>` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 try:
                     trade_amt = float(args[1])
                     pin = str(args[2]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 db.set_hyper_trade_config(chat_id, enabled=True, amount=trade_amt)
@@ -8382,8 +8382,8 @@ class TelegramBotThread(BaseThread):
                     "🛡️ **Risk Guard** ៖ `Dynamic TP/SL & Auto Margin Protection`\n\n"
                     "_Bot នឹងស្កេនកើបចំណេញលើទីផ្សារ 24/7 ស្វ័យប្រវត្តិ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             # Case 2: Specific symbol execution (e.g., /hyper_trade BTCUSDT 100 10 <PIN>)
@@ -8395,18 +8395,18 @@ class TelegramBotThread(BaseThread):
                     lev = int(args[2])
                     pin = str(args[3]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ ទិន្នន័យបញ្ចូលមិនត្រឹមត្រូវ!")
+                    await (update.effective_message or update.message).reply_text("❌ ទិន្នន័យបញ្ចូលមិនត្រឹមត្រូវ!")
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 keys = db.get_user_api(chat_id)
                 if not keys:
-                    await update.message.reply_text("❌ មិនទាន់មាន API Key! សូមប្រើពាក្យបញ្ជា `` `/add_api` `` ជាមុនសិន។")
+                    await (update.effective_message or update.message).reply_text("❌ មិនទាន់មាន API Key! សូមប្រើពាក្យបញ្ជា `` `/add_api` `` ជាមុនសិន។")
                     return
 
                 import hyper_trade_engine
@@ -8426,8 +8426,8 @@ class TelegramBotThread(BaseThread):
                     err_msg = res.get("message", "Execution failed") if isinstance(res, dict) else str(res)
                     msg = f"❌ **បរាជ័យក្នុងការបើក Hyper-Trade:** {err_msg}"
 
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
         async def auto_arb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -8458,8 +8458,8 @@ class TelegramBotThread(BaseThread):
                 "• ប្រសិនបើអ្នកចង់ស្កេនកើបចំណេញ 24/7 ៖ ប្រើប្រាស់ `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>`\n\n"
                 "✅ _ប្រព័ន្ធកំណែថ្មី v13.00 ការពារ Fee Erosion ១០០% និងធានាប្រាក់ចំណេញសុទ្ធ!_"
             )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
             action = str(args[0]).upper().strip()
@@ -8467,30 +8467,30 @@ class TelegramBotThread(BaseThread):
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_auto_arb_config(chat_id, enabled=False, amount=0.0)
-                await update.message.reply_text("🛑 **Delta-Neutral Auto-Arbitrage ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Delta-Neutral Auto-Arbitrage ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             if action == "ON":
                 if len(args) < 3:
-                    await update.message.reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_arb ON 100 <PIN>` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_arb ON 100 <PIN>` ``", parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 try:
                     arb_amt = float(args[1])
                     pin = str(args[2]).strip()
                 except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
                     return
 
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 db.set_auto_arb_config(chat_id, enabled=True, amount=arb_amt)
@@ -8501,8 +8501,8 @@ class TelegramBotThread(BaseThread):
                     "🛡️ **Fee Protection** ៖ `BNB Fee Deduction Clamping Active`\n\n"
                     "_Bot នឹងស្កេន និងច្រូតកាត់ប្រាក់ចំណេញ Risk-Free 24/7 ស្វ័យប្រវត្តិ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
         async def infinity_matrix_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -8681,8 +8681,8 @@ class TelegramBotThread(BaseThread):
                 "ដើម្បីប្រតិបត្តិការជួញដូរមានល្បឿនលឿនជាងមុន និងការពារហានិភ័យកុំឲ្យ Order ជាន់គ្នា។\n\n"
                 "👉 សូមប្រើប្រាស់ពាក្យបញ្ជា ៖ `/turbo_hedge <COIN> <USDT> <LEV> <PIN>`"
             )
-            await update.message.reply_text(notice, parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(notice, parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
 
         async def funding_harvester_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -8892,8 +8892,8 @@ class TelegramBotThread(BaseThread):
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/pre_pump ON 50` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/pre_pump OFF 1234` ``"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             action = str(args[0]).upper().strip()
@@ -8901,12 +8901,12 @@ class TelegramBotThread(BaseThread):
                 pin = str(args[1]).strip() if len(args) >= 2 else ""
                 stored_pin = db.get_user_pin(chat_id)
                 if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await update.message.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_pre_pump_config(chat_id, False, 50.0)
-                await update.message.reply_text("🛑 **Pre-Pump Spike Sniper ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text("🛑 **Pre-Pump Spike Sniper ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Pre-Pump Sniper.")
                 return
 
@@ -8914,8 +8914,8 @@ class TelegramBotThread(BaseThread):
                 try:
                     trade_amt = float(args[1]) if len(args) >= 2 else 50.0
                 except ValueError:
-                    await update.message.reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
-                    await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
 
                 db.set_pre_pump_config(chat_id, True, trade_amt)
@@ -8926,24 +8926,24 @@ class TelegramBotThread(BaseThread):
                     "🎯 **យុទ្ធសាស្រ្ត** ៖ `Smart Money Accumulation (Trifecta Signal)`\n\n"
                     "_Bot នឹងស្កេន និងស្ទាក់ទិញកាក់ត្រៀមផ្ទុះតម្លៃ 24/7 ស្វ័យប្រវត្តិ!_"
                 )
-                await update.message.reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 self.log_signal.emit(f"🚀 VIP User {chat_id} ENABLED Pre-Pump Sniper (Amount: {trade_amt}).")
                 return
 
             # Invalid usage prompt
-            await update.message.reply_text("💡 **របៀបប្រើ:** `` `/pre_pump ON 50` `` ឬ `` `/pre_pump OFF 1234` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text("💡 **របៀបប្រើ:** `` `/pre_pump ON 50` `` ឬ `` `/pre_pump OFF 1234` ``", parse_mode="Markdown")
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         async def trailing_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id
             if not db.is_vip(chat_id):
-                await update.message.reply_text("❌ **មុខងារនេះសម្រាប់តែ VIP ទេ!**", parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text("❌ **មុខងារនេះសម្រាប់តែ VIP ទេ!**", parse_mode="Markdown")
                 return
             
             if len(context.args) < 4:
-                await update.message.reply_text("💡 **របៀបប្រើ:** `/trailing_stop <Symbol> <Qty> <Buy_Price> <Stop_Pct>`\n\nឧទាហរណ៍: `/trailing_stop BTCUSDT 0.05 60000 2.5`", parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text("💡 **របៀបប្រើ:** `/trailing_stop <Symbol> <Qty> <Buy_Price> <Stop_Pct>`\n\nឧទាហរណ៍: `/trailing_stop BTCUSDT 0.05 60000 2.5`", parse_mode="Markdown")
                 return
                 
             try:
@@ -8953,9 +8953,9 @@ class TelegramBotThread(BaseThread):
                 pct = float(context.args[3])
                 
                 db.add_active_trade(chat_id, symbol, qty, buy_price, pct)
-                await update.message.reply_text(f"✅ **ចាប់ផ្តើម Trailing Stop ស្វ័យប្រវត្តិ!**\n\n🪙 Symbol: {symbol}\n📊 ទិញចូល: ${buy_price:,.2f}\n🛡️ ការពារចំណេញ (Trailing): {pct}%\n\n_Apex AI នឹងតាមដានតម្លៃទីផ្សាររៀងរាល់ ៣ វិនាទីម្តង!_", parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text(f"✅ **ចាប់ផ្តើម Trailing Stop ស្វ័យប្រវត្តិ!**\n\n🪙 Symbol: {symbol}\n📊 ទិញចូល: ${buy_price:,.2f}\n🛡️ ការពារចំណេញ (Trailing): {pct}%\n\n_Apex AI នឹងតាមដានតម្លៃទីផ្សាររៀងរាល់ ៣ វិនាទីម្តង!_", parse_mode="Markdown")
             except Exception as e:
-                await update.message.reply_text(f"❌ **បញ្ហា:** {e}", parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text(f"❌ **បញ្ហា:** {e}", parse_mode="Markdown")
 
         async def trailing_guard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -9270,7 +9270,7 @@ class TelegramBotThread(BaseThread):
                 if update.callback_query:
                     await update.callback_query.message.reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
                 else:
-                    await update.message.reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
+                    await (update.effective_message or update.message).reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
                 return
 
             raw_arg = str(args[0]).upper().strip()
@@ -9292,7 +9292,7 @@ class TelegramBotThread(BaseThread):
                 stored_pin = db.get_user_pin(chat_id)
                 if stored_pin and not security.verify_pin(pin, chat_id, stored_pin):
                     err_pin = "❌ Invalid PIN code." if user_lang == 'en' else ("❌ PIN 码不正确。" if user_lang == 'zh' else "❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await update.message.reply_text(err_pin)
+                    await (update.effective_message or update.message).reply_text(err_pin)
                     return
 
             db.stop_bots_for_symbol(chat_id, target_symbol)
@@ -9371,7 +9371,7 @@ class TelegramBotThread(BaseThread):
             if update.callback_query:
                 await update.callback_query.message.reply_text(stop_card, parse_mode="Markdown", reply_markup=reply_markup)
             else:
-                await update.message.reply_text(stop_card, parse_mode="Markdown", reply_markup=reply_markup)
+                await (update.effective_message or update.message).reply_text(stop_card, parse_mode="Markdown", reply_markup=reply_markup)
             self.log_signal.emit(f"🛑 Targeted Stop executed for {chat_id} on symbol {target_symbol}.")
 
         async def stop_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -9394,7 +9394,7 @@ class TelegramBotThread(BaseThread):
                 if update.callback_query:
                     await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
                 else:
-                    await update.message.reply_text(err_msg, parse_mode="Markdown")
+                    await (update.effective_message or update.message).reply_text(err_msg, parse_mode="Markdown")
                 return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
@@ -9563,7 +9563,7 @@ class TelegramBotThread(BaseThread):
                 if update.callback_query:
                     await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 else:
-                    await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception as e:
                 print(f"❌ [HEALTH COMMAND ERROR]: {e}")
                 err_msg = (
@@ -9578,7 +9578,7 @@ class TelegramBotThread(BaseThread):
                     try: await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
                     except Exception: pass
                 elif update.message:
-                    try: await update.message.reply_text(err_msg, parse_mode="Markdown")
+                    try: await (update.effective_message or update.message).reply_text(err_msg, parse_mode="Markdown")
                     except Exception: pass
 
         async def sync_brain_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -9592,7 +9592,7 @@ class TelegramBotThread(BaseThread):
                 if update.callback_query:
                     await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
                 else:
-                    await update.message.reply_text(err_msg, parse_mode="Markdown")
+                    await (update.effective_message or update.message).reply_text(err_msg, parse_mode="Markdown")
                 return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
@@ -9624,7 +9624,7 @@ class TelegramBotThread(BaseThread):
                 await update.callback_query.answer()
                 status_msg_obj = await update.callback_query.message.reply_text(loading_msg, parse_mode="Markdown")
             else:
-                status_msg_obj = await update.message.reply_text(loading_msg, parse_mode="Markdown")
+                status_msg_obj = await (update.effective_message or update.message).reply_text(loading_msg, parse_mode="Markdown")
 
             try:
                 res = await asyncio.to_thread(self.ai_engine.sync_brain_from_huggingface)
@@ -9747,7 +9747,7 @@ class TelegramBotThread(BaseThread):
                 except Exception: pass
                 status_msg = await update.callback_query.message.reply_text(loading_msg, parse_mode="Markdown")
             else:
-                status_msg = await update.message.reply_text(loading_msg, parse_mode="Markdown")
+                status_msg = await (update.effective_message or update.message).reply_text(loading_msg, parse_mode="Markdown")
 
             try:
                 import requests
@@ -10111,8 +10111,8 @@ class TelegramBotThread(BaseThread):
                     f"{inactive_str}\n\n"
                     "💡 _ចុចលើពាក្យបញ្ជាខាងលើតែម្តងដើម្បី Copy ចូល Telegram ភ្លាមៗ!_"
                 )
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, update.message.message_id, user_lang)
+            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
         self.app.add_handler(CommandHandler("menu", menu_command))
