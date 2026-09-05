@@ -19,8 +19,22 @@ HEADERS = {
     "Cache-Control": "no-cache"
 }
 
-BULLISH_KEYWORDS = ["surge", "jump", "soar", "gain", "bull", "breakout", "rally", "buy", "adoption", "approval", "record", "high", "upgrade", "partnership", "inflow", "boost", "soaring"]
-BEARISH_KEYWORDS = ["drop", "fall", "plummet", "crash", "bear", "hack", "exploit", "ban", "lawsuit", "sec", "dump", "outflow", "decline", "crackdown", "risk", "warn", "threat"]
+BULLISH_KEYWORDS = [
+    "inflow", "inflows", "surge", "surges", "soar", "soars", "jump", "jumps", 
+    "rally", "rallies", "record", "high", "highs", "strongest", "bull", "bullish", 
+    "breakout", "accumulate", "accumulation", "accumulating", "buying", "adopt", 
+    "adoption", "approve", "approval", "gain", "gains", "pump", "boost", "boosts", 
+    "institutional", "expansion", "rebound", "rebounds", "recover", "recovery", 
+    "all-time high", "ath", "green", "milestone", "upgrade", "partnership"
+]
+BEARISH_KEYWORDS = [
+    "outflow", "outflows", "crash", "crashes", "dump", "dumps", "plunge", "plunges", 
+    "hack", "hacked", "exploit", "exploited", "ban", "banned", "lawsuit", "sue", 
+    "sued", "fraud", "scam", "bankrupt", "bankruptcy", "liquidation", "liquidated", 
+    "collapse", "collapses", "bear", "bearish", "drop", "drops", "fall", "falls", 
+    "crackdown", "panic", "selloff", "bleeding", "investigation", "penalty", "fine",
+    "decline", "warn", "threat"
+]
 
 class NewsReportResult(str):
     """
@@ -161,38 +175,66 @@ def clean_ai_news_output(raw_text: str) -> str:
     if not raw_text:
         return ""
 
-    # Remove <thinking>...</thinking> or <thought>...</thought>
+    # 1. Remove reasoning / thinking tags
     raw_text = re.sub(r'(?s)<thinking>.*?</thinking>', '', raw_text)
     raw_text = re.sub(r'(?s)<thought>.*?</thought>', '', raw_text)
     raw_text = re.sub(r'(?s)<think>.*?</think>', '', raw_text)
     raw_text = re.sub(r'(?s)```think.*?```', '', raw_text)
     raw_text = re.sub(r'(?s)\[THINKING\].*?\[/THINKING\]', '', raw_text)
 
+    # 2. Extract clean final block if duplicated draft outputs exist
+    header_matches = [m.start() for m in re.finditer(r'(?:^|\n)\s*(?:📰 \*\*APEX SUPER AGI|🚨 ព័ត៌មានទាន់ហេតុការណ៍)', raw_text)]
+    if len(header_matches) > 1:
+        raw_text = raw_text[header_matches[-1]:].strip()
+
+    # 3. Check for standalone dateline block
+    dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*[\u1780-\u17ffA-Za-z\s]+[៖:]', raw_text))
+    if dateline_matches:
+        last_idx = dateline_matches[-1].start()
+        prefix = raw_text[:last_idx].lower()
+        has_draft_markers = any(k in prefix for k in [
+            "khmer refinement", "refinement:", "goal:", "dual technical", "structure:", "para 3", "end with"
+        ])
+        if has_draft_markers or last_idx > 100:
+            cand = raw_text[last_idx:].strip()
+            if len(cand) > 300:
+                raw_text = cand
+
     lines = raw_text.splitlines()
     cleaned_lines = []
 
-    skip_keywords = [
+    bad_prefixes = [
         "structure:", "confirm structure:", "khmer translation/refinement:",
         "location:", "refinement:", "translated title", "location in p1", 
         "impact in p2", "stability in p3", "ending with ៕", "p3: legal", 
-        "confirm structure", "draft (khmer)", "system directive"
+        "confirm structure", "draft (khmer)", "system directive", "goal:",
+        "dual technical vocabulary:", "khmer refinement:", "english refinement:",
+        "end with", "para 1:", "para 2:", "para 3:", "para 1", "para 2", "para 3",
+        "legal/regulatory", "regulatory landscape", "compliance requirements",
+        "step 1", "step 2", "final symbol"
     ]
 
     for line in lines:
         l = line.strip()
         if not l:
-            cleaned_lines.append("")
             continue
         l_lower = l.lower()
 
+        # Strip "Khmer Refinement:" prefix if present on a substantial paragraph
+        if re.match(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', l, flags=re.IGNORECASE):
+            l = re.sub(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', '', l, flags=re.IGNORECASE).strip()
+            l_lower = l.lower()
+            if len(l) < 50:
+                continue
+
         # Drop lines that are purely section/paragraph labels (e.g. ផ្នែកទី១, កថាខណ្ឌទី១, Para 1, Section 2)
         is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
-        is_short_subhead = (len(l) < 70) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)', l, flags=re.IGNORECASE))
+        is_short_subhead = (len(l) < 90) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+|goal|structure|refinement|dual technical)', l, flags=re.IGNORECASE))
 
         if is_pure_label or is_short_subhead:
             continue
 
-        if any(kw in l_lower for kw in skip_keywords):
+        if any(l_lower.startswith(bad) for bad in bad_prefixes):
             continue
 
         # Strip any leading paragraph/section label embedded at the start of a sentence
@@ -206,13 +248,7 @@ def clean_ai_news_output(raw_text: str) -> str:
         if l:
             cleaned_lines.append(l)
 
-    result = "\n".join(cleaned_lines).strip()
-
-    # If duplicated draft outputs exist, take the clean final iteration
-    header_matches = [m.start() for m in re.finditer(r'(📰 \*\*APEX SUPER AGI|🚨 ព័ត៌មានទាន់ហេតុការណ៍)', result)]
-    if len(header_matches) > 1:
-        result = result[header_matches[-1]:].strip()
-
+    result = "\n\n".join(cleaned_lines).strip()
     return result
 
 def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = None) -> NewsReportResult:

@@ -314,21 +314,21 @@ async def check_crypto_news(app: Application, ai_engine):
                 f"   - កថាខណ្ឌទីមួយ ៖ ចាប់ផ្តើមភ្លាមដោយឈ្មោះទីក្រុងសារព័ត៌មាន (ឧទាហរណ៍ ៖ «ទីក្រុងញូវយ៉ក ៖» ឬ «ទីក្រុងវ៉ាស៊ីនតោន ៖») រួចរៀបរាប់ពីហេតុការណ៍ចម្បង តួលេខទំហំទឹកប្រាក់ ស្ថាប័នពាក់ព័ន្ធ និងបរិបទនៃព្រឹត្តិការណ៍។\n"
                 f"   - កថាខណ្ឌទីពីរ ៖ វិភាគស៊ីជម្រៅលើផលប៉ះពាល់ទីផ្សារ លំហូរសាច់ប្រាក់ងាយស្រួល (Liquidity), ចលនាទិញសន្សំរបស់ត្រីបាឡែន (Whale Accumulation), ទីផ្សារដេរីវ៉េទីវ (Derivatives) និងទស្សនវិស័យម៉ាក្រូសេដ្ឋកិច្ច។\n"
                 f"   - កថាខណ្ឌទីបី ៖ វិភាគផ្នែកក្របខ័ណ្ឌគតិយុត្ត បទប្បញ្ញត្តិច្បាប់ និងការការពារហានិភ័យសម្រាប់វិនិយោគិន ដោយត្រូវបញ្ចប់កថាខណ្ឌទីបីដោយសញ្ញាខណ្ឌ «៕» ជានិច្ច។\n"
-                f"៥. ហាមមានការគិត (Thinking/Reasoning), ហាមមានពាក្យពន្យល់ជាភាសាអង់គ្លេសនៅខាងក្រៅអត្ថបទ។ ផ្តល់តែអត្ថបទសម្រេចជាភាសាខ្មែរប៉ុណ្ណោះ។"
+                f"៥. ដាច់ខាតហាមសរសេរពាក្យដូចជា \"Dual Technical Vocabulary\", \"Structure\", \"Goal\", \"Khmer Refinement\", \"Para\", \"Draft\", ឬសរសេរកំណត់ចំណាំការគិត (Thinking/Scratchpad) មុន ឬក្រោយអត្ថបទជាដាច់ខាត! ចាប់ផ្តើមអក្សរដំបូងនៃអត្ថបទដោយឈ្មោះទីក្រុងសារព័ត៌មានភ្លាម (ឧទាហរណ៍ ៖ «ទីក្រុងញូវយ៉ក ៖»)។"
             )
             khmer_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, kh_prompt)
 
             # 2. English Article
             en_prompt = (
                 f"Write an institutional 3-paragraph financial news analysis in clean English for: {title}. {description}\n"
-                f"Rules: No paragraph labels (e.g. Paragraph 1:). Start with dateline city (e.g. NEW YORK —). Cover event, macro liquidity, and regulatory impact."
+                f"Rules: Strictly NO internal thinking, scratchpads, or notes (NO 'Goal:', 'Structure:', 'Refinement:'). NO paragraph labels (e.g. Paragraph 1:). Start directly with dateline city (e.g. NEW YORK —). Cover event, macro liquidity, and regulatory impact."
             )
             english_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, en_prompt)
 
             # 3. Chinese Article
             zh_prompt = (
                 f"请为以下新闻撰写3段深度机构级中文财经新闻分析: {title}. {description}\n"
-                f"严格要求: 严禁包含段落标签(如第一段、段落1等)。直接以地点电头开始(如 纽约讯 —)，深入分析事件、流动性影响与监管合规。"
+                f"严格要求: 严禁包含任何内部思考、草稿笔记(如 Goal、Structure、Refinement 等)。严禁包含段落标签(如第一段、段落1等)。直接以地点电头开始(如 纽约讯 —)，深入分析事件、流动性影响与监管合规。"
             )
             chinese_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, zh_prompt)
 
@@ -336,37 +336,75 @@ async def check_crypto_news(app: Application, ai_engine):
             def clean_final_news_text(txt, fallback_title="", lang="khmer"):
                 if not txt: return ""
                 
-                # Purge reasoning & thinking tags
+                # 1. Purge reasoning & thinking tags
                 txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL | re.IGNORECASE)
                 txt = re.sub(r"<thought>.*?</thought>", "", txt, flags=re.DOTALL | re.IGNORECASE)
                 txt = re.sub(r"```think.*?```", "", txt, flags=re.DOTALL | re.IGNORECASE)
                 txt = re.sub(r"\[THINKING\].*?\[/THINKING\]", "", txt, flags=re.DOTALL | re.IGNORECASE)
 
+                # 2. Extract clean final block if Gemini generated scratchpad/drafts followed by final article
+                if lang == "khmer":
+                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*[\u1780-\u17ffA-Za-z\s]+[៖:]', txt))
+                    if dateline_matches:
+                        last_idx = dateline_matches[-1].start()
+                        prefix = txt[:last_idx].lower()
+                        has_draft_markers = any(k in prefix for k in [
+                            "khmer refinement", "refinement:", "goal:", "dual technical", "structure:", "para 3", "end with"
+                        ])
+                        if has_draft_markers or last_idx > 100:
+                            candidate = txt[last_idx:].strip()
+                            if len(candidate) > 400:
+                                txt = candidate
+                elif lang == "english":
+                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:[A-Z\s]{3,20})\s*[-—–:]', txt))
+                    if dateline_matches:
+                        last_idx = dateline_matches[-1].start()
+                        candidate = txt[last_idx:].strip()
+                        if len(candidate) > 250:
+                            txt = candidate
+                elif lang == "chinese":
+                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*[\u4e00-\u9fa5]{2,6}(?:讯|电)?\s*[-—–:]', txt))
+                    if dateline_matches:
+                        last_idx = dateline_matches[-1].start()
+                        candidate = txt[last_idx:].strip()
+                        if len(candidate) > 200:
+                            txt = candidate
+
                 lines = []
+                bad_prefixes = [
+                    "chief ai", "persona", "wait,", "the prompt", "formal khmer", 
+                    "title:", "description:", "3 paragraphs", "paragraph 1", "paragraph 2", 
+                    "paragraph 3", "event:", "context:", "impact:", "score:", "analysis:",
+                    "translation:", "note:", "system directive", "read full article",
+                    "confirm structure", "khmer translation", "draft (khmer)", "structure:",
+                    "goal:", "dual technical vocabulary:", "end with", "para 1:", "para 2:", "para 3:",
+                    "para 1", "para 2", "para 3", "legal/regulatory", "regulatory landscape", 
+                    "compliance requirements", "step 1", "step 2", "final symbol"
+                ]
+
                 for line in txt.split("\n"):
                     l = line.strip()
                     if not l:
                         continue
                     l_lower = l.lower()
 
-                    # Drop lines that are purely section/paragraph labels (e.g. ផ្នែកទី១, កថាខណ្ឌទី១, Para 1, Section 2)
-                    is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
-                    is_short_subhead = (len(l) < 70) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)', l, flags=re.IGNORECASE))
+                    # Strip "Khmer Refinement:" prefix if present on a substantial paragraph
+                    if re.match(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', l, flags=re.IGNORECASE):
+                        l = re.sub(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', '', l, flags=re.IGNORECASE).strip()
+                        l_lower = l.lower()
+                        if len(l) < 50:
+                            continue
 
+                    # Drop lines matching bad prefixes
+                    if any(l_lower.startswith(bad) for bad in bad_prefixes):
+                        continue
+
+                    # Drop lines that are purely section/paragraph labels
+                    is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
+                    is_short_subhead = (len(l) < 90) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+|goal|structure|refinement|dual technical)', l, flags=re.IGNORECASE))
                     if is_pure_label or is_short_subhead:
                         continue
 
-                    # Filter out prompt regurgitations & LLM scratchpad reasoning
-                    if any(l_lower.startswith(bad) for bad in [
-                        "chief ai", "persona", "wait,", "the prompt", "formal khmer", 
-                        "title:", "description:", "3 paragraphs", "paragraph 1", "paragraph 2", 
-                        "paragraph 3", "event:", "context:", "impact:", "score:", "analysis:",
-                        "translation:", "note:", "system directive", "read full article",
-                        "confirm structure", "khmer translation", "draft (khmer)", "structure:"
-                    ]):
-                        continue
-
-                    # Filter out mapping lines like "Protocol" -> ពិធីការ or Title: ...
                     if "->" in l or "=>" in l or l_lower.startswith("title"):
                         continue
 
@@ -374,6 +412,8 @@ async def check_crypto_news(app: Application, ai_engine):
                     if lang == "khmer":
                         has_khmer = any('\u1780' <= c <= '\u17ff' for c in l)
                         if not has_khmer and len(l.split()) > 2:
+                            continue
+                        if re.match(r'^(?:end with|final symbol|para \d|goal|structure)', l_lower):
                             continue
 
                     # Strip any leading paragraph/section label embedded at the start of a sentence
@@ -424,10 +464,27 @@ async def check_crypto_news(app: Application, ai_engine):
                     target_sym = sym
                     break
 
-            is_bearish = any(w in title_lower for w in [
-                'drop', 'crash', 'hack', 'dump', 'ban', 'lawsuit', 'bear', 'fall', 
-                'investigation', 'plunge', 'sec sue', 'fraud', 'bankrupt', 'liquidation'
-            ])
+            # Weighted Institutional Sentiment Evaluation (5x Headline Dominance)
+            BULLISH_KEYWORDS = [
+                "inflow", "inflows", "surge", "surges", "soar", "soars", "jump", "jumps", 
+                "rally", "rallies", "record", "high", "highs", "strongest", "bull", "bullish", 
+                "breakout", "accumulate", "accumulation", "accumulating", "buying", "adopt", 
+                "adoption", "approve", "approval", "gain", "gains", "pump", "boost", "boosts", 
+                "institutional", "expansion", "rebound", "rebounds", "recover", "recovery", 
+                "all-time high", "ath", "green", "milestone"
+            ]
+            BEARISH_KEYWORDS = [
+                "outflow", "outflows", "crash", "crashes", "dump", "dumps", "plunge", "plunges", 
+                "hack", "hacked", "exploit", "exploited", "ban", "banned", "lawsuit", "sue", 
+                "sued", "fraud", "scam", "bankrupt", "bankruptcy", "liquidation", "liquidated", 
+                "collapse", "collapses", "bear", "bearish", "drop", "drops", "fall", "falls", 
+                "crackdown", "panic", "selloff", "bleeding", "investigation", "penalty", "fine"
+            ]
+            t_lower = title.lower()
+            d_lower = description.lower()
+            bull_score = sum(5 for kw in BULLISH_KEYWORDS if kw in t_lower) + sum(1 for kw in BULLISH_KEYWORDS if kw in d_lower)
+            bear_score = sum(5 for kw in BEARISH_KEYWORDS if kw in t_lower) + sum(1 for kw in BEARISH_KEYWORDS if kw in d_lower)
+            is_bearish = bear_score > bull_score
             trade_side = "SELL" if is_bearish else "BUY"
             market_bias_km = "🔴 BEARISH DISTRIBUTION (លក់កាត់បន្ថយហានិភ័យ)" if is_bearish else "🟢 BULLISH ACCUMULATION (ទិញសន្សំតាមស្ថាប័ន)"
             market_bias_en = "🔴 BEARISH DISTRIBUTION (De-risking)" if is_bearish else "🟢 BULLISH ACCUMULATION (Institutional Inflows)"
