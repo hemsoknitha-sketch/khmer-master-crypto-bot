@@ -1428,7 +1428,8 @@ class TelegramBotThread(BaseThread):
                     futures_section_msg += f"⚡️ **{sym}** (Futures {side} {leverage}x ISOLATED)\n"
                     futures_section_msg += f"💰 Margin: `${margin:,.2f}` | 💵 Entry: `${entry_p:,.4f}`\n"
                     futures_section_msg += f"📈 Mark Price: `${mark_p:,.4f}`\n"
-                    futures_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT`\n\n"
+                    roi_pct = (unRealizedProfit / margin * 100.0) if margin > 0 else 0.0
+                    futures_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT` (`{roi_pct:+.2f}%`)\n\n"
 
             import psutil
             import os
@@ -7811,7 +7812,8 @@ class TelegramBotThread(BaseThread):
                                 is_order_success = True
                         
                         if is_order_success:
-                            db.add_turbo_hedge_bot(chat_id, c_sym, amount, leverage, c_side, target_tp)
+                            db.add_turbo_hedge_bot(chat_id, c_sym, amount, leverage, c_side, target_tp, is_bot_initiated=True)
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{c_sym}_initiated_by_bot", "1")
                             entry_p = await asyncio.to_thread(trading_engine.get_current_price, c_sym)
                             if entry_p > 0:
                                 db.update_system_setting(f"turbo_hedge_{chat_id}_{c_sym}_entry_price", str(entry_p))
@@ -7849,6 +7851,27 @@ class TelegramBotThread(BaseThread):
                                 await msg_target.reply_text(final_msg)
                             except Exception:
                                 pass
+
+                asyncio.create_task(_background_top_scanner())
+                return
+
+        async def compound_grid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
+            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+
+            args = context.args
+            if not args or len(args) == 0:
+                usage = (
+                    "⚠️ **របៀបប្រើប្រាស់ Compound Grid:**\n\n"
+                    "👉 **AI Smart Auto 3X Compound:**\n`` `/compound_grid <កាក់> <ទំហំលុយវិនិយោគ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 100 1234` ``\n\n"
+                    "👉 **Custom Step Compound:**\n`` `/compound_grid <កាក់> <ទំហំទិញ១ជាន់> <ភាគរយគម្លាត> <ដើមទុនគោលដៅ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 10 1.0 100 1234` ``"
+                )
+                await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                return
 
             symbol = str(args[0]).upper().strip()
             if not symbol.endswith("USDT"):
@@ -10191,7 +10214,7 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("auto_snipe", smart_listing_sniper_command))
 
         self.app.add_handler(CommandHandler("infinity_grid", infinity_grid_command))
-        self.app.add_handler(CommandHandler("compound_grid", infinity_grid_command))
+        self.app.add_handler(CommandHandler("compound_grid", compound_grid_command))
         self.app.add_handler(CommandHandler("grid_bot", infinity_grid_command))
         self.app.add_handler(CommandHandler("infinity_matrix", infinity_grid_command))
 

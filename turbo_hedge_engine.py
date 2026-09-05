@@ -557,6 +557,8 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                 amount_usdt = spot_cash
             print(f"🚀 [TURBO HEDGE STRICT SPOT ROUTE] Executing Binance Spot Market Order for {symbol} (${amount_usdt:.2f} USDT)...")
             spot_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "BUY", amount_usdt)
+            if isinstance(spot_res, dict) and (spot_res.get("status") in ["success", "FILLED"] or spot_res.get("orderId")):
+                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
             return spot_res if isinstance(spot_res, dict) else {"status": "success", "res": spot_res}
 
         # 1. Bounded Margin & Leverage Safety Sizing based on AVAILABLE BALANCE
@@ -660,6 +662,8 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                 except Exception as ex:
                     print(f"Auto-prune DB error: {ex}")
 
+        if isinstance(res, dict) and (res.get("status") in ["success", "NEW", "FILLED"] or res.get("orderId")):
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
         print(f"🛡️ [TURBO HEDGE EXECUTION] {symbol} {side} Qty: {qty} Leverage: {effective_leverage}x -> Res: {res}")
         return res
     except Exception as e:
@@ -714,6 +718,8 @@ def execute_direct_reverse_flip(api_key: str, api_secret: str, symbol: str, amou
         flip_qty = trading_engine.get_futures_max_sellable_qty(symbol, flip_qty)
 
         res = trading_engine.execute_futures_order(api_key, api_secret, symbol, target_side, flip_qty, leverage=effective_leverage)
+        if isinstance(res, dict) and (res.get("status") in ["success", "NEW", "FILLED"] or res.get("orderId")):
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
         print(f"⚡ [DIRECT SINGLE-ORDER REVERSE FLIP (<15ms)] {symbol} -> {target_side} Flip Qty: {flip_qty} ({effective_leverage}x Lev)")
         
         # 🛡️ Instant Verification: Check if Binance position actually flipped to target_side
@@ -798,18 +804,33 @@ async def monitor_turbo_hedge_bots(app):
                             active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
                             print(f"🧹 [CLOSED FUTURES POSITION PURGED FROM DB] User {target_chat_id} {b_sym} purged to free slot!")
 
-                # 2. Auto-discover active positions on Binance and sync to DB
+                # 2. Auto-discover active positions on Binance and sync to DB (Bot-Initiated Only!)
                 active_syms = [b.get("symbol") for b in active_hedge_bots if b.get("chat_id") == target_chat_id]
                 for p in binance_positions:
                     p_sym = p.get("symbol")
                     p_amt = float(p.get("positionAmt", 0))
                     if p_amt != 0 and p_sym not in active_syms and p_sym not in EXCLUDED_SYMBOLS:
+                        # 🛡️ P0 SAFETY GUARD: Never hijack manual user trades!
+                        # Only re-sync positions if they were initiated by the bot.
+                        is_bot_initiated = db.get_system_setting(f"turbo_hedge_{target_chat_id}_{p_sym}_initiated_by_bot", "0") == "1"
+                        if not is_bot_initiated:
+                            continue
                         p_side = "BUY" if p_amt > 0 else "SELL"
-                        user_custom_tp_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5")
+
+                        existing_amt_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_{p_sym}_amount", "20.0")
+                        existing_amt = float(existing_amt_str) if existing_amt_str.replace('.', '', 1).isdigit() else 20.0
+
+                        existing_lev_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_{p_sym}_leverage", "10")
+                        existing_lev = int(existing_lev_str) if existing_lev_str.isdigit() else 10
+
+                        user_custom_tp_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_{p_sym}_target_tp", "")
+                        if not user_custom_tp_str:
+                            user_custom_tp_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5")
                         user_custom_tp = float(user_custom_tp_str) if user_custom_tp_str.replace('.', '', 1).isdigit() else 2.5
-                        db.add_turbo_hedge_bot(target_chat_id, p_sym, 20.0, 10, p_side, user_custom_tp)
-                        active_hedge_bots.append({"chat_id": target_chat_id, "symbol": p_sym, "amount": 20.0, "leverage": 10, "side": p_side, "target_tp": user_custom_tp})
-                        print(f"🛡️ [BINANCE LIVE POSITION AUTO-DISCOVERED & SYNCED] User {target_chat_id} {p_sym} ({p_side}) -> Registered for 24/7 Protection & Target TP ${user_custom_tp:.2f} USDT!")
+
+                        db.add_turbo_hedge_bot(target_chat_id, p_sym, existing_amt, existing_lev, p_side, user_custom_tp, is_bot_initiated=True)
+                        active_hedge_bots.append({"chat_id": target_chat_id, "symbol": p_sym, "amount": existing_amt, "leverage": existing_lev, "side": p_side, "target_tp": user_custom_tp})
+                        print(f"🛡️ [BINANCE BOT POSITION RE-SYNCED] User {target_chat_id} {p_sym} ({p_side}) -> Restored active protection & Target TP ${user_custom_tp:.2f} USDT!")
 
         if not active_hedge_bots:
             # Check if any user has top_mode active even if active_hedge_bots is currently empty!
@@ -1006,7 +1027,8 @@ async def monitor_turbo_hedge_bots(app):
                     break
 
                 if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
-                    db.add_turbo_hedge_bot(target_chat_id, c_cand, actual_trade_amount, unit_leverage, target_side, unit_tp)
+                    db.add_turbo_hedge_bot(target_chat_id, c_cand, actual_trade_amount, unit_leverage, target_side, unit_tp, is_bot_initiated=True)
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_initiated_by_bot", "1")
                     entry_p = trading_engine.get_current_price(c_cand)
                     now_ts_entry = int(time.time())
                     if entry_p > 0:

@@ -22,9 +22,10 @@ def get_total_deployable_capital(user_id: int, ai_engine=None):
             return cached_val
             
     # Connect to Binance
-    api_key, api_secret = db.get_api_keys(user_id)
-    if not api_key or not api_secret:
+    keys = db.get_user_api(user_id)
+    if not keys:
         return 0.0
+    api_key, api_secret = keys
         
     try:
         # Get account balances
@@ -146,8 +147,9 @@ async def run_ico_cycle(app, ai_engine):
                 best_target = cand
                 best_target_score = cand_score
                 
-        api_key, api_secret = db.get_api_keys(user_id)
-        if not api_key or not api_secret: continue
+        keys = db.get_user_api(user_id)
+        if not keys: continue
+        api_key, api_secret = keys
         
         # Step 5: Execute Liquidations Concurrently & Completely (Zero Dust)
         async def liquidate_task(cand):

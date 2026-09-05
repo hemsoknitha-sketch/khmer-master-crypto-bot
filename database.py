@@ -1361,6 +1361,9 @@ def get_user_api(chat_id: int):
             return (dec_key.strip(), dec_secret.strip())
     return None
 
+# Backwards compatibility alias
+get_api_keys = get_user_api
+
 def remove_user_api(chat_id: int) -> bool:
     """Removes user's API keys and disables all auto-trading immediately."""
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
@@ -2769,7 +2772,7 @@ def get_pre_pump_config(chat_id: int) -> dict:
         return {"enabled": bool(row[0]), "amount": float(row[1] or 50.0)}
     return {"enabled": False, "amount": 50.0}
 
-def add_turbo_hedge_bot(chat_id: int, symbol: str, amount: float = 20.0, leverage: int = 75, side: str = "BUY", target_tp: float = 10.0):
+def add_turbo_hedge_bot(chat_id: int, symbol: str, amount: float = 20.0, leverage: int = 75, side: str = "BUY", target_tp: float = 10.0, is_bot_initiated: bool = True):
     symbol = symbol.upper().strip()
     if not symbol.endswith("USDT"):
         symbol += "USDT"
@@ -2784,6 +2787,8 @@ def add_turbo_hedge_bot(chat_id: int, symbol: str, amount: float = 20.0, leverag
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0.0")
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
     update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(int(time.time())))
+    if is_bot_initiated:
+        update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
 
 def update_turbo_hedge_side(chat_id: int, symbol: str, new_side: str):
     symbol = symbol.upper().strip()
