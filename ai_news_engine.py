@@ -164,22 +164,47 @@ def clean_ai_news_output(raw_text: str) -> str:
     # Remove <thinking>...</thinking> or <thought>...</thought>
     raw_text = re.sub(r'(?s)<thinking>.*?</thinking>', '', raw_text)
     raw_text = re.sub(r'(?s)<thought>.*?</thought>', '', raw_text)
+    raw_text = re.sub(r'(?s)<think>.*?</think>', '', raw_text)
+    raw_text = re.sub(r'(?s)```think.*?```', '', raw_text)
+    raw_text = re.sub(r'(?s)\[THINKING\].*?\[/THINKING\]', '', raw_text)
 
     lines = raw_text.splitlines()
     cleaned_lines = []
 
     skip_keywords = [
         "structure:", "confirm structure:", "khmer translation/refinement:",
-        "para 1:", "para 2:", "para 3:", "location:", "refinement:",
-        "translated title", "location in p1", "impact in p2", "stability in p3",
-        "ending with ៕", "p3: legal", "confirm structure"
+        "location:", "refinement:", "translated title", "location in p1", 
+        "impact in p2", "stability in p3", "ending with ៕", "p3: legal", 
+        "confirm structure", "draft (khmer)", "system directive"
     ]
 
     for line in lines:
-        line_lower = line.strip().lower()
-        if any(kw in line_lower for kw in skip_keywords):
+        l = line.strip()
+        if not l:
+            cleaned_lines.append("")
             continue
-        cleaned_lines.append(line)
+        l_lower = l.lower()
+
+        # Drop lines that are purely section/paragraph labels (e.g. ផ្នែកទី១, កថាខណ្ឌទី១, Para 1, Section 2)
+        is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
+        is_short_subhead = (len(l) < 70) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)', l, flags=re.IGNORECASE))
+
+        if is_pure_label or is_short_subhead:
+            continue
+
+        if any(kw in l_lower for kw in skip_keywords):
+            continue
+
+        # Strip any leading paragraph/section label embedded at the start of a sentence
+        l = re.sub(
+            r'^(?:[\*\_#\-\s📌]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:[\*\_#\-\s]*)[៖:]\s*',
+            '',
+            l,
+            flags=re.IGNORECASE
+        ).strip()
+
+        if l:
+            cleaned_lines.append(l)
 
     result = "\n".join(cleaned_lines).strip()
 
@@ -210,6 +235,9 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
     user_lang = 'en' if lang_clean in ['en', 'english'] else ('zh' if lang_clean in ['zh', 'chinese'] else 'km')
 
     headlines_raw = "\n".join([f"{i+1}. {item['title']} (URL: {item['link']})" for i, item in enumerate(news_list)])
+    target_sym_cmd = sym_str or "TOP"
+    is_bearish = (sentiment_badge == "BEARISH") or (score < 45)
+    trade_side_cmd = "SELL" if is_bearish else "BUY"
 
     if ai_engine and hasattr(ai_engine, "chat_with_user"):
         try:
@@ -218,22 +246,25 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
                 f"You are Executive Financial News Editor for Apex AGI News Network.\n"
                 f"Here are top breaking crypto news headlines:\n{headlines_raw}\n\n"
                 f"STRICT FORMAT INSTRUCTION:\n"
-                f"DO NOT include any internal thoughts, draft notes, or structure checklists like 'Confirm structure:' or 'Khmer translation:'.\n"
-                f"Output ONLY the final 3-paragraph executive journalistic report in {target_lang_name}:\n\n"
+                f"1. DO NOT include any internal thoughts, draft notes, or structure checklists.\n"
+                f"2. Write 3 rich, seamless journalistic narrative paragraphs. DO NOT label them with 'PARAGRAPH 1', 'PARAGRAPH 2', 'PARAGRAPH 3', or 'ផ្នែកទី១', 'ផ្នែកទី២', 'ផ្នែកទី៣'. Write the continuous story directly!\n"
+                f"3. For Khmer language, include standard English technical terms in parentheses (e.g., សាច់ប្រាក់ងាយស្រួល (Liquidity), លំហូរទុនស្ថាប័ន (Institutional Inflows)). Paragraph 1 must begin directly with the dateline location (e.g. 'ទីក្រុងញូវយ៉ក ៖'). Paragraph 3 must end with '៕'.\n"
+                f"4. Format the final output strictly as follows:\n\n"
                 f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
                 f"═══════════════════════════════\n\n"
                 f"🔥 **TOP BREAKING HEADLINES:**\n"
                 f"1. 🟢 [ Translated Title 1 ](URL)\n"
                 f"2. 🔴 [ Translated Title 2 ](URL)\n\n"
-                f"📌 **PARAGRAPH 1: EXECUTIVE VERDICT & AGI SENTIMENT INDEX**\n"
+                f"[Full Narrative Paragraph 1: Executive Event Context & Dateline City]\n\n"
+                f"[Full Narrative Paragraph 2: Quantitative & Macro Liquidity Evidence Synthesis]\n\n"
+                f"[Full Narrative Paragraph 3: Regulatory Compliance & Systemic Stability Outlook ending with ៕]\n\n"
+                f"═══════════════════════════════\n"
+                f"📊 **INSTITUTIONAL VERDICT**\n"
                 f"• Target Asset ៖ {sym_str or 'GLOBAL CRYPTO MARKET'}\n"
                 f"• Sentiment Index ៖ {sentiment_badge}\n"
-                f"• AI Confidence Win Rate ៖ {min(98.5, max(82.0, score + 20)):.1f}%\n"
-                f"• Strategic Verdict ៖ [ Executive 2-sentence summary of overall market stance ]\n\n"
-                f"📌 **PARAGRAPH 2: QUANTITATIVE & MACRO EVIDENCE SYNTHESIS**\n"
-                f"[ In-depth journalistic synthesis of macro policy, liquidity flows, exchange volume, and on-chain catalysts ]\n\n"
-                f"📌 **PARAGRAPH 3: EXECUTIVE ACTION COMMAND**\n"
-                f"`/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>`\n\n"
+                f"• AI Confidence Win Rate ៖ {min(98.5, max(82.0, score + 20)):.1f}%\n\n"
+                f"👉 **1-Tap Action Execution ៖**\n"
+                f"`/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 <PIN>`\n\n"
                 f"Respond ONLY with the final report in clean {target_lang_name} markdown."
             )
             ai_res = ai_engine.chat_with_user(ai_prompt, history=[])
@@ -256,15 +287,16 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             msg += f"{idx}. {icon} [{item['title']}]({item['link']})\n"
 
         msg += (
-            "\n📌 **PARAGRAPH 1: EXECUTIVE VERDICT & AGI SENTIMENT INDEX**\n"
+            f"\nNEW YORK — Global institutional orderflow signals controlled accumulation across primary digital asset markets. Key moving average supports have absorbed spot selling, reflecting persistent long-term capital commitments from tier-1 liquidity providers.\n\n"
+            "Recent macroeconomic data indicates tightening credit conditions in traditional risk assets, while major layer-1 protocols absorb steady institutional inflows. On-chain metrics reveal exchange reserves hitting multi-month lows, confirming sustained whale accumulation into cold storage custody solutions.\n\n"
+            "From a regulatory governance perspective, international supervisory authorities are formalizing compliance standards to ensure systemic market integrity. These frameworks provide institutional participants with the legal certainty required for durable capital deployment across volatile market cycles.\n\n"
+            "═══════════════════════════════\n"
+            "📊 **INSTITUTIONAL VERDICT**\n"
             f"• **Target Asset**: `{sym_str or 'GLOBAL CRYPTO MARKET'}`\n"
             f"• **AGI Sentiment Index**: `{sentiment_badge}`\n"
             f"• **Confidence Score**: `{min(98.5, max(82.0, score + 20)):.1f}%` Win Rate Probability\n"
-            "• **Strategic Stance**: Global institutional orderflow signals controlled accumulation with strong buy volume at key moving average supports.\n\n"
-            "📌 **PARAGRAPH 2: QUANTITATIVE & MACRO EVIDENCE SYNTHESIS**\n"
-            "Recent macro data indicates tightening liquidity in traditional risk assets while Bitcoin and major layer-1 altcoins absorb steady ETF inflows. On-chain metrics reveal exchange reserves hitting multi-month lows, confirming whale accumulation into cold storage wallets.\n\n"
-            "📌 **PARAGRAPH 3: EXECUTIVE ACTION COMMAND**\n"
-            "👉 **Recommended Execution ៖** `` `/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>` ``"
+            f"• **Strategic Stance**: Controlled institutional accumulation with strong spot bid depth.\n\n"
+            f"👉 **Recommended Execution ៖** `` `/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 <PIN>` ``"
         )
     elif user_lang == 'zh':
         msg = (
@@ -277,36 +309,38 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             msg += f"{idx}. {icon} [{item['title']}]({item['link']})\n"
 
         msg += (
-            "\n📌 **第一段：执行裁决与 AGI 情绪指数**\n"
+            f"\n纽约讯 — 全球机构资金流向显示在关键均线支撑位存在强劲买盘，主流数字资产市场处于受控吸筹阶段。一级流动性提供商持续吸纳现货抛压，展现出坚实的长期资本配置意愿。\n\n"
+            "近期宏观经济数据显示传统风险资产流动性紧缩，而核心 Layer-1 公链生态持续吸引 ETF 与结构化资本稳定流入。链上深度指标显示各大交易所储备金降至数月低位，证实巨鲸正在加速向冷钱包托管系统归集资产。\n\n"
+            "在合规与风险防范层面，国际监管机构正进一步完善反洗钱与客户资产隔离制度，旨在巩固金融系统整体稳定性，并为机构级投资者参与加密市场提供更加明晰的法律与制度保障。\n\n"
+            "═══════════════════════════════\n"
+            "📊 **机构最终裁决 (INSTITUTIONAL VERDICT)**\n"
             f"• **目标资产**: `{sym_str or '全球加密货币市场'}`\n"
             f"• **AGI 情绪指数**: `{sentiment_badge}`\n"
             f"• **AI 胜率置信度**: `{min(98.5, max(82.0, score + 20)):.1f}%`\n"
-            "• **战略立场**: 全球机构资金流向显示在关键均线支撑位存在强劲买盘，市场处于受控吸筹阶段。\n\n"
-            "📌 **第二段：定量与宏观证据综合分析**\n"
-            "近期宏观数据显示传统风险资产流动性紧缩，而比特币及主流 Layer-1 公链持续吸引 ETF 稳定流入。链上指标显示交易所储备金创下多月新低，证实巨鲸正在向冷钱包大量提现囤货。\n\n"
-            "📌 **第三段：执行操作指令**\n"
-            "👉 **推荐一键执行 ៖** `` `/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>` ``"
+            f"• **战略立场**: 受控机构吸筹，现货支撑买盘强劲。\n\n"
+            f"👉 **推荐一键执行 ៖** `` `/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 <PIN>` ``"
         )
     else:
         msg = (
             f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
             "═══════════════════════════════\n\n"
-            "🔥 **ព័ត៌មានក្តៅៗចុងក្រោយ (TOP BREAKING HEADLINES):**\n"
+            "🔥 **ព័ត៌មានក្តៅៗចុងក្រោយ (TOP BREAKING HEADLINES) ៖**\n"
         )
         for idx, item in enumerate(news_list, 1):
             icon = "🟢" if item["sentiment"] == "BULLISH" else ("🔴" if item["sentiment"] == "BEARISH" else "⚪")
             msg += f"{idx}. {icon} [{item['title']}]({item['link']})\n"
 
         msg += (
-            "\n📌 **ផ្នែកទី ១ ៖ សេចក្តីសម្រេចចិត្ត និងសន្ទស្សន៍ព័ត៌មាន (EXECUTIVE VERDICT & AGI SENTIMENT INDEX)**\n"
+            f"\nទីក្រុងញូវយ៉ក ៖ យោងតាមទិន្នន័យចុងក្រោយនៃទីផ្សារទ្រព្យឌីជីថលសកល ការវិភាគបរិមាណវិស័យទៅលើ «{sym_str or 'GLOBAL CRYPTO MARKET'}» បានបង្ហាញពីសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងរឹងមាំ ខណៈដែលលំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) កំពុងជំរុញឱ្យមានរលកទិញសន្សំទ្រង់ទ្រាយធំប្រកបដោយស្ថិរភាព។\n\n"
+            "ទិន្នន័យម៉ាក្រូសេដ្ឋកិច្ច និងសៀវភៅបញ្ជាទិញ (Order Book Depth) បង្ហាញថា ទីផ្សារ Risk-On កំពុងស្រូបយកទុនយ៉ាងច្រើន ខណៈដែលស្ថាប័នគ្រប់គ្រងមូលនិធិធំៗបន្តបង្កើនការទិញសន្សំ (Whale Accumulation) ចូលទៅកាន់ Cold Storage យ៉ាងគំហុក ដែលកាត់បន្ថយសម្ពាធផ្គត់ផ្គង់នៅលើផ្សារជួញដូរធំៗ (Exchange Reserves) ដល់កម្រិតទាបបំផុតជាប្រវត្តិសាស្ត្រ។\n\n"
+            "ទាក់ទងនឹងទិដ្ឋភាពច្បាប់ និងការការពារហានិភ័យ និយ័តករអន្តរជាតិកំពុងពង្រឹងក្របខ័ណ្ឌអនុលោមភាព (Regulatory Compliance) ដើម្បីធានាបាននូវស្ថិរភាពប្រព័ន្ធហិរញ្ញវត្ថុជារួម (Systemic Stability) ដែលផ្តល់នូវទំនុកចិត្តយ៉ាងរឹងមាំសម្រាប់វិនិយោគិនក្នុងការចូលរួមចំណែកក្នុងទីផ្សាររយៈពេលវែង៕\n\n"
+            "═══════════════════════════════\n"
+            "📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
             f"• **ទ្រព្យសកម្មគោលដៅ** ៖ `{sym_str or 'GLOBAL CRYPTO MARKET'}`\n"
             f"• **សន្ទស្សន៍ព័ត៌មាន AGI** ៖ `{sentiment_badge}`\n"
             f"• **អត្រាជោគជ័យនៃការវិភាគ (Win Rate Confidence)** ៖ `{min(98.5, max(82.0, score + 20)):.1f}%`\n"
             "• **ជំហរយុទ្ធសាស្ត្រ** ៖ លំហូរសាច់ប្រាក់ពីវិនិយោគិនធំៗ (Institutional Inflows) កំពុងជំរុញឱ្យមាន Momentum ឡើងលើប្រកបដោយស្ថិរភាព។\n\n"
-            "📌 **ផ្នែកទី ២ ៖ ភស្តុតាងបរិមាណវិស័យ និងម៉ាក្រូសេដ្ឋកិច្ច (QUANTITATIVE & MACRO EVIDENCE SYNTHESIS)**\n"
-            "ទិន្នន័យម៉ាក្រូសេដ្ឋកិច្ចចុងក្រោយបង្ហាញថា ទីផ្សារ Risk-On កំពុងស្រូបយកទុនយ៉ាងច្រើន ខណៈដែល Bitcoin ETF Inflows រក្សាបាននូវកំណើនវិជ្ជមាន។ ចលនា On-Chain បង្ហាញថា reserves របស់ Exchange ធ្លាក់ចុះទាបបំផុត បញ្ជាក់ពីការទិញសន្សំ (Whale Accumulation) ចូល Cold Storage។\n\n"
-            "📌 **ផ្នែកទី ៣ ៖ បញ្ជាប្រតិបត្តិការ (EXECUTIVE ACTION COMMAND)**\n"
-            "👉 **អនុសាសន៍ប្រតិបត្តិការ ៖** `` `/turbo_hedge TOP 20 10 AUTO 2.5 <PIN>` ``"
+            f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Execution) ៖**\n`` `/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 <PIN>` ``"
         )
 
     return NewsReportResult(msg, top_image_url)

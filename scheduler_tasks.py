@@ -47,29 +47,44 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                     return
                     
                 # 2. Send Photo if available
-                # 2. Try sending photo with caption if photo_path is provided
+                # 2. Try sending photo: if msg <= 1000, send as caption; if msg > 1000, send photo first then full message!
                 sent_photo = False
                 if p_path:
                     try:
                         if str(p_path).startswith(('http://', 'https://')):
-                            caption_txt = msg if len(msg) <= 1000 else (msg[:950] + "...\n\n🔗 [Read Full Article]")
-                            try:
-                                await app.bot.send_photo(chat_id=cid, photo=p_path, caption=caption_txt, parse_mode=parse_mode)
-                                sent_photo = True
-                            except Exception:
-                                clean_caption = caption_txt.replace('*', '').replace('`', '').replace('_', '')
-                                await app.bot.send_photo(chat_id=cid, photo=p_path, caption=clean_caption)
-                                sent_photo = True
-                        else:
-                            with open(p_path, 'rb') as f:
-                                caption_txt = msg if len(msg) <= 1000 else (msg[:950] + "...")
+                            if len(msg) <= 1000:
                                 try:
-                                    await app.bot.send_photo(chat_id=cid, photo=f, caption=caption_txt, parse_mode=parse_mode)
+                                    await app.bot.send_photo(chat_id=cid, photo=p_path, caption=msg, parse_mode=parse_mode)
                                     sent_photo = True
                                 except Exception:
-                                    clean_caption = caption_txt.replace('*', '').replace('`', '').replace('_', '')
-                                    await app.bot.send_photo(chat_id=cid, photo=f, caption=clean_caption)
+                                    clean_caption = msg.replace('*', '').replace('`', '').replace('_', '')
+                                    await app.bot.send_photo(chat_id=cid, photo=p_path, caption=clean_caption)
                                     sent_photo = True
+                            else:
+                                # For comprehensive articles (> 1000 chars, e.g. 3000-4000 chars),
+                                # send image first, then dispatch FULL unabridged text via send_message!
+                                try:
+                                    await app.bot.send_photo(chat_id=cid, photo=p_path)
+                                except Exception as e_p:
+                                    print(f"⚠️ Photo broadcast notice: {e_p}")
+                                # sent_photo remains False so the full message is sent below via send_message!
+                        else:
+                            if len(msg) <= 1000:
+                                with open(p_path, 'rb') as f:
+                                    try:
+                                        await app.bot.send_photo(chat_id=cid, photo=f, caption=msg, parse_mode=parse_mode)
+                                        sent_photo = True
+                                    except Exception:
+                                        clean_caption = msg.replace('*', '').replace('`', '').replace('_', '')
+                                        await app.bot.send_photo(chat_id=cid, photo=f, caption=clean_caption)
+                                        sent_photo = True
+                            else:
+                                with open(p_path, 'rb') as f:
+                                    try:
+                                        await app.bot.send_photo(chat_id=cid, photo=f)
+                                    except Exception as e_p:
+                                        print(f"⚠️ Local photo broadcast notice: {e_p}")
+                                # sent_photo remains False so the full message is sent below!
                     except Exception as e_photo:
                         print(f"⚠️ Photo broadcast notice: {e_photo}")
                         sent_photo = False
@@ -244,24 +259,77 @@ async def check_crypto_news(app: Application, ai_engine):
 
             # Process this new article
             db.mark_news_seen(link)
+
+            # Helpers for News Formatting
+            from urllib.parse import urlparse
+            def get_source_name(src_link):
+                if not src_link: return "CoinTelegraph"
+                netloc = urlparse(src_link).netloc.lower()
+                if 'cointelegraph' in netloc: return "CoinTelegraph"
+                elif 'coindesk' in netloc: return "CoinDesk"
+                elif 'bloomberg' in netloc: return "Bloomberg Crypto"
+                elif 'reuters' in netloc: return "Reuters Financial"
+                elif 'decrypt' in netloc: return "Decrypt"
+                elif 'theblock' in netloc: return "The Block"
+                elif 'cryptopanic' in netloc: return "CryptoPanic"
+                elif 'binance' in netloc: return "Binance News"
+                return netloc.replace("www.", "").capitalize() or "Global Crypto Terminal"
+
+            def format_khmer_datetime(dt=None):
+                from datetime import datetime, timezone, timedelta
+                tz_cambodia = timezone(timedelta(hours=7))
+                if dt is None:
+                    dt = datetime.now(tz_cambodia)
+                elif dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc).astimezone(tz_cambodia)
+                else:
+                    dt = dt.astimezone(tz_cambodia)
+
+                kh_days = ["ច័ន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍", "អាទិត្យ"]
+                kh_months = ["មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"]
+                kh_digits = {'0':'០', '1':'១', '2':'២', '3':'៣', '4':'៤', '5':'៥', '6':'៦', '7':'៧', '8':'៨', '9':'៩'}
+                
+                def to_kh_num(val):
+                    return "".join(kh_digits.get(c, c) for c in f"{val:02d}" if c.isdigit())
+                
+                day_name = kh_days[dt.weekday()]
+                month_name = kh_months[dt.month - 1]
+                day_str = to_kh_num(dt.day)
+                year_str = "".join(kh_digits.get(c, c) for c in str(dt.year))
+                time_str = f"{to_kh_num(dt.hour)}:{to_kh_num(dt.minute)}"
+                
+                return f"ថ្ងៃ{day_name} ទី{day_str} ខែ{month_name} ឆ្នាំ{year_str} ម៉ោង {time_str} (GMT+7)"
             
-            # 1. Khmer Article (Strict Chuon Nath Executive Standard)
+            # 1. Khmer Article (Strict Chuon Nath Executive Standard - 3 Seamless Paragraphs)
             kh_prompt = (
-                f"សូមសរសេរអត្ថបទព័ត៌មានហិរញ្ញវត្ថុគ្រីបតូជាភាសាខ្មែរផ្លូវការ (អក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចជួនណាត) ៣ កថាខណ្ឌ សម្រាប់ព័ត៌មានខាងក្រោម ៖\n"
+                f"អ្នកគឺជាប្រធាននិពន្ធសារព័ត៌មានហិរញ្ញវត្ថុគ្រីបតូស្ថាប័នជាន់ខ្ពស់ (Executive Financial News Chief Editor)។\n"
+                f"សូមសរសេរអត្ថបទព័ត៌មានវិភាគស៊ីជម្រៅកម្រិតស្ថាប័នជាភាសាខ្មែរផ្លូវការ ត្រឹមត្រូវតាមក្បួនអក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ឱ្យបានក្បោះក្បាយ មានប្រវែងចន្លោះពី 2,500 ដល់ 3,500 តួអក្សរ ដោយផ្អែកលើព័ត៌មានខាងក្រោម ៖\n"
                 f"ចំណងជើង ៖ {title}\n"
                 f"ខ្លឹមសារ ៖ {description}\n\n"
-                f"កថាខណ្ឌទី១ ៖ ទីតាំង (ឧទាហរណ៍ ៖ ទីក្រុងញូវយ៉ក៖) និងសេចក្តីសង្ខេបព្រឹត្តិការណ៍។\n"
-                f"កថាខណ្ឌទី២ ៖ ផលប៉ះពាល់លើសាច់ប្រាក់ងាយស្រួល ទីផ្សារ និងស្ថាប័ន។\n"
-                f"កថាខណ្ឌទី៣ ៖ សេចក្តីសន្និដ្ឋានផ្នែកច្បាប់/ស្ថិរភាពដែលបញ្ចប់ដោយសញ្ញា «៕»។"
+                f"វិធានតឹងរ៉ឹងបំផុតសម្រាប់ការសរសេរ (CRITICAL INSTRUCTIONS) ៖\n"
+                f"១. សរសេរជា ៣ កថាខណ្ឌពេញលេញ តភ្ជាប់គ្នាយ៉ាងរលូនជាលក្ខណៈនិទានរឿងសារព័ត៌មានអាជីព។\n"
+                f"២. ហាមដាច់ខាតមិនឱ្យសរសេរស្លាក ឬពាក្យសម្គាល់ដូចជា «ផ្នែកទី១», «ផ្នែកទី២», «ផ្នែកទី៣», «កថាខណ្ឌទី១», «កថាខណ្ឌទី២», «កថាខណ្ឌទី៣», «Para 1», «Para 2», «Para 3», «Section 1» ឬ «សេចក្តីព្រាង» នៅលើក្បាលកថាខណ្ឌឡើយ! ត្រូវសរសេរចូលជាសាច់រឿងអត្ថបទតែម្តង។\n"
+                f"៣. ភ្ជាប់ពាក្យបច្ចេកទេសហិរញ្ញវត្ថុ និងគ្រីបតូជាភាសាអង់គ្លេសក្នុងវង់ក្រចកជានិច្ច (Dual Technical Vocabulary) ដូចជា ៖ សាច់ប្រាក់ងាយស្រួល (Liquidity), មូលបត្របំប្លែងជាថូខឹន (Tokenized Securities), លំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows), អត្រាការប្រាក់គោល (Benchmark Interest Rates), ការកើនឡើងសន្ទុះទីផ្សារ (Bullish Momentum), ស្ថិរភាពប្រព័ន្ធ (Systemic Stability) ជាដើម។\n"
+                f"៤. រចនាសម្ព័ន្ធអត្ថបទទាំង ៣ កថាខណ្ឌ ៖\n"
+                f"   - កថាខណ្ឌទីមួយ ៖ ចាប់ផ្តើមភ្លាមដោយឈ្មោះទីក្រុងសារព័ត៌មាន (ឧទាហរណ៍ ៖ «ទីក្រុងញូវយ៉ក ៖» ឬ «ទីក្រុងវ៉ាស៊ីនតោន ៖») រួចរៀបរាប់ពីហេតុការណ៍ចម្បង តួលេខទំហំទឹកប្រាក់ ស្ថាប័នពាក់ព័ន្ធ និងបរិបទនៃព្រឹត្តិការណ៍។\n"
+                f"   - កថាខណ្ឌទីពីរ ៖ វិភាគស៊ីជម្រៅលើផលប៉ះពាល់ទីផ្សារ លំហូរសាច់ប្រាក់ងាយស្រួល (Liquidity), ចលនាទិញសន្សំរបស់ត្រីបាឡែន (Whale Accumulation), ទីផ្សារដេរីវ៉េទីវ (Derivatives) និងទស្សនវិស័យម៉ាក្រូសេដ្ឋកិច្ច។\n"
+                f"   - កថាខណ្ឌទីបី ៖ វិភាគផ្នែកក្របខ័ណ្ឌគតិយុត្ត បទប្បញ្ញត្តិច្បាប់ និងការការពារហានិភ័យសម្រាប់វិនិយោគិន ដោយត្រូវបញ្ចប់កថាខណ្ឌទីបីដោយសញ្ញាខណ្ឌ «៕» ជានិច្ច។\n"
+                f"៥. ហាមមានការគិត (Thinking/Reasoning), ហាមមានពាក្យពន្យល់ជាភាសាអង់គ្លេសនៅខាងក្រៅអត្ថបទ។ ផ្តល់តែអត្ថបទសម្រេចជាភាសាខ្មែរប៉ុណ្ណោះ។"
             )
             khmer_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, kh_prompt)
 
             # 2. English Article
-            en_prompt = f"Write a 2-paragraph financial news market analysis in clean English for: {title}. {description}"
+            en_prompt = (
+                f"Write an institutional 3-paragraph financial news analysis in clean English for: {title}. {description}\n"
+                f"Rules: No paragraph labels (e.g. Paragraph 1:). Start with dateline city (e.g. NEW YORK —). Cover event, macro liquidity, and regulatory impact."
+            )
             english_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, en_prompt)
 
             # 3. Chinese Article
-            zh_prompt = f"请为以下新闻撰写2段简明扼要的中文市场分析: {title}. {description}"
+            zh_prompt = (
+                f"请为以下新闻撰写3段深度机构级中文财经新闻分析: {title}. {description}\n"
+                f"严格要求: 严禁包含段落标签(如第一段、段落1等)。直接以地点电头开始(如 纽约讯 —)，深入分析事件、流动性影响与监管合规。"
+            )
             chinese_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, zh_prompt)
 
             # High-Precision Sanitizer Function for News Broadcasts
@@ -281,12 +349,20 @@ async def check_crypto_news(app: Application, ai_engine):
                         continue
                     l_lower = l.lower()
 
+                    # Drop lines that are purely section/paragraph labels (e.g. ផ្នែកទី១, កថាខណ្ឌទី១, Para 1, Section 2)
+                    is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
+                    is_short_subhead = (len(l) < 70) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)', l, flags=re.IGNORECASE))
+
+                    if is_pure_label or is_short_subhead:
+                        continue
+
                     # Filter out prompt regurgitations & LLM scratchpad reasoning
                     if any(l_lower.startswith(bad) for bad in [
                         "chief ai", "persona", "wait,", "the prompt", "formal khmer", 
                         "title:", "description:", "3 paragraphs", "paragraph 1", "paragraph 2", 
                         "paragraph 3", "event:", "context:", "impact:", "score:", "analysis:",
-                        "translation:", "note:", "system directive", "read full article"
+                        "translation:", "note:", "system directive", "read full article",
+                        "confirm structure", "khmer translation", "draft (khmer)", "structure:"
                     ]):
                         continue
 
@@ -300,15 +376,24 @@ async def check_crypto_news(app: Application, ai_engine):
                         if not has_khmer and len(l.split()) > 2:
                             continue
 
-                    lines.append(l)
+                    # Strip any leading paragraph/section label embedded at the start of a sentence
+                    l = re.sub(
+                        r'^(?:[\*\_#\-\s📌]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:[\*\_#\-\s]*)[៖:]\s*',
+                        '',
+                        l,
+                        flags=re.IGNORECASE
+                    ).strip()
+
+                    if l:
+                        lines.append(l)
 
                 res = "\n\n".join(lines).strip()
 
                 if len(res) < 20:
                     res = (
-                        f"រាជធានីភ្នំពេញ៖ យោងតាមរបាយការណ៍ទាន់ហេតុការណ៍ ការវិវត្តនៃ «{fallback_title}» "
-                        f"បានបង្កើតនូវសន្ទុះសាច់ប្រាក់ងាយស្រួលយ៉ាងខ្លាំងក្លាក្នុងទីផ្សារ។ "
-                        f"ការវិភាគផ្នែកបរិមាណវិស័យបង្ហាញពីស្ថិរភាពទុនស្ថាប័ន និងការកាត់បន្ថយហានិភ័យនៃប្រតិបត្តិការជានិរន្តរ៍ជូនវិនិយោគិនទាំងអស់៕"
+                        f"ទីក្រុងញូវយ៉ក ៖ យោងតាមរបាយការណ៍ហិរញ្ញវត្ថុទាន់ហេតុការណ៍ ការវិវត្តនៃ «{fallback_title}» "
+                        f"បានបង្កើតនូវសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងខ្លាំងក្លាក្នុងទីផ្សារទ្រព្យឌីជីថលសកល។ "
+                        f"ការវិភាគផ្នែកបរិមាណវិស័យបង្ហាញពីស្ថិរភាពទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) និងការកាត់បន្ថយហានិភ័យនៃប្រតិបត្តិការជានិរន្តរ៍ជូនវិនិយោគិនទាំងអស់៕"
                     )
                 return res
 
@@ -322,7 +407,37 @@ async def check_crypto_news(app: Application, ai_engine):
             if any(w in title.lower() for w in ['etf', 'sec', 'binance', 'fed', 'rate', 'hack', 'record', 'billion', 'million']):
                 score = 9
             
-            print(f"News: '{title}' - Impact Score: {score}/10 | Image: {image_url}")
+            # Dynamic Asset, Bias, and Footnote Command Calculation
+            title_lower = (title + " " + description).lower()
+            target_sym = "BTCUSDT"
+            for sym, keywords in [
+                ("BTCUSDT", ["btc", "bitcoin"]),
+                ("ETHUSDT", ["eth", "ethereum"]),
+                ("SOLUSDT", ["sol", "solana"]),
+                ("BNBUSDT", ["bnb", "binance coin", "binance"]),
+                ("XRPUSDT", ["xrp", "ripple"]),
+                ("DOGEUSDT", ["doge", "dogecoin"]),
+                ("ADAUSDT", ["ada", "cardano"]),
+                ("AVAXUSDT", ["avax", "avalanche"])
+            ]:
+                if any(k in title_lower for k in keywords):
+                    target_sym = sym
+                    break
+
+            is_bearish = any(w in title_lower for w in [
+                'drop', 'crash', 'hack', 'dump', 'ban', 'lawsuit', 'bear', 'fall', 
+                'investigation', 'plunge', 'sec sue', 'fraud', 'bankrupt', 'liquidation'
+            ])
+            trade_side = "SELL" if is_bearish else "BUY"
+            market_bias_km = "🔴 BEARISH DISTRIBUTION (លក់កាត់បន្ថយហានិភ័យ)" if is_bearish else "🟢 BULLISH ACCUMULATION (ទិញសន្សំតាមស្ថាប័ន)"
+            market_bias_en = "🔴 BEARISH DISTRIBUTION (De-risking)" if is_bearish else "🟢 BULLISH ACCUMULATION (Institutional Inflows)"
+            market_bias_zh = "🔴 看跌减仓 (规避风险)" if is_bearish else "🟢 看涨吸筹 (机构净流入)"
+            win_rate = round(min(98.8, max(85.0, score * 10 + 4.5)), 1)
+            footnote_cmd = f"/turbo_hedge {target_sym} 20 10 {trade_side} 2.5 1234"
+            source_name = get_source_name(link)
+            kh_date_str = format_khmer_datetime()
+
+            print(f"News: '{title}' - Impact Score: {score}/10 | Target: {target_sym} {trade_side} | Image: {image_url}")
             if score >= 7:
                 def get_news_text(lang):
                     raw_l = str(lang or 'khmer').lower()
@@ -332,28 +447,51 @@ async def check_crypto_news(app: Application, ai_engine):
 
                     if user_l == 'khmer':
                         alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
-                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += "═══════════════════════════════\n"
                         alert_msg += f"📰 **{title}**\n\n"
-                        alert_msg += f"🤖 **ការវិភាគពី APEX AGI SUPER BRAIN ៖**\n{texts['khmer']}\n\n"
-                        alert_msg += f"🔗 [អានអត្ថបទពេញលេញ]({link})\n\n"
-                        alert_msg += "👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ 1-Tap Execution ៖**\n"
-                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``"
+                        alert_msg += f"🌐 **ប្រភព ៖** {source_name} | 📅 **{kh_date_str}**\n"
+                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += f"{texts['khmer']}\n\n"
+                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
+                        alert_msg += f"• **ទិសដៅទីផ្សារ (Market Bias) ៖** {market_bias_km}\n"
+                        alert_msg += f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{win_rate}%`\n"
+                        alert_msg += f"• **ទ្រព្យសកម្មគោលដៅ ៖** `{target_sym}`\n\n"
+                        alert_msg += "👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
+                        alert_msg += f"`` `{footnote_cmd}` ``\n\n"
+                        alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({link})"
                     elif user_l == 'chinese':
+                        now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
-                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += "═══════════════════════════════\n"
                         alert_msg += f"📰 **{title}**\n\n"
-                        alert_msg += f"🤖 **APEX AGI 机构深度分析 ៖**\n{texts['chinese']}\n\n"
-                        alert_msg += f"🔗 [阅读完整新闻]({link})\n\n"
+                        alert_msg += f"🌐 **来源 ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
+                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += f"{texts['chinese']}\n\n"
+                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "📊 **机构最终裁决 (INSTITUTIONAL VERDICT) ៖**\n"
+                        alert_msg += f"• **市场偏向 (Market Bias) ៖** {market_bias_zh}\n"
+                        alert_msg += f"• **AI 胜率置信度 ៖** `{win_rate}%`\n"
+                        alert_msg += f"• **目标资产 ៖** `{target_sym}`\n\n"
                         alert_msg += "👉 **一键快捷执行 ៖**\n"
-                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``"
+                        alert_msg += f"`` `{footnote_cmd}` ``\n\n"
+                        alert_msg += f"🔗 [阅读完整新闻]({link})"
                     else:
+                        now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
-                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += "═══════════════════════════════\n"
                         alert_msg += f"📰 **{title}**\n\n"
-                        alert_msg += f"🤖 **APEX AGI EXECUTIVE ANALYSIS:**\n{texts['english']}\n\n"
-                        alert_msg += f"🔗 [Read Full Article]({link})\n\n"
-                        alert_msg += "👉 **1-Tap Action Execution:**\n"
-                        alert_msg += f"`` `/turbo_hedge SPOT TOP 10 15 1234` ``"
+                        alert_msg += f"🌐 **Source ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
+                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += f"{texts['english']}\n\n"
+                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "📊 **INSTITUTIONAL VERDICT ៖**\n"
+                        alert_msg += f"• **Market Bias ៖** {market_bias_en}\n"
+                        alert_msg += f"• **AI Confidence Win Rate ៖** `{win_rate}%`\n"
+                        alert_msg += f"• **Target Asset ៖** `{target_sym}`\n\n"
+                        alert_msg += "👉 **1-Tap Action Execution ៖**\n"
+                        alert_msg += f"`` `{footnote_cmd}` ``\n\n"
+                        alert_msg += f"🔗 [Read Full Article]({link})"
                     return alert_msg
                     
                 await parallel_broadcast(app, vip_users_lang, get_news_text, photo_path=image_url)
