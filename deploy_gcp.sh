@@ -16,18 +16,31 @@ sudo apt-get install -y python3 python3-pip python3-venv git curl htop systemd c
 sudo growpart /dev/sda 1 2>/dev/null || sudo growpart /dev/vda 1 2>/dev/null || true
 sudo resize2fs /dev/sda1 2>/dev/null || sudo resize2fs /dev/vda1 2>/dev/null || true
 
-# 2. Configure 2GB Swapfile (Prevents OS RAM Spikes on 1GB VPS)
-if [ ! -f /swapfile ]; then
-    echo "🛡️ Setting up 2GB Swapfile for memory safety..."
-    sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+# 2. Configure 4GB High-Speed SSD Swapfile & Linux Kernel Memory Tuning
+echo "🛡️ Setting up 4GB Swapfile & Zero-OOM Shield for 6.5GB Effective RAM..."
+if [ ! -f /swapfile ] || [ $(stat -c%s /swapfile 2>/dev/null || echo 0) -lt 3000000000 ]; then
+    sudo swapoff -a 2>/dev/null || true
+    sudo rm -f /swapfile
+    sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096 status=none
     sudo chmod 600 /swapfile
     sudo mkswap /swapfile
     sudo swapon /swapfile
+    sudo sed -i '/\/swapfile/d' /etc/fstab
     echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-    echo "✅ Swapfile enabled."
+    echo "✅ 4GB Swapfile configured successfully."
 else
-    echo "ℹ️ Swapfile already exists."
+    echo "ℹ️ 4GB Swapfile already active."
 fi
+
+# Kernel memory optimization
+sudo tee /etc/sysctl.d/99-apex-vps-memory.conf > /dev/null << 'EOF'
+vm.swappiness=60
+vm.vfs_cache_pressure=50
+vm.dirty_background_ratio=5
+vm.dirty_ratio=10
+vm.overcommit_memory=1
+EOF
+sudo sysctl -p /etc/sysctl.d/99-apex-vps-memory.conf > /dev/null 2>&1 || true
 
 # 3. Setup Project Workspace
 APP_DIR="/opt/khmer-master-crypto-bot"
