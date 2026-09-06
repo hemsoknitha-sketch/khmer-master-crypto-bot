@@ -7364,9 +7364,10 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE ENGINE v13.00** 🛡️\n"
+                        "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
                         "═══════════════════════════════\n\n"
-                        "📊 **INSTITUTIONAL TURBO HEDGE ARCHITECTURE:**\n"
+                        "💡 **PRO TIP**: You can use `/smart_trade` or `/turbo_hedge` interchangeably!\n\n"
+                        "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
                         "• 🚀 **Dual Market Support (Spot & Futures)** ៖ Execute Spot (1x) or Futures (1x-15x/75x) with zero collision\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL Instant Reversal\n"
                         "• 💰 **Dual-Check Profit Lock** ៖ +$5.00 USDT / +25% ROI ➔ Instant Market Close & Re-Entry 24/7\n"
@@ -7374,20 +7375,21 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **Live Position Auto-Sync** ៖ Scans Binance `/fapi/v2/positionRisk` every 3 seconds with 0% miss\n"
                         "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) 94.5% win-rate\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
-                        "👉 **🧠 Futures AGI Auto Decision (AI Scans & Auto-Decides BUY/SELL) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
-                        "👉 **🚀 Futures Top Gainers LONG (BUY 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
-                        "👉 **📉 Futures Top Dumpers SHORT (SELL 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
-                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Single-Coin Mode ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 Stop & Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                        "👉 **🧠 Futures AGI Auto Decision (AI Scans & Auto-Decides BUY/SELL) ៖**\n`` `/smart_trade TOP 20 10 AUTO 5 1234` ``\n\n"
+                        "👉 **🚀 Futures Top Gainers LONG (BUY 10x, $5/coin) ៖**\n`` `/smart_trade TOP 20 10 BUY 5 1234` ``\n\n"
+                        "👉 **📉 Futures Top Dumpers SHORT (SELL 10x, $5/coin) ៖**\n`` `/smart_trade TOP 20 10 SELL 5 1234` ``\n\n"
+                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/smart_trade HEDGE BTC 100 1234` ``\n\n"
+                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/smart_trade SPOT AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 Spot Single-Coin Mode ៖**\n`` `/smart_trade SPOT SOL 50 1234` ``\n\n"
+                        "👉 **🛑 Stop & Market Close ៖**\n`` `/smart_trade STOP SOL 1234` ``\n"
+                        "`` `/smart_trade STOP ALL 1234` ``"
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE 高频对冲引擎 v13.00** 🛡️\n"
+                        "⚡ **KHMER MASTER CRYPTO | SUPER SMART 高频量化交易系统 v13.00** 🛡️\n"
                         "═══════════════════════════════\n\n"
-                        "📊 **机构级 TURBO HEDGE 架构：**\n"
+                        "💡 **提示**：您可以完全互换使用 `/smart_trade` 或 `/turbo_hedge`！\n\n"
+                        "📊 **机构级 SUPER SMART 架构：**\n"
                         "• 🚀 **现货与合约双市场支持** ៖ 零冲突支持 Spot (1x) 或 Futures (1x-15x/75x) 自动建仓\n"
                         "• 🔄 **极速反向翻单 (<30ms)** ៖ 触发 -10.0% ROI / -$2.00 USDT 硬止损 ➔ 立即 BUY ↔ SELL 翻单\n"
                         "• 💰 **双重锁定止盈** ៖ +$5.00 USDT / +25% ROI ➔ 24/7 极速平仓并重入\n"
@@ -7395,20 +7397,21 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **实时持仓同步** ៖ 每 3 秒同步 Binance `/fapi/v2/positionRisk` 零漏单\n"
                         "• 🧠 **5-Swarm 与华尔街 ML** ៖ 三重集成 (XGBoost + CatBoost + LightGBM) 94.5% 胜率\n\n"
                         "📋 **一键复制指令：**\n\n"
-                        "👉 **🧠 合约 AGI 智能全自动决策 (AI 自动研判 BUY/SELL) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
-                        "👉 **🚀 合约做多 24h 涨幅榜 TOP 20 (BUY 10x) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
-                        "👉 **📉 合约做空 24h 跌幅榜 TOP 20 (SELL 10x) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
-                        "👉 **🛡️ 零风险 Delta-Neutral 对冲 (Spot 买入 1x + Futures 做空 1x) ៖**\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 现货多币突破全自动扫描 ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 现货单币模式 ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 停止与平仓指令 ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                        "👉 **🧠 合约 AGI 智能全自动决策 (AI 自动研判 BUY/SELL) ៖**\n`` `/smart_trade TOP 20 10 AUTO 5 1234` ``\n\n"
+                        "👉 **🚀 合约做多 24h 涨幅榜 TOP 20 (BUY 10x) ៖**\n`` `/smart_trade TOP 20 10 BUY 5 1234` ``\n\n"
+                        "👉 **📉 合约做空 24h 跌幅榜 TOP 20 (SELL 10x) ៖**\n`` `/smart_trade TOP 20 10 SELL 5 1234` ``\n\n"
+                        "👉 **🛡️ 零风险 Delta-Neutral 对冲 (Spot 买入 1x + Futures 做空 1x) ៖**\n`` `/smart_trade HEDGE BTC 100 1234` ``\n\n"
+                        "👉 **🛒 现货多币突破全自动扫描 ៖**\n`` `/smart_trade SPOT AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 现货单币模式 ៖**\n`` `/smart_trade SPOT SOL 50 1234` ``\n\n"
+                        "👉 **🛑 停止与平仓指令 ៖**\n`` `/smart_trade STOP SOL 1234` ``\n"
+                        "`` `/smart_trade STOP ALL 1234` ``"
                     )
                 else:
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE ENGINE v13.00** 🛡️\n"
+                        "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
                         "═══════════════════════════════\n\n"
-                        "📊 **INSTITUTIONAL TURBO HEDGE ARCHITECTURE:**\n"
+                        "💡 **ការណែនាំពិសេស** ៖ លោកអ្នកអាចប្រើប្រាស់បញ្ជា `/smart_trade` ឬ `/turbo_hedge` ដូចគ្នា 100%!\n\n"
+                        "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
                         "• 🚀 **គាំទ្រទីផ្សារពីរ (Spot & Futures)** ៖ រត់ Spot (1x) និង Futures (1x-15x/75x) ដោយគ្មានការទង្គិចគ្នា\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL ភ្លាមៗ (Zero Loss Past -15%)\n"
                         "• 💰 **Dual-Check Profit Lock** ៖ +$5.00 USDT / +25% ROI ➔ Instant Market Close & Re-Entry 24/7\n"
@@ -7416,14 +7419,14 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **Live Position Auto-Sync** ៖ ស្កេន Binance `/fapi/v2/positionRisk` រៀងរាល់ ៣ វិនាទី 100% គ្មានរំលង\n"
                         "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) Win-Rate 94.5%\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
-                        "👉 **🧠 Futures AGI Auto Decision (AI ស្កេន & សម្រេចចិត្ត BUY/SELL ស្វ័យប្រវត្តិ 24/7) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
-                        "👉 **🚀 Futures Top Gainers LONG (ទិញឡើង BUY 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
-                        "👉 **📉 Futures Top Dumpers SHORT (ទិញចុះ SELL 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
-                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Single-Coin Mode (0% Liquidation Risk) ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 បិទ និង Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                        "👉 **🧠 Futures AGI Auto Decision (AI ស្កេន & សម្រេចចិត្ត BUY/SELL ស្វ័យប្រវត្តិ 24/7) ៖**\n`` `/smart_trade TOP 20 10 AUTO 5 1234` ``\n\n"
+                        "👉 **🚀 Futures Top Gainers LONG (ទិញឡើង BUY 10x, ទុន $5/កាក់) ៖**\n`` `/smart_trade TOP 20 10 BUY 5 1234` ``\n\n"
+                        "👉 **📉 Futures Top Dumpers SHORT (ទិញចុះ SELL 10x, ទុន $5/កាក់) ៖**\n`` `/smart_trade TOP 20 10 SELL 5 1234` ``\n\n"
+                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/smart_trade HEDGE BTC 100 1234` ``\n\n"
+                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/smart_trade SPOT AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 Spot Single-Coin Mode (0% Liquidation Risk) ៖**\n`` `/smart_trade SPOT SOL 50 1234` ``\n\n"
+                        "👉 **🛑 បិទ និង Market Close ៖**\n`` `/smart_trade STOP SOL 1234` ``\n"
+                        "`` `/smart_trade STOP ALL 1234` ``"
                     )
                 msg_target = update.effective_message or update.message
                 if msg_target:
@@ -10214,18 +10217,20 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("cancel_alert", cancel_alert_command))
         self.app.add_handler(CommandHandler("top", top_command))
         self.app.add_handler(CommandHandler("news", news_command))
-        # v13.00 6 Flagship Quantitative Engines & Gold Radar Handlers
+        # v13.00 Flagship Quantitative Engines & Market Intelligence Handlers
         self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
+        self.app.add_handler(CommandHandler("auto_arb", funding_harvester_command))
+        self.app.add_handler(CommandHandler("turbo_yield", funding_harvester_command))
         self.app.add_handler(CommandHandler("whales", whales_command))
+        self.app.add_handler(CommandHandler("whale_radar", whales_command))
         self.app.add_handler(CommandHandler("infinity_matrix", infinity_grid_command))
+        self.app.add_handler(CommandHandler("infinity_grid", infinity_grid_command))
+        self.app.add_handler(CommandHandler("grid_bot", infinity_grid_command))
+        self.app.add_handler(CommandHandler("compound_grid", compound_grid_command))
         self.app.add_handler(CommandHandler("flash_crash", flash_crash_command))
         self.app.add_handler(CommandHandler("gold_guard", gold_radar_command))
         self.app.add_handler(CommandHandler("gold_radar", gold_radar_command))
-        self.app.add_handler(CommandHandler("cb_gold", gold_radar_command))
-        self.app.add_handler(CommandHandler("paxg_arbitrage", gold_radar_command))
-        self.app.add_handler(CommandHandler("black_swan_guard", gold_radar_command))
-        self.app.add_handler(CommandHandler("gold_btc_rebalance", gold_radar_command))
 
         self.app.add_handler(CommandHandler("language", language_command))
         self.app.add_handler(CommandHandler("quiet", quiet_command))
@@ -10235,31 +10240,16 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("add_bybit_api", add_bybit_api_command))
         self.app.add_handler(CommandHandler("remove_api", remove_api_command))
 
-        # Flagship & Aliased Trading Commands
+        # 🌟 Super Smart Consolidated Trading Suite (Spot & Futures Multi-Mode Engine)
         self.app.add_handler(CommandHandler("turbo_hedge", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("wave_rider", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("sweep_sniper", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("scalp", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("scan", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("hyper_trade", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("smart_trade", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("trade", turbo_hedge_command))
         self.app.add_handler(CommandHandler("auto_trade", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("sweep_auto", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("scalp", turbo_hedge_command))
 
         self.app.add_handler(CommandHandler("snipe", smart_listing_sniper_command))
         self.app.add_handler(CommandHandler("auto_snipe", smart_listing_sniper_command))
 
-        self.app.add_handler(CommandHandler("infinity_grid", infinity_grid_command))
-        self.app.add_handler(CommandHandler("compound_grid", compound_grid_command))
-        self.app.add_handler(CommandHandler("grid_bot", infinity_grid_command))
-        self.app.add_handler(CommandHandler("infinity_matrix", infinity_grid_command))
-
-        self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
-        self.app.add_handler(CommandHandler("auto_arb", funding_harvester_command))
-        self.app.add_handler(CommandHandler("turbo_yield", funding_harvester_command))
-        self.app.add_handler(CommandHandler("execute_top_tier_accumulation", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("monitor_all_streams", whales_command))
-        self.app.add_handler(CommandHandler("execute_short_cascade", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("execute_arb_engine", funding_harvester_command))
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
@@ -10267,19 +10257,13 @@ class TelegramBotThread(BaseThread):
 
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(stop_all_callback, pattern="^stopall_"))
-        self.app.add_handler(CommandHandler("sell_all", stop_all_command))
         self.app.add_handler(CommandHandler("balance", balance_command))
         self.app.add_handler(CommandHandler("status", status_command))
-        self.app.add_handler(CommandHandler("staus", status_command))
         self.app.add_handler(CommandHandler("health", health_command))
         self.app.add_handler(CommandHandler("sync_brain", sync_brain_command))
-        self.app.add_handler(CommandHandler("whales", whales_command))
-        self.app.add_handler(CommandHandler("whale_radar", whales_command))
-        self.app.add_handler(CommandHandler("whale_alert", whales_command))
         self.app.add_handler(CommandHandler("toggle_breaker", toggle_breaker_command))
         self.app.add_handler(CommandHandler("opt_rebalance", opt_rebalance_command))
         self.app.add_handler(CommandHandler("toggle_rebalance", toggle_rebalance_command))
-
 
         self.app.add_handler(CommandHandler("predict", predict_command))
         async def paper_trading_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -10408,7 +10392,6 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("trailing_stop", trailing_stop_command))
         self.app.add_handler(CommandHandler("trailing_guard", trailing_guard_command))
         self.app.add_handler(CommandHandler("gold_turbo", gold_turbo_command))
-        self.app.add_handler(CommandHandler("turbo_hedge", turbo_hedge_command))
         self.app.add_handler(CommandHandler("paper_trading", paper_trading_command))
 
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -10445,8 +10428,8 @@ class TelegramBotThread(BaseThread):
                     BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
                     BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
                     BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-                    BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
-                    BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
+                    BotCommand("smart_trade", "⚡ Super Smart Spot/Futures Trading Engine"),
+                    BotCommand("turbo_hedge", "🚀 Institutional Turbo Hedge Suite"),
                     BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
                     BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
                     BotCommand("balance", "💰 Check Spot & Futures Balance"),
@@ -10636,12 +10619,24 @@ class TelegramBotThread(BaseThread):
             id='check_funding_rates'
         )
 
+        # 💾 Silent Hourly Local Database Backup (Local disk retention without Telegram spam)
         self.scheduler.add_job(
             scheduler_tasks.hourly_database_backup,
             'interval',
             hours=1,
             args=[self.app],
             id='hourly_database_backup'
+        )
+
+        # 🛡️ Daily 2:00 AM (Phnom Penh Time) Database Auto-Backup & Telegram Admin Alert (Once every 24 hours)
+        self.scheduler.add_job(
+            scheduler_tasks.daily_database_backup_job,
+            'cron',
+            hour=2,
+            minute=0,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id='daily_database_backup_job'
         )
 
         self.scheduler.add_job(

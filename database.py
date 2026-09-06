@@ -1060,16 +1060,6 @@ def get_vip_users():
     conn.close()
     return [r[0] for r in rows] if rows else [859271875]
 
-def get_all_vip_users() -> list:
-    """Returns all registered users/VIP users for broadcast messages."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT chat_id FROM users")
-    rows = cursor.fetchall()
-    conn.close()
-    if not rows:
-        return [859271875]
-    return [r[0] for r in rows]
 
 def get_vip_users_with_lang():
     """Returns a list of VIP users and their preferred language."""
@@ -1364,169 +1354,25 @@ def get_user_api(chat_id: int):
 # Backwards compatibility alias
 get_api_keys = get_user_api
 
-def remove_user_api(chat_id: int) -> bool:
-    """Removes user's API keys and disables all auto-trading immediately."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    
-    # Check if API exists first
-    cursor.execute("SELECT 1 FROM user_api_keys WHERE chat_id = ?", (chat_id,))
-    exists = cursor.fetchone()
-    
-    if not exists:
-        conn.close()
-        return False
-        
-    # Delete the API Keys
-    cursor.execute("DELETE FROM user_api_keys WHERE chat_id = ?", (chat_id,))
-    
-    # Disable ALL Auto Trading as a security measure (Kill Switch)
-    cursor.execute("UPDATE users SET auto_trade_enabled = 0, hedge_mode_enabled = 0 WHERE chat_id = ?", (chat_id,))
-    cursor.execute("UPDATE smart_dca SET is_active = 0 WHERE chat_id = ?", (chat_id,))
-    cursor.execute("UPDATE grid_bots SET is_active = 0 WHERE chat_id = ?", (chat_id,))
-    
-    conn.commit()
-    conn.close()
-    return True
 
 # --- AI MEMORY (CHAT HISTORY) ---
 
-def add_chat_history(chat_id: int, role: str, content: str):
-    """Saves a message to the user's chat history."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE active_trades SET qty = ? WHERE id = ?", (new_qty, trade_id))
-    conn.commit()
-    conn.close()
 
-def get_active_trades_by_user(chat_id: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, symbol, qty, buy_price, current_highest, stop_loss_pct FROM active_trades WHERE chat_id = ?", (chat_id,))
-    res = cursor.fetchall()
-    conn.close()
-    return res
 
-def update_trade_qty_and_scale(trade_id: int, new_qty: float, scale_level: int):
-    """Updates trade quantity and scale-out level after a partial take-profit."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE active_trades SET qty = ?, scale_out_level = ? WHERE id = ?", (new_qty, scale_level, trade_id))
-    conn.commit()
-    conn.close()
 
-def update_active_trade_highest(trade_id: int, highest_price: float):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE active_trades SET current_highest = ? WHERE id = ?", (highest_price, trade_id))
-    conn.commit()
-    conn.close()
 
-def remove_active_trade(trade_id: int, exit_price: float = 0.0, exit_reason: str = "MANUAL"):
-    """Removes an active trade and logs it to trade_history."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # 1. Fetch trade details
-    cursor.execute('SELECT chat_id, symbol, qty, buy_price, timestamp FROM active_trades WHERE id = ?', (trade_id,))
-    trade = cursor.fetchone()
-    
-    if trade:
-        chat_id, symbol, qty, buy_price, entry_time = trade
-        pnl = 0.0
-        pnl_percent = 0.0
-        if buy_price and buy_price > 0 and exit_price > 0:
-            effective_buy_cost = (buy_price * qty) * 1.001
 
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, chat_id, symbol, base_amount, entry_price, current_drop_level FROM smart_dca WHERE is_active = 1")
-    dca_configs = cursor.fetchall()
-    conn.close()
-    return dca_configs
 
-def get_active_smart_dca_by_user(chat_id: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, symbol, base_amount, entry_price, current_drop_level FROM smart_dca WHERE chat_id = ? AND is_active = 1", (chat_id,))
-    dca_configs = cursor.fetchall()
-    conn.close()
-    return dca_configs
 
-def update_dca_level(dca_id: int, new_level: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE smart_dca SET current_drop_level = ? WHERE id = ?", (new_level, dca_id))
-    conn.commit()
-    conn.close()
-
-def deactivate_smart_dca(dca_id: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE smart_dca SET is_active = 0 WHERE id = ?", (dca_id,))
-    conn.commit()
 
 # --- GRID BOT FUNCTIONS ---
 
-def add_grid_bot(chat_id: int, symbol: str, lower_price: float, upper_price: float, grids: int, total_investment: float, grid_step: float, qty_per_grid: float) -> int:
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    query = "INSERT INTO grid_bots (chat_id, symbol, lower_price, upper_price, grids, total_investment, grid_step, qty_per_grid, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)"
-    cursor.execute(query, (chat_id, symbol, lower_price, upper_price, grids, total_investment, grid_step, qty_per_grid))
-    bot_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return bot_id
 
-def add_grid_order(bot_id: int, order_type: str, target_price: float):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO grid_orders (bot_id, order_type, target_price, status) VALUES (?, ?, ?, 'OPEN')", (bot_id, order_type, target_price))
-    conn.commit()
-    conn.close()
 
-def get_active_grid_bots():
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, chat_id, symbol, lower_price, upper_price, grids, total_investment, grid_step, qty_per_grid FROM grid_bots WHERE is_active = 1")
-    bots = cursor.fetchall()
-    conn.close()
-    return bots
 
-def get_open_grid_orders(bot_id: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, order_type, target_price FROM grid_orders WHERE bot_id = ? AND status = 'OPEN'", (bot_id,))
-    orders = cursor.fetchall()
-    conn.close()
-    return orders
 
-def update_grid_order_status(order_id: int, status: str):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE grid_orders SET status = ? WHERE id = ?", (status, order_id))
-    conn.commit()
-    conn.close()
 
-def deactivate_grid_bot(bot_id: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE grid_bots SET is_active = 0 WHERE id = ?", (bot_id,))
-    cursor.execute("UPDATE grid_orders SET status = 'CANCELLED' WHERE bot_id = ? AND status = 'OPEN'", (bot_id,))
-    conn.commit()
-    conn.close()
 
-def get_hedge_mode_config(chat_id: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT hedge_mode_enabled, hedge_amount, hedge_leverage FROM users WHERE chat_id = ?", (chat_id,))
-    res = cursor.fetchone()
-    conn.close()
-    if res:
-        return {"enabled": bool(res[0]), "amount": float(res[1]), "leverage": int(res[2])}
-    return {"enabled": False, "amount": 50.0, "leverage": 5}
 
 def get_active_hedge_users():
     conn = get_db_connection()
@@ -1536,35 +1382,9 @@ def get_active_hedge_users():
     conn.close()
     return [{"chat_id": r[0], "amount": r[1] or 50.0, "leverage": r[2] or 5} for r in rows]
 
-def set_hedge_mode_config(chat_id: int, enabled: bool, amount: float, leverage: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET hedge_mode_enabled = ?, hedge_amount = ?, hedge_leverage = ? WHERE chat_id = ?", (int(enabled), amount, leverage, chat_id))
-    conn.commit()
-    conn.close()
 
-def add_active_short(chat_id: int, symbol: str, margin: float, leverage: int, entry_price: float):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO active_shorts (chat_id, symbol, margin_usdt, leverage, entry_price) VALUES (?, ?, ?, ?, ?)",
-                   (chat_id, symbol, margin, leverage, entry_price))
-    conn.commit()
-    conn.close()
 
-def get_active_shorts():
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, chat_id, symbol, margin_usdt, leverage, entry_price FROM active_shorts WHERE status = 'OPEN'")
-    res = cursor.fetchall()
-    conn.close()
-    return res
 
-def close_active_short(short_id: int):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE active_shorts SET status = 'CLOSED' WHERE id = ?", (short_id,))
-    conn.commit()
-    conn.close()
 
 
 def remove_user_api(chat_id: int) -> bool:
@@ -1646,23 +1466,7 @@ def can_user_buy(chat_id: int) -> bool:
     
     return count < max_trades
 
-def add_active_trade(chat_id: int, symbol: str, qty: float, buy_price: float, stop_loss_pct: float):
-    """Records a new active trade for trailing stop loss and sets initial_qty equal to qty."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    query = "INSERT INTO active_trades (chat_id, symbol, qty, initial_qty, buy_price, current_highest, stop_loss_pct, scale_out_level, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)"
-    cursor.execute(query, (chat_id, symbol, qty, qty, buy_price, buy_price, stop_loss_pct, timestamp))
-    conn.commit()
-    conn.close()
 
-def get_all_active_trades():
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, chat_id, symbol, qty, buy_price, current_highest, stop_loss_pct, scale_out_level, initial_qty FROM active_trades")
-    trades = cursor.fetchall()
-    conn.close()
-    return trades
 
 def mark_trade_scaled_out(trade_id: int):
     conn = get_db_connection()
@@ -1715,12 +1519,6 @@ def update_trade_qty_and_scale(trade_id: int, new_qty: float, scale_level: int):
     conn.commit()
     conn.close()
 
-def update_active_trade_highest(trade_id: int, highest_price: float):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE active_trades SET current_highest = ? WHERE id = ?", (highest_price, trade_id))
-    conn.commit()
-    conn.close()
 
 def remove_active_trade(trade_id: int, exit_price: float = 0.0, exit_reason: str = "MANUAL"):
     """Removes an active trade and logs it to trade_history."""
@@ -2051,79 +1849,16 @@ def get_active_infinity_grids_by_user(chat_id: int):
     conn.close()
     return res
 
-def set_wave_rider_config(chat_id, enabled: bool):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE users SET wave_rider_enabled = ? WHERE chat_id = ?', (1 if enabled else 0, chat_id))
-    conn.commit()
-    conn.close()
 
 # --- Trailing Stop Engine (Active Trades) ---
-def add_active_trade(chat_id, symbol, qty, buy_price, stop_loss_pct):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    query = "INSERT INTO active_trades (chat_id, symbol, qty, initial_qty, buy_price, current_highest, stop_loss_pct, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    cursor.execute(query, (chat_id, symbol, qty, qty, buy_price, buy_price, stop_loss_pct, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    trade_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return trade_id
 
-def get_all_active_trades():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT id, chat_id, symbol, qty, buy_price, current_highest, stop_loss_pct, scaled_out FROM active_trades')
-    rows = cursor.fetchall()
-    return [{"id": r[0], "chat_id": r[1], "symbol": r[2], "qty": r[3], "buy_price": r[4], "current_highest": r[5], "stop_loss_pct": r[6], "scaled_out": bool(r[7])} for r in rows]
 
-def update_active_trade_highest(trade_id, current_highest):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE active_trades SET current_highest = ? WHERE id = ?', (current_highest, trade_id))
-    conn.commit()
-    conn.close()
 
 # remove_active_trade is defined above
 
 # --- Auto Trade Engine ---
-def get_auto_trade_users():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT chat_id FROM users WHERE auto_trade_enabled = 1 AND is_vip = 1')
-        rows = cursor.fetchall()
-        conn.close()
-        return [r[0] for r in rows]
-    except Exception as e:
-        print(f"Error getting auto trade users: {e}")
-        conn.close()
-        return []
 
-def toggle_auto_trade(chat_id, enabled: bool):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('UPDATE users SET auto_trade_enabled = ? WHERE chat_id = ?', 
-                       (1 if enabled else 0, chat_id))
-        conn.commit()
-    except Exception as e:
-        print(f"Error toggling auto trade: {e}")
-    finally:
-        conn.close()
 
-def is_auto_trade_enabled(chat_id) -> bool:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT auto_trade_enabled FROM users WHERE chat_id = ?', (chat_id,))
-        row = cursor.fetchone()
-        conn.close()
-        if row and row[0] == 1:
-            return True
-        return False
-    except:
-        conn.close()
-        return False
 
 # --- SMART PORTFOLIO REBALANCING ---
 def is_global_rebalance_enabled() -> bool:
@@ -2150,49 +1885,9 @@ def set_global_rebalance(status: bool):
     conn.commit()
     conn.close()
 
-def is_user_opted_in_rebalance(chat_id: int) -> bool:
-    cache_key = f"rebalance_opt_{chat_id}"
-    cached = cache_get(cache_key)
-    if cached is not None: return cached
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT rebalance_opt_in FROM users WHERE chat_id = ?", (chat_id,))
-        res = cursor.fetchone()
-        val = bool(res[0]) if res else False
-    except Exception: val = False
-    conn.close()
-    cache_set(cache_key, val, 60)
-    return val
 
-def toggle_user_rebalance_opt_in(chat_id: int) -> bool:
-    current = is_user_opted_in_rebalance(chat_id)
-    new_val = not current
-    cache_delete(f"rebalance_opt_{chat_id}")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET rebalance_opt_in = ? WHERE chat_id = ?", (1 if new_val else 0, chat_id))
-    conn.commit()
-    conn.close()
-    return new_val
 
-def can_user_rebalance(chat_id: int) -> bool:
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT daily_rebalance_count, rebalance_last_date FROM users WHERE chat_id = ?", (chat_id,))
-    res = cursor.fetchone()
-    conn.close()
-    if res:
-        count, last_date = res
-        if last_date != today:
-            return True # New day, reset happens on increment
-        return count < 3 # Max 3 per day
-    return False
 
-def increment_user_rebalance(chat_id: int):
-    from datetime import datetime
 def stop_delta_neutral_bot(bot_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -2277,198 +1972,26 @@ def deactivate_all_bots_by_symbol(chat_id: int, symbol):
     finally:
         conn.close()
 
-def is_wave_rider_enabled(chat_id) -> bool:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT wave_rider_enabled FROM users WHERE chat_id = ?', (chat_id,))
-        row = cursor.fetchone()
-        conn.close()
-        if row and row[0] == 1:
-            return True
-        return False
-    except:
-        conn.close()
-        return True # Default to true
 
-def set_wave_rider_config(chat_id, enabled: bool):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE users SET wave_rider_enabled = ? WHERE chat_id = ?', 
-                   (1 if enabled else 0, chat_id))
-    conn.commit()
-    conn.close()
 
 # --- Trailing Stop Engine (Active Trades) ---
-def add_active_trade(chat_id, symbol, qty, buy_price, stop_loss_pct):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    query = "INSERT INTO active_trades (chat_id, symbol, qty, initial_qty, buy_price, current_highest, stop_loss_pct, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    cursor.execute(query, (chat_id, symbol, qty, qty, buy_price, buy_price, stop_loss_pct, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    trade_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return trade_id
 
-def get_all_active_trades():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT id, chat_id, symbol, qty, buy_price, current_highest, stop_loss_pct, scaled_out FROM active_trades')
-    rows = cursor.fetchall()
-    conn.close()
-    return [{"id": r[0], "chat_id": r[1], "symbol": r[2], "qty": r[3], "buy_price": r[4], "current_highest": r[5], "stop_loss_pct": r[6], "scaled_out": bool(r[7])} for r in rows]
 
-def update_active_trade_highest(trade_id, current_highest):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE active_trades SET current_highest = ? WHERE id = ?', (current_highest, trade_id))
-    conn.commit()
-    conn.close()
 
 # remove_active_trade is defined above
 
 # --- Auto Trade Engine ---
-def get_auto_trade_users():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT chat_id FROM users WHERE auto_trade_enabled = 1 AND is_vip = 1')
-        rows = cursor.fetchall()
-        conn.close()
-        return [r[0] for r in rows]
-    except Exception as e:
-        print(f"Error getting auto trade users: {e}")
-        conn.close()
-        return []
 
-def toggle_auto_trade(chat_id, enabled: bool):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('UPDATE users SET auto_trade_enabled = ? WHERE chat_id = ?', 
-                       (1 if enabled else 0, chat_id))
-        conn.commit()
-    except Exception as e:
-        print(f"Error toggling auto trade: {e}")
-    finally:
-        conn.close()
 
-def is_auto_trade_enabled(chat_id) -> bool:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT auto_trade_enabled FROM users WHERE chat_id = ?', (chat_id,))
-        row = cursor.fetchone()
-        conn.close()
-        if row and row[0] == 1:
-            return True
-        return False
-    except:
-        conn.close()
-        return False
 
 # --- SMART PORTFOLIO REBALANCING ---
-def is_global_rebalance_enabled() -> bool:
-    cache_key = "global_rebalance"
-    cached = cache_get(cache_key)
-    if cached is not None: return cached
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT global_rebalance_enabled FROM system_settings WHERE id = 1")
-        res = cursor.fetchone()
-        val = bool(res[0]) if res else False
-    except Exception:
-        val = False
-    conn.close()
-    cache_set(cache_key, val, 60)
-    return val
-
-def set_global_rebalance(status: bool):
-    cache_delete("global_rebalance")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE system_settings SET global_rebalance_enabled = ? WHERE id = 1", (1 if status else 0,))
-    conn.commit()
-    conn.close()
-
-def is_user_opted_in_rebalance(chat_id: int) -> bool:
-    cache_key = f"rebalance_opt_{chat_id}"
-    cached = cache_get(cache_key)
-    if cached is not None: return cached
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT rebalance_opt_in FROM users WHERE chat_id = ?", (chat_id,))
-        res = cursor.fetchone()
-        val = bool(res[0]) if res else False
-    except Exception: val = False
-    conn.close()
-    cache_set(cache_key, val, 60)
-    return val
-
-def toggle_user_rebalance_opt_in(chat_id: int) -> bool:
-    current = is_user_opted_in_rebalance(chat_id)
-    new_val = not current
-    cache_delete(f"rebalance_opt_{chat_id}")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET rebalance_opt_in = ? WHERE chat_id = ?", (1 if new_val else 0, chat_id))
-    conn.commit()
-    conn.close()
-    return new_val
-
-def can_user_rebalance(chat_id: int) -> bool:
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT daily_rebalance_count, rebalance_last_date FROM users WHERE chat_id = ?", (chat_id,))
-    res = cursor.fetchone()
-    conn.close()
-    if res:
-        count, last_date = res
-        if last_date != today:
-            return True # New day, reset happens on increment
-        return count < 3 # Max 3 per day
-    return False
-
-def increment_user_rebalance(chat_id: int):
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT daily_rebalance_count, rebalance_last_date FROM users WHERE chat_id = ?", (chat_id,))
-    res = cursor.fetchone()
-    if res:
-        count, last_date = res
-        if last_date != today:
-            count = 1
-            last_date = today
-        else:
-            count += 1
-        cursor.execute("UPDATE users SET daily_rebalance_count = ?, rebalance_last_date = ? WHERE chat_id = ?", (count, last_date, chat_id))
-        conn.commit()
-    conn.close()
 
 
-def update_strategy_pnl(chat_id: int, strategy_name: str, pnl_usdt: float):
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT total_pnl_usdt, win_count, loss_count FROM strategy_pnl_attribution WHERE chat_id = ? AND strategy_name = ?", (chat_id, strategy_name))
-        row = cursor.fetchone()
-        is_win = 1 if pnl_usdt > 0 else 0
-        is_loss = 1 if pnl_usdt < 0 else 0
-        if row:
-            cursor.execute("UPDATE strategy_pnl_attribution SET total_pnl_usdt = ?, win_count = ?, loss_count = ?, last_updated = CURRENT_TIMESTAMP WHERE chat_id = ? AND strategy_name = ?", (row[0]+pnl_usdt, row[1]+is_win, row[2]+is_loss, chat_id, strategy_name))
-        else:
-            cursor.execute("INSERT INTO strategy_pnl_attribution (chat_id, strategy_name, total_pnl_usdt, win_count, loss_count) VALUES (?, ?, ?, ?, ?)", (chat_id, strategy_name, pnl_usdt, is_win, is_loss))
-        conn.commit()
-    except Exception as e:
-        print(f"Error update_strategy_pnl: {e}")
-    finally:
-        conn.close()
+
+
+
+
+
 
 def is_wave_rider_enabled(chat_id) -> bool:
     conn = get_db_connection()
@@ -2506,10 +2029,26 @@ def add_active_trade(chat_id, symbol, qty, buy_price, stop_loss_pct):
 def get_all_active_trades():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, chat_id, symbol, qty, buy_price, current_highest, stop_loss_pct, scaled_out FROM active_trades')
-    rows = cursor.fetchall()
-    conn.close()
-    return [{"id": r[0], "chat_id": r[1], "symbol": r[2], "qty": r[3], "buy_price": r[4], "current_highest": r[5], "stop_loss_pct": r[6], "scaled_out": bool(r[7])} for r in rows]
+    try:
+        cursor.execute('SELECT id, chat_id, symbol, qty, buy_price, current_highest, stop_loss_pct, scale_out_level, initial_qty FROM active_trades')
+        rows = cursor.fetchall()
+        return [{
+            "id": r[0], "chat_id": r[1], "symbol": r[2], "qty": r[3],
+            "buy_price": r[4], "current_highest": r[5], "stop_loss_pct": r[6],
+            "scale_out_level": r[7] if len(r) > 7 and r[7] is not None else 0,
+            "initial_qty": r[8] if len(r) > 8 and r[8] is not None else r[3]
+        } for r in rows]
+    except Exception:
+        cursor.execute('SELECT id, chat_id, symbol, qty, buy_price, current_highest, stop_loss_pct FROM active_trades')
+        rows = cursor.fetchall()
+        return [{
+            "id": r[0], "chat_id": r[1], "symbol": r[2], "qty": r[3],
+            "buy_price": r[4], "current_highest": r[5], "stop_loss_pct": r[6],
+            "scale_out_level": 0,
+            "initial_qty": r[3]
+        } for r in rows]
+    finally:
+        conn.close()
 
 def update_active_trade_highest(trade_id, current_highest):
     conn = get_db_connection()
@@ -2561,12 +2100,7 @@ def is_auto_trade_enabled(chat_id) -> bool:
         return False
 
 # --- SMART PORTFOLIO REBALANCING ---
-def is_global_rebalance_enabled() -> bool:
-    val = get_system_setting("global_rebalance")
-    return val != "0"
 
-def set_global_rebalance(status: bool):
-    update_system_setting("global_rebalance", "1" if status else "0")
 
 def is_user_opted_in_rebalance(chat_id: int) -> bool:
     cache_key = f"rebalance_opt_{chat_id}"
@@ -3377,17 +2911,6 @@ def get_active_scalpers_by_user(chat_id: int) -> list:
     return res
 
 # --- LIQUIDATION DEFENDER HELPERS ---
-def get_all_active_defenders() -> list:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT DISTINCT chat_id FROM users WHERE chat_id IS NOT NULL")
-        rows = cursor.fetchall()
-        return [r[0] for r in rows if r[0] is not None]
-    except Exception:
-        return []
-    finally:
-        conn.close()
 
 def is_defender_enabled(chat_id: int) -> bool:
     conn = get_db_connection()
@@ -3905,5 +3428,4 @@ def restore_state_snapshot() -> dict:
     except Exception as e:
         print(f"⚠️ [STATE RESTORE ERROR]: {e}")
         return {}
-
 

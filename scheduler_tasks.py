@@ -47,7 +47,10 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                     return
                     
                 # 2. Send Photo if available
-                # 2. Try sending photo: if msg <= 1000, send as caption; if msg > 1000, send photo first then full message!
+                # 2. Try sending photo with text:
+                # - If msg <= 1000: Native photo caption via send_photo (1 message)
+                # - If msg <= 4000 and HTTP photo URL: Telegram LinkPreviewOptions with prefer_large_media=True & show_above_text=True (1 SINGLE GORGEOUS MESSAGE with large photo on top!)
+                # - If local photo or msg > 4000: send photo first, then text chunk(s)
                 sent_photo = False
                 if p_path:
                     try:
@@ -60,14 +63,31 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                                     clean_caption = msg.replace('*', '').replace('`', '').replace('_', '')
                                     await app.bot.send_photo(chat_id=cid, photo=p_path, caption=clean_caption)
                                     sent_photo = True
+                            elif len(msg) <= 4000:
+                                # Telegram Bot API 7.0+ LinkPreviewOptions (Large Media Photo on Top of Text in EXACTLY 1 MESSAGE!)
+                                try:
+                                    from telegram import LinkPreviewOptions
+                                    lpo = LinkPreviewOptions(url=str(p_path), prefer_large_media=True, show_above_text=True)
+                                    await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, link_preview_options=lpo)
+                                    sent_photo = True
+                                except Exception as e_lpo:
+                                    print(f"⚠️ LinkPreviewOptions broadcast notice: {e_lpo}")
+                                    try:
+                                        clean_msg = msg.replace('*', '').replace('`', '').replace('_', '')
+                                        await app.bot.send_message(chat_id=cid, text=clean_msg, link_preview_options=lpo)
+                                        sent_photo = True
+                                    except Exception:
+                                        # Fallback to separate photo if link preview failed
+                                        try:
+                                            await app.bot.send_photo(chat_id=cid, photo=p_path)
+                                        except Exception:
+                                            pass
                             else:
-                                # For comprehensive articles (> 1000 chars, e.g. 3000-4000 chars),
-                                # send image first, then dispatch FULL unabridged text via send_message!
+                                # Over 4000 chars: send photo first, then text chunks below
                                 try:
                                     await app.bot.send_photo(chat_id=cid, photo=p_path)
                                 except Exception as e_p:
                                     print(f"⚠️ Photo broadcast notice: {e_p}")
-                                # sent_photo remains False so the full message is sent below via send_message!
                         else:
                             if len(msg) <= 1000:
                                 with open(p_path, 'rb') as f:
@@ -84,7 +104,6 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                                         await app.bot.send_photo(chat_id=cid, photo=f)
                                     except Exception as e_p:
                                         print(f"⚠️ Local photo broadcast notice: {e_p}")
-                                # sent_photo remains False so the full message is sent below!
                     except Exception as e_photo:
                         print(f"⚠️ Photo broadcast notice: {e_photo}")
                         sent_photo = False
@@ -138,30 +157,200 @@ async def daily_market_brief(app: Application, ai_engine):
     ml_summary = await asyncio.to_thread(ml_predictor.predict_price, symbol)
     summary += f"\n\n{ml_summary}"
     
-    # Analyze with AI (Polyglot)
-    ai_prompt = (
-        f"Provide a brief, energizing morning market summary based on this data:\n{summary}\n\n"
-        f"[CRITICAL INSTRUCTION: You MUST output the exact same summary in 3 languages, formatted EXACTLY like this:\n"
-        f"[ENGLISH]\n...\n===LANG_SEP===\n[KHMER]\n...\n===LANG_SEP===\n[CHINESE]\n...]"
-    )
-    analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, ai_prompt)
-    
-    # Parse Polyglot Output
-    parts = analysis.split('===LANG_SEP===')
-    texts = {'english': analysis, 'khmer': analysis, 'chinese': analysis, 'auto': analysis}
-    if len(parts) >= 3:
-        texts['english'] = parts[0].replace('[ENGLISH]', '').strip()
-        texts['khmer'] = parts[1].replace('[KHMER]', '').strip()
-        texts['chinese'] = parts[2].replace('[CHINESE]', '').strip()
-        texts['auto'] = texts['khmer']
-    
+    # Determine which languages are needed by active VIP members
+    needed_langs = set()
+    for _, l in vip_users_lang:
+        code = str(l or 'khmer').lower().strip()
+        if code in ['en', 'english']:
+            needed_langs.add('english')
+        elif code in ['zh', 'chinese', 'cn']:
+            needed_langs.add('chinese')
+        else:
+            needed_langs.add('khmer')
+            
+    if not needed_langs:
+        needed_langs.add('khmer')
+
+    # Dedicated Sanitizer for Market Briefings to guarantee 0% thoughts or language cross-bleed
+    def sanitize_brief_text(raw_text: str, target_lang: str = "khmer") -> str:
+        if not raw_text:
+            return ""
+        # 1. Purge reasoning/think tags
+        txt = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL | re.IGNORECASE)
+        txt = re.sub(r'<thought>.*?</thought>', '', txt, flags=re.DOTALL | re.IGNORECASE)
+        txt = re.sub(r'```think.*?```', '', txt, flags=re.DOTALL | re.IGNORECASE)
+        txt = re.sub(r'\[THINKING\].*?\[/THINKING\]', '', txt, flags=re.DOTALL | re.IGNORECASE)
+        
+        target_clean = (target_lang or 'khmer').lower().strip()
+        
+        # 2. Extract specific language section if multiple languages are present
+        if target_clean in ['km', 'khmer']:
+            matches = list(re.finditer(r'(?:\[KHMER\]|\*\*\[KHMER\]\*\*|(?:\n|^)\s*(?:1[\.\)]\s*)?ផ្នែកទី\s*១[៖:])', txt, re.IGNORECASE))
+            if matches:
+                chosen_start = -1
+                for m in reversed(matches):
+                    idx = m.start()
+                    sub = txt[idx:idx+500]
+                    if "system prompt" not in sub.lower() and "wait," not in sub.lower() and "user instruction" not in sub.lower():
+                        chosen_start = idx
+                        break
+                if chosen_start != -1:
+                    after = txt[chosen_start:]
+                    end_m = re.search(r'(?:\n\s*\*?\s*\*\*\[(?:CHINESE|ENGLISH)\]\*\*|\n\s*\[(?:CHINESE|ENGLISH)\]|\n\s*\*?\s*Language requirement|\n\s*\*?\s*Format:)', after, re.IGNORECASE)
+                    if end_m:
+                        txt = after[:end_m.start()]
+                    else:
+                        txt = after
+        elif target_clean in ['en', 'english']:
+            matches = list(re.finditer(r'(?:\[ENGLISH\]|\*\*\[ENGLISH\]\*\*|(?:\n|^)\s*(?:1[\.\)]\s*)?Section\s*1)', txt, re.IGNORECASE))
+            if not matches:
+                matches = list(re.finditer(r'(?:\n|^)\s*1\.\s*The Institutional Verdict', txt, re.IGNORECASE))
+                matches = [m for m in matches if not re.search(r'[\u1780-\u17ff\u4e00-\u9fa5]', txt[max(0, m.start()-20):m.end()])]
+            if matches:
+                chosen_start = matches[0].start()
+                after = txt[chosen_start:]
+                end_m = re.search(r'(?:\n\s*\*?\s*\*\*\[(?:CHINESE|KHMER)\]\*\*|\n\s*\[(?:CHINESE|KHMER)\]|\n\s*\*?\s*\*{2,4}\s*\n|\n\s*\*?\s*Language requirement|\n\s*(?:1[\.\)]\s*)?ផ្នែកទី)', after, re.IGNORECASE)
+                if end_m:
+                    txt = after[:end_m.start()]
+                else:
+                    txt = after
+        elif target_clean in ['zh', 'chinese']:
+            matches = list(re.finditer(r'(?:\[CHINESE\]|\*\*\[CHINESE\]\*\*|(?:\n|^)\s*(?:1[\.\)]\s*)?机构决策)', txt, re.IGNORECASE))
+            if matches:
+                chosen_start = -1
+                for m in reversed(matches):
+                    idx = m.start()
+                    sub = txt[idx:idx+500]
+                    if "system prompt" not in sub.lower() and "wait," not in sub.lower() and "user instruction" not in sub.lower():
+                        chosen_start = idx
+                        break
+                if chosen_start != -1:
+                    after = txt[chosen_start:]
+                    end_m = re.search(r'(?:\n\s*\*?\s*\*\*\[(?:ENGLISH|KHMER)\]\*\*|\n\s*\[(?:ENGLISH|KHMER)\]|\n\s*\*?\s*Language requirement)', after, re.IGNORECASE)
+                    if end_m:
+                        txt = after[:end_m.start()]
+                    else:
+                        txt = after
+
+        # 3. Clean scratchpad lines, bullet markers, and language headers
+        lines = txt.split("\n")
+        cleaned = []
+        skip_prefixes = (
+            "*   [chinese]", "*   [english]", "*   [khmer]",
+            "**[chinese]**", "**[english]**", "**[khmer]**",
+            "[chinese]", "[english]", "[khmer]",
+            "*   *wait", "* *wait", "* wait", "wait,",
+            "*   *asset:", "* *asset:", "* asset:",
+            "*   *price:", "* *price:", "* price:",
+            "*   *direction:", "* *direction:", "* direction:",
+            "*   *confidence:", "* *confidence:", "* confidence:",
+            "*   *leverage:", "* *leverage:", "* leverage:",
+            "*   *analysis:", "* *analysis:", "* analysis:",
+            "*   language requirement", "language requirement",
+            "*   format:", "format:",
+            "*   ****", "****", "*   ***", "***"
+        )
+        for line in lines:
+            stripped = line.strip()
+            stripped_lower = stripped.lower()
+            if not stripped or stripped in ["*   ****", "****", "*   ***", "***", "*"]:
+                continue
+            if any(stripped_lower.startswith(p) for p in skip_prefixes):
+                continue
+            if "(checked)" in stripped_lower:
+                continue
+            if "the user instruction says" in stripped_lower:
+                continue
+            if "the system prompt's structure" in stripped_lower:
+                continue
+            if "i will apply this structure" in stripped_lower:
+                continue
+            cleaned.append(line)
+            
+        res = "\n".join(cleaned).strip()
+        return re.sub(r'\n{3,}', '\n\n', res)
+
+    texts = {}
+
+    # 1. Khmer Executive Brief
+    if 'khmer' in needed_langs:
+        kh_prompt = (
+            f"សូមរៀបចំសេចក្តីសង្ខេបទីផ្សារពេលព្រឹក (Daily Market Brief) កម្រិតស្ថាប័នផ្លូវការសម្រាប់សមាជិក VIP ដោយផ្អែកលើទិន្នន័យជាក់ស្តែងខាងក្រោម ៖\n{summary}\n\n"
+            f"សូមសរសេរជាភាសាខ្មែរសុទ្ធ ១០០% តាមរចនាសម្ព័ន្ធប្រតិបត្តិ ៣ ផ្នែក ៖\n"
+            f"ផ្នែកទី ១៖ សេចក្តីសម្រេចចិត្តរបស់ស្ថាប័ន (The Institutional Verdict)\n"
+            f"- ទ្រព្យសកម្មគោលដៅ ៖ {symbol}\n"
+            f"- ទិសដៅទីផ្សារ ៖ [Bullish / Bearish / Neutral]\n"
+            f"- អត្រាជោគជ័យនៃ AI (Win Rate Confidence) ៖ [Win Rate %]\n"
+            f"- អនុសាសន៍សម្រាប់ Leverage ៖ [Leverage x]\n"
+            f"- ប៉ារ៉ាម៉ែត្រហានិភ័យ ៖ Stop-loss 1.0% និង Trailing Peak Lock\n\n"
+            f"ផ្នែកទី ២៖ ភស្តុតាងបរិមាណវិស័យ និងម៉ាក្រូសេដ្ឋកិច្ច (Quantitative and Macro Evidence)\n"
+            f"[ វិភាគស៊ីជម្រៅពី RSI, MACD, Funding Rate, Fear & Greed Index និងទិសដៅសន្ទុះទីផ្សារ ]\n\n"
+            f"ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (The Executive Action Command)\n"
+            f"`/[command] [amount]`\n\n"
+            f"វិធានតឹងរ៉ឹងបំផុត ៖\n"
+            f"- ផ្ញើចេញតែអត្ថបទបទបង្ហាញចុងក្រោយសុទ្ធសាធជាភាសាខ្មែរ។\n"
+            f"- ហាមដាច់ខាតមិនឱ្យបញ្ចេញកំណត់ចំណាំការគិត ការផ្ទៀងផ្ទាត់ ឬការព្រាងទុក (Thinking/Scratchpad/Notes) ឡើយ។"
+        )
+        raw_kh = await asyncio.to_thread(ai_engine.generate_response, kh_prompt, "khmer")
+        texts['khmer'] = sanitize_brief_text(raw_kh, "khmer")
+
+    # 2. English Executive Brief (if needed)
+    if 'english' in needed_langs:
+        en_prompt = (
+            f"Provide an institutional morning Daily Market Brief for VIP members based on this data:\n{summary}\n\n"
+            f"Structure your response strictly in 3 sections:\n"
+            f"Section 1: The Institutional Verdict\n"
+            f"- Target Asset: {symbol}\n"
+            f"- Market Direction: [Bullish / Bearish / Neutral]\n"
+            f"- AI Win Rate Confidence: [Win Rate %]\n"
+            f"- Recommended Leverage: [Leverage x]\n"
+            f"- Risk Parameters: Stop-loss 1.0% & Trailing Peak Lock\n\n"
+            f"Section 2: Quantitative and Macro Evidence\n"
+            f"[Deep analysis covering RSI, MACD, Funding Rate, Fear & Greed Index, and momentum]\n\n"
+            f"Section 3: The Executive Action Command\n"
+            f"`/[command] [amount]`\n\n"
+            f"Rules: Reply strictly in 100% English. Output ONLY the final executive presentation text. NO internal thoughts, scratchpad notes, or drafting."
+        )
+        raw_en = await asyncio.to_thread(ai_engine.generate_response, en_prompt, "english")
+        texts['english'] = sanitize_brief_text(raw_en, "english")
+
+    # 3. Chinese Executive Brief (if needed)
+    if 'chinese' in needed_langs:
+        zh_prompt = (
+            f"请根据以下实时数据为 VIP 会员提供机构级早间市场简报 (Daily Market Brief):\n{summary}\n\n"
+            f"请严格按照以下三部分结构输出:\n"
+            f"第一部分: 机构决策 (The Institutional Verdict)\n"
+            f"- 目标资产: {symbol}\n"
+            f"- 市场方向: [看涨 Bullish / 看跌 Bearish / 震荡 Neutral]\n"
+            f"- AI 胜率置信度: [Win Rate %]\n"
+            f"- 杠杆建议: [Leverage x]\n"
+            f"- 风险参数: 止损 1.0% 及 移动止盈 (Trailing Peak Lock)\n\n"
+            f"第二部分: 量化与宏观证据 (Quantitative and Macro Evidence)\n"
+            f"[深入分析 RSI、MACD、资金费率、恐慌与贪婪指数及动能]\n\n"
+            f"第三部分: 执行指令 (The Executive Action Command)\n"
+            f"`/[command] [amount]`\n\n"
+            f"严格规则: 仅使用专业简体中文输出最终简报文本。严禁包含任何思考过程、草稿笔记或提示词复述。"
+        )
+        raw_zh = await asyncio.to_thread(ai_engine.generate_response, zh_prompt, "chinese")
+        texts['chinese'] = sanitize_brief_text(raw_zh, "chinese")
+
     # Generate Chart
     chart_path = market_data.generate_chart(df, symbol)
     
     # Send to all VIPs using parallel_broadcast
     def get_market_brief_text(lang):
-        user_lang = lang if lang in texts else 'khmer'
-        return f"🌅 **Daily Market Brief**\n\n{texts[user_lang]}"
+        code = str(lang or 'khmer').lower().strip()
+        if code in ['en', 'english']:
+            brief = texts.get('english') or texts.get('khmer', '')
+            header = "🌅 **Daily Market Brief**"
+        elif code in ['zh', 'chinese', 'cn']:
+            brief = texts.get('chinese') or texts.get('khmer', '')
+            header = "🌅 **每日市场晨报 (Daily Market Brief)**"
+        else:
+            brief = texts.get('khmer') or texts.get('english', '')
+            header = "🌅 **សេចក្តីសង្ខេបទីផ្សារពេលព្រឹក (Daily Market Brief)**"
+            
+        return f"{header}\n\n{brief}"
 
     await parallel_broadcast(app, vip_users_lang, get_market_brief_text, photo_path=chart_path)
 
@@ -303,7 +492,7 @@ async def check_crypto_news(app: Application, ai_engine):
             # 1. Khmer Article (Strict Chuon Nath Executive Standard - 3 Seamless Paragraphs)
             kh_prompt = (
                 f"អ្នកគឺជាប្រធាននិពន្ធសារព័ត៌មានហិរញ្ញវត្ថុគ្រីបតូស្ថាប័នជាន់ខ្ពស់ (Executive Financial News Chief Editor)។\n"
-                f"សូមសរសេរអត្ថបទព័ត៌មានវិភាគស៊ីជម្រៅកម្រិតស្ថាប័នជាភាសាខ្មែរផ្លូវការ ត្រឹមត្រូវតាមក្បួនអក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ឱ្យបានក្បោះក្បាយ មានប្រវែងចន្លោះពី 2,500 ដល់ 3,500 តួអក្សរ ដោយផ្អែកលើព័ត៌មានខាងក្រោម ៖\n"
+                f"សូមសរសេរអត្ថបទព័ត៌មានវិភាគស៊ីជម្រៅកម្រិតស្ថាប័នជាភាសាខ្មែរផ្លូវការ ត្រឹមត្រូវតាមក្បួនអក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ឱ្យបានក្បោះក្បាយ មានប្រវែងចន្លោះពី 1,800 ដល់ 2,500 តួអក្សរ (ដើម្បីធានាការផ្ញើចេញរួមគ្នាជាមួយរូបភាពក្នុងសារតែមួយគត់នៃ Telegram) ដោយផ្អែកលើព័ត៌មានខាងក្រោម ៖\n"
                 f"ចំណងជើង ៖ {title}\n"
                 f"ខ្លឹមសារ ៖ {description}\n\n"
                 f"វិធានតឹងរ៉ឹងបំផុតសម្រាប់ការសរសេរ (CRITICAL INSTRUCTIONS) ៖\n"
@@ -320,14 +509,14 @@ async def check_crypto_news(app: Application, ai_engine):
 
             # 2. English Article
             en_prompt = (
-                f"Write an institutional 3-paragraph financial news analysis in clean English for: {title}. {description}\n"
+                f"Write an institutional 3-paragraph financial news analysis in clean English (approx 1,500 - 2,000 characters) for: {title}. {description}\n"
                 f"Rules: Strictly NO internal thinking, scratchpads, or notes (NO 'Goal:', 'Structure:', 'Refinement:'). NO paragraph labels (e.g. Paragraph 1:). Start directly with dateline city (e.g. NEW YORK —). Cover event, macro liquidity, and regulatory impact."
             )
             english_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, en_prompt)
 
             # 3. Chinese Article
             zh_prompt = (
-                f"请为以下新闻撰写3段深度机构级中文财经新闻分析: {title}. {description}\n"
+                f"请为以下新闻撰写3段深度机构级中文财经新闻分析 (约 800 - 1,200 字): {title}. {description}\n"
                 f"严格要求: 严禁包含任何内部思考、草稿笔记(如 Goal、Structure、Refinement 等)。严禁包含段落标签(如第一段、段落1等)。直接以地点电头开始(如 纽约讯 —)，深入分析事件、流动性影响与监管合规。"
             )
             chinese_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, zh_prompt)
@@ -1955,32 +2144,81 @@ async def hedge_short_monitor(app):
     except Exception as e:
         print(f"Error in hedge_short_monitor: {e}")
 
-async def hourly_database_backup(app: Application):
-    """Background job to backup the database every hour and send to Admin."""
+async def daily_database_backup_job(app: Application):
+    """
+    🛡️ Daily 2:00 AM (Phnom Penh Time) Database Auto-Backup & Telegram Admin Alert.
+    Performs SQLite database backup and sends the backup document with alert to Admin Bot
+    strictly ONCE every 24 hours at 2:00 AM Cambodia time (Asia/Phnom_Penh).
+    """
     try:
         import os
         import backup_manager
-        print("💾 Running Scheduled Database Backup...")
+        import database as db
+        print("💾 [24H AUTO-BACKUP] Running 2:00 AM (Phnom Penh Time) Daily Database Backup...")
         backup_path = backup_manager.perform_backup(is_boot=False)
         
         if backup_path and os.path.exists(backup_path):
-            admin_chat_id = "859271875"
+            admin_ids = ["859271875"]
             try:
-                await app.bot.send_document(
-                    chat_id=admin_chat_id,
-                    document=open(backup_path, 'rb'),
-                    caption="🛡️ **[AUTO-BACKUP]** ទិន្នន័យ Database ចុងក្រោយបំផុតត្រូវបានរក្សាទុកដោយសុវត្ថិភាព!",
-                    parse_mode="Markdown",
-                    read_timeout=120,
-                    write_timeout=120,
-                    connect_timeout=120
-                )
-                print("✅ Backup sent to Admin Telegram!")
-            except Exception as e:
-                print(f"❌ Failed to send backup to Telegram: {e}")
-                
+                extra_admins = db.get_all_admins()
+                for aid in extra_admins:
+                    str_aid = str(aid).strip()
+                    if str_aid and str_aid not in admin_ids:
+                        admin_ids.append(str_aid)
+            except Exception:
+                pass
+
+            caption_text = (
+                "🛡️ **[AUTO-BACKUP]** ទិន្នន័យ Database ចុងក្រោយបំផុតត្រូវបានរក្សាទុកដោយសុវត្ថិភាព!\n"
+                "═══════════════════════════════\n"
+                "⏰ **កាលវិភាគ** ៖ ម៉ោង ០២:០០ ព្រឹក (ម៉ោងនៅភ្នំពេញ ប្រទេសកម្ពុជា)\n"
+                "💾 **របាយការណ៍** ៖ រក្សាទុក និងផ្ញើជូន Admin តែម្តងគត់ក្នុងរយៈពេល ២៤ ម៉ោង\n"
+                "🔒 **សុវត្ថិភាព** ៖ VIP Users & All Positions 100% Preserved"
+            )
+
+            for target_admin in admin_ids:
+                try:
+                    with open(backup_path, 'rb') as doc_file:
+                        await app.bot.send_document(
+                            chat_id=target_admin,
+                            document=doc_file,
+                            caption=caption_text,
+                            parse_mode="Markdown",
+                            read_timeout=120,
+                            write_timeout=120,
+                            connect_timeout=120
+                        )
+                    print(f"✅ [24H AUTO-BACKUP] 2:00 AM Daily Backup successfully sent to Admin ({target_admin})!")
+                except Exception as e:
+                    print(f"⚠️ Markdown error sending daily backup to {target_admin}: {e}, trying plain text...")
+                    try:
+                        clean_caption = "🛡️ [AUTO-BACKUP] ទិន្នន័យ Database ចុងក្រោយបំផុតត្រូវបានរក្សាទុកដោយសុវត្ថិភាព! (ម៉ោង ០២:០០ ព្រឹក ម៉ោងនៅភ្នំពេញ)"
+                        with open(backup_path, 'rb') as doc_file:
+                            await app.bot.send_document(
+                                chat_id=target_admin,
+                                document=doc_file,
+                                caption=clean_caption,
+                                read_timeout=120,
+                                write_timeout=120,
+                                connect_timeout=120
+                            )
+                        print(f"✅ [24H AUTO-BACKUP] Plaintext daily backup sent to Admin ({target_admin})!")
+                    except Exception as e2:
+                        print(f"❌ Failed to send daily backup to Admin {target_admin}: {e2}")
     except Exception as e:
-        print(f"Error in hourly_database_backup: {e}")
+        print(f"Error in daily_database_backup_job: {e}")
+
+async def hourly_database_backup(app: Application):
+    """
+    💾 Silent Hourly Local Database Backup:
+    Backs up the database to the local disk every hour according to the 24-hour retention policy.
+    Does NOT send Telegram documents to prevent spamming the Admin Bot every hour.
+    """
+    try:
+        import backup_manager
+        backup_manager.perform_backup(is_boot=False)
+    except Exception as e:
+        print(f"Error in silent hourly_database_backup: {e}")
 
 async def order_book_sniper(app: Application, ai_engine):
     """
@@ -2317,12 +2555,12 @@ async def ai_scalper_monitor(app, ai_engine):
                     # BUY!
                     if keys:
                         api_key, api_secret = keys
-                        available_usdt = trading_engine.get_available_usdt_balance(api_key, api_secret)
+                        available_usdt = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
                         actual_buy_amount = min(amount, available_usdt)
-                        if actual_buy_amount >= 5.0:
+                        if actual_buy_amount >= 10.50:
                             trading_engine.place_market_buy(api_key, api_secret, symbol, actual_buy_amount)
                         else:
-                            print(f"❌ AI Scalper Buy Failed for {symbol}: Insufficient USDT ({available_usdt})")
+                            print(f"❌ AI Scalper Buy Failed for {symbol}: Insufficient Spot USDT ({available_usdt:.2f} < 10.50 MIN_NOTIONAL)")
                             continue
                         
                     msg = f"🏓 **AI SCALPER (BUY)** 🏓\n\n🪙 **{symbol}**\n💵 ទិញចូល: `${current_price:,.4f}`\n🎯 គោលដៅចំណេញបន្ទាប់: `+{profit_target_pct}%`"
@@ -3980,32 +4218,6 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                         try: await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
                         except: pass
 
-async def pre_pump_daily_train_job(app: Application):
-    from pre_pump_engine import pre_pump_engine
-    import database as db
-    
-    print("⚙️ [SCHEDULER] Triggering Daily Pre-Pump Sniper Training...")
-    try:
-        await pre_pump_engine.daily_train()
-        
-        # Notify Admin (Assuming Admin chat_id is stored or we notify the first VIP user for now, 
-        # or we can use a hardcoded admin ID if it exists in db, but typically broadcast to VIPs with role 'admin'.
-        # Since we don't know the admin ID, let's just log it and send to all users who have it enabled.)
-        pre_pump_users = await asyncio.to_thread(db.get_pre_pump_users)
-        if pre_pump_users:
-            msg = (
-                f"🧠 **AI SYSTEM UPDATE**\\n\\n"
-                f"✅ **Pre-Pump Sniper Engine** has successfully completed its daily deep-learning cycle.\\n"
-                f"📊 Analyzed over 300+ coins' On-Chain and Orderbook footprints from the last 24h.\\n"
-                f"🎯 Predictive thresholds have been dynamically optimized for current market conditions."
-            )
-            for chat_id, _ in pre_pump_users:
-                try: 
-                    await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                except: 
-                    pass
-    except Exception as e:
-        print(f"❌ [SCHEDULER ERROR] Pre-Pump Daily Train failed: {e}")
 
 async def macro_gold_monitor(app: Application):
     """Periodically monitors Macro Gold Indicators (DXY, 10Y Yields, PAXG) and alerts users on macro breakouts."""

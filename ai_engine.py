@@ -509,12 +509,18 @@ class AIInvestmentEngine:
         text = re.sub(r'Section\s*3\s*\([^)]*\)\s*:', 'ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (The Executive Action Command)', text, flags=re.IGNORECASE)
 
         # 4. Slice off drafting headers if present
-        if "ផ្នែកទី ១" in text:
-            idx = text.find("ផ្នែកទី ១")
-            text = text[idx:]
-        elif "ផ្នែកទី១" in text:
-            idx = text.find("ផ្នែកទី១")
-            text = text[idx:]
+        if "ផ្នែកទី ១" in text or "ផ្នែកទី១" in text:
+            matches = list(re.finditer(r'(?:^|\n)\s*(?:1[\.\)]\s*)?ផ្នែកទី\s*១[៖:]', text))
+            if matches:
+                chosen_idx = -1
+                for m in reversed(matches):
+                    c_idx = m.start()
+                    c_sub = text[c_idx:c_idx+300]
+                    if "system prompt" not in c_sub.lower() and "wait," not in c_sub.lower() and "user instruction" not in c_sub.lower():
+                        chosen_idx = c_idx
+                        break
+                if chosen_idx != -1:
+                    text = text[chosen_idx:].strip()
         elif "Drafting final Khmer text:" in text:
             idx = text.find("Drafting final Khmer text:")
             text = text[idx + len("Drafting final Khmer text:"):]
@@ -551,6 +557,19 @@ class AIInvestmentEngine:
             "*   Constraint", "Constraint 1:", "Constraint 2:", "Constraint 3:",
             "*   Persona:", "* Persona:", "Persona:",
             "*   Command:", "*   Asset:", "*   Direction:", "*   Leverage:",
+            "*   *Wait", "* *Wait", "* Wait", "*   Wait", "Wait,",
+            "*   *Asset:", "* *Asset:", "* Asset:",
+            "*   *Price:", "* *Price:", "* Price:",
+            "*   *Direction:", "* *Direction:", "* Direction:",
+            "*   *Confidence:", "* *Confidence:", "* Confidence:",
+            "*   *Leverage:", "* *Leverage:", "* Leverage:",
+            "*   *Analysis:", "* *Analysis:", "* Analysis:",
+            "*   Language requirement", "Language requirement",
+            "*   Format:", "Format:",
+            "*   [CHINESE]", "*   [ENGLISH]", "*   [KHMER]",
+            "**[CHINESE]**", "**[ENGLISH]**", "**[KHMER]**",
+            "[CHINESE]", "[ENGLISH]", "[KHMER]",
+            "*   ****", "****", "*   ***", "***",
             "*   Heading:", "*   Status:", "*   Execution Details:", "*   Risk Management:",
             "*   Header:", "*   Body:", "*   Table/List:", "*   Warning:",
             "*   Drafting", "*   Role:", "* Role:", "Role:",
@@ -571,24 +590,32 @@ class AIInvestmentEngine:
 
         for line in lines:
             stripped = line.strip()
-            if any(stripped.startswith(prefix) for prefix in scratchpad_prefixes):
+            stripped_lower = stripped.lower()
+            if not stripped or stripped in ["*   ****", "****", "*   ***", "***", "*"]:
                 continue
-            if any(kw in stripped for kw in [
-                "Respond ONLY in clean, executive",
-                "User's language preference:",
-                "Structure: Section 1, 2, 3",
-                "No fluff/reasoning",
-                "Win Rate: Let's estimate",
-                "Section 1: The Institutional Verdict",
-                "Section 2: Quantitative and Macro",
-                "Section 3: The Executive Action",
+            if any(stripped_lower.startswith(prefix.lower()) for prefix in scratchpad_prefixes):
+                continue
+            if any(kw in stripped_lower for kw in [
+                "respond only in clean, executive",
+                "user's language preference:",
+                "structure: section 1, 2, 3",
+                "no fluff/reasoning",
+                "win rate: let's estimate",
+                "section 1: the institutional verdict",
+                "section 2: quantitative and macro",
+                "section 3: the executive action",
                 "2-sentence rule",
-                "Self-Correction during drafting",
-                "Fact Check (Real World vs. Context)",
-                "Contextual Interpretation:",
-                "Strategic Response:",
-                "Executive Response Strategy:",
-                "Final Output Generation:"
+                "self-correction during drafting",
+                "fact check (real world vs. context)",
+                "contextual interpretation:",
+                "strategic response:",
+                "executive response strategy:",
+                "final output generation:",
+                "the user instruction says",
+                "system prompt's structure",
+                "i will apply this structure",
+                "(checked)",
+                "language requirement:"
             ]):
                 continue
 

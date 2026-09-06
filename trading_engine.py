@@ -440,7 +440,7 @@ def get_available_usdt_balance(api_key: str, api_secret: str) -> float:
             futures_usdt = res_f
     except Exception:
         pass
-    return max(spot_usdt, futures_usdt)
+    return round(spot_usdt + futures_usdt, 2)
 
 def get_portfolio_margin_balance(api_key: str, api_secret: str, asset: str = "USDT") -> float:
     """Fetches Portfolio Margin & Cross Margin Wallet Equity from Binance SAPI."""
@@ -649,14 +649,19 @@ def emergency_reduce_position(api_key: str, api_secret: str, symbol: str, side: 
         endpoint = "/fapi/v1/order"
         timestamp = (int(time.time() * 1000) + TIME_OFFSET)
         trade_side = "SELL" if side.upper() == "LONG" else "BUY"
-        payload = urlencode({
+        order_params = {
             "symbol": symbol,
             "side": trade_side,
             "type": "MARKET",
             "quantity": qty,
-            "reduceOnly": "true",
             "timestamp": timestamp
-        })
+        }
+        if is_hedge_mode(api_key, api_secret):
+            order_params["positionSide"] = side.upper()
+        else:
+            order_params["reduceOnly"] = "true"
+
+        payload = urlencode(order_params)
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
         url = f"{FUTURES_URL}{endpoint}?{payload}&signature={signature}"
@@ -855,14 +860,17 @@ def place_market_buy(api_key: str, api_secret: str, symbol: str, quote_order_qty
         qty = round(quote_order_qty / price, 3)
         return simulate_order_response(symbol, "BUY", qty, price)
 
-    # Super Smart Balance Check
+    # Super Smart Balance Check (Binance Spot requires $10.00 MIN_NOTIONAL)
     available_balance = get_spot_balance(api_key, api_secret, "USDT")
     if available_balance < quote_order_qty:
-        if available_balance >= 5.0:
-            print(f"⚠️ Insufficient full balance. Auto-adjusting Spot BUY from {quote_order_qty} to {available_balance}")
+        if available_balance >= 10.50:
+            print(f"⚠️ Insufficient full balance. Auto-adjusting Spot BUY from {quote_order_qty} to {available_balance:.2f}")
             quote_order_qty = available_balance
         else:
-            return {"error": f"Insufficient USDT Balance (Available: {available_balance:.2f} USDT). Minimum required: $5.00"}
+            return {"error": f"Insufficient Spot USDT Balance (Available: {available_balance:.2f} USDT). Minimum required: $10.50 (Binance Spot MIN_NOTIONAL filter)."}
+
+    # Enforce absolute minimum $10.50
+    quote_order_qty = max(10.50, quote_order_qty)
 
     # 🥷 Super Smart Anti-Slippage Check (Lowered threshold to $15.00)
     if quote_order_qty >= 15.0:
@@ -1137,12 +1145,16 @@ def place_futures_short(api_key: str, api_secret: str, symbol: str, margin_usdt:
         return simulate_order_response(symbol, "FUTURES_SHORT", qty, current_price)
 
     set_leverage(api_key, api_secret, symbol, leverage)
+    set_futures_margin_type(api_key, api_secret, symbol, "ISOLATED")
     
     endpoint = "/fapi/v1/order"
     params = {
         "symbol": symbol, "side": "SELL", "type": "MARKET",
         "quantity": qty, "recvWindow": 60000, "timestamp": (int(time.time() * 1000) + TIME_OFFSET)
     }
+    if is_hedge_mode(api_key, api_secret):
+        params["positionSide"] = "SHORT"
+
     query_string = urlencode(params)
     signature = generate_signature(api_secret, query_string)
     headers = {"X-MBX-APIKEY": api_key}
@@ -1167,8 +1179,13 @@ def close_futures_short(api_key: str, api_secret: str, symbol: str, qty: float) 
     endpoint = "/fapi/v1/order"
     params = {
         "symbol": symbol, "side": "BUY", "type": "MARKET", "quantity": qty,
-        "reduceOnly": "true", "recvWindow": 60000, "timestamp": (int(time.time() * 1000) + TIME_OFFSET)
+        "recvWindow": 60000, "timestamp": (int(time.time() * 1000) + TIME_OFFSET)
     }
+    if is_hedge_mode(api_key, api_secret):
+        params["positionSide"] = "SHORT"
+    else:
+        params["reduceOnly"] = "true"
+
     query_string = urlencode(params)
     signature = generate_signature(api_secret, query_string)
     headers = {"X-MBX-APIKEY": api_key}
@@ -1718,13 +1735,40 @@ def get_futures_max_leverage(api_key: str, api_secret: str, symbol: str) -> int:
     return 20
 
 _ONEWAY_MODE_CACHE = set()
+_DUAL_SIDE_CACHE = {}
+
+def is_hedge_mode(api_key: str, api_secret: str) -> bool:
+    """
+    Checks whether user account is set to Hedge Mode (dualSidePosition = True).
+    Caches result for fast lookups.
+    """
+    global _DUAL_SIDE_CACHE
+    if not api_key or not api_secret:
+        return False
+    cache_key = api_key[-6:]
+    if cache_key in _DUAL_SIDE_CACHE:
+        return _DUAL_SIDE_CACHE[cache_key]
+    try:
+        endpoint = "/fapi/v1/positionSide/dual"
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = urlencode({"recvWindow": 60000, "timestamp": timestamp})
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        res = HFT_SESSION.get(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
+        if res.status_code == 200:
+            val = bool(res.json().get("dualSidePosition", False))
+            _DUAL_SIDE_CACHE[cache_key] = val
+            return val
+    except Exception:
+        pass
+    return False
 
 def ensure_oneway_position_mode(api_key: str, api_secret: str) -> bool:
     """
     Ensures user account is set to One-Way Position Mode (dualSidePosition = False).
     Prevents Error -4061 (Order's position side does not match user's setting) on Hedge Mode accounts.
     """
-    global _ONEWAY_MODE_CACHE
+    global _ONEWAY_MODE_CACHE, _DUAL_SIDE_CACHE
     if not api_key or not api_secret:
         return False
     cache_key = api_key[-6:]
@@ -1739,7 +1783,11 @@ def ensure_oneway_position_mode(api_key: str, api_secret: str) -> bool:
         res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
         if res.status_code == 200 or "-4059" in res.text: # -4059: No need to change position side
             _ONEWAY_MODE_CACHE.add(cache_key)
+            _DUAL_SIDE_CACHE[cache_key] = False
             return True
+        elif "-4061" in res.text or "-4068" in res.text:
+            # Has open positions in Hedge mode, cannot change now
+            _DUAL_SIDE_CACHE[cache_key] = True
     except Exception:
         pass
     return False
@@ -1850,11 +1898,12 @@ def get_futures_free_margin(api_key: str, api_secret: str) -> float:
         print(f"Error fetching futures free margin: {e}")
     return 0.0
 
-def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 25) -> dict:
+def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 25, position_side: str = None) -> dict:
     """
     Executes a market order on Binance Futures API (/fapi/v1/order).
     Automatically formats quantity to Binance's exact LOT_SIZE precision.
     Includes Super Smart APEX TURBO AGI Dynamic Margin Auto-Recovery & Pre-Flight Free Margin Shield for Error -2019.
+    Full support for both One-Way Mode and Hedge (Dual-Side) Mode (Error -4061 Auto-Recovery).
     Uses HFT_SESSION pre-warmed connection pool for sub-30ms micro-execution latency.
     """
     if not api_key or not api_secret:
@@ -1915,24 +1964,36 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
     if quantity <= 0:
         return {"status": "error", "error": f"Calculated quantity {quantity} invalid for {symbol}"}
 
-    def _send_hft_order(ord_qty: float, ord_lev: int):
+    def _send_hft_order(ord_qty: float, ord_lev: int, pos_side: str = None):
         set_futures_leverage(api_key, api_secret, symbol, ord_lev)
         endpoint = "/fapi/v1/order"
         timestamp = int(time.time() * 1000) + TIME_OFFSET
-        params = urlencode({
+        ord_params = {
             "symbol": symbol,
             "side": side.upper(),
             "type": "MARKET",
             "quantity": ord_qty,
             "recvWindow": 60000,
             "timestamp": timestamp
-        })
+        }
+        eff_pos = pos_side or position_side
+        if not eff_pos and is_hedge_mode(api_key, api_secret):
+            eff_pos = "LONG" if side.upper() == "BUY" else "SHORT"
+        if eff_pos and eff_pos in ["LONG", "SHORT"]:
+            ord_params["positionSide"] = eff_pos
+
+        params = urlencode(ord_params)
         sig = generate_signature(api_secret, params)
         headers = {"X-MBX-APIKEY": api_key}
         return HFT_SESSION.post(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
 
     try:
         res = _send_hft_order(quantity, leverage)
+
+        # Hedge Mode Error -4061 Auto-Recovery
+        if "-4061" in res.text:
+            retry_pos = "LONG" if side.upper() == "BUY" else "SHORT"
+            res = _send_hft_order(quantity, leverage, pos_side=retry_pos)
         
         if res.status_code == 200:
             data = res.json()
@@ -2027,9 +2088,9 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
         print(f"Error in place_futures_order: {e}")
         return {"status": "error", "error": str(e)}
 
-def execute_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 25) -> dict:
+def execute_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 25, position_side: str = None) -> dict:
     """Alias for place_futures_order."""
-    return place_futures_order(api_key, api_secret, symbol, side, quantity, leverage)
+    return place_futures_order(api_key, api_secret, symbol, side, quantity, leverage, position_side=position_side)
 
 def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "BUY", amount_usdt: float = 10.0) -> dict:
     """
