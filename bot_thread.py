@@ -221,7 +221,10 @@ class TelegramBotThread(BaseThread):
                 # Silent handling for harmless idle long-poll timeouts (Telegram API European server latency)
                 pass
             else:
-                self.log_signal.emit(f"❌ Telegram Error: {context.error}")
+                import traceback
+                tb_lines = traceback.format_exception(type(context.error), context.error, context.error.__traceback__)
+                tb_str = " | ".join([line.strip() for line in tb_lines[-3:] if line.strip()])
+                self.log_signal.emit(f"❌ Telegram Error: {context.error} [{tb_str}]")
                 
         self.app.add_error_handler(global_error_handler)
 
@@ -3872,7 +3875,11 @@ class TelegramBotThread(BaseThread):
                 await turbo_hedge_command(update, context)
             elif data in ["btn_cross_arb", "btn_cross_arb_scan"]:
                 await cross_arb_command(update, context)
-            elif data in ["btn_flash_loan", "btn_flash_loan_scan"]:
+            elif data == "btn_flash_loan":
+                context.args = []
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_scan":
+                context.args = ["SCAN"]
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_strategy":
                 context.args = ["STRATEGY"]
@@ -3890,6 +3897,7 @@ class TelegramBotThread(BaseThread):
                 context.args = ["AUTO", "OFF"]
                 await flash_loan_command(update, context)
             elif data == "btn_set_web3_prompt":
+                context.args = []
                 await set_web3_wallet_command(update, context)
             elif data == "btn_turbo_hedge_stop_all":
                 context.args = ["STOP", "ALL"]
