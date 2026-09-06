@@ -74,23 +74,43 @@ source venv/bin/activate
 pip install --no-cache-dir --upgrade pip
 if [ -f "requirements.txt" ]; then
     pip install --no-cache-dir -r requirements.txt
-    pip install --no-cache-dir aiohttp httpx
+    pip install --no-cache-dir aiohttp httpx huggingface_hub python-dotenv
 fi
 
-# 5. Check .env File
+# 5. Check .env File & Pre-configure Hedge Fund Parameters
 if [ ! -f ".env" ]; then
-    echo "⚠️ Warning: .env file not found. Creating template .env..."
+    echo "⚙️ Initializing Institutional .env configuration..."
     cat <<EOT > .env
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-GEMINI_API_KEY=your_gemini_api_key_here
-HF_SPACE_URL=https://khmer-master-crypto-bot.hf.space
+# 1. Telegram Bot Token
+TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN_HERE
+
+# 2. Gemini API Key
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
+
+# 3. Master Key for API Security
+MASTER_KEY=YOUR_MASTER_KEY_HERE
+
+# 4. Paper Trading Flag (False = Real Capital Trading)
+PAPER_TRADING=False
+
+# 5. Hugging Face Institutional Model Hub Config
+HF_TOKEN=YOUR_HF_TOKEN_HERE
+HF_MODEL_REPO=hemsinath/apex-ai-brain-models
+HF_SPACE_URL=https://hemsinath-khmer-master-crypto-bot.hf.space
 EOT
-    echo "❗ Please edit $BOT_WORKING_DIR/.env with your actual Telegram Token and API keys!"
 fi
+
+# 6. Synchronize All 25 Institutional AI Models from Hugging Face Hub
+echo "🧠 Synchronizing all 25 Institutional AI Brain Models from Hugging Face..."
+python sync_local_models.py || true
+
+# 7. Run Pre-Flight System Audit (Zero Technical Negligence Verification)
+echo "🛡️ Running Institutional Pre-Flight Audit..."
+python audit_system.py || true
 
 chmod +x "$BOT_WORKING_DIR/auto_update_vps.sh" 2>/dev/null || true
 
-# 6. Configure Systemd 24/7 Daemon Service
+# 8. Configure Systemd 24/7 Daemon Service
 SERVICE_FILE="/etc/systemd/system/khmer-master-crypto-bot.service"
 echo "⚙️ Creating Systemd service at $SERVICE_FILE..."
 

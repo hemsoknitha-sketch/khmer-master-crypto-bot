@@ -1,0 +1,10 @@
+{
+    "model_type": "IsolationForest",
+    "correlation_threshold": -0.5,
+    "volume_spike_multiplier": 2.0,
+    "target_pairs": [
+        "BTC",
+        "ETH"
+    ],
+    "strategy": "Pairs Trading (Market Neutral)"
+}

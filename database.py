@@ -1354,8 +1354,190 @@ def get_user_api(chat_id: int):
 # Backwards compatibility alias
 get_api_keys = get_user_api
 
+def detect_wallet_chain(address: str) -> tuple:
+    """Detects blockchain network based on address format."""
+    clean = str(address or "").strip()
+    if clean.startswith("0x") and len(clean) == 42:
+        return ("EVM", "EVM Multi-Chain (ETH, BNB, Arbitrum, Base, Linea, Monad, OP, Polygon)")
+    elif clean.startswith("T") and len(clean) == 34:
+        return ("TRON", "TRON Network (TRX / TRC-20 USDT)")
+    elif clean.startswith("bc1") or (clean.startswith(("1", "3")) and 26 <= len(clean) <= 35):
+        return ("BITCOIN", "Bitcoin Network (BTC Native SegWit / Taproot)")
+    elif 32 <= len(clean) <= 44 and not clean.startswith("0x"):
+        return ("SOLANA", "Solana Network (SOL High-Speed DEX)")
+    return ("CUSTOM", "Custom Blockchain Network")
 
-# --- AI MEMORY (CHAT HISTORY) ---
+def set_user_web3_wallet(chat_id: int, address: str, chain: str = None) -> tuple:
+    """Saves user's Multi-Chain Web3 wallet address for Flash Loan settlements."""
+    detected_chain, chain_name = detect_wallet_chain(address)
+    final_chain = str(chain or detected_chain).upper().strip()
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 1. Primary legacy table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS user_web3_wallets (
+        chat_id INTEGER PRIMARY KEY,
+        address TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )''')
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    clean_addr = str(address or "").strip()
+    cursor.execute("INSERT OR REPLACE INTO user_web3_wallets (chat_id, address, updated_at) VALUES (?, ?, ?)", (chat_id, clean_addr, now_str))
+    
+    # 2. Multi-chain table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS user_multichain_wallets (
+        chat_id INTEGER NOT NULL,
+        chain TEXT NOT NULL,
+        address TEXT NOT NULL,
+        chain_name TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (chat_id, chain)
+    )''')
+    cursor.execute(
+        "INSERT OR REPLACE INTO user_multichain_wallets (chat_id, chain, address, chain_name, updated_at) VALUES (?, ?, ?, ?, ?)",
+        (chat_id, final_chain, clean_addr, chain_name, now_str)
+    )
+    conn.commit()
+    conn.close()
+    return (final_chain, chain_name)
+
+def get_user_web3_wallet(chat_id: int, chain: str = None) -> str:
+    """Retrieves user's Web3 wallet address for Flash Loan settlements."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if chain:
+            cursor.execute('''CREATE TABLE IF NOT EXISTS user_multichain_wallets (
+                chat_id INTEGER NOT NULL,
+                chain TEXT NOT NULL,
+                address TEXT NOT NULL,
+                chain_name TEXT,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (chat_id, chain)
+            )''')
+            cursor.execute("SELECT address FROM user_multichain_wallets WHERE chat_id = ? AND chain = ?", (chat_id, chain.upper()))
+            row = cursor.fetchone()
+            if row and row[0]:
+                conn.close()
+                return str(row[0]).strip()
+        
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_web3_wallets (
+            chat_id INTEGER PRIMARY KEY,
+            address TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )''')
+        cursor.execute("SELECT address FROM user_web3_wallets WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return str(row[0]).strip() if row and row[0] else ""
+    except Exception:
+        return ""
+
+def get_user_multichain_wallets(chat_id: int) -> dict:
+    """Retrieves all registered multi-chain wallet addresses for a user."""
+    wallets = {}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_multichain_wallets (
+            chat_id INTEGER NOT NULL,
+            chain TEXT NOT NULL,
+            address TEXT NOT NULL,
+            chain_name TEXT,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (chat_id, chain)
+        )''')
+        cursor.execute("SELECT chain, address, chain_name FROM user_multichain_wallets WHERE chat_id = ?", (chat_id,))
+        for row in cursor.fetchall():
+            wallets[str(row[0]).upper()] = {
+                "address": str(row[1]).strip(),
+                "chain_name": str(row[2] or row[0]).strip()
+            }
+        conn.close()
+    except Exception:
+        pass
+    return wallets
+
+def set_user_flash_loan_auto(chat_id: int, enabled: bool = True):
+    """Enables or disables 24/7 Super Smart Flash Loan Arbitrage for VIP user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_settings (
+        chat_id INTEGER PRIMARY KEY,
+        is_auto_active INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+    )''')
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT OR REPLACE INTO user_flash_loan_settings (chat_id, is_auto_active, updated_at) VALUES (?, ?, ?)", (chat_id, 1 if enabled else 0, now_str))
+    conn.commit()
+    conn.close()
+
+def is_user_flash_loan_auto(chat_id: int) -> bool:
+    """Checks if 24/7 Flash Loan Arbitrage is active for a user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_settings (
+            chat_id INTEGER PRIMARY KEY,
+            is_auto_active INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )''')
+        cursor.execute("SELECT is_auto_active FROM user_flash_loan_settings WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return bool(row[0]) if row else False
+    except Exception:
+        return False
+
+def set_user_flash_loan_strategy_config(chat_id: int, anti_mev: bool = True, l2_priority: str = "ARBITRUM", max_slippage_pct: float = 0.15):
+    """Saves user's Flash Loan 4-Strategy parameters."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_strategy_config (
+        chat_id INTEGER PRIMARY KEY,
+        anti_mev_enabled INTEGER NOT NULL DEFAULT 1,
+        l2_priority TEXT NOT NULL DEFAULT 'ARBITRUM',
+        max_slippage_pct REAL NOT NULL DEFAULT 0.15,
+        updated_at TEXT NOT NULL
+    )''')
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute(
+        "INSERT OR REPLACE INTO user_flash_loan_strategy_config (chat_id, anti_mev_enabled, l2_priority, max_slippage_pct, updated_at) VALUES (?, ?, ?, ?, ?)",
+        (chat_id, 1 if anti_mev else 0, str(l2_priority).upper(), float(max_slippage_pct), now_str)
+    )
+    conn.commit()
+    conn.close()
+
+def get_user_flash_loan_strategy_config(chat_id: int) -> dict:
+    """Retrieves user's Flash Loan 4-Strategy parameters."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_strategy_config (
+            chat_id INTEGER PRIMARY KEY,
+            anti_mev_enabled INTEGER NOT NULL DEFAULT 1,
+            l2_priority TEXT NOT NULL DEFAULT 'ARBITRUM',
+            max_slippage_pct REAL NOT NULL DEFAULT 0.15,
+            updated_at TEXT NOT NULL
+        )''')
+        cursor.execute("SELECT anti_mev_enabled, l2_priority, max_slippage_pct FROM user_flash_loan_strategy_config WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "anti_mev_enabled": bool(row[0]),
+                "l2_priority": str(row[1]),
+                "max_slippage_pct": float(row[2])
+            }
+    except Exception:
+        pass
+    return {
+        "anti_mev_enabled": True,
+        "l2_priority": "ARBITRUM",
+        "max_slippage_pct": 0.15
+    }
+
 
 
 

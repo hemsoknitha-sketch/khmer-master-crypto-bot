@@ -1,0 +1,30 @@
+{
+    "Deep_Learning_Models_LSTM_Transformers": {
+        "description": "ប្រើប្រាស់ 500-1000 Epochs ប៉ុន្តែមាន Early Stopping ការពារ Overfitting",
+        "epochs": 1000,
+        "batch_size": 256,
+        "learning_rate": 0.0001,
+        "early_stopping_patience": 50,
+        "dropout_rate": 0.4,
+        "weight_decay": 1e-05
+    },
+    "Reinforcement_Learning_DQN_PPO": {
+        "description": "មិនវាស់ជា Epoch ទេ តែវាស់ជាជំហាន (Timesteps) ដែល AI រៀនក្នុងទីផ្សារក្លែងក្លាយ",
+        "total_timesteps": 5000000,
+        "learning_rate": 0.0003,
+        "gamma_discount_factor": 0.99,
+        "exploration_fraction": 0.2
+    },
+    "Tree_Based_Ensemble_XGBoost": {
+        "description": "ប្រើប្រាស់ដើមឈើការសម្រេចចិត្តរាប់ពាន់ អមដោយការប្រលងឆ្លងខ្វែង (Cross-Validation)",
+        "n_estimators": 5000,
+        "learning_rate": 0.01,
+        "max_depth": 7,
+        "cv_folds": 5
+    },
+    "Risk_Management_Expectations": {
+        "target_win_rate": "55% - 65%",
+        "target_risk_reward_ratio": "1:2 to 1:4",
+        "note": "No AI guarantees 100% accuracy. The goal is statistical edge over time."
+    }
+}

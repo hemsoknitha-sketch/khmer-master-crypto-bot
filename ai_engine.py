@@ -39,7 +39,10 @@ class AIInvestmentEngine:
         self.hf_token = os.getenv("HF_TOKEN", "").strip()
         if self.hf_token and InferenceClient:
             try:
-                self.hf_client = InferenceClient(api_key=self.hf_token)
+                try:
+                    self.hf_client = InferenceClient(token=self.hf_token)
+                except TypeError:
+                    self.hf_client = InferenceClient(api_key=self.hf_token)
                 print("✅ [AI ENGINE] Hugging Face Super Brain Inference API (DeepSeek-R1 / Llama-3-70B) connected.")
             except Exception as e:
                 self.hf_client = None
@@ -220,53 +223,14 @@ class AIInvestmentEngine:
         }
     def sync_brain_from_huggingface(self, repo_id: str = None) -> dict:
         """
-        Downloads latest 2-week trained Machine Learning weights (.pkl) and brain_config.json
-        from Hugging Face Model Hub directly into dedicated local models/ directory with zero downtime.
+        Downloads all 25 institutional Machine Learning weights, neural nets (.keras, .h5, .pth),
+        and brain_config.json from Hugging Face Model Hub directly into models/ with zero downtime.
         """
-        target_repo = repo_id or os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models")
-        token = self.hf_token or os.getenv("HF_TOKEN", "")
-        
-        models_dir = os.path.join(os.getcwd(), "models")
-        os.makedirs(models_dir, exist_ok=True)
-
-        files_to_sync = [
-            "brain_price.pkl",
-            "brain_trend.pkl",
-            "brain_vol.pkl",
-            "brain_tp.pkl",
-            "brain_dca.pkl",
-            "brain_scaler.pkl",
-            "brain_catboost.pkl",
-            "brain_lightgbm.pkl",
-            "brain_graph.pkl",
-            "brain_patchtst.h5",
-            "brain_ppo_policy.json",
-            "brain_config.json"
-        ]
-        
-        synced_files = []
         try:
-            from huggingface_hub import hf_hub_download
-            for filename in files_to_sync:
-                try:
-                    # Download to models/ directory
-                    downloaded_path = hf_hub_download(
-                        repo_id=target_repo,
-                        filename=filename,
-                        repo_type="model",
-                        token=token if token else None,
-                        local_dir=models_dir
-                    )
-                    synced_files.append(filename)
-                except Exception as e_file:
-                    print(f"⚠️ [HF SYNC NOTICE] Could not download {filename}: {e_file}")
-                    
-            if synced_files:
-                print(f"✅ [HF BRAIN SYNC SUCCESS] Downloaded {len(synced_files)} updated model files to models/ folder from {target_repo}.")
-                self.load_trained_brain_models()
-                return {"status": "success", "synced_files": synced_files, "repo": target_repo}
-            else:
-                return {"status": "standby", "reason": "No new files found or repo is private", "repo": target_repo}
+            import sync_local_models
+            synced_count = sync_local_models.sync_all_models()
+            self.load_trained_brain_models()
+            return {"status": "success", "synced_files_count": synced_count}
         except Exception as e:
             print(f"⚠️ [HF BRAIN SYNC NOTICE]: {e}")
             return {"status": "error", "error": str(e)}
