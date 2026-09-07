@@ -174,8 +174,29 @@ class KeeperRelayerEngine:
             "chain_id": ARBITRUM_CHAIN_ID
         }
 
+    def _query_single_chain(self, cid: str, info: dict, checksum_addr: str) -> tuple:
+        bal_val = 0.0
+        for rpc_url in info["rpc"]:
+            try:
+                w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={'timeout': 2.5}))
+                bal_wei = w3.eth.get_balance(checksum_addr)
+                bal_val = float(w3.from_wei(bal_wei, 'ether'))
+                break
+            except Exception:
+                continue
+        usd_val = round(bal_val * info["usd_rate"], 2)
+        chain_data = {
+            "name": info["name"],
+            "symbol": info["symbol"],
+            "balance": round(bal_val, 6),
+            "usd_est": usd_val,
+            "is_funded": bal_val > 0.0005,
+            "explorer_url": f"{info['explorer']}{checksum_addr}"
+        }
+        return cid, chain_data, usd_val
+
     def get_multichain_balances(self, address: str) -> dict:
-        """Queries live native gas balances across Arbitrum, BSC, and Ethereum."""
+        """Queries live native gas balances in parallel across Arbitrum, BSC, and Ethereum."""
         if not address or not address.startswith("0x") or len(address) != 42:
             return {"address": address or "N/A", "chains": {}, "total_usd": 0.0}
         
@@ -187,28 +208,20 @@ class KeeperRelayerEngine:
         res = {"address": checksum_addr, "chains": {}, "total_usd": 0.0}
         total_usd = 0.0
 
-        for cid, info in MULTICHAIN_NETWORKS.items():
-            bal_val = 0.0
-            for rpc_url in info["rpc"]:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [
+                executor.submit(self._query_single_chain, cid, info, checksum_addr)
+                for cid, info in MULTICHAIN_NETWORKS.items()
+            ]
+            for fut in concurrent.futures.as_completed(futures, timeout=4.0):
                 try:
-                    w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={'timeout': 4}))
-                    bal_wei = w3.eth.get_balance(checksum_addr)
-                    bal_val = float(w3.from_wei(bal_wei, 'ether'))
-                    break
+                    cid, chain_data, usd_val = fut.result()
+                    res["chains"][cid] = chain_data
+                    total_usd += usd_val
                 except Exception:
-                    continue
+                    pass
 
-            usd_val = round(bal_val * info["usd_rate"], 2)
-            total_usd += usd_val
-            res["chains"][cid] = {
-                "name": info["name"],
-                "symbol": info["symbol"],
-                "balance": round(bal_val, 6),
-                "usd_est": usd_val,
-                "is_funded": bal_val > 0.0005,
-                "explorer_url": f"{info['explorer']}{checksum_addr}"
-            }
-        
         res["total_usd"] = round(total_usd, 2)
         return res
 

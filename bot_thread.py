@@ -1031,7 +1031,7 @@ class TelegramBotThread(BaseThread):
                 k_tot_str = f"`~${keeper_multichain.get('total_usd', 0.0):.2f} USD`"
 
                 # Determine operational status and smart guidance
-                is_keeper_arb_funded = k_arb.get("balance', 0.0", 0.0) >= 0.001 or kp_funded
+                is_keeper_arb_funded = k_arb.get("balance", 0.0) >= 0.001 or kp_funded
                 fund_badge_km = "🟢 ពេញលេញ (LIVE ARBITRUM READY 100%)" if is_keeper_arb_funded else "⚪ រង់ចាំ Gas លើ Keeper ($5-$10 ETH)"
                 fund_badge_en = "🟢 FULLY FUNDED (LIVE ARBITRUM READY)" if is_keeper_arb_funded else "⚪ PENDING KEEPER GAS ($5-$10 ETH)"
 
@@ -1116,7 +1116,18 @@ class TelegramBotThread(BaseThread):
                         f"{guidance_en}"
                     )
 
-                sent_kp = await send_reply_or_edit(update, context, kp_msg)
+                kp_keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_flash_loan_keeper"),
+                        InlineKeyboardButton("💼 Set Web3 Wallet", callback_data="btn_set_web3_prompt")
+                    ],
+                    [
+                        InlineKeyboardButton("⚡ Flash Loan Menu", callback_data="btn_flash_loan_scan"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                sent_kp = await send_reply_or_edit(update, context, kp_msg, reply_markup=kp_keyboard)
                 return
 
             # Sub-action: SIMULATION (/flash_loan SIM or callback)
@@ -1316,6 +1327,11 @@ class TelegramBotThread(BaseThread):
 
             if msg_target:
                 await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
+        async def keeper_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            context.args = ["KEEPER"]
+            await flash_loan_command(update, context)
 
         async def set_web3_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -10995,6 +11011,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("news", news_command))
         # v13.00 Flagship Quantitative Engines & Market Intelligence Handlers
         self.app.add_handler(CommandHandler("flash_loan", flash_loan_command))
+        self.app.add_handler(CommandHandler("keeper", keeper_command))
+        self.app.add_handler(CommandHandler("flash_loan_keeper", keeper_command))
         self.app.add_handler(CommandHandler("set_web3_wallet", set_web3_wallet_command))
         self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
