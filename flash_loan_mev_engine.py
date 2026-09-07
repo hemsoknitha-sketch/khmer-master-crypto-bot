@@ -262,7 +262,7 @@ class FlashLoanMEVEngine:
             {"sym": "ETHUSDT",  "pair": "WETH/USDT", "token": "WETH", "addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 500, "fee_hurdle": 0.38, "default_loan": 50000.0},
             {"sym": "GMXUSDT",  "pair": "GMX/USDT",  "token": "GMX",  "addr": "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a", "pool_fee": 3000, "fee_hurdle": 0.65, "default_loan": 15000.0},
             {"sym": "LINKUSDT", "pair": "LINK/USDT", "token": "LINK", "addr": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4", "pool_fee": 3000, "fee_hurdle": 0.65, "default_loan": 20000.0},
-            {"sym": "PENDLEUSDT","pair": "PENDLE/USDT","token":"PENDLE","addr": "0x0c880f67ed5b3645a32626698d4f8dd7ecd0016b", "pool_fee": 3000, "fee_hurdle": 0.68, "default_loan": 15000.0}
+            {"sym": "PENDLEUSDT","pair": "PENDLE/USDT","token":"PENDLE","addr": "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8", "pool_fee": 3000, "fee_hurdle": 0.68, "default_loan": 15000.0}
         ]
 
         results = []
@@ -292,32 +292,27 @@ class FlashLoanMEVEngine:
             except Exception:
                 pass
 
-            # Fallback if one DEX is missing quote from DexScreener
-            if uni_price <= 0 and cam_price > 0:
-                uni_price = cam_price
-            elif cam_price <= 0 and uni_price > 0:
-                cam_price = uni_price
-            elif uni_price <= 0 and cam_price <= 0:
-                if token == "USDC": uni_price, cam_price = 1.0001, 0.9998
-                elif token == "ARB": uni_price, cam_price = 0.1750, 0.1755
-                elif token == "WETH": uni_price, cam_price = 2496.0, 2501.0
-                elif token == "GMX": uni_price, cam_price = 7.86, 7.92
-                elif token == "LINK": uni_price, cam_price = 12.98, 13.01
-                elif token == "PENDLE": uni_price, cam_price = 4.12, 4.15
+            # Require verified live quotes on both DEXes to prevent false triggers
+            if uni_price > 0 and cam_price > 0:
+                if cam_price > uni_price:
+                    dex_route = 1
+                    route_desc = "Uniswap V3 -> Camelot (Arbitrum)"
+                    spread_pct = round(((cam_price - uni_price) / uni_price) * 100.0, 4)
+                else:
+                    dex_route = 2
+                    route_desc = "Camelot -> Uniswap V3 (Arbitrum)"
+                    spread_pct = round(((uni_price - cam_price) / cam_price) * 100.0, 4)
 
-            # Calculate spread and optimal route
-            if cam_price > uni_price:
-                dex_route = 1
-                route_desc = "Uniswap V3 -> Camelot (Arbitrum)"
-                spread_pct = round(((cam_price - uni_price) / uni_price) * 100.0, 4)
+                net_spread = spread_pct - hurdle
+                net_profit_usd = round(loan_amt * (net_spread / 100.0), 2) if net_spread > 0 else 0.0
+                status = "PROFITABLE_READY" if net_profit_usd > 0 else "MONITORING_SPREAD"
             else:
-                dex_route = 2
-                route_desc = "Camelot -> Uniswap V3 (Arbitrum)"
-                spread_pct = round(((uni_price - cam_price) / cam_price) * 100.0, 4)
-
-            net_spread = spread_pct - hurdle
-            net_profit_usd = round(loan_amt * (net_spread / 100.0), 2) if net_spread > 0 else 0.0
-            status = "PROFITABLE_READY" if net_profit_usd > 0 else "MONITORING_SPREAD"
+                # If one DEX pool lacks active quotes, stay in safe monitoring mode
+                dex_route = 1
+                route_desc = "Monitoring Pools (Arbitrum)"
+                spread_pct = 0.0
+                net_profit_usd = 0.0
+                status = "MONITORING_SPREAD"
 
             results.append({
                 "symbol": sym,
