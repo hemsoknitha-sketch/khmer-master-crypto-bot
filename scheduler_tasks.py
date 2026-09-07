@@ -533,30 +533,32 @@ async def check_crypto_news(app: Application, ai_engine):
 
                 # 2. Extract clean final block if Gemini generated scratchpad/drafts followed by final article
                 if lang == "khmer":
-                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*[\u1780-\u17ffA-Za-z\s]+[៖:]', txt))
+                    # Matches any city name with or without ទីក្រុង/រាជធានី followed by ៖ or : (e.g. ឡុងដ៍ ៖, សិង្ហបុរី ៖, ទីក្រុងញូវយ៉ក ៖)
+                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*)?[\u1780-\u17ff]{2,20}\s*[៖:]', txt))
                     if dateline_matches:
                         last_idx = dateline_matches[-1].start()
                         prefix = txt[:last_idx].lower()
                         has_draft_markers = any(k in prefix for k in [
-                            "khmer refinement", "refinement:", "goal:", "dual technical", "structure:", "para 3", "end with"
+                            "khmer refinement", "refinement:", "goal:", "dual technical", "structure:", "para 3", "end with",
+                            "dateline:", "terms:", "focus:", "check ending", "mental check"
                         ])
-                        if has_draft_markers or last_idx > 100:
+                        if has_draft_markers or last_idx > 50:
                             candidate = txt[last_idx:].strip()
-                            if len(candidate) > 400:
+                            if len(candidate) > 200:
                                 txt = candidate
                 elif lang == "english":
                     dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:[A-Z\s]{3,20})\s*[-—–:]', txt))
                     if dateline_matches:
                         last_idx = dateline_matches[-1].start()
                         candidate = txt[last_idx:].strip()
-                        if len(candidate) > 250:
+                        if len(candidate) > 200:
                             txt = candidate
                 elif lang == "chinese":
                     dateline_matches = list(re.finditer(r'(?:^|\n)\s*[\u4e00-\u9fa5]{2,6}(?:讯|电)?\s*[-—–:]', txt))
                     if dateline_matches:
                         last_idx = dateline_matches[-1].start()
                         candidate = txt[last_idx:].strip()
-                        if len(candidate) > 200:
+                        if len(candidate) > 150:
                             txt = candidate
 
                 lines = []
@@ -568,7 +570,10 @@ async def check_crypto_news(app: Application, ai_engine):
                     "confirm structure", "khmer translation", "draft (khmer)", "structure:",
                     "goal:", "dual technical vocabulary:", "end with", "para 1:", "para 2:", "para 3:",
                     "para 1", "para 2", "para 3", "legal/regulatory", "regulatory landscape", 
-                    "compliance requirements", "step 1", "step 2", "final symbol"
+                    "compliance requirements", "step 1", "step 2", "final symbol",
+                    "dateline:", "terms:", "focus:", "* check ending", "check ending:",
+                    "(mental check", "mental check", "let's use", "let us use", "spelling:",
+                    "*   check ending", "check ending: must end with"
                 ]
 
                 for line in txt.split("\n"):
@@ -590,7 +595,7 @@ async def check_crypto_news(app: Application, ai_engine):
 
                     # Drop lines that are purely section/paragraph labels
                     is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
-                    is_short_subhead = (len(l) < 90) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+|goal|structure|refinement|dual technical)', l, flags=re.IGNORECASE))
+                    is_short_subhead = (len(l) < 90) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+|goal|structure|refinement|dual technical|dateline|terms|focus)', l, flags=re.IGNORECASE))
                     if is_pure_label or is_short_subhead:
                         continue
 
@@ -602,7 +607,7 @@ async def check_crypto_news(app: Application, ai_engine):
                         has_khmer = any('\u1780' <= c <= '\u17ff' for c in l)
                         if not has_khmer and len(l.split()) > 2:
                             continue
-                        if re.match(r'^(?:end with|final symbol|para \d|goal|structure)', l_lower):
+                        if re.match(r'^(?:end with|final symbol|para \d|goal|structure|dateline|terms|focus|check ending|\* check|\(mental check)', l_lower):
                             continue
 
                     # Strip any leading paragraph/section label embedded at the start of a sentence
@@ -617,6 +622,25 @@ async def check_crypto_news(app: Application, ai_engine):
                         lines.append(l)
 
                 res = "\n\n".join(lines).strip()
+
+                # 3. Post-processing deduplication: Ensure no repeated draft exists
+                city_m = re.match(r'^((?:(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*)?[\u1780-\u17ff]{2,20}\s*[៖:])', res)
+                if city_m:
+                    dateline_tag = city_m.group(1).strip()
+                    # Check if dateline_tag appears again later in the output (e.g. repeated draft)
+                    sub_idx = res.find(dateline_tag, len(dateline_tag))
+                    if sub_idx != -1 and sub_idx > 150:
+                        second_part = res[sub_idx:].strip()
+                        if len(second_part) > 200:
+                            res = second_part
+
+                # 4. Enforce strict character limit (Max 2,500 chars) so Telegram NEVER splits into 2 messages
+                if len(res) > 2500:
+                    last_end = res.rfind("៕", 0, 2500)
+                    if last_end != -1 and last_end > 1000:
+                        res = res[:last_end + 1].strip()
+                    else:
+                        res = res[:2500].strip() + "..."
 
                 if len(res) < 20:
                     res = (
