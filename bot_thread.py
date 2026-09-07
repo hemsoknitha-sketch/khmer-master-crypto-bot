@@ -7522,17 +7522,26 @@ class TelegramBotThread(BaseThread):
                 return
 
             if len(args) < 4:
-                usage = "⚠️ **របៀបប្រើប្រាស់ AI Scalper:**\n\n`/scalp <កាក់> <ចំនួនលុយទិញ> <ភាគរយចំណេញ> <លេខកូដ PIN>`\n\nឧទាហរណ៍៖ `/scalp XRP 100 1.5 1234`\n(ទិញ XRP ចំនួន $100 និងលក់ចេញពេលចំណេញបាន 1.5%)"
+                usage = (
+                    "⚠️ **របៀបប្រើប្រាស់ AI Scalper:**\n\n"
+                    "👉 **Single Coin Scalp** ៖ `` `/scalp XRP 50 1.5 1234` ``\n"
+                    "👉 **Auto High-Velocity Scalp** ៖ `` `/scalp AUTO 50 1.5 1234` ``\n\n"
+                    "_(ទិញកាក់ និងលក់ចេញយកប្រាក់ចំណេញរហ័ស 24/7 ដោយស្វ័យប្រវត្តិ)_"
+                )
                 await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
-            symbol = str(args[0]).upper().strip()
-            if not symbol.endswith("USDT"):
-                symbol += "USDT"
+            raw_sym = str(args[0]).upper().strip()
+            if raw_sym in ["AUTO", "AUTOUSDT", "TOP", "TOPUSDT"]:
+                import turbo_hedge_engine
+                cands = turbo_hedge_engine.get_active_high_velocity_spot_coins(limit=5)
+                symbol = cands[0] if cands else "SOLUSDT"
+            else:
+                symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
 
             try:
-                amount = float(args[1])
+                amount = max(10.50, float(args[1]))  # Enforce $10.50 MIN_NOTIONAL floor
                 profit_pct = float(args[2])
                 pin = str(args[3]).strip()
             except ValueError:
@@ -11081,12 +11090,11 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("add_bybit_api", add_bybit_api_command))
         self.app.add_handler(CommandHandler("remove_api", remove_api_command))
 
-        # 🌟 Super Smart Consolidated Trading Suite (Spot & Futures Multi-Mode Engine)
-        self.app.add_handler(CommandHandler("turbo_hedge", turbo_hedge_command))
+        # 🌟 Institutional Specialized Trading Engines (Zero-Duplicate, Dedicated Superpowers)
         self.app.add_handler(CommandHandler("smart_trade", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("trade", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("auto_trade", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("scalp", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("turbo_hedge", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("scalp", scalp_command))
+        self.app.add_handler(CommandHandler("auto_trade", auto_trade_command))
 
         self.app.add_handler(CommandHandler("snipe", smart_listing_sniper_command))
         self.app.add_handler(CommandHandler("auto_snipe", smart_listing_sniper_command))
@@ -11270,9 +11278,10 @@ class TelegramBotThread(BaseThread):
                     BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
                     BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
                     BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
-                    BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-                    BotCommand("smart_trade", "⚡ Super Smart Spot/Futures Trading Engine"),
-                    BotCommand("turbo_hedge", "🚀 Institutional Turbo Hedge Suite"),
+                    BotCommand("smart_trade", "🛒 Spot 6-Tier Breakout Engine"),
+                    BotCommand("turbo_hedge", "🛡️ Futures Dual-Side Delta-Neutral Hedge"),
+                    BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
+                    BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
                     BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
                     BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
                     BotCommand("balance", "💰 Check Spot & Futures Balance"),
