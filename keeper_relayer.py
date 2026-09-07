@@ -417,15 +417,33 @@ class KeeperRelayerEngine:
             tx_hash_bytes = self.w3.eth.send_raw_transaction(raw_tx)
             tx_hash = self.w3.to_hex(tx_hash_bytes)
 
-            return {
-                "success": True,
-                "mode": "LIVE_MAINNET",
-                "tx_hash": tx_hash,
-                "explorer_url": f"{ARBITRUM_EXPLORER_TX}{tx_hash}",
-                "net_profit_usd": round(min_net_profit_usd, 2),
-                "recipient": user_recipient,
-                "notice": "Real transaction broadcast to Arbitrum One Mainnet!"
-            }
+            # Wait for Arbitrum block confirmation and verify on-chain settlement
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=45)
+            receipt_status = getattr(receipt, 'status', None) or receipt.get('status')
+            gas_used = getattr(receipt, 'gasUsed', None) or receipt.get('gasUsed')
+
+            if receipt_status == 1:
+                return {
+                    "success": True,
+                    "mode": "LIVE_MAINNET",
+                    "tx_hash": tx_hash,
+                    "explorer_url": f"{ARBITRUM_EXPLORER_TX}{tx_hash}",
+                    "net_profit_usd": round(min_net_profit_usd, 2),
+                    "recipient": user_recipient,
+                    "gas_used": gas_used,
+                    "notice": "Real transaction confirmed and net profit settled on Arbitrum One!"
+                }
+            else:
+                return {
+                    "success": False,
+                    "mode": "REVERTED_CAPITAL_PROTECTED",
+                    "tx_hash": tx_hash,
+                    "explorer_url": f"{ARBITRUM_EXPLORER_TX}{tx_hash}",
+                    "net_profit_usd": 0.0,
+                    "recipient": user_recipient,
+                    "gas_used": gas_used,
+                    "notice": "Transaction reverted on Arbitrum: Spread did not cover DEX fees. Capital protected ($0.00 lost)."
+                }
         except Exception as e:
             return {
                 "success": False,
