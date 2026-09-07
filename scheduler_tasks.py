@@ -5080,18 +5080,18 @@ async def flash_loan_autonomous_engine(app: Application):
         import flash_loan_mev_engine
         engine = flash_loan_mev_engine.flash_loan_engine
 
-        # Scan real-time CeDeFi matrix
-        cedefi_items = await asyncio.to_thread(engine.scan_cedefi_arbitrage_matrix)
-        if not cedefi_items:
-            return
+        # Scan real-time DexScreener Arbitrum opportunities first
+        dex_items = await asyncio.to_thread(engine.scan_dexscreener_arbitrum_opportunities)
+        profitable_items = [it for it in dex_items if it.get("net_profit_usd", 0.0) > 0.0]
 
-        # Check if Keeper is live ready to enforce strict live gas preservation
-        import keeper_relayer
-        is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
+        if not profitable_items:
+            # Fallback to CeDeFi matrix with strict live gas preservation
+            import keeper_relayer
+            is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
+            min_hurdle = 0.45 if is_live_ready else 0.20
+            cedefi_items = await asyncio.to_thread(engine.scan_cedefi_arbitrage_matrix)
+            profitable_items = [it for it in cedefi_items if it.get("gross_spread_pct", 0.0) >= min_hurdle and it.get("net_profit_usd", 0.0) > 0.0]
 
-        # For Live Mainnet, require gross spread >= 0.45% to cover all DEX fees and slippage
-        min_hurdle = 0.45 if is_live_ready else 0.20
-        profitable_items = [it for it in cedefi_items if it.get("gross_spread_pct", 0.0) >= min_hurdle and it.get("net_profit_usd", 0.0) > 0.0]
         if not profitable_items:
             return
 
@@ -5099,10 +5099,14 @@ async def flash_loan_autonomous_engine(app: Application):
         net_profit = top_op.get("net_profit_usd", 0.0)
         symbol = top_op.get("symbol", "ETHUSDT")
         pair = top_op.get("pair", "WETH/USDT")
+        borrow_asset = top_op.get("borrow_asset", "USDT")
+        intermediate_token = top_op.get("intermediate_token", top_op.get("token", "WETH"))
         chain = top_op.get("chain", "ARBITRUM")
         loan_amt = top_op.get("optimal_loan_usd", 50000.0)
         spread_pct = top_op.get("gross_spread_pct", 0.28)
         dex_source = top_op.get("dex_source", "Uniswap V3")
+        pool_fee_val = top_op.get("pool_fee", 500)
+        dex_route_val = top_op.get("dex_route", 1)
 
         now_ts = time.time()
 
@@ -5137,12 +5141,13 @@ async def flash_loan_autonomous_engine(app: Application):
             if is_live_ready and wallet_addr:
                 # Execute on-chain transaction via Keeper Relayer
                 exec_res = keeper_relayer.keeper_engine.execute_onchain_flash_loan(
-                    borrow_asset="USDT",
+                    borrow_asset=borrow_asset,
                     amount_usd=loan_amt,
-                    intermediate_token="WETH",
+                    intermediate_token=intermediate_token,
                     min_net_profit_usd=net_profit,
                     user_recipient=wallet_addr,
-                    dex_route=1
+                    dex_route=dex_route_val,
+                    pool_fee=pool_fee_val
                 )
                 tx_hash = exec_res.get("tx_hash", "")
                 explorer_link = exec_res.get("explorer_url", f"https://arbiscan.io/tx/{tx_hash}")

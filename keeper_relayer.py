@@ -43,7 +43,12 @@ ARBITRUM_TOKENS = {
     "USDT": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
     "USDC": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
     "WETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
-    "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
+    "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+    "ARB": "0x912CE59144191C1204E64559FE8253a0e49E6548",
+    "GMX": "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a",
+    "LINK": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
+    "PENDLE": "0x0c880f67ed5b3645a32626698d4f8dd7ecd0016b",
+    "PEPE": "0x25d887ce7a350f44399bee2df4532e3a89045763"
 }
 
 # Multi-Chain Gas & Balance Monitoring Infrastructure
@@ -348,7 +353,8 @@ class KeeperRelayerEngine:
         intermediate_token: str,
         min_net_profit_usd: float,
         user_recipient: str,
-        dex_route: int = 1
+        dex_route: int = 1,
+        pool_fee: int = None
     ) -> dict:
         """
         Submits on-chain flash loan arbitrage transaction on Arbitrum One.
@@ -386,7 +392,14 @@ class KeeperRelayerEngine:
             min_profit_units = int(min_net_profit_usd * (10 ** decimals))
 
             # Encode parameters: (address intermediateToken, uint24 poolFee, uint256 minProfit, address recipient, uint8 dexRoute)
-            pool_fee = 500 # 0.05% Uniswap V3 fee tier
+            if pool_fee is None or pool_fee <= 0:
+                if intermediate_token.upper() in ["USDC", "USDT"]:
+                    pool_fee = 100 # 0.01% fee for stablecoins
+                elif intermediate_token.upper() in ["ARB", "WETH", "WBTC"]:
+                    pool_fee = 500 # 0.05% fee for blue chips
+                else:
+                    pool_fee = 3000 # 0.30% fee for altcoins
+
             recipient_checksum = Web3.to_checksum_address(user_recipient)
 
             from eth_abi import encode

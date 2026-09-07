@@ -1241,74 +1241,60 @@ class TelegramBotThread(BaseThread):
 
             # Sub-action: SCAN LIVE DEX SPREADS (/flash_loan SCAN or callback)
             if (args and args[0].upper() == "SCAN") or (update.callback_query and update.callback_query.data == "btn_flash_loan_scan"):
-                sent_scan = await send_reply_or_edit(update, context, "⚡ **Scanning Aave V3 Liquidity & DEX Arbitrage Spreads...**")
+                sent_scan = await send_reply_or_edit(update, context, "⚡ **Scanning Arbitrum DEX Pools (Uniswap V3, Camelot, Stablecoins, Altcoins)...**")
                 
-                import requests
-                dex_pairs = [
-                    {"pair": "WETH/USDT", "aave_pool": "$350,000,000", "dex_a": "Uniswap V3", "dex_b": "PancakeSwap V3", "price_a": 3212.40, "price_b": 3221.80, "spread": 0.29},
-                    {"pair": "WBTC/USDT", "aave_pool": "$280,000,000", "dex_a": "Curve Finance", "dex_b": "Uniswap V3", "price_a": 91250.00, "price_b": 91480.00, "spread": 0.25},
-                    {"pair": "BNB/USDT",  "aave_pool": "$190,000,000", "dex_a": "PancakeSwap", "dex_b": "BiSwap", "price_a": 645.20, "price_b": 647.10, "spread": 0.29},
-                    {"pair": "SOL/USDT",  "aave_pool": "$145,000,000", "dex_a": "Orca DEX", "dex_b": "Raydium V3", "price_a": 194.50, "price_b": 195.15, "spread": 0.33},
-                ]
-
-                try:
-                    r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", timeout=2)
-                    if r.status_code == 200:
-                        live_eth = float(r.json().get("price", 3212.40))
-                        dex_pairs[0]["price_a"] = round(live_eth, 2)
-                        dex_pairs[0]["price_b"] = round(live_eth * 1.0028, 2)
-                except Exception:
-                    pass
+                import flash_loan_mev_engine
+                dex_items = await asyncio.to_thread(flash_loan_mev_engine.flash_loan_engine.scan_dexscreener_arbitrum_opportunities)
 
                 if user_lang == 'km':
                     scan_msg = (
-                        "⚡️ **LIVE AAVE V3 & DEX ARBITRAGE RADAR MATRIX** ⚡️\n"
+                        "⚡️ **LIVE ARBITRUM DEX POOLS & FLASH LOAN RADAR** ⚡️\n"
                         "═════════════════════════════════════════\n\n"
                         "🏦 **AAVE V3 POOL LIQUIDITY (កម្ចីគ្មានទ្រព្យបញ្ចាំ) ៖**\n"
-                        "• USDT Pool: `$480,250,000` | Fee: `0.05%`\n"
-                        "• USDC Pool: `$520,100,000` | Fee: `0.05%`\n"
-                        "• WETH Pool: `$350,000,000` | Fee: `0.05%`\n\n"
-                        "📊 **DEX ARBITRAGE SPREADS បច្ចុប្បន្ន ៖**\n\n"
+                        "• USDT Pool: `$480,250,000` | Aave Fee: `0.05%`\n"
+                        "• USDC Pool: `$520,100,000` | Uniswap Fee: `0.01%`\n"
+                        "• WETH Pool: `$350,000,000` | Gas: `Arbitrum L2 <$0.02`\n\n"
+                        "📊 **ឱកាស ARBITRAGE ជាក់ស្តែងលើ ARBITRUM ONE ៖**\n\n"
                     )
-                    for dp in dex_pairs:
-                        p_a = dp['price_a']
-                        p_b = dp['price_b']
-                        sp = dp['spread']
+                    for item in dex_items:
+                        status_icon = "🟢 PROFIT" if item["net_profit_usd"] > 0 else "⚪ SCANNING"
                         scan_msg += (
-                            f"🪙 **{dp['pair']}** ៖\n"
-                            f"  • ទិញទាប ({dp['dex_a']}) ៖ `${p_a:,.2f}`\n"
-                            f"  • លក់ខ្ពស់ ({dp['dex_b']}) ៖ `${p_b:,.2f}`\n"
-                            f"  • គម្លាតចំណេញ (Spread) ៖ `+{sp:.2f}%` (Net > Fee 0.05%)\n"
-                            f"  • Aave Pool កម្ចី ៖ `{dp['aave_pool']}`\n\n"
+                            f"🪙 **{item['symbol']} ({item['pair']})** ៖ `{status_icon}`\n"
+                            f"  • Uniswap V3 ៖ `${item['uniswap_price']:,.4f}`\n"
+                            f"  • Camelot DEX ៖ `${item['camelot_price']:,.4f}`\n"
+                            f"  • គម្លាតតម្លៃ (Spread) ៖ `+{item['gross_spread_pct']:.3f}%` (Hurdle: `{item['fee_hurdle_pct']}%`)\n"
+                            f"  • ទិសដៅជួញដូរ ៖ `{item['dex_source']}`\n"
+                            f"  • កម្ចីទាញយក ៖ `${item['optimal_loan_usd']:,.0f} USDT`\n"
+                            f"  • ប្រាក់ចំណេញសុទ្ធ ៖ `+${item['net_profit_usd']:,.2f} USDT`\n\n"
                         )
                     scan_msg += (
                         f"💼 **កាបូបទទួលលុយចំណេញ** ៖ {wallet_display}\n\n"
-                        "💡 _រាល់ប្រតិបត្តិការ Flash Loan ត្រូវចំណេញសុទ្ធកាត់ថ្លៃ Fee & Gas ទើប Smart Contract បញ្ចប់ជោគជ័យ!_"
+                        "💡 _ទិន្នន័យទាញយក Real-Time ពី DexScreener & Arbitrum Pools! រាល់ពេលមាន Net Profit > $0 Smart Contract បាញ់កម្ចី Flash Loan ភ្លាម!_"
                     )
                 else:
                     scan_msg = (
-                        "⚡️ **LIVE AAVE V3 & DEX ARBITRAGE RADAR MATRIX** ⚡️\n"
+                        "⚡️ **LIVE ARBITRUM DEX POOLS & FLASH LOAN RADAR** ⚡️\n"
                         "═════════════════════════════════════════\n\n"
                         "🏦 **AAVE V3 POOL LIQUIDITY (Zero Collateral Borrow) :**\n"
-                        "• USDT Pool: `$480,250,000` | Fee: `0.05%`\n"
-                        "• USDC Pool: `$520,100,000` | Fee: `0.05%`\n"
-                        "• WETH Pool: `$350,000,000` | Fee: `0.05%`\n\n"
-                        "📊 **ACTIVE DEX ARBITRAGE SPREADS:**\n\n"
+                        "• USDT Pool: `$480,250,000` | Aave Fee: `0.05%`\n"
+                        "• USDC Pool: `$520,100,000` | Uniswap Fee: `0.01%`\n"
+                        "• WETH Pool: `$350,000,000` | Gas: `Arbitrum L2 <$0.02`\n\n"
+                        "📊 **REAL-TIME ARBITRUM DEX OPPORTUNITIES:**\n\n"
                     )
-                    for dp in dex_pairs:
-                        p_a = dp['price_a']
-                        p_b = dp['price_b']
-                        sp = dp['spread']
+                    for item in dex_items:
+                        status_icon = "🟢 PROFIT" if item["net_profit_usd"] > 0 else "⚪ SCANNING"
                         scan_msg += (
-                            f"🪙 **{dp['pair']}**:\n"
-                            f"  • Buy Low ({dp['dex_a']}): `${p_a:,.2f}`\n"
-                            f"  • Sell High ({dp['dex_b']}): `${p_b:,.2f}`\n"
-                            f"  • Gross Spread: `+{sp:.2f}%` (Net > Fee 0.05%)\n"
-                            f"  • Aave Pool: `{dp['aave_pool']}`\n\n"
+                            f"🪙 **{item['symbol']} ({item['pair']})**: `{status_icon}`\n"
+                            f"  • Uniswap V3: `${item['uniswap_price']:,.4f}`\n"
+                            f"  • Camelot DEX: `${item['camelot_price']:,.4f}`\n"
+                            f"  • Spread: `+{item['gross_spread_pct']:.3f}%` (Hurdle: `{item['fee_hurdle_pct']}%`)\n"
+                            f"  • Optimal Route: `{item['dex_source']}`\n"
+                            f"  • Flash Loan: `${item['optimal_loan_usd']:,.0f} USDT`\n"
+                            f"  • Net Profit: `+${item['net_profit_usd']:,.2f} USDT`\n\n"
                         )
                     scan_msg += (
                         f"💼 **Settlement Web3 Wallet**: {wallet_display}\n\n"
-                        "💡 _All flash loans are mathematically bounded. Unprofitable cycles automatically revert with zero loss!_"
+                        "💡 _Real-time prices via DexScreener on Arbitrum One. Trades trigger atomically when net profit exceeds all hurdles!_"
                     )
 
                 if sent_scan:
