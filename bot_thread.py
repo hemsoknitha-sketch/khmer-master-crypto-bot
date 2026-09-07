@@ -725,6 +725,10 @@ class TelegramBotThread(BaseThread):
             auto_badge = "🟢 ACTIVE (24/7 Continuous Scanning)" if is_auto else "⚪ IDLE (Manual Mode)"
             auto_badge_km = "🟢 កំពុងដំណើរការស្កេន 24/7 (ACTIVE)" if is_auto else "⚪ ឈប់ដំណើរការ (MANUAL MODE)"
 
+            pnl_stats = db.get_user_flash_loan_pnl_summary(chat_id)
+            tot_fl_profit = pnl_stats.get("total_net_profit_usd", 0.0)
+            tot_fl_trades = pnl_stats.get("total_trades", 0)
+
             if user_wallets:
                 wallet_items = []
                 for ch, info in user_wallets.items():
@@ -751,11 +755,14 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🧪 Simulate $1M Loan", callback_data="btn_flash_loan_sim")
                 ],
                 [
-                    InlineKeyboardButton("💼 Multi-Chain Wallets", callback_data="btn_set_web3_prompt"),
-                    InlineKeyboardButton("⚡ CEX Cross-Arb (<5ms)", callback_data="btn_cross_arb")
+                    InlineKeyboardButton("📜 Execution History", callback_data="btn_flash_loan_history"),
+                    InlineKeyboardButton("💼 Multi-Chain Wallets", callback_data="btn_set_web3_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("⚡ CEX Cross-Arb (<5ms)", callback_data="btn_cross_arb"),
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
+                ],
+                [
                     InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ])
@@ -932,6 +939,54 @@ class TelegramBotThread(BaseThread):
                 sent_auto = await send_reply_or_edit(update, context, auto_msg)
                 return
 
+            # Sub-action: HISTORY (/flash_loan HISTORY or callback)
+            if (args and args[0].upper() in ["HISTORY", "LOGS"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_history"):
+                recent_trades = db.get_user_flash_loan_trades(chat_id, limit=10)
+                tot_pnl = tot_fl_profit
+                tot_trades = tot_fl_trades
+
+                if user_lang == 'km':
+                    hist_msg = (
+                        "📜 **ប្រវត្តិជួញដូរ 24/7 FLASH LOAN ARBITRAGE v13.00** 📜\n"
+                        "═════════════════════════════════════════\n\n"
+                        f"📊 **សរុបផលចំណេញកើបបាន ៖** `+${tot_pnl:,.2f} USDT` ({tot_trades} ប្រតិបត្តិការ)\n"
+                        f"💼 **កាបូបទទួលប្រាក់ ៖** {wallet_display}\n\n"
+                    )
+                    if recent_trades:
+                        hist_msg += "🏆 **ប្រតិបត្តិការជោគជ័យចុងក្រោយ ៖**\n\n"
+                        for idx, tr in enumerate(recent_trades, 1):
+                            hist_msg += (
+                                f"**{idx}. {tr['symbol']} ({tr['pair']})** ➔ `{tr['chain']}`\n"
+                                f"  • Flash Loan ៖ `${tr['loan_amount']:,.2f} USDT` | Spread ៖ `+{tr['gross_spread_pct']:.3f}%`\n"
+                                f"  • ចំណេញសុទ្ធ (Net) ៖ `+${tr['net_profit_usd']:,.2f} USDT` 🟢\n"
+                                f"  • ពេលវេលា ៖ `{tr['created_at']}` | Tx ៖ `{tr['tx_hash'][:10]}...`\n\n"
+                            )
+                    else:
+                        hist_msg += "_មិនទាន់មានកំណត់ត្រាជួញដូរនៅឡើយទេ។ ប្រព័ន្ធកំពុងដំណើរការស្កេន 24/7 រៀងរាល់ 60 វិនាទី!_\n\n"
+                    hist_msg += "💡 _រាល់ប្រតិបត្តិការទាំងអស់ត្រូវបានការពារដោយក្បួនខ្នាត 0% Risk Invariant!_"
+                else:
+                    hist_msg = (
+                        "📜 **24/7 FLASH LOAN ARBITRAGE EXECUTION HISTORY v13.00** 📜\n"
+                        "═════════════════════════════════════════\n\n"
+                        f"📊 **Total Cumulative Profit:** `+${tot_pnl:,.2f} USDT` ({tot_trades} trades)\n"
+                        f"💼 **Settlement Wallet:** {wallet_display}\n\n"
+                    )
+                    if recent_trades:
+                        hist_msg += "🏆 **Recent Successful Executions:**\n\n"
+                        for idx, tr in enumerate(recent_trades, 1):
+                            hist_msg += (
+                                f"**{idx}. {tr['symbol']} ({tr['pair']})** ➔ `{tr['chain']}`\n"
+                                f"  • Borrowed: `${tr['loan_amount']:,.2f} USDT` | Spread: `+{tr['gross_spread_pct']:.3f}%`\n"
+                                f"  • Net Profit: `+${tr['net_profit_usd']:,.2f} USDT` 🟢\n"
+                                f"  • Time: `{tr['created_at']}` | Tx: `{tr['tx_hash'][:10]}...`\n\n"
+                            )
+                    else:
+                        hist_msg += "_No flash loan execution records yet. 24/7 background engine is actively scanning every 60 seconds!_\n\n"
+                    hist_msg += "💡 _All arbitrage cycles execute atomically with zero out-of-pocket capital risk!_"
+
+                sent_hist = await send_reply_or_edit(update, context, hist_msg)
+                return
+
             # Sub-action: SIMULATION (/flash_loan SIM or callback)
             if (args and args[0].upper() == "SIM") or (update.callback_query and update.callback_query.data == "btn_flash_loan_sim"):
                 sim_amt = 1000000.0
@@ -1079,6 +1134,7 @@ class TelegramBotThread(BaseThread):
                     "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
                     "═════════════════════════════════════════\n\n"
                     f"📡 **ស្ថានភាពប្រព័ន្ធ 24/7** ៖ `{auto_badge_km}`\n"
+                    f"🏆 **ប្រាក់ចំណេញកើបបានសរុប** ៖ `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} ប្រតិបត្តិការ)\n"
                     "🏦 **ស្ថាបត្យកម្ម FLASH LOAN & DEX ARBITRAGE ៖**\n"
                     "• 🤖 **AI Ensemble Models** ៖ `MEV Orderflow Classifier` + `GNN Graph Path Finder`\n"
                     "• 🌐 **ប្រភពដើមទុនកម្ចី** ៖ `Aave V3 Liquidity Pool ($1.5B+ USDT/USDC/ETH)`\n"
@@ -1092,6 +1148,7 @@ class TelegramBotThread(BaseThread):
                     "• 🌐 `Strategy 4: CeDeFi Hybrid Bridge` ➔ Binance CEX <-> DEX Live Arbitrage\n\n"
                     "📋 **ទម្រង់ពាក្យបញ្ជា 1-TAP EXECUTIONS ៖**\n\n"
                     "👉 **បើក/បិទ Flash Loan Arbitrage 24/7 ស្វ័យប្រវត្តិ ៖**\n`` `/flash_loan 24/7` `` ឬ `` `/flash_loan AUTO ON` ``\n\n"
+                    "👉 **ពិនិត្យប្រវត្តិជួញដូរ និងប្រាក់ចំណេញសរុប ៖**\n`` `/flash_loan HISTORY` ``\n\n"
                     "👉 **ពិនិត្យស្ថានភាពយុទ្ធសាស្ត្រទាំង ៤ ៖**\n`` `/flash_loan STRATEGY` ``\n\n"
                     "👉 **ស្កេន CeDeFi (Binance vs DEX) Spreads ៖**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **ធ្វើតេស្តសាកល្បងកម្ចី Flash Loan $1M (0% Risk) ៖**\n`` `/flash_loan SIM 1000000` ``\n\n"
@@ -1102,6 +1159,7 @@ class TelegramBotThread(BaseThread):
                     "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
                     "═════════════════════════════════════════\n\n"
                     f"📡 **24/7 System Status**: `{auto_badge}`\n"
+                    f"🏆 **Total Cumulative Profit**: `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} trades)\n"
                     "🏦 **INSTITUTIONAL FLASH LOAN ARCHITECTURE:**\n"
                     "• 🤖 **AI Ensemble Models**: `MEV Orderflow Classifier` + `GNN Graph Path Finder`\n"
                     "• 🌐 **Borrow Pool Source**: `Aave V3 Liquidity Pools ($1.5B+ USDT/USDC/ETH)`\n"
@@ -1115,6 +1173,7 @@ class TelegramBotThread(BaseThread):
                     "• 🌐 `Strategy 4: CeDeFi Hybrid Bridge` ➔ Binance CEX <-> DEX Live Arbitrage\n\n"
                     "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
                     "👉 **Toggle 24/7 Autonomous Flash Loan Mode:**\n`` `/flash_loan 24/7` `` or `` `/flash_loan AUTO ON` ``\n\n"
+                    "👉 **View Execution History & Profit Ledger:**\n`` `/flash_loan HISTORY` ``\n\n"
                     "👉 **Inspect 4 Strategies Diagnostics:**\n`` `/flash_loan STRATEGY` ``\n\n"
                     "👉 **Scan CeDeFi (Binance vs DEX) Spreads:**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **Simulate $1M Flash Loan Execution (Zero Risk):**\n`` `/flash_loan SIM 1000000` ``\n\n"
@@ -3889,6 +3948,9 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_sim":
                 context.args = ["SIM", "1000000"]
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_history":
+                context.args = ["HISTORY"]
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_auto_on":
                 context.args = ["AUTO", "ON"]
@@ -11102,6 +11164,17 @@ class TelegramBotThread(BaseThread):
             coalesce=True,
             args=[self.app],
             id='funding_harvester_monitor'
+        )
+
+        # 6. Autonomous 24/7 Flash Loan & CeDeFi Arbitrage Engine (Every 60 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.flash_loan_autonomous_engine,
+            'interval',
+            seconds=60,
+            max_instances=1,
+            coalesce=True,
+            args=[self.app],
+            id='flash_loan_autonomous_engine'
         )
 
         # 🔵 POSITION & RISK MANAGEMENT LOOPS

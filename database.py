@@ -1538,6 +1538,134 @@ def get_user_flash_loan_strategy_config(chat_id: int) -> dict:
         "max_slippage_pct": 0.15
     }
 
+def get_all_flash_loan_auto_users() -> list:
+    """Retrieves all user chat_ids who have enabled 24/7 Autonomous Flash Loan Arbitrage."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_settings (
+            chat_id INTEGER PRIMARY KEY,
+            is_auto_active INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )''')
+        cursor.execute("SELECT chat_id FROM user_flash_loan_settings WHERE is_auto_active = 1")
+        rows = cursor.fetchall()
+        conn.close()
+        return [r[0] for r in rows if r and r[0]]
+    except Exception:
+        return []
+
+def record_flash_loan_trade(chat_id: int, symbol: str, pair: str, chain: str, loan_amount: float, gross_spread_pct: float, net_profit_usd: float, settlement_wallet: str, tx_hash: str = None) -> int:
+    """Records an executed or simulated Flash Loan Arbitrage cycle into user ledger."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            pair TEXT NOT NULL,
+            chain TEXT NOT NULL,
+            loan_amount REAL NOT NULL,
+            gross_spread_pct REAL NOT NULL,
+            net_profit_usd REAL NOT NULL,
+            settlement_wallet TEXT NOT NULL,
+            tx_hash TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )''')
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            '''INSERT INTO user_flash_loan_trades 
+               (chat_id, symbol, pair, chain, loan_amount, gross_spread_pct, net_profit_usd, settlement_wallet, tx_hash, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (chat_id, symbol, pair, chain, float(loan_amount), float(gross_spread_pct), float(net_profit_usd), str(settlement_wallet), str(tx_hash or ""), "SETTLED", now_str)
+        )
+        trade_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return trade_id
+    except Exception:
+        return 0
+
+def get_user_flash_loan_trades(chat_id: int, limit: int = 10) -> list:
+    """Retrieves recent Flash Loan trade history for a user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            pair TEXT NOT NULL,
+            chain TEXT NOT NULL,
+            loan_amount REAL NOT NULL,
+            gross_spread_pct REAL NOT NULL,
+            net_profit_usd REAL NOT NULL,
+            settlement_wallet TEXT NOT NULL,
+            tx_hash TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )''')
+        cursor.execute(
+            "SELECT symbol, pair, chain, loan_amount, gross_spread_pct, net_profit_usd, settlement_wallet, tx_hash, created_at FROM user_flash_loan_trades WHERE chat_id = ? ORDER BY id DESC LIMIT ?",
+            (chat_id, limit)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        results = []
+        for r in rows:
+            results.append({
+                "symbol": r[0],
+                "pair": r[1],
+                "chain": r[2],
+                "loan_amount": r[3],
+                "gross_spread_pct": r[4],
+                "net_profit_usd": r[5],
+                "settlement_wallet": r[6],
+                "tx_hash": r[7],
+                "created_at": r[8]
+            })
+        return results
+    except Exception:
+        return []
+
+def get_user_flash_loan_pnl_summary(chat_id: int) -> dict:
+    """Returns cumulative trade count, total net profit, and last execution time for a user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            pair TEXT NOT NULL,
+            chain TEXT NOT NULL,
+            loan_amount REAL NOT NULL,
+            gross_spread_pct REAL NOT NULL,
+            net_profit_usd REAL NOT NULL,
+            settlement_wallet TEXT NOT NULL,
+            tx_hash TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )''')
+        cursor.execute("SELECT COUNT(*), COALESCE(SUM(net_profit_usd), 0.0), MAX(created_at) FROM user_flash_loan_trades WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "total_trades": int(row[0] or 0),
+                "total_net_profit_usd": float(row[1] or 0.0),
+                "last_trade_time": str(row[2] or "N/A")
+            }
+    except Exception:
+        pass
+    return {
+        "total_trades": 0,
+        "total_net_profit_usd": 0.0,
+        "last_trade_time": "N/A"
+    }
+
 
 
 
