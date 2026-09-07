@@ -117,7 +117,8 @@ def deploy_arbitrum_contract() -> dict:
     signed_tx = w3.eth.account.sign_transaction(tx, private_key=engine.keeper_private_key)
 
     print("🚀 Broadcasting deployment transaction to Arbitrum One...")
-    tx_hash_bytes = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    raw_tx = getattr(signed_tx, 'raw_transaction', getattr(signed_tx, 'rawTransaction', None))
+    tx_hash_bytes = w3.eth.send_raw_transaction(raw_tx)
     tx_hash = w3.to_hex(tx_hash_bytes)
     print(f"🔗 Tx Hash: {tx_hash}")
     print(f"👉 Explorer: https://arbiscan.io/tx/{tx_hash}")
@@ -125,14 +126,16 @@ def deploy_arbitrum_contract() -> dict:
     print("⏳ Waiting for Arbitrum block confirmation (usually 2-5 seconds)...")
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
 
-    if receipt.status == 1:
-        deployed_addr = receipt.contractAddress
+    receipt_status = getattr(receipt, 'status', None) or receipt.get('status')
+    if receipt_status == 1:
+        deployed_addr = getattr(receipt, 'contractAddress', None) or receipt.get('contractAddress')
+        gas_used = getattr(receipt, 'gasUsed', None) or receipt.get('gasUsed')
         print("\n" + "=" * 70)
         print("  🎉 SMART CONTRACT DEPLOYED SUCCESSFULLY TO ARBITRUM ONE! 🎉")
         print("=" * 70)
         print(f"• Contract Address: {deployed_addr}")
         print(f"• Arbiscan URL:     https://arbiscan.io/address/{deployed_addr}")
-        print(f"• Gas Used:         {receipt.gasUsed}")
+        print(f"• Gas Used:         {gas_used}")
         print("=" * 70)
         
         save_contract_to_env(deployed_addr)
