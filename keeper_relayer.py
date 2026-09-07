@@ -374,5 +374,16 @@ class KeeperRelayerEngine:
                 "notice": f"Mainnet execution reverted or failed: {e}"
             }
 
+    def deploy_contract(self) -> dict:
+        """Deploys AaveFlashLoanArbitrage contract to Arbitrum One using Keeper wallet."""
+        try:
+            from contracts.deploy_arbitrum import deploy_arbitrum_contract
+            res = deploy_arbitrum_contract()
+            if res.get("success"):
+                self.contract_address = res.get("contract_address", "")
+            return res
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
 # Global Singleton Instance
 keeper_engine = KeeperRelayerEngine()

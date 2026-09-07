@@ -163,6 +163,14 @@ contract AaveFlashLoanArbitrage is IFlashLoanSimpleReceiver {
         );
     }
 
+    struct ArbitrageParams {
+        address intermediateToken;
+        uint24 poolFee;
+        uint256 minProfit;
+        address recipient;
+        uint8 dexRoute;
+    }
+
     /**
      * @notice Callback invoked by Aave V3 Pool with borrowed funds.
      */
@@ -176,47 +184,38 @@ contract AaveFlashLoanArbitrage is IFlashLoanSimpleReceiver {
         require(msg.sender == address(POOL), "Callback caller must be Aave Pool");
         require(initiator == address(this), "Initiator must be this contract");
 
-        // Decode execution parameters
-        (
-            address intermediateToken,
-            uint24 poolFee,
-            uint256 minProfit,
-            address recipient,
-            uint8 dexRoute
-        ) = abi.decode(params, (address, uint24, uint256, address, uint8));
+        ArbitrageParams memory p = abi.decode(params, (ArbitrageParams));
+        _executeArbitrageSwap(asset, amount, p);
 
         uint256 totalRepay = amount + premium;
+        uint256 finalBalance = IERC20(asset).balanceOf(address(this));
+        require(finalBalance >= totalRepay, "Arbitrage did not cover loan + premium");
 
-        // Execute Multi-DEX Arbitrage Path
-        if (dexRoute == 1) {
-            // Path 1: Uniswap V3 (Buy intermediate) -> Camelot (Sell back to asset)
-            _swapUniswapV3(asset, intermediateToken, poolFee, amount);
-            uint256 intermBalance = IERC20(intermediateToken).balanceOf(address(this));
-            _swapCamelot(intermediateToken, asset, intermBalance);
-        } else {
-            // Path 2: Camelot (Buy intermediate) -> Uniswap V3 (Sell back to asset)
-            _swapCamelot(asset, intermediateToken, amount);
-            uint256 intermBalance = IERC20(intermediateToken).balanceOf(address(this));
-            _swapUniswapV3(intermediateToken, asset, poolFee, intermBalance);
-        }
-
-        // Verify balance after arbitrage
-        uint256 finalAssetBalance = IERC20(asset).balanceOf(address(this));
-        require(finalAssetBalance >= totalRepay, "Arbitrage did not cover loan + premium: Reverting");
-
-        uint256 netProfit = finalAssetBalance - totalRepay;
-        require(netProfit >= minProfit, "Net profit below minimum hurdle: Reverting to protect capital");
+        uint256 netProfit = finalBalance - totalRepay;
+        require(netProfit >= p.minProfit, "Net profit below minimum hurdle: Reverting to protect capital");
 
         // Approve Aave Pool to withdraw repayment
         IERC20(asset).safeApprove(address(POOL), totalRepay);
 
         // Transfer 100% net profit directly to user recipient wallet!
-        if (netProfit > 0 && recipient != address(0)) {
-            IERC20(asset).safeTransfer(recipient, netProfit);
+        if (netProfit > 0 && p.recipient != address(0)) {
+            IERC20(asset).safeTransfer(p.recipient, netProfit);
         }
 
-        emit FlashLoanExecuted(asset, amount, premium, netProfit, recipient);
+        emit FlashLoanExecuted(asset, amount, premium, netProfit, p.recipient);
         return true;
+    }
+
+    function _executeArbitrageSwap(address asset, uint256 amount, ArbitrageParams memory p) internal {
+        if (p.dexRoute == 1) {
+            _swapUniswapV3(asset, p.intermediateToken, p.poolFee, amount);
+            uint256 intermBalance = IERC20(p.intermediateToken).balanceOf(address(this));
+            _swapCamelot(p.intermediateToken, asset, intermBalance);
+        } else {
+            _swapCamelot(asset, p.intermediateToken, amount);
+            uint256 intermBalance = IERC20(p.intermediateToken).balanceOf(address(this));
+            _swapUniswapV3(p.intermediateToken, asset, p.poolFee, intermBalance);
+        }
     }
 
     function _swapUniswapV3(

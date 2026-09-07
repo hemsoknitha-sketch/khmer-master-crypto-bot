@@ -8,6 +8,8 @@ Deploys AaveFlashLoanArbitrage.sol to Arbitrum One Mainnet using the Keeper Wall
 
 import os
 import sys
+import json
+import time
 from web3 import Web3
 import keeper_relayer
 
@@ -15,29 +17,122 @@ import keeper_relayer
 AAVE_V3_ADDRESSES_PROVIDER = "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb" # Aave V3 Arbitrum
 UNISWAP_V3_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564"          # Uniswap V3 SwapRouter
 CAMELOT_ROUTER_V2 = "0xc873fEcbd354f5A56E00E710B90EF4201db2448d"          # Camelot V2 Router
+ARBITRUM_CHAIN_ID = 42161
 
-def check_deployment_prerequisites():
-    status = keeper_relayer.keeper_engine.get_status_overview()
-    print("=" * 70)
-    print("  ARBITRUM ONE AAVE V3 FLASH LOAN CONTRACT DEPLOYMENT STATUS")
-    print("=" * 70)
-    print(f"• Keeper Wallet Address: {status['keeper_address']}")
-    print(f"• Arbitrum Gas Balance:  {status['arbitrum_gas_eth']} ETH (~${status['gas_usd_est']} USD)")
-    print(f"• Is Funded with Gas:    {status['is_funded']}")
-    print(f"• RPC Connection Live:   {status['rpc_connected']}")
-    print(f"• Active Contract:       {status['contract_address']}")
-    print("-" * 70)
+def save_contract_to_env(contract_addr: str):
+    """Persists FLASH_LOAN_CONTRACT_ADDRESS to .env file."""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    lines = []
+    found = False
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        new_lines = []
+        for line in lines:
+            if line.strip().startswith("FLASH_LOAN_CONTRACT_ADDRESS="):
+                new_lines.append(f"FLASH_LOAN_CONTRACT_ADDRESS={contract_addr}\n")
+                found = True
+            else:
+                new_lines.append(line)
+        if not found:
+            new_lines.append(f"\n# Aave V3 Flash Loan Smart Contract (Arbitrum One)\nFLASH_LOAN_CONTRACT_ADDRESS={contract_addr}\n")
+        
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    else:
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.write(f"FLASH_LOAN_CONTRACT_ADDRESS={contract_addr}\n")
+            
+    os.environ["FLASH_LOAN_CONTRACT_ADDRESS"] = contract_addr
+    keeper_relayer.keeper_engine.contract_address = contract_addr
 
-    if not status["is_funded"]:
-        print("\n⚠️ DEPLOYMENT NOTICE:")
-        print(f"Please deposit at least 0.002 to 0.005 ETH (~$5 to $12 USD) on ARBITRUM ONE network")
-        print(f"to the Keeper Wallet address above:")
-        print(f"  👉 {status['keeper_address']}")
-        print("\nOnce funded, run this script to deploy AaveFlashLoanArbitrage.sol to Arbitrum One!")
-        return False
-    
-    print("\n✅ Keeper Wallet is FUNDED and ready for deployment!")
-    return True
+def deploy_arbitrum_contract() -> dict:
+    """Deploys AaveFlashLoanArbitrage contract to Arbitrum One using Keeper wallet."""
+    engine = keeper_relayer.keeper_engine
+    status = engine.get_status_overview()
+
+    print("=" * 70)
+    print("  ARBITRUM ONE AAVE V3 FLASH LOAN CONTRACT DEPLOYMENT")
+    print("=" * 70)
+    print(f"• Keeper Wallet:  {status['keeper_address']}")
+    print(f"• Gas Balance:    {status['arbitrum_gas_eth']} ETH (~${status['gas_usd_est']} USD)")
+    print(f"• Is Funded:      {status['is_funded']}")
+
+    if not status["is_funded"] or status["arbitrum_gas_eth"] < 0.0008:
+        msg = f"Insufficient gas: {status['arbitrum_gas_eth']} ETH. Need at least 0.001 ETH."
+        print(f"\n❌ {msg}")
+        return {"success": False, "error": msg}
+
+    # Load compiled JSON artifact
+    json_path = os.path.join(os.path.dirname(__file__), "AaveFlashLoanArbitrage.json")
+    if not os.path.exists(json_path):
+        msg = f"Artifact not found: {json_path}. Please compile contract first."
+        print(f"\n❌ {msg}")
+        return {"success": False, "error": msg}
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        artifact = json.load(f)
+
+    abi = artifact["abi"]
+    bytecode = artifact["bytecode"]
+
+    w3 = engine.w3
+    if not w3 or not w3.is_connected():
+        w3 = Web3(Web3.HTTPProvider(keeper_relayer.ARBITRUM_RPC_PRIMARY))
+
+    print("\n📡 Connected to Arbitrum One RPC. Preparing deployment transaction...")
+    contract_factory = w3.eth.contract(abi=abi, bytecode=bytecode)
+
+    nonce = w3.eth.get_transaction_count(engine.keeper_address)
+    gas_price = w3.eth.gas_price
+
+    tx = contract_factory.constructor(
+        Web3.to_checksum_address(AAVE_V3_ADDRESSES_PROVIDER),
+        Web3.to_checksum_address(UNISWAP_V3_ROUTER),
+        Web3.to_checksum_address(CAMELOT_ROUTER_V2)
+    ).build_transaction({
+        'from': engine.keeper_address,
+        'nonce': nonce,
+        'gasPrice': int(gas_price * 1.25),
+        'chainId': ARBITRUM_CHAIN_ID
+    })
+
+    print(f"⛽ Estimated Gas Price: {gas_price / 10**9:.3f} Gwei | Nonce: {nonce}")
+    print("✍️ Signing deployment transaction with Keeper Private Key...")
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key=engine.keeper_private_key)
+
+    print("🚀 Broadcasting deployment transaction to Arbitrum One...")
+    tx_hash_bytes = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    tx_hash = w3.to_hex(tx_hash_bytes)
+    print(f"🔗 Tx Hash: {tx_hash}")
+    print(f"👉 Explorer: https://arbiscan.io/tx/{tx_hash}")
+
+    print("⏳ Waiting for Arbitrum block confirmation (usually 2-5 seconds)...")
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+
+    if receipt.status == 1:
+        deployed_addr = receipt.contractAddress
+        print("\n" + "=" * 70)
+        print("  🎉 SMART CONTRACT DEPLOYED SUCCESSFULLY TO ARBITRUM ONE! 🎉")
+        print("=" * 70)
+        print(f"• Contract Address: {deployed_addr}")
+        print(f"• Arbiscan URL:     https://arbiscan.io/address/{deployed_addr}")
+        print(f"• Gas Used:         {receipt.gasUsed}")
+        print("=" * 70)
+        
+        save_contract_to_env(deployed_addr)
+        print("💾 Saved contract address to .env successfully!")
+        return {
+            "success": True,
+            "contract_address": deployed_addr,
+            "tx_hash": tx_hash,
+            "arbiscan_url": f"https://arbiscan.io/address/{deployed_addr}",
+            "gas_used": receipt.gasUsed
+        }
+    else:
+        print("\n❌ Deployment transaction reverted on Arbitrum One!")
+        return {"success": False, "error": "Transaction reverted by network", "tx_hash": tx_hash}
 
 if __name__ == "__main__":
-    check_deployment_prerequisites()
+    deploy_arbitrum_contract()

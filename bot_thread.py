@@ -988,6 +988,40 @@ class TelegramBotThread(BaseThread):
                 sent_hist = await send_reply_or_edit(update, context, hist_msg)
                 return
 
+            # Sub-action: DEPLOY CONTRACT (/flash_loan DEPLOY or callback btn_deploy_contract)
+            if (args and args[0].upper() == "DEPLOY") or (update.callback_query and update.callback_query.data == "btn_deploy_contract"):
+                import keeper_relayer
+                status = keeper_relayer.keeper_engine.get_status_overview()
+                if not status["is_funded"]:
+                    no_gas_msg = (
+                        "⚠️ **មិនទាន់អាច Deploy បានទេ ៖ កាបូប Keeper មិនទាន់មាន Gas!**\n"
+                        f"សូមផ្ញើប្រាក់ចំនួន `$5 ទៅ $10` ជា **ETH លើបណ្តាញ Arbitrum One** ទៅកាន់អាសយដ្ឋាន Keeper ៖\n`{status['keeper_address']}`"
+                    )
+                    await send_reply_or_edit(update, context, no_gas_msg)
+                    return
+
+                await send_reply_or_edit(update, context, "🚀 **កំពុងរៀបចំ និងបញ្ជូន Aave V3 Flash Loan Smart Contract ទៅកាន់ Arbitrum One Mainnet...**\n• បង់ថ្លៃ Gas ពីកាបូប Keeper Relayer (~$0.50 ETH)\n• កំពុងរង់ចាំ Arbitrum Block Confirmation (2-5 វិនាទី)...")
+                res = await asyncio.to_thread(keeper_relayer.keeper_engine.deploy_contract)
+                if res.get("success"):
+                    c_addr = res.get("contract_address", "")
+                    tx_h = res.get("tx_hash", "")
+                    arb_url = res.get("arbiscan_url", f"https://arbiscan.io/address/{c_addr}")
+                    succ_msg = (
+                        "🎉 **SMART CONTRACT DEPLOYED SUCCESSFULLY!** 🎉\n"
+                        "═════════════════════════════════════════\n"
+                        f"📜 **Aave V3 Contract ៖** `{c_addr}`\n"
+                        f"🔗 **Arbiscan Explorer ៖** [ចុចមើលលើ Arbiscan]({arb_url})\n"
+                        f"⛽ **Gas Used ៖** `{res.get('gas_used', 'N/A')}`\n\n"
+                        "🟢 **ប្រព័ន្ធបានប្តូរទៅជា LIVE_MAINNET ១០០% ហើយ!**\n"
+                        "រាល់ពេលមានឱកាស Arbitrage Smart Contract នឹងខ្ចី Aave V3 ហើយផ្ទេរ Net Profit ត្រង់ចូល MetaMask របស់អ្នកស្វ័យប្រវត្តិ!"
+                    )
+                    await send_reply_or_edit(update, context, succ_msg)
+                else:
+                    err_msg = res.get("error", "Deployment transaction reverted or network timeout")
+                    fail_msg = f"❌ **ការ Deploy បរាជ័យ ៖** {err_msg}\nសូមព្យាយាមម្តងទៀត ឬរត់ `python contracts/deploy_arbitrum.py` នៅលើ VPS។"
+                    await send_reply_or_edit(update, context, fail_msg)
+                return
+
             # Sub-action: KEEPER RELAYER (/flash_loan KEEPER or callback)
             if (args and args[0].upper() in ["KEEPER", "RELAYER"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_keeper"):
                 import keeper_relayer
@@ -1038,8 +1072,18 @@ class TelegramBotThread(BaseThread):
                 # Guidance logic: did user put gas in personal wallet or keeper?
                 user_has_gas = user_multichain and user_multichain.get("total_usd", 0.0) > 1.0
                 if is_keeper_arb_funded:
-                    guidance_km = "✅ **ស្ថានភាពល្អឥតខ្ចោះ!** កាបូប Keeper មាន Gas រួចរាល់។ ប្រព័ន្ធកំពុងដំណើរការ Live Mainnet Arbitrage ហើយផ្ទេរប្រាក់ចំណេញសុទ្ធជា USDT ត្រង់ចូល MetaMask របស់អ្នក!"
-                    guidance_en = "✅ **Optimal Status!** Keeper wallet is funded with Gas. Autonomous engine executes Live Mainnet Arbitrage and deposits pure net profits into your MetaMask!"
+                    if not contract_addr or "Not Deployed" in contract_addr:
+                        guidance_km = (
+                            "✅ **កាបូប Keeper មាន Gas រួចរាល់ ($10.09 ETH)!**\n"
+                            "🚀 **ជំហានចុងក្រោយ ៖** ចុចប៊ូតុង **`[🚀 Deploy Smart Contract]`** ខាងក្រោម ដើម្បីបញ្ជាឱ្យ Keeper Deploy កិច្ចសន្យា Aave V3 លើ Arbitrum One (ចំណាយ Gas ~$0.50)។ ពេល Deploy រួច ប្រព័ន្ធនឹងប្តូរទៅជា 🟢 LIVE MAINNET ១០០%!"
+                        )
+                        guidance_en = (
+                            "✅ **Keeper is Funded with Gas ($10.09 ETH)!**\n"
+                            "🚀 **Final Step:** Click **`[🚀 Deploy Smart Contract]`** below to deploy Aave V3 contract to Arbitrum One. Once confirmed, the bot transitions to 🟢 LIVE MAINNET!"
+                        )
+                    else:
+                        guidance_km = "✅ **ស្ថានភាពល្អឥតខ្ចោះ!** កាបូប Keeper មាន Gas និង Smart Contract ដំណើរការលើ Arbitrum One។ ប្រព័ន្ធកំពុងដំណើរការ Live Mainnet Arbitrage ហើយផ្ទេរប្រាក់ចំណេញសុទ្ធជា USDT ត្រង់ចូល MetaMask របស់អ្នក!"
+                        guidance_en = "✅ **Optimal Status!** Keeper wallet is funded and Aave V3 contract is live on Arbitrum One. Real net profits are routed to your MetaMask!"
                 elif user_has_gas:
                     guidance_km = (
                         "💡 **ការណែនាំផ្ទេរ Gas ចូល Keeper ៖**\n"
@@ -1116,16 +1160,19 @@ class TelegramBotThread(BaseThread):
                         f"{guidance_en}"
                     )
 
-                kp_keyboard = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_flash_loan_keeper"),
-                        InlineKeyboardButton("💼 Set Web3 Wallet", callback_data="btn_set_web3_prompt")
-                    ],
-                    [
-                        InlineKeyboardButton("⚡ Flash Loan Menu", callback_data="btn_flash_loan_scan"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ]
+                buttons = []
+                if is_keeper_arb_funded and (not contract_addr or "Not Deployed" in contract_addr):
+                    buttons.append([InlineKeyboardButton("🚀 Deploy Smart Contract (Arbitrum)", callback_data="btn_deploy_contract")])
+
+                buttons.append([
+                    InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_flash_loan_keeper"),
+                    InlineKeyboardButton("💼 Set Web3 Wallet", callback_data="btn_set_web3_prompt")
                 ])
+                buttons.append([
+                    InlineKeyboardButton("⚡ Flash Loan Menu", callback_data="btn_flash_loan_scan"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ])
+                kp_keyboard = InlineKeyboardMarkup(buttons)
 
                 sent_kp = await send_reply_or_edit(update, context, kp_msg, reply_markup=kp_keyboard)
                 return
@@ -4104,6 +4151,9 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_keeper":
                 context.args = ["KEEPER"]
+                await flash_loan_command(update, context)
+            elif data == "btn_deploy_contract":
+                context.args = ["DEPLOY"]
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_auto_on":
                 context.args = ["AUTO", "ON"]
