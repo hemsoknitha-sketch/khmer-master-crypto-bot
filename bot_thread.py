@@ -11273,6 +11273,12 @@ class TelegramBotThread(BaseThread):
                 ]
                 admin_commands = [
                     BotCommand("admin", "👑 Open Super Admin Control Panel"),
+                    BotCommand("admin_users", "👥 View Registered Users Directory"),
+                    BotCommand("admin_license", "🔑 Grant or Renew VIP License"),
+                    BotCommand("admin_broadcast", "📢 Broadcast Urgent Message to Users"),
+                    BotCommand("admin_stats", "📊 View Platform Volume & Stats"),
+                    BotCommand("admin_config", "⚙️ Modify Live System Parameters"),
+                    BotCommand("admin_nuke", "☢️ Emergency Panic Nuke & Shutdown"),
                     BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
                     BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
                 ] + public_commands
