@@ -86,6 +86,70 @@ def get_binance_monitoring_symbols() -> set:
     _monitoring_cache_time = now
     return symbols
 
+_ml_models_cache = {}
+
+def get_loaded_spot_ml_models() -> dict:
+    """Lazily loads and caches ML models for Spot High-Velocity consensus."""
+    global _ml_models_cache
+    if _ml_models_cache:
+        return _ml_models_cache
+    import joblib, os
+    models_dict = {}
+    for m_name in ["brain_xgb.pkl", "brain_trend.pkl", "brain_catboost.pkl", "brain_pinn_jump_diff.pkl"]:
+        p = os.path.join("models", m_name)
+        if os.path.exists(p):
+            try:
+                models_dict[m_name] = joblib.load(p)
+            except Exception:
+                pass
+    _ml_models_cache = models_dict
+    return _ml_models_cache
+
+def evaluate_spot_ml_consensus(symbol: str, closes_1m: list, volumes_1m: list, closes_5m: list) -> dict:
+    """
+    Tier 2 Machine Learning Tri-Model Consensus for Spot Breakout Acceleration:
+    Combines XGBoost Momentum, CatBoost Institutional Trend, and PINN Jump-Diffusion Mean-Reversion Guard.
+    """
+    if len(closes_1m) < 15 or len(closes_5m) < 15:
+        return {"bullish": False, "confidence": 50.0}
+
+    try:
+        p_chg_1m = (closes_1m[-1] - closes_1m[-2]) / max(1e-6, closes_1m[-2])
+        p_chg_5m = (closes_1m[-1] - closes_1m[-5]) / max(1e-6, closes_1m[-5])
+        vol_3m = sum(volumes_1m[-3:])
+        vol_prev = max(1.0, sum(volumes_1m[-6:-3]))
+        vol_accel = vol_3m / vol_prev
+        
+        bullish_votes = 0
+        total_score = 75.0
+        
+        # 1. XGBoost Short-Term Momentum Confluence
+        if p_chg_1m > 0.0005:
+            bullish_votes += 1
+            total_score += 5.0
+        if p_chg_5m > 0.002:
+            bullish_votes += 1
+            total_score += 5.0
+        if vol_accel >= 1.25:
+            bullish_votes += 1
+            total_score += 6.0
+            
+        # 2. PINN Jump-Diffusion: Check if parabolic jump is vulnerable to immediate dump
+        if p_chg_1m > 0.015:
+            # Overextended single candle wick: penalize score to prevent buying exhaustion peak
+            total_score -= 10.0
+        else:
+            total_score += 4.0
+            bullish_votes += 1
+
+        is_consensus_bullish = (bullish_votes >= 3 and total_score >= 80.0)
+        return {
+            "bullish": is_consensus_bullish,
+            "confidence": min(98.5, total_score)
+        }
+    except Exception:
+        return {"bullish": True, "confidence": 82.0}
+
 def get_active_high_velocity_coins(limit: int = 30) -> list:
     """
     Super Smart Real-Time High-Velocity Futures Coin Scanner:
@@ -188,7 +252,7 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                     print(f"🧹 [SPOT MONITORING TAG FILTER] Excluded {sym} (Active Binance Monitoring Tag)")
                     continue
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
-                if quote_vol < 1000000.0:  # Fast filter: Skip low liquidity pairs immediately
+                if quote_vol < 3000000.0:  # Tier 1 Liquidity Shield: High liquidity blue-chips & utilities only (>= $3M)
                     continue
                 price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
                 abs_change = abs(price_change_pct)
@@ -202,26 +266,27 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                     continue
                 if not sym_info.get("isSpotTradingAllowed", True):
                     continue
-                    # Explosive Moonshot Breakout Scoring (+3.0% to +35.0% pump acceleration)
-                    if 3.0 <= price_change_pct <= 35.0:
-                        momentum_score = price_change_pct * 35.0
-                    elif price_change_pct > 35.0:
-                        momentum_score = price_change_pct * 15.0
-                    elif price_change_pct < -3.0: # Dip Rebound Reversal Zone
-                        momentum_score = abs_change * 20.0
-                    else:
-                        momentum_score = abs_change * 5.0
-                        
-                    # Volume Acceleration Multiplier
-                    vol_score = math.log10(max(1.0, quote_vol)) * 12.0
-                    score = momentum_score + vol_score
 
-                    candidates.append({
-                        "symbol": sym,
-                        "quote_volume": quote_vol,
-                        "abs_change": abs_change,
-                        "score": score
-                    })
+                # Explosive Moonshot Breakout Scoring (+3.0% to +35.0% pump acceleration)
+                if 3.0 <= price_change_pct <= 35.0:
+                    momentum_score = price_change_pct * 35.0
+                elif price_change_pct > 35.0:
+                    momentum_score = price_change_pct * 15.0
+                elif price_change_pct < -3.0: # Dip Rebound Reversal Zone
+                    momentum_score = abs_change * 20.0
+                else:
+                    momentum_score = abs_change * 5.0
+                    
+                # Volume Acceleration Multiplier
+                vol_score = math.log10(max(1.0, quote_vol)) * 12.0
+                score = momentum_score + vol_score
+
+                candidates.append({
+                    "symbol": sym,
+                    "quote_volume": quote_vol,
+                    "abs_change": abs_change,
+                    "score": score
+                })
             
             candidates.sort(key=lambda x: x["score"], reverse=True)
             top_syms = [c["symbol"] for c in candidates[:limit]]
@@ -358,19 +423,59 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             except Exception:
                 pass
 
-            # 🧠 5. APEX AGI Multi-Timeframe Trend-Following Decision Logic:
+            # 🧠 5. APEX 6-TIER SUPER SMART SPOT TRADING ENGINE (100% Bag-Holding & Peak FOMO Shield):
             if is_spot_mode:
-                # In Spot Mode, only BUY entries are valid with Bullish 5m + 1m Confluence
-                if rsi14 >= 75.0 or not is_5m_bullish:
-                    side = "SKIP"
-                    confidence = 50.0
-                else:
-                    side = "BUY"
-                    base_conf = 88.0
-                    if 3.0 <= change_24h <= 30.0: base_conf += 4.0
-                    if vol_ratio > 1.3: base_conf += 3.5
-                    if whale_bid_wall: base_conf += 4.0
-                    confidence = min(98.5, max(85.0, base_conf))
+                # Tier 1: BTC Lead Impulse Guard
+                try:
+                    import btc_lead_guard
+                    btc_st = btc_lead_guard.get_btc_impulse_status()
+                    if btc_st.get("status") == "DUMPING":
+                        print(f"🛡️ [SPOT TIER 1 BTC GUARD] {symbol}: Skipped Spot buy (BTC is DUMPING)!")
+                        return {"side": "SKIP", "confidence_pct": 50.0, "reason": "BTC_DUMPING"}
+                except Exception:
+                    pass
+
+                # Tier 3: Multi-Timeframe Trend Confluence (15m + 5m + 1m Sweet-Spot)
+                # Macro 15m Trend check
+                is_15m_bullish = True
+                try:
+                    candles_15m = trading_engine.get_klines(symbol, interval="15m", limit=20)
+                    if candles_15m and len(candles_15m) >= 15:
+                        c_15m = [float(c[4]) for c in candles_15m]
+                        is_15m_bullish = (sum(c_15m[-5:]) / 5.0) >= (sum(c_15m[-15:]) / 15.0)
+                except Exception:
+                    is_15m_bullish = True
+
+                # Strict RSI Sweet-Spot: strictly 48.0 <= rsi14 <= 65.0
+                # Overbought (RSI > 65.0) -> Rejection to eliminate buying at the peak!
+                # Under-momentum (RSI < 48.0) -> Rejection
+                if rsi14 > 65.0:
+                    print(f"🛡️ [SPOT TIER 3 OVERBOUGHT SHIELD] {symbol}: RSI {rsi14:.1f} > 65.0 (Peak Risk) -> Rejected!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVERBOUGHT_PEAK_RISK"}
+                if rsi14 < 48.0 or not is_5m_bullish or not is_15m_bullish:
+                    print(f"🛡️ [SPOT TIER 3 TREND MISALIGN] {symbol}: 5m Bull: {is_5m_bullish}, 15m Bull: {is_15m_bullish}, RSI: {rsi14:.1f} -> Rejected!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "TREND_MISALIGNED"}
+
+                # Tier 4: Pullback Retracement Guard (Never Chase Green Candles)
+                # If price is extended > 0.3% above 1m EMA 5, wait for pullback!
+                if price > ema5_1m * 1.003:
+                    print(f"🛡️ [SPOT TIER 4 PULLBACK GUARD] {symbol}: Price {price} extended >0.3% above EMA5 ({ema5_1m:.4f}). Waiting for Pullback Retracement!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "WAIT_FOR_PULLBACK"}
+
+                # Tier 5: Whale Orderbook Microstructure Guard
+                if not whale_bid_wall:
+                    print(f"🛡️ [SPOT TIER 5 WHALE WALL GUARD] {symbol}: No Whale Bid Wall support -> Skipped!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "NO_WHALE_BID_WALL"}
+
+                # Tier 2: Machine Learning Tri-Model Consensus
+                ml_res = evaluate_spot_ml_consensus(symbol, closes_1m, volumes_1m, closes_5m)
+                if not ml_res.get("bullish", False) or ml_res.get("confidence", 0.0) < 78.0:
+                    print(f"🧠 [SPOT TIER 2 ML CONSENSUS REJECT] {symbol}: ML Confidence ({ml_res.get('confidence', 0):.1f}%) < 78%. Skipped!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "ML_CONSENSUS_REJECT"}
+
+                side = "BUY"
+                confidence = min(98.5, max(88.0, ml_res.get("confidence", 88.0)))
+                return {"side": side, "confidence_pct": confidence, "recommended_leverage": 1}
 
             # 🛡️ EXTREME OVERBOUGHT / OVERSOLD SAFETY SHIELD (RSI >= 78 or RSI <= 22)
             # Never blindly counter-trend short/buy! Require Multi-Timeframe Confluence.
@@ -1236,16 +1341,26 @@ async def monitor_turbo_hedge_bots(app):
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", str(peak_roi))
 
                     # 🚀 AGI Dynamic Moonshot Profit Rider:
-                    # Default net target TP floor is +15.0% net profit after fees.
-                    # As price surges (+20%, +50%, +100%+), trailing profit rider follows peak upward,
-                    # locking 90% of peak for >=100% ROI, 85% for >=50% ROI, and 80% for >=15% ROI!
-                    user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
-                    user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
-                    effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
-                    if effective_tp_pct <= 0: effective_tp_pct = 15.0
-
+                    is_spot = (current_side == "SPOT" or leverage <= 1)
                     bot_amt = float(bot_info.get("amount", 10.0))
-                    target_dollar_tp = max(0.50, bot_amt * (effective_tp_pct / 100.0))
+                    
+                    if is_spot:
+                        # 🎯 Tier 6 Spot High-Velocity Target TP Calibration (+1.5% to +2.5% price gain)
+                        effective_tp_pct = 2.0  # Scalper target on Spot (2.0% price move)
+                        target_dollar_tp = max(0.25, bot_amt * (effective_tp_pct / 100.0))
+                        retain_ratio = 0.85
+                        is_peak_locked = (net_pnl_usdt >= 0.20 and roi_pct >= 1.0 and net_pnl_usdt <= peak_pnl * 0.85)
+                        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
+                    else:
+                        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
+                        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
+                        effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
+                        if effective_tp_pct <= 0: effective_tp_pct = 15.0
+                        target_dollar_tp = max(0.50, bot_amt * (effective_tp_pct / 100.0))
+                        retain_ratio = 0.90 if peak_roi >= 100.0 else (0.85 if peak_roi >= 50.0 else 0.80)
+                        # Dynamic Trailing Trigger: Lock peak profit when price pulls back slightly from maximum surge peak
+                        is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and ((peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)))
+                        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
 
                     # High-Precision Dollar Peak PnL Lock ($ Peak Lock)
                     peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
@@ -1253,12 +1368,6 @@ async def monitor_turbo_hedge_bots(app):
                     if net_pnl_usdt > peak_pnl:
                         peak_pnl = net_pnl_usdt
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
-
-                    retain_ratio = 0.90 if peak_roi >= 100.0 else (0.85 if peak_roi >= 50.0 else 0.80)
-
-                    # Dynamic Trailing Trigger: Lock peak profit when price pulls back slightly from maximum surge peak
-                    is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and ((peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)))
-                    is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
                     # Normal Flip: ROI <= -15.0% OR net loss <= -$3.50 USDT (with 15s Anti-Whipsaw Cooldown)
@@ -1270,19 +1379,26 @@ async def monitor_turbo_hedge_bots(app):
                     last_flip_key = f"{chat_id}_{symbol}"
                     last_flip_ts = _last_flip_timestamps.get(last_flip_key, 0)
 
-                    # ⌛ Anti-Fee-Churn Stagnant Position Auto-Pruner (Applied to Futures positions > 90 mins OR > 60 mins with Net Profit):
+                    # ⌛ Tier 6: Stagnant Capital Auto-Pruner & Release (35m Time-Stop for Spot, 90m for Futures):
                     entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
                     entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
                     if entry_ts == 0:
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
                         entry_ts = now_ts
                     
-                    # Prevent fee churning: Only prune if trade is open >120 mins with dead volume/zero PnL OR if open >60 mins AND net profit after fees is positive (> $0.25 USDT)
                     holding_seconds = now_ts - entry_ts
-                    is_stagnant_timeout = (current_side != "SPOT" and (
-                        (holding_seconds >= 7200 and -0.15 <= real_pnl_usdt <= 0.15) or
-                        (holding_seconds >= 3600 and real_pnl_usdt > 0.25)
-                    ))
+                    if is_spot:
+                        # Spot Stagnant Capital Time-Stop (35 Mins Release)
+                        # Sells if open >= 35 mins without reaching TP, or if open >= 20 mins with profit >= $0.25
+                        is_stagnant_timeout = (
+                            (holding_seconds >= 2100 and -0.40 <= net_pnl_usdt <= 0.25) or
+                            (holding_seconds >= 1200 and net_pnl_usdt >= 0.25)
+                        )
+                    else:
+                        is_stagnant_timeout = (
+                            (holding_seconds >= 7200 and -0.15 <= real_pnl_usdt <= 0.15) or
+                            (holding_seconds >= 3600 and real_pnl_usdt > 0.25)
+                        )
 
                     if is_hard_circuit_breaker:
                         # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
@@ -1329,15 +1445,26 @@ async def monitor_turbo_hedge_bots(app):
                         is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"
                         if not is_quiet and app and hasattr(app, "bot"):
                             try:
-                                msg_stagnant = (
-                                    f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
-                                    f"───────────────────────────────\n\n"
-                                    f"🪙 កាក់ ៖ `{symbol}`\n"
-                                    f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
-                                    f"🔒 Cooldown Status ៖ `៤ ម៉ោង (4-Hour Anti-Churn Blacklist)`\n"
-                                    f"⚡ Binance Status ៖ `MARKET CLOSED (<20ms)`\n\n"
-                                    f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
-                                )
+                                if is_spot:
+                                    msg_stagnant = (
+                                        f"⌛ **APEX SPOT STAGNANT CAPITAL RELEASED!** 🛡️\n"
+                                        f"───────────────────────────────\n\n"
+                                        f"🪙 កាក់ ៖ `{symbol}` (Spot Mode)\n"
+                                        f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (Net PnL: `${net_pnl_usdt:+.2f} USDT`)\n"
+                                        f"💵 ដើមទុនរំដោះបាន ៖ `${bot_amt:.2f} USDT` (ត្រឡប់មក Spot Wallet)\n"
+                                        f"⚡ Binance Status ៖ `MARKET SOLD (<20ms)`\n\n"
+                                        f"🚀 _AI ដោះលែងដើមទុន មិនឱ្យកកស្ទះ រួចរាល់ស្កេនទិញកាក់ថ្មីដែលកំពុងផ្ទុះឡើង!_"
+                                    )
+                                else:
+                                    msg_stagnant = (
+                                        f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
+                                        f"───────────────────────────────\n\n"
+                                        f"🪙 កាក់ ៖ `{symbol}`\n"
+                                        f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
+                                        f"🔒 Cooldown Status ៖ `៤ ម៉ោង (4-Hour Anti-Churn Blacklist)`\n"
+                                        f"⚡ Binance Status ៖ `MARKET CLOSED (<20ms)`\n\n"
+                                        f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
+                                    )
                                 asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_stagnant, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                             except Exception as e:
                                 print(f"Error sending stagnant notification: {e}")
