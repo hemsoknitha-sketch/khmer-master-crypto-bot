@@ -1927,25 +1927,6 @@ class TelegramBotThread(BaseThread):
                     await context.bot.send_message(chat_id=chat_id, text=current_msg, parse_mode="Markdown", reply_markup=reply_markup)
                 except Exception:
                     await context.bot.send_message(chat_id=chat_id, text=current_msg, reply_markup=reply_markup)
-            elif "🔴 SELL" in analysis_result or "BEARISH" in analysis_result.upper():
-                config = db.get_hedge_mode_config(chat_id)
-                if config["enabled"]:
-                    keys = db.get_user_api(chat_id)
-                    if keys:
-                        await context.bot.send_message(chat_id=chat_id, text=loc.get_text(user_lang, 'hedge_short_start', symbol=symbol), parse_mode="Markdown")
-                        import trading_engine
-                        import ml_predictor
-                        vol_tgt = await asyncio.to_thread(ml_predictor.get_vol_target, symbol)
-                        res = trading_engine.place_futures_short(keys[0], keys[1], symbol, config["amount"], config["leverage"], vol_target=vol_tgt)
-                        if "error" not in res and res.get("status") == "FILLED":
-                            db.add_active_short(chat_id, symbol, config["amount"], config["leverage"], res['price'])
-                            msg = loc.get_text(user_lang, 'hedge_short_success', symbol=symbol, price=res['price'], leverage=config['leverage'])
-                            await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                            self.log_signal.emit(f"🤖 Hedge Mode Executed for {chat_id}: SHORT {symbol}")
-                        else:
-                            error_msg = res.get("error", "Unknown error")
-                            msg = loc.get_text(user_lang, 'hedge_short_fail', error=error_msg)
-                            await context.bot.send_message(chat_id=chat_id, text=msg)
 
 
 
@@ -11079,7 +11060,6 @@ class TelegramBotThread(BaseThread):
 
         self.app.add_handler(CommandHandler("language", language_command))
         self.app.add_handler(CommandHandler("quiet", quiet_command))
-        self.app.add_handler(CommandHandler("silent", quiet_command))
         self.app.add_handler(CommandHandler("set_pin", set_pin_command))
         self.app.add_handler(CommandHandler("add_api", add_api_command))
         self.app.add_handler(CommandHandler("add_bybit_api", add_bybit_api_command))
