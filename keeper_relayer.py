@@ -14,6 +14,14 @@ import json
 import secrets
 import requests
 
+try:
+    from dotenv import load_dotenv
+    _env_f = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(_env_f):
+        load_dotenv(_env_f, override=True)
+except Exception:
+    pass
+
 # Graceful Web3 import shield: enables zero-dependency JSON-RPC queries even if web3 is not installed
 try:
     from web3 import Web3
@@ -137,19 +145,70 @@ class KeeperRelayerEngine:
 
     def _load_or_create_keeper_key(self) -> str:
         """
-        Loads Keeper Private Key from environment, or generates a fresh dedicated
-        key and persists to .env if not found.
+        Loads Keeper Private Key from environment or .env file.
+        If multiple candidate keys exist, automatically selects the one matching
+        the funded keeper address (0x3D1eef...) or possessing Arbitrum ETH gas.
         """
-        key = os.getenv("KEEPER_RELAYER_PRIVATE_KEY", "").strip()
-        if key and key.startswith("0x") and len(key) == 66:
-            return key
-        elif key and len(key) == 64:
-            return "0x" + key
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+        candidate_keys = []
 
-        # Generate a new cryptographically secure isolated keeper key
+        # 1. Read from os.environ
+        k_env = os.getenv("KEEPER_RELAYER_PRIVATE_KEY", "").strip()
+        if k_env:
+            fmt_k = k_env if k_env.startswith("0x") else "0x" + k_env
+            candidate_keys.append(fmt_k)
+
+        # 2. Read directly from .env file to collect all candidate keys
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        l = line.strip()
+                        if l.startswith("KEEPER_RELAYER_PRIVATE_KEY="):
+                            val = l.split("=", 1)[1].strip().strip('"').strip("'")
+                            if val:
+                                fmt_v = val if val.startswith("0x") else "0x" + val
+                                if fmt_v not in candidate_keys:
+                                    candidate_keys.append(fmt_v)
+            except Exception:
+                pass
+
+        if candidate_keys:
+            # Target funded address known on Arbitrum One
+            target_funded_addr = "0x3D1eef56843ABBDc5a6e9E46dDAA8CC76df453f9".lower()
+
+            if HAS_WEB3 and Account:
+                # Check for exact target address match
+                for ck in candidate_keys:
+                    try:
+                        acct = Account.from_key(ck)
+                        if acct.address.lower() == target_funded_addr:
+                            os.environ["KEEPER_RELAYER_PRIVATE_KEY"] = ck
+                            return ck
+                    except Exception:
+                        pass
+
+                # Check which key has Arbitrum ETH gas > 0
+                for ck in candidate_keys:
+                    try:
+                        acct = Account.from_key(ck)
+                        payload = {"jsonrpc": "2.0", "method": "eth_getBalance", "params": [acct.address, "latest"], "id": 1}
+                        r = requests.post(ARBITRUM_RPC_PRIMARY, json=payload, timeout=2.5).json()
+                        raw_bal = r.get("result", "0x0")
+                        if int(raw_bal, 16) > 0:
+                            os.environ["KEEPER_RELAYER_PRIVATE_KEY"] = ck
+                            return ck
+                    except Exception:
+                        pass
+
+            # Fallback to the first candidate key
+            chosen = candidate_keys[0]
+            os.environ["KEEPER_RELAYER_PRIVATE_KEY"] = chosen
+            return chosen
+
+        # Generate a new cryptographically secure isolated keeper key only if none exists
         fresh_key = "0x" + secrets.token_hex(32)
         try:
-            env_path = os.path.join(os.path.dirname(__file__), ".env")
             if os.path.exists(env_path):
                 with open(env_path, "a", encoding="utf-8") as f:
                     f.write(f"\n# Automated Dedicated Keeper Relayer Wallet (Arbitrum One)\nKEEPER_RELAYER_PRIVATE_KEY={fresh_key}\n")

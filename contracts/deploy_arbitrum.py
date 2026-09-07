@@ -14,6 +14,14 @@ root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
+try:
+    from dotenv import load_dotenv
+    _env_f = os.path.join(root_dir, ".env")
+    if os.path.exists(_env_f):
+        load_dotenv(_env_f, override=True)
+except Exception:
+    pass
+
 import json
 import time
 from web3 import Web3
