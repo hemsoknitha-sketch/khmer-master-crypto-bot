@@ -11068,19 +11068,14 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("keeper", keeper_command))
         self.app.add_handler(CommandHandler("flash_loan_keeper", keeper_command))
         self.app.add_handler(CommandHandler("set_web3_wallet", set_web3_wallet_command))
+        # 🌾 Institutional High-Yield & Arbitrage Engines (Dedicated Handlers, Zero-Duplicate)
         self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
-        self.app.add_handler(CommandHandler("auto_arb", funding_harvester_command))
-        self.app.add_handler(CommandHandler("turbo_yield", funding_harvester_command))
         self.app.add_handler(CommandHandler("whales", whales_command))
-        self.app.add_handler(CommandHandler("whale_radar", whales_command))
         self.app.add_handler(CommandHandler("infinity_matrix", infinity_grid_command))
-        self.app.add_handler(CommandHandler("infinity_grid", infinity_grid_command))
-        self.app.add_handler(CommandHandler("grid_bot", infinity_grid_command))
-        self.app.add_handler(CommandHandler("compound_grid", compound_grid_command))
         self.app.add_handler(CommandHandler("flash_crash", flash_crash_command))
+        self.app.add_handler(CommandHandler("gold_turbo", gold_turbo_command))
         self.app.add_handler(CommandHandler("gold_guard", gold_radar_command))
-        self.app.add_handler(CommandHandler("gold_radar", gold_radar_command))
 
         self.app.add_handler(CommandHandler("language", language_command))
         self.app.add_handler(CommandHandler("quiet", quiet_command))
@@ -11097,7 +11092,7 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("auto_trade", auto_trade_command))
 
         self.app.add_handler(CommandHandler("snipe", smart_listing_sniper_command))
-        self.app.add_handler(CommandHandler("auto_snipe", smart_listing_sniper_command))
+        self.app.add_handler(CommandHandler("auto_snipe", auto_snipe_command))
 
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
@@ -11240,7 +11235,6 @@ class TelegramBotThread(BaseThread):
 
         self.app.add_handler(CommandHandler("trailing_stop", trailing_stop_command))
         self.app.add_handler(CommandHandler("trailing_guard", trailing_guard_command))
-        self.app.add_handler(CommandHandler("gold_turbo", gold_turbo_command))
         self.app.add_handler(CommandHandler("paper_trading", paper_trading_command))
 
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -11278,6 +11272,10 @@ class TelegramBotThread(BaseThread):
                     BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
                     BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
                     BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
+                    BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
+                    BotCommand("gold_turbo", "🥇 PAXG Macro Gold Correlation Radar"),
+                    BotCommand("snipe", "🎯 Smart Listing Token Sniper"),
+                    BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
                     BotCommand("smart_trade", "🛒 Spot 6-Tier Breakout Engine"),
                     BotCommand("turbo_hedge", "🛡️ Futures Dual-Side Delta-Neutral Hedge"),
                     BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
