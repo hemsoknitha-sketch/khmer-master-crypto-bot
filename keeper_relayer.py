@@ -312,6 +312,36 @@ class KeeperRelayerEngine:
             "is_funded": bal_val > 0.0005,
             "explorer_url": f"{info['explorer']}{checksum_addr}"
         }
+
+        # Query ERC-20 Tokens if Arbitrum One (ARB Token & USDT)
+        if cid == "ARBITRUM":
+            arb_bal = 0.0
+            usdt_bal = 0.0
+            try:
+                rpc_target = info["rpc"][0]
+                # ARB Token: 0x912CE59144191C1204E64559FE8253a0e49E6548 (18 decimals)
+                data_arb = '0x70a08231' + checksum_addr[2:].lower().rjust(64, '0')
+                r_arb = requests.post(rpc_target, json={'jsonrpc': '2.0', 'method': 'eth_call', 'params': [{'to': '0x912CE59144191C1204E64559FE8253a0e49E6548', 'data': data_arb}, 'latest'], 'id': 2}, timeout=2.0).json()
+                res_arb = r_arb.get('result', '0x0')
+                if res_arb and res_arb != '0x':
+                    arb_bal = int(res_arb, 16) / (10**18)
+                
+                # USDT Token: 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9 (6 decimals)
+                data_usdt = '0x70a08231' + checksum_addr[2:].lower().rjust(64, '0')
+                r_usdt = requests.post(rpc_target, json={'jsonrpc': '2.0', 'method': 'eth_call', 'params': [{'to': '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', 'data': data_usdt}, 'latest'], 'id': 3}, timeout=2.0).json()
+                res_usdt = r_usdt.get('result', '0x0')
+                if res_usdt and res_usdt != '0x':
+                    usdt_bal = int(res_usdt, 16) / (10**6)
+            except Exception:
+                pass
+
+            arb_usd = round(arb_bal * 0.174, 2)
+            chain_data["arb_token_balance"] = round(arb_bal, 5)
+            chain_data["arb_token_usd"] = arb_usd
+            chain_data["usdt_token_balance"] = round(usdt_bal, 2)
+            usd_val = round(usd_val + arb_usd + usdt_bal, 2)
+            chain_data["usd_est"] = usd_val
+
         return cid, chain_data, usd_val
 
     def get_multichain_balances(self, address: str) -> dict:

@@ -1045,7 +1045,16 @@ class TelegramBotThread(BaseThread):
                     u_arb = user_multichain["chains"].get("ARBITRUM", {})
                     u_bsc = user_multichain["chains"].get("BSC", {})
                     u_eth = user_multichain["chains"].get("ETHEREUM", {})
-                    u_arb_str = f"`{u_arb.get('balance', 0.0)} ETH` (~${u_arb.get('usd_est', 0.0):.2f})"
+                    arb_eth = u_arb.get('balance', 0.0)
+                    arb_tok = u_arb.get('arb_token_balance', 0.0)
+                    arb_usdt = u_arb.get('usdt_token_balance', 0.0)
+                    token_extra = ""
+                    if arb_tok > 0:
+                        token_extra += f" | `{arb_tok:,.4f} ARB` (~${u_arb.get('arb_token_usd', 0.0):.2f})"
+                    if arb_usdt > 0:
+                        token_extra += f" | `${arb_usdt:,.2f} USDT`"
+
+                    u_arb_str = f"`{arb_eth} ETH`{token_extra} (~${u_arb.get('usd_est', 0.0):.2f})"
                     u_bsc_str = f"`{u_bsc.get('balance', 0.0)} BNB` (~${u_bsc.get('usd_est', 0.0):.2f})"
                     u_eth_str = f"`{u_eth.get('balance', 0.0)} ETH` (~${u_eth.get('usd_est', 0.0):.2f})"
                     u_tot_str = f"`~${user_multichain.get('total_usd', 0.0):.2f} USD`"
