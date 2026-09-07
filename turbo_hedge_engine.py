@@ -45,7 +45,46 @@ def is_symbol_in_cooldown(symbol: str) -> bool:
 def is_close_successful(res) -> bool:
     if not res or not isinstance(res, dict):
         return False
-    return res.get("status") in ["success", "FILLED", "NEW"] or res.get("closed") is True or res.get("orderId") is not None
+_monitoring_cache = set()
+_monitoring_cache_time = 0.0
+
+def get_binance_monitoring_symbols() -> set:
+    """
+    Fetches real-time Binance Monitoring Tag symbols from Binance's marketing API.
+    Guarantees strict zero-investment in high-risk / delisting surveillance coins.
+    """
+    global _monitoring_cache, _monitoring_cache_time
+    now = time.time()
+    if _monitoring_cache and (now - _monitoring_cache_time) < 1800.0:  # 30-min cache
+        return _monitoring_cache
+
+    symbols = set([
+        'ACTUSDT', 'ARKUSDT', 'AVAUSDT', 'AWEUSDT', 'BLURUSDT', 'COOKIEUSDT', 'DODOUSDT', 'EPICUSDT', 
+        'FTTUSDT', 'GLMRUSDT', 'GNSUSDT', 'GTCUSDT', 'HEIUSDT', 'JASMYUSDT', 'LSKUSDT', 'MOVEUSDT', 
+        'MOVRUSDT', 'NOMUSDT', 'PORTALUSDT', 'QIUSDT', 'QKCUSDT', 'QUICKUSDT', 'RAREUSDT', 'RESOLVUSDT', 
+        'SCRUSDT', 'SOPHUSDT', 'STXUSDT', 'SYNUSDT', 'TLMUSDT', 'TOWNSUSDT', 'VELODROMEUSDT', 'WIFUSDT'
+    ])
+    try:
+        url = "https://www.binance.com/bapi/composite/v1/public/marketing/symbol/list"
+        r = trading_engine.HFT_SESSION.get(url, timeout=4)
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            for item in data:
+                sym = item.get("symbol", "")
+                tags = [str(t).lower() for t in item.get("tags", [])]
+                tag_infos = [str(ti.get("tag", "")).lower() for ti in item.get("tagInfos", []) if isinstance(ti, dict)]
+                displays = [str(ti.get("display", "")).lower() for ti in item.get("tagInfos", []) if isinstance(ti, dict)]
+                combined = set(tags + tag_infos + displays)
+                if any("monitor" in t for t in combined):
+                    symbols.add(sym)
+            _monitoring_cache = symbols
+            _monitoring_cache_time = now
+            return symbols
+    except Exception as e:
+        print(f"⚠️ Notice fetching Binance monitoring symbols: {e}")
+    _monitoring_cache = symbols
+    _monitoring_cache_time = now
+    return symbols
 
 def get_active_high_velocity_coins(limit: int = 30) -> list:
     """
@@ -71,11 +110,14 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 "EPICUSDT", "USD1USDT"
             }
             EXCLUDED_SYMBOLS = TRADFI_STOCK_SYMBOLS
+            monitoring_set = get_binance_monitoring_symbols()
             for t in tickers:
                 sym = t.get("symbol", "")
                 if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS or not sym.isascii():
                     continue
                 if is_symbol_in_cooldown(sym):
+                    continue
+                if sym in monitoring_set:
                     continue
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
                 price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
@@ -135,13 +177,19 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                 "VOXELUSDT", "WINGUSDT", "WNXMUSDT", "YFIIUSDT", "ZECUSDT", "FTTUSDT", "LUNCUSDT", "USTCUSDT",
                 "BALUSDT", "FIROUSDT", "FISUSDT", "IDRTUSDT", "KP3RUSDT", "OAXUSDT"
             }
+            monitoring_set = get_binance_monitoring_symbols()
             for t in tickers:
                 sym = t.get("symbol", "")
                 if not sym.endswith("USDT") or "USDC" in sym or "BUSD" in sym or sym in EXCLUDED_SYMBOLS or not sym.isascii():
                     continue
                 if is_symbol_in_cooldown(sym):
                     continue
+                if sym in monitoring_set:
+                    print(f"🧹 [SPOT MONITORING TAG FILTER] Excluded {sym} (Active Binance Monitoring Tag)")
+                    continue
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
+                if quote_vol < 1000000.0:  # Fast filter: Skip low liquidity pairs immediately
+                    continue
                 price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
                 abs_change = abs(price_change_pct)
                 
@@ -154,8 +202,6 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                     continue
                 if not sym_info.get("isSpotTradingAllowed", True):
                     continue
-
-                if quote_vol >= 1000000.0:  # Include liquid spot pairs >= $1M volume
                     # Explosive Moonshot Breakout Scoring (+3.0% to +35.0% pump acceleration)
                     if 3.0 <= price_change_pct <= 35.0:
                         momentum_score = price_change_pct * 35.0
@@ -208,6 +254,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
     # 🛡️ Binance Spot Monitoring & Delisting Risk Safety Shield
     if is_spot_mode:
+        if symbol in get_binance_monitoring_symbols():
+            print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Active Binance Monitoring Tag)")
+            return {"side": "SKIP", "confidence_pct": 0.0, "reason": "MONITORING_TAGGED"}
         sym_info = trading_engine.get_symbol_info(symbol)
         if not sym_info or sym_info.get("status") != "TRADING" or not sym_info.get("isSpotTradingAllowed", True):
             print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Delisted or Not Trading on Binance)")
