@@ -2899,7 +2899,7 @@ class TelegramBotThread(BaseThread):
                             "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
                             "👉 **ទស្សន៍ទាយទិសដៅ K-Line 24h & ML Win-Rate (%) ៖**\n`` `/predict BTCUSDT` ``\n"
                             "`` `/predict SOL` ``\n"
-                            "`` `/analyze PAXG` ``"
+                            "`` `/predict PAXG` ``"
                         )
                     await (update.effective_message or update.message).reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
                     return
