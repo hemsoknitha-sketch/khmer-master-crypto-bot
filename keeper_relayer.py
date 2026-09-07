@@ -29,6 +29,34 @@ ARBITRUM_TOKENS = {
     "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
 }
 
+# Multi-Chain Gas & Balance Monitoring Infrastructure
+MULTICHAIN_NETWORKS = {
+    "ARBITRUM": {
+        "name": "Arbitrum One",
+        "rpc": ["https://arb1.arbitrum.io/rpc", "https://rpc.ankr.com/arbitrum"],
+        "symbol": "ETH",
+        "usd_rate": 2550.0,
+        "explorer": "https://arbiscan.io/address/",
+        "chain_id": 42161
+    },
+    "BSC": {
+        "name": "BNB Smart Chain",
+        "rpc": ["https://bsc-dataseed.binance.org/", "https://binance.llamarpc.com"],
+        "symbol": "BNB",
+        "usd_rate": 570.0,
+        "explorer": "https://bscscan.com/address/",
+        "chain_id": 56
+    },
+    "ETHEREUM": {
+        "name": "Ethereum Mainnet",
+        "rpc": ["https://ethereum-rpc.publicnode.com", "https://rpc.ankr.com/eth"],
+        "symbol": "ETH",
+        "usd_rate": 2550.0,
+        "explorer": "https://etherscan.io/address/",
+        "chain_id": 1
+    }
+}
+
 # Minimal ABI for AaveFlashLoanArbitrage
 FLASH_LOAN_CONTRACT_ABI = [
     {
@@ -145,6 +173,44 @@ class KeeperRelayerEngine:
             "rpc_connected": self.w3.is_connected() if self.w3 else False,
             "chain_id": ARBITRUM_CHAIN_ID
         }
+
+    def get_multichain_balances(self, address: str) -> dict:
+        """Queries live native gas balances across Arbitrum, BSC, and Ethereum."""
+        if not address or not address.startswith("0x") or len(address) != 42:
+            return {"address": address or "N/A", "chains": {}, "total_usd": 0.0}
+        
+        try:
+            checksum_addr = Web3.to_checksum_address(address.lower())
+        except Exception:
+            return {"address": address, "chains": {}, "total_usd": 0.0}
+
+        res = {"address": checksum_addr, "chains": {}, "total_usd": 0.0}
+        total_usd = 0.0
+
+        for cid, info in MULTICHAIN_NETWORKS.items():
+            bal_val = 0.0
+            for rpc_url in info["rpc"]:
+                try:
+                    w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={'timeout': 4}))
+                    bal_wei = w3.eth.get_balance(checksum_addr)
+                    bal_val = float(w3.from_wei(bal_wei, 'ether'))
+                    break
+                except Exception:
+                    continue
+
+            usd_val = round(bal_val * info["usd_rate"], 2)
+            total_usd += usd_val
+            res["chains"][cid] = {
+                "name": info["name"],
+                "symbol": info["symbol"],
+                "balance": round(bal_val, 6),
+                "usd_est": usd_val,
+                "is_funded": bal_val > 0.0005,
+                "explorer_url": f"{info['explorer']}{checksum_addr}"
+            }
+        
+        res["total_usd"] = round(total_usd, 2)
+        return res
 
     def execute_onchain_flash_loan(
         self,
