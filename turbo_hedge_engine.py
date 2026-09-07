@@ -249,7 +249,6 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                 if is_symbol_in_cooldown(sym):
                     continue
                 if sym in monitoring_set:
-                    print(f"🧹 [SPOT MONITORING TAG FILTER] Excluded {sym} (Active Binance Monitoring Tag)")
                     continue
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
                 if quote_vol < 3000000.0:  # Tier 1 Liquidity Shield: High liquidity blue-chips & utilities only (>= $3M)
@@ -262,7 +261,6 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                     continue
                 tags = [str(tg).upper() for tg in sym_info.get("tags", [])]
                 if any(tag_item in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for tag_item in tags):
-                    print(f"🧹 [SPOT MONITORING/DELIST FILTER] Excluded {sym} (Tagged as {tags})")
                     continue
                 if not sym_info.get("isSpotTradingAllowed", True):
                     continue
@@ -357,9 +355,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
     confidence = 50.0
     try:
         # Fetch 1m candles for short-term entry momentum
-        candles_1m = trading_engine.get_klines(symbol, interval="1m", limit=25)
+        candles_1m = trading_engine.get_klines(symbol, interval="1m", limit=25, is_spot=is_spot_mode)
         # Fetch 5m candles for higher timeframe trend confluence
-        candles_5m = trading_engine.get_klines(symbol, interval="5m", limit=30)
+        candles_5m = trading_engine.get_klines(symbol, interval="5m", limit=30, is_spot=is_spot_mode)
 
         if candles_1m and len(candles_1m) >= 15 and candles_5m and len(candles_5m) >= 20:
             closes_1m = [float(c[4]) for c in candles_1m]
@@ -407,11 +405,14 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 t_res = HFT_SESSION.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
                 if t_res.status_code == 200:
                     change_24h = float(t_res.json().get("priceChangePercent", 0.0))
-                fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
-                if fr_res.status_code == 200:
-                    funding_rate = float(fr_res.json().get("lastFundingRate", 0.0))
+                
+                if not is_spot_mode:
+                    fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
+                    if fr_res.status_code == 200:
+                        funding_rate = float(fr_res.json().get("lastFundingRate", 0.0))
 
-                d_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit=20", timeout=2)
+                depth_url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=20" if is_spot_mode else f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit=20"
+                d_res = HFT_SESSION.get(depth_url, timeout=2)
                 if d_res.status_code == 200:
                     d_data = d_res.json()
                     bids_val = sum([float(b[0]) * float(b[1]) for b in d_data.get("bids", [])])
@@ -439,7 +440,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 # Macro 15m Trend check
                 is_15m_bullish = True
                 try:
-                    candles_15m = trading_engine.get_klines(symbol, interval="15m", limit=20)
+                    candles_15m = trading_engine.get_klines(symbol, interval="15m", limit=20, is_spot=True)
                     if candles_15m and len(candles_15m) >= 15:
                         c_15m = [float(c[4]) for c in candles_15m]
                         is_15m_bullish = (sum(c_15m[-5:]) / 5.0) >= (sum(c_15m[-15:]) / 15.0)
@@ -1122,11 +1123,12 @@ async def monitor_turbo_hedge_bots(app):
             if len(_failed_candidate_symbols) > 10:
                 _failed_candidate_symbols.clear()
             if user_side_input == "SPOT":
-                top_coins = get_active_high_velocity_spot_coins(limit=100)
+                top_coins = get_active_high_velocity_spot_coins(limit=15)
             else:
-                top_coins = get_active_high_velocity_coins(limit=100)
+                top_coins = get_active_high_velocity_coins(limit=15)
 
-            for c_cand in top_coins:
+            for c_cand in top_coins[:10]:
+                await asyncio.sleep(0.02)
                 # 🛡️ STRICT IN-LOOP CAP CHECK: Re-evaluate active bot count before opening new trade
                 fresh_all = db.get_active_turbo_hedge_bots()
                 fresh_active = [b for b in fresh_all if b.get("chat_id") == target_chat_id]

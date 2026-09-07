@@ -66,6 +66,28 @@ FUTURES_URL = os.getenv("BINANCE_FUTURES_URL", "https://fapi.binance.com").rstri
 import math
 
 SYMBOL_INFO_CACHE = {}
+_full_exchange_info_loaded = False
+_full_exchange_info_time = 0
+
+def load_full_exchange_info():
+    """Pre-loads all Binance Spot exchangeInfo symbols once, eliminating hundreds of individual HTTP requests."""
+    global _full_exchange_info_loaded, _full_exchange_info_time
+    now = time.time()
+    if _full_exchange_info_loaded and (now - _full_exchange_info_time) < 3600.0:
+        return
+    try:
+        url = f"{BASE_URL}/api/v3/exchangeInfo"
+        res = HFT_SESSION.get(url, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            for s in data.get('symbols', []):
+                sym = s.get('symbol')
+                if sym:
+                    SYMBOL_INFO_CACHE[sym] = s
+            _full_exchange_info_loaded = True
+            _full_exchange_info_time = now
+    except Exception as e:
+        print(f"Notice pre-loading exchange info: {e}")
 
 def get_symbol_info(symbol):
     if not symbol:
@@ -75,9 +97,15 @@ def get_symbol_info(symbol):
     symbol = symbol.upper().strip()
     if symbol in SYMBOL_INFO_CACHE:
         return SYMBOL_INFO_CACHE[symbol]
+    
+    if not _full_exchange_info_loaded:
+        load_full_exchange_info()
+        if symbol in SYMBOL_INFO_CACHE:
+            return SYMBOL_INFO_CACHE[symbol]
+
     try:
         url = f"{BASE_URL}/api/v3/exchangeInfo?symbol={symbol}"
-        res = requests.get(url, timeout=5)
+        res = HFT_SESSION.get(url, timeout=3)
         if res.status_code == 200:
             data = res.json()
             if data.get('symbols'):
@@ -85,17 +113,33 @@ def get_symbol_info(symbol):
                 return SYMBOL_INFO_CACHE[symbol]
     except Exception as e:
         print(f"Failed to fetch exchangeInfo for {symbol}: {e}")
+    return None
+
 _klines_cache = {}
 _klines_cache_time = {}
 
-def get_klines(symbol: str, interval: str = "1m", limit: int = 25):
+def get_klines(symbol: str, interval: str = "1m", limit: int = 25, is_spot: bool = False):
     """Fetches Binance spot/futures klines safely with 3s TTL cache and sub-second execution."""
     if not symbol: return []
     symbol = str(symbol).upper().strip()
-    cache_key = f"{symbol}_{interval}_{limit}"
+    cache_key = f"{symbol}_{interval}_{limit}_{is_spot}"
     now = time.time()
     if cache_key in _klines_cache and (now - _klines_cache_time.get(cache_key, 0)) < 3.0:
         return _klines_cache[cache_key]
+
+    if is_spot:
+        try:
+            url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+            res = HFT_SESSION.get(url, timeout=1.5)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list) and data:
+                    _klines_cache[cache_key] = data
+                    _klines_cache_time[cache_key] = now
+                    return data
+        except Exception:
+            pass
+        return _klines_cache.get(cache_key, [])
 
     try:
         url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
