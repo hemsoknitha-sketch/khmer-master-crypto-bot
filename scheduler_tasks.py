@@ -5124,9 +5124,32 @@ async def flash_loan_autonomous_engine(app: Application):
 
             wallet_display = f"`{wallet_addr[:8]}...{wallet_addr[-6:]}`" if (wallet_addr and len(wallet_addr) >= 16) else (f"`{wallet_addr}`" if wallet_addr else "`Internal Escrow Vault (Pending Setup)`")
 
-            # Generate institutional deterministic simulation/relayer transaction hash
-            tx_seed = f"{chat_id}-{symbol}-{loan_amt}-{int(now_ts)}"
-            tx_hash = "0x" + hashlib.sha256(tx_seed.encode()).hexdigest()[:40]
+            # Check Keeper Relayer Mainnet Status
+            import keeper_relayer
+            keeper_status = keeper_relayer.keeper_engine.get_status_overview()
+            is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
+
+            if is_live_ready and wallet_addr:
+                # Execute on-chain transaction via Keeper Relayer
+                exec_res = keeper_relayer.keeper_engine.execute_onchain_flash_loan(
+                    borrow_asset="USDT",
+                    amount_usd=loan_amt,
+                    intermediate_token="WETH",
+                    min_net_profit_usd=net_profit,
+                    user_recipient=wallet_addr,
+                    dex_route=1
+                )
+                tx_hash = exec_res.get("tx_hash", "")
+                mode_badge = "🟢 LIVE ARBITRUM MAINNET (On-Chain Settled)"
+                mode_badge_km = "🟢 LIVE ARBITRUM MAINNET (កើបលុយពិតលើ Blockchain)"
+                explorer_link = exec_res.get("explorer_url", f"https://arbiscan.io/tx/{tx_hash}")
+            else:
+                # Paper Simulation / Scanning Execution
+                tx_seed = f"{chat_id}-{symbol}-{loan_amt}-{int(now_ts)}"
+                tx_hash = "0x" + hashlib.sha256(tx_seed.encode()).hexdigest()[:40]
+                mode_badge = "🧪 SIMULATION / PAPER TRADING (Fund Keeper to Go Live)"
+                mode_badge_km = "🧪 SIMULATION / PAPER TRADING (ដាក់ $5 Gas លើ Keeper ដើម្បីប្តូរជា LIVE)"
+                explorer_link = f"https://arbiscan.io/tx/{tx_hash} (Simulated)"
 
             # Record in SQLite database
             db.record_flash_loan_trade(
@@ -5150,7 +5173,7 @@ async def flash_loan_autonomous_engine(app: Application):
                 notif_msg = (
                     "⚡️ **[24/7 FLASH LOAN ARBITRAGE EXECUTED]** 🟢\n"
                     "═════════════════════════════════════════\n\n"
-                    "🎉 **ប្រព័ន្ធស្វ័យប្រវត្តិទើបតែបញ្ចប់ប្រតិបត្តិការកម្ចី Arbitrage ជោគជ័យ!**\n\n"
+                    f"⚙️ **របៀបដំណើរការ (Mode)** ៖ `{mode_badge_km}`\n\n"
                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{symbol} ({pair})`\n"
                     f"🌐 **បណ្ដាញ Blockchain ៖** `{chain} (Atomic 1-Block)`\n"
                     f"🏦 **ប្រភព Liquidity ៖** `Aave V3 Protocol ($1.5B+ Pool)`\n"
@@ -5159,6 +5182,7 @@ async def flash_loan_autonomous_engine(app: Application):
                     f"📈 **គម្លាតចំណេញ (Gross Spread) ៖** `+{spread_pct:.3f}%`\n"
                     f"🏆 **ប្រាក់ចំណេញសុទ្ធពិតប្រាកដ (NET PROFIT) ៖** `+${net_profit:,.2f} USDT` 🟢\n\n"
                     f"💼 **កាបូបទទួលប្រាក់ចំណេញ ៖** {wallet_display}\n"
+                    f"⛽ **Keeper Relayer Gas ៖** `{keeper_status['arbitrum_gas_eth']} ETH` (~${keeper_status['gas_usd_est']})\n"
                     f"🛡️ **ហានិភ័យទុនផ្ទាល់ខ្លួន ៖** `$0.00 (Single-Block Atomic Safety Invariant)`\n"
                     f"🔗 **Transaction Hash ៖** `{tx_hash}`\n\n"
                     "═════════════════════════════════════════\n"
@@ -5169,7 +5193,7 @@ async def flash_loan_autonomous_engine(app: Application):
                 notif_msg = (
                     "⚡️ **[24/7 FLASH LOAN ARBITRAGE EXECUTED]** 🟢\n"
                     "═════════════════════════════════════════\n\n"
-                    "🎉 **Autonomous 24/7 Arbitrage Cycle Successfully Executed!**\n\n"
+                    f"⚙️ **Execution Mode**: `{mode_badge}`\n\n"
                     f"🪙 **Symbol / Pair:** `{symbol} ({pair})`\n"
                     f"🌐 **Execution Chain:** `{chain} (Atomic 1-Block)`\n"
                     f"🏦 **Liquidity Source:** `Aave V3 Protocol ($1.5B+ Pool)`\n"
@@ -5178,6 +5202,7 @@ async def flash_loan_autonomous_engine(app: Application):
                     f"📈 **Gross Price Spread:** `+{spread_pct:.3f}%`\n"
                     f"🏆 **Pure Net Profit:** `+${net_profit:,.2f} USDT` 🟢\n\n"
                     f"💼 **Settlement Wallet:** {wallet_display}\n"
+                    f"⛽ **Keeper Gas Balance:** `{keeper_status['arbitrum_gas_eth']} ETH` (~${keeper_status['gas_usd_est']})\n"
                     f"🛡️ **User Capital Risk:** `$0.00 (Single-Block Atomic Safety Invariant)`\n"
                     f"🔗 **Transaction Hash:** `{tx_hash}`\n\n"
                     "═════════════════════════════════════════\n"

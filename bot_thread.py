@@ -756,13 +756,14 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton("📜 Execution History", callback_data="btn_flash_loan_history"),
-                    InlineKeyboardButton("💼 Multi-Chain Wallets", callback_data="btn_set_web3_prompt")
+                    InlineKeyboardButton("⛽ Keeper Gas Wallet", callback_data="btn_flash_loan_keeper")
                 ],
                 [
-                    InlineKeyboardButton("⚡ CEX Cross-Arb (<5ms)", callback_data="btn_cross_arb"),
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
+                    InlineKeyboardButton("💼 Multi-Chain Wallets", callback_data="btn_set_web3_prompt"),
+                    InlineKeyboardButton("⚡ CEX Cross-Arb (<5ms)", callback_data="btn_cross_arb")
                 ],
                 [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
                     InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ])
@@ -987,6 +988,60 @@ class TelegramBotThread(BaseThread):
                 sent_hist = await send_reply_or_edit(update, context, hist_msg)
                 return
 
+            # Sub-action: KEEPER RELAYER (/flash_loan KEEPER or callback)
+            if (args and args[0].upper() in ["KEEPER", "RELAYER"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_keeper"):
+                import keeper_relayer
+                keeper_info = keeper_relayer.keeper_engine.get_status_overview()
+                kp_addr = keeper_info["keeper_address"]
+                kp_gas = keeper_info["arbitrum_gas_eth"]
+                kp_usd = keeper_info["gas_usd_est"]
+                kp_funded = keeper_info["is_funded"]
+                kp_mode = keeper_info["execution_mode"]
+                contract_addr = keeper_info["contract_address"]
+
+                fund_badge_km = "🟢 ពេញលេញ (LIVE READY 100%)" if kp_funded else "⚪ រង់ចាំដាក់ Gas ($5-$10 ETH)"
+                fund_badge_en = "🟢 FULLY FUNDED (LIVE READY)" if kp_funded else "⚪ PENDING GAS ($5-$10 ETH)"
+
+                if user_lang == 'km':
+                    kp_msg = (
+                        "⛽ **KEEPER RELAYER WALLET & LIVE MAINNET SETUP** ⛽\n"
+                        "═════════════════════════════════════════\n\n"
+                        "🛡️ **គោលការណ៍សុវត្ថិភាពខ្ពស់បំផុត (Zero Key Risk) ៖**\n"
+                        "• កាបូបមេ MetaMask របស់អ្នក **មិនដែលត្រូវបានសុំ Private Key ឡើយ**!\n"
+                        "• កាបូប Keeper ខាងក្រោមនេះ គឺជាកាបូបដាច់ដោយឡែករបស់ Bot ដែលមាននាទីត្រឹមតែ **ចុះហត្ថលេខាបាញ់កូដលើ Blockchain និងបង់ថ្លៃ Gas ជំនួសលោកអ្នក**!\n\n"
+                        f"📬 **អាសយដ្ឋានកាបូប Keeper Relayer ៖**\n`{kp_addr}`\n\n"
+                        f"⛽ **សមតុល្យ Gas លើ Arbitrum One ៖** `{kp_gas} ETH` (~${kp_usd} USD)\n"
+                        f"📡 **ស្ថានភាពបច្ចុប្បន្ន ៖** `{fund_badge_km}`\n"
+                        f"⚙️ **របៀបប្រតិបត្តិការ ៖** `{kp_mode}`\n"
+                        f"📜 **Aave V3 Smart Contract ៖** `{contract_addr}`\n\n"
+                        "═════════════════════════════════════════\n"
+                        "💡 **ការណែនាំដើម្បីបើកដំណើរការកើបលុយពិត (Go Live) ៖**\n"
+                        "1. ផ្ញើប្រាក់ចំនួន `$5 ទៅ $10` ជា **ETH លើបណ្តាញ Arbitrum One** ទៅកាន់អាសយដ្ឋាន Keeper ខាងលើ។\n"
+                        "2. នៅពេលមាន Gas លើ Keeper ហើយ Bot នឹងប្តូរពី Paper Simulation ទៅជា **Live Mainnet Arbitrage** ស្វ័យប្រវត្តិ!\n"
+                        f"3. រាល់ពេលចំណេញ Smart Contract នឹងផ្ទេរ Net Profit ជា USDT ត្រង់ចូល MetaMask របស់អ្នក ({wallet_display})!"
+                    )
+                else:
+                    kp_msg = (
+                        "⛽ **KEEPER RELAYER WALLET & LIVE MAINNET SETUP** ⛽\n"
+                        "═════════════════════════════════════════\n\n"
+                        "🛡️ **Zero Private Key Risk Architecture:**\n"
+                        "• Your personal MetaMask wallet private key is NEVER required or stored!\n"
+                        "• The Keeper Wallet below is an isolated worker bot wallet whose sole purpose is signing on-chain transactions and paying network gas on your behalf!\n\n"
+                        f"📬 **Dedicated Keeper Relayer Address:**\n`{kp_addr}`\n\n"
+                        f"⛽ **Arbitrum Gas Balance:** `{kp_gas} ETH` (~${kp_usd} USD)\n"
+                        f"📡 **Status:** `{fund_badge_en}`\n"
+                        f"⚙️ **Execution Mode:** `{kp_mode}`\n"
+                        f"📜 **Aave V3 Smart Contract:** `{contract_addr}`\n\n"
+                        "═════════════════════════════════════════\n"
+                        "💡 **How to Activate Live Mainnet Profits:**\n"
+                        "1. Deposit `$5 to $10` worth of **ETH on Arbitrum One** to the Keeper address above.\n"
+                        "2. Once funded, the engine transitions from Paper Simulation to **Live Mainnet Flash Loans** automatically!\n"
+                        f"3. All net arbitrage profits are routed directly to your MetaMask ({wallet_display})!"
+                    )
+
+                sent_kp = await send_reply_or_edit(update, context, kp_msg)
+                return
+
             # Sub-action: SIMULATION (/flash_loan SIM or callback)
             if (args and args[0].upper() == "SIM") or (update.callback_query and update.callback_query.data == "btn_flash_loan_sim"):
                 sim_amt = 1000000.0
@@ -1149,6 +1204,7 @@ class TelegramBotThread(BaseThread):
                     "📋 **ទម្រង់ពាក្យបញ្ជា 1-TAP EXECUTIONS ៖**\n\n"
                     "👉 **បើក/បិទ Flash Loan Arbitrage 24/7 ស្វ័យប្រវត្តិ ៖**\n`` `/flash_loan 24/7` `` ឬ `` `/flash_loan AUTO ON` ``\n\n"
                     "👉 **ពិនិត្យប្រវត្តិជួញដូរ និងប្រាក់ចំណេញសរុប ៖**\n`` `/flash_loan HISTORY` ``\n\n"
+                    "👉 **ពិនិត្យកាបូប Keeper Relayer Gas (Live Mode) ៖**\n`` `/flash_loan KEEPER` ``\n\n"
                     "👉 **ពិនិត្យស្ថានភាពយុទ្ធសាស្ត្រទាំង ៤ ៖**\n`` `/flash_loan STRATEGY` ``\n\n"
                     "👉 **ស្កេន CeDeFi (Binance vs DEX) Spreads ៖**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **ធ្វើតេស្តសាកល្បងកម្ចី Flash Loan $1M (0% Risk) ៖**\n`` `/flash_loan SIM 1000000` ``\n\n"
@@ -1174,6 +1230,7 @@ class TelegramBotThread(BaseThread):
                     "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
                     "👉 **Toggle 24/7 Autonomous Flash Loan Mode:**\n`` `/flash_loan 24/7` `` or `` `/flash_loan AUTO ON` ``\n\n"
                     "👉 **View Execution History & Profit Ledger:**\n`` `/flash_loan HISTORY` ``\n\n"
+                    "👉 **Inspect Keeper Relayer Gas (Live Mode):**\n`` `/flash_loan KEEPER` ``\n\n"
                     "👉 **Inspect 4 Strategies Diagnostics:**\n`` `/flash_loan STRATEGY` ``\n\n"
                     "👉 **Scan CeDeFi (Binance vs DEX) Spreads:**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **Simulate $1M Flash Loan Execution (Zero Risk):**\n`` `/flash_loan SIM 1000000` ``\n\n"
@@ -3951,6 +4008,9 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_history":
                 context.args = ["HISTORY"]
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_keeper":
+                context.args = ["KEEPER"]
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_auto_on":
                 context.args = ["AUTO", "ON"]
