@@ -5085,11 +5085,13 @@ async def flash_loan_autonomous_engine(app: Application):
         if not cedefi_items:
             return
 
-        # Find top profitable opportunity with spread hurdle >= 0.42%
-        profitable_items = [it for it in cedefi_items if it.get("gross_spread_pct", 0.0) >= 0.42 and it.get("net_profit_usd", 0.0) > 0.0]
-        if not profitable_items:
-            # Fallback to general profitable item if scanning
-            profitable_items = [it for it in cedefi_items if it.get("net_profit_usd", 0.0) > 0.0]
+        # Check if Keeper is live ready to enforce strict live gas preservation
+        import keeper_relayer
+        is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
+
+        # For Live Mainnet, require gross spread >= 0.45% to cover all DEX fees and slippage
+        min_hurdle = 0.45 if is_live_ready else 0.20
+        profitable_items = [it for it in cedefi_items if it.get("gross_spread_pct", 0.0) >= min_hurdle and it.get("net_profit_usd", 0.0) > 0.0]
         if not profitable_items:
             return
 
