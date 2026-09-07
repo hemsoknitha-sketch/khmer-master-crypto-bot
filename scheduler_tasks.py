@@ -5095,26 +5095,32 @@ async def flash_loan_autonomous_engine(app: Application):
         if not profitable_items:
             return
 
-        top_op = profitable_items[0]
-        net_profit = top_op.get("net_profit_usd", 0.0)
-        symbol = top_op.get("symbol", "ETHUSDT")
-        pair = top_op.get("pair", "WETH/USDT")
-        borrow_asset = top_op.get("borrow_asset", "USDT")
-        intermediate_token = top_op.get("intermediate_token", top_op.get("token", "WETH"))
-        chain = top_op.get("chain", "ARBITRUM")
-        loan_amt = top_op.get("optimal_loan_usd", 50000.0)
-        spread_pct = top_op.get("gross_spread_pct", 0.28)
-        dex_source = top_op.get("dex_source", "Uniswap V3")
-        pool_fee_val = top_op.get("pool_fee", 500)
-        dex_route_val = top_op.get("dex_route", 1)
+        import random
+        # 🌐 Multi-User Fair Distribution: Shuffle users and match across profitable pool opportunities
+        active_user_list = list(auto_users)
+        random.shuffle(active_user_list)
 
         now_ts = time.time()
 
-        for chat_id in auto_users:
+        for user_idx, chat_id in enumerate(active_user_list):
             # 10-minute cooldown per user to prevent notification flooding
             last_exec = FLASH_LOAN_USER_LAST_EXEC.get(chat_id, 0.0)
             if now_ts - last_exec < 600.0:
                 continue
+
+            # Fairly assign opportunity across multiple discovered pools
+            top_op = profitable_items[user_idx % len(profitable_items)]
+            net_profit = top_op.get("net_profit_usd", 0.0)
+            symbol = top_op.get("symbol", "ETHUSDT")
+            pair = top_op.get("pair", "WETH/USDT")
+            borrow_asset = top_op.get("borrow_asset", "USDT")
+            intermediate_token = top_op.get("intermediate_token", top_op.get("token", "WETH"))
+            chain = top_op.get("chain", "ARBITRUM")
+            loan_amt = top_op.get("optimal_loan_usd", 50000.0)
+            spread_pct = top_op.get("gross_spread_pct", 0.28)
+            dex_source = top_op.get("dex_source", "Uniswap V3")
+            pool_fee_val = top_op.get("pool_fee", 500)
+            dex_route_val = top_op.get("dex_route", 1)
 
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km').lower().strip()
