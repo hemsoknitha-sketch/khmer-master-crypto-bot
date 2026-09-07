@@ -1359,7 +1359,7 @@ def detect_wallet_chain(address: str) -> tuple:
     clean = str(address or "").strip()
     if clean.startswith("0x") and len(clean) == 42:
         return ("EVM", "EVM Multi-Chain (ETH, BNB, Arbitrum, Base, Linea, Monad, OP, Polygon)")
-    elif clean.startswith("T") and len(clean) == 34:
+    elif clean.startswith("T") and 33 <= len(clean) <= 35:
         return ("TRON", "TRON Network (TRX / TRC-20 USDT)")
     elif clean.startswith("bc1") or (clean.startswith(("1", "3")) and 26 <= len(clean) <= 35):
         return ("BITCOIN", "Bitcoin Network (BTC Native SegWit / Taproot)")

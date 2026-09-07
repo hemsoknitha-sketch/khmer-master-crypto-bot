@@ -71,12 +71,12 @@ class FlashLoanMEVEngine:
 
         # Liquidity Pool Anchors for Optimal Sizing & Depth Analysis
         self.pool_liquidity_depths = {
-            "WETH/USDT": {"tvl": 450_000_000, "max_safe_borrow": 2_500_000, "slippage_factor": 0.00000004},
-            "WBTC/USDT": {"tvl": 320_000_000, "max_safe_borrow": 2_000_000, "slippage_factor": 0.00000005},
-            "BNB/USDT":  {"tvl": 180_000_000, "max_safe_borrow": 1_200_000, "slippage_factor": 0.00000009},
-            "SOL/USDT":  {"tvl": 150_000_000, "max_safe_borrow": 1_000_000, "slippage_factor": 0.00000010},
-            "PAXG/USDT": {"tvl":  80_000_000, "max_safe_borrow":   500_000, "slippage_factor": 0.00000015},
-            "ARB/USDT":  {"tvl":  65_000_000, "max_safe_borrow":   400_000, "slippage_factor": 0.00000020}
+            "WETH/USDT": {"tvl": 450_000_000, "max_safe_borrow": 2_500_000, "slippage_factor": 0.0000000005},
+            "WBTC/USDT": {"tvl": 320_000_000, "max_safe_borrow": 2_000_000, "slippage_factor": 0.0000000008},
+            "BNB/USDT":  {"tvl": 180_000_000, "max_safe_borrow": 1_200_000, "slippage_factor": 0.0000000012},
+            "SOL/USDT":  {"tvl": 150_000_000, "max_safe_borrow": 1_000_000, "slippage_factor": 0.0000000015},
+            "PAXG/USDT": {"tvl":  80_000_000, "max_safe_borrow":   500_000, "slippage_factor": 0.0000000025},
+            "ARB/USDT":  {"tvl":  65_000_000, "max_safe_borrow":   400_000, "slippage_factor": 0.0000000030}
         }
 
         self.aave_fee_rate = 0.0005  # 0.05% Aave V3 Flash Loan Premium
