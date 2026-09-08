@@ -159,7 +159,7 @@ class KeeperRelayerEngine:
 
         # 1. Read from os.environ
         k_env = os.getenv("KEEPER_RELAYER_PRIVATE_KEY", "").strip()
-        if k_env:
+        if k_env and not k_env.startswith("PASTE_"):
             fmt_k = k_env if k_env.startswith("0x") else "0x" + k_env
             candidate_keys.append(fmt_k)
 
@@ -171,7 +171,7 @@ class KeeperRelayerEngine:
                         l = line.strip()
                         if l.startswith("KEEPER_RELAYER_PRIVATE_KEY="):
                             val = l.split("=", 1)[1].strip().strip('"').strip("'")
-                            if val:
+                            if val and not val.startswith("PASTE_"):
                                 fmt_v = val if val.startswith("0x") else "0x" + val
                                 if fmt_v not in candidate_keys:
                                     candidate_keys.append(fmt_v)
@@ -211,15 +211,9 @@ class KeeperRelayerEngine:
             os.environ["KEEPER_RELAYER_PRIVATE_KEY"] = chosen
             return chosen
 
-        # Generate a new cryptographically secure isolated keeper key only if none exists
+        # Return fallback key in-memory without corrupting or spamming .env file
         fresh_key = "0x" + secrets.token_hex(32)
-        try:
-            if os.path.exists(env_path):
-                with open(env_path, "a", encoding="utf-8") as f:
-                    f.write(f"\n# Automated Dedicated Keeper Relayer Wallet (Arbitrum One)\nKEEPER_RELAYER_PRIVATE_KEY={fresh_key}\n")
-            os.environ["KEEPER_RELAYER_PRIVATE_KEY"] = fresh_key
-        except Exception as e:
-            print(f"Notice saving keeper key to .env: {e}")
+        os.environ["KEEPER_RELAYER_PRIVATE_KEY"] = fresh_key
         return fresh_key
 
     def get_keeper_gas_balance(self) -> float:
