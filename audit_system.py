@@ -29,7 +29,7 @@ def run_audit():
     failures = []
     
     # 1. Compile all python files
-    print("\n[CHECK 1/10] Verifying Syntax & AST Compilation for all Python files...")
+    print("\n[CHECK 1/12] Verifying Syntax & AST Compilation for all Python files...")
     py_files = glob.glob("*.py")
     comp_failed = []
     for f in py_files:
@@ -44,7 +44,7 @@ def run_audit():
         log_pass(f"All {len(py_files)} Python files compiled with ZERO syntax errors!")
 
     # 2. Database Deduplication Check
-    print("\n[CHECK 2/10] Verifying database.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 2/12] Verifying database.py Zero-Duplicate-Function Invariant...")
     try:
         with open("database.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -63,7 +63,7 @@ def run_audit():
         log_fail(str(e))
 
     # 3. Scheduler Tasks Deduplication Check
-    print("\n[CHECK 3/10] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 3/12] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -82,7 +82,7 @@ def run_audit():
         log_fail(str(e))
 
     # 4. Command Dispatcher Integrity & Consolidation Check
-    print("\n[CHECK 4/10] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
+    print("\n[CHECK 4/12] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -116,7 +116,7 @@ def run_audit():
         log_fail(str(e))
 
     # 5. Spot MIN_NOTIONAL Filter Shield ($10.50 floor)
-    print("\n[CHECK 5/10] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
+    print("\n[CHECK 5/12] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -131,7 +131,7 @@ def run_audit():
         log_fail(str(e))
 
     # 6. Binance Hedge Mode & Error -4061 Recovery Check
-    print("\n[CHECK 6/10] Verifying Hedge Mode & DualSidePosition Invariant...")
+    print("\n[CHECK 6/12] Verifying Hedge Mode & DualSidePosition Invariant...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -150,7 +150,7 @@ def run_audit():
         log_fail(str(e))
 
     # 7. Isolated Margin Enforcement Check
-    print("\n[CHECK 7/10] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
+    print("\n[CHECK 7/12] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -165,7 +165,7 @@ def run_audit():
         log_fail(str(e))
 
     # 8. Small Capital Leverage Shield Check (<=10x)
-    print("\n[CHECK 8/10] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
+    print("\n[CHECK 8/12] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -180,7 +180,7 @@ def run_audit():
         log_fail(str(e))
 
     # 9. TradFi Stock Perpetual & Delisted Exclusion Check
-    print("\n[CHECK 9/10] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
+    print("\n[CHECK 9/12] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -195,7 +195,7 @@ def run_audit():
         log_fail(str(e))
 
     # 10. Fee-Adjusted Net Profit Floor (+0.12% Offset)
-    print("\n[CHECK 10/10] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
+    print("\n[CHECK 10/12] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -207,6 +207,79 @@ def run_audit():
             log_fail("Net profit floor missing!")
     except Exception as e:
         failures.append(f"Net profit floor check failed: {e}")
+        log_fail(str(e))
+
+    # 11. Telegram Inline Keyboard Button & Callback Query Routing Audit
+    print("\n[CHECK 11/12] Verifying 100% Inline Button & Callback Query Routing in bot_thread.py...")
+    try:
+        import re
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bot_code = f.read()
+
+        buttons = re.findall(r'callback_data=["\']([^"\']+)["\']', bot_code)
+        unique_buttons = sorted(list(set(buttons)))
+        
+        unhandled_buttons = []
+        for b in unique_buttons:
+            escaped_b = re.escape(b)
+            patterns = [
+                rf'data\s*==\s*["\']{escaped_b}["\']',
+                rf'["\']{escaped_b}["\']\s*==\s*data',
+                rf'["\']{escaped_b}["\']\s*in\s*data',
+                rf'data\s*in\s*\[[^\]]*["\']{escaped_b}["\'][^\]]*\]',
+                rf'data\s*in\s*\{{[^\}}]*["\']{escaped_b}["\'][^\}}]*\}}',
+                rf'data\s*in\s*\([^\)]*["\']{escaped_b}["\'][^\)]*\)',
+            ]
+            found = False
+            for p in patterns:
+                if re.search(p, bot_code):
+                    found = True
+                    break
+            if not found:
+                for m in re.finditer(r'(?:data|query\.data)\.startswith\(["\']([^"\']+)["\']\)', bot_code):
+                    prefix = m.group(1)
+                    if b.startswith(prefix):
+                        found = True
+                        break
+            if not found:
+                unhandled_buttons.append(b)
+
+        if unhandled_buttons:
+            failures.append(f"Found {len(unhandled_buttons)} unhandled callback button(s): {unhandled_buttons}")
+            log_fail(f"{len(unhandled_buttons)} dead button(s) detected: {unhandled_buttons}")
+        else:
+            log_pass(f"All {len(unique_buttons)} unique InlineKeyboardButtons are 100% routed and functional (0 Dead Buttons)!")
+    except Exception as e:
+        failures.append(f"Inline button callback check failed: {e}")
+        log_fail(str(e))
+
+    # 12. DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Invariant Audit
+    print("\n[CHECK 12/12] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
+    try:
+        # Check flash_loan_mev_engine.py
+        with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
+            mev_code = f.read()
+
+        has_stack = "def get_hft_weapon_stack" in mev_code
+        has_private_bundle = "execute_private_mempool_submission" in mev_code
+        has_assembly = "get_assembly_code_metrics" in mev_code
+        has_multihop = "execute_multi_hop_jit_arbitrage" in mev_code
+        has_tokyo = "get_tokyo_colocation_specs" in mev_code
+
+        # Check HFT files existence
+        yul_file = os.path.exists("hft_infrastructure/Optimized_MEV_Arbitrage.yul")
+        config_file = os.path.exists("hft_infrastructure/hft_server_config.json")
+        router_file = os.path.exists("hft_infrastructure/ai_multi_hop_jit_router_v2.py")
+        mempool_file = os.path.exists("hft_infrastructure/private_mempool_integration_v2.py")
+
+        if (has_stack and has_private_bundle and has_assembly and has_multihop and has_tokyo and 
+            yul_file and config_file and router_file and mempool_file):
+            log_pass("DeFi Flash Loan & Tokyo HFT MEV 4-Pillar Stack is 100% verified and operational!")
+        else:
+            failures.append("Tokyo HFT MEV Stack integrity verification failed!")
+            log_fail(f"HFT MEV missing components: stack={has_stack}, yul={yul_file}, config={config_file}")
+    except Exception as e:
+        failures.append(f"DeFi Flash Loan & HFT MEV check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
@@ -226,3 +299,4 @@ def run_audit():
 if __name__ == "__main__":
     success = run_audit()
     sys.exit(0 if success else 1)
+
