@@ -60,6 +60,7 @@ def main():
         if not os.path.exists(sdir):
             continue
         for root, dirs, files in os.walk(sdir):
+            dirs[:] = [d for d in dirs if d not in ['venv', '.git', '__pycache__', 'node_modules']]
             for fname in files:
                 fpath = os.path.join(root, fname)
                 # Check text/config files
