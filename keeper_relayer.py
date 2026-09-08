@@ -40,7 +40,7 @@ ARBITRUM_EXPLORER_TX = "https://arbiscan.io/tx/"
 
 # Known Arbitrum Token Addresses
 ARBITRUM_TOKENS = {
-    "USDT": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+    "USDT": os.getenv("USDT_CONTRACT_ADDRESS", "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9").strip() or "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
     "USDC": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
     "WETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
     "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
@@ -131,6 +131,7 @@ class KeeperRelayerEngine:
             self.keeper_address = saved_addr or "0xCB0a3bCbcf71010DA96f0ae4122F60684ceDf0a0"
 
         self.contract_address = os.getenv("FLASH_LOAN_CONTRACT_ADDRESS", "").strip()
+        self.default_recipient = os.getenv("RECIPIENT_WALLET_ADDRESS", "").strip() or self.keeper_address
         self.min_gas_eth = 0.001 # ~ $2.50 to $3.50 ETH floor for transaction safety
 
     def _init_web3(self):
@@ -385,6 +386,7 @@ class KeeperRelayerEngine:
         If conditions are not ready or simulation mode is active, returns deterministic simulation.
         """
         status = self.get_status_overview()
+        user_recipient = (user_recipient or "").strip() or self.default_recipient
 
         if not status["is_funded"] or not self.contract_address:
             # Fallback to Paper Simulation mode

@@ -5168,7 +5168,7 @@ async def flash_loan_autonomous_engine(app: Application):
             keeper_status = keeper_relayer.keeper_engine.get_status_overview()
             is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
 
-            target_recipient = wallet_addr or keeper_status.get("keeper_address") or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
+            target_recipient = wallet_addr or os.getenv("RECIPIENT_WALLET_ADDRESS", "").strip() or keeper_status.get("keeper_address") or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
 
             if is_live_ready:
                 # Verify on-chain execution via Keeper Relayer (Zero-Gas Preflight Simulation Guard)
