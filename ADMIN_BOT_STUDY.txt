@@ -1,475 +1,546 @@
 ================================================================================
-   👑 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ SUPER ADMIN ៖ KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00
-          (សៀវភៅដៃប្រតិបត្តិការ ស្ថាបត្យកម្មប្រព័ន្ធ និងគ្រប់គ្រងបច្ចេកទេសកម្រិតខ្ពស់)
+     👑 មគ្គុទ្ទេសក៍សិក្សាថ្នាក់ SUPER ADMIN ៖ KHMER MASTER CRYPTO v13.00
+      (សៀវភៅដៃប្រតិបត្តិការ ស្ថាបត្យកម្មប្រព័ន្ធ និងកាតាឡុកមុខងារពេញលេញ)
 ================================================================================
 
-សូមស្វាគមន៍មកកាន់ មគ្គុទ្ទេសក៍សិក្សា និងសៀវភៅដៃប្រតិបត្តិការផ្លូវការកម្រិត SUPER ADMIN / SYSTEM ADMINISTRATOR!
-ឯកសារនេះត្រូវបានចងក្រងឡើងយ៉ាងលម្អិត បរិបូរណ៍ និងស៊ីជម្រៅបំផុតសម្រាប់ Khmer Master Crypto / APEX AGI Engine v13.00 Absolute Ultimate AGI Edition។ គោលបំណងចម្បងនៃឯកសារនេះ គឺដើម្បីផ្ដល់នូវចំណេះដឹងគ្រប់ជ្រុងជ្រោយអំពីដំណើរការផ្ទៃក្នុងរបស់កម្មវិធី (Application Lifecycle & Internal Logic Flow), ស្ថាបត្យកម្មប្រព័ន្ធ (System Architecture), ម៉ាស៊ីនជួញដូរស្វ័យប្រវត្តកម្រិត Wall Street ទាំង ៦ (6 Institutional Quantitative Engines), ម៉ាស៊ីន DeFi MEV & Flash Loan Arbitrage Engine កម្រិតស្ថាប័ន, ប្រព័ន្ធ 6-Tier Super Smart Spot Trading Engine, ដំណើរការ HFT Engine ល្បឿន Sub-Millisecond, បញ្ញាសិប្បនិម្មិត AGI Super Brain & Master Fusion Models, ការគ្រប់គ្រងទិន្នន័យ Database SQLite WAL Mode, ផ្ទាំងបញ្ជា Desktop Executive GUI (PyQt5) និង Telegram Bot Node, ព្រមទាំងពិធីការសុវត្ថិភាព និងវិធីសាស្ត្រដោះស្រាយបញ្ហា (Troubleshooting) លើ VPS ២៤ម៉ោង/៧ថ្ងៃ ដោយគ្មានការខាតបង់ទិន្នន័យ (Zero Data Loss)។
+សូមស្វាគមន៍មកកាន់ មគ្គុទ្ទេសក៍សិក្សា និងប្រតិបត្តិការផ្លូវការកម្រិត SUPER ADMIN!
+ឯកសារនេះត្រូវបានរៀបចំឡើងយ៉ាងស្អាតបាត ម៉ត់ចត់ និងមានរបៀបរៀបរយខ្ពស់បំផុត សម្រាប់អ្នកគ្រប់គ្រងប្រព័ន្ធ (Super Administrator / System Architect) នៃ Khmer Master Crypto / APEX AGI Engine v13.00 Absolute Ultimate AGI Edition។
+
+ឯកសារនេះពន្យល់លម្អិតអំពី ៖
+១. ស្ថាបត្យកម្មប្រព័ន្ធ និងដំណើរការផ្ទៃក្នុងពីដើមដល់ចប់ (Internal Logic Flow)
+២. ពាក្យបញ្ជា Super Admin ផ្តាច់មុខ (Super Admin Executive Suite)
+៣. ម៉ាស៊ីនជួញដូរស្នូល Flagship Turbo Hedge HFT & Apex 6-Tier Spot Engine
+៤. ម៉ាស៊ីន DeFi MEV & Flash Loan Arbitrage Engine ($0 Collateral)
+៥. ម៉ាស៊ីនវិនិយោគស្ថាប័ន Wall Street ទាំង ៦ (6 Quantitative Engines)
+៦. ម៉ាស៊ីនចាប់ព័ត៌មានល្បឿនលឿន HFT X & Truth Social Firehose (<2ms)
+៧. ប្រព័ន្ធ AI Super Brain, ML Master Fusion Models & Colab GPU Trainer
+៨. កាតាឡុកពាក្យបញ្ជាពេញលេញសម្រាប់សមាជិក VIP (VIP Commands Catalog)
+៩. ស្ថាបត្យកម្មទិន្នន័យ SQLite WAL Mode & In-Memory RAM Cache
+១០. ពិធីការសុវត្ថិភាព Encryption AES-256 & 2FA PBKDF2-HMAC-SHA256
+១១. ដំណោះស្រាយល្បឿន និងការលុបបំបាត់បញ្ហាគាំង (Performance Breakthroughs)
+១២. មគ្គុទ្ទេសក៍គ្រប់គ្រង Cloud VPS, Systemd Service & Troubleshooting Guide
+១៣. តារាង Matrix គ្រប់គ្រងដើមទុន និងហានិភ័យ (Capital Allocation Matrix)
 
 ================================================================================
-១. សេចក្តីផ្តើម និងទិដ្ឋភាពទូទៅនៃប្រព័ន្ធ (SYSTEM OVERVIEW & MASTER VISION v13.00)
+                                 តារាងមាតិកា (TABLE OF CONTENTS)
 ================================================================================
 
-១.១ ទស្សនវិស័យ និងបេសកកម្មរបស់ KHMER MASTER CRYPTO v13.00 ៖
-Khmer Master Crypto (Apex AGI Engine) គឺជាប្រព័ន្ធជួញដូរបរូបិយវត្ថុឌីជីថលស្វ័យប្រវត្តកម្រិតស្ថាប័នវិនិយោគ (Institutional-Grade Quantitative Trading System) ដែលត្រូវបានបង្កើតឡើងដើម្បីផ្តល់ប្រៀបឈ្នះក្នុងការប្រកួតប្រជែងលើទីផ្សារហិរញ្ញវត្ថុអន្តរជាតិ។ ប្រព័ន្ធនេះដំណើរការដោយស្វ័យប្រវត្តិ ២៤ម៉ោង/៧ថ្ងៃ គ្មានការឈប់សម្រាក តាមរយៈបណ្តាញម៉ាស៊ីនបម្រើការ (Cloud VPS/Server) ដោយរួមបញ្ចូលនូវ ៖
-• ប្រព័ន្ធបញ្ញាសិប្បនិម្មិតកូនកាត់ (Hybrid AI System) ៖ ការរួមបញ្ចូលគ្នារវាង Large Language Models (LLM Swarm), Deep Learning (PatchTST Transformer, LSTM, Deep RL PPO), Machine Learning (XGBoost, CatBoost, LightGBM), Graph Neural Networks (TGAT), និង High-Frequency Trading (HFT) Algorithms។
-• ការដោះស្រាយបញ្ហាសេវាជួញដូរ (Fee-Erosion Elimination) ៖ លុបបំបាត់ការខាតបង់លើកម្រៃជើងសារ Taker Fee តាមរយៈការគណនា Net Profit Take Profit Floor (+0.12% Offset) ធានាថារាល់ការជួញដូរដែលបិទបញ្ចប់គឺទទួលបានប្រាក់ចំណេញសុទ្ធ ១០០%។
-• ការការពារដើមទុនដាច់ខាត (Absolute Capital Preservation) ៖ ការពារគណនីតាមរយៈយន្តការ Dynamic Leverage Shield, ISOLATED Margin Enforcement, Circuit Breaker, Flash Crash Hunter, 6-Tier Spot Safety Shield, និង PAXG Physical Gold Safe Haven Protocol។
+ផ្នែកទី ១  ៖ ទិដ្ឋភាពទូទៅនៃប្រព័ន្ធ និងស្ថាបត្យកម្មស្នូល (SYSTEM OVERVIEW & CORE)
+ផ្នែកទី ២  ៖ កាតាឡុកពាក្យបញ្ជា SUPER ADMIN ផ្តាច់មុខ (SUPER ADMIN EXECUTIVE SUITE)
+ផ្នែកទី ៣  ៖ ម៉ាស៊ីនជួញដូរស្នូល TURBO HEDGE & 6-TIER SPOT ENGINE
+ផ្នែកទី ៤  ៖ ម៉ាស៊ីន DEFI MEV & FLASH LOAN ARBITRAGE ENGINE
+ផ្នែកទី ៥  ៖ ម៉ាស៊ីនវិនិយោគស្ថាប័នទាំង ៦ (6 WALL STREET QUANTITATIVE ENGINES)
+ផ្នែកទី ៦  ៖ ម៉ាស៊ីន HFT X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE (<2ms)
+ផ្នែកទី ៧  ៖ ខួរក្បាល AI MULTI-MODEL SWARM & GOOGLE COLAB TRAINER
+ផ្នែកទី ៨  ៖ កាតាឡុកពាក្យបញ្ជាពេញលេញសម្រាប់សមាជិក VIP (VIP COMMAND CATALOG)
+ផ្នែកទី ៩  ៖ ស្ថាបត្យកម្មប្រព័ន្ធទិន្នន័យ (DATABASE WAL MODE & SCHEMAS)
+ផ្នែកទី ១០ ៖ ពិធីការសុវត្ថិភាព និងការការពារការវាយប្រហារ (SECURITY PROTOCOLS)
+ផ្នែកទី ១១ ៖ ដំណោះស្រាយសមត្ថភាព និងល្បឿនដំណើរការ (PERFORMANCE BREAKTHROUGHS)
+ផ្នែកទី ១២ ៖ មគ្គុទ្ទេសក៍គ្រប់គ្រង VPS, DEPLOYMENT & TROUBLESHOOTING GUIDE
+ផ្នែកទី ១៣ ៖ តារាង MATRIX គ្រប់គ្រងដើមទុន និងហានិភ័យ (CAPITAL ALLOCATION MATRIX)
 
-១.២ ភាពខុសគ្នារវាងគណនី SUPER ADMIN និងសមាជិក VIP ៖
-• 👑 គណនី Super Admin (Chat ID: `859271875` ឬ Admin ដែលបានចាត់តាំងក្នុង Database) ៖
-  - មានសិទ្ធិអំណាចពេញលេញលើប្រព័ន្ធទាំងមូល (Full Root Access) ទាំងនៅលើ Telegram និង Desktop GUI។
-  - អាចមើលឃើញបញ្ជីសមាជិកទាំងអស់ (`/admin_users`), ស្ថិតិប្រព័ន្ធសរុប (`/admin_stats`), ផ្តល់ និងដកហូតអាជ្ញាប័ណ្ណ VIP (`/admin_license`), លុបទិន្នន័យ ឬ Reset PIN (`/admin_delete`, `/admin_reset_pin`)។
-  - អាចបញ្ជា Global Emergency Nuke (`/admin_nuke`, `/kill`) ដើម្បីបិទការជួញដូរទាំងអស់ក្នុងគ្រាអាសន្ន។
-  - អាចពិនិត្យមើលសុខភាព VPS Hardware Real-Time (`/health`) និង Hot-Reload AI Brain ពី Hugging Face (`/sync_brain`)។
-  - ទទួលបាន Menu ពិសេសដែលលាក់បាំងពីអ្នកប្រើប្រាស់ទូទៅ តាមរយៈ Telegram `BotCommandScopeChat`។
+================================================================================
+ផ្នែកទី ១ ៖ ទិដ្ឋភាពទូទៅនៃប្រព័ន្ធ និងស្ថាបត្យកម្មស្នូល (SYSTEM OVERVIEW & CORE)
+================================================================================
+
+១.១ បេសកកម្ម និងគោលការណ៍គ្រឹះពីររបស់ KHMER MASTER CRYPTO v13.00 ៖
+--------------------------------------------------------------------------------
+• គោលការណ៍ទី ១ (លុបបំបាត់ការធ្វេសប្រហែសបច្ចេកទេស ១០០%) ៖
+  គ្មានការជួញដូរ ឬដើមទុនណាមួយត្រូវបានខាតបង់ដោយសារកំហុស Software, កំហុស API (-1013, -4061, -4411, -2019, -4140), ការមិនស៊ីសង្វាក់គ្នានៃ Position Side, ឬការលុបបំបាត់មុខងារស្ទួនឡើយ។
+
+• គោលការណ៍ទី ២ (ប្រៀបឈ្នះបែបគណិតវិទ្យា Mathematical Edge) ៖
+  ការបែងចែកដើមទុនត្រូវបានកំណត់យ៉ាងតឹងរ៉ឹងដោយរូបមន្តគណិតវិទ្យា Expectancy វិជ្ជមាន (E[X] > 0), កម្រៃជើងសារ Net Profit Floor (+0.12% Offset), អនុបាត Risk-to-Reward (R:R >= 1:2.5), និង Dynamic ATR Trailing Stops។
+
+១.២ សិទ្ធិអំណាចរវាង SUPER ADMIN និង VIP MEMBERS ៖
+--------------------------------------------------------------------------------
+• 👑 គណនី Super Admin (Chat ID: 859271875 ឬ Admin ក្នុង Database) ៖
+  - មានសិទ្ធិអំណាចពេញលេញ (Full Root Access) ទាំងនៅលើ Telegram និង Desktop GUI។
+  - គ្រប់គ្រងសមាជិកទាំងអស់ (មើលបញ្ជី, ផ្តល់/ដកហូត VIP License, Reset PIN, លុប User)។
+  - បញ្ជា Emergency Nuke ឬ Emergency Stop បិទ Positions ទាំងអស់លើ Binance ក្នុងពេល <30ms។
+  - ត្រួតពិនិត្យសុខភាពម៉ាស៊ីន VPS Hardware Real-time និង Hot-Reload AI Models ពី Cloud Hub។
+  - ទទួលបាន Menu ពិសេសតាមរយៈ Telegram `BotCommandScopeChat` ដែល User ទូទៅមើលមិនឃើញ។
+
 • 👥 គណនីសមាជិក VIP (VIP Members) ៖
-  - ប្រើប្រាស់បានតែមុខងារជួញដូរ យុទ្ធសាស្ត្រវិនិយោគ ពិនិត្យសមតុល្យ និងការវិភាគទីផ្សារប៉ុណ្ណោះ។
-  - ត្រូវបានកំណត់ល្បឿនចុច (Adaptive Rate Limiter: អតិបរមា ៣ បញ្ជា ក្នុង ១០ វិនាទី)។
-  - មិនអាចចូលប្រើប្រាស់ Command រដ្ឋបាល ឬមើលឃើញសមតុល្យ/API Keys របស់ Admin និង User ដទៃបានដាច់ខាត (Isolated Session Security)។
+  - ប្រើប្រាស់បានតែមុខងារជួញដូរ យុទ្ធសាស្ត្រវិនិយោគ ពិនិត្យសមតុល្យ និងការវិភាគប៉ុណ្ណោះ។
+  - ត្រូវបានការពារដោយ Adaptive Rate Limiter (អតិបរមា ៣ បញ្ជា ក្នុង ១០ វិនាទី)។
+  - មិនអាចចូលប្រើប្រាស់ Command រដ្ឋបាល ឬមើលឃើញសមតុល្យ/API Keys របស់ Admin និង User ដទៃបានឡើយ។
 
-១.៣ របៀបដំណើរការពីរផ្លូវ (DUAL-MODE EXECUTION ARCHITECTURE) ៖
-ប្រព័ន្ធត្រូវបានរៀបចំឡើងជាពីរទម្រង់ដំណើរការ ស្របតាមតម្រូវការជាក់ស្តែងរបស់អ្នកគ្រប់គ្រង ៖
-១. 🖥️ Desktop Executive GUI Mode (`python main.py`) ៖
-   - ដំណើរការដោយមានផ្ទាំង Dashboard ទំនើប (PyQt5 Modern Dark Glassmorphic Interface) សម្រាប់ Super Admin ប្រើប្រាស់លើកុំព្យូទ័រ Admin ដោយផ្ទាល់។
-   - មានផ្ទាំងបញ្ជា ៥ Tabs ៖ Executive Control Console, User Management, Broadcast Center, AI Help Center, និង AI Settings។
-   - ភ្ជាប់មកជាមួយ System Tray Icon ដំណើរការ Background ២៤ម៉ោង និងមុខងារ Auto-Backup ពេលបើក និងបិទកម្មវិធី។
-២. 🚀 Pure Headless VPS CLI Mode (`python main.py --cli` ឬ `--no-gui`, `--vps`, `--headless`) ៖
-   - ដំណើរការលើ Cloud VPS (Google Cloud Platform / Ubuntu Server) ដោយគ្មាន Interface GUI ប្រើប្រាស់សុទ្ធសាធតែ Pure Python Asyncio Thread។
-   - សន្សំសំចៃធនធាន RAM និង CPU ខ្ពស់បំផុត (Ultra-Low Footprint) ឆ្លើយតប HFT ក្រោម ៣០ មីលីវិនាទី (<30ms) ធានាដំណើរការ ២៤/៧ ឥតគាំង។
+១.៣ ស្ថាបត្យកម្មដំណើរការពីរផ្លូវ (DUAL-MODE EXECUTION) ៖
+--------------------------------------------------------------------------------
+• 🖥️ Desktop Executive GUI Mode (`python main.py`) ៖
+  - បើកដំណើរការផ្ទាំង Dashboard ទំនើប (PyQt5 Dark Glassmorphic Interface) លើកុំព្យូទ័រ Admin។
+  - មាន ៥ Tabs ស្នូល ៖ Control Console, User Management, Broadcast Center, AI Help, និង Settings។
+  - មាន System Tray Icon ដំណើរការ Background ២៤/៧ និង Auto-Backup Database ពេលបើក/បិទ។
 
-================================================================================
-២. ស្ថាបត្យកម្មប្រព័ន្ធស្នូល និងដំណើរការលម្អិត (END-TO-END APPLICATION LIFECYCLE)
-================================================================================
-
-នៅពេល Super Admin បញ្ជាដំណើរការ `python main.py` (ឬរត់តាម Systemd Service លើ VPS) កម្មវិធីនឹងប្រតិបត្តិតាមជំហានម៉ត់ចត់ជាបន្តបន្ទាប់ដូចខាងក្រោម ៖
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│               ជំហានលម្អិតនៃដំណើរការប្រព័ន្ធ (BOOTSTRAP TO EXECUTION)         │
-└─────────────────────────────────────────────────────────────────────────────┘
-  │
-  ├─► [ជំហានទី ១] ៖ Smart DNS-over-HTTPS (DoH API Resolution Override)
-  │    └─ ប្រព័ន្ធដំណើរការ `new_getaddrinfo` Override ដើម្បីទាញយក IP របស់ Binance ដោយផ្ទាល់
-  │       ពី Google DNS API (`https://dns.google/resolve?name=fapi.binance.com`)។
-  │       យន្តការនេះលុបបំបាត់ចោលទាំងស្រុងនូវការបិទខ្ទប់ DNS ពី ISP ក្នុងស្រុក និងកំហុស DNS Timeout!
-  │
-  ├─► [ជំហានទី ២] ៖ Institutional Single-Instance Lock Guard
-  │    └─ ប្រព័ន្ធត្រួតពិនិត្យឯកសារ `bot_instance.lock` តាមរយៈ POSIX `fcntl.flock` (លើ Linux)
-  │       និង `psutil` Process ID (លើ Windows)។ ប្រសិនបើមាន Instance ចាស់កំពុងរត់ វានឹង Exit
-  │       ដោយស្អាត (Status 0) ដើម្បីលុបបំបាត់កំហុស Telegram `409 Conflict: terminated by other getUpdates`។
-  │
-  ├─► [ជំហានទី ៣] ៖ Environment Variables & Cryptographic Key Initialization
-  │    └─ ប្រព័ន្ធដំណើរការ `dotenv.load_dotenv()` អានការកំណត់ពី `.env` ព្រមទាំងត្រួតពិនិត្យ
-  │       `MASTER_KEY` (AES-256 Fernet) សម្រាប់ចាក់សោសុវត្ថិភាព API Keys របស់អ្នកប្រើប្រាស់។
-  │
-  ├─► [ជំហានទី ៤] ៖ Zero-Data-Loss Boot Backup (`backup_manager.perform_backup(is_boot=True)`)
-  │    └─ ថតចម្លង Database `bot_database.db` ទៅកាន់ Folder `backups/boot_bot_database_<TIMESTAMP>.db`
-  │       ភ្លាមៗមុនពេលដំណើរការ Code ផ្សេងទៀត ការពារទិន្នន័យមិនឱ្យបាត់បង់សូម្បីតែ ១ Byte។
-  │
-  ├─► [ជំហានទី ៥] ៖ SQLite Database Initialization & WAL Mode Upgrade (`database.init_db()`)
-  │    └─ បង្កើតតារាងទាំងអស់ (Tables & Indexes) និងកំណត់ `PRAGMA journal_mode=WAL;`,
-  │       `PRAGMA synchronous=NORMAL;`, `PRAGMA busy_timeout=30000;` បង្កើនល្បឿន Read/Write ១០ ដង។
-  │
-  ├─► [ជំហានទី ៦] ៖ Pre-Warmed HFT Session Pool & Batch ExchangeInfo Preloading
-  │    └─ បង្កើត `requests.Session()` Pool (១០០ Connections) ជាមួយ Keep-Alive Headers,
-  │       ធ្វើសមកាលកម្មម៉ោង (Time Offset Synchronization) ជាមួយ Binance Server Time,
-  │       និង Pre-load Binance Spot `exchangeInfo` ទាំងអស់ (3,692 Symbols) ចូលក្នុង RAM Cache តែ ១ ដង (<1.2s)
-  │       លុបបំបាត់ចោលទាំងស្រុងនូវការហៅ HTTP REST ដដែលៗរាប់រយដង!
-  │
-  ├─► [ជំហានទី ៧] ៖ Launching Multi-Thread Engine Architecture
-  │    ├─ Thread A: PyQt5 GUI Main Event Loop (បើដំណើរការក្នុង Desktop GUI Mode)
-  │    ├─ Thread B: `TelegramBotThread` (រត់ Asyncio Event Loop, Telegram Polling, Token Bucket Limiter)
-  │    ├─ Thread C: APScheduler Background Cron/Interval Engine (គ្រប់គ្រង ៥ Engines ស្នូល និង Monitors)
-  │    └─ Thread D: `HFT X & Truth Firehose Engine` (In-Memory RAM Ring Buffer, Nano-NLP Keyword Trie)
-  │
-  └─► [ជំហានទី ៨] ៖ Graceful Shutdown Hook (`atexit` & `signal.SIGINT`)
-       └─ នៅពេលបិទប្រព័ន្ធ (Ctrl+C ឬ Quit System): Cancel background tasks, បិទ Scheduler,
-          ដោះលែង Lock File, និងធ្វើការ Backup Database ចុងក្រោយបញ្ជូនទៅ Admin Chat ID ស្វ័យប្រវត្តិ។
+• 🚀 Headless VPS CLI Mode (`python main.py --cli` ឬ `--no-gui`, `--vps`, `--headless`) ៖
+  - ដំណើរការលើ Cloud VPS (GCP / Ubuntu Server) ដោយគ្មាន Interface GUI ប្រើប្រាស់តែ Asyncio Thread។
+  - សន្សំសំចៃ RAM និង CPU ខ្ពស់បំផុត (<100MB RAM) ឆ្លើយតប HFT ក្រោម ៣០ មីលីវិនាទី (<30ms) ២៤/៧។
 
 ================================================================================
-៣. ម៉ាស៊ីនវិនិយោគស្ថាប័នទាំង ៦ (6 INSTITUTIONAL QUANTITATIVE ENGINES)
+ផ្នែកទី ២ ៖ កាតាឡុកពាក្យបញ្ជា SUPER ADMIN ផ្តាច់មុខ (SUPER ADMIN EXECUTIVE SUITE)
 ================================================================================
 
-Apex AGI Engine v13.00 បានបំពាក់នូវម៉ាស៊ីនវិនិយោគស្ថាប័នលំដាប់ Wall Street ចំនួន ៦ ធំៗ ដែលដំណើរការដោយបច្ចេកវិទ្យា AI កម្រិតខ្ពស់ ៖
+(ចំណាំ ៖ រាល់ Command ក្នុងផ្នែកនេះ ត្រូវបានការពារដោយសុវត្ថិភាពដាច់ខាត ដោយផ្ទៀងផ្ទាត់ Chat ID `859271875` ឬ `db.is_admin(chat_id)`។ អ្នកប្រើប្រាស់ទូទៅមិនអាចមើលឃើញ ឬដំណើរការបានឡើយ)។
 
-៣.១ ⚡ SUB-5ms CROSS-EXCHANGE ARBITRAGE ENGINE (`/cross_arb`, `cross_exchange_arb_engine.py`) ៖
-• **គោលការណ៍ស្នូល** ៖ ស្កេនចាប់យកគម្លាតតម្លៃ (Price Disparity & Spread) រវាងផ្សារដោះដូរធំៗទាំង ៤ គឺ Binance, Bybit, OKX, និង Coinbase ក្នុងល្បឿន Sub-5ms។
-• **AI Ensemble Models** ៖
-  - `ONNX Sub-10ms HFT Model` ៖ គណនាគម្លាតតម្លៃ និងល្បឿនបំពេញ Orderbook ក្នុងរយៈពេល ៣.៨ មីលីវិនាទី។
-  - `XGBoost Orderbook Imbalance Classifier` ៖ វិភាគសមាមាត្រ Bid/Ask Depth ជៀសវាងបញ្ហា Slippage។
-  - `LSTM Neural Net` ៖ ព្យាករណ៍និន្នាការតម្លៃរយៈពេលខ្លី ធានាថាក្រោយពេលកាត់ថ្លៃសេវា Fee (Binance 0.075%, Bybit 0.08%, OKX 0.08%, Coinbase 0.10%) នៅតែទទួលបានផលចំណេញសុទ្ធ (Net Spread > 0.18%)។
-• **ទម្រង់បញ្ជាប្រើប្រាស់** ៖
-  - `/cross_arb SCAN` ➔ ស្កេនពិនិត្យគម្លាតតម្លៃផ្សារទាំង ៤ Real-time។
-  - `/cross_arb AUTO 100 1234` ➔ បើកដំណើរការ Arbitrage ស្វ័យប្រវត្តដោយប្រើទុន $100 USDT (ទាមទារ PIN)។
-  - `/cross_arb BTC 50 1234` ➔ បើកដំណើរការ Arbitrage លើគូកាក់ BTCUSDT។
+--------------------------------------------------------------------------------
+១. `/admin` ឬ `/admin_panel`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : បើកផ្ទាំង Master Admin Dashboard Interactive លើ Telegram ជាមួយ Inline Buttons។
+• របៀបដំណើរការ    : បង្ហាញ Menu បញ្ជា រួមមាន ៖ User Management, System Stats, Global Config, Signals, Broadcast, និង Emergency Controls។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin`
 
-៣.២ 🌾 INSTITUTIONAL DELTA-NEUTRAL FUNDING RATE HARVESTER (`/funding_harvester`, `funding_harvester_engine.py`) ៖
-• **គោលការណ៍ស្នូល** ៖ យុទ្ធសាស្ត្រប្រមូលផលប្រយោជន៍អត្រាការប្រាក់ Funding Fee ពី Binance Perpetual Futures រៀងរាល់ ៨ ម៉ោងម្តង (៣ ដងក្នុងមួយថ្ងៃ = ១០៩៥ ដង/ឆ្នាំ) ដោយគ្មានហានិភ័យទិសដៅទីផ្សារ (0% Directional Risk)។
-• **យន្តការ Delta-Neutral 1:1** ៖
-  - ប្រព័ន្ធទិញ Spot កាក់ 100% និងបើក Short Futures 1x ក្នុងបរិមាណដូចគ្នាបេះបិទ (Spot Buy = Futures Short)។
-  - ទោះបីជាទីផ្សារឡើងថ្លៃ ឬធ្លាក់ថ្លៃខ្លាំងយ៉ាងណាក៏ដោយ ក៏ដើមទុនរួមមិនប្រែប្រួលឡើយ ប៉ុន្តែប្រព័ន្ធប្រមូលយកតែ Funding Fee ពីអ្នកកាន់ Position Long នៅពេល Funding Rate វិជ្ជមាន (APY ចន្លោះពី 30% ទៅ 120%/ឆ្នាំ)!
-• **AI Models** ៖
-  - `HMM Market Regime Classifier` ៖ កំណត់សភាពទីផ្សារ (Extreme Bull FOMO, Moderate Bull, Bear Squeeze, Balanced)។
-  - `RL Dynamic PPO Agent` ៖ គណនាផលចំណេញប្រចាំឆ្នាំ (Annualized APY) និងវាយតម្លៃហានិភ័យមុនពេលចូល Position។
-• **ទម្រង់បញ្ជាប្រើប្រាស់** ៖
-  - `/funding_harvester SCAN` ➔ ស្កេនរកកាក់ដែលមាន Funding Rate ខ្ពស់បំផុតលើ Binance Real-time។
-  - `/funding_harvester AUTO 100 1234` ➔ បើកដំណើរការកើប Funding Rate អូតូជាមួយទុន $100 USDT។
-  - `/funding_harvester SOL 50 1234` ➔ បើកដំណើរការ Delta-Neutral លើកាក់ SOL។
+--------------------------------------------------------------------------------
+២. `/admin_users`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ពិនិត្យបញ្ជីឈ្មោះ និងស្ថានភាពសមាជិកទាំងអស់ក្នុងប្រព័ន្ធ។
+• របៀបដំណើរការ    : ទាញយកទិន្នន័យពីតារាង `users` បង្ហាញ User ID, Username, ស្ថានភាព VIP, កាលបរិច្ឆេទផុតកំណត់ License, និងចំនួន Bot កំពុងរត់។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_users`
 
-៣.៣ 🐋 WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR (`/whales`, `onchain_whale_radar.py`) ៖
-• **គោលការណ៍ស្នូល** ៖ តាមដានចលនាសាច់ប្រាក់របស់ស្ថាប័នធំៗ និងមហាសេដ្ឋីលំដាប់ពិភពលោក (Whales & Institutional Custodians) ក្នុងកម្រិត Sub-Second រួមមាន ៖
-  - BlackRock iShares Bitcoin Trust (`0x40ec...bbdf`)
-  - Fidelity Wise Origin Custody (`0x3f5c...f0be`)
-  - MicroStrategy Treasury Vault (`bc1qgdjqv0av3...`)
-  - Binance Cold Reserve Vault 1 (`0x28C6...1d60`)
-  - Coinbase Prime Custody Vault (`0x7167...1d20`)
-• **AI Models & Execution** ៖
-  - `PatchTST Attention Transformer` ៖ ព្យាករណ៍រលកកើនឡើងនៃតម្លៃ (Price Surge Curve) នៅពេលរកឃើញ Orderflow ចាប់ពី $1,000,000 USDT ឡើងទៅ។
-  - `NLP & On-Chain AGI` ៖ វិភាគចលនាសាច់ប្រាក់ចូល (Accumulation Inflow) ដើម្បីបាញ់បញ្ជា Front-Run Buy ឬសាច់ប្រាក់ចេញ (Dump Outflow) ដើម្បីបាញ់បញ្ជា Front-Run Short មុនពេលទីផ្សាររាយរាប់ម៉ឺនដង!
-  - `Whale Dumping Lockout` ៖ ប្រសិនបើរលកសញ្ញាបង្ហាញថា Whale កំពុង Dump លក់បង្ខំ ប្រព័ន្ធនឹងចាក់សោមិនឱ្យ Bot ទិញកាក់នោះរយៈពេល ៣០ នាទីជាដាច់ខាត។
-• **ទម្រង់បញ្ជាប្រើប្រាស់** ៖
-  - `/whales` ➔ មើលរបាយការណ៍ចលនា Whale Real-time។
-  - `/whale_alert ON` ➔ បើកការជូនដំណឹងពេល Whale ធំៗធ្វើសកម្មភាព។
+--------------------------------------------------------------------------------
+៣. `/admin_license <USER_ID> <DURATION>`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ផ្តល់ ឬពន្យារអាជ្ញាប័ណ្ណ VIP License ជូនសមាជិក។
+• របៀបដំណើរការ    : បញ្ចូលរយៈពេល (`1d`, `3d`, `1m`, `3m`, `1y`, `Lifetime`, `Revoke`) ទៅក្នុង Database។ ប្រព័ន្ធមាន Smart Regex Cleaner កម្ចាត់ចោលសញ្ញា `ID:`, `:`, `#` ដោយស្វ័យប្រវត្តិ។
+• ឧទាហរណ៍ជាក់ស្តែង :
+  - `/admin_license 537186806 Lifetime`   (ផ្តល់ VIP មួយជីវិត)
+  - `/admin_license 537186806 1m`         (ផ្តល់ VIP រយៈពេល ១ ខែ)
+  - `/admin_license 537186806 Revoke`     (ដកហូតសិទ្ធិ VIP វិញ)
 
-៣.៤ 📈 AI DYNAMIC COMPOUND INFINITY MATRIX (`/infinity_matrix`, `infinity_matrix_engine.py`) ៖
-• **គោលការណ៍ស្នូល** ៖ បង្រួមប្រព័ន្ធ Grid Bot បុរាណទាំងអស់មកជាប្រព័ន្ធ Dynamic Grid បញ្ញាសិប្បនិម្មិតតែមួយ។
-• **យន្តការ 100% Profit Compounding** ៖
-  - រាល់ប្រាក់ចំណេញតូចៗ (Micro-Profits) ដែលទទួលបានពីការរាយសំណាញ់ទិញថោកលក់ថ្លៃ ត្រូវបានប្រព័ន្ធយកទៅ Rebalance និងបូកបន្ថែមចូលដើមទុនដើម (Compound Interest) ភ្លាមៗ ២៤ម៉ោង/៧ថ្ងៃ។
-• **AI Models & Small-Capital Shield** ៖
-  - `LSTM Neural Net` ៖ គណនាចន្លោះ Grid (Grid Bounds) តាមរលកបម្រែបម្រួលតម្លៃ ២៤ ម៉ោង (ATR Volatility) ដោយស្វ័យប្រវត្តិ។
-  - `Min-Notional Guard` ៖ គណនាកម្រិត Grid Step និង Position Size ឱ្យស្របតាមច្បាប់ Binance MIN_NOTIONAL ($10.50 USDT) ការពារមិនឱ្យមានកំហុស API Error -1013 សម្រាប់អ្នកមានដើមទុនតូច។
-• **ទម្រង់បញ្ជាប្រើប្រាស់** ៖
-  - `/infinity_matrix PAXG 500 100 1234` ➔ បើក Matrix លើមាស PAXG ទុន $500, ចំនួន 100 Grids។
-  - `/infinity_matrix BTC 100 20 1234` ➔ បើក Matrix លើ BTC ទុន $100, ចំនួន 20 Grids។
+--------------------------------------------------------------------------------
+៤. `/admin_broadcast <MESSAGE>`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ផ្សាយដំណឹងអាសន្ន ឬសារយុទ្ធសាស្ត្រទៅកាន់គ្រប់សមាជិក VIP ទាំងអស់។
+• របៀបដំណើរការ    : ដំណើរការ Async Parallel Batching បញ្ជូនសារទៅគ្រប់ Chat ID ទាំងអស់ដោយមិនជាប់ Rate Limit របស់ Telegram។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_broadcast 📢 ទីផ្សារកំពុងប្រែប្រួលខ្លាំង សូមពិនិត្យមើល Trailing Stop របស់អ្នក!`
 
-៣.៥ 🎯 FLASH CRASH / LIQUIDATION CASCADE HUNTING ENGINE (`/flash_crash`, `flash_crash_sniper_engine.py`) ៖
-• **គោលការណ៍ស្នូល** ៖ ស្ទាក់ចាប់ប្រាក់ចំណេញក្នុងពេលទីផ្សារមានវិបត្តិជ្រុះខ្លាំងភ្លាមៗ (Liquidation Cascade / Flash Crash)។
-• **យន្តការ Deep Wick Catch & Instant Exit** ៖
-  - ពេលដែល Position Futures រាយរាប់ពាន់ត្រូវ Liquidate បង្ខំឱ្យតម្លៃធ្លាក់យ៉ាងគំហុក (-5% ទៅ -25%) ម៉ាស៊ីន HMM Regime Classifier នឹងដាស់តឿនប្រព័ន្ធ។
-  - `ONNX Sub-10ms Model` នឹងដាក់បញ្ជា Limit Buy Catch នៅជើងស្រមោលទៀន (Deep Wick 5% - 15% discount) រួចបាញ់បញ្ជាលក់ចេញ (Instant Exit Rebound) ក្នុងរយៈពេលតិចជាង ៥ វិនាទី (<5s) ពេលតម្លៃងើបឡើងវិញ កើបចំណេញ 5% ទៅ 25% ភ្លាមៗ!
-• **ទម្រង់បញ្ជាប្រើប្រាស់** ៖
-  - `/flash_crash SCAN` ➔ ស្កេនកាក់ដែលកំពុងមានសភាព Liquidation Cascade។
-  - `/flash_crash AUTO 10 100 1234` ➔ បើក Snipe Deep Wicks អូតូ (Leverage 10x, ទុន $100 USDT)។
-  - `/flash_crash SOL 10 50 1234` ➔ បើកស្ទាក់បាតទៀនលើកាក់ SOL។
+--------------------------------------------------------------------------------
+៥. `/admin_stats`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ពិនិត្យស្ថិតិប្រតិបត្តិការសរុបទូទាំងប្រព័ន្ធ។
+• របៀបដំណើរការ    : បង្ហាញចំនួនសមាជិកសរុប, ចំនួន VIP, ទំហំជួញដូរសរុប (Total Volume), ចំនួន Bot កំពុងដំណើរការ, និងផលចំណេញរួម (Aggregate Net PnL)។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_stats`
 
-៣.៦ 🏆 PAXG GOLD WEALTH PROTECTION SWITCHER (`/gold_guard`, `/gold_radar`, `macro_gold_engine.py`, `central_bank_gold_radar.py`) ៖
-• **គោលការណ៍ស្នូល** ៖ យន្តការការពារទ្រព្យសម្បត្តិ និងការពារហានិភ័យម៉ាក្រូសេដ្ឋកិច្ច (Macro Safe Haven) តាមរយៈមាសឌីជីថល PAXG (Pax Gold - កាក់ដែលមានមាសសុទ្ធ ១ អោនត៍នៅធនាគារ Brink's គាំទ្រ ១០០%)។
-• **Macro Radar Indicators** ៖
-  - តាមដានតម្លៃ PAXG/USDT, សន្ទស្សន៍ប្រាក់ដុល្លារអាមេរិក DXY Index, អត្រាការប្រាក់ប័ណ្ណបំណុលអាមេរិក US 10-Year Treasury Yield, អត្រាអតិផរណា CPI, និង Real Yield។
-  - `Central Bank Gold Reserve Radar` ៖ តាមដានសកម្មភាពទិញមាសរបស់ធនាគារកណ្តាលពិភពលោក (PBOC, RBI, CBR, NBP)។
-• **Black Swan Crisis Flight-to-Safety** ៖
-  - នៅពេលមានសញ្ញាសង្គ្រាម ឬវិបត្តិសេដ្ឋកិច្ចធ្ងន់ធ្ងរ (Black Swan Event) ប្រព័ន្ធអាចដកដើមទុនបម្រុងពីកាក់គ្រីបតូដែលមានហានិភ័យខ្ពស់ មកទិញ និងរក្សាទុកក្នុង PAXG Gold ដោយស្វ័យប្រវត្តិ។
-• **ទម្រង់បញ្ជាប្រើប្រាស់** ៖
-  - `/gold_guard` ឬ `/gold_radar` ➔ ពិនិត្យមើលរបាយការណ៍វិភាគមាសម៉ាក្រូសេដ្ឋកិច្ច Real-time។
-  - `/gold_turbo AUTO 100 1234` ➔ បើកដំណើរការប្រព័ន្ធជួញដូរមាសស្វ័យប្រវត្តិ។
+--------------------------------------------------------------------------------
+៦. `/admin_config`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ពិនិត្យ និងកែសម្រួលការកំណត់ប្រព័ន្ធសកលក្នុង Runtime ដោយមិនបាច់ Restart Bot។
+• របៀបដំណើរការ    : កែប្រែ Risk Hurdle, Fee Offset (+0.12%), Min Notional ($10.50), និង Max Leverage តាមរយៈ Inline Keyboard។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_config`
 
-================================================================================
-៤. ⚡ ម៉ាស៊ីន DEFI MEV & FLASH LOAN ARBITRAGE ENGINE (`/flash_loan`, `flash_loan_mev_engine.py`)
-================================================================================
+--------------------------------------------------------------------------------
+៧. `/admin_signal <SYMBOL> <SIDE> <LEV>`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : បាញ់ Signal ជួញដូរទៅឱ្យ Bot របស់សមាជិកទាំងអស់បើក Order ស្វ័យប្រវត្តិតាម Admin។
+• របៀបដំណើរការ    : ផ្ញើបញ្ជាទៅគ្រប់ Bot របស់ User ណាដែលបានបើកមុខងារ Auto-Follow Signal ឱ្យចូល Order ភ្លាមៗក្នុងពេល <50ms។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_signal BTCUSDT BUY 10`  (បាញ់ Signal ទិញ Long BTC Leverage 10x)
 
-៤.១ គោលការណ៍ស្នូលនៃ FLASH LOAN ARBITRAGE ៖
-• **ខ្ចីទុនរាប់លានដុល្លារដោយគ្មានទ្រព្យបញ្ចាំ ($0 Collateral)** ៖ ប្រព័ន្ធខ្ចីសាច់ប្រាក់រាប់សែន ឬរាប់លានដុល្លារពី Aave V3 Liquidity Pools (ETH, USDT, USDC, WBTC)។
-• **ការប្រតិបត្តិក្នុង Block តែមួយគត់ (Atomic Single-Block Execution)** ៖
-  - ជំហានទី ១ ៖ ខ្ចីប្រាក់ពី Aave V3 Pool។
-  - ជំហានទី ២ ៖ ជួញដូរ Arbitrage លើ Decentralized Exchanges (Uniswap V3, PancakeSwap, Raydium, Curve, SushiSwap)។
-  - ជំហានទី ៣ ៖ សងប្រាក់ដើមបូកកម្រៃជើងសារ 0.05% ទៅកាន់ Aave វិញ។
-  - ជំហានទី ៤ ៖ ផ្ទេរប្រាក់ចំណេញសុទ្ធ (Net Profit) ស្វ័យប្រវត្តិចូលកាបូប Web3 (MetaMask, Trust Wallet) របស់អ្នកប្រើប្រាស់ក្នុង Block ដដែល!
-• **ហានិភ័យបាត់បង់ប្រាក់ដើម ០.០០ ដុល្លារ ($0.00 Capital Risk)** ៖ ប្រសិនបើការជួញដូរមិនទទួលបានប្រាក់ចំណេញ Smart Contract នឹងដំណើរការ `revert()` ធ្វើឱ្យប្រតិបត្តិការទាំងអស់ត្រូវលុបចោលទាំងស្រុង ដោយមិនបាត់បង់លុយសូម្បីតែ ១ សេន!
+--------------------------------------------------------------------------------
+៨. `/admin_reset_pin <USER_ID>`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : កំណត់លេខកូដសម្ងាត់ 2FA PIN របស់សមាជិកឡើងវិញ ក្នុងករណី User ភ្លេចលេខសម្ងាត់។
+• របៀបដំណើរការ    : លុប Password Hash ចាស់ក្នុង Database ចោល អនុញ្ញាតឱ្យ User កំណត់ `/set_pin` ថ្មីបានភ្លាមៗ។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_reset_pin 537186806`
 
-៤.២ កត្តាជំនួយ និងយុទ្ធសាស្ត្រគន្លឹះ ៤ យ៉ាង (THE 4 KEY AUXILIARY STRATEGIES) ៖
-១. 🛡️ **Private RPC & Anti-MEV Sandwich / Front-Running Shield** ៖
-   - ភ្ជាប់ត្រង់ទៅកាន់ Flashbots Protect Relay, MEV-Blocker, និង Eden Network។
-   - ប្រតិបត្តិការមិនឆ្លងកាត់ Public Mempool ឡើយ (0% Mempool Exposure) លុបបំបាត់ការរងការវាយប្រហារពី MEV Sandwich Bots ១០០%!
-២. ⚡ **Layer 2 Ultra-Low Gas Priority Routing Engine** ៖
-   - ផ្តល់អាទិភាពដល់បណ្តាញ L2 (Arbitrum One, Base, BNB Smart Chain, Linea, Polygon PoS) ដែលមានថ្លៃ Gas ទាបបំផុត (< $0.05/Tx) និងល្បឿន Block Time ក្រោម 0.25 វិនាទី!
-៣. 🎯 **AI Dynamic Liquidity Depth & Optimal Loan Sizing** ៖
-   - ប្រើប្រាស់ XGBoost Model គណនាជម្រៅ Liquidity Pool ជាក់ស្តែង និងកំណត់ទំហំកម្ចីល្អបំផុត ($L^*$) ដើម្បីទប់ស្កាត់ Slippage មិនឱ្យលើសពី 0.15% ជាដាច់ខាត។
-៤. 🌐 **CeDeFi Hybrid Arbitrage Bridging Engine** ៖
-   - ស្កេនរកគម្លាតតម្លៃ Real-Time រវាង Binance CEX Orderbook និង DEX AMM Pools ដោយស្វ័យប្រវត្តិ។
+--------------------------------------------------------------------------------
+៩. `/admin_delete <USER_ID>`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : លុបទិន្នន័យសមាជិកណាមួយចេញពី Database ទាំងស្រុង។
+• របៀបដំណើរការ    : លុបព័ត៌មាន User, កម្ទេច API Keys ដែល Encrypt ទុក, លុបប្រវត្តិជួញដូរ និងកំណត់ហេតុទាំងអស់។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_delete 537186806`
 
-៤.៣ ការកំណត់កាបូប WEB3 MULTI-CHAIN SETTLEMENT (`/set_web3_wallet`) ៖
-• សមាជិក VIP គ្រាន់តែ Copied & Paste អាសយដ្ឋានកាបូប Web3 របស់ខ្លួន ៖
-  - `/set_web3_wallet 0x71C...` ➔ ប្រព័ន្ធស្គាល់ និងចាក់សោរបណ្តាញ EVM (Ethereum, Base, Arbitrum, BSC, Linea, Polygon)
-  - `/set_web3_wallet 7xKX...` ➔ ប្រព័ន្ធស្គាល់បណ្តាញ Solana (Raydium Arbitrage)
-  - `/set_web3_wallet TYu8...` ➔ ប្រព័ន្ធស្គាល់បណ្តាញ TRON
-  - `/set_web3_wallet bc1q...` ➔ ប្រព័ន្ធស្គាល់បណ្តាញ Bitcoin
-• រាល់ Net Profit ពី Flash Loan ត្រូវបានផ្ទេរត្រង់ទៅកាន់កាបូបនេះ ដោយគ្មាន Developer ណាអាចទប់ស្កាត់បានឡើយ!
+--------------------------------------------------------------------------------
+១០. `/admin_nuke <PIN>`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : កុងតាក់អាសន្នបិទប្រព័ន្ធទាំងស្រុង (Global Emergency Panic Shutdown)។
+• របៀបដំណើរការ    : ផ្ទៀងផ្ទាត់ PIN Admin រួចបញ្ជា Market Close រាល់ Positions ទាំងអស់លើ Binance និងផ្អាករាល់ Bot ទាំងអស់ក្នុងពេល <30ms!
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_nuke 1234`
 
-៤.៤ ម៉ឺនុយបញ្ជា FLASH LOAN SUITE ៖
-• `/flash_loan` ➔ បង្ហាញផ្ទាំងបញ្ជា Flash Loan Arbitrage Console Interactive។
-• `/flash_loan 24/7` ឬ `/flash_loan AUTO ON` ➔ បើកស្កេន និងប្រតិបត្តិ Flash Loan Arbitrage ស្វ័យប្រវត្តិ ២៤ ម៉ោង។
-• `/flash_loan SCAN` ➔ ស្កេនរកឱកាស Arbitrage ផ្ទាល់រវាង DEX Pools Real-time។
-• `/flash_loan STRATEGY` ➔ ពិនិត្យមើលព័ត៌មានលម្អិតនៃយុទ្ធសាស្ត្រគន្លឹះទាំង ៤។
-• `/flash_loan CEDEFI` ➔ ស្កេនរកគម្លាតតម្លៃរវាង Binance Orderbook និង DEX Pools។
-• `/flash_loan SIM <AMOUNT>` ➔ សាកល្បងរត់ Simulation Flash Loan (ឧ. `/flash_loan SIM 1000000`)។
-• `/keeper` ឬ `/flash_loan_keeper` ➔ ពិនិត្យមើលស្ថានភាព Web3 Keeper Bot Relayer។
+--------------------------------------------------------------------------------
+១១. `/admin_view_portfolio <USER_ID>`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ពិនិត្យមើល Portfolio និងសមតុល្យសាច់ប្រាក់របស់សមាជិកណាម្នាក់។
+• របៀបដំណើរការ    : អានទិន្នន័យកាបូប Spot, Futures, និង PnL បច្ចុប្បន្នរបស់ User នោះ ដើម្បីងាយស្រួលជួយដោះស្រាយបញ្ហា។
+• ឧទាហរណ៍ជាក់ស្តែង : `/admin_view_portfolio 537186806`
+
+--------------------------------------------------------------------------------
+១២. `/toggle_breaker`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : បើក ឬបិទ ស្វិតស្វ័យប្រវត្តិ Circuit Breaker។
+• របៀបដំណើរការ    : កំណត់ស្ថានភាព Breaker (ON/OFF)។ នៅពេល ON ប្រព័ន្ធនឹងផ្អាកការបើក Order ថ្មីទាំងអស់ ប្រសិនបើទីផ្សារជួបវិបត្តិធ្លាក់ចុះខ្លាំង។
+• ឧទាហរណ៍ជាក់ស្តែង : `/toggle_breaker`
+
+--------------------------------------------------------------------------------
+១៣. `/toggle_rebalance`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : បើក ឬបិទ មុខងារ Rebalance ទុនសកលរវាង Spot និង Futures។
+• របៀបដំណើរការ    : ផ្ទេរប្រាក់ចំណេញពី Futures មក Spot ឬបែងចែកទុនតាម Sharpe Ratio ដោយស្វ័យប្រវត្តិ។
+• ឧទាហរណ៍ជាក់ស្តែង : `/toggle_rebalance`
+
+--------------------------------------------------------------------------------
+១៤. `/health`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ពិនិត្យមើលសុខភាពផ្នែករឹងរបស់ម៉ាស៊ីន VPS Real-Time។
+• របៀបដំណើរការ    : បង្ហាញបន្ទុក CPU Load %, RAM Usage %, ទំហំ Disk Free, ទំហំ Database SQLite (MB), និង Network Latency ទៅកាន់ Binance API (ms)។
+• ឧទាហរណ៍ជាក់ស្តែង : `/health`
+
+--------------------------------------------------------------------------------
+១៥. `/sync_brain`
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : Hot-Reload ទាញយកទម្ងន់ AI Models ថ្មីៗពី Hugging Face Cloud Hub។
+• របៀបដំណើរការ    : ទាញយកឯកសារ `.pkl`, `.h5`, `.json` ថ្មីមកជំនួសក្នុង RAM ក្នុងពេលត្រឹមតែ ១ វិនាទី ដោយមិនបាច់ Restart Bot ឡើយ!
+• ឧទាហរណ៍ជាក់ស្តែង : `/sync_brain`
 
 ================================================================================
-៥. ម៉ាស៊ីនជួញដូរស្នូល TURBO HEDGE HFT & 6-TIER SPOT TRADING ENGINE
+ផ្នែកទី ៣ ៖ ម៉ាស៊ីនជួញដូរស្នូល TURBO HEDGE & 6-TIER SPOT ENGINE
 ================================================================================
 
-Turbo Hedge HFT Engine គឺជាម៉ាស៊ីនស្នូលដ៏មានឥទ្ធិពលបំផុតរបស់ Apex AGI Bot ដែលទទួលបន្ទុកការជួញដូរទាំងស្រុងលើ Binance Spot និង Binance USDT-M Futures ៖
+៣.១ FUTURES MULTI-COIN HFT SCANNER (`/turbo_hedge TOP`) ៖
+--------------------------------------------------------------------------------
+• ការស្កេនកាក់ ២០០+ លើ Binance Futures ៖
+  ទាញយកទិន្នន័យ 24hr Ticker រៀងរាល់ ១៥ វិនាទី ដោយជ្រើសរើសតែកាក់ណាដែលមាន Volume >= $5,000,000 USDT ដើម្បីលុបបំបាត់បញ្ហា Slippage។
 
-៥.១ ដំណើរការ FUTURES MULTI-COIN HFT SCANNER (`/turbo_hedge TOP`) ៖
-• **ការស្កេនកាក់ ២០០+ លើ Binance Futures** ៖ ប្រព័ន្ធទាញយកទិន្នន័យពី `/fapi/v1/ticker/24hr` រៀងរាល់ ១៥ វិនាទី ដោយចម្រោះយកតែកាក់ណាដែលមានទំហំជួញដូរធំ (Quote Volume >= $5,000,000 USDT) ដើម្បីលុបបំបាត់បញ្ហា Slippage ទាំងស្រុង។
-• **ការចម្រោះកាក់ TradFi Stock Perpetual Index ចោល ១០០% (Error -4411 Fix)** ៖
-  - ប្រព័ន្ធចម្រោះកាក់ភាគហ៊ុនអាមេរិក និងបរទេស (QNTX, MINIMAX, ZHIPU, NVDA, TSLA, AAPL, AMZN, MSFT, MSTR, PLTR, ARM...) ដោយស្វ័យប្រវត្តិ ធានាថាមិនមានការបាញ់ Order ទៅលើកាក់ដែល Binance មិនអនុញ្ញាតឡើយ។
-• **Multi-Timeframe Alignment (1m + 5m + 15m Trend Confluence)** ៖
-  - ទៀន 1 នាទី ៖ គណនា EMA 5 និង EMA 15 ព្រមទាំង RSI 14 និង Volume Delta ដើម្បីកំណត់ចំណុចចូល (Entry Timing)។
-  - ទៀន 5 នាទី និង 15 នាទី ៖ គណនា EMA 20 និង EMA 50 ដើម្បីបញ្ជាក់ទិសដៅនិន្នាការធំ (Trend Direction)។ បើ 5m បង្ហាញ Bullish ទើបអនុញ្ញាតឱ្យបើក Long ហើយបើ Bearish ទើបអនុញ្ញាតឱ្យបើក Short ជៀសវាងការជួញដូរបញ្ច្រាសទិសដៅទីផ្សារ (Choppy Market Shield)។
-• **Dynamic Leverage Shield សម្រាប់ដើមទុនតូច** ៖
-  - គណនីដែលមានដើមទុនក្រោម $100 USDT ត្រូវបានប្រព័ន្ធកម្រិត Leverage អតិបរមាត្រឹម **10x** ជាដាច់ខាត ទោះបីជា User វាយបញ្ជាលើសពីនេះក៏ដោយ។
-  - គណនីទុនធំត្រូវបានអនុញ្ញាតអតិបរមាត្រឹម **15x Max Ceiling** (សម្រាប់ Bot Autonomous) ដើម្បីធានាសុវត្ថិភាព មិនឱ្យមានហានិភ័យ Liquidation ឡើយ។
-• **ISOLATED Margin Enforcement ដាច់ខាត** ៖
-  - ប្រព័ន្ធបង្ខំ Margin Type ទៅជា **ISOLATED** ជានិច្ច មុនពេលបើក Position។ ប្រសិនបើមានបញ្ហាកាក់ណាមួយ គឺខាតបង់ត្រឹមកាក់នោះ មិនអាចរាលដាលដល់សមតុល្យសរុបក្នុង Wallet ឡើយ (Zero Cross-Margin Risk)។
-• **Net Profit Take Profit Floor (+0.12% Offset)** ៖
-  - ប្រព័ន្ធគណនាថ្លៃសេវាជួញដូរ Binance Taker Fee (0.04% ពេលបើក + 0.04% ពេលបិទ = 0.08% សរុប) ដោយបន្ថែម Floor 0.12% ទៅលើគោលដៅចំណេញ ធានាថាប្រាក់ចំណេញដែលទទួលបានគឺជាប្រាក់ចំណេញសុទ្ធពិតប្រាកដ។
+• ការចម្រោះកាក់ TradFi Stock ចោល ១០០% (Invariant 7 - Error -4411 Fix) ៖
+  ស្កាត់ចោលកាក់ភាគហ៊ុន (NVDA, TSLA, AAPL, AMZN, MSFT, MSTR, PLTR, QNTX, MINIMAX...) ធានាថាមិនមានការបាញ់ Order ទៅកាក់ដែលមិនមានលើ Crypto Perpetual ឡើយ។
 
-៥.២ APEX 6-TIER SUPER SMART SPOT TRADING ENGINE (`/turbo_hedge SPOT TOP` ឬ `/smart_trade SPOT`) ៖
-យន្តការកម្រិតកំពូលទាំង ៦ របស់ Spot Engine លុបបំបាត់ចោលទាំងស្រុងនូវហានិភ័យជាប់គាំងកាក់ (100% Bag-Holding Elimination) និងការដេញទិញនៅកំពូលភ្នំ (Peak FOMO Shield) ៖
-• **Tier 1: BTC Lead Impulse Guard** ៖
-  - ពិនិត្យចលនារបស់ Bitcoin (BTCUSDT) ជាមុន។ ប្រសិនបើ BTC កំពុងធ្លាក់ចុះខ្លាំង (DUMPING) ម៉ាស៊ីននឹងផ្អាកការទិញ Spot លើ Altcoins ទាំងអស់ជាបន្ទាន់ ដើម្បីជៀសវាងការធ្លាក់ចុះតាមមេធំ។
-• **Tier 2: Binance Spot Delisting & Monitoring Tag Safety Shield** ៖
-  - ស្កាត់ចោលកាក់ណាដែលជាប់ស្លាក "MONITORING", "DELISTING", "ST", "SEED_TAG" ឬមិនអនុញ្ញាតឱ្យជួញដូរ Spot លើ Binance។
-• **Tier 3: Multi-Timeframe Trend Confluence & RSI Sweet-Spot (15m + 5m + 1m)** ៖
-  - តម្រូវឱ្យ 15m Trend Bullish + 5m Trend Bullish + 1m EMA Confluence។
-  - RSI 14 ត្រូវស្ថិតនៅក្នុងតំបន់ Sweet-Spot ចន្លោះពី **48.0 ដល់ 65.0**។ ប្រសិនបើ RSI > 65.0 (Overbought / Peak Risk) ប្រព័ន្ធនឹងបដិសេធមិនទិញដាច់ខាត!
-• **Tier 4: Pullback Retracement Guard (លុបបំបាត់ការដេញទិញ FOMO)** ៖
-  - ប្រសិនបើតម្លៃកាក់កំពុងហក់ឡើងលើសពី 0.3% ពីលើខ្សែ EMA 5 (Price Extended > 0.3% above EMA5) ម៉ាស៊ីននឹងរង់ចាំឱ្យតម្លៃ Retrace មកប៉ះ EMA 5 សិន ទើបបញ្ជាទិញ។
-• **Tier 5: Whale Bid Wall Orderbook Confluence** ៖
-  - ស្កេនជម្រៅ Orderbook Depth (Top 20 Bids/Asks)។ ទាមទារឱ្យមាន Whale Bid Wall Support យ៉ាងតិច **$100,000 USDT** និងទំហំទិញត្រូវធំជាងទំហំលក់យ៉ាងតិច 1.8 ដង (Bids > 1.8x Asks)។
-• **Tier 6: Multi-Stage Staggered Take-Profit & Dynamic ATR Trailing Stop** ៖
-  - បែងចែកការលក់យកចំណេញជាដំណាក់កាល (Scale-Out 50% ពេលចំណេញដល់ Target) និងរុញ Stop Loss មកលើ Entry Price (Break-Even Lock) រួមជាមួយ Dynamic ATR Trailing Stop ដេញតាមកំពូលរហូតដល់អស់រលក!
+• Multi-Timeframe Confluence (1m + 5m + 15m) ៖
+  - ទៀន 1m ៖ គណនា EMA 5, EMA 15, RSI 14, និង Volume Delta កំណត់ចំណុចចូល (Entry Timing)។
+  - ទៀន 5m & 15m ៖ គណនា EMA 20 និង EMA 50 បញ្ជាក់ទិសដៅធំ (Bullish = Long, Bearish = Short)។
 
-៥.៣ គំរូ និងរូបមន្តនៃពាក្យបញ្ជា SUPER SMART SUITE (`/smart_trade` ឬ `/turbo_hedge`) ៖
-រូបមន្ត ៖
-`/smart_trade [ទីតាំង១: ម៉ូដ/កាក់] [ទីតាំង២: ទុន/ចំនួន] [ទីតាំង៣: Leverage] [ទីតាំង៤: ទិសដៅ/AUTO] [ទីតាំង៥: គោលដៅចំណេញ] [ទីតាំង៦: PIN]`
+• Dynamic Leverage Shield (Invariant 8) ៖
+  - ដើមទុន < $100 USDT ៖ Leverage ត្រូវបានកម្រិតត្រឹម <= 10x ដាច់ខាត។
+  - ដើមទុនធំ ៖ Leverage អតិបរមាត្រឹម 15x Ceiling សម្រាប់ដំណើរការ Bot អូតូ។
 
-ឧទាហរណ៍ជាក់ស្តែង (1-Tap Copy) ៖
-• `Futures AGI Auto Decision`   ➔ `/smart_trade TOP 20 10 AUTO 5 1234` (AI ស្កេន & សម្រេចចិត្ត Long/Short ស្វ័យប្រវត្តិ 24/7)
-• `Futures Top Gainers LONG`    ➔ `/smart_trade TOP 20 10 BUY 5 1234` (ស្កេន Futures Gainers កំពូល ២០, ទុន $5, 10x)
-• `Futures Top Dumpers SHORT`   ➔ `/smart_trade TOP 20 10 SELL 5 1234` (ស្កេន Futures Dumpers កំពូល ២០, ទុន $5, 10x)
-• `Delta-Neutral Hedge (0% Risk)`➔ `/smart_trade HEDGE BTC 100 1234` (ទិញ Spot 1x + Short Futures 1x ប្រមូល Yield)
-• `Spot Multi-Coin Scanner`     ➔ `/smart_trade SPOT AUTO 50 1234` (ស្កេនកាក់ Spot Breakout 0% Liquidation, ទុន $50)
-• `Spot Single-Coin Mode`        ➔ `/smart_trade SPOT SOL 50 1234` (ទិញ Spot SOL ទុន $50, 1x)
-• `Stop Single Coin`             ➔ `/smart_trade STOP SOL 1234` (បិទ និង Market Sell SOL ភ្លាមៗ)
-• `Stop All Positions`           ➔ `/smart_trade STOP ALL 1234` (បិទ និង Market Sell គ្រប់កាក់ទាំងអស់ភ្លាមៗ <30ms)
+• ISOLATED Margin Enforcement (Invariant 3) ៖
+  - បង្ខំ Margin Type ទៅជា ISOLATED ជានិច្ច ការពារមិនឱ្យការខាតបង់រាលដាលដល់សមតុល្យសរុបក្នុងកាបូប (Zero Cross-Wallet Spillover)។
 
-================================================================================
-៦. ⚡ HFT X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE (<2ms LATENCY)
-================================================================================
+• Net Profit Take Profit Floor (Invariant 9) ៖
+  - បូកបន្ថែម Offset +0.12% ទៅលើគោលដៅ Take Profit ដើម្បីទូទាត់ថ្លៃសេវាជួញដូរ Binance Taker Fee (0.08% Round-trip) ធានាថាប្រាក់ចំណេញដែលទទួលបានគឺជាប្រាក់ចំណេញសុទ្ធ ១០០%។
 
-ស្ថាបត្យកម្ម `hft_x_truth_firehose_engine.py` គឺជាកំពូលបច្ចេកវិទ្យាចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុតរបស់ Khmer Master Crypto ដែលត្រូវបានរៀបចំឡើងជាពិសេស ៖
+៣.២ APEX 6-TIER SUPER SMART SPOT TRADING ENGINE ៖
+--------------------------------------------------------------------------------
+យន្តការសុវត្ថិភាព ៦ ជាន់ លុបបំបាត់ចោលទាំងស្រុងនូវបញ្ហាជាប់គាំងកាក់ (Zero Bag-Holding) ៖
+• Tier 1: BTC Lead Impulse Guard ៖ ផ្អាកការទិញ Spot Altcoins ទាំងអស់ភ្លាមៗ ប្រសិនបើ Bitcoin (BTC) កំពុងធ្លាក់ចុះខ្លាំង (Dumping)។
+• Tier 2: Binance Delisting & Tag Shield ៖ ស្កាត់ចោលកាក់ដែលជាប់ស្លាក "MONITORING", "DELISTING", "ST", "SEED_TAG"។
+• Tier 3: Multi-Timeframe Trend & RSI Sweet-Spot ៖ ទៀន 15m + 5m ត្រូវ Bullish ហើយ RSI 14 ត្រូវស្ថិតក្នុងចន្លោះពី 48.0 ដល់ 65.0 (បើ RSI > 65 បដិសេធមិនទិញដាច់ខាត ការពារការទិញនៅកំពូល)។
+• Tier 4: Pullback Retracement Guard ៖ ប្រសិនបើតម្លៃហក់ឡើងលើសពី 0.3% ពីលើខ្សែ EMA 5 ម៉ាស៊ីននឹងរង់ចាំឱ្យតម្លៃ Retrace ប៉ះ EMA 5 សិន ទើបទិញ (បំបាត់ការទិញ FOMO)។
+• Tier 5: Whale Bid Wall Confluence ៖ ស្កេន Orderbook Depth ទាមទារឱ្យមាន Whale Bid Wall Support យ៉ាងតិច $100,000 USDT និងទំហំទិញត្រូវធំជាងលក់ 1.8 ដង (Bids > 1.8x Asks)។
+• Tier 6: Multi-Stage Staggered TP & Dynamic ATR Trailing Stop ៖ លក់យកចំណេញជាដំណាក់កាល (Scale-Out 50% ពេលដល់ Target) និងរុញ Stop Loss មកលើ Entry Price (Break-Even Lock) រួមជាមួយ Dynamic ATR Trailing Stop ដេញតាមរលកតម្លៃ។
 
-• **ការតភ្ជាប់ Direct Push Stream API** ៖
-  - បោះបង់ចោលវិធីសាស្ត្រ Polling ចាស់ដែលស៊ីពេល (1-5 វិនាទី) ដោយជំនួសមកវិញនូវ WebSocket Direct Push ពី X (Twitter API v2) និង Truth Social Webhooks ចូលមកកាន់ Server Tokyo/Singapore ដោយផ្ទាល់។
-• **ការផ្ទៀងផ្ទាត់គណនីផ្លូវការតាម Numeric User IDs (Anti-Spoofing Guard)** ៖
-  - ប្រព័ន្ធចាក់សោតាមដានតែ ID លេខពិតប្រាកដរបស់បុគ្គលមានឥទ្ធិពលបំផុតប៉ុណ្ណោះ រួមមាន ៖
-    * Donald J. Trump (`25073877`)
-    * Elon Musk (`44196397`)
-    * Federal Reserve (`14886361`)
-    * SEC Gov (`7592462`)
-  - យន្តការនេះលុបបំបាត់ ១០០% នូវការក្លែងបន្លំគណនី (Fake Account Spoofing) ឬគណនីដែលទិញ Blue Badge ក្លែងឈ្មោះ!
-• **Aho-Corasick Trie String Automaton (`FastSentimentTrie`)** ៖
-  - ជំនួសការហៅ LLM API ដែលយឺត (ស៊ីពេល 500ms - 2000ms) ដោយប្រើប្រាស់ C-backed string matching automaton។
-  - វិភាគ Sentiment (BULLISH / BEARISH) និងកាក់គោលដៅ (BTC, ETH, SOL, DOGE, PAXG) ក្នុងរយៈពេលត្រឹមតែ **0.021 មីលីវិនាទី** (២១ មីក្រូវិនាទី) ប៉ុណ្ណោះ!
-• **Negation Word Filter (តម្រងពាក្យបដិសេធ)** ៖
-  - ស្កេនពិនិត្យ ២៥ តួអក្សរមុនពាក្យគន្លឹះ ប្រសិនបើមានពាក្យ "not", "never", "no", "deny", "false", "fake" ប្រព័ន្ធនឹងបម្លែងទិសដៅ Sentiment ដោយស្វ័យប្រវត្តិ ការពារការយល់ច្រឡំលើព័ត៌មានបដិសេធ។
-• **Zero-Copy In-Memory RAM Ring Buffer (`EventRingBuffer`)** ៖
-  - ដំណើរការលើ RAM ១០០% តាមរយៈ `collections.deque` ដោយមិនសរសេរចុះ Hard Disk មុនពេល Trade ឡើយ។
-• **Pre-Warmed WebSocket Order Dispatcher** ៖
-  - បាញ់បញ្ជាទិញ/លក់ជាប្រភេទ IOC (Immediate-Or-Cancel) ទៅកាន់ Binance/Bybit WebSocket ក្នុងរយៈពេល **0.044 មីលីវិនាទី** (Benchmark Latency) មុនពេលទីផ្សាររាយរាប់ម៉ឺននាក់ដឹងខ្លួន!
+៣.៣ រូបមន្តបញ្ជា SUPER SMART SUITE (`/smart_trade` ឬ `/turbo_hedge`) ៖
+--------------------------------------------------------------------------------
+ទម្រង់ទូទៅ ៖
+`/smart_trade [ម៉ូដ/កាក់] [ទុន/ចំនួន] [Leverage] [ទិសដៅ/AUTO] [គោលដៅចំណេញ] [PIN]`
+
+ឧទាហរណ៍អនុវត្តជាក់ស្តែង (1-Tap Copy) ៖
+• `Futures AGI Auto 24/7`  ➔ `/smart_trade TOP 20 10 AUTO 5 1234`  (AI ស្កេន និងសម្រេចចិត្ត Long/Short អូតូ)
+• `Futures Top Gainers`    ➔ `/smart_trade TOP 20 10 BUY 5 1234`   (ស្កេន Futures Gainers កំពូល ២០, ទុន $5, 10x)
+• `Futures Top Dumpers`    ➔ `/smart_trade TOP 20 10 SELL 5 1234`  (ស្កេន Futures Dumpers កំពូល ២០, ទុន $5, 10x)
+• `Delta-Neutral Hedge`    ➔ `/smart_trade HEDGE BTC 100 1234`     (ទិញ Spot 1x + Short Futures 1x កើប Yield 0% Risk)
+• `Spot Breakout Scanner`  ➔ `/smart_trade SPOT AUTO 50 1234`      (ស្កេនទិញ Spot Breakout អូតូ 0% Liquidation)
+• `Spot Single Coin`       ➔ `/smart_trade SPOT SOL 50 1234`       (ទិញ Spot SOL ទុន $50)
+• `Stop Single Coin`       ➔ `/smart_trade STOP SOL 1234`          (បិទ និង Market Sell SOL ភ្លាមៗ)
+• `Stop All Positions`     ➔ `/smart_trade STOP ALL 1234`          (បិទ និង Market Close គ្រប់កាក់ទាំងអស់ <30ms)
 
 ================================================================================
-៧. ស្ថាបត្យកម្ម AI SUPER BRAIN, MASTER FUSION MODELS & COLAB TRAINER
+ផ្នែកទី ៤ ៖ ម៉ាស៊ីន DEFI MEV & FLASH LOAN ARBITRAGE ENGINE
+================================================================================
+
+៤.១ គោលការណ៍គ្រឹះនៃ FLASH LOAN ARBITRAGE (`/flash_loan`) ៖
+--------------------------------------------------------------------------------
+• ខ្ចីទុនរាប់លានដុល្លារដោយគ្មានទ្រព្យបញ្ចាំ ($0 Collateral) ពី Aave V3 Liquidity Pools (ETH, USDT, USDC, WBTC)។
+• ការប្រតិបត្តិក្នុង Block តែមួយ (Atomic Single-Block Execution) ៖
+  ១. ខ្ចីប្រាក់ពី Aave V3 Pool
+  ២. ជួញដូរ Arbitrage លើ Decentralized Exchanges (Uniswap, PancakeSwap, Raydium, Curve, SushiSwap)
+  ៣. សងប្រាក់ដើមបូកកម្រៃជើងសារ 0.05% ទៅកាន់ Aave វិញ
+  ៤. ផ្ទេរប្រាក់ចំណេញសុទ្ធ (Net Profit) ស្វ័យប្រវត្តិចូលកាបូប Web3 របស់អ្នកប្រើប្រាស់ក្នុង Block ដដែល!
+• ហានិភ័យបាត់បង់ប្រាក់ដើម ០.០០ ដុល្លារ ($0.00 Capital Risk) ៖
+  ប្រសិនបើការជួញដូរមិនទទួលបានប្រាក់ចំណេញ Smart Contract នឹងដំណើរការ `revert()` ធ្វើឱ្យប្រតិបត្តិការទាំងអស់ត្រូវលុបចោលទាំងស្រុង ដោយមិនបាត់បង់លុយសូម្បីតែ ១ សេន!
+
+៤.២ យុទ្ធសាស្ត្រគន្លឹះ ៤ យ៉ាង (THE 4 KEY AUXILIARY STRATEGIES) ៖
+--------------------------------------------------------------------------------
+• ១. Private RPC & Anti-MEV Sandwich Shield ៖
+  ភ្ជាប់ត្រង់ទៅ Flashbots Protect Relay, MEV-Blocker និង Eden Network (0% Mempool Exposure) លុបបំបាត់ការរងការវាយប្រហារពី MEV Bots ១០០%។
+• ២. Layer 2 Ultra-Low Gas Priority Routing ៖
+  ផ្តល់អាទិភាពដល់បណ្តាញ L2 (Arbitrum, Base, BSC, Linea, Polygon) ដែលមាន Gas ទាបបំផុត (< $0.05/Tx) និងល្បឿន Block ក្រោម 0.25 វិនាទី។
+• ៣. AI Dynamic Liquidity Depth & Loan Sizing ៖
+  ប្រើប្រាស់ XGBoost Model គណនាទំហំកម្ចីល្អបំផុត ដើម្បីទប់ស្កាត់ Slippage មិនឱ្យលើសពី 0.15% ជាដាច់ខាត។
+• ៤. CeDeFi Hybrid Arbitrage Bridging ៖
+  ស្កេនរកគម្លាតតម្លៃ Real-Time រវាង Binance CEX Orderbook និង DEX AMM Pools ដោយស្វ័យប្រវត្តិ។
+
+៤.៣ បញ្ជីពាក្យបញ្ជា FLASH LOAN SUITE ៖
+--------------------------------------------------------------------------------
+• `/flash_loan`                     : បង្ហាញផ្ទាំងបញ្ជា Flash Loan Console Interactive
+• `/flash_loan 24/7`                : បើកស្កេន និងប្រតិបត្តិ Flash Loan Arbitrage ស្វ័យប្រវត្តិ ២៤ ម៉ោង
+• `/flash_loan SCAN`                : ស្កេនរកឱកាស Arbitrage ផ្ទាល់រវាង DEX Pools Real-time
+• `/flash_loan STRATEGY`            : ពិនិត្យព័ត៌មានលម្អិតនៃយុទ្ធសាស្ត្រគន្លឹះទាំង ៤
+• `/flash_loan CEDEFI`              : ស្កេនរកគម្លាតតម្លៃរវាង Binance Orderbook និង DEX Pools
+• `/flash_loan SIM <AMOUNT>`        : សាកល្បង Simulation Flash Loan (ឧ. `/flash_loan SIM 1000000`)
+• `/set_web3_wallet <ADDRESS>`      : កំណត់អាសយដ្ឋានកាបូប Web3 (MetaMask/Trust Wallet) ទទួល Net Profit
+• `/keeper` ឬ `/flash_loan_keeper`  : ពិនិត្យមើលស្ថានភាព Web3 Keeper Bot Relayer
+
+================================================================================
+ផ្នែកទី ៥ ៖ ម៉ាស៊ីនវិនិយោគស្ថាប័នទាំង ៦ (6 WALL STREET QUANTITATIVE ENGINES)
+================================================================================
+
+--------------------------------------------------------------------------------
+៥.១ ⚡ SUB-5ms CROSS-EXCHANGE ARBITRAGE ENGINE (`/cross_arb`)
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ស្កេនចាប់យកគម្លាតតម្លៃ (Spread) រវាង Binance, Bybit, OKX, និង Coinbase ក្នុងល្បឿន Sub-5ms។
+• របៀបដំណើរការ    : ប្រើប្រាស់ ONNX Sub-10ms Model + XGBoost Orderbook Imbalance + LSTM Neural Net ធានាថាក្រោយកាត់ Fee នៅតែចំណេញសុទ្ធ (Net Spread > 0.18%)។
+• ពាក្យបញ្ជាប្រើប្រាស់ :
+  - `/cross_arb SCAN`                ➔ ស្កេនពិនិត្យគម្លាតតម្លៃផ្សារទាំង ៤ Real-time
+  - `/cross_arb AUTO 100 1234`       ➔ បើក Arbitrage អូតូទុន $100 USDT (ទាមទារ PIN)
+  - `/cross_arb BTC 50 1234`         ➔ បើក Arbitrage លើគូកាក់ BTCUSDT
+
+--------------------------------------------------------------------------------
+៥.២ 🌾 INSTITUTIONAL DELTA-NEUTRAL FUNDING RATE HARVESTER (`/funding_harvester`)
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : កើបយកអត្រាការប្រាក់ Funding Fee ពី Binance Futures រៀងរាល់ ៨ ម៉ោងម្តង (APY 30% - 120%) ដោយគ្មានហានិភ័យតម្លៃ (0% Directional Risk)។
+• របៀបដំណើរការ    : ទិញ Spot 100% និងបើក Short Futures 1x ក្នុងបរិមាណដូចគ្នាបេះបិទ។ ទោះបីទីផ្សារឡើងឬចុះ ដើមទុនរួមនៅថេរ ប៉ុន្តែប្រមូលបាន Funding Fee ពី Trader ដទៃទៀត។
+• ពាក្យបញ្ជាប្រើប្រាស់ :
+  - `/funding_harvester SCAN`          ➔ ស្កេនរកកាក់ដែលមាន Funding Rate ខ្ពស់បំផុត
+  - `/funding_harvester AUTO 100 1234` ➔ បើកដំណើរការកើប Funding Rate អូតូជាមួយទុន $100 USDT
+  - `/funding_harvester SOL 50 1234`   ➔ បើកដំណើរការ Delta-Neutral លើកាក់ SOL
+
+--------------------------------------------------------------------------------
+៥.៣ 🐋 WHALE ORDERFLOW & DARK POOL FRONT-RUNNING RADAR (`/whales`)
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : តាមដានចលនាសាច់ប្រាក់របស់ស្ថាប័នធំៗ (BlackRock, MicroStrategy, Binance Cold Vault, Fidelity, Coinbase Prime) ក្នុងកម្រិត Sub-Second។
+• របៀបដំណើរការ    : ប្រើប្រាស់ PatchTST Attention Transformer + NLP On-Chain AGI ចាប់សញ្ញា Orderflow >= $1,000,000 USDT ដើម្បីបើក Order Front-Run មុនទីផ្សាររាយរាប់ម៉ឺនដង។
+• ពាក្យបញ្ជាប្រើប្រាស់ :
+  - `/whales`                        ➔ មើលរបាយការណ៍ចលនា Whale Real-time
+  - `/whale_alert ON`                ➔ បើកការជូនដំណឹងពេល Whale ធំៗធ្វើសកម្មភាព
+
+--------------------------------------------------------------------------------
+៥.៤ 📈 AI DYNAMIC COMPOUND INFINITY MATRIX (`/infinity_matrix`)
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : បង្រួម Grid Bot បុរាណទាំងអស់មកជា Dynamic Matrix ជាមួយ 100% Profit Compounding។
+• របៀបដំណើរការ    : រាល់ Micro-Profits ទាំងអស់ត្រូវបានយកទៅ Rebalance និងបូកបន្ថែមចូលដើមទុនដើម (Compound Interest) ភ្លាមៗ ២៤ម៉ោង/៧ថ្ងៃ។
+• ពាក្យបញ្ជាប្រើប្រាស់ :
+  - `/infinity_matrix PAXG 500 100 1234` ➔ បើក Matrix លើមាស PAXG ទុន $500, ចំនួន 100 Grids
+  - `/infinity_matrix BTC 100 20 1234`   ➔ បើក Matrix លើ BTC ទុន $100, ចំនួន 20 Grids
+
+--------------------------------------------------------------------------------
+៥.៥ 🎯 FLASH CRASH / LIQUIDATION CASCADE HUNTING ENGINE (`/flash_crash`)
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ស្ទាក់ចាប់ប្រាក់ចំណេញក្នុងពេលទីផ្សារមានវិបត្តិជ្រុះខ្លាំងភ្លាមៗ (Liquidation Cascade)។
+• របៀបដំណើរការ    : ដាក់បញ្ជា Limit Buy Catch នៅជើងស្រមោលទៀន (Deep Wick 5% - 25% discount) រួចបាញ់បញ្ជាលក់ចេញ (Instant Exit) ក្នុងពេល < 5 វិនាទី កើបចំណេញ 5% ទៅ 25% ភ្លាមៗ!
+• ពាក្យបញ្ជាប្រើប្រាស់ :
+  - `/flash_crash SCAN`              ➔ ស្កេនកាក់ដែលកំពុងមាន Liquidation Cascade
+  - `/flash_crash AUTO 10 100 1234`  ➔ បើក Snipe Deep Wicks អូតូ (Leverage 10x, ទុន $100)
+  - `/flash_crash SOL 10 50 1234`    ➔ បើកស្ទាក់បាតទៀនលើកាក់ SOL
+
+--------------------------------------------------------------------------------
+៥.៦ 🏆 PAXG GOLD WEALTH PROTECTION SWITCHER (`/gold_guard`, `/gold_radar`)
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : យន្តការការពារទ្រព្យសម្បត្តិម៉ាក្រូសេដ្ឋកិច្ច (Macro Safe Haven) តាមរយៈមាសឌីជីថល PAXG (Pax Gold - មានមាសសុទ្ធ ១ អោនត៍នៅ Brink's គាំទ្រ ១០០%)។
+• របៀបដំណើរការ    : តាមដាន DXY, US 10-Year Treasury Yield, CPI, និងទិន្នន័យទិញមាសរបស់ធនាគារកណ្តាលពិភពលោក (PBOC, RBI, CBR)។ ពេលមានវិបត្តិសង្គ្រាម ឬ Black Swan ប្រព័ន្ធអាចដកទុនមកកាន់ PAXG អូតូ។
+• ពាក្យបញ្ជាប្រើប្រាស់ :
+  - `/gold_guard` ឬ `/gold_radar`    ➔ ពិនិត្យរបាយការណ៍វិភាគមាសម៉ាក្រូសេដ្ឋកិច្ច Real-time
+  - `/gold_turbo AUTO 100 1234`      ➔ បើកដំណើរការប្រព័ន្ធជួញដូរមាសស្វ័យប្រវត្តិ
+
+================================================================================
+ផ្នែកទី ៦ ៖ ម៉ាស៊ីន HFT X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE (<2ms)
+================================================================================
+
+ស្ថាបត្យកម្ម `hft_x_truth_firehose_engine.py` គឺជាកំពូលបច្ចេកវិទ្យាចាប់សញ្ញាព័ត៌មានល្បឿនលឿនបំផុតរបស់ប្រព័ន្ធ ៖
+
+• WebSocket Direct Push API ៖
+  ភ្ជាប់ត្រង់ទៅកាន់ X (Twitter API v2) និង Truth Social Webhooks ចូលមកកាន់ Server Tokyo/Singapore ដោយផ្ទាល់ ដោយមិនប្រើ Polling យឺតៗឡើយ។
+
+• Numeric User IDs Anti-Spoofing Guard ៖
+  ចាក់សោតាមដានតែ ID លេខពិតប្រាកដរបស់បុគ្គលមានឥទ្ធិពលបំផុតប៉ុណ្ណោះ ៖
+  - Donald J. Trump : `25073877`
+  - Elon Musk       : `44196397`
+  - Federal Reserve : `14886361`
+  - SEC Gov         : `7592462`
+  (យន្តការនេះលុបបំបាត់ ១០០% នូវការក្លែងបន្លំគណនី Fake Account ឬ Blue Badge ក្លែងឈ្មោះ)!
+
+• Aho-Corasick Trie String Automaton (`FastSentimentTrie`) ៖
+  ជំនួសការហៅ LLM API ដែលយឺត (500ms - 2000ms) ដោយប្រើ C-backed string automaton វិភាគ Sentiment (BULLISH/BEARISH) ក្នុងពេលត្រឹមតែ 0.021 មីលីវិនាទី (២១ មីក្រូវិនាទី)!
+
+• Negation Word Filter ៖
+  ស្កេនពិនិត្យ ២៥ តួអក្សរមុនពាក្យគន្លឹះ បើមានពាក្យ "not", "never", "deny", "false", "fake" ប្រព័ន្ធនឹងបម្លែងទិសដៅ Sentiment អូតូ ការពារការយល់ច្រឡំលើព័ត៌មានបដិសេធ។
+
+• In-Memory RAM Ring Buffer & Order Dispatcher ៖
+  ដំណើរការលើ RAM ១០០% តាមរយៈ `collections.deque` និងបាញ់បញ្ជា IOC ទៅ Binance/Bybit WebSocket ក្នុងរយៈពេលត្រឹមតែ 0.044 មីលីវិនាទី!
+
+================================================================================
+ផ្នែកទី ៧ ៖ ខួរក្បាល AI MULTI-MODEL SWARM & GOOGLE COLAB TRAINER
 ================================================================================
 
 ៧.១ AGI 5-MODEL SWARM ENSEMBLE (`ai_engine.py`) ៖
-ប្រព័ន្ធវិភាគទីផ្សារ និងផ្តល់ប្រឹក្សាបញ្ញាសិប្បនិម្មិត ដំណើរការដោយការបោះឆ្នោតរួមគ្នានៃកំពូល AI ទាំង ៥ ៖
+--------------------------------------------------------------------------------
+ការវិភាគទីផ្សារដំណើរការដោយការបោះឆ្នោតរួមគ្នានៃកំពូល AI ទាំង ៥ ៖
 ១. Google Gemini 2.5 Pro / Flash (Primary High-Reasoning Model)
 ២. DeepSeek-R1 (Hugging Face Serverless Quant Model)
 ៣. Meta Llama-3.3-70B-Instruct (Deep Financial Context)
 ៤. Qwen-2.5-32B (Cross-Market Multilingual Engine)
 ៥. Mistral-7B (Ultra-Fast Fallback Parser)
-• **Consensus Voting System** ៖ ប្រព័ន្ធប្រៀបធៀបលទ្ធផលពី AI ទាំង ៥ ប្រសិនបើសំឡេងភាគច្រើនស្របគ្នា ទើបសញ្ញាជួញដូរត្រូវបានអនុម័ត ជួយកាត់បន្ថយ False Signals ជិតដល់ 0%។
-• **Quantitative Fallback** ៖ ប្រសិនបើបណ្តាញអ៊ីនធឺណិតមានបញ្ហា ឬ Gemini API Key ជាប់កំហុស 401/429 ប្រព័ន្ធនឹងប្តូរមកប្រើ Quantitative Indicators (RSI, ATR, Bollinger, MACD) ជំនួសភ្លាមៗដោយមិនរាំងស្ទះដំណើរការជួញដូរឡើយ។
+• Consensus Voting System ៖ សំឡេងភាគច្រើនស្របគ្នា ទើបសញ្ញាជួញដូរត្រូវបានអនុម័ត កាត់បន្ថយ False Signals ជិតដល់ 0%។
+• Quantitative Fallback ៖ ប្រសិនបើបណ្តាញអ៊ីនធឺណិតមានបញ្ហា ឬ Gemini Key ជាប់ Error 401/429 ប្រព័ន្ធនឹងប្តូរមកប្រើ Indicators (RSI, ATR, Bollinger, MACD) ជំនួសភ្លាមៗដោយមិនរាំងស្ទះឡើយ។
 
-៧.២ ម៉ូដែល AI ជាន់ខ្ពស់ទាំង ១៦ របស់ APEX AGI (`APEX_AGI_Colab_Master_Trainer.py`) ៖
-១. `brain_price.pkl` ៖ XGBoost Regressor ព្យាករណ៍តម្លៃកាក់បន្ទាប់។
-២. `brain_trend.pkl` ៖ XGBoost Classifier កំណត់និន្នាការ (Bullish, Neutral, Bearish)។
-៣. `brain_vol.pkl` ៖ XGBoost Regressor គណនា ATR Volatility សម្រាប់ Stop Loss/Take Profit។
-៤. `brain_tp.pkl` ៖ XGBoost Classifier ចាប់សញ្ញាចំណុចកំពូល Take Profit (TP Exit Signal)។
-៥. `brain_dca.pkl` ៖ XGBoost Classifier កំណត់តំបន់បាតដែលត្រូវទិញ Smart DCA។
-៦. `brain_scaler.pkl` ៖ Scikit-Learn StandardScaler ស្តង់ដារនីយកម្មទិន្នន័យ។
-៧. `brain_graph.pkl` ៖ ក្រាហ្វទំនាក់ទំនងចលនាតម្លៃរវាងកាក់ (Market Graph Correlation)។
-៨. `brain_patchtst.h5` ៖ PatchTST Attention Transformer វិភាគ Time-Series រយៈពេលវែង។
-៩. `brain_ppo_policy.json` ៖ OpenAI PPO Deep Reinforcement Learning Agent គ្រប់គ្រង Strategy Policy។
-១០. `brain_moe_router.pkl` ៖ Mixture of Experts (MoE) Dynamic Gating Router បែងចែកបញ្ជាទៅកាន់ Expert Models តាមស្ថានភាពទីផ្សារជាក់ស្តែង។
-១១. `brain_tgat_graph.pkl` ៖ Temporal Graph Attention Network ភ្ជាប់ទំនាក់ទំនង Orderbook ផ្សារទាំង ៤ និង Whale Wallets។
-១២. `brain_actor_critic_allocator.json` ៖ Deep Actor-Critic Capital Allocator បែងចែកទុនអូតូតាម Kelly Criterion & Sharpe Ratio។
-១៣. `brain_pinn_jump_diff.pkl` ៖ Physics-Informed Jump-Diffusion Volatility Model ព្យាករណ៍ Liquidity Vacuum មុនពេលមាន Flash Crash។
-១៤. `Triple-Ensemble Model` ៖ ការរួមបញ្ចូលគ្នានៃ CatBoost, LightGBM, និង XGBoost។
-១៥. `HMM Gaussian Regime Classifier` ៖ កំណត់សភាពទីផ្សារតាម Hidden Markov Model។
-១៦. `Causal-Learn Discovery` ៖ ក្បួនដោះស្រាយ PC Algorithm ជ្រើសរើស Feature ដែលមានឥទ្ធិពលពិតប្រាកដលើតម្លៃ។
+៧.២ ម៉ូដែល MACHINE LEARNING ទាំង ១៦ របស់ APEX AGI ៖
+--------------------------------------------------------------------------------
+១. `brain_price.pkl`             : XGBoost Regressor ព្យាករណ៍តម្លៃកាក់បន្ទាប់
+២. `brain_trend.pkl`             : XGBoost Classifier កំណត់និន្នាការ (Bullish, Neutral, Bearish)
+៣. `brain_vol.pkl`               : XGBoost Regressor គណនា ATR Volatility សម្រាប់ SL/TP
+៤. `brain_tp.pkl`                : XGBoost Classifier ចាប់សញ្ញាចំណុចកំពូល Take Profit
+៥. `brain_dca.pkl`               : XGBoost Classifier កំណត់តំបន់បាត Smart DCA
+៦. `brain_scaler.pkl`            : Scikit-Learn StandardScaler ស្តង់ដារនីយកម្មទិន្នន័យ
+៧. `brain_graph.pkl`             : Market Graph Correlation ទំនាក់ទំនងតម្លៃរវាងកាក់
+៨. `brain_patchtst.h5`           : PatchTST Attention Transformer វិភាគ Time-Series រយៈវែង
+៩. `brain_ppo_policy.json`       : OpenAI PPO Deep Reinforcement Learning Agent
+១០. `brain_moe_router.pkl`       : Mixture of Experts (MoE) Dynamic Gating Router
+១១. `brain_tgat_graph.pkl`       : Temporal Graph Attention Network ភ្ជាប់ទំនាក់ទំនង Orderbook
+១២. `brain_actor_critic_allocator.json` : Deep Actor-Critic Allocator (Kelly Criterion & Sharpe)
+១៣. `brain_pinn_jump_diff.pkl`   : Physics-Informed Jump-Diffusion Model ព្យាករណ៍ Liquidity Vacuum
+១៤. `Triple-Ensemble Model`      : ការរួមបញ្ចូលគ្នានៃ CatBoost, LightGBM, និង XGBoost
+១៥. `HMM Regime Classifier`      : កំណត់សភាពទីផ្សារតាម Hidden Markov Model
+១៦. `Causal-Learn Discovery`     : PC Algorithm ជ្រើសរើស Feature ដែលមានឥទ្ធិពលពិតប្រាកដ
 
 ៧.៣ GOOGLE COLAB GPU MASTER TRAINER & HUGGING FACE PIPELINE ៖
-• **Google Colab Self-Contained Trainer (`APEX_AGI_Colab_Master_Trainer.py`)** ៖
-  - ឯកសារនេះជា Single-Cell Script ពេញលេញសម្រាប់រត់លើ Google Colab GPU (T4 ឬ A100 GPU ឥតគិតថ្លៃ)។
-  - ទាញយកទិន្នន័យប្រវត្តិសាស្ត្រ ១៥០០ ថ្ងៃ (OHLCV, CVD, Order Flow, On-Chain Metrics, Funding Rates, Fear & Greed Index, S&P 500)។
-  - ហ្វឹកហាត់ម៉ូដែល AI ទាំងអស់ រួច Upload ទម្ងន់ម៉ូដែលថ្មីទៅកាន់ Hugging Face Model Hub (`hemsinath/apex-ai-brain-models`) ដោយស្វ័យប្រវត្តិ។
-  - **អត្ថប្រយោជន៍** ៖ ដំណើរការហ្វឹកហាត់ធ្ងន់ធ្ងររត់លើ Cloud GPU របស់ Google ធ្វើឱ្យ VPS របស់ Admin រក្សាបន្ទុក CPU/RAM 0% ត្រជាក់ និងលឿនរហូត!
-• **Hot-Reload លើ VPS (`/sync_brain`)** ៖
-  - Super Admin គ្រាន់តែវាយបញ្ជា `/sync_brain` លើ Telegram នោះ Bot លើ VPS នឹងទាញយកម៉ូដែល AI ថ្មីៗពី Hugging Face មកជំនួសក្នុងពេលត្រឹមតែ ១ វិនាទី ដោយមិនបាច់ Restart Bot ឡើយ!
+--------------------------------------------------------------------------------
+• Google Colab Self-Contained Trainer (`APEX_AGI_Colab_Master_Trainer.py`) ៖
+  ដំណើរការហ្វឹកហាត់លើ Google Colab GPU (T4 ឬ A100 ឥតគិតថ្លៃ) ទាញយកទិន្នន័យ ១៥០០ ថ្ងៃ រួច Upload ទម្ងន់ម៉ូដែលថ្មីទៅ Hugging Face Hub (`hemsinath/apex-ai-brain-models`) ដោយស្វ័យប្រវត្តិ។ ដំណើរការនេះធ្វើឱ្យ VPS របស់ Admin រក្សាបន្ទុក 0% ត្រជាក់ និងលឿនរហូត!
+• Hot-Reload លើ VPS (`/sync_brain`) ៖
+  Super Admin គ្រាន់តែវាយ `/sync_brain` លើ Telegram នោះ Bot នឹងទាញយកម៉ូដែល AI ថ្មីមកអនុវត្តក្នុងពេលត្រឹមតែ ១ វិនាទី!
 
-៧.៤ FINBERT & 3-PARAGRAPH JOURNALISTIC KHMER CRYPTO NEWS (`ai_news_engine.py`) ៖
-• ស្កេនព័ត៌មានទាន់ហេតុការណ៍ពី RSS Feeds លំដាប់ពិភពលោក (CoinDesk, Cointelegraph, CryptoPotato, Decrypt, Bitcoin.com) រៀងរាល់ ១៥ នាទី។
-• ប្រើប្រាស់ FinBERT Financial Sentiment Analysis ដើម្បីវាយតម្លៃព័ត៌មាន (BULLISH, BEARISH, NEUTRAL)។
-• ទាញយករូបភាព Cover Image កម្រិតច្បាស់ High-Resolution ផ្ញើជូនសមាជិក VIP ជាមួយអត្ថបទព័ត៌មានវិជ្ជាជីវៈ ៣ វគ្គផ្លូវការ ស្របតាមក្បួនខ្នាតអក្សរសិល្បិ៍ខ្មែរ និងវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ១០០%។
+៧.៤ FINBERT & 3-PARAGRAPH KHMER CRYPTO NEWS (`ai_news_engine.py`) ៖
+--------------------------------------------------------------------------------
+ស្កេនព័ត៌មានពី CoinDesk, Cointelegraph, Decrypt, Bitcoin.com រៀងរាល់ ១៥ នាទី ប្រើ FinBERT Sentiment Analysis និងទាញយករូបភាព High-Res Cover Alerts រួចសរសេរជា ៣ វគ្គផ្លូវការ ស្របតាមក្បួនខ្នាតវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ១០០%។
 
 ================================================================================
-៨. ផ្ទាំងបញ្ជា SUPER ADMIN CONSOLE & COMMAND CATALOG (TELEGRAM + GUI)
+ផ្នែកទី ៨ ៖ កាតាឡុកពាក្យបញ្ជាពេញលេញសម្រាប់សមាជិក VIP (VIP COMMAND CATALOG)
 ================================================================================
 
-៨.១ ពាក្យបញ្ជាអំណាច SUPER ADMIN SUITE (TELEGRAM COMMANDS) ៖
-(ការពារដាច់ខាតដោយ `chat_id == 859271875` ឬ `db.is_admin(chat_id)` - ជនក្រៅមិនអាចចូលបានឡើយ) ៖
+--------------------------------------------------------------------------------
+៨.១ ពាក្យបញ្ជាគណនី និងសុវត្ថិភាព (ACCOUNT & SECURITY) ៖
+--------------------------------------------------------------------------------
+• `/start`                       : ចាប់ផ្តើម Bot និងជ្រើសរើសភាសា (ខ្មែរ / English / 中文)
+• `/menu`                        : បើកផ្ទាំង Master Control Panel Interactive ជាមួយ Inline Buttons
+• `/help`                        : មើលសៀវភៅណែនាំ និង Syntax គំរូជាភាសាខ្មែរ
+• `/set_pin <PIN>`               : កំណត់លេខកូដសម្ងាត់ 2FA PIN (សារលុបចេញពី Telegram អូតូ <500ms)
+• `/add_api <KEY> <SECRET> <PIN>` : ភ្ជាប់ Binance API Key & Secret (ធ្វើបានតែក្នុង Private Chat)
+• `/add_bybit_api <KEY> <SECRET> <PIN>` : ភ្ជាប់ Bybit Arbitrage API Key & Secret
+• `/remove_api`                  : លុបបំបាត់ និងកម្ទេច API Keys ចេញពីប្រព័ន្ធទាំងស្រុង
+• `/language <km/en/zh>`         : ផ្លាស់ប្តូរភាសាប្រព័ន្ធរវាង ខ្មែរ, English, និង 中文
+• `/quiet <ON/OFF>`              : បើក/បិទ មុខងារស្ងាត់ ដើម្បីកុំឱ្យផ្ញើសាររំខាន
+• `/paper_trading <ON/OFF> <PIN>`: ប្តូររវាង Simulation Mode (`ON`) និង Live Trading (`OFF`)
+• `/balance`                     : ពិនិត្យសមតុល្យលុយ ៥ កាបូប (Spot Cash, Spot Hold, Futures, Margin, Funding)
+• `/status`                      : បង្ហាញ Positions កំពុងរត់ជាក់ស្តែង (Entry, Mark, Liq Distance, ROI %)
+• `/portfolio`                   : ពិនិត្យមើលទ្រព្យសកម្មសរុប និងប្រវត្តិ Net PnL
 
-• `/admin` ឬ `/admin_panel` ៖ បើកផ្ទាំង Master Admin Dashboard Interactive លើ Telegram ជាមួយប៊ូតុង GUI បញ្ជាគ្រប់គ្រងប្រព័ន្ធទាំងមូល។
-• `/admin_users` ៖ ពិនិត្យបញ្ជីឈ្មោះ, Telegram ID, និងកាលបរិច្ឆេទផុតកំណត់ VIP License របស់សមាជិកទាំងអស់។
-• `/admin_license <USER_ID> <DURATION>` ៖ ផ្តល់ ឬពន្យារ VIP License ជូន User (`1d`, `3d`, `1m`, `2m`, `3m`, `1y`, `2y`, `3y`, `Lifetime`, `Revoke`)។
-  - ប្រព័ន្ធមាន Smart Regex Cleaner សម្អាតចោលនូវអក្សរ `ID:`, `<`, `>`, `:`, `#` ដោយស្វ័យប្រវត្តិ (ឧទាហរណ៍ ៖ `/admin_license 537186806 Lifetime`)។
-• `/admin_broadcast <MESSAGE>` ៖ ផ្សាយដំណឹងអាសន្ន ឬសារយុទ្ធសាស្ត្រទៅកាន់គ្រប់សមាជិក VIP ទាំងអស់ក្នុងពេលដំណាលគ្នា (Parallel Batching មិនស្ទះ Rate Limit)។
-• `/admin_stats` ៖ ពិនិត្យទំហំជួញដូរសរុប (Total Volume), ចំនួន Bot កំពុងរ៉ាន់, និងផលចំណេញរួមទូទាំងប្រព័ន្ធ។
-• `/admin_config` ៖ កែសម្រួល Risk Hurdle, Fee Offset, Min Notional, Max Leverage ក្នុង Runtime ដោយមិនបាច់ Restart Bot!
-• `/admin_signal <SYMBOL> <SIDE> <LEV>` ៖ បាញ់ Signal ជួញដូរឱ្យ Bot របស់សមាជិកទាំងអស់ចូល Order ស្វ័យប្រវត្តិតាម Admin។
-• `/admin_reset_pin <USER_ID>` ៖ កំណត់លេខកូដ 2FA PIN របស់សមាជិកឡើងវិញក្នុងករណីភ្លេច ឬជាប់គាំង។
-• `/admin_delete <USER_ID>` ៖ លុបទិន្នន័យសមាជិកណាមួយចេញពី Database រួមទាំងកម្ទេច API Keys និង Trade Records ទាំងអស់។
-• `/admin_nuke <PIN>` ៖ Emergency Panic Shutdown Market Close រាល់ Positions ទាំងអស់លើ Binance និងផ្អាកប្រព័ន្ធទាំងស្រុងក្នុងករណីអាសន្នបំផុត (<30ms)!
-• `/admin_view_portfolio <USER_ID>` ៖ ពិនិត្យមើល Portfolio, សមតុល្យសាច់ប្រាក់ និងកាក់ដែល User កំពុង Trade។
-• `/toggle_breaker` ៖ បើក ឬបិទ ស្វិតអាសន្ន Circuit Breaker។
-• `/toggle_rebalance` ៖ បើក ឬបិទ យន្តការ Capital Rebalance។
-• `/health` ៖ ពិនិត្យសុខភាពផ្នែករឹង VPS (CPU Load %, RAM Usage %, Disk Space, Database Size, Exchange API Latency)។
-• `/sync_brain` ៖ Hot-Reload ទាញយកទម្ងន់ AI Models ថ្មីៗពី Hugging Face Cloud Hub មកអនុវត្តភ្លាមៗក្នុងពេល ១ វិនាទី!
+--------------------------------------------------------------------------------
+៨.២ ពាក្យបញ្ជាជួញដូរ និងយុទ្ធសាស្ត្រ QUANTITATIVE (TRADING & ENGINES) ៖
+--------------------------------------------------------------------------------
+• `/smart_trade` ឬ `/turbo_hedge`: Flagship Unified Investment Suite (Spot & Futures HFT)
+• `/flash_loan`                  : DeFi MEV & Flash Loan Arbitrage Suite ($0.00 Risk)
+• `/set_web3_wallet <ADDRESS>`   : កំណត់អាសយដ្ឋានកាបូប Web3 ទទួល Net Profit ពី Flash Loan
+• `/cross_arb`                   : Sub-5ms Cross-Exchange Arbitrage (Binance, Bybit, OKX, Coinbase)
+• `/funding_harvester`           : Delta-Neutral 8-Hour Funding Yield Harvester (APY 30%-120%)
+• `/whales`                      : Whale Orderflow & Dark Pool Front-Running Radar
+• `/infinity_matrix`             : Dynamic Compound Grid Matrix ជាមួយ 100% Profit Compounding
+• `/flash_crash`                 : Liquidation Cascade Deep Wick Hunter (Catch wick & exit <5s)
+• `/gold_guard` ឬ `/gold_radar`  : PAXG Gold Macro Safe Haven & Wealth Protection Radar
+• `/gold_turbo AUTO 100 1234`    : បើកដំណើរការប្រព័ន្ធជួញដូរមាសស្វ័យប្រវត្តិ
+• `/scalp <SYMBOL> <AMOUNT> <PIN>`: បើកការជួញដូរ Scalping ល្បឿនលឿនលើកាក់ដែលបានជ្រើសរើស
+• `/auto_trade <ON/OFF> <AMOUNT> <PIN>` : បើក/បិទ មុខងារជួញដូរស្វ័យប្រវត្តិតាម AI Signal
+• `/snipe` ឬ `/auto_snipe`       : Binance New Listing & RVOL Volatility Spike Sniper
+• `/pre_pump`                    : Stealth Smart-Money Accumulation Scanner
+• `/trailing_stop` & `/trailing_guard` : Dynamic ATR Trailing Profit Lock ចាក់សោរប្រាក់ចំណេញ
+• `/stop <SYMBOL> <PIN>`         : បិទ និង Market Close កាក់ណាមួយជាបន្ទាន់ (<30ms)
+• `/stop_all <PIN>`              : Global Emergency Kill-Switch បិទគ្រប់ Positions ទាំងអស់ (<30ms)
 
-៨.២ កាតាឡុកពាក្យបញ្ជាពេញលេញសម្រាប់សមាជិក VIP (VIP USER SUITE) ៖
-
-[១. គណនី និងសុវត្ថិភាពអ្នកប្រើប្រាស់ - ACCOUNT & SECURITY] ៖
-• `/start` ៖ ចាប់ផ្តើម Bot និងជ្រើសរើសភាសាប្រើប្រាស់ (ខ្មែរ / English / 中文)។
-• `/menu` ៖ បើកផ្ទាំង Master Control Panel ជាមួយ Inline Buttons ទាំងអស់។
-• `/help` ៖ សៀវភៅណែនាំប្រើប្រាស់ និង Syntax គំរូជាភាសាខ្មែរ។
-• `/set_pin <PIN>` ៖ កំណត់លេខកូដសម្ងាត់ 2FA PIN (៤-៦ ខ្ទង់) សារត្រូវបានលុបចេញពី Telegram ភ្លាមៗ (<500ms)។
-• `/add_api <KEY> <SECRET> <PIN>` ៖ ភ្ជាប់ Binance API Key & Secret (ធ្វើបានតែក្នុង Private Chat)។
-• `/add_bybit_api <KEY> <SECRET> <PIN>` ៖ ភ្ជាប់ Bybit HFT Arbitrage API Key & Secret។
-• `/remove_api` ៖ លុបបំបាត់ និងកម្ទេច API Keys ចេញពីប្រព័ន្ធទាំងស្រុងដោយសុវត្ថិភាព។
-• `/language <km/en/zh>` ៖ ផ្លាស់ប្តូរភាសាប្រព័ន្ធរវាង ភាសាខ្មែរ, English, និង 中文។
-• `/quiet <ON/OFF>` ៖ បើក/បិទ មុខងារស្ងាត់ ដើម្បីកុំឱ្យផ្ញើសាររំខានក្នុង Telegram ពេល Bot ដំណើរការ។
-• `/paper_trading <ON/OFF> <PIN>` ៖ ប្តូររវាង Demo/Simulation Mode (`ON`) និង Live Money Trading (`OFF`)។
-• `/balance` ៖ ពិនិត្យសមតុល្យលុយបំបែកជា ៥ កាបូបច្បាស់លាស់ (Spot Cash, Spot Hold, Futures, Margin, Funding)។
-• `/status` ៖ បង្ហាញ Positions ដែលកំពុងរ៉ាន់ជាក់ស្តែង (Entry, Mark Price, Liquidation Distance, ROI %)។
-• `/portfolio` ៖ ពិនិត្យមើលទ្រព្យសកម្មសរុប និងប្រវត្តិប្រាក់ចំណេញ Net PnL។
-
-[២. ម៉ាស៊ីនវិនិយោគ និងយុទ្ធសាស្ត្រជួញដូរ - QUANT & DEFI SUITE] ៖
-• `/smart_trade` ឬ `/turbo_hedge` ៖ Flagship Unified Investment Suite (Spot & Futures HFT)។
-• `/flash_loan` ៖ DeFi MEV & Flash Loan Arbitrage Suite ($0.00 Capital Loss Risk)។
-• `/set_web3_wallet <ADDRESS>` ៖ កំណត់អាសយដ្ឋានកាបូប Web3 (MetaMask, Trust Wallet) ទទួល Net Profit។
-• `/cross_arb` ៖ Sub-5ms Cross-Exchange Arbitrage (Binance, Bybit, OKX, Coinbase)។
-• `/funding_harvester` ៖ Delta-Neutral 8-Hour Funding Yield Harvester (APY 30%-120%)។
-• `/whales` ៖ Whale Orderflow & Dark Pool Front-Running Radar ($\ge \$100,000+$ Walls)។
-• `/infinity_matrix` ៖ Dynamic Compound Grid Matrix ជាមួយ 100% Profit Compounding។
-• `/flash_crash` ៖ Liquidation Cascade Deep Wick Hunter (Catch bottom wick & exit < 5s)។
-• `/gold_guard` ឬ `/gold_radar` ៖ PAXG Gold Macro Safe Haven & Wealth Protection Radar។
-• `/snipe` ឬ `/auto_snipe` ៖ Binance New Listing & RVOL Volatility Spike Sniper។
-• `/pre_pump` ៖ Stealth Smart-Money Accumulation Scanner។
-• `/trailing_stop` & `/trailing_guard` ៖ Dynamic ATR Trailing Profit Lock ចាក់សោរប្រាក់ចំណេញ។
-• `/stop` ៖ Single-Coin Sub-30ms Market Close & Engine Exit។
-• `/stop_all` ៖ Global Emergency Kill-Switch & Circuit Breaker (<30ms Exit)។
-
-[៣. បញ្ញាសិប្បនិម្មិត និងព័ត៌មានទីផ្សារ - AI & MARKET INTEL] ៖
-• `/analyze <SYMBOL>` ៖ AGI 5-Model Swarm វិភាគបច្ចេកទេស 360° អមជាមួយ Candlestick Chart 4H។
-• `/predict <SYMBOL>` ៖ 12 Wall Street ML Models ព្យាករណ៍ទិសដៅ K-Line ២៤ ម៉ោង, តម្លៃ Target និង Win-Rate %។
-• `/news` ៖ អានព័ត៌មានទាន់ហេតុការណ៍គ្រីបតូ និងសេដ្ឋកិច្ចម៉ាក្រូសរសេរជា ៣ វគ្គផ្លូវការ។
-• `/top` ៖ Binance 24h Volatility & RVOL Radar (Top Gainers, Losers, Surge >2.5x RVOL)។
-• `/alert <COIN> <PRICE> <ABOVE/BELOW>` ៖ Sub-Second WebSocket Price Watchdog ជូនដំណឹងតម្លៃ Real-time។
-• `/my_alerts` ៖ ពិនិត្យមើល Alert ដែលបានកំណត់ទាំងអស់។
-• `/cancel_alert <ID>` ៖ លុប Alert ណាមួយចោល។
+--------------------------------------------------------------------------------
+៨.៣ ពាក្យបញ្ជាវិភាគ AI និងទិន្នន័យទីផ្សារ (AI INTEL & MARKET DATA) ៖
+--------------------------------------------------------------------------------
+• `/analyze <SYMBOL>`            : AGI 5-Model Swarm វិភាគបច្ចេកទេស 360° អមជាមួយ Candlestick Chart 4H
+• `/predict <SYMBOL>`            : 16 ML Models ព្យាករណ៍ទិសដៅ K-Line ២៤ ម៉ោង, តម្លៃ Target និង Win-Rate %
+• `/news`                        : អានព័ត៌មានទាន់ហេតុការណ៍គ្រីបតូ ៣ វគ្គផ្លូវការ អមជាមួយរូបភាព Cover Image
+• `/top`                         : Binance 24h Volatility Radar (Top Gainers, Losers, Surge >2.5x RVOL)
+• `/alert <COIN> <PRICE> <ABOVE/BELOW>` : Sub-Second WebSocket Price Watchdog ជូនដំណឹងតម្លៃ Real-time
+• `/my_alerts`                   : ពិនិត្យមើល Alert ដែលបានកំណត់ទាំងអស់
+• `/cancel_alert <ID>`           : លុប Alert ណាមួយចោល
 
 ================================================================================
-៩. ស្ថាបត្យកម្មប្រព័ន្ធទិន្នន័យ (DATABASE ARCHITECTURE & SCHEMAS)
+ផ្នែកទី ៩ ៖ ស្ថាបត្យកម្មប្រព័ន្ធទិន្នន័យ (DATABASE WAL MODE & SCHEMAS)
 ================================================================================
-
-Database ផ្លូវការរបស់ប្រព័ន្ធគឺ `bot_database.db` ដែលជាប្រព័ន្ធទិន្នន័យ SQLite កម្រិតខ្ពស់ដំណើរការដោយ Write-Ahead Logging (WAL Mode) ៖
 
 ៩.១ IN-MEMORY RAM CACHE & OPTIMIZATION ៖
-• ប្រព័ន្ធប្រើប្រាស់ `MEMORY_CACHE` ក្នុង RAM ជាមួយ TTL (Time-To-Live) ចន្លោះពី 10s ទៅ 60s សម្រាប់ទិន្នន័យដែលត្រូវអានញឹកញាប់ កាត់បន្ថយបន្ទុក Disk I/O ដល់ទៅ ៩៥%។
+--------------------------------------------------------------------------------
+• ដំណើរការ SQLite ក្រោម Write-Ahead Logging (`PRAGMA journal_mode=WAL;`), `synchronous=NORMAL;`, `busy_timeout=30000;` បង្កើនល្បឿន Read/Write ១០ ដង។
 • Pre-load ព័ត៌មានកាក់ `exchangeInfo` ទាំងអស់ (3,692 Symbols) ចូលក្នុង RAM Cache តែម្តងគត់ (<1.2s) ធ្វើឱ្យការឆែកកាក់នីមួយៗប្រើពេលត្រឹម `0.0001 ms`!
 
-៩.២ តារាងទិន្នន័យស្នូលក្នុង DATABASE (CORE TABLE SCHEMAS) ៖
-១. `users` ៖ ព័ត៌មានសមាជិក (chat_id, username, is_vip, joined_at, language, pin_code, license_expiry, phone_number, auto_trade_amount...)។
-២. `user_api_keys` ៖ Binance API Key & Secret Encrypted ដោយ AES-256 (chat_id, api_key, api_secret)។
-៣. `arbitrage_api_keys` ៖ Bybit, OKX API Keys សម្រាប់ Cross-Exchange Arbitrage។
-៤. `user_web3_wallets` ៖ អាសយដ្ឋានកាបូប Web3 Multi-Chain (chat_id, chain, wallet_address, is_active, updated_at)។
-៥. `flash_loan_settings` ៖ ការកំណត់ដំណើរការ Flash Loan Arbitrage (chat_id, auto_mode, preferred_l2, max_loan_size, min_net_profit)។
-៦. `blacklisted_users` ៖ បញ្ជីខ្មៅអ្នកប្រើប្រាស់ដែលត្រូវហាមឃាត់អចិន្ត្រៃយ៍។
-៧. `system_settings` ៖ ការកំណត់ប្រព័ន្ធសកល (key, value) ដូចជាស្ថានភាព Circuit Breaker និង Quiet Mode។
-៨. `admin_audit_log` ៖ កត់ត្រារាល់សកម្មភាពរបស់ Admin លើប្រព័ន្ធ។
-៩. `active_trades` ៖ កត់ត្រា Position Spot ដែលកំពុងបើកដំណើរការសម្រាប់ Trailing Stop។
-១០. `active_shorts` ៖ កត់ត្រា Position Futures ដែលកំពុងបើកដំណើរការ។
-១១. `turbo_hedge_bots` ៖ កត់ត្រា Bot កំពុងរ៉ាន់ជួញដូរ Turbo Hedge។
-១២. `infinity_matrix_bots` ៖ កត់ត្រា Grid Matrix Bots និងទំហំទុន Accumulated PnL។
-១៣. `funding_harvester_config` & `delta_neutral_bots` ៖ កត់ត្រាការជួញដូរ Delta-Neutral Funding Harvester។
-១៤. `price_alerts` ៖ កត់ត្រាការកំណត់ Alert តម្លៃកាក់របស់ User សម្រាប់ WebSocket Watchdog។
-១៥. `seen_news`, `economic_alerts`, `smart_money_tx`, `failed_pumps` ៖ Anti-Duplicate State Machines ការពារការផ្ញើសារដំណឹងជាន់គ្នា។
+៩.២ តារាងទិន្នន័យស្នូលទាំង ១៥ ក្នុង DATABASE (`bot_database.db`) ៖
+--------------------------------------------------------------------------------
+១. `users`                       : ព័ត៌មានសមាជិក (chat_id, username, is_vip, pin_code, license_expiry...)
+២. `user_api_keys`               : Binance API Key & Secret Encrypted ដោយ AES-256
+៣. `arbitrage_api_keys`          : Bybit, OKX API Keys សម្រាប់ Cross-Exchange Arbitrage
+៤. `user_web3_wallets`           : អាសយដ្ឋានកាបូប Web3 Multi-Chain (EVM, Solana, TRON, BTC)
+៥. `flash_loan_settings`         : ការកំណត់ដំណើរការ Flash Loan Arbitrage
+៦. `blacklisted_users`           : បញ្ជីខ្មៅអ្នកប្រើប្រាស់ដែលត្រូវហាមឃាត់អចិន្ត្រៃយ៍
+៧. `system_settings`             : ការកំណត់ប្រព័ន្ធសកល (Circuit Breaker, Quiet Mode)
+៨. `admin_audit_log`             : កត់ត្រារាល់សកម្មភាពរបស់ Admin លើប្រព័ន្ធ
+៩. `active_trades`               : កត់ត្រា Position Spot ដែលកំពុងរត់សម្រាប់ Trailing Stop
+១០. `active_shorts`              : កត់ត្រា Position Futures ដែលកំពុងដំណើរការ
+១១. `turbo_hedge_bots`           : កត់ត្រា Bot កំពុងរ៉ាន់ជួញដូរ Turbo Hedge
+១២. `infinity_matrix_bots`       : កត់ត្រា Grid Matrix Bots និងទំហំទុន Accumulated PnL
+១៣. `funding_harvester_config`   : កត់ត្រាការជួញដូរ Delta-Neutral Funding Harvester
+១៤. `price_alerts`               : កត់ត្រាការកំណត់ Alert តម្លៃកាក់របស់ User
+១៥. `seen_news` & Anti-Dup State : ការពារការផ្ញើសារដំណឹងព័ត៌មានជាន់គ្នា
 
 ================================================================================
-១០. ស្ថាបត្យកម្មសុវត្ថិភាព និងប្រព័ន្ធការពារការវាយប្រហារ (SECURITY PROTOCOLS)
+ផ្នែកទី ១០ ៖ ពិធីការសុវត្ថិភាព និងការការពារការវាយប្រហារ (SECURITY PROTOCOLS)
 ================================================================================
 
 ១០.១ MILITARY-GRADE AES-256 FERNET ENCRYPTION ៖
-• រាល់ API Key និង API Secret របស់អ្នកប្រើប្រាស់ត្រូវបានធ្វើកូដនីយកម្ម (Encryption) ដោយប្រើប្រាស់គន្លឹះយោធា AES-256 Fernet Key មុនពេលរក្សាទុកក្នុង Database SQLite។
+--------------------------------------------------------------------------------
+• រាល់ API Key និង Secret របស់អ្នកប្រើប្រាស់ត្រូវបាន Encrypt ដោយ AES-256 Fernet Key មុនពេលរក្សាទុកក្នុង Database SQLite។
 • ប្រសិនបើមានជនអនាមិកលួចទាញយកឯកសារ `bot_database.db` ក៏មិនអាចអាន API Keys បានឡើយ ប្រសិនបើគ្មាន `MASTER_KEY` នៅក្នុងឯកសារ `.env`។
 
 ១០.២ PBKDF2-HMAC-SHA256 (100,000 ROUNDS) សម្រាប់ PIN 2FA ៖
-• លេខកូដ PIN សម្ងាត់របស់ User មិនត្រូវបានរក្សាទុកជា Plain Text ឡើយ។
-• ប្រព័ន្ធប្រើប្រាស់ក្បួន PBKDF2-HMAC-SHA256 ជាមួយ Iteration ចំនួន **100,000 ជុំ** និងបូកបញ្ចូលជាមួយ Unique Per-User Salt (`<CHAT_ID>_TURBO_AGI_SALT_2026`) ការពារការវាយប្រហារ Rainbow Table និង Brute-force ១០០%។
+--------------------------------------------------------------------------------
+• លេខកូដ PIN ត្រូវបាន Hash ដោយក្បួន PBKDF2-HMAC-SHA256 ចំនួន 100,000 ជុំ បូកបញ្ចូលជាមួយ Unique Per-User Salt (`<CHAT_ID>_TURBO_AGI_SALT_2026`) ការពារ Rainbow Table និង Brute-force ១០០%។
 • សារដែលមានផ្ទុកលេខកូដ PIN ត្រូវបានលុបចេញពី Telegram ភ្លាមៗ (<500ms) ដោយស្វ័យប្រវត្តិ (Sub-Second Auto-Purge)!
 
 ================================================================================
-១១. ដំណោះស្រាយសមត្ថភាព និងល្បឿនដំណើរការ (PERFORMANCE BREAKTHROUGHS)
+ផ្នែកទី ១១ ៖ ដំណោះស្រាយសមត្ថភាព និងល្បឿនដំណើរការ (PERFORMANCE BREAKTHROUGHS)
 ================================================================================
 
-ដើម្បីដោះស្រាយបញ្ហា Bot ដំណើរការយឺត ឬគាំងលើម៉ាស៊ីន VPS ប្រព័ន្ធបានអនុវត្តនូវដំណោះស្រាយលំដាប់ខ្ពស់ចំនួន ៤ ៖
+ដើម្បីធានាថា Bot ដំណើរការលឿនដូចផ្លេកបន្ទោរ (<30ms) គ្មានការគាំងលើ VPS ៖
 
-១. ⚡ **Batch ExchangeInfo Pre-loading (សន្សំពេល ៩៩%)** ៖
-   - ជំនួសការហៅ API ExchangeInfo ម្តងមួយៗរាប់រយដង ដោយទាញយកទិន្នន័យកាក់ Binance Spot ទាំងអស់ (3,692 Symbols) ចូលក្នុង RAM Cache តែម្តងគត់ (<1.2s) ពេល Boot។
-   - រាល់ការឆែកកាក់បន្ទាប់ពីនោះ ប្រើពេលត្រឹមតែ **`0.0001 ms` (Microsecond Lookup)** ដោយគ្មាន HTTP Network Delay ឡើយ!
-២. 🎯 **Direct Spot Routing (កម្ចាត់ Timeout Delay ១០០%)** ៖
-   - បន្ថែមប៉ារ៉ាម៉ែត្រ `is_spot=True` ទៅកាន់ `get_klines` និង `depth`។ នៅពេលស្កេនកាក់ Spot ប្រព័ន្ធនឹងរត់ត្រង់ទៅកាន់ `api.binance.com/api/v3` ដោយផ្ទាល់ មិនឆ្លងកាត់ Futures និងលែងមានការរង់ចាំ Timeout ១.៥ វិនាទីទៀតឡើយ។
-៣. 💎 **Precision Top 15 Slicing** ៖
-   - កាត់បន្ថយចំនួនកាក់ដែលត្រូវស្កេនពី ១០០ កាក់ មកត្រឹម **Top 15 Momentum Coins** (ព្រោះប្រព័ន្ធត្រូវការទិញត្រឹមតែ ១ ទៅ ៣ កាក់ប៉ុណ្ណោះ) កាត់បន្ថយបន្ទុក API ជាង ៨៥%។
-៤. 🔄 **Asyncio Event Loop Yielding (`await asyncio.sleep(0.02)`)** ៖
-   - បញ្ចូលការផ្ទេរសិទ្ធិ (Yield) ទៅឱ្យ Telegram Event Loop ក្នុងចន្លោះពេលពិនិត្យកាក់នីមួយៗ ធានាថា Telegram Bot ឆ្លើយតបសាររបស់អ្នកប្រើប្រាស់បានភ្លាមៗ **(<30ms Instant Response)** ដោយគ្មានការគាំងឡើយ!
+• ១. Batch ExchangeInfo Pre-loading (សន្សំពេល ៩៩%) ៖
+  ទាញយកទិន្នន័យ Binance Spot ទាំងអស់ (3,692 Symbols) ចូល RAM តែម្តងគត់ពេល Boot (<1.2s)។ ការឆែកកាក់បន្ទាប់ពីនោះប្រើពេលត្រឹម `0.0001 ms` គ្មាន Network Delay ឡើយ!
+
+• ២. Direct Spot Routing (កម្ចាត់ Timeout Delay ១០០%) ៖
+  បន្ថែម `is_spot=True` ទៅកាន់ Klines និង Depth រត់ត្រង់ទៅ `api.binance.com/api/v3` ដោយផ្ទាល់ លុបបំបាត់ការរង់ចាំ Timeout ១.៥ វិនាទី។
+
+• ៣. Precision Top 15 Slicing ៖
+  កាត់បន្ថយការស្កេនពី ១០០ កាក់ មកត្រឹម Top 15 Momentum Coins កាត់បន្ថយបន្ទុក API ជាង ៨៥%។
+
+• ៤. Asyncio Event Loop Yielding (`await asyncio.sleep(0.02)`) ៖
+  ផ្ទេរសិទ្ធិទៅឱ្យ Telegram Event Loop ក្នុងចន្លោះពេលពិនិត្យកាក់នីមួយៗ ធានាថា Telegram Bot ឆ្លើយតបសារភ្លាមៗ (<30ms) គ្មានការគាំងឡើយ!
 
 ================================================================================
-១២. វិធីសាស្ត្រដំឡើង ថែទាំ និង DEPLOYMENT លើ CLOUD VPS (SYSTEMD)
+ផ្នែកទី ១២ ៖ មគ្គុទ្ទេសក៍គ្រប់គ្រង VPS, DEPLOYMENT & TROUBLESHOOTING GUIDE
 ================================================================================
 
-១២.១ ការបែងចែកដាច់ខាតរវាង WINDOWS LOCAL TERMINAL និង GCP VPS SSH TERMINAL ៖
-⚠️ **ចំណុចសំខាន់បំផុតដែល SUPER ADMIN ត្រូវដឹង** ៖
-• **Windows Local PC (e:\AI CODE PYTHON\Khmer Master Crypto\...)** ៖
-  - នេះជាម៉ាស៊ីនកុំព្យូទ័រផ្ទាល់ខ្លួនរបស់អ្នក (Local Development Machine)។
-  - Folder `/opt/khmer-master-crypto-bot` **មិនមាននៅលើ Windows ឡើយ**! ប្រសិនបើអ្នកវាយ `cd /opt/...` ក្នុង PowerShell លើ Windows វានឹងចេញ Error ៖
+១២.១ ការបែងចែករវាង WINDOWS LOCAL PC និង GCP VPS SSH ៖
+--------------------------------------------------------------------------------
+⚠️ ចំណុចសំខាន់បំផុត ៖
+• Windows Local PC (`E:\AI CODE PYTHON\Khmer Master Crypto\...`) ៖
+  - នេះជាម៉ាស៊ីនកុំព្យូទ័រផ្ទាល់ខ្លួនរបស់អ្នក។ Folder `/opt/...` មិនមាននៅលើ Windows ឡើយ!
+  - ប្រសិនបើវាយ `cd /opt/...` ក្នុង PowerShell លើ Windows វានឹងចេញ Error ៖
     `Set-Location: Cannot find path 'E:\opt\khmer-master-crypto-bot' because it does not exist.`
-• **Google Cloud Platform (GCP) Linux VPS** ៖
-  - នេះជាម៉ាស៊ីន Server ពពកដែលដំណើរការ Bot ២៤/៧។
-  - Command `cd /opt/khmer-master-crypto-bot` អាចប្រើបាន **លុះត្រាតែអ្នកបាន SSH ចូលទៅក្នុង VPS ជាមុនសិន** តាមរយៈ ៖
-    ```bash
-    # ភ្ជាប់ SSH ចូលទៅកាន់ GCP VPS ៖
-    gcloud compute ssh khmer-master-crypto-bot --zone=<YOUR_ZONE>
-    # ឬប្រើកម្មវិធី PuTTY / Terminal SSH ដោយប្រើ IP របស់ VPS
-    ```
+• Google Cloud Platform (GCP) Linux VPS ៖
+  - នេះជា Server ពពកដែលដំណើរការ Bot ២៤/៧។
+  - Command `cd /opt/khmer-master-crypto-bot` ដំណើរការបានលុះត្រាតែអ្នកបាន SSH ចូលទៅក្នុង VPS ជាមុនសិន តាមរយៈ Cloud Console Web SSH ឬ ៖
+    `gcloud compute ssh khmer-master-crypto-bot --zone=<YOUR_ZONE>`
 
-១២.២ វិធីសាស្ត្រ UPDATE កូដថ្មីលើ GCP VPS (ZERO DATA LOSS) ៖
+១២.២ របៀប UPDATE កូដថ្មីលើ GCP VPS (ZERO DATA LOSS) ៖
+--------------------------------------------------------------------------------
 ក្រោយពេលភ្ជាប់ SSH ចូលក្នុង GCP VPS រួចរាល់ សូមដំណើរការ ៖
-
 ```bash
 # ១. ចូលទៅកាន់ Folder របស់ Bot លើ Linux VPS
 cd /opt/khmer-master-crypto-bot
@@ -486,10 +557,10 @@ sudo journalctl -u khmer-master-crypto-bot -f -n 50
 ```
 
 ១២.៣ វិធីសាស្ត្រដោះស្រាយបញ្ហាបច្ចេកទេស (TROUBLESHOOTING GUIDE) ៖
-
-• 🚨 **បញ្ហាទី ១ ៖ កំហុស Telegram `409 Conflict: terminated by other getUpdates request`**
-  - *មូលហេតុ* ៖ មាន Bot Instance លើសពីមួយកំពុងដំណើរការទាញយកសារពី Telegram ដំណាលគ្នា (ឧ. រត់ទាំងលើ Windows និងលើ VPS ឬរត់ ២ Process លើ VPS តែមួយ)។
-  - *ដំណោះស្រាយ* ៖
+--------------------------------------------------------------------------------
+• 🚨 បញ្ហា Telegram `409 Conflict: terminated by other getUpdates request` ៖
+  - មូលហេតុ ៖ មាន Bot Instance លើសពីមួយកំពុងដំណើរការដំណាលគ្នា (រត់ទាំងលើ PC និងលើ VPS)។
+  - ដំណោះស្រាយ ៖
     ```bash
     sudo systemctl stop khmer-master-crypto-bot
     pkill -9 -f main.py || true
@@ -497,35 +568,35 @@ sudo journalctl -u khmer-master-crypto-bot -f -n 50
     sudo systemctl start khmer-master-crypto-bot
     ```
 
-• 🚨 **បញ្ហាទី ២ ៖ Binance API Error `-1013 Filter failure: LOT_SIZE / MIN_NOTIONAL`**
-  - *មូលហេតុ* ៖ ទំហំសាច់ប្រាក់តូចជាងលក្ខខណ្ឌកំណត់របស់ Binance ($10.00 USDT)។
-  - *ដំណោះស្រាយ* ៖ កំណែ v13.00 បានចាក់សោរ Hard Floor $10.50 USDT (Invariant 1) លុបបំបាត់កំហុសនេះ ១០០%។
+• 🚨 បញ្ហា Binance API Error `-1013 Filter failure: MIN_NOTIONAL` ៖
+  - មូលហេតុ ៖ ទំហំកុម្ម៉ង់ទិញតូចជាង $10.00 USDT។
+  - ដំណោះស្រាយ ៖ កំណែ v13.00 បានចាក់សោរ Hard Floor $10.50 USDT (Invariant 1) លុបបំបាត់កំហុសនេះ ១០០%។
 
-• 🚨 **បញ្ហាទី ៣ ៖ Binance API Error `-4061 Order's position side does not match user's setting`**
-  - *មូលហេតុ* ៖ គណនី Binance ស្ថិតក្នុង Hedge Mode ប៉ុន្តែ Order មិនបានបញ្ជាក់ `positionSide="LONG"` ឬ `"SHORT"`។
-  - *ដំណោះស្រាយ* ៖ ប្រព័ន្ធមាន Auto-Recovery dynamically toggles and retries automatically (Invariant 2)។
+• 🚨 បញ្ហា Binance API Error `-4061 Order's position side does not match` ៖
+  - មូលហេតុ ៖ គណនីស្ថិតក្នុង Hedge Mode ប៉ុន្តែ Order មិនបានបញ្ជាក់ positionSide។
+  - ដំណោះស្រាយ ៖ ប្រព័ន្ធមាន Auto-Recovery dynamically toggles and retries automatically (Invariant 2)។
 
-• 🚨 **បញ្ហាទី ៤ ៖ កំហុស Gemini API `401 Invalid Authentication` ឬ `429 Resource Exhausted`**
-  - *ដំណោះស្រាយ* ៖ ចូលទៅកាន់ `aistudio.google.com` បង្កើត API Key ថ្មី រួចដាក់ចូលក្នុង `.env`។ ប្រព័ន្ធនឹងប្តូរទៅប្រើ Quantitative Fallback ដោយស្វ័យប្រវត្តិ មិនធ្វើឱ្យ Bot គាំងឡើយ។
+• 🚨 បញ្ហា Gemini API `401 Invalid Authentication` ឬ `429 Resource Exhausted` ៖
+  - ដំណោះស្រាយ ៖ បង្កើត API Key ថ្មីពី `aistudio.google.com` ដាក់ចូលក្នុង `.env`។ ប្រព័ន្ធនឹងប្តូរទៅប្រើ Quantitative Fallback អូតូ មិនធ្វើឱ្យ Bot គាំងឡើយ។
 
 ================================================================================
-១៣. តារាង MATRIX គ្រប់គ្រងដើមទុន និងហានិភ័យ (CAPITAL ALLOCATION MATRIX)
+ផ្នែកទី ១៣ ៖ តារាង MATRIX គ្រប់គ្រងដើមទុន និងហានិភ័យ (CAPITAL ALLOCATION MATRIX)
 ================================================================================
 
-ដើម្បីធានាសុវត្ថិភាពដើមទុន ១០០% សម្រាប់សមាជិក VIP គ្រប់រូប Super Admin ត្រូវណែនាំសមាជិកឱ្យអនុវត្តតាមតារាង Matrix គ្រប់គ្រងទុនកម្រិតស្ថាប័នខាងក្រោម ៖
+ដើម្បីធានាសុវត្ថិភាពដើមទុន ១០០% សូមណែនាំសមាជិកឱ្យអនុវត្តតាមតារាង Matrix ខាងក្រោម ៖
 
-┌────────────────────┬──────────────┬───────────────┬─────────────────┬────────────────────────┐
-│ កម្រិតដើមទុន (USDT) │ ចំនួនកាក់អតិបរមា │ Leverage អតិបរមា │ ទំហំទុនក្នុង 1 កាក់ │ យុទ្ធសាស្ត្រដែលណែនាំ     │
-├────────────────────┼──────────────┼───────────────┼─────────────────┼────────────────────────┤
-│ ក្រោម $15 USDT      │ ១ កាក់         │ 10x Max       │ $2.50 - $5.00   │ Single-Coin Futures/DCA│
-│ $15 - $30 USDT     │ ៣ ទៅ ៥ កាក់    │ 10x Max       │ $3.00 - $5.00   │ Turbo Hedge TOP (Auto) │
-│ $30 - $100 USDT    │ ៥ ទៅ ១០ កាក់   │ 10x - 15x Max │ $5.00 - $10.00  │ Turbo Hedge + Matrix   │
-│ $100 - $500 USDT   │ ១០ ទៅ ១៥ កាក់  │ 10x - 15x Max │ $10.00 - $25.00 │ All Quant + DeFi Suite │
-│ លើសពី $500 USDT    │ ២០ កាក់        │ 10x - 15x Max │ $25.00 - $50.00 │ Full Multi-Asset Portfolio│
-└────────────────────┴──────────────┴───────────────┴─────────────────┴────────────────────────┘
+--------------------------------------------------------------------------------
+កម្រិតដើមទុន (USDT) | ចំនួនកាក់  | Leverage អតិបរមា | ទុនក្នុង 1 កាក់  | យុទ្ធសាស្ត្រណែនាំ
+--------------------+-----------+------------------+-----------------+--------------------------
+ក្រោម $15 USDT      | ១ កាក់     | 10x Max          | $2.50 - $5.00   | Single-Coin Futures/DCA
+$15 - $30 USDT     | ៣ - ៥ កាក់ | 10x Max          | $3.00 - $5.00   | Turbo Hedge TOP (Auto)
+$30 - $100 USDT    | ៥ - ១០ កាក់| 10x - 15x Max    | $5.00 - $10.00  | Turbo Hedge + Matrix
+$100 - $500 USDT   | ១០-១៥ កាក់ | 10x - 15x Max    | $10.00 - $25.00 | All Quant + DeFi Suite
+លើសពី $500 USDT    | ២០ កាក់    | 10x - 15x Max    | $25.00 - $50.00 | Full Portfolio & Arbitrage
+--------------------------------------------------------------------------------
 
-💡 **គោលការណ៍មាសសម្រាប់ SUPER ADMIN** ៖
-១. រក្សាទុក Free Margin យ៉ាងតិច ៤០% ទៅ ៥០% នៃសមតុល្យកាបូប Futures ជានិច្ច ជៀសវាងការប្រើទុនអស់ ១០០% (Margin Exhaustion)។
+💡 គោលការណ៍មាស ៣ យ៉ាងសម្រាប់ SUPER ADMIN ៖
+១. រក្សាទុក Free Margin យ៉ាងតិច ៤០% ទៅ ៥០% នៃសមតុល្យកាបូប Futures ជានិច្ច ជៀសវាង Margin Exhaustion។
 ២. លើកទឹកចិត្តឱ្យសមាជិកកំណត់លេខកូដ 2FA PIN ជានិច្ច មុនពេលចាប់ផ្តើមបើកមុខងារជួញដូរ។
 ៣. ធ្វើការ Backup Database និងពិនិត្យមើល `/health` យ៉ាងហោចណាស់ ១ សប្តាហ៍ម្តង ដើម្បីធានាសុខភាពម៉ាស៊ីន VPS!
 
