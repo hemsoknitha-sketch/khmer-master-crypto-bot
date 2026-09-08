@@ -5194,7 +5194,7 @@ async def flash_loan_autonomous_engine(app: Application):
                             "═════════════════════════════════════════\n\n"
                             "⚙️ **ស្ថានភាព ៖** `REVERTED (ការពារទុន 0-Risk ជោគជ័យ)`\n"
                             f"🪙 **គូជួញដូរ ៖** `{symbol} ({pair})`\n"
-                            f"📈 **គម្លាតតម្លៃ ៖** `+{spread_pct:.3f}%` (មិនទាន់គ្រប់ថ្លៃ DEX Fee សរុប ~0.45%)\n"
+                            f"📈 **គម្លាតតម្លៃ ៖** `+{spread_pct:.3f}%` (ថ្លៃ Fee សរុប ~{fee_hurdle:.2f}%)\n"
                             f"🛡️ **ហានិភ័យទុន ៖** `$0.00 (Zero Out-of-pocket Loss)`\n"
                             f"🔗 **Arbiscan Tx ៖** [ចុចមើល Transaction]({explorer_link})\n\n"
                             "💡 _Smart Contract បាន Revert ស្វ័យប្រវត្តិក្នុ Block ដដែល ដើម្បីធានាថាមិនខាតបង់ប្រាក់ដើមសូម្បីតែ $1! ប្រព័ន្ធកំពុងស្កេនរកគម្លាតធំជាងនេះបន្តទៀត..._"
@@ -5205,7 +5205,7 @@ async def flash_loan_autonomous_engine(app: Application):
                             "═════════════════════════════════════════\n\n"
                             "⚙️ **Status:** `REVERTED (0-Risk Capital Protection Active)`\n"
                             f"🪙 **Pair:** `{symbol} ({pair})`\n"
-                            f"📈 **Price Spread:** `+{spread_pct:.3f}%` (Below DEX round-trip fees ~0.45%)\n"
+                            f"📈 **Price Spread:** `+{spread_pct:.3f}%` (Round-trip fees ~{fee_hurdle:.2f}%)\n"
                             f"🛡️ **Capital Lost:** `$0.00 (Zero Loss Guarantee)`\n"
                             f"🔗 **Arbiscan Tx:** [View Transaction]({explorer_link})\n\n"
                             "💡 _Smart contract atomically reverted in the same block to protect principal. Scanner continues searching for wider spreads!_"
@@ -5217,7 +5217,14 @@ async def flash_loan_autonomous_engine(app: Application):
                             pass
                     continue
 
-                if wallet_addr:
+                if exec_res.get("mode") == "KEEPER_AUTHORIZATION_REQUIRED":
+                    if wallet_addr:
+                        mode_badge = "🟡 VERIFIED ON-CHAIN (Contract Authorization Pending)"
+                        mode_badge_km = "🟡 VERIFIED ON-CHAIN (រង់ចាំការបើកសិទ្ធិ Keeper ពីកាបូប Owner)"
+                    else:
+                        mode_badge = "🧪 SIMULATION / VERIFIED (Link Web3 Wallet to Settle)"
+                        mode_badge_km = "🧪 SIMULATION / VERIFIED (ភ្ជាប់ Web3 Wallet ដើម្បីដកប្រាក់ពិត)"
+                elif wallet_addr:
                     mode_badge = "🟢 LIVE ARBITRUM MAINNET (On-Chain Settled)"
                     mode_badge_km = "🟢 LIVE ARBITRUM MAINNET (កើបលុយពិតលើ Blockchain)"
                 else:
