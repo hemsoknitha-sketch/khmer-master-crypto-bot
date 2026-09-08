@@ -169,7 +169,7 @@ class KeeperRelayerEngine:
                 with open(env_path, "r", encoding="utf-8") as f:
                     for line in f:
                         l = line.strip()
-                        if l.startswith("KEEPER_RELAYER_PRIVATE_KEY="):
+                        if l.startswith("KEEPER_RELAYER_PRIVATE_KEY") and "=" in l:
                             val = l.split("=", 1)[1].strip().strip('"').strip("'")
                             if val and not val.startswith("PASTE_"):
                                 fmt_v = val if val.startswith("0x") else "0x" + val
