@@ -9,6 +9,7 @@
 import os
 import sys
 import json
+import shutil
 import joblib
 import numpy as np
 
@@ -88,7 +89,14 @@ CANONICAL_ARTIFACTS = [
     "brain_xgb.pkl",
     "dqn_market_maker.pth",
     "inverse_trend_config.json",
-    "production_hyperparameters.json"
+    "production_hyperparameters.json",
+    "hft_infrastructure/MEV_Arbitrage.yul",
+    "hft_infrastructure/Optimized_MEV_Arbitrage.yul",
+    "hft_infrastructure/ai_multi_hop_jit_router.py",
+    "hft_infrastructure/ai_multi_hop_jit_router_v2.py",
+    "hft_infrastructure/hft_server_config.json",
+    "hft_infrastructure/private_mempool_integration.py",
+    "hft_infrastructure/private_mempool_integration_v2.py"
 ]
 
 def generate_local_master_fusion_fallback(filename):
@@ -192,6 +200,12 @@ def sync_all_models():
                 repo_type="model"
             )
             print(f"  └─ SUCCESS: Synced {filename} -> {downloaded_path}")
+            if filename.startswith("hft_infrastructure/"):
+                root_hft_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hft_infrastructure")
+                os.makedirs(root_hft_dir, exist_ok=True)
+                dest = os.path.join(root_hft_dir, os.path.basename(filename))
+                if os.path.exists(downloaded_path):
+                    shutil.copy2(downloaded_path, dest)
             synced_count += 1
         except Exception as e:
             target_path = os.path.join(MODELS_DIR, filename)

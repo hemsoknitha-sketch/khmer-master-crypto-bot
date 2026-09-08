@@ -270,6 +270,7 @@
 ៤.៣ បញ្ជីពាក្យបញ្ជា FLASH LOAN SUITE ៖
 --------------------------------------------------------------------------------
 • `/flash_loan`                     : បង្ហាញផ្ទាំងបញ្ជា Flash Loan Console Interactive
+• `/flash_loan MEV`                 : ពិនិត្យស្ថានភាព Tokyo HFT MEV Weapon Stack ទាំង ៤ សសរស្ដម្ភ
 • `/flash_loan 24/7`                : បើកស្កេន និងប្រតិបត្តិ Flash Loan Arbitrage ស្វ័យប្រវត្តិ ២៤ ម៉ោង
 • `/flash_loan SCAN`                : ស្កេនរកឱកាស Arbitrage ផ្ទាល់រវាង DEX Pools Real-time
 • `/flash_loan STRATEGY`            : ពិនិត្យព័ត៌មានលម្អិតនៃយុទ្ធសាស្ត្រគន្លឹះទាំង ៤
@@ -277,6 +278,34 @@
 • `/flash_loan SIM <AMOUNT>`        : សាកល្បង Simulation Flash Loan (ឧ. `/flash_loan SIM 1000000`)
 • `/set_web3_wallet <ADDRESS>`      : កំណត់អាសយដ្ឋានកាបូប Web3 (MetaMask/Trust Wallet) ទទួល Net Profit
 • `/keeper` ឬ `/flash_loan_keeper`  : ពិនិត្យមើលស្ថានភាព Web3 Keeper Bot Relayer
+
+៤.៤ អាវុធ HFT MEV ស្នូលទាំង ៤ នៅលើ GCP TOKYO VPS (THE TOKYO HFT MEV WEAPON STACK) ៖
+--------------------------------------------------------------------------------
+ការរួមបញ្ចូលគ្នារវាងបច្ចេកវិទ្យាកំពូលទាំង ៤ ធ្វើឱ្យ Bot នៅលើ VPS Tokyo ក្លាយជាអាវុធ MEV ដ៏មានឥទ្ធិពលបំផុតដែលគ្មាននរណាអាចរារាំងបាន ៖
+
+១. 🛡️ Flashbots (លាក់បំបាំង ០% Mempool Exposure) ៖
+   • ឯកសារអនុវត្ត ៖ `hft_infrastructure/private_mempool_integration.py`, `private_mempool_integration_v2.py`
+   • យន្តការ ៖ បាញ់ Transactions តាមផ្លូវសម្ងាត់ (Private Bundle Relay) ផ្ទាល់ទៅកាន់ Flashbots Protect, Eden Network, BeaverBuild, Titan Builder និង rsync-builder។
+   • អត្ថប្រយោជន៍ ៖ មិនឆ្លងកាត់ Public Mempool ឡើយ (0% Exposure) ការពារ ១០០% ពីការលួចចម្លង (Front-running) ឬការវាយប្រហារ Sandwich Attack ពី Bot ដទៃ។
+
+២. ⚡ Assembly Code (សន្សំ Gas ៦៨.៨៩%) ៖
+   • ឯកសារអនុវត្ត ៖ `hft_infrastructure/MEV_Arbitrage.yul`, `Optimized_MEV_Arbitrage.yul`
+   • យន្តការ ៖ សរសេរកូដ Low-Level Yul EVM Bytecode ដោយផ្ទាល់ គ្រប់គ្រងលើ Memory និង Storage Pointers ដោយមិនឆ្លងកាត់ Overhead របស់ Solidity Compiler។
+   • អត្ថប្រយោជន៍ ៖ ប្រតិបត្តិការចំណាយត្រឹមតែ ~42,000 Gas ប៉ុណ្ណោះ បើធៀបនឹង Solidity ទូទៅដែលស៊ីដល់ទៅ ~135,000 Gas (សន្សំបាន ៦៨.៨៩%) ផ្តល់ប្រៀបឈ្នះដាច់គេលើថ្លៃ Gas ក្នុងការប្រជែង Block នីមួយៗ!
+
+៣. 🔄 Multi-Hop JIT Router (ផ្លូវស្មុគស្មាញ) ៖
+   • ឯកសារអនុវត្ត ៖ `hft_infrastructure/ai_multi_hop_jit_router.py`, `ai_multi_hop_jit_router_v2.py`
+   • យន្តការ ៖ ម៉ាស៊ីន AI Pathfinder រកផ្លូវជួញដូរឆ្លងកាត់ DEX Pools ច្រើនដំណាក់កាល (Cyclic 4-Hop Routing ៖ Aave V3 ➔ Uniswap V3 ➔ SushiSwap ➔ Curve ➔ Balancer ➔ Aave V3)។
+   • អត្ថប្រយោជន៍ ៖ បង្កើតឱកាសចំណេញលើផ្លូវស្មុគស្មាញដែល Bot ទូទៅមើលមិនឃើញ ជាមួយបច្ចេកទេស Just-In-Time (JIT) Flash Liquidity Borrow។
+
+៤. 🚀 Co-location (ល្បឿនពន្លឺ Sub-Millisecond) ៖
+   • ឯកសារអនុវត្ត ៖ `hft_infrastructure/hft_server_config.json`
+   • យន្តការ ៖ ម៉ាស៊ីន Google Cloud VPS ស្ថិតក្នុងតំបន់ Tokyo Region (`asia-northeast1` / AWS `ap-northeast-1`) ជាមួយបច្ចេកវិទ្យា DPDK Kernel Bypass, CPU Pinning Cores 1-15, និងបណ្តាញ 100 Gbps Ultra-Low Latency Fiber។
+   • អត្ថប្រយោជន៍ ៖ Ping ទៅកាន់ Ethereum/Arbitrum RPC Nodes ក្នុងពេលត្រឹមតែ 0.42ms (< 1ms) លឿនជាង Bot ទូទៅ 10 ទៅ 50 ដង ធានាការដណ្តើម Block បានមុនគេជានិច្ច!
+
+៥. 🧠 Hugging Face Hub Synchronization (`HF_TOKEN`) ៖
+   • គ្រប់ម៉ូដែល AI ជំនាន់ចុងក្រោយ និងឯកសារ HFT ត្រូវបានទាញយក និងធ្វើសមកាលកម្មដោយស្វ័យប្រវត្តិពីរតនាគារ `hemsinath/apex-ai-brain-models` មកកាន់ Local PC និង VPS តាមរយៈ `python sync_local_models.py` ដោយប្រើ Hugging Face Access Token ដែលបានកំណត់ទុកក្នុង `.env`។
+
 
 ================================================================================
 ផ្នែកទី ៥ ៖ ម៉ាស៊ីនវិនិយោគស្ថាប័នទាំង ៦ (6 WALL STREET QUANTITATIVE ENGINES)

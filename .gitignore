@@ -24,3 +24,10 @@ ico_silent_logs.txt
 
 # Charts & Temporary Images
 *.png
+
+# Root-level AI Model Weights (Canonical tracked in models/ and Hugging Face Hub)
+/*.pkl
+/*.pth
+/*.keras
+/*.h5
+
