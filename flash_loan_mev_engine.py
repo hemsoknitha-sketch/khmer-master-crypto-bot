@@ -257,12 +257,12 @@ class FlashLoanMEVEngine:
         Dynamically selects dex_route (1 = Buy Uni / Sell Cam; 2 = Buy Cam / Sell Uni).
         """
         target_tokens = [
-            {"sym": "USDCUSDT", "pair": "USDT/USDC", "token": "USDC", "addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 50000.0},
-            {"sym": "ARBUSDT",  "pair": "ARB/USDT",  "token": "ARB",  "addr": "0x912CE59144191C1204E64559FE8253a0e49E6548", "pool_fee": 500, "fee_hurdle": 0.40, "default_loan": 25000.0},
-            {"sym": "ETHUSDT",  "pair": "WETH/USDT", "token": "WETH", "addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 500, "fee_hurdle": 0.38, "default_loan": 50000.0},
-            {"sym": "GMXUSDT",  "pair": "GMX/USDT",  "token": "GMX",  "addr": "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a", "pool_fee": 3000, "fee_hurdle": 0.65, "default_loan": 15000.0},
-            {"sym": "LINKUSDT", "pair": "LINK/USDT", "token": "LINK", "addr": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4", "pool_fee": 3000, "fee_hurdle": 0.65, "default_loan": 20000.0},
-            {"sym": "PENDLEUSDT","pair": "PENDLE/USDT","token":"PENDLE","addr": "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8", "pool_fee": 3000, "fee_hurdle": 0.68, "default_loan": 15000.0}
+            {"sym": "USDCUSDT", "pair": "USDT/USDC", "token": "USDC", "addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.12, "default_loan": 50000.0},
+            {"sym": "ARBUSDT",  "pair": "ARB/USDT",  "token": "ARB",  "addr": "0x912CE59144191C1204E64559FE8253a0e49E6548", "pool_fee": 500, "fee_hurdle": 0.45, "default_loan": 25000.0},
+            {"sym": "ETHUSDT",  "pair": "WETH/USDT", "token": "WETH", "addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 500, "fee_hurdle": 0.45, "default_loan": 50000.0},
+            {"sym": "GMXUSDT",  "pair": "GMX/USDT",  "token": "GMX",  "addr": "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a", "pool_fee": 3000, "fee_hurdle": 0.70, "default_loan": 15000.0},
+            {"sym": "LINKUSDT", "pair": "LINK/USDT", "token": "LINK", "addr": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4", "pool_fee": 3000, "fee_hurdle": 0.70, "default_loan": 20000.0},
+            {"sym": "PENDLEUSDT","pair": "PENDLE/USDT","token":"PENDLE","addr": "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8", "pool_fee": 3000, "fee_hurdle": 0.72, "default_loan": 15000.0}
         ]
 
         results = []
