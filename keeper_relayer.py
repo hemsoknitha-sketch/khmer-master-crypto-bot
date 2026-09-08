@@ -179,8 +179,8 @@ class KeeperRelayerEngine:
                 pass
 
         if candidate_keys:
-            # Target funded address known on Arbitrum One
-            target_funded_addr = "0x3D1eef56843ABBDc5a6e9E46dDAA8CC76df453f9".lower()
+            # Target primary funded owner address known on Arbitrum One
+            target_funded_addr = "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560".lower()
 
             if HAS_WEB3 and Account:
                 # Check for exact target address match
