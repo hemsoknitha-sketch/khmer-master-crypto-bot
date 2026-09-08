@@ -526,35 +526,46 @@
 ផ្នែកទី ១២ ៖ មគ្គុទ្ទេសក៍គ្រប់គ្រង VPS, DEPLOYMENT & TROUBLESHOOTING GUIDE
 ================================================================================
 
-១២.១ ការបែងចែករវាង WINDOWS LOCAL PC និង GCP VPS SSH ៖
+១២.១ វិធីសាស្ត្រធ្វើយ៉ាងណាទើបលែង ERROR ផ្លូវ FOLDER (ELIMINATE PATH ERROR 100%) ៖
 --------------------------------------------------------------------------------
-⚠️ ចំណុចសំខាន់បំផុត ៖
-• Windows Local PC (`E:\AI CODE PYTHON\Khmer Master Crypto\...`) ៖
-  - នេះជាម៉ាស៊ីនកុំព្យូទ័រផ្ទាល់ខ្លួនរបស់អ្នក។ Folder `/opt/...` មិនមាននៅលើ Windows ឡើយ!
-  - ប្រសិនបើវាយ `cd /opt/...` ក្នុង PowerShell លើ Windows វានឹងចេញ Error ៖
-    `Set-Location: Cannot find path 'E:\opt\khmer-master-crypto-bot' because it does not exist.`
-• Google Cloud Platform (GCP) Linux VPS ៖
-  - នេះជា Server ពពកដែលដំណើរការ Bot ២៤/៧។
-  - Command `cd /opt/khmer-master-crypto-bot` ដំណើរការបានលុះត្រាតែអ្នកបាន SSH ចូលទៅក្នុង VPS ជាមុនសិន តាមរយៈ Cloud Console Web SSH ឬ ៖
-    `gcloud compute ssh khmer-master-crypto-bot --zone=<YOUR_ZONE>`
+⚠️ មូលហេតុ និងដំណោះស្រាយដើម្បីកុំឱ្យ Error ជារៀងរហូត ៖
 
-១២.២ របៀប UPDATE កូដថ្មីលើ GCP VPS (ZERO DATA LOSS) ៖
+• ១. នៅលើម៉ាស៊ីនកុំព្យូទ័រ WINDOWS ផ្ទាល់ខ្លួន (ផ្ទាំង Terminal ក្នុង VS Code / Antigravity IDE) ៖
+  - ទីតាំងពិតប្រាកដគឺ ៖ `E:\AI CODE PYTHON\Khmer Master Crypto\khmer-master-crypto-bot`
+  - 🛑 ហាមវាយ `cd /opt/...` ដាច់ខាត (ព្រោះនៅលើ Windows គ្មាន Folder `/opt/...` ឡើយ)!
+  - ✅ ដំណោះស្រាយងាយបំផុត ៖ ដើម្បី Update កូដថ្មីឡើងទៅ GitHub និង VPS សូមវាយតែមួយគត់ ៖
+    `.\update.bat`
+    (Script នេះនឹងធ្វើការ Git Add, Commit, និង Push ឡើងទៅកាន់ GitHub ដោយស្វ័យប្រវត្តិ គ្មាន Error ឡើយ!)
+
+• ២. នៅលើម៉ាស៊ីនពពក GOOGLE CLOUD PLATFORM (GCP LINUX VPS) ៖
+  - ទីតាំងពិតប្រាកដគឺ ៖ `/opt/khmer-master-crypto-bot`
+  - 🛑 កុំវាយបញ្ជានេះក្នុង Windows Terminal!
+  - ✅ របៀបចូលទៅកាន់ទីតាំងនេះឱ្យបានត្រឹមត្រូវ ៖
+    ១. បើកកម្មវិធីរុករក (Browser) ចូលទៅកាន់ Google Cloud Console (`console.cloud.google.com`)
+    ២. ចូលទៅកាន់ម៉ឺនុយ **Compute Engine** ➔ **VM instances**
+    ៣. ចុចលើប៊ូតុង **[ SSH ]** ពណ៌ខៀវ នៅខាងស្តាំឈ្មោះម៉ាស៊ីន `khmer-master-crypto-bot`
+    ៤. ផ្ទាំង Terminal ខ្មៅមួយនឹងបើកឡើង ដោយបង្ហាញអក្សរ ៖
+       `hemsoknitha@khmer-master-crypto-bot:~$`
+    ៥. នៅក្នុងផ្ទាំងខ្មៅ SSH នោះហើយ ទើបជាកន្លែងដែលត្រូវវាយ ៖
+       ```bash
+       cd /opt/khmer-master-crypto-bot
+       git pull origin main
+       sudo systemctl restart khmer-master-crypto-bot
+       sudo systemctl status khmer-master-crypto-bot
+       ```
+
+១២.២ ជម្រើសងាយៗ ២ យ៉ាងក្នុងការ UPDATE BOT (ជ្រើសរើស ១ ក្នុងចំណោម ២) ៖
 --------------------------------------------------------------------------------
-ក្រោយពេលភ្ជាប់ SSH ចូលក្នុង GCP VPS រួចរាល់ សូមដំណើរការ ៖
-```bash
-# ១. ចូលទៅកាន់ Folder របស់ Bot លើ Linux VPS
-cd /opt/khmer-master-crypto-bot
+• ជម្រើសទី ១ (ធ្វើពីលើកុំព្យូទ័រ Windows ផ្ទាល់ខ្លួន - ងាយបំផុត) ៖
+  ១. ក្នុង Terminal លើ Windows គ្រាន់តែវាយ ៖ `.\update.bat` (ដើម្បី Push កូដឡើង GitHub)
+  ២. បើក Telegram ចូលទៅកាន់ Bot របស់អ្នក រួចវាយបញ្ជា ៖ `/sync_brain`
+     (Bot នឹងធ្វើការទាញយកកូដ និងទម្ងន់ AI ថ្មីភ្លាមៗក្នុងពេលត្រឹមតែ ១ វិនាទី ដោយមិនបាច់បើក SSH លើ VPS ឡើយ!)
 
-# ២. ទាញយកកូដថ្មីពី GitHub
-git pull origin main
-
-# ៣. Restart សេវាកម្ម Bot
-sudo systemctl restart khmer-master-crypto-bot
-
-# ៤. ពិនិត្យមើលស្ថានភាព និង Log ដំណើរការ
-sudo systemctl status khmer-master-crypto-bot
-sudo journalctl -u khmer-master-crypto-bot -f -n 50
-```
+• ជម្រើសទី ២ (ធ្វើផ្ទាល់លើ VPS តាម SSH Browser) ៖
+  បើកផ្ទាំង SSH លើ Google Cloud Console រួចចម្លងពាក្យបញ្ជាទាំង ៤ បន្ទាត់នេះបិទភ្ជាប់ (Paste) ៖
+  ```bash
+  cd /opt/khmer-master-crypto-bot && git pull origin main && sudo systemctl restart khmer-master-crypto-bot
+  ```
 
 ១២.៣ វិធីសាស្ត្រដោះស្រាយបញ្ហាបច្ចេកទេស (TROUBLESHOOTING GUIDE) ៖
 --------------------------------------------------------------------------------

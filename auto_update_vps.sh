@@ -13,6 +13,9 @@ if [ -d "$APP_DIR/khmer-master-crypto-bot" ]; then
     cd "$APP_DIR/khmer-master-crypto-bot"
 elif [ -d "$APP_DIR" ]; then
     cd "$APP_DIR"
+else
+    # Auto-fallback to current directory if running locally on Windows or non-standard path
+    cd "$(dirname "$0")"
 fi
 
 echo "🔍 [GCP VPS AUTO-UPDATE] Checking for new code commits on GitHub..."
