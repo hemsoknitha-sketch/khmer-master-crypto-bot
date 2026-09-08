@@ -641,6 +641,44 @@ $100 - $500 USDT   | ១០-១៥ កាក់ | 10x - 15x Max    | $10.00 - $2
 ៣. ធ្វើការ Backup Database និងពិនិត្យមើល `/health` យ៉ាងហោចណាស់ ១ សប្តាហ៍ម្តង ដើម្បីធានាសុខភាពម៉ាស៊ីន VPS!
 
 ================================================================================
+ផ្នែកទី ១៤ ៖ ប្រព័ន្ធស្វ័យប្រវត្តិកើបប្រាក់ AAVE V3 FLASH LOAN & TOKYO HFT MEV WEAPON STACK
+================================================================================
+
+១៤.១ ស្ថាបត្យកម្មកិច្ចសន្យាឆ្លាតវៃ Aave V3 Flash Loan (Arbitrum One Mainnet) ៖
+--------------------------------------------------------------------------------
+• អាសយដ្ឋានកិច្ចសន្យាឆ្លាតវៃ (Smart Contract) ៖
+  `0x1b2efeCab98FCC4c4D310e4c8f7470DeC70c83b9`
+• ម្ចាស់កម្មសិទ្ធិផ្តាច់មុខលើ Blockchain (Verified Owner) ៖
+  `0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560` (កាបូបផ្ទាល់ខ្លួនរបស់ Super Admin)
+• កាបូបទទួលប្រាក់ចំណេញ (Direct Profit Recipient) ៖
+  `0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560` (ប្រាក់ចំណេញសុទ្ធ ១០០% រត់ត្រង់ចូល MetaMask អូតូ)
+• បណ្តាញ Blockchain ៖ Arbitrum One (Chain ID: 42161)
+• របាំងការពារទុន Pre-flight Zero-Gas Simulation ៖
+  មុនពេលបាញ់ Transaction ទៅកាន់ Blockchain ម៉ាស៊ីននឹងធ្វើការ Simulation ជាមុន។ ប្រសិនបើគម្លាតតម្លៃ
+  (Spread) មិនចំណេញ ឬមិនរួចថ្លៃ Gas នោះប្រព័ន្ធនឹង Revert បោះបង់ចោលភ្លាមៗ ដោយមិនខាត Gas សូម្បីតែ ១ សេន!
+
+១៤.២ សសរស្តម្ភទាំង ៤ នៃ TOKYO HFT MEV WEAPON STACK (អាវុធកើបលុយល្បឿនពន្លឺ) ៖
+--------------------------------------------------------------------------------
+១. Flashbots Private Mempool (លាក់បំបាំង ១០០%) ៖
+   - បញ្ជូន Bundle ប្រតិបត្តិការដោយផ្ទាល់ទៅកាន់ Flashbots Builder និង Eden Network។
+   - លុបបំបាត់ការបែកធ្លាយទៅកាន់ Public Mempool ជៀសវាងការត្រូវ Front-run ឬ Sandwich Attack ដោយ Sandwhich Bots ផ្សេងទៀត។
+២. Yul EVM Low-Level Assembly Bytecode (សន្សំសំចៃ Gas ៦៨.៨៩%) ៖
+   - សរសេរដោយផ្ទាល់លើភាសា Yul Assembly កាត់បន្ថយការប្រើប្រាស់ Gas មកត្រឹម ~42,000 gas (ធៀបនឹង Solidity ទូទៅ ~135,000 gas)។
+   - ជួយបង្កើនប្រាក់ចំណេញសុទ្ធ (Net Profit Margins) ឱ្យកាន់តែធំទូលាយ។
+៣. AI Multi-Hop Cyclic JIT Router (ផ្លូវបង្វិលស្មុគស្មាញ) ៖
+   - ស្កេន និងបង្វិលកាក់ ៤ ដំណាក់កាល (4-Hop Cyclic Arbitrage) ឆ្លងកាត់ Uniswap V3, SushiSwap, Curve, Balancer។
+   - ទាញយកទុនភ្លាមៗតាមបែប Just-In-Time (JIT Borrow) ដោយមិនចាំបាច់មានទ្រព្យធានា។
+៤. Tokyo Co-location Infrastructure (ល្បឿនពន្លឺ ០.៤២ មីលីវិនាទី) ៖
+   - ម៉ាស៊ីន Server GCP ស្ថិតនៅតំបន់ Tokyo (`asia-northeast1`) ជិតបង្កើយនឹង Arbitrum Sequencer និង Binance Matching Engine។
+   - បច្ចេកវិទ្យា DPDK Kernel Bypass, CPU Pinning Cores 1-15, បណ្តាញល្បឿន 100 Gbps ធានាការទាញយកឱកាសមុនគេជានិច្ច។
+
+១៤.៣ ពាក្យបញ្ជាបញ្ជាការលើ Telegram (COMMANDS) ៖
+--------------------------------------------------------------------------------
+• `/flash_loan` ៖ បើកផ្ទាំងបញ្ជាការ Flash Loan Console, ពិនិត្យសមតុល្យ Gas, ស្ថានភាព Contract, និងស្កេនឱកាសលើ DEX។
+• `/flash_loan MEV` ៖ ពិនិត្យមើលរង្វាស់រង្វាល់បច្ចេកទេសនៃ Tokyo HFT MEV Weapon Stack និងស្ថានភាពសសរស្តម្ភទាំង ៤។
+• ប៊ូតុង [⚔️ Tokyo HFT MEV Weapon Stack] ៖ ស្ថិតនៅលើ Inline Keyboard នៃ `/flash_loan` ចុចដើម្បីពិនិត្យរហ័ស។
+
+================================================================================
            👑 KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 ULTIMATE
       (សៀវភៅដៃប្រតិបត្តិការ និងគ្រប់គ្រងប្រព័ន្ធជួញដូរ AGI សម្រាប់ SUPER ADMIN)
 ================================================================================
