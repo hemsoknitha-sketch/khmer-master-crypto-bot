@@ -469,6 +469,7 @@ class FlashLoanMEVEngine:
 
             pairs_for_token = token_pair_map.get(addr_lower, [])
             uni_price, cam_price, sushi_price = 0.0, 0.0, 0.0
+            uni_liq, cam_liq, sushi_liq = 0.0, 0.0, 0.0
 
             for p in pairs_for_token:
                 dex = str(p.get("dexId") or "").lower()
@@ -476,62 +477,113 @@ class FlashLoanMEVEngine:
                 liq = float((p.get("liquidity") or {}).get("usd") or 0.0)
                 if price <= 0:
                     continue
-                if "uniswap" in dex and liq > 2000 and uni_price == 0.0:
+                # Minimum liquidity floor of $10,000 to eliminate dead or unexecutable micro-pools
+                if "uniswap" in dex and liq >= 10000.0 and uni_price == 0.0:
                     uni_price = price
-                elif "camelot" in dex and liq > 1000 and cam_price == 0.0:
+                    uni_liq = liq
+                elif "camelot" in dex and liq >= 10000.0 and cam_price == 0.0:
                     cam_price = price
-                elif "sushiswap" in dex and liq > 1000 and sushi_price == 0.0:
+                    cam_liq = liq
+                elif "sushiswap" in dex and liq >= 10000.0 and sushi_price == 0.0:
                     sushi_price = price
+                    sushi_liq = liq
 
             # Compare pairs across DEXes
             p_buy, p_sell = 0.0, 0.0
+            liq_buy, liq_sell = 0.0, 0.0
             dex_route = 1
             route_desc = "Uniswap V3 -> Camelot (Arbitrum)"
 
             if uni_price > 0 and cam_price > 0:
                 if cam_price > uni_price:
                     p_buy, p_sell = uni_price, cam_price
+                    liq_buy, liq_sell = uni_liq, cam_liq
                     dex_route = 1
                     route_desc = "Uniswap V3 -> Camelot (Arbitrum)"
                 else:
                     p_buy, p_sell = cam_price, uni_price
+                    liq_buy, liq_sell = cam_liq, uni_liq
                     dex_route = 2
                     route_desc = "Camelot -> Uniswap V3 (Arbitrum)"
             elif uni_price > 0 and sushi_price > 0:
                 if sushi_price > uni_price:
                     p_buy, p_sell = uni_price, sushi_price
+                    liq_buy, liq_sell = uni_liq, sushi_liq
                     dex_route = 1
                     route_desc = "Uniswap V3 -> SushiSwap (Arbitrum)"
                 else:
                     p_buy, p_sell = sushi_price, uni_price
+                    liq_buy, liq_sell = sushi_liq, uni_liq
                     dex_route = 2
                     route_desc = "SushiSwap -> Uniswap V3 (Arbitrum)"
             elif cam_price > 0 and sushi_price > 0:
                 if sushi_price > cam_price:
                     p_buy, p_sell = cam_price, sushi_price
+                    liq_buy, liq_sell = cam_liq, sushi_liq
                     dex_route = 1
                     route_desc = "Camelot -> SushiSwap (Arbitrum)"
                 else:
                     p_buy, p_sell = sushi_price, cam_price
+                    liq_buy, liq_sell = sushi_liq, cam_liq
                     dex_route = 2
                     route_desc = "SushiSwap -> Camelot (Arbitrum)"
 
-            if p_buy > 0 and p_sell > 0:
+            slippage_pct = 0.0
+            net_spread_pct = 0.0
+            loan_amt = item["default_loan"]
+
+            if p_buy > 0 and p_sell > 0 and liq_buy >= 10000.0 and liq_sell >= 10000.0:
                 raw_spread = ((p_sell - p_buy) / p_buy) * 100.0
-                # Sanity clamp: Exclude artificial illiquid/dead pool anomalies (>15.0%)
-                if raw_spread > 15.0:
+                
+                # Sanity filter: Exclude artificial illiquid/dead pool anomalies (>15.0%)
+                if 0.15 <= raw_spread <= 15.0:
+                    spread_pct = round(raw_spread, 4)
+                    spread_dec = spread_pct / 100.0
+                    hurdle_dec = hurdle / 100.0
+                    
+                    # 📐 Harmonic-Mean Marginal Slippage Beta Factor:
+                    # Beta = 1 / (2 * liq_buy) + 1 / (2 * liq_sell)
+                    beta = (1.0 / (2.0 * max(liq_buy, 1.0))) + (1.0 / (2.0 * max(liq_sell, 1.0)))
+                    effective_spread_dec = spread_dec - hurdle_dec
+                    
+                    if effective_spread_dec > 0 and beta > 0:
+                        # 🚀 Unconstrained Optimal Loan Size: L* = (SpreadDec - HurdleDec) / (2 * Beta)
+                        raw_optimal = effective_spread_dec / (2.0 * beta)
+                        
+                        # 🛡️ Dynamic Liquidity-Aware Safe Bounds:
+                        # Borrow amount is capped at 6.0% of the shallower pool to strictly prevent price collapse
+                        shallower_pool_liq = min(liq_buy, liq_sell)
+                        max_safe_borrow = min(item["default_loan"], shallower_pool_liq * 0.06)
+                        
+                        # Determine final optimal loan with $1,500 floor
+                        optimal_loan = min(max_safe_borrow, max(1500.0, raw_optimal))
+                        
+                        # Recalculate true slippage and net spread at this optimal loan size
+                        slippage_pct = round((optimal_loan * beta) * 100.0, 4)
+                        net_spread_pct = round(spread_pct - hurdle - slippage_pct, 4)
+                        
+                        # Deduct Arbitrum L2 execution gas ($0.12)
+                        net_profit_usd = round(optimal_loan * (net_spread_pct / 100.0) - 0.12, 2)
+                        loan_amt = round(optimal_loan, 2)
+                        
+                        # Strict Quality Gate: Net Profit >= $1.00 USD and Net Spread >= 0.05%
+                        if net_profit_usd >= 1.0 and net_spread_pct >= 0.05:
+                            status = "PROFITABLE_READY"
+                        else:
+                            status = "SLIPPAGE_EXCEEDS_SPREAD"
+                            net_profit_usd = 0.0
+                    else:
+                        spread_pct = round(raw_spread, 4)
+                        net_profit_usd = 0.0
+                        status = "SPREAD_BELOW_HURDLE"
+                else:
                     spread_pct = 0.0
                     net_profit_usd = 0.0
-                    status = "MONITORING_SPREAD"
-                else:
-                    spread_pct = round(raw_spread, 4)
-                    net_spread = spread_pct - hurdle
-                    net_profit_usd = round(loan_amt * (net_spread / 100.0), 2) if net_spread > 0 else 0.0
-                    status = "PROFITABLE_READY" if net_profit_usd > 0 else "MONITORING_SPREAD"
+                    status = "ANOMALY_OR_INSUFFICIENT"
             else:
                 spread_pct = 0.0
                 net_profit_usd = 0.0
-                status = "MONITORING_SPREAD"
+                status = "INSUFFICIENT_LIQUIDITY"
 
             results.append({
                 "symbol": sym,
@@ -548,6 +600,10 @@ class FlashLoanMEVEngine:
                 "gross_spread_pct": spread_pct,
                 "fee_hurdle_pct": hurdle,
                 "optimal_loan_usd": loan_amt,
+                "estimated_slippage_pct": slippage_pct,
+                "net_spread_pct": net_spread_pct,
+                "buy_pool_liquidity": liq_buy,
+                "sell_pool_liquidity": liq_sell,
                 "net_profit_usd": net_profit_usd,
                 "status": status
             })
