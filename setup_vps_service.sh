@@ -61,14 +61,12 @@ EOF
 sudo ln -sf "$SERVICE_PRIMARY" "$SERVICE_ALIAS"
 sudo ln -sf "$SERVICE_PRIMARY" "$SERVICE_SHORT"
 
-# 4. Reload and Enable Both Services
+# 4. Reload and Enable Primary Service (Aliases are handled automatically)
 echo "🔄 Reloading systemd daemon..."
 sudo systemctl daemon-reload
 
-echo "✅ Enabling services on system boot..."
-sudo systemctl enable khmer-master-crypto-bot.service || true
-sudo systemctl enable khmer-crypto-bot.service || true
-sudo systemctl enable khmer-master-crypto.service || true
+echo "✅ Enabling khmer-master-crypto-bot service on system boot..."
+sudo systemctl enable khmer-master-crypto-bot.service
 
 echo "🚀 Restarting bot service..."
 sudo systemctl restart khmer-master-crypto-bot.service || sudo systemctl restart khmer-master-crypto.service || true
