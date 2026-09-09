@@ -107,6 +107,12 @@ def run_audit():
             log_fail("Missing /turbo_hedge command handler!")
         else:
             log_pass("Institutional /turbo_hedge engine command is registered and active!")
+
+        if "smart_x" not in cmd_names:
+            failures.append("bot_thread.py missing /smart_x command handler!")
+            log_fail("Missing /smart_x command handler!")
+        else:
+            log_pass("Flagship /smart_x Institutional AI Suite command is registered and active!")
             
         if "staus" in cmd_names:
             failures.append("Typo /staus still found in bot_thread.py!")

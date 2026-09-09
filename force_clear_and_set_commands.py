@@ -58,6 +58,7 @@ async def force_reset_menu():
         BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
         BotCommand("smart_trade", "⚡ Super Smart Spot/Futures Trading Engine"),
         BotCommand("turbo_hedge", "🚀 Institutional Turbo Hedge Suite"),
+        BotCommand("smart_x", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
         BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
         BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
         BotCommand("balance", "💰 Check Spot & Futures Balance"),

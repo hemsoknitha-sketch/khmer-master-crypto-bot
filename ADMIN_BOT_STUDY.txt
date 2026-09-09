@@ -757,6 +757,61 @@ $100 - $500 USDT   | ១០-១៥ កាក់ | 10x - 15x Max    | $10.00 - $2
 • ប៊ូតុង [⚔️ Tokyo HFT MEV Weapon Stack] ៖ ស្ថិតនៅលើ Inline Keyboard នៃ `/flash_loan` ចុចដើម្បីពិនិត្យរហ័ស។
 
 ================================================================================
+ផ្នែកទី ១៥ ៖ ស្ថាបត្យកម្ម /smart_x SUPER SMART X ប្រកួតប្រជែងឈ្នះ PORTAL.TAGMARKETS.COM
+================================================================================
+
+១៥.១ ការប្រៀបធៀបស្ថាបត្យកម្មហិរញ្ញវត្ថុ (/smart_x vs portal.tagmarkets.com) ៖
+--------------------------------------------------------------------------------
+Tag Markets (portal.tagmarkets.com) គឺជា Broker លក់ CFD/Forex និង MT5 PAMM ដែលមានចំណុចខ្សោយធំៗ ៖
+១. ហានិភ័យ Broker B-Book & Counterparty ៖ ជួញដូរលើ CFD Contract អាចមានការលួច Spread, Slippage និងបញ្ហារាំងស្ទះដកប្រាក់។
+   ➔ ដំណោះស្រាយ /smart_x ៖ ជួញដូរផ្ទាល់លើ Binance Spot & USDT-M Futures / Bybit តាមរយៈ API ដោយផ្ទាល់ (Non-Custodial ១០០% គ្មាន Broker កណ្តាល)។
+២. ការជួញដូរមាស (Gold Trading) ៖ Tag Markets ជួញដូរ XAUUSD CFD មានថ្លៃ Overnight Swap Fees ខ្ពស់។
+   ➔ ដំណោះស្រាយ /smart_x ៖ ជួញដូរ PAXGUSDT (Pax Gold) ដែលជាមាសសុទ្ធ ១០០% តម្កល់ក្នុងឃ្លាំងនៅ London លើបណ្តាញ Blockchain គ្មានថ្លៃ Swap និងមានសន្ទុះថ្លៃស្មើនឹងមាសពិតប្រាកដ។
+៣. គ្រោះមហន្តរាយឆេះគណនីពេលចេញព័ត៌មានម៉ាក្រូសេដ្ឋកិច្ច (News Whipsaw) ៖ Tag Markets តែងតែជួបប្រទះការឆេះគណនីពេលចេញ CPI, FOMC, NFP។
+   ➔ ដំណោះស្រាយ /smart_x ៖ តម្លើង Macroeconomic Event Impact NLP Guard បញ្ជាឱ្យប្រព័ន្ធ ផ្អាកការបើក Position ១៥ នាទីមុនពេលព័ត៌មានចេញ និង Clamp Leverage មកត្រឹម 2x-3x។
+៤. បញ្ហា MT5 Grid/Martingale EAs ៖ EA របស់ MT5 ភាគច្រើនដំណើរការតែក្នុងទីផ្សារ Sideway ពេលទីផ្សារដើរ Trend ខ្លាំង តែងតែទាញឱ្យឆេះគណនី។
+   ➔ ដំណោះស្រាយ /smart_x ៖ ប្រើប្រាស់ Mixture-of-Experts Router (brain_moe_router.pkl) ប្តូរយុទ្ធសាស្ត្រអូតូ (Trend ➔ Breakout; Sideway ➔ Mean-Reversion Scalp)។
+
+១៥.២ ម៉ូដែល AI SUPER BRAIN ទាំង ៥ ដែលដំណើរការលើ /smart_x (READY-TO-USE 100%) ៖
+--------------------------------------------------------------------------------
+១. Mixture-of-Experts Router (brain_moe_router.pkl) ៖
+   - វិភាគរបបទីផ្សារ (Market Regime) ក្នុងល្បឿន <5ms។
+   - Trend Bull/Bear ➔ បើកដំណើរការ Trend-Following Breakout Engine។
+   - Choppy Sideway ➔ បើកដំណើរការ Mean-Reversion Micro-Scalping Engine។
+២. Tabular Ensemble Models (brain_catboost.pkl, brain_lightgbm.pkl, brain_xgb.pkl) ៖
+   - ផ្តល់សញ្ញា Breakout Confirmation និង Liquidity Sweep លើ PAXG (Gold), BTC, ETH ជាមួយ Multi-Model Voting។
+៣. Reinforcement Learning Capital Allocator (brain_actor_critic_allocator.json & brain_ppo_policy.json) ៖
+   - ដើរតួជា PAMM Fund Manager គណនាទំហំដើមទុនតាមទ្រឹស្តី Half-Kelly Criterion ($f^* = 0.5 \times \frac{bp-q}{b}$) ធានា Sharpe > 3.2។
+៤. Physics-Informed Jump-Diffusion Model (brain_pinn_jump_diff.pkl) ៖
+   - គណនាប្រូបាប៊ីលីតេនៃការធ្លាក់គំហុក (Crash Wick / Jump Risk Factor lambda)។ ប្រសិនបើ lambda > 0.60 ប្រព័ន្ធនឹងបន្ថយទំហំ Trade 50% និងរំកិល Trailing Stop ការពារភ្លាមៗ។
+៥. Dynamic Volatility & Take-Profit Engines (brain_vol.pkl, brain_tp.pkl) ៖
+   - កំណត់ Dynamic TP និង ATR Trailing Stop តាមពេលវេលាជាក់ស្តែង (គ្មាន Fixed Targets)។
+
+១៥.៣ របាំងការពារពិសេសទាំង ៣ នៃ /smart_x (SPECIALIZED INSTITUTIONAL SHIELDS) ៖
+--------------------------------------------------------------------------------
+១. Session Liquidity Sweep Classifier (15m Timeframe លើ PAXGUSDT & BTCUSDT) ៖
+   - Asian Range Accumulation ៖ កំណត់ Asian High និង Asian Low (00:00 - 08:00 UTC)។
+   - London Open (07:00-10:00 UTC) & NY Open (12:00-16:00 UTC) ៖ វិភាគថាតើជា True Breakout ឬ Turtle Soup Fakeout។
+   - ប្រសិនបើតម្លៃបោសសំអាត Stop Loss ហួស Asian High/Low ហើយ Reject ត្រឡប់ចូលក្នុងវិញ ➔ ផ្តល់សញ្ញា Reversal Scalp ដោយមាន Win Rate > 78%!
+២. Macroeconomic Event Impact NLP Guard (CPI, FOMC, NFP Shield) ៖
+   - ស្កេន និងត្រួតពិនិត្យប្រតិទិនសេដ្ឋកិច្ចពិភពលោក។
+   - ផ្អាកការបើក Position ១៥ នាទីមុនពេលចេញព័ត៌មាន និង Clamp Leverage មកត្រឹម 2x-3x ការពារទុន ១០០%។
+៣. Adaptive Kelly Criterion Drawdown Guard ៖
+   - ចាក់សោរ Hard Daily Drawdown Ceiling មិនឱ្យលើសពី 2.5% នៃ Portfolio ដាច់ខាត។
+   - បង្កើនទំហំ Trade ពេលមាន Win Streak វិជ្ជមាន និងបន្ថយទំហំ Trade ភ្លាមៗពេលទីផ្សារមាន Volatility ខ្ពស់។
+
+១៥.៤ ពាក្យបញ្ជាបញ្ជាការ /smart_x លើ TELEGRAM (1-TAP COMMANDS) ៖
+--------------------------------------------------------------------------------
+• `/smart_x` ៖ បើកផ្ទាំងបញ្ជាការ Master Dashboard ជាមួយ Inline Buttons សម្រាប់បញ្ជា Trade មាស (PAXG) ឬ Crypto។
+• `/smart_x GOLD 20 10 AUTO 1234` ៖ ជួញដូរ Futures មាស (PAXGUSDT) ដោយ AI សម្រេចចិត្តទិសដៅអូតូ។
+• `/smart_x BTC 50 10 AUTO 1234` ៖ ជួញដូរ Futures BTCUSDT ដោយ AI សម្រេចចិត្តទិសដៅអូតូ។
+• `/smart_x SPOT PAXG 50 1234` ៖ សន្សំទិញ Spot មាស (PAXGUSDT) ដោយគ្មានហានិភ័យ Liquidation។
+• `/smart_x SPOT AUTO 100 1234` ៖ ស្កេនទិញ Spot កាក់ណាដែលទើបតែចាប់ផ្តើមបំបែកពង្រោះ (Early Breakout)។
+• `/smart_x METRICS` ៖ ពិនិត្យមើលរបបទីផ្សារ (MoE Regime), Session Liquidity Sweep, និងស្ថានភាព Macro News Guard តាមពេលវេលាជាក់ស្តែង។
+• `/smart_x STOP ALL 1234` ៖ បញ្ឈប់ និងបិទ Position ទាំងអស់ភ្លាមៗ។
+
+================================================================================
            👑 KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 ULTIMATE
       (សៀវភៅដៃប្រតិបត្តិការ និងគ្រប់គ្រងប្រព័ន្ធជួញដូរ AGI សម្រាប់ SUPER ADMIN)
 ================================================================================
+

@@ -36,6 +36,7 @@ async def set_menu_commands():
         BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
         BotCommand("smart_trade", "🛒 Spot 6-Tier Breakout Engine"),
         BotCommand("turbo_hedge", "🛡️ Futures Dual-Side Delta-Neutral Hedge"),
+        BotCommand("smart_x", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
         BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
         BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
         BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
