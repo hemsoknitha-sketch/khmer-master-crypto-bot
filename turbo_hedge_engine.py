@@ -193,18 +193,35 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
                 price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
                 abs_change = abs(price_change_pct)
-                
+
+                # 🛡️ STRICT EXCLUSION: Hard reject coins that surged > +20% or dumped < -20%
+                # Eliminates chasing overextended pumps/dumps (IOST, FORM, FF, XAN, etc.) prone to whale whipsaws
+                if abs_change > 20.0 or abs_change < 2.5:
+                    continue
+
                 # Check trading status via symbol info if available
                 sym_info = trading_engine.get_futures_symbol_info(sym)
                 if sym_info and sym_info.get("status") != "TRADING":
                     continue
 
                 if quote_vol >= 5000000.0:  # Include highly liquid futures pairs >= $5M volume to eliminate slippage
+                    # 🎯 EARLY BREAKOUT SWEET-SPOT SCORING (+3.0% to +12.0% Golden Window)
+                    if 3.0 <= abs_change <= 12.0:
+                        # Maximum score in the prime early breakout window (peak around 7.0% - 8.0%)
+                        breakout_score = 150.0 - (abs(abs_change - 7.5) * 5.0)
+                    elif 12.0 < abs_change <= 20.0:
+                        # Decays rapidly as it approaches the +20% exclusion threshold
+                        breakout_score = 80.0 - ((abs_change - 12.0) * 8.0)
+                    else:
+                        # 2.5% <= abs_change < 3.0%
+                        breakout_score = 60.0
+
+                    vol_score = math.log10(max(1.0, quote_vol)) * 10.0
                     candidates.append({
                         "symbol": sym,
                         "quote_volume": quote_vol,
                         "abs_change": abs_change,
-                        "score": (abs_change * 15.0) + (math.log10(max(1.0, quote_vol)))
+                        "score": breakout_score + vol_score
                     })
             
             candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -262,7 +279,12 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                     continue
                 price_change_pct = float(t.get("priceChangePercent", 0.0) or 0.0)
                 abs_change = abs(price_change_pct)
-                
+
+                # 🛡️ STRICT EXCLUSION: Hard reject any coin that has pumped > +20.0% or dumped < -20.0%
+                # Strictly prevents FOMO buying at the absolute peak or catching free-falling knives
+                if price_change_pct > 20.0 or price_change_pct < -20.0 or abs_change < 2.5:
+                    continue
+
                 sym_info = trading_engine.get_symbol_info(sym)
                 if not sym_info or sym_info.get("status") != "TRADING":
                     continue
@@ -272,16 +294,19 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
                 if not sym_info.get("isSpotTradingAllowed", True):
                     continue
 
-                # Explosive Moonshot Breakout Scoring (+3.0% to +35.0% pump acceleration)
-                if 3.0 <= price_change_pct <= 35.0:
-                    momentum_score = price_change_pct * 35.0
-                elif price_change_pct > 35.0:
-                    momentum_score = price_change_pct * 15.0
-                elif price_change_pct < -3.0: # Dip Rebound Reversal Zone
-                    momentum_score = abs_change * 20.0
+                # 🎯 EARLY BREAKOUT SWEET-SPOT SCORING (+3.0% to +12.0% Golden Window)
+                if 3.0 <= price_change_pct <= 12.0:
+                    # Prime sweet spot: fresh early breakout with high explosive runway
+                    momentum_score = 150.0 - (abs(price_change_pct - 7.5) * 5.0)
+                elif 12.0 < price_change_pct <= 20.0:
+                    # Extended zone: rapidly penalize approaching +20%
+                    momentum_score = 80.0 - ((price_change_pct - 12.0) * 8.0)
+                elif -12.0 <= price_change_pct <= -3.0:
+                    # Controlled Dip Rebound Reversal Zone
+                    momentum_score = 100.0 - (abs(abs_change - 7.5) * 5.0)
                 else:
-                    momentum_score = abs_change * 5.0
-                    
+                    momentum_score = 50.0
+
                 # Volume Acceleration Multiplier
                 vol_score = math.log10(max(1.0, quote_vol)) * 12.0
                 score = momentum_score + vol_score
@@ -442,6 +467,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
             # 🧠 5. APEX 6-TIER SUPER SMART SPOT TRADING ENGINE (100% Bag-Holding & Peak FOMO Shield):
             if is_spot_mode:
+                # 🛡️ STRICT 20% EXCLUSION SHIELD (+20% Peak & -20% Falling Knife Guard)
+                if change_24h > 20.0 or change_24h < -20.0:
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT STRICT 20% EXCLUSION] {symbol}: 24h Change {change_24h:+.2f}% is outside safe early breakout window (+3% to +12%). Extreme risk rejected!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVEREXTENDED_24H_EXCLUSION"}
+
                 # Tier 1: BTC Lead Impulse Guard
                 try:
                     import btc_lead_guard
@@ -523,7 +553,12 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.02 and rsi14 < 72.0:
                     side = "BUY"
                     base_conf = 88.0
-                    if vol_ratio > 1.2: base_conf += 4.0
+                    if vol_ratio >= 2.5:
+                        base_conf += 6.0  # 🚀 Institutional Volume Spike (> 2.5x)
+                    elif vol_ratio >= 1.8:
+                        base_conf += 4.0
+                    elif vol_ratio >= 1.2:
+                        base_conf += 2.0
                     if funding_rate < -0.0001: base_conf += 3.0
                     if whale_bid_wall: base_conf += 4.0
                     confidence = min(98.5, max(86.0, base_conf))
@@ -531,7 +566,12 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.02 and rsi14 > 28.0:
                     side = "SELL"
                     base_conf = 88.0
-                    if vol_ratio > 1.2: base_conf += 4.0
+                    if vol_ratio >= 2.5:
+                        base_conf += 6.0  # 🚀 Institutional Volume Spike (> 2.5x)
+                    elif vol_ratio >= 1.8:
+                        base_conf += 4.0
+                    elif vol_ratio >= 1.2:
+                        base_conf += 2.0
                     if funding_rate > 0.0001: base_conf += 3.0
                     if whale_ask_wall: base_conf += 4.0
                     confidence = min(98.5, max(86.0, base_conf))
@@ -541,21 +581,21 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     confidence = 50.0
                     print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Trend Misaligned (5m Bull: {is_5m_bullish}, 1m EMA5>15: {ema5_1m > ema15_1m}) -> SKIPPED!")
 
-            # 🛡️ Anti-Peak Buying, Anti-FOMO & Pullback Entry Guard
-            if not is_spot_mode and side != "SKIP":
-                if side == "BUY" and (change_24h >= 25.0 or rsi14 >= 70.0):
+            # 🛡️ Early Breakout Sweet-Spot & Strict 20% Exclusion Guard
+            if side != "SKIP":
+                if side == "BUY" and (change_24h >= 20.0 or rsi14 >= 70.0):
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [ANTI-PEAK BUYING PROTECTION] {symbol}: 24h Change {change_24h:+.1f}% or RSI {rsi14:.1f} >= 70 -> Blocked BUY!")
-                elif side == "BUY" and price > ema5_1m * 1.004:
+                    print(f"🛡️ [STRICT EXCLUSION: ANTI-PEAK BUYING] {symbol}: 24h Change {change_24h:+.1f}% >= +20% or RSI {rsi14:.1f} >= 70 -> Blocked BUY!")
+                elif side == "BUY" and not is_spot_mode and price > ema5_1m * 1.004:
                     # Price extended > 0.4% above 1m EMA5 -> Wait for Pullback Retracement!
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.4% above EMA5 -> Waiting for Pullback!")
-                elif side == "SELL" and (rsi14 <= 30.0 or price < ema5_1m * 0.996):
+                elif side == "SELL" and (change_24h <= -20.0 or rsi14 <= 30.0 or (not is_spot_mode and price < ema5_1m * 0.996)):
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [ANTI-BOTTOM SELLING PROTECTION] {symbol}: RSI {rsi14:.1f} <= 30 or extended below EMA5 -> Blocked SELL!")
+                    print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -20% or RSI {rsi14:.1f} <= 30 -> Blocked SELL!")
 
             # 🛡️ BTC Lead Impulse Guard & Funding Fee Penalty Guard
             if side != "SKIP" and symbol != "BTCUSDT":
