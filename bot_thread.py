@@ -1186,8 +1186,7 @@ class TelegramBotThread(BaseThread):
                     "0x912ce59144191c1204e64559fe8253a0e49e6548": ("Arbitrum (ARB)", "Arbitrum One"),
                     "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": ("Wrapped BTC (WBTC)", "Arbitrum One"),
                     "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract", "Arbitrum One"),
-                    "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One"),
-                    "0xe3833ddaf7fb92b3f0e0a57169c98bd9482e9560": ("Bot Keeper Engine Relayer", "Arbitrum One")
+                    "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One")
                 }
 
                 matched_contract = KNOWN_TOKEN_CONTRACTS.get(primary_user_wallet.lower()) if primary_user_wallet else None
@@ -1205,6 +1204,10 @@ class TelegramBotThread(BaseThread):
                         f"• The balance `{u_tot_str}` belongs to the token pool, NOT your wallet!\n"
                         f"• ⚠️ **To prevent loss of profits:** Please open MetaMask, copy your `Account 1` address, and send: ``/wallet 0x...``"
                     )
+
+                is_unified_admin_keeper = bool(primary_user_wallet and kp_addr and primary_user_wallet.lower() == kp_addr.lower())
+                unified_note_km = " ✨ _(កាបូបរួម Admin MetaMask & Keeper តែមួយ - ផលចំណេញរត់ចូលផ្ទាល់)_" if is_unified_admin_keeper else ""
+                unified_note_en = " ✨ _(Unified Admin MetaMask & Keeper - Profits routed directly)_" if is_unified_admin_keeper else ""
 
                 if is_admin_user:
                     # 👑 SUPER ADMIN EXPERIENCE: Full Infrastructure Diagnostics & Controls
@@ -1238,7 +1241,7 @@ class TelegramBotThread(BaseThread):
                             "⛽ **SUPER ADMIN | KEEPER RELAYER MASTER VAULT** 👑\n"
                             "══════════════════════════\n\n"
                             "💼 **១. ព័ត៌មានកាបូប Web3 (Admin MetaMask) ៖**\n"
-                            f"• អាសយដ្ឋាន ៖ {user_addr_display}\n"
+                            f"• អាសយដ្ឋាន ៖ {user_addr_display}{unified_note_km}\n"
                             f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
                             f"• 🌐 BNB Smart Chain ៖ {u_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet ៖ {u_eth_str}\n"
@@ -1261,7 +1264,7 @@ class TelegramBotThread(BaseThread):
                             "⛽ **SUPER ADMIN | KEEPER RELAYER MASTER VAULT** 👑\n"
                             "══════════════════════════\n\n"
                             "💼 **1. Admin Linked Web3 Wallet (MetaMask):**\n"
-                            f"• Address: {user_addr_display}\n"
+                            f"• Address: {user_addr_display}{unified_note_en}\n"
                             f"• 🌐 Arbitrum One: {u_arb_str}\n"
                             f"• 🌐 BNB Smart Chain: {u_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet: {u_eth_str}\n"
@@ -1690,8 +1693,7 @@ class TelegramBotThread(BaseThread):
                 "0x912ce59144191c1204e64559fe8253a0e49e6548": ("Arbitrum (ARB)", "Arbitrum One"),
                 "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": ("Wrapped BTC (WBTC)", "Arbitrum One"),
                 "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract", "Arbitrum One"),
-                "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One"),
-                "0xe3833ddaf7fb92b3f0e0a57169c98bd9482e9560": ("Bot Keeper Engine Relayer", "Arbitrum One")
+                "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One")
             }
 
             matched_contract = KNOWN_TOKEN_CONTRACTS.get(raw_address.lower())
