@@ -1173,6 +1173,37 @@ class TelegramBotThread(BaseThread):
 
                 buttons = []
 
+                # Check if user accidentally linked a Token Smart Contract address instead of personal wallet
+                KNOWN_TOKEN_CONTRACTS = {
+                    "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": ("Tether USD (USDT)", "Arbitrum One"),
+                    "0xdac17f958d2ee523a2206206994597c13d831ec7": ("Tether USD (USDT)", "Ethereum Mainnet"),
+                    "0x55d398326f99059ff775485246999027b3197955": ("Tether USD (USDT)", "BNB Smart Chain"),
+                    "0xaf88d065e77c8cc2239327c5edb3a432268e5831": ("USD Coin (USDC)", "Arbitrum One"),
+                    "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8": ("USD Coin (USDC.e)", "Arbitrum One"),
+                    "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": ("Wrapped Ether (WETH)", "Arbitrum One"),
+                    "0x912ce59144191c1204e64559fe8253a0e49e6548": ("Arbitrum (ARB)", "Arbitrum One"),
+                    "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": ("Wrapped BTC (WBTC)", "Arbitrum One"),
+                    "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract", "Arbitrum One"),
+                    "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One"),
+                    "0xe3833ddaf7fb92b3f0e0a57169c98bd9482e9560": ("Bot Keeper Engine Relayer", "Arbitrum One")
+                }
+
+                matched_contract = KNOWN_TOKEN_CONTRACTS.get(primary_user_wallet.lower()) if primary_user_wallet else None
+                contract_warn_km = ""
+                contract_warn_en = ""
+                if matched_contract:
+                    c_tok_name, c_chain_name = matched_contract
+                    contract_warn_km = (
+                        f"\n\n🚨 **ការព្រមានសុវត្ថិភាពខ្ពស់ ៖** អាសយដ្ឋានដែលបានភ្ជាប់ `{primary_user_wallet[:10]}...` គឺជា **Smart Contract របស់កាក់ {c_tok_name} ({c_chain_name})** មិនមែនជាកាបូប MetaMask ផ្ទាល់ខ្លួនរបស់អ្នកឡើយ!\n"
+                        f"• ចំនួនទឹកប្រាក់ `{u_tot_str}` គឺជាទ្រព្យសម្បត្តិរបស់ Contract មិនមែនជាលុយក្នុងកាបូបរបស់អ្នកឡើយ!\n"
+                        f"• ⚠️ **ដើម្បីកុំឱ្យបាត់បង់ប្រាក់ចំណេញ ៖** សូមបើក MetaMask ចុចលើ `Account 1` ដើម្បី Copy អាសយដ្ឋានកាបូបផ្ទាល់ខ្លួនពិតប្រាកដ រួចវាយ ៖ ``/wallet 0x...``"
+                    )
+                    contract_warn_en = (
+                        f"\n\n🚨 **CRITICAL SECURITY WARNING:** The address `{primary_user_wallet[:10]}...` is the **Smart Contract for {c_tok_name} ({c_chain_name})**, NOT your personal MetaMask wallet!\n"
+                        f"• The balance `{u_tot_str}` belongs to the token pool, NOT your wallet!\n"
+                        f"• ⚠️ **To prevent loss of profits:** Please open MetaMask, copy your `Account 1` address, and send: ``/wallet 0x...``"
+                    )
+
                 if is_admin_user:
                     # 👑 SUPER ADMIN EXPERIENCE: Full Infrastructure Diagnostics & Controls
                     if is_keeper_arb_funded:
@@ -1209,7 +1240,7 @@ class TelegramBotThread(BaseThread):
                             f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
                             f"• 🌐 BNB Smart Chain ៖ {u_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet ៖ {u_eth_str}\n"
-                            f"• 💵 សមតុល្យសរុប ៖ {u_tot_str}\n\n"
+                            f"• 💵 សមតុល្យសរុប ៖ {u_tot_str}{contract_warn_km}\n\n"
                             "⛽ **២. ព័ត៌មានកាបូប Keeper Relayer (Admin Gas Engine) ៖**\n"
                             f"• អាសយដ្ឋាន ៖ `{kp_addr}`\n"
                             f"• 🌐 Arbitrum One ៖ {k_arb_str}\n"
@@ -1232,7 +1263,7 @@ class TelegramBotThread(BaseThread):
                             f"• 🌐 Arbitrum One: {u_arb_str}\n"
                             f"• 🌐 BNB Smart Chain: {u_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet: {u_eth_str}\n"
-                            f"• 💵 Total Balance: {u_tot_str}\n\n"
+                            f"• 💵 Total Balance: {u_tot_str}{contract_warn_en}\n\n"
                             "⛽ **2. Dedicated Keeper Relayer Gas Engine:**\n"
                             f"• Address: `{kp_addr}`\n"
                             f"• 🌐 Arbitrum One: {k_arb_str}\n"
@@ -1266,7 +1297,7 @@ class TelegramBotThread(BaseThread):
                             f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
                             f"• 🌐 BNB Smart Chain ៖ {u_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet ៖ {u_eth_str}\n"
-                            f"• 💵 សមតុល្យសរុប ៖ {u_tot_str}\n"
+                            f"• 💵 សមតុល្យសរុប ៖ {u_tot_str}{contract_warn_km}\n"
                             "💡 _រាល់ប្រាក់ចំណេញសុទ្ធ (Net Profit USDT) ពី Flash Loan & MEV Arbitrage នឹងត្រូវផ្ទេរត្រង់ចូលកាបូបនេះដោយស្វ័យប្រវត្តិ ២៤/៧!_\n\n"
                             "⛽ **២. ស្ថានភាពម៉ាស៊ីន KEEPER RELAYER GAS ENGINE ៖**\n"
                             f"• ម៉ាស៊ីនបម្រើ Gas Node ៖ {kp_masked} `(Institutional Dedicated Node)`\n"
@@ -1288,7 +1319,7 @@ class TelegramBotThread(BaseThread):
                             f"• 🌐 Arbitrum One: {u_arb_str}\n"
                             f"• 🌐 BNB Smart Chain: {u_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet: {u_eth_str}\n"
-                            f"• 💵 Total Balance: {u_tot_str}\n"
+                            f"• 💵 Total Balance: {u_tot_str}{contract_warn_en}\n"
                             "💡 _All net profits (USDT) from Flash Loan & MEV Arbitrage will be transferred directly to this wallet 24/7!_\n\n"
                             "⛽ **2. Dedicated Keeper Relayer Gas Engine Status:**\n"
                             f"• Relayer Node: {kp_masked} `(Institutional Dedicated Node)`\n"
@@ -1644,6 +1675,58 @@ class TelegramBotThread(BaseThread):
                 )
                 if msg_target:
                     await msg_target.reply_text(err_text, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            # Smart Contract Address Rejection Shield
+            KNOWN_TOKEN_CONTRACTS = {
+                "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": ("Tether USD (USDT)", "Arbitrum One"),
+                "0xdac17f958d2ee523a2206206994597c13d831ec7": ("Tether USD (USDT)", "Ethereum Mainnet"),
+                "0x55d398326f99059ff775485246999027b3197955": ("Tether USD (USDT)", "BNB Smart Chain"),
+                "0xaf88d065e77c8cc2239327c5edb3a432268e5831": ("USD Coin (USDC)", "Arbitrum One"),
+                "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8": ("USD Coin (USDC.e)", "Arbitrum One"),
+                "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": ("Wrapped Ether (WETH)", "Arbitrum One"),
+                "0x912ce59144191c1204e64559fe8253a0e49e6548": ("Arbitrum (ARB)", "Arbitrum One"),
+                "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": ("Wrapped BTC (WBTC)", "Arbitrum One"),
+                "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract", "Arbitrum One"),
+                "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One"),
+                "0xe3833ddaf7fb92b3f0e0a57169c98bd9482e9560": ("Bot Keeper Engine Relayer", "Arbitrum One")
+            }
+
+            matched_contract = KNOWN_TOKEN_CONTRACTS.get(raw_address.lower())
+            if matched_contract:
+                tok_name, ch_name = matched_contract
+                if user_lang == 'km':
+                    contract_rej_msg = (
+                        "🚨 **កំហុសសុវត្ថិភាព ៖ អាសយដ្ឋាននេះជា SMART CONTRACT របស់កាក់ មិនមែនជាកាបូប METAMASK របស់អ្នកឡើយ!**\n"
+                        "═════════════════════════════════════════\n\n"
+                        f"⚠️ **អាសយដ្ឋានដែលបានបញ្ចូល ៖** `{raw_address}`\n"
+                        f"📌 **អត្តសញ្ញាណ ៖** `{tok_name} ({ch_name})`\n\n"
+                        "❌ **មូលហេតុដែលប្រព័ន្ធបដិសេធមិនទទួល ៖**\n"
+                        "• នេះគឺជាកិច្ចសន្យាឆ្លាតវៃផ្លូវការ (Smart Contract) របស់កាក់ផ្ទាល់ មិនមែនជាកាបូបផ្ទាល់ខ្លួនរបស់អ្នកឡើយ!\n"
+                        "• ប្រសិនបើអ្នកភ្ជាប់អាសយដ្ឋាននេះ រាល់ប្រាក់ចំណេញ Flash Loan នឹងត្រូវផ្ញើចូល Token Contract នោះ ហើយបាត់បង់ជារៀងរហូត (មិនអាចដកយកមកវិញបាន)!\n"
+                        "• សមតុល្យដែលអ្នកឃើញលើ Arbiscan គឺជាទ្រព្យសម្បត្តិរបស់ Contract មិនមែនជាលុយក្នុងកាបូបរបស់អ្នកឡើយ!\n\n"
+                        "📋 **របៀបយកអាសយដ្ឋាន MetaMask ត្រឹមត្រូវ (ងាយៗ ៣ ជំហាន) ៖**\n"
+                        "1️⃣ បើកកម្មវិធី **MetaMask** (លើទូរស័ព្ទ ឬកុំព្យូទ័រ)\n"
+                        "2️⃣ ចុចលើពាក្យ **`Account 1`** (នៅចំកណ្តាលខាងលើ) ដើម្បី **Copy អាសយដ្ឋានផ្ទាល់ខ្លួន**\n"
+                        "3️⃣ រួចផ្ញើមកកាន់ Bot វិញ ៖ ``/wallet 0xអាសយដ្ឋានដែលទើបតែ Copy``"
+                    )
+                else:
+                    contract_rej_msg = (
+                        "🚨 **SECURITY ALERT: THIS IS A TOKEN SMART CONTRACT, NOT YOUR PERSONAL METAMASK WALLET!**\n"
+                        "═════════════════════════════════════════\n\n"
+                        f"⚠️ **Address Entered:** `{raw_address}`\n"
+                        f"📌 **Identity:** `{tok_name} ({ch_name})`\n\n"
+                        "❌ **Why The System Rejected This Address:**\n"
+                        "• This is an official Token Smart Contract, NOT your personal receiving wallet!\n"
+                        "• If registered, all Flash Loan net profits will be transferred into the token contract and lost forever!\n"
+                        "• Balances shown on Arbiscan belong to the token pool, NOT your personal account!\n\n"
+                        "📋 **How to Get Your Real MetaMask Address (3 Simple Steps):**\n"
+                        "1️⃣ Open your **MetaMask** app or extension\n"
+                        "2️⃣ Tap on **`Account 1`** (top center) to **Copy your personal address**\n"
+                        "3️⃣ Paste and send: ``/wallet 0xYourCopiedAddress``"
+                    )
+                if msg_target:
+                    await msg_target.reply_text(contract_rej_msg, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
             chain_key, chain_name = db.set_user_web3_wallet(chat_id, raw_address, chain_override)
