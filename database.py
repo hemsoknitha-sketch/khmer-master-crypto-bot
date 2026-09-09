@@ -1020,6 +1020,49 @@ def delete_user_data(chat_id: int):
     conn.commit()
     conn.close()
 
+def delete_user_api(chat_id: int):
+    """Deletes API keys for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM user_api_keys WHERE chat_id = ?", (chat_id,))
+    except Exception:
+        pass
+    try:
+        cursor.execute("UPDATE users SET api_key = NULL, api_secret = NULL WHERE chat_id = ?", (chat_id,))
+    except Exception:
+        pass
+    conn.commit()
+    conn.close()
+
+def get_all_active_symbols(chat_id: int) -> list:
+    """Returns all active trade and short symbols for a given user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    symbols = set()
+    try:
+        cursor.execute("SELECT symbol FROM active_trades WHERE chat_id = ?", (chat_id,))
+        for row in cursor.fetchall():
+            if row and row[0]: symbols.add(str(row[0]).upper())
+    except Exception:
+        pass
+    try:
+        cursor.execute("SELECT symbol FROM active_shorts WHERE chat_id = ?", (chat_id,))
+        for row in cursor.fetchall():
+            if row and row[0]: symbols.add(str(row[0]).upper())
+    except Exception:
+        pass
+    conn.close()
+    return sorted(list(symbols))
+
+def get_user_config(chat_id: int, config_type: str = "auto_trade"):
+    """Fetches user configuration for a given strategy type."""
+    if config_type == "auto_trade":
+        return get_auto_trade_config(chat_id)
+    elif config_type == "hyper_trade":
+        return get_hyper_trade_config(chat_id)
+    return None
+
 def set_user_license(chat_id: int, duration_str: str):
     """Sets the user's license expiry based on duration string."""
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
@@ -1371,8 +1414,9 @@ def get_user_api(chat_id: int):
             return (dec_key.strip(), dec_secret.strip())
     return None
 
-# Backwards compatibility alias
+# Backwards compatibility aliases
 get_api_keys = get_user_api
+get_user_api_keys = get_user_api
 
 def detect_wallet_chain(address: str) -> tuple:
     """Detects blockchain network based on address format."""
@@ -1841,6 +1885,9 @@ def get_active_trades_by_user(chat_id: int):
     conn.close()
     return res
 
+# Backwards compatibility alias
+get_active_trades = get_active_trades_by_user
+
 def update_trade_qty_and_scale(trade_id: int, new_qty: float, scale_level: int):
     """Updates trade quantity and scale-out level after a partial take-profit."""
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
@@ -2224,6 +2271,76 @@ def stop_delta_neutral_bot(bot_id):
     cursor.execute('UPDATE delta_neutral_bots SET status = "CLOSED" WHERE id = ?', (bot_id,))
     conn.commit()
     conn.close()
+
+def add_delta_neutral_bot(chat_id: int, symbol: str, invest_amount: float, spot_qty: float, futures_qty: float):
+    """Registers a new delta neutral arbitrage bot in the database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO delta_neutral_bots (chat_id, symbol, invest_amount, spot_qty, futures_qty, status)
+        VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+    ''', (chat_id, str(symbol).upper(), float(invest_amount), float(spot_qty), float(futures_qty)))
+    conn.commit()
+    conn.close()
+
+def get_active_delta_neutral_bots():
+    """Fetches all currently active delta neutral bots across all users."""
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM delta_neutral_bots WHERE status = "ACTIVE"')
+    rows = cursor.fetchall()
+    bots = [dict(r) for r in rows]
+    conn.close()
+    return bots
+
+def get_user_delta_neutral_bots(chat_id: int):
+    """Fetches active delta neutral bots for a specific user."""
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM delta_neutral_bots WHERE chat_id = ? AND status = "ACTIVE"', (chat_id,))
+    rows = cursor.fetchall()
+    bots = [dict(r) for r in rows]
+    conn.close()
+    return bots
+
+def set_defender_active(active: bool = True, chat_id: int = None):
+    """Activates global or user-specific defender circuit breaker."""
+    set_circuit_breaker_status(bool(active))
+    if chat_id is not None:
+        try:
+            set_defender_status(chat_id, bool(active))
+        except Exception:
+            pass
+
+def update_compound_grid_state(grid_id: int, current_layer_size: float, total_coins_bought: float, last_price: float):
+    """Updates compound snowball grid layer size, coin inventory, and last execution price."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE compound_grids
+        SET current_layer_size = ?, total_coins_bought = ?, last_price = ?
+        WHERE id = ?
+    ''', (float(current_layer_size), float(total_coins_bought), float(last_price), int(grid_id)))
+    conn.commit()
+    conn.close()
+
+def update_trade_entry_price(chat_id: int, symbol: str, entry_price: float):
+    """Updates buy entry price for active trade upon WebSocket fill."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE active_trades
+            SET buy_price = ?, current_highest = MAX(current_highest, ?)
+            WHERE chat_id = ? AND symbol = ?
+        ''', (float(entry_price), float(entry_price), chat_id, str(symbol).upper()))
+        conn.commit()
+    except Exception as e:
+        print(f"Error updating trade entry price: {e}")
+    finally:
+        conn.close()
 
 
 def is_dynamic_leverage_enabled(chat_id) -> bool:

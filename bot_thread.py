@@ -9822,7 +9822,7 @@ class TelegramBotThread(BaseThread):
                         if msg_target:
                             await msg_target.reply_text("❌ Security PIN verification failed.")
                         return
-                keys = db.get_user_api_keys(chat_id)
+                keys = db.get_user_api(chat_id)
                 if keys and keys[0] and keys[1]:
                     if symbol == "ALL":
                         trading_engine.market_close_all_futures_positions(keys[0], keys[1])

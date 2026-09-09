@@ -722,7 +722,7 @@ def execute_smart_x_futures(
         }
 
     # 3. Fetch User API Keys
-    keys = db.get_user_api_keys(chat_id)
+    keys = db.get_user_api(chat_id)
     if not keys or not keys[0] or not keys[1]:
         return {
             "status": "error",
@@ -809,7 +809,7 @@ def execute_smart_x_spot(
         }
 
     # 3. Fetch User API Keys
-    keys = db.get_user_api_keys(chat_id)
+    keys = db.get_user_api(chat_id)
     if not keys or not keys[0] or not keys[1]:
         return {
             "status": "error",
