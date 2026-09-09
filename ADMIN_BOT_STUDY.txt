@@ -450,6 +450,7 @@
 • `/menu`                        : បើកផ្ទាំង Master Control Panel Interactive ជាមួយ Inline Buttons
 • `/help`                        : មើលសៀវភៅណែនាំ និង Syntax គំរូជាភាសាខ្មែរ
 • `/set_pin <PIN>`               : កំណត់លេខកូដសម្ងាត់ 2FA PIN (សារលុបចេញពី Telegram អូតូ <500ms)
+• `/reset_pin`                   : Super Smart 2FA PIN Manager & Recovery (ប្តូរ PIN, ភ្លេច PIN, Zero-Knowledge Recovery, Admin Override)
 • `/add_api <KEY> <SECRET> <PIN>` : ភ្ជាប់ Binance API Key & Secret (ធ្វើបានតែក្នុង Private Chat)
 • `/add_bybit_api <KEY> <SECRET> <PIN>` : ភ្ជាប់ Bybit Arbitrage API Key & Secret
 • `/remove_api`                  : លុបបំបាត់ និងកម្ទេច API Keys ចេញពីប្រព័ន្ធទាំងស្រុង

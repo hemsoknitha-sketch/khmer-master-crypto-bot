@@ -1171,6 +1171,14 @@ def get_user_pin(chat_id: int):
     conn.close()
     return result[0] if result else None
 
+def delete_user_pin(chat_id: int):
+    """Deletes or clears the user's 2FA PIN."""
+    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET pin_code = NULL WHERE chat_id = ?", (chat_id,))
+    conn.commit()
+    conn.close()
+
 def set_user_language(chat_id: int, language: str):
     """Updates user language preference."""
     cache_delete(f"lang_{chat_id}")

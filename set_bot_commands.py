@@ -47,6 +47,8 @@ async def set_menu_commands():
         BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
         BotCommand("alert", "🔔 Set Price Alert"),
         BotCommand("stop", "🛑 Stop Trading / Market Close"),
+        BotCommand("reset_pin", "🔒 Super Smart 2FA PIN Reset & Recovery"),
+        BotCommand("set_pin", "🔒 Configure 2FA Security PIN"),
     ]
 
     admin_commands = [
