@@ -250,8 +250,8 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
         headers = {"X-MBX-APIKEY": api_key}
 
         # Alternative endpoints for GCP and Non-US routing
-        spot_endpoints = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.info", "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"]
-        futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
+        spot_endpoints = [BASE_URL, "https://api-gcp.binance.com", "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"]
+        futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi1.binance.com", "https://fapi2.binance.com"]
         
         spot_enabled = False
         futures_enabled = False
@@ -265,19 +265,23 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
                 spot_url = f"{s_base}/api/v3/account?{query_string}&signature={signature}"
                 spot_res = requests.get(spot_url, headers=headers, timeout=5)
                 if spot_res.status_code == 200:
-                    spot_enabled = True
-                    spot_err_detail = ""
-                    break
-                else:
-                    err_txt = spot_res.text
                     try:
-                        ej = spot_res.json()
-                        spot_err_detail = f"Code {ej.get('code')}: {ej.get('msg')}"
+                        s_data = spot_res.json()
+                        if isinstance(s_data, dict) and "balances" in s_data:
+                            spot_enabled = True
+                            spot_err_detail = ""
+                            break
                     except Exception:
-                        spot_err_detail = f"HTTP {spot_res.status_code}: {err_txt[:100]}"
-                    if "restricted location" in err_txt.lower() or "b. eligibility" in err_txt.lower():
-                        is_restricted_loc = True
-                    last_error_msg = err_txt
+                        pass
+                err_txt = spot_res.text
+                try:
+                    ej = spot_res.json()
+                    spot_err_detail = f"Code {ej.get('code')}: {ej.get('msg')}"
+                except Exception:
+                    spot_err_detail = f"HTTP {spot_res.status_code}: {err_txt[:100]}"
+                if "restricted location" in err_txt.lower() or "b. eligibility" in err_txt.lower():
+                    is_restricted_loc = True
+                last_error_msg = err_txt
             except Exception as ex:
                 spot_err_detail = str(ex)
                 continue
@@ -288,14 +292,18 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
                 futures_url = f"{f_base}/fapi/v2/balance?{query_string}&signature={signature}"
                 futures_res = requests.get(futures_url, headers=headers, timeout=5)
                 if futures_res.status_code == 200:
-                    futures_enabled = True
-                    break
-                else:
-                    err_txt = futures_res.text
-                    if "restricted location" in err_txt.lower() or "b. eligibility" in err_txt.lower():
-                        is_restricted_loc = True
-                    if not last_error_msg:
-                        last_error_msg = err_txt
+                    try:
+                        f_data = futures_res.json()
+                        if isinstance(f_data, list):
+                            futures_enabled = True
+                            break
+                    except Exception:
+                        pass
+                err_txt = futures_res.text
+                if "restricted location" in err_txt.lower() or "b. eligibility" in err_txt.lower():
+                    is_restricted_loc = True
+                if not last_error_msg:
+                    last_error_msg = err_txt
             except Exception:
                 continue
         

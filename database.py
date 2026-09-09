@@ -883,6 +883,18 @@ def get_arbitrage_api(chat_id: int, exchange: str):
         return security.decrypt_data(enc_key), security.decrypt_data(enc_secret)
     return None
 
+def delete_arbitrage_api(chat_id: int, exchange: str = 'Bybit'):
+    """Delete API keys for alternate exchanges securely."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM arbitrage_api_keys WHERE chat_id = ? AND exchange = ?", (chat_id, exchange))
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Database error in delete_arbitrage_api: {e}")
+    finally:
+        conn.close()
+
 def has_api_keys(chat_id: int) -> bool:
     """Checks if a user is VIP and if their license is still valid."""
     conn = sqlite3.connect(DB_FILE, timeout=15.0)

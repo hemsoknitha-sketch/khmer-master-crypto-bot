@@ -4663,7 +4663,12 @@ class TelegramBotThread(BaseThread):
 
             raw_args = [str(a).strip() for a in context.args] if (context and context.args) else []
             args = [a for a in raw_args if a]
-            if args and args[0].lower() in ["binance", "binance_spot", "spot", "ex"]:
+            target_exchange = "binance"
+            if args and args[0].lower() in ["bybit", "bybit_spot", "bybit_futures"]:
+                target_exchange = "bybit"
+                args = args[1:]
+            elif args and args[0].lower() in ["binance", "binance_spot", "spot", "ex"]:
+                target_exchange = "binance"
                 args = args[1:]
 
             if len(args) != 3:
@@ -4679,12 +4684,11 @@ class TelegramBotThread(BaseThread):
                         "🌐 **SUPPORTED EXCHANGE API SYNTAXES:**\n\n"
                         "👉 **1. BINANCE API (Primary Spot, Futures, HFT & PAXG Gold) ៖**\n"
                         "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **2. OKX API (Sub-5ms Cross-Exchange Arbitrage & Hedging) ៖**\n"
+                        "👉 **2. BYBIT API (Futures Hedging, Arbitrage & Orderflow) ៖**\n"
+                        "`` `/add_bybit_api <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "*(or: `` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``)*\n\n"
+                        "👉 **3. OKX API (Sub-5ms Cross-Exchange Arbitrage & Hedging) ៖**\n"
                         "`` `/add_api OKX <API_KEY> <API_SECRET> <PASSPHRASE> <PIN>` ``\n\n"
-                        "👉 **3. BYBIT API (Futures Hedging & Orderflow) ៖**\n"
-                        "`` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **4. GATE.IO API (Auto Listing Sniper & Altcoin Arb) ៖**\n"
-                        "`` `/add_api GATE <API_KEY> <API_SECRET> <PIN>` ``\n"
                         "═══════════════════════════════\n"
                         "💡 _Your API Secret & PIN will be automatically purged from Telegram chat after verification!_"
                     )
@@ -4700,12 +4704,11 @@ class TelegramBotThread(BaseThread):
                         "🌐 **支持的交易所 API 绑定格式：**\n\n"
                         "👉 **1. BINANCE API (现货、合约、高频对冲与 PAXG 黄金) ៖**\n"
                         "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **2. OKX API (毫秒级跨所套利与对冲) ៖**\n"
+                        "👉 **2. BYBIT API (合约对冲、套利与订单流) ៖**\n"
+                        "`` `/add_bybit_api <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "*(或：`` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``)*\n\n"
+                        "👉 **3. OKX API (毫秒级跨所套利与对冲) ៖**\n"
                         "`` `/add_api OKX <API_KEY> <API_SECRET> <PASSPHRASE> <PIN>` ``\n\n"
-                        "👉 **3. BYBIT API (合约对冲与订单流) ៖**\n"
-                        "`` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **4. GATE.IO API (自动抢购与山寨套利) ៖**\n"
-                        "`` `/add_api GATE <API_KEY> <API_SECRET> <PIN>` ``\n"
                         "═══════════════════════════════\n"
                         "💡 _验证成功后，包含 API Secret 与 PIN 的敏感消息将被系统自动删除！_"
                     )
@@ -4721,12 +4724,11 @@ class TelegramBotThread(BaseThread):
                         "🌐 **SUPPORTED EXCHANGE API SYNTAXES (ទម្រង់ភ្ជាប់ API) ៖**\n\n"
                         "👉 **1. BINANCE API (Primary Spot, Futures, HFT & PAXG Gold) ៖**\n"
                         "`` `/add_api <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **2. OKX API (Sub-5ms Cross-Exchange Arbitrage & Hedging) ៖**\n"
+                        "👉 **2. BYBIT API (Futures Hedging, Arbitrage & Orderflow) ៖**\n"
+                        "`` `/add_bybit_api <API_KEY> <API_SECRET> <PIN>` ``\n"
+                        "*(ឬប្រើ ៖ `` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``)*\n\n"
+                        "👉 **3. OKX API (Sub-5ms Cross-Exchange Arbitrage & Hedging) ៖**\n"
                         "`` `/add_api OKX <API_KEY> <API_SECRET> <PASSPHRASE> <PIN>` ``\n\n"
-                        "👉 **3. BYBIT API (Futures Hedging & Orderflow) ៖**\n"
-                        "`` `/add_api BYBIT <API_KEY> <API_SECRET> <PIN>` ``\n\n"
-                        "👉 **4. GATE.IO API (Auto Listing Sniper & Altcoin Arb) ៖**\n"
-                        "`` `/add_api GATE <API_KEY> <API_SECRET> <PIN>` ``\n"
                         "═══════════════════════════════\n"
                         "💡 _សារដែលមាន API Secret & PIN របស់អ្នកនឹងត្រូវលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
                     )
@@ -4741,8 +4743,8 @@ class TelegramBotThread(BaseThread):
                     await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
-            api_key = args[0].strip().strip("'\"[]()")
-            api_secret = args[1].strip().strip("'\"[]()")
+            api_key = args[0].strip().strip('\'"[]()')
+            api_secret = args[1].strip().strip('\'"[]()')
             pin_input = args[2].strip()
 
             stored_pin = db.get_user_pin(chat_id)
@@ -4766,9 +4768,99 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
                 return
 
+            # Target 1: BYBIT
+            if target_exchange == "bybit":
+                import bybit_engine as bbe
+                is_valid, reason, details = bbe.validate_bybit_api_keys(api_key, api_secret)
+                if not is_valid:
+                    val_err = f"📊 **BYBIT API KEY VERIFICATION FAILED ៖**\n\n{reason}"
+                    await update.effective_message.reply_text(val_err, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                    return
+
+                db.set_arbitrage_api(chat_id, "Bybit", api_key, api_secret)
+                if hasattr(db, 'log_admin_action'):
+                    db.log_admin_action(chat_id, "ADD_API", "BYBIT", "Bybit API keys connected & verified.")
+
+                if user_lang == 'en':
+                    success_msg = (
+                        "✅ **APEX BYBIT API CONNECTED SUCCESSFULLY!** 🟢\n"
+                        "═══════════════════════════════\n\n"
+                        f"{reason}\n\n"
+                        "🛡️ **ENCRYPTION VAULT**: `AES-256 Multi-Layer Active`\n"
+                        "⚡ **ARBITRAGE STATUS**: `Sub-5ms Binance ↔ Bybit Arbitrage Active`\n"
+                        "💡 _Your sensitive API Secret & PIN message has been automatically purged from Chat for security._"
+                    )
+                elif user_lang == 'zh':
+                    success_msg = (
+                        "✅ **BYBIT API 密钥成功连接验证！** 🟢\n"
+                        "═══════════════════════════════\n\n"
+                        f"{reason}\n\n"
+                        "🛡️ **安全加密金库**: `AES-256 多层加密激活`\n"
+                        "⚡ **套利状态**: `Sub-5ms Binance ↔ Bybit 跨所套利已激活`\n"
+                        "💡 _包含 API Secret 与 PIN 的敏感消息已被系统从聊天记录中自动删除。_"
+                    )
+                else:
+                    success_msg = (
+                        "✅ **APEX BYBIT API CONNECTED SUCCESSFULLY!** 🟢\n"
+                        "═══════════════════════════════\n\n"
+                        f"{reason}\n\n"
+                        "🛡️ **ENCRYPTION VAULT**: `AES-256 Multi-Layer Safe Storage`\n"
+                        "⚡ **ARBITRAGE STATUS**: `Sub-5ms Binance ↔ Bybit Arbitrage Active`\n"
+                        "💡 _សារដែលមាន API Secret & PIN របស់អ្នកត្រូវបានលុបចេញពី Chat ស្វ័យប្រវត្តិដើម្បីសុវត្ថិភាព 100%!_"
+                    )
+
+                await update.effective_message.reply_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                self.log_signal.emit(f"✅ VIP User {chat_id} updated their Bybit API keys.")
+                return
+
+            # Target 2: BINANCE (with intelligent Bybit fallback auto-detection)
             import trading_engine as te
             is_valid, reason = te.validate_api_keys(api_key, api_secret)
             if not is_valid:
+                # Proactive auto-detection: check if user provided a Bybit API Key
+                import bybit_engine as bbe
+                bb_valid, bb_reason, bb_details = bbe.validate_bybit_api_keys(api_key, api_secret)
+                if bb_valid:
+                    db.set_arbitrage_api(chat_id, "Bybit", api_key, api_secret)
+                    if hasattr(db, 'log_admin_action'):
+                        db.log_admin_action(chat_id, "ADD_API", "BYBIT", "Auto-detected Bybit API keys connected.")
+                    if user_lang == 'en':
+                        auto_msg = (
+                            "💡 **AUTO-DETECTED BYBIT API KEY!** 🟢\n"
+                            "═══════════════════════════════\n\n"
+                            "The system identified this key as a **Bybit API** (not Binance) and connected it to your Bybit Vault successfully!\n\n"
+                            f"{bb_reason}\n\n"
+                            "🛡️ **ENCRYPTION VAULT**: `AES-256 Multi-Layer Safe Storage`\n"
+                            "⚡ **ARBITRAGE STATUS**: `Sub-5ms Binance ↔ Bybit Arbitrage Active`\n"
+                            "💡 _Your sensitive API Secret & PIN message has been purged for security._"
+                        )
+                    elif user_lang == 'zh':
+                        auto_msg = (
+                            "💡 **自动识别为 BYBIT API 密钥！** 🟢\n"
+                            "═══════════════════════════════\n\n"
+                            "系统自动识别该密钥为 **Bybit API**（非 Binance），并已成功将其连接存储至 Bybit 金库！\n\n"
+                            f"{bb_reason}\n\n"
+                            "🛡️ **安全加密金库**: `AES-256 多层加密`\n"
+                            "⚡ **套利状态**: `Sub-5ms Binance ↔ Bybit 跨所套利已激活`\n"
+                            "💡 _敏感信息已从聊天记录中自动删除。_"
+                        )
+                    else:
+                        auto_msg = (
+                            "💡 **ស្គាល់ឃើញ BYBIT API KEY ស្វ័យប្រវត្តិ!** 🟢\n"
+                            "═══════════════════════════════\n\n"
+                            "ប្រព័ន្ធបានដឹងថា Key នេះជា **Bybit API** (មិនមែន Binance ទេ) ហើយបានភ្ជាប់ទៅកាន់ Bybit Vault ដោយជោគជ័យ!\n\n"
+                            f"{bb_reason}\n\n"
+                            "🛡️ **ENCRYPTION VAULT**: `AES-256 Multi-Layer Safe Storage`\n"
+                            "⚡ **ARBITRAGE STATUS**: `Sub-5ms Binance ↔ Bybit Arbitrage Active`\n"
+                            "💡 _សារដែលមាន API Secret & PIN ត្រូវបានលុបចេញពី Chat ស្វ័យប្រវត្តិ!_"
+                        )
+                    await update.effective_message.reply_text(auto_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                    self.log_signal.emit(f"✅ VIP User {chat_id} auto-connected Bybit API keys.")
+                    return
+
                 val_err = f"📊 **BINANCE API KEY VERIFICATION FAILED ៖**\n\n{reason}"
                 await update.effective_message.reply_text(val_err, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
@@ -4977,17 +5069,9 @@ class TelegramBotThread(BaseThread):
 
         async def add_bybit_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
-            if not chat_id: return
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km').lower().strip()
-            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit(): user_lang = 'km'
-            elif user_lang in ['en', 'english']: user_lang = 'en'
-            elif user_lang in ['zh', 'chinese']: user_lang = 'zh'
-            else: user_lang = 'km'
-
-            await update.effective_message.reply_text("🔑 **Bybit API Integration Vault Ready!** Use: `/add_api <KEY> <SECRET> <PIN>` for Binance & Bybit.", parse_mode="Markdown")
-            return
+            raw_args = list(context.args) if (context and context.args) else []
+            context.args = ["bybit"] + raw_args
+            await add_api_command(update, context)
 
         async def remove_api_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return

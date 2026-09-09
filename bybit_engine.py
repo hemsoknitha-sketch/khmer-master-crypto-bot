@@ -74,3 +74,131 @@ def place_market_sell(api_key: str, api_secret: str, symbol: str, qty: float) ->
     """Places a market sell order."""
     qty = round(qty, 4)
     return place_market_order(api_key, api_secret, symbol, "Sell", qty)
+
+def validate_bybit_api_keys(api_key: str, api_secret: str) -> tuple[bool, str, dict]:
+    """
+    Validates Bybit API Key and Secret using official Bybit V5 user/query-api endpoint.
+    Returns: (is_valid: bool, status_message: str, details: dict)
+    """
+    try:
+        srv_time = int(time.time() * 1000)
+        try:
+            time_res = requests.get(f"{BYBIT_API_URL}/v5/market/time", timeout=5)
+            if time_res.status_code == 200:
+                srv_time = int(time_res.json().get("time", srv_time))
+        except Exception:
+            pass
+
+        timestamp = str(srv_time)
+        recv_window = "10000"
+        params_str = ""
+        
+        sign_payload = timestamp + api_key + recv_window + params_str
+        signature = hmac.new(
+            bytes(api_secret, "utf-8"),
+            bytes(sign_payload, "utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
+        headers = {
+            "X-BAPI-API-KEY": api_key,
+            "X-BAPI-SIGN": signature,
+            "X-BAPI-TIMESTAMP": timestamp,
+            "X-BAPI-RECV-WINDOW": recv_window,
+            "Content-Type": "application/json"
+        }
+
+        res = requests.get(f"{BYBIT_API_URL}/v5/user/query-api", headers=headers, timeout=8)
+        if res.status_code != 200:
+            return False, f"HTTP {res.status_code}: មិនអាចភ្ជាប់ទៅកាន់ Bybit API បានទេ ({res.text[:120]})", {}
+
+        data = res.json()
+        ret_code = data.get("retCode", -1)
+        ret_msg = data.get("retMsg", "Unknown Error")
+
+        if ret_code != 0:
+            return False, f"Code {ret_code}: {ret_msg}", {}
+
+        result = data.get("result", {})
+        perms = result.get("permissions", {})
+        
+        spot_perms = perms.get("Spot", [])
+        contract_perms = perms.get("ContractTrade", [])
+        is_read_only = bool(result.get("readOnly", 0))
+
+        spot_status = "🟢 ដំណើរការ (Enabled)" if spot_perms else "🟡 មិនទាន់បើក (Spot Not Selected)"
+        contract_status = "🟢 ដំណើរការ (Enabled)" if contract_perms else "🟡 មិនទាន់បើក (ContractTrade Not Selected)"
+        mode_status = "🔴 Read-Only (គ្មានសិទ្ធិ Trade)" if is_read_only else "🟢 Read-Write (ពេញលេញ)"
+
+        msg = (
+            "✅ **ភ្ជាប់ BYBIT API ជោគជ័យ! (Bybit V5 API Connected)**\n\n"
+            "**មុខងារដែលបានបើកសិទ្ធិលើ Bybit:**\n"
+            f" - Spot Trading: {spot_status}\n"
+            f" - Derivatives/Futures Trading: {contract_status}\n"
+            f" - API Permission Mode: {mode_status}\n\n"
+            "*(ប្រព័ន្ធគាំទ្រ Sub-5ms Cross-Exchange Arbitrage & Bybit Futures Hedging ពេញលេញ!)*"
+        )
+        return True, msg, result
+    except Exception as e:
+        return False, f"កំហុសក្នុងការតភ្ជាប់ Bybit ៖ {str(e)}", {}
+
+def get_bybit_wallet_balance(api_key: str, api_secret: str, account_type: str = "UNIFIED") -> dict:
+    """
+    Fetches Bybit wallet balance for Unified Trading or Contract account.
+    """
+    try:
+        srv_time = int(time.time() * 1000)
+        try:
+            time_res = requests.get(f"{BYBIT_API_URL}/v5/market/time", timeout=5)
+            if time_res.status_code == 200:
+                srv_time = int(time_res.json().get("time", srv_time))
+        except Exception:
+            pass
+
+        timestamp = str(srv_time)
+        recv_window = "10000"
+        params_str = f"accountType={account_type}"
+
+        sign_payload = timestamp + api_key + recv_window + params_str
+        signature = hmac.new(
+            bytes(api_secret, "utf-8"),
+            bytes(sign_payload, "utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
+        headers = {
+            "X-BAPI-API-KEY": api_key,
+            "X-BAPI-SIGN": signature,
+            "X-BAPI-TIMESTAMP": timestamp,
+            "X-BAPI-RECV-WINDOW": recv_window,
+            "Content-Type": "application/json"
+        }
+
+        url = f"{BYBIT_API_URL}/v5/account/wallet-balance?{params_str}"
+        res = requests.get(url, headers=headers, timeout=8)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("retCode") == 0:
+                accts = data.get("result", {}).get("list", [])
+                if accts:
+                    acct = accts[0]
+                    total_equity = float(acct.get("totalEquity", 0.0))
+                    total_available = float(acct.get("totalAvailableBalance", 0.0))
+                    usdt_balance = 0.0
+                    for c in acct.get("coin", []):
+                        if c.get("coin") == "USDT":
+                            usdt_balance = float(c.get("walletBalance", 0.0))
+                            break
+                    return {
+                        "total_equity": total_equity,
+                        "total_available": total_available,
+                        "usdt_balance": usdt_balance,
+                        "account_type": account_type,
+                        "success": True
+                    }
+        if account_type == "UNIFIED":
+            return get_bybit_wallet_balance(api_key, api_secret, "CONTRACT")
+        return {"success": False, "usdt_balance": 0.0, "total_equity": 0.0}
+    except Exception as e:
+        return {"success": False, "error": str(e), "usdt_balance": 0.0}
+

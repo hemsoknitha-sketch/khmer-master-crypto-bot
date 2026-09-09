@@ -1171,7 +1171,11 @@ async def cross_venue_arbitrage_job(app: Application):
                 
                 # Execute for all users who have both API keys
                 for user in bybit_users:
-                    chat_id, bybit_key, bybit_secret = user
+                    chat_id = user[0]
+                    bybit_keys = db.get_arbitrage_api(chat_id, 'Bybit')
+                    if not bybit_keys:
+                        continue
+                    bybit_key, bybit_secret = bybit_keys
                     binance_keys = db.get_user_api(chat_id)
                     if not binance_keys:
                         continue
