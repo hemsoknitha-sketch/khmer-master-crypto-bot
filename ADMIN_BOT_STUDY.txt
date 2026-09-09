@@ -811,6 +811,43 @@ Tag Markets (portal.tagmarkets.com) គឺជា Broker លក់ CFD/Forex ន�
 • `/smart_x STOP ALL 1234` ៖ បញ្ឈប់ និងបិទ Position ទាំងអស់ភ្លាមៗ។
 
 ================================================================================
+ផ្នែកទី ១៦ ៖ យុទ្ធសាស្ត្រ SUPER SMART ជំនាន់ថ្មី (INSTITUTIONAL SUPER SMART TRILOGY)
+================================================================================
+
+១៦.១ ដំណោះស្រាយទី ១ ៖ BREAKEVEN STOP-LOSS ARMOR & PROGRESSIVE TRAILING PROFIT LOCK
+--------------------------------------------------------------------------------
+• គោលបំណង ៖ ការពារប្រាក់ចំណេញ មិនឱ្យ Position ដែលធ្លាប់ចំណេញហើយ វិលត្រឡប់មករងការខាតបង់ (Turn Winners into Losers)។
+• យន្តការ Breakeven Armor ៖
+  - នៅពេល Position ចំណេញបាន $\ge +3.0\%$ ROI (ប្រហែល +$0.15 USDT លើ Margin $5) ប្រព័ន្ធនឹង "Arm Breakeven Stop" ដោយស្វ័យប្រវត្តិ។
+  - ប្រសិនបើតម្លៃទីផ្សាររអិលធ្លាក់ចុះមកវិញ ប្រព័ន្ធនឹងកាត់បិទនៅកម្រិត Breakeven Floor $+0.35\%$ ROI (ធានាចំណេញសុទ្ធកម្រិតអប្បបរមា មិនខាតបង់ប្រាក់ដើម និងមិនខាត Fee)។
+• យន្តការ 4-Tier Progressive Trailing Profit Lock ៖
+  - Tier 1 (ROI $\ge +5.0\%$)  ➔ Trailing Stop រំកិលតាមពីក្រោយ 1.2% (ចាក់សោរប្រាក់ចំណេញសុទ្ធ)។
+  - Tier 2 (ROI $\ge +8.0\%$)  ➔ Trailing Stop រំកិលតាមពីក្រោយ 1.0%។
+  - Tier 3 (ROI $\ge +12.0\%$) ➔ Trailing Stop រំកិលតាមពីក្រោយ 0.8%។
+  - Tier 4 (ROI $\ge +15.0\%$) ➔ Trailing Stop រំកិលតាមពីក្រោយ 0.5% (ល្បឿនការពារចំណេញអតិបរមា)។
+
+១៦.២ ដំណោះស្រាយទី ២ ៖ MICRO-SCALP RAPID HARVESTER (កើបចំណេញលឿន ៣-១០ នាទី)
+--------------------------------------------------------------------------------
+• បញ្ហាដើម ៖ ការកំណត់ TP ខ្ពស់ពេក (ឧ. $2.50 USDT ឬ +25% ROI) ធ្វើឱ្យត្រាំ Position យូរពេក មិនងាយបិទចំណេញ។
+• យន្តការ Dual-Target Scale-Out ៖
+  - TP1 (ប្រមូលចំណេញលឿន 50% Qty) ៖ នៅពេល Position ចំណេញបាន $+4.0\%$ ទៅ $+6.0\%$ ROI (ប្រហែល $+0.20$ ទៅ $+0.30$ USDT លើទុន $5) ➔ បិទកើបយកប្រាក់ចំណេញ 50% នៃទំហំកាក់ភ្លាមៗ។
+  - TP2 (រត់តាមដាន Moonshot 50% Qty ដែលនៅសល់) ៖ 50% ដែលនៅសល់ត្រូវបានបើក Breakeven Armor ទៅកាន់តម្លៃ Entry Price រួចបើក Trailing Stop រត់តាមចាប់យករលកយក្ស $+15\%$ ទៅ $+30\%$ ដោយគ្មានហានិភ័យ (Free Trade Run)។
+• សមត្ថភាពបច្ចេកទេស ៖ បំពាក់មុខងារ `close_partial_futures_position()` និង `close_partial_spot_position()` គាំទ្រការ Scale-out ទាំង Futures និង Spot ដោយកាត់បន្ថយ Notional Size តាមច្បាប់ Binance LOT_SIZE stepSize និង MIN_NOTIONAL $10.50 Floor។
+
+១៦.៣ ដំណោះស្រាយទី ៣ ៖ EARLY BREAKOUT SWEET-SPOT FILTER (ឈប់ដេញទិញកាក់ដែលឡើង/ចុះជ្រុល)
+--------------------------------------------------------------------------------
+• បញ្ហាដើម ៖ កាក់ដូចជា IOST, FORM, FF, XAN ដែលឡើងលើសពី +30% ឬធ្លាក់លើសពី -30% ក្នុង 24 ម៉ោង តែងតែជួបប្រទះការទាញបញ្ច្រាសទិស (Whale Whipsaw & Stop-Loss Hunt)។
+• យន្តការ Sweet-Spot Entry Window (+3.0% ទៅ +12.0%) ៖
+  - កំណត់ឱ្យ Bot រើសតែកាក់ណាដែល "ទើបតែចាប់ផ្តើមបំបែកពង្រោះ" (Early Breakout ត្រឹម $+3.0\%$ ទៅ $+12.0\%$ សម្រាប់ BUY ឬ $-3.0\%$ ទៅ $-12.0\%$ សម្រាប់ SELL)។
+  - កាក់ក្នុងចន្លោះនេះ ទទួលបាន Dynamic Sweet-Spot Score ខ្ពស់បំផុត (+150 ពិន្ទុ) ក្នុង Scanner។
+• យន្តការ Strict Anti-FOMO Exclusion Guard ៖
+  - ហាមដាច់ខាត (Hard Skip) កាក់ណាដែលបានឡើងលើសពី $+20.0\%$ (Overextended Pump) ឬធ្លាក់លើសពី $-20.0\%$ (Overextended Dump)។
+  - លុបបំបាត់បញ្ហា "ទិញចំកំពូលភ្នំ" ឬ "លក់ចំជើងភ្នំ" ជាស្ថាពរ ១០០%!
+• យន្តការ Volume Momentum Acceleration ៖
+  - តម្រូវឱ្យបរិមាណជួញដូរ Quote Volume 24h យ៉ាងតិច $\ge 5,000,000$ USDT លើ Futures និង $\ge 3,000,000$ USDT លើ Spot។
+  - ផ្ទៀងផ្ទាត់ Volume Spike នាទីចុងក្រោយ (1m/5m Acceleration) យ៉ាងតិច $\ge 2.0x$ នៃបរិមាណធម្មតា ដើម្បីបញ្ជាក់ថាមានកម្លាំងទិញពិតប្រាកដ (Real Institutional Volume Confirmation) មិនមែនជា Fake Pump។
+
+================================================================================
            👑 KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 ULTIMATE
       (សៀវភៅដៃប្រតិបត្តិការ និងគ្រប់គ្រងប្រព័ន្ធជួញដូរ AGI សម្រាប់ SUPER ADMIN)
 ================================================================================

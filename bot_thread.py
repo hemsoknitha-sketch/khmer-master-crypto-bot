@@ -1605,10 +1605,10 @@ class TelegramBotThread(BaseThread):
                         "• ⚠️ **ហាមដាច់ខាត ៖** កុំផ្ញើ Private Key ឬ 12 Seed Words ចូល Telegram Bot ជាដាច់ខាត!\n\n"
                         "📋 **របៀបចម្លងដាក់ (Copy & Paste) ងាយៗ ៖**\n"
                         "👉 **Paste អាសយដ្ឋានដោយផ្ទាល់ (AI នឹង Auto-Detect បណ្ដាញស្វ័យប្រវត្តិ) ៖**\n"
-                        "• `` `/wallet 0x71C258284C8...` `` (MetaMask / Arbitrum USDT)\n"
-                        "• `` `/wallet 9WzDXwBbmkg...` `` (Solana SOL / USDC)\n"
-                        "• `` `/wallet TJy44mR6V...` `` (TRON TRC-20 USDT)\n"
-                        "• `` `/wallet bc1qar0srrr...` `` (Bitcoin Native)\n\n"
+                        "• `` `/web3_wallet 0x71C258284C8...` `` (MetaMask / Arbitrum USDT)\n"
+                        "• `` `/web3_wallet 9WzDXwBbmkg...` `` (Solana SOL / USDC)\n"
+                        "• `` `/web3_wallet TJy44mR6V...` `` (TRON TRC-20 USDT)\n"
+                        "• `` `/web3_wallet bc1qar0srrr...` `` (Bitcoin Native)\n\n"
                         "💡 _រាល់ប្រាក់ចំណេញពី Flash Loan & MEV Arbitrage នឹងត្រូវផ្ទេរចូលអាសយដ្ឋាននេះដោយស្វ័យប្រវត្តិ ២៤/៧!_"
                     )
                 else:
@@ -1626,10 +1626,10 @@ class TelegramBotThread(BaseThread):
                         "• ⚠️ **NEVER SHARE**: Do NOT share Private Keys or 12 Seed Words!\n\n"
                         "📋 **Quick Copy & Paste Usage:**\n"
                         "👉 **Paste address directly (AI auto-detects chain):**\n"
-                        "• `` `/wallet 0x71C258284C8...` `` (MetaMask / Arbitrum USDT)\n"
-                        "• `` `/wallet 9WzDXwBbmkg...` `` (Solana SOL / USDC)\n"
-                        "• `` `/wallet TJy44mR6V...` `` (TRON TRC-20 USDT)\n"
-                        "• `` `/wallet bc1qar0srrr...` `` (Bitcoin Native)\n\n"
+                        "• `` `/web3_wallet 0x71C258284C8...` `` (MetaMask / Arbitrum USDT)\n"
+                        "• `` `/web3_wallet 9WzDXwBbmkg...` `` (Solana SOL / USDC)\n"
+                        "• `` `/web3_wallet TJy44mR6V...` `` (TRON TRC-20 USDT)\n"
+                        "• `` `/web3_wallet bc1qar0srrr...` `` (Bitcoin Native)\n\n"
                         "💡 _All net profits from Flash Loan & DEX Arbitrage will settle automatically into these wallets 24/7!_"
                     )
                 if msg_target:
@@ -1820,7 +1820,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - View total PnL and active trading positions\n"
                     "• `/balance` - Check Spot & Futures Balances Real-Time\n"
                     "• `/status` - View 24/7 Engine Execution & Order Status\n"
-                    "• `/stop_all` - Emergency Stop All Active Trading Engines\n\n"
+                    "• `/stop ALL` - Emergency Stop All Active Trading Engines\n\n"
                     "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Autonomous Trading Engine (Spot/Futures)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage Engine (Binance vs Bybit)\n"
@@ -1849,7 +1849,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - 查看总 PnL 及所有持仓\n"
                     "• `/balance` - 实时查询 Spot 与 Futures 余额\n"
                     "• `/status` - 查看 24/7 交易引擎运行状态\n"
-                    "• `/stop_all` - 紧急一键停止所有运行引擎\n\n"
+                    "• `/stop ALL` - 紧急一键停止所有运行引擎\n\n"
                     "🚀 **2. 核心自主交易引擎**\n"
                     "• `/turbo_hedge` - 🚀 24/7 HFT 多币/单币高频对冲扫描器 (Spot/Futures)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms 跨交易所套利引擎 (Binance vs Bybit)\n"
@@ -1878,7 +1878,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
                     "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
                     "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time 24/7\n"
-                    "• `/stop_all` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
+                    "• `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
                     "🚀 **២. FLAGSHIP AUTONOMOUS TRADING ENGINES (ម៉ាស៊ីនវិនិយោគស្វ័យប្រវត្តិ)**\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Trading Engine (Spot/Futures)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage (Binance vs Bybit)\n"
@@ -2566,7 +2566,7 @@ class TelegramBotThread(BaseThread):
                 f"👉 ពិនិត្យ Balance ៖ `/balance`\n"
                 f"👉 Launch HFT Turbo Hedge ៖ `/turbo_hedge`\n"
                 f"👉 Launch Listing Sniper ៖ `/snipe`\n"
-                f"👉 ផ្ដាច់ប្រព័ន្ធទាំងអស់ ៖ `/stop_all`"
+                f"👉 ផ្ដាច់ប្រព័ន្ធទាំងអស់ ៖ `/stop ALL`"
             )
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -3670,7 +3670,7 @@ class TelegramBotThread(BaseThread):
                 "👉 `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
                 "👉 `/balance` - ឆែកសមតុល្យលុយក្នុងកាបូប Binance Spot & Futures\n"
                 "👉 `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time\n"
-                "👉 `/stop_all` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft Stop / Hard Stop)\n\n"
+                "👉 `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft Stop / Hard Stop)\n\n"
                 "🚀 **2. មុខងារជួញដូរស្វ័យប្រវត្តស្នូល (FLAGSHIP AUTONOMOUS ENGINES)**\n"
                 "👉 `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>` - 🟢 HFT Auto-Scanner 24/7\n"
                 "👉 `/snipe` - 🎯 Listing & Volatility (High RVOL) Sniper\n"
@@ -9140,7 +9140,7 @@ class TelegramBotThread(BaseThread):
                     msg = (
                         "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
                         "═══════════════════════════════\n\n"
-                        "💡 **PRO TIP**: You can use `/smart_trade` or `/turbo_hedge` interchangeably!\n\n"
+                        "💡 **PRO TIP**: `/turbo_hedge` is your unified Super Smart & Institutional Hedge Engine!\n\n"
                         "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
                         "• 🚀 **Dual Market Support (Spot & Futures)** ៖ Execute Spot (1x) or Futures (1x-15x/75x) with zero collision\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL Instant Reversal\n"
@@ -9149,20 +9149,20 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **Live Position Auto-Sync** ៖ Scans Binance `/fapi/v2/positionRisk` every 3 seconds with 0% miss\n"
                         "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) 94.5% win-rate\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
-                        "👉 **🧠 Futures AGI Auto Decision (AI Scans & Auto-Decides BUY/SELL) ៖**\n`` `/smart_trade TOP 20 10 AUTO 5 1234` ``\n\n"
-                        "👉 **🚀 Futures Top Gainers LONG (BUY 10x, $5/coin) ៖**\n`` `/smart_trade TOP 20 10 BUY 5 1234` ``\n\n"
-                        "👉 **📉 Futures Top Dumpers SHORT (SELL 10x, $5/coin) ៖**\n`` `/smart_trade TOP 20 10 SELL 5 1234` ``\n\n"
-                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/smart_trade HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/smart_trade SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Single-Coin Mode ៖**\n`` `/smart_trade SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 Stop & Market Close ៖**\n`` `/smart_trade STOP SOL 1234` ``\n"
-                        "`` `/smart_trade STOP ALL 1234` ``"
+                        "👉 **🧠 Futures AGI Auto Decision (AI Scans & Auto-Decides BUY/SELL) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
+                        "👉 **🚀 Futures Top Gainers LONG (BUY 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
+                        "👉 **📉 Futures Top Dumpers SHORT (SELL 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
+                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
+                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 Spot Single-Coin Mode ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
+                        "👉 **🛑 Stop & Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
+                        "`` `/turbo_hedge STOP ALL 1234` ``"
                     )
                 elif user_lang == 'zh':
                     msg = (
                         "⚡ **KHMER MASTER CRYPTO | SUPER SMART 高频量化交易系统 v13.00** 🛡️\n"
                         "═══════════════════════════════\n\n"
-                        "💡 **提示**：您可以完全互换使用 `/smart_trade` 或 `/turbo_hedge`！\n\n"
+                        "💡 **提示**：`/turbo_hedge` 是您统一的超级智能量化与机构级对冲引擎！\n\n"
                         "📊 **机构级 SUPER SMART 架构：**\n"
                         "• 🚀 **现货与合约双市场支持** ៖ 零冲突支持 Spot (1x) 或 Futures (1x-15x/75x) 自动建仓\n"
                         "• 🔄 **极速反向翻单 (<30ms)** ៖ 触发 -10.0% ROI / -$2.00 USDT 硬止损 ➔ 立即 BUY ↔ SELL 翻单\n"
@@ -9171,20 +9171,20 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **实时持仓同步** ៖ 每 3 秒同步 Binance `/fapi/v2/positionRisk` 零漏单\n"
                         "• 🧠 **5-Swarm 与华尔街 ML** ៖ 三重集成 (XGBoost + CatBoost + LightGBM) 94.5% 胜率\n\n"
                         "📋 **一键复制指令：**\n\n"
-                        "👉 **🧠 合约 AGI 智能全自动决策 (AI 自动研判 BUY/SELL) ៖**\n`` `/smart_trade TOP 20 10 AUTO 5 1234` ``\n\n"
-                        "👉 **🚀 合约做多 24h 涨幅榜 TOP 20 (BUY 10x) ៖**\n`` `/smart_trade TOP 20 10 BUY 5 1234` ``\n\n"
-                        "👉 **📉 合约做空 24h 跌幅榜 TOP 20 (SELL 10x) ៖**\n`` `/smart_trade TOP 20 10 SELL 5 1234` ``\n\n"
-                        "👉 **🛡️ 零风险 Delta-Neutral 对冲 (Spot 买入 1x + Futures 做空 1x) ៖**\n`` `/smart_trade HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 现货多币突破全自动扫描 ៖**\n`` `/smart_trade SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 现货单币模式 ៖**\n`` `/smart_trade SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 停止与平仓指令 ៖**\n`` `/smart_trade STOP SOL 1234` ``\n"
-                        "`` `/smart_trade STOP ALL 1234` ``"
+                        "👉 **🧠 合约 AGI 智能全自动决策 (AI 自动研判 BUY/SELL) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
+                        "👉 **🚀 合约做多 24h 涨幅榜 TOP 20 (BUY 10x) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
+                        "👉 **📉 合约做空 24h 跌幅榜 TOP 20 (SELL 10x) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
+                        "👉 **🛡️ 零风险 Delta-Neutral 对冲 (Spot 买入 1x + Futures 做空 1x) ៖**\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
+                        "👉 **🛒 现货多币突破全自动扫描 ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 现货单币模式 ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
+                        "👉 **🛑 停止与平仓指令 ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
+                        "`` `/turbo_hedge STOP ALL 1234` ``"
                     )
                 else:
                     msg = (
                         "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
                         "═══════════════════════════════\n\n"
-                        "💡 **ការណែនាំពិសេស** ៖ លោកអ្នកអាចប្រើប្រាស់បញ្ជា `/smart_trade` ឬ `/turbo_hedge` ដូចគ្នា 100%!\n\n"
+                        "💡 **ការណែនាំពិសេស** ៖ `/turbo_hedge` គឺជាម៉ាស៊ីន Super Smart និង Institutional Hedge រួមបញ្ចូលគ្នាតែមួយ!\n\n"
                         "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
                         "• 🚀 **គាំទ្រទីផ្សារពីរ (Spot & Futures)** ៖ រត់ Spot (1x) និង Futures (1x-15x/75x) ដោយគ្មានការទង្គិចគ្នា\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL ភ្លាមៗ (Zero Loss Past -15%)\n"
@@ -9193,14 +9193,14 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **Live Position Auto-Sync** ៖ ស្កេន Binance `/fapi/v2/positionRisk` រៀងរាល់ ៣ វិនាទី 100% គ្មានរំលង\n"
                         "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) Win-Rate 94.5%\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
-                        "👉 **🧠 Futures AGI Auto Decision (AI ស្កេន & សម្រេចចិត្ត BUY/SELL ស្វ័យប្រវត្តិ 24/7) ៖**\n`` `/smart_trade TOP 20 10 AUTO 5 1234` ``\n\n"
-                        "👉 **🚀 Futures Top Gainers LONG (ទិញឡើង BUY 10x, ទុន $5/កាក់) ៖**\n`` `/smart_trade TOP 20 10 BUY 5 1234` ``\n\n"
-                        "👉 **📉 Futures Top Dumpers SHORT (ទិញចុះ SELL 10x, ទុន $5/កាក់) ៖**\n`` `/smart_trade TOP 20 10 SELL 5 1234` ``\n\n"
-                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/smart_trade HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/smart_trade SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Single-Coin Mode (0% Liquidation Risk) ៖**\n`` `/smart_trade SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 បិទ និង Market Close ៖**\n`` `/smart_trade STOP SOL 1234` ``\n"
-                        "`` `/smart_trade STOP ALL 1234` ``"
+                        "👉 **🧠 Futures AGI Auto Decision (AI ស្កេន & សម្រេចចិត្ត BUY/SELL ស្វ័យប្រវត្តិ 24/7) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
+                        "👉 **🚀 Futures Top Gainers LONG (ទិញឡើង BUY 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
+                        "👉 **📉 Futures Top Dumpers SHORT (ទិញចុះ SELL 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
+                        "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
+                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 Spot Single-Coin Mode (0% Liquidation Risk) ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
+                        "👉 **🛑 បិទ និង Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
+                        "`` `/turbo_hedge STOP ALL 1234` ``"
                     )
                 msg_target = update.effective_message or update.message
                 if msg_target:
@@ -9670,10 +9670,10 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "👑 **KHMER MASTER CRYPTO | /smart_x INSTITUTIONAL QUANT SUITE** 🏆\n"
+                        "👑 **KHMER MASTER CRYPTO | /smartx INSTITUTIONAL QUANT SUITE** 🏆\n"
                         "*(Architectural Super Brain Outperforming portal.tagmarkets.com)*\n"
                         "════════════════════════════════════════\n\n"
-                        "💡 **WHY /smart_x CRUSHES RETAIL BROKER EAs & PAMMs:**\n"
+                        "💡 **WHY /smartx CRUSHES RETAIL BROKER EAs & PAMMs:**\n"
                         "• 🥇 **0% Broker B-Book & Counterparty Risk** ៖ Direct execution on Binance Spot & Futures / Bybit with isolated margin.\n"
                         "• 🔀 **Mixture-of-Experts Router (`brain_moe_router.pkl`)** ៖ Auto-switches between Trend-Following and Mean-Reversion Scalping (eliminating MT5 EA trend-blowouts).\n"
                         "• 🎯 **Session Liquidity Sweep Classifier** ៖ Sweeps Asian Range (00:00-08:00 UTC) at London & NY Open. Classifies True Breakout vs Turtle Soup Fakeout (>78% Win Rate on Gold & BTC).\n"
@@ -9681,20 +9681,20 @@ class TelegramBotThread(BaseThread):
                         "• ⚖️ **Adaptive Kelly & PINN Jump-Diffusion** ៖ Strict Daily Drawdown <= 2.5% ceiling with dynamic crash-wick risk dampening.\n"
                         "• 🛡️ **5 Super Smart Invariants** ៖ Breakeven Armor (+3% ROI), Micro-Scalp TP1 50%, Sweet-Spot Filter (+3% to +12%), 15m/1h Trend Confluence, and Anti-Whipsaw Clean Stop (-10% ROI, 2h cooldown).\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
-                        "👉 **🥇 Gold (PAXG) Institutional AGI (Auto BUY/SELL) ៖**\n`` `/smart_x GOLD 20 10 AUTO 1234` ``\n\n"
-                        "👉 **⚡ BTC / Crypto Futures AGI (Auto Direction 24/7) ៖**\n`` `/smart_x BTC 50 10 AUTO 1234` ``\n\n"
-                        "👉 **🛒 Spot Gold (PAXG) Macro Accumulation ៖**\n`` `/smart_x SPOT PAXG 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/smart_x SPOT AUTO 100 1234` ``\n\n"
-                        "👉 **🤗 Hot-Reload All Models from Hugging Face ៖**\n`` `/smart_x SYNC` ``\n\n"
-                        "👉 **📊 Live Market Regime & Session Sweep Dashboard ៖**\n`` `/smart_x METRICS` ``\n\n"
-                        "👉 **🛑 Stop & Market Close ៖**\n`` `/smart_x STOP ALL 1234` ``"
+                        "👉 **🥇 Gold (PAXG) Institutional AGI (Auto BUY/SELL) ៖**\n`` `/smartx GOLD 20 10 AUTO 1234` ``\n\n"
+                        "👉 **⚡ BTC / Crypto Futures AGI (Auto Direction 24/7) ៖**\n`` `/smartx BTC 50 10 AUTO 1234` ``\n\n"
+                        "👉 **🛒 Spot Gold (PAXG) Macro Accumulation ៖**\n`` `/smartx SPOT PAXG 50 1234` ``\n\n"
+                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/smartx SPOT AUTO 100 1234` ``\n\n"
+                        "👉 **🤗 Hot-Reload All Models from Hugging Face ៖**\n`` `/smartx SYNC` ``\n\n"
+                        "👉 **📊 Live Market Regime & Session Sweep Dashboard ៖**\n`` `/smartx METRICS` ``\n\n"
+                        "👉 **🛑 Stop & Market Close ៖**\n`` `/smartx STOP ALL 1234` ``"
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "👑 **KHMER MASTER CRYPTO | /smart_x 机构级量化系统** 🏆\n"
+                        "👑 **KHMER MASTER CRYPTO | /smartx 机构级量化系统** 🏆\n"
                         "*(超越 portal.tagmarkets.com 零售经纪商 EA 与 PAMM 架构)*\n"
                         "════════════════════════════════════════\n\n"
-                        "💡 **为何 /smart_x 能够彻底碾压零售经纪商 EA：**\n"
+                        "💡 **为何 /smartx 能够彻底碾压零售经纪商 EA：**\n"
                         "• 🥇 **零经纪商对赌风险** ៖ 资金直连 Binance 现货与合约 / Bybit API，采用逐仓隔离保证金。\n"
                         "• 🔀 **专家混合路由 (MoE Router)** ៖ 实时研判市场 Regime (趋势跟踪 vs 均值回归)，避免 MT5 EA 爆仓。\n"
                         "• 🎯 **交易时区流动性扫单分类器** ៖ 捕捉亚盘高低点 (00:00-08:00 UTC) 并在伦敦/纽约开盘研判真突破与假动作 (>78% 胜率)。\n"
@@ -9702,20 +9702,20 @@ class TelegramBotThread(BaseThread):
                         "• ⚖️ **自适应凯利与 PINN 跳跃扩散** ៖ 严格限制单日最大回撤 <= 2.5%，动态防范插针风险。\n"
                         "• 🛡️ **5 重 Super Smart 永恒法则** ៖ +3% ROI 自动保本、TP1 止盈 50%、+3%~+12% 早期突破筛选、15m/1h 趋势共振与 -10% ROI 硬止损。\n\n"
                         "📋 **一键复制指令：**\n\n"
-                        "👉 **🥇 黄金 (PAXG) 机构合约全自动 ៖**\n`` `/smart_x GOLD 20 10 AUTO 1234` ``\n\n"
-                        "👉 **⚡ 比特币/主流币合约全自动 ៖**\n`` `/smart_x BTC 50 10 AUTO 1234` ``\n\n"
-                        "👉 **🛒 现货黄金 (PAXG) 宏观定投 ៖**\n`` `/smart_x SPOT PAXG 50 1234` ``\n\n"
-                        "👉 **🛒 现货多币早期突破扫描 ៖**\n`` `/smart_x SPOT AUTO 100 1234` ``\n\n"
-                        "👉 **🤗 从 Hugging Face 热重载所有模型 ៖**\n`` `/smart_x SYNC` ``\n\n"
-                        "👉 **📊 实时 Regime 与流动性扫单看板 ៖**\n`` `/smart_x METRICS` ``\n\n"
-                        "👉 **🛑 停止与平仓 ៖**\n`` `/smart_x STOP ALL 1234` ``"
+                        "👉 **🥇 黄金 (PAXG) 机构合约全自动 ៖**\n`` `/smartx GOLD 20 10 AUTO 1234` ``\n\n"
+                        "👉 **⚡ 比特币/主流币合约全自动 ៖**\n`` `/smartx BTC 50 10 AUTO 1234` ``\n\n"
+                        "👉 **🛒 现货黄金 (PAXG) 宏观定投 ៖**\n`` `/smartx SPOT PAXG 50 1234` ``\n\n"
+                        "👉 **🛒 现货多币早期突破扫描 ៖**\n`` `/smartx SPOT AUTO 100 1234` ``\n\n"
+                        "👉 **🤗 从 Hugging Face 热重载所有模型 ៖**\n`` `/smartx SYNC` ``\n\n"
+                        "👉 **📊 实时 Regime 与流动性扫单看板 ៖**\n`` `/smartx METRICS` ``\n\n"
+                        "👉 **🛑 停止与平仓 ៖**\n`` `/smartx STOP ALL 1234` ``"
                     )
                 else:
                     msg = (
-                        "👑 **KHMER MASTER CRYPTO | /smart_x INSTITUTIONAL QUANT SUITE** 🏆\n"
+                        "👑 **KHMER MASTER CRYPTO | /smartx INSTITUTIONAL QUANT SUITE** 🏆\n"
                         "*(ស្ថាបត្យកម្មកំពូលប្រកួតប្រជែង និងយកឈ្នះ portal.tagmarkets.com 100%)*\n"
                         "════════════════════════════════════════\n\n"
-                        "💡 **ហេតុអ្វីបានជា /smart_x យកឈ្នះ Broker EA & PAMM របស់ Tag Markets?**\n"
+                        "💡 **ហេតុអ្វីបានជា /smartx យកឈ្នះ Broker EA & PAMM របស់ Tag Markets?**\n"
                         "• 🥇 **0% Counterparty & B-Book Risk** ៖ ជួញដូរផ្ទាល់លើ Binance Spot & Futures / Bybit គ្មាន Broker លួច Spread ឬពន្យារដកប្រាក់ឡើយ។\n"
                         "• 🔀 **Mixture-of-Experts Router (`brain_moe_router.pkl`)** ៖ ប្តូររបបទីផ្សារស្វ័យប្រវត្តិ (Trend ➔ Breakout; Sideway ➔ Mean-Reversion Scalp) កម្ចាត់ចោលបញ្ហាឆេះគណនីរបស់ MT5 EA។\n"
                         "• 🎯 **Session Liquidity Sweep Classifier** ៖ ចាប់យក Asian Range (00:00-08:00 UTC) នៅ London & NY Open បែងចែក True Breakout ឬ Turtle Soup Fakeout (Win Rate >78% លើ Gold & BTC)។\n"
@@ -9723,13 +9723,13 @@ class TelegramBotThread(BaseThread):
                         "• ⚖️ **Adaptive Kelly & PINN Jump-Diffusion** ៖ ធានា Daily Drawdown មិនដែលលើសពី 2.5% និងរំកិល Trailing Stop ការពារមុនពេលទីផ្សារធ្លាក់គំហុក។\n"
                         "• 🛡️ **5 Super Smart Invariants** ៖ Breakeven Armor (+3% ROI), Micro-Scalp TP1 50%, Sweet-Spot Filter (+3% ទៅ +12%), 15m/1h Trend Confluence, និង Anti-Whipsaw Clean Stop (-10% ROI, Cooldown ២ ម៉ោង)។\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
-                        "👉 **🥇 Gold (PAXG) Futures AGI (Auto BUY/SELL 24/7) ៖**\n`` `/smart_x GOLD 20 10 AUTO 1234` ``\n\n"
-                        "👉 **⚡ BTC / Crypto Futures AGI (AI វិភាគ & សម្រេចទិសដៅ) ៖**\n`` `/smart_x BTC 50 10 AUTO 1234` ``\n\n"
-                        "👉 **🛒 Spot Gold (PAXG) Macro Accumulation (0% Liquidation) ៖**\n`` `/smart_x SPOT PAXG 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Early Breakout Scanner ៖**\n`` `/smart_x SPOT AUTO 100 1234` ``\n\n"
-                        "👉 **🤗 Sync & Hot-Reload ម៉ូដែល AI ពី Hugging Face ៖**\n`` `/smart_x SYNC` ``\n\n"
-                        "👉 **📊 Live AI Regime & Session Sweep Dashboard ៖**\n`` `/smart_x METRICS` ``\n\n"
-                        "👉 **🛑 បញ្ឈប់ និងបិទ Position ៖**\n`` `/smart_x STOP ALL 1234` ``"
+                        "👉 **🥇 Gold (PAXG) Futures AGI (Auto BUY/SELL 24/7) ៖**\n`` `/smartx GOLD 20 10 AUTO 1234` ``\n\n"
+                        "👉 **⚡ BTC / Crypto Futures AGI (AI វិភាគ & សម្រេចទិសដៅ) ៖**\n`` `/smartx BTC 50 10 AUTO 1234` ``\n\n"
+                        "👉 **🛒 Spot Gold (PAXG) Macro Accumulation (0% Liquidation) ៖**\n`` `/smartx SPOT PAXG 50 1234` ``\n\n"
+                        "👉 **🛒 Spot Multi-Coin Early Breakout Scanner ៖**\n`` `/smartx SPOT AUTO 100 1234` ``\n\n"
+                        "👉 **🤗 Sync & Hot-Reload ម៉ូដែល AI ពី Hugging Face ៖**\n`` `/smartx SYNC` ``\n\n"
+                        "👉 **📊 Live AI Regime & Session Sweep Dashboard ៖**\n`` `/smartx METRICS` ``\n\n"
+                        "👉 **🛑 បញ្ឈប់ និងបិទ Position ៖**\n`` `/smartx STOP ALL 1234` ``"
                     )
                 if msg_target:
                     await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
@@ -9753,7 +9753,7 @@ class TelegramBotThread(BaseThread):
                         f"• **Active AI Brain Models in RAM** ៖ `{sync_res.get('total_models')} Models`\n"
                         f"• **Policies & Hyperparameters** ៖ `{sync_res.get('total_configs')} Configs`\n"
                         f"• **Loaded Regressors/Classifiers** ៖\n  └ {loaded_models}\n"
-                        "• **Status** ៖ `🟢 100% Fully Synchronized & Operational in /smart_x Engine`"
+                        "• **Status** ៖ `🟢 100% Fully Synchronized & Operational in /smartx Engine`"
                     )
                 else:
                     resp_text = f"⚠️ [HF SYNC] Notice: {sync_res.get('message')}"
@@ -9768,7 +9768,7 @@ class TelegramBotThread(BaseThread):
                 btc_sig = smart_x_engine.SmartXEngine.generate_smart_x_signal("BTCUSDT")
                 macro = smart_x_engine.MacroEventNLPGuard.check_macro_guard()
                 status_text = (
-                    "📊 **KHMER MASTER CRYPTO | /smart_x LIVE AI METRICS**\n"
+                    "📊 **KHMER MASTER CRYPTO | /smartx LIVE AI METRICS**\n"
                     "════════════════════════════════════\n"
                     f"📰 **Macroeconomic Event Guard** ៖ `{'🚨 FROZEN' if macro['is_frozen'] else '🟢 ACTIVE CLEAR'}`\n"
                     f"   └ Reason: `{macro['freeze_reason']}` (Max Lev: `{macro['max_allowed_leverage']}x`)\n\n"
@@ -11391,8 +11391,7 @@ class TelegramBotThread(BaseThread):
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
                         "👉 **Stop Single-Coin Trading Engine & Market Close ៖**\n`` `/stop SOL 1234` ``\n"
                         "`` `/stop BTC 1234` ``\n\n"
-                        "👉 **Global Emergency Kill-Switch (All Trading Engines) ៖**\n`` `/stop ALL 1234` ``\n"
-                        "`` `/stop_all` ``"
+                        "👉 **Global Emergency Kill-Switch (All Trading Engines) ៖**\n`` `/stop ALL 1234` ``"
                     )
                 elif user_lang == 'zh':
                     usage_card = (
@@ -11405,8 +11404,7 @@ class TelegramBotThread(BaseThread):
                         "📋 **一键复制指令：**\n\n"
                         "👉 **停止单币种交易引擎与市价平仓 ៖**\n`` `/stop SOL 1234` ``\n"
                         "`` `/stop BTC 1234` ``\n\n"
-                        "👉 **全局紧急关机断路器 (所有交易引擎) ៖**\n`` `/stop ALL 1234` ``\n"
-                        "`` `/stop_all` ``"
+                        "👉 **全局紧急关机断路器 (所有交易引擎) ៖**\n`` `/stop ALL 1234` ``"
                     )
                 else:
                     usage_card = (
@@ -11419,8 +11417,7 @@ class TelegramBotThread(BaseThread):
                         "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
                         "👉 **បញ្ឈប់ការជួញដូរលើកាក់ជាក់លាក់ & Market Close ៖**\n`` `/stop SOL 1234` ``\n"
                         "`` `/stop BTC 1234` ``\n\n"
-                        "👉 **បញ្ឈប់គ្រប់ AI Engines ទាំងអស់ (Global Shutdown) ៖**\n`` `/stop ALL 1234` ``\n"
-                        "`` `/stop_all` ``"
+                        "👉 **បញ្ឈប់គ្រប់ AI Engines ទាំងអស់ (Global Shutdown) ៖**\n`` `/stop ALL 1234` ``"
                     )
                 if update.callback_query:
                     await update.callback_query.message.reply_text(usage_card, parse_mode="Markdown", reply_markup=reply_markup)
@@ -12308,7 +12305,6 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("menu", menu_command))
         self.app.add_handler(CommandHandler("start", start_command))
         self.app.add_handler(CommandHandler("admin", admin_panel_command))
-        self.app.add_handler(CommandHandler("admin_panel", admin_panel_command))
 
         self.app.add_handler(CommandHandler("admin_users", admin_users_command))
         self.app.add_handler(CommandHandler("admin_license", admin_license_command))
@@ -12330,14 +12326,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("news", news_command))
         # v13.00 Flagship Quantitative Engines & Market Intelligence Handlers
         self.app.add_handler(CommandHandler("flash_loan", flash_loan_command))
-        self.app.add_handler(CommandHandler("keeper", keeper_command))
         self.app.add_handler(CommandHandler("flash_loan_keeper", keeper_command))
-        self.app.add_handler(CommandHandler("set_web3_wallet", set_web3_wallet_command))
-        self.app.add_handler(CommandHandler("wallet", set_web3_wallet_command))
-        self.app.add_handler(CommandHandler("set_wallet", set_web3_wallet_command))
-        self.app.add_handler(CommandHandler("my_wallet", set_web3_wallet_command))
         self.app.add_handler(CommandHandler("web3_wallet", set_web3_wallet_command))
-        self.app.add_handler(CommandHandler("metamask", set_web3_wallet_command))
         # 🌾 Institutional High-Yield & Arbitrage Engines (Dedicated Handlers, Zero-Duplicate)
         self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
@@ -12355,9 +12345,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("add_bybit_api", add_bybit_api_command))
         self.app.add_handler(CommandHandler("remove_api", remove_api_command))
 
-        # 🌟 Institutional Specialized Trading Engines (Zero-Duplicate, Dedicated Superpowers)
-        self.app.add_handler(CommandHandler("smart_trade", turbo_hedge_command))
+        # 🌟 Institutional Specialized Trading Engines (Zero-Duplicate, Canonical Superpowers)
         self.app.add_handler(CommandHandler("turbo_hedge", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("smart_trade", auto_trade_command))
         self.app.add_handler(CommandHandler("smart_x", smart_x_command))
         self.app.add_handler(CommandHandler("smartx", smart_x_command))
         self.app.add_handler(CommandHandler("scalp", scalp_command))
@@ -12369,7 +12359,6 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
-        self.app.add_handler(CommandHandler("stop_all", stop_all_command))
 
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(stop_all_callback, pattern="^stopall_"))
@@ -12539,8 +12528,8 @@ class TelegramBotThread(BaseThread):
                     BotCommand("start", "🚀 Start Bot & Choose Language"),
                     BotCommand("menu", "🎛️ Interactive Master Control Panel"),
                     BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
-                    BotCommand("wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
-                    BotCommand("set_web3_wallet", "💼 Configure Web3 Settlement Wallet"),
+                    BotCommand("flash_loan_keeper", "⚡ DeFi Flash Loan 0-Risk Keeper"),
+                    BotCommand("web3_wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
                     BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
                     BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
                     BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
@@ -12549,8 +12538,8 @@ class TelegramBotThread(BaseThread):
                     BotCommand("gold_turbo", "🥇 PAXG Macro Gold Correlation Radar"),
                     BotCommand("snipe", "🎯 Smart Listing Token Sniper"),
                     BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
-                    BotCommand("smart_trade", "🛒 Spot 6-Tier Breakout Engine"),
-                    BotCommand("turbo_hedge", "🛡️ Futures Dual-Side Delta-Neutral Hedge"),
+                    BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
+                    BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
                     BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
                     BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
                     BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
