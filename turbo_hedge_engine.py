@@ -371,6 +371,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
     if symbol == "DODOUSDT":
         symbol = "DODOXUSDT"
 
+    # 🛡️ 2-Hour Anti-Whipsaw Blacklist Cooldown Guard
+    if is_symbol_in_cooldown(symbol):
+        print(f"🛡️ [COOLDOWN BLACKLIST SHIELD] {symbol} is currently in 2-Hour Blacklist Cooldown -> SKIPPED!")
+        return {"side": "SKIP", "confidence_pct": 50.0, "reason": "SYMBOL_IN_COOLDOWN"}
+
     # 🛡️ Binance Spot Monitoring & Delisting Risk Safety Shield
     if is_spot_mode:
         if symbol in get_binance_monitoring_symbols():
@@ -787,6 +792,11 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
     side_str = side.upper().strip()
     if side_str == "SKIP" or side_str not in ["BUY", "SELL", "SPOT", "HEDGE", "DELTA_NEUTRAL"]:
         return {"status": "skipped", "reason": f"AI recommended SKIP or invalid trade side ({side})"}
+
+    # 🛡️ 2-Hour Anti-Whipsaw Blacklist Cooldown Guard
+    if is_symbol_in_cooldown(symbol):
+        print(f"🛡️ [TURBO HEDGE COOLDOWN GUARD] {symbol} is currently in Blacklist Cooldown. Skipping order execution.")
+        return {"status": "skipped", "reason": f"{symbol} in 2-hour cooldown"}
 
     exec_key = f"{chat_id}_{symbol}"
     # 🚫 Overtrade Guard: Prevent concurrent duplicate executions per user/symbol
@@ -1515,11 +1525,13 @@ async def monitor_turbo_hedge_bots(app):
                         else:
                             is_tp1_hit = (roi_pct >= 4.0 or net_pnl_usdt >= max(0.20, bot_amt * 0.04))
 
-                    # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
-                    # Normal Flip: ROI <= -15.0% OR net loss <= -$3.50 USDT (with 15s Anti-Whipsaw Cooldown)
-                    # Emergency Hard Breaker: ROI <= -25.0% OR net loss <= -$5.00 USDT (Instant Emergency Close WITHOUT Cooldown)
-                    is_stop_loss_hit = (current_side != "SPOT" and (roi_pct <= -15.0 or net_pnl_usdt <= -3.50))
-                    is_hard_circuit_breaker = (current_side != "SPOT" and (roi_pct <= -25.0 or net_pnl_usdt <= -5.00))
+                    # 🛡️ SUPER SMART ANTI-WHIPSAW CLEAN STOP-LOSS (-10.0% ROI / -$0.50 minimum floor):
+                    # Clean Market Close & 2-Hour Blacklist Cooldown (Zero Reverse Flip)
+                    is_stop_loss_hit = (
+                        (not is_spot and (roi_pct <= -10.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.10))) or
+                        (is_spot and (roi_pct <= -5.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.05)))
+                    )
+                    is_hard_circuit_breaker = (roi_pct <= -25.0 or net_pnl_usdt <= -max(1.25, bot_amt * 0.25))
 
                     now_ts = int(time.time())
                     last_flip_key = f"{chat_id}_{symbol}"
@@ -1722,70 +1734,38 @@ async def monitor_turbo_hedge_bots(app):
                                 print(f"Error sending stagnant notification: {e}")
 
                     elif is_stop_loss_hit:
-                        # 🔄 INSTANT DIRECT REVERSE FLIP (<15ms): ROI <= -15.0% / PnL <= -$3.50 USDT
-                        # Flips position direction (BUY ↔ SELL) ONLY IF verified 5m/15m trend supports flip AND confidence >= 88.0% AND cooldown >= 60s
-                        target_flip_side = "SELL" if current_side == "BUY" else "BUY"
-                        is_trend_supporting_flip = (ai_recommended_side == target_flip_side and ai_confidence >= 88.0)
-                        can_reverse_flip = (current_side != "SPOT" and (now_ts - last_flip_ts) >= 60 and is_trend_supporting_flip)
-                        if can_reverse_flip:
-                            print(f"🔄 [INSTANT DIRECT REVERSE FLIP (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Flipping {current_side} ➔ {target_flip_side} (MTF Confluence Verified)!")
-                            flip_res = await asyncio.to_thread(execute_direct_reverse_flip, keys[0], keys[1], symbol, amount, target_flip_side, leverage, chat_id)
-                            
-                            is_flip_success = False
-                            if isinstance(flip_res, dict) and (flip_res.get("status") in ["success", "NEW", "FILLED"] or flip_res.get("orderId")):
-                                is_flip_success = True
-                            
-                            if is_flip_success:
-                                db.update_turbo_hedge_side(chat_id, symbol, target_flip_side)
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(mark_price))
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0.0")
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", "0.0")
-                                _last_flip_timestamps[last_flip_key] = now_ts
+                        # 🛡️ APEX ANTI-WHIPSAW CLEAN STOP (<20ms): ROI <= -10.0%
+                        # PERMANENTLY ELIMINATES REVERSE FLIP to eliminate Double-Hit losses!
+                        # Executes immediate Clean Market Close & places symbol in 2-Hour Blacklist Cooldown (7200s).
+                        print(f"🛡️ [ANTI-WHIPSAW CLEAN STOP (<20ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(net_pnl_usdt):.2f} USDT -> Clean Market Close & 2-Hour Cooldown (Zero Flip)!")
+                        if current_side == "SPOT":
+                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+                        else:
+                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+                        
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
+                        if is_close_successful(close_res):
+                            db.remove_turbo_hedge_bot(chat_id, symbol)
+                            add_symbol_cooldown(symbol, 7200)
+                            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt, net_pnl_usdt, roi_pct, "ANTI_WHIPSAW_STOP_LOSS")
+                        else:
+                            print(f"⚠️ [CLEAN STOP RETRY] Market close for {symbol} failed. Retrying on next loop...")
 
-                                if app and hasattr(app, "bot"):
-                                    try:
-                                        msg_flip = (
-                                            f"⚡ **APEX TURBO HEDGE INSTANT REVERSE FLIP!** 🔄\n"
-                                            f"───────────────────────────────\n\n"
-                                            f"🪙 កាក់ ៖ `{symbol}`\n"
-                                            f"🔄 ទិសដៅ ៖ `{current_side}` ➔ `{target_flip_side}`\n"
-                                            f"🛑 ROI Flip Point ៖ `{roi_pct:.1f}%` (PnL: `-${abs(real_pnl_usdt):.2f} USDT`)\n"
-                                            f"⚡ Execution Speed ៖ `INSTANT SINGLE-ORDER (<15ms)`\n\n"
-                                            f"🧠 AI Status ៖ `ដេញតាម Trend ផ្ទុយ ស្ទាក់កើបប្រាក់ចំណេញសងវិញ 100%!_`"
-                                        )
-                                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_flip, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                                    except Exception as e:
-                                        print(f"Error sending flip notification: {e}")
-                            else:
-                                can_reverse_flip = False  # Fallback to market close if flip failed
-
-                        if not can_reverse_flip:
-                            print(f"🛡️ [STOP LOSS PROTECTOR] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Executing clean Market Close & 2-Hour Cooldown...")
-                            if current_side == "SPOT":
-                                close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
-                            else:
-                                close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
-                            if is_close_successful(close_res):
-                                db.remove_turbo_hedge_bot(chat_id, symbol)
-                                add_symbol_cooldown(symbol, 7200)
-
-                            if app and hasattr(app, "bot"):
-                                try:
-                                    msg_sl = (
-                                        f"🛡️ **APEX TURBO HEDGE STOP LOSS ACTIVATED!** 🛑\n"
-                                        f"───────────────────────────────\n\n"
-                                        f"🪙 កាក់ ៖ `{symbol}`\n"
-                                        f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (PnL: `-${abs(real_pnl_usdt):.2f} USDT`)\n"
-                                        f"🔒 Anti-Whipsaw Status ៖ `២ ម៉ោង Cooldown Applied`\n"
-                                        f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n\n"
-                                        f"🧠 AI Status ៖ `ការពារដើមទុន និងរង់ចាំស្កេនកាក់ថ្មីដែលមាន Trend Confluence 100%!`"
-                                    )
-                                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                                except Exception as e:
-                                    print(f"Error sending SL notification: {e}")
+                        if app and hasattr(app, "bot"):
+                            try:
+                                msg_sl = (
+                                    f"🛡️ **APEX ANTI-WHIPSAW CLEAN STOP ACTIVATED!** 🛑\n"
+                                    f"───────────────────────────────\n\n"
+                                    f"🪙 កាក់ ៖ `{symbol}`\n"
+                                    f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (Stop Loss Floor -10.0%)\n"
+                                    f"💵 PnL ខាតជាក់ស្តែង ៖ `-${abs(net_pnl_usdt):.2f} USDT`\n"
+                                    f"🔒 Anti-Whipsaw Cooldown ៖ `២ ម៉ោង Blacklist Applied (7200s)`\n"
+                                    f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n\n"
+                                    f"🛡️ _AI កាត់បិទភ្លាមៗ ដោយមិន Flip បញ្ច្រាសទិស ធានាមិនឱ្យខាតពីរសងខាង (Zero Double-Hit) និងការពារដើមទុន ១០០%!_"
+                                )
+                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+                            except Exception as e:
+                                print(f"Error sending SL notification: {e}")
 
     except Exception as e:
         print(f"⚠️ [TURBO HEDGE MONITOR ERROR]: {e}")
