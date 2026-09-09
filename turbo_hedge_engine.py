@@ -298,6 +298,15 @@ def get_active_high_velocity_spot_coins(limit: int = 30) -> list:
 
 _eval_cache = {}
 _eval_cache_time = {}
+_last_spot_reject_logs = {}
+
+def _log_spot_rejection(symbol: str, message: str, throttle_sec: float = 60.0):
+    """Throttles high-frequency scan rejection logs to keep systemd logs responsive and uncluttered."""
+    now_t = time.time()
+    last_t = _last_spot_reject_logs.get(symbol, 0.0)
+    if now_t - last_t >= throttle_sec:
+        _last_spot_reject_logs[symbol] = now_t
+        print(message)
 
 def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_bal: float = 0.0, is_spot_mode: bool = False) -> dict:
     """
@@ -451,27 +460,27 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 # Overbought (RSI > 65.0) -> Rejection to eliminate buying at the peak!
                 # Under-momentum (RSI < 48.0) -> Rejection
                 if rsi14 > 65.0:
-                    print(f"🛡️ [SPOT TIER 3 OVERBOUGHT SHIELD] {symbol}: RSI {rsi14:.1f} > 65.0 (Peak Risk) -> Rejected!")
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 OVERBOUGHT SHIELD] {symbol}: RSI {rsi14:.1f} > 65.0 (Peak Risk) -> Rejected!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVERBOUGHT_PEAK_RISK"}
                 if rsi14 < 48.0 or not is_5m_bullish or not is_15m_bullish:
-                    print(f"🛡️ [SPOT TIER 3 TREND MISALIGN] {symbol}: 5m Bull: {is_5m_bullish}, 15m Bull: {is_15m_bullish}, RSI: {rsi14:.1f} -> Rejected!")
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 TREND MISALIGN] {symbol}: 5m Bull: {is_5m_bullish}, 15m Bull: {is_15m_bullish}, RSI: {rsi14:.1f} -> Rejected!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "TREND_MISALIGNED"}
 
                 # Tier 4: Pullback Retracement Guard (Never Chase Green Candles)
                 # If price is extended > 0.3% above 1m EMA 5, wait for pullback!
                 if price > ema5_1m * 1.003:
-                    print(f"🛡️ [SPOT TIER 4 PULLBACK GUARD] {symbol}: Price {price} extended >0.3% above EMA5 ({ema5_1m:.4f}). Waiting for Pullback Retracement!")
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 4 PULLBACK GUARD] {symbol}: Price {price} extended >0.3% above EMA5 ({ema5_1m:.4f}). Waiting for Pullback Retracement!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "WAIT_FOR_PULLBACK"}
 
                 # Tier 5: Whale Orderbook Microstructure Guard
                 if not whale_bid_wall:
-                    print(f"🛡️ [SPOT TIER 5 WHALE WALL GUARD] {symbol}: No Whale Bid Wall support -> Skipped!")
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 5 WHALE WALL GUARD] {symbol}: No Whale Bid Wall support -> Skipped!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "NO_WHALE_BID_WALL"}
 
                 # Tier 2: Machine Learning Tri-Model Consensus
                 ml_res = evaluate_spot_ml_consensus(symbol, closes_1m, volumes_1m, closes_5m)
                 if not ml_res.get("bullish", False) or ml_res.get("confidence", 0.0) < 78.0:
-                    print(f"🧠 [SPOT TIER 2 ML CONSENSUS REJECT] {symbol}: ML Confidence ({ml_res.get('confidence', 0):.1f}%) < 78%. Skipped!")
+                    _log_spot_rejection(symbol, f"🧠 [SPOT TIER 2 ML CONSENSUS REJECT] {symbol}: ML Confidence ({ml_res.get('confidence', 0):.1f}%) < 78%. Skipped!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "ML_CONSENSUS_REJECT"}
 
                 side = "BUY"
@@ -943,8 +952,8 @@ async def monitor_turbo_hedge_bots(app):
                     if b_side == "SPOT" or b_lev <= 1:
                         # Spot position check: verify spot asset balance and notional value
                         base_asset = b_sym.replace("USDT", "").replace("DODOX", "DODO")
-                        spot_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], base_asset)
-                        mark_p = trading_engine.get_current_price(b_sym)
+                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, f_keys[0], f_keys[1], base_asset)
+                        mark_p = await asyncio.to_thread(trading_engine.get_current_price, b_sym)
                         notional_val = spot_bal * mark_p if mark_p > 0 else spot_bal
                         if spot_bal <= 0 or notional_val < 1.0:
                             db.remove_turbo_hedge_bot(target_chat_id, b_sym)
@@ -953,7 +962,7 @@ async def monitor_turbo_hedge_bots(app):
                     else:
                         if b_sym in EXCLUDED_SYMBOLS or (b_sym in live_sym_map and live_sym_map[b_sym] == 0):
                             if b_sym in EXCLUDED_SYMBOLS and live_sym_map.get(b_sym, 0) != 0:
-                                trading_engine.close_futures_position_for_symbol(f_keys[0], f_keys[1], b_sym)
+                                await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, f_keys[0], f_keys[1], b_sym)
                                 print(f"🛑 [SUPER SMART PURGE] Market Closed delisted symbol {b_sym} for User {target_chat_id}!")
                             db.remove_turbo_hedge_bot(target_chat_id, b_sym)
                             active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
@@ -1016,24 +1025,24 @@ async def monitor_turbo_hedge_bots(app):
             # 🛡️ Dynamic Binance API Permission Sensor:
             # If user disabled Futures API permission on Binance, PAUSE Futures mode completely!
             if user_side_input != "SPOT":
-                spot_ok, fut_ok = trading_engine.check_user_api_permissions(f_keys[0], f_keys[1])
+                spot_ok, fut_ok = await asyncio.to_thread(trading_engine.check_user_api_permissions, f_keys[0], f_keys[1])
                 if not fut_ok:
                     print(f"🛑 [API SENSOR] User {target_chat_id} API key lacks Futures permission on Binance. Pausing Futures mode for User {target_chat_id}!")
                     db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_mode", "0")
                     continue
 
             if user_side_input == "SPOT":
-                avail_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], "USDT")
+                avail_bal = await asyncio.to_thread(trading_engine.get_spot_balance, f_keys[0], f_keys[1], "USDT")
                 if avail_bal <= 0.0:
-                    avail_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
+                    avail_bal = await asyncio.to_thread(trading_engine.get_futures_available_balance, f_keys[0], f_keys[1])
                 wallet_bal = avail_bal
             else:
-                avail_bal = trading_engine.get_futures_available_balance(f_keys[0], f_keys[1])
+                avail_bal = await asyncio.to_thread(trading_engine.get_futures_available_balance, f_keys[0], f_keys[1])
                 if avail_bal <= 0.0:
-                    avail_bal = trading_engine.get_futures_free_margin(f_keys[0], f_keys[1])
+                    avail_bal = await asyncio.to_thread(trading_engine.get_futures_free_margin, f_keys[0], f_keys[1])
                 if avail_bal <= 0.0:
-                    avail_bal = trading_engine.get_spot_balance(f_keys[0], f_keys[1], "USDT")
-                wallet_bal = trading_engine.get_futures_wallet_balance(f_keys[0], f_keys[1], "USDT") or avail_bal
+                    avail_bal = await asyncio.to_thread(trading_engine.get_spot_balance, f_keys[0], f_keys[1], "USDT")
+                wallet_bal = (await asyncio.to_thread(trading_engine.get_futures_wallet_balance, f_keys[0], f_keys[1], "USDT")) or avail_bal
 
             # 🧠 1️⃣ AGI VIP Retention & Autonomous Profit Supercharger (v13.00 Architecture):
             # Autonomous Equity Sensing: Track peak wallet balance per user.
@@ -1144,13 +1153,13 @@ async def monitor_turbo_hedge_bots(app):
                     continue
 
                 is_spot = (user_side_input == "SPOT")
-                c_info = trading_engine.get_symbol_info(c_cand)
+                c_info = await asyncio.to_thread(trading_engine.get_symbol_info, c_cand)
                 if not c_info or c_info.get("status") != "TRADING" or (is_spot and not c_info.get("isSpotTradingAllowed", True)):
                     print(f"🚫 [SPOT DELIST GUARD] Rejected candidate {c_cand}: Symbol is delisted or not trading on Binance!")
                     _failed_candidate_symbols.add(c_cand)
                     continue
 
-                eval_res = scan_and_evaluate_symbol(c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
+                eval_res = await asyncio.to_thread(scan_and_evaluate_symbol, c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
                 
                 # Reject any symbol flagged as SKIP by safety shields
                 eval_side = eval_res.get("side", "SKIP")
@@ -1172,7 +1181,7 @@ async def monitor_turbo_hedge_bots(app):
 
                 target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side
                 exec_leverage = min(unit_leverage, 10) if is_recovery_mode else unit_leverage
-                exec_res = execute_turbo_hedge_trade(f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
+                exec_res = await asyncio.to_thread(execute_turbo_hedge_trade, f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
                 
                 if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
                     monitor_turbo_hedge_bots._last_stagger_entry = time.time()

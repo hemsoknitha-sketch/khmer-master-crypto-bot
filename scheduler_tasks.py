@@ -5143,6 +5143,7 @@ async def flash_loan_autonomous_engine(app: Application):
             loan_amt = top_op.get("optimal_loan_usd", 50000.0)
             spread_pct = top_op.get("gross_spread_pct", 0.28)
             dex_source = top_op.get("dex_source", "Uniswap V3")
+            fee_hurdle = float(top_op.get("fee_hurdle", 0.18))
             pool_fee_val = top_op.get("pool_fee", 500)
             dex_route_val = top_op.get("dex_route", 1)
 
