@@ -1,3 +1,5 @@
+import os
+import sys
 import asyncio
 from telegram.ext import Application
 import database as db
@@ -5096,6 +5098,7 @@ async def flash_loan_autonomous_engine(app: Application):
     """
     import time
     import hashlib
+    import os
     try:
         auto_users = db.get_all_flash_loan_auto_users()
         if not auto_users:
