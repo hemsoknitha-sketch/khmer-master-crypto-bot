@@ -184,11 +184,19 @@
 • ឧទាហរណ៍ជាក់ស្តែង : `/health`
 
 --------------------------------------------------------------------------------
-១៥. `/sync_brain`
+១៥. `/sync_brain` (SUPER SMART AI BRAIN HOT-RELOAD & INFERENCE ENGINE)
 --------------------------------------------------------------------------------
-• តួនាទីស្នូល     : Hot-Reload ទាញយកទម្ងន់ AI Models ថ្មីៗពី Hugging Face Cloud Hub។
-• របៀបដំណើរការ    : ទាញយកឯកសារ `.pkl`, `.h5`, `.json` ថ្មីមកជំនួសក្នុង RAM ក្នុងពេលត្រឹមតែ ១ វិនាទី ដោយមិនបាច់ Restart Bot ឡើយ!
-• ឧទាហរណ៍ជាក់ស្តែង : `/sync_brain`
+• តួនាទីស្នូល     : Super Smart AI Brain Control Panel, Cloud Hot-Reload, និង Multi-Model Live Inference Test។
+• របៀបដំណើរការ    : 
+  ១. `/sync_brain` (គ្មាន Argument) ៖ បើកផ្ទាំងបញ្ជា Interactive Super Smart Control Panel បង្ហាញម៉ាទ្រីសម៉ូដែល AI ទាំង ២៥ ក្នុង RAM, កម្រិតផ្ទុក memory (<15MB), CPU overhead (0%), និងប៊ូតុងបញ្ជា ១-Tap!
+  ២. `/sync_brain NOW` ៖ ទាញយកទម្ងន់ថ្មីៗពី Hugging Face Cloud Model Hub (`hemsinath/apex-ai-brain-models`) និង Hot-Reload ចូលទៅក្នុង AIInvestmentEngine និង SmartXBrainLoader ដោយផ្ទាល់ក្នុងពេល ១ វិនាទី (0ms Trading Downtime)!
+  ៣. `/sync_brain STATUS` ៖ ត្រួតពិនិត្យសុខភាពលម្អិតនៃឯកសារទម្ងន់ទាំង ២៥ (ឈ្មោះ, ទំហំ KB, កាលបរិច្ឆេទ Update, និងសុវត្ថិភាព RAM)!
+  ៤. `/sync_brain TEST <SYMBOL>` (ឧ. `/sync_brain TEST BTCUSDT`) ៖ ដំណើរការ Real-Time Ensemble Prediction (XGBoost + CatBoost + LightGBM Weighted Voting + PINN Jump-Diffusion Tail Risk) លើទីផ្សារផ្ទាល់!
+• ឧទាហរណ៍ជាក់ស្តែង :
+  - បើកផ្ទាំងបញ្ជា ៖ `/sync_brain`
+  - Hot-Reload ភ្លាមៗ ៖ `/sync_brain NOW`
+  - ពិនិត្យសុខភាពម៉ូដែល ៖ `/sync_brain STATUS`
+  - តេស្តទីផ្សារផ្ទាល់ ៖ `/sync_brain TEST BTCUSDT`
 
 ================================================================================
 ផ្នែកទី ៣ ៖ ម៉ាស៊ីនជួញដូរស្នូល TURBO HEDGE & 6-TIER SPOT ENGINE

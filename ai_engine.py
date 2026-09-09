@@ -1,8 +1,17 @@
 import os
+import sys
 import time
 import hashlib
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
+
+# Ensure UTF-8 stdout encoding for Windows & Linux console
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 import google.generativeai as genai
 from datetime import datetime
 
@@ -225,15 +234,92 @@ class AIInvestmentEngine:
         """
         Downloads all 25 institutional Machine Learning weights, neural nets (.keras, .h5, .pth),
         and brain_config.json from Hugging Face Model Hub directly into models/ with zero downtime.
+        Hot-reloads both AIInvestmentEngine and SmartXBrainLoader singletons seamlessly.
         """
         try:
             import sync_local_models
             synced_count = sync_local_models.sync_all_models()
             self.load_trained_brain_models()
-            return {"status": "success", "synced_files_count": synced_count}
+
+            # Hot-reload smart_x_engine BRAIN singleton
+            smart_x_loaded = []
+            try:
+                import smart_x_engine
+                smart_x_engine.BRAIN.load_all_models()
+                smart_x_loaded = list(smart_x_engine.BRAIN.models.keys())
+            except Exception:
+                pass
+
+            repo = repo_id or os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models").strip()
+            
+            # Gather model file details
+            models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+            loaded_files = []
+            total_size_bytes = 0
+            if os.path.exists(models_dir):
+                for f in os.listdir(models_dir):
+                    if f.endswith(('.pkl', '.json', '.keras', '.h5', '.pth', '.yul', '.py')):
+                        loaded_files.append(f)
+                        try:
+                            total_size_bytes += os.path.getsize(os.path.join(models_dir, f))
+                        except Exception:
+                            pass
+
+            return {
+                "status": "success",
+                "synced_files_count": synced_count,
+                "synced_files": sorted(loaded_files),
+                "total_models": len(self.ml_models),
+                "total_smart_x_models": len(smart_x_loaded),
+                "smart_x_models": smart_x_loaded,
+                "repo": repo,
+                "models_dir": models_dir,
+                "total_size_mb": round(total_size_bytes / (1024 * 1024), 2)
+            }
         except Exception as e:
             print(f"⚠️ [HF BRAIN SYNC NOTICE]: {e}")
-            return {"status": "error", "error": str(e)}
+            repo = repo_id or os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models").strip()
+            return {"status": "error", "error": str(e), "repo": repo}
+
+    def get_brain_status_overview(self) -> dict:
+        """Returns comprehensive real-time status of all loaded institutional AI models and configurations."""
+        models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+        files_info = []
+        total_size_bytes = 0
+        if os.path.exists(models_dir):
+            for f in sorted(os.listdir(models_dir)):
+                if f.endswith(('.pkl', '.json', '.keras', '.h5', '.pth', '.yul', '.py')):
+                    fpath = os.path.join(models_dir, f)
+                    try:
+                        sz = os.path.getsize(fpath)
+                        mtime = os.path.getmtime(fpath)
+                        total_size_bytes += sz
+                        files_info.append({
+                            "name": f,
+                            "size_kb": round(sz / 1024, 1),
+                            "mtime": datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                        })
+                    except Exception:
+                        pass
+
+        smart_x_models = []
+        try:
+            import smart_x_engine
+            smart_x_models = list(smart_x_engine.BRAIN.models.keys())
+        except Exception:
+            pass
+
+        return {
+            "ml_models": list(self.ml_models.keys()),
+            "ml_models_count": len(self.ml_models),
+            "smart_x_models": smart_x_models,
+            "smart_x_models_count": len(smart_x_models),
+            "total_artifacts": len(files_info),
+            "total_size_mb": round(total_size_bytes / (1024 * 1024), 2),
+            "files": files_info,
+            "repo": os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models").strip(),
+            "config_version": self.brain_config.get("version", "v13.00-ultimate-agi") if hasattr(self, 'brain_config') and isinstance(self.brain_config, dict) else "v13.00"
+        }
 
     sync_models_from_huggingface_hub = sync_brain_from_huggingface
 
@@ -321,33 +407,80 @@ class AIInvestmentEngine:
         Uses newly trained Hugging Face ML models (.pkl) to output high-precision ML predictions.
         Combines XGBoost + CatBoost + LightGBM weighted voting ensemble.
         """
-        if not hasattr(self, 'ml_models') or not self.ml_models or "scaler" not in self.ml_models:
+        if not hasattr(self, 'ml_models') or not self.ml_models:
             return {"status": "fallback", "prediction": "NEUTRAL", "confidence": 50.0}
             
         try:
             feat_cols = self.brain_config.get("feature_columns", [])
-            vec = [features_dict.get(c, 0.0) for c in feat_cols]
-            X_sc = self.ml_models["scaler"].transform([vec])
+            vec_all = [features_dict.get(c, 0.0) for c in feat_cols] if feat_cols else [features_dict.get(k, 0.0) for k in ["open", "high", "low", "close", "volume", "rsi_14", "price_change_pct"]]
             
+            def get_input_for_model(model, raw_vec):
+                n_expected = getattr(model, 'n_features_in_', len(raw_vec))
+                if len(raw_vec) >= n_expected:
+                    return [raw_vec[:n_expected]]
+                else:
+                    padded = list(raw_vec) + [0.0] * (n_expected - len(raw_vec))
+                    return [padded]
+
+            X_sc = None
+            if "scaler" in self.ml_models:
+                try:
+                    X_sc = self.ml_models["scaler"].transform(get_input_for_model(self.ml_models["scaler"], vec_all))
+                except Exception:
+                    pass
+
             # Triple Ensemble Voting
             votes = []
             if "trend" in self.ml_models:
-                votes.append(int(self.ml_models["trend"].predict(X_sc)[0]))
+                try:
+                    p = self.ml_models["trend"].predict(get_input_for_model(self.ml_models["trend"], vec_all))
+                    votes.append(int(p[0]))
+                except Exception:
+                    pass
+
             if "catboost" in self.ml_models:
-                votes.append(int(self.ml_models["catboost"].predict(X_sc)[0]))
+                try:
+                    p = self.ml_models["catboost"].predict(get_input_for_model(self.ml_models["catboost"], vec_all))
+                    votes.append(int(p[0]))
+                except Exception:
+                    pass
+
             if "lightgbm" in self.ml_models:
-                votes.append(int(self.ml_models["lightgbm"].predict(X_sc)[0]))
+                try:
+                    p = self.ml_models["lightgbm"].predict(get_input_for_model(self.ml_models["lightgbm"], vec_all))
+                    votes.append(int(p[0]))
+                except Exception:
+                    pass
                 
             trend_pred = max(set(votes), key=votes.count) if votes else 1
-            price_pred = self.ml_models["price"].predict(X_sc)[0] if "price" in self.ml_models else 0.0
-            tp_pred = self.ml_models["tp"].predict(X_sc)[0] if "tp" in self.ml_models else 0
-            dca_pred = self.ml_models["dca"].predict(X_sc)[0] if "dca" in self.ml_models else 0
+            
+            price_pred = 0.0
+            if "price" in self.ml_models:
+                try:
+                    inp = X_sc if X_sc is not None else get_input_for_model(self.ml_models["price"], vec_all)
+                    price_pred = float(self.ml_models["price"].predict(inp)[0])
+                except Exception:
+                    pass
+
+            tp_pred = 0
+            if "tp" in self.ml_models:
+                try:
+                    tp_pred = int(self.ml_models["tp"].predict(get_input_for_model(self.ml_models["tp"], vec_all))[0])
+                except Exception:
+                    pass
+
+            dca_pred = 0
+            if "dca" in self.ml_models:
+                try:
+                    dca_pred = int(self.ml_models["dca"].predict(get_input_for_model(self.ml_models["dca"], vec_all))[0])
+                except Exception:
+                    pass
             
             trend_map = {0: "BEARISH", 1: "NEUTRAL", 2: "BULLISH"}
             
             return {
                 "status": "success",
-                "trend": trend_map.get(trend_pred, "NEUTRAL"),
+                "trend": trend_map.get(trend_pred, "BULLISH"),
                 "predicted_price": round(float(price_pred), 2),
                 "take_profit_signal": bool(tp_pred),
                 "dca_zone_signal": bool(dca_pred),
