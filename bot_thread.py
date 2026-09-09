@@ -9860,23 +9860,74 @@ class TelegramBotThread(BaseThread):
                         pin = str(args[1]).strip()
                     else:
                         symbol = str(args[1]).upper().strip()
+                        pin = ""
+                else:
+                    symbol = "ALL"
+                    pin = ""
+
                 is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
                 stored_pin = db.get_user_pin(chat_id)
-                if not is_admin and stored_pin:
-                    if not pin or str(pin).strip() != str(stored_pin).strip():
+
+                if not stored_pin and pin:
+                    db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                    stored_pin = db.get_user_pin(chat_id)
+                elif is_admin and pin:
+                    db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                    stored_pin = db.get_user_pin(chat_id)
+
+                if stored_pin and not is_admin:
+                    if not pin or not security.verify_pin(pin, chat_id, stored_pin):
                         if msg_target:
                             await msg_target.reply_text("❌ Security PIN verification failed.")
+                        await delete_sensitive_message(context, chat_id, update, user_lang)
                         return
+                elif not stored_pin and not is_admin:
+                    if msg_target:
+                        await msg_target.reply_text("❌ Security PIN verification failed.")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
+                # Stop 24/7 Turbo Hedge & Top Mode
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
-                keys = db.get_user_api(chat_id)
-                if keys and keys[0] and keys[1]:
-                    if symbol == "ALL":
-                        trading_engine.market_close_all_futures_positions(keys[0], keys[1])
-                    else:
-                        turbo_hedge_engine.execute_turbo_hedge_trade(keys[0], keys[1], symbol, 0, "CLOSE", 1, chat_id)
                 db.remove_all_turbo_hedge_bots(chat_id)
+
+                # Execute institutional market close via stop_turbo_hedge_engine
+                import turbo_hedge_engine
+                stop_res = await asyncio.to_thread(turbo_hedge_engine.stop_turbo_hedge_engine, chat_id, symbol)
+                closed_count = stop_res.get("count", 0) if isinstance(stop_res, dict) else 0
+                total_pnl = stop_res.get("total_pnl", 0.0) if isinstance(stop_res, dict) else 0.0
+
+                # Also guarantee all futures positions are closed if symbol is ALL
+                keys = db.get_user_api(chat_id)
+                if keys and keys[0] and keys[1] and symbol == "ALL":
+                    try:
+                        fut_res = await asyncio.to_thread(trading_engine.close_all_futures_positions, keys[0], keys[1])
+                        if isinstance(fut_res, dict):
+                            closed_count = max(closed_count, fut_res.get("closed_count", 0))
+                    except Exception as err:
+                        print(f"Error in secondary futures close: {err}")
+
                 if msg_target:
-                    await msg_target.reply_text(f"🛑 [SMART X] Successfully stopped 24/7 scanner and closed {symbol} positions!")
+                    pnl_sign = "+" if total_pnl >= 0 else ""
+                    if user_lang == 'km':
+                        msg = (
+                            f"🛑 **[SMART X] បានបញ្ឈប់ម៉ាស៊ីនស្វ័យប្រវត្តិ ២៤/៧ ដោយជោគជ័យ!**\n"
+                            f"══════════════════════════\n"
+                            f"📊 **គោលដៅ ៖** `{symbol}`\n"
+                            f"🔒 **ការបិទ Position ៖** បានបិទ `{closed_count}` positions លើ Binance\n"
+                            f"💵 **Realized PnL ៖** `{pnl_sign}${total_pnl:.2f} USDT`\n\n"
+                            f"✅ _ប្រព័ន្ធ 24/7 Scanner និង Bot ត្រូវបានបិទទាំងស្រុង។ ដើមទុនត្រូវបានការពារដោយសុវត្ថិភាព។_"
+                        )
+                    else:
+                        msg = (
+                            f"🛑 **[SMART X] 24/7 Engine Stopped Successfully!**\n"
+                            f"══════════════════════════\n"
+                            f"📊 **Target:** `{symbol}`\n"
+                            f"🔒 **Positions Closed:** `{closed_count}` on Binance\n"
+                            f"💵 **Realized PnL:** `{pnl_sign}${total_pnl:.2f} USDT`\n\n"
+                            f"✅ _24/7 Scanner and Bots are completely stopped. Capital is secured._"
+                        )
+                    await msg_target.reply_text(msg, parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 

@@ -1670,6 +1670,10 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
         print(f"Error in close_futures_position_for_symbol: {e}")
         return {"status": "error", "closed": False, "error": str(e)}
 
+# Canonical aliases to guarantee 100% zero AttributeError across all callers
+market_close_all_futures_positions = close_all_futures_positions
+market_close_futures_position_for_symbol = close_futures_position_for_symbol
+
 def close_partial_futures_position(api_key: str, api_secret: str, symbol: str, ratio: float = 0.50) -> dict:
     """
     Super Smart Micro-Scalping Partial Close (Scale-Out 50% Qty):

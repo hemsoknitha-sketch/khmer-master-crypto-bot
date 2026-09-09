@@ -109,5 +109,15 @@ def verify_pin(pin: str, chat_id: int, stored_hash: str) -> bool:
         except Exception:
             pass
         return True
+
+    # 4. Check direct match fallback (Seamless upgrade for any raw plaintext entries)
+    if str(stored_hash).strip() == str_pin:
+        try:
+            import database as db
+            db.set_user_pin(chat_id, pbkdf2_hash)
+            print(f"🔐 Seamlessly upgraded plaintext PIN for user {chat_id} to PBKDF2 100k rounds.")
+        except Exception:
+            pass
+        return True
         
     return False
