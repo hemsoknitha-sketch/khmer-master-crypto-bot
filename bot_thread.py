@@ -13297,7 +13297,7 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.turbo_hedge_monitor,
             'interval',
             seconds=10,
-            max_instances=3,
+            max_instances=5,
             coalesce=True,
             args=[self.app],
             id='turbo_hedge_monitor'
@@ -13363,6 +13363,8 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.trailing_stop_engine_job, 
             'interval', 
             seconds=6, 
+            max_instances=5,
+            coalesce=True,
             args=[self.app],
             id='trailing_stop_engine'
         )
@@ -13371,6 +13373,8 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.trailing_guard_monitor, 
             'interval', 
             seconds=6, 
+            max_instances=5,
+            coalesce=True,
             args=[self.app],
             id='trailing_guard_monitor'
         )
