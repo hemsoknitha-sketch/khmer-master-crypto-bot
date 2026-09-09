@@ -1119,6 +1119,7 @@ class TelegramBotThread(BaseThread):
                 kp_funded = keeper_info["is_funded"]
                 kp_mode = keeper_info["execution_mode"]
                 contract_addr = keeper_info["contract_address"]
+                is_admin_user = db.is_admin(chat_id) or (chat_id == 859271875)
 
                 primary_user_wallet = db.get_user_web3_wallet(chat_id)
                 if not primary_user_wallet and user_wallets:
@@ -1129,7 +1130,7 @@ class TelegramBotThread(BaseThread):
                 user_multichain = await asyncio.to_thread(keeper_relayer.keeper_engine.get_multichain_balances, primary_user_wallet) if primary_user_wallet else None
                 keeper_multichain = await asyncio.to_thread(keeper_relayer.keeper_engine.get_multichain_balances, kp_addr)
 
-                # Format User Balances
+                # Format User Balances cleanly with zero duplication
                 if user_multichain and user_multichain.get("chains"):
                     u_arb = user_multichain["chains"].get("ARBITRUM", {})
                     u_bsc = user_multichain["chains"].get("BSC", {})
@@ -1137,135 +1138,175 @@ class TelegramBotThread(BaseThread):
                     arb_eth = u_arb.get('balance', 0.0)
                     arb_tok = u_arb.get('arb_token_balance', 0.0)
                     arb_usdt = u_arb.get('usdt_token_balance', 0.0)
-                    token_extra = ""
+                    
+                    arb_parts = []
+                    if arb_eth > 0 or (arb_tok == 0 and arb_usdt == 0):
+                        arb_parts.append(f"`{arb_eth:,.4f} ETH`")
                     if arb_tok > 0:
-                        token_extra += f" | `{arb_tok:,.4f} ARB` (~${u_arb.get('arb_token_usd', 0.0):.2f})"
+                        arb_parts.append(f"`{arb_tok:,.4f} ARB` (~${u_arb.get('arb_token_usd', 0.0):.2f})")
                     if arb_usdt > 0:
-                        token_extra += f" | `${arb_usdt:,.2f} USDT`"
-
-                    u_arb_str = f"`{arb_eth} ETH`{token_extra} (~${u_arb.get('usd_est', 0.0):.2f})"
-                    u_bsc_str = f"`{u_bsc.get('balance', 0.0)} BNB` (~${u_bsc.get('usd_est', 0.0):.2f})"
-                    u_eth_str = f"`{u_eth.get('balance', 0.0)} ETH` (~${u_eth.get('usd_est', 0.0):.2f})"
-                    u_tot_str = f"`~${user_multichain.get('total_usd', 0.0):.2f} USD`"
+                        arb_parts.append(f"`${arb_usdt:,.2f} USDT`")
+                    u_arb_str = " | ".join(arb_parts) if arb_parts else "`0.0 ETH`"
+                    
+                    u_bsc_str = f"`{u_bsc.get('balance', 0.0):,.4f} BNB` (~${u_bsc.get('usd_est', 0.0):.2f})"
+                    u_eth_str = f"`{u_eth.get('balance', 0.0):,.4f} ETH` (~${u_eth.get('usd_est', 0.0):.2f})"
+                    u_tot_str = f"`~${user_multichain.get('total_usd', 0.0):,.2f} USD`"
                     user_addr_display = f"`{user_multichain.get('address', primary_user_wallet)}`"
                 else:
-                    u_arb_str = u_bsc_str = u_eth_str = "_មិនទាន់ភ្ជាប់ (Use `/set_web3_wallet`)_"
+                    u_arb_str = u_bsc_str = u_eth_str = "_មិនទាន់ភ្ជាប់ (Use `/wallet 0x...`)_" if user_lang == 'km' else "_Not Linked (Use `/wallet 0x...`)_"
                     u_tot_str = "`$0.00`"
-                    user_addr_display = "_មិនទាន់កំណត់ (Not Linked)_"
+                    user_addr_display = "_មិនទាន់កំណត់ (Not Linked - វាយ `/wallet 0x...`)_" if user_lang == 'km' else "_Not Configured (Use `/wallet 0x...`)_"
 
                 # Format Keeper Balances
                 k_arb = keeper_multichain.get("chains", {}).get("ARBITRUM", {})
                 k_bsc = keeper_multichain.get("chains", {}).get("BSC", {})
                 k_eth = keeper_multichain.get("chains", {}).get("ETHEREUM", {})
-                k_arb_str = f"`{k_arb.get('balance', 0.0)} ETH` (~${k_arb.get('usd_est', 0.0):.2f})"
-                k_bsc_str = f"`{k_bsc.get('balance', 0.0)} BNB` (~${k_bsc.get('usd_est', 0.0):.2f})"
-                k_eth_str = f"`{k_eth.get('balance', 0.0)} ETH` (~${k_eth.get('usd_est', 0.0):.2f})"
-                k_tot_str = f"`~${keeper_multichain.get('total_usd', 0.0):.2f} USD`"
+                k_arb_str = f"`{k_arb.get('balance', 0.0):,.4f} ETH` (~${k_arb.get('usd_est', 0.0):.2f})"
+                k_bsc_str = f"`{k_bsc.get('balance', 0.0):,.4f} BNB` (~${k_bsc.get('usd_est', 0.0):.2f})"
+                k_eth_str = f"`{k_eth.get('balance', 0.0):,.4f} ETH` (~${k_eth.get('usd_est', 0.0):.2f})"
+                k_tot_str = f"`~${keeper_multichain.get('total_usd', 0.0):,.2f} USD`"
 
-                # Determine operational status and smart guidance
+                # Operational status badge
                 is_keeper_arb_funded = k_arb.get("balance", 0.0) >= 0.001 or kp_funded
                 fund_badge_km = "🟢 ពេញលេញ (LIVE ARBITRUM READY 100%)" if is_keeper_arb_funded else "⚪ រង់ចាំ Gas លើ Keeper ($5-$10 ETH)"
                 fund_badge_en = "🟢 FULLY FUNDED (LIVE ARBITRUM READY)" if is_keeper_arb_funded else "⚪ PENDING KEEPER GAS ($5-$10 ETH)"
 
-                # Guidance logic: did user put gas in personal wallet or keeper?
-                user_has_gas = user_multichain and user_multichain.get("total_usd", 0.0) > 1.0
-                if is_keeper_arb_funded:
-                    if not contract_addr or "Not Deployed" in contract_addr:
+                buttons = []
+
+                if is_admin_user:
+                    # 👑 SUPER ADMIN EXPERIENCE: Full Infrastructure Diagnostics & Controls
+                    if is_keeper_arb_funded:
+                        if not contract_addr or "Not Deployed" in contract_addr:
+                            guidance_km = (
+                                "✅ **កាបូប Keeper មាន Gas រួចរាល់!**\n"
+                                "🚀 **ជំហានចុងក្រោយ ៖** ចុចប៊ូតុង **`[🚀 Deploy Smart Contract]`** ខាងក្រោម ដើម្បីបញ្ជាឱ្យ Keeper Deploy កិច្ចសន្យា Aave V3 លើ Arbitrum One (ចំណាយ Gas ~$0.50)។ ពេល Deploy រួច ប្រព័ន្ធនឹងប្តូរទៅជា 🟢 LIVE MAINNET ១០០%!"
+                            )
+                            guidance_en = (
+                                "✅ **Keeper is Funded with Gas!**\n"
+                                "🚀 **Final Step:** Click **`[🚀 Deploy Smart Contract]`** below to deploy Aave V3 contract to Arbitrum One. Once confirmed, the bot transitions to 🟢 LIVE MAINNET!"
+                            )
+                        else:
+                            guidance_km = "✅ **ស្ថានភាពល្អឥតខ្ចោះ!** កាបូប Keeper មាន Gas និង Smart Contract ដំណើរការលើ Arbitrum One។ ប្រព័ន្ធកំពុងដំណើរការ Live Mainnet Arbitrage ហើយផ្ទេរប្រាក់ចំណេញសុទ្ធជា USDT ត្រង់ចូល MetaMask របស់អ្នក!"
+                            guidance_en = "✅ **Optimal Status!** Keeper wallet is funded and Aave V3 contract is live on Arbitrum One. Real net profits are routed to your MetaMask!"
+                    else:
                         guidance_km = (
-                            "✅ **កាបូប Keeper មាន Gas រួចរាល់ ($10.09 ETH)!**\n"
-                            "🚀 **ជំហានចុងក្រោយ ៖** ចុចប៊ូតុង **`[🚀 Deploy Smart Contract]`** ខាងក្រោម ដើម្បីបញ្ជាឱ្យ Keeper Deploy កិច្ចសន្យា Aave V3 លើ Arbitrum One (ចំណាយ Gas ~$0.50)។ ពេល Deploy រួច ប្រព័ន្ធនឹងប្តូរទៅជា 🟢 LIVE MAINNET ១០០%!"
+                            "💡 **ការណែនាំ Admin ដើម្បីបញ្ចូល Gas លើ Keeper ៖**\n"
+                            f"• ផ្ញើប្រាក់ចំនួន `$5 ទៅ $10` ជា **ETH លើបណ្តាញ Arbitrum One** ទៅកាន់អាសយដ្ឋាន Keeper ៖\n`{kp_addr}`\n"
+                            "• នៅពេលមាន Gas លើ Keeper ហើយ Bot នឹងប្តូរទៅជា **Live Arbitrum Mainnet Arbitrage** ស្វ័យប្រវត្តិ!"
                         )
                         guidance_en = (
-                            "✅ **Keeper is Funded with Gas ($10.09 ETH)!**\n"
-                            "🚀 **Final Step:** Click **`[🚀 Deploy Smart Contract]`** below to deploy Aave V3 contract to Arbitrum One. Once confirmed, the bot transitions to 🟢 LIVE MAINNET!"
+                            "💡 **Admin Keeper Gas Top-Up Guidance:**\n"
+                            f"• Deposit `$5 to $10` worth of **ETH on Arbitrum One** to the Keeper address:\n`{kp_addr}`\n"
+                            "• Once funded, the bot transitions to **Live Mainnet Flash Loans**!"
+                        )
+
+                    if user_lang == 'km':
+                        kp_msg = (
+                            "⛽ **SUPER ADMIN | KEEPER RELAYER MASTER VAULT** 👑\n"
+                            "═════════════════════════════════════════\n\n"
+                            "💼 **១. ព័ត៌មានកាបូប Web3 (Admin MetaMask) ៖**\n"
+                            f"• អាសយដ្ឋាន ៖ {user_addr_display}\n"
+                            f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
+                            f"• 🌐 BNB Smart Chain ៖ {u_bsc_str}\n"
+                            f"• 🌐 Ethereum Mainnet ៖ {u_eth_str}\n"
+                            f"• 💵 សមតុល្យសរុប ៖ {u_tot_str}\n\n"
+                            "⛽ **២. ព័ត៌មានកាបូប Keeper Relayer (Admin Gas Engine) ៖**\n"
+                            f"• អាសយដ្ឋាន ៖ `{kp_addr}`\n"
+                            f"• 🌐 Arbitrum One ៖ {k_arb_str}\n"
+                            f"• 🌐 BNB Smart Chain ៖ {k_bsc_str}\n"
+                            f"• 🌐 Ethereum Mainnet ៖ {k_eth_str}\n"
+                            f"• 💵 Gas សរុបលើ Keeper ៖ {k_tot_str}\n\n"
+                            "═════════════════════════════════════════\n"
+                            f"📡 **ស្ថានភាពបច្ចុប្បន្ន ៖** `{fund_badge_km}`\n"
+                            f"⚙️ **របៀបប្រតិបត្តិការ ៖** `{kp_mode}`\n"
+                            f"📜 **Aave V3 Smart Contract ៖** `{contract_addr}`\n\n"
+                            "═════════════════════════════════════════\n"
+                            f"{guidance_km}"
                         )
                     else:
-                        guidance_km = "✅ **ស្ថានភាពល្អឥតខ្ចោះ!** កាបូប Keeper មាន Gas និង Smart Contract ដំណើរការលើ Arbitrum One។ ប្រព័ន្ធកំពុងដំណើរការ Live Mainnet Arbitrage ហើយផ្ទេរប្រាក់ចំណេញសុទ្ធជា USDT ត្រង់ចូល MetaMask របស់អ្នក!"
-                        guidance_en = "✅ **Optimal Status!** Keeper wallet is funded and Aave V3 contract is live on Arbitrum One. Real net profits are routed to your MetaMask!"
-                elif user_has_gas:
-                    guidance_km = (
-                        "💡 **ការណែនាំផ្ទេរ Gas ចូល Keeper ៖**\n"
-                        "• យើងសង្កេតឃើញថា ប្រាក់ Gas របស់លោកអ្នកបច្ចុប្បន្នស្ថិតនៅក្នុង **កាបូប MetaMask របស់អ្នកផ្ទាល់**។\n"
-                        f"• ដើម្បីឱ្យ Bot អាចបង់ថ្លៃ Gas លើ Arbitrum One ជំនួសលោកអ្នកបាន សូមផ្ទេរប្រាក់ចំនួន `$5 ទៅ $9` ជា **ETH (លើបណ្តាញ Arbitrum One)** ពីកាបូប MetaMask របស់អ្នក ផ្ញើចូលទៅកាន់អាសយដ្ឋានកាបូប Keeper Relayer ៖\n"
-                        f"👉 `{kp_addr}`\n\n"
-                        "*(ចំណាំ ៖ កាបូបមេ MetaMask របស់អ្នកមិនអាចឱ្យ Bot ចុះហត្ថលេខាផ្ទាល់ទេ ព្រោះគ្មាននរណាដឹង Private Key របស់អ្នកឡើយ ដូច្នេះទើបត្រូវប្រើ Keeper)*"
-                    )
-                    guidance_en = (
-                        "💡 **Transfer Gas to Keeper Guidance:**\n"
-                        "• We detect your gas deposit is currently in your **personal MetaMask wallet**.\n"
-                        f"• For the bot to broadcast transactions on your behalf, please transfer `$5 to $9` worth of **ETH on Arbitrum One** from your MetaMask to the dedicated Keeper Relayer address:\n"
-                        f"👉 `{kp_addr}`\n\n"
-                        "*(Note: Your personal wallet is 100% secure as the bot never holds its private key)*"
-                    )
+                        kp_msg = (
+                            "⛽ **SUPER ADMIN | KEEPER RELAYER MASTER VAULT** 👑\n"
+                            "═════════════════════════════════════════\n\n"
+                            "💼 **1. Admin Linked Web3 Wallet (MetaMask):**\n"
+                            f"• Address: {user_addr_display}\n"
+                            f"• 🌐 Arbitrum One: {u_arb_str}\n"
+                            f"• 🌐 BNB Smart Chain: {u_bsc_str}\n"
+                            f"• 🌐 Ethereum Mainnet: {u_eth_str}\n"
+                            f"• 💵 Total Balance: {u_tot_str}\n\n"
+                            "⛽ **2. Dedicated Keeper Relayer Gas Engine:**\n"
+                            f"• Address: `{kp_addr}`\n"
+                            f"• 🌐 Arbitrum One: {k_arb_str}\n"
+                            f"• 🌐 BNB Smart Chain: {k_bsc_str}\n"
+                            f"• 🌐 Ethereum Mainnet: {k_eth_str}\n"
+                            f"• 💵 Total Keeper Gas: {k_tot_str}\n\n"
+                            "═════════════════════════════════════════\n"
+                            f"📡 **Status:** `{fund_badge_en}`\n"
+                            f"⚙️ **Execution Mode:** `{kp_mode}`\n"
+                            f"📜 **Aave V3 Smart Contract:** `{contract_addr}`\n\n"
+                            "═════════════════════════════════════════\n"
+                            f"{guidance_en}"
+                        )
+
+                    if is_keeper_arb_funded and (not contract_addr or "Not Deployed" in contract_addr):
+                        buttons.append([InlineKeyboardButton("🚀 Deploy Smart Contract (Arbitrum)", callback_data="btn_deploy_contract")])
+
+                    buttons.append([
+                        InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_flash_loan_keeper"),
+                        InlineKeyboardButton("💼 Set Admin Wallet", callback_data="btn_set_web3_prompt")
+                    ])
                 else:
-                    guidance_km = (
-                        "💡 **ការណែនាំដើម្បីបើកដំណើរការកើបលុយពិត (Go Live) ៖**\n"
-                        f"1. ផ្ញើប្រាក់ចំនួន `$5 ទៅ $10` ជា **ETH លើបណ្តាញ Arbitrum One** ទៅកាន់អាសយដ្ឋាន Keeper ៖\n`{kp_addr}`\n"
-                        "2. នៅពេលមាន Gas លើ Keeper ហើយ Bot នឹងប្តូរពី Simulation ទៅជា **Live Arbitrum Mainnet Arbitrage** ស្វ័យប្រវត្តិ!\n"
-                        f"3. រាល់ពេលចំណេញ Smart Contract នឹងផ្ទេរ Net Profit USDT ត្រង់ចូល MetaMask របស់អ្នក ({wallet_display})!"
-                    )
-                    guidance_en = (
-                        "💡 **How to Activate Live Mainnet Profits:**\n"
-                        f"1. Deposit `$5 to $10` worth of **ETH on Arbitrum One** to the Keeper address:\n`{kp_addr}`\n"
-                        "2. Once funded, the bot seamlessly transitions to **Live Mainnet Flash Loans**!\n"
-                        f"3. All net arbitrage profits are routed directly to your MetaMask ({wallet_display})!"
-                    )
+                    # 💎 VIP USER EXPERIENCE: Privacy-Preserving Institutional Service Dashboard
+                    kp_masked = f"`{kp_addr[:6]}...{kp_addr[-4:]}`"
+                    if user_lang == 'km':
+                        kp_msg = (
+                            "⛽ **KEEPER RELAYER & WEB3 WALLET DASHBOARD (VIP)** ⚡\n"
+                            "═════════════════════════════════════════\n\n"
+                            "💼 **១. ព័ត៌មានកាបូប Web3 (MetaMask) ផ្ទាល់ខ្លួនរបស់អ្នក ៖**\n"
+                            f"• អាសយដ្ឋាន ៖ {user_addr_display}\n"
+                            f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
+                            f"• 🌐 BNB Smart Chain ៖ {u_bsc_str}\n"
+                            f"• 🌐 Ethereum Mainnet ៖ {u_eth_str}\n"
+                            f"• 💵 សមតុល្យសរុប ៖ {u_tot_str}\n"
+                            "💡 _រាល់ប្រាក់ចំណេញសុទ្ធ (Net Profit USDT) ពី Flash Loan & MEV Arbitrage នឹងត្រូវផ្ទេរត្រង់ចូលកាបូបនេះដោយស្វ័យប្រវត្តិ ២៤/៧!_\n\n"
+                            "⛽ **២. ស្ថានភាពម៉ាស៊ីន KEEPER RELAYER GAS ENGINE ៖**\n"
+                            f"• ម៉ាស៊ីនបម្រើ Gas Node ៖ {kp_masked} `(Institutional Dedicated Node)`\n"
+                            "• 🌐 បណ្តាញប្រតិបត្តិការ ៖ `Arbitrum One Nitro L2 (<0.42ms Sub-millisecond)`\n"
+                            f"• 📡 ស្ថានភាពបច្ចុប្បន្ន ៖ `{fund_badge_km}`\n"
+                            "• 🎁 ថ្លៃសេវា Gas សម្រាប់ VIP ៖ `ឥតគិតថ្លៃ $0.00 (Gas Fee 100% Subsidized by Khmer Master Crypto)`\n"
+                            f"• 📜 Aave V3 Smart Contract ៖ `{contract_addr}`\n\n"
+                            "═════════════════════════════════════════\n"
+                            "✅ **ស្ថានភាពល្អឥតខ្ចោះ ៖** ម៉ាស៊ីនបម្រើ Keeper Relayer កំពុងរ៉ាប់រងថ្លៃ Gas ១០០% សម្រាប់លោកអ្នក! លោកអ្នកមិនបាច់បង់ថ្លៃ Gas ឡើយ។ ប្រព័ន្ធកំពុងដំណើរការ Live Flash Loan Arbitrage ហើយផ្ទេរប្រាក់ចំណេញសុទ្ធជា USDT ត្រង់ចូល MetaMask របស់អ្នក!\n\n"
+                            "👉 **បើកដំណើរការកើបលុយពិត ២៤/៧ ៖** ``/flash_loan 24/7``\n"
+                            "👉 **ឬតេស្តសាកល្បងកម្ចី $1M ៖** ``/flash_loan SIM 1000000``"
+                        )
+                    else:
+                        kp_msg = (
+                            "⛽ **VIP WEB3 SETTLEMENT & KEEPER RELAYER DASHBOARD** ⚡\n"
+                            "═════════════════════════════════════════\n\n"
+                            "💼 **1. Your Linked Personal Web3 Wallet (MetaMask):**\n"
+                            f"• Address: {user_addr_display}\n"
+                            f"• 🌐 Arbitrum One: {u_arb_str}\n"
+                            f"• 🌐 BNB Smart Chain: {u_bsc_str}\n"
+                            f"• 🌐 Ethereum Mainnet: {u_eth_str}\n"
+                            f"• 💵 Total Balance: {u_tot_str}\n"
+                            "💡 _All net profits (USDT) from Flash Loan & MEV Arbitrage will be transferred directly to this wallet 24/7!_\n\n"
+                            "⛽ **2. Dedicated Keeper Relayer Gas Engine Status:**\n"
+                            f"• Relayer Node: {kp_masked} `(Institutional Dedicated Node)`\n"
+                            "• 🌐 Execution Network: `Arbitrum One Nitro L2 (<0.42ms Sub-millisecond)`\n"
+                            f"• 📡 Gas Status: `{fund_badge_en}`\n"
+                            "• 🎁 VIP Gas Fee: `$0.00 (100% Subsidized by Khmer Master Crypto)`\n"
+                            f"• 📜 Aave V3 Smart Contract: `{contract_addr}`\n\n"
+                            "═════════════════════════════════════════\n"
+                            "✅ **Optimal Status!** The platform's Keeper Relayer covers 100% of all transaction gas on your behalf! Real net profits are routed directly to your MetaMask wallet!\n\n"
+                            "👉 **Activate 24/7 Autonomous Flash Loan:** ``/flash_loan 24/7``\n"
+                            "👉 **Simulate $1M Flash Loan:** ``/flash_loan SIM 1000000``"
+                        )
 
-                if user_lang == 'km':
-                    kp_msg = (
-                        "⛽ **KEEPER RELAYER & WEB3 WALLET DASHBOARD** ⛽\n"
-                        "═════════════════════════════════════════\n\n"
-                        "💼 **១. ព័ត៌មានកាបូប Web3 (MetaMask) ផ្ទាល់ខ្លួនរបស់អ្នក ៖**\n"
-                        f"• អាសយដ្ឋាន ៖ {user_addr_display}\n"
-                        f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
-                        f"• 🌐 BNB Smart Chain ៖ {u_bsc_str}\n"
-                        f"• 🌐 Ethereum Mainnet ៖ {u_eth_str}\n"
-                        f"• 💵 សមតុល្យសរុប ៖ {u_tot_str}\n\n"
-                        "⛽ **២. ព័ត៌មានកាបូប Keeper Relayer (សម្រាប់បង់ថ្លៃ Gas) ៖**\n"
-                        f"• អាសយដ្ឋាន ៖ `{kp_addr}`\n"
-                        f"• 🌐 Arbitrum One ៖ {k_arb_str}\n"
-                        f"• 🌐 BNB Smart Chain ៖ {k_bsc_str}\n"
-                        f"• 🌐 Ethereum Mainnet ៖ {k_eth_str}\n"
-                        f"• 💵 Gas សរុបលើ Keeper ៖ {k_tot_str}\n\n"
-                        "═════════════════════════════════════════\n"
-                        f"📡 **ស្ថានភាពបច្ចុប្បន្ន ៖** `{fund_badge_km}`\n"
-                        f"⚙️ **របៀបប្រតិបត្តិការ ៖** `{kp_mode}`\n"
-                        f"📜 **Aave V3 Smart Contract ៖** `{contract_addr}`\n\n"
-                        "═════════════════════════════════════════\n"
-                        f"{guidance_km}"
-                    )
-                else:
-                    kp_msg = (
-                        "⛽ **KEEPER RELAYER & WEB3 WALLET DASHBOARD** ⛽\n"
-                        "═════════════════════════════════════════\n\n"
-                        "💼 **1. Your Linked Personal Web3 Wallet (MetaMask):**\n"
-                        f"• Address: {user_addr_display}\n"
-                        f"• 🌐 Arbitrum One: {u_arb_str}\n"
-                        f"• 🌐 BNB Smart Chain: {u_bsc_str}\n"
-                        f"• 🌐 Ethereum Mainnet: {u_eth_str}\n"
-                        f"• 💵 Total Balance: {u_tot_str}\n\n"
-                        "⛽ **2. Dedicated Keeper Relayer Wallet (Gas Engine):**\n"
-                        f"• Address: `{kp_addr}`\n"
-                        f"• 🌐 Arbitrum One: {k_arb_str}\n"
-                        f"• 🌐 BNB Smart Chain: {k_bsc_str}\n"
-                        f"• 🌐 Ethereum Mainnet: {k_eth_str}\n"
-                        f"• 💵 Total Keeper Gas: {k_tot_str}\n\n"
-                        "═════════════════════════════════════════\n"
-                        f"📡 **Status:** `{fund_badge_en}`\n"
-                        f"⚙️ **Execution Mode:** `{kp_mode}`\n"
-                        f"📜 **Aave V3 Smart Contract:** `{contract_addr}`\n\n"
-                        "═════════════════════════════════════════\n"
-                        f"{guidance_en}"
-                    )
+                    buttons.append([
+                        InlineKeyboardButton("💼 កំណត់កាបូប MetaMask", callback_data="btn_set_web3_prompt") if user_lang == 'km' else InlineKeyboardButton("💼 Set My Wallet", callback_data="btn_set_web3_prompt"),
+                        InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_flash_loan_keeper")
+                    ])
 
-                buttons = []
-                if is_keeper_arb_funded and (not contract_addr or "Not Deployed" in contract_addr):
-                    buttons.append([InlineKeyboardButton("🚀 Deploy Smart Contract (Arbitrum)", callback_data="btn_deploy_contract")])
-
-                buttons.append([
-                    InlineKeyboardButton("🔄 Refresh Dashboard", callback_data="btn_flash_loan_keeper"),
-                    InlineKeyboardButton("💼 Set Web3 Wallet", callback_data="btn_set_web3_prompt")
-                ])
                 buttons.append([
                     InlineKeyboardButton("⚡ Flash Loan Menu", callback_data="btn_flash_loan_scan"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
