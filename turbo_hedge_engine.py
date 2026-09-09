@@ -332,6 +332,21 @@ _eval_cache = {}
 _eval_cache_time = {}
 _last_spot_reject_logs = {}
 
+def calculate_series_ema(prices: list, period: int = 50) -> float:
+    """
+    Calculates Exponential Moving Average (EMA) with SMA seed.
+    If historical candles < period, falls back to available SMA to support newly listed tokens safely.
+    """
+    if not prices:
+        return 0.0
+    if len(prices) < period:
+        return sum(prices) / len(prices)
+    k = 2.0 / (period + 1)
+    ema = sum(prices[:period]) / period
+    for price in prices[period:]:
+        ema = (price * k) + (ema * (1.0 - k))
+    return ema
+
 def _log_spot_rejection(symbol: str, message: str, throttle_sec: float = 60.0):
     """Throttles high-frequency scan rejection logs to keep systemd logs responsive and uncluttered."""
     now_t = time.time()
@@ -397,8 +412,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
     try:
         # Fetch 1m candles for short-term entry momentum
         candles_1m = trading_engine.get_klines(symbol, interval="1m", limit=25, is_spot=is_spot_mode)
-        # Fetch 5m candles for higher timeframe trend confluence
+        # Fetch 5m candles for intermediate momentum
         candles_5m = trading_engine.get_klines(symbol, interval="5m", limit=30, is_spot=is_spot_mode)
+        # Fetch 15m and 1h candles for institutional macro trend confluence (EMA 50 lock)
+        candles_15m = trading_engine.get_klines(symbol, interval="15m", limit=60, is_spot=is_spot_mode)
+        candles_1h = trading_engine.get_klines(symbol, interval="1h", limit=60, is_spot=is_spot_mode)
 
         if candles_1m and len(candles_1m) >= 15 and candles_5m and len(candles_5m) >= 20:
             closes_1m = [float(c[4]) for c in candles_1m]
@@ -409,11 +427,29 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             ema5_1m = sum(closes_1m[-5:]) / 5.0
             ema15_1m = sum(closes_1m[-15:]) / 15.0
 
-            # 2. Multi-Timeframe Trend Confirmation (5m EMA 20 & EMA 50)
+            # 2. Intermediate 5m Trend Confirmation (5m EMA 20 & EMA 50)
             ema20_5m = sum(closes_5m[-20:]) / 20.0
             ema50_5m = sum(closes_5m[-30:]) / 30.0 if len(closes_5m) >= 30 else sum(closes_5m[-20:]) / 20.0
             is_5m_bullish = ema20_5m > ema50_5m
             is_5m_bearish = ema20_5m < ema50_5m
+
+            # 2b. Macro 15m & 1h Trend Confluence (EMA 50 Multi-Timeframe Lock)
+            closes_15m = [float(c[4]) for c in candles_15m] if candles_15m else []
+            closes_1h = [float(c[4]) for c in candles_1h] if candles_1h else []
+
+            ema50_15m = calculate_series_ema(closes_15m, period=50) if closes_15m else 0.0
+            ema50_1h = calculate_series_ema(closes_1h, period=50) if closes_1h else 0.0
+
+            p_15m = closes_15m[-1] if closes_15m else price
+            p_1h = closes_1h[-1] if closes_1h else price
+
+            is_15m_uptrend = (p_15m > ema50_15m) if ema50_15m > 0 else True
+            is_1h_uptrend = (p_1h > ema50_1h) if ema50_1h > 0 else True
+            is_macro_uptrend = (is_15m_uptrend and is_1h_uptrend)
+
+            is_15m_downtrend = (p_15m < ema50_15m) if ema50_15m > 0 else True
+            is_1h_downtrend = (p_1h < ema50_1h) if ema50_1h > 0 else True
+            is_macro_downtrend = (is_15m_downtrend and is_1h_downtrend)
 
             # 3. Volume Delta & Price Velocity
             vol_recent = sum(volumes_1m[-3:])
@@ -472,6 +508,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     _log_spot_rejection(symbol, f"🛡️ [SPOT STRICT 20% EXCLUSION] {symbol}: 24h Change {change_24h:+.2f}% is outside safe early breakout window (+3% to +12%). Extreme risk rejected!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVEREXTENDED_24H_EXCLUSION"}
 
+                # 🛡️ 15M/1H MACRO TREND CONFLUENCE GUARD (100% True Macro Uptrend Lock)
+                if not is_macro_uptrend:
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT 15M/1H TREND GUARD] {symbol}: Rejected! 15m > EMA50: {is_15m_uptrend} ({p_15m:.4f} vs {ema50_15m:.4f}), 1h > EMA50: {is_1h_uptrend} ({p_1h:.4f} vs {ema50_1h:.4f}). Not in True Macro Uptrend!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "MACRO_TREND_NOT_UPTREND"}
+
                 # Tier 1: BTC Lead Impulse Guard
                 try:
                     import btc_lead_guard
@@ -482,25 +523,14 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 except Exception:
                     pass
 
-                # Tier 3: Multi-Timeframe Trend Confluence (15m + 5m + 1m Sweet-Spot)
-                # Macro 15m Trend check
-                is_15m_bullish = True
-                try:
-                    candles_15m = trading_engine.get_klines(symbol, interval="15m", limit=20, is_spot=True)
-                    if candles_15m and len(candles_15m) >= 15:
-                        c_15m = [float(c[4]) for c in candles_15m]
-                        is_15m_bullish = (sum(c_15m[-5:]) / 5.0) >= (sum(c_15m[-15:]) / 15.0)
-                except Exception:
-                    is_15m_bullish = True
-
                 # Strict RSI Sweet-Spot: strictly 48.0 <= rsi14 <= 65.0
                 # Overbought (RSI > 65.0) -> Rejection to eliminate buying at the peak!
                 # Under-momentum (RSI < 48.0) -> Rejection
                 if rsi14 > 65.0:
                     _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 OVERBOUGHT SHIELD] {symbol}: RSI {rsi14:.1f} > 65.0 (Peak Risk) -> Rejected!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVERBOUGHT_PEAK_RISK"}
-                if rsi14 < 48.0 or not is_5m_bullish or not is_15m_bullish:
-                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 TREND MISALIGN] {symbol}: 5m Bull: {is_5m_bullish}, 15m Bull: {is_15m_bullish}, RSI: {rsi14:.1f} -> Rejected!")
+                if rsi14 < 48.0 or not is_5m_bullish:
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 TREND MISALIGN] {symbol}: 5m Bull: {is_5m_bullish}, RSI: {rsi14:.1f} -> Rejected!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "TREND_MISALIGNED"}
 
                 # Tier 4: Pullback Retracement Guard (Never Chase Green Candles)
@@ -527,7 +557,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             # 🛡️ EXTREME OVERBOUGHT / OVERSOLD SAFETY SHIELD (RSI >= 78 or RSI <= 22)
             # Never blindly counter-trend short/buy! Require Multi-Timeframe Confluence.
             elif rsi14 >= 78.0:
-                if is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.10:
+                if is_macro_downtrend and is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.10:
                     side = "SELL"
                     base_conf = 88.0
                     if whale_ask_wall: base_conf += 4.0
@@ -535,10 +565,10 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 else:
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Overbought RSI {rsi14:.1f} without 5m Bearish Confluence -> SKIPPED SHORT!")
+                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Overbought RSI {rsi14:.1f} without 15m/1h Macro Downtrend -> SKIPPED SHORT!")
 
             elif rsi14 <= 22.0:
-                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.10:
+                if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.10:
                     side = "BUY"
                     base_conf = 88.0
                     if whale_bid_wall: base_conf += 4.0
@@ -546,11 +576,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 else:
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Oversold RSI {rsi14:.1f} without 5m Bullish Confluence -> SKIPPED BUY!")
+                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Oversold RSI {rsi14:.1f} without 15m/1h Macro Uptrend -> SKIPPED BUY!")
 
             # ✅ SMART MULTI-TIMEFRAME TREND FOLLOWING (RSI 22 - 78)
             else:
-                if is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.02 and rsi14 < 72.0:
+                if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.02 and rsi14 < 72.0:
                     side = "BUY"
                     base_conf = 88.0
                     if vol_ratio >= 2.5:
@@ -563,7 +593,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     if whale_bid_wall: base_conf += 4.0
                     confidence = min(98.5, max(86.0, base_conf))
 
-                elif is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.02 and rsi14 > 28.0:
+                elif is_macro_downtrend and is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.02 and rsi14 > 28.0:
                     side = "SELL"
                     base_conf = 88.0
                     if vol_ratio >= 2.5:
@@ -579,11 +609,22 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 else:
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Trend Misaligned (5m Bull: {is_5m_bullish}, 1m EMA5>15: {ema5_1m > ema15_1m}) -> SKIPPED!")
+                    if not is_macro_uptrend and not is_macro_downtrend:
+                        print(f"⚪ [15M/1H CHOP SUPPRESSION] {symbol}: 15m/1h Sideways / Choppy Range (15m Bull: {is_15m_uptrend}, 1h Bull: {is_1h_uptrend}) -> SKIPPED!")
+                    else:
+                        print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Entry Misaligned with 15m/1h Macro Trend -> SKIPPED!")
 
-            # 🛡️ Early Breakout Sweet-Spot & Strict 20% Exclusion Guard
+            # 🛡️ 15m/1h Macro Trend Confluence & Strict Exclusion Guard
             if side != "SKIP":
-                if side == "BUY" and (change_24h >= 20.0 or rsi14 >= 70.0):
+                if side == "BUY" and not is_macro_uptrend:
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [15M/1H TREND LOCK] {symbol}: BUY suppressed because 15m/1h is not in True Uptrend!")
+                elif side == "SELL" and not is_macro_downtrend:
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [15M/1H TREND LOCK] {symbol}: SELL suppressed because 15m/1h is not in True Downtrend!")
+                elif side == "BUY" and (change_24h >= 20.0 or rsi14 >= 70.0):
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [STRICT EXCLUSION: ANTI-PEAK BUYING] {symbol}: 24h Change {change_24h:+.1f}% >= +20% or RSI {rsi14:.1f} >= 70 -> Blocked BUY!")
