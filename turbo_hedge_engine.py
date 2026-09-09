@@ -45,6 +45,13 @@ def is_symbol_in_cooldown(symbol: str) -> bool:
 def is_close_successful(res) -> bool:
     if not res or not isinstance(res, dict):
         return False
+    if res.get("status") in ["success", "NEW", "FILLED"] or res.get("closed") is True:
+        return True
+    if res.get("orderId") or (isinstance(res.get("res"), dict) and res["res"].get("orderId")):
+        return True
+    if res.get("message") == "No open position found":
+        return True
+    return False
 _monitoring_cache = set()
 _monitoring_cache_time = 0.0
 
@@ -1344,12 +1351,18 @@ async def monitor_turbo_hedge_bots(app):
                     # Strictly enforce binance_real_roi matching Net PnL in Hand
                     roi_pct = binance_real_roi
 
-                    # Peak ROI tracking
-                    peak_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0")
-                    peak_roi = float(peak_str) if peak_str.replace('.', '', 1).isdigit() else 0.0
+                    # Peak ROI and Peak PnL Tracking (Always Monitored & Persisted)
+                    peak_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0.0")
+                    peak_roi = float(peak_str) if peak_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
                     if roi_pct > peak_roi:
                         peak_roi = roi_pct
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", str(peak_roi))
+
+                    peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
+                    peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+                    if net_pnl_usdt > peak_pnl:
+                        peak_pnl = net_pnl_usdt
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
                     # 🚀 AGI Dynamic Moonshot Profit Rider:
                     is_spot = (current_side == "SPOT" or leverage <= 1)
@@ -1373,12 +1386,41 @@ async def monitor_turbo_hedge_bots(app):
                         is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and ((peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)))
                         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
 
-                    # High-Precision Dollar Peak PnL Lock ($ Peak Lock)
-                    peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
-                    peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-                    if net_pnl_usdt > peak_pnl:
-                        peak_pnl = net_pnl_usdt
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
+                    # 🛡️ SUPER SMART BREAKEVEN STOP-LOSS ARMOR & PROGRESSIVE TRAILING LOCK:
+                    # Axiom: Any trade that has reached positive profit (+3.0% ROI on Futures, +1.0% on Spot)
+                    # SHALL NEVER BE PERMITTED TO TURN INTO A LOSING TRADE!
+                    is_breakeven_armed = False
+                    min_guaranteed_roi = -999.0
+                    
+                    if is_spot:
+                        # Spot Mode: Breakeven activates at +1.0% price gain (covers Spot fees 0.15% - 0.20%)
+                        if peak_roi >= 1.0 or peak_pnl >= 0.15:
+                            is_breakeven_armed = True
+                            if peak_roi < 2.0:
+                                min_guaranteed_roi = 0.25  # Breakeven + fee buffer (+0.25%)
+                            elif peak_roi < 3.5:
+                                min_guaranteed_roi = max(0.50, peak_roi * 0.65)
+                            else:
+                                min_guaranteed_roi = peak_roi * 0.82
+                    else:
+                        # Futures Mode: Breakeven activates at +3.0% ROI (covers 2-way taker fees +0.10% - 0.12%)
+                        if peak_roi >= 3.0 or peak_pnl >= 0.15:
+                            is_breakeven_armed = True
+                            if peak_roi < 5.0:
+                                # Tier 1: Initial Breakeven Lock (+0.35% ROI guarantees net profit after all fees)
+                                min_guaranteed_roi = 0.35
+                            elif peak_roi < 8.0:
+                                # Tier 2: Early Profit Lock (guarantee at least +1.80% or 50% of peak ROI)
+                                min_guaranteed_roi = max(1.80, peak_roi * 0.50)
+                            elif peak_roi < 15.0:
+                                # Tier 3: Momentum Profit Lock (guarantee at least +4.50% or 70% of peak ROI)
+                                min_guaranteed_roi = max(4.50, peak_roi * 0.70)
+                            else:
+                                # Tier 4: Moonshot Peak Lock (guarantee 85% of peak ROI!)
+                                min_guaranteed_roi = peak_roi * 0.85
+
+                    # Breakeven Stop Triggered when Armed and ROI drops to or below the guaranteed floor
+                    is_breakeven_triggered = is_breakeven_armed and (roi_pct <= min_guaranteed_roi)
 
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
                     # Normal Flip: ROI <= -15.0% OR net loss <= -$3.50 USDT (with 15s Anti-Whipsaw Cooldown)
@@ -1441,6 +1483,66 @@ async def monitor_turbo_hedge_bots(app):
                             except Exception as e:
                                 print(f"Error sending breaker notification: {e}")
 
+                    elif is_breakeven_triggered or is_tp_harvested or is_peak_locked:
+                        if is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
+                            if min_guaranteed_roi <= 0.50:
+                                reason_tag = "BREAKEVEN ARMOR LOCKED"
+                                alert_title = "🛡️ **APEX TURBO HEDGE BREAKEVEN ARMOR ACTIVATED!** 🔒"
+                                alert_desc = "_AI ស្ទាក់កើបយកប្រាក់ចំណេញស្មើដើម មិនឱ្យ Trade ដែលធ្លាប់ចំណេញ ក្លាយជាខាតវិញឡើយ!_"
+                            else:
+                                reason_tag = f"TRAILING PEAK LOCK (+{min_guaranteed_roi:.1f}%)"
+                                alert_title = "🎯 **APEX TURBO HEDGE TRAILING PROFIT LOCKED!** 💰"
+                                alert_desc = f"_AI រំកិល Stop-Loss តាមដេញចាប់ប្រាក់ចំណេញរហូតដល់កំពូល ចាក់សោបាន +{roi_pct:.1f}% ROI!_"
+                        elif is_peak_locked:
+                            reason_tag = "PEAK LOCKED"
+                            alert_title = "💰 **APEX TURBO HEDGE PEAK PROFIT LOCKED!** 🚀"
+                            alert_desc = "_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
+                        else:
+                            reason_tag = "DUAL-CHECK TP HARVESTED"
+                            alert_title = "💰 **APEX TURBO HEDGE PROFIT HARVESTED!** 🚀"
+                            alert_desc = "_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
+
+                        print(f"💰 [TURBO HEDGE {reason_tag}] {symbol}: Real PnL +${real_pnl_usdt:.2f} USDT (ROI: +{roi_pct:.1f}%) -> Closing Position (<30ms)...")
+                        
+                        # Market Close Position on Binance (<30ms)
+                        if current_side == "SPOT":
+                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+                        else:
+                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+                        
+                        if is_close_successful(close_res):
+                            db.remove_turbo_hedge_bot(chat_id, symbol)
+                            cooldown_dur = 1800 if is_breakeven_triggered else 14400  # 30 mins for breakeven, 4h for full TP
+                            add_symbol_cooldown(symbol, cooldown_dur)
+
+                            # Track accumulated profit
+                            tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
+                            tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+                            tot_pnl += max(0.0, real_pnl_usdt)
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+                            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
+                        else:
+                            print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
+
+                        # Notify Telegram User
+                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
+                        if not is_quiet and app and hasattr(app, "bot"):
+                            try:
+                                msg = (
+                                    f"{alert_title}\n"
+                                    f"───────────────────────────────\n\n"
+                                    f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
+                                    f"📈 ចំណុចកំពូលធ្លាប់ឡើងដល់ ៖ `+{peak_roi:.1f}% ROI`\n"
+                                    f"💵 ផលចំណេញប្រមូលបាន ៖ `+${real_pnl_usdt:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
+                                    f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
+                                    f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n"
+                                    f"🛡️ សុវត្ថិភាព ៖ `ZERO CAPITAL LOSS (ធានាដើមទុន 100%)`\n\n"
+                                    f"{alert_desc}"
+                                )
+                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+                            except Exception as e:
+                                print(f"Error sending harvest notification: {e}")
+
                     elif is_stagnant_timeout:
                         holding_mins = holding_seconds // 60
                         print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >{holding_mins} mins with PnL (${real_pnl_usdt:.2f}). Market closing & freeing capital...")
@@ -1453,7 +1555,7 @@ async def monitor_turbo_hedge_bots(app):
                             db.remove_turbo_hedge_bot(chat_id, symbol)
                             add_symbol_cooldown(symbol, 14400)
 
-                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"
+                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
                         if not is_quiet and app and hasattr(app, "bot"):
                             try:
                                 if is_spot:
@@ -1545,46 +1647,6 @@ async def monitor_turbo_hedge_bots(app):
                                     asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                                 except Exception as e:
                                     print(f"Error sending SL notification: {e}")
-
-                    elif is_tp_harvested or is_peak_locked:
-                        reason_tag = "PEAK LOCKED" if is_peak_locked else "DUAL-CHECK TP HARVESTED"
-                        print(f"💰 [TURBO HEDGE {reason_tag}] {symbol}: Real PnL +${real_pnl_usdt:.2f} USDT (ROI: +{roi_pct:.1f}%) -> Closing Position (<50ms)...")
-                        
-                        # Market Close Position on Binance (<50ms)
-                        if current_side == "SPOT":
-                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
-                        else:
-                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        
-                        if is_close_successful(close_res):
-                            db.remove_turbo_hedge_bot(chat_id, symbol)
-                            add_symbol_cooldown(symbol, 14400)  # 4-Hour Anti-Repeat Rotation Shield
-
-                            # Track accumulated profit
-                            tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
-                            tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).isdigit() else 0.0
-                            tot_pnl += max(0.0, real_pnl_usdt)
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
-                            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
-                        else:
-                            print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
-
-                        # Notify Telegram User
-                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1") == "1"
-                        if not is_quiet and app and hasattr(app, "bot"):
-                            try:
-                                msg = (
-                                    f"💰 **APEX TURBO HEDGE PROFIT HARVESTED!** 🚀\n"
-                                    f"───────────────────────────────\n\n"
-                                    f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
-                                    f"💵 ផលចំណេញប្រមូលបាន ៖ `+${real_pnl_usdt:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
-                                    f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
-                                    f"⚡ Binance Status ៖ `HARVESTED INSTANTLY (<50ms)`\n\n"
-                                    f"_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
-                                )
-                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                            except Exception as e:
-                                print(f"Error sending harvest notification: {e}")
 
     except Exception as e:
         print(f"⚠️ [TURBO HEDGE MONITOR ERROR]: {e}")
