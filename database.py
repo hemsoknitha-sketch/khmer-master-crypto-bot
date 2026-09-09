@@ -2813,7 +2813,17 @@ def remove_turbo_hedge_bot(chat_id: int, symbol: str):
         for key_suffix in ["status", "amount", "leverage", "side", "target_tp", "entry_price", "entry_timestamp", "peak_roi", "peak_pnl", "initial_margin", "active_leverage", "liq_price", "entry_leverage"]:
             cache_delete(f"turbo_hedge_{chat_id}_{symbol}_{key_suffix}")
 
+def remove_all_turbo_hedge_bots(chat_id: int):
+    """
+    Canonical alias: Purges all active and stopped turbo hedge bots for a specific chat_id.
+    """
+    return remove_turbo_hedge_bot(chat_id, "ALL")
 
+def stop_all_turbo_hedge_bots(chat_id: int):
+    """
+    Canonical alias: Stops all active turbo hedge bots for a specific chat_id.
+    """
+    return stop_turbo_hedge_bot(chat_id, "ALL")
 
 def get_active_turbo_hedge_bots() -> list:
     conn = get_db_connection()

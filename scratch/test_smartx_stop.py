@@ -37,7 +37,21 @@ def test_pin_verification():
     assert security.verify_pin(raw_pin, chat_id, raw_pin) is True
     print("[PASS] Plaintext raw PIN verification with automatic upgrade works")
 
+def test_database_stop_aliases():
+    print("\nTesting database stop aliases...")
+    assert hasattr(db, "remove_all_turbo_hedge_bots"), "remove_all_turbo_hedge_bots missing in db"
+    assert hasattr(db, "stop_all_turbo_hedge_bots"), "stop_all_turbo_hedge_bots missing in db"
+    assert hasattr(db, "remove_turbo_hedge_bot"), "remove_turbo_hedge_bot missing in db"
+    assert hasattr(db, "stop_turbo_hedge_bot"), "stop_turbo_hedge_bot missing in db"
+    
+    # Verify execution without errors
+    db.remove_all_turbo_hedge_bots(999999999)
+    db.stop_all_turbo_hedge_bots(999999999)
+    print("[PASS] db.remove_all_turbo_hedge_bots and db.stop_all_turbo_hedge_bots executed cleanly!")
+
 if __name__ == "__main__":
     test_aliases()
     test_pin_verification()
+    test_database_stop_aliases()
     print("\n>>> ALL TESTS PASSED SUCCESSFULLY! <<<")
+
