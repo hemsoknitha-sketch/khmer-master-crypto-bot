@@ -193,7 +193,12 @@ class FlashLoanMEVEngine:
         Formula: Slippage = L * alpha. Net Spread = gross_spread - Slippage - aave_fee.
         L* maximizes: L * (gross_spread - L * alpha - aave_fee).
         """
-        pool_data = self.pool_liquidity_depths.get(pair, self.pool_liquidity_depths["WETH/USDT"])
+        default_pool = {
+            "tvl": 1_000_000,
+            "max_safe_borrow": 25_000,
+            "slippage_factor": 0.00000015
+        }
+        pool_data = self.pool_liquidity_depths.get(pair, default_pool)
         tvl = pool_data["tvl"]
         max_cap = pool_data["max_safe_borrow"]
         alpha = pool_data["slippage_factor"]
@@ -208,7 +213,8 @@ class FlashLoanMEVEngine:
         else:
             # Mathematical unconstrained optimal L = effective_spread / (2 * alpha)
             raw_optimal = effective_spread / (2.0 * max(alpha, 1e-9))
-            optimal_loan = min(max_cap, max(50_000.0, raw_optimal))
+            min_floor = 25_000.0 if any(k in pair for k in ["WETH", "WBTC", "BTC", "ETH"]) else 1_500.0
+            optimal_loan = min(max_cap, max(min_floor, raw_optimal))
             
             # Slippage at optimal loan size
             slippage_pct = round((optimal_loan * alpha) * 100.0, 3)
@@ -589,6 +595,7 @@ class FlashLoanMEVEngine:
                 "symbol": sym,
                 "pair": pair,
                 "token": token,
+                "token_addr": item.get("addr", ""),
                 "borrow_asset": "USDT",
                 "intermediate_token": token,
                 "chain": "ARBITRUM",

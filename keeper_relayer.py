@@ -42,13 +42,111 @@ ARBITRUM_EXPLORER_TX = "https://arbiscan.io/tx/"
 ARBITRUM_TOKENS = {
     "USDT": os.getenv("USDT_CONTRACT_ADDRESS", "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9").strip() or "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
     "USDC": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "USDC.E": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+    "DAI": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+    "FRAX": "0x17FCB070E22d7419741b6BE5900a444161730606",
+    "MIM": "0xFEa7a6a0B346362BF88A8e0A8864424b4b1922fA",
+    "LUSD": "0x93b346b6BC2548dA6A1E7d98E9a421B42541425b",
+    "USDE": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34",
+    "USDV": "0x0E573Ce273da571743624571083086d8BEbEc255",
+    "CRVUSD": "0x4988a896b1227218e4A686fdE5EabdcAbd91571f",
+    "DOLA": "0x6A7661795C374c0bFC635934efAddFf3A7Ee23b6",
     "WETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+    "ETH": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
     "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+    "BTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
     "ARB": "0x912CE59144191C1204E64559FE8253a0e49E6548",
-    "GMX": "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a",
     "LINK": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
+    "UNI": "0xFa7F8980b0f1E64A2062791cc3b0871572f1f7f0",
+    "LDO": "0x13Ad51ed4F1B7e9Dc168d8a00cB3f4dDD85EfA60",
+    "AAVE": "0xba5DdD1f9d7F570dc94a51479a000E3BCE967196",
+    "MKR": "0x3f545B821c1a9667794BFE69D4b48074dcfc9aCA",
+    "CRV": "0x11cDb42B0EB467393b10FB88cb41118128362612",
+    "BAL": "0x040d1EdC9569d4Bab2D15287Dc5A4F10F56a56B8",
+    "SUSHI": "0xd4d42F0b6DEF4CE0383636770eF773390d85c61A",
+    "COMP": "0x354A6dA3fcde098F8389cad84b0182725c6C91dE",
+    "SNX": "0x8700dAec35af8Ff88c16BdF0418774CB3D7599B4",
+    "FXS": "0x9D2F299715D94d8A7E6F5eaa8E654E8c74a988A7",
+    "CVX": "0x711c107577884d538676DA00efc6E1A4aD4ff7aF",
+    "SPELL": "0x3E6648C5a70A150A88bCE65F4aD4d506Fe15d2AF",
+    "YFI": "0x82E3A8F93063302D4F5E6c5598695d739B973e6b",
+    "1INCH": "0x640a3DA3056402E46d31616472421981500ee566",
+    "KNC": "0x5D7Fbc1013De333a90abC3B78a8Fe43f54aC08d9",
+    "DODO": "0x69Eb41C160F5605d39379F2579bE174DE679930D",
+    "PERP": "0x9e10E81D23b498b563045588c507ac85E05596A0",
+    "BIFI": "0x99C409E5f62E4bd2AC142f17caFb5290CE7F094F",
+    "GMX": "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a",
     "PENDLE": "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8",
-    "PEPE": "0x25d887ce7a350f44399bee2df4532e3a89045763"
+    "RDNT": "0x3082CC23568eA640225c2467653dB90e9250AaA0",
+    "GRAIL": "0x3d9907F9a368ad0a51Be60f7Da3b97cf940982D8",
+    "GNS": "0x18c11FD8F532e7851BC7387659F14241Be2be450",
+    "MAGIC": "0x539bdE0d7Dbd336b79148AA742883198BBF60342",
+    "DPX": "0x6C2C06790b3E3E3c38e12Ee22dB8183A37e416ff",
+    "RDPX": "0x32Eb7902D4134bf98A28b463Def8159A9eA52767",
+    "SPA": "0x5575552988A97ab1553372251E140e741362eE26",
+    "JONES": "0x10393c20945cF1947Fad12d8690242f3332d4084",
+    "PLS": "0x51318B7D00db7AC57156B471744e025c82abc438",
+    "VRTX": "0x95146881b86B3ee99e63705eC87FbE29C1013E00",
+    "SILO": "0x0341C0C0ec423328621788d4854119B97f44E391",
+    "PREMIA": "0x51EBaf9455c52635c028832599BA3E041070Eb9F",
+    "WINR": "0xD77710f4612393140A763b294132302372500021",
+    "TROVE": "0x9853A30C9875a33757397732a4f470b459744156",
+    "EQUAL": "0x3d6324881373b18736024192b0a1a09d3b37bdae",
+    "STG": "0x6694340fc020c5E6B96567843da2df01b2CE1eb6",
+    "SYN": "0x080f64f1480ac50461eb04446034177d0f32a772",
+    "HOP": "0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC",
+    "CELR": "0x47d95393a6A99e91F60520603f908e7e31bEeb92",
+    "WSTETH": "0x5979D7b546E38E414F7E9822514be443A4800529",
+    "RETH": "0xEC5dCb5Dbf4B114C9d0F65BcCAb49EC54F6A0867",
+    "EZETH": "0x2416092f143378750bb29b79eD961ab1954E5033",
+    "WEETH": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe",
+    "ZRO": "0x6985884C43924282a40Cd499252f8E9164Ce5c1E",
+    "EIGEN": "0x599026e6A512fde1B79E33989c93Ac3945F3779e",
+    "ONDO": "0xfaba6f8e4a5e8ab82f62fe7c39859fa577269be3",
+    "ENA": "0x595d21464c0628373b9e4a3e8e20255b5d15c7fa",
+    "ETHFI": "0x402b8a7b0A1eb0b9aD6c65e89aAe18A51D18aA42",
+    "PYTH": "0xE4D5c6aE46ad977f80721E90E97626Ff38E469c4",
+    "TIA": "0xD38338d5De2d0C9173fb330B2433f815Ddf59c63",
+    "REZ": "0x0f3681421f6c4ff5da8d1ec9c7f12e8b0a94e857",
+    "IO": "0x328cf2436d8d85f81dfc9c22971511a58d601ee0",
+    "NOT": "0xa48ef4b50c0c666ec485d454df7d7045fa7f7532",
+    "ZK": "0x5A7d6b2F92C77FAD6CCaBd10B9f1618037c5da5e",
+    "SCR": "0xd1f20d7500d9841804e1bf2cf38965fbca971eb0",
+    "SUI": "0x2213F9cD73F6d2A73C905EB657d2a50c8eDF1476",
+    "SEI": "0x4e6F37bB190288E75c9424759A1b7F04fB14b73E",
+    "STRK": "0x50f96899E0e5E535C59637c35FfCEc36E739D737",
+    "AEVO": "0x19cf53dc30e0e1e9f16e3bfda0d306bdfd80765c",
+    "TAO": "0xa8c49e7b231ff991d37e28fc15e638e4a77bc404",
+    "RENDER": "0x3a48e47A5cbeB1bB0c5E67252F750e6A5B9156A5",
+    "FET": "0x0DbA7ea6C8431e67041793D28b99e74659bDb6b1",
+    "AGIX": "0x42E2E69046c8227Ac47b744B8487A4F817A5c3D8",
+    "OCEAN": "0x0905151b74704B1d9BE9D3088C838F5F5aB87C21",
+    "PEPE": "0x25d887Ce7a35172C62FeBFD67a1856620DAeb000",
+    "SHIB": "0x56a64426A99A2a7bF144CE92004246A3A49971D1",
+    "DOGE": "0xC4da4c24fd591125c3F47b340b6f4f76111883d8",
+    "AIDOGE": "0x09E145A771e695079a40a831C2Acf3A1aC363d66",
+    "SMOL": "0x6B58F58c6731cfFd4EBFA11C526F6762391264c7",
+    "CAP": "0x0316EB71485b0Ab14103307bf65a021042c6d380",
+    "TST": "0xdc31Ee1FF77De30432b84Ba58890ddfd0e241067",
+    "ELON": "0x40317e0081d6364024dd9f090b83b38ea4766bca",
+    "BOOP": "0x9a8494b79cf437fb2215c0e7fe7cb9a54ec4101e",
+    "BANANA": "0x600c3b06E1a62d040859a84B02206771F5299Ec3",
+    "NEIRO": "0x738d2f7823e201b10620ec422116631ad02e9a37",
+    "TURBO": "0x68bc7f81ec65ef49b4fb7c88081f8f94ab8e390c",
+    "BABYDOGE": "0xdB039eb9f7C6bF641328904FE03D4f0d6199a540",
+    "CATI": "0x0e7fb8bcbb0299691b0f5127520e5015b36440c9",
+    "HMSTR": "0x3ca6e69315cf3d97f5647e30d12ec28205f7ee2a",
+    "MOODENG": "0x247596048d08c58ac3227efd0fba209ef41b25ca",
+    "PNUT": "0x194beec6bb651f67f082e6669894e63b6164f7fe",
+    "GOAT": "0x074a3fbe3fa3ffbd28b3d68df8eb0d0bbdf32289",
+    "ACT": "0x83e29f379ea63a02a94432c74d081f9f2ba634ef",
+    "FLOKI": "0x0Fcb3962d3a3c9bFfc83141F16B6168F635dF4B1",
+    "BONK": "0x11cd7a11F0c6D1E616C0D92F0e4D6e268A2b270E",
+    "WIF": "0x7b11d8825f8F18A375Ac9F93F161bE4E0fB1Ec2e",
+    "BOME": "0x3A3a9925e0a6d17b4c8A72F671E86A8D0039A5D6",
+    "MEW": "0x247596048d08c58ac3227efd0fba209ef41b25cb",
+    "POPCAT": "0x539bdE0d7Dbd336b79148AA742883198BBF60343",
+    "BRETT": "0x6C2C06790b3E3E3c38e12Ee22dB8183A37e416f0"
 }
 
 # Multi-Chain Gas & Balance Monitoring Infrastructure
@@ -379,7 +477,9 @@ class KeeperRelayerEngine:
         min_net_profit_usd: float,
         user_recipient: str,
         dex_route: int = 1,
-        pool_fee: int = None
+        pool_fee: int = None,
+        token_out_address: str = None,
+        token_in_address: str = None
     ) -> dict:
         """
         Submits on-chain flash loan arbitrage transaction on Arbitrum One.
@@ -409,8 +509,24 @@ class KeeperRelayerEngine:
                 abi=FLASH_LOAN_CONTRACT_ABI
             )
 
-            token_in_addr = ARBITRUM_TOKENS.get(borrow_asset.upper(), ARBITRUM_TOKENS["USDT"])
-            token_out_addr = ARBITRUM_TOKENS.get(intermediate_token.upper(), ARBITRUM_TOKENS["WETH"])
+            token_in_addr = token_in_address or ARBITRUM_TOKENS.get(borrow_asset.upper(), ARBITRUM_TOKENS["USDT"])
+            token_out_addr = token_out_address or ARBITRUM_TOKENS.get(intermediate_token.upper())
+            if not token_out_addr:
+                if intermediate_token and intermediate_token.startswith("0x") and len(intermediate_token) == 42:
+                    token_out_addr = intermediate_token
+                else:
+                    return {
+                        "success": False,
+                        "mode": "TOKEN_ADDRESS_NOT_FOUND",
+                        "tx_hash": None,
+                        "explorer_url": None,
+                        "net_profit_usd": 0.0,
+                        "recipient": user_recipient,
+                        "gas_used": 0,
+                        "gas_saved_eth": 0.0,
+                        "error": f"Token address for '{intermediate_token}' not configured on Arbitrum One",
+                        "notice": f"Execution halted to protect capital: '{intermediate_token}' address missing."
+                    }
 
             # USDT decimals = 6
             decimals = 6 if "USD" in borrow_asset.upper() else 18

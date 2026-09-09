@@ -5146,6 +5146,7 @@ async def flash_loan_autonomous_engine(app: Application):
             pair = top_op.get("pair", "WETH/USDT")
             borrow_asset = top_op.get("borrow_asset", "USDT")
             intermediate_token = top_op.get("intermediate_token", top_op.get("token", "WETH"))
+            token_out_address = top_op.get("token_addr", top_op.get("addr", ""))
             chain = top_op.get("chain", "ARBITRUM")
             loan_amt = top_op.get("optimal_loan_usd", 50000.0)
             spread_pct = top_op.get("gross_spread_pct", 0.28)
@@ -5187,42 +5188,48 @@ async def flash_loan_autonomous_engine(app: Application):
                     min_net_profit_usd=net_profit,
                     user_recipient=target_recipient,
                     dex_route=dex_route_val,
-                    pool_fee=pool_fee_val
+                    pool_fee=pool_fee_val,
+                    token_out_address=token_out_address
                 )
                 tx_hash = exec_res.get("tx_hash", "")
                 explorer_link = exec_res.get("explorer_url") or f"https://arbiscan.io/address/{target_recipient}"
 
-                # If transaction reverted (or pre-flight simulation failed), send capital protection alert to ALL users
-                # and strictly do NOT record phantom/fake profit in database!
+                # If transaction reverted (or pre-flight simulation failed), strictly do NOT record phantom/fake profit!
+                # Only notify users if an actual on-chain transaction reverted or verbose alerts are requested.
                 if not exec_res.get("success"):
                     FLASH_LOAN_USER_LAST_EXEC[chat_id] = now_ts
-                    if user_lang == 'km':
-                        shield_msg = (
-                            "🛡️ **[FLASH LOAN CAPITAL SHIELD TRIGGERED]** 🛡️\n"
-                            "═════════════════════════════════════════\n\n"
-                            "⚙️ **ស្ថានភាព ៖** `REVERTED (ការពារទុន 0-Risk ជោគជ័យ)`\n"
-                            f"🪙 **គូជួញដូរ ៖** `{symbol} ({pair})`\n"
-                            f"📈 **គម្លាតតម្លៃ ៖** `+{spread_pct:.3f}%` (ថ្លៃ Fee សរុប ~{fee_hurdle:.2f}%)\n"
-                            f"🛡️ **ហានិភ័យទុន ៖** `$0.00 (Zero Out-of-pocket Loss)`\n"
-                            f"🔗 **Arbiscan Tx ៖** [ចុចមើល Transaction]({explorer_link})\n\n"
-                            "💡 _Smart Contract បាន Revert ស្វ័យប្រវត្តិក្នុ Block ដដែល ដើម្បីធានាថាមិនខាតបង់ប្រាក់ដើមសូម្បីតែ $1! ប្រព័ន្ធកំពុងស្កេនរកគម្លាតធំជាងនេះបន្តទៀត..._"
-                        )
-                    else:
-                        shield_msg = (
-                            "🛡️ **[FLASH LOAN CAPITAL SHIELD TRIGGERED]** 🛡️\n"
-                            "═════════════════════════════════════════\n\n"
-                            "⚙️ **Status:** `REVERTED (0-Risk Capital Protection Active)`\n"
-                            f"🪙 **Pair:** `{symbol} ({pair})`\n"
-                            f"📈 **Price Spread:** `+{spread_pct:.3f}%` (Round-trip fees ~{fee_hurdle:.2f}%)\n"
-                            f"🛡️ **Capital Lost:** `$0.00 (Zero Loss Guarantee)`\n"
-                            f"🔗 **Arbiscan Tx:** [View Transaction]({explorer_link})\n\n"
-                            "💡 _Smart contract atomically reverted in the same block to protect principal. Scanner continues searching for wider spreads!_"
-                        )
-                    if app and hasattr(app, "bot"):
-                        try:
-                            await app.bot.send_message(chat_id=chat_id, text=shield_msg, parse_mode="Markdown", disable_web_page_preview=True)
-                        except Exception:
-                            pass
+                    send_shield_alert = (
+                        exec_res.get("mode") != "PREFLIGHT_SIMULATION_REVERT_PREVENTED"
+                        or os.getenv("FLASH_LOAN_NOTIFY_ON_REVERT", "false").lower() in ("true", "1")
+                    )
+                    if send_shield_alert:
+                        if user_lang == 'km':
+                            shield_msg = (
+                                "🛡️ **[FLASH LOAN CAPITAL SHIELD TRIGGERED]** 🛡️\n"
+                                "═════════════════════════════════════════\n\n"
+                                "⚙️ **ស្ថានភាព ៖** `REVERTED (ការពារទុន 0-Risk ជោគជ័យ)`\n"
+                                f"🪙 **គូជួញដូរ ៖** `{symbol} ({pair})`\n"
+                                f"📈 **គម្លាតតម្លៃ ៖** `+{spread_pct:.3f}%` (ថ្លៃ Fee សរុប ~{fee_hurdle:.2f}%)\n"
+                                f"🛡️ **ហានិភ័យទុន ៖** `$0.00 (Zero Out-of-pocket Loss)`\n"
+                                f"🔗 **Arbiscan Tx ៖** [ចុចមើល Transaction]({explorer_link})\n\n"
+                                "💡 _Smart Contract បាន Revert ស្វ័យប្រវត្តិក្នុ Block ដដែល ដើម្បីធានាថាមិនខាតបង់ប្រាក់ដើមសូម្បីតែ $1! ប្រព័ន្ធកំពុងស្កេនរកគម្លាតធំជាងនេះបន្តទៀត..._"
+                            )
+                        else:
+                            shield_msg = (
+                                "🛡️ **[FLASH LOAN CAPITAL SHIELD TRIGGERED]** 🛡️\n"
+                                "═════════════════════════════════════════\n\n"
+                                "⚙️ **Status:** `REVERTED (0-Risk Capital Protection Active)`\n"
+                                f"🪙 **Pair:** `{symbol} ({pair})`\n"
+                                f"📈 **Price Spread:** `+{spread_pct:.3f}%` (Round-trip fees ~{fee_hurdle:.2f}%)\n"
+                                f"🛡️ **Capital Lost:** `$0.00 (Zero Loss Guarantee)`\n"
+                                f"🔗 **Arbiscan Tx:** [View Transaction]({explorer_link})\n\n"
+                                "💡 _Smart contract atomically reverted in the same block to protect principal. Scanner continues searching for wider spreads!_"
+                            )
+                        if app and hasattr(app, "bot"):
+                            try:
+                                await app.bot.send_message(chat_id=chat_id, text=shield_msg, parse_mode="Markdown", disable_web_page_preview=True)
+                            except Exception:
+                                pass
                     continue
 
                 if exec_res.get("mode") == "KEEPER_AUTHORIZATION_REQUIRED":
