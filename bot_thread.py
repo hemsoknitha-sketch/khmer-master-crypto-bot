@@ -172,7 +172,8 @@ class TelegramBotThread(BaseThread):
                 BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
                 BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
                 BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
-                BotCommand("turbo_hedge", "🚀 HFT Multi/Single Trading Engine"),
+                BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
+                BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
                 BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
                 BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
                 BotCommand("balance", "💰 Check Spot & Futures Balance"),
@@ -12794,6 +12795,11 @@ class TelegramBotThread(BaseThread):
         
         async def run_bot_async():
             await self.app.initialize()
+            if hasattr(self.app, 'post_init') and self.app.post_init:
+                try:
+                    await self.app.post_init(self.app)
+                except Exception as e_post_init:
+                    print(f"⚠️ [POST-INIT SYNC NOTICE]: {e_post_init}")
             await self.app.start()
             if self.app.updater:
                 try:
