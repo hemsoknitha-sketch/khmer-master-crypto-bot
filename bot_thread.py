@@ -13043,6 +13043,8 @@ class TelegramBotThread(BaseThread):
             scheduler_tasks.turbo_hedge_monitor,
             'interval',
             seconds=10,
+            max_instances=3,
+            coalesce=True,
             args=[self.app],
             id='turbo_hedge_monitor'
         )

@@ -657,10 +657,15 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.4% above EMA5 -> Waiting for Pullback!")
-                elif side == "SELL" and (change_24h <= -20.0 or rsi14 <= 30.0 or (not is_spot_mode and price < ema5_1m * 0.996)):
+                elif side == "SELL" and (change_24h <= -20.0 or rsi14 <= 30.0):
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -20% or RSI {rsi14:.1f} <= 30 -> Blocked SELL!")
+                elif side == "SELL" and not is_spot_mode and price < ema5_1m * 0.996:
+                    # Price extended > 0.4% below 1m EMA5 -> Wait for Bounce Retracement!
+                    side = "SKIP"
+                    confidence = 50.0
+                    print(f"🛡️ [BOUNCE RETRACEMENT GUARD] {symbol}: Price extended > 0.4% below EMA5 -> Waiting for Retracement!")
 
             # 🛡️ BTC Lead Impulse Guard & Funding Fee Penalty Guard
             if side != "SKIP" and symbol != "BTCUSDT":
