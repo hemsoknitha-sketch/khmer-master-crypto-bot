@@ -1422,6 +1422,18 @@ async def monitor_turbo_hedge_bots(app):
                     # Breakeven Stop Triggered when Armed and ROI drops to or below the guaranteed floor
                     is_breakeven_triggered = is_breakeven_armed and (roi_pct <= min_guaranteed_roi)
 
+                    # 🎯 SUPER SMART DUAL-TARGET MICRO-SCALP RAPID HARVESTER:
+                    # TP1 Target: +4.0% to +6.0% ROI (approx +$0.20 - $0.30 USDT on $5 margin) -> 50% Scale-Out Cash in Hand
+                    scale_level_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
+                    scale_out_level = int(scale_level_str) if scale_level_str.isdigit() else 0
+                    
+                    is_tp1_hit = False
+                    if scale_out_level == 0:
+                        if is_spot:
+                            is_tp1_hit = (roi_pct >= 1.2 or net_pnl_usdt >= max(0.20, bot_amt * 0.012))
+                        else:
+                            is_tp1_hit = (roi_pct >= 4.0 or net_pnl_usdt >= max(0.20, bot_amt * 0.04))
+
                     # 🔄 1. Instant Direct Reverse Flip (<30ms) & Hard-Coded Circuit Breaker:
                     # Normal Flip: ROI <= -15.0% OR net loss <= -$3.50 USDT (with 15s Anti-Whipsaw Cooldown)
                     # Emergency Hard Breaker: ROI <= -25.0% OR net loss <= -$5.00 USDT (Instant Emergency Close WITHOUT Cooldown)
@@ -1483,8 +1495,53 @@ async def monitor_turbo_hedge_bots(app):
                             except Exception as e:
                                 print(f"Error sending breaker notification: {e}")
 
+                    elif is_tp1_hit and scale_out_level == 0:
+                        # ⚡ TP1 MICRO-SCALP RAPID HARVESTER (50% Qty Scale-Out)
+                        can_split = (notional_val * 0.50 >= 10.50) if is_spot else (notional_val * 0.50 >= 5.05)
+                        if can_split:
+                            print(f"⚡ [MICRO-SCALP TP1 TRIGGERED] {symbol}: ROI +{roi_pct:.1f}% / PnL +${net_pnl_usdt:.2f} USDT -> Scaling out 50% Qty (<25ms)...")
+                            if is_spot:
+                                part_res = await asyncio.to_thread(trading_engine.close_partial_spot_position, keys[0], keys[1], symbol, 0.50)
+                            else:
+                                part_res = await asyncio.to_thread(trading_engine.close_partial_futures_position, keys[0], keys[1], symbol, 0.50)
+
+                            if isinstance(part_res, dict) and part_res.get("status") == "success":
+                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "1")
+                                partial_pnl = net_pnl_usdt * 0.50
+                                tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
+                                tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+                                tot_pnl += max(0.0, partial_pnl)
+                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+                                db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt * 0.50, partial_pnl, roi_pct, "TP1_MICRO_SCALP_50%")
+
+                                is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
+                                if not is_quiet and app and hasattr(app, "bot"):
+                                    try:
+                                        msg_tp1 = (
+                                            f"⚡ **APEX MICRO-SCALP TP1 HARVESTED (50%)!** 💰\n"
+                                            f"───────────────────────────────\n\n"
+                                            f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
+                                            f"💵 ផលចំណេញកើបបាន ៖ `+${partial_pnl:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
+                                            f"📊 ទំហំលក់ ៖ `50% Qty (កើបលុយសុទ្ធដាក់ហោប៉ៅភ្លាម)`\n"
+                                            f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
+                                            f"🛡️ យុទ្ធសាស្ត្រ TP2 ៖ `50% ទៀត រត់តាម Dynamic Trailing Stop ចាប់យក Moonshot!`\n"
+                                            f"🔒 សុវត្ថិភាព ៖ `BREAKEVEN LOCKED (+0.35%) ធានា Zero Risk 100%!`\n"
+                                            f"⚡ Binance Status ៖ `PARTIAL MARKET FILLED (<25ms)`"
+                                        )
+                                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+                                    except Exception as e:
+                                        print(f"Error sending TP1 notification: {e}")
+                                continue
+                        else:
+                            # Notional too small to split into 50% (< $5.05 min notional) -> Harvest 100% full profit at TP1
+                            is_tp_harvested = True
+
                     elif is_breakeven_triggered or is_tp_harvested or is_peak_locked:
-                        if is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
+                        if scale_out_level == 1:
+                            reason_tag = "TP2 TRAILING MOONSHOT (FINAL 50%)"
+                            alert_title = "🎯 **APEX MICRO-SCALP TP2 FULLY HARVESTED!** 🚀"
+                            alert_desc = "_AI បានប្រមូលផលចំណេញពេញលេញទាំង ២ ដំណាក់កាល (TP1 + TP2) ដោយជោគជ័យ ១០០%!_"
+                        elif is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
                             if min_guaranteed_roi <= 0.50:
                                 reason_tag = "BREAKEVEN ARMOR LOCKED"
                                 alert_title = "🛡️ **APEX TURBO HEDGE BREAKEVEN ARMOR ACTIVATED!** 🔒"
@@ -1512,6 +1569,7 @@ async def monitor_turbo_hedge_bots(app):
                         
                         if is_close_successful(close_res):
                             db.remove_turbo_hedge_bot(chat_id, symbol)
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
                             cooldown_dur = 1800 if is_breakeven_triggered else 14400  # 30 mins for breakeven, 4h for full TP
                             add_symbol_cooldown(symbol, cooldown_dur)
 

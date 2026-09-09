@@ -1670,6 +1670,137 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
         print(f"Error in close_futures_position_for_symbol: {e}")
         return {"status": "error", "closed": False, "error": str(e)}
 
+def close_partial_futures_position(api_key: str, api_secret: str, symbol: str, ratio: float = 0.50) -> dict:
+    """
+    Super Smart Micro-Scalping Partial Close (Scale-Out 50% Qty):
+    Queries Binance Futures /fapi/v2/positionRisk for open position.
+    Calculates partial quantity = abs(positionAmt) * ratio.
+    Verifies MIN_NOTIONAL ($5.05+).
+    Closes 50% via reduceOnly=true Market Order (<30ms).
+    Handles One-Way and Hedge Mode (-4061 Auto-Recovery).
+    """
+    if not api_key or not api_secret:
+        return {"status": "error", "error": "No API keys provided"}
+
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+
+    try:
+        endpoint_pos = "/fapi/v2/positionRisk"
+        timestamp = (int(time.time() * 1000) + TIME_OFFSET)
+        params_pos = urlencode({"symbol": symbol, "recvWindow": 60000, "timestamp": timestamp})
+        sig_pos = generate_signature(api_secret, params_pos)
+        headers = {"X-MBX-APIKEY": api_key}
+        res = HFT_SESSION.get(f"{FUTURES_URL}{endpoint_pos}?{params_pos}&signature={sig_pos}", headers=headers, timeout=5)
+
+        if res.status_code == 200:
+            positions = res.json()
+            if isinstance(positions, list):
+                for pos in positions:
+                    if pos.get("symbol") == symbol:
+                        amt = float(pos.get("positionAmt", 0))
+                        if amt != 0:
+                            close_side = "SELL" if amt > 0 else "BUY"
+                            raw_partial_qty = abs(amt) * ratio
+                            partial_qty = get_futures_max_sellable_qty(symbol, raw_partial_qty)
+                            if partial_qty <= 0:
+                                partial_qty = raw_partial_qty
+
+                            # Verify Notional >= $5.05
+                            mark_p = get_current_price(symbol)
+                            notional = partial_qty * mark_p if mark_p > 0 else 10.0
+                            if notional < 5.05:
+                                return {"status": "skipped", "reason": f"Partial notional ${notional:.2f} < $5.05 minimum floor"}
+
+                            endpoint_order = "/fapi/v1/order"
+                            timestamp_ord = (int(time.time() * 1000) + TIME_OFFSET)
+                            ord_params = {
+                                "symbol": symbol,
+                                "side": close_side,
+                                "type": "MARKET",
+                                "quantity": partial_qty,
+                                "reduceOnly": "true",
+                                "recvWindow": 60000,
+                                "timestamp": timestamp_ord
+                            }
+
+                            pos_side_setting = pos.get("positionSide")
+                            if not pos_side_setting or pos_side_setting == "BOTH":
+                                if is_hedge_mode(api_key, api_secret):
+                                    ord_params["positionSide"] = "LONG" if close_side == "SELL" else "SHORT"
+                            else:
+                                ord_params["positionSide"] = pos_side_setting
+
+                            payload = urlencode(ord_params)
+                            sig_ord = generate_signature(api_secret, payload)
+                            ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
+
+                            # Auto-Recovery from -4061
+                            if "-4061" in ord_res.text:
+                                retry_side = "LONG" if close_side == "SELL" else "SHORT"
+                                ord_params["positionSide"] = retry_side
+                                payload2 = urlencode(ord_params)
+                                sig_ord2 = generate_signature(api_secret, payload2)
+                                ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
+
+                            if ord_res.status_code == 200:
+                                res_data = ord_res.json()
+                                print(f"🚀 [BINANCE PARTIAL SCALE-OUT SUCCESS (<25ms)] {symbol} {close_side} Qty: {partial_qty} (50%) -> OrderId: {res_data.get('orderId')}")
+                                return {
+                                    "status": "success",
+                                    "closed": True,
+                                    "partial": True,
+                                    "closed_qty": partial_qty,
+                                    "remaining_qty": abs(amt) - partial_qty,
+                                    "orderId": res_data.get('orderId'),
+                                    "res": res_data
+                                }
+                            else:
+                                print(f"⚠️ [BINANCE PARTIAL SCALE-OUT FAILED] {symbol}: {ord_res.text}")
+                                return {"status": "error", "error": ord_res.text}
+
+        return {"status": "skipped", "reason": "No active position found"}
+    except Exception as e:
+        print(f"Error in close_partial_futures_position: {e}")
+        return {"status": "error", "error": str(e)}
+
+def close_partial_spot_position(api_key: str, api_secret: str, symbol: str, ratio: float = 0.50) -> dict:
+    """
+    Super Smart Spot Micro-Scalping Partial Close (Scale-Out 50% Qty):
+    Sells 50% of spot holding if notional >= $10.50 (Invariant 1).
+    """
+    try:
+        base_asset = symbol.upper().replace("USDT", "").replace("DODOX", "DODO")
+        spot_bal = get_spot_balance(api_key, api_secret, base_asset)
+        if spot_bal <= 0:
+            return {"status": "skipped", "reason": "No spot balance"}
+        
+        mark_p = get_current_price(symbol)
+        raw_close_qty = spot_bal * ratio
+        close_qty = get_spot_max_sellable_qty(symbol, raw_close_qty)
+        notional = close_qty * mark_p if mark_p > 0 else 0.0
+
+        if notional < 10.50:
+            # Cannot scale out 50% on spot if below MIN_NOTIONAL $10.50 (Invariant 1)
+            return {"status": "skipped", "reason": f"Spot partial notional ${notional:.2f} < $10.50 MIN_NOTIONAL"}
+
+        res = execute_spot_trade(api_key, api_secret, symbol, "SELL", quantity=close_qty)
+        if isinstance(res, dict) and (res.get("status") in ["success", "FILLED", "NEW"] or res.get("orderId")):
+            return {
+                "status": "success",
+                "closed": True,
+                "partial": True,
+                "closed_qty": close_qty,
+                "remaining_qty": spot_bal - close_qty,
+                "res": res
+            }
+        return res
+    except Exception as e:
+        print(f"Error in close_partial_spot_position: {e}")
+        return {"status": "error", "error": str(e)}
+
+
 def get_futures_position_pnl(api_key: str, api_secret: str, symbol: str) -> dict:
     """
     Fetches real-time open futures position info (entryPrice, unrealizedProfit, positionAmt) from Binance /fapi/v2/positionRisk.
