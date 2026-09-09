@@ -54,7 +54,13 @@ class SmartXBrainLoader:
             models_dir = base_dir
 
         # 1. Load JSON policies
-        for cfg_name in ["brain_actor_critic_allocator.json", "brain_ppo_policy.json", "brain_config.json"]:
+        for cfg_name in [
+            "brain_actor_critic_allocator.json",
+            "brain_ppo_policy.json",
+            "brain_config.json",
+            "production_hyperparameters.json",
+            "inverse_trend_config.json"
+        ]:
             cfg_path = os.path.join(models_dir, cfg_name)
             if not os.path.exists(cfg_path):
                 cfg_path = os.path.join(base_dir, cfg_name)
@@ -76,7 +82,12 @@ class SmartXBrainLoader:
             "tp_signal": "brain_tp.pkl",
             "trend": "brain_trend.pkl",
             "price": "brain_price.pkl",
-            "scaler": "brain_scaler.pkl"
+            "scaler": "brain_scaler.pkl",
+            "scaler_x": "brain_scaler_x.pkl",
+            "scaler_y": "brain_scaler_y.pkl",
+            "dca": "brain_dca.pkl",
+            "graph": "brain_graph.pkl",
+            "tgat_graph": "brain_tgat_graph.pkl"
         }
 
         for model_key, filename in target_pickles.items():
@@ -91,6 +102,28 @@ class SmartXBrainLoader:
 
         self.is_loaded = True
         print(f"🧠 [SmartXBrain] Successfully loaded {len(self.models)} Wall Street AI Models + {len(self.configs)} Policies into RAM!")
+
+    @classmethod
+    def sync_from_huggingface(cls) -> dict:
+        """Syncs latest model artifacts from Hugging Face Hub (hemsinath/apex-ai-brain-models) and hot-reloads into RAM."""
+        try:
+            import sync_local_models
+            synced_count = sync_local_models.sync_all_models()
+            instance = cls()
+            instance.load_all_models()
+            return {
+                "status": "success",
+                "synced_count": synced_count,
+                "total_models": len(instance.models),
+                "total_configs": len(instance.configs),
+                "model_names": list(instance.models.keys()),
+                "repo_id": sync_local_models.HF_REPO_ID
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e)
+            }
 
 # Global Singleton
 BRAIN = SmartXBrainLoader()

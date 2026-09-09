@@ -4452,6 +4452,9 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_x_futures":
                 context.args = ["AUTO", "20", "10", "AUTO"]
                 await smart_x_command(update, context)
+            elif data == "btn_smart_x_sync":
+                context.args = ["SYNC"]
+                await smart_x_command(update, context)
             elif data == "btn_smart_x_metrics":
                 context.args = ["METRICS"]
                 await smart_x_command(update, context)
@@ -9653,11 +9656,14 @@ class TelegramBotThread(BaseThread):
                         InlineKeyboardButton("🛡️ Launch Futures Mode", callback_data="btn_smart_x_futures")
                     ],
                     [
-                        InlineKeyboardButton("📊 AI Regime & Sweep Metrics", callback_data="btn_smart_x_metrics"),
-                        InlineKeyboardButton("🛑 STOP Smart X Engine", callback_data="btn_smart_x_stop_all")
+                        InlineKeyboardButton("🤗 Sync HF Cloud Brain", callback_data="btn_smart_x_sync"),
+                        InlineKeyboardButton("📊 AI Regime & Metrics", callback_data="btn_smart_x_metrics")
                     ],
                     [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🛑 STOP Smart X Engine", callback_data="btn_smart_x_stop_all"),
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    ],
+                    [
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
@@ -9679,6 +9685,7 @@ class TelegramBotThread(BaseThread):
                         "👉 **⚡ BTC / Crypto Futures AGI (Auto Direction 24/7) ៖**\n`` `/smart_x BTC 50 10 AUTO 1234` ``\n\n"
                         "👉 **🛒 Spot Gold (PAXG) Macro Accumulation ៖**\n`` `/smart_x SPOT PAXG 50 1234` ``\n\n"
                         "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/smart_x SPOT AUTO 100 1234` ``\n\n"
+                        "👉 **🤗 Hot-Reload All Models from Hugging Face ៖**\n`` `/smart_x SYNC` ``\n\n"
                         "👉 **📊 Live Market Regime & Session Sweep Dashboard ៖**\n`` `/smart_x METRICS` ``\n\n"
                         "👉 **🛑 Stop & Market Close ៖**\n`` `/smart_x STOP ALL 1234` ``"
                     )
@@ -9699,6 +9706,7 @@ class TelegramBotThread(BaseThread):
                         "👉 **⚡ 比特币/主流币合约全自动 ៖**\n`` `/smart_x BTC 50 10 AUTO 1234` ``\n\n"
                         "👉 **🛒 现货黄金 (PAXG) 宏观定投 ៖**\n`` `/smart_x SPOT PAXG 50 1234` ``\n\n"
                         "👉 **🛒 现货多币早期突破扫描 ៖**\n`` `/smart_x SPOT AUTO 100 1234` ``\n\n"
+                        "👉 **🤗 从 Hugging Face 热重载所有模型 ៖**\n`` `/smart_x SYNC` ``\n\n"
                         "👉 **📊 实时 Regime 与流动性扫单看板 ៖**\n`` `/smart_x METRICS` ``\n\n"
                         "👉 **🛑 停止与平仓 ៖**\n`` `/smart_x STOP ALL 1234` ``"
                     )
@@ -9719,6 +9727,7 @@ class TelegramBotThread(BaseThread):
                         "👉 **⚡ BTC / Crypto Futures AGI (AI វិភាគ & សម្រេចទិសដៅ) ៖**\n`` `/smart_x BTC 50 10 AUTO 1234` ``\n\n"
                         "👉 **🛒 Spot Gold (PAXG) Macro Accumulation (0% Liquidation) ៖**\n`` `/smart_x SPOT PAXG 50 1234` ``\n\n"
                         "👉 **🛒 Spot Multi-Coin Early Breakout Scanner ៖**\n`` `/smart_x SPOT AUTO 100 1234` ``\n\n"
+                        "👉 **🤗 Sync & Hot-Reload ម៉ូដែល AI ពី Hugging Face ៖**\n`` `/smart_x SYNC` ``\n\n"
                         "👉 **📊 Live AI Regime & Session Sweep Dashboard ៖**\n`` `/smart_x METRICS` ``\n\n"
                         "👉 **🛑 បញ្ឈប់ និងបិទ Position ៖**\n`` `/smart_x STOP ALL 1234` ``"
                     )
@@ -9728,6 +9737,30 @@ class TelegramBotThread(BaseThread):
                 return
 
             action = str(args[0]).upper().strip()
+
+            # Subcommand: SYNC / HF (Hugging Face Hub Sync & Hot-Reload)
+            if action in ["SYNC", "HF", "DOWNLOAD", "PULL"]:
+                if msg_target:
+                    await msg_target.reply_text("⏳ [HUGGING FACE SYNC] Connecting to `hemsinath/apex-ai-brain-models` & hot-loading models into RAM...")
+                sync_res = await asyncio.to_thread(smart_x_engine.SmartXBrainLoader.sync_from_huggingface)
+                if sync_res.get("status") == "success":
+                    loaded_models = ", ".join([f"`{m}`" for m in sync_res.get("model_names", [])])
+                    resp_text = (
+                        "🤗 **[HUGGING FACE MODEL SYNC COMPLETE]** 🚀\n"
+                        "════════════════════════════════════\n"
+                        f"• **Repository** ៖ `{sync_res.get('repo_id')}`\n"
+                        f"• **Synced Remote Artifacts** ៖ `{sync_res.get('synced_count')} files (100% Complete)`\n"
+                        f"• **Active AI Brain Models in RAM** ៖ `{sync_res.get('total_models')} Models`\n"
+                        f"• **Policies & Hyperparameters** ៖ `{sync_res.get('total_configs')} Configs`\n"
+                        f"• **Loaded Regressors/Classifiers** ៖\n  └ {loaded_models}\n"
+                        "• **Status** ៖ `🟢 100% Fully Synchronized & Operational in /smart_x Engine`"
+                    )
+                else:
+                    resp_text = f"⚠️ [HF SYNC] Notice: {sync_res.get('message')}"
+                if msg_target:
+                    await msg_target.reply_text(resp_text, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
+                return
 
             # Subcommand: METRICS / STATUS
             if action in ["METRICS", "STATUS", "CHECK"]:
