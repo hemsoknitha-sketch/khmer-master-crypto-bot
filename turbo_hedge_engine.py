@@ -75,15 +75,17 @@ def get_binance_monitoring_symbols() -> set:
         url = "https://www.binance.com/bapi/composite/v1/public/marketing/symbol/list"
         r = trading_engine.HFT_SESSION.get(url, timeout=4)
         if r.status_code == 200:
-            data = r.json().get("data", [])
+            resp_json = r.json()
+            data = resp_json.get("data", []) if isinstance(resp_json, dict) else (resp_json if isinstance(resp_json, list) else [])
             for item in data:
-                sym = item.get("symbol", "")
-                tags = [str(t).lower() for t in item.get("tags", [])]
-                tag_infos = [str(ti.get("tag", "")).lower() for ti in item.get("tagInfos", []) if isinstance(ti, dict)]
-                displays = [str(ti.get("display", "")).lower() for ti in item.get("tagInfos", []) if isinstance(ti, dict)]
-                combined = set(tags + tag_infos + displays)
-                if any("monitor" in t for t in combined):
-                    symbols.add(sym)
+                if isinstance(item, dict):
+                    sym = item.get("symbol", "")
+                    tags = [str(t).lower() for t in item.get("tags", []) if t]
+                    tag_infos = [str(ti.get("tag", "")).lower() for ti in item.get("tagInfos", []) if isinstance(ti, dict)]
+                    displays = [str(ti.get("display", "")).lower() for ti in item.get("tagInfos", []) if isinstance(ti, dict)]
+                    combined = set(tags + tag_infos + displays)
+                    if any("monitor" in t for t in combined):
+                        symbols.add(sym)
             _monitoring_cache = symbols
             _monitoring_cache_time = now
             return symbols
@@ -389,6 +391,23 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
         if any(t in ["MONITORING", "DELISTING", "SPECIAL_TREATMENT", "ST", "SEED_TAG"] for t in tags):
             print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Binance Monitoring/Delisting Tag: {tags})")
             return {"side": "SKIP", "confidence_pct": 0.0, "reason": "MONITORING_OR_DELISTING_TAGGED"}
+
+    # 🛡️ SUPER SMART EARLY BREAKOUT SWEET-SPOT & ANTI-OVEREXTENSION GUARD
+    # Hard reject any coin that has pumped > +20.0% or dumped < -20.0% (Eliminates buying pump tops like IOST/FORM/FF/XAN)
+    try:
+        url_24 = f"{trading_engine.BASE_URL}/api/v3/ticker/24hr?symbol={symbol}" if is_spot_mode else f"{trading_engine.FUTURES_URL}/fapi/v1/ticker/24hr?symbol={symbol}"
+        r24 = trading_engine.HFT_SESSION.get(url_24, timeout=3)
+        if r24.status_code == 200:
+            ticker_24h = r24.json()
+            pct_24h = float(ticker_24h.get("priceChangePercent", 0.0) or 0.0)
+            if pct_24h > 20.0:
+                print(f"🛡️ [ANTI-FOMO PEAK SHIELD] {symbol}: 24h surge +{pct_24h:.1f}% > +20.0% threshold. Hard Skip to prevent buying whale pump tops!")
+                return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVEREXTENDED_PUMP_PEAK"}
+            elif pct_24h < -20.0:
+                print(f"🛡️ [ANTI-KNIFE BOTTOM SHIELD] {symbol}: 24h dump {pct_24h:.1f}% < -20.0% threshold. Hard Skip to prevent catching falling knives!")
+                return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVEREXTENDED_DUMP_BOTTOM"}
+    except Exception:
+        pass
 
     # Enforce Hard Leverage Ceiling (Max 15x Futures, Max 1x Spot)
     requested_leverage = 1 if is_spot_mode else min(15, max(1, requested_leverage))
