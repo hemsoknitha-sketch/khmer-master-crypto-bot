@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import time
 import hashlib
 import sys
@@ -9690,10 +9691,11 @@ class TelegramBotThread(BaseThread):
                         "• ⚖️ **Adaptive Kelly & PINN Jump-Diffusion** ៖ Strict Daily Drawdown <= 2.5% ceiling with dynamic crash-wick risk dampening.\n"
                         "• 🛡️ **5 Super Smart Invariants** ៖ Breakeven Armor (+3% ROI), Micro-Scalp TP1 50%, Sweet-Spot Filter (+3% to +12%), 15m/1h Trend Confluence, and Anti-Whipsaw Clean Stop (-10% ROI, 2h cooldown).\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 🚀 **Futures Multi-Coin Breakout Scanner (AI Auto Coin & Direction) ៖**\n`/smartx AUTO 20 10 AUTO 1234`\n\n"
                         "👉 🥇 **Gold (PAXG) Institutional AGI (Auto BUY/SELL 24/7) ៖**\n`/smartx GOLD 20 10 AUTO 1234`\n\n"
                         "👉 ⚡ **BTC / Crypto Futures AGI (Auto Direction 24/7) ៖**\n`/smartx BTC 50 10 AUTO 1234`\n\n"
-                        "👉 🛒 **Spot Gold (PAXG) Macro Accumulation (0% Liquidation) ៖**\n`/smartx SPOT PAXG 50 1234`\n\n"
                         "👉 🛒 **Spot Multi-Coin Early Breakout Scanner ៖**\n`/smartx SPOT AUTO 100 1234`\n\n"
+                        "👉 🛒 **Spot Gold (PAXG) Macro Accumulation (0% Liquidation) ៖**\n`/smartx SPOT PAXG 50 1234`\n\n"
                         "👉 🤗 **Sync & Hot-Reload Models from Hugging Face ៖**\n`/smartx SYNC`\n\n"
                         "👉 📊 **Live AI Regime & Session Sweep Dashboard ៖**\n`/smartx METRICS`\n\n"
                         "👉 🛑 **Stop & Close All Positions ៖**\n`/smartx STOP ALL 1234`"
@@ -9709,10 +9711,11 @@ class TelegramBotThread(BaseThread):
                         "• ⚖️ **自适应凯利与 PINN 跳跃扩散** ៖ 严格限制单日最大回撤 <= 2.5%，动态防范插针风险。\n"
                         "• 🛡️ **5 重 Super Smart 永恒法则** ៖ +3% ROI 自动保本、TP1 止盈 50%、+3%~+12% 早期突破筛选、15m/1h 趋势共振与 -10% ROI 硬止损。\n\n"
                         "📋 **一键复制指令：**\n\n"
+                        "👉 🚀 **合约多币种全自动突破扫描器 (AI 自动选币+方向) ៖**\n`/smartx AUTO 20 10 AUTO 1234`\n\n"
                         "👉 🥇 **黄金 (PAXG) 机构合约全自动 (Auto BUY/SELL 24/7) ៖**\n`/smartx GOLD 20 10 AUTO 1234`\n\n"
                         "👉 ⚡ **比特币/主流币合约全自动 ៖**\n`/smartx BTC 50 10 AUTO 1234`\n\n"
-                        "👉 🛒 **现货黄金 (PAXG) 宏观定投 (0% 强平风险) ៖**\n`/smartx SPOT PAXG 50 1234`\n\n"
                         "👉 🛒 **现货多币早期突破扫描 ៖**\n`/smartx SPOT AUTO 100 1234`\n\n"
+                        "👉 🛒 **现货黄金 (PAXG) 宏观定投 (0% 强平风险) ៖**\n`/smartx SPOT PAXG 50 1234`\n\n"
                         "👉 🤗 **从 Hugging Face 热重载模型 ៖**\n`/smartx SYNC`\n\n"
                         "👉 📊 **实时 AI 机制与扫单看板 ៖**\n`/smartx METRICS`\n\n"
                         "👉 🛑 **停止并全平所有仓位 ៖**\n`/smartx STOP ALL 1234`"
@@ -9728,10 +9731,11 @@ class TelegramBotThread(BaseThread):
                         "• ⚖️ **Adaptive Kelly & PINN Jump-Diffusion** ៖ ធានា Daily Drawdown មិនដែលលើសពី 2.5% និងរំកិល Trailing Stop ការពារមុនពេលទីផ្សារធ្លាក់គំហុក។\n"
                         "• 🛡️ **5 Super Smart Invariants** ៖ Breakeven Armor (+3% ROI), Micro-Scalp TP1 50%, Sweet-Spot Filter (+3% ទៅ +12%), 15m/1h Trend Confluence, និង Anti-Whipsaw Clean Stop (-10% ROI, Cooldown ២ ម៉ោង)។\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 🚀 **Futures Multi-Coin Breakout Scanner (AI រើសកាក់ & ទិសដៅ AUTO) ៖**\n`/smartx AUTO 20 10 AUTO 1234`\n\n"
                         "👉 🥇 **Gold (PAXG) Futures AGI (Auto BUY/SELL 24/7) ៖**\n`/smartx GOLD 20 10 AUTO 1234`\n\n"
                         "👉 ⚡️ **BTC / Crypto Futures AGI (AI វិភាគ & សម្រេចទិសដៅ) ៖**\n`/smartx BTC 50 10 AUTO 1234`\n\n"
-                        "👉 🛒 **Spot Gold (PAXG) Macro Accumulation (0% Liquidation) ៖**\n`/smartx SPOT PAXG 50 1234`\n\n"
                         "👉 🛒 **Spot Multi-Coin Early Breakout Scanner ៖**\n`/smartx SPOT AUTO 100 1234`\n\n"
+                        "👉 🛒 **Spot Gold (PAXG) Macro Accumulation (0% Liquidation) ៖**\n`/smartx SPOT PAXG 50 1234`\n\n"
                         "👉 🤗 **Sync & Hot-Reload ម៉ូដែល AI ពី Hugging Face ៖**\n`/smartx SYNC`\n\n"
                         "👉 📊 **Live AI Regime & Session Sweep Dashboard ៖**\n`/smartx METRICS`\n\n"
                         "👉 🛑 **បញ្ឈប់ និងបិទ Position ៖**\n`/smartx STOP ALL 1234`"
@@ -9938,16 +9942,39 @@ class TelegramBotThread(BaseThread):
                     return
 
             if action == "AUTO":
-                candidates = ["PAXGUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT"]
-                best_sym = "PAXGUSDT"
+                high_vel = turbo_hedge_engine.get_active_high_velocity_coins(limit=15)
+                candidates = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "PAXGUSDT"] + [s for s in high_vel if s not in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "PAXGUSDT"]]
+                best_sym = None
                 highest_conf = 0.0
-                best_side = "BUY"
+                best_side = None
                 for cand in candidates:
                     sig = smart_x_engine.SmartXEngine.generate_smart_x_signal(cand)
-                    if sig.get("side") in ["BUY", "SELL"] and sig.get("confidence_pct", 0.0) > highest_conf:
+                    if sig.get("side") in ["BUY", "SELL"] and sig.get("confidence_pct", 0.0) >= 75.0 and sig.get("confidence_pct", 0.0) > highest_conf:
                         highest_conf = sig["confidence_pct"]
                         best_sym = cand
                         best_side = sig["side"]
+
+                if not best_sym:
+                    standby_msg = (
+                        "ℹ️ **[SMART X AUTO-SCAN STANDBY]** 🛡️\n"
+                        "══════════════════════════\n"
+                        "• AI Brain បានស្កេនកាក់ Futures ស្ថាប័នធំៗ (BTC, ETH, SOL, PAXG និងកាក់ Sweet-Spot Breakout)។\n"
+                        "• ទីផ្សារគ្រប់គូកំពុងស្ថិតក្នុងរង្វង់ Sideways / Choppy Consolidation ដោយគ្មានចលនា Breakout ឬ Liquidity Sweep ច្បាស់លាស់ឡើយ។\n"
+                        "• Bot ជ្រើសរើស **ឈរជើងការពារទុន ១០០% (Standby)** មិនបើក Position ដើម្បីចៀសវាងការខាត Fee និង Stop Hunt។\n"
+                        "👉 សូមសាកល្បងម្ដងទៀតក្នុង ៥-១៥ នាទី ឬកំណត់កាក់បញ្ជាផ្ទាល់ (ឧ. `/smartx BTC 20 10 AUTO 1234` ឬ `/smartx GOLD 20 10 BUY 1234`)។"
+                        if user_lang == 'km' else
+                        "ℹ️ **[SMART X AUTO-SCAN STANDBY]** 🛡️\n"
+                        "══════════════════════════\n"
+                        "• AI Brain scanned top institutional perpetuals (BTC, ETH, SOL, PAXG & Sweet-Spot Breakout candidates).\n"
+                        "• All pairs are currently in choppy range consolidation with no confirmed breakout.\n"
+                        "• Bot chose **STANDBY to protect capital 100%** (eliminating fee leakage & whipsaws).\n"
+                        "👉 Please retry in 5-15 mins or specify a pair directly (e.g. `/smartx BTC 20 10 AUTO 1234` or `/smartx GOLD 20 10 BUY 1234`)."
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(standby_msg, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
                 target_sym = best_sym
                 side_val = best_side
 

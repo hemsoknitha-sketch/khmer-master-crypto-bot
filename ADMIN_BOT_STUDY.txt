@@ -453,6 +453,30 @@
   - `/gold_guard` ឬ `/gold_radar`    ➔ ពិនិត្យរបាយការណ៍វិភាគមាសម៉ាក្រូសេដ្ឋកិច្ច Real-time
   - `/gold_turbo AUTO 100 1234`      ➔ បើកដំណើរការប្រព័ន្ធជួញដូរមាសស្វ័យប្រវត្តិ
 
+--------------------------------------------------------------------------------
+៥.៧ 👑 INSTITUTIONAL AI MULTI-ASSET QUANT SUITE (`/smartx`)
+--------------------------------------------------------------------------------
+• តួនាទីស្នូល     : ម៉ាស៊ីនជួញដូរកម្រិតស្ថាប័នកម្រិតខ្ពស់បំផុត រួមបញ្ចូលគ្នានូវ Gold (PAXG), Bitcoin, Ethereum, Solana និងកាក់ Sweet-Spot Breakout។
+• យន្តការ AUTO ជ្រើសរើសកាក់ (How Auto Coin Selection Works) ៖
+  ១. ស្កេនកាក់ស្ថាប័នស្នូល (Institutional Core) ៖ ពិនិត្យ BTC, ETH, SOL, PAXG ជាប្រចាំ ជាមួយ Mixture-of-Experts Router (`brain_moe_router.pkl`)។
+  ២. ស្កេនកាក់ Sweet-Spot Breakout ៖ ទាញយកកាក់ទាំងអស់លើ Binance Futures ដែលមាន Volume >= $5,000,000 USDT និងស្ថិតក្នុងចន្លោះ Golden Window (+3.0% ទៅ +12.0%)។
+  ៣. Exclusion Shield ៖ បដិសេធដាច់ខាតកាក់ដែលឡើងលើសពី +20.0% ឬធ្លាក់លើសពី -20.0% ក្នុងរយៈពេល ២៤ ម៉ោង ដើម្បីកម្ចាត់ចោលការទិញចំក្បាលកាក់ ឬលក់ចំចុងជើងកាក់។
+  ៤. AI Alpha Evaluation ៖ ដំណើរការម៉ូដែល AI ទាំង ១៥ ក្នុង RAM ដើម្បីវាស់ស្ទង់ Confidence %។ កាក់ណាដែលមាន Confidence ខ្ពស់បំផុត (>= 75.0%) នឹងត្រូវជ្រើសរើសបើក Order ភ្លាមៗ (<30ms)!
+  ៥. Standby Protection ៖ ប្រសិនបើគ្រប់កាក់ទាំងអស់កំពុងស្ថិតក្នុងរលក Sideways Chop គ្មានទិសដៅច្បាស់លាស់ Bot នឹង Standby ការពារទុន ១០០% មិនបើក Position ដើម្បីចៀសវាងការខាត Fee និង Stop Hunt។
+• យន្តការ AUTO ទិសដៅ (Auto Direction Decision) ៖
+  - ប្រសិនបើសញ្ញាវិភាគចេញមក BUY ➔ បើក LONG ដោយស្វ័យប្រវត្តិ។
+  - ប្រសិនបើសញ្ញាវិភាគចេញមក SELL ➔ បើក SHORT ដោយស្វ័យប្រវត្តិ។
+  - ប្រសិនបើសញ្ញាវិភាគចេញមក SKIP ➔ ឈរជើង Standby ការពារដើមទុន។
+• ពាក្យបញ្ជាប្រើប្រាស់ (1-Tap Copy) ៖
+  - `/smartx AUTO 20 10 AUTO 1234`       ➔ ស្កេនជ្រើសរើសកាក់ Futures និងទិសដៅ BUY/SELL អូតូ (ទុន $20, Lev 10x)
+  - `/smartx GOLD 20 10 AUTO 1234`       ➔ ជួញដូរមាស PAXG Futures (AI សម្រេចចិត្តទិសដៅ BUY/SELL អូតូ)
+  - `/smartx BTC 50 10 AUTO 1234`        ➔ ជួញដូរ BTC Futures (AI សម្រេចចិត្តទិសដៅ BUY/SELL អូតូ)
+  - `/smartx SPOT AUTO 100 1234`         ➔ ស្កេនទិញ Spot Breakout អូតូ (Sweet-Spot +3% ដល់ +12%, 0% Liq)
+  - `/smartx SPOT PAXG 50 1234`          ➔ សន្សំមាស Spot PAXG ម៉ាក្រូសេដ្ឋកិច្ច (0% Liq)
+  - `/smartx SYNC`                       ➔ Hot-Reload ម៉ូដែល AI ពី Hugging Face Cloud ចូល RAM
+  - `/smartx METRICS`                    ➔ ពិនិត្យផ្ទាំង Real-time AI Metrics, Regime & Macro News
+  - `/smartx STOP ALL 1234`              ➔ បិទ និង Market Close គ្រប់ Position ទាំងអស់ (<30ms)
+
 ================================================================================
 ផ្នែកទី ៦ ៖ ម៉ាស៊ីន HFT X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE (<2ms)
 ================================================================================
@@ -550,6 +574,7 @@
 ៨.២ ពាក្យបញ្ជាជួញដូរ និងយុទ្ធសាស្ត្រ QUANTITATIVE (TRADING & ENGINES) ៖
 --------------------------------------------------------------------------------
 • `/smart_trade` ឬ `/turbo_hedge`: Flagship Unified Investment Suite (Spot & Futures HFT)
+• `/smartx`                      : Institutional AI Multi-Asset Suite (Gold & Crypto Futures/Spot Auto-Scanner)
 • `/flash_loan`                  : DeFi MEV & Flash Loan Arbitrage Suite ($0.00 Risk)
 • `/set_web3_wallet <ADDRESS>`   : កំណត់អាសយដ្ឋានកាបូប Web3 ទទួល Net Profit ពី Flash Loan
 • `/cross_arb`                   : Sub-5ms Cross-Exchange Arbitrage (Binance, Bybit, OKX, Coinbase)
