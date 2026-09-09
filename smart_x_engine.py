@@ -1,7 +1,7 @@
 """
 KHMER MASTER CRYPTO - /smart_x SUPER SMART X INSTITUTIONAL QUANT ENGINE
 ========================================================================
-Competitive Institutional Architecture Outperforming portal.tagmarkets.com
+Institutional Multi-Asset Quant Engine (Direct Binance & Bybit Execution)
 - Direct Binance & Bybit Execution (Zero broker dealing-desk / B-book counterparty risk)
 - Pre-Trained AI Brain Models (MoE Router, Tabular Ensemble, PINN Jump-Diffusion, Dynamic TP/Vol)
 - Session Liquidity Sweep Classifier (Asian Range vs London & NY Open Sweeps)

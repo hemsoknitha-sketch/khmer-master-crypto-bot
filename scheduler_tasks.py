@@ -719,12 +719,12 @@ async def check_crypto_news(app: Application, ai_engine):
 
                     if user_l == 'khmer':
                         alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
-                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "══════════════════════════\n"
                         alert_msg += f"📰 **{title}**\n\n"
                         alert_msg += f"🌐 **ប្រភព ៖** {source_name} | 📅 **{kh_date_str}**\n"
-                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += "══════════════════════════\n\n"
                         alert_msg += f"{texts['khmer']}\n\n"
-                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "══════════════════════════\n"
                         alert_msg += "📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
                         alert_msg += f"• **ទិសដៅទីផ្សារ (Market Bias) ៖** {market_bias_km}\n"
                         alert_msg += f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{win_rate}%`\n"
@@ -735,12 +735,12 @@ async def check_crypto_news(app: Application, ai_engine):
                     elif user_l == 'chinese':
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
-                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "══════════════════════════\n"
                         alert_msg += f"📰 **{title}**\n\n"
                         alert_msg += f"🌐 **来源 ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
-                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += "══════════════════════════\n\n"
                         alert_msg += f"{texts['chinese']}\n\n"
-                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "══════════════════════════\n"
                         alert_msg += "📊 **机构最终裁决 (INSTITUTIONAL VERDICT) ៖**\n"
                         alert_msg += f"• **市场偏向 (Market Bias) ៖** {market_bias_zh}\n"
                         alert_msg += f"• **AI 胜率置信度 ៖** `{win_rate}%`\n"
@@ -751,12 +751,12 @@ async def check_crypto_news(app: Application, ai_engine):
                     else:
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
-                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "══════════════════════════\n"
                         alert_msg += f"📰 **{title}**\n\n"
                         alert_msg += f"🌐 **Source ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
-                        alert_msg += "═══════════════════════════════\n\n"
+                        alert_msg += "══════════════════════════\n\n"
                         alert_msg += f"{texts['english']}\n\n"
-                        alert_msg += "═══════════════════════════════\n"
+                        alert_msg += "══════════════════════════\n"
                         alert_msg += "📊 **INSTITUTIONAL VERDICT ៖**\n"
                         alert_msg += f"• **Market Bias ៖** {market_bias_en}\n"
                         alert_msg += f"• **AI Confidence Win Rate ៖** `{win_rate}%`\n"
@@ -2200,7 +2200,7 @@ async def daily_database_backup_job(app: Application):
 
             caption_text = (
                 "🛡️ **[AUTO-BACKUP]** ទិន្នន័យ Database ចុងក្រោយបំផុតត្រូវបានរក្សាទុកដោយសុវត្ថិភាព!\n"
-                "═══════════════════════════════\n"
+                "══════════════════════════\n"
                 "⏰ **កាលវិភាគ** ៖ ម៉ោង ០២:០០ ព្រឹក (ម៉ោងនៅភ្នំពេញ ប្រទេសកម្ពុជា)\n"
                 "💾 **របាយការណ៍** ៖ រក្សាទុក និងផ្ញើជូន Admin តែម្តងគត់ក្នុងរយៈពេល ២៤ ម៉ោង\n"
                 "🔒 **សុវត្ថិភាព** ៖ VIP Users & All Positions 100% Preserved"
@@ -4058,7 +4058,7 @@ async def pre_pump_daily_train_job(app: Application):
         # Always log & dispatch alert to Super Admin Console (ID: 859271875)
         admin_alert_msg = (
             "🧠 **APEX TURBO AGI | 2:00 AM UTC+7 PRE-PUMP DAILY TRAIN COMPLETED** 🚀\n"
-            "═══════════════════════════════\n\n"
+            "══════════════════════════\n\n"
             "⚡ **AI Deep-Learning Training Summary:**\n"
             "• **Schedule**: `2:00 AM (UTC+7 / Phnom Penh Time)` ⏰\n"
             "• **Coins Analyzed**: `300+ Binance Spot & Futures Pairs` 📊\n"
@@ -4082,7 +4082,7 @@ async def pre_pump_daily_train_job(app: Application):
                 if user_lang == 'km':
                     user_msg = (
                         "🚀 **TURBO AGI PRE-PUMP ENGINE | ការបណ្តុះបណ្តាលប្រចាំថ្ងៃ 2:00 AM (UTC+7)** 🧠\n"
-                        "═══════════════════════════════\n\n"
+                        "══════════════════════════\n\n"
                         "✅ **ប្រព័ន្ធ AI Pre-Pump Sniper បានបណ្តុះបណ្តាល និងអាប់គ្រេដ Algorithm ជោគជ័យ ៖**\n"
                         "• **ទិន្នន័យបានស្កេន** ៖ `៣០០+ កាក់ Spot/Futures លើ Binance` 📊\n"
                         "• **ល្បឿនបញ្ជូន Signal** ៖ `Sub-50ms (កម្រិត Millisecond)` ⚡\n"
@@ -4092,7 +4092,7 @@ async def pre_pump_daily_train_job(app: Application):
                 else:
                     user_msg = (
                         "🚀 **TURBO AGI PRE-PUMP ENGINE | 2:00 AM (UTC+7) DAILY TRAIN COMPLETED** 🧠\n"
-                        "═══════════════════════════════\n\n"
+                        "══════════════════════════\n\n"
                         "✅ **Pre-Pump Sniper AI Engine successfully completed daily training cycle:**\n"
                         "• **Coins Analyzed**: `300+ Binance Spot & Futures Pairs` 📊\n"
                         "• **Signal Execution**: `Sub-50ms Millisecond Latency` ⚡\n"
@@ -4928,10 +4928,10 @@ async def biweekly_apex_brain_train_job(app: Application, ai_engine=None):
 
         report_msg = (
             "🧠 **APEX SUPER BRAIN AI MODELS | 16-MODEL RETRAINING COMPLETED** 🚀\n"
-            "═══════════════════════════════\n"
+            "══════════════════════════\n"
             f"⏰ **Timestamp ៖** `{now_str} (UTC+7)`\n"
             "🛡️ **Admin Target ៖** `Super Admin Console (ID: 859271875)`\n"
-            "═══════════════════════════════\n\n"
+            "══════════════════════════\n\n"
             "📊 **16-MODEL RETRAINING MATRIX (100% VERIFIED) ៖**\n"
             "1. `brain_price.pkl` (XGBoost Regressor) ៖ `🟢 TRAINED`\n"
             "2. `brain_trend.pkl` (Random Forest Classifier) ៖ `🟢 TRAINED`\n"
@@ -5005,10 +5005,10 @@ async def vip_8hour_executive_report_job(app: Application):
 
                 report_text = (
                     f"🤖 **APEX SUPER AGI v13.00 | 8-HOUR VIP EXECUTIVE REPORT** 🤖\n"
-                    f"═══════════════════════════════\n"
+                    f"══════════════════════════\n"
                     f"⏰ **កាលបរិច្ឆេទ ៖** `{now_str} (UTC+7)`\n"
                     f"🛡️ **VIP CLEARANCE ៖** `VERIFIED` | 🚀 `REAL LIVE TRADING`\n"
-                    f"═══════════════════════════════\n\n"
+                    f"══════════════════════════\n\n"
                 )
 
                 if not user_bots:
@@ -5039,7 +5039,7 @@ async def vip_8hour_executive_report_job(app: Application):
                         )
 
                 report_text += (
-                    f"═══════════════════════════════\n"
+                    f"══════════════════════════\n"
                     f"💰 **សមតុល្យទុនចុងក្រោយ (LIVE EQUITY SUMMARY)**\n"
                     f"💵 **Wallet Balance ៖** `${wallet_bal:,.2f} USDT`\n"
                     f"🏦 **Free Margin ៖** `${avail_bal:,.2f} USDT`\n"
@@ -5068,7 +5068,7 @@ async def vip_8hour_executive_report_job(app: Application):
                     report_text += f"💰 **សរុបផលចំណេញកើបបាន ៨ ម៉ោង ៖** `+${tot_8h_pnl:,.2f} USDT`\n"
 
                 report_text += (
-                    f"═══════════════════════════════\n"
+                    f"══════════════════════════\n"
                     f"💡 _របាយការណ៍សរុបស្វ័យប្រវត្តិរៀងរាល់ ៨ ម៉ោងម្តង ជូន VIP Users!_"
                 )
 
@@ -5206,7 +5206,7 @@ async def flash_loan_autonomous_engine(app: Application):
                         if user_lang == 'km':
                             shield_msg = (
                                 "🛡️ **[FLASH LOAN CAPITAL SHIELD TRIGGERED]** 🛡️\n"
-                                "═════════════════════════════════════════\n\n"
+                                "══════════════════════════\n\n"
                                 "⚙️ **ស្ថានភាព ៖** `REVERTED (ការពារទុន 0-Risk ជោគជ័យ)`\n"
                                 f"🪙 **គូជួញដូរ ៖** `{symbol} ({pair})`\n"
                                 f"📈 **គម្លាតតម្លៃ ៖** `+{spread_pct:.3f}%` (ថ្លៃ Fee សរុប ~{fee_hurdle:.2f}%)\n"
@@ -5217,7 +5217,7 @@ async def flash_loan_autonomous_engine(app: Application):
                         else:
                             shield_msg = (
                                 "🛡️ **[FLASH LOAN CAPITAL SHIELD TRIGGERED]** 🛡️\n"
-                                "═════════════════════════════════════════\n\n"
+                                "══════════════════════════\n\n"
                                 "⚙️ **Status:** `REVERTED (0-Risk Capital Protection Active)`\n"
                                 f"🪙 **Pair:** `{symbol} ({pair})`\n"
                                 f"📈 **Price Spread:** `+{spread_pct:.3f}%` (Round-trip fees ~{fee_hurdle:.2f}%)\n"
@@ -5274,7 +5274,7 @@ async def flash_loan_autonomous_engine(app: Application):
             if user_lang == 'km':
                 notif_msg = (
                     "⚡️ **[24/7 FLASH LOAN ARBITRAGE EXECUTED]** 🟢\n"
-                    "═════════════════════════════════════════\n\n"
+                    "══════════════════════════\n\n"
                     f"⚙️ **របៀបដំណើរការ (Mode)** ៖ `{mode_badge_km}`\n\n"
                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{symbol} ({pair})`\n"
                     f"🌐 **បណ្ដាញ Blockchain ៖** `{chain} (Atomic 1-Block)`\n"
@@ -5287,14 +5287,14 @@ async def flash_loan_autonomous_engine(app: Application):
                     f"⛽ **Keeper Relayer Gas ៖** `{keeper_status['arbitrum_gas_eth']} ETH` (~${keeper_status['gas_usd_est']})\n"
                     f"🛡️ **ហានិភ័យទុនផ្ទាល់ខ្លួន ៖** `$0.00 (Single-Block Atomic Safety Invariant)`\n"
                     f"🔗 **Transaction Hash ៖** `{tx_hash}`\n\n"
-                    "═════════════════════════════════════════\n"
+                    "══════════════════════════\n"
                     f"📊 **សរុបផលចំណេញ Flash Loan ៖** `+${tot_pnl:,.2f} USDT` ({tot_trades} ប្រតិបត្តិការ)\n"
                     "💡 _ប្រព័ន្ធកំពុងបន្តស្កេន និងចាប់យកផលចំណេញស្វ័យប្រវត្ត ២៤ម៉ោង/៧ថ្ងៃ!_"
                 )
             else:
                 notif_msg = (
                     "⚡️ **[24/7 FLASH LOAN ARBITRAGE EXECUTED]** 🟢\n"
-                    "═════════════════════════════════════════\n\n"
+                    "══════════════════════════\n\n"
                     f"⚙️ **Execution Mode**: `{mode_badge}`\n\n"
                     f"🪙 **Symbol / Pair:** `{symbol} ({pair})`\n"
                     f"🌐 **Execution Chain:** `{chain} (Atomic 1-Block)`\n"
@@ -5307,7 +5307,7 @@ async def flash_loan_autonomous_engine(app: Application):
                     f"⛽ **Keeper Gas Balance:** `{keeper_status['arbitrum_gas_eth']} ETH` (~${keeper_status['gas_usd_est']})\n"
                     f"🛡️ **User Capital Risk:** `$0.00 (Single-Block Atomic Safety Invariant)`\n"
                     f"🔗 **Transaction Hash:** `{tx_hash}`\n\n"
-                    "═════════════════════════════════════════\n"
+                    "══════════════════════════\n"
                     f"📊 **Total Flash Loan Cumulative Profit:** `+${tot_pnl:,.2f} USDT` ({tot_trades} trades)\n"
                     "💡 _Autonomous AI engine continuously monitors market disparities 24/7!_"
                 )
