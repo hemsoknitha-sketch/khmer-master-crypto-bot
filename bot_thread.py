@@ -1926,16 +1926,16 @@ class TelegramBotThread(BaseThread):
             
             keyboard = [
                 [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+                    InlineKeyboardButton("📊 24H Executive Report", callback_data="btn_executive_report"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ],
                 [
                     InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
                 ],
                 [
                     InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                    InlineKeyboardButton("🐋 Whale Radar", callback_data="btn_whales_refresh")
+                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
                 ],
                 [
                     InlineKeyboardButton("📈 Infinity Matrix", callback_data="btn_infinity_grid_launch"),
@@ -2324,6 +2324,39 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     await query.message.reply_text(hard_card, parse_mode="Markdown", reply_markup=nav_keyboard)
                 self.log_signal.emit(f"🔴 Hard Stop executed for user {chat_id} ({closed_count} positions closed).")
+
+        async def executive_summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id:
+                return
+            if not await verify_user(update):
+                return
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
+
+            try:
+                import scheduler_tasks
+                msg, keyboard = await scheduler_tasks.build_executive_summary_report(chat_id)
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await update.callback_query.message.reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                else:
+                    await (update.effective_message or update.message).reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception as e:
+                err_txt = f"⚠️ Error generating executive report: {e}"
+                if update.callback_query:
+                    try:
+                        await update.callback_query.answer(err_txt, show_alert=True)
+                    except Exception:
+                        pass
+                else:
+                    await (update.effective_message or update.message).reply_text(err_txt)
 
         async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
@@ -3767,6 +3800,29 @@ class TelegramBotThread(BaseThread):
             await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
+        async def executive_summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            query = update.callback_query
+            if query:
+                await query.answer()
+                chat_id = query.message.chat_id
+            else:
+                chat_id = update.effective_chat.id
+
+            try:
+                from scheduler_tasks import build_executive_summary_report
+                msg, keyboard = await build_executive_summary_report(chat_id)
+                if query:
+                    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception as e:
+                err_msg = f"⚠️ កំហុសក្នុងការបង្កើតរបាយការណ៍ 24H Executive Report: {e}"
+                if query:
+                    await query.message.reply_text(err_msg)
+                else:
+                    await update.message.reply_text(err_msg)
+
         async def cancel_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
@@ -4532,6 +4588,8 @@ class TelegramBotThread(BaseThread):
                 await toggle_breaker_command(update, context)
             elif data == "btn_admin_nuke":
                 await admin_nuke_command(update, context)
+            elif data in ["btn_executive_report", "btn_report_refresh"]:
+                await executive_summary_command(update, context)
             elif data in ["btn_menu_portfolio", "btn_portfolio"]:
                 await portfolio_command(update, context)
             elif data == "btn_balance_refresh":

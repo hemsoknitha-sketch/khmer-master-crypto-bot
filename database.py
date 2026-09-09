@@ -828,6 +828,23 @@ def init_db():
             updated_at TEXT
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS trade_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            symbol TEXT,
+            side TEXT,
+            entry_price REAL,
+            exit_price REAL,
+            qty REAL,
+            entry_time TEXT,
+            exit_time TEXT,
+            pnl REAL,
+            pnl_percent REAL,
+            exit_reason TEXT
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -3450,6 +3467,75 @@ def get_user_strategy_pnl_summary(chat_id: int) -> dict:
         return {"total_pnl": 0.0, "total_trades": 0, "wins": 0, "losses": 0, "win_rate": 100.0}
     finally:
         conn.close()
+
+def get_user_24h_summary(chat_id: int) -> dict:
+    """
+    Super Smart 24-Hour Executive PnL and Performance Aggregator.
+    Combines realized PnL and win rates across trade_history,
+    strategy_pnl_attribution, and user_flash_loan_trades in the last 24 hours.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    tot_pnl = 0.0
+    tot_trades = 0
+    wins = 0
+
+    try:
+        # 1. Closed trades in trade_history (Turbo Hedge, Micro-Scalping, Spot Breakout)
+        cursor.execute("""
+            SELECT SUM(pnl), COUNT(*),
+                   SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END)
+            FROM trade_history
+            WHERE chat_id = ? AND exit_time >= datetime('now', '-24 hours')
+        """, (chat_id,))
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            tot_pnl += float(row[0])
+            tot_trades += int(row[1])
+            wins += int(row[2] or 0)
+    except Exception:
+        pass
+
+    try:
+        # 2. Flash Loan / Arbitrage trades
+        cursor.execute("""
+            SELECT SUM(net_profit_usd), COUNT(*)
+            FROM user_flash_loan_trades
+            WHERE chat_id = ? AND status = 'COMPLETED' AND created_at >= datetime('now', '-24 hours')
+        """, (chat_id,))
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            tot_pnl += float(row[0])
+            tot_trades += int(row[1])
+            wins += int(row[1])
+    except Exception:
+        pass
+
+    try:
+        # 3. Strategy PnL Attribution updates in last 24h
+        cursor.execute("""
+            SELECT SUM(total_pnl_usdt), SUM(win_count), SUM(loss_count)
+            FROM strategy_pnl_attribution
+            WHERE chat_id = ? AND last_updated >= datetime('now', '-24 hours')
+        """, (chat_id,))
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            tot_pnl += float(row[0])
+            tot_trades += int(row[1] or 0) + int(row[2] or 0)
+            wins += int(row[1] or 0)
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+    win_rate = round((wins / tot_trades * 100.0), 1) if tot_trades > 0 else 100.0
+    return {
+        "total_pnl": round(tot_pnl, 2),
+        "total_trades": tot_trades,
+        "wins": wins,
+        "losses": max(0, tot_trades - wins),
+        "win_rate": win_rate
+    }
 
 _DEFENDER_CACHE = False
 

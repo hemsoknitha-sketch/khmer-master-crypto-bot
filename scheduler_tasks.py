@@ -4723,6 +4723,108 @@ async def trailing_guard_monitor(app: Application):
     except Exception as e:
         print(f"⚠️ [TRAILING GUARD MONITOR ERROR]: {e}")
 
+async def build_executive_summary_report(chat_id: int):
+    """
+    Super Smart & Institutional 24-Hour Executive Summary Report Builder.
+    Aggregates Spot balance, Futures margin, 24-hour realized PnL, win rates,
+    and 5 core Super Smart engines status with 1-Tap Copyable activation syntaxes.
+    """
+    import localization as loc
+    import trading_engine
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    user_lang = db.get_user_language(chat_id) or 'km'
+    if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+        user_lang = 'km'
+    elif user_lang in ['en', 'english']:
+        user_lang = 'en'
+    elif user_lang in ['zh', 'chinese']:
+        user_lang = 'zh'
+    else:
+        user_lang = 'km'
+
+    # Check 5 Super Smart engines
+    is_hyper = db.is_hyper_trade_enabled(chat_id)
+    is_arb = db.is_auto_arb_enabled(chat_id)
+    is_sweep = db.is_sweep_auto_enabled(chat_id)
+    is_funding = db.is_funding_harvester_enabled(chat_id)
+    is_guard = db.is_trailing_guard_enabled(chat_id)
+
+    # 24-Hour Performance summary from DB
+    summary = await asyncio.to_thread(db.get_user_24h_summary, chat_id)
+    total_pnl = summary.get("total_pnl", 0.0)
+    total_trades = summary.get("total_trades", 0)
+    win_rate = summary.get("win_rate", 100.0)
+
+    # Balance Query
+    keys = db.get_user_api(chat_id)
+    free_usdt = 0.0
+    futures_margin = 0.0
+    if keys:
+        try:
+            acc = await asyncio.to_thread(trading_engine.get_account_balance_spot, keys[0], keys[1])
+            free_usdt = float(acc.get("free_usdt", 0.0))
+        except Exception:
+            pass
+        try:
+            fut_acc = await asyncio.to_thread(trading_engine.get_futures_account_balance, keys[0], keys[1])
+            futures_margin = float(fut_acc.get("totalWalletBalance", 0.0))
+        except Exception:
+            pass
+
+    # Dynamic PIN for 1-Tap copy
+    user_pin = db.get_user_pin(chat_id) or "1234"
+    if not user_pin or not str(user_pin).isalnum() or len(str(user_pin)) > 8:
+        user_pin = "1234"
+
+    if user_lang == 'en':
+        lbl_copy = "1-Tap Copy to Activate"
+    elif user_lang == 'zh':
+        lbl_copy = "一键复制开启"
+    else:
+        lbl_copy = "1-Tap Copy ដើម្បបើកដំណើរការ"
+
+    # Format 1-Tap copyable monospace command blocks (zero entity parsing errors)
+    hyper_txt = "🟢 ACTIVE" if is_hyper else f"🔴 OFF\n   └ {lbl_copy} ៖  `/hyper_trade ON 10 {user_pin}`"
+    arb_txt = "🟢 ACTIVE" if is_arb else f"🔴 OFF\n   └ {lbl_copy} ៖  `/auto_arb ON 50 {user_pin}`"
+    sweep_txt = "🟢 ACTIVE" if is_sweep else f"🔴 OFF\n   └ {lbl_copy} ៖  `/sweep_auto ON 50 {user_pin}`"
+    funding_txt = "🟢 ACTIVE" if is_funding else f"🔴 OFF\n   └ {lbl_copy} ៖  `/funding_harvester ON {user_pin}`"
+    guard_txt = "🟢 ACTIVE" if is_guard else f"🔴 OFF\n   └ {lbl_copy} ៖  `/trailing_guard ON {user_pin}`"
+
+    pnl_formatted = f"+${total_pnl:,.2f} USDT" if total_pnl >= 0 else f"-${abs(total_pnl):,.2f} USDT"
+
+    msg = loc.get_text(
+        user_lang,
+        'daily_executive_summary_report',
+        spot_bal=free_usdt,
+        futures_bal=futures_margin,
+        pnl_formatted=pnl_formatted,
+        total_pnl=total_pnl,
+        trades_24h=total_trades,
+        win_rate=win_rate,
+        hyper_status=hyper_txt,
+        arb_status=arb_txt,
+        sweep_status=sweep_txt,
+        funding_status=funding_txt,
+        guard_status=guard_txt
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔄 Refresh Report", callback_data="btn_executive_report"),
+            InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+        ],
+        [
+            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+            InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+        ],
+        [
+            InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+        ]
+    ])
+
+    return msg, keyboard
+
 async def daily_executive_summary_report(app: Application):
     """
     Super Smart 24-Hour Executive Summary Report Generator.
@@ -4734,65 +4836,10 @@ async def daily_executive_summary_report(app: Application):
         if not users:
             return
 
-        import localization as loc
-        import trading_engine
-
         for chat_id in users:
             try:
-                user_lang = db.get_user_language(chat_id) or 'km'
-                
-                is_hyper = db.is_hyper_trade_enabled(chat_id)
-                is_arb = db.is_auto_arb_enabled(chat_id)
-                is_sweep = db.is_sweep_auto_enabled(chat_id)
-                is_funding = db.is_funding_harvester_enabled(chat_id)
-                is_guard = db.is_trailing_guard_enabled(chat_id)
-
-                summary = await asyncio.to_thread(db.get_user_strategy_pnl_summary, chat_id)
-                total_pnl = summary.get("total_pnl", 0.0)
-                total_trades = summary.get("total_trades", 0)
-                win_rate = summary.get("win_rate", 100.0)
-
-                keys = db.get_user_api(chat_id)
-                free_usdt = 0.0
-                futures_margin = 0.0
-                if keys:
-                    try:
-                        acc = await asyncio.to_thread(trading_engine.get_account_balance_spot, keys[0], keys[1])
-                        free_usdt = float(acc.get("free_usdt", 0.0))
-                        fut_acc = await asyncio.to_thread(trading_engine.get_futures_account_balance, keys[0], keys[1])
-                        futures_margin = float(fut_acc.get("totalWalletBalance", 0.0))
-                    except Exception:
-                        pass
-
-                if user_lang == 'en':
-                    lbl_copy = "1-Tap Copy to Activate"
-                elif user_lang == 'zh':
-                    lbl_copy = "一键复制开启"
-                else:
-                    lbl_copy = "1-Tap Copy ដើម្បបើកដំណើរការ"
-
-                hyper_txt = "🟢 ACTIVE" if is_hyper else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/hyper_trade ON 10 1234` ``"
-                arb_txt = "🟢 ACTIVE" if is_arb else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/auto_arb ON 50 1234` ``"
-                sweep_txt = "🟢 ACTIVE" if is_sweep else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/sweep_auto ON 50 1234` ``"
-                funding_txt = "🟢 ACTIVE" if is_funding else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/funding_harvester ON 1234` ``"
-                guard_txt = "🟢 ACTIVE" if is_guard else f"🔴 OFF\n   └ {lbl_copy} ៖ `` `/trailing_guard ON 1234` ``"
-
-                msg = loc.get_text(
-                    user_lang,
-                    'daily_executive_summary_report',
-                    spot_bal=free_usdt,
-                    futures_bal=futures_margin,
-                    total_pnl=total_pnl,
-                    trades_24h=total_trades,
-                    win_rate=win_rate,
-                    hyper_status=hyper_txt,
-                    arb_status=arb_txt,
-                    sweep_status=sweep_txt,
-                    funding_status=funding_txt,
-                    guard_status=guard_txt
-                )
-
-                await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                msg, keyboard = await build_executive_summary_report(chat_id)
+                await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception as u_err:
                 print(f"⚠️ Error sending daily summary to {chat_id}: {u_err}")
     except asyncio.CancelledError:

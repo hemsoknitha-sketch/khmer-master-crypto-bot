@@ -139,15 +139,15 @@ MESSAGES = {
             "💵 Spot Balance: **${spot_bal:,.2f} USDT**\n"
             "📈 Futures Balance: **${futures_bal:,.2f} USDT**\n\n"
             "💰 **24-HOUR PERFORMANCE:**\n"
-            "💎 Realized PnL: **+${total_pnl:,.2f} USDT**\n"
-            "⚡ Micro-Trades Executed: **{trades_24h} Trades**\n"
+            "💎 Realized PnL: **{pnl_formatted}**\n"
+            "⚡️ Micro-Trades Executed: **{trades_24h} Trades**\n"
             "🎯 AI Strategy Win Rate: **{win_rate:.1f}%**\n\n"
             "🤖 **SUPER SMART ENGINES STATUS (24/7 Silent):**\n"
             "🚀 Hyper-Trade Scalper: {hyper_status}\n"
-            "⚡ Delta-Neutral Arbitrage: {arb_status}\n"
-            "🛡️ Liquidity Sweep Sniper: {sweep_status}\n"
+            "⚡️ Delta-Neutral Arbitrage: {arb_status}\n"
+            "🛡 Liquidity Sweep Sniper: {sweep_status}\n"
             "🌾 Perpetual Funding Harvester: {funding_status}\n"
-            "🛡️ Auto-Liquidation Guard: {guard_status}\n\n"
+            "🛡 Auto-Liquidation Guard: {guard_status}\n\n"
             "⚙️ *Apex Super Brain កំពុងដំណើរការស្វ័យប្រវត្តិ ២៤ម៉ោង/ថ្ងៃ ដោយសុវត្ថិភាព 0% Risk!*"
         ),
 
@@ -293,16 +293,16 @@ MESSAGES = {
             "💵 Spot Balance: **${spot_bal:,.2f} USDT**\n"
             "📈 Futures Balance: **${futures_bal:,.2f} USDT**\n\n"
             "💰 **24-HOUR PERFORMANCE:**\n"
-            "💎 Realized PnL: **+${total_pnl:,.2f} USDT**\n"
-            "⚡ Micro-Trades Executed: **{trades_24h} Trades**\n"
+            "💎 Realized PnL: **{pnl_formatted}**\n"
+            "⚡️ Micro-Trades Executed: **{trades_24h} Trades**\n"
             "🎯 AI Strategy Win Rate: **{win_rate:.1f}%**\n\n"
             "🤖 **SUPER SMART ENGINES STATUS (24/7 Silent):**\n"
             "🚀 Hyper-Trade Scalper: {hyper_status}\n"
-            "⚡ Delta-Neutral Arbitrage: {arb_status}\n"
-            "🛡️ Liquidity Sweep Sniper: {sweep_status}\n"
+            "⚡️ Delta-Neutral Arbitrage: {arb_status}\n"
+            "🛡 Liquidity Sweep Sniper: {sweep_status}\n"
             "🌾 Perpetual Funding Harvester: {funding_status}\n"
-            "🛡️ Auto-Liquidation Guard: {guard_status}\n\n"
-            "⚙️ *Apex Super Brain is running autonomously 24/7 with zero notification spam!*"
+            "🛡 Auto-Liquidation Guard: {guard_status}\n\n"
+            "⚙️ *Apex Super Brain is running autonomously 24/7 with zero risk!*"
         ),
 
         'whale_deposit_alert': "🚨 **ON-CHAIN RED ALERT (INFLOW)** 🚨\n\n🐋 A whale just deposited into **Binance**!\n💰 Amount: **${value:,.2f} {symbol}**\n\n⚠️ *Note: This could indicate a massive buy order preparation or a potential market dump!*",
@@ -445,7 +445,25 @@ MESSAGES = {
         'remove_api_not_found': "🤷‍♂️ 您尚未连接任何 API，或者它已被删除。",
         'funding_harvester_usage': "❌ របៀបប្រើប្រាស់: `/funding_harvester ON <ទុន> <PIN>` ឬ `/funding_harvester OFF <PIN>`",
         'funding_harvester_enabled': "🌾 **8-Hour Perpetual Funding Yield Harvester បានបើក!**\n\n💵 ទុនស្ទាក់ទិញ: `${amount:.2f} USDT`\n🛡️ យុទ្ធសាស្ត្រ: 1:1 Delta-Neutral (0% Risk-Free)\n\n*AI នឹងស្កេនរកកាក់ដែលមាន Funding Rate ខ្ពស់បំផុត ១០ នាទីមុនពេល settlement រៀងរាល់ ៨ ម៉ោងម្តងដើម្បីប្រមូលសាច់ប្រាក់!*",
-        'funding_harvester_disabled': "🚫 **8-Hour Perpetual Funding Yield Harvester ត្រូវបានបិទ!**"
+        'funding_harvester_disabled': "🚫 **8-Hour Perpetual Funding Yield Harvester ត្រូវបានបិទ!**",
+        'daily_executive_summary_report': (
+            "📊 **APEX AI 24-HOUR EXECUTIVE SUMMARY REPORT** 📊\n"
+            "───────────────────────────────\n"
+            "🏦 **PORTFOLIO BALANCE & EQUITY:**\n"
+            "💵 Spot Balance: **${spot_bal:,.2f} USDT**\n"
+            "📈 Futures Balance: **${futures_bal:,.2f} USDT**\n\n"
+            "💰 **24-HOUR PERFORMANCE:**\n"
+            "💎 Realized PnL: **{pnl_formatted}**\n"
+            "⚡️ Micro-Trades Executed: **{trades_24h} Trades**\n"
+            "🎯 AI Strategy Win Rate: **{win_rate:.1f}%**\n\n"
+            "🤖 **SUPER SMART ENGINES STATUS (24/7 Silent):**\n"
+            "🚀 Hyper-Trade Scalper: {hyper_status}\n"
+            "⚡️ Delta-Neutral Arbitrage: {arb_status}\n"
+            "🛡 Liquidity Sweep Sniper: {sweep_status}\n"
+            "🌾 Perpetual Funding Harvester: {funding_status}\n"
+            "🛡 Auto-Liquidation Guard: {guard_status}\n\n"
+            "⚙️ *Apex Super Brain 24/7 自主运行，安全保本 0% Risk！*"
+        )
     }
 }
 

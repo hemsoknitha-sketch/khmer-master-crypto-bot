@@ -42,6 +42,7 @@ async def set_menu_commands():
         BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
         BotCommand("balance", "💰 Check Spot & Futures Balance"),
         BotCommand("portfolio", "💼 Unified Portfolio & Net PnL"),
+        BotCommand("report", "📊 24H Executive PnL & Yield Summary"),
         BotCommand("status", "📊 View Active Trades & PnL"),
         BotCommand("paper_trading", "🧪 Toggle Paper vs Live Trading"),
         BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),

@@ -72,6 +72,20 @@ fi
 
 # 5. Restart Systemd Service Cleanly
 echo "🔄 [SYSTEMD] Restarting khmer-master-crypto-bot service on Google Cloud VPS..."
-sudo systemctl restart khmer-master-crypto-bot.service || sudo systemctl restart khmer-master-crypto-bot
+if [ ! -f "/etc/systemd/system/khmer-master-crypto-bot.service" ]; then
+    echo "⚙️ [SYSTEMD] Service file not found. Auto-configuring via setup_vps_service.sh..."
+    bash setup_vps_service.sh || true
+else
+    # Ensure aliases exist
+    if [ ! -f "/etc/systemd/system/khmer-master-crypto.service" ]; then
+        sudo ln -sf /etc/systemd/system/khmer-master-crypto-bot.service /etc/systemd/system/khmer-master-crypto.service 2>/dev/null || true
+        sudo systemctl daemon-reload 2>/dev/null || true
+    fi
+    sudo systemctl restart khmer-master-crypto-bot.service 2>/dev/null || \
+    sudo systemctl restart khmer-master-crypto.service 2>/dev/null || \
+    sudo systemctl restart khmer-crypto-bot.service 2>/dev/null || \
+    sudo systemctl restart khmer-master-crypto-bot 2>/dev/null || true
+fi
 
 echo "🎉 [SUCCESS] GCP VPS successfully updated to latest GitHub & Hugging Face release!"
+

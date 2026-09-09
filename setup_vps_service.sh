@@ -27,6 +27,7 @@ fi
 CURRENT_USER=$(whoami)
 SERVICE_PRIMARY="/etc/systemd/system/khmer-master-crypto-bot.service"
 SERVICE_ALIAS="/etc/systemd/system/khmer-crypto-bot.service"
+SERVICE_SHORT="/etc/systemd/system/khmer-master-crypto.service"
 
 echo "⚙️ Configuring Systemd 24/7 service for user: $CURRENT_USER..."
 echo "📍 Working Directory: $APP_DIR"
@@ -53,41 +54,24 @@ StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-Alias=khmer-crypto-bot.service
+Alias=khmer-crypto-bot.service khmer-master-crypto.service
 EOF
 
-# 3. Create Fallback/Alias Service File (/etc/systemd/system/khmer-crypto-bot.service)
-sudo tee "$SERVICE_ALIAS" > /dev/null <<EOF
-[Unit]
-Description=Khmer Master Crypto APEX AGI Engine (Alias Service)
-After=network.target
-
-[Service]
-Type=simple
-User=$CURRENT_USER
-WorkingDirectory=$APP_DIR
-ExecStart=$PYTHON_BIN main.py --cli
-Restart=always
-RestartSec=5
-SuccessExitStatus=0
-Environment=PYTHONUNBUFFERED=1
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
+# 3. Create Fallback/Alias Service Files
+sudo ln -sf "$SERVICE_PRIMARY" "$SERVICE_ALIAS"
+sudo ln -sf "$SERVICE_PRIMARY" "$SERVICE_SHORT"
 
 # 4. Reload and Enable Both Services
 echo "🔄 Reloading systemd daemon..."
 sudo systemctl daemon-reload
 
 echo "✅ Enabling services on system boot..."
-sudo systemctl enable khmer-master-crypto-bot.service
-sudo systemctl enable khmer-crypto-bot.service
+sudo systemctl enable khmer-master-crypto-bot.service || true
+sudo systemctl enable khmer-crypto-bot.service || true
+sudo systemctl enable khmer-master-crypto.service || true
 
 echo "🚀 Restarting bot service..."
-sudo systemctl restart khmer-master-crypto-bot.service
+sudo systemctl restart khmer-master-crypto-bot.service || sudo systemctl restart khmer-master-crypto.service || true
 
 echo ""
 echo "========================================================================="
