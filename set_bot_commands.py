@@ -24,6 +24,7 @@ async def set_menu_commands():
         BotCommand("start", "🚀 Start Bot & Choose Language"),
         BotCommand("menu", "🎛️ Interactive Master Control Panel"),
         BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
+        BotCommand("wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
         BotCommand("set_web3_wallet", "💼 Configure Web3 Settlement Wallet"),
         BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
         BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),

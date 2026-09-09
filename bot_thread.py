@@ -164,6 +164,7 @@ class TelegramBotThread(BaseThread):
                 BotCommand("start", "🚀 Start Bot & Choose Language"),
                 BotCommand("menu", "🎛️ Interactive Master Control Panel"),
                 BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
+                BotCommand("wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
                 BotCommand("set_web3_wallet", "💼 Configure Web3 Settlement Wallet"),
                 BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
                 BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
@@ -1532,10 +1533,10 @@ class TelegramBotThread(BaseThread):
                         "• ⚠️ **ហាមដាច់ខាត ៖** កុំផ្ញើ Private Key ឬ 12 Seed Words ចូល Telegram Bot ជាដាច់ខាត!\n\n"
                         "📋 **របៀបចម្លងដាក់ (Copy & Paste) ងាយៗ ៖**\n"
                         "👉 **Paste អាសយដ្ឋានដោយផ្ទាល់ (AI នឹង Auto-Detect បណ្ដាញស្វ័យប្រវត្តិ) ៖**\n"
-                        "`` `/set_web3_wallet 0x71C258284C8...` ``\n"
-                        "`` `/set_web3_wallet 9WzDXwBbmkg...` ``\n"
-                        "`` `/set_web3_wallet TJy44mR6V...` ``\n"
-                        "`` `/set_web3_wallet bc1qar0srrr...` ``\n\n"
+                        "• `` `/wallet 0x71C258284C8...` `` (MetaMask / Arbitrum USDT)\n"
+                        "• `` `/wallet 9WzDXwBbmkg...` `` (Solana SOL / USDC)\n"
+                        "• `` `/wallet TJy44mR6V...` `` (TRON TRC-20 USDT)\n"
+                        "• `` `/wallet bc1qar0srrr...` `` (Bitcoin Native)\n\n"
                         "💡 _រាល់ប្រាក់ចំណេញពី Flash Loan & MEV Arbitrage នឹងត្រូវផ្ទេរចូលអាសយដ្ឋាននេះដោយស្វ័យប្រវត្តិ ២៤/៧!_"
                     )
                 else:
@@ -1553,23 +1554,56 @@ class TelegramBotThread(BaseThread):
                         "• ⚠️ **NEVER SHARE**: Do NOT share Private Keys or 12 Seed Words!\n\n"
                         "📋 **Quick Copy & Paste Usage:**\n"
                         "👉 **Paste address directly (AI auto-detects chain):**\n"
-                        "`` `/set_web3_wallet 0x71C258284C8...` ``\n"
-                        "`` `/set_web3_wallet 9WzDXwBbmkg...` ``\n"
-                        "`` `/set_web3_wallet TJy44mR6V...` ``\n"
-                        "`` `/set_web3_wallet bc1qar0srrr...` ``\n\n"
+                        "• `` `/wallet 0x71C258284C8...` `` (MetaMask / Arbitrum USDT)\n"
+                        "• `` `/wallet 9WzDXwBbmkg...` `` (Solana SOL / USDC)\n"
+                        "• `` `/wallet TJy44mR6V...` `` (TRON TRC-20 USDT)\n"
+                        "• `` `/wallet bc1qar0srrr...` `` (Bitcoin Native)\n\n"
                         "💡 _All net profits from Flash Loan & DEX Arbitrage will settle automatically into these wallets 24/7!_"
                     )
                 if msg_target:
-                    await msg_target.reply_text(guide_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    try:
+                        await msg_target.reply_text(guide_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await msg_target.reply_text(guide_msg.replace("*", "").replace("`", ""), reply_markup=keyboard)
                 return
 
-            # Address is provided
+            # Address is provided - Clean and sanitize args
+            clean_args = [str(a).strip(" '\"`:,<>[](){}") for a in args if str(a).strip(" '\"`:,<>[](){}")]
             chain_override = None
-            if len(args) >= 2 and len(args[0]) <= 10:
-                chain_override = args[0].upper()
-                raw_address = args[1].strip()
-            else:
-                raw_address = args[0].strip()
+            raw_address = ""
+
+            if len(clean_args) >= 2:
+                c0 = clean_args[0]
+                c1 = clean_args[1]
+                if (len(c0) <= 12 and not c0.startswith("0x")) and (c1.startswith("0x") or len(c1) >= 26):
+                    chain_override = c0.upper()
+                    raw_address = c1
+                elif (len(c1) <= 12 and not c1.startswith("0x")) and (c0.startswith("0x") or len(c0) >= 26):
+                    chain_override = c1.upper()
+                    raw_address = c0
+                else:
+                    raw_address = c0
+            elif clean_args:
+                raw_address = clean_args[0]
+
+            # Validate address sanity
+            if not raw_address or len(raw_address) < 20:
+                err_text = (
+                    "⚠️ **ទម្រង់អាសយដ្ឋានកាបូបមិនត្រឹមត្រូវ!**\n\n"
+                    "សូមពិនិត្យមើលអាសយដ្ឋាន Web3 របស់អ្នកឡើងវិញ ៖\n"
+                    "• សម្រាប់ MetaMask (Arbitrum USDT) ៖ ត្រូវផ្តើមដោយ `0x...` (៤២ តួអក្សរ)\n"
+                    "• ឧទាហរណ៍ ៖ `` `/wallet 0x71C837072465c40461876D8892f3b925F4C74B29` ``\n"
+                    "• ឬ ៖ `` `/wallet USDT 0x71C837072465c40461876D8892f3b925F4C74B29` ``"
+                ) if user_lang == 'km' else (
+                    "⚠️ **Invalid Wallet Address Format!**\n\n"
+                    "Please verify your Web3 address:\n"
+                    "• For MetaMask (Arbitrum USDT): Must start with `0x...` (42 chars)\n"
+                    "• Example: `` `/wallet 0x71C837072465c40461876D8892f3b925F4C74B29` ``\n"
+                    "• Or: `` `/wallet USDT 0x71C837072465c40461876D8892f3b925F4C74B29` ``"
+                )
+                if msg_target:
+                    await msg_target.reply_text(err_text, parse_mode="Markdown", reply_markup=keyboard)
+                return
 
             chain_key, chain_name = db.set_user_web3_wallet(chat_id, raw_address, chain_override)
             
@@ -1597,7 +1631,10 @@ class TelegramBotThread(BaseThread):
                 )
 
             if msg_target:
-                await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
+                try:
+                    await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await msg_target.reply_text(succ_msg.replace("*", "").replace("`", ""), reply_markup=keyboard)
 
         async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -3293,6 +3330,37 @@ class TelegramBotThread(BaseThread):
             if not await check_spam_and_lock(update, context, chat_id, user_lang):
                 return
                 
+            # 💼 Auto-detect Web3 wallet address submitted as normal message or without slash
+            trimmed_text = str(user_input or "").strip()
+            import re
+            evm_match = re.search(r'\b(0x[a-fA-F0-9]{40})\b', trimmed_text)
+            sol_match = re.search(r'\b([1-9A-HJ-NP-Za-km-z]{32,44})\b', trimmed_text) if not evm_match else None
+            tron_match = re.search(r'\b(T[A-Za-z1-9]{33})\b', trimmed_text) if not (evm_match or sol_match) else None
+            
+            is_explicit_wallet_msg = (
+                trimmed_text.lower().startswith(("wallet", "set_wallet", "set_web3_wallet", "my_wallet", "metamask", "usdt", "arb", "arbitrum"))
+                or len(trimmed_text.split()) <= 3
+            )
+            
+            extracted_addr = None
+            extracted_tag = None
+            if evm_match and (is_explicit_wallet_msg or len(trimmed_text) == 42):
+                extracted_addr = evm_match.group(1)
+                extracted_tag = "USDT" if "usdt" in trimmed_text.lower() else ("METAMASK" if "metamask" in trimmed_text.lower() else None)
+            elif tron_match and (is_explicit_wallet_msg or 33 <= len(trimmed_text) <= 35):
+                extracted_addr = tron_match.group(1)
+                extracted_tag = "TRON"
+            elif sol_match and (is_explicit_wallet_msg or 32 <= len(trimmed_text) <= 44):
+                if len(sol_match.group(1)) >= 32 and not sol_match.group(1).lower().startswith("http"):
+                    extracted_addr = sol_match.group(1)
+                    extracted_tag = "SOLANA"
+                    
+            if extracted_addr:
+                context.args = [extracted_tag, extracted_addr] if extracted_tag else [extracted_addr]
+                await set_web3_wallet_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+
             try:
                 self.log_signal.emit(f"📩 Received message from {chat_id}: {user_input}")
                 await context.bot.send_message(chat_id=chat_id, text=loc.get_text(user_lang, 'processing_request'))
@@ -11783,6 +11851,11 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("keeper", keeper_command))
         self.app.add_handler(CommandHandler("flash_loan_keeper", keeper_command))
         self.app.add_handler(CommandHandler("set_web3_wallet", set_web3_wallet_command))
+        self.app.add_handler(CommandHandler("wallet", set_web3_wallet_command))
+        self.app.add_handler(CommandHandler("set_wallet", set_web3_wallet_command))
+        self.app.add_handler(CommandHandler("my_wallet", set_web3_wallet_command))
+        self.app.add_handler(CommandHandler("web3_wallet", set_web3_wallet_command))
+        self.app.add_handler(CommandHandler("metamask", set_web3_wallet_command))
         # 🌾 Institutional High-Yield & Arbitrage Engines (Dedicated Handlers, Zero-Duplicate)
         self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
@@ -11982,6 +12055,7 @@ class TelegramBotThread(BaseThread):
                     BotCommand("start", "🚀 Start Bot & Choose Language"),
                     BotCommand("menu", "🎛️ Interactive Master Control Panel"),
                     BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
+                    BotCommand("wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
                     BotCommand("set_web3_wallet", "💼 Configure Web3 Settlement Wallet"),
                     BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
                     BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
