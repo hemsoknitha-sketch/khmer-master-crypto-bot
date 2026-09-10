@@ -174,6 +174,7 @@ class TelegramBotThread(BaseThread):
                 BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
                 BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
                 BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
+                BotCommand("smart_swap", "⚡ Multi-Chain DEX & AI Gem Sniper"),
                 BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
                 BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
                 BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
@@ -1827,6 +1828,7 @@ class TelegramBotThread(BaseThread):
                     "• `/stop ALL` - Emergency Stop All Active Trading Engines\n\n"
                     "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Autonomous Trading Engine (Spot/Futures)\n"
+                    "• `/smart_swap` - ⚡ Multi-Chain DEX Aggregator & AI Gem Sniper (Solana/BSC/ETH)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage Engine (Binance vs Bybit)\n"
                     "• `/funding_harvester` - 🌾 Delta-Neutral 30%-120% APY Perpetual Funding Yield\n"
                     "• `/whales` - 🐋 Whale Orderflow Front-Running & Dark Pool Radar\n"
@@ -1856,6 +1858,7 @@ class TelegramBotThread(BaseThread):
                     "• `/stop ALL` - 紧急一键停止所有运行引擎\n\n"
                     "🚀 **2. 核心自主交易引擎**\n"
                     "• `/turbo_hedge` - 🚀 24/7 HFT 多币/单币高频对冲扫描器 (Spot/Futures)\n"
+                    "• `/smart_swap` - ⚡ 跨链 DEX 聚合器与 AI 暴涨代币狙击引擎 (Solana/BSC/ETH)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms 跨交易所套利引擎 (Binance vs Bybit)\n"
                     "• `/funding_harvester` - 🌾 8小时永续合约资金费率套利引擎 (30%-120% APY)\n"
                     "• `/whales` - 🐋 实时追踪链上巨鲸与暗盘资金流向\n"
@@ -1885,6 +1888,7 @@ class TelegramBotThread(BaseThread):
                     "• `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
                     "🚀 **២. FLAGSHIP AUTONOMOUS TRADING ENGINES (ម៉ាស៊ីនវិនិយោគស្វ័យប្រវត្តិ)**\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Trading Engine (Spot/Futures)\n"
+                    "• `/smart_swap` - ⚡ Multi-Chain DEX Aggregator & AI Gem Sniper (Solana/BSC/ETH)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage (Binance vs Bybit)\n"
                     "• `/funding_harvester` - 🌾 Delta-Neutral 30%-120% APY Perpetual Funding Yield\n"
                     "• `/whales` - 🐋 Whale Orderflow Front-Running & Dark Pool Radar\n"
@@ -1931,29 +1935,30 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+                    InlineKeyboardButton("⚡ Smart Swap AI (DEX)", callback_data="btn_smart_swap_menu")
                 ],
                 [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh"),
                     InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
                 ],
                 [
-                    InlineKeyboardButton("📈 Infinity Matrix", callback_data="btn_infinity_grid_launch"),
-                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar")
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("📈 Infinity Matrix", callback_data="btn_infinity_grid_launch")
                 ],
                 [
-                    InlineKeyboardButton("🎯 Flash Crash Wick", callback_data="btn_snipe_launch"),
-                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
+                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar"),
+                    InlineKeyboardButton("🎯 Flash Crash Wick", callback_data="btn_snipe_launch")
                 ],
                 [
-                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
-                    InlineKeyboardButton("📰 Crypto News", callback_data="btn_news_refresh")
+                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt"),
+                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
-                    InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km")
+                    InlineKeyboardButton("📰 Crypto News", callback_data="btn_news_refresh"),
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
                 ],
                 [
+                    InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km"),
                     InlineKeyboardButton("🔄 Refresh Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ]
@@ -4304,6 +4309,9 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_x_stop_all":
                 context.args = ["STOP", "ALL"]
                 await smart_x_command(update, context)
+            elif data in ["btn_smart_swap_menu", "btn_smart_swap"]:
+                context.args = []
+                await smart_swap_command(update, context)
             elif data == "btn_smart_swap_auto_20":
                 context.args = ["AUTO", "20", "1234"]
                 await smart_swap_command(update, context)
@@ -10796,6 +10804,8 @@ class TelegramBotThread(BaseThread):
                             solscan_u = res.get("solscan_url", "")
                             bot_w = res.get("bot_wallet", "")
                             bot_sol = res.get("bot_sol_balance", 0.0)
+                            tx_h = res.get("tx_hash", "ONCHAIN_TX")
+                            recipient_addr = res.get("recipient") or res.get("bot_wallet") or str(chat_id)
 
                             if is_live:
                                 exec_line = "⚡ **Execution ៖** `🟢 LIVE ON-CHAIN MAINNET (Jupiter DEX)`"
@@ -10826,16 +10836,35 @@ class TelegramBotThread(BaseThread):
                                 f"{live_tx_line}\n\n"
                                 f"🔄 **ប្រព័ន្ធ AI កំពុងតាមដានតម្លៃ 24/7 ដើម្បីកើបផលចំណេញអូតូ...**"
                             )
+                            card_kb = InlineKeyboardMarkup([
+                                [
+                                    InlineKeyboardButton("📊 ពិនិត្យ Status", callback_data="btn_smart_swap_status"),
+                                    InlineKeyboardButton("💳 កាបូប Solana", callback_data="btn_smart_swap_wallet")
+                                ],
+                                [
+                                    InlineKeyboardButton("🛑 STOP Swaps (Exit All)", callback_data="btn_smart_swap_stop_all"),
+                                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                                ]
+                            ])
                         else:
-                            card = f"⚠️ **[SMART SWAP SNIPER NOTICE]**\n{res.get('msg', res.get('reason', 'Notice'))}"
+                            card = f"⚠️ **[SMART SWAP SNIPER NOTICE]**\n\n{res.get('msg', res.get('reason', 'Notice'))}"
+                            card_kb = InlineKeyboardMarkup([
+                                [
+                                    InlineKeyboardButton("💳 ដាក់ទុន SOL ចូលកាបូប", callback_data="btn_smart_swap_wallet"),
+                                    InlineKeyboardButton("🔄 ស្កេនរកកាក់ Gem ថ្មី", callback_data="btn_smart_swap_scan")
+                                ],
+                                [
+                                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                                ]
+                            ])
 
                         if ack_msg:
                             try:
-                                await ack_msg.edit_text(card, parse_mode="Markdown")
+                                await ack_msg.edit_text(card, reply_markup=card_kb, parse_mode="Markdown")
                             except Exception:
-                                await ack_msg.edit_text(card)
+                                await ack_msg.edit_text(card, reply_markup=card_kb)
                         elif msg_target:
-                            await msg_target.reply_text(card, parse_mode="Markdown")
+                            await msg_target.reply_text(card, reply_markup=card_kb, parse_mode="Markdown")
                     except Exception as e:
                         print(f"Error in _background_smart_swap_sniper: {e}")
 
@@ -13859,6 +13888,7 @@ class TelegramBotThread(BaseThread):
                     BotCommand("snipe", "🎯 Smart Listing Token Sniper"),
                     BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
                     BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
+                    BotCommand("smart_swap", "⚡ Multi-Chain DEX & AI Gem Sniper"),
                     BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
                     BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
                     BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),

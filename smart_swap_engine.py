@@ -496,7 +496,14 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
         try:
             import solana_trading_wallet
             w_info = solana_trading_wallet.get_user_solana_wallet_overview(chat_id)
-            if w_info.get("lamports", 0) >= required_lamports:
+            user_lamports = w_info.get("lamports", 0)
+            user_pub = w_info.get("public_key", "")
+            sol_bal = w_info.get("sol_balance", 0.0)
+
+            import trading_engine
+            is_paper = getattr(trading_engine, "PAPER_TRADING", False)
+
+            if user_lamports >= required_lamports:
                 # 🚀 EXECUTE LIVE ON-CHAIN JUPITER TRANSACTION USING USER DEDICATED WALLET
                 user_priv, user_pub = solana_trading_wallet.get_or_create_user_solana_wallet(chat_id)
                 live_res = solana_trading_wallet.execute_jupiter_live_swap(
@@ -513,7 +520,30 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
                     solscan_link = live_res["solscan_url"]
                     print(f"🚀 [USER {chat_id} LIVE ON-CHAIN SWAP CONFIRMED] Tx: {simulated_tx} | {solscan_link}")
                 else:
-                    print(f"⚠️ [USER {chat_id} LIVE SWAP NOTICE] {live_res.get('msg')} -> Recorded with Jito MEV Simulation")
+                    live_err = live_res.get("msg", "Jupiter Swap rejected")
+                    print(f"⚠️ [USER {chat_id} LIVE SWAP ERROR] {live_err}")
+                    return {
+                        "status": "error",
+                        "reason": "LIVE_SWAP_REJECTED",
+                        "msg": f"ការជួញដូរ On-Chain បរាជ័យ ៖ {live_err}"
+                    }
+            else:
+                # Wallet unfunded
+                if not is_paper:
+                    needed_sol = required_lamports / 1e9
+                    return {
+                        "status": "error",
+                        "reason": "INSUFFICIENT_SOL_BALANCE",
+                        "msg": (
+                            f"⚠️ **កាបូប Solana របស់អ្នកមិនទាន់មានសមតុល្យគ្រប់គ្រាន់ទេ ៖**\n\n"
+                            f"💰 សមតុល្យបច្ចុប្បន្ន ៖ `{sol_bal:.4f} SOL` (ត្រូវការ `{needed_sol:.4f} SOL` សម្រាប់ទិញនិងបង់ Gas Fee)\n"
+                            f"📍 **កាបូបជួញដូររបស់អ្នក (Solana Deposit Address) ៖**\n`{user_pub}`\n\n"
+                            f"👉 សូមផ្ញើប្រាក់ទុន SOL ចូលកាបូបខាងលើ រួចវាយ `/smart_swap auto 20 1234` ម្តងទៀត ដើម្បីកើបផលចំណេញពិតលើ On-Chain!\n"
+                            f"💡 (ឬវាយ `/smart_swap wallet` ដើម្បីមើលព័ត៌មានលម្អិត និងភ្ជាប់កាបូប Phantom របស់អ្នក)"
+                        )
+                    }
+                else:
+                    print(f"ℹ️ [USER {chat_id} PAPER MODE] Executing in high-fidelity simulation.")
         except Exception as e:
             print(f"[SMART_SWAP] Live on-chain execution attempt error: {e}")
     else:

@@ -119,7 +119,25 @@ def test_smart_swap_execution_and_vault():
     for s in db.get_active_smart_swaps(chat_id=test_chat_id):
         db.remove_active_smart_swap(s["id"])
 
-    # Direct swap SOL to USDC
+    import trading_engine
+
+    # 1. Test Live Trading with Unfunded Wallet -> Expect INSUFFICIENT_SOL_BALANCE rejection
+    trading_engine.PAPER_TRADING = False
+    res_unfunded = smart_swap_engine.execute_smart_swap(
+        chat_id=test_chat_id,
+        chain="SOLANA",
+        from_token="SOL",
+        to_token="USDC",
+        amount=0.1,
+        slippage_pct=0.5,
+        pin="1234"
+    )
+    print(f"  Unfunded Live Swap: status={res_unfunded.get('status')}, reason={res_unfunded.get('reason')}")
+    assert res_unfunded.get("status") == "error", "Unfunded wallet must not execute live on-chain"
+    assert res_unfunded.get("reason") == "INSUFFICIENT_SOL_BALANCE", "Reason must be INSUFFICIENT_SOL_BALANCE"
+
+    # 2. Test Paper Trading Execution -> Expect Success & Recorded Position
+    trading_engine.PAPER_TRADING = True
     res = smart_swap_engine.execute_smart_swap(
         chat_id=test_chat_id,
         chain="SOLANA",
@@ -136,7 +154,7 @@ def test_smart_swap_execution_and_vault():
     print(f"  Recipient Vault: {res.get('recipient')} (is_vault: {res.get('is_vault')})")
     print(f"  MEV Shield: {res.get('mev_shield')}")
 
-    assert res.get("status") == "success", f"Direct swap failed: {res}"
+    assert res.get("status") == "success", f"Paper swap failed: {res}"
     assert res.get("token_qty", 0) > 0, "Token quantity must be > 0"
     assert res.get("is_vault") is True, "Should use vault fallback when no user wallet linked"
 
