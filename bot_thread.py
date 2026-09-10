@@ -33,7 +33,7 @@ else:
         BaseThread = object
 
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from ai_engine import AIInvestmentEngine
 import database as db
 import localization as loc
@@ -10290,6 +10290,7 @@ class TelegramBotThread(BaseThread):
                 return
 
         async def smart_swap_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import smart_swap_engine
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -10301,7 +10302,6 @@ class TelegramBotThread(BaseThread):
 
             args = context.args
             if not args or len(args) == 0:
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 keyboard = InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20"),
