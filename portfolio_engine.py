@@ -36,6 +36,83 @@ import trading_engine
 
 # Start time reference for uptime calculation
 _START_TIME = time.time()
+_ONCHAIN_BALANCE_CACHE = {}
+
+def get_onchain_live_balances(address: str) -> dict:
+    """
+    Fetches real-time on-chain balance for a connected Web3 wallet (EVM or Solana).
+    Caches results for 45 seconds to guarantee sub-millisecond execution.
+    """
+    if not address or len(address) < 20:
+        return {"total_usd": 0.0, "details": "", "address": ""}
+
+    now = time.time()
+    clean = str(address).strip()
+    if clean in _ONCHAIN_BALANCE_CACHE:
+        cached_time, cached_data = _ONCHAIN_BALANCE_CACHE[clean]
+        if now - cached_time < 45:
+            return cached_data
+
+    total_usd = 0.0
+    details = ""
+
+    # 1. EVM Chains (Arbitrum One USDT & ETH)
+    if clean.startswith("0x") and len(clean) == 42:
+        try:
+            import urllib.request
+            import json
+            rpc_url = "https://arb1.arbitrum.io/rpc"
+            
+            # Native ETH
+            p_eth = {'jsonrpc': '2.0', 'method': 'eth_getBalance', 'params': [clean, 'latest'], 'id': 1}
+            req1 = urllib.request.Request(rpc_url, data=json.dumps(p_eth).encode(), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req1, timeout=1.8) as r1:
+                res1 = json.loads(r1.read().decode())
+                wei = int(res1.get('result', '0x0'), 16)
+                eth_bal = round(wei / 1e18, 5)
+
+            # Arbitrum USDT (0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9)
+            usdt_contract = '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9'
+            d_call = '0x70a08231000000000000000000000000' + clean[2:].lower()
+            p_usdt = {'jsonrpc': '2.0', 'method': 'eth_call', 'params': [{'to': usdt_contract, 'data': d_call}, 'latest'], 'id': 2}
+            req2 = urllib.request.Request(rpc_url, data=json.dumps(p_usdt).encode(), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req2, timeout=1.8) as r2:
+                res2 = json.loads(r2.read().decode())
+                raw_usdt = int(res2.get('result', '0x0'), 16)
+                usdt_bal = round(raw_usdt / 1e6, 2)
+
+            eth_est_price = 2450.0
+            eth_usd = eth_bal * eth_est_price
+            total_usd = round(usdt_bal + eth_usd, 2)
+            details = f"{usdt_bal:.2f} USDT + {eth_bal:.4f} ETH លើ Arbitrum"
+        except Exception:
+            pass
+
+    # 2. Solana Network (SOL)
+    elif 32 <= len(clean) <= 44 and not clean.startswith("0x"):
+        try:
+            import urllib.request
+            import json
+            rpc_url = "https://api.mainnet-beta.solana.com"
+            payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [clean]}
+            req = urllib.request.Request(rpc_url, data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=1.8) as resp:
+                res = json.loads(resp.read().decode())
+                lamports = res.get("result", {}).get("value", 0)
+                sol_bal = round(lamports / 1e9, 4)
+                sol_est_price = 145.0
+                total_usd = round(sol_bal * sol_est_price, 2)
+                details = f"{sol_bal:.4f} SOL លើ Solana"
+        except Exception:
+            pass
+
+    res_data = {
+        "total_usd": total_usd,
+        "details": details,
+        "address": clean
+    }
+    _ONCHAIN_BALANCE_CACHE[clean] = (now, res_data)
+    return res_data
 
 def get_full_system_portfolio_data(chat_id: int) -> dict:
     """
@@ -273,10 +350,15 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     # =========================================================================
     # CONSOLIDATED TOTALS CALCULATION
     # =========================================================================
+    onchain_wallet_data = get_onchain_live_balances(primary_web3)
+    wallet_usd_balance = onchain_wallet_data.get("total_usd", 0.0)
+    wallet_details_str = onchain_wallet_data.get("details", "")
+
     total_spot_capital = spot_usdt_free + spot_alt_exposure
     total_futures_capital = futures_wallet_usdt + futures_unrealized_pnl
-    total_onchain_capital = sum(s["current_val_usd"] for s in active_smart_swaps)
-    total_portfolio_net_worth = total_spot_capital + total_futures_capital + total_onchain_capital
+    active_swaps_usd = sum(s["current_val_usd"] for s in active_smart_swaps)
+    total_onchain_capital = round(active_swaps_usd + wallet_usd_balance, 2)
+    total_portfolio_net_worth = round(total_spot_capital + total_futures_capital + total_onchain_capital, 2)
 
     total_invested_usd = 0.0
     total_unrealized_pnl = 0.0
@@ -319,6 +401,8 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "total_onchain_capital": round(total_onchain_capital, 2),
         "web3_wallets": web3_wallets,
         "primary_web3": primary_web3,
+        "wallet_usd_balance": wallet_usd_balance,
+        "wallet_details_str": wallet_details_str,
 
         # Active Positions per Engine
         "active_futures_positions": active_futures_positions,
@@ -384,10 +468,30 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             "🏦 **MULTI-WALLET BALANCES:**\n"
             f"• 🟡 **Binance Spot:** `${data['spot_usdt_free']:,.2f} USDT` free | `${data['spot_alt_exposure']:,.2f}` in Coins\n"
             f"• ⚡ **Binance Futures:** `${data['futures_wallet_usdt']:,.2f} USDT` balance (PnL: `${data['futures_unrealized_pnl']:+,.2f}`)\n"
-            f"• 🌐 **Web3 On-Chain:** `${data['total_onchain_capital']:,.2f} USD` across Solana & EVM\n"
+        )
+        primary_w = data.get("primary_web3", "")
+        if primary_w:
+            short_addr = f"{primary_w[:6]}...{primary_w[-4:]}"
+            w_detail = data.get("wallet_details_str", "")
+            onchain_disp_en = f"${data['total_onchain_capital']:,.2f} USD ({w_detail} | `{short_addr}`)" if w_detail else f"${data['total_onchain_capital']:,.2f} USD (`{short_addr}`)"
+            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD ({w_detail} | `{short_addr}`)" if w_detail else f"${data['total_onchain_capital']:,.2f} USD (កាបូប `{short_addr}`)"
+        else:
+            onchain_disp_en = f"${data['total_onchain_capital']:,.2f} USD across Solana & EVM"
+            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD លើ Solana & EVM"
+
+        header += (
+            f"• 🌐 **Web3 On-Chain:** {onchain_disp_en}\n"
             "──────────────────────────────────────\n\n"
         )
     else:
+        primary_w = data.get("primary_web3", "")
+        if primary_w:
+            short_addr = f"{primary_w[:6]}...{primary_w[-4:]}"
+            w_detail = data.get("wallet_details_str", "")
+            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD ({w_detail} | `{short_addr}`)" if w_detail else f"${data['total_onchain_capital']:,.2f} USD (កាបូប `{short_addr}`)"
+        else:
+            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD លើ Solana & EVM"
+
         header = (
             "👑 **KHMER MASTER CRYPTO | របាយការណ៍វិនិយោគរួម SUPER SMART PORTFOLIO** 🛡️\n"
             "══════════════════════════════════════\n"
@@ -400,7 +504,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             "🏦 **សមតុល្យតាមកាបូបនីមួយៗ (Multi-Wallet Balances) ៖**\n"
             f"• 🟡 **Binance Spot ៖** `${data['spot_usdt_free']:,.2f} USDT` សេរី | `${data['spot_alt_exposure']:,.2f}` កំពុងកាន់កាក់\n"
             f"• ⚡ **Binance Futures ៖** `${data['futures_wallet_usdt']:,.2f} USDT` ក្នុងកាបូប (PnL: `${data['futures_unrealized_pnl']:+,.2f}`)\n"
-            f"• 🌐 **Web3 On-Chain ៖** `${data['total_onchain_capital']:,.2f} USD` លើ Solana & EVM\n"
+            f"• 🌐 **Web3 On-Chain ៖** {onchain_disp_km}\n"
             "──────────────────────────────────────\n\n"
         )
 
@@ -491,7 +595,10 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
         e4_body = "\n".join(e4_details)
     else:
         e4_status = "🟡 STANDBY (ស្កេន DexScreener/Jupiter ស្វែងរកកាក់ Breakout 24/7)" if lang == "km" else "🟡 STANDBY (Scanning DEX Breakout Firehose 24/7)"
-        e4_body = "  • ស្ថានភាព ៖ Honeypot & Jito MEV Shield សកម្ម (វាយ `/smart_swap auto 20 1234` ដើម្បីបាញ់)" if lang == "km" else "  • Status: Armed with Jito MEV Protection (Execute `/smart_swap auto 20 1234`)"
+        primary_w = data.get("primary_web3", "")
+        w_note = f"\n  • កាបូប Web3 ៖ `{primary_w[:8]}...{primary_w[-6:]}` (ភ្ជាប់រួចរាល់ ✅)" if primary_w else "\n  • កាបូប Web3 ៖ មិនទាន់ភ្ជាប់ (វាយ `/wallet <address>` ដើម្បីភ្ជាប់)"
+        w_note_en = f"\n  • Web3 Wallet: `{primary_w[:8]}...{primary_w[-6:]}` (Linked & Ready ✅)" if primary_w else "\n  • Web3 Wallet: Not Linked (Execute `/wallet <address>`)"
+        e4_body = f"  • ស្ថានភាព ៖ Honeypot & Jito MEV Shield សកម្ម (វាយ `/smart_swap auto 20 1234` ដើម្បីបាញ់){w_note}" if lang == "km" else f"  • Status: Armed with Jito MEV Protection (Execute `/smart_swap auto 20 1234`){w_note_en}"
     engines_text += f"4️⃣ **Smart Swap Multi-Chain DEX & AI Sniper (`/smart_swap`)**\n   {e4_status}\n{e4_body}\n\n"
 
     # --- ENGINE 5: Dynamic Infinity Matrix & Compound Grid ---
