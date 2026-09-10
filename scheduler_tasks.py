@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import asyncio
 from telegram.ext import Application
 import database as db
@@ -4382,6 +4383,7 @@ async def smart_swap_monitor(app: Application):
         return
     async with _smart_swap_lock:
         try:
+            import time
             import smart_swap_engine
             await asyncio.to_thread(smart_swap_engine.monitor_smart_swap_positions, app)
 
