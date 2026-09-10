@@ -6,7 +6,7 @@ Institutional-grade, zero-external-dependency Solana Keypair management,
 Jupiter DEX aggregator integration, and autonomous transaction execution.
 
 Features:
-- Ed25519 cryptographic keypair management using PyNaCl
+- Ed25519 cryptographic keypair management using standard 'cryptography' (zero compile dependencies)
 - Pure-Python Base58 encoding & decoding (zero C++ compile dependencies)
 - Automatic key generation & persistence in .env / SQLite
 - Real-time Solana Mainnet balance & gas estimation
@@ -20,8 +20,11 @@ import time
 import json
 import base64
 import urllib.request
-import nacl.signing
 from dotenv import load_dotenv
+
+# Standard cryptography library (pre-installed on VPS)
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives import serialization
 
 load_dotenv()
 
@@ -67,18 +70,18 @@ def b58decode(s: str) -> bytes:
 # 🔑 KEYPAIR MANAGEMENT & PERSISTENCE
 # ==============================================================================
 
-_CACHED_SIGNING_KEY = None
+_CACHED_PRIV_KEY = None
 _CACHED_PUBLIC_KEY = None
 
-def load_or_create_bot_keypair() -> tuple[nacl.signing.SigningKey, str]:
+def load_or_create_bot_keypair():
     """
     Loads the bot's dedicated Solana trading keypair from environment / .env,
     or generates a new secure Ed25519 keypair and persists it.
-    Returns: (nacl.signing.SigningKey, public_address_base58)
+    Returns: (ed25519.Ed25519PrivateKey, public_address_base58)
     """
-    global _CACHED_SIGNING_KEY, _CACHED_PUBLIC_KEY
-    if _CACHED_SIGNING_KEY is not None and _CACHED_PUBLIC_KEY is not None:
-        return _CACHED_SIGNING_KEY, _CACHED_PUBLIC_KEY
+    global _CACHED_PRIV_KEY, _CACHED_PUBLIC_KEY
+    if _CACHED_PRIV_KEY is not None and _CACHED_PUBLIC_KEY is not None:
+        return _CACHED_PRIV_KEY, _CACHED_PUBLIC_KEY
 
     env_key = os.getenv("SOLANA_BOT_PRIVATE_KEY", "").strip()
     env_pub = os.getenv("SOLANA_BOT_PUBLIC_KEY", "").strip()
@@ -86,24 +89,35 @@ def load_or_create_bot_keypair() -> tuple[nacl.signing.SigningKey, str]:
     if env_key:
         try:
             raw_bytes = b58decode(env_key)
-            # Solana private keys are either 32-byte seeds or 64-byte secret+public
+            # Solana private keys are 32-byte seed or 64-byte seed+public
             seed = raw_bytes[:32]
-            sk = nacl.signing.SigningKey(seed)
-            pub = b58encode(sk.verify_key.encode())
-            _CACHED_SIGNING_KEY = sk
+            priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
+            pub_bytes = priv.public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw
+            )
+            pub = b58encode(pub_bytes)
+            _CACHED_PRIV_KEY = priv
             _CACHED_PUBLIC_KEY = pub
-            return sk, pub
+            return priv, pub
         except Exception as e:
             print(f"[SOLANA_WALLET] Failed to decode existing SOLANA_BOT_PRIVATE_KEY: {e}")
 
     # Generate a fresh cryptographically secure Ed25519 keypair
-    sk = nacl.signing.SigningKey.generate()
-    seed = sk.encode()
-    pub_bytes = sk.verify_key.encode()
+    priv = ed25519.Ed25519PrivateKey.generate()
+    seed = priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    pub_bytes = priv.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw
+    )
     pub = b58encode(pub_bytes)
     full_priv_b58 = b58encode(seed + pub_bytes)
 
-    _CACHED_SIGNING_KEY = sk
+    _CACHED_PRIV_KEY = priv
     _CACHED_PUBLIC_KEY = pub
 
     # Persist to .env
@@ -136,11 +150,12 @@ def load_or_create_bot_keypair() -> tuple[nacl.signing.SigningKey, str]:
             f.writelines(new_lines)
 
         os.environ["SOLANA_BOT_PRIVATE_KEY"] = full_priv_b58
+        os.environ["SOLANA_BOT_PUBLIC_KEY"] = pub
         print(f"[SOLANA_WALLET] Generated and secured new dedicated Bot Hot Wallet: {pub}")
     except Exception as e:
         print(f"[SOLANA_WALLET] Error persisting keypair to .env: {e}")
 
-    return sk, pub
+    return priv, pub
 
 def get_bot_solana_public_key() -> str:
     """Returns the dedicated Bot Hot Wallet Base58 public address."""
@@ -253,7 +268,7 @@ def execute_jupiter_live_swap(
     4. Broadcasts signed transaction to Solana Mainnet RPC.
     5. Returns transaction hash and live Solscan URL.
     """
-    sk, pub = load_or_create_bot_keypair()
+    priv, pub = load_or_create_bot_keypair()
     
     # Check balance before attempting
     bal_info = get_solana_balance(pub)
@@ -311,13 +326,13 @@ def execute_jupiter_live_swap(
     if not raw_tx_b64:
         return {"status": "error", "reason": "EMPTY_SWAP_TRANSACTION", "msg": "Jupiter returned empty transaction."}
 
-    # 3. Sign the Versioned Transaction using PyNaCl Ed25519
+    # 3. Sign the Versioned Transaction using Ed25519
     try:
         tx_bytes = bytearray(base64.b64decode(raw_tx_b64))
         num_sigs = tx_bytes[0]
         # In Solana VersionedTransaction, the message bytes follow the signature array
         message_bytes = bytes(tx_bytes[1 + num_sigs * 64:])
-        signature = sk.sign(message_bytes).signature
+        signature = priv.sign(message_bytes)
         tx_bytes[1:65] = signature
         signed_b64 = base64.b64encode(tx_bytes).decode("utf-8")
         tx_signature_b58 = b58encode(signature)
