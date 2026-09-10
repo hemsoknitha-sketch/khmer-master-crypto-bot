@@ -435,15 +435,32 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
             "msg": f"Target token {final_symbol} failed security audit: " + " | ".join(audit_res["reasons"])
         }
 
-    # 2. Check User Registered Web3 Wallet in Database (or institutional Keeper Relayer Vault)
+    # 2. Check User Registered Web3 Wallet in Database (or institutional Dedicated Bot Hot Wallet)
     user_wallet = db.get_user_web3_wallet(chat_id, chain_upper)
     is_vault = False
-    if not user_wallet:
-        if chain_upper == "SOLANA":
-            user_wallet = os.getenv("SOLANA_KEEPER_ADDRESS", "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin")
-        else:
+    bot_wallet_addr = ""
+    bot_sol_bal = 0.0
+    is_live_onchain = False
+    solscan_link = ""
+
+    if chain_upper == "SOLANA":
+        try:
+            import solana_trading_wallet
+            bot_wallet_info = solana_trading_wallet.get_bot_solana_wallet_overview()
+            bot_wallet_addr = bot_wallet_info["public_key"]
+            bot_sol_bal = bot_wallet_info["sol_balance"]
+            if not user_wallet:
+                user_wallet = bot_wallet_addr
+                is_vault = True
+        except Exception as e:
+            print(f"[SMART_SWAP] Error loading bot hot wallet: {e}")
+            if not user_wallet:
+                user_wallet = os.getenv("SOLANA_KEEPER_ADDRESS", "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin")
+                is_vault = True
+    else:
+        if not user_wallet:
             user_wallet = os.getenv("RECIPIENT_WALLET_ADDRESS", "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560")
-        is_vault = True
+            is_vault = True
 
     # 3. Fetch Best Route Quote
     price_to = get_token_price_usd(chain_upper, to_addr)
@@ -467,12 +484,40 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
         out_qty = out_amount_raw / (10 ** out_decimals)
         price_impact = quote["price_impact_pct"]
         route_steps = quote["route_steps"]
+
+        # Check if Bot Hot Wallet is funded for Live On-Chain Execution
+        is_sol_input = ("So11111111111111111111111111111111111111112" in from_addr)
+        required_lamports = amount_atomic + 5000000 if is_sol_input else 5000000
+        
         simulated_tx = f"jito_{int(time.time()*1000)}_{from_token}_{to_token}"
+        solscan_link = f"https://solscan.io/account/{to_addr}"
+
+        try:
+            import solana_trading_wallet
+            w_info = solana_trading_wallet.get_bot_solana_wallet_overview()
+            if w_info.get("lamports", 0) >= required_lamports:
+                # 🚀 EXECUTE LIVE ON-CHAIN JUPITER TRANSACTION
+                live_res = solana_trading_wallet.execute_jupiter_live_swap(
+                    from_mint=from_addr,
+                    to_mint=to_addr,
+                    amount_lamports=amount_atomic,
+                    slippage_bps=slippage_bps
+                )
+                if live_res.get("status") == "success":
+                    is_live_onchain = True
+                    simulated_tx = live_res["tx_hash"]
+                    solscan_link = live_res["solscan_url"]
+                    print(f"🚀 [SOLANA LIVE ON-CHAIN SWAP CONFIRMED] Tx: {simulated_tx} | {solscan_link}")
+                else:
+                    print(f"⚠️ [SOLANA LIVE SWAP NOTICE] {live_res.get('msg')} -> Recorded with Jito MEV Simulation")
+        except Exception as e:
+            print(f"[SMART_SWAP] Live on-chain execution attempt error: {e}")
     else:
         out_qty = (amount_usd / max(0.000001, price_to)) if price_to > 0 else float(amount)
         price_impact = 0.02
         route_steps = 1
         simulated_tx = f"flashbots_{int(time.time()*1000)}_{from_token}_{to_token}"
+        solscan_link = f"https://arbiscan.io/tx/{simulated_tx}"
 
     effective_price = (amount_usd / max(0.000001, out_qty)) if out_qty > 0 else price_to
 
@@ -501,6 +546,10 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
         "price_impact_pct": price_impact,
         "route_steps": route_steps,
         "tx_hash": simulated_tx,
+        "solscan_url": solscan_link,
+        "is_live_onchain": is_live_onchain,
+        "bot_wallet": bot_wallet_addr,
+        "bot_sol_balance": bot_sol_bal,
         "mev_shield": "Jito Bundle (Private MEV Shield)" if chain_upper == "SOLANA" else "Flashbots Protect RPC",
         "recipient": user_wallet,
         "is_vault": is_vault

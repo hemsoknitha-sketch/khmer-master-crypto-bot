@@ -4319,6 +4319,9 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_swap_status":
                 context.args = ["STATUS"]
                 await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_wallet":
+                context.args = ["WALLET"]
+                await smart_swap_command(update, context)
             elif data == "btn_smart_swap_stop_all":
                 context.args = ["STOP", "ALL", "1234"]
                 await smart_swap_command(update, context)
@@ -10294,11 +10297,14 @@ class TelegramBotThread(BaseThread):
                         InlineKeyboardButton("🛡️ Security & Gems Scan", callback_data="btn_smart_swap_scan")
                     ],
                     [
-                        InlineKeyboardButton("📊 Active Swaps Status", callback_data="btn_smart_swap_status"),
-                        InlineKeyboardButton("🛑 STOP Swaps (Exit All)", callback_data="btn_smart_swap_stop_all")
+                        InlineKeyboardButton("💳 Bot Hot Wallet", callback_data="btn_smart_swap_wallet"),
+                        InlineKeyboardButton("📊 Active Swaps Status", callback_data="btn_smart_swap_status")
                     ],
                     [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🛑 STOP Swaps (Exit All)", callback_data="btn_smart_swap_stop_all"),
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    ],
+                    [
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
@@ -10315,6 +10321,7 @@ class TelegramBotThread(BaseThread):
                         "• ⚡ **Private MEV Sandwich Shield:** Zero mempool exposure via Jito Bundles (Solana) & Flashbots Protect (EVM).\n"
                         "• 💰 **PPO Dynamic Micro-Scalp Harvester:** 50% TP1 (+40% ROI) retrieves 100% initial capital; remaining 50% trails as risk-free moonbag!\n\n"
                         "👉 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "• `/smart_swap wallet` — Dedicated Bot Hot Wallet & SOL deposit address for live on-chain trading\n"
                         "• `/smart_swap auto 20 1234` — Auto-scan & snipe highest momentum verified gem with $20 USD\n"
                         "• `/smart_swap SOL SOL USDC 1.5 1234` — Direct DEX swap SOL to USDC at best aggregator rate\n"
                         "• `/smart_swap status` — Monitor active on-chain swap positions & live PnL\n"
@@ -10332,6 +10339,7 @@ class TelegramBotThread(BaseThread):
                         "• ⚡ **Private MEV Sandwich Shield ៖** ការពារការលួច Front-run / Sandwich តាមរយៈ Jito Private Bundles & Flashbots Protect\n"
                         "• 💰 **PPO Dynamic Trailing Harvester ៖** TP1 (+40% ROI) លក់ 50% ដកយកដើមទុន ១០០% មកវិញភ្លាមៗ រីឯ 50% ទៀតក្លាយជា Moonbag គ្មានហានិភ័យ!\n\n"
                         "👉 **បញ្ជាផ្ទាល់តាមពាក្យគន្លឹះ (1-Tap Executions) ៖**\n"
+                        "• `/smart_swap wallet` — ពិនិត្យកាបូប Hot Wallet របស់ Bot និងអាសយដ្ឋានផ្ញើ SOL ដើម្បីទិញកាក់ On-Chain ពិត\n"
                         "• `/smart_swap auto 20 1234` — ស្កេននិងទិញកាក់ Gem ផ្ទុះខ្លាំងបំផុតដោយស្វ័យប្រវត្តិទុន $20 USD\n"
                         "• `/smart_swap SOL SOL USDC 1.5 1234` — Swap ផ្ទាល់ពី SOL ទៅ USDC ក្នុងអត្រា aggregator ចំណេញបំផុត\n"
                         "• `/smart_swap status` — ពិនិត្យមើលស្ថានភាពកាក់កំពុងកាន់កាប់ និងប្រាក់ចំណេញ PnL Live\n"
@@ -10346,6 +10354,36 @@ class TelegramBotThread(BaseThread):
                 return
 
             subcmd = str(args[0]).upper().strip()
+
+            # 0. WALLET / HOTWALLET (Dedicated Bot Hot Wallet on Solana Mainnet)
+            if subcmd in ["WALLET", "HOTWALLET", "BOTWALLET"]:
+                import solana_trading_wallet
+                w_info = solana_trading_wallet.get_bot_solana_wallet_overview()
+                pub = w_info["public_key"]
+                sol_b = w_info["sol_balance"]
+                usd_v = w_info["usd_value"]
+                sol_p = w_info["sol_price_usd"]
+                status_badge = "🟢 ត្រៀមរួចរាល់ (Funded & Active)" if w_info["is_funded"] else "🟡 ត្រូវការដាក់ទុន (Needs Funding)"
+
+                wallet_card = (
+                    f"💳 **KHMER MASTER CRYPTO | DEDICATED BOT HOT WALLET** 🛰️\n"
+                    f"───────────────────────────────\n\n"
+                    f"📍 **Solana Mainnet Deposit Address (ចុចដើម្បីចម្លង ៖)**\n"
+                    f"`{pub}`\n\n"
+                    f"💰 **សមតុល្យបច្ចុប្បន្ន ៖** `{sol_b:.4f} SOL` (~`${usd_v:,.2f} USD`)\n"
+                    f"💵 **តម្លៃទីផ្សារ SOL ៖** `${sol_p:.2f} USD`\n"
+                    f"📊 **ស្ថានភាពប្រតិបត្តិការ ៖** {status_badge}\n"
+                    f"🔗 **ពិនិត្យលើ Solscan ៖** [ចុចមើល Solscan.io](https://solscan.io/account/{pub})\n\n"
+                    f"───────────────────────────────\n"
+                    f"💡 **របៀបដាក់ទុនដើម្បីឱ្យ Bot ទិញកាក់ On-Chain ពិតប្រាកដ ៖**\n"
+                    f"1. ចុច Copy លើអាសយដ្ឋានកាបូបខាងលើ `{pub}`\n"
+                    f"2. បើកកាបូប **Phantom, Binance, OKX ឬ Bybit** របស់លោកអ្នក\n"
+                    f"3. ផ្ញើប្រាក់ **SOL** (ឧទាហរណ៍ ៖ `0.1 SOL` ទៅ `1.0 SOL`) តាមបណ្តាញ **Solana Network** មកកាន់អាសយដ្ឋាននេះ\n"
+                    f"4. នៅពេលមានសមតុល្យ Bot នឹងចុះហត្ថលេខា (Sign Transaction) និងបញ្ជាទិញកាក់លើ Jupiter DEX ដោយស្វ័យប្រវត្តិកម្រិត Sub-Second (<15ms)!"
+                )
+                if msg_target:
+                    await msg_target.reply_text(wallet_card, parse_mode="Markdown", disable_web_page_preview=True)
+                return
 
             # 1. STATUS
             if subcmd == "STATUS":
@@ -10497,8 +10535,21 @@ class TelegramBotThread(BaseThread):
                             ai_sc = res.get("ai_score", 92.0)
                             b_vel = res.get("buy_velocity", 2.5)
                             mev = res.get("mev_shield", "Jito Private Bundle")
-                            tx_h = res.get("tx_hash", "confirmed")
-                            recipient_addr = res.get("recipient", "")
+                            is_live = res.get("is_live_onchain", False)
+                            solscan_u = res.get("solscan_url", "")
+                            bot_w = res.get("bot_wallet", "")
+                            bot_sol = res.get("bot_sol_balance", 0.0)
+
+                            if is_live:
+                                exec_line = "⚡ **Execution ៖** `🟢 LIVE ON-CHAIN MAINNET (Jupiter DEX)`"
+                                live_tx_line = f"🌐 **Solscan Live Tx ៖** [ចុចមើល Live Transaction On-Chain]({solscan_u})"
+                            else:
+                                exec_line = "⚡ **Execution ៖** `🟡 HIGH-FIDELITY QUANT SIMULATION`"
+                                bot_w_short = f"{bot_w[:6]}...{bot_w[-4:]}" if bot_w else "Vault"
+                                live_tx_line = (
+                                    f"💳 **Bot Hot Wallet ៖** `{bot_w_short}` (`{bot_sol:.4f} SOL`)\n"
+                                    f"💡 *ដាក់ទុន SOL ចូលកាបូប Bot (`/smart_swap wallet`) ដើម្បីទិញលើ On-Chain ពិត!*"
+                                )
 
                             card = (
                                 f"⚡ **KHMER MASTER CRYPTO | SMART SWAP GEM SNIPER SUCCESS** 🚀\n"
@@ -10510,10 +10561,12 @@ class TelegramBotThread(BaseThread):
                                 f"🧠 **AI Momentum Score ៖** `{ai_sc}/100` (PatchTST + XGBoost)\n"
                                 f"📈 **5m Buy Velocity ៖** `{b_vel:.1f}x` (ចំនួនអ្នកទិញច្រើនជាងអ្នកលក់)\n"
                                 f"🛡️ **Honeypot Audit ៖** `100% ស្អាតគ្មានហានិភ័យ (Freeze/Mint Revoked)`\n"
-                                f"⚡ **MEV Protection ៖** `{mev}` (គ្មានការលួច Front-run)\n"
+                                f"{exec_line}\n"
+                                f"🛡️ **MEV Protection ៖** `{mev}` (គ្មានការលួច Front-run)\n"
                                 f"🌾 **24/7 Profit Harvester ៖** `TP1 +40% (ដកដើមទុន ១០០%) | Moonbag 50% Trailing`\n"
                                 f"💼 **Settlement Vault ៖** `{recipient_addr[:6]}...{recipient_addr[-4:]}`\n"
-                                f"🔗 **Tx Reference ៖** `{tx_h}`\n\n"
+                                f"🔗 **Tx Reference ៖** `{tx_h}`\n"
+                                f"{live_tx_line}\n\n"
                                 f"🔄 **ប្រព័ន្ធ AI កំពុងតាមដានតម្លៃ 24/7 ដើម្បីកើបផលចំណេញអូតូ...**"
                             )
                         else:
