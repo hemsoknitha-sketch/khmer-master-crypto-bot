@@ -5241,22 +5241,34 @@ async def flash_loan_autonomous_engine(app: Application):
             elif user_lang in ['zh', 'chinese']: user_lang = 'zh'
             else: user_lang = 'km'
 
-            # Get user's settlement wallet
+            # Get user's settlement wallet (Must be a valid EVM 0x... address for Arbitrum One)
             wallet_addr = db.get_user_web3_wallet(chat_id)
-            if not wallet_addr:
-                user_wallets = db.get_user_multichain_wallets(chat_id)
-                if user_wallets:
-                    first_k = next(iter(user_wallets))
-                    wallet_addr = user_wallets[first_k].get("address", "")
+            evm_wallet_addr = ""
+            if wallet_addr and wallet_addr.startswith("0x") and len(wallet_addr) == 42:
+                evm_wallet_addr = wallet_addr
+            else:
+                user_wallets = db.get_user_multichain_wallets(chat_id) if hasattr(db, 'get_user_multichain_wallets') else {}
+                for ch_name, w_obj in user_wallets.items():
+                    cand = w_obj.get("address", "")
+                    if cand.startswith("0x") and len(cand) == 42:
+                        evm_wallet_addr = cand
+                        break
 
-            wallet_display = f"`{wallet_addr[:8]}...{wallet_addr[-6:]}`" if (wallet_addr and len(wallet_addr) >= 16) else (f"`{wallet_addr}`" if wallet_addr else "`Internal Escrow Vault (Pending Setup)`")
+            if evm_wallet_addr:
+                wallet_display = f"`{evm_wallet_addr[:8]}...{evm_wallet_addr[-6:]}`"
+            elif wallet_addr and not wallet_addr.startswith("0x"):
+                wallet_display = "`Solana Linked (Need 0x EVM for Arbitrum)`"
+            else:
+                wallet_display = "`Internal Escrow Vault (Pending Setup)`"
 
             # Check Keeper Relayer Mainnet Status
             import keeper_relayer
             keeper_status = keeper_relayer.keeper_engine.get_status_overview()
             is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
 
-            target_recipient = wallet_addr or os.getenv("RECIPIENT_WALLET_ADDRESS", "").strip() or keeper_status.get("keeper_address") or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
+            target_recipient = evm_wallet_addr or os.getenv("RECIPIENT_WALLET_ADDRESS", "").strip() or keeper_status.get("keeper_address") or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
+            if not (target_recipient.startswith("0x") and len(target_recipient) == 42):
+                target_recipient = "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
 
             if is_live_ready:
                 # Verify on-chain execution via Keeper Relayer (Zero-Gas Preflight Simulation Guard)
@@ -5271,14 +5283,14 @@ async def flash_loan_autonomous_engine(app: Application):
                     token_out_address=token_out_address
                 )
                 tx_hash = exec_res.get("tx_hash", "")
-                explorer_link = exec_res.get("explorer_url") or f"https://arbiscan.io/address/{target_recipient}"
+                explorer_link = exec_res.get("explorer_url") or (f"https://arbiscan.io/address/{target_recipient}" if target_recipient.startswith("0x") else "https://arbiscan.io")
 
                 # If transaction reverted (or pre-flight simulation failed), strictly do NOT record phantom/fake profit!
                 # Only notify users if an actual on-chain transaction reverted or verbose alerts are requested.
                 if not exec_res.get("success"):
                     FLASH_LOAN_USER_LAST_EXEC[chat_id] = now_ts
                     send_shield_alert = (
-                        exec_res.get("mode") != "PREFLIGHT_SIMULATION_REVERT_PREVENTED"
+                        exec_res.get("mode") not in ("PREFLIGHT_SIMULATION_REVERT_PREVENTED", "EXECUTION_ERROR")
                         or os.getenv("FLASH_LOAN_NOTIFY_ON_REVERT", "false").lower() in ("true", "1")
                     )
                     if send_shield_alert:

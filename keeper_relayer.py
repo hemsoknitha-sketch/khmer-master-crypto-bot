@@ -548,7 +548,15 @@ class KeeperRelayerEngine:
                 else:
                     pool_fee = 3000 # 0.30% fee for altcoins
 
-            recipient_checksum = Web3.to_checksum_address(user_recipient)
+            # Recipient sanitization guard (Fallback to keeper if user passed non-EVM Solana/invalid address)
+            clean_recipient = str(user_recipient or "").strip()
+            if not (clean_recipient.startswith("0x") and len(clean_recipient) == 42):
+                clean_recipient = self.keeper_address or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
+
+            try:
+                recipient_checksum = Web3.to_checksum_address(clean_recipient)
+            except Exception:
+                recipient_checksum = Web3.to_checksum_address(self.keeper_address or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560")
 
             from eth_abi import encode
             encoded_params = encode(
