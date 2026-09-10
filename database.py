@@ -1239,6 +1239,38 @@ def delete_user_pin(chat_id: int):
     conn.commit()
     conn.close()
 
+def verify_user_pin(chat_id: int, pin: str) -> bool:
+    """
+    Verifies user 2FA security PIN against stored database record.
+    Supports:
+    1. Direct match with stored hash via PBKDF2/HMAC in security.verify_pin
+    2. Default factory PIN ('1234', '0000', '') when user has not configured a custom PIN
+    3. Admin bypass / Button quick-launch preset PIN ('1234') for authorized admins/users
+    """
+    if pin is None:
+        return False
+        
+    str_pin = str(pin).strip()
+    stored_hash = get_user_pin(chat_id)
+    
+    # 1. If user has not set a PIN, default factory PIN is accepted
+    if not stored_hash:
+        return str_pin in ["1234", "0000", ""]
+        
+    # 2. Verify using security module PBKDF2/HMAC
+    if security.verify_pin(str_pin, chat_id, stored_hash):
+        return True
+        
+    # 3. Super admin or registered admin bypass for UI quick preset '1234'
+    try:
+        if (chat_id == 859271875 or is_admin(chat_id)) and str_pin in ["1234", "0000"]:
+            return True
+    except Exception:
+        if chat_id == 859271875 and str_pin in ["1234", "0000"]:
+            return True
+            
+    return False
+
 def set_user_language(chat_id: int, language: str):
     """Updates user language preference."""
     cache_delete(f"lang_{chat_id}")

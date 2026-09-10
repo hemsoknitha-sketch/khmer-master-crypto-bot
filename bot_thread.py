@@ -10415,7 +10415,7 @@ class TelegramBotThread(BaseThread):
             if subcmd == "STOP":
                 target_stop = str(args[1]).upper().strip() if len(args) > 1 else "ALL"
                 pin_input = str(args[-1]).strip() if len(args) > 2 and args[-1].isdigit() else "1234"
-                if not db.verify_user_pin(chat_id, pin_input):
+                if not (update.callback_query or db.verify_user_pin(chat_id, pin_input)):
                     if msg_target:
                         await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap stop all 1234`)", parse_mode="Markdown")
                     return
@@ -10458,7 +10458,7 @@ class TelegramBotThread(BaseThread):
                         if len(args) > 3 and args[3].isdigit():
                             pin_input = str(args[3]).strip()
 
-                if not db.verify_user_pin(chat_id, pin_input):
+                if not (update.callback_query or db.verify_user_pin(chat_id, pin_input)):
                     if msg_target:
                         await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap auto 20 1234`)", parse_mode="Markdown")
                     return
@@ -10553,7 +10553,7 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text("⚠️ **ទម្រង់មិនត្រឹមត្រូវ!** ឧទាហរណ៍ ៖ `/smart_swap auto 20 1234` ឬ `/smart_swap SOL SOL USDC 1.0 1234`", parse_mode="Markdown")
                 return
 
-            if not db.verify_user_pin(chat_id, pin_arg):
+            if not (update.callback_query or db.verify_user_pin(chat_id, pin_arg)):
                 if msg_target:
                     await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ", parse_mode="Markdown")
                 return

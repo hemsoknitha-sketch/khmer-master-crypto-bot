@@ -4354,26 +4354,36 @@ async def gold_turbo_monitor(app: Application):
     except Exception as e:
         print(f"⚠️ [GOLD TURBO MONITOR ERROR]: {e}")
 
+_turbo_hedge_lock = asyncio.Lock()
+
 async def turbo_hedge_monitor(app: Application):
     """
     Continuous 3-Second Background Monitor for Turbo Hedge Auto-Flipping Engine.
     """
-    try:
-        import turbo_hedge_engine
-        await turbo_hedge_engine.monitor_turbo_hedge_bots(app)
-    except Exception as e:
-        print(f"⚠️ [TURBO HEDGE MONITOR TASK ERROR]: {e}")
+    if _turbo_hedge_lock.locked():
+        return
+    async with _turbo_hedge_lock:
+        try:
+            import turbo_hedge_engine
+            await turbo_hedge_engine.monitor_turbo_hedge_bots(app)
+        except Exception as e:
+            print(f"⚠️ [TURBO HEDGE MONITOR TASK ERROR]: {e}")
+
+_smart_swap_lock = asyncio.Lock()
 
 async def smart_swap_monitor(app: Application):
     """
     Continuous 5-Second Background Monitor for On-Chain Smart Swap & Gem Sniper Positions.
     Triggers TP1 Capital Recovery and Moonbag Trailing Exits.
     """
-    try:
-        import smart_swap_engine
-        await asyncio.to_thread(smart_swap_engine.monitor_smart_swap_positions, app)
-    except Exception as e:
-        print(f"⚠️ [SMART SWAP MONITOR TASK ERROR]: {e}")
+    if _smart_swap_lock.locked():
+        return
+    async with _smart_swap_lock:
+        try:
+            import smart_swap_engine
+            await asyncio.to_thread(smart_swap_engine.monitor_smart_swap_positions, app)
+        except Exception as e:
+            print(f"⚠️ [SMART SWAP MONITOR TASK ERROR]: {e}")
 
 
 _last_arb_harvest_time = {}
