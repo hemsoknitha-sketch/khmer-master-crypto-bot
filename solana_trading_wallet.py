@@ -148,6 +148,39 @@ def export_user_private_key(chat_id: int) -> dict | None:
         "private_key_b58": decrypted_b58
     }
 
+def bind_user_phantom_wallet(chat_id: int, phantom_address: str) -> dict:
+    """
+    Binds a user's personal Phantom Wallet address as their Profit Settlement Vault.
+    Validates Base58 Solana public key format (must decode to 32 bytes).
+    """
+    clean_addr = str(phantom_address or "").strip()
+    try:
+        raw_bytes = b58decode(clean_addr)
+        if len(raw_bytes) != 32:
+            return {
+                "status": "error",
+                "reason": "INVALID_SOLANA_ADDRESS",
+                "msg": "អាសយដ្ឋាន Phantom Wallet ត្រូវតែជា Solana Public Address (32 bytes) ត្រឹមត្រូវ!"
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "reason": "INVALID_SOLANA_ADDRESS",
+            "msg": f"អាសយដ្ឋាន Solana Base58 មិនត្រឹមត្រូវ ៖ {e}"
+        }
+
+    db.set_user_web3_wallet(int(chat_id), clean_addr, "SOLANA")
+    return {
+        "status": "success",
+        "chat_id": int(chat_id),
+        "phantom_address": clean_addr,
+        "solscan_url": f"https://solscan.io/account/{clean_addr}"
+    }
+
+def get_user_phantom_wallet(chat_id: int) -> str:
+    """Retrieves the user's bound Phantom settlement wallet, if any."""
+    return db.get_user_web3_wallet(int(chat_id), "SOLANA")
+
 # ==============================================================================
 # 🔑 KEEPER / BOT HOT WALLET (FALLBACK & ADMIN POOL)
 # ==============================================================================
@@ -448,14 +481,26 @@ def execute_sol_transfer(
 
 def withdraw_user_sol(
     chat_id: int,
-    recipient_address: str,
+    recipient_address: str = None,
     amount_sol: float = None
 ) -> dict:
     """
     Safely withdraws native SOL from the user's dedicated trading wallet to their personal wallet.
+    If recipient_address is None or 'PHANTOM', auto-resolves to the user's bound Phantom vault.
     Keeps a minimal 0.00001 SOL buffer for network gas.
     If amount_sol is None or 0, withdraws all available balance.
     """
+    dest_addr = str(recipient_address or "").strip()
+    if not dest_addr or dest_addr.upper() == "PHANTOM":
+        phantom_vault = get_user_phantom_wallet(chat_id)
+        if not phantom_vault:
+            return {
+                "status": "error",
+                "reason": "NO_PHANTOM_LINKED",
+                "msg": "លោកអ្នកមិនទាន់បានភ្ជាប់ Phantom Wallet ផ្ទាល់ខ្លួននៅឡើយទេ។ សូមចុច '🔗 ភ្ជាប់ Phantom Wallet' ឬវាយ `/smart_swap bind_phantom <address>` ជាមុនសិន។"
+            }
+        dest_addr = phantom_vault
+
     priv, pub = get_or_create_user_solana_wallet(chat_id)
     bal_data = get_solana_balance(pub)
     current_lamports = bal_data["lamports"]
@@ -483,7 +528,7 @@ def withdraw_user_sol(
             }
         transfer_lamports = req_lamports
 
-    return execute_sol_transfer(priv, recipient_address, transfer_lamports)
+    return execute_sol_transfer(priv, dest_addr, transfer_lamports)
 
 # ==============================================================================
 # ⚡ JUPITER ON-CHAIN TRANSACTION SIGNING & BROADCAST

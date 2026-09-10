@@ -4328,6 +4328,12 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_swap_withdraw_prompt":
                 context.args = ["WITHDRAW_PROMPT"]
                 await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_bind_prompt":
+                context.args = ["BIND_PROMPT"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_withdraw_phantom":
+                context.args = ["WITHDRAW", "ALL", "PHANTOM", "1234"]
+                await smart_swap_command(update, context)
             elif data == "btn_smart_swap_export_prompt":
                 context.args = ["EXPORT_PROMPT"]
                 await smart_swap_command(update, context)
@@ -10373,60 +10379,90 @@ class TelegramBotThread(BaseThread):
                 usd_v = w_info["usd_value"]
                 sol_p = w_info["sol_price_usd"]
                 status_badge = "🟢 ត្រៀមរួចរាល់ (Funded & Active)" if w_info["is_funded"] else "🟡 ត្រូវការដាក់ទុន (Needs Funding)"
+                
+                phantom_vault = solana_trading_wallet.get_user_phantom_wallet(chat_id)
+                if phantom_vault:
+                    vault_display = f"`{phantom_vault}`\n*(🟢 ភ្ជាប់រួចរាល់ - Auto Profit Settlement Vault)*"
+                    kb_buttons = [
+                        [
+                            InlineKeyboardButton("🔄 ពិនិត្យសមតុល្យ (Refresh)", callback_data="btn_smart_swap_refresh_wallet"),
+                            InlineKeyboardButton("💸 ដកចូល Phantom ភ្លាមៗ", callback_data="btn_smart_swap_withdraw_phantom")
+                        ],
+                        [
+                            InlineKeyboardButton("🔗 ប្តូរ Phantom Wallet", callback_data="btn_smart_swap_bind_prompt"),
+                            InlineKeyboardButton("🔑 យក Private Key (Export)", callback_data="btn_smart_swap_export_prompt")
+                        ],
+                        [
+                            InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20")
+                        ]
+                    ]
+                else:
+                    vault_display = "`⚠️ មិនទាន់ភ្ជាប់ (Not Linked)`\n*(ចុចប៊ូតុង '🔗 ភ្ជាប់ Phantom Wallet' ខាងក្រោម)*"
+                    kb_buttons = [
+                        [
+                            InlineKeyboardButton("🔄 ពិនិត្យសមតុល្យ (Refresh)", callback_data="btn_smart_swap_refresh_wallet"),
+                            InlineKeyboardButton("🔗 ភ្ជាប់ Phantom Wallet", callback_data="btn_smart_swap_bind_prompt")
+                        ],
+                        [
+                            InlineKeyboardButton("💸 ដកប្រាក់ SOL (Custom)", callback_data="btn_smart_swap_withdraw_prompt"),
+                            InlineKeyboardButton("🔑 យក Private Key (Export)", callback_data="btn_smart_swap_export_prompt")
+                        ],
+                        [
+                            InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20")
+                        ]
+                    ]
 
                 wallet_card = (
                     f"💳 **KHMER MASTER CRYPTO | DEDICATED SOLANA WALLET** 🛰️\n"
                     f"*(ស្ថាបត្យកម្មកាបូបផ្ទាល់ខ្លួន ១០០% Non-Custodial Multi-Tenant)*\n"
                     f"───────────────────────────────\n\n"
-                    f"👤 **ម្ចាស់កាបូប (Telegram ID) ៖** `{chat_id}`\n"
-                    f"📍 **Solana Mainnet Deposit Address (ចុចដើម្បីចម្លង ៖)**\n"
+                    f"👤 **ម្ចាស់កាបូប (Telegram ID) ៖** `{chat_id}`\n\n"
+                    f"📍 **កាបូប Bot Trading Wallet (សម្រាប់ដាក់ទុនជួញដូរ) ៖**\n"
                     f"`{pub}`\n\n"
+                    f"🏦 **កាបូប Phantom Profit Vault (សម្រាប់ទទួលប្រាក់ចំណេញ) ៖**\n"
+                    f"{vault_display}\n\n"
                     f"💰 **សមតុល្យបច្ចុប្បន្ន ៖** `{sol_b:.4f} SOL` (~`${usd_v:,.2f} USD`)\n"
                     f"💵 **តម្លៃទីផ្សារ SOL ៖** `${sol_p:.2f} USD`\n"
                     f"📊 **ស្ថានភាពប្រតិបត្តិការ ៖** {status_badge}\n"
                     f"🔒 **សុវត្ថិភាព Private Key ៖** `AES-256 Encrypted (យោធា)`\n"
                     f"🔗 **ពិនិត្យលើ Solscan ៖** [ចុចមើល Solscan.io](https://solscan.io/account/{pub})\n\n"
                     f"───────────────────────────────\n"
-                    f"💡 **របៀបប្រើប្រាស់កាបូបផ្ទាល់ខ្លួន ៖**\n"
-                    f"1. ចុច Copy លើអាសយដ្ឋានកាបូបខាងលើ `{pub}`\n"
-                    f"2. ផ្ញើប្រាក់ **SOL** ពីកាបូប Phantom, OKX ឬ Binance មកកាន់អាសយដ្ឋាននេះ\n"
-                    f"3. វាយ `/smart_swap auto 20 1234` ដើម្បីឱ្យ Bot ទិញកាក់ Gem ដោយស្វ័យប្រវត្តិកម្រិត Sub-Second\n"
-                    f"4. ដកប្រាក់ត្រឡប់ទៅវិញ ៖ `/smart_swap withdraw <ចំនួន_SOL> <កាបូប_ទទួល> <PIN>`\n"
-                    f"5. យក Private Key ទៅប្រើលើ Phantom ៖ `/smart_swap export_key <PIN>`"
+                    f"💡 **របៀបប្រើប្រាស់ SUPER SMART ៖**\n"
+                    f"1. ផ្ញើ **SOL** ពី Phantom របស់អ្នកមកកាន់កាបូបជួញដូរ `{pub}`\n"
+                    f"2. វាយ `/smart_swap auto 20 1234` ដើម្បីឱ្យ Bot ទិញកាក់ Gem On-Chain អូតូ\n"
+                    f"3. ចុចប៊ូតុង **'💸 ដកចូល Phantom ភ្លាមៗ'** ដើម្បីផ្ញើប្រាក់ចំណេញទៅកាន់ Phantom របស់អ្នកវិញដោយសុវត្ថិភាព ១០០%!"
                 )
-                kb = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🔄 ពិនិត្យសមតុល្យ (Refresh)", callback_data="btn_smart_swap_refresh_wallet"),
-                        InlineKeyboardButton("💸 ដកប្រាក់ SOL (Withdraw)", callback_data="btn_smart_swap_withdraw_prompt")
-                    ],
-                    [
-                        InlineKeyboardButton("🔑 យក Private Key (Export)", callback_data="btn_smart_swap_export_prompt"),
-                        InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20")
-                    ]
-                ])
+                kb = InlineKeyboardMarkup(kb_buttons)
                 if msg_target:
                     await msg_target.reply_text(wallet_card, reply_markup=kb, parse_mode="Markdown", disable_web_page_preview=True)
                 return
 
             # 0.1 WITHDRAW / SEND_SOL (Safely Withdraw SOL to Personal Wallet)
             if subcmd in ["WITHDRAW", "SEND_SOL"]:
-                if len(args) < 3:
+                if len(args) < 2:
                     help_msg = (
                         "💸 **APEX SMART SWAP | របៀបដកប្រាក់ SOL ទៅកាន់កាបូបផ្ទាល់ខ្លួន**\n"
                         "───────────────────────────────\n\n"
                         "📌 **ទម្រង់បញ្ជា ៖**\n"
-                        "`/smart_swap withdraw <ចំនួន_SOL_ឬ_ALL> <កាបូប_Solana_ទទួល> <PIN>`\n\n"
+                        "• ដកចូល Phantom ផ្ទាល់ខ្លួន ៖ `/smart_swap withdraw all phantom 1234`\n"
+                        "• ដកទៅកាបូបជាក់លាក់ ៖ `/smart_swap withdraw <ចំនួន_SOL> <កាបូប_Solana_ទទួល> <PIN>`\n\n"
                         "💡 **ឧទាហរណ៍ ៖**\n"
-                        "• ដកទាំងអស់ ៖ `/smart_swap withdraw all 9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin 1234`\n"
-                        "• ដកចំនួនកំណត់ ៖ `/smart_swap withdraw 0.5 9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin 1234`"
+                        "• ដកទាំងអស់ចូល Phantom ៖ `/smart_swap withdraw all`\n"
+                        "• ដក 0.5 SOL ចូល Phantom ៖ `/smart_swap withdraw 0.5`\n"
+                        "• ដកទៅកាបូបផ្សេង ៖ `/smart_swap withdraw 0.5 9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin 1234`"
                     )
                     if msg_target:
                         await msg_target.reply_text(help_msg, parse_mode="Markdown")
                     return
 
                 amt_str = str(args[1]).lower().strip()
-                dest_addr = str(args[2]).strip()
+                dest_addr = str(args[2]).strip() if len(args) > 2 else "PHANTOM"
                 pin_input = str(args[3]).strip() if len(args) > 3 else "1234"
+
+                # If 2nd arg was actually a PIN (e.g., /smart_swap withdraw all 1234)
+                if dest_addr.isdigit() and len(dest_addr) == 4:
+                    pin_input = dest_addr
+                    dest_addr = "PHANTOM"
 
                 # Verify PIN
                 is_pin_valid = False
@@ -10448,11 +10484,12 @@ class TelegramBotThread(BaseThread):
                     tx_h = res.get("tx_hash", "")
                     sol_amt = res.get("sol_amount", 0.0)
                     tx_url = res.get("solscan_url", f"https://solscan.io/tx/{tx_h}")
+                    receipt_dest = res.get("recipient", dest_addr)
                     receipt_card = (
                         "🚀 **KHMER MASTER CRYPTO | SOL WITHDRAWAL SUCCESS** 💸\n"
                         "───────────────────────────────\n\n"
                         f"💰 **ចំនួនទឹកប្រាក់បានដក ៖** `{sol_amt:.5f} SOL`\n"
-                        f"📍 **កាបូបទទួល (Recipient) ៖** `{dest_addr}`\n"
+                        f"📍 **កាបូបទទួល (Recipient) ៖** `{receipt_dest}`\n"
                         f"🔗 **Solscan Live Receipt ៖** [ចុចមើល Transaction លើ Solscan]({tx_url})\n\n"
                         "✅ **ប្រាក់ SOL ត្រូវបានផ្ទេរចេញដោយជោគជ័យលើ Solana Mainnet!**"
                     )
@@ -10518,15 +10555,74 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text(key_card, parse_mode="Markdown")
                 return
 
+            # 0.3 BIND_PHANTOM (Connect Personal Phantom Address as Profit Settlement Vault)
+            if subcmd in ["BIND_PHANTOM", "BIND", "CONNECT_PHANTOM"]:
+                if len(args) < 2:
+                    help_bind = (
+                        "🔗 **APEX SMART SWAP | ភ្ជាប់ PHANTOM WALLET ផ្ទាល់ខ្លួន**\n"
+                        "───────────────────────────────\n\n"
+                        "📌 **ទម្រង់បញ្ជា ៖**\n"
+                        "`/smart_swap bind_phantom <អាសយដ្ឋាន_Solana_របស់អ្នក>`\n\n"
+                        "💡 **ឧទាហរណ៍ ៖**\n"
+                        "`/smart_swap bind_phantom 9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin`"
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(help_bind, parse_mode="Markdown")
+                    return
+
+                target_addr = str(args[1]).strip()
+                import solana_trading_wallet
+                bind_res = solana_trading_wallet.bind_user_phantom_wallet(chat_id, target_addr)
+                if bind_res.get("status") == "success":
+                    bind_card = (
+                        "🎉 **PHANTOM WALLET LINKED SUCCESSFULLY!** 🔗\n"
+                        "───────────────────────────────\n\n"
+                        f"🏦 **Phantom Settlement Vault ៖**\n"
+                        f"`{target_addr}`\n\n"
+                        "✅ **កាបូប Phantom ផ្ទាល់ខ្លួនរបស់អ្នកត្រូវបានចងភ្ជាប់ធ្វើជា Profit Settlement Vault រួចរាល់!**\n"
+                        "• 🛡️ សុវត្ថិភាពខ្ពស់បំផុត ១០០% (Bot ស្គាល់ត្រឹមតែអាសយដ្ឋានទទួលលុយ គ្មាន Private Key)\n"
+                        "• 💸 រាល់ពេលដកប្រាក់ ឬកើបផលចំណេញ លោកអ្នកគ្រាន់តែចុច '💸 ដកចូល Phantom ភ្លាមៗ' ជាការស្រេច!"
+                    )
+                    kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("💳 មើលកាបូប /smart_swap", callback_data="btn_smart_swap_wallet"),
+                            InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20")
+                        ]
+                    ])
+                    if msg_target:
+                        await msg_target.reply_text(bind_card, reply_markup=kb, parse_mode="Markdown")
+                else:
+                    if msg_target:
+                        await msg_target.reply_text(f"❌ **ការភ្ជាប់បរាជ័យ ៖** {bind_res.get('msg', 'Invalid Address')}")
+                return
+
+            if subcmd == "BIND_PROMPT":
+                prompt_msg = (
+                    "🔗 **APEX SMART SWAP | ភ្ជាប់ PHANTOM WALLET ផ្ទាល់ខ្លួន (PROFIT VAULT)**\n"
+                    "───────────────────────────────\n\n"
+                    "💡 *កាបូប Phantom ផ្ទាល់ខ្លួនរបស់អ្នក នឹងដើរតួជាកន្លែងទទួលប្រាក់ចំណេញ (Profit Settlement Vault) ដោយសុវត្ថិភាព ១០០% (Zero Risk - មិនត្រូវការ Private Key ឡើយ)!*\n\n"
+                    "📌 **របៀបភ្ជាប់ងាយៗ (១ ជំហាន) ៖**\n"
+                    "សូម Copy និង Paste ពាក្យបញ្ជាខាងក្រោម រួចប្តូរអាសយដ្ឋានរបស់អ្នក ៖\n\n"
+                    "`/smart_swap bind_phantom <អាសយដ្ឋាន_Solana_របស់អ្នក>`\n\n"
+                    "💡 **ឧទាហរណ៍ ៖**\n"
+                    "`/smart_swap bind_phantom 9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin`\n\n"
+                    "👉 **របៀប Copy អាសយដ្ឋានពី Phantom App ៖**\n"
+                    "1. បើកកម្មវិធី **Phantom Wallet** លើទូរស័ព្ទរបស់អ្នក\n"
+                    "2. ចុចលើពាក្យ **Receive** -> ជ្រើសរើស **Solana**\n"
+                    "3. ចុច **Copy** អាសយដ្ឋាន រួចយកមក Paste ផ្ញើមកកាន់ Bot ឥឡូវនេះ!"
+                )
+                if msg_target:
+                    await msg_target.reply_text(prompt_msg, parse_mode="Markdown")
+                return
+
             if subcmd == "WITHDRAW_PROMPT":
                 prompt_msg = (
                     "💸 **APEX SMART SWAP | របៀបដកប្រាក់ SOL ទៅកាន់កាបូបផ្ទាល់ខ្លួន**\n"
                     "───────────────────────────────\n\n"
                     "📌 **ទម្រង់បញ្ជាដកប្រាក់ ៖**\n"
-                    "`/smart_swap withdraw <ចំនួន_SOL_ឬ_ALL> <កាបូប_Solana_ទទួល> <PIN>`\n\n"
-                    "💡 **ឧទាហរណ៍ ៖**\n"
-                    "• ដកទាំងអស់ ៖ `/smart_swap withdraw all 9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin 1234`\n"
-                    "• ដក 0.2 SOL ៖ `/smart_swap withdraw 0.2 9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin 1234`"
+                    "• ដកចូល Phantom ផ្ទាល់ខ្លួន ៖ `/smart_swap withdraw all`\n"
+                    "• ដកចំនួនកំណត់ ៖ `/smart_swap withdraw 0.2`\n"
+                    "• ដកទៅកាបូបផ្សេង ៖ `/smart_swap withdraw 0.2 <កាបូប_Solana> 1234`"
                 )
                 if msg_target:
                     await msg_target.reply_text(prompt_msg, parse_mode="Markdown")
