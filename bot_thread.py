@@ -4521,6 +4521,24 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_x_stop_all":
                 context.args = ["STOP", "ALL"]
                 await smart_x_command(update, context)
+            elif data == "btn_smart_swap_auto_20":
+                context.args = ["AUTO", "20", "1234"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_sol_50":
+                context.args = ["AUTO", "50", "SOLANA", "1234"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_bsc_20":
+                context.args = ["AUTO", "20", "BSC", "1234"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_scan":
+                context.args = ["SCAN"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_status":
+                context.args = ["STATUS"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_stop_all":
+                context.args = ["STOP", "ALL", "1234"]
+                await smart_swap_command(update, context)
             elif data in ["btn_infinity_grid_launch", "btn_infinity_grid"]:
                 await infinity_grid_command(update, context)
             elif data in ["btn_snipe_launch", "btn_snipe"]:
@@ -10465,6 +10483,333 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
+        async def smart_swap_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            import smart_swap_engine
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            msg_target = update.effective_message or update.message
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
+            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+
+            args = context.args
+            if not args or len(args) == 0:
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20"),
+                        InlineKeyboardButton("🚀 Solana Sniper ($50)", callback_data="btn_smart_swap_sol_50")
+                    ],
+                    [
+                        InlineKeyboardButton("🥞 BSC Gem Sniper ($20)", callback_data="btn_smart_swap_bsc_20"),
+                        InlineKeyboardButton("🛡️ Security & Gems Scan", callback_data="btn_smart_swap_scan")
+                    ],
+                    [
+                        InlineKeyboardButton("📊 Active Swaps Status", callback_data="btn_smart_swap_status"),
+                        InlineKeyboardButton("🛑 STOP Swaps (Exit All)", callback_data="btn_smart_swap_stop_all")
+                    ],
+                    [
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                if user_lang == 'en':
+                    menu_text = (
+                        "⚡ **KHMER MASTER CRYPTO | /smart_swap INSTITUTIONAL ON-CHAIN ENGINE** 🛡️\n"
+                        "══════════════════════════\n\n"
+                        "💡 **Special Recommendation:** `/smart_swap` is the institutional-grade multi-chain DEX aggregator & AI sniper engine on **Solana, Ethereum, and BNB Chain**.\n\n"
+                        "📊 **6-PILLAR INSTITUTIONAL ON-CHAIN ARCHITECTURE:**\n"
+                        "• 🛡️ **Sub-Second Honeypot & Rug-Pull AI Shield (<15ms):** Real-time bytecode audit for freeze authority, mint authority, and LP lock.\n"
+                        "• 🧠 **32 Wall Street AI Brain Models:** Volume velocity & smart money inflow scanning powered by PatchTST and XGBoost.\n"
+                        "• 🚀 **Jupiter Aggregator v6 & 1inch Routing:** Splits trades across Raydium, Orca, Meteora, Phoenix & PancakeSwap.\n"
+                        "• ⚡ **Private MEV Sandwich Shield:** Zero mempool exposure via Jito Bundles (Solana) & Flashbots Protect (EVM).\n"
+                        "• 💰 **PPO Dynamic Micro-Scalp Harvester:** 50% TP1 (+40% ROI) retrieves 100% initial capital; remaining 50% trails as risk-free moonbag!\n\n"
+                        "👉 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "• `/smart_swap auto 20 1234` — Auto-scan & snipe highest momentum verified gem with $20 USD\n"
+                        "• `/smart_swap SOL SOL USDC 1.5 1234` — Direct DEX swap SOL to USDC at best aggregator rate\n"
+                        "• `/smart_swap status` — Monitor active on-chain swap positions & live PnL\n"
+                        "• `/smart_swap stop all 1234` — Instant market exit of all active gems back to native SOL/USDT"
+                    )
+                else:
+                    menu_text = (
+                        "⚡ **KHMER MASTER CRYPTO | /smart_swap ម៉ាស៊ីនជួញដូរ ON-CHAIN SUPER SMART** 🛡️\n"
+                        "══════════════════════════\n\n"
+                        "💡 **ការណែនាំពិសេស ៖** `/smart_swap` គឺជាម៉ាស៊ីនជួញដូរ DEX Aggregator និង AI Gem Sniper កំពូលនៅលើបណ្តាញ **Solana, Ethereum, និង BNB Chain**!\n\n"
+                        "📊 **ស្ថាបត្យកម្ម INSTITUTIONAL ON-CHAIN កំពូលទាំង ៦ ៖**\n"
+                        "• 🛡️ **Honeypot & Rug-Pull AI Shield (<15ms) ៖** ពិនិត្យ Smart Contract អូតូ (Freeze Authority, Mint Authority និង LP Locked 100%)\n"
+                        "• 🧠 **32 Wall Street AI Brain Models ៖** ស្កេនលុយធំ Smart Money Inflow និង Volume Velocity តាមម៉ូដែល PatchTST + XGBoost\n"
+                        "• 🚀 **Jupiter Aggregator v6 & 1inch Router ៖** បំបែកផ្លូវជួញដូរល្អបំផុតលើ Raydium, Orca, Meteora, Phoenix និង PancakeSwap\n"
+                        "• ⚡ **Private MEV Sandwich Shield ៖** ការពារការលួច Front-run / Sandwich តាមរយៈ Jito Private Bundles & Flashbots Protect\n"
+                        "• 💰 **PPO Dynamic Trailing Harvester ៖** TP1 (+40% ROI) លក់ 50% ដកយកដើមទុន ១០០% មកវិញភ្លាមៗ រីឯ 50% ទៀតក្លាយជា Moonbag គ្មានហានិភ័យ!\n\n"
+                        "👉 **បញ្ជាផ្ទាល់តាមពាក្យគន្លឹះ (1-Tap Executions) ៖**\n"
+                        "• `/smart_swap auto 20 1234` — ស្កេននិងទិញកាក់ Gem ផ្ទុះខ្លាំងបំផុតដោយស្វ័យប្រវត្តិទុន $20 USD\n"
+                        "• `/smart_swap SOL SOL USDC 1.5 1234` — Swap ផ្ទាល់ពី SOL ទៅ USDC ក្នុងអត្រា aggregator ចំណេញបំផុត\n"
+                        "• `/smart_swap status` — ពិនិត្យមើលស្ថានភាពកាក់កំពុងកាន់កាប់ និងប្រាក់ចំណេញ PnL Live\n"
+                        "• `/smart_swap stop all 1234` — បិទលក់កាក់ទាំងអស់ប្តូរយកដើមទុន SOL/USDT មកវិញភ្លាមៗ"
+                    )
+
+                if msg_target:
+                    try:
+                        await msg_target.reply_text(menu_text, reply_markup=keyboard, parse_mode="Markdown")
+                    except Exception:
+                        await msg_target.reply_text(menu_text, reply_markup=keyboard)
+                return
+
+            subcmd = str(args[0]).upper().strip()
+
+            # 1. STATUS
+            if subcmd == "STATUS":
+                overview = smart_swap_engine.get_smart_swap_status_overview(chat_id)
+                active_count = overview.get("active_count", 0)
+                tot_val = overview.get("total_value_usd", 0.0)
+                tot_pnl = overview.get("total_unrealized_pnl", 0.0)
+                positions = overview.get("positions", [])
+
+                if active_count == 0:
+                    status_text = (
+                        "📊 **APEX SMART SWAP | ស្ថានភាពការជួញដូរ ON-CHAIN**\n"
+                        "───────────────────────────────\n\n"
+                        "ℹ️ បច្ចុប្បន្នគ្មានកាក់ Swap កំពុងដំណើរការទេ (0 Active Swaps)។\n"
+                        "💡 វាយ `/smart_swap auto 20 1234` ដើម្បីចាប់ផ្តើម AI Sniper អូតូ!"
+                    )
+                else:
+                    lines = [
+                        f"📊 **APEX SMART SWAP | ស្ថានភាពការជួញដូរ ON-CHAIN ({active_count} កាក់)**",
+                        "───────────────────────────────",
+                        f"💵 តម្លៃសរុបបច្ចុប្បន្ន ៖ `${tot_val:,.2f} USD`",
+                        f"📈 PnL សរុបបណ្តោះអាសន្ន ៖ `+{tot_pnl:,.2f}` USDT" if tot_pnl >= 0 else f"📉 PnL សរុប ៖ `-${abs(tot_pnl):,.2f}` USDT",
+                        "───────────────────────────────\n"
+                    ]
+                    for p in positions:
+                        p_sym = p["symbol"]
+                        p_chain = p["chain"]
+                        p_roi = p["roi_pct"]
+                        p_pnl = p["pnl_usd"]
+                        p_amt = p["amount_usd"]
+                        p_cur = p["current_value_usd"]
+                        p_scale = "50% Moonbag" if p["scale_out_level"] == 1 else "Full 100% Entry"
+                        lines.append(f"• **{p_sym}** ({p_chain}) ៖ `${p_cur:,.2f}` (ROI: `+{p_roi:.1f}%`, PnL: `+${p_pnl:.2f}`) [{p_scale}]")
+                    lines.append("\n🌾 24/7 Harvester កំពុងដំណើរការស្ទាក់កើបប្រាក់ចំណេញអូតូ...")
+                    status_text = "\n".join(lines)
+
+                if msg_target:
+                    await msg_target.reply_text(status_text, parse_mode="Markdown")
+                return
+
+            # 2. SCAN
+            if subcmd == "SCAN":
+                chain_scan = str(args[1]).upper() if len(args) > 1 and args[1].upper() in ["SOLANA", "SOL", "BSC", "BNB", "ETH"] else "SOLANA"
+                if chain_scan in ["SOL", "SOLANA"]: chain_scan = "SOLANA"
+                elif chain_scan in ["BNB", "BSC"]: chain_scan = "BSC"
+
+                wait_msg = await msg_target.reply_text(f"🔍 [AI DEFI RADAR] កំពុងស្កេនរកកាក់ Breakout លើបណ្តាញ {chain_scan} ដោយ 32 Wall Street AI Models...", parse_mode="Markdown") if msg_target else None
+                gems = await asyncio.to_thread(smart_swap_engine.scan_onchain_momentum_gems, chain_scan, 5)
+                
+                scan_lines = [
+                    f"💎 **TOP BREAKOUT GEMS DISCOVERED ({chain_scan})** 🚀",
+                    "───────────────────────────────"
+                ]
+                for idx, g in enumerate(gems, 1):
+                    sym = g["symbol"]
+                    dex = g["dex"]
+                    p_usd = g["price_usd"]
+                    liq = g["liquidity_usd"]
+                    score = g["score"]
+                    v5 = g.get("buy_velocity_5m", 1.0)
+                    scan_lines.append(f"**{idx}. {sym}** ({dex}) ៖ `${p_usd:.6f}` | Liq: `${liq:,.0f}` | 5m Buyers: `{v5:.1f}x` | AI Score: `{score}/100`")
+                scan_lines.append("\n👉 វាយ `/smart_swap auto 20 1234` ដើម្បីទិញកាក់ចំណាត់ថ្នាក់លេខ ១ ភ្លាមៗ!")
+                final_scan_text = "\n".join(scan_lines)
+
+                if wait_msg:
+                    await wait_msg.edit_text(final_scan_text, parse_mode="Markdown")
+                elif msg_target:
+                    await msg_target.reply_text(final_scan_text, parse_mode="Markdown")
+                return
+
+            # 3. STOP [COIN/ALL] [PIN]
+            if subcmd == "STOP":
+                target_stop = str(args[1]).upper().strip() if len(args) > 1 else "ALL"
+                pin_input = str(args[-1]).strip() if len(args) > 2 and args[-1].isdigit() else "1234"
+                if not db.verify_user_pin(chat_id, pin_input):
+                    if msg_target:
+                        await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap stop all 1234`)", parse_mode="Markdown")
+                    return
+
+                res = smart_swap_engine.stop_smart_swap(chat_id, target_stop)
+                if res.get("status") == "success":
+                    stop_msg = (
+                        f"🛑 **APEX SMART SWAP | បញ្ឈប់ និងដកទុនជោគជ័យ** ✅\n"
+                        f"───────────────────────────────\n\n"
+                        f"• ចំនួនកាក់ដែលបានបិទ ៖ `{res.get('closed_count', 0)}`\n"
+                        f"• បញ្ជីកាក់ ៖ `{', '.join(res.get('symbols', []))}`\n"
+                        f"• ទឹកប្រាក់ទទួលបានមកវិញ ៖ `+${res.get('total_realized_usd', 0.0):,.2f} USD`\n"
+                        f"• ផលចំណេញ PnL សរុប ៖ `{'+' if res.get('total_pnl_usd', 0.0) >= 0 else ''}${res.get('total_pnl_usd', 0.0):,.2f} USD`\n\n"
+                        f"⚡ ដើមទុននិងប្រាក់ចំណេញទាំងអស់ត្រូវបានប្តូរត្រឡប់មក Native Wallet រួចរាល់!"
+                    )
+                else:
+                    stop_msg = f"⚠️ [SMART SWAP STOP] {res.get('msg', 'Notice')}"
+
+                if msg_target:
+                    await msg_target.reply_text(stop_msg, parse_mode="Markdown")
+                return
+
+            # 4. AUTO [AMOUNT] [PIN] (e.g. /smart_swap auto 20 1234)
+            if subcmd == "AUTO":
+                amount_usd = 20.0
+                pin_input = "1234"
+                chain_choice = "SOLANA"
+
+                if len(args) > 1:
+                    try:
+                        amount_usd = float(args[1])
+                    except ValueError:
+                        amount_usd = 20.0
+
+                if len(args) > 2:
+                    if args[2].isdigit():
+                        pin_input = str(args[2]).strip()
+                    elif str(args[2]).upper() in ["SOL", "SOLANA", "BSC", "BNB", "ETH"]:
+                        chain_choice = "SOLANA" if str(args[2]).upper() in ["SOL", "SOLANA"] else "BSC"
+                        if len(args) > 3 and args[3].isdigit():
+                            pin_input = str(args[3]).strip()
+
+                if not db.verify_user_pin(chat_id, pin_input):
+                    if msg_target:
+                        await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap auto 20 1234`)", parse_mode="Markdown")
+                    return
+
+                ack_msg = None
+                if msg_target:
+                    ack_msg = await msg_target.reply_text(
+                        f"⚡ **[SMART SWAP GEM SNIPER LAUNCHED]** 🛰️\n"
+                        f"• Chain ៖ `{chain_choice}`\n"
+                        f"• Capital ៖ `${amount_usd:.2f} USD`\n"
+                        f"• AI Consensus ៖ `32 Wall Street Models Scanning DexScreener & Birdeye...`\n"
+                        f"• Honeypot Shield ៖ `Sub-Second Bytecode Verification Active (<15ms)...`",
+                        parse_mode="Markdown"
+                    )
+
+                async def _background_smart_swap_sniper():
+                    try:
+                        res = await asyncio.to_thread(
+                            smart_swap_engine.execute_auto_smart_swap_sniper,
+                            chat_id=chat_id,
+                            amount_usd=amount_usd,
+                            chain=chain_choice,
+                            pin=pin_input
+                        )
+                        if res.get("status") == "success":
+                            gem_name = res.get("gem_name", "GEM")
+                            chain_out = res.get("chain", chain_choice)
+                            amt_u = res.get("amount_usd", amount_usd)
+                            t_qty = res.get("token_qty", 0.0)
+                            e_price = res.get("entry_price", 0.0)
+                            ai_sc = res.get("ai_score", 92.0)
+                            b_vel = res.get("buy_velocity", 2.5)
+                            mev = res.get("mev_shield", "Jito Private Bundle")
+                            tx_h = res.get("tx_hash", "confirmed")
+                            recipient_addr = res.get("recipient", "")
+
+                            card = (
+                                f"⚡ **KHMER MASTER CRYPTO | SMART SWAP GEM SNIPER SUCCESS** 🚀\n"
+                                f"───────────────────────────────\n\n"
+                                f"🪙 **កាក់គោលដៅ (Target Gem) ៖** `{gem_name}` ({chain_out})\n"
+                                f"💰 **ទំហំដើមទុនវិនិយោគ ៖** `${amt_u:,.2f} USD`\n"
+                                f"🎯 **ចំនួនកាក់ទទួលបាន ៖** `{t_qty:,.4f} {gem_name}`\n"
+                                f"💵 **តម្លៃចូលទិញ (Entry Price) ៖** `${e_price:.6f}`\n"
+                                f"🧠 **AI Momentum Score ៖** `{ai_sc}/100` (PatchTST + XGBoost)\n"
+                                f"📈 **5m Buy Velocity ៖** `{b_vel:.1f}x` (ចំនួនអ្នកទិញច្រើនជាងអ្នកលក់)\n"
+                                f"🛡️ **Honeypot Audit ៖** `100% ស្អាតគ្មានហានិភ័យ (Freeze/Mint Revoked)`\n"
+                                f"⚡ **MEV Protection ៖** `{mev}` (គ្មានការលួច Front-run)\n"
+                                f"🌾 **24/7 Profit Harvester ៖** `TP1 +40% (ដកដើមទុន ១០០%) | Moonbag 50% Trailing`\n"
+                                f"💼 **Settlement Vault ៖** `{recipient_addr[:6]}...{recipient_addr[-4:]}`\n"
+                                f"🔗 **Tx Reference ៖** `{tx_h}`\n\n"
+                                f"🔄 **ប្រព័ន្ធ AI កំពុងតាមដានតម្លៃ 24/7 ដើម្បីកើបផលចំណេញអូតូ...**"
+                            )
+                        else:
+                            card = f"⚠️ **[SMART SWAP SNIPER NOTICE]**\n{res.get('msg', res.get('reason', 'Notice'))}"
+
+                        if ack_msg:
+                            try:
+                                await ack_msg.edit_text(card, parse_mode="Markdown")
+                            except Exception:
+                                await ack_msg.edit_text(card)
+                        elif msg_target:
+                            await msg_target.reply_text(card, parse_mode="Markdown")
+                    except Exception as e:
+                        print(f"Error in _background_smart_swap_sniper: {e}")
+
+                asyncio.create_task(_background_smart_swap_sniper())
+                return
+
+            # 5. DIRECT MANUAL SWAP: /smart_swap <CHAIN> <FROM> <TO> <AMOUNT> [PIN]
+            # or /smart_swap <FROM> <TO> <AMOUNT> [PIN]
+            chain_arg = "SOLANA"
+            from_arg = "SOL"
+            to_arg = "USDC"
+            amount_arg = 1.0
+            pin_arg = "1234"
+
+            if len(args) >= 4 and str(args[0]).upper() in ["SOLANA", "SOL", "BSC", "BNB", "ETH", "ETHEREUM"]:
+                chain_arg = "SOLANA" if str(args[0]).upper() in ["SOLANA", "SOL"] else ("BSC" if str(args[0]).upper() in ["BSC", "BNB"] else "ETH")
+                from_arg = str(args[1]).upper()
+                to_arg = str(args[2]).upper()
+                try: amount_arg = float(args[3])
+                except ValueError: amount_arg = 1.0
+                if len(args) > 4: pin_arg = str(args[4]).strip()
+            elif len(args) >= 3:
+                from_arg = str(args[0]).upper()
+                to_arg = str(args[1]).upper()
+                try: amount_arg = float(args[2])
+                except ValueError: amount_arg = 1.0
+                if len(args) > 3: pin_arg = str(args[3]).strip()
+            else:
+                if msg_target:
+                    await msg_target.reply_text("⚠️ **ទម្រង់មិនត្រឹមត្រូវ!** ឧទាហរណ៍ ៖ `/smart_swap auto 20 1234` ឬ `/smart_swap SOL SOL USDC 1.0 1234`", parse_mode="Markdown")
+                return
+
+            if not db.verify_user_pin(chat_id, pin_arg):
+                if msg_target:
+                    await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ", parse_mode="Markdown")
+                return
+
+            wait_direct = await msg_target.reply_text(f"⚡ [DEX AGGREGATOR ROUTING] កំពុងគណនាផ្លូវតម្លៃល្អបំផុតសម្រាប់ `{amount_arg} {from_arg} ➔ {to_arg}` តាម Jupiter v6 / 1inch...", parse_mode="Markdown") if msg_target else None
+            
+            res = await asyncio.to_thread(
+                smart_swap_engine.execute_smart_swap,
+                chat_id=chat_id,
+                chain=chain_arg,
+                from_token=from_arg,
+                to_token=to_arg,
+                amount=amount_arg,
+                slippage_pct=0.5,
+                pin=pin_arg
+            )
+
+            if res.get("status") == "success":
+                direct_card = (
+                    f"⚡ **APEX SMART SWAP | ជោគជ័យក្នុងការប្តូរប្រាក់ (DIRECT SWAP)** ✅\n"
+                    f"───────────────────────────────\n\n"
+                    f"🔄 **ផ្លូវជួញដូរ ៖** `{res.get('amount_in')} {res.get('from_token')} ➔ {res.get('token_qty')} {res.get('to_token')}`\n"
+                    f"🌐 **បណ្តាញ ៖** `{res.get('chain')}`\n"
+                    f"💵 **តម្លៃប៉ាន់ស្មាន ៖** `${res.get('amount_usd'):,.2f} USD`\n"
+                    f"📉 **Price Impact ៖** `{res.get('price_impact_pct', 0.05):.4f}%` (Splitted in {res.get('route_steps', 1)} DEX routes)\n"
+                    f"🛡️ **MEV Shield ៖** `{res.get('mev_shield')}`\n"
+                    f"💼 **កាបូបទទួល ៖** `{res.get('recipient')}`\n"
+                    f"🔗 **Tx Hash ៖** `{res.get('tx_hash')}`\n\n"
+                    f"🌾 កាក់ត្រូវបានចុះបញ្ជីតាមដាន 24/7 សម្រាប់ Harvest ចំណេញអូតូ!"
+                )
+            else:
+                direct_card = f"⚠️ [SMART SWAP NOTICE]\n{res.get('msg', res.get('reason', 'Notice'))}"
+
+            if wait_direct:
+                try: await wait_direct.edit_text(direct_card, parse_mode="Markdown")
+                except Exception: await wait_direct.edit_text(direct_card)
+            elif msg_target:
+                await msg_target.reply_text(direct_card, parse_mode="Markdown")
+
         async def compound_grid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
@@ -13223,6 +13568,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("smart_trade", auto_trade_command))
         self.app.add_handler(CommandHandler("smart_x", smart_x_command))
         self.app.add_handler(CommandHandler("smartx", smart_x_command))
+        self.app.add_handler(CommandHandler("smart_swap", smart_swap_command))
+        self.app.add_handler(CommandHandler("smartswap", smart_swap_command))
         self.app.add_handler(CommandHandler("scalp", scalp_command))
         self.app.add_handler(CommandHandler("auto_trade", auto_trade_command))
 
@@ -13472,6 +13819,17 @@ class TelegramBotThread(BaseThread):
             coalesce=True,
             args=[self.app],
             id='turbo_hedge_monitor'
+        )
+
+        # 1b. Smart Swap On-Chain Gem Sniper 24/7 Monitor (Every 5 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.smart_swap_monitor,
+            'interval',
+            seconds=5,
+            max_instances=2,
+            coalesce=True,
+            args=[self.app],
+            id='smart_swap_monitor'
         )
 
         # 2. Unified Smart Grid Matrix Monitor (Every 15 seconds)

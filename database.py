@@ -1540,6 +1540,163 @@ def get_user_multichain_wallets(chat_id: int) -> dict:
         pass
     return wallets
 
+# ==============================================================================
+# ⚡ SUPER SMART ON-CHAIN SWAP & SNIPER REGISTRY (SOLANA, EVM, BSC)
+# ==============================================================================
+
+def add_active_smart_swap(chat_id: int, chain: str, token_address: str, token_symbol: str, amount_in_usd: float, token_qty: float, entry_price: float, tx_hash: str = "") -> int:
+    """Records an active on-chain Smart Swap position for real-time monitoring and profit harvesting."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS active_smart_swaps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL,
+        chain TEXT NOT NULL,
+        token_address TEXT NOT NULL,
+        token_symbol TEXT NOT NULL,
+        amount_in_usd REAL NOT NULL,
+        token_qty REAL NOT NULL,
+        entry_price REAL NOT NULL,
+        peak_price REAL NOT NULL,
+        scale_out_level INTEGER DEFAULT 0,
+        tx_hash TEXT,
+        created_at TEXT NOT NULL
+    )''')
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute('''INSERT INTO active_smart_swaps 
+        (chat_id, chain, token_address, token_symbol, amount_in_usd, token_qty, entry_price, peak_price, scale_out_level, tx_hash, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)''',
+        (chat_id, chain.upper(), token_address, token_symbol.upper(), float(amount_in_usd), float(token_qty), float(entry_price), float(entry_price), tx_hash, now_str)
+    )
+    swap_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return swap_id
+
+def get_active_smart_swaps(chat_id: int = None, chain: str = None) -> list:
+    """Retrieves all currently active Smart Swap positions (optionally filtered by chat_id and chain)."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS active_smart_swaps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            chain TEXT NOT NULL,
+            token_address TEXT NOT NULL,
+            token_symbol TEXT NOT NULL,
+            amount_in_usd REAL NOT NULL,
+            token_qty REAL NOT NULL,
+            entry_price REAL NOT NULL,
+            peak_price REAL NOT NULL,
+            scale_out_level INTEGER DEFAULT 0,
+            tx_hash TEXT,
+            created_at TEXT NOT NULL
+        )''')
+        query = "SELECT id, chat_id, chain, token_address, token_symbol, amount_in_usd, token_qty, entry_price, peak_price, scale_out_level, tx_hash, created_at FROM active_smart_swaps"
+        params = []
+        clauses = []
+        if chat_id is not None:
+            clauses.append("chat_id = ?")
+            params.append(chat_id)
+        if chain is not None:
+            clauses.append("chain = ?")
+            params.append(chain.upper())
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+        swaps = []
+        for r in rows:
+            swaps.append({
+                "id": r[0],
+                "chat_id": r[1],
+                "chain": r[2],
+                "token_address": r[3],
+                "token_symbol": r[4],
+                "amount_in_usd": float(r[5]),
+                "token_qty": float(r[6]),
+                "entry_price": float(r[7]),
+                "peak_price": float(r[8]),
+                "scale_out_level": int(r[9]),
+                "tx_hash": r[10],
+                "created_at": r[11]
+            })
+        return swaps
+    except Exception:
+        return []
+
+def update_smart_swap_peak(swap_id: int, current_price: float, scale_out_level: int = None):
+    """Updates the highest peak price or scale-out status reached by an active smart swap."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if scale_out_level is not None:
+        cursor.execute("UPDATE active_smart_swaps SET peak_price = MAX(peak_price, ?), scale_out_level = ? WHERE id = ?", (float(current_price), int(scale_out_level), int(swap_id)))
+    else:
+        cursor.execute("UPDATE active_smart_swaps SET peak_price = MAX(peak_price, ?) WHERE id = ?", (float(current_price), int(swap_id)))
+    conn.commit()
+    conn.close()
+
+def remove_active_smart_swap(swap_id: int):
+    """Removes a closed smart swap position from the active monitoring registry."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM active_smart_swaps WHERE id = ?", (int(swap_id),))
+    conn.commit()
+    conn.close()
+
+def log_smart_swap_history(chat_id: int, chain: str, token_symbol: str, action: str, amount_usd: float, pnl_usd: float, roi_pct: float, tx_hash: str = ""):
+    """Logs completed smart swap trade to history for user analytics."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS smart_swap_trade_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL,
+        chain TEXT NOT NULL,
+        token_symbol TEXT NOT NULL,
+        action TEXT NOT NULL,
+        amount_usd REAL NOT NULL,
+        pnl_usd REAL NOT NULL,
+        roi_pct REAL NOT NULL,
+        tx_hash TEXT,
+        closed_at TEXT NOT NULL
+    )''')
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute('''INSERT INTO smart_swap_trade_history
+        (chat_id, chain, token_symbol, action, amount_usd, pnl_usd, roi_pct, tx_hash, closed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        (chat_id, chain.upper(), token_symbol.upper(), action.upper(), float(amount_usd), float(pnl_usd), float(roi_pct), tx_hash, now_str)
+    )
+    conn.commit()
+    conn.close()
+
+def get_smart_swap_history(chat_id: int, limit: int = 10) -> list:
+    """Retrieves recent smart swap history for a user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS smart_swap_trade_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            chain TEXT NOT NULL,
+            token_symbol TEXT NOT NULL,
+            action TEXT NOT NULL,
+            amount_usd REAL NOT NULL,
+            pnl_usd REAL NOT NULL,
+            roi_pct REAL NOT NULL,
+            tx_hash TEXT,
+            closed_at TEXT NOT NULL
+        )''')
+        cursor.execute("SELECT chain, token_symbol, action, amount_usd, pnl_usd, roi_pct, tx_hash, closed_at FROM smart_swap_trade_history WHERE chat_id = ? ORDER BY id DESC LIMIT ?", (chat_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            "chain": r[0], "token_symbol": r[1], "action": r[2], "amount_usd": r[3],
+            "pnl_usd": r[4], "roi_pct": r[5], "tx_hash": r[6], "closed_at": r[7]
+        } for r in rows]
+    except Exception:
+        return []
+
 def set_user_flash_loan_auto(chat_id: int, enabled: bool = True):
     """Enables or disables 24/7 Super Smart Flash Loan Arbitrage for VIP user."""
     conn = get_db_connection()

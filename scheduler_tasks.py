@@ -4364,6 +4364,18 @@ async def turbo_hedge_monitor(app: Application):
     except Exception as e:
         print(f"⚠️ [TURBO HEDGE MONITOR TASK ERROR]: {e}")
 
+async def smart_swap_monitor(app: Application):
+    """
+    Continuous 5-Second Background Monitor for On-Chain Smart Swap & Gem Sniper Positions.
+    Triggers TP1 Capital Recovery and Moonbag Trailing Exits.
+    """
+    try:
+        import smart_swap_engine
+        await asyncio.to_thread(smart_swap_engine.monitor_smart_swap_positions, app)
+    except Exception as e:
+        print(f"⚠️ [SMART SWAP MONITOR TASK ERROR]: {e}")
+
+
 _last_arb_harvest_time = {}
 
 async def auto_arb_monitor(app: Application):

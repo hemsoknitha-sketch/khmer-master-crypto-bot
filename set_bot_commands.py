@@ -36,6 +36,7 @@ async def set_menu_commands():
         BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
         BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
         BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
+        BotCommand("smart_swap", "⚡ Institutional Multi-Chain DEX & AI Sniper"),
         BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
         BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
         BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
