@@ -339,7 +339,7 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "db_size_mb": db_size_mb
     }
 
-def render_portfolio_card(data: dict, user_lang: str = "km") -> str:
+def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: bool = False) -> str:
     """
     Renders an institutional-grade, highly aesthetic Telegram message
     categorizing and auditing EVERY single investment engine with full transparency.
@@ -520,26 +520,32 @@ def render_portfolio_card(data: dict, user_lang: str = "km") -> str:
     engines_text += f"🔟 **Liquidation Defender & Circuit Breaker Sentinel**\n   {e10_status}\n{e10_body}\n"
 
     # =========================================================================
-    # 3. HARDWARE & VITALS SUMMARY
+    # 3. INTERACTIVE FOOTER
     # =========================================================================
-    vitals_block = (
-        "──────────────────────────────────────\n"
-        "🖥️ **ស្ថានភាពម៉ាស៊ីនបម្រើការ (VPS Vitals & Health):**\n"
-        f"• ⏳ Uptime ៖ `{data['uptime_str']}`\n"
-        f"• 🧠 CPU Load ៖ `{data['cpu_usage']:.1f}%` (Dynamic Core)\n"
-        f"• 📊 RAM Usage ៖ `{data['ram_usage_mb']} MB / {data['ram_total_mb']} MB ({data['ram_pct']:.1f}%)`\n"
-        f"• 💾 Database Size ៖ `{data['db_size_mb']:.2f} MB` (SQLite WAL High-Speed Mode)\n"
+    footer = (
         "──────────────────────────────────────\n"
         "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh ឬបញ្ជា Stop/Launch ភ្លាមៗ ៖*"
     ) if lang == "km" else (
         "──────────────────────────────────────\n"
-        "🖥️ **VPS HARDWARE & SYSTEM HEALTH:**\n"
-        f"• ⏳ Uptime: `{data['uptime_str']}`\n"
-        f"• 🧠 CPU Load: `{data['cpu_usage']:.1f}%` (Multi-Core Dynamic)\n"
-        f"• 📊 RAM Usage: `{data['ram_usage_mb']} MB / {data['ram_total_mb']} MB ({data['ram_pct']:.1f}%)`\n"
-        f"• 💾 Database Size: `{data['db_size_mb']:.2f} MB` (WAL High-Speed Mode)\n"
-        "──────────────────────────────────────\n"
         "💡 *Use the interactive buttons below to refresh or manage positions:*"
     )
 
-    return header + engines_text + vitals_block
+    if include_vitals:
+        vitals_block = (
+            "──────────────────────────────────────\n"
+            "🖥️ **ស្ថានភាពម៉ាស៊ីនបម្រើការ (VPS Vitals & Health):**\n"
+            f"• ⏳ Uptime ៖ `{data['uptime_str']}`\n"
+            f"• 🧠 CPU Load ៖ `{data['cpu_usage']:.1f}%` (Dynamic Core)\n"
+            f"• 📊 RAM Usage ៖ `{data['ram_usage_mb']} MB / {data['ram_total_mb']} MB ({data['ram_pct']:.1f}%)`\n"
+            f"• 💾 Database Size ៖ `{data['db_size_mb']:.2f} MB` (SQLite WAL High-Speed Mode)\n"
+        ) if lang == "km" else (
+            "──────────────────────────────────────\n"
+            "🖥️ **VPS HARDWARE & SYSTEM HEALTH:**\n"
+            f"• ⏳ Uptime: `{data['uptime_str']}`\n"
+            f"• 🧠 CPU Load: `{data['cpu_usage']:.1f}%` (Multi-Core Dynamic)\n"
+            f"• 📊 RAM Usage: `{data['ram_usage_mb']} MB / {data['ram_total_mb']} MB ({data['ram_pct']:.1f}%)`\n"
+            f"• 💾 Database Size: `{data['db_size_mb']:.2f} MB` (WAL High-Speed Mode)\n"
+        )
+        return header + engines_text + vitals_block + footer
+
+    return header + engines_text + footer
