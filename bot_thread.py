@@ -2371,258 +2371,41 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
 
-            trades = db.get_active_trades_by_user(chat_id) if hasattr(db, 'get_active_trades_by_user') else []
-            infinity_grids = db.get_active_infinity_grids_by_user(chat_id) if hasattr(db, 'get_active_infinity_grids_by_user') else []
-            turbo_bots = db.get_active_turbo_hedge_bots() or []
-            user_turbo_bots = [b for b in turbo_bots if b.get("chat_id") == chat_id]
-            
-            import scheduler_tasks
-            import trading_engine
-
-            active_snipers = getattr(scheduler_tasks, "active_smart_snipers", {})
-            user_snipers = [s for tid, s in active_snipers.items() if s.get('chat_id') == chat_id]
-                
-            symbols = set()
-            for t in trades:
-                if len(t) > 1 and t[1]: symbols.add(str(t[1]))
-            for g in infinity_grids:
-                if len(g) > 1 and g[1]: symbols.add(str(g[1]))
-            for sn in user_snipers: 
-                if sn.get('symbol'): symbols.add(str(sn.get('symbol')))
-            for tb in user_turbo_bots:
-                if tb.get('symbol'): symbols.add(str(tb.get('symbol')))
-                
-            prices = {}
-            if symbols:
-                async def fetch_price(s):
-                    s_str = str(s)
-                    return s_str, await asyncio.to_thread(trading_engine.get_current_price, s_str)
-                results = await asyncio.gather(*(fetch_price(s) for s in symbols))
-                prices = dict(results)
-                
-            keys = db.get_user_api(chat_id)
-            actual_balances = {}
-            free_usdt = 0.0
-            futures_wallet_balance = 0.0
-            futures_positions = []
-            
-            if keys:
-                api_key, api_secret = keys
-                try:
-                    all_bals = await asyncio.to_thread(trading_engine.get_all_spot_balances, api_key, api_secret)
-                    actual_balances = all_bals or {}
-                    free_usdt = float(actual_balances.get("USDT", 0.0))
-                except Exception:
-                    pass
-                try:
-                    fut_bal, _ = await asyncio.to_thread(trading_engine.get_futures_balance_detailed, api_key, api_secret, "USDT")
-                    futures_wallet_balance = float(fut_bal or 0.0)
-                    futures_positions = await asyncio.to_thread(trading_engine.get_futures_positions, api_key, api_secret)
-                except Exception:
-                    pass
-
-            is_paper = getattr(trading_engine, "PAPER_TRADING", False)
-            mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
-
-            msg = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | UNIFIED PORTFOLIO** 🤖\n"
-                "══════════════════════════\n"
-                f"🛡️ **SECURITY CLEARANCE**: `VERIFIED` | `{mode_badge}`\n"
-                "══════════════════════════\n\n"
-            )
-            total_profit = 0.0
-            total_invested = 0.0
-            valid_trades_found = False
-
-            # --- 1. SPOT MARKET INVESTMENTS GROUP ---
-            spot_section_msg = ""
-            for trade in trades:
-                trade_id, sym, qty, buy_price, current_highest, stop_loss_pct = trade[:6]
-                sym = str(sym)
-                base_coin = sym.replace("USDT", "")
-                actual_qty = actual_balances.get(base_coin, 0.0)
-                if actual_qty < (qty * 0.1):
-                    db.remove_active_trade(trade_id, prices.get(sym, 0.0), "SOLD_MANUALLY")
-                    continue
-                current_price = prices.get(sym, 0.0)
-                invested = qty * buy_price
-                if invested < 1.0:
-                    continue
-                valid_trades_found = True
-                pnl, pnl_pct = trading_engine.calculate_net_pnl(buy_price, current_price, qty)
-                total_invested += invested
-                total_profit += pnl
-                emoji = '🟩' if pnl >= 0 else '🟥'
-                pnl_str = f"+${pnl:,.2f}" if pnl >= 0 else f"-${abs(pnl):,.2f}"
-                spot_section_msg += f"🟡 **{sym} (Spot Market)**\n"
-                spot_section_msg += f"💰 ដើមទុន: `${invested:,.2f}` | 💵 Entry: `${buy_price:,.4f}`\n"
-                spot_section_msg += f"📈 Mark Price: `${current_price:,.4f}`\n"
-                spot_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT` (`{pnl_pct:+.2f}%`)\n\n"
-
-            for tb in user_turbo_bots:
-                if tb.get("side") == "SPOT" or tb.get("leverage", 1) <= 1:
-                    sym = str(tb.get("symbol"))
-                    invested = float(tb.get("amount", 10.0))
-                    entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{sym}_entry_price", "0.0")
-                    entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
-                    current_price = prices.get(sym, 0.0) or entry_p
-                    pnl = 0.0
-                    pnl_pct = 0.0
-                    if entry_p > 0 and current_price > 0:
-                        qty = invested / entry_p
-                        pnl, pnl_pct = trading_engine.calculate_net_pnl(entry_p, current_price, qty)
-                    valid_trades_found = True
-                    total_invested += invested
-                    total_profit += pnl
-                    emoji = '🟩' if pnl >= 0 else '🟥'
-                    pnl_str = f"+${pnl:,.2f}" if pnl >= 0 else f"-${abs(pnl):,.2f}"
-                    spot_section_msg += f"🟡 **{sym} (Spot Market)**\n"
-                    spot_section_msg += f"💰 ដើមទុន: `${invested:,.2f}` | 💵 Entry: `${entry_p:,.4f}`\n"
-                    spot_section_msg += f"📈 Mark Price: `${current_price:,.4f}`\n"
-                    spot_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT` (`{pnl_pct:+.2f}%`)\n\n"
-
-            if spot_section_msg:
-                msg += "🟡 **SPOT MARKET HOLDINGS** 🟡\n"
-                msg += "───────────────────────────────\n"
-                msg += spot_section_msg
-
-            # --- 2. FUTURES & TURBO HEDGE POSITIONS GROUP ---
-            futures_section_msg = ""
-            if futures_positions:
-                for pos in futures_positions:
-                    raw_amt = float(pos.get("positionAmt", 0.0) or 0.0)
-                    if raw_amt == 0:
-                        continue
-                    valid_trades_found = True
-                    sym = str(pos.get("symbol", ""))
-                    entry_p = float(pos.get("entryPrice", 0.0) or 0.0)
-                    mark_p = float(pos.get("markPrice", 0.0) or 0.0)
-                    unRealizedProfit = float(pos.get("unRealizedProfit", 0.0) or 0.0)
-                    leverage = int(pos.get("leverage", 1) or 1)
-                    side = "LONG" if raw_amt > 0 else "SHORT"
-                    abs_qty = abs(raw_amt)
-                    margin = (abs_qty * entry_p) / leverage if leverage > 0 else 0
-                    
-                    total_invested += margin
-                    total_profit += unRealizedProfit
-                    
-                    emoji = '🟩' if unRealizedProfit >= 0 else '🟥'
-                    pnl_str = f"+${unRealizedProfit:,.2f}" if unRealizedProfit >= 0 else f"-${abs(unRealizedProfit):,.2f}"
-                    futures_section_msg += f"⚡️ **{sym}** (Futures {side} {leverage}x ISOLATED)\n"
-                    futures_section_msg += f"💰 Margin: `${margin:,.2f}` | 💵 Entry: `${entry_p:,.4f}`\n"
-                    futures_section_msg += f"📈 Mark Price: `${mark_p:,.4f}`\n"
-                    roi_pct = (unRealizedProfit / margin * 100.0) if margin > 0 else 0.0
-                    futures_section_msg += f"{emoji} Unrealized PnL: `{pnl_str} USDT` (`{roi_pct:+.2f}%`)\n\n"
-
-            import psutil
-            import os
-            import time
-            import trading_engine
-
-            start_time = getattr(self, "start_time", time.time())
-            uptime_sec = int(time.time() - start_time)
-            hours, remainder = divmod(uptime_sec, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            uptime_str = f"{hours}h {minutes}m {seconds}s"
-
-            cpu_usage = 0.0
-            ram_usage_mb = 0
-            ram_total_mb = 0
-            ram_pct = 0.0
-            disk_used_gb = 0.0
-            disk_total_gb = 0.0
-            disk_pct = 0.0
-
-            try:
-                cpu_usage = psutil.cpu_percent(interval=0.1)
-                mem = psutil.virtual_memory()
-                ram_usage_mb = int(mem.used / (1024 * 1024))
-                ram_total_mb = int(mem.total / (1024 * 1024))
-                ram_pct = mem.percent
-                disk = psutil.disk_usage('/')
-                disk_used_gb = round(disk.used / (1024**3), 2)
-                disk_total_gb = round(disk.total / (1024**3), 2)
-                disk_pct = disk.percent
-            except Exception:
-                pass
-
-            db_size_mb = 0.0
-            try:
-                if os.path.exists(db.DB_FILE):
-                    db_size_mb = round(os.path.getsize(db.DB_FILE) / (1024 * 1024), 2)
-            except Exception:
-                pass
-
-            defender_on = db.is_defender_active() if hasattr(db, 'is_defender_active') else False
-            paper_on = getattr(trading_engine, "PAPER_TRADING", False)
-
-            turbo_bots = db.get_active_turbo_hedge_bots() or []
-            user_turbo_bots = [b for b in turbo_bots if b.get("chat_id") == chat_id]
-            turbo_active = len(user_turbo_bots) > 0 or db.get_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0") == "1"
-
-            funding_cfg = db.get_funding_harvester_config(chat_id) if hasattr(db, 'get_funding_harvester_config') else None
-            funding_active = bool(funding_cfg and funding_cfg.get("enabled"))
-
-            keys = db.get_user_api(chat_id)
-            avail_usdt = 0.0
-            if keys:
-                try:
-                    avail_usdt = await asyncio.to_thread(trading_engine.get_available_usdt_balance, keys[0], keys[1])
-                except Exception:
-                    pass
-
-            status_icon = "🟢 Normal" if cpu_usage < 75.0 else ("🟡 Heavy Load" if cpu_usage < 90.0 else "🔴 Critical Load")
-
-            is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
-            vps_hardware_block = ""
-            if is_admin:
-                vps_hardware_block = (
-                    f"🖥️ **VPS HARDWARE & SYSTEM HEALTH**\n"
-                    f"⏳ Uptime: `{uptime_str}`\n"
-                    f"🧠 CPU Load: `{cpu_usage:.1f}%` (Multi-Core Dynamic)\n"
-                    f"📊 RAM Usage: `{ram_usage_mb} MB / {ram_total_mb} MB ({ram_pct:.1f}%)`\n"
-                    f"💽 SSD Storage: `{disk_used_gb} GB / {disk_total_gb} GB ({disk_pct:.1f}%)`\n"
-                    f"💾 Database Size: `{db_size_mb:.2f} MB` (WAL Mode Optimized)\n"
-                    f"🚦 System Status: {status_icon}\n\n"
-                )
-
-            msg = (
-                f"📊 **KHMER MASTER CRYPTO v13.00 | SYSTEM & AGI DIAGNOSTICS** 📊\n"
-                f"───────────────────────────────\n\n"
-                f"{vps_hardware_block}"
-                f"🛡️ **AGI CORE ENGINES MATRIX v13.00 (CHAT ID: `{chat_id}`)**\n"
-                f"💵 Mode: {'🟡 PAPER TRADING' if paper_on else '🚀 REAL MONEY LIVE'}\n"
-                f"🛡️ Liquidation Defender: {'🟢 ACTIVE (2% Max Drawdown Breaker)' if defender_on else '🟡 READY'}\n"
-                f"🚀 Turbo Hedge HFT Node: {'🟢 ACTIVE (' + str(len(user_turbo_bots)) + ' Positions)' if turbo_active else '🔴 STANDBY'}\n"
-                f"🎯 Listing & RVOL Sniper: {'🟢 STANDBY (Scanning New Listings 24/7)'}\n"
-                f"🌾 8-Hour Funding Harvester: {'🟢 ACTIVE' if funding_active else '🔴 STANDBY'}\n\n"
-                f"💰 **CAPITAL & BALANCE SUMMARY**\n"
-                f"💵 Available Spot Cash: `${avail_usdt:,.2f} USDT`\n\n"
-                f"📋 **QUICK CONTROL COMMANDS (SINGLE-TAP COPY)**\n"
-                f"👉 ពិនិត្យ Portfolio ៖ `/portfolio`\n"
-                f"👉 ពិនិត្យ Balance ៖ `/balance`\n"
-                f"👉 Launch HFT Turbo Hedge ៖ `/turbo_hedge`\n"
-                f"👉 Launch Listing Sniper ៖ `/snipe`\n"
-                f"👉 ផ្ដាច់ប្រព័ន្ធទាំងអស់ ៖ `/stop ALL`"
-            )
+            import portfolio_engine
+            # Query full system portfolio data asynchronously
+            data = await asyncio.to_thread(portfolio_engine.get_full_system_portfolio_data, chat_id)
+            card_text = portfolio_engine.render_portfolio_card(data, user_lang=user_lang)
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_menu_refresh"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    InlineKeyboardButton("🔄 Refresh Portfolio", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("💰 Check Balance", callback_data="btn_balance_refresh")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🎯 Listing Sniper", callback_data="btn_snipe_launch")
+                    InlineKeyboardButton("⚡ Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("🚀 Smart Swap DEX", callback_data="btn_smart_swap_scan")
                 ],
                 [
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
+                    InlineKeyboardButton("🛑 STOP ALL (Exit Market)", callback_data="btn_smart_swap_stop_all"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
 
-            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            if len(card_text) > 4000:
+                # Split cleanly if Telegram 4096 character limit exceeded
+                chunks = [card_text[i:i+3900] for i in range(0, len(card_text), 3900)]
+                for idx, chk in enumerate(chunks):
+                    kb = keyboard if idx == len(chunks) - 1 else None
+                    try:
+                        await msg_target.reply_text(chk, parse_mode="Markdown", reply_markup=kb)
+                    except Exception:
+                        await msg_target.reply_text(chk, reply_markup=kb)
+            else:
+                try:
+                    await msg_target.reply_text(card_text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await msg_target.reply_text(card_text, reply_markup=keyboard)
 
         async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
