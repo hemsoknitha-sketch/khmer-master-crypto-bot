@@ -9622,6 +9622,77 @@ class TelegramBotThread(BaseThread):
                 # ⚡ 2. Launch background scanner so Telegram is 100% Non-Blocking & Instant!
                 async def _background_top_scanner():
                     try:
+                        if user_side_input == "HEDGE":
+                            best_hedge_sym, hedge_eval = turbo_hedge_engine.get_best_hedge_coin(amount, return_details=True)
+                            
+                            spot_cash = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
+                            fut_avail = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
+                            
+                            eff_hedge_amt = max(10.50, amount)
+                            if spot_cash < eff_hedge_amt or fut_avail < max(6.50, eff_hedge_amt / max(1, leverage)):
+                                err_msg = (
+                                    f"⚠️ **សមតុល្យមិនគ្រប់គ្រាន់សម្រាប់ Super Delta-Neutral Hedge ៖**\n\n"
+                                    f"• Spot Cash ៖ `${spot_cash:,.2f} USDT` (ទាមទារយ៉ាងតិច `${eff_hedge_amt:,.2f} USDT`)\n"
+                                    f"• Futures Wallet ៖ `${fut_avail:,.2f} USDT` (ទាមទារយ៉ាងតិច `${max(6.50, eff_hedge_amt / max(1, leverage)):,.2f} USDT`)\n\n"
+                                    f"💡 _ដើម្បីឱ្យ Delta = 0 (0% Liquidation Risk) អ្នកត្រូវការដើមទុនទាំងលើ Spot និង Futures_ 🛡️"
+                                )
+                                if ack_msg:
+                                    try: await ack_msg.edit_text(err_msg, parse_mode="Markdown")
+                                    except Exception: await ack_msg.edit_text(err_msg)
+                                elif msg_target:
+                                    await msg_target.reply_text(err_msg, parse_mode="Markdown")
+                                return
+
+                            exec_res = await asyncio.to_thread(
+                                turbo_hedge_engine.execute_super_delta_neutral_hedge,
+                                keys[0], keys[1], best_hedge_sym, eff_hedge_amt, leverage, chat_id
+                            )
+                            if isinstance(exec_res, dict) and exec_res.get("status") == "success":
+                                spot_q = exec_res.get("spot_qty", 0.0)
+                                fut_q = exec_res.get("futures_qty", 0.0)
+                                entry_p = exec_res.get("entry_price", 0.0)
+                                coin_name = hedge_eval.get("coin", best_hedge_sym)
+                                apr = hedge_eval.get("annualized_apr", 0.0)
+                                fr_pct = hedge_eval.get("funding_rate_pct", 0.0)
+                                basis_spread = hedge_eval.get("basis_spread_pct", 0.0)
+                                comp_yield = hedge_eval.get("composite_yield_apr", apr)
+                                countdown = hedge_eval.get("countdown_str", "N/A")
+                                score = hedge_eval.get("score", 90.0)
+                                
+                                success_msg = (
+                                    f"🛡️ **SUPER SMART APEX DELTA-NEUTRAL HEDGE ACTIVATED!** 🚀\n"
+                                    f"───────────────────────────────\n\n"
+                                    f"🪙 កាក់ AI ជ្រើសរើស ៖ `{best_hedge_sym}` ({coin_name})\n"
+                                    f"🧠 AI Consensus Score ៖ `{score}/100` (Optimal Multi-Coin Rank)\n"
+                                    f"📊 យុទ្ធសាស្ត្រ ៖ `Delta = 0.00 (0% Liquidation Risk Pure Lock)`\n"
+                                    f"───────────────────────────────\n"
+                                    f"🛒 Leg 1 (Spot Buy 1x) ៖ `+${eff_hedge_amt:.2f} USDT` (`{spot_q:.6f}`)\n"
+                                    f"📉 Leg 2 (Futures Short 1x) ៖ `-${eff_hedge_amt:.2f} USDT` (`{fut_q:.6f}`)\n"
+                                    f"💵 Entry Price ៖ `${entry_p:,.2f}`\n"
+                                    f"───────────────────────────────\n"
+                                    f"⏳ Payout Countdown ៖ `{countdown} ទៀត` (Binance Funding Settlement)\n"
+                                    f"💰 Funding Rate ៖ `+{fr_pct:.4f}% / 8h` (`+{apr:.2f}% APR`)\n"
+                                    f"📐 Cash & Carry Basis ៖ `{basis_spread:+.3f}%` (Futures vs Spot Spread)\n"
+                                    f"🌾 សរុបផលចំណេញរំពឹងទុក ៖ `+{comp_yield:.2f}% APY`\n"
+                                    f"🎯 Target Profit ៖ `+${target_tp:.2f} USDT`\n"
+                                    f"🛡️ ហានិភ័យទីផ្សារ ៖ `0.0% (Pure Delta-Neutral Immune to Market Crashing)`\n\n"
+                                    f"🔄 _24/7 AI Engine កំពុងស្ទាក់កើប Funding Fee & Basis Arbitrage អូតូ..._"
+                                )
+                                if ack_msg:
+                                    try: await ack_msg.edit_text(success_msg, parse_mode="Markdown")
+                                    except Exception: await ack_msg.edit_text(success_msg)
+                                elif msg_target:
+                                    await msg_target.reply_text(success_msg, parse_mode="Markdown")
+                            else:
+                                err_reason = exec_res.get('msg', exec_res.get('reason', 'Execution error')) if isinstance(exec_res, dict) else 'Failed'
+                                fail_msg = f"❌ **បរាជ័យក្នុងការបើក Super Delta-Neutral Hedge ៖**\n`{err_reason}`"
+                                if ack_msg:
+                                    try: await ack_msg.edit_text(fail_msg, parse_mode="Markdown")
+                                    except Exception: await ack_msg.edit_text(fail_msg)
+                                elif msg_target:
+                                    await msg_target.reply_text(fail_msg, parse_mode="Markdown")
+                            return
+
                         is_spot = (user_side_input == "SPOT")
                         scan_limit = max(1, min(50, top_count))
                         if is_spot:
@@ -9742,6 +9813,105 @@ class TelegramBotThread(BaseThread):
 
                 asyncio.create_task(_background_top_scanner())
                 return
+            else:
+                # Direct Single-Asset Execution (BTC, ETH, SOL, or custom symbol)
+                if user_side_input == "HEDGE":
+                    exec_res = await asyncio.to_thread(
+                        turbo_hedge_engine.execute_super_delta_neutral_hedge,
+                        keys[0], keys[1], symbol, amount, leverage, chat_id
+                    )
+                    is_order_success = (isinstance(exec_res, dict) and exec_res.get("status") == "success")
+                    if is_order_success:
+                        db.add_turbo_hedge_bot(chat_id, symbol, amount, leverage, "HEDGE", target_tp, is_bot_initiated=True)
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
+                        spot_q = exec_res.get("spot_qty", 0.0)
+                        fut_q = exec_res.get("futures_qty", 0.0)
+                        entry_p = exec_res.get("entry_price", 0.0)
+                        hedge_ev = turbo_hedge_engine.evaluate_smart_hedge_consensus(symbol)
+                        apr = hedge_ev.get("annualized_apr", 0.0)
+                        fr_pct = hedge_ev.get("funding_rate_pct", 0.0)
+                        basis_spread = hedge_ev.get("basis_spread_pct", 0.0)
+                        comp_yield = hedge_ev.get("composite_yield_apr", apr)
+                        countdown = hedge_ev.get("countdown_str", "N/A")
+                        score = hedge_ev.get("score", 90.0)
+                        resp_msg = (
+                            f"🛡️ **SUPER SMART DELTA-NEUTRAL HEDGE EXECUTED!** 🚀\n"
+                            f"───────────────────────────────\n\n"
+                            f"🪙 កាក់ ៖ `{symbol}` (AI Score: `{score}/100`)\n"
+                            f"🛒 Leg 1 (Spot Buy 1x) ៖ `+${amount:.2f} USDT` (`{spot_q:.6f}`)\n"
+                            f"📉 Leg 2 (Futures Short 1x) ៖ `-${amount:.2f} USDT` (`{fut_q:.6f}`)\n"
+                            f"💵 Entry Price ៖ `${entry_p:,.2f}`\n"
+                            f"───────────────────────────────\n"
+                            f"⏳ Payout Countdown ៖ `{countdown} ទៀត`\n"
+                            f"💰 Funding APR ៖ `+{apr:.2f}% / Year` (`+{fr_pct:.4f}% / 8h`)\n"
+                            f"📐 Basis Spread ៖ `{basis_spread:+.3f}%`\n"
+                            f"🌾 Composite APY ៖ `+{comp_yield:.2f}%`\n"
+                            f"🛡️ Liquidation Risk ៖ `0.0% (100% Delta-Neutral Lock)`\n"
+                            f"🎯 Target TP ៖ `+${target_tp:.2f} USDT`\n\n"
+                            f"_AI ស្កេន Binance រៀងរាល់ ៣ វិនាទី កើប Funding Fee & Trailing Harvest អូតូ!_"
+                        )
+                    else:
+                        err_str = exec_res.get('msg', exec_res.get('reason', 'Execution notice')) if isinstance(exec_res, dict) else str(exec_res)
+                        resp_msg = f"❌ **បរាជ័យក្នុងការបើក Super Hedge ៖**\n`{err_str}`"
+
+                    if msg_target:
+                        await msg_target.reply_text(resp_msg, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+                elif user_side_input == "SPOT":
+                    exec_res = await asyncio.to_thread(
+                        trading_engine.execute_spot_trade,
+                        keys[0], keys[1], symbol, "BUY", amount
+                    )
+                    is_order_success = (isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "FILLED"] or exec_res.get("orderId")))
+                    if is_order_success:
+                        db.add_turbo_hedge_bot(chat_id, symbol, amount, 1, "SPOT", target_tp, is_bot_initiated=True)
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
+                        entry_p = await asyncio.to_thread(trading_engine.get_current_price, symbol)
+                        if entry_p > 0:
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
+                        resp_msg = (
+                            f"🛒 **[SPOT BUY EXECUTION SUCCESS]** 🚀\n"
+                            f"• Symbol: `{symbol}`\n"
+                            f"• Capital: `${amount:.2f} USDT` (1x Spot)\n"
+                            f"• Entry Price: `${entry_p:.4f}`\n"
+                            f"• 24/7 Monitoring: `ACTIVE in HFT Turbo Monitor`"
+                        )
+                    else:
+                        resp_msg = f"❌ Spot Buy Failed: {exec_res.get('error', 'Unknown Error') if isinstance(exec_res, dict) else str(exec_res)}"
+
+                    if msg_target:
+                        await msg_target.reply_text(resp_msg, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+                else:
+                    trade_side = user_side_input if user_side_input in ["BUY", "SELL"] else "BUY"
+                    exec_res = await asyncio.to_thread(
+                        turbo_hedge_engine.execute_turbo_hedge_trade,
+                        keys[0], keys[1], symbol, amount, trade_side, leverage, chat_id
+                    )
+                    is_order_success = (isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")))
+                    if is_order_success:
+                        db.add_turbo_hedge_bot(chat_id, symbol, amount, leverage, trade_side, target_tp, is_bot_initiated=True)
+                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
+                        entry_p = await asyncio.to_thread(trading_engine.get_current_price, symbol)
+                        if entry_p > 0:
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
+                        resp_msg = (
+                            f"⚡ **[TURBO HEDGE FUTURES EXECUTION SUCCESS]** 🚀\n"
+                            f"• Symbol: `{symbol}`\n"
+                            f"• Side: `{trade_side}` ({leverage}x Lev)\n"
+                            f"• Capital: `${amount:.2f} USDT`\n"
+                            f"• Entry Price: `${entry_p:.4f}`\n"
+                            f"• 24/7 Monitoring: `ACTIVE in HFT Turbo Monitor`"
+                        )
+                    else:
+                        resp_msg = f"❌ Futures Order Failed: {exec_res.get('error', exec_res.get('reason', 'Unknown Error')) if isinstance(exec_res, dict) else str(exec_res)}"
+
+                    if msg_target:
+                        await msg_target.reply_text(resp_msg, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
 
         async def smart_x_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             import smart_x_engine

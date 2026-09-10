@@ -7,6 +7,7 @@ import database as db
 import trading_engine
 import hyper_trade_engine
 import ai_engine
+import market_data
 
 # Overtrade Guard: Execution Tracker keyed by (chat_id, symbol) to prevent double order stacking
 _active_executing_keys = set()
@@ -722,6 +723,225 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
     _eval_cache_time[cache_key] = now
     return res
 
+
+INSTITUTIONAL_HEDGE_COINS = {
+    "BTCUSDT": {
+        "name": "Bitcoin (Digital Gold Anchor)",
+        "min_funding": 0.00003, # 0.003% (3.3% APR)
+        "volatility_class": "LOW",
+        "dca_drop_threshold": 4.0, # -4.0% dip triggers Spot DCA opportunity
+        "weight": 1.2
+    },
+    "ETHUSDT": {
+        "name": "Ethereum (Smart Contract Hub)",
+        "min_funding": 0.00005, # 0.005% (5.5% APR)
+        "volatility_class": "MEDIUM",
+        "dca_drop_threshold": 5.0, # -5.0% dip triggers Spot DCA opportunity
+        "weight": 1.1
+    },
+    "SOLUSDT": {
+        "name": "Solana (High-Beta Momentum King)",
+        "min_funding": 0.00008, # 0.008% (8.7% APR)
+        "volatility_class": "HIGH",
+        "dca_drop_threshold": 7.0, # -7.0% dip triggers Spot DCA opportunity
+        "weight": 1.3
+    },
+    "BNBUSDT": {
+        "name": "BNB (Binance Ecosystem Vault)",
+        "min_funding": 0.00004, # 0.004% (4.4% APR)
+        "volatility_class": "LOW_MEDIUM",
+        "dca_drop_threshold": 4.5, # -4.5% dip triggers Spot DCA opportunity
+        "weight": 1.0
+    }
+}
+
+def evaluate_smart_hedge_consensus(symbol: str) -> dict:
+    """
+    Evaluates institutional Delta-Neutral Hedge conditions and coin characteristics
+    specifically for BTC, ETH, SOL, BNB (and any other tradable symbol).
+    - Checks Live Funding Rate & Annualized APR (positive funding means shorts collect yield from longs).
+    - Queries Binance Futures premiumIndex for markPrice, indexPrice, lastFundingRate, and nextFundingTime.
+    - Calculates Cash & Carry Basis Spread Arbitrage ((Futures - Spot) / Spot * 100%).
+    - Calculates exact Funding Settlement Countdown (minutes left until 8-hour payout).
+    - Computes Composite Yield APR (Annualized Funding APR + Annualized Basis Convergence Yield).
+    - Decides optimal entry timing (ENTER_HEDGE vs WAIT_FUNDING) and detects Spot DCA dip opportunities.
+    """
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+
+    profile = INSTITUTIONAL_HEDGE_COINS.get(symbol, {
+        "name": symbol.replace("USDT", ""),
+        "min_funding": 0.00005,
+        "volatility_class": "MEDIUM",
+        "dca_drop_threshold": 5.0,
+        "weight": 1.0
+    })
+
+    mark_price = 0.0
+    index_price = 0.0
+    funding_rate = 0.0
+    next_funding_time_ms = 0
+    server_time_ms = int(time.time() * 1000)
+
+    try:
+        fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=3)
+        if fr_res.status_code == 200:
+            fr_data = fr_res.json()
+            mark_price = float(fr_data.get("markPrice", 0.0))
+            index_price = float(fr_data.get("indexPrice", 0.0))
+            funding_rate = float(fr_data.get("lastFundingRate", 0.0))
+            next_funding_time_ms = int(fr_data.get("nextFundingTime", 0))
+            server_time_ms = int(fr_data.get("time", server_time_ms))
+    except Exception:
+        pass
+
+    if funding_rate == 0.0:
+        funding_rate = market_data.fetch_funding_rate(symbol)
+
+    spot_price = trading_engine.get_current_price(symbol)
+    if spot_price <= 0.0:
+        spot_price = index_price if index_price > 0.0 else mark_price
+    if mark_price <= 0.0:
+        mark_price = spot_price
+
+    # 1. Exact Funding Settlement Countdown (minutes remaining until 8h settlement: 00:00, 08:00, 16:00 UTC)
+    if next_funding_time_ms > server_time_ms:
+        mins_until_funding = max(0, int((next_funding_time_ms - server_time_ms) / 60000))
+    else:
+        now_sec = int(time.time())
+        sec_in_cycle = now_sec % 28800
+        mins_until_funding = max(0, int((28800 - sec_in_cycle) / 60))
+
+    hours_left = mins_until_funding // 60
+    mins_left = mins_until_funding % 60
+    countdown_str = f"{hours_left}h {mins_left}m" if hours_left > 0 else f"{mins_left} នាទី"
+
+    # 2. Cash & Carry Basis Spread Calculation ((Futures - Spot) / Spot)
+    basis_spread_usd = mark_price - spot_price
+    basis_spread_pct = ((mark_price - spot_price) / spot_price * 100.0) if spot_price > 0 else 0.0
+    # Annualized basis capture assuming standard 7-day convergence window
+    basis_apr = (basis_spread_pct / 7.0) * 365.0 if basis_spread_pct > 0 else 0.0
+
+    # 3. Annualized Funding Yield & Composite Yield
+    annualized_apr = funding_rate * 3.0 * 365.0 * 100.0
+    daily_yield_pct = (funding_rate * 3.0) * 100.0
+    composite_yield_apr = annualized_apr + max(0.0, basis_apr)
+
+    # 4. 24h Price Change & Volatility
+    change_24h = 0.0
+    try:
+        t_res = HFT_SESSION.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
+        if t_res.status_code == 200:
+            change_24h = float(t_res.json().get("priceChangePercent", 0.0))
+    except Exception:
+        pass
+
+    # 5. Super Smart Multi-Factor Score Synthesis
+    score = 50.0
+    # Funding Component
+    if funding_rate > 0.0:
+        score += min(30.0, (funding_rate / 0.0003) * 30.0)
+    else:
+        score -= min(35.0, (abs(funding_rate) / 0.0002) * 35.0)
+
+    # Basis Spread Component (Futures > Spot provides basis arbitrage premium)
+    if basis_spread_pct > 0.02:
+        score += min(20.0, (basis_spread_pct / 0.10) * 20.0)
+    elif basis_spread_pct < -0.05:
+        score -= 10.0
+
+    # Settlement Timing Component (Bonus when within 60-120 mins of funding payout)
+    if 0 < mins_until_funding <= 60 and funding_rate > 0.0:
+        score += 15.0
+    elif 60 < mins_until_funding <= 120 and funding_rate > 0.0:
+        score += 8.0
+
+    # Stability & Volatility
+    if -5.0 <= change_24h <= 8.0:
+        score += 10.0
+    elif abs(change_24h) > 20.0:
+        score -= 10.0
+
+    score = round(min(99.0, max(10.0, score * profile["weight"])), 1)
+
+    if funding_rate >= profile["min_funding"]:
+        action = "ENTER_HEDGE"
+        confidence = min(98.0, 82.0 + (score * 0.16))
+    elif funding_rate > 0.0:
+        action = "ENTER_HEDGE"
+        confidence = 78.0
+    elif funding_rate < -0.0001:
+        action = "WAIT_FUNDING"
+        confidence = 45.0
+    else:
+        action = "ENTER_HEDGE"
+        confidence = 70.0
+
+    spot_dca_opportunity = change_24h <= -profile["dca_drop_threshold"]
+
+    return {
+        "symbol": symbol,
+        "coin": profile["name"],
+        "price": spot_price if spot_price > 0 else mark_price,
+        "spot_price": spot_price,
+        "fut_price": mark_price,
+        "basis_spread_usd": round(basis_spread_usd, 4),
+        "basis_spread_pct": round(basis_spread_pct, 4),
+        "basis_apr": round(basis_apr, 2),
+        "funding_rate": funding_rate,
+        "funding_rate_pct": funding_rate * 100.0,
+        "annualized_apr": annualized_apr,
+        "funding_apr": annualized_apr,
+        "composite_yield_apr": round(composite_yield_apr, 2),
+        "daily_yield_pct": daily_yield_pct,
+        "mins_until_funding": mins_until_funding,
+        "countdown_str": countdown_str,
+        "next_funding_time_ms": next_funding_time_ms,
+        "change_24h": change_24h,
+        "volatility_class": profile["volatility_class"],
+        "action": action,
+        "confidence_pct": round(confidence, 1),
+        "score": score,
+        "spot_dca_opportunity": spot_dca_opportunity,
+        "reason": f"{profile['name']} Yield +{composite_yield_apr:.1f}% APY (Funding {funding_rate*100:+.4f}%, Basis {basis_spread_pct:+.2f}%, {countdown_str} to payout) -> {action}"
+    }
+
+def get_best_hedge_coin(capital_usdt: float = 20.0, return_details: bool = False):
+    """
+    Scans the 4 institutional coins (BTC, ETH, SOL, BNB) and selects the
+    optimal asset for Super Delta-Neutral Hedge based on funding yield, basis spread,
+    settlement countdown timing, stability, and capital compatibility.
+    - BTC requires ~$78 min for 0.001 BTC contract.
+    - SOL and ETH support micro-capital ($10 - $20).
+    """
+    candidates = ["SOLUSDT", "ETHUSDT", "BNBUSDT", "BTCUSDT"]
+    best_sym = "SOLUSDT"
+    best_eval = None
+    best_score = -999.0
+    for sym in candidates:
+        try:
+            p = trading_engine.get_current_price(sym)
+            if p > 0:
+                est_q = capital_usdt / p
+                fut_q = trading_engine.get_futures_max_sellable_qty(sym, est_q)
+                if fut_q <= 0.0:
+                    continue
+            ev = evaluate_smart_hedge_consensus(sym)
+            if ev["score"] > best_score:
+                best_score = ev["score"]
+                best_sym = sym
+                best_eval = ev
+        except Exception:
+            pass
+
+    if best_eval is None:
+        best_eval = evaluate_smart_hedge_consensus(best_sym)
+
+    if return_details:
+        return best_sym, best_eval
+    return best_sym
+
 def execute_super_delta_neutral_hedge(api_key: str, api_secret: str, symbol: str, amount_usdt: float, leverage: int = 1, chat_id: int = 0) -> dict:
     """
     Executes Super Delta-Neutral Hedge (Spot Market Buy 1x + Futures Market Short 1x/2x).
@@ -734,6 +954,29 @@ def execute_super_delta_neutral_hedge(api_key: str, api_secret: str, symbol: str
     if not symbol.endswith("USDT"):
         symbol += "USDT"
 
+    # Enforce Spot MIN_NOTIONAL $10.50 floor
+    amount_usdt = max(10.50, float(amount_usdt))
+
+    # Pre-Flight LOT_SIZE Compatibility Check
+    current_price = trading_engine.get_current_price(symbol)
+    if current_price > 0:
+        est_q = amount_usdt / current_price
+        test_fut_q = trading_engine.get_futures_max_sellable_qty(symbol, est_q)
+        if test_fut_q <= 0.0:
+            sym_info = trading_engine.get_futures_symbol_info(symbol)
+            step_sz = 0.001
+            if sym_info:
+                for f in sym_info.get("filters", []):
+                    if f.get("filterType") == "LOT_SIZE":
+                        step_sz = float(f.get("stepSize", 0.001))
+                        break
+            min_req_cost = step_sz * current_price
+            return {
+                "status": "error",
+                "reason": "AMOUNT_BELOW_MIN_LOT_SIZE",
+                "msg": f"${amount_usdt:.2f} USDT is below minimum contract size for {symbol}. Minimum required is {step_sz} {symbol.replace('USDT','')} (~${min_req_cost:.2f} USDT). For smaller capital ($20), use SOL, ETH, or BNB!"
+            }
+
     # 1. Pre-Flight Balance & Permission Checks
     spot_cash = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
     futures_avail = trading_engine.get_futures_available_balance(api_key, api_secret)
@@ -745,7 +988,7 @@ def execute_super_delta_neutral_hedge(api_key: str, api_secret: str, symbol: str
             "msg": f"Spot Cash (${spot_cash:,.2f} USDT) is less than required amount (${amount_usdt:,.2f} USDT)."
         }
 
-    needed_futures_margin = amount_usdt / max(1, leverage)
+    needed_futures_margin = max(6.50, amount_usdt / max(1, leverage))
     if futures_avail < needed_futures_margin:
         return {
             "status": "error",
@@ -772,12 +1015,23 @@ def execute_super_delta_neutral_hedge(api_key: str, api_secret: str, symbol: str
             "msg": f"Spot Market Buy failed: {spot_res.get('msg', spot_res.get('error', 'Unknown Error'))}"
         }
 
-    # 3. Leg 2: Execute Futures Market Short (Sell)
-    print(f"🛡️ [SUPER HEDGE LEG 2] Executing Futures Market Short for {symbol} (${amount_usdt:.2f} USDT, {leverage}x)...")
-    futures_res = trading_engine.execute_futures_order(api_key, api_secret, symbol, "SELL", amount_usdt, leverage)
+    # Extract actual executed base asset quantity from Spot Buy
+    spot_data = spot_res.get("res", {}) if isinstance(spot_res, dict) else {}
+    executed_qty = float(spot_data.get("executedQty", 0.0))
+    current_price = trading_engine.get_current_price(symbol)
+    if executed_qty <= 0.0 and current_price > 0.0:
+        executed_qty = amount_usdt / current_price
+
+    # 3. Leg 2: Execute Futures Market Short (Sell) matching exact Spot coin quantity
+    futures_qty = trading_engine.get_futures_max_sellable_qty(symbol, executed_qty)
+    if futures_qty <= 0.0:
+        futures_qty = executed_qty
+
+    print(f"🛡️ [SUPER HEDGE LEG 2] Executing Futures Market Short for {symbol} (Qty: {futures_qty}, Notional: ~${amount_usdt:.2f} USDT, {leverage}x)...")
+    futures_res = trading_engine.execute_futures_order(api_key, api_secret, symbol, "SELL", futures_qty, leverage)
 
     # 4. 🚨 ATOMIC ROLLBACK GUARD: Rollback Leg 1 if Leg 2 Fails!
-    if not futures_res or futures_res.get("status") == "error" or futures_res.get("code") != 200:
+    if not futures_res or futures_res.get("status") == "error" or (isinstance(futures_res, dict) and futures_res.get("code") and futures_res.get("code") != 200):
         err_msg = futures_res.get("msg", futures_res.get("error", "Unknown Futures Error")) if isinstance(futures_res, dict) else "Futures Order Failed"
         print(f"⚠️ [SUPER HEDGE ROLLBACK] Futures Short leg failed ({err_msg}). Executing INSTANT Spot Rollback Sell to prevent unhedged risk...")
         rollback_res = trading_engine.execute_spot_trade(api_key, api_secret, symbol, "SELL")
@@ -788,12 +1042,23 @@ def execute_super_delta_neutral_hedge(api_key: str, api_secret: str, symbol: str
             "rollback_status": rollback_res
         }
 
-    print(f"✅ [SUPER HEDGE SUCCESS] 100% Delta-Neutral Position Opened for {symbol} (${amount_usdt:.2f} USDT)! 0% Liquidation Risk.")
+    # Record bot in DB if chat_id provided
+    if chat_id > 0:
+        db.add_turbo_hedge_bot(chat_id, symbol, amount_usdt, leverage, "HEDGE", target_tp=2.5, is_bot_initiated=True)
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_spot_qty", str(executed_qty))
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_futures_qty", str(futures_qty))
+        if current_price > 0:
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(current_price))
+
+    print(f"✅ [SUPER HEDGE SUCCESS] 100% Delta-Neutral Position Opened for {symbol} (Spot Buy: {executed_qty} / Fut Short: {futures_qty})! 0% Liquidation Risk.")
     return {
         "status": "success",
         "mode": "SUPER_DELTA_NEUTRAL",
         "symbol": symbol,
         "amount_usdt": amount_usdt,
+        "spot_qty": executed_qty,
+        "futures_qty": futures_qty,
+        "entry_price": current_price,
         "leverage": leverage,
         "spot_res": spot_res,
         "futures_res": futures_res,
@@ -1071,7 +1336,28 @@ async def monitor_turbo_hedge_bots(app):
                     b_side = str(b.get("side", "BUY")).upper()
                     b_lev = int(b.get("leverage", 10))
                     
-                    if b_side == "SPOT" or b_lev <= 1:
+                    if b_side in ["HEDGE", "DELTA_NEUTRAL"]:
+                        base_asset = b_sym.replace("USDT", "").replace("DODOX", "DODO")
+                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, f_keys[0], f_keys[1], base_asset)
+                        mark_p = await asyncio.to_thread(trading_engine.get_current_price, b_sym)
+                        notional_val = spot_bal * mark_p if mark_p > 0 else spot_bal
+                        has_fut_pos = (b_sym in live_sym_map and live_sym_map[b_sym] < 0)
+                        
+                        if (spot_bal <= 0 or notional_val < 1.0) and not has_fut_pos:
+                            db.remove_turbo_hedge_bot(target_chat_id, b_sym)
+                            active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
+                            print(f"🧹 [CLOSED HEDGE POSITION PURGED FROM DB] User {target_chat_id} {b_sym} purged!")
+                        elif (spot_bal <= 0 or notional_val < 1.0) and has_fut_pos:
+                            print(f"⚠️ [UNHEDGED SPOT DETECTED] Spot missing for {b_sym}. Emergency closing Futures short...")
+                            await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, f_keys[0], f_keys[1], b_sym)
+                            db.remove_turbo_hedge_bot(target_chat_id, b_sym)
+                            active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
+                        elif notional_val >= 1.0 and not has_fut_pos:
+                            print(f"⚠️ [UNHEDGED FUTURES DETECTED] Futures short missing for {b_sym}. Emergency selling Spot...")
+                            await asyncio.to_thread(trading_engine.execute_spot_trade, f_keys[0], f_keys[1], b_sym, "SELL")
+                            db.remove_turbo_hedge_bot(target_chat_id, b_sym)
+                            active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
+                    elif b_side == "SPOT" or b_lev <= 1:
                         # Spot position check: verify spot asset balance and notional value
                         base_asset = b_sym.replace("USDT", "").replace("DODOX", "DODO")
                         spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, f_keys[0], f_keys[1], base_asset)
@@ -1391,7 +1677,32 @@ async def monitor_turbo_hedge_bots(app):
             active_lev = int(active_lev_str) if active_lev_str.isdigit() else leverage
 
             # 2. Check Live Real-Time Position Risk & PnL from Binance Spot or Futures API
-            if current_side == "SPOT" or leverage <= 1:
+            if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
+                mark_p = trading_engine.get_current_price(symbol)
+                entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
+                entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
+                if entry_p <= 0 and mark_p > 0:
+                    entry_p = mark_p
+                    db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
+
+                base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+                spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+                fut_pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
+                
+                spot_pnl = (mark_p - entry_p) * spot_qty if (entry_p > 0 and mark_p > 0) else 0.0
+                fut_pnl = float(fut_pnl_info.get("unrealizedProfit", 0.0)) if fut_pnl_info.get("has_position") else 0.0
+                combined_pnl = spot_pnl + fut_pnl
+                
+                pnl_info = {
+                    "has_position": (spot_qty > 0 or fut_pnl_info.get("has_position")),
+                    "unrealizedProfit": combined_pnl,
+                    "entryPrice": entry_p,
+                    "markPrice": mark_p,
+                    "liquidationPrice": 0.0,
+                    "positionAmt": spot_qty,
+                    "side": "HEDGE"
+                }
+            elif current_side == "SPOT" or leverage <= 1:
                 mark_p = trading_engine.get_current_price(symbol)
                 entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
                 entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
@@ -1480,10 +1791,16 @@ async def monitor_turbo_hedge_bots(app):
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
                     # 🚀 AGI Dynamic Moonshot Profit Rider:
-                    is_spot = (current_side == "SPOT" or leverage <= 1)
+                    is_hedge = (current_side in ["HEDGE", "DELTA_NEUTRAL"])
+                    is_spot = (current_side == "SPOT" or (leverage <= 1 and not is_hedge))
                     bot_amt = float(bot_info.get("amount", 10.0))
                     
-                    if is_spot:
+                    if is_hedge:
+                        # 🛡️ Super Delta-Neutral Hedge Profit Harvester (Captures Funding Payouts + Cash & Carry Basis)
+                        target_dollar_tp = max(0.20, float(target_tp) if float(target_tp) > 0 else 0.50)
+                        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
+                        is_peak_locked = (net_pnl_usdt >= 0.15 and peak_pnl >= 0.25 and net_pnl_usdt <= peak_pnl * 0.85)
+                    elif is_spot:
                         # 🎯 Tier 6 Spot High-Velocity Target TP Calibration (+1.5% to +2.5% price gain)
                         effective_tp_pct = 2.0  # Scalper target on Spot (2.0% price move)
                         target_dollar_tp = max(0.25, bot_amt * (effective_tp_pct / 100.0))
@@ -1507,7 +1824,12 @@ async def monitor_turbo_hedge_bots(app):
                     is_breakeven_armed = False
                     min_guaranteed_roi = -999.0
                     
-                    if is_spot:
+                    if is_hedge:
+                        # Delta-Neutral Hedge holds 0 directional risk; breakeven arms once funding/basis profit reaches +$0.20
+                        if peak_pnl >= 0.20:
+                            is_breakeven_armed = True
+                            min_guaranteed_roi = 0.20
+                    elif is_spot:
                         # Spot Mode: Breakeven activates at +1.0% price gain (covers Spot fees 0.15% - 0.20%)
                         if peak_roi >= 1.0 or peak_pnl >= 0.15:
                             is_breakeven_armed = True
@@ -1543,7 +1865,7 @@ async def monitor_turbo_hedge_bots(app):
                     scale_out_level = int(scale_level_str) if scale_level_str.isdigit() else 0
                     
                     is_tp1_hit = False
-                    if scale_out_level == 0:
+                    if scale_out_level == 0 and not is_hedge:
                         if is_spot:
                             is_tp1_hit = (roi_pct >= 1.2 or net_pnl_usdt >= max(0.20, bot_amt * 0.012))
                         else:
@@ -1551,13 +1873,27 @@ async def monitor_turbo_hedge_bots(app):
 
                     # 🛡️ SUPER SMART ANTI-WHIPSAW CLEAN STOP-LOSS (-10.0% ROI / -$0.50 minimum floor):
                     # Clean Market Close & 2-Hour Blacklist Cooldown (Zero Reverse Flip)
-                    is_stop_loss_hit = (
-                        (not is_spot and (roi_pct <= -10.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.10))) or
-                        (is_spot and (roi_pct <= -5.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.05)))
-                    )
-                    is_hard_circuit_breaker = (roi_pct <= -25.0 or net_pnl_usdt <= -max(1.25, bot_amt * 0.25))
-
                     now_ts = int(time.time())
+                    if is_hedge:
+                        # Delta-Neutral Hedge has 0% liquidation risk and zero market directional exposure.
+                        is_stop_loss_hit = False
+                        is_hard_circuit_breaker = False
+
+                        # Negative Funding Rate Inversion Sentinel:
+                        # If funding rate flips negative, shorts pay longs. Alert and log!
+                        curr_fr = market_data.fetch_funding_rate(symbol)
+                        if curr_fr < -0.0001:
+                            last_alert_ts = int(db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", "0"))
+                            if now_ts - last_alert_ts > 14400:
+                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", str(now_ts))
+                                print(f"⚠️ [HEDGE NEGATIVE FUNDING INVERSION] {symbol}: Funding rate {curr_fr*100:+.4f}% < 0. Yield rotation advised.")
+                    else:
+                        is_stop_loss_hit = (
+                            (not is_spot and (roi_pct <= -10.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.10))) or
+                            (is_spot and (roi_pct <= -5.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.05)))
+                        )
+                        is_hard_circuit_breaker = (roi_pct <= -25.0 or net_pnl_usdt <= -max(1.25, bot_amt * 0.25))
+
                     last_flip_key = f"{chat_id}_{symbol}"
                     last_flip_ts = _last_flip_timestamps.get(last_flip_key, 0)
 
@@ -1569,7 +1905,10 @@ async def monitor_turbo_hedge_bots(app):
                         entry_ts = now_ts
                     
                     holding_seconds = now_ts - entry_ts
-                    if is_spot:
+                    if is_hedge:
+                        # Delta-Neutral Hedge earns funding 24/7 without liquidation risk. Only release if stagnant after 48h with profit.
+                        is_stagnant_timeout = (holding_seconds >= 172800 and net_pnl_usdt >= 0.30)
+                    elif is_spot:
                         # Spot Stagnant Capital Time-Stop (35 Mins Release)
                         # Sells if open >= 35 mins without reaching TP, or if open >= 20 mins with profit >= $0.25
                         is_stagnant_timeout = (
@@ -1679,7 +2018,11 @@ async def monitor_turbo_hedge_bots(app):
                         print(f"💰 [TURBO HEDGE {reason_tag}] {symbol}: Real PnL +${real_pnl_usdt:.2f} USDT (ROI: +{roi_pct:.1f}%) -> Closing Position (<30ms)...")
                         
                         # Market Close Position on Binance (<30ms)
-                        if current_side == "SPOT":
+                        if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
+                            close_spot = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+                            close_fut = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+                            close_res = close_fut if is_close_successful(close_fut) else close_spot
+                        elif current_side == "SPOT":
                             close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
                         else:
                             close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
@@ -1863,9 +2206,31 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
         else:
             # Single coin stop
             target_bot = next((b for b in user_bots if b.get("symbol") == symbol), None)
-            is_spot_bot = target_bot and (str(target_bot.get("side")).upper() == "SPOT" or int(target_bot.get("leverage", 10)) <= 1)
+            is_hedge_bot = target_bot and (str(target_bot.get("side")).upper() in ["HEDGE", "DELTA_NEUTRAL"])
+            is_spot_bot = target_bot and (str(target_bot.get("side")).upper() == "SPOT" or int(target_bot.get("leverage", 10)) <= 1) and not is_hedge_bot
             
-            if is_spot_bot:
+            if is_hedge_bot:
+                base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+                spot_bal = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+                if spot_bal > 0:
+                    close_res_spot = trading_engine.execute_spot_trade(keys[0], keys[1], symbol, "SELL")
+                    mark_p = trading_engine.get_current_price(symbol)
+                    entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
+                    entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
+                    spot_pnl = (mark_p - entry_p) * spot_bal if (entry_p > 0 and mark_p > 0) else 0.0
+                    total_pnl_realized += spot_pnl
+                    closed_details.append({"symbol": f"{symbol} (Spot)", "amt": spot_bal, "pnl": spot_pnl, "res": close_res_spot})
+                
+                pos_info = trading_engine.get_futures_position_pnl(keys[0], keys[1], symbol)
+                if pos_info.get("has_position"):
+                    fut_pnl = float(pos_info.get("unrealizedProfit", 0))
+                    total_pnl_realized += fut_pnl
+                    close_res_fut = trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
+                    closed_details.append({"symbol": f"{symbol} (Futures)", "amt": pos_info.get("positionAmt"), "pnl": fut_pnl, "res": close_res_fut})
+                else:
+                    trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
+                print(f"🛑 [SUPER SMART STOP HEDGE SINGLE] Market Closed BOTH Spot & Futures legs for {symbol} (Total PnL: ${total_pnl_realized:.2f})!")
+            elif is_spot_bot:
                 base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
                 spot_bal = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
                 if spot_bal > 0:
