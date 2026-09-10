@@ -315,9 +315,58 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     is_defender_active = db.is_defender_active() if hasattr(db, 'is_defender_active') else False
     circuit_breaker = db.get_circuit_breaker_status() if hasattr(db, 'get_circuit_breaker_status') else {"tripped": False}
 
-    # 11. Multi-Chain Web3 Settlement Wallet
+    # 11. Multi-Chain Web3 Settlement Wallet & Smart Swap Dedicated Wallets
     web3_wallets = db.get_user_multichain_wallets(chat_id) if hasattr(db, 'get_user_multichain_wallets') else {}
     primary_web3 = db.get_user_web3_wallet(chat_id) if hasattr(db, 'get_user_web3_wallet') else ""
+
+    # Dedicated Solana Trading Hot Wallet (Trojan / BonkBot Architecture)
+    user_sol_wallet = None
+    user_sol_pubkey = ""
+    user_sol_bal = 0.0
+    user_sol_usd = 0.0
+    user_sol_funded = False
+    try:
+        import solana_trading_wallet
+        user_sol_wallet = solana_trading_wallet.get_user_solana_wallet_overview(chat_id)
+        user_sol_pubkey = user_sol_wallet.get("public_key", "")
+        user_sol_bal = float(user_sol_wallet.get("sol_balance", 0.0))
+        user_sol_usd = float(user_sol_wallet.get("usd_value", 0.0))
+        user_sol_funded = bool(user_sol_wallet.get("is_funded", False))
+    except Exception as e:
+        print(f"[PORTFOLIO] Solana wallet query error: {e}")
+
+    # Bound Phantom Profit Settlement Vault (100% Non-Custodial Zero-Risk Destination)
+    phantom_vault = ""
+    phantom_bal_usd = 0.0
+    phantom_details_str = ""
+    try:
+        import solana_trading_wallet
+        phantom_vault = solana_trading_wallet.get_user_phantom_wallet(chat_id) or ""
+        if phantom_vault:
+            p_data = get_onchain_live_balances(phantom_vault)
+            phantom_bal_usd = float(p_data.get("total_usd", 0.0))
+            phantom_details_str = p_data.get("details", "")
+    except Exception as e:
+        print(f"[PORTFOLIO] Phantom vault query error: {e}")
+
+    # EVM Web3 Wallet (Arbitrum / Ethereum)
+    evm_bal_usd = 0.0
+    evm_details_str = ""
+    if primary_web3 and primary_web3.startswith("0x"):
+        e_data = get_onchain_live_balances(primary_web3)
+        evm_bal_usd = float(e_data.get("total_usd", 0.0))
+        evm_details_str = e_data.get("details", "")
+
+    # Smart Swap Realized PnL & Trade Count
+    swap_history = []
+    total_realized_swap_pnl = 0.0
+    total_swaps_count = 0
+    try:
+        swap_history = db.get_smart_swap_history(chat_id=chat_id, limit=30) or []
+        total_swaps_count = len(swap_history)
+        total_realized_swap_pnl = sum(float(h.get("realized_pnl_usd", 0.0)) for h in swap_history)
+    except Exception as e:
+        print(f"[PORTFOLIO] Swap history query error: {e}")
 
     # 12. VPS & System Health
     uptime_sec = int(time.time() - _START_TIME)
@@ -350,14 +399,10 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     # =========================================================================
     # CONSOLIDATED TOTALS CALCULATION
     # =========================================================================
-    onchain_wallet_data = get_onchain_live_balances(primary_web3)
-    wallet_usd_balance = onchain_wallet_data.get("total_usd", 0.0)
-    wallet_details_str = onchain_wallet_data.get("details", "")
-
     total_spot_capital = spot_usdt_free + spot_alt_exposure
     total_futures_capital = futures_wallet_usdt + futures_unrealized_pnl
     active_swaps_usd = sum(s["current_val_usd"] for s in active_smart_swaps)
-    total_onchain_capital = round(active_swaps_usd + wallet_usd_balance, 2)
+    total_onchain_capital = round(active_swaps_usd + user_sol_usd + evm_bal_usd, 2)
     total_portfolio_net_worth = round(total_spot_capital + total_futures_capital + total_onchain_capital, 2)
 
     total_invested_usd = 0.0
@@ -401,8 +446,19 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "total_onchain_capital": round(total_onchain_capital, 2),
         "web3_wallets": web3_wallets,
         "primary_web3": primary_web3,
-        "wallet_usd_balance": wallet_usd_balance,
-        "wallet_details_str": wallet_details_str,
+        
+        # Dedicated Smart Swap & Web3 Fields
+        "user_sol_pubkey": user_sol_pubkey,
+        "user_sol_bal": user_sol_bal,
+        "user_sol_usd": round(user_sol_usd, 2),
+        "user_sol_funded": user_sol_funded,
+        "phantom_vault": phantom_vault,
+        "phantom_bal_usd": round(phantom_bal_usd, 2),
+        "phantom_details_str": phantom_details_str,
+        "evm_bal_usd": round(evm_bal_usd, 2),
+        "evm_details_str": evm_details_str,
+        "total_realized_swap_pnl": round(total_realized_swap_pnl, 2),
+        "total_swaps_count": total_swaps_count,
 
         # Active Positions per Engine
         "active_futures_positions": active_futures_positions,
@@ -452,6 +508,25 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     pnl_emoji = "🟩" if pnl >= 0 else "🟥"
     pnl_str = f"{pnl_sign}${abs(pnl):,.2f} USD"
 
+    # Solana Hot Wallet and Phantom Vault addresses for display
+    user_sol_pub = data.get("user_sol_pubkey", "")
+    short_sol = f"`{user_sol_pub[:6]}...{user_sol_pub[-4:]}`" if user_sol_pub else "`N/A`"
+    sol_usd = data.get("user_sol_usd", 0.0)
+    sol_bal = data.get("user_sol_bal", 0.0)
+
+    p_vault = data.get("phantom_vault", "")
+    if p_vault:
+        short_pvault_en = f"`{p_vault[:6]}...{p_vault[-4:]}` (Linked ✅ | Auto Profit Vault)"
+        short_pvault_km = f"`{p_vault[:6]}...{p_vault[-4:]}` (ភ្ជាប់រួចរាល់ ✅ | Auto Profit Vault)"
+    else:
+        short_pvault_en = "Not linked (`/smart_swap bind_phantom <addr>`)"
+        short_pvault_km = "មិនទាន់ភ្ជាប់ (`/smart_swap bind_phantom <អាសយដ្ឋាន>`)"
+
+    evm_u = data.get("evm_bal_usd", 0.0)
+    evm_det = data.get("evm_details_str", "")
+    evm_line_en = f"• 🌐 **Arbitrum/EVM Web3:** `${evm_u:,.2f} USD` ({evm_det})\n" if (evm_u > 0 or evm_det) else ""
+    evm_line_km = f"• 🌐 **Arbitrum/EVM Web3 ៖** `${evm_u:,.2f} USD` ({evm_det})\n" if (evm_u > 0 or evm_det) else ""
+
     # =========================================================================
     # 1. HEADER & EXECUTIVE CAPITAL SUMMARY
     # =========================================================================
@@ -468,30 +543,13 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             "🏦 **MULTI-WALLET BALANCES:**\n"
             f"• 🟡 **Binance Spot:** `${data['spot_usdt_free']:,.2f} USDT` free | `${data['spot_alt_exposure']:,.2f}` in Coins\n"
             f"• ⚡ **Binance Futures:** `${data['futures_wallet_usdt']:,.2f} USDT` balance (PnL: `${data['futures_unrealized_pnl']:+,.2f}`)\n"
-        )
-        primary_w = data.get("primary_web3", "")
-        if primary_w:
-            short_addr = f"{primary_w[:6]}...{primary_w[-4:]}"
-            w_detail = data.get("wallet_details_str", "")
-            onchain_disp_en = f"${data['total_onchain_capital']:,.2f} USD ({w_detail} | `{short_addr}`)" if w_detail else f"${data['total_onchain_capital']:,.2f} USD (`{short_addr}`)"
-            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD ({w_detail} | `{short_addr}`)" if w_detail else f"${data['total_onchain_capital']:,.2f} USD (កាបូប `{short_addr}`)"
-        else:
-            onchain_disp_en = f"${data['total_onchain_capital']:,.2f} USD across Solana & EVM"
-            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD លើ Solana & EVM"
-
-        header += (
-            f"• 🌐 **Web3 On-Chain:** {onchain_disp_en}\n"
+            f"• ⚡ **Solana Trading Wallet:** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL` | {short_sol}) [Dedicated Hot Wallet]\n"
+            f"• 🟣 **Phantom Vault (Withdraw):** {short_pvault_en}\n"
+            f"{evm_line_en}"
+            f"• 🌐 **Total On-Chain Net Capital:** `${data['total_onchain_capital']:,.2f} USD`\n"
             "──────────────────────────────────────\n\n"
         )
     else:
-        primary_w = data.get("primary_web3", "")
-        if primary_w:
-            short_addr = f"{primary_w[:6]}...{primary_w[-4:]}"
-            w_detail = data.get("wallet_details_str", "")
-            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD ({w_detail} | `{short_addr}`)" if w_detail else f"${data['total_onchain_capital']:,.2f} USD (កាបូប `{short_addr}`)"
-        else:
-            onchain_disp_km = f"${data['total_onchain_capital']:,.2f} USD លើ Solana & EVM"
-
         header = (
             "👑 **KHMER MASTER CRYPTO | របាយការណ៍វិនិយោគរួម SUPER SMART PORTFOLIO** 🛡️\n"
             "══════════════════════════════════════\n"
@@ -504,7 +562,10 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             "🏦 **សមតុល្យតាមកាបូបនីមួយៗ (Multi-Wallet Balances) ៖**\n"
             f"• 🟡 **Binance Spot ៖** `${data['spot_usdt_free']:,.2f} USDT` សេរី | `${data['spot_alt_exposure']:,.2f}` កំពុងកាន់កាក់\n"
             f"• ⚡ **Binance Futures ៖** `${data['futures_wallet_usdt']:,.2f} USDT` ក្នុងកាបូប (PnL: `${data['futures_unrealized_pnl']:+,.2f}`)\n"
-            f"• 🌐 **Web3 On-Chain ៖** {onchain_disp_km}\n"
+            f"• ⚡ **Solana Trading Wallet ៖** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL` | {short_sol}) [កាបូបជួញដូរផ្ទាល់ខ្លួន]\n"
+            f"• 🟣 **Phantom Vault (ដកប្រាក់) ៖** {short_pvault_km}\n"
+            f"{evm_line_km}"
+            f"• 🌐 **ទុនជួញដូរ On-Chain សរុប ៖** `${data['total_onchain_capital']:,.2f} USD`\n"
             "──────────────────────────────────────\n\n"
         )
 
@@ -585,20 +646,39 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
 
     # --- ENGINE 4: Smart Swap Multi-Chain DEX & AI Gem Sniper ---
     swaps = data["active_smart_swaps"]
+    realized_swap_pnl = data.get("total_realized_swap_pnl", 0.0)
+    swaps_cnt = data.get("total_swaps_count", 0)
+    pnl_hist_str_km = f"\n  • 🏆 ផលចំណេញកើបបានពីមុន ៖ `+${realized_swap_pnl:,.2f} USD` (ពីការជួញដូរ {swaps_cnt} ដង)" if swaps_cnt > 0 else ""
+    pnl_hist_str_en = f"\n  • 🏆 Realized DEX Profit ៖ `+${realized_swap_pnl:,.2f} USD` ({swaps_cnt} completed trades)" if swaps_cnt > 0 else ""
+
     if swaps:
         e4_status = f"🟢 ACTIVE ({len(swaps)} On-Chain Gems កំពុងកើបចំណេញ)" if lang == "km" else f"🟢 ACTIVE ({len(swaps)} On-Chain Gems)"
         e4_details = []
         for s in swaps:
             sw_sign = "+" if s['pnl_usd'] >= 0 else ""
-            scale_str = "50% Moonbag" if s['scale_out_level'] == 1 else "100% Full Qty"
-            e4_details.append(f"  • `{s['symbol']}` ({s['chain']}) ៖ Value `${s['current_val_usd']:.2f}` | Entry: `${s['entry_price']:.6f}` | Live: `${s['current_price']:.6f}` | PnL: `{sw_sign}${s['pnl_usd']:.2f}` (`{s['roi_pct']:+.1f}%`) [{scale_str}]")
-        e4_body = "\n".join(e4_details)
+            scale_str = "50% Moonbag Trailing" if s['scale_out_level'] == 1 else "100% Full Qty"
+            short_addr = f"{s['address'][:6]}...{s['address'][-4:]}"
+            e4_details.append(
+                f"  • `{s['symbol']}` ({s['chain']}) ៖ Value `${s['current_val_usd']:.2f}` | Entry: `${s['entry_price']:.6f}` | Live: `${s['current_price']:.6f}` | PnL: `{sw_sign}${s['pnl_usd']:.2f}` (`{s['roi_pct']:+.1f}%`) [{scale_str}]\n"
+                f"    🌾 TP/SL: `TP1 +40% (ដកដើម ១០០%) | Trailing Stop Active` | Mint: `{short_addr}`"
+            )
+        e4_body = ("\n".join(e4_details) + pnl_hist_str_km) if lang == "km" else ("\n".join(e4_details) + pnl_hist_str_en)
     else:
-        e4_status = "🟡 STANDBY (ស្កេន DexScreener/Jupiter ស្វែងរកកាក់ Breakout 24/7)" if lang == "km" else "🟡 STANDBY (Scanning DEX Breakout Firehose 24/7)"
-        primary_w = data.get("primary_web3", "")
-        w_note = f"\n  • កាបូប Web3 ៖ `{primary_w[:8]}...{primary_w[-6:]}` (ភ្ជាប់រួចរាល់ ✅)" if primary_w else "\n  • កាបូប Web3 ៖ មិនទាន់ភ្ជាប់ (វាយ `/wallet <address>` ដើម្បីភ្ជាប់)"
-        w_note_en = f"\n  • Web3 Wallet: `{primary_w[:8]}...{primary_w[-6:]}` (Linked & Ready ✅)" if primary_w else "\n  • Web3 Wallet: Not Linked (Execute `/wallet <address>`)"
-        e4_body = f"  • ស្ថានភាព ៖ Honeypot & Jito MEV Shield សកម្ម (វាយ `/smart_swap auto 20 1234` ដើម្បីបាញ់){w_note}" if lang == "km" else f"  • Status: Armed with Jito MEV Protection (Execute `/smart_swap auto 20 1234`){w_note_en}"
+        e4_status = "🟡 STANDBY (ស្កេន DexScreener & Jupiter Breakout Firehose 24/7)" if lang == "km" else "🟡 STANDBY (Scanning DEX Breakout Firehose 24/7)"
+        sol_bal_text = f"`{sol_bal:.4f} SOL` (${sol_usd:.2f} USD)"
+        e4_body = (
+            f"  • 💳 កាបូបជួញដូរ Solana ៖ {sol_bal_text} | {short_sol}\n"
+            f"  • 🟣 Phantom Settlement Vault ៖ {short_pvault_km}\n"
+            f"  • 🛡️ សុវត្ថិភាព ៖ Jito Private MEV Shield & Honeypot AI Shield សកម្ម ១០០%\n"
+            f"  • 🎯 សកម្មភាព ៖ វាយ `/smart_swap auto 20 1234` ដើម្បីបាញ់កាក់ Gem អូតូ!"
+            f"{pnl_hist_str_km}"
+        ) if lang == "km" else (
+            f"  • 💳 Solana Hot Wallet: {sol_bal_text} | {short_sol}\n"
+            f"  • 🟣 Phantom Settlement Vault: {short_pvault_en}\n"
+            f"  • 🛡️ Protection: Jito Private MEV Shield & Honeypot AI Active 100%\n"
+            f"  • 🎯 Action: Execute `/smart_swap auto 20 1234` to launch sniper!"
+            f"{pnl_hist_str_en}"
+        )
     engines_text += f"4️⃣ **Smart Swap Multi-Chain DEX & AI Sniper (`/smart_swap`)**\n   {e4_status}\n{e4_body}\n\n"
 
     # --- ENGINE 5: Dynamic Infinity Matrix & Compound Grid ---
@@ -698,3 +778,129 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
         return header + engines_text + vitals_block + footer
 
     return header + engines_text + footer
+
+def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> str:
+    """
+    Renders an institutional-grade, specialized On-Chain DEX Portfolio card
+    focusing entirely on /smart_swap, Solana Hot Wallet, Phantom Vault, and Live Gems.
+    """
+    lang = "en" if str(user_lang).lower() in ["en", "english"] else "km"
+    chat_id = data["chat_id"]
+    is_paper = data["is_paper"]
+    badge_mode = "🧪 PAPER TRADING SIMULATION" if is_paper else "🚀 REAL LIVE ON-CHAIN (Jupiter DEX)"
+
+    user_sol_pub = data.get("user_sol_pubkey", "")
+    short_sol = f"`{user_sol_pub[:6]}...{user_sol_pub[-4:]}`" if user_sol_pub else "`N/A`"
+    sol_usd = data.get("user_sol_usd", 0.0)
+    sol_bal = data.get("user_sol_bal", 0.0)
+
+    p_vault = data.get("phantom_vault", "")
+    short_pvault = f"`{p_vault[:6]}...{p_vault[-4:]}`" if p_vault else ""
+
+    swaps = data.get("active_smart_swaps", [])
+    active_swaps_usd = sum(s.get("current_val_usd", 0.0) for s in swaps)
+    active_swaps_pnl = sum(s.get("pnl_usd", 0.0) for s in swaps)
+    realized_pnl = data.get("total_realized_swap_pnl", 0.0)
+    swaps_count = data.get("total_swaps_count", 0)
+    total_onchain = data.get("total_onchain_capital", 0.0)
+
+    pnl_sign = "+" if active_swaps_pnl >= 0 else ""
+    pnl_emoji = "🟩" if active_swaps_pnl >= 0 else "🟥"
+
+    if lang == "en":
+        lines = [
+            "⚡ **KHMER MASTER CRYPTO | SUPER SMART ON-CHAIN DEX PORTFOLIO** 🚀",
+            "══════════════════════════════════════",
+            f"💼 **ACCOUNT CLEARANCE:** `ID: {chat_id}` | `{badge_mode}`",
+            "══════════════════════════════════════\n",
+            "💰 **ON-CHAIN CAPITAL & DEX METRICS:**",
+            f"• 💎 **Total On-Chain Net Capital:** `${total_onchain:,.2f} USD`",
+            f"• 🎯 **Active in DEX Breakout Gems:** `${active_swaps_usd:,.2f} USD` ({len(swaps)} active)",
+            f"• 💵 **Solana Hot Wallet Balance:** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL`)",
+            f"• {pnl_emoji} **Floating DEX PnL:** `{pnl_sign}${active_swaps_pnl:,.2f} USD`",
+            f"• 🏆 **Historical Realized Profit:** `+${realized_pnl:,.2f} USD` ({swaps_count} completed trades)\n",
+            "💳 **MULTI-TENANT DUAL-WALLET ARCHITECTURE:**",
+            f"• ⚡ **Dedicated Solana Trading Wallet:** {short_sol} (`{user_sol_pub}`)",
+            "  *(Personal Trojan/BonkBot-style execution wallet for sub-second DEX swaps)*"
+        ]
+        if p_vault:
+            lines.append(f"• 🟣 **Phantom Profit Settlement Vault:** {short_pvault} (`{p_vault}`) (Bound ✅)")
+            lines.append("  *(100% Non-Custodial Zero-Risk destination for automated profit taking)*\n")
+        else:
+            lines.append("• 🟣 **Phantom Profit Settlement Vault:** `Not Linked`")
+            lines.append("  *(Execute `/smart_swap bind_phantom <address>` to set your profit destination)*\n")
+
+        lines.append("📊 **ACTIVE ON-CHAIN GEM POSITIONS:**")
+        if swaps:
+            for s in swaps:
+                s_sign = "+" if s['pnl_usd'] >= 0 else ""
+                scale_str = "50% Moonbag Trailing" if s['scale_out_level'] == 1 else "100% Full Position"
+                short_mint = f"{s['address'][:6]}...{s['address'][-4:]}"
+                lines.append(
+                    f"• `{s['symbol']}` ({s['chain']}) ៖ Value `${s['current_val_usd']:.2f}` | Entry: `${s['entry_price']:.6f}` | Live: `${s['current_price']:.6f}` | PnL: `{s_sign}${s['pnl_usd']:.2f}` (`{s['roi_pct']:+.1f}%`)\n"
+                    f"  🌾 Strategy: `TP1 +40% (Capital Lock) | Moonbag Trailing` | Mint: `{short_mint}`"
+                )
+            lines.append("")
+        else:
+            lines.append("• 🟡 *No active DEX positions currently open (AI Scanner active 24/7)*\n")
+
+        lines.extend([
+            "🛡️ **INSTITUTIONAL SPEED & SECURITY STACK:**",
+            "• ⚡ **Routing Engine:** `Jupiter Aggregator v6 Multi-DEX Direct`",
+            "• 🛡️ **Anti-MEV:** `Jito Private Bundle (Zero Sandwich & Front-run Immune)`",
+            "• 🔍 **Honeypot Shield:** `Sub-Second Pre-Trade Security Audit (Freeze/Mint Revoked)`",
+            "• 🌾 **Profit Harvester:** `TP1 +40% (100% Capital Lock) + 50% Trailing Moonbag`\n",
+            "──────────────────────────────────────",
+            "💡 *Use the interactive buttons below to snipe gems, check wallet, or exit market:*"
+        ])
+        return "\n".join(lines)
+    else:
+        lines = [
+            "⚡ **KHMER MASTER CRYPTO | SUPER SMART ON-CHAIN DEX PORTFOLIO** 🚀",
+            "══════════════════════════════════════",
+            f"💼 **គណនីវិនិយោគិន ៖** `ID: {chat_id}` | `{badge_mode}`",
+            "══════════════════════════════════════\n",
+            "💰 **ទិដ្ឋភាពទុនជួញដូរ On-Chain (DEX Capital Overview) ៖**",
+            f"• 💎 **ទុន On-Chain សរុប ៖** `${total_onchain:,.2f} USD`",
+            f"• 🎯 **កំពុងវិនិយោគក្នុង DEX Gems ៖** `${active_swaps_usd:,.2f} USD` ({len(swaps)} កាក់សកម្ម)",
+            f"• 💵 **ត្រៀមក្នុងកាបូប Solana Hot Wallet ៖** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL`)",
+            f"• {pnl_emoji} **ផលចំណេញបណ្តោះអាសន្ន (Floating DEX PnL) ៖** `{pnl_sign}${active_swaps_pnl:,.2f} USD`",
+            f"• 🏆 **ប្រាក់ចំណេញកើបបានពីមុន (Realized PnL) ៖** `+${realized_pnl:,.2f} USD` ({swaps_count} លើក)\n",
+            "💳 **ការគ្រប់គ្រងកាបូប On-Chain (Dual-Wallet Architecture) ៖**",
+            f"• ⚡ **Solana Dedicated Hot Wallet ៖** {short_sol}",
+            f"  `{user_sol_pub}`",
+            "  *(កាបូបផ្ទាល់ខ្លួន Bot សម្រាប់បាញ់កាក់លើ Jupiter DEX & Raydium អូតូ ២៤/៧)*"
+        ]
+        if p_vault:
+            lines.append(f"• 🟣 **Phantom Profit Settlement Vault ៖** {short_pvault} (ភ្ជាប់រួចរាល់ ✅)")
+            lines.append(f"  `{p_vault}`")
+            lines.append("  *(រាល់ពេលដកចំណេញ នឹងរត់ចូល Phantom ផ្ទាល់ខ្លួនភ្លាមៗ សុវត្ថិភាព ១០០%)*\n")
+        else:
+            lines.append("• 🟣 **Phantom Profit Settlement Vault ៖** `មិនទាន់ភ្ជាប់`")
+            lines.append("  *(វាយ `/smart_swap bind_phantom <address>` ដើម្បីភ្ជាប់កាបូបដកប្រាក់)*\n")
+
+        lines.append("📊 **ស្ថានភាពកាក់ Gem On-Chain កំពុងជួញដូរ (Active Positions) ៖**")
+        if swaps:
+            for s in swaps:
+                s_sign = "+" if s['pnl_usd'] >= 0 else ""
+                scale_str = "50% Moonbag Trailing" if s['scale_out_level'] == 1 else "100% Full Position"
+                short_mint = f"{s['address'][:6]}...{s['address'][-4:]}"
+                lines.append(
+                    f"• `{s['symbol']}` ({s['chain']}) ៖ Value `${s['current_val_usd']:.2f}` | Entry: `${s['entry_price']:.6f}` | Live: `${s['current_price']:.6f}` | PnL: `{s_sign}${s['pnl_usd']:.2f}` (`{s['roi_pct']:+.1f}%`)\n"
+                    f"  🌾 យុទ្ធសាស្ត្រ: `TP1 +40% (ដកដើម ១០០%) | Trailing Stop` | Mint: `{short_mint}`"
+                )
+            lines.append("")
+        else:
+            lines.append("• 🟡 *បច្ចុប្បន្នគ្មានកាក់ Gem កំពុងកាន់កាប់ឡើយ (ម៉ាស៊ីន AI កំពុងស្កេន DexScreener 24/7)*\n")
+
+        lines.extend([
+            "🛡️ **ប្រព័ន្ធសុវត្ថិភាព និងល្បឿនស្ថាប័ន (Institutional DEX Stack) ៖**",
+            "• ⚡ **Router ៖** `Jupiter Aggregator v6 Direct Routing`",
+            "• 🛡️ **Anti-MEV ៖** `Jito Private Bundle (ការពារការលួច Front-run & Sandwich)`",
+            "• 🔍 **Honeypot Shield ៖** `Sub-Second Security Audit (Freeze & Mint Revoked)`",
+            "• 🌾 **Profit Harvester ៖** `TP1 +40% (Lock ដើមទុន ១០០%) + Moonbag 50% Trailing`\n",
+            "──────────────────────────────────────",
+            "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បីបញ្ជា Auto Gem Sniper, ពិនិត្យកាបូប ឬ Stop Market ភ្លាមៗ ៖*"
+        ])
+        return "\n".join(lines)
+

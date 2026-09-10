@@ -2379,23 +2379,52 @@ class TelegramBotThread(BaseThread):
             import portfolio_engine
             # Query full system portfolio data asynchronously
             data = await asyncio.to_thread(portfolio_engine.get_full_system_portfolio_data, chat_id)
-            card_text = portfolio_engine.render_portfolio_card(data, user_lang=user_lang)
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🔄 Refresh Portfolio", callback_data="btn_menu_portfolio"),
-                    InlineKeyboardButton("💰 Check Balance", callback_data="btn_balance_refresh")
-                ],
-                [
-                    InlineKeyboardButton("⚡ Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🚀 Smart Swap DEX", callback_data="btn_smart_swap_scan")
-                ],
-                [
-                    InlineKeyboardButton("🛑 STOP ALL (Exit Market)", callback_data="btn_smart_swap_stop_all"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                ]
-            ])
+
+            # Check if user requested specialized DEX / Smart Swap portfolio breakdown
+            args = [str(a).lower().strip() for a in (context.args or [])]
+            is_dex_view = any(x in args for x in ["smart_swap", "dex", "swap", "solana", "gem", "gems"])
+
+            if is_dex_view:
+                card_text = portfolio_engine.render_smart_swap_dex_portfolio_card(data, user_lang=user_lang)
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh DEX", callback_data="btn_portfolio_smart_swap"),
+                        InlineKeyboardButton("💳 Solana Hot Wallet", callback_data="btn_smart_swap_wallet")
+                    ],
+                    [
+                        InlineKeyboardButton("🎯 Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20"),
+                        InlineKeyboardButton("🔍 ស្កេនរកកាក់ Breakout", callback_data="btn_smart_swap_scan")
+                    ],
+                    [
+                        InlineKeyboardButton("🛑 STOP Swaps (Exit)", callback_data="btn_smart_swap_stop_all"),
+                        InlineKeyboardButton("💼 Full 10-Engine Portfolio", callback_data="btn_menu_portfolio")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+            else:
+                card_text = portfolio_engine.render_portfolio_card(data, user_lang=user_lang)
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh Portfolio", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("⚡ Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                        InlineKeyboardButton("⚡ Smart Swap AI (DEX)", callback_data="btn_portfolio_smart_swap")
+                    ],
+                    [
+                        InlineKeyboardButton("💳 Solana Hot Wallet", callback_data="btn_smart_swap_wallet"),
+                        InlineKeyboardButton("🎯 Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20")
+                    ],
+                    [
+                        InlineKeyboardButton("🛑 STOP ALL (Exit Market)", callback_data="btn_smart_swap_stop_all"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
 
             if len(card_text) > 4000:
                 # Split cleanly if Telegram 4096 character limit exceeded
@@ -4418,6 +4447,10 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_executive_report", "btn_report_refresh"]:
                 await executive_summary_command(update, context)
             elif data in ["btn_menu_portfolio", "btn_portfolio"]:
+                context.args = []
+                await portfolio_command(update, context)
+            elif data in ["btn_portfolio_smart_swap", "btn_portfolio_dex"]:
+                context.args = ["smart_swap"]
                 await portfolio_command(update, context)
             elif data == "btn_balance_refresh":
                 await balance_command(update, context)
