@@ -446,14 +446,15 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
     if chain_upper == "SOLANA":
         try:
             import solana_trading_wallet
-            bot_wallet_info = solana_trading_wallet.get_bot_solana_wallet_overview()
-            bot_wallet_addr = bot_wallet_info["public_key"]
-            bot_sol_bal = bot_wallet_info["sol_balance"]
+            user_priv, user_pub = solana_trading_wallet.get_or_create_user_solana_wallet(chat_id)
+            user_wallet_info = solana_trading_wallet.get_user_solana_wallet_overview(chat_id)
+            bot_wallet_addr = user_pub
+            bot_sol_bal = user_wallet_info["sol_balance"]
             if not user_wallet:
-                user_wallet = bot_wallet_addr
+                user_wallet = user_pub
                 is_vault = True
         except Exception as e:
-            print(f"[SMART_SWAP] Error loading bot hot wallet: {e}")
+            print(f"[SMART_SWAP] Error loading user dedicated wallet: {e}")
             if not user_wallet:
                 user_wallet = os.getenv("SOLANA_KEEPER_ADDRESS", "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin")
                 is_vault = True
@@ -485,7 +486,7 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
         price_impact = quote["price_impact_pct"]
         route_steps = quote["route_steps"]
 
-        # Check if Bot Hot Wallet is funded for Live On-Chain Execution
+        # Check if User Dedicated Wallet is funded for Live On-Chain Execution
         is_sol_input = ("So11111111111111111111111111111111111111112" in from_addr)
         required_lamports = amount_atomic + 5000000 if is_sol_input else 5000000
         
@@ -494,22 +495,25 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
 
         try:
             import solana_trading_wallet
-            w_info = solana_trading_wallet.get_bot_solana_wallet_overview()
+            w_info = solana_trading_wallet.get_user_solana_wallet_overview(chat_id)
             if w_info.get("lamports", 0) >= required_lamports:
-                # 🚀 EXECUTE LIVE ON-CHAIN JUPITER TRANSACTION
+                # 🚀 EXECUTE LIVE ON-CHAIN JUPITER TRANSACTION USING USER DEDICATED WALLET
+                user_priv, user_pub = solana_trading_wallet.get_or_create_user_solana_wallet(chat_id)
                 live_res = solana_trading_wallet.execute_jupiter_live_swap(
                     from_mint=from_addr,
                     to_mint=to_addr,
                     amount_lamports=amount_atomic,
-                    slippage_bps=slippage_bps
+                    slippage_bps=slippage_bps,
+                    signing_priv_key=user_priv,
+                    user_pubkey=user_pub
                 )
                 if live_res.get("status") == "success":
                     is_live_onchain = True
                     simulated_tx = live_res["tx_hash"]
                     solscan_link = live_res["solscan_url"]
-                    print(f"🚀 [SOLANA LIVE ON-CHAIN SWAP CONFIRMED] Tx: {simulated_tx} | {solscan_link}")
+                    print(f"🚀 [USER {chat_id} LIVE ON-CHAIN SWAP CONFIRMED] Tx: {simulated_tx} | {solscan_link}")
                 else:
-                    print(f"⚠️ [SOLANA LIVE SWAP NOTICE] {live_res.get('msg')} -> Recorded with Jito MEV Simulation")
+                    print(f"⚠️ [USER {chat_id} LIVE SWAP NOTICE] {live_res.get('msg')} -> Recorded with Jito MEV Simulation")
         except Exception as e:
             print(f"[SMART_SWAP] Live on-chain execution attempt error: {e}")
     else:

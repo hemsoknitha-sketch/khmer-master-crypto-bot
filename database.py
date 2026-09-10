@@ -1573,6 +1573,60 @@ def get_user_multichain_wallets(chat_id: int) -> dict:
     return wallets
 
 # ==============================================================================
+# 💳 PER-USER DEDICATED SOLANA TRADING WALLETS (TROJAN / BONKBOT ARCHITECTURE)
+# ==============================================================================
+
+def get_user_solana_wallet(chat_id: int) -> dict | None:
+    """Retrieves the dedicated Solana trading wallet for a specific user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_solana_trading_wallets (
+            chat_id INTEGER PRIMARY KEY,
+            public_key TEXT NOT NULL,
+            encrypted_private_key TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )''')
+        cursor.execute("SELECT chat_id, public_key, encrypted_private_key, created_at FROM user_solana_trading_wallets WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "chat_id": row[0],
+                "public_key": row[1],
+                "encrypted_private_key": row[2],
+                "created_at": row[3]
+            }
+        return None
+    except Exception as e:
+        print(f"[DB] Error querying user_solana_trading_wallets: {e}")
+        return None
+
+def save_user_solana_wallet(chat_id: int, public_key: str, encrypted_private_key: str) -> bool:
+    """Saves or updates a dedicated Solana trading wallet for a specific user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_solana_trading_wallets (
+            chat_id INTEGER PRIMARY KEY,
+            public_key TEXT NOT NULL,
+            encrypted_private_key TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )''')
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''INSERT OR REPLACE INTO user_solana_trading_wallets
+            (chat_id, public_key, encrypted_private_key, created_at)
+            VALUES (?, ?, ?, ?)''',
+            (chat_id, public_key.strip(), encrypted_private_key.strip(), now_str)
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[DB] Error saving user_solana_trading_wallets: {e}")
+        return False
+
+# ==============================================================================
 # ⚡ SUPER SMART ON-CHAIN SWAP & SNIPER REGISTRY (SOLANA, EVM, BSC)
 # ==============================================================================
 

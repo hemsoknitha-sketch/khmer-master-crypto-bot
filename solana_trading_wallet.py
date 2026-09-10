@@ -3,14 +3,17 @@
 🚀 KHMER MASTER CRYPTO - DEDICATED SOLANA ON-CHAIN TRADING WALLET
 ==============================================================================
 Institutional-grade, zero-external-dependency Solana Keypair management,
+Multi-Tenant Per-User Dedicated Wallets (Trojan / BonkBot Architecture),
 Jupiter DEX aggregator integration, and autonomous transaction execution.
 
 Features:
-- Ed25519 cryptographic keypair management using standard 'cryptography' (zero compile dependencies)
+- Ed25519 cryptographic keypair management using standard 'cryptography'
 - Pure-Python Base58 encoding & decoding (zero C++ compile dependencies)
-- Automatic key generation & persistence in .env / SQLite
+- Per-User Dedicated Solana Wallets with military-grade AES-256 (Fernet) encryption
 - Real-time Solana Mainnet balance & gas estimation
-- Jupiter v1 swap instruction retrieval, signing, and RPC broadcasting
+- Pure-Python native SOL Transfer & Withdrawal engine
+- Exportable Private Keys for 100% Non-Custodial Phantom Wallet / Solflare import
+- Jupiter v1 swap instruction retrieval, user signing, and RPC broadcasting
 - Automated reverse-swap for TP1 (+40%) & Moonbag trailing exits
 ==============================================================================
 """
@@ -19,12 +22,16 @@ import os
 import time
 import json
 import base64
+import struct
 import urllib.request
 from dotenv import load_dotenv
 
 # Standard cryptography library (pre-installed on VPS)
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
+
+import database as db
+import security
 
 load_dotenv()
 
@@ -67,7 +74,82 @@ def b58decode(s: str) -> bytes:
     return b"\x00" * pad + res
 
 # ==============================================================================
-# 🔑 KEYPAIR MANAGEMENT & PERSISTENCE
+# 🔑 PER-USER DEDICATED WALLET MANAGEMENT (TROJAN / BONKBOT ARCHITECTURE)
+# ==============================================================================
+
+def get_or_create_user_solana_wallet(chat_id: int) -> tuple[ed25519.Ed25519PrivateKey, str]:
+    """
+    Retrieves or generates a dedicated Solana trading keypair for a specific Telegram user.
+    Stores the private key in SQLite encrypted via military-grade AES-256 (Fernet).
+    Returns: (ed25519.Ed25519PrivateKey, public_address_base58)
+    """
+    chat_id = int(chat_id)
+    existing = db.get_user_solana_wallet(chat_id)
+    if existing and existing.get("encrypted_private_key"):
+        try:
+            decrypted_b58 = security.decrypt_data(existing["encrypted_private_key"])
+            if decrypted_b58:
+                raw_bytes = b58decode(decrypted_b58)
+                seed = raw_bytes[:32]
+                priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
+                pub = existing["public_key"]
+                return priv, pub
+        except Exception as e:
+            print(f"[SOLANA_WALLET] Error decrypting wallet for user {chat_id}: {e}")
+
+    # Generate a fresh cryptographically secure Ed25519 keypair for this specific user
+    priv = ed25519.Ed25519PrivateKey.generate()
+    seed = priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    pub_bytes = priv.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw
+    )
+    pub = b58encode(pub_bytes)
+    full_priv_b58 = b58encode(seed + pub_bytes)
+
+    # Encrypt with AES-256 and persist to SQLite
+    enc_priv = security.encrypt_data(full_priv_b58)
+    db.save_user_solana_wallet(chat_id, pub, enc_priv)
+    print(f"[SOLANA_WALLET] Created and encrypted dedicated Solana wallet for User {chat_id}: {pub}")
+
+    return priv, pub
+
+def get_user_solana_wallet_overview(chat_id: int) -> dict:
+    """Returns a full overview of the dedicated Solana trading wallet for the given user."""
+    _, pub = get_or_create_user_solana_wallet(chat_id)
+    bal_data = get_solana_balance(pub)
+    return {
+        "chat_id": chat_id,
+        "public_key": pub,
+        "lamports": bal_data["lamports"],
+        "sol_balance": bal_data["sol_balance"],
+        "sol_price_usd": bal_data["sol_price_usd"],
+        "usd_value": bal_data["usd_value"],
+        "solscan_url": bal_data["solscan_url"],
+        "is_funded": bal_data["sol_balance"] >= 0.005
+    }
+
+def export_user_private_key(chat_id: int) -> dict | None:
+    """
+    Exports the user's Base58 private key for 100% Non-Custodial import into Phantom or Solflare.
+    """
+    existing = db.get_user_solana_wallet(int(chat_id))
+    if not existing or not existing.get("encrypted_private_key"):
+        return None
+    decrypted_b58 = security.decrypt_data(existing["encrypted_private_key"])
+    if not decrypted_b58:
+        return None
+    return {
+        "public_key": existing["public_key"],
+        "private_key_b58": decrypted_b58
+    }
+
+# ==============================================================================
+# 🔑 KEEPER / BOT HOT WALLET (FALLBACK & ADMIN POOL)
 # ==============================================================================
 
 _CACHED_PRIV_KEY = None
@@ -75,7 +157,7 @@ _CACHED_PUBLIC_KEY = None
 
 def load_or_create_bot_keypair():
     """
-    Loads the bot's dedicated Solana trading keypair from environment / .env,
+    Loads the bot's master Solana trading keypair from environment / .env,
     or generates a new secure Ed25519 keypair and persists it.
     Returns: (ed25519.Ed25519PrivateKey, public_address_base58)
     """
@@ -89,7 +171,6 @@ def load_or_create_bot_keypair():
     if env_key:
         try:
             raw_bytes = b58decode(env_key)
-            # Solana private keys are 32-byte seed or 64-byte seed+public
             seed = raw_bytes[:32]
             priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
             pub_bytes = priv.public_key().public_bytes(
@@ -162,6 +243,20 @@ def get_bot_solana_public_key() -> str:
     _, pub = load_or_create_bot_keypair()
     return pub
 
+def get_bot_solana_wallet_overview() -> dict:
+    """Returns a full overview of the dedicated Bot Hot Wallet."""
+    pub = get_bot_solana_public_key()
+    bal_data = get_solana_balance(pub)
+    return {
+        "public_key": pub,
+        "lamports": bal_data["lamports"],
+        "sol_balance": bal_data["sol_balance"],
+        "sol_price_usd": bal_data["sol_price_usd"],
+        "usd_value": bal_data["usd_value"],
+        "solscan_url": bal_data["solscan_url"],
+        "is_funded": bal_data["sol_balance"] >= 0.005
+    }
+
 # ==============================================================================
 # 💰 ON-CHAIN BALANCE & GAS QUERIES
 # ==============================================================================
@@ -170,7 +265,7 @@ SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.co
 
 def get_solana_balance(address: str = None) -> dict:
     """
-    Fetches real-time native SOL balance for the given address (or default bot address).
+    Fetches real-time native SOL balance for the given address.
     Returns dict with lamports, sol_balance, sol_price_usd, and usd_value.
     """
     target_addr = str(address or get_bot_solana_public_key()).strip()
@@ -235,19 +330,160 @@ def get_solana_balance(address: str = None) -> dict:
         "solscan_url": f"https://solscan.io/account/{target_addr}"
     }
 
-def get_bot_solana_wallet_overview() -> dict:
-    """Returns a full overview of the dedicated Bot Hot Wallet."""
-    pub = get_bot_solana_public_key()
-    bal_data = get_solana_balance(pub)
-    return {
-        "public_key": pub,
-        "lamports": bal_data["lamports"],
-        "sol_balance": bal_data["sol_balance"],
-        "sol_price_usd": bal_data["sol_price_usd"],
-        "usd_value": bal_data["usd_value"],
-        "solscan_url": bal_data["solscan_url"],
-        "is_funded": bal_data["sol_balance"] >= 0.005  # minimum for gas & tx
+# ==============================================================================
+# 💸 PURE-PYTHON NATIVE SOL TRANSFER & WITHDRAWAL ENGINE
+# ==============================================================================
+
+def execute_sol_transfer(
+    sender_priv: ed25519.Ed25519PrivateKey,
+    dest_address_b58: str,
+    lamports: int
+) -> dict:
+    """
+    Executes a native SOL transfer transaction on Solana Mainnet:
+    1. Validates destination Base58 address.
+    2. Fetches latest blockhash from RPC.
+    3. Builds standard SystemProgram transfer instruction in pure Python.
+    4. Signs with sender Ed25519 private key.
+    5. Broadcasts to Solana Mainnet RPC.
+    """
+    dest_b58 = dest_address_b58.strip()
+    try:
+        dest_pub = b58decode(dest_b58)
+        if len(dest_pub) != 32:
+            return {"status": "error", "reason": "INVALID_RECIPIENT_ADDRESS", "msg": "Recipient Solana address must decode to 32 bytes."}
+    except Exception as e:
+        return {"status": "error", "reason": "INVALID_RECIPIENT_ADDRESS", "msg": f"Invalid Solana Base58 address: {e}"}
+
+    if lamports <= 0:
+        return {"status": "error", "reason": "INVALID_AMOUNT", "msg": "Transfer amount must be greater than 0 lamports."}
+
+    # 1. Fetch recent blockhash
+    blockhash_bytes = None
+    try:
+        bh_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getLatestBlockhash",
+            "params": [{"commitment": "finalized"}]
+        }
+        req_bh = urllib.request.Request(
+            SOLANA_RPC_URL,
+            data=json.dumps(bh_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req_bh, timeout=4.0) as resp_bh:
+            bh_data = json.loads(resp_bh.read().decode("utf-8"))
+            bh_str = bh_data.get("result", {}).get("value", {}).get("blockhash")
+            if bh_str:
+                blockhash_bytes = b58decode(bh_str)
+    except Exception as e:
+        return {"status": "error", "reason": "BLOCKHASH_FETCH_ERROR", "msg": f"Failed to get recent blockhash: {e}"}
+
+    if not blockhash_bytes:
+        return {"status": "error", "reason": "BLOCKHASH_FETCH_ERROR", "msg": "Empty blockhash returned from Solana RPC."}
+
+    # 2. Build transfer message
+    sender_pub = sender_priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    system_prog = b"\x00" * 32  # 11111111111111111111111111111111
+
+    # Header: 1 signer, 0 readonly signed, 1 readonly unsigned
+    header = bytes([1, 0, 1])
+    accounts = bytes([3]) + sender_pub + dest_pub + system_prog
+    
+    # Instruction: System Program Transfer (index 2), accounts [0, 1]
+    ix_data = struct.pack("<IQ", 2, int(lamports))
+    ix = bytes([2, 2, 0, 1, len(ix_data)]) + ix_data
+    instructions = bytes([1]) + ix
+
+    msg = header + accounts + blockhash_bytes + instructions
+    
+    # 3. Sign message
+    sig = sender_priv.sign(msg)
+    raw_tx = bytes([1]) + sig + msg
+    tx_b64 = base64.b64encode(raw_tx).decode("utf-8")
+    tx_sig_b58 = b58encode(sig)
+
+    # 4. Broadcast via sendTransaction
+    rpc_payload = {
+        "jsonrpc": "2.0",
+        "id": int(time.time()),
+        "method": "sendTransaction",
+        "params": [
+            tx_b64,
+            {"encoding": "base64", "skipPreflight": False, "preflightCommitment": "confirmed"}
+        ]
     }
+
+    confirmed_sig = tx_sig_b58
+    try:
+        req_tx = urllib.request.Request(
+            SOLANA_RPC_URL,
+            data=json.dumps(rpc_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req_tx, timeout=7.0) as resp_tx:
+            tx_res = json.loads(resp_tx.read().decode("utf-8"))
+            if "error" in tx_res:
+                err_msg = tx_res["error"].get("message", str(tx_res["error"]))
+                return {
+                    "status": "error",
+                    "reason": "SOLANA_RPC_REJECTION",
+                    "msg": f"Solana RPC rejected transfer: {err_msg}",
+                    "tx_hash": tx_sig_b58
+                }
+            confirmed_sig = tx_res.get("result", tx_sig_b58)
+    except Exception as e:
+        confirmed_sig = tx_sig_b58
+
+    return {
+        "status": "success",
+        "tx_hash": confirmed_sig,
+        "solscan_url": f"https://solscan.io/tx/{confirmed_sig}",
+        "lamports": lamports,
+        "sol_amount": round(lamports / 1e9, 5),
+        "sender": b58encode(sender_pub),
+        "recipient": dest_b58
+    }
+
+def withdraw_user_sol(
+    chat_id: int,
+    recipient_address: str,
+    amount_sol: float = None
+) -> dict:
+    """
+    Safely withdraws native SOL from the user's dedicated trading wallet to their personal wallet.
+    Keeps a minimal 0.00001 SOL buffer for network gas.
+    If amount_sol is None or 0, withdraws all available balance.
+    """
+    priv, pub = get_or_create_user_solana_wallet(chat_id)
+    bal_data = get_solana_balance(pub)
+    current_lamports = bal_data["lamports"]
+    gas_reserve = 10000  # 0.00001 SOL network fee reserve
+
+    if current_lamports <= gas_reserve:
+        return {
+            "status": "error",
+            "reason": "INSUFFICIENT_BALANCE",
+            "msg": f"សមតុល្យក្នុងកាបូបមានត្រឹមតែ {bal_data['sol_balance']:.4f} SOL មិនគ្រប់គ្រាន់សម្រាប់ផ្ទេរប្រាក់ និងបង់ Gas Fee ឡើយ។",
+            "current_sol": bal_data["sol_balance"]
+        }
+
+    if amount_sol is None or float(amount_sol) <= 0:
+        transfer_lamports = current_lamports - gas_reserve
+    else:
+        req_lamports = int(float(amount_sol) * 1e9)
+        if req_lamports + gas_reserve > current_lamports:
+            max_sol = max(0.0, (current_lamports - gas_reserve) / 1e9)
+            return {
+                "status": "error",
+                "reason": "AMOUNT_EXCEEDS_BALANCE",
+                "msg": f"ចំនួនស្នើសុំ {amount_sol} SOL លើសពីសមតុល្យដែលអាចដកបាន ({max_sol:.4f} SOL) បន្ទាប់ពីកាត់ Gas Fee។",
+                "max_withdrawable_sol": round(max_sol, 4)
+            }
+        transfer_lamports = req_lamports
+
+    return execute_sol_transfer(priv, recipient_address, transfer_lamports)
 
 # ==============================================================================
 # ⚡ JUPITER ON-CHAIN TRANSACTION SIGNING & BROADCAST
@@ -258,17 +494,19 @@ def execute_jupiter_live_swap(
     to_mint: str,
     amount_lamports: int,
     slippage_bps: int = 50,
-    wrap_unwrap_sol: bool = True
+    wrap_unwrap_sol: bool = True,
+    signing_priv_key: ed25519.Ed25519PrivateKey = None,
+    user_pubkey: str = None
 ) -> dict:
     """
     Executes a real, live on-chain swap via Jupiter DEX Aggregator:
-    1. Fetches best route quote from Jupiter.
-    2. Requests serialized swap Versioned Transaction from Jupiter.
-    3. Signs transaction using the bot's dedicated Ed25519 keypair.
-    4. Broadcasts signed transaction to Solana Mainnet RPC.
-    5. Returns transaction hash and live Solscan URL.
+    Supports both User-Dedicated Wallets (Trojan-style) and Master Hot Wallet.
     """
-    priv, pub = load_or_create_bot_keypair()
+    if signing_priv_key is not None and user_pubkey is not None:
+        priv = signing_priv_key
+        pub = str(user_pubkey).strip()
+    else:
+        priv, pub = load_or_create_bot_keypair()
     
     # Check balance before attempting
     bal_info = get_solana_balance(pub)
@@ -277,7 +515,7 @@ def execute_jupiter_live_swap(
         return {
             "status": "error",
             "reason": "INSUFFICIENT_SOL_BALANCE",
-            "msg": f"Bot Hot Wallet balance {bal_info['sol_balance']:.4f} SOL is insufficient for {amount_lamports/1e9:.4f} SOL order + gas fee.",
+            "msg": f"កាបូប {pub[:6]}...{pub[-4:]} មានសមតុល្យ {bal_info['sol_balance']:.4f} SOL មិនគ្រប់គ្រាន់សម្រាប់ទិញ {amount_lamports/1e9:.4f} SOL + ថ្លៃ Gas ឡើយ។",
             "bot_wallet": pub,
             "required_sol": round((amount_lamports + 5000000) / 1e9, 4),
             "current_sol": bal_info["sol_balance"]
@@ -330,7 +568,6 @@ def execute_jupiter_live_swap(
     try:
         tx_bytes = bytearray(base64.b64decode(raw_tx_b64))
         num_sigs = tx_bytes[0]
-        # In Solana VersionedTransaction, the message bytes follow the signature array
         message_bytes = bytes(tx_bytes[1 + num_sigs * 64:])
         signature = priv.sign(message_bytes)
         tx_bytes[1:65] = signature
@@ -369,7 +606,6 @@ def execute_jupiter_live_swap(
                 }
             confirmed_sig = rpc_res.get("result", tx_signature_b58)
     except Exception as e:
-        # If timeout or network lag occurs after sending, transaction might still succeed on-chain
         confirmed_sig = tx_signature_b58
 
     return {
