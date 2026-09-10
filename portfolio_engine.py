@@ -368,6 +368,13 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     except Exception as e:
         print(f"[PORTFOLIO] Swap history query error: {e}")
 
+    # Smart Swap 24/7 Auto-Pilot Status
+    smart_swap_autopilot_cfg = {}
+    try:
+        smart_swap_autopilot_cfg = db.get_smart_swap_autopilot_config(chat_id)
+    except Exception as e:
+        print(f"[PORTFOLIO] Smart Swap autopilot query error: {e}")
+
     # 12. VPS & System Health
     uptime_sec = int(time.time() - _START_TIME)
     h, rem = divmod(uptime_sec, 3600)
@@ -469,6 +476,7 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "user_snipers": user_snipers,
 
         # Engine Flags
+        "smart_swap_autopilot": smart_swap_autopilot_cfg,
         "funding_cfg": funding_cfg,
         "gold_turbo_cfg": gold_turbo_cfg,
         "smart_x_active": smart_x_active,
@@ -648,6 +656,12 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     swaps = data["active_smart_swaps"]
     realized_swap_pnl = data.get("total_realized_swap_pnl", 0.0)
     swaps_cnt = data.get("total_swaps_count", 0)
+    ap_cfg = data.get("smart_swap_autopilot", {})
+    is_ap_on = ap_cfg.get("enabled", False)
+    ap_amt = ap_cfg.get("amount", 20.0)
+    ap_pos = ap_cfg.get("max_positions", 2)
+    ap_str_km = f"\n  • 🔄 24/7 Auto-Pilot ៖ `🟢 ACTIVE (${ap_amt:.0f}/Trade | Slot: {len(swaps)}/{ap_pos})`" if is_ap_on else f"\n  • 🔄 24/7 Auto-Pilot ៖ `⚪ STANDBY` (វាយ `/smart_swap autopilot ON 20 1234`)"
+    ap_str_en = f"\n  • 🔄 24/7 Auto-Pilot: `🟢 ACTIVE (${ap_amt:.0f}/Trade | Slot: {len(swaps)}/{ap_pos})`" if is_ap_on else f"\n  • 🔄 24/7 Auto-Pilot: `⚪ STANDBY` (Execute `/smart_swap autopilot ON 20 1234`)"
     pnl_hist_str_km = f"\n  • 🏆 ផលចំណេញកើបបានពីមុន ៖ `+${realized_swap_pnl:,.2f} USD` (ពីការជួញដូរ {swaps_cnt} ដង)" if swaps_cnt > 0 else ""
     pnl_hist_str_en = f"\n  • 🏆 Realized DEX Profit ៖ `+${realized_swap_pnl:,.2f} USD` ({swaps_cnt} completed trades)" if swaps_cnt > 0 else ""
 
@@ -662,7 +676,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
                 f"  • `{s['symbol']}` ({s['chain']}) ៖ Value `${s['current_val_usd']:.2f}` | Entry: `${s['entry_price']:.6f}` | Live: `${s['current_price']:.6f}` | PnL: `{sw_sign}${s['pnl_usd']:.2f}` (`{s['roi_pct']:+.1f}%`) [{scale_str}]\n"
                 f"    🌾 TP/SL: `TP1 +40% (ដកដើម ១០០%) | Trailing Stop Active` | Mint: `{short_addr}`"
             )
-        e4_body = ("\n".join(e4_details) + pnl_hist_str_km) if lang == "km" else ("\n".join(e4_details) + pnl_hist_str_en)
+        e4_body = ("\n".join(e4_details) + ap_str_km + pnl_hist_str_km) if lang == "km" else ("\n".join(e4_details) + ap_str_en + pnl_hist_str_en)
     else:
         e4_status = "🟡 STANDBY (ស្កេន DexScreener & Jupiter Breakout Firehose 24/7)" if lang == "km" else "🟡 STANDBY (Scanning DEX Breakout Firehose 24/7)"
         sol_bal_text = f"`{sol_bal:.4f} SOL` (${sol_usd:.2f} USD)"
@@ -670,13 +684,15 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             f"  • 💳 កាបូបជួញដូរ Solana ៖ {sol_bal_text} | {short_sol}\n"
             f"  • 🟣 Phantom Settlement Vault ៖ {short_pvault_km}\n"
             f"  • 🛡️ សុវត្ថិភាព ៖ Jito Private MEV Shield & Honeypot AI Shield សកម្ម ១០០%\n"
-            f"  • 🎯 សកម្មភាព ៖ វាយ `/smart_swap auto 20 1234` ដើម្បីបាញ់កាក់ Gem អូតូ!"
+            f"  • 🎯 សកម្មភាព ៖ វាយ `/smart_swap auto 20 1234` ឬ `/smart_swap autopilot ON`"
+            f"{ap_str_km}"
             f"{pnl_hist_str_km}"
         ) if lang == "km" else (
             f"  • 💳 Solana Hot Wallet: {sol_bal_text} | {short_sol}\n"
             f"  • 🟣 Phantom Settlement Vault: {short_pvault_en}\n"
             f"  • 🛡️ Protection: Jito Private MEV Shield & Honeypot AI Active 100%\n"
-            f"  • 🎯 Action: Execute `/smart_swap auto 20 1234` to launch sniper!"
+            f"  • 🎯 Action: Execute `/smart_swap auto 20 1234` or `/smart_swap autopilot ON`"
+            f"{ap_str_en}"
             f"{pnl_hist_str_en}"
         )
     engines_text += f"4️⃣ **Smart Swap Multi-Chain DEX & AI Sniper (`/smart_swap`)**\n   {e4_status}\n{e4_body}\n\n"
@@ -807,6 +823,13 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
     pnl_sign = "+" if active_swaps_pnl >= 0 else ""
     pnl_emoji = "🟩" if active_swaps_pnl >= 0 else "🟥"
 
+    ap_cfg = data.get("smart_swap_autopilot", {})
+    is_ap_on = ap_cfg.get("enabled", False)
+    ap_amt = ap_cfg.get("amount", 20.0)
+    ap_pos = ap_cfg.get("max_positions", 2)
+    ap_status_en = f"`🟢 ACTIVE 24/7` (${ap_amt:.0f}/Trade | Slot: `{len(swaps)}/{ap_pos}`)" if is_ap_on else "`⚪ STANDBY` (Run `/smart_swap autopilot ON 20 1234`)"
+    ap_status_km = f"`🟢 ACTIVE 24/7` (${ap_amt:.0f}/Trade | Slot: `{len(swaps)}/{ap_pos}`)" if is_ap_on else "`⚪ STANDBY` (វាយ `/smart_swap autopilot ON 20 1234`)"
+
     if lang == "en":
         lines = [
             "⚡ **KHMER MASTER CRYPTO | SUPER SMART ON-CHAIN DEX PORTFOLIO** 🚀",
@@ -818,7 +841,8 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
             f"• 🎯 **Active in DEX Breakout Gems:** `${active_swaps_usd:,.2f} USD` ({len(swaps)} active)",
             f"• 💵 **Solana Hot Wallet Balance:** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL`)",
             f"• {pnl_emoji} **Floating DEX PnL:** `{pnl_sign}${active_swaps_pnl:,.2f} USD`",
-            f"• 🏆 **Historical Realized Profit:** `+${realized_pnl:,.2f} USD` ({swaps_count} completed trades)\n",
+            f"• 🏆 **Historical Realized Profit:** `+${realized_pnl:,.2f} USD` ({swaps_count} completed trades)",
+            f"• 🔄 **24/7 Autonomous Auto-Pilot:** {ap_status_en}\n",
             "💳 **MULTI-TENANT DUAL-WALLET ARCHITECTURE:**",
             f"• ⚡ **Dedicated Solana Trading Wallet:** {short_sol} (`{user_sol_pub}`)",
             "  *(Personal Trojan/BonkBot-style execution wallet for sub-second DEX swaps)*"
@@ -865,7 +889,8 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
             f"• 🎯 **កំពុងវិនិយោគក្នុង DEX Gems ៖** `${active_swaps_usd:,.2f} USD` ({len(swaps)} កាក់សកម្ម)",
             f"• 💵 **ត្រៀមក្នុងកាបូប Solana Hot Wallet ៖** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL`)",
             f"• {pnl_emoji} **ផលចំណេញបណ្តោះអាសន្ន (Floating DEX PnL) ៖** `{pnl_sign}${active_swaps_pnl:,.2f} USD`",
-            f"• 🏆 **ប្រាក់ចំណេញកើបបានពីមុន (Realized PnL) ៖** `+${realized_pnl:,.2f} USD` ({swaps_count} លើក)\n",
+            f"• 🏆 **ប្រាក់ចំណេញកើបបានពីមុន (Realized PnL) ៖** `+${realized_pnl:,.2f} USD` ({swaps_count} លើក)",
+            f"• 🔄 **24/7 Autonomous Auto-Pilot ៖** {ap_status_km}\n",
             "💳 **ការគ្រប់គ្រងកាបូប On-Chain (Dual-Wallet Architecture) ៖**",
             f"• ⚡ **Solana Dedicated Hot Wallet ៖** {short_sol}",
             f"  `{user_sol_pub}`",

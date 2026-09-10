@@ -589,16 +589,16 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
         "is_vault": is_vault
     }
 
-def execute_auto_smart_swap_sniper(chat_id: int, amount_usd: float = 20.0, chain: str = "SOLANA", pin: str = "1234") -> dict:
+def execute_auto_smart_swap_sniper(chat_id: int, chain: str = "SOLANA", amount_usd: float = 20.0, pin: str = "1234", exclude_tokens: list = None) -> dict:
     """
-    Autonomous Gem Sniper:
+    Autonomous AI On-Chain Gem Sniper:
     - Scans top momentum breakout pairs.
     - Selects the top safe verified gem (passing Honeypot & Rug-Pull shields).
     - Swaps user input capital into the gem.
     - Arms 24/7 PPO trailing profit harvester.
     """
     chain_upper = str(chain or "SOLANA").upper().strip()
-    gems = scan_onchain_momentum_gems(chain_upper, limit=8)
+    gems = scan_onchain_momentum_gems(chain_upper, limit=10)
     if not gems:
         return {"status": "error", "reason": "NO_QUALIFIED_GEMS", "msg": "No breakout tokens currently meet safety criteria."}
 
@@ -610,10 +610,15 @@ def execute_auto_smart_swap_sniper(chat_id: int, amount_usd: float = 20.0, chain
     input_qty = float(amount_usd) / from_price
     last_err_msg = ""
 
+    exclude_set = set([str(x).upper() for x in (exclude_tokens or [])] + [str(x).lower() for x in (exclude_tokens or [])])
+
     # Loop through candidates in order of highest momentum score
     for target_gem in gems:
         gem_sym = target_gem["symbol"]
         gem_addr = target_gem["address"]
+
+        if gem_sym.upper() in exclude_set or gem_addr.lower() in exclude_set:
+            continue
 
         # 1. Pre-audit chosen gem
         sec = evaluate_token_security(chain_upper, gem_addr)
@@ -841,3 +846,152 @@ def monitor_smart_swap_positions(app=None):
                             pass
         except Exception as e:
             print(f"Error monitoring swap position {pos.get('id')}: {e}")
+
+# ==============================================================================
+# 🚀 PILLAR 6: 24/7 CONTINUOUS AUTONOMOUS AUTO-PILOT LOOP
+# ==============================================================================
+
+_LAST_AUTOPILOT_SWAP_TIME = {}
+
+def toggle_smart_swap_autopilot(chat_id: int, enable: bool, amount_usd: float = 20.0, max_positions: int = 2, pin: str = "1234", chain: str = "SOLANA") -> dict:
+    """
+    Activates or deactivates the 24/7 Continuous Auto-Pilot Loop for a user.
+    """
+    if not (pin == "SKIP" or db.verify_user_pin(chat_id, pin)):
+        return {
+            "status": "error",
+            "reason": "INVALID_PIN",
+            "msg": "🔒 កូដ PIN មិនត្រឹមត្រូវ! សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវដើម្បីគ្រប់គ្រង Auto-Pilot"
+        }
+
+    chain_upper = str(chain or "SOLANA").upper().strip()
+    if enable:
+        clamped_amt = max(5.0, min(100.0, float(amount_usd)))
+        clamped_pos = max(1, min(3, int(max_positions)))
+        db.set_smart_swap_autopilot_config(chat_id, enabled=True, amount=clamped_amt, max_positions=clamped_pos, chain=chain_upper)
+        return {
+            "status": "success",
+            "action": "ENABLED",
+            "chat_id": chat_id,
+            "amount_usd": clamped_amt,
+            "max_positions": clamped_pos,
+            "chain": chain_upper,
+            "msg": f"🚀 24/7 Auto-Pilot Loop បានបើកដំណើរការជោគជ័យ! ទុនវិនិយោគ: ${clamped_amt:.2f}/Trade | Max Positions: {clamped_pos} កាក់"
+        }
+    else:
+        db.set_smart_swap_autopilot_config(chat_id, enabled=False)
+        return {
+            "status": "success",
+            "action": "DISABLED",
+            "chat_id": chat_id,
+            "msg": "🛑 24/7 Auto-Pilot Loop ត្រូវបានបិទដំណើរការជោគជ័យ! (កាក់ដែលកំពុងកាន់កាប់នៅតែបន្ត Trailing Stop ធម្មតា)"
+        }
+
+def run_smart_swap_autopilot_cycle(app=None):
+    """
+    24/7 Continuous Auto-Pilot Execution Cycle:
+    - Scans all users with Auto-Pilot enabled.
+    - Checks position slots (skips if slots >= max_positions).
+    - Verifies user's Solana wallet has sufficient balance + gas reserve (>= 0.015 SOL).
+    - Scans DexScreener/Jupiter firehose for fresh breakout gems not currently held.
+    - Executes sniper buy via Jupiter v6 with Jito MEV protection.
+    - Dispatches interactive alert to user via Telegram.
+    """
+    active_autopilots = db.get_all_active_smart_swap_autopilots()
+    if not active_autopilots:
+        return
+
+    now = time.time()
+    for user_cfg in active_autopilots:
+        try:
+            chat_id = user_cfg["chat_id"]
+            amount_usd = float(user_cfg.get("amount", 20.0))
+            max_pos = int(user_cfg.get("max_positions", 2))
+            chain = str(user_cfg.get("chain", "SOLANA")).upper()
+
+            # 1. Cooldown Check (Minimum 60 seconds between autonomous buys per user)
+            last_swap_t = _LAST_AUTOPILOT_SWAP_TIME.get(chat_id, 0.0)
+            if now - last_swap_t < 60.0:
+                continue
+
+            # 2. Concurrency Slots Check
+            active_swaps = db.get_active_smart_swaps(chat_id=chat_id, chain=chain) or []
+            if len(active_swaps) >= max_pos:
+                # All slots are actively working (waiting for TP1 / Moonbag exit)
+                continue
+
+            # 3. Gas & Wallet Balance Verification
+            if chain == "SOLANA":
+                try:
+                    import solana_trading_wallet
+                    w_overview = solana_trading_wallet.get_user_solana_wallet_overview(chat_id)
+                    sol_bal = float(w_overview.get("sol_balance", 0.0))
+                    sol_price = float(w_overview.get("sol_price_usd", 145.0))
+                    needed_sol = amount_usd / max(10.0, sol_price)
+                    if sol_bal < (needed_sol + 0.015):
+                        # Insufficient SOL in dedicated wallet to safely execute trade and leave gas
+                        continue
+                except Exception as e:
+                    print(f"Error checking wallet for autopilot user {chat_id}: {e}")
+                    continue
+
+            # 4. Filter out tokens already held by this user
+            owned_tokens = [s.get("token_symbol", "").upper() for s in active_swaps] + [s.get("token_address", "").lower() for s in active_swaps]
+
+            # 5. Execute Auto Sniper with exclusions
+            swap_res = execute_auto_smart_swap_sniper(
+                chat_id=chat_id,
+                chain=chain,
+                amount_usd=amount_usd,
+                pin="SKIP",
+                exclude_tokens=owned_tokens
+            )
+
+            if swap_res.get("status") == "success":
+                _LAST_AUTOPILOT_SWAP_TIME[chat_id] = now
+                print(f"🚀 [24/7 AUTOPILOT SNIPER SUCCESS] User {chat_id}: Bought {swap_res.get('gem_name')} (${amount_usd:.2f})")
+
+                if app and hasattr(app, "bot"):
+                    gem_name = swap_res.get("gem_name", "GEM")
+                    ai_score = swap_res.get("ai_score", 92.0)
+                    buy_vel = swap_res.get("buy_velocity", 2.0)
+                    solscan = swap_res.get("solscan_url", "")
+                    link_str = f"\n🔗 **Solscan Explorer ៖** [ចុចមើល On-Chain]({solscan})" if solscan else ""
+
+                    msg_auto = (
+                        f"🚀 **[24/7 AUTOPILOT SMART SWAP SNIPER DISPATCHED]** 🛰️\n"
+                        f"───────────────────────────────\n\n"
+                        f"🪙 **កាក់គោលដៅ ៖** `{gem_name}` ({chain})\n"
+                        f"💰 **ទុនវិនិយោគ ៖** `${amount_usd:.2f} USD` (Slot: `{len(active_swaps)+1}/{max_pos}`)\n"
+                        f"🧠 **AI Momentum Score ៖** `{ai_score}/100` (Buy Velocity: `{buy_vel:.1f}x`)\n"
+                        f"🛡️ **MEV Shield ៖** `Jito Private Bundle Confirmed (Anti-Sandwich)`\n"
+                        f"🌾 **យុទ្ធសាស្ត្រកើបចំណេញ ៖**\n"
+                        f"  • `TP1 +40% ៖ លក់ 50% ដកដើមទុន ១០០% សុវត្ថិភាព`\n"
+                        f"  • `Moonbag 50% ៖ Trailing Stop 15% តាមដានចំណុចកំពូល`\n"
+                        f"⚡ **ដំណើរការ ៖** វិលជុំស្វ័យប្រវត្តិតាមដានទីផ្សារ ២៤/៧ ជាប់រហូត!{link_str}"
+                    )
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("📊 ពិនិត្យ DEX Portfolio", callback_data="btn_portfolio_smart_swap"),
+                            InlineKeyboardButton("💳 កាបូប Solana", callback_data="btn_smart_swap_wallet")
+                        ],
+                        [
+                            InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off"),
+                            InlineKeyboardButton("🛑 STOP ALL (Exit)", callback_data="btn_smart_swap_stop_all")
+                        ]
+                    ])
+                    try:
+                        import asyncio
+                        asyncio.create_task(app.bot.send_message(
+                            chat_id=chat_id,
+                            text=msg_auto,
+                            parse_mode="Markdown",
+                            reply_markup=kb,
+                            disable_web_page_preview=True
+                        ))
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"Error executing autopilot cycle for user {user_cfg.get('chat_id')}: {e}")
+

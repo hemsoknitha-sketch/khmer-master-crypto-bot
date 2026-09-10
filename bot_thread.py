@@ -4341,6 +4341,15 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_smart_swap_menu", "btn_smart_swap"]:
                 context.args = []
                 await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_autopilot_on":
+                context.args = ["AUTOPILOT", "ON", "20", "1234"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_autopilot_off":
+                context.args = ["AUTOPILOT", "OFF", "1234"]
+                await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_autopilot_status":
+                context.args = ["AUTOPILOT", "STATUS"]
+                await smart_swap_command(update, context)
             elif data == "btn_smart_swap_auto_20":
                 context.args = ["AUTO", "20", "1234"]
                 await smart_swap_command(update, context)
@@ -10345,6 +10354,10 @@ class TelegramBotThread(BaseThread):
             if not args or len(args) == 0:
                 keyboard = InlineKeyboardMarkup([
                     [
+                        InlineKeyboardButton("🚀 បើក Auto-Pilot 24/7", callback_data="btn_smart_swap_autopilot_on"),
+                        InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off")
+                    ],
+                    [
                         InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20"),
                         InlineKeyboardButton("🚀 Solana Sniper ($50)", callback_data="btn_smart_swap_sol_50")
                     ],
@@ -10375,8 +10388,11 @@ class TelegramBotThread(BaseThread):
                         "• 🧠 **32 Wall Street AI Brain Models:** Volume velocity & smart money inflow scanning powered by PatchTST and XGBoost.\n"
                         "• 🚀 **Jupiter Aggregator v6 & 1inch Routing:** Splits trades across Raydium, Orca, Meteora, Phoenix & PancakeSwap.\n"
                         "• ⚡ **Private MEV Sandwich Shield:** Zero mempool exposure via Jito Bundles (Solana) & Flashbots Protect (EVM).\n"
-                        "• 💰 **PPO Dynamic Micro-Scalp Harvester:** 50% TP1 (+40% ROI) retrieves 100% initial capital; remaining 50% trails as risk-free moonbag!\n\n"
+                        "• 💰 **PPO Dynamic Micro-Scalp Harvester:** 50% TP1 (+40% ROI) retrieves 100% initial capital; remaining 50% trails as risk-free moonbag!\n"
+                        "• 🔄 **24/7 Autonomous Auto-Pilot Loop:** Continuously scans & snipes breakout gems whenever capital is free!\n\n"
                         "👉 **1-TAP COMMAND EXECUTIONS:**\n"
+                        "• `/smart_swap autopilot ON 20 1234` — Activate 24/7 recurring loop ($20/trade, auto-compounding)\n"
+                        "• `/smart_swap autopilot OFF 1234` — Stop 24/7 recurring auto-sniping loop\n"
                         "• `/smart_swap wallet` — Dedicated Bot Hot Wallet & SOL deposit address for live on-chain trading\n"
                         "• `/smart_swap auto 20 1234` — Auto-scan & snipe highest momentum verified gem with $20 USD\n"
                         "• `/smart_swap SOL SOL USDC 1.5 1234` — Direct DEX swap SOL to USDC at best aggregator rate\n"
@@ -10393,8 +10409,11 @@ class TelegramBotThread(BaseThread):
                         "• 🧠 **32 Wall Street AI Brain Models ៖** ស្កេនលុយធំ Smart Money Inflow និង Volume Velocity តាមម៉ូដែល PatchTST + XGBoost\n"
                         "• 🚀 **Jupiter Aggregator v6 & 1inch Router ៖** បំបែកផ្លូវជួញដូរល្អបំផុតលើ Raydium, Orca, Meteora, Phoenix និង PancakeSwap\n"
                         "• ⚡ **Private MEV Sandwich Shield ៖** ការពារការលួច Front-run / Sandwich តាមរយៈ Jito Private Bundles & Flashbots Protect\n"
-                        "• 💰 **PPO Dynamic Trailing Harvester ៖** TP1 (+40% ROI) លក់ 50% ដកយកដើមទុន ១០០% មកវិញភ្លាមៗ រីឯ 50% ទៀតក្លាយជា Moonbag គ្មានហានិភ័យ!\n\n"
+                        "• 💰 **PPO Dynamic Trailing Harvester ៖** TP1 (+40% ROI) លក់ 50% ដកយកដើមទុន ១០០% មកវិញភ្លាមៗ រីឯ 50% ទៀតក្លាយជា Moonbag គ្មានហានិភ័យ!\n"
+                        "• 🔄 **24/7 Continuous Auto-Pilot Loop ៖** ដើរស្កេន និងបាញ់ទិញកាក់ Gem វិលជុំស្វ័យប្រវត្តិ ២៤/៧ រាល់ពេលកាបូបមានទុនទំនេរ!\n\n"
                         "👉 **បញ្ជាផ្ទាល់តាមពាក្យគន្លឹះ (1-Tap Executions) ៖**\n"
+                        "• `/smart_swap autopilot ON 20 1234` — បើកដំណើរការវិលជុំ ២៤/៧ បាញ់កាក់ Gem អូតូ (ទុន $20/Trade)\n"
+                        "• `/smart_swap autopilot OFF 1234` — បិទដំណើរការវិលជុំ ២៤/៧ វិញ\n"
                         "• `/smart_swap wallet` — ពិនិត្យកាបូប Hot Wallet របស់ Bot និងអាសយដ្ឋានផ្ញើ SOL ដើម្បីទិញកាក់ On-Chain ពិត\n"
                         "• `/smart_swap auto 20 1234` — ស្កេននិងទិញកាក់ Gem ផ្ទុះខ្លាំងបំផុតដោយស្វ័យប្រវត្តិទុន $20 USD\n"
                         "• `/smart_swap SOL SOL USDC 1.5 1234` — Swap ផ្ទាល់ពី SOL ទៅ USDC ក្នុងអត្រា aggregator ចំណេញបំផុត\n"
@@ -10778,6 +10797,101 @@ class TelegramBotThread(BaseThread):
                 if msg_target:
                     await msg_target.reply_text(stop_msg, parse_mode="Markdown")
                 return
+
+            # 3b. AUTOPILOT [ON/OFF/STATUS] [AMOUNT] [PIN] (e.g. /smart_swap autopilot ON 20 1234)
+            if subcmd in ["AUTOPILOT", "PILOT"]:
+                action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
+                amount_usd = 20.0
+                pin_input = "1234"
+                
+                # Check arguments
+                for a in args[2:]:
+                    if str(a).replace('.', '', 1).isdigit():
+                        if "." in str(a) or float(a) > 4:
+                            try: amount_usd = float(a)
+                            except: pass
+                        elif len(str(a)) == 4 and str(a).isdigit():
+                            pin_input = str(a).strip()
+                    elif len(str(a)) == 4 and str(a).isdigit():
+                        pin_input = str(a).strip()
+
+                if action == "ON":
+                    if not (update.callback_query or db.verify_user_pin(chat_id, pin_input)):
+                        if msg_target:
+                            await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap autopilot ON 20 1234`)", parse_mode="Markdown")
+                        return
+
+                    res = smart_swap_engine.toggle_smart_swap_autopilot(chat_id, enable=True, amount_usd=amount_usd, max_positions=2, pin=pin_input)
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("📊 ពិនិត្យ DEX Portfolio", callback_data="btn_portfolio_smart_swap"),
+                            InlineKeyboardButton("💳 កាបូប Solana", callback_data="btn_smart_swap_wallet")
+                        ],
+                        [
+                            InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off"),
+                            InlineKeyboardButton("🛑 STOP ALL (Exit)", callback_data="btn_smart_swap_stop_all")
+                        ]
+                    ])
+                    on_msg = (
+                        f"🚀 **APEX SMART SWAP | 24/7 AUTONOMOUS AUTO-PILOT ENABLED** 🛰️\n"
+                        f"───────────────────────────────\n\n"
+                        f"• ស្ថានភាព ៖ `🟢 ACTIVE 24/7 (កំពុងដំណើរការវិលជុំជាប់រហូត)`\n"
+                        f"• ទុនវិនិយោគ / Trade ៖ `${res.get('amount_usd', amount_usd):.2f} USD`\n"
+                        f"• Max Concurrency ៖ `{res.get('max_positions', 2)} កាក់ក្នុងពេលតែមួយ`\n"
+                        f"• បណ្តាញ ៖ `Solana Mainnet (Jupiter v6 + Jito Private MEV)`\n"
+                        f"• យុទ្ធសាស្ត្រ ៖ `TP1 +40% (ដកដើម ១០០%) | Trailing Moonbag 50%`\n"
+                        f"• ប្រតិបត្តិការ ៖ `រាល់ពេលកាក់ចាស់ Take Profit ដកដើមរួច ម៉ាស៊ីននឹងស្កេនបាញ់កាក់ Gem ថ្មីភ្លាមៗ`\n\n"
+                        f"💡 *ប្រព័ន្ធនឹងដើរស្កេន និងកើបចំណេញដោយស្វ័យប្រវត្ត ២៤/៧ រហូតដល់លោកអ្នកចុច OFF!*"
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(on_msg, parse_mode="Markdown", reply_markup=kb)
+                    return
+
+                elif action == "OFF":
+                    res = smart_swap_engine.toggle_smart_swap_autopilot(chat_id, enable=False)
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("⚡ បើក Auto-Pilot 24/7", callback_data="btn_smart_swap_autopilot_on"),
+                            InlineKeyboardButton("📊 ពិនិត្យ DEX Portfolio", callback_data="btn_portfolio_smart_swap")
+                        ]
+                    ])
+                    off_msg = (
+                        f"🛑 **APEX SMART SWAP | 24/7 AUTO-PILOT DISABLED** 🔒\n"
+                        f"───────────────────────────────\n\n"
+                        f"• ស្ថានភាព ៖ `🔴 DISABLED (បានបិទការចូលទិញវិលជុំ ២៤/៧)`\n"
+                        f"• កាក់ដែលកំពុងកាន់កាប់ ៖ `នៅតែបន្ត Trailing Stop និង Take Profit ធម្មតា`\n\n"
+                        f"💡 *លោកអ្នកអាចបើកឡើងវិញគ្រប់ពេលដោយវាយ `/smart_swap autopilot ON 20 1234` ឬចុចប៊ូតុងខាងក្រោម ៖*"
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(off_msg, parse_mode="Markdown", reply_markup=kb)
+                    return
+
+                else:
+                    # STATUS
+                    cfg = db.get_smart_swap_autopilot_config(chat_id)
+                    active_swaps = db.get_active_smart_swaps(chat_id=chat_id) or []
+                    st_str = "🟢 ACTIVE 24/7 (កំពុងរត់)" if cfg.get("enabled") else "🔴 STANDBY (បានបិទ)"
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    btn_toggle = InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off") if cfg.get("enabled") else InlineKeyboardButton("⚡ បើក Auto-Pilot 24/7", callback_data="btn_smart_swap_autopilot_on")
+                    kb = InlineKeyboardMarkup([
+                        [btn_toggle, InlineKeyboardButton("💳 កាបូប Solana", callback_data="btn_smart_swap_wallet")],
+                        [InlineKeyboardButton("📊 ពិនិត្យ DEX Portfolio", callback_data="btn_portfolio_smart_swap"), InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
+                    ])
+                    stat_msg = (
+                        f"🛰️ **APEX SMART SWAP | 24/7 AUTONOMOUS AUTO-PILOT STATUS** 📊\n"
+                        f"───────────────────────────────\n\n"
+                        f"• ស្ថានភាពបច្ចុប្បន្ន ៖ `{st_str}`\n"
+                        f"• ទុនវិនិយោគ / Trade ៖ `${cfg.get('amount', 20.0):.2f} USD`\n"
+                        f"• កាក់កំពុងកាន់កាប់ ៖ `{len(active_swaps)} / {cfg.get('max_positions', 2)} កាក់`\n"
+                        f"• បណ្តាញជួញដូរ ៖ `{cfg.get('chain', 'SOLANA')}`\n"
+                        f"• ប្រព័ន្ធការពារ ៖ `Jito Private MEV + Sub-Second Honeypot Shield`\n\n"
+                        f"💡 *វាយ `/smart_swap autopilot ON 20 1234` ដើម្បីបើក ឬ `/smart_swap autopilot OFF 1234` ដើម្បីបិទ*"
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(stat_msg, parse_mode="Markdown", reply_markup=kb)
+                    return
 
             # 4. AUTO [AMOUNT] [PIN] (e.g. /smart_swap auto 20 1234)
             if subcmd == "AUTO":

@@ -4370,18 +4370,26 @@ async def turbo_hedge_monitor(app: Application):
             print(f"⚠️ [TURBO HEDGE MONITOR TASK ERROR]: {e}")
 
 _smart_swap_lock = asyncio.Lock()
+_last_autopilot_cycle_time = 0.0
 
 async def smart_swap_monitor(app: Application):
     """
     Continuous 5-Second Background Monitor for On-Chain Smart Swap & Gem Sniper Positions.
-    Triggers TP1 Capital Recovery and Moonbag Trailing Exits.
+    Triggers TP1 Capital Recovery, Moonbag Trailing Exits, and 24/7 Continuous Auto-Pilot Sniping.
     """
+    global _last_autopilot_cycle_time
     if _smart_swap_lock.locked():
         return
     async with _smart_swap_lock:
         try:
             import smart_swap_engine
             await asyncio.to_thread(smart_swap_engine.monitor_smart_swap_positions, app)
+
+            # Periodically execute 24/7 Auto-Pilot cycle (every 25 seconds)
+            now = time.time()
+            if now - _last_autopilot_cycle_time >= 25.0:
+                _last_autopilot_cycle_time = now
+                await asyncio.to_thread(smart_swap_engine.run_smart_swap_autopilot_cycle, app)
         except Exception as e:
             print(f"⚠️ [SMART SWAP MONITOR TASK ERROR]: {e}")
 

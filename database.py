@@ -4215,3 +4215,61 @@ def restore_state_snapshot() -> dict:
         print(f"⚠️ [STATE RESTORE ERROR]: {e}")
         return {}
 
+# ==============================================================================
+# 🚀 SMART SWAP 24/7 AUTONOMOUS CONTINUOUS AUTO-PILOT SETTINGS
+# ==============================================================================
+
+def set_smart_swap_autopilot_config(chat_id: int, enabled: bool, amount: float = 20.0, max_positions: int = 2, chain: str = "SOLANA"):
+    """
+    Saves or updates 24/7 Smart Swap Auto-Pilot configuration for a user.
+    """
+    update_system_setting(f"smart_swap_autopilot_{chat_id}_enabled", "1" if enabled else "0")
+    update_system_setting(f"smart_swap_autopilot_{chat_id}_amount", str(amount))
+    update_system_setting(f"smart_swap_autopilot_{chat_id}_max_pos", str(max_positions))
+    update_system_setting(f"smart_swap_autopilot_{chat_id}_chain", str(chain).upper())
+
+def get_smart_swap_autopilot_config(chat_id: int) -> dict:
+    """
+    Retrieves 24/7 Smart Swap Auto-Pilot configuration for a user.
+    """
+    enabled = (get_system_setting(f"smart_swap_autopilot_{chat_id}_enabled", "0") == "1")
+    amt_str = get_system_setting(f"smart_swap_autopilot_{chat_id}_amount", "20.0")
+    max_pos_str = get_system_setting(f"smart_swap_autopilot_{chat_id}_max_pos", "2")
+    chain = get_system_setting(f"smart_swap_autopilot_{chat_id}_chain", "SOLANA")
+    try:
+        amt = float(amt_str)
+    except Exception:
+        amt = 20.0
+    try:
+        max_pos = int(max_pos_str)
+    except Exception:
+        max_pos = 2
+    return {
+        "enabled": enabled,
+        "amount": amt,
+        "max_positions": max_pos,
+        "chain": chain
+    }
+
+def get_all_active_smart_swap_autopilots() -> list:
+    """
+    Returns a list of all users who currently have 24/7 Smart Swap Auto-Pilot enabled.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT key FROM system_settings WHERE key LIKE 'smart_swap_autopilot_%_enabled' AND value = '1'")
+    rows = cursor.fetchall()
+    conn.close()
+    active = []
+    for r in rows:
+        parts = r[0].split("_")
+        if len(parts) >= 5:
+            try:
+                cid = int(parts[3])
+                cfg = get_smart_swap_autopilot_config(cid)
+                if cfg.get("enabled"):
+                    active.append({"chat_id": cid, **cfg})
+            except Exception:
+                pass
+    return active
+
