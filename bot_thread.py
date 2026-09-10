@@ -13334,6 +13334,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("flash_loan", flash_loan_command))
         self.app.add_handler(CommandHandler("flash_loan_keeper", keeper_command))
         self.app.add_handler(CommandHandler("web3_wallet", set_web3_wallet_command))
+        self.app.add_handler(CommandHandler("wallet", set_web3_wallet_command))
+        self.app.add_handler(CommandHandler("set_web3_wallet", set_web3_wallet_command))
         # 🌾 Institutional High-Yield & Arbitrage Engines (Dedicated Handlers, Zero-Duplicate)
         self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
