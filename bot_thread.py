@@ -9919,6 +9919,7 @@ class TelegramBotThread(BaseThread):
 
                 # Stop 24/7 Turbo Hedge & Top Mode
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
+                db.update_system_setting(f"smart_x_{chat_id}_active", "0")
                 db.remove_all_turbo_hedge_bots(chat_id)
 
                 # Execute institutional market close via stop_turbo_hedge_engine
@@ -10229,6 +10230,8 @@ class TelegramBotThread(BaseThread):
                     except Exception as e:
                         print(f"Error in _background_smart_x_scanner: {e}")
 
+                db.update_system_setting(f"smart_x_{chat_id}_active", "1")
+                db.update_system_setting(f"smart_x_{chat_id}_target", target_symbol)
                 asyncio.create_task(_background_smart_x_scanner())
                 return
             else:
@@ -10246,6 +10249,8 @@ class TelegramBotThread(BaseThread):
                 if is_order_success:
                     db.add_turbo_hedge_bot(chat_id, target_symbol, amount, leverage, trade_side, target_tp, is_bot_initiated=True)
                     db.update_system_setting(f"turbo_hedge_{chat_id}_{target_symbol}_initiated_by_bot", "1")
+                    db.update_system_setting(f"smart_x_{chat_id}_active", "1")
+                    db.update_system_setting(f"smart_x_{chat_id}_target", target_symbol)
                     entry_p = await asyncio.to_thread(trading_engine.get_current_price, target_symbol)
                     if entry_p > 0:
                         db.update_system_setting(f"turbo_hedge_{chat_id}_{target_symbol}_entry_price", str(entry_p))

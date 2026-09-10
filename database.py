@@ -2901,7 +2901,7 @@ def set_gold_turbo_config(chat_id: int, enabled: bool, amount: float = 15.0):
     update_system_setting(f"gold_turbo_{chat_id}_amount", str(amount))
 
 def get_gold_turbo_config(chat_id: int) -> dict:
-    enabled_val = get_system_setting(f"gold_turbo_{chat_id}_enabled", "1")
+    enabled_val = get_system_setting(f"gold_turbo_{chat_id}_enabled", "0")
     amount_val = get_system_setting(f"gold_turbo_{chat_id}_amount", "15.0")
     return {
         "is_enabled": enabled_val == "1",

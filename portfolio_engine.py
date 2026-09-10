@@ -223,6 +223,13 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     # 8. Funding Harvester
     funding_cfg = db.get_funding_harvester_config(chat_id) if hasattr(db, 'get_funding_harvester_config') else {"enabled": False, "amount": 50.0}
 
+    # 8b. Gold Turbo Config
+    gold_turbo_cfg = db.get_gold_turbo_config(chat_id) if hasattr(db, 'get_gold_turbo_config') else {"is_enabled": False, "amount_per_trade": 15.0}
+
+    # 8c. Smart X Quant Config
+    smart_x_active = (db.get_system_setting(f"smart_x_{chat_id}_active", "0") == "1") if hasattr(db, 'get_system_setting') else False
+    smart_x_target = db.get_system_setting(f"smart_x_{chat_id}_target", "GOLD") if hasattr(db, 'get_system_setting') else "GOLD"
+
     # 9. Flash Loan Keeper & Strategy
     is_flash_loan_auto = db.is_user_flash_loan_auto(chat_id) if hasattr(db, 'is_user_flash_loan_auto') else False
     flash_loan_pnl = db.get_user_flash_loan_pnl_summary(chat_id) if hasattr(db, 'get_user_flash_loan_pnl_summary') else {"count": 0, "total_profit": 0.0}
@@ -323,6 +330,9 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
 
         # Engine Flags
         "funding_cfg": funding_cfg,
+        "gold_turbo_cfg": gold_turbo_cfg,
+        "smart_x_active": smart_x_active,
+        "smart_x_target": smart_x_target,
         "is_flash_loan_auto": is_flash_loan_auto,
         "flash_loan_pnl": flash_loan_pnl,
         "is_defender_active": is_defender_active,
@@ -433,14 +443,40 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     engines_text += f"2️⃣ **Super Smart Trade Suite (`/smart_trade` / `auto_trade`)**\n   {e2_status}\n{e2_body}\n\n"
 
     # --- ENGINE 3: Smart X Multi-Asset Quant Suite (Gold & BTC) ---
-    paxg_active = any("PAXG" in p.get("symbol", "") for p in fut_pos) or any("PAXG" in s.get("symbol", "") for s in sp_trades)
-    btc_active = any("BTC" in p.get("symbol", "") for p in fut_pos) or any("BTC" in s.get("symbol", "") for s in sp_trades)
-    if paxg_active or btc_active:
-        e3_status = "🟢 ACTIVE / INVESTED (កំពុងគ្រប់គ្រងទីតាំងមាស PAXG / BTC)" if lang == "km" else "🟢 ACTIVE / INVESTED (Managing PAXG / BTC)"
-        e3_body = f"  • ម៉ូដែល AI ៖ Mixture-of-Experts Router (`brain_moe_router.pkl`) Active"
+    smart_x_active = data.get("smart_x_active", False)
+    smart_x_target = data.get("smart_x_target", "GOLD")
+    paxg_pos = [p for p in fut_pos if "PAXG" in p.get("symbol", "")] + [s for s in sp_trades if "PAXG" in s.get("symbol", "")]
+    btc_pos = [p for p in fut_pos if "BTC" in p.get("symbol", "")] + [s for s in sp_trades if "BTC" in s.get("symbol", "")]
+    smart_x_bots = [b for b in tb_bots if "PAXG" in b.get("symbol", "") or "BTC" in b.get("symbol", "")]
+
+    if smart_x_active or paxg_pos or btc_pos or smart_x_bots:
+        e3_status = "🟢 ACTIVE / INVESTED (ម៉ាស៊ីន AI Quant កំពុងជួញដូរ)" if lang == "km" else "🟢 ACTIVE / INVESTED"
+        e3_details = []
+        if paxg_pos:
+            for p in paxg_pos:
+                p_pnl = p.get('pnl_usd', 0.0)
+                p_sign = "+" if p_pnl >= 0 else ""
+                p_margin = p.get('margin_usd', p.get('invested_usd', 0.0))
+                p_side = p.get('side', 'BUY')
+                p_lev = p.get('leverage', 10)
+                e3_details.append(f"  • `PAXGUSDT` (Gold Quant {p_side} {p_lev}x) ៖ Margin `${p_margin:.2f}` | Entry: `${p.get('entry_price', 0):.2f}` | PnL: `{p_sign}${p_pnl:.2f}` (`{p.get('roi_pct', 0.0):+.1f}%`)")
+        elif btc_pos:
+            for p in btc_pos:
+                p_pnl = p.get('pnl_usd', 0.0)
+                p_sign = "+" if p_pnl >= 0 else ""
+                p_margin = p.get('margin_usd', p.get('invested_usd', 0.0))
+                p_side = p.get('side', 'BUY')
+                p_lev = p.get('leverage', 10)
+                e3_details.append(f"  • `BTCUSDT` (Bitcoin Quant {p_side} {p_lev}x) ៖ Margin `${p_margin:.2f}` | Entry: `${p.get('entry_price', 0):.2f}` | PnL: `{p_sign}${p_pnl:.2f}` (`{p.get('roi_pct', 0.0):+.1f}%`)")
+        elif smart_x_bots:
+            for b in smart_x_bots:
+                e3_details.append(f"  • `{b['symbol']}` (Quant Bot) ៖ ដើមទុន `${b['amount_usd']:.2f}` ({b['side']} {b['leverage']}x) | TP: `+{b['target_tp_pct']}%`")
+        else:
+            e3_details.append(f"  • ស្ថានភាព ៖ ម៉ាស៊ីន AI Quant សកម្ម (កំពុងស្កេនទុនជួញដូរ {smart_x_target} 24/7 តាម MoE Router)")
+        e3_body = "\n".join(e3_details)
     else:
         e3_status = "🟡 STANDBY (រង់ចាំ London/NY Liquidity Sweep)" if lang == "km" else "🟡 STANDBY (Waiting for London/NY Sweep)"
-        e3_body = "  • ស្ថានភាព ៖ រង់ចាំវាយលុក Asian Range Fakeout (វាយ `/smartx` ដើម្បីបើក)" if lang == "km" else "  • Status: Ready to launch via `/smartx`"
+        e3_body = "  • ស្ថានភាព ៖ រង់ចាំវាយលុក Asian Range Fakeout (វាយ `/smartx GOLD 20 10 AUTO 1234` ដើម្បីបើក)" if lang == "km" else "  • Status: Ready to launch via `/smartx GOLD 20 10 AUTO 1234`"
     engines_text += f"3️⃣ **Smart X Quant Suite (`/smart_x` / `/smartx`)**\n   {e3_status}\n{e3_body}\n\n"
 
     # --- ENGINE 4: Smart Swap Multi-Chain DEX & AI Gem Sniper ---
@@ -493,8 +529,14 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     engines_text += f"7️⃣ **8-Hour Funding Rate Harvester (`/funding_harvester`)**\n   {e7_status}\n{e7_body}\n\n"
 
     # --- ENGINE 8: Gold Turbo & Macro Radar ---
-    e8_status = "🟢 ACTIVE (តាមដាន DXY, US Yields & PAXG Correlation 24/7)" if lang == "km" else "🟢 ACTIVE (Tracking DXY & PAXG Macro Radar 24/7)"
-    e8_body = "  • ស្ថានភាព ៖ វិភាគ Macro Sentiment & AI Gold Regime Real-Time" if lang == "km" else "  • Status: Macro Sentiment & AI Gold Correlation Active"
+    gold_cfg = data.get("gold_turbo_cfg", {})
+    gold_on = gold_cfg.get("is_enabled", False)
+    if gold_on:
+        e8_status = "🟢 ACTIVE (ដំណើរការ HFT Gold Turbo 24/7)" if lang == "km" else "🟢 ACTIVE (HFT Gold Turbo Active 24/7)"
+        e8_body = f"  • ដើមទុន / Trade ៖ `${gold_cfg.get('amount_per_trade', 15.0):.2f} USDT` ({gold_cfg.get('max_leverage', 25)}x Lev) | AI Win-Rate Threshold: 85%" if lang == "km" else f"  • Capital / Trade: ${gold_cfg.get('amount_per_trade', 15.0):.2f} USDT"
+    else:
+        e8_status = "🟡 STANDBY (រង់ចាំការបើកដំណើរការ)" if lang == "km" else "🟡 STANDBY (Awaiting Activation)"
+        e8_body = "  • ស្ថានភាព ៖ ម៉ាស៊ីន Macro Standby (វាយ `/gold_turbo ON 1234` ដើម្បីបើក)" if lang == "km" else "  • Status: Standby (Activate via `/gold_turbo ON 1234`)"
     engines_text += f"8️⃣ **Gold Turbo & Macro Radar (`/gold_turbo` / `/gold_guard`)**\n   {e8_status}\n{e8_body}\n\n"
 
     # --- ENGINE 9: DeFi Flash Loan & Tokyo HFT MEV Keeper ---
