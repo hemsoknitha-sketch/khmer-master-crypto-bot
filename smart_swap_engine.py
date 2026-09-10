@@ -80,11 +80,59 @@ def resolve_token_address(chain: str, symbol_or_addr: str) -> str:
     s = str(symbol_or_addr or "").strip()
     chain_upper = str(chain or "SOLANA").upper().strip()
     if chain_upper == "SOLANA":
-        return SOLANA_TOKENS.get(s.upper(), s)
+        if s.upper() in SOLANA_TOKENS:
+            return SOLANA_TOKENS[s.upper()]
+        if len(s) >= 32 and not s.startswith("0x"):
+            return s
+        try:
+            r = SWAP_SESSION.get(f"https://api.dexscreener.com/latest/dex/search?q={s}", timeout=2.5)
+            if r.status_code == 200:
+                pairs = r.json().get("pairs", [])
+                for p in pairs:
+                    if str(p.get("chainId", "")).lower() == "solana" and p.get("baseToken", {}).get("symbol", "").upper() == s.upper():
+                        addr = p.get("baseToken", {}).get("address")
+                        if addr:
+                            SOLANA_TOKENS[s.upper()] = addr
+                            return addr
+        except Exception:
+            pass
+        return s
     elif chain_upper in ["BSC", "BNB"]:
-        return BSC_TOKENS.get(s.upper(), s)
+        if s.upper() in BSC_TOKENS:
+            return BSC_TOKENS[s.upper()]
+        if s.startswith("0x") and len(s) == 42:
+            return s
+        try:
+            r = SWAP_SESSION.get(f"https://api.dexscreener.com/latest/dex/search?q={s}", timeout=2.5)
+            if r.status_code == 200:
+                pairs = r.json().get("pairs", [])
+                for p in pairs:
+                    if str(p.get("chainId", "")).lower() in ["bsc", "bnb"] and p.get("baseToken", {}).get("symbol", "").upper() == s.upper():
+                        addr = p.get("baseToken", {}).get("address")
+                        if addr:
+                            BSC_TOKENS[s.upper()] = addr
+                            return addr
+        except Exception:
+            pass
+        return s
     elif chain_upper in ["ETH", "ETHEREUM"]:
-        return ETH_TOKENS.get(s.upper(), s)
+        if s.upper() in ETH_TOKENS:
+            return ETH_TOKENS[s.upper()]
+        if s.startswith("0x") and len(s) == 42:
+            return s
+        try:
+            r = SWAP_SESSION.get(f"https://api.dexscreener.com/latest/dex/search?q={s}", timeout=2.5)
+            if r.status_code == 200:
+                pairs = r.json().get("pairs", [])
+                for p in pairs:
+                    if str(p.get("chainId", "")).lower() in ["ethereum", "eth"] and p.get("baseToken", {}).get("symbol", "").upper() == s.upper():
+                        addr = p.get("baseToken", {}).get("address")
+                        if addr:
+                            ETH_TOKENS[s.upper()] = addr
+                            return addr
+        except Exception:
+            pass
+        return s
     return s
 
 # ==============================================================================
@@ -361,7 +409,7 @@ def scan_onchain_momentum_gems(chain: str = "SOLANA", limit: int = 8) -> list:
 # ⚡ PILLAR 4 & 5: EXECUTION, AUTO-SNIPER & HARVEST ENGINE
 # ==============================================================================
 
-def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str, amount: float, slippage_pct: float = 0.5, pin: str = "1234") -> dict:
+def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str, amount: float, slippage_pct: float = 0.5, pin: str = "1234", target_symbol: str = None) -> dict:
     """
     Executes a direct high-speed DEX swap with Pre-Flight Honeypot verification,
     best aggregator routing (Jupiter v6 / 1inch), and Private MEV protection.
@@ -370,13 +418,21 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
     from_addr = resolve_token_address(chain_upper, from_token)
     to_addr = resolve_token_address(chain_upper, to_token)
 
+    final_symbol = str(target_symbol or to_token).upper().strip()
+    if final_symbol == to_addr and len(final_symbol) >= 32:
+        # Reverse lookup if symbol is an address
+        for sym, addr in (SOLANA_TOKENS.items() if chain_upper == "SOLANA" else BSC_TOKENS.items()):
+            if addr.lower() == to_addr.lower():
+                final_symbol = sym
+                break
+
     # 1. Pre-Flight Honeypot & Rug-Pull Security Audit
     audit_res = evaluate_token_security(chain_upper, to_addr)
     if not audit_res["is_safe"]:
         return {
             "status": "error",
             "reason": "HONEYPOT_SECURITY_REJECTION",
-            "msg": f"Target token {to_token} failed security audit: " + " | ".join(audit_res["reasons"])
+            "msg": f"Target token {final_symbol} failed security audit: " + " | ".join(audit_res["reasons"])
         }
 
     # 2. Check User Registered Web3 Wallet in Database (or institutional Keeper Relayer Vault)
@@ -393,7 +449,7 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
     price_to = get_token_price_usd(chain_upper, to_addr)
     price_from = get_token_price_usd(chain_upper, from_addr)
     if price_from <= 0:
-        price_from = 100.0 if "SOL" in from_token.upper() else (1.0 if "USD" in from_token.upper() else 600.0)
+        price_from = 145.0 if "SOL" in from_token.upper() else (1.0 if "USD" in from_token.upper() else 600.0)
 
     amount_usd = float(amount) * price_from
     slippage_bps = max(10, int(float(slippage_pct) * 100))
@@ -425,7 +481,7 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
         chat_id=chat_id,
         chain=chain_upper,
         token_address=to_addr,
-        token_symbol=to_token.upper(),
+        token_symbol=final_symbol,
         amount_in_usd=amount_usd,
         token_qty=out_qty,
         entry_price=effective_price,
@@ -437,7 +493,7 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
         "swap_id": swap_id,
         "chain": chain_upper,
         "from_token": from_token.upper(),
-        "to_token": to_token.upper(),
+        "to_token": final_symbol,
         "amount_in": float(amount),
         "amount_usd": round(amount_usd, 2),
         "token_qty": round(out_qty, 6),
@@ -454,43 +510,54 @@ def execute_auto_smart_swap_sniper(chat_id: int, amount_usd: float = 20.0, chain
     """
     Autonomous Gem Sniper:
     - Scans top momentum breakout pairs.
-    - Selects the #1 safe verified gem (passing Honeypot & Rug-Pull shields).
+    - Selects the top safe verified gem (passing Honeypot & Rug-Pull shields).
     - Swaps user input capital into the gem.
     - Arms 24/7 PPO trailing profit harvester.
     """
     chain_upper = str(chain or "SOLANA").upper().strip()
-    gems = scan_onchain_momentum_gems(chain_upper, limit=5)
+    gems = scan_onchain_momentum_gems(chain_upper, limit=8)
     if not gems:
         return {"status": "error", "reason": "NO_QUALIFIED_GEMS", "msg": "No breakout tokens currently meet safety criteria."}
 
-    # Pick top scoring verified gem
-    target_gem = gems[0]
-    gem_sym = target_gem["symbol"]
-    gem_addr = target_gem["address"]
-
-    # Security check on chosen gem
-    sec = evaluate_token_security(chain_upper, gem_addr)
-    if not sec["is_safe"]:
-        # Fallback to second best if first is flagged
-        if len(gems) > 1:
-            target_gem = gems[1]
-            gem_sym = target_gem["symbol"]
-            gem_addr = target_gem["address"]
-        else:
-            return {"status": "error", "reason": "SECURITY_CHECK_FAILED", "msg": "Target gem failed security audit."}
-
-    # Execute Swap from SOL / USDT into the gem
     from_token = "SOL" if chain_upper == "SOLANA" else "USDT"
     from_price = get_token_price_usd(chain_upper, from_token)
-    if from_price <= 0: from_price = 100.0 if from_token == "SOL" else 1.0
+    if from_price <= 0:
+        from_price = 145.0 if from_token == "SOL" else 1.0
 
     input_qty = float(amount_usd) / from_price
-    swap_res = execute_smart_swap(chat_id, chain_upper, from_token, gem_sym, input_qty, slippage_pct=0.5, pin=pin)
-    if swap_res.get("status") == "success":
-        swap_res["ai_score"] = target_gem["score"]
-        swap_res["buy_velocity"] = target_gem["buy_velocity_5m"]
-        swap_res["gem_name"] = gem_sym
-    return swap_res
+    last_err_msg = ""
+
+    # Loop through candidates in order of highest momentum score
+    for target_gem in gems:
+        gem_sym = target_gem["symbol"]
+        gem_addr = target_gem["address"]
+
+        # 1. Pre-audit chosen gem
+        sec = evaluate_token_security(chain_upper, gem_addr)
+        if not sec["is_safe"]:
+            last_err_msg = f"Target token {gem_sym} failed security audit: " + " | ".join(sec.get("reasons", ["Unsafe"]))
+            continue
+
+        # 2. Execute Swap using actual mint address!
+        swap_res = execute_smart_swap(
+            chat_id=chat_id,
+            chain=chain_upper,
+            from_token=from_token,
+            to_token=gem_addr,
+            amount=input_qty,
+            slippage_pct=0.5,
+            pin=pin,
+            target_symbol=gem_sym
+        )
+        if swap_res.get("status") == "success":
+            swap_res["ai_score"] = target_gem.get("score", 90.0)
+            swap_res["buy_velocity"] = target_gem.get("buy_velocity_5m", 2.0)
+            swap_res["gem_name"] = gem_sym
+            return swap_res
+        else:
+            last_err_msg = swap_res.get("msg", "Swap execution failed")
+
+    return {"status": "error", "reason": "SECURITY_CHECK_FAILED", "msg": last_err_msg or "No verified gems passed safety audit."}
 
 def stop_smart_swap(chat_id: int, target: str = "ALL") -> dict:
     """
