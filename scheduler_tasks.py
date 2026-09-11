@@ -4811,10 +4811,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     growth_pct = round((net_profit / base_cap * 100.0), 2)
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
-    sep = "━━━━━━━━━━━━━━━━━━━━━━"
-    dash_sep = "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
-    line_sep = "──────────────────────"
+    from ui_standards import DIVIDER_HEAVY, DIVIDER_LIGHT, DIVIDER_DASH, OFFICIAL_FOOTNOTE
+    sep = DIVIDER_HEAVY
+    dash_sep = DIVIDER_DASH
+    line_sep = DIVIDER_LIGHT
 
     title_filter = f" | {data['engine_filter'].upper()}" if data.get("engine_filter") else ""
 
