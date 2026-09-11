@@ -151,8 +151,64 @@ MESSAGES = {
             "⚙️ *Apex Super Brain កំពុងដំណើរការស្វ័យប្រវត្តិ ២៤ម៉ោង/ថ្ងៃ ដោយសុវត្ថិភាព 0% Risk!*"
         ),
 
-        'whale_deposit_alert': "🚨 **ON-CHAIN RED ALERT (INFLOW)** 🚨\n\n🐋 ត្រីបាឡែនទើបតែផ្ទេរលុយចូល **Binance**!\n💰 ទំហំសាច់ប្រាក់: **${value:,.2f} {symbol}**\n\n⚠️ *ចំណាំ: នេះអាចជាសញ្ញានៃការត្រៀមទិញកាក់ធំៗ ឬអាចជាការទម្លាក់លក់ (Dump)!*",
-        'whale_withdrawal_alert': "💸 **ON-CHAIN GREEN ALERT (OUTFLOW)** 💸\n\n🐋 ត្រីបាឡែនទើបតែដកលុយចេញពី **Binance**!\n💰 ទំហំសាច់ប្រាក់: **${value:,.2f} {symbol}**\n\n🟢 *ចំណាំ: ការដកសាច់ប្រាក់ចេញច្រើន អាចមានន័យថាពួកគេកំពុងប្រមូលទិញហើយយកទៅលាក់ទុក (Accumulation)!*",
+        'whale_deposit_alert': (
+            "🚨 *ON-CHAIN RED ALERT (INFLOW)* 🚨\n\n"
+            "🐋 ត្រីបាឡែនទើបតែផ្ទេរលុយចូល *Binance*!\n"
+            "💰 ទំហំសាច់ប្រាក់: *${value:,.2f} {symbol}*\n\n"
+            "⚠️ *ចំណាំ ៖* នេះអាចជាសញ្ញានៃការត្រៀមទិញកាក់ធំៗ ឬអាចជាការទម្លាក់លក់ (Dump)!\n"
+            "━━━━━━━━━━━━\n"
+            "🛡️ *ការគ្រប់គ្រងហានិភ័យ & ឱកាស (RISK & OPPORTUNITY)*\n"
+            "📉 ទិសដៅទីផ្សារ ៖ `Dump Risk Protection / High-Yield Short Snipe`\n"
+            "💡 វិភាគ AI ៖ សាច់ប្រាក់ហូរចូល Exchange ច្រើន អាចបង្កឱ្យមាន Panic Selling ឬការទម្លាក់ថ្លៃដើម្បីទិញថោក!\n\n"
+            "👉 *បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖*\n"
+            "`/turbo_hedge BTCUSDT 20 10 SELL 2.5 1234`\n"
+            "`/turbo_hedge ETHUSDT 20 10 SELL 2.5 1234`\n\n"
+            "🛡️ *ជម្រើស Delta-Neutral Hedge (0% Loss Risk) ៖*\n"
+            "`/turbo_hedge HEDGE BTC 100 1234`\n\n"
+            "📉 *Futures Top 20 Dumpers Scanner ៖*\n"
+            "`/turbo_hedge TOP 20 10 SELL 5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
+        'whale_withdrawal_alert': (
+            "💸 *ON-CHAIN GREEN ALERT (OUTFLOW)* 💸\n\n"
+            "🐋 ត្រីបាឡែនទើបតែដកលុយចេញពី *Binance*!\n"
+            "💰 ទំហំសាច់ប្រាក់: *${value:,.2f} {symbol}*\n\n"
+            "🟢 *ចំណាំ ៖* ការដកសាច់ប្រាក់ចេញច្រើន អាចមានន័យថាពួកគេកំពុងប្រមូលទិញហើយយកទៅលាក់ទុក (Accumulation)!\n"
+            "━━━━━━━━━━━━\n"
+            "🎯 *ឱកាសវិនិយោគ (INVESTMENT OPPORTUNITY)*\n"
+            "📈 ទិសដៅទីផ្សារ ៖ `Bullish Accumulation / Pre-Pump Run`\n"
+            "💡 វិភាគ AI ៖ ត្រីបាឡែនដកសាច់ប្រាក់ទុក កាត់បន្ថយសម្ពាធលក់លើ Exchange បង្កើតឱកាសរុញតម្លៃឡើងខ្លាំង!\n\n"
+            "👉 *បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖*\n"
+            "`/turbo_hedge BTCUSDT 20 10 BUY 2.5 1234`\n"
+            "`/turbo_hedge ETHUSDT 20 10 BUY 2.5 1234`\n\n"
+            "🛒 *ជម្រើស Spot Breakout (Zero Liquidation Risk) ៖*\n"
+            "`/turbo_hedge SPOT BTC 50 1234`\n\n"
+            "🚀 *Futures Top 20 Gainers Scanner ៖*\n"
+            "`/turbo_hedge TOP 20 10 BUY 5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
+        'funding_rate_alert': (
+            "🌾 *FUNDING RATE ARBITRAGE ALERT* 🌾\n\n"
+            "🪙 ទីផ្សារ ៖ *{symbol}*\n"
+            "📊 អត្រា Funding ៖ *{rate}%*\n"
+            "⚡ ស្ថានភាព ៖ `{message}`\n"
+            "━━━━━━━━━━━━\n"
+            "🎯 *ឱកាសវិនិយោគ & កើប Yield (ARBITRAGE OPPORTUNITY)*\n"
+            "💡 វិភាគ AI ៖ អត្រា Funding ខ្ពស់បង្កើតឱកាសកើបចំណេញពី Funding Harvester ឬលោតទិញស្របពេល Squeeze!\n\n"
+            "👉 *បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖*\n"
+            "`/turbo_hedge HEDGE BTC 100 1234`\n"
+            "`/turbo_hedge BTCUSDT 20 10 AUTO 2.5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
         'smart_dca_usage': "❌ របៀបប្រើប្រាស់: `/smart_dca <ឈ្មោះកាក់> <ទំហំប្រាក់> <PIN>`\nឧទាហរណ៍: `/smart_dca BTC 100 1234`",
         'smart_dca_set': "✅ **Smart DCA ត្រូវបានចាប់ផ្តើម!**\n🤖 ខ្ញុំកំពុងតាមដាន **{symbol}** ចាប់ពីតម្លៃ **${entry_price:,.2f}**។ បើវាធ្លាក់ចុះខ្លាំង ខ្ញុំនឹងប្រើប្រាស់យុទ្ធសាស្រ្ត Martingale គុណលុយទិញជាកាំជណ្តើរភ្លាមៗ!",
         'smart_dca_buy_success': "🤖 **SMART DCA ដំណើរការ!** 🤖\n\nទិញបានសម្រេច: **${amount:,.2f} នៃ {symbol}** ក្នុងតម្លៃ {buy_price}។ (DCA Drop Level: {level})\n\n🛡 មុខងារ Auto-Trade & Trailing Stop នឹងគ្រប់គ្រងការលក់កាត់ចំណេញដោយស្វ័យប្រវត្តិ!",
@@ -305,8 +361,64 @@ MESSAGES = {
             "⚙️ *Apex Super Brain is running autonomously 24/7 with zero risk!*"
         ),
 
-        'whale_deposit_alert': "🚨 **ON-CHAIN RED ALERT (INFLOW)** 🚨\n\n🐋 A whale just deposited into **Binance**!\n💰 Amount: **${value:,.2f} {symbol}**\n\n⚠️ *Note: This could indicate a massive buy order preparation or a potential market dump!*",
-        'whale_withdrawal_alert': "💸 **ON-CHAIN GREEN ALERT (OUTFLOW)** 💸\n\n🐋 A whale just withdrew from **Binance**!\n💰 Amount: **${value:,.2f} {symbol}**\n\n🟢 *Note: Massive outflows often indicate accumulation and storage!*",
+        'whale_deposit_alert': (
+            "🚨 *ON-CHAIN RED ALERT (INFLOW)* 🚨\n\n"
+            "🐋 A whale just deposited into *Binance*!\n"
+            "💰 Amount: *${value:,.2f} {symbol}*\n\n"
+            "⚠️ *Note:* Massive inflows often precede heavy dumps or aggressive volatility!\n"
+            "━━━━━━━━━━━━\n"
+            "🛡️ *RISK & OPPORTUNITY (SUPER SMART)*\n"
+            "📉 Market Direction: `Dump Risk / High-Yield Short Snipe`\n"
+            "💡 AI Insight: Whale liquidity inflow increases sell pressure or triggers flash-dump liquidations!\n\n"
+            "👉 *1-Tap Copyable Execution Commands:*\n"
+            "`/turbo_hedge BTCUSDT 20 10 SELL 2.5 1234`\n"
+            "`/turbo_hedge ETHUSDT 20 10 SELL 2.5 1234`\n\n"
+            "🛡️ *Delta-Neutral Hedge (0% Loss Risk):*\n"
+            "`/turbo_hedge HEDGE BTC 100 1234`\n\n"
+            "📉 *Futures Top 20 Dumpers Auto-Scanner:*\n"
+            "`/turbo_hedge TOP 20 10 SELL 5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
+        'whale_withdrawal_alert': (
+            "💸 *ON-CHAIN GREEN ALERT (OUTFLOW)* 💸\n\n"
+            "🐋 A whale just withdrew from *Binance*!\n"
+            "💰 Amount: *${value:,.2f} {symbol}*\n\n"
+            "🟢 *Note:* Massive outflows often indicate accumulation and cold storage!\n"
+            "━━━━━━━━━━━━\n"
+            "🎯 *INVESTMENT OPPORTUNITY (SUPER SMART)*\n"
+            "📈 Market Direction: `Bullish Accumulation / Pre-Pump Run`\n"
+            "💡 AI Insight: Exchange supply is shrinking, reducing sell pressure for an explosive breakout!\n\n"
+            "👉 *1-Tap Copyable Execution Commands:*\n"
+            "`/turbo_hedge BTCUSDT 20 10 BUY 2.5 1234`\n"
+            "`/turbo_hedge ETHUSDT 20 10 BUY 2.5 1234`\n\n"
+            "🛒 *Spot Breakout (Zero Liquidation Risk):*\n"
+            "`/turbo_hedge SPOT BTC 50 1234`\n\n"
+            "🚀 *Futures Top 20 Gainers Auto-Scanner:*\n"
+            "`/turbo_hedge TOP 20 10 BUY 5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
+        'funding_rate_alert': (
+            "🌾 *FUNDING RATE ARBITRAGE ALERT* 🌾\n\n"
+            "🪙 Symbol: *{symbol}*\n"
+            "📊 Funding Rate: *{rate}%*\n"
+            "⚡ Condition: `{message}`\n"
+            "━━━━━━━━━━━━\n"
+            "🎯 *ARBITRAGE OPPORTUNITY (SUPER SMART)*\n"
+            "💡 AI Insight: Extreme funding rates create massive risk-free yield harvest or squeeze momentum!\n\n"
+            "👉 *1-Tap Copyable Execution Commands:*\n"
+            "`/turbo_hedge HEDGE BTC 100 1234`\n"
+            "`/turbo_hedge BTCUSDT 20 10 AUTO 2.5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
         'smart_dca_usage': "❌ Usage: `/smart_dca <SYMBOL> <AMOUNT> <PIN>`\nExample: `/smart_dca BTC 100 1234`",
         'smart_dca_set': "✅ **Smart DCA Activated!**\n🤖 I am monitoring **{symbol}** from **${entry_price:,.2f}**. If it drops significantly, I will execute a Martingale ladder buy strategy!",
         'smart_dca_buy_success': "🤖 **SMART DCA TRIGGERED!** 🤖\n\nSuccessfully bought: **${amount:,.2f} of {symbol}** at {buy_price}. (DCA Drop Level: {level})\n\n🛡 Auto-Trade & Trailing Stop is now managing this trade!",
@@ -423,8 +535,64 @@ MESSAGES = {
         'auto_trade_usage': "❌ 用法: `/auto_trade ON <Amount_USDT> <PIN>` 或 `/auto_trade OFF <PIN>`\n例如: `/auto_trade ON 50 1234`",
         'auto_trade_enabled': "✅ 自动交易已开启!\n💵 金额: ${amount} USDT\n🛡️ 追踪止损: {trailing}%\n\n*注意：每当 AI 输出 BUY 信号时，Bot 都会自动买入！*",
         'auto_trade_disabled': "🚫 自动交易已关闭。",
-        'whale_deposit_alert': "🚨 **链上红色警报 (资金流入)** 🚨\n\n🐋 巨鲸刚刚向 **Binance** 存入资金!\n💰 金额: **${value:,.2f} {symbol}**\n\n⚠️ *注意: 这可能表明正在准备大规模买单，或者是潜在的抛售 (Dump)!*",
-        'whale_withdrawal_alert': "💸 **链上绿色警报 (资金流出)** 💸\n\n🐋 巨鲸刚刚从 **Binance** 提取资金!\n💰 金额: **${value:,.2f} {symbol}**\n\n🟢 *注意: 大规模资金流出通常表明巨鲸正在囤积代币!*",
+        'whale_deposit_alert': (
+            "🚨 *链上红色警报 (资金流入)* 🚨\n\n"
+            "🐋 巨鲸刚刚向 *Binance* 存入资金!\n"
+            "💰 金额: *${value:,.2f} {symbol}*\n\n"
+            "⚠️ *注意:* 大规模资金流入通常表明巨鲸可能正在准备大举抛售 (Dump)!\n"
+            "━━━━━━━━━━━━\n"
+            "🛡️ *风险与交易机会 (SUPER SMART)*\n"
+            "📉 市场方向: `做空套利 / 极速 Short 狙击`\n"
+            "💡 AI 研判: 交易所供应量增加，可能引发恐慌性抛售或插针行情!\n\n"
+            "👉 *一键复制执行指令 (1-Tap Copyable):*\n"
+            "`/turbo_hedge BTCUSDT 20 10 SELL 2.5 1234`\n"
+            "`/turbo_hedge ETHUSDT 20 10 SELL 2.5 1234`\n\n"
+            "🛡️ *零风险对冲模式 (Delta-Neutral):*\n"
+            "`/turbo_hedge HEDGE BTC 100 1234`\n\n"
+            "📉 *合约跌幅榜 TOP 20 扫描:*\n"
+            "`/turbo_hedge TOP 20 10 SELL 5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
+        'whale_withdrawal_alert': (
+            "💸 *链上绿色警报 (资金流出)* 💸\n\n"
+            "🐋 巨鲸刚刚从 *Binance* 提取资金!\n"
+            "💰 金额: *${value:,.2f} {symbol}*\n\n"
+            "🟢 *注意:* 大规模资金流出通常表明巨鲸正在囤积代币并转入冷钱包 (Accumulation)!\n"
+            "━━━━━━━━━━━━\n"
+            "🎯 *投资与建仓机会 (SUPER SMART)*\n"
+            "📈 市场方向: `看涨囤积 / 拉升蓄势`\n"
+            "💡 AI 研判: 交易所筹码锐减，抛压减弱，极易引发爆发性拉升突破!\n\n"
+            "👉 *一键复制执行指令 (1-Tap Copyable):*\n"
+            "`/turbo_hedge BTCUSDT 20 10 BUY 2.5 1234`\n"
+            "`/turbo_hedge ETHUSDT 20 10 BUY 2.5 1234`\n\n"
+            "🛒 *现货突破模式 (0% 清算风险):*\n"
+            "`/turbo_hedge SPOT BTC 50 1234`\n\n"
+            "🚀 *合约涨幅榜 TOP 20 自动扫描:*\n"
+            "`/turbo_hedge TOP 20 10 BUY 5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
+        'funding_rate_alert': (
+            "🌾 *资金费率套利警报* 🌾\n\n"
+            "🪙 交易对: *{symbol}*\n"
+            "📊 费率: *{rate}%*\n"
+            "⚡ 状态: `{message}`\n"
+            "━━━━━━━━━━━━\n"
+            "🎯 *套利机会 (SUPER SMART)*\n"
+            "💡 AI 研判: 极端资金费率创造了无风险年化收益收割或轧空行情!\n\n"
+            "👉 *一键复制执行指令 (1-Tap Copyable):*\n"
+            "`/turbo_hedge HEDGE BTC 100 1234`\n"
+            "`/turbo_hedge BTCUSDT 20 10 AUTO 2.5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
         'smart_dca_usage': "❌ 用法: `/smart_dca <代币> <金额> <PIN>`\n例如: `/smart_dca BTC 100 1234`",
         'smart_dca_set': "✅ **Smart DCA 已启动!**\n🤖 正在从 **${entry_price:,.2f}** 监控 **{symbol}**。如果大幅下跌，将执行马丁格尔阶梯买入策略!",
         'smart_dca_buy_success': "🤖 **SMART DCA 已触发!** 🤖\n\n已成功买入: {buy_price} 的 **${amount:,.2f} {symbol}**。(DCA 下跌等级: {level})\n\n🛡 自动交易和追踪止损现在正在管理这笔交易!",

@@ -4595,6 +4595,29 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_turbo_hedge_top_launch":
                 context.args = ["TOP", "20", "10", "AUTO", "5"]
                 await turbo_hedge_command(update, context)
+            elif data == "btn_alert_exec_btc_buy":
+                context.args = ["BTCUSDT", "20", "10", "BUY", "2.5"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_alert_exec_btc_sell":
+                context.args = ["BTCUSDT", "20", "10", "SELL", "2.5"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_alert_exec_btc_spot":
+                context.args = ["SPOT", "BTC", "50"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_alert_exec_btc_hedge":
+                context.args = ["HEDGE", "BTC", "100"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_alert_exec_top_dumpers":
+                context.args = ["TOP", "20", "10", "SELL", "5"]
+                await turbo_hedge_command(update, context)
+            elif data.startswith("btn_alert_exec_long_"):
+                sym = data.replace("btn_alert_exec_long_", "")
+                context.args = [sym, "20", "10", "BUY", "2.5"]
+                await turbo_hedge_command(update, context)
+            elif data.startswith("btn_alert_exec_short_"):
+                sym = data.replace("btn_alert_exec_short_", "")
+                context.args = [sym, "20", "10", "SELL", "2.5"]
+                await turbo_hedge_command(update, context)
             elif data.startswith("btn_scalp_"):
                 sym = data.replace("btn_scalp_", "")
                 context.args = [sym]
@@ -9366,8 +9389,13 @@ class TelegramBotThread(BaseThread):
                 return
 
             symbol_raw = raw_args[0].upper().strip()
-            pin = str(raw_args[-1]).strip()
-            inner_args = raw_args[1:-1]
+            last_tok = str(raw_args[-1]).strip()
+            if len(raw_args) >= 3 and len(last_tok) == 4 and last_tok.isdigit():
+                pin = last_tok
+                inner_args = raw_args[1:-1]
+            else:
+                pin = ""
+                inner_args = raw_args[1:]
 
             if symbol_raw in ["AUTO", "SCAN", "TOP", "ON", "START", "RUN"]:
                 symbol = "TOP"
@@ -9476,27 +9504,61 @@ class TelegramBotThread(BaseThread):
                         elif len(nums) == 1:
                             amount = float(nums[0])
                 else:
-                    # Single coin
-                    nums = []
-                    for tok in inner_args:
+                    # Single coin: Supports /turbo_hedge BTCUSDT 20 10 BUY 2.5 1234
+                    # or /turbo_hedge BTCUSDT 20 10x BUY 2.5 1234
+                    side_idx = -1
+                    for i, tok in enumerate(inner_args):
                         u = tok.upper()
-                        if u in ["BUY", "SELL", "AUTO", "SPOT"]:
-                            user_side_input = u
-                        else:
+                        if u in ["BUY", "SELL", "AUTO", "SPOT", "LONG", "SHORT"]:
+                            user_side_input = "BUY" if u == "LONG" else ("SELL" if u == "SHORT" else u)
+                            side_idx = i
+                            break
+
+                    if side_idx != -1:
+                        before_tokens = inner_args[:side_idx]
+                        after_tokens = inner_args[side_idx+1:]
+                        before_nums = []
+                        for t in before_tokens:
                             try:
-                                val = float(tok)
-                                nums.append(val)
+                                clean_t = t.lower().replace('$', '').replace('x', '').replace('usdt', '')
+                                before_nums.append(float(clean_t))
                             except ValueError:
                                 pass
-                    if len(nums) >= 3:
-                        leverage = int(nums[0])
-                        amount = float(nums[1])
-                        target_tp = float(nums[2])
-                    elif len(nums) == 2:
-                        leverage = int(nums[0])
-                        amount = float(nums[1])
-                    elif len(nums) == 1:
-                        amount = float(nums[0])
+                        after_nums = []
+                        for t in after_tokens:
+                            try:
+                                clean_t = t.lower().replace('%', '').replace('$', '').replace('usdt', '')
+                                after_nums.append(float(clean_t))
+                            except ValueError:
+                                pass
+
+                        if len(before_nums) >= 2:
+                            amount = float(before_nums[0])
+                            leverage = int(before_nums[1])
+                        elif len(before_nums) == 1:
+                            amount = float(before_nums[0])
+
+                        if len(after_nums) >= 2:
+                            target_tp = float(after_nums[0])
+                        elif len(after_nums) == 1:
+                            target_tp = float(after_nums[0])
+                    else:
+                        nums = []
+                        for tok in inner_args:
+                            clean_t = tok.lower().replace('$', '').replace('x', '').replace('%', '').replace('usdt', '')
+                            try:
+                                nums.append(float(clean_t))
+                            except ValueError:
+                                pass
+                        if len(nums) >= 3:
+                            amount = float(nums[0])
+                            leverage = int(nums[1])
+                            target_tp = float(nums[2])
+                        elif len(nums) == 2:
+                            amount = float(nums[0])
+                            leverage = int(nums[1])
+                        elif len(nums) == 1:
+                            amount = float(nums[0])
 
             is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
             stored_pin = db.get_user_pin(chat_id)

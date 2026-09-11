@@ -15,11 +15,11 @@ import trading_engine
 
 GLOBAL_INSUFFICIENT_MUTE = {}
 
-async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="Markdown", photo_path=None):
+async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="Markdown", photo_path=None, reply_markup=None):
     """
     Broadcasts messages to users in parallel batches of 25 to respect Telegram API rate limits.
     `users` can be a list of chat_ids or a list of tuples (chat_id, lang).
-    `text_or_func` can be a static string or a callable that takes `lang` and returns a string.
+    `text_or_func` can be a static string or a callable that takes `lang` and returns a string (or (text, reply_markup)).
     """
     chunk_size = 25
     for i in range(0, len(users), chunk_size):
@@ -34,77 +34,77 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                 lang = 'khmer'
                 
             async def send_task(cid, l, p_path):
+                reply_markup_to_use = reply_markup
                 # 1. Generate text in parallel
                 if callable(text_or_func):
                     if asyncio.iscoroutinefunction(text_or_func):
-                        msg = await text_or_func(cid, l)
+                        res = await text_or_func(cid, l)
                     else:
                         try:
-                            msg = await asyncio.to_thread(text_or_func, cid, l)
+                            res = await asyncio.to_thread(text_or_func, cid, l)
                         except TypeError:
-                            msg = await asyncio.to_thread(text_or_func, l)
+                            res = await asyncio.to_thread(text_or_func, l)
+                    if isinstance(res, (tuple, list)) and len(res) == 2:
+                        msg, res_kb = res
+                        if res_kb is not None:
+                            reply_markup_to_use = res_kb
+                    else:
+                        msg = res
                 else:
                     msg = text_or_func
                 
                 if not msg:
                     return
                     
-                # 2. Send Photo if available
                 # 2. Try sending photo with text:
-                # - If msg <= 1000: Native photo caption via send_photo (1 message)
-                # - If msg <= 4000 and HTTP photo URL: Telegram LinkPreviewOptions with prefer_large_media=True & show_above_text=True (1 SINGLE GORGEOUS MESSAGE with large photo on top!)
-                # - If local photo or msg > 4000: send photo first, then text chunk(s)
                 sent_photo = False
                 if p_path:
                     try:
                         if str(p_path).startswith(('http://', 'https://')):
                             if len(msg) <= 1000:
                                 try:
-                                    await app.bot.send_photo(chat_id=cid, photo=p_path, caption=msg, parse_mode=parse_mode)
+                                    await app.bot.send_photo(chat_id=cid, photo=p_path, caption=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use)
                                     sent_photo = True
                                 except Exception:
                                     clean_caption = msg.replace('*', '').replace('`', '').replace('_', '')
-                                    await app.bot.send_photo(chat_id=cid, photo=p_path, caption=clean_caption)
+                                    await app.bot.send_photo(chat_id=cid, photo=p_path, caption=clean_caption, reply_markup=reply_markup_to_use)
                                     sent_photo = True
                             elif len(msg) <= 4000:
-                                # Telegram Bot API 7.0+ LinkPreviewOptions (Large Media Photo on Top of Text in EXACTLY 1 MESSAGE!)
                                 try:
                                     from telegram import LinkPreviewOptions
                                     lpo = LinkPreviewOptions(url=str(p_path), prefer_large_media=True, show_above_text=True)
-                                    await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, link_preview_options=lpo)
+                                    await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, link_preview_options=lpo, reply_markup=reply_markup_to_use)
                                     sent_photo = True
                                 except Exception as e_lpo:
                                     print(f"⚠️ LinkPreviewOptions broadcast notice: {e_lpo}")
                                     try:
                                         clean_msg = msg.replace('*', '').replace('`', '').replace('_', '')
-                                        await app.bot.send_message(chat_id=cid, text=clean_msg, link_preview_options=lpo)
+                                        await app.bot.send_message(chat_id=cid, text=clean_msg, link_preview_options=lpo, reply_markup=reply_markup_to_use)
                                         sent_photo = True
                                     except Exception:
-                                        # Fallback to separate photo if link preview failed
                                         try:
-                                            await app.bot.send_photo(chat_id=cid, photo=p_path)
+                                            await app.bot.send_photo(chat_id=cid, photo=p_path, reply_markup=reply_markup_to_use)
                                         except Exception:
                                             pass
                             else:
-                                # Over 4000 chars: send photo first, then text chunks below
                                 try:
-                                    await app.bot.send_photo(chat_id=cid, photo=p_path)
+                                    await app.bot.send_photo(chat_id=cid, photo=p_path, reply_markup=reply_markup_to_use)
                                 except Exception as e_p:
                                     print(f"⚠️ Photo broadcast notice: {e_p}")
                         else:
                             if len(msg) <= 1000:
                                 with open(p_path, 'rb') as f:
                                     try:
-                                        await app.bot.send_photo(chat_id=cid, photo=f, caption=msg, parse_mode=parse_mode)
+                                        await app.bot.send_photo(chat_id=cid, photo=f, caption=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use)
                                         sent_photo = True
                                     except Exception:
                                         clean_caption = msg.replace('*', '').replace('`', '').replace('_', '')
-                                        await app.bot.send_photo(chat_id=cid, photo=f, caption=clean_caption)
+                                        await app.bot.send_photo(chat_id=cid, photo=f, caption=clean_caption, reply_markup=reply_markup_to_use)
                                         sent_photo = True
                             else:
                                 with open(p_path, 'rb') as f:
                                     try:
-                                        await app.bot.send_photo(chat_id=cid, photo=f)
+                                        await app.bot.send_photo(chat_id=cid, photo=f, reply_markup=reply_markup_to_use)
                                     except Exception as e_p:
                                         print(f"⚠️ Local photo broadcast notice: {e_p}")
                     except Exception as e_photo:
@@ -113,15 +113,17 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
 
                 if not sent_photo:
                     if len(msg) > 4000:
-                        for chunk_txt in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
-                            try: await app.bot.send_message(chat_id=cid, text=chunk_txt, parse_mode=parse_mode)
+                        chunks = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
+                        for idx, chunk_txt in enumerate(chunks):
+                            kb_for_chunk = reply_markup_to_use if idx == len(chunks) - 1 else None
+                            try: await app.bot.send_message(chat_id=cid, text=chunk_txt, parse_mode=parse_mode, reply_markup=kb_for_chunk)
                             except Exception:
-                                try: await app.bot.send_message(chat_id=cid, text=chunk_txt)
+                                try: await app.bot.send_message(chat_id=cid, text=chunk_txt, reply_markup=kb_for_chunk)
                                 except Exception: pass
                     else:
-                        try: await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode)
+                        try: await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use)
                         except Exception:
-                            try: await app.bot.send_message(chat_id=cid, text=msg)
+                            try: await app.bot.send_message(chat_id=cid, text=msg, reply_markup=reply_markup_to_use)
                             except Exception: pass
                         
             tasks.append(send_task(chat_id, lang, photo_path))
@@ -1006,6 +1008,32 @@ async def check_whale_trades(app: Application):
                     except Exception as we:
                         print(f"Whale trigger scanner warning: {we}")
 
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                if not is_deposit:
+                    # Outflow / Withdrawal -> Bullish Accumulation
+                    alert_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🚀 Long BTC ($20 10x)", callback_data="btn_alert_exec_btc_buy"),
+                            InlineKeyboardButton("🛒 Spot Buy BTC ($50)", callback_data="btn_alert_exec_btc_spot")
+                        ],
+                        [
+                            InlineKeyboardButton("🎯 Launch Turbo Top", callback_data="btn_turbo_hedge_top_launch"),
+                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                        ]
+                    ])
+                else:
+                    # Inflow / Deposit -> Bearish Dump Risk
+                    alert_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔻 Short BTC ($20 10x)", callback_data="btn_alert_exec_btc_sell"),
+                            InlineKeyboardButton("🛡️ Hedge BTC (0% Risk)", callback_data="btn_alert_exec_btc_hedge")
+                        ],
+                        [
+                            InlineKeyboardButton("📉 Short Top Dumpers", callback_data="btn_alert_exec_top_dumpers"),
+                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                        ]
+                    ])
+
                 def get_whale_text(lang):
                     user_lang = lang if lang else 'khmer'
                     if is_deposit:
@@ -1013,7 +1041,7 @@ async def check_whale_trades(app: Application):
                     else:
                         return loc.get_text(user_lang, 'whale_withdrawal_alert', value=value, symbol=token_symbol)
 
-                await parallel_broadcast(app, vip_users_lang, get_whale_text)
+                await parallel_broadcast(app, vip_users_lang, get_whale_text, reply_markup=alert_kb)
                         
     except Exception as e:
         print(f"Error checking whale trades: {e}")
@@ -1241,11 +1269,22 @@ async def check_funding_rates(app: Application):
             
         db.mark_economic_event_alerted(event_id)
         
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        funding_kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🛡️ Hedge BTC (0% Risk)", callback_data="btn_alert_exec_btc_hedge"),
+                InlineKeyboardButton("🚀 Long BTC ($20 10x)", callback_data="btn_alert_exec_btc_buy")
+            ],
+            [
+                InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+            ]
+        ])
+
         def get_funding_text(lang):
             user_lang = lang if lang else 'khmer'
             return loc.get_text(user_lang, 'funding_rate_alert', symbol="BTC/USDT", rate=f"{rate*100:.4f}", message=condition)
             
-        await parallel_broadcast(app, vip_users_lang, get_funding_text)
+        await parallel_broadcast(app, vip_users_lang, get_funding_text, reply_markup=funding_kb)
     except Exception as e:
         print(f"Error checking funding rates: {e}")
 
@@ -1353,12 +1392,32 @@ async def check_smart_money(app: Application, ai_engine=None):
                         except Exception as e:
                             print(f"Error mirroring trade for {chat_id}: {e}")
                             
-                    return (f"🚨 **SMART MONEY ALERT** 🚨\n\n"
-                                 f"👤 **មហាសេដ្ឋី:** {whale_name}\n"
-                                 f"📥 **ប្រមូលទិញ:** **{value:,.0f} {token_symbol}**\n"
-                                 f"🔗 [View on Blockscout](https://eth.blockscout.com/tx/{tx_hash})\n\n"
-                                 f"🧠 **ការវិភាគពី AI:**\n{ai_analysis}\n\n"
-                                 f"⚡ ប្រើបញ្ជា `/infinity_grid {binance_symbol} 10 1.0 100 <PIN>` ដើម្បីចាប់ឱកាសនេះ!")
+                    smart_msg = (
+                        f"🚨 **SMART MONEY ALERT** 🚨\n\n"
+                        f"👤 **មហាសេដ្ឋី ៖** {whale_name}\n"
+                        f"📥 **ប្រមូលទិញ ៖** **{value:,.0f} {token_symbol}**\n"
+                        f"🔗 [View on Blockscout](https://eth.blockscout.com/tx/{tx_hash})\n\n"
+                        f"🧠 **ការវិភាគពី AI ៖**\n{ai_analysis}\n\n"
+                        f"━━━━━━━━━━━━\n"
+                        f"👉 **1-Tap Execution Long ៖**\n"
+                        f"`` `/turbo_hedge {binance_symbol} 20 10 BUY 2.5 1234` ``\n\n"
+                        f"👉 **1-Tap Spot Buy ៖**\n"
+                        f"`` `/turbo_hedge SPOT {token_symbol} 50 1234` ``\n"
+                        f"━━━━━━━━━━━━\n"
+                        f"_Khmer Master Crypto | APEX SUPER BRAIN_"
+                    )
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    smart_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🚀 Long BTC ($20 10x)", callback_data="btn_alert_exec_btc_buy"),
+                            InlineKeyboardButton("🛒 Spot Buy BTC ($50)", callback_data="btn_alert_exec_btc_spot")
+                        ],
+                        [
+                            InlineKeyboardButton("🎯 Launch Turbo Top", callback_data="btn_turbo_hedge_top_launch"),
+                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                        ]
+                    ])
+                    return (smart_msg, smart_kb)
                                  
                 await parallel_broadcast(app, vip_users_lang, process_whale_trade)
                             
@@ -1587,7 +1646,24 @@ async def sentiment_sniper(app: Application, ai_engine):
                     full_text = alert_msg
                     if trade_msgs:
                         full_text += "\n\n" + "\n\n".join(trade_msgs)
-                    return full_text
+                    
+                    full_text += (
+                        f"\n━━━━━━━━━━━━\n"
+                        f"👉 **1-Tap Execution ({'BUY' if sentiment == 'BULLISH' else 'SELL'}) ៖**\n"
+                        f"`` `/turbo_hedge {symbol_to_trade} 20 10 {'BUY' if sentiment == 'BULLISH' else 'SELL'} 2.5 1234` ``\n"
+                        f"━━━━━━━━━━━━\n"
+                        f"_Khmer Master Crypto | APEX SUPER BRAIN_"
+                    )
+                    
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    sniper_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🚀 Long BTC ($20 10x)" if sentiment == 'BULLISH' else "🔻 Short BTC ($20 10x)", 
+                                                 callback_data="btn_alert_exec_btc_buy" if sentiment == 'BULLISH' else "btn_alert_exec_btc_sell"),
+                            InlineKeyboardButton("🎛️ Turbo Hedge", callback_data="btn_turbo_hedge")
+                        ]
+                    ])
+                    return (full_text, sniper_kb)
                     
                 await parallel_broadcast(app, vip_users_lang, process_flash_news)
     except Exception as e:
