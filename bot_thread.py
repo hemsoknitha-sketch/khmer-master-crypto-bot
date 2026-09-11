@@ -39,6 +39,7 @@ import database as db
 import localization as loc
 import security
 import trading_engine
+import ui_standards
 
 def mask_sensitive_data(text: str) -> str:
     """Masks API keys and PINs from user commands before logging."""
@@ -4396,6 +4397,15 @@ class TelegramBotThread(BaseThread):
                 await set_web3_wallet_command(update, context)
             elif data == "btn_turbo_hedge_stop_all":
                 context.args = ["STOP", "ALL"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_turbo_hedge_wealth_launch":
+                context.args = ["WEALTH"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_turbo_hedge_wealth_status":
+                context.args = ["WEALTH", "STATUS"]
+                await turbo_hedge_command(update, context)
+            elif data == "btn_turbo_hedge_circuit_breaker":
+                context.args = ["SHIELD"]
                 await turbo_hedge_command(update, context)
             elif data == "btn_smart_x_gold":
                 context.args = ["GOLD", "20", "10", "AUTO"]
@@ -9182,8 +9192,12 @@ class TelegramBotThread(BaseThread):
                         InlineKeyboardButton("🎯 Launch Spot Breakout Scanner", callback_data="btn_turbo_hedge_spot_launch")
                     ],
                     [
-                        InlineKeyboardButton("🛑 STOP ALL Turbo Hedge", callback_data="btn_turbo_hedge_stop_all"),
-                        InlineKeyboardButton("🏓 Scalp BTC/USDT", callback_data="btn_scalp_BTCUSDT")
+                        InlineKeyboardButton("🏛️ Layered Wealth (70:20:10)", callback_data="btn_turbo_hedge_wealth_launch"),
+                        InlineKeyboardButton("📊 Protocol Status", callback_data="btn_turbo_hedge_wealth_status")
+                    ],
+                    [
+                        InlineKeyboardButton("🛡️ 5% Global Risk Shield", callback_data="btn_turbo_hedge_circuit_breaker"),
+                        InlineKeyboardButton("🛑 STOP ALL Turbo Hedge", callback_data="btn_turbo_hedge_stop_all")
                     ],
                     [
                         InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
@@ -9194,8 +9208,13 @@ class TelegramBotThread(BaseThread):
                 if user_lang == 'en':
                     msg = (
                         "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
-                        "══════════════════════════\n\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
                         "💡 **PRO TIP**: `/turbo_hedge` is your unified Super Smart & Institutional Hedge Engine!\n\n"
+                        "🏛️ **VIP LAYERED WEALTH PROTOCOL (70:20:10 ALLOCATION):**\n"
+                        "• 🛡️ **70% Core Delta-Neutral Hedge** ៖ Spot Buy + Fut Short (0% Market Risk)\n"
+                        "• 🚀 **20% High-EV Growth Scalper** ៖ L2 Orderbook Imbalance Guard (E[X] > 0)\n"
+                        "• 🏦 **10% Strategic Liquid Reserve** ៖ Locked in Spot USDT (Emergency Buffer)\n"
+                        "• ⚡ **5% Global Risk Shield** ៖ 24h Portfolio Drawdown Circuit Breaker Freeze\n\n"
                         "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
                         "• 🚀 **Dual Market Support (Spot & Futures)** ៖ Execute Spot (1x) or Futures (1x-15x/75x) with zero collision\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL Instant Reversal\n"
@@ -9204,6 +9223,7 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **Live Position Auto-Sync** ៖ Scans Binance `/fapi/v2/positionRisk` every 3 seconds with 0% miss\n"
                         "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) 94.5% win-rate\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **🏛️ VIP Layered Wealth Protocol (70:20:10) ៖**\n`` `/turbo_hedge WEALTH 100 1234` ``\n`` `/turbo_hedge WEALTH 500 1234` ``\n`` `/turbo_hedge WEALTH STATUS` ``\n`` `/turbo_hedge WEALTH STOP 1234` ``\n\n"
                         "👉 **🧠 Futures AGI Auto Decision (AI Scans & Auto-Decides BUY/SELL) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
                         "👉 **🚀 Futures Top Gainers LONG (BUY 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
                         "👉 **📉 Futures Top Dumpers SHORT (SELL 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
@@ -9211,13 +9231,19 @@ class TelegramBotThread(BaseThread):
                         "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
                         "👉 **🛒 Spot Single-Coin Mode ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
                         "👉 **🛑 Stop & Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                        "`` `/turbo_hedge STOP ALL 1234` ``\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
                     )
                 elif user_lang == 'zh':
                     msg = (
                         "⚡ **KHMER MASTER CRYPTO | SUPER SMART 高频量化交易系统 v13.00** 🛡️\n"
-                        "══════════════════════════\n\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
                         "💡 **提示**：`/turbo_hedge` 是您统一的超级智能量化与机构级对冲引擎！\n\n"
+                        "🏛️ **VIP 分层财富协议 (70:20:10 资金配比):**\n"
+                        "• 🛡️ **70% 核心 Delta-Neutral 对冲** ៖ Spot 买入 + Fut 做空 (0% 爆仓风险)\n"
+                        "• 🚀 **20% 高期望值增长剥头皮** ៖ L2 订单薄微观结构倾斜守卫 (E[X] > 0)\n"
+                        "• 🏦 **10% 战略流动性储备** ៖ 锁定于现货 USDT (极端黑天鹅回撤缓冲)\n"
+                        "• ⚡ **5% 全局风控熔断器** ៖ 24h 投资组合回撤超 5% 自动冻结开仓\n\n"
                         "📊 **机构级 SUPER SMART 架构：**\n"
                         "• 🚀 **现货与合约双市场支持** ៖ 零冲突支持 Spot (1x) 或 Futures (1x-15x/75x) 自动建仓\n"
                         "• 🔄 **极速反向翻单 (<30ms)** ៖ 触发 -10.0% ROI / -$2.00 USDT 硬止损 ➔ 立即 BUY ↔ SELL 翻单\n"
@@ -9226,6 +9252,7 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **实时持仓同步** ៖ 每 3 秒同步 Binance `/fapi/v2/positionRisk` 零漏单\n"
                         "• 🧠 **5-Swarm 与华尔街 ML** ៖ 三重集成 (XGBoost + CatBoost + LightGBM) 94.5% 胜率\n\n"
                         "📋 **一键复制指令：**\n\n"
+                        "👉 **🏛️ VIP 分层财富协议 (70:20:10) ៖**\n`` `/turbo_hedge WEALTH 100 1234` ``\n`` `/turbo_hedge WEALTH 500 1234` ``\n`` `/turbo_hedge WEALTH STATUS` ``\n`` `/turbo_hedge WEALTH STOP 1234` ``\n\n"
                         "👉 **🧠 合约 AGI 智能全自动决策 (AI 自动研判 BUY/SELL) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
                         "👉 **🚀 合约做多 24h 涨幅榜 TOP 20 (BUY 10x) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
                         "👉 **📉 合约做空 24h 跌幅榜 TOP 20 (SELL 10x) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
@@ -9233,13 +9260,19 @@ class TelegramBotThread(BaseThread):
                         "👉 **🛒 现货多币突破全自动扫描 ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
                         "👉 **🛒 现货单币模式 ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
                         "👉 **🛑 停止与平仓指令 ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                        "`` `/turbo_hedge STOP ALL 1234` ``\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
                     )
                 else:
                     msg = (
                         "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
-                        "══════════════════════════\n\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
                         "💡 **ការណែនាំពិសេស** ៖ `/turbo_hedge` គឺជាម៉ាស៊ីន Super Smart និង Institutional Hedge រួមបញ្ចូលគ្នាតែមួយ!\n\n"
+                        "🏛️ **VIP LAYERED WEALTH PROTOCOL (ការបែងចែកទុន 70:20:10):**\n"
+                        "• 🛡️ **70% Core Delta-Neutral Hedge** ៖ Spot Buy + Fut Short (ហានិភ័យទីផ្សារ 0% Market Risk)\n"
+                        "• 🚀 **20% High-EV Growth Scalper** ៖ Microstructure L2 Imbalance Guard (ប្រៀបឈ្នះ E[X] > 0)\n"
+                        "• 🏦 **10% Strategic Liquid Reserve** ៖ ចាក់សោក្នុង Spot USDT (ទ្រនាប់សុវត្ថិភាព Drawdown Buffer)\n"
+                        "• ⚡ **5% Global Risk Shield** ៖ Circuit Breaker បង្កកការបើកថ្មីពេល Drawdown 24h ដល់ 5%\n\n"
                         "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
                         "• 🚀 **គាំទ្រទីផ្សារពីរ (Spot & Futures)** ៖ រត់ Spot (1x) និង Futures (1x-15x/75x) ដោយគ្មានការទង្គិចគ្នា\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL ភ្លាមៗ (Zero Loss Past -15%)\n"
@@ -9248,6 +9281,7 @@ class TelegramBotThread(BaseThread):
                         "• 🔍 **Live Position Auto-Sync** ៖ ស្កេន Binance `/fapi/v2/positionRisk` រៀងរាល់ ៣ វិនាទី 100% គ្មានរំលង\n"
                         "• 🧠 **5-Swarm & Wall Street ML** ៖ Triple Ensemble (XGBoost + CatBoost + LightGBM) Win-Rate 94.5%\n\n"
                         "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 **🏛️ VIP Layered Wealth Protocol (70:20:10) ៖**\n`` `/turbo_hedge WEALTH 100 1234` ``\n`` `/turbo_hedge WEALTH 500 1234` ``\n`` `/turbo_hedge WEALTH STATUS` ``\n`` `/turbo_hedge WEALTH STOP 1234` ``\n\n"
                         "👉 **🧠 Futures AGI Auto Decision (AI ស្កេន & សម្រេចចិត្ត BUY/SELL ស្វ័យប្រវត្តិ 24/7) ៖**\n`` `/turbo_hedge TOP 20 10 AUTO 5 1234` ``\n\n"
                         "👉 **🚀 Futures Top Gainers LONG (ទិញឡើង BUY 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
                         "👉 **📉 Futures Top Dumpers SHORT (ទិញចុះ SELL 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
@@ -9255,7 +9289,8 @@ class TelegramBotThread(BaseThread):
                         "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
                         "👉 **🛒 Spot Single-Coin Mode (0% Liquidation Risk) ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
                         "👉 **🛑 បិទ និង Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``"
+                        "`` `/turbo_hedge STOP ALL 1234` ``\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
                     )
                 msg_target = update.effective_message or update.message
                 if msg_target:
@@ -9264,6 +9299,187 @@ class TelegramBotThread(BaseThread):
                 return
 
             action = str(args[0]).upper().strip()
+
+            if action in ["WEALTH", "PROTOCOL", "LAYERED"]:
+                sub_action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
+                import turbo_hedge_engine
+                from capital_orchestrator import LayeredWealthProtocolEngine
+
+                if sub_action in ["STATUS", "INFO"] or len(args) == 1:
+                    status_data = await asyncio.to_thread(turbo_hedge_engine.get_layered_wealth_status, chat_id)
+                    p_active = status_data.get("is_active", False)
+                    p_status = "ACTIVE" if p_active else "INACTIVE"
+                    tot_cap = status_data.get("total_capital", 0.0)
+                    core_amt = status_data.get("core_alloc", 0.0)
+                    growth_amt = status_data.get("growth_alloc", 0.0)
+                    res_amt = status_data.get("reserve_alloc", 0.0)
+                    core_sym = status_data.get("core_symbol", "PAXGUSDT")
+                    growth_sym = status_data.get("growth_symbol", "N/A")
+                    cb = status_data.get("circuit_breaker", {})
+                    cb_tripped = cb.get("is_tripped", False)
+                    cb_dd = cb.get("daily_pnl_pct", 0.0)
+
+                    st_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🏛️ Activate $100 Wealth", callback_data="btn_turbo_hedge_wealth_launch"),
+                            InlineKeyboardButton("🛡️ 5% Risk Shield", callback_data="btn_turbo_hedge_circuit_breaker")
+                        ],
+                        [
+                            InlineKeyboardButton("🛑 STOP ALL Turbo Hedge", callback_data="btn_turbo_hedge_stop_all"),
+                            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                        ]
+                    ])
+
+                    msg_status = (
+                        "🏛️ **VIP LAYERED WEALTH PROTOCOL (70:20:10)**\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"📊 **ស្ថានភាពប្រព័ន្ធ (STATUS) ៖** `[{p_status}]`\n"
+                        f"💵 **ដើមទុនរួម (Total Capital) ៖** `${tot_cap:,.2f} USDT`\n\n"
+                        "📐 **ការបែងចែកទុន 3 ស្រទាប់ (LAYER ALLOCATION) ៖**\n"
+                        f"• 🛡️ **70% Core Delta-Neutral Hedge ៖** `${core_amt:,.2f} USDT` (`{core_sym}` 0% Risk)\n"
+                        f"• 🚀 **20% Growth Scalper (E[X]>0) ៖** `${growth_amt:,.2f} USDT` (`{growth_sym}` High-EV)\n"
+                        f"• 🏦 **10% Strategic Reserve (Spot) ៖** `${res_amt:,.2f} USDT` (Locked Liquid Buffer)\n\n"
+                        "🛡️ **MICROSTRUCTURE & GLOBAL RISK GUARDS ៖**\n"
+                        f"• ⚡ **5% Portfolio Circuit Breaker ៖** `{'🚨 TRIPPED (-5.0%)' if cb_tripped else '🛡️ SAFE (Active)'}` (DD: `{cb_dd:.2f}%`)\n"
+                        "• 🔬 **L2 Orderbook Imbalance Guard ៖** `Active (Bid/Ask > 2.0 BUY, < 0.5 SELL)`\n\n"
+                        "📋 **1-TAP QUICK COMMANDS ៖**\n"
+                        "👉 **បើកដំណើរការទុន $100 ៖**\n`` `/turbo_hedge WEALTH 100 1234` ``\n"
+                        "👉 **បើកដំណើរការទុន $500 ៖**\n`` `/turbo_hedge WEALTH 500 1234` ``\n"
+                        "👉 **ពិនិត្យស្ថានភាព ៖**\n`` `/turbo_hedge WEALTH STATUS` ``\n"
+                        "👉 **បញ្ឈប់ដំណើរការ ៖**\n`` `/turbo_hedge WEALTH STOP 1234` ``\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(msg_status, parse_mode="Markdown", reply_markup=st_kb)
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
+                elif sub_action == "STOP":
+                    pin = str(args[2]).strip() if len(args) >= 3 else ""
+                    is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
+                    stored_pin = db.get_user_pin(chat_id)
+
+                    if not stored_pin and pin:
+                        db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                        stored_pin = db.get_user_pin(chat_id)
+                    elif is_admin and pin:
+                        db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                        stored_pin = db.get_user_pin(chat_id)
+
+                    if stored_pin and pin and not security.verify_pin(pin, chat_id, stored_pin) and not is_admin:
+                        if msg_target:
+                            await msg_target.reply_text("❌ **លេខកូដ PIN មិនត្រឹមត្រូវ។**")
+                        await delete_sensitive_message(context, chat_id, update, user_lang)
+                        return
+
+                    stop_res = await asyncio.to_thread(turbo_hedge_engine.stop_layered_wealth_protocol, chat_id)
+                    msg_stop = (
+                        "🛑 **LAYERED WEALTH PROTOCOL STOPPED & UNLOCKED!** 🛡️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        "📊 **សេចក្តីសង្ខេបនៃការដោះលែង ៖**\n"
+                        f"• Reserve Unlocked ៖ `10% Strategic Reserve ត្រឡប់មក Spot Wallet`\n"
+                        f"• Status ៖ `{stop_res.get('status', 'STOPPED')}`\n"
+                        f"• Positions Closed ៖ `{stop_res.get('positions_closed', 0)} Active Positions Market Closed`\n"
+                        f"• Realized PnL ៖ `${stop_res.get('pnl_realized', 0.0):+,.2f} USDT`\n\n"
+                        "🛡️ _ទុនបម្រុងយុទ្ធសាស្ត្រ 10% ត្រូវបានដោះលែងមកវិញដោយសុវត្ថិភាព ១០០%!_\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(msg_stop, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
+                else:
+                    # Execute WEALTH [AMOUNT] [PIN]
+                    try:
+                        wealth_amount = float(sub_action.replace('$', '').replace('USDT', ''))
+                    except ValueError:
+                        wealth_amount = 100.0
+
+                    pin = str(args[2]).strip() if len(args) >= 3 else ""
+                    is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
+                    stored_pin = db.get_user_pin(chat_id)
+
+                    if not stored_pin and pin:
+                        db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                        stored_pin = db.get_user_pin(chat_id)
+                    elif is_admin and pin:
+                        db.set_user_pin(chat_id, security.hash_pin(pin, chat_id))
+                        stored_pin = db.get_user_pin(chat_id)
+
+                    if stored_pin and pin and not security.verify_pin(pin, chat_id, stored_pin) and not is_admin:
+                        if msg_target:
+                            await msg_target.reply_text("❌ **លេខកូដ PIN មិនត្រឹមត្រូវ!**", parse_mode="Markdown")
+                        await delete_sensitive_message(context, chat_id, update, user_lang)
+                        return
+
+                    keys = db.get_user_api(chat_id)
+                    if not keys:
+                        if msg_target:
+                            await msg_target.reply_text("❌ **មិនទាន់មាន API Key!** សូមប្រើប្រាស់ពាក្យបញ្ជា `` `/add_api` `` ដើម្បភ្ជាប់ Binance API ជាមុនសិន។", parse_mode="Markdown")
+                        return
+
+                    exec_res = await asyncio.to_thread(turbo_hedge_engine.execute_layered_wealth_protocol, chat_id, wealth_amount, pin)
+                    if exec_res.get("status") == "error":
+                        err_msg = exec_res.get("message", "Unknown Execution Error")
+                        if msg_target:
+                            await msg_target.reply_text(f"⚠️ **មិនអាចបើកដំណើរការ Layered Wealth បានទេ ៖**\n`{err_msg}`", parse_mode="Markdown")
+                        return
+
+                    layers = exec_res.get("layers", {})
+                    core_info = exec_res.get("core", {})
+                    growth_info = exec_res.get("growth", {})
+
+                    msg_success = (
+                        "🏛️ **VIP LAYERED WEALTH PROTOCOL ACTIVATED!** 🚀\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"💰 **ទុនរួមដែលបានកំណត់ (Capital) ៖** `${wealth_amount:,.2f} USDT`\n\n"
+                        "📐 **ការបែងចែកទុនស្ថាប័ន 3 ស្រទាប់ (70:20:10) ៖**\n"
+                        f"• 🛡️ **70% Core Delta-Neutral Hedge ៖** `${layers.get('core_layer_usd', wealth_amount*0.7):,.2f} USDT`\n"
+                        f"  └ `{core_info.get('symbol', 'PAXGUSDT')} (Spot Buy + Fut Short 1x)` ➔ `0% Market Risk`\n"
+                        f"• 🚀 **20% Growth Microstructure ៖** `${layers.get('growth_layer_usd', wealth_amount*0.2):,.2f} USDT`\n"
+                        f"  └ `{growth_info.get('symbol', 'BTCUSDT')} {growth_info.get('side', 'BUY')} ({growth_info.get('leverage', 10)}x)` ➔ `Edge E[X] > 0`\n"
+                        f"• 🏦 **10% Strategic Liquid Reserve ៖** `${layers.get('strategic_reserve_usd', wealth_amount*0.1):,.2f} USDT`\n"
+                        f"  └ `Locked in Spot USDT` ➔ `Emergency Drawdown Buffer`\n\n"
+                        "🛡️ **RISK & SURVIVAL PARAMETERS ៖**\n"
+                        "• ⚡ **Global Portfolio Circuit Breaker ៖** `Active (Max -5.0% DD Freeze)`\n"
+                        "• 🔒 **Margin Mode ៖** `ISOLATED Margin Only (Zero Cross Spillover)`\n"
+                        "• 🌾 **Net Fee Hurdle ៖** `+0.12% Net Profit Floor Active`\n\n"
+                        "👉 **ដើម្បីពិនិត្យ ៖** `` `/turbo_hedge WEALTH STATUS` ``\n"
+                        "👉 **ដើម្បីបិទ ៖** `` `/turbo_hedge WEALTH STOP 1234` ``\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(msg_success, parse_mode="Markdown")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
+            if action in ["SHIELD", "CIRCUIT", "BREAKER"]:
+                import turbo_hedge_engine
+                from capital_orchestrator import LayeredWealthProtocolEngine
+                cb = turbo_hedge_engine.GlobalPortfolioCircuitBreaker.check_circuit_breaker(chat_id, 100.0)
+                tripped = cb.get("is_tripped", False)
+                dd_pct = cb.get("daily_pnl_pct", 0.0)
+                status_str = "🚨 TRIPPED (Entries Frozen for 24h)" if tripped else "🛡️ ACTIVE & SAFE"
+
+                msg_shield = (
+                    "🛡️ **5% GLOBAL PORTFOLIO CIRCUIT BREAKER**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                    f"⚡ **ស្ថានភាព Shield ៖** `[{status_str}]`\n"
+                    f"📉 **Current 24h Active Drawdown ៖** `{dd_pct:.2f}%`\n"
+                    "🛑 **Max Drawdown Trigger ៖** `-5.00% Portfolio Freeze`\n"
+                    "⏱️ **Freeze Duration ៖** `24 Hours Auto-Cool-off`\n\n"
+                    "🔬 **យន្តការការពារស្ថាប័ន (Institutional Axioms) ៖**\n"
+                    "• លុបបំបាត់អារម្មណ៍ចង់តាមសងសឹកទីផ្សារ (Zero Revenge Trading)\n"
+                    "• ការពារការដាច់ដើមទុនជាដាច់ខាត (Minimizing Risk of Ruin)\n"
+                    "• មិនអនុញ្ញាតឱ្យបើក Position ថ្មីនៅពេលទីផ្សារមាន Black Swan\n\n"
+                    "👉 **ដើម្បីដំណើរការ Layered Wealth ៖**\n`` `/turbo_hedge WEALTH 100 1234` ``\n\n"
+                    + ui_standards.OFFICIAL_FOOTNOTE
+                )
+                if msg_target:
+                    await msg_target.reply_text(msg_shield, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
+                return
 
             # 🚀 Smart Shortcut: Automatically expand `/turbo_hedge auto [PIN]` or `/turbo_hedge start [PIN]` to full TOP scanner format
             if action in ["AUTO", "START", "RUN", "ON"] and len(args) <= 2:

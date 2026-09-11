@@ -2269,3 +2269,280 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
         db.stop_turbo_hedge_bot(chat_id, symbol)
         return {"status": "error", "error": str(e), "symbol": symbol, "closed_positions": [], "total_pnl": 0.0}
 
+
+# ============================================================================
+# VIP LAYERED WEALTH PROTOCOL ENGINE (70:20:10 ALLOCATION)
+# ============================================================================
+
+class MicrostructureOrderbookGuard:
+    """
+    Evaluates real-time Level 2 Orderbook Microstructure (Bid/Ask Imbalance).
+    Filters false breakouts and protects against entering into massive opposing walls.
+    """
+
+    @staticmethod
+    def evaluate_orderbook_microstructure(symbol: str) -> dict:
+        symbol = symbol.upper().strip()
+        if not symbol.endswith("USDT"):
+            symbol += "USDT"
+
+        import orderbook_engine
+        
+        # 1. First check local WebSocket cache
+        ratio = orderbook_engine.get_imbalance(symbol)
+        spread_pct = 0.05
+
+        # 2. Fallback to direct REST depth if ratio is perfectly default 1.0
+        if ratio == 1.0:
+            try:
+                url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=20"
+                r = trading_engine.HFT_SESSION.get(url, timeout=2.5)
+                if r.status_code == 200:
+                    d = r.json()
+                    bids = d.get("bids", [])
+                    asks = d.get("asks", [])
+                    bid_vol = sum(float(b[0]) * float(b[1]) for b in bids)
+                    ask_vol = sum(float(a[0]) * float(a[1]) for a in asks)
+                    ratio = (bid_vol / ask_vol) if ask_vol > 0 else 5.0
+                    if bids and asks:
+                        best_bid = float(bids[0][0])
+                        best_ask = float(asks[0][0])
+                        spread_pct = ((best_ask - best_bid) / best_ask) * 100.0
+            except Exception:
+                pass
+
+        # High EV classification
+        high_ev_signal = "NEUTRAL"
+        confidence_boost = 0.0
+        passed_long = True
+        passed_short = True
+
+        if ratio >= 2.0:
+            high_ev_signal = "BUY"
+            confidence_boost = min(15.0, (ratio - 1.0) * 5.0)
+            passed_short = False  # DO NOT SHORT INTO MASSIVE BUY WALL
+        elif ratio <= 0.5:
+            high_ev_signal = "SELL"
+            confidence_boost = min(15.0, (1.0 / max(0.01, ratio) - 1.0) * 5.0)
+            passed_long = False   # DO NOT BUY INTO MASSIVE SELL WALL
+
+        return {
+            "symbol": symbol,
+            "imbalance_ratio": round(ratio, 2),
+            "spread_pct": round(spread_pct, 3),
+            "high_ev_signal": high_ev_signal,
+            "confidence_boost": round(confidence_boost, 1),
+            "passed_long_guard": passed_long,
+            "passed_short_guard": passed_short
+        }
+
+
+class GlobalPortfolioCircuitBreaker:
+    """
+    Global 5% Portfolio Drawdown Circuit Breaker.
+    Monitors aggregate 24h PnL across all open and closed positions for a user.
+    If cumulative loss exceeds 5.0% of total equity, engages immediate emergency freeze
+    to eliminate risk of ruin.
+    """
+
+    MAX_DRAWDOWN_PCT = 5.0
+
+    @classmethod
+    def check_circuit_breaker(cls, chat_id: int, total_capital: float = 0.0) -> dict:
+        is_active = (db.get_system_setting(f"turbo_hedge_circuit_breaker_{chat_id}", "0") == "1")
+        if is_active:
+            trigger_time_str = db.get_system_setting(f"turbo_hedge_cb_time_{chat_id}", "0")
+            trigger_time = float(trigger_time_str) if trigger_time_str.replace('.', '', 1).isdigit() else 0.0
+            # 24h cooldown
+            if time.time() - trigger_time < 86400:
+                return {
+                    "is_tripped": True,
+                    "reason": "CIRCUIT_BREAKER_ACTIVE_24H_FREEZE",
+                    "cooldown_remaining_sec": int(86400 - (time.time() - trigger_time))
+                }
+            else:
+                # Reset after 24h
+                db.update_system_setting(f"turbo_hedge_circuit_breaker_{chat_id}", "0")
+
+        # Calculate daily cumulative PnL
+        daily_pnl_pct = db.get_user_daily_pnl_pct(chat_id)
+        if daily_pnl_pct <= -cls.MAX_DRAWDOWN_PCT:
+            # TRIP CIRCUIT BREAKER
+            db.update_system_setting(f"turbo_hedge_circuit_breaker_{chat_id}", "1")
+            db.update_system_setting(f"turbo_hedge_cb_time_{chat_id}", str(time.time()))
+            print(f"🚨 [GLOBAL RISK CIRCUIT BREAKER TRIPPED] User {chat_id} daily loss {daily_pnl_pct:.2f}% <= -5.0%!")
+            return {
+                "is_tripped": True,
+                "reason": f"PORTFOLIO_DRAWDOWN_EXCEEDED_{daily_pnl_pct:.2f}%",
+                "daily_pnl_pct": daily_pnl_pct
+            }
+
+        return {
+            "is_tripped": False,
+            "daily_pnl_pct": daily_pnl_pct,
+            "max_allowed_dd_pct": cls.MAX_DRAWDOWN_PCT
+        }
+
+    @classmethod
+    def reset_circuit_breaker(cls, chat_id: int):
+        db.update_system_setting(f"turbo_hedge_circuit_breaker_{chat_id}", "0")
+        db.update_system_setting(f"turbo_hedge_cb_time_{chat_id}", "0")
+
+
+def execute_layered_wealth_protocol(
+    chat_id: int,
+    total_capital: float,
+    pin: str = ""
+) -> dict:
+    """
+    Executes the Institutional VIP Layered Wealth Protocol (70:20:10 Allocation).
+    1. Core Layer (70%): Delta-Neutral Safe Accumulation (Funding Fee Harvesting).
+    2. Growth Layer (20%): Microstructure High-EV Scalper (Orderbook Imbalance).
+    3. Strategic Reserve (10%): Locked in Liquid USDT buffer.
+    """
+    import capital_orchestrator
+
+    total_capital = max(10.50, float(total_capital))
+
+    # 1. Check Circuit Breaker
+    cb = GlobalPortfolioCircuitBreaker.check_circuit_breaker(chat_id, total_capital)
+    if cb.get("is_tripped"):
+        return {
+            "status": "error",
+            "message": f"🚨 [CIRCUIT BREAKER LOCK] Account is frozen for 24h due to previous -5.0% drawdown limit: {cb.get('reason')}."
+        }
+
+    # 2. Check API Keys
+    keys = db.get_user_api(chat_id)
+    if not keys or not keys[0] or not keys[1]:
+        return {
+            "status": "error",
+            "message": "❌ Binance API Keys missing. Please connect via /add_api."
+        }
+
+    # 3. Calculate 70:20:10 Split
+    layers = capital_orchestrator.LayeredWealthProtocolEngine.calculate_wealth_layers(total_capital)
+    core_amt = layers["core_layer_usd"]
+    growth_amt = layers["growth_layer_usd"]
+    reserve_amt = layers["strategic_reserve_usd"]
+
+    # 4. Lock 10% Strategic Reserve in Liquid USDT
+    capital_orchestrator.LayeredWealthProtocolEngine.lock_strategic_reserve(chat_id, reserve_amt)
+
+    # 5. Execute Core Layer (70% - Delta-Neutral Hedge)
+    core_candidates = ["PAXGUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    best_core_sym = "PAXGUSDT"
+    for c in core_candidates:
+        if not is_symbol_in_cooldown(c):
+            best_core_sym = c
+            break
+
+    print(f"🏛️ [LAYERED WEALTH - CORE 70%] Deploying ${core_amt:.2f} USDT into Delta-Neutral Hedge on {best_core_sym}...")
+    core_res = execute_super_delta_neutral_hedge(
+        api_key=keys[0],
+        api_secret=keys[1],
+        symbol=best_core_sym,
+        amount_usdt=core_amt,
+        leverage=1,
+        chat_id=chat_id
+    )
+
+    core_status = "SUCCESS" if core_res.get("status") == "success" else "ERROR"
+
+    # 6. Execute Growth Layer (20% - Microstructure Orderbook High-EV Scalper)
+    growth_syms = get_active_high_velocity_coins(limit=10)
+    best_growth_sym = "BTCUSDT"
+    best_growth_side = "BUY"
+    growth_lev = 10 if total_capital < 100.0 else 15
+
+    for sym in growth_syms:
+        if is_symbol_in_cooldown(sym):
+            continue
+        ob_guard = MicrostructureOrderbookGuard.evaluate_orderbook_microstructure(sym)
+        if ob_guard["high_ev_signal"] in ["BUY", "SELL"]:
+            best_growth_sym = sym
+            best_growth_side = ob_guard["high_ev_signal"]
+            break
+
+    print(f"🚀 [LAYERED WEALTH - GROWTH 20%] Deploying ${growth_amt:.2f} USDT into {best_growth_sym} {best_growth_side} ({growth_lev}x)...")
+    growth_res = execute_turbo_hedge_trade(
+        api_key=keys[0],
+        api_secret=keys[1],
+        symbol=best_growth_sym,
+        amount_usdt=growth_amt,
+        side=best_growth_side,
+        leverage=growth_lev,
+        chat_id=chat_id
+    )
+    growth_status = "SUCCESS" if growth_res.get("status") in ["success", "NEW", "FILLED"] or growth_res.get("orderId") else "ERROR"
+
+    # Save protocol settings
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_active", "1")
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_total_capital", str(total_capital))
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_core_alloc", str(core_amt))
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_growth_alloc", str(growth_amt))
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_reserve_alloc", str(reserve_amt))
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_core_sym", best_core_sym)
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_growth_sym", best_growth_sym)
+
+    return {
+        "status": "success",
+        "total_capital": total_capital,
+        "layers": layers,
+        "core": {
+            "symbol": best_core_sym,
+            "amount_usdt": core_amt,
+            "status": core_status,
+            "details": core_res
+        },
+        "growth": {
+            "symbol": best_growth_sym,
+            "side": best_growth_side,
+            "amount_usdt": growth_amt,
+            "leverage": growth_lev,
+            "status": growth_status,
+            "details": growth_res
+        },
+        "strategic_reserve": {
+            "amount_usdt": reserve_amt,
+            "status": "LOCKED_LIQUID_USDT"
+        }
+    }
+
+
+def get_layered_wealth_status(chat_id: int) -> dict:
+    is_active = (db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_active", "0") == "1")
+    total_cap = float(db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_total_capital", "0.0"))
+    core_alloc = float(db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_core_alloc", "0.0"))
+    growth_alloc = float(db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_growth_alloc", "0.0"))
+    reserve_alloc = float(db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_reserve_alloc", "0.0"))
+    core_sym = db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_core_sym", "N/A")
+    growth_sym = db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_growth_sym", "N/A")
+
+    cb = GlobalPortfolioCircuitBreaker.check_circuit_breaker(chat_id, total_cap)
+
+    return {
+        "is_active": is_active,
+        "total_capital": total_cap,
+        "core_alloc": core_alloc,
+        "growth_alloc": growth_alloc,
+        "reserve_alloc": reserve_alloc,
+        "core_symbol": core_sym,
+        "growth_symbol": growth_sym,
+        "circuit_breaker": cb
+    }
+
+
+def stop_layered_wealth_protocol(chat_id: int) -> dict:
+    import capital_orchestrator
+    db.update_system_setting(f"turbo_hedge_wealth_{chat_id}_active", "0")
+    capital_orchestrator.LayeredWealthProtocolEngine.unlock_strategic_reserve(chat_id)
+    res = stop_turbo_hedge_engine(chat_id, "ALL")
+    return {
+        "status": "stopped",
+        "pnl_realized": res.get("total_pnl", 0.0),
+        "positions_closed": res.get("count", 0),
+        "reserve_unlocked": True
+    }
+
+

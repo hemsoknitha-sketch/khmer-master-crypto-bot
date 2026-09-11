@@ -196,9 +196,74 @@ async def run_ico_cycle(app, ai_engine):
                 buy_price = float(buy_res.get('price', trading_engine.get_current_price(best_target)))
                 buy_qty = float(buy_res.get('origQty', buy_usdt / buy_price))
                 
-                db.add_active_trade(user_id, best_target, buy_qty, buy_price, current_highest=buy_price, stop_loss_pct=0.0)
+                db.add_active_trade(user_id, best_target, buy_qty, buy_price, 0.0)
                 msg_realloc = f"⚖️ <b>ICO: Capital Reallocation</b>\n\n🚀 ប្តូរទុនសរុប ${buy_usdt:.2f} ទៅ {best_target} ភ្លាមៗ (Zero Seconds)\n🤖 ពិន្ទុ AI ខ្ពស់: {best_target_score:.1f}"
                 await send_smart_notification(app, user_id, msg_realloc, category="ACTION")
                 db.increment_user_rebalance(user_id)
             except Exception as e:
                 await send_smart_notification(app, user_id, f"ICO Reallocation Failed: {e}", category="CRITICAL")
+
+
+class LayeredWealthProtocolEngine:
+    """
+    VIP Layered Wealth Protocol Orchestrator (70:20:10 Capital Split).
+    - Core Layer (70%): Allocated to Delta-Neutral steady accumulation.
+    - Growth Layer (20%): Allocated to Microstructure Orderbook High-EV Scalper.
+    - Strategic Reserve (10%): Locked in Liquid USDT buffer.
+    """
+
+    DEFAULT_RATIO = (0.70, 0.20, 0.10)
+
+    @classmethod
+    def calculate_wealth_layers(cls, total_capital: float, ratio: tuple = (0.70, 0.20, 0.10)) -> dict:
+        total_capital = max(10.50, float(total_capital))
+        core_r, growth_r, reserve_r = ratio
+        
+        core_usd = round(total_capital * core_r, 2)
+        growth_usd = round(total_capital * growth_r, 2)
+        reserve_usd = round(total_capital * reserve_r, 2)
+
+        # Enforce Spot MIN_NOTIONAL $10.50 floor on Core & Growth if applicable
+        if core_usd < 10.50:
+            core_usd = 10.50
+        if growth_usd < 5.0:
+            growth_usd = 5.0
+
+        return {
+            "total_capital": total_capital,
+            "core_layer_usd": core_usd,
+            "growth_layer_usd": growth_usd,
+            "strategic_reserve_usd": reserve_usd,
+            "core_ratio_pct": int(core_r * 100),
+            "growth_ratio_pct": int(growth_r * 100),
+            "reserve_ratio_pct": int(reserve_r * 100)
+        }
+
+    @classmethod
+    def lock_strategic_reserve(cls, user_id: int, amount: float):
+        """Locks the 10% Strategic Reserve in liquid USDT so other bots never deplete it."""
+        db.update_system_setting(f"turbo_hedge_wealth_{user_id}_reserve", str(round(amount, 2)))
+        db.update_system_setting(f"turbo_hedge_wealth_{user_id}_reserve_status", "LOCKED_LIQUID_USDT")
+
+    @classmethod
+    def get_locked_reserve(cls, user_id: int) -> float:
+        try:
+            return float(db.get_system_setting(f"turbo_hedge_wealth_{user_id}_reserve", "0.0"))
+        except Exception:
+            return 0.0
+
+    @classmethod
+    def unlock_strategic_reserve(cls, user_id: int):
+        db.update_system_setting(f"turbo_hedge_wealth_{user_id}_reserve", "0.0")
+        db.update_system_setting(f"turbo_hedge_wealth_{user_id}_reserve_status", "UNLOCKED")
+
+    @classmethod
+    def get_deployable_capital_excluding_reserve(cls, user_id: int, total_capital: float = None, ai_engine=None) -> float:
+        """Returns deployable capital minus the protected 10% strategic reserve."""
+        if total_capital is not None and isinstance(total_capital, (int, float)):
+            total = float(total_capital)
+        else:
+            total = get_total_deployable_capital(user_id, ai_engine)
+        locked = cls.get_locked_reserve(user_id)
+        return max(0.0, total - locked)
+

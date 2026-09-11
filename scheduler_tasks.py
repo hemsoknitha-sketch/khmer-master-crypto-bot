@@ -4995,6 +4995,11 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     if cur_eng == "turbo_hedge":
         pairs_cnt = len(turbo_bots) if turbo_bots else 0
         pairs_lbl = f"{pairs_cnt} Pairs" if pairs_cnt > 0 else "Scan Mode"
+        wealth_active = (db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_active", "0") == "1")
+        wealth_lbl = "ACTIVE (70:20:10)" if wealth_active else "STANDBY"
+        res_locked = float(db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_reserve_alloc", "0.0"))
+        cb_active = (db.get_system_setting(f"turbo_hedge_circuit_breaker_{chat_id}", "0") == "1")
+        cb_lbl = "🚨 TRIPPED (-5%)" if cb_active else "🛡️ SAFE (-5% Max)"
         msg_lines = [
             f"👑 *APEX VIP AUDIT — 🚀 TURBO HEDGE*",
             f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
@@ -5012,6 +5017,9 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
             f"├ 🚀 ស្ថានភាព     : `[{turbo_act}]`",
+            f"├ 🏛️ Wealth Layer : `[{wealth_lbl}]`",
+            f"├ 🏦 10% Reserve  : `${res_locked:,.2f} USDT`",
+            f"├ ⚡ Risk Shield  : `[{cb_lbl}]`",
             f"├ 💵 ទុនបម្រុង     : `{turbo_res_str}`",
             f"├ ⚙️ Leverage     : `{turbo_lev}x (ISOLATED)`",
             f"├ 🛡️ Dual-Side    : `HEDGE MODE (Long + Short)`",
