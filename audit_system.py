@@ -215,15 +215,33 @@ def run_audit():
         failures.append(f"Net profit floor check failed: {e}")
         log_fail(str(e))
 
-    # 11. Telegram Inline Keyboard Button & Callback Query Routing Audit
-    print("\n[CHECK 11/12] Verifying 100% Inline Button & Callback Query Routing in bot_thread.py...")
+    # 11. Telegram Inline Keyboard Button & Callback Query Routing Audit (Repository-Wide)
+    print("\n[CHECK 11/12] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
             bot_code = f.read()
 
-        buttons = re.findall(r'callback_data=["\']([^"\']+)["\']', bot_code)
-        unique_buttons = sorted(list(set(buttons)))
+        all_buttons = set()
+        py_files = [f for f in os.listdir(".") if f.endswith(".py")]
+        for pf in py_files:
+            try:
+                with open(pf, "r", encoding="utf-8") as f:
+                    content = f.read()
+                # Static buttons
+                static_matches = re.findall(r'callback_data=["\']([^"\']+)["\']', content)
+                for sm in static_matches:
+                    all_buttons.add(sm)
+                # Dynamic buttons
+                dyn_matches = re.findall(r'callback_data=f["\']([^"\'{]+)', content)
+                for dm in dyn_matches:
+                    prefix = dm.strip()
+                    if prefix:
+                        all_buttons.add(prefix)
+            except Exception:
+                pass
+
+        unique_buttons = sorted(list(all_buttons))
         
         unhandled_buttons = []
         for b in unique_buttons:
@@ -251,10 +269,10 @@ def run_audit():
                 unhandled_buttons.append(b)
 
         if unhandled_buttons:
-            failures.append(f"Found {len(unhandled_buttons)} unhandled callback button(s): {unhandled_buttons}")
+            failures.append(f"Found {len(unhandled_buttons)} unhandled callback button(s) across repository: {unhandled_buttons}")
             log_fail(f"{len(unhandled_buttons)} dead button(s) detected: {unhandled_buttons}")
         else:
-            log_pass(f"All {len(unique_buttons)} unique InlineKeyboardButtons are 100% routed and functional (0 Dead Buttons)!")
+            log_pass(f"All {len(unique_buttons)} unique InlineKeyboardButtons across all files are 100% routed and functional (0 Dead Buttons)!")
     except Exception as e:
         failures.append(f"Inline button callback check failed: {e}")
         log_fail(str(e))
