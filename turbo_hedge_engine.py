@@ -697,6 +697,28 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 confidence = 50.0
                 print(f"🛡️ [FUNDING RATE SHIELD] {symbol}: Suppressed SHORT due to extreme negative funding rate ({funding_rate*100:.3f}%)!")
 
+            # 🏛️ 10-PILLAR SUPER SMART CONFLUENCE ENGINE GATING
+            if side != "SKIP":
+                try:
+                    pillar_res = market_data.extract_10_pillar_feature_vector(symbol, interval="15m")
+                    p_score = pillar_res.get("confluence_score", 50.0)
+                    p_sug = pillar_res.get("suggested_direction", "HOLD")
+
+                    # If side is BUY but 10-pillar confluence says SELL or score < 48, suppress:
+                    if side == "BUY" and (p_score < 48.0 or p_sug == "SELL"):
+                        print(f"🛑 [10-PILLAR SUPER SMART GATE] {symbol}: BUY suppressed because 10-Pillar Confluence ({p_score}%) does not confirm Uptrend!")
+                        side = "SKIP"
+                        confidence = 50.0
+                    # If side is SELL but 10-pillar confluence says BUY or score > 52, suppress:
+                    elif side == "SELL" and (p_score > 52.0 or p_sug == "BUY"):
+                        print(f"🛑 [10-PILLAR SUPER SMART GATE] {symbol}: SELL suppressed because 10-Pillar Confluence ({p_score}%) does not confirm Downtrend!")
+                        side = "SKIP"
+                        confidence = 50.0
+                    elif side in ["BUY", "SELL"]:
+                        confidence = min(96.0, max(confidence, p_score))
+                except Exception as p_err:
+                    print(f"⚠️ [10-PILLAR CONFLUENCE NOTICE] {symbol}: {p_err}")
+
     except Exception as ex:
         print(f"⚠️ [SIGNAL EVALUATION NOTICE] {symbol}: {ex}")
         side = "SKIP"
