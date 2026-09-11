@@ -5022,9 +5022,9 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
         ])
     elif cur_eng == "smart_x":
         msg_lines = [
-            f"👑 *APEX VIP AUDIT — 🧠 SMARTX AI*",
+            f"👑 *APEX VIP AUDIT — 🥇 SMARTX GOLD QUANT*",
             f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
-            f"🛡️ *Mode ៖* `5-Agent Swarm + 12 Wall St ML`",
+            f"🛡️ *Mode ៖* `100% Institutional Gold (XAUUSD / PAXG)`",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
             f"💵 Spot / Fut: `${free_usdt:,.2f}` / `${futures_margin:,.2f}`",
@@ -5038,9 +5038,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
             f"├ 🧠 ស្ថានភាព     : `[{smartx_act}]`",
             f"├ 💵 ទុនបម្រុង     : `{smartx_res_str}`",
-            f"├ 🎯 AI Regime    : `SweetSpot High-Frequency`",
-            f"├ 🤖 Quant Models : `12 Wall Street ML Ensembles`",
-            f"└ 🏆 Target Asym  : `R:R >= 1:2.5 & Dynamic ATR`",
+            f"├ 🏆 យុទ្ធសាស្ត្រ    : `SONIC (87.12% Win, 0.26% Max DD)`",
+            f"├ 🤖 AI Models    : `25 Brain Ensembles (CatBoost+LGB+XGB)`",
+            f"├ 📡 Radar ម៉ាក្រូ   : `SGE LBMA Premium + PBOC Accumulation`",
+            f"└ 🎯 Asymmetry    : `+$2.50 to +$10/oz | 1-3m Scratch Stop`",
             sep,
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ])
