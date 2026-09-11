@@ -61,6 +61,7 @@ async def force_reset_menu():
         BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
         BotCommand("balance", "💰 Check Spot & Futures Balance"),
         BotCommand("status", "📊 View Active Trades & PnL"),
+        BotCommand("report", "📊 VIP Audit Report (Daily/Monthly/Yearly/Engines)"),
         BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
         BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
         BotCommand("alert", "🔔 Set Price Alert"),

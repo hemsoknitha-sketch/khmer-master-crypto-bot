@@ -179,6 +179,7 @@ class TelegramBotThread(BaseThread):
                 BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
                 BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
                 BotCommand("balance", "💰 Check Spot & Futures Balance"),
+                BotCommand("report", "📊 VIP Audit Report (Daily/Monthly/Yearly/Engines)"),
                 BotCommand("status", "📊 View Active Trades & PnL"),
                 BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
                 BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
@@ -1825,6 +1826,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - View total PnL and active trading positions\n"
                     "• `/balance` - Check Spot & Futures Balances Real-Time\n"
                     "• `/status` - View 24/7 Engine Execution & Order Status\n"
+                    "• `/report` - 📊 Multi-Timeframe & Engine VIP Audit Report\n"
                     "• `/stop ALL` - Emergency Stop All Active Trading Engines\n\n"
                     "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Autonomous Trading Engine (Spot/Futures)\n"
@@ -1855,6 +1857,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - 查看总 PnL 及所有持仓\n"
                     "• `/balance` - 实时查询 Spot 与 Futures 余额\n"
                     "• `/status` - 查看 24/7 交易引擎运行状态\n"
+                    "• `/report` - 📊 多周期与各引擎 VIP 审计报表\n"
                     "• `/stop ALL` - 紧急一键停止所有运行引擎\n\n"
                     "🚀 **2. 核心自主交易引擎**\n"
                     "• `/turbo_hedge` - 🚀 24/7 HFT 多币/单币高频对冲扫描器 (Spot/Futures)\n"
@@ -1885,6 +1888,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
                     "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
                     "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time 24/7\n"
+                    "• `/report` - 📊 របាយការណ៍សវនកម្ម VIP (Daily, Monthly, Engines)\n"
                     "• `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
                     "🚀 **២. FLAGSHIP AUTONOMOUS TRADING ENGINES (ម៉ាស៊ីនវិនិយោគស្វ័យប្រវត្តិ)**\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Trading Engine (Spot/Futures)\n"
@@ -14061,6 +14065,7 @@ class TelegramBotThread(BaseThread):
                     BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
                     BotCommand("balance", "💰 Check Spot & Futures Balance"),
                     BotCommand("portfolio", "💼 Unified Portfolio & Net PnL"),
+                    BotCommand("report", "📊 VIP Audit Report (Daily/Monthly/Yearly/Engines)"),
                     BotCommand("status", "📊 View Active Trades & PnL"),
                     BotCommand("paper_trading", "🧪 Toggle Paper vs Live Trading"),
                     BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
