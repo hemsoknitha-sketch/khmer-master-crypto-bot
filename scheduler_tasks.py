@@ -5202,7 +5202,20 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     trade_res_str = f"${trade_alloc:,.2f} USDT" if trade_alloc > 0 else "$0.00 (Standby)"
 
     swap_pnl = engines.get("smart_swap", {}).get("pnl", 0.0)
-    swap_act = "ACTIVE" if engines.get("smart_swap", {}).get("active") else "STANDBY"
+    swap_setting = (db.get_system_setting(f"smart_swap_{chat_id}", "0") == "1")
+    swap_act = "ACTIVE" if (engines.get("smart_swap", {}).get("active") or swap_setting) else "STANDBY"
+
+    is_flash_keeper = (db.get_system_setting(f"flash_loan_keeper_{chat_id}", "0") == "1")
+    flash_act = "ACTIVE" if is_flash_keeper else "STANDBY"
+
+    is_funding = db.is_funding_harvester_enabled(chat_id)
+    funding_act = "ACTIVE" if is_funding else "STANDBY"
+
+    is_guard = db.is_trailing_guard_enabled(chat_id)
+    guard_act = "ACTIVE" if is_guard else "STANDBY"
+
+    is_pre_pump = db.is_pre_pump_enabled(chat_id)
+    pump_act = "ACTIVE" if is_pre_pump else "STANDBY"
 
     msg_lines = []
 
@@ -5326,22 +5339,23 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
 
         msg_lines.extend([
             sep,
-            f"⚙️ *ទុនតាមមុខងារ (ENGINES)*",
+            f"⚙️ *ស្ថានភាពកំពូលម៉ាស៊ីន (SUPER SMART ENGINES)*",
             f"\n🚀 *Turbo Hedge* (`/turbo_hedge`) `[{turbo_act}]`",
-            f"├ 💵 ទុនបម្រុង : `{turbo_res_str}`",
-            f"├ ⚙️ Leverage  : `{turbo_lev}x (Isolated)`",
-            f"└ 🌾 PnL/Yield : `{turbo_pnl:+,.2f} USDT`",
-            f"\n🧠 *SmartX AI* (`/smartx`) `[{smartx_act}]`",
-            f"├ 💵 ទុនបម្រុង : `{smartx_res_str}`",
-            f"├ 🎯 AI Regime : `SweetSpot HFT`",
-            f"└ 💎 PnL       : `{smartx_pnl:+,.2f} USDT`",
-            f"\n📊 *Smart Trade* (`/smart_trade`) `[{trade_act}]`",
-            f"├ 💵 ទុនបម្រុង : `{trade_res_str}`",
-            f"├ 🛡️ Spot Floor: `Min $10.50`",
-            f"└ 📈 PnL       : `{trade_pnl:+,.2f} USDT`",
-            f"\n⚡ *Smart Swap* (`/smart_swap`) `[{swap_act}]`",
-            f"├ 💵 DEX Snipes: `Solana / EVM`",
-            f"└ 💎 PnL       : `{swap_pnl:+,.2f} USDT`",
+            f"├ 💵 ទុនបម្រុង : `{turbo_res_str}` | Lev: `{turbo_lev}x`" if turbo_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/turbo_hedge ON 50 10 1234` ``",
+            f"\n🧠 *SmartX AI Quant* (`/smartx`) `[{smartx_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{smartx_res_str}` | MoE: `SweetSpot HFT`" if smartx_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smartx ON 50 10 1234` ``",
+            f"\n📊 *24/7 Auto-Trade Radar* (`/auto_trade`) `[{trade_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{trade_res_str}` | Spot Floor: `Min $10.50`" if trade_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/auto_trade ON 30 1234` ``",
+            f"\n⚡ *Aave V3 Flash Loan Keeper* (`/flash_loan_keeper`) `[{flash_act}]`",
+            f"├ 💵 Mode     : `Tokyo Private Mempool (0% Risk)`" if flash_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/flash_loan_keeper AUTO ON 1234` ``",
+            f"\n🌾 *Perpetual Funding Harvester* (`/funding_harvester`) `[{funding_act}]`",
+            f"├ 💵 Yield    : `Delta-Neutral 30%-120% APY`" if funding_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/funding_harvester ON 1234` ``",
+            f"\n🛡️ *Auto-Liquidation & Trailing Guard* (`/trailing_guard`) `[{guard_act}]`",
+            f"├ 💵 Guard    : `Dynamic Peak Lock + Margin Buffer`" if guard_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/trailing_guard ON 1234` ``",
+            f"\n⚡ *Smart Swap DEX MEV* (`/smart_swap`) `[{swap_act}]`",
+            f"├ 💵 DEX      : `Solana / EVM Sub-5ms Arbitrage`" if swap_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smart_swap AUTO 50 1234` ``",
+            f"\n🐋 *Whale Pre-Pump Radar* (`/pre_pump`) `[{pump_act}]`",
+            f"├ 💵 Radar    : `Whale Orderflow Front-Running`" if pump_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/pre_pump ON 50 1234` ``",
             sep,
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ])
