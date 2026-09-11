@@ -697,12 +697,25 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 confidence = 50.0
                 print(f"🛡️ [FUNDING RATE SHIELD] {symbol}: Suppressed SHORT due to extreme negative funding rate ({funding_rate*100:.3f}%)!")
 
-            # 🏛️ 10-PILLAR SUPER SMART CONFLUENCE ENGINE GATING
+            # 🏛️ 10-PILLAR SUPER SMART CONFLUENCE & ICT/CVD ABSORPTION GATING
+            pillar_res = {}
             if side != "SKIP":
                 try:
                     pillar_res = market_data.extract_10_pillar_feature_vector(symbol, interval="15m")
                     p_score = pillar_res.get("confluence_score", 50.0)
                     p_sug = pillar_res.get("suggested_direction", "HOLD")
+                    cvd_abs = pillar_res.get("cvd_absorption", "NONE")
+                    ict_session = pillar_res.get("ict_session", "INTER_SESSION")
+
+                    # CVD Absorption Shield:
+                    if side == "BUY" and cvd_abs == "BEARISH_ABSORPTION":
+                        print(f"🛑 [CVD ABSORPTION SHIELD] {symbol}: BUY suppressed because Whale Limit Sellers are Absorbing Buy Flow (Bearish Distribution)!")
+                        side = "SKIP"
+                        confidence = 50.0
+                    elif side == "SELL" and cvd_abs == "BULLISH_ABSORPTION":
+                        print(f"🛑 [CVD ABSORPTION SHIELD] {symbol}: SELL suppressed because Whale Limit Buyers are Absorbing Sell Dumps (Bullish Accumulation)!")
+                        side = "SKIP"
+                        confidence = 50.0
 
                     # If side is BUY but 10-pillar confluence says SELL or score < 48, suppress:
                     if side == "BUY" and (p_score < 48.0 or p_sug == "SELL"):
@@ -716,6 +729,16 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                         confidence = 50.0
                     elif side in ["BUY", "SELL"]:
                         confidence = min(96.0, max(confidence, p_score))
+                        if cvd_abs == "BULLISH_ABSORPTION" and side == "BUY":
+                            confidence = min(98.0, confidence + 4.0)
+
+                    # ICT Session Low-Liquidity Dead Zone Protection:
+                    if ict_session == "DEAD_ZONE" and side != "SKIP":
+                        if confidence < 65.0:
+                            print(f"⚪ [ICT DEAD ZONE SHIELD] {symbol}: Entry skipped during thin 21:00-23:59 UTC Dead Zone (Confidence {confidence:.1f}% < 65%)!")
+                            side = "SKIP"
+                            confidence = 50.0
+
                 except Exception as p_err:
                     print(f"⚠️ [10-PILLAR CONFLUENCE NOTICE] {symbol}: {p_err}")
 
@@ -730,6 +753,10 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
     # Small Capital Shield Clamp (< $100 USDT balance -> Max 10x)
     if avail_bal <= 0.0 or avail_bal < 100.0:
         dynamic_leverage = min(dynamic_leverage, 10)
+
+    # ICT Dead Zone Leverage Clamp (Max 5x during thin liquidity hours)
+    if side != "SKIP" and pillar_res.get("ict_session") == "DEAD_ZONE":
+        dynamic_leverage = min(dynamic_leverage, 5)
 
     recommended_route = "SPOT" if (is_spot_mode or dynamic_leverage <= 1) else "FUTURES"
 

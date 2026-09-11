@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import requests
 import pandas as pd
 import numpy as np
@@ -517,6 +518,124 @@ def detect_liquidity_sweep(symbol: str) -> dict:
         
     return {"type": None, "confidence": 0, "price": 0.0}
 
+def detect_ict_kill_zone(timestamp=None) -> dict:
+    """
+    ICT Session Kill Zone & Time-Gating Engine:
+    - Asian Consolidation / Range: 00:00 - 06:00 UTC (Liquidity setup)
+    - London Open Kill Zone: 07:00 - 10:00 UTC (London Expansion / Judas Swing)
+    - London Lunch / NY Pre-Market: 10:00 - 12:00 UTC
+    - New York AM Kill Zone (Silver Bullet): 12:00 - 15:00 UTC (Prime Institutional Volatility)
+    - London Close / NY PM: 15:00 - 17:00 UTC
+    - Asian Prep / Late NY: 17:00 - 21:00 UTC
+    - Dead Zone (Low Liquidity / Widening Spreads): 21:00 - 23:59 UTC
+    """
+    if timestamp is None:
+        dt = datetime.utcnow()
+    elif isinstance(timestamp, (int, float)):
+        dt = datetime.utcfromtimestamp(timestamp / 1000.0 if timestamp > 1e11 else timestamp)
+    elif isinstance(timestamp, pd.Timestamp):
+        dt = timestamp.to_pydatetime()
+    else:
+        dt = datetime.utcnow()
+
+    hour = dt.hour
+    minute = dt.minute
+    total_minutes = hour * 60 + minute
+
+    if 420 <= total_minutes < 600:
+        session = "LONDON_OPEN_KZ"
+        multiplier = 1.25
+        is_prime = True
+        desc = "London Open Kill Zone (Judas Swing & Liquidity Expansion)"
+    elif 720 <= total_minutes < 900:
+        session = "NY_AM_SILVER_BULLET_KZ"
+        multiplier = 1.30
+        is_prime = True
+        desc = "New York AM Kill Zone / Silver Bullet (Peak Institutional Flow)"
+    elif 900 <= total_minutes < 1020:
+        session = "LONDON_CLOSE_KZ"
+        multiplier = 1.15
+        is_prime = True
+        desc = "London Close Kill Zone (Trend Continuation or Reversal)"
+    elif 0 <= total_minutes < 360:
+        session = "ASIAN_RANGE"
+        multiplier = 0.90
+        is_prime = False
+        desc = "Asian Session Range (Liquidity Pool Accumulation)"
+    elif 1260 <= total_minutes <= 1440:
+        session = "DEAD_ZONE"
+        multiplier = 0.65
+        is_prime = False
+        desc = "Low Liquidity Dead Zone (High Spread Risk - Suppress Leverage)"
+    else:
+        session = "INTER_SESSION"
+        multiplier = 1.00
+        is_prime = False
+        desc = "Inter-session Transition Window"
+
+    return {
+        "session": session,
+        "is_prime_liquidity": is_prime,
+        "liquidity_multiplier": multiplier,
+        "utc_time": dt.strftime("%H:%M UTC"),
+        "description": desc
+    }
+
+def detect_cvd_absorption_divergence(df: pd.DataFrame) -> dict:
+    """
+    Order Flow CVD Absorption & Institutional Footprint Engine:
+    Detects when passive Limit orders (Whale Absorption) counter aggressive Market dumps or pumps.
+    - Bullish Absorption: Price tests low while CVD makes Higher Low (Whale Limit Buying).
+    - Bearish Absorption: Price tests high while CVD makes Lower High (Whale Limit Selling).
+    """
+    if len(df) < 15 or 'taker_buy_base' not in df.columns:
+        return {"divergence": "NONE", "bias": 0.0, "confidence": 0, "description": "Insufficient order flow data"}
+
+    try:
+        taker_buy = df['taker_buy_base']
+        volume = df['volume']
+        taker_sell = volume - taker_buy
+        delta = taker_buy - taker_sell
+        cvd = delta.cumsum()
+
+        recent_df = df.iloc[-15:]
+        recent_cvd = cvd.iloc[-15:]
+
+        curr_price = float(recent_df['close'].iloc[-1])
+        price_span = (recent_df['high'].max() - recent_df['low'].min()) + 1e-10
+        cvd_span = (recent_cvd.max() - recent_cvd.min()) + 1e-10
+
+        curr_cvd = float(recent_cvd.iloc[-1])
+
+        # Price near low (within bottom 25% of 15-bar range)
+        price_near_low = (curr_price - recent_df['low'].min()) / price_span < 0.25
+        # CVD is clearly higher than its 15-bar minimum
+        cvd_higher_than_low = curr_cvd > recent_cvd.min() + cvd_span * 0.35
+
+        # Price near high (within top 25% of 15-bar range)
+        price_near_high = (recent_df['high'].max() - curr_price) / price_span < 0.25
+        # CVD is clearly lower than its 15-bar maximum
+        cvd_lower_than_high = curr_cvd < recent_cvd.max() - cvd_span * 0.35
+
+        if price_near_low and cvd_higher_than_low and delta.iloc[-3:].sum() > 0:
+            return {
+                "divergence": "BULLISH_ABSORPTION",
+                "bias": 1.0,
+                "confidence": 88,
+                "description": "Whale Limit Buying Absorbing Sell Dumps (Institutional Accumulation)"
+            }
+        elif price_near_high and cvd_lower_than_high and delta.iloc[-3:].sum() < 0:
+            return {
+                "divergence": "BEARISH_ABSORPTION",
+                "bias": -1.0,
+                "confidence": 88,
+                "description": "Whale Limit Selling Absorbing Buy Pumps (Institutional Distribution)"
+            }
+
+        return {"divergence": "NONE", "bias": 0.0, "confidence": 50, "description": "Order flow delta balanced"}
+    except Exception as e:
+        return {"divergence": "NONE", "bias": 0.0, "confidence": 0, "description": f"Error: {e}"}
+
 # ==============================================================================
 # 🏛️ INSTITUTIONAL 10-PILLAR QUANTITATIVE FEATURE ENGINE (SUPER SMART SUITE)
 # ==============================================================================
@@ -824,13 +943,20 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
         # 10. Fibonacci Retracement
         fib_data = calculate_fibonacci_proximity(df)
 
+        # 11. ICT Session Kill Zone Gating
+        ict_data = detect_ict_kill_zone(df['timestamp'].iloc[-1] if 'timestamp' in df.columns else None)
+
+        # 12. Order Flow CVD Absorption Divergence
+        cvd_abs = detect_cvd_absorption_divergence(df)
+
         # Vectorized Multi-Factor Technical Score (0.0 to 100.0%)
         bull_weights = (
-            struct['bias'] * 20.0 +
+            struct['bias'] * 18.0 +
             snr['bias'] * 10.0 +
-            (1.0 if sweep.get('type') == 'BULLISH' else 0.0) * 15.0 +
-            ema_score * 15.0 +
-            order_flow_bias * 10.0 +
+            (1.0 if sweep.get('type') == 'BULLISH' else 0.0) * 12.0 +
+            ema_score * 12.0 +
+            order_flow_bias * 8.0 +
+            cvd_abs['bias'] * 14.0 +
             vwap_data['bias'] * 10.0 +
             (1.0 if 40.0 <= rsi_val <= 65.0 else (0.0 if rsi_val > 75.0 else -0.5)) * 10.0 +
             hist_accel * 5.0 +
@@ -892,6 +1018,10 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
         else:
             confluence_pct = round(raw_tech_confluence, 1)
 
+        # Apply Prime Liquidity Boost or Dead Zone Dampener
+        if ict_data.get('is_prime_liquidity') and confluence_pct >= 55.0:
+            confluence_pct = min(98.0, round(confluence_pct * 1.03, 1))
+
         return {
             "symbol": symbol,
             "price": curr_price,
@@ -905,6 +1035,11 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
             "cvd_imbalance": float(cvd_imbalance),
             "vwap_zscore": vwap_data['zscore'],
             "fib_golden_pocket": fib_data['in_golden_pocket'],
+            "ict_session": ict_data['session'],
+            "is_prime_liquidity": ict_data['is_prime_liquidity'],
+            "ict_description": ict_data['description'],
+            "cvd_absorption": cvd_abs['divergence'],
+            "cvd_absorption_desc": cvd_abs['description'],
             "regime": regime_name,
             "ml_win_rate_pct": round(ml_prob, 1),
             "ml_active": ml_active,
