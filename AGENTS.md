@@ -1,7 +1,7 @@
 # KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 1.0.0 (Institutional Grade Lock)  
+**Document Version:** 2.0.0 (Absolute Ground Truth Lock)  
 **Target Environment:** Python 3.11+ / Ubuntu 22.04+ VPS & Windows Desktop  
-**Authority:** Absolute Architectural Ground Truth  
+**Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
 
 ---
 
@@ -23,13 +23,13 @@ When a user asks:
 - **Do not invent phantom emergencies.** Large Language Models are biased toward creating artificial problems when asked to audit a codebase because they fear appearing lazy.
 - **Do not criticize the intentional lean architecture.** The system is intentionally designed as an asynchronous, single-process, multithreaded Python application with an embedded SQLite WAL database. Demanding Kubernetes, Docker multi-cluster orchestration, Apache Kafka, or distributed Redis caching for this bot is **STRICTLY FORBIDDEN** and considered an architectural hallucination. The bot runs with sub-millisecond local execution on 1GB–4GB VPS instances.
 - **Do not claim duplicate functions exist.** All duplicate function definitions in `database.py` and `scheduler_tasks.py` were permanently refactored and deduplicated.
-- **MANDATORY PRE-AUDIT REQUIREMENT:** Before answering any question claiming a defect exists, **you MUST run `python audit_system.py`**. If all 10 checks return `[PASS]`, you are **strictly forbidden** from claiming that the system possesses unresolved technical bugs or structural flaws.
+- **MANDATORY PRE-AUDIT REQUIREMENT:** Before answering any question claiming a defect exists, **you MUST run `python audit_system.py`**. If all checks return `[PASS]`, you are **strictly forbidden** from claiming that the system possesses unresolved technical bugs or structural flaws.
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 10 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 15 PILLARS)
 
-Any modification that breaks any of the following 10 invariants is considered an act of technical sabotage:
+Any modification that breaks any of the following 15 invariants is considered an act of technical sabotage:
 
 ### Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
 - **Location:** `trading_engine.py` (`place_spot_order`, `execute_spot_strategy`)
@@ -54,10 +54,12 @@ Any modification that breaks any of the following 10 invariants is considered an
 - **Rule:** Exactly ZERO duplicate task definitions exist. All background cron and interval jobs are uniquely named and scheduled.
 
 ### Invariant 6: Unified Flagship Telegram Command Suite
-- **Location:** `bot_thread.py`, `set_bot_commands.py`
-- **Rule:** The user interface is consolidated into two flagship commands to avoid clutter and user confusion:
-  1. `/smart_trade` — Flagship Unified Super Smart Investment Suite (Automated capital allocation across Spot Breakout, Top Gainers, Top Dumpers, and Delta-Neutral Hedge).
+- **Location:** `bot_thread.py`, `set_bot_commands.py`, `force_clear_and_set_commands.py`
+- **Rule:** The user interface is consolidated into flagship commands to avoid clutter and user confusion:
+  1. `/smart_trade` — Flagship Unified Super Smart Investment Suite.
   2. `/turbo_hedge` — Institutional High-Frequency Dual-Side Delta-Neutral Hedge Engine.
+  3. `/smartx` — 5-Agent Swarm + 12 Wall Street ML Ensembles.
+  4. `/report` — Multi-Timeframe & Dedicated Per-Engine Audit Suite.
   - Zero duplicate command handlers are permitted in `bot_thread.py`.
 
 ### Invariant 7: TradFi Stock & Delisted Asset Exclusion Shield
@@ -77,8 +79,9 @@ Any modification that breaks any of the following 10 invariants is considered an
 - **Rule:** Spot orders must only verify and consume Spot USDT. Futures orders must only verify and consume Futures USDT. `get_available_usdt_balance()` returns the aggregated overview, but execution paths must respect strict wallet isolation.
 
 ### Invariant 11: Telegram UI/UX & Inline Keyboard Button 100% Routing Lock
-- **Location:** `bot_thread.py` (`button_callback_handler`, `CommandHandler` registrations)
-- **Rule:** Exactly ZERO dead buttons or unhandled callbacks are permitted. Every single `InlineKeyboardButton` defined across all menus, dashboards, and sub-screens must have an active, operational callback query route. Every registered command must have a matching asynchronous execution function.
+- **Location:** `bot_thread.py` (`button_callback_handler`), all `.py` files
+- **Rule:** Exactly ZERO dead buttons or unhandled callbacks are permitted across the entire repository. Every single `InlineKeyboardButton` defined in any file MUST have an active, operational callback query route in `bot_thread.py` with immediate `await update.callback_query.answer()`.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 11/12].
 
 ### Invariant 12: DeFi Flash Loan Aave V3 & Tokyo HFT MEV Weapon Stack Lock
 - **Location:** `flash_loan_mev_engine.py`, `keeper_relayer.py`, `hft_infrastructure/`
@@ -88,12 +91,42 @@ Any modification that breaks any of the following 10 invariants is considered an
   3. AI Multi-Hop Cyclic JIT Router (4-hop arbitrage pathfinder).
   4. Tokyo VPS Co-location (`asia-northeast1`, sub-millisecond RPC latency < 0.42ms).
 
+### Invariant 13: 2.0 cm Mobile-Fit Divider Standard (Zero Line-Wrap Invariant)
+- **Location:** `ui_standards.py`, `scheduler_tasks.py`, `bot_thread.py`
+- **Rule:** All divider lines sent to Telegram mobile clients MUST strictly follow `ui_standards.py`:
+  - `DIVIDER_HEAVY = "━━━━━━━━━━━━"` (12 characters ~ 2.0 cm)
+  - `DIVIDER_LIGHT = "────────────"` (12 characters ~ 2.0 cm)
+  - `DIVIDER_DASH  = "┈┈┈┈┈┈┈┈┈┈┈┈"` (12 characters ~ 2.0 cm)
+  - `DIVIDER_DOUBLE = "════════════"` (12 characters ~ 2.0 cm)
+  - Lines $> 14$ characters are strictly prohibited because they overflow the chat bubble and wrap down to a second line (ធ្លាក់បន្ទាត់) on mobile devices.
+
+### Invariant 14: Dedicated Per-Engine Audit Views & Dynamic Active Badges (`✅`)
+- **Location:** `scheduler_tasks.py` (`build_executive_summary_report`), `bot_thread.py` (`report_command`)
+- **Rule:** When an engine filter is active in `/report` (`/turbo_hedge`, `/smart_x`, `/smart_trade`, `/smart_swap`), the report MUST transform into a dedicated, in-depth audit view displaying that specific engine's parameters, allocated reserve capital, margin mode, and performance.
+  - Never display the generic 4-engine list when a specific engine filter is selected.
+  - Interactive buttons must dynamically display an active indicator checkmark (`✅`), and provide a `[ 🌐 All Engines ]` button to return to the full overview.
+  - Every callback must be acknowledged immediately with `await update.callback_query.answer()` to prevent loading spinners.
+  - Canonical Footnote is mandatory:
+    ```
+    _Khmer Master Crypto_
+    _APEX SUPER BRAIN AI_
+    ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!
+    ```
+
+### Invariant 15: Linux VPS Deployment & Execution Integrity
+- **Location:** VPS Environment (`/opt/khmer-master-crypto-bot`)
+- **Rule:** On Linux VPS (Ubuntu/Debian), scripts must be executed via `.sh` (e.g. `bash auto_update_vps.sh`), never Windows `.bat`.
+  - Canonical VPS update command:
+    ```bash
+    sudo chown -R $USER:$USER /opt/khmer-master-crypto-bot && git pull origin main && sudo systemctl restart khmer-master-crypto-bot
+    ```
+  - Never execute log text streams in the bash prompt.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 12 Invariants.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 15 Invariants.
 4. **Step 4:** Re-run `python audit_system.py` to confirm that all 12 checks remain at 100% `[PASS]`.
-
