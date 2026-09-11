@@ -116,9 +116,17 @@ Any modification that breaks any of the following 15 invariants is considered an
 ### Invariant 15: Linux VPS Deployment & Execution Integrity
 - **Location:** VPS Environment (`/opt/khmer-master-crypto-bot`)
 - **Rule:** On Linux VPS (Ubuntu/Debian), scripts must be executed via `.sh` (e.g. `bash auto_update_vps.sh`), never Windows `.bat`.
-  - Canonical VPS update command:
+  - Canonical VPS update command (Stops active SQLite WAL file locks before pulling):
     ```bash
-    cd /opt/khmer-master-crypto-bot && git pull origin main && sudo systemctl restart khmer-master-crypto-bot
+    sudo systemctl stop khmer-master-crypto-bot && git pull origin main && sudo systemctl start khmer-master-crypto-bot
+    ```
+  - Alternative with permission reset (suppressing ephemeral SQLite `-shm`/`-wal` warnings):
+    ```bash
+    sudo chown -R $USER:$USER /opt/khmer-master-crypto-bot 2>/dev/null || true; git pull origin main && sudo systemctl restart khmer-master-crypto-bot
+    ```
+  - Or automated script:
+    ```bash
+    bash auto_update_vps.sh
     ```
   - Never execute log text streams in the bash prompt.
 
