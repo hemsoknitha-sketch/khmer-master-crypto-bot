@@ -4816,27 +4816,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     dash_sep = DIVIDER_DASH
     line_sep = DIVIDER_LIGHT
 
-    title_filter = f" | {data['engine_filter'].upper()}" if data.get("engine_filter") else ""
-
-    msg_lines = [
-        f"👑 **APEX VIP {tf_label.upper()} AUDIT** 👑",
-        f"⏰ `{now_str} UTC+7`{title_filter}",
-        f"🛡️ **Status ៖** `VIP Clearance Active`",
-        sep,
-        f"💰 **ទុនជាក់ស្តែង (EQUITY)**",
-        f"💵 Spot      : `${free_usdt:,.2f}`",
-        f"📈 Futures   : `${futures_margin:,.2f}`",
-        f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
-        f"💎 Net Total : `${total_equity:,.2f}`"
-    ]
-
-    if not has_api:
-        msg_lines.append("⚠️ _មិនទាន់ភ្ជាប់ API (សូមវាយ /add_api)_")
-
-    msg_lines.extend([
-        sep,
-        f"⚙️ **ទុនតាមមុខងារ (ENGINES)**"
-    ])
+    cur_tf = (timeframe or "daily").lower().strip()
+    cur_eng = (engine_filter or "").lower().strip() if engine_filter else "all"
+    if cur_eng in ["none", ""]:
+        cur_eng = "all"
 
     # Dynamic Engine Allocations from DB
     turbo_bots = db.get_user_turbo_hedge_bots(chat_id)
@@ -4846,13 +4829,6 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     turbo_pnl = engines.get("turbo_hedge", {}).get("pnl", 0.0)
     turbo_res_str = f"${turbo_amt:,.2f} USDT" if turbo_amt > 0 else "$0.00 (Standby)"
 
-    msg_lines.extend([
-        f"\n🚀 **Turbo Hedge** (`/turbo_hedge`) `[{turbo_act}]`",
-        f"├ 💵 ទុនបម្រុង : `{turbo_res_str}`",
-        f"├ ⚙️ Leverage  : `{turbo_lev}x (Isolated)`",
-        f"└ 🌾 PnL/Yield : `{turbo_pnl:+,.2f} USDT`"
-    ])
-
     is_hyper = db.is_hyper_trade_enabled(chat_id)
     is_arb = db.is_auto_arb_enabled(chat_id)
     smartx_act = "ACTIVE" if (is_hyper or is_arb) else "STANDBY"
@@ -4860,35 +4836,147 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     smartx_alloc = float(db.get_system_setting(f"smart_x_{chat_id}_alloc", "0.0"))
     smartx_res_str = f"${smartx_alloc:,.2f} USDT" if smartx_alloc > 0 else "$0.00 (Standby)"
 
-    msg_lines.extend([
-        f"\n🧠 **SmartX AI** (`/smartx`) `[{smartx_act}]`",
-        f"├ 💵 ទុនបម្រុង : `{smartx_res_str}`",
-        f"├ 🎯 AI Regime : `SweetSpot HFT`",
-        f"└ 💎 PnL       : `{smartx_pnl:+,.2f} USDT`"
-    ])
-
     is_auto_tr = db.is_auto_trade_enabled(chat_id)
     trade_act = "ACTIVE" if is_auto_tr else "STANDBY"
     trade_pnl = engines.get("smart_trade", {}).get("pnl", 0.0)
     trade_alloc = float(db.get_system_setting(f"smart_trade_{chat_id}_alloc", "0.0"))
     trade_res_str = f"${trade_alloc:,.2f} USDT" if trade_alloc > 0 else "$0.00 (Standby)"
 
-    msg_lines.extend([
-        f"\n📊 **Smart Trade** (`/smart_trade`) `[{trade_act}]`",
-        f"├ 💵 ទុនបម្រុង : `{trade_res_str}`",
-        f"├ 🛡️ Spot Floor: `Min $10.50`",
-        f"└ 📈 PnL       : `{trade_pnl:+,.2f} USDT`"
-    ])
-
     swap_pnl = engines.get("smart_swap", {}).get("pnl", 0.0)
     swap_act = "ACTIVE" if engines.get("smart_swap", {}).get("active") else "STANDBY"
-    msg_lines.extend([
-        f"\n⚡ **Smart Swap** (`/smart_swap`) `[{swap_act}]`",
-        f"├ 💵 DEX Snipes: `Solana / EVM`",
-        f"└ 💎 PnL       : `{swap_pnl:+,.2f} USDT`",
-        sep,
-        f"📋 **សកម្មភាពជួញដូរ ({tf_label})**"
-    ])
+
+    msg_lines = []
+
+    if cur_eng == "turbo_hedge":
+        pairs_cnt = len(turbo_bots) if turbo_bots else 0
+        pairs_lbl = f"{pairs_cnt} Pairs" if pairs_cnt > 0 else "Scan Mode"
+        msg_lines = [
+            f"👑 **APEX VIP AUDIT — 🚀 TURBO HEDGE**",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ **Mode ៖** `Dual-Side Delta-Neutral HFT`",
+            sep,
+            f"💰 **ទុនជាក់ស្តែង (EQUITY)**",
+            f"📈 Futures   : `${futures_margin:,.2f}`",
+            f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
+            f"💎 Net Total : `${total_equity:,.2f}`"
+        ]
+        if not has_api:
+            msg_lines.append("⚠️ _មិនទាន់ភ្ជាប់ API (សូមវាយ /add_api)_")
+
+        msg_lines.extend([
+            sep,
+            f"⚙️ **ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)**",
+            f"├ 🚀 ស្ថានភាព     : `[{turbo_act}]`",
+            f"├ 💵 ទុនបម្រុង     : `{turbo_res_str}`",
+            f"├ ⚙️ Leverage     : `{turbo_lev}x (ISOLATED)`",
+            f"├ 🛡️ Dual-Side    : `HEDGE MODE (Long + Short)`",
+            f"├ 🌾 Profit Floor : `+0.12% Net Fee Offset`",
+            f"└ 🪙 Active Pairs : `{pairs_lbl}`",
+            sep,
+            f"📋 **សកម្មភាពជួញដូរ ({tf_label})**"
+        ])
+    elif cur_eng == "smart_x":
+        msg_lines = [
+            f"👑 **APEX VIP AUDIT — 🧠 SMARTX AI**",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ **Mode ៖** `5-Agent Swarm + 12 Wall St ML`",
+            sep,
+            f"💰 **ទុនជាក់ស្តែង (EQUITY)**",
+            f"💵 Spot / Fut: `${free_usdt:,.2f}` / `${futures_margin:,.2f}`",
+            f"💎 Net Total : `${total_equity:,.2f}`"
+        ]
+        if not has_api:
+            msg_lines.append("⚠️ _មិនទាន់ភ្ជាប់ API (សូមវាយ /add_api)_")
+
+        msg_lines.extend([
+            sep,
+            f"⚙️ **ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)**",
+            f"├ 🧠 ស្ថានភាព     : `[{smartx_act}]`",
+            f"├ 💵 ទុនបម្រុង     : `{smartx_res_str}`",
+            f"├ 🎯 AI Regime    : `SweetSpot High-Frequency`",
+            f"├ 🤖 Quant Models : `12 Wall Street ML Ensembles`",
+            f"└ 🏆 Target Asym  : `R:R >= 1:2.5 & Dynamic ATR`",
+            sep,
+            f"📋 **សកម្មភាពជួញដូរ ({tf_label})**"
+        ])
+    elif cur_eng == "smart_trade":
+        msg_lines = [
+            f"👑 **APEX VIP AUDIT — 📊 SMART TRADE**",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ **Mode ៖** `Spot & Momentum Auto-Trade`",
+            sep,
+            f"💰 **ទុនជាក់ស្តែង (EQUITY)**",
+            f"💵 Spot Bal  : `${free_usdt:,.2f}`",
+            f"💎 Net Total : `${total_equity:,.2f}`"
+        ]
+        if not has_api:
+            msg_lines.append("⚠️ _មិនទាន់ភ្ជាប់ API (សូមវាយ /add_api)_")
+
+        msg_lines.extend([
+            sep,
+            f"⚙️ **ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)**",
+            f"├ 📊 ស្ថានភាព     : `[{trade_act}]`",
+            f"├ 💵 ទុនបម្រុង     : `{trade_res_str}`",
+            f"├ 🛡️ Spot Floor   : `Min $10.50 (Zero -1013)`",
+            f"├ 📈 Strategy     : `Spot Breakout & Volatility`",
+            f"└ 💎 TP Trailing  : `Dynamic Profit Lock`",
+            sep,
+            f"📋 **សកម្មភាពជួញដូរ ({tf_label})**"
+        ])
+    elif cur_eng == "smart_swap":
+        msg_lines = [
+            f"👑 **APEX VIP AUDIT — ⚡ SMART SWAP**",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ **Mode ៖** `Multi-Chain DEX & MEV Shield`",
+            sep,
+            f"💰 **ទុនជាក់ស្តែង (EQUITY)**",
+            f"🌐 Multi-Chain: `Solana / EVM Settlement`",
+            f"💎 Net Total : `${total_equity:,.2f}`",
+            sep,
+            f"⚙️ **ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)**",
+            f"├ ⚡ ស្ថានភាព     : `[{swap_act}]`",
+            f"├ 🌐 Support DEX  : `Raydium, Jupiter, Uniswap`",
+            f"├ 🛡️ MEV Shield   : `Tokyo Sub-5ms Flashbot Route`",
+            f"└ 🎯 Strategy     : `AI Gem & Meme Coin Sniper`",
+            sep,
+            f"📋 **សកម្មភាពជួញដូរ ({tf_label})**"
+        ]
+    else:
+        msg_lines = [
+            f"👑 **APEX VIP {tf_label.upper()} AUDIT** 👑",
+            f"⏰ `{now_str} UTC+7`",
+            f"🛡️ **Status ៖** `VIP Clearance Active`",
+            sep,
+            f"💰 **ទុនជាក់ស្តែង (EQUITY)**",
+            f"💵 Spot      : `${free_usdt:,.2f}`",
+            f"📈 Futures   : `${futures_margin:,.2f}`",
+            f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
+            f"💎 Net Total : `${total_equity:,.2f}`"
+        ]
+        if not has_api:
+            msg_lines.append("⚠️ _មិនទាន់ភ្ជាប់ API (សូមវាយ /add_api)_")
+
+        msg_lines.extend([
+            sep,
+            f"⚙️ **ទុនតាមមុខងារ (ENGINES)**",
+            f"\n🚀 **Turbo Hedge** (`/turbo_hedge`) `[{turbo_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{turbo_res_str}`",
+            f"├ ⚙️ Leverage  : `{turbo_lev}x (Isolated)`",
+            f"└ 🌾 PnL/Yield : `{turbo_pnl:+,.2f} USDT`",
+            f"\n🧠 **SmartX AI** (`/smartx`) `[{smartx_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{smartx_res_str}`",
+            f"├ 🎯 AI Regime : `SweetSpot HFT`",
+            f"└ 💎 PnL       : `{smartx_pnl:+,.2f} USDT`",
+            f"\n📊 **Smart Trade** (`/smart_trade`) `[{trade_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{trade_res_str}`",
+            f"├ 🛡️ Spot Floor: `Min $10.50`",
+            f"└ 📈 PnL       : `{trade_pnl:+,.2f} USDT`",
+            f"\n⚡ **Smart Swap** (`/smart_swap`) `[{swap_act}]`",
+            f"├ 💵 DEX Snipes: `Solana / EVM`",
+            f"└ 💎 PnL       : `{swap_pnl:+,.2f} USDT`",
+            sep,
+            f"📋 **សកម្មភាពជួញដូរ ({tf_label})**"
+        ])
 
     if not recent_trades:
         msg_lines.append("🟢 `ទុនរៀបរយ - គ្មាន Position ត្រាំ`")
@@ -4919,49 +5007,79 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     net_sign = "+" if net_profit >= 0 else ""
     growth_sign = "+" if growth_pct >= 0 else ""
 
-    msg_lines.extend([
-        sep,
-        f"🏆 **សរុបលទ្ធផលសុទ្ធ ({tf_label.upper()})**",
-        f"🎯 សរុប Trades : `{tot_trades} Executed`",
-        f"✅ Win Rate    : `{win_rate:.1f}%`",
-        f"💰 Gross PnL   : `{tot_pnl:+,.2f}`",
-        f"💸 Total Fee   : `-${tot_fees:,.2f}`",
-        f"🌾 Net Funding : `{tot_funding:+,.2f}`",
-        line_sep,
-        f"💎 **NET PROFIT : {net_sign}${net_profit:,.2f} USDT**",
-        f"📈 **{growth_label} : {growth_sign}{growth_pct:.2f}% Net**",
-        f"├ 🚀 `/turbo_hedge` : `{turbo_pnl:+,.2f} ({turbo_roi:+.2f}%)`",
-        f"├ 🧠 `/smart_x`     : `{smartx_pnl:+,.2f} ({smartx_roi:+.2f}%)`",
-        f"├ 📊 `/smart_trade` : `{trade_pnl:+,.2f} ({trade_roi:+.2f}%)`",
-        f"└ ⚡ `/smart_swap`  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
-        sep,
-        f"_Khmer Master Crypto_",
-        f"_APEX SUPER BRAIN AI_",
-        f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
-    ])
+    if cur_eng != "all":
+        eng_pnl = engines.get(cur_eng, {}).get("pnl", 0.0)
+        eng_roi = (eng_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+        eng_title = cur_eng.replace('_', ' ').upper()
+        msg_lines.extend([
+            sep,
+            f"🏆 **សរុបលទ្ធផល ({eng_title} - {tf_label.upper()})**",
+            f"🎯 សរុប Trades : `{tot_trades} Executed`",
+            f"✅ Win Rate    : `{win_rate:.1f}%`",
+            f"💰 Gross PnL   : `{tot_pnl:+,.2f}`",
+            f"💸 Total Fee   : `-${tot_fees:,.2f}`",
+            f"🌾 Net Funding : `{tot_funding:+,.2f}`",
+            line_sep,
+            f"💎 **NET PROFIT : {net_sign}${net_profit:,.2f} USDT**",
+            f"📈 **{growth_label} : {growth_sign}{eng_roi:.2f}% Net**",
+            sep,
+            OFFICIAL_FOOTNOTE
+        ])
+    else:
+        msg_lines.extend([
+            sep,
+            f"🏆 **សរុបលទ្ធផលសុទ្ធ ({tf_label.upper()})**",
+            f"🎯 សរុប Trades : `{tot_trades} Executed`",
+            f"✅ Win Rate    : `{win_rate:.1f}%`",
+            f"💰 Gross PnL   : `{tot_pnl:+,.2f}`",
+            f"💸 Total Fee   : `-${tot_fees:,.2f}`",
+            f"🌾 Net Funding : `{tot_funding:+,.2f}`",
+            line_sep,
+            f"💎 **NET PROFIT : {net_sign}${net_profit:,.2f} USDT**",
+            f"📈 **{growth_label} : {growth_sign}{growth_pct:.2f}% Net**",
+            f"├ 🚀 `/turbo_hedge` : `{turbo_pnl:+,.2f} ({turbo_roi:+.2f}%)`",
+            f"├ 🧠 `/smart_x`     : `{smartx_pnl:+,.2f} ({smartx_roi:+.2f}%)`",
+            f"├ 📊 `/smart_trade` : `{trade_pnl:+,.2f} ({trade_roi:+.2f}%)`",
+            f"└ ⚡ `/smart_swap`  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
+            sep,
+            OFFICIAL_FOOTNOTE
+        ])
 
     msg = "\n".join([line for line in msg_lines if line != ""])
 
-    cur_tf = timeframe or "daily"
+    b_daily = "✅ 24H Daily" if cur_tf == "daily" else "📅 24H Daily"
+    b_monthly = "✅ Monthly" if cur_tf == "monthly" else "🗓️ Monthly"
+    b_yearly = "✅ Yearly" if cur_tf == "yearly" else "📆 Yearly"
+    b_lifetime = "✅ Lifetime" if cur_tf == "lifetime" else "♾️ Lifetime"
+
+    b_turbo = "✅ Turbo Hedge" if cur_eng == "turbo_hedge" else "🚀 Turbo Hedge"
+    b_smartx = "✅ SmartX" if cur_eng == "smart_x" else "🧠 SmartX"
+    b_swap = "✅ Smart Swap" if cur_eng == "smart_swap" else "⚡ Smart Swap"
+    b_trade = "✅ Smart Trade" if cur_eng == "smart_trade" else "📊 Smart Trade"
+    b_all = "✅ All Engines" if cur_eng == "all" else "🌐 All Engines"
+
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📅 24H Daily", callback_data="btn_report_daily"),
-            InlineKeyboardButton("🗓️ Monthly", callback_data="btn_report_monthly")
+            InlineKeyboardButton(b_daily, callback_data=f"btn_report_tf_daily_{cur_eng}"),
+            InlineKeyboardButton(b_monthly, callback_data=f"btn_report_tf_monthly_{cur_eng}")
         ],
         [
-            InlineKeyboardButton("📆 Yearly", callback_data="btn_report_yearly"),
-            InlineKeyboardButton("♾️ Lifetime", callback_data="btn_report_lifetime")
+            InlineKeyboardButton(b_yearly, callback_data=f"btn_report_tf_yearly_{cur_eng}"),
+            InlineKeyboardButton(b_lifetime, callback_data=f"btn_report_tf_lifetime_{cur_eng}")
         ],
         [
-            InlineKeyboardButton("🚀 Turbo Hedge", callback_data="btn_report_turbo_hedge"),
-            InlineKeyboardButton("🧠 SmartX", callback_data="btn_report_smart_x")
+            InlineKeyboardButton(b_turbo, callback_data=f"btn_report_eng_turbo_hedge_{cur_tf}"),
+            InlineKeyboardButton(b_smartx, callback_data=f"btn_report_eng_smart_x_{cur_tf}")
         ],
         [
-            InlineKeyboardButton("⚡ Smart Swap", callback_data="btn_report_smart_swap"),
-            InlineKeyboardButton("📊 Smart Trade", callback_data="btn_report_smart_trade")
+            InlineKeyboardButton(b_swap, callback_data=f"btn_report_eng_smart_swap_{cur_tf}"),
+            InlineKeyboardButton(b_trade, callback_data=f"btn_report_eng_smart_trade_{cur_tf}")
         ],
         [
-            InlineKeyboardButton("🔄 Refresh", callback_data=f"btn_report_{cur_tf}"),
+            InlineKeyboardButton(b_all, callback_data=f"btn_report_eng_all_{cur_tf}"),
+            InlineKeyboardButton("🔄 Refresh", callback_data=f"btn_report_refresh_{cur_tf}_{cur_eng}")
+        ],
+        [
             InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
         ]
     ])

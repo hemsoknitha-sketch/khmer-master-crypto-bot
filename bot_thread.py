@@ -2352,12 +2352,40 @@ class TelegramBotThread(BaseThread):
             timeframe = "daily"
             engine_filter = None
 
-            if cb_data and cb_data.startswith("btn_report_"):
+            if cb_data and (cb_data.startswith("btn_report_") or cb_data.startswith("btn_executive_report")):
                 suffix = cb_data.replace("btn_report_", "").lower().strip()
-                if suffix in ["daily", "monthly", "yearly", "lifetime"]:
+                if suffix.startswith("tf_"):
+                    parts = suffix[3:].split("_")
+                    if parts:
+                        timeframe = parts[0]
+                        eng_cand = "_".join(parts[1:])
+                        engine_filter = None if eng_cand in ["all", "", "none"] else eng_cand
+                elif suffix.startswith("eng_"):
+                    parts = suffix[4:].split("_")
+                    if len(parts) >= 2:
+                        if parts[0] in ["turbo", "smart"]:
+                            eng_cand = f"{parts[0]}_{parts[1]}"
+                            tf_cand = "_".join(parts[2:]) if len(parts) > 2 else "daily"
+                        elif parts[0] == "all":
+                            eng_cand = "all"
+                            tf_cand = "_".join(parts[1:])
+                        else:
+                            eng_cand = parts[0]
+                            tf_cand = "_".join(parts[1:])
+                        engine_filter = None if eng_cand in ["all", "", "none"] else eng_cand
+                        timeframe = tf_cand if tf_cand in ["daily", "monthly", "yearly", "lifetime"] else "daily"
+                elif suffix.startswith("refresh_"):
+                    parts = suffix[8:].split("_")
+                    if parts:
+                        timeframe = parts[0] if parts[0] in ["daily", "monthly", "yearly", "lifetime"] else "daily"
+                        eng_cand = "_".join(parts[1:]) if len(parts) > 1 else "all"
+                        engine_filter = None if eng_cand in ["all", "", "none"] else eng_cand
+                elif suffix in ["daily", "monthly", "yearly", "lifetime"]:
                     timeframe = suffix
                 elif suffix in ["turbo_hedge", "smart_x", "smart_swap", "smart_trade"]:
                     engine_filter = suffix
+                elif suffix in ["all", "all_engines"]:
+                    engine_filter = None
             elif args:
                 arg0 = args[0]
                 if arg0 in ["daily", "24h", "1d", "day"]:
@@ -2377,14 +2405,35 @@ class TelegramBotThread(BaseThread):
                 elif arg0 in ["smart_trade", "smarttrade", "spot"]:
                     engine_filter = "smart_trade"
 
+                if len(args) > 1:
+                    arg1 = args[1]
+                    if arg1 in ["turbo_hedge", "turbo", "hedge"]:
+                        engine_filter = "turbo_hedge"
+                    elif arg1 in ["smartx", "smart_x"]:
+                        engine_filter = "smart_x"
+                    elif arg1 in ["smart_swap", "smartswap", "swap", "dex"]:
+                        engine_filter = "smart_swap"
+                    elif arg1 in ["smart_trade", "smarttrade", "spot"]:
+                        engine_filter = "smart_trade"
+
             try:
                 import scheduler_tasks
                 msg, keyboard = await scheduler_tasks.build_executive_summary_report(chat_id, timeframe=timeframe, engine_filter=engine_filter)
                 if update.callback_query:
                     try:
                         await update.callback_query.edit_message_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
-                    except Exception:
-                        await update.callback_query.message.reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception as edit_err:
+                        err_str = str(edit_err).lower()
+                        if "message is not modified" in err_str:
+                            try:
+                                await update.callback_query.answer("✅ របាយការណ៍បច្ចុប្បន្នភាពស្រេចហើយ!", show_alert=False)
+                            except Exception:
+                                pass
+                        else:
+                            try:
+                                await update.callback_query.message.reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                            except Exception:
+                                pass
                 else:
                     await (update.effective_message or update.message).reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception as e:
