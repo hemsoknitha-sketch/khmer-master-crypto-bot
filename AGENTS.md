@@ -118,7 +118,7 @@ Any modification that breaks any of the following 15 invariants is considered an
 - **Rule:** On Linux VPS (Ubuntu/Debian), scripts must be executed via `.sh` (e.g. `bash auto_update_vps.sh`), never Windows `.bat`.
   - Canonical VPS update command:
     ```bash
-    sudo chown -R $USER:$USER /opt/khmer-master-crypto-bot && cd /opt/khmer-master-crypto-bot && git pull origin main && sudo systemctl restart khmer-master-crypto-bot
+    cd /opt/khmer-master-crypto-bot && git pull origin main && sudo systemctl restart khmer-master-crypto-bot
     ```
   - Never execute log text streams in the bash prompt.
 
