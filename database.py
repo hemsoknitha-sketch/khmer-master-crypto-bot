@@ -3994,10 +3994,62 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
     finally:
         conn.close()
 
+    # If local trade_history has no trades, pull actual live trades & income from Binance API
+    keys = get_user_api(chat_id)
+    if total_trades == 0 and keys and keys[0] and keys[1]:
+        try:
+            import trading_engine
+            b_hours = 24 if tf in ["daily", "24h"] else (720 if tf in ["monthly", "30d"] else 8760)
+            b_trades, b_incomes = trading_engine.get_user_24h_binance_trades_and_income(keys[0], keys[1], hours=b_hours)
+            for inc in b_incomes:
+                inc_type = inc.get("incomeType", "")
+                inc_val = float(inc.get("income", 0.0) or 0.0)
+                if inc_type == "REALIZED_PNL":
+                    total_pnl += inc_val
+                    total_trades += 1
+                    if inc_val >= 0:
+                        wins += 1
+                    engines["turbo_hedge"]["pnl"] += inc_val
+                    engines["turbo_hedge"]["trades"] += 1
+                    if inc_val >= 0:
+                        engines["turbo_hedge"]["wins"] += 1
+                elif inc_type == "COMMISSION":
+                    total_fees += abs(inc_val)
+                elif inc_type == "FUNDING_FEE":
+                    total_funding += inc_val
+
+            for bt in b_trades[:5]:
+                b_pnl = float(bt.get("realizedPnl", 0.0) or 0.0)
+                b_fee = float(bt.get("commission", 0.0) or 0.0)
+                b_price = float(bt.get("price", 0.0) or 0.0)
+                b_qty = float(bt.get("qty", 0.0) or 0.0)
+                b_time_ms = int(bt.get("time", 0) or 0)
+                b_time_str = datetime.fromtimestamp(b_time_ms / 1000.0).strftime("%Y-%m-%d %H:%M:%S") if b_time_ms > 0 else ""
+
+                recent_trades.append({
+                    "id": f"#{bt.get('orderId', bt.get('id', ''))}",
+                    "symbol": bt.get("symbol", "BTCUSDT"),
+                    "side": bt.get("side", "BUY"),
+                    "type": "BINANCE_FUTURES",
+                    "qty": f"{b_qty:.3f} {bt.get('symbol','').replace('USDT','')}",
+                    "entry_price": b_price,
+                    "exit_price": b_price,
+                    "time": b_time_str,
+                    "pnl": b_pnl,
+                    "roi": round((b_pnl / (max(10.0, b_qty * b_price)) * 100.0), 1),
+                    "commission": b_fee,
+                    "funding": 0.0,
+                    "net_pnl": round(b_pnl - b_fee, 2),
+                    "engine": "turbo_hedge"
+                })
+        except Exception as e:
+            print(f"Error fetching live Binance trades for report: {e}")
+
     win_rate = round((wins / total_trades * 100.0), 1) if total_trades > 0 else 100.0
     net_profit = round(total_pnl - total_fees + total_funding, 2)
 
     return {
+
         "timeframe": tf,
         "timeframe_label": tf_label,
         "growth_label": growth_label,

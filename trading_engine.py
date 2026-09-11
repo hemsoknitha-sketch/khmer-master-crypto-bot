@@ -2355,6 +2355,50 @@ def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "
         print(f"Error in execute_spot_trade: {e}")
         return {"status": "error", "error": str(e)}
 
+def get_user_24h_binance_trades_and_income(api_key: str, api_secret: str, hours: int = 24):
+    """
+    Direct Live Binance Pull: Queries actual real-time 24-hour executed trades,
+    income (Realized PnL), commissions, and funding fees directly from Binance Futures API.
+    """
+    if not api_key or not api_secret:
+        return [], []
+    import time
+    start_time = int((time.time() - (hours * 3600)) * 1000)
+    
+    trades = []
+    incomes = []
+    
+    try:
+        endpoint = "/fapi/v1/income"
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = urlencode({"startTime": start_time, "limit": 100, "recvWindow": 60000, "timestamp": timestamp})
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        res = requests.get(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, list):
+                incomes = data
+    except Exception as e:
+        print(f"Error fetching futures income: {e}")
+
+    try:
+        endpoint = "/fapi/v1/userTrades"
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = urlencode({"startTime": start_time, "limit": 100, "recvWindow": 60000, "timestamp": timestamp})
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        res = requests.get(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, list):
+                trades = data
+    except Exception as e:
+        print(f"Error fetching futures userTrades: {e}")
+
+    return trades, incomes
+
+
 
 
 

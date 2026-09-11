@@ -4786,21 +4786,25 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
 
     # Balance Query
     keys = db.get_user_api(chat_id)
+    has_api = bool(keys and keys[0] and keys[1])
     free_usdt = 0.0
     futures_margin = 0.0
     avail_margin = 0.0
-    if keys:
+
+    if has_api:
         try:
-            acc = await asyncio.to_thread(trading_engine.get_account_balance_spot, keys[0], keys[1])
-            free_usdt = float(acc.get("free_usdt", 0.0))
-        except Exception:
-            pass
+            free_usdt = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
+        except Exception as e:
+            print(f"Error fetching spot balance: {e}")
         try:
-            fut_acc = await asyncio.to_thread(trading_engine.get_futures_account_balance, keys[0], keys[1])
-            futures_margin = float(fut_acc.get("totalWalletBalance", 0.0))
-            avail_margin = float(fut_acc.get("availableBalance", 0.0))
-        except Exception:
-            pass
+            fut_bal, _ = await asyncio.to_thread(trading_engine.get_futures_balance_detailed, keys[0], keys[1], "USDT")
+            futures_margin = float(fut_bal or 0.0)
+        except Exception as e:
+            print(f"Error fetching futures wallet balance: {e}")
+        try:
+            avail_margin = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
+        except Exception as e:
+            print(f"Error fetching futures available margin: {e}")
 
     total_equity = free_usdt + futures_margin
     base_cap = total_equity if total_equity > 0 else 100.0
@@ -4823,34 +4827,55 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
         f"💵 Spot      : `${free_usdt:,.2f}`",
         f"📈 Futures   : `${futures_margin:,.2f}`",
         f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
-        f"💎 Net Total : `${total_equity:,.2f}`",
-        sep,
-        f"⚙️ **ទុនតាមមុខងារ (ENGINES)**"
+        f"💎 Net Total : `${total_equity:,.2f}`"
     ]
 
-    turbo_pnl = engines.get("turbo_hedge", {}).get("pnl", 0.0)
-    turbo_act = "ACTIVE" if engines.get("turbo_hedge", {}).get("active") else "STANDBY"
+    if not has_api:
+        msg_lines.append("⚠️ _មិនទាន់ភ្ជាប់ API (សូមវាយ /add_api)_")
+
     msg_lines.extend([
-        f"\n🚀 **/turbo_hedge** `[{turbo_act}]`",
-        f"├ 💵 ទុនបម្រុង : `$800.00 USDT`",
-        f"├ ⚙️ Leverage  : `10x (Isolated)`",
+        sep,
+        f"⚙️ **ទុនតាមមុខងារ (ENGINES)**"
+    ])
+
+    # Dynamic Engine Allocations from DB
+    turbo_bots = db.get_user_turbo_hedge_bots(chat_id)
+    turbo_act = "ACTIVE" if turbo_bots else "STANDBY"
+    turbo_amt = sum(float(b.get("amount", 0.0)) for b in turbo_bots) if turbo_bots else 0.0
+    turbo_lev = turbo_bots[0].get("leverage", 10) if turbo_bots else 10
+    turbo_pnl = engines.get("turbo_hedge", {}).get("pnl", 0.0)
+    turbo_res_str = f"${turbo_amt:,.2f} USDT" if turbo_amt > 0 else "$0.00 (Standby)"
+
+    msg_lines.extend([
+        f"\n🚀 **Turbo Hedge** (`/turbo_hedge`) `[{turbo_act}]`",
+        f"├ 💵 ទុនបម្រុង : `{turbo_res_str}`",
+        f"├ ⚙️ Leverage  : `{turbo_lev}x (Isolated)`",
         f"└ 🌾 PnL/Yield : `{turbo_pnl:+,.2f} USDT`"
     ])
 
+    is_hyper = db.is_hyper_trade_enabled(chat_id)
+    is_arb = db.is_auto_arb_enabled(chat_id)
+    smartx_act = "ACTIVE" if (is_hyper or is_arb) else "STANDBY"
     smartx_pnl = engines.get("smart_x", {}).get("pnl", 0.0)
-    smartx_act = "ACTIVE" if engines.get("smart_x", {}).get("active") else "STANDBY"
+    smartx_alloc = float(db.get_system_setting(f"smart_x_{chat_id}_alloc", "0.0"))
+    smartx_res_str = f"${smartx_alloc:,.2f} USDT" if smartx_alloc > 0 else "$0.00 (Standby)"
+
     msg_lines.extend([
-        f"\n🧠 **/smart_x** `[{smartx_act}]`",
-        f"├ 💵 ទុនបម្រុង : `$650.00 USDT`",
+        f"\n🧠 **SmartX AI** (`/smartx`) `[{smartx_act}]`",
+        f"├ 💵 ទុនបម្រុង : `{smartx_res_str}`",
         f"├ 🎯 AI Regime : `SweetSpot HFT`",
         f"└ 💎 PnL       : `{smartx_pnl:+,.2f} USDT`"
     ])
 
+    is_auto_tr = db.is_auto_trade_enabled(chat_id)
+    trade_act = "ACTIVE" if is_auto_tr else "STANDBY"
     trade_pnl = engines.get("smart_trade", {}).get("pnl", 0.0)
-    trade_act = "ACTIVE" if engines.get("smart_trade", {}).get("active") else "STANDBY"
+    trade_alloc = float(db.get_system_setting(f"smart_trade_{chat_id}_alloc", "0.0"))
+    trade_res_str = f"${trade_alloc:,.2f} USDT" if trade_alloc > 0 else "$0.00 (Standby)"
+
     msg_lines.extend([
-        f"\n📊 **/smart_trade** `[{trade_act}]`",
-        f"├ 💵 ទុនបម្រុង : `$500.00 USDT`",
+        f"\n📊 **Smart Trade** (`/smart_trade`) `[{trade_act}]`",
+        f"├ 💵 ទុនបម្រុង : `{trade_res_str}`",
         f"├ 🛡️ Spot Floor: `Min $10.50`",
         f"└ 📈 PnL       : `{trade_pnl:+,.2f} USDT`"
     ])
@@ -4858,7 +4883,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     swap_pnl = engines.get("smart_swap", {}).get("pnl", 0.0)
     swap_act = "ACTIVE" if engines.get("smart_swap", {}).get("active") else "STANDBY"
     msg_lines.extend([
-        f"\n⚡ **/smart_swap** `[{swap_act}]`",
+        f"\n⚡ **Smart Swap** (`/smart_swap`) `[{swap_act}]`",
         f"├ 💵 DEX Snipes: `Solana / EVM`",
         f"└ 💎 PnL       : `{swap_pnl:+,.2f} USDT`",
         sep,
@@ -4905,10 +4930,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
         line_sep,
         f"💎 **NET PROFIT : {net_sign}${net_profit:,.2f} USDT**",
         f"📈 **{growth_label} : {growth_sign}{growth_pct:.2f}% Net**",
-        f"├ 🚀 **/turbo_hedge** : `{turbo_pnl:+,.2f} ({turbo_roi:+.2f}%)`",
-        f"├ 🧠 **/smart_x**     : `{smartx_pnl:+,.2f} ({smartx_roi:+.2f}%)`",
-        f"├ 📊 **/smart_trade** : `{trade_pnl:+,.2f} ({trade_roi:+.2f}%)`",
-        f"└ ⚡ **/smart_swap**  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
+        f"├ 🚀 `/turbo_hedge` : `{turbo_pnl:+,.2f} ({turbo_roi:+.2f}%)`",
+        f"├ 🧠 `/smart_x`     : `{smartx_pnl:+,.2f} ({smartx_roi:+.2f}%)`",
+        f"├ 📊 `/smart_trade` : `{trade_pnl:+,.2f} ({trade_roi:+.2f}%)`",
+        f"└ ⚡ `/smart_swap`  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
         sep,
         f"_Khmer Master Crypto_",
         f"_APEX SUPER BRAIN AI_",
