@@ -209,6 +209,23 @@ MESSAGES = {
             "_APEX SUPER BRAIN AI_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
+        'macro_event_alert': (
+            "🌐 *GLOBAL MACRO MATRIX ALERT* 🌐\n\n"
+            "📅 ព្រឹត្តិការណ៍ ៖ *{title}*\n"
+            "⏱️ ពេលវេលា ៖ ក្នុងរយៈពេល *{minutes} នាទី*\n"
+            "📊 ទិន្នន័យ ៖ ព្យាករណ៍ *{forecast}* | មុន *{previous}*\n"
+            "━━━━━━━━━━━━\n"
+            "🤖 *សន្ទស្សន៍ទីផ្សារ AI (AI SENTIMENT) ៖* *{sentiment}*\n"
+            "💡 *ការវិភាគស៊ីជម្រៅ (Executive AI Brief) ៖*\n"
+            "{ai_analysis}\n\n"
+            "⚡ *សកម្មភាព Bot ៖* `{action_taken}`\n\n"
+            "👉 *បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖*\n"
+            "`{exec_cmd}`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
         'smart_dca_usage': "❌ របៀបប្រើប្រាស់: `/smart_dca <ឈ្មោះកាក់> <ទំហំប្រាក់> <PIN>`\nឧទាហរណ៍: `/smart_dca BTC 100 1234`",
         'smart_dca_set': "✅ **Smart DCA ត្រូវបានចាប់ផ្តើម!**\n🤖 ខ្ញុំកំពុងតាមដាន **{symbol}** ចាប់ពីតម្លៃ **${entry_price:,.2f}**។ បើវាធ្លាក់ចុះខ្លាំង ខ្ញុំនឹងប្រើប្រាស់យុទ្ធសាស្រ្ត Martingale គុណលុយទិញជាកាំជណ្តើរភ្លាមៗ!",
         'smart_dca_buy_success': "🤖 **SMART DCA ដំណើរការ!** 🤖\n\nទិញបានសម្រេច: **${amount:,.2f} នៃ {symbol}** ក្នុងតម្លៃ {buy_price}។ (DCA Drop Level: {level})\n\n🛡 មុខងារ Auto-Trade & Trailing Stop នឹងគ្រប់គ្រងការលក់កាត់ចំណេញដោយស្វ័យប្រវត្តិ!",
@@ -419,6 +436,23 @@ MESSAGES = {
             "_APEX SUPER BRAIN AI_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
+        'macro_event_alert': (
+            "🌐 *GLOBAL MACRO MATRIX ALERT* 🌐\n\n"
+            "📅 Event: *{title}*\n"
+            "⏱️ Time: In *{minutes} mins*\n"
+            "📊 Data: Forecast *{forecast}* | Prev *{previous}*\n"
+            "━━━━━━━━━━━━\n"
+            "🤖 *AI Market Sentiment:* *{sentiment}*\n"
+            "💡 *Executive AI Analysis:*\n"
+            "{ai_analysis}\n\n"
+            "⚡ *Bot Action:* `{action_taken}`\n\n"
+            "👉 *1-Tap Copyable Execution Command:*\n"
+            "`{exec_cmd}`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
         'smart_dca_usage': "❌ Usage: `/smart_dca <SYMBOL> <AMOUNT> <PIN>`\nExample: `/smart_dca BTC 100 1234`",
         'smart_dca_set': "✅ **Smart DCA Activated!**\n🤖 I am monitoring **{symbol}** from **${entry_price:,.2f}**. If it drops significantly, I will execute a Martingale ladder buy strategy!",
         'smart_dca_buy_success': "🤖 **SMART DCA TRIGGERED!** 🤖\n\nSuccessfully bought: **${amount:,.2f} of {symbol}** at {buy_price}. (DCA Drop Level: {level})\n\n🛡 Auto-Trade & Trailing Stop is now managing this trade!",
@@ -588,6 +622,23 @@ MESSAGES = {
             "👉 *一键复制执行指令 (1-Tap Copyable):*\n"
             "`/turbo_hedge HEDGE BTC 100 1234`\n"
             "`/turbo_hedge BTCUSDT 20 10 AUTO 2.5 1234`\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        ),
+        'macro_event_alert': (
+            "🌐 *全球宏观矩阵警报 (MACRO ALERT)* 🌐\n\n"
+            "📅 宏观事件: *{title}*\n"
+            "⏱️ 倒计时: 还有 *{minutes} 分钟*\n"
+            "📊 数据对比: 预测 *{forecast}* | 前值 *{previous}*\n"
+            "━━━━━━━━━━━━\n"
+            "🤖 *AI 市场情绪研判:* *{sentiment}*\n"
+            "💡 *执行级深度解析 (Executive AI Analysis):*\n"
+            "{ai_analysis}\n\n"
+            "⚡ *量化引擎操作:* `{action_taken}`\n\n"
+            "👉 *一键复制执行指令 (1-Tap Copyable):*\n"
+            "`{exec_cmd}`\n"
             "━━━━━━━━━━━━\n"
             "_Khmer Master Crypto_\n"
             "_APEX SUPER BRAIN AI_\n"

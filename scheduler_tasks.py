@@ -830,23 +830,87 @@ async def check_economic_calendar(app: Application, ai_engine=None):
                 previous = event.get('previous', 'N/A')
                 minutes_rounded = int(minutes_to_event)
                 
-                # AI Sentiment Analysis
+                # AI Sentiment Analysis & Macro Transmission Engine
                 ai_analysis = ""
                 sentiment = "NEUTRAL"
                 if ai_engine:
-                    prompt = (f"The USD economic event '{title}' is happening in {minutes_rounded} mins. "
-                              f"Forecast: {forecast}, Previous: {previous}. "
-                              f"Based on historical patterns, will this be BULLISH or BEARISH for Bitcoin right now? "
-                              f"Start your response with 'BULLISH' or 'BEARISH', then explain why in exactly 2 short sentences in Khmer language.")
+                    prompt = (
+                        f"The USD economic event '{title}' is happening in {minutes_rounded} mins.\n"
+                        f"Forecast: {forecast}, Previous: {previous}.\n"
+                        f"Direct Verdict: Is this BULLISH, BEARISH, or NEUTRAL for Bitcoin?\n"
+                        f"Provide your answer in this exact format:\n"
+                        f"VERDICT: <BULLISH, BEARISH, or NEUTRAL>\n"
+                        f"ANALYSIS: <Explain macroeconomic impact on Bitcoin in exactly 2 concise Khmer sentences. Output ONLY the clean final text with zero drafting notes.>"
+                    )
                     try:
                         ai_resp = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
-                        if "BULLISH" in ai_resp.upper()[:20]:
-                            sentiment = "BULLISH"
-                        elif "BEARISH" in ai_resp.upper()[:20]:
-                            sentiment = "BEARISH"
-                        ai_analysis = ai_resp
+                        clean_resp = ai_engine._clean_response(ai_resp) if hasattr(ai_engine, '_clean_response') else ai_resp
+                        
+                        import re
+                        m = re.search(r'\b(BULLISH|BEARISH|NEUTRAL)\b', clean_resp.upper())
+                        if m:
+                            sentiment = m.group(1)
+                        
+                        filtered_lines = []
+                        for l in clean_resp.split('\n'):
+                            ls = l.strip()
+                            if not ls:
+                                continue
+                            if ls.upper().startswith("VERDICT:"):
+                                continue
+                            if ls.upper().startswith("ANALYSIS:"):
+                                ls = ls[len("ANALYSIS:"):].strip()
+                            if ls.upper() in ["BULLISH", "BEARISH", "NEUTRAL"]:
+                                continue
+                            if ls:
+                                filtered_lines.append(ls)
+                        
+                        if filtered_lines:
+                            ai_analysis = " ".join(filtered_lines)
+                        else:
+                            ai_analysis = clean_resp
                     except Exception:
                         ai_analysis = "⚠️ AI Analysis temporarily unavailable."
+                
+                # 1-Tap Copyable Execution Command
+                if sentiment == "BULLISH":
+                    exec_cmd = "/turbo_hedge BTCUSDT 20 10 BUY 2.5 1234"
+                elif sentiment == "BEARISH":
+                    exec_cmd = "/turbo_hedge BTCUSDT 20 10 SELL 2.5 1234"
+                else:
+                    exec_cmd = "/turbo_hedge HEDGE BTC 100 1234"
+                
+                # Institutional Interactive Keyboards (100% Routed Callbacks)
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                if sentiment == "BULLISH":
+                    macro_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🚀 Long BTC ($20 10x)", callback_data="btn_alert_exec_btc_buy"),
+                            InlineKeyboardButton("🛒 Spot Buy BTC ($50)", callback_data="btn_alert_exec_btc_spot")
+                        ],
+                        [
+                            InlineKeyboardButton("🎯 Launch Turbo Top", callback_data="btn_turbo_hedge_top_launch"),
+                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                        ]
+                    ])
+                elif sentiment == "BEARISH":
+                    macro_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔻 Short BTC ($20 10x)", callback_data="btn_alert_exec_btc_sell"),
+                            InlineKeyboardButton("🛡️ Hedge BTC (0% Risk)", callback_data="btn_alert_exec_btc_hedge")
+                        ],
+                        [
+                            InlineKeyboardButton("📉 Short Top Dumpers", callback_data="btn_alert_exec_top_dumpers"),
+                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                        ]
+                    ])
+                else:
+                    macro_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🛡️ Hedge BTC (0% Risk)", callback_data="btn_alert_exec_btc_hedge"),
+                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                        ]
+                    ])
                 
                 async def process_economic_trade(chat_id, lang):
                     user_lang = lang if lang else 'khmer'
@@ -947,16 +1011,21 @@ async def check_economic_calendar(app: Application, ai_engine=None):
                             except Exception as e:
                                 action_taken = f"❌ **Execution Error:** {e}"
                                 
-                    alert_msg = (f"🌐 **GLOBAL MACRO MATRIX ALERT** 🌐\n\n"
-                                 f"📅 **Event:** {title}\n"
-                                 f"⏱️ **Time:** In {minutes_rounded} mins\n"
-                                 f"📊 **Forecast:** {forecast} | 📉 **Prev:** {previous}\n\n"
-                                 f"🤖 **AI Sentiment:** **{sentiment}**\n"
-                                 f"💡 **AI វិភាគ:** {ai_analysis}\n\n"
-                                 f"⚡ **Bot Action:** {action_taken}")
+                    alert_msg = loc.get_text(
+                        user_lang,
+                        'macro_event_alert',
+                        title=title,
+                        minutes=minutes_rounded,
+                        forecast=forecast,
+                        previous=previous,
+                        sentiment=sentiment,
+                        ai_analysis=ai_analysis,
+                        action_taken=action_taken,
+                        exec_cmd=exec_cmd
+                    )
                     return alert_msg
                 
-                await parallel_broadcast(app, vip_users_lang, process_economic_trade)
+                await parallel_broadcast(app, vip_users_lang, process_economic_trade, reply_markup=macro_kb)
                         
     except Exception as e:
         print(f"Error checking economic calendar: {e}")

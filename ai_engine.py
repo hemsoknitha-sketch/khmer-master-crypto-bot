@@ -606,6 +606,29 @@ class AIInvestmentEngine:
         text = re.sub(r'Section\s*3\s*\([^)]*\)\s*:', 'ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (The Executive Action Command)', text, flags=re.IGNORECASE)
 
         # 4. Slice off drafting headers if present
+        if "Final execution." in text:
+            idx = text.rfind("Final execution.")
+            text = text[idx + len("Final execution."):].strip()
+        elif "Final Output Generation:" in text:
+            idx = text.rfind("Final Output Generation:")
+            text = text[idx + len("Final Output Generation:"):]
+        elif "Drafting final Khmer text:" in text:
+            idx = text.rfind("Drafting final Khmer text:")
+            text = text[idx + len("Drafting final Khmer text:"):]
+        elif "Final Text:" in text:
+            idx = text.rfind("Final Text:")
+            text = text[idx + len("Final Text:"):]
+        elif "Final Polish:" in text:
+            idx = text.rfind("Final Polish:")
+            text = text[idx + len("Final Polish:"):].strip()
+
+        # 5. If Khmer is expected and there is an isolated verdict followed by Khmer text, slice to the last verdict block
+        verdict_blocks = list(re.finditer(r'(?:^|\n)\s*(BULLISH|BEARISH|NEUTRAL)\s*\n\s*([\u1780-\u17FF][^\n]*(?:\n\s*[\u1780-\u17FF][^\n]*)*)', text, flags=re.IGNORECASE))
+        if verdict_blocks:
+            last_vb = verdict_blocks[-1]
+            text = last_vb.group(1).upper() + "\n" + last_vb.group(2).strip()
+
+        # 6. Standard 3-section header slice if present
         if "ផ្នែកទី ១" in text or "ផ្នែកទី១" in text:
             matches = list(re.finditer(r'(?:^|\n)\s*(?:1[\.\)]\s*)?ផ្នែកទី\s*១[៖:]', text))
             if matches:
@@ -618,71 +641,28 @@ class AIInvestmentEngine:
                         break
                 if chosen_idx != -1:
                     text = text[chosen_idx:].strip()
-        elif "Drafting final Khmer text:" in text:
-            idx = text.find("Drafting final Khmer text:")
-            text = text[idx + len("Drafting final Khmer text:"):]
-        elif "Final Text:" in text:
-            idx = text.find("Final Text:")
-            text = text[idx + len("Final Text:"):]
-        elif "Final Output Generation:" in text:
-            idx = text.find("Final Output Generation:")
-            text = text[idx + len("Final Output Generation:"):]
 
         lines = text.split("\n")
         cleaned_lines = []
 
         scratchpad_prefixes = [
-            "*   User Question", "* User Question", "User Question",
-            "*   System Context", "* System Context", "System Context",
-            "*   Goal", "* Goal", "Goal:",
-            "*   Fact Check", "* Fact Check", "Fact Check",
-            "*   Contextual", "* Contextual", "Contextual",
-            "*   Strategic Response", "* Strategic Response", "Strategic Response",
-            "*   Refined Logic", "* Refined Logic", "Refined Logic",
-            "*   Correction", "* Correction", "Correction:",
-            "*   Actually", "* Actually", "Actually:",
-            "*   Information", "* Information", "Information:",
-            "*   Decision", "* Decision", "Decision:",
-            "*   Executive Response", "* Executive Response", "Executive Response",
-            "*   Khmer Translation", "* Khmer Translation", "Khmer Translation",
-            "*   Refining to be", "* Refining to be", "Refining to be",
-            "*   Final check", "* Final check", "Final check",
-            "*   One detail", "* One detail", "One detail",
-            "*   Final Output", "* Final Output", "Final Output",
-            "*   User Input:", "* User Input:", "User Input:",
-            "*   Time:", "* Time:", "Time:",
-            "*   Constraint", "Constraint 1:", "Constraint 2:", "Constraint 3:",
-            "*   Persona:", "* Persona:", "Persona:",
-            "*   Command:", "*   Asset:", "*   Direction:", "*   Leverage:",
-            "*   *Wait", "* *Wait", "* Wait", "*   Wait", "Wait,",
-            "*   *Asset:", "* *Asset:", "* Asset:",
-            "*   *Price:", "* *Price:", "* Price:",
-            "*   *Direction:", "* *Direction:", "* Direction:",
-            "*   *Confidence:", "* *Confidence:", "* Confidence:",
-            "*   *Leverage:", "* *Leverage:", "* Leverage:",
-            "*   *Analysis:", "* *Analysis:", "* Analysis:",
-            "*   Language requirement", "Language requirement",
-            "*   Format:", "Format:",
-            "*   [CHINESE]", "*   [ENGLISH]", "*   [KHMER]",
-            "**[CHINESE]**", "**[ENGLISH]**", "**[KHMER]**",
-            "[CHINESE]", "[ENGLISH]", "[KHMER]",
-            "*   ****", "****", "*   ***", "***",
-            "*   Heading:", "*   Status:", "*   Execution Details:", "*   Risk Management:",
-            "*   Header:", "*   Body:", "*   Table/List:", "*   Warning:",
-            "*   Drafting", "*   Role:", "* Role:", "Role:",
-            "*   Context:", "* Context:", "Context:",
-            "*   Task:", "* Task:", "Task:",
-            "*   Tone:", "* Tone:", "Tone:",
-            "*   Requirements:", "* Requirements:", "Requirements:",
-            "*   Contextual Reason", "* Opportunity:", "*   Strategy:", "*   Parameters:", "*   The Command:",
-            "*   Intro:", "*   Market Status:", "*   Analysis:", "*   Strategy Details:",
-            "*   Sentence 1:", "*   Sentence 2:", "Sentence 1:", "Sentence 2:",
-            "*   Does it meet", "*   Is it in", "*   Is it executive", "*   Are there any",
-            "*   Self-Correction", "*   Final Polish", "*   Wait, checking",
-            "Respond ONLY in clean", "Use the 3-section structure", "User's language preference:",
-            "Structure: Section", "No fluff/reasoning", "Win Rate: Let's estimate",
-            "Ensure the tone", "Check the 1-tap", "Self-Correction", "Drafting Command", "Use bolding", "Use Emojis",
-            "(Proceeding to generate", "(Drafting the Output", "Drafting final", "Final Polish:", "Wait, checking"
+            "user roleplay", "user role", "user question", "user input", "system context",
+            "goal", "fact check", "contextual", "strategic response", "refined logic",
+            "correction", "actually", "information", "decision", "executive response",
+            "khmer translation", "translation to khmer", "refining", "final check",
+            "one detail", "final output", "time:", "constraint", "persona", "command:",
+            "asset:", "direction:", "leverage:", "wait", "*wait", "price:", "confidence:",
+            "analysis:", "language requirement", "format:", "[chinese]", "[english]", "[khmer]",
+            "heading:", "status:", "execution details:", "risk management:", "header:",
+            "body:", "table/list:", "warning:", "drafting", "draft:", "role:", "context:",
+            "task:", "tone:", "requirements:", "opportunity:", "strategy:", "parameters:",
+            "the command:", "intro:", "market status:", "strategy details:", "sentence 1:",
+            "sentence 2:", "does it meet", "is it in", "is it executive", "are there any",
+            "self-correction", "final polish", "data:", "event:", "trend:", "economic logic:",
+            "asset impact:", "verdict:", "reasoning", "start with", "follow with", "no fluff",
+            "checking constraints", "in prompt engineering", "system prompt", "let's ensure",
+            "total sentences", "khmer check", "final execution", "result:", "english word",
+            "higher ppi ->", "logic:", "note:", "prompt:"
         ]
 
         for line in lines:
@@ -690,33 +670,20 @@ class AIInvestmentEngine:
             stripped_lower = stripped.lower()
             if not stripped or stripped in ["*   ****", "****", "*   ***", "***", "*"]:
                 continue
-            if any(stripped_lower.startswith(prefix.lower()) for prefix in scratchpad_prefixes):
+            clean_line_start = re.sub(r'^[\*\-\s]+', '', stripped_lower)
+            if any(clean_line_start.startswith(p) for p in scratchpad_prefixes):
                 continue
             if any(kw in stripped_lower for kw in [
-                "respond only in clean, executive",
-                "user's language preference:",
-                "structure: section 1, 2, 3",
-                "no fluff/reasoning",
-                "win rate: let's estimate",
-                "section 1: the institutional verdict",
-                "section 2: quantitative and macro",
-                "section 3: the executive action",
-                "2-sentence rule",
-                "self-correction during drafting",
-                "fact check (real world vs. context)",
-                "contextual interpretation:",
-                "strategic response:",
-                "executive response strategy:",
-                "final output generation:",
-                "the user instruction says",
-                "system prompt's structure",
-                "i will apply this structure",
-                "(checked)",
-                "language requirement:"
+                "respond only in clean", "user's language preference", "structure: section",
+                "no fluff/reasoning", "win rate: let's estimate", "2-sentence rule",
+                "self-correction during drafting", "fact check", "contextual interpretation",
+                "the user instruction says", "system prompt's structure", "i will apply this structure",
+                "language requirement:", "start your response with", "explain why in exactly",
+                "in prompt engineering", "user prompt explicitly", "most recent instruction"
             ]):
                 continue
 
-            cleaned_lines.append(line)
+            cleaned_lines.append(line.strip())
 
         result = "\n".join(cleaned_lines).strip()
         result = re.sub(r'\n{3,}', '\n\n', result)
