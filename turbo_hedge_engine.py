@@ -1613,6 +1613,14 @@ async def monitor_turbo_hedge_bots(app):
                     break
 
                 target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side
+
+                # 🛡️ SUPER SMART ANTI-OVERSOLD SHORT GUARD (RSI <= 38.0 Bottom Trap Rejection)
+                if target_side.upper() == "SELL":
+                    rsi_val = market_data.get_symbol_rsi(c_cand, interval="15m")
+                    if rsi_val <= 38.0:
+                        print(f"🛑 [SUPER SMART ANTI-OVERSOLD GUARD] {c_cand}: 15m RSI {rsi_val:.1f} <= 38.0 (Bottom Trap Zone). Skipping candidate to avoid Short Squeeze trap!")
+                        continue
+
                 exec_leverage = min(unit_leverage, 10) if is_recovery_mode else unit_leverage
                 exec_res = await asyncio.to_thread(execute_turbo_hedge_trade, f_keys[0], f_keys[1], c_cand, actual_trade_amount, target_side, exec_leverage, target_chat_id)
                 
