@@ -377,8 +377,9 @@ def upload_to_huggingface_hub(models_dir="models", repo_id=None, token=None):
 
         api = HfApi()
         print(f"  └─ Target Repository: {repo_id}")
+        api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True, token=token)
         
-        files_to_upload = [f for f in os.listdir(models_dir) if f.endswith(('.pkl', '.h5', '.json'))]
+        files_to_upload = [f for f in os.listdir(models_dir) if f.endswith(('.pkl', '.h5', '.keras', '.json', '.pth'))]
         for f in files_to_upload:
             file_path = os.path.join(models_dir, f)
             print(f"  └─ Uploading {f} to {repo_id}...")
