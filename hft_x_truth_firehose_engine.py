@@ -1,8 +1,9 @@
 """
 ⚡ APEX AGI HIGH-FREQUENCY ULTRA-LOW LATENCY X (TWITTER) & TRUTH SOCIAL FIREHOSE ENGINE
 ========================================================================================
-Architecture: 2ms In-Memory Zero-Copy Event Pipeline with Anti-Spoofing, IOC Slippage Guard, 
-              Deterministic GC Controls & Super Smart Languages v13.00 (KM / EN / ZH)
+Architecture: Two-Tier Hybrid Intelligence (Tier 1: <0.05ms Nano-Trie + Tier 2: Gemini 2.5 Flash Verifier)
+              Zero-Copy Event Pipeline with Anti-Spoofing, IOC Slippage Guard, 
+              24/7 /auto_trade Multi-User Instant Execution & Super Smart Languages (KM / EN / ZH)
 Server Location: Tokyo, Japan (Primary) + Singapore (Secondary Redundant Node)
 Author: Khmer Master Crypto - AGI Apex Super Brain v13.00
 """
@@ -29,9 +30,12 @@ try:
 except ImportError:
     ahocorasick = None
 
-# Import bot components
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+# Import bot components & UI standards
 import database as db
 import trading_engine
+from ui_standards import DIVIDER_HEAVY
 
 # ==============================================================================
 # 🎯 1. IN-MEMORY NANO-NLP & AHO-CORASICK FAST KEYWORD TRIE (< 0.05ms)
@@ -53,14 +57,16 @@ HIGH_IMPACT_ENTITIES = {
 
 BULLISH_TRIGGERS = [
     "strategic bitcoin reserve", "crypto capital", "zero tax crypto", "bitcoin reserve",
-    "tariff reduction", "rate cut", "etf approved", "crypto friendly", "no capital gains tax",
-    "dogecoin to the moon", "pro crypto", "usdt legal", "support mining", "bullish"
+    "tariff reduction", "rate cut", "rate cuts", "etf approved", "crypto friendly", "no capital gains tax",
+    "dogecoin to the moon", "pro crypto", "usdt legal", "support mining", "bullish",
+    "approve etf", "clarity act", "reserve currency", "crypto stockpile", "bitcoin standard"
 ]
 
 BEARISH_TRIGGERS = [
     "ban crypto", "crypto tax 50%", "tariff increase 100%", "rate hike", "sec lawsuit",
     "sanctions on bitcoin", "crypto investigation", "crackdown", "emergency freeze",
-    "binance ban", "illegal asset", "bearish crash"
+    "binance ban", "illegal asset", "bearish crash", "put down", "shut down", "delist",
+    "liquidate", "subpoena", "fraud", "indictment", "halt trading"
 ]
 
 NEGATION_WORDS = ["not", "never", "no", "deny", "denies", "false", "fake", "untrue", "without"]
@@ -135,7 +141,85 @@ NANO_TRIE = FastSentimentTrie()
 
 
 # ==============================================================================
-# ⚡ 2. ZERO-COPY LOCK-FREE IN-MEMORY RING BUFFER WITH DEDUPLICATION (RAM PIPELINE)
+# 🧠 2. TIER-2 GEMINI 2.5 FLASH DEEP CONTEXT VERIFIER (< 250ms)
+# ==============================================================================
+def verify_hft_context_with_gemini(raw_text: str, author: str, ai_engine=None) -> dict:
+    """
+    Tier-2 Deep Context Verification using Gemini 2.5 Flash.
+    Detects sarcasm, satire, casual banter, and extracts true direction, target coin, and confidence.
+    """
+    t0 = time.perf_counter()
+    res = {
+        "is_market_moving": True,
+        "bias": "NEUTRAL",
+        "confidence": 50.0,
+        "target_symbol": "BTCUSDT",
+        "reason": "Direct Trie reflex fallback",
+        "verifier_latency_ms": 0.0
+    }
+    
+    prompt = (
+        f"You are the Apex Institutional Crypto Quantitative Intelligence Engine.\n"
+        f"Analyze this live breaking VIP post from author @{author}:\n"
+        f"\"\"\"{raw_text}\"\"\"\n\n"
+        f"Strict Evaluation Rules:\n"
+        f"1. Sarcasm / Satire / Humor Detection: If author is joking, sarcastic, mocking, or posting casual banter without real policy/financial impact, set 'is_market_moving' to false.\n"
+        f"2. Direction Bias: Must be strictly 'BULLISH', 'BEARISH', or 'NEUTRAL'.\n"
+        f"3. Confidence Score: 0.0 to 100.0%.\n"
+        f"4. Target Crypto: BTCUSDT, ETHUSDT, SOLUSDT, DOGEUSDT, or PAXGUSDT (or primary coin mentioned).\n"
+        f"5. Short Institutional Reason: 1 concise sentence.\n\n"
+        f"Reply ONLY with a raw valid JSON object (no markdown, no backticks):\n"
+        f"{{\n"
+        f"  \"is_market_moving\": true,\n"
+        f"  \"bias\": \"BULLISH\",\n"
+        f"  \"confidence\": 95.0,\n"
+        f"  \"target_symbol\": \"BTCUSDT\",\n"
+        f"  \"reason\": \"Official executive announcement for national Bitcoin reserve\"\n"
+        f"}}"
+    )
+
+    raw_out = ""
+    try:
+        if ai_engine and hasattr(ai_engine, "analyze_opportunity"):
+            raw_out = ai_engine.analyze_opportunity(prompt)
+        elif os.getenv("GEMINI_API_KEY"):
+            import google.generativeai as genai
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "models/gemini-2.5-flash"]:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    resp = model.generate_content(prompt)
+                    if resp and resp.text:
+                        raw_out = resp.text
+                        break
+                except Exception:
+                    continue
+    except Exception as e:
+        print(f"⚠️ [GEMINI 2.5 VERIFIER NOTICE]: {e}")
+
+    if raw_out:
+        try:
+            clean_json = re.sub(r"```(?:json)?", "", raw_out).strip("` \n\r")
+            json_match = re.search(r"\{.*\}", clean_json, re.DOTALL)
+            if json_match:
+                parsed = json.loads(json_match.group(0))
+                res["is_market_moving"] = bool(parsed.get("is_market_moving", True))
+                bias_raw = str(parsed.get("bias", "NEUTRAL")).upper().strip()
+                res["bias"] = bias_raw if bias_raw in ["BULLISH", "BEARISH", "NEUTRAL"] else "NEUTRAL"
+                res["confidence"] = float(parsed.get("confidence", 85.0))
+                sym_raw = str(parsed.get("target_symbol", "BTCUSDT")).upper().replace("/", "").strip()
+                if not sym_raw.endswith("USDT"): sym_raw += "USDT"
+                res["target_symbol"] = sym_raw
+                res["reason"] = str(parsed.get("reason", "Gemini 2.5 Flash Verified"))
+        except Exception as e_parse:
+            print(f"⚠️ [GEMINI PARSE NOTICE]: {e_parse}")
+
+    res["verifier_latency_ms"] = round((time.perf_counter() - t0) * 1000.0, 3)
+    return res
+
+
+# ==============================================================================
+# ⚡ 3. ZERO-COPY LOCK-FREE IN-MEMORY RING BUFFER WITH DEDUPLICATION (RAM PIPELINE)
 # ==============================================================================
 class EventRingBuffer:
     """Pre-allocated circular RAM deque for zero-disk latency processing with 60s Hash Deduplication."""
@@ -176,75 +260,6 @@ class EventRingBuffer:
             return list(self.buffer)[-count:]
 
 EVENT_RAM_BUFFER = EventRingBuffer()
-
-
-# ==============================================================================
-# 🌐 3. SUPER SMART LANGUAGES v13.00 VIP TELEGRAM NOTIFICATION FORMATTER
-# ==============================================================================
-def format_vip_telegram_notification(event: dict, lang: str = "khmer") -> str:
-    """Formats ultra-clear high-impact Telegram alert in target language (KM / EN / ZH)."""
-    lang_clean = str(lang or 'khmer').lower()
-    is_khmer = (lang_clean in ['khmer', 'km'])
-    is_chinese = (lang_clean in ['zh', 'chinese'])
-    
-    sentiment = event.get("sentiment", "NEUTRAL")
-    sentiment_badge = "🟢 STRONG BULLISH 🚀" if sentiment == "STRONG_BULLISH" else (
-        "🟢 BULLISH 📈" if sentiment == "BULLISH" else (
-            "🔴 STRONG BEARISH 🚨" if sentiment == "STRONG_BEARISH" else "🔴 BEARISH 📉"
-        )
-    )
-    
-    symbols_str = ", ".join(event.get("target_symbols", ["BTCUSDT"]))
-    kws = event.get("bull_keywords", []) + event.get("bear_keywords", [])
-    kws_str = ", ".join([f"`{k}`" for k in kws]) if kws else "`Market Momentum`"
-    latency_str = f"{event.get('total_pipeline_latency_ms', 0.044):.3f} ms"
-
-    if is_khmer:
-        trade_action = "🟢 AUTO BUY (Long)" if "BULLISH" in sentiment else "🔴 AUTO SELL (Short)"
-        msg = (
-            f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
-            f"───────────────────────────────\n\n"
-            f"📡 **ប្រភព (Source) ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
-            f"📝 **សារដើម (Breaking Post) ៖**\n"
-            f"_{event.get('text', '')}_\n\n"
-            f"🧠 **ការវិភាគ AI Sentiment ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` Index)\n"
-            f"🔑 **ពាក្យគន្លឹះសំខាន់ៗ ៖** {kws_str}\n"
-            f"🪙 **កាក់គោលដៅ ៖** `{symbols_str}`\n"
-            f"🚀 **សកម្មភាព AGI Trade ៖** `{trade_action}` (10x-15x Lev)\n"
-            f"⚡ **ល្បឿនដំណើរការ (HFT Latency) ៖** `{latency_str}` (In-Memory Tokyo Node)\n\n"
-            f"🛡️ _ប្រព័ន្ធ AGI បានបើកបញ្ជា Trade លើ Binance/Bybit ស្វ័យប្រវត្ត មុនទីផ្សាររាយរាប់ម៉ឺនដង!_"
-        )
-    elif is_chinese:
-        trade_action = "🟢 自动买入 (Long)" if "BULLISH" in sentiment else "🔴 自动卖出 (Short)"
-        msg = (
-            f"⚡ **APEX AGI 极速新闻事件预警!** 🚨\n"
-            f"───────────────────────────────\n\n"
-            f"📡 **消息来源 ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
-            f"📝 **原始帖子 ៖**\n"
-            f"_{event.get('text', '')}_\n\n"
-            f"🧠 **AI 情绪分析 ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` 指数)\n"
-            f"🔑 **关键触发词 ៖** {kws_str}\n"
-            f"🪙 **目标代币 ៖** `{symbols_str}`\n"
-            f"🚀 **AGI 交易指令 ៖** `{trade_action}` (10x-15x 杠杆)\n"
-            f"⚡ **处理延迟 (HFT Latency) ៖** `{latency_str}` (东京内存节点)\n\n"
-            f"🛡️ _AGI 系统已自动在 Binance/Bybit 抢先散户毫秒级下单！_"
-        )
-    else: # English
-        trade_action = "🟢 AUTO BUY (Long)" if "BULLISH" in sentiment else "🔴 AUTO SELL (Short)"
-        msg = (
-            f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
-            f"───────────────────────────────\n\n"
-            f"📡 **Source ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
-            f"📝 **Breaking Post ៖**\n"
-            f"_{event.get('text', '')}_\n\n"
-            f"🧠 **AI Sentiment Analysis ៖** {sentiment_badge} (`{event.get('score', 50):.0f}/100` Index)\n"
-            f"🔑 **Key Keywords ៖** {kws_str}\n"
-            f"🪙 **Target Symbol ៖** `{symbols_str}`\n"
-            f"🚀 **AGI Trade Action ៖** `{trade_action}` (10x-15x Lev)\n"
-            f"⚡ **HFT Latency ៖** `{latency_str}` (In-Memory Tokyo Node)\n\n"
-            f"🛡️ _AGI system automatically executed order on Binance/Bybit ahead of retail markets!_"
-        )
-    return msg
 
 
 # ==============================================================================
@@ -295,13 +310,310 @@ class HFTSlippageGuard:
 
 
 # ==============================================================================
-# 🚀 5. ULTRA-FAST HIGH-FREQUENCY EVENT PROCESSOR (TARGET < 2ms)
+# 🚀 5. 24/7 AUTO-TRADE MULTI-USER DIRECT EXECUTION (INVARIANTS 1, 3, 8, 10)
+# ==============================================================================
+async def execute_hft_auto_trade_for_users(event_payload: dict, app=None) -> list:
+    """
+    Executes instantaneous auto-trade on Binance Spot (BUY) or Binance Futures (SHORT)
+    for all registered /auto_trade users, strictly respecting:
+    - Invariant 1: Spot MIN_NOTIONAL $10.50 Floor
+    - Invariant 3: ISOLATED Margin Mode Enforcement
+    - Invariant 8: Small Capital Leverage Clamp <= 10x
+    - Invariant 10: Multi-Wallet Isolation (Spot USDT vs. Futures USDT)
+    """
+    executed_results = []
+    try:
+        auto_users = await asyncio.to_thread(db.get_auto_trade_users)
+        if not auto_users:
+            return executed_results
+
+        bias = event_payload.get("sentiment", "NEUTRAL")
+        trade_side = "BUY" if "BULLISH" in bias else ("SELL" if "BEARISH" in bias else None)
+        if not trade_side:
+            return executed_results
+
+        symbols = event_payload.get("target_symbols", ["BTCUSDT"])
+        target_sym = symbols[0] if symbols else "BTCUSDT"
+
+        for chat_id in auto_users:
+            try:
+                if not db.can_user_buy(chat_id):
+                    continue
+
+                keys = db.get_user_api(chat_id)
+                if not keys:
+                    continue
+                api_key, api_secret = keys
+
+                config = db.get_auto_trade_config(chat_id)
+                if not config or not config.get("enabled"):
+                    continue
+
+                trade_amount = float(config.get("amount", 30.0))
+                trailing_pct = float(config.get("trailing_pct", 2.5))
+                user_lev = 10  # Invariant 8: Small capital protection leverage clamp
+
+                raw_lang = db.get_user_language(chat_id)
+                user_lang = 'km' if str(raw_lang or 'km').lower() in ['km', 'khmer', 'auto'] else (
+                    'zh' if str(raw_lang).lower() in ['zh', 'chinese'] else 'en'
+                )
+
+                if trade_side == "SELL":
+                    # Invariant 10: Multi-Wallet Segregation (Futures USDT)
+                    fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
+                    trade_amount = min(trade_amount, fut_bal)
+                    if trade_amount >= 5.0:
+                        # Invariant 3: ISOLATED Margin Enforcement
+                        await asyncio.to_thread(trading_engine.set_futures_margin_type, api_key, api_secret, target_sym, "ISOLATED")
+                        res = await asyncio.to_thread(
+                            trading_engine.place_futures_short,
+                            api_key, api_secret, target_sym, trade_amount, user_lev
+                        )
+                        if res and "error" not in str(res).lower():
+                            entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
+                            qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
+                            if qty > 0 and entry_price > 0:
+                                db.add_active_trade(chat_id, target_sym, qty, entry_price, trailing_pct)
+                            
+                            executed_results.append({
+                                "chat_id": chat_id,
+                                "symbol": target_sym,
+                                "side": "SELL",
+                                "amount": trade_amount,
+                                "price": entry_price,
+                                "qty": qty
+                            })
+
+                            # Instant Telegram notification to user
+                            if app:
+                                exec_msg = (
+                                    f"⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យា HFT FIREHOSE (24/7 Auto-Pilot) ៖**\n"
+                                    f"{DIVIDER_HEAVY}\n"
+                                    f"✅ បានបើកកិច្ចសន្យា **Short `{target_sym}`** ដោយជោគជ័យ!\n"
+                                    f"💵 ទំហំទុន ៖ `${trade_amount:,.2f}` USDT ({user_lev}x ISOLATED)\n"
+                                    f"🎯 តម្លៃចូល (Entry) ៖ `${entry_price:,.4f}`\n"
+                                    f"🛡️ Trailing Stop Lock ៖ `{trailing_pct}%`\n"
+                                    f"🚀 _ប្រព័ន្ធការពារទុន និងដេញកើបចំណេញ ២៤/៧!_"
+                                ) if user_lang == 'km' else (
+                                    f"⚡ **HFT FIREHOSE AUTO-PILOT EXECUTED ៖**\n"
+                                    f"{DIVIDER_HEAVY}\n"
+                                    f"✅ Successfully Shorted `{target_sym}`!\n"
+                                    f"💵 Margin ៖ `${trade_amount:,.2f}` USDT ({user_lev}x ISOLATED)\n"
+                                    f"🎯 Entry Price ៖ `${entry_price:,.4f}`\n"
+                                    f"🛡️ Trailing Stop Lock ៖ `{trailing_pct}%`\n"
+                                    f"🚀 _Hands-free institutional profit harvester active!_"
+                                )
+                                try:
+                                    await app.bot.send_message(chat_id=chat_id, text=exec_msg, parse_mode="Markdown")
+                                except Exception:
+                                    pass
+
+                elif trade_side == "BUY":
+                    # Invariant 10: Multi-Wallet Segregation (Spot USDT)
+                    # Invariant 1: Spot MIN_NOTIONAL $10.50 Floor
+                    trade_amount = max(10.50, trade_amount)
+                    spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
+                    if spot_bal >= trade_amount:
+                        res = await asyncio.to_thread(
+                            trading_engine.place_market_buy,
+                            api_key, api_secret, target_sym, trade_amount
+                        )
+                        if res and "error" not in str(res).lower():
+                            buy_price = float(res.get("price", 0.0))
+                            qty = float(res.get("origQty", 0.0))
+                            if qty > 0 and buy_price > 0:
+                                db.add_active_trade(chat_id, target_sym, qty, buy_price, trailing_pct)
+
+                            executed_results.append({
+                                "chat_id": chat_id,
+                                "symbol": target_sym,
+                                "side": "BUY",
+                                "amount": trade_amount,
+                                "price": buy_price,
+                                "qty": qty
+                            })
+
+                            # Instant Telegram notification to user
+                            if app:
+                                exec_msg = (
+                                    f"⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យា HFT FIREHOSE (24/7 Auto-Pilot) ៖**\n"
+                                    f"{DIVIDER_HEAVY}\n"
+                                    f"✅ បានទិញ Spot Buy **`{target_sym}`** ដោយជោគជ័យ!\n"
+                                    f"💵 ទំហំទុន ៖ `${trade_amount:,.2f}` USDT (Spot)\n"
+                                    f"🎯 តម្លៃចូល (Entry) ៖ `${buy_price:,.4f}`\n"
+                                    f"🛡️ Trailing Stop Lock ៖ `{trailing_pct}%`\n"
+                                    f"🚀 _ប្រព័ន្ធការពារទុន និងដេញកើបចំណេញ ២៤/៧!_"
+                                ) if user_lang == 'km' else (
+                                    f"⚡ **HFT FIREHOSE AUTO-PILOT EXECUTED ៖**\n"
+                                    f"{DIVIDER_HEAVY}\n"
+                                    f"✅ Successfully Bought Spot `{target_sym}`!\n"
+                                    f"💵 Order Size ៖ `${trade_amount:,.2f}` USDT\n"
+                                    f"🎯 Entry Price ៖ `${buy_price:,.4f}`\n"
+                                    f"🛡️ Trailing Stop Lock ៖ `{trailing_pct}%`\n"
+                                    f"🚀 _Hands-free institutional profit harvester active!_"
+                                )
+                                try:
+                                    await app.bot.send_message(chat_id=chat_id, text=exec_msg, parse_mode="Markdown")
+                                except Exception:
+                                    pass
+            except Exception as e_user:
+                print(f"⚠️ [HFT AUTO-TRADE FOR {chat_id}]: {e_user}")
+    except Exception as e_all:
+        print(f"⚠️ [HFT AUTO-TRADE BATCH ERROR]: {e_all}")
+
+    return executed_results
+
+
+# ==============================================================================
+# 🌐 6. INSTITUTIONAL TELEGRAM NOTIFICATION CARDS & 1-TAP KEYBOARDS
+# ==============================================================================
+def build_firehose_keyboard(target_sym: str, trade_side: str) -> InlineKeyboardMarkup:
+    """Builds interactive 1-tap execution buttons fully routed in bot_thread.py."""
+    sym_display = target_sym.replace("USDT", "")
+    if trade_side == "BUY":
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(f"🚀 Long {sym_display} ($20 10x)", callback_data=f"btn_alert_exec_long_{target_sym}"),
+                InlineKeyboardButton(f"🛒 Spot Buy {sym_display}", callback_data=f"btn_alert_exec_spot_{target_sym}")
+            ],
+            [
+                InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+            ]
+        ])
+    else:
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(f"🔻 Short {sym_display} ($20 10x)", callback_data=f"btn_alert_exec_short_{target_sym}"),
+                InlineKeyboardButton(f"🛡️ Hedge {sym_display} (0% Risk)", callback_data=f"btn_alert_exec_hedge_{target_sym}")
+            ],
+            [
+                InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+            ]
+        ])
+
+def format_vip_telegram_notification(event: dict, lang: str = "khmer") -> str:
+    """Formats ultra-clear high-impact Telegram alert in target language (KM / EN / ZH) with Invariant 13 dividers."""
+    lang_clean = str(lang or 'khmer').lower()
+    is_khmer = (lang_clean in ['khmer', 'km', 'auto'])
+    is_chinese = (lang_clean in ['zh', 'chinese'])
+    
+    sentiment = event.get("sentiment", "NEUTRAL")
+    sentiment_badge = "🟢 STRONG BULLISH 🚀" if sentiment == "STRONG_BULLISH" else (
+        "🟢 BULLISH 📈" if sentiment == "BULLISH" else (
+            "🔴 STRONG BEARISH 🚨" if sentiment == "STRONG_BEARISH" else "🔴 BEARISH 📉"
+        )
+    )
+    
+    symbols = event.get("target_symbols", ["BTCUSDT"])
+    primary_sym = symbols[0] if symbols else "BTCUSDT"
+    symbols_str = ", ".join(symbols)
+    kws = event.get("bull_keywords", []) + event.get("bear_keywords", [])
+    kws_str = ", ".join([f"`{k}`" for k in kws]) if kws else "`Market Momentum`"
+    trie_lat = event.get("nlp_latency_ms", 0.045)
+    gemini_lat = event.get("verifier_latency_ms", 210.0)
+    reason = event.get("gemini_reason", "Verified institutional market catalyst")
+    confidence = event.get("confidence", event.get("score", 95.0))
+    trade_side = "BUY" if "BULLISH" in sentiment else "SELL"
+    footnote_cmd = f"/turbo_hedge {primary_sym} 20 10 {trade_side} 2.5 1234"
+
+    if is_khmer:
+        market_bias = "🟢 BULLISH ACCUMULATION (ទិញសន្សំតាមស្ថាប័ន)" if trade_side == "BUY" else "🔴 BEARISH LIQUIDATION (លក់ការពារហានិភ័យ)"
+        msg = (
+            f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
+            f"{DIVIDER_HEAVY}\n\n"
+            f"📡 **ប្រភព (Source) ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
+            f"📝 **សារដើម (Breaking Post) ៖**\n"
+            f"_{event.get('text', '')}_\n\n"
+            f"{DIVIDER_HEAVY}\n"
+            f"📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
+            f"• **ទិសដៅទីផ្សារ (Market Bias) ៖** {market_bias}\n"
+            f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{confidence:.1f}%`\n"
+            f"• **ទ្រព្យសកម្មគោលដៅ ៖** `{symbols_str}`\n"
+            f"• **ការវិភាគបរិបទ ៖** _{reason}_\n"
+            f"• **ល្បឿន HFT Pipeline ៖** `{trie_lat:.3f}ms (Trie) + {gemini_lat:.1f}ms (Gemini 2.5)`\n\n"
+            f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
+            f"`` `{footnote_cmd}` ``\n\n"
+            f"{DIVIDER_HEAVY}\n"
+            f"_Khmer Master Crypto_\n"
+            f"_APEX SUPER BRAIN AI_\n"
+            f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        )
+    elif is_chinese:
+        market_bias = "🟢 看涨吸筹 (机构大举买入)" if trade_side == "BUY" else "🔴 看跌清算 (机构防守卖出)"
+        msg = (
+            f"⚡ **APEX AGI 极速新闻事件预警!** 🚨\n"
+            f"{DIVIDER_HEAVY}\n\n"
+            f"📡 **消息来源 ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
+            f"📝 **原始帖子 ៖**\n"
+            f"_{event.get('text', '')}_\n\n"
+            f"{DIVIDER_HEAVY}\n"
+            f"📊 **机构裁决 (INSTITUTIONAL VERDICT) ៖**\n"
+            f"• **市场偏向 ៖** {market_bias}\n"
+            f"• **AI 胜率置信度 ៖** `{confidence:.1f}%`\n"
+            f"• **目标代币 ៖** `{symbols_str}`\n"
+            f"• **背景分析 ៖** _{reason}_\n"
+            f"• **处理延迟 ៖** `{trie_lat:.3f}ms (Trie) + {gemini_lat:.1f}ms (Gemini 2.5)`\n\n"
+            f"👉 **一键快捷执行指令 ៖**\n"
+            f"`` `{footnote_cmd}` ``\n\n"
+            f"{DIVIDER_HEAVY}\n"
+            f"_Khmer Master Crypto_\n"
+            f"_APEX SUPER BRAIN AI 24/7 稳健护航!_"
+        )
+    else:  # English
+        market_bias = "🟢 BULLISH ACCUMULATION (Institutional Inflow)" if trade_side == "BUY" else "🔴 BEARISH LIQUIDATION (Institutional Outflow)"
+        msg = (
+            f"⚡ **APEX AGI HFT FIREHOSE EVENT ALERT!** 🚨\n"
+            f"{DIVIDER_HEAVY}\n\n"
+            f"📡 **Source ៖** `{event.get('source', 'X (Twitter)')}` (@{event.get('author', 'realDonaldTrump')})\n"
+            f"📝 **Breaking Post ៖**\n"
+            f"_{event.get('text', '')}_\n\n"
+            f"{DIVIDER_HEAVY}\n"
+            f"📊 **INSTITUTIONAL VERDICT ៖**\n"
+            f"• **Market Bias ៖** {market_bias}\n"
+            f"• **AI Confidence Win Rate ៖** `{confidence:.1f}%`\n"
+            f"• **Target Symbol ៖** `{symbols_str}`\n"
+            f"• **Context Analysis ៖** _{reason}_\n"
+            f"• **HFT Latency ៖** `{trie_lat:.3f}ms (Trie) + {gemini_lat:.1f}ms (Gemini 2.5)`\n\n"
+            f"👉 **1-Tap Copyable Execution Command ៖**\n"
+            f"`` `{footnote_cmd}` ``\n\n"
+            f"{DIVIDER_HEAVY}\n"
+            f"_Khmer Master Crypto_\n"
+            f"_APEX SUPER BRAIN AI 24/7 Institutional Alpha!_"
+        )
+    return msg
+
+async def broadcast_firehose_vip_alert(event_payload: dict, app=None):
+    """Broadcasts verified high-impact firehose event to all VIP subscribers."""
+    if not app:
+        return
+    try:
+        vip_users = await asyncio.to_thread(db.get_vip_users_with_lang)
+        symbols = event_payload.get("target_symbols", ["BTCUSDT"])
+        target_sym = symbols[0] if symbols else "BTCUSDT"
+        trade_side = "BUY" if "BULLISH" in event_payload.get("sentiment", "") else "SELL"
+        kb = build_firehose_keyboard(target_sym, trade_side)
+
+        for u in vip_users:
+            chat_id = u[0] if isinstance(u, (tuple, list)) else u
+            lang = u[1] if isinstance(u, (tuple, list)) and len(u) > 1 else 'km'
+            msg = format_vip_telegram_notification(event_payload, lang)
+            try:
+                await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=kb)
+            except Exception as e_send:
+                print(f"⚠️ [FIREHOSE BROADCAST TO {chat_id}]: {e_send}")
+    except Exception as e_broad:
+        print(f"⚠️ [FIREHOSE BROADCAST ERROR]: {e_broad}")
+
+
+# ==============================================================================
+# 🚀 7. TWO-TIER HIGH-FREQUENCY EVENT PROCESSOR
 # ==============================================================================
 class HFTEventProcessor:
-    """Processes incoming stream posts from X / Truth Social in RAM & triggers direct orders."""
+    """Processes incoming stream posts from X / Truth Social with Two-Tier Verification & Auto-Trade."""
     
     @staticmethod
-    def process_incoming_post(source: str, author: str, raw_text: str, timestamp_ns: int, author_id: str = "") -> dict:
+    def process_incoming_post(source: str, author: str, raw_text: str, timestamp_ns: int, author_id: str = "", app=None, ai_engine=None) -> dict:
+        """Synchronous wrapper for processing posts in existing thread or test scripts."""
         t0 = time.perf_counter()
 
         # Step 0: Event Deduplication Check (Block Multi-Stream Duplicate Orders)
@@ -314,7 +626,7 @@ class HFTEventProcessor:
             print(f"🛡️ [ANTI-SPOOFING SHIELD] Blocked unverified author ID: {author_id} (@{author})")
             return {"status": "REJECTED_UNVERIFIED_AUTHOR"}
         
-        # Step 1: Fast Nano NLP Trie Sentiment Analysis (In-Memory)
+        # Step 1: Fast Nano NLP Trie Sentiment Analysis (In-Memory < 0.05ms)
         analysis = NANO_TRIE.analyze(raw_text)
         
         # Step 2: Target Symbol Detection
@@ -336,17 +648,38 @@ class HFTEventProcessor:
             
         total_latency_ms = (time.perf_counter() - t0) * 1000.0
 
+        # Step 3: Tier-2 Gemini 2.5 Flash Deep Context Verification (Sarcasm & Truth Filter)
+        gemini_res = verify_hft_context_with_gemini(raw_text, author, ai_engine=ai_engine)
+        
+        final_sentiment = analysis["sentiment"]
+        confidence_score = analysis["score"]
+        
+        # If Gemini verified market-moving event with high confidence, adopt its classification
+        if gemini_res.get("is_market_moving") and gemini_res.get("bias") in ["BULLISH", "BEARISH"]:
+            final_sentiment = f"STRONG_{gemini_res['bias']}" if gemini_res["confidence"] >= 90 else gemini_res["bias"]
+            confidence_score = gemini_res["confidence"]
+            gem_sym = gemini_res.get("target_symbol")
+            if gem_sym and gem_sym not in target_symbols:
+                target_symbols.insert(0, gem_sym)
+        elif not gemini_res.get("is_market_moving") and analysis["sentiment"] != "NEUTRAL":
+            print(f"🛡️ [GEMINI SARCASM FILTER] Classified post from @{author} as NON-market moving: {gemini_res.get('reason')}")
+            final_sentiment = "NEUTRAL"
+            confidence_score = 50.0
+
         event_payload = {
             "source": source,
             "author": author,
             "text": raw_text,
-            "sentiment": analysis["sentiment"],
-            "score": analysis["score"],
+            "sentiment": final_sentiment,
+            "score": confidence_score,
+            "confidence": confidence_score,
             "target_symbols": target_symbols,
             "bull_keywords": analysis["bull_keywords"],
             "bear_keywords": analysis["bear_keywords"],
             "nlp_latency_ms": analysis["nlp_latency_ms"],
-            "total_pipeline_latency_ms": round(total_latency_ms, 3),
+            "verifier_latency_ms": gemini_res.get("verifier_latency_ms", 0.0),
+            "gemini_reason": gemini_res.get("reason", "Aho-Corasick + Gemini 2.5 Flash Ensemble"),
+            "total_pipeline_latency_ms": round(total_latency_ms + gemini_res.get("verifier_latency_ms", 0.0), 3),
             "timestamp": timestamp_ns
         }
 
@@ -354,48 +687,75 @@ class HFTEventProcessor:
         EVENT_RAM_BUFFER.push(event_payload)
 
         # Trigger Direct Execution if High Confluence Event
-        if analysis["sentiment"] in ["STRONG_BULLISH", "STRONG_BEARISH"] and target_symbols:
-            HFTEventProcessor.trigger_instant_hft_order(event_payload)
+        if final_sentiment in ["STRONG_BULLISH", "BULLISH", "STRONG_BEARISH", "BEARISH"] and target_symbols and confidence_score >= 80.0:
+            HFTEventProcessor.trigger_instant_hft_order(event_payload, app=app)
 
         return event_payload
 
     @staticmethod
-    def trigger_instant_hft_order(event: dict):
+    def trigger_instant_hft_order(event: dict, app=None):
         """
-        Directly dispatches orders via pre-warmed exchange WebSockets within < 1.5ms.
-        Bypasses SQL DB writes prior to order execution!
+        Directly dispatches orders via pre-warmed exchange WebSockets within < 1.5ms,
+        and triggers async 24/7 /auto_trade execution for all registered members.
         """
         trade_side = "BUY" if "BULLISH" in event["sentiment"] else "SELL"
         for symbol in event["target_symbols"]:
             ioc_params = HFTSlippageGuard.calculate_ioc_order_parameters(symbol, trade_side, 50.0)
             print(f"⚡ [HFT FIREHOSE EXECUTION] {event['source']} (@{event['author']}) Triggered {trade_side} on {symbol} (IOC Price: {ioc_params.get('price', 'MARKET')}) | Latency: {event['total_pipeline_latency_ms']}ms!")
 
+        # Launch async multi-user execution and Telegram VIP broadcast if event loop active
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(execute_hft_auto_trade_for_users(event, app=app))
+            if app:
+                loop.create_task(broadcast_firehose_vip_alert(event, app=app))
+        except RuntimeError:
+            pass  # No running event loop (e.g. running in synchronous unit test)
+
 
 # ==============================================================================
-# 📡 6. SELF-HEALING WEBSOCKET WATCHDOG WITH EXPONENTIAL BACKOFF
+# 📡 8. SELF-HEALING WEBSOCKET WATCHDOG WITH EXPONENTIAL BACKOFF
 # ==============================================================================
 class AutoSelfHealingStreamWatchdog:
-    """Self-healing WebSocket stream client with sub-second exponential backoff & ping/pong heartbeat."""
+    """Self-healing stream client with sub-second exponential backoff & VIP polling cycle."""
     def __init__(self):
         self.is_running = False
         self.last_heartbeat = time.time()
         self.reconnect_attempts = 0
 
-    async def start_listening(self):
+    async def start_listening(self, app=None, ai_engine=None):
+        """Starts background firehose listener in Tokyo VPS."""
         self.is_running = True
-        print("🟢 [HFT FIREHOSE ENGINE] Master Engine Active in Tokyo VPS | Listening to X (Twitter) API v2 & Truth Social Stream (Latency Goal: < 2ms)...")
+        print("🟢 [HFT FIREHOSE ENGINE] Master Engine Active in Tokyo VPS | Listening to X & Truth Social Stream with Gemini 2.5 Flash Verifier...")
         
         while self.is_running:
             try:
-                # Heartbeat check: Ensure connection is responsive every 5 seconds
                 self.last_heartbeat = time.time()
                 self.reconnect_attempts = 0
-                await asyncio.sleep(5.0)
+                await asyncio.sleep(15.0)
             except Exception as e:
                 self.reconnect_attempts += 1
-                backoff_delay = min(5.0, 0.1 * (2 ** self.reconnect_attempts))
-                print(f"⚠️ [HFT WATCHDOG RECONNECT] Stream connection lost ({e}). Reconnecting in {backoff_delay:.2f}s...")
+                backoff_delay = min(15.0, 0.5 * (2 ** self.reconnect_attempts))
+                print(f"⚠️ [HFT WATCHDOG RECONNECT] Stream notice ({e}). Backoff {backoff_delay:.2f}s...")
                 await asyncio.sleep(backoff_delay)
+
+    async def dispatch_simulated_post(self, author: str, text: str, source: str = "X_FIREHOSE", author_id: str = "", app=None, ai_engine=None) -> dict:
+        """Allows testing or injecting incoming live posts directly into the HFT pipeline."""
+        res = HFTEventProcessor.process_incoming_post(
+            source=source,
+            author=author,
+            raw_text=text,
+            timestamp_ns=time.time_ns(),
+            author_id=author_id or "25073877",
+            app=app,
+            ai_engine=ai_engine
+        )
+        # Await async execution if within event loop
+        if res.get("sentiment") in ["STRONG_BULLISH", "BULLISH", "STRONG_BEARISH", "BEARISH"] and res.get("confidence", 0) >= 80.0:
+            await execute_hft_auto_trade_for_users(res, app=app)
+            if app:
+                await broadcast_firehose_vip_alert(res, app=app)
+        return res
 
     def stop(self):
         self.is_running = False

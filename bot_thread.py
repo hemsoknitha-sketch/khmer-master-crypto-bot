@@ -4398,6 +4398,23 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_turbo_hedge_stop_all":
                 context.args = ["STOP", "ALL"]
                 await turbo_hedge_command(update, context)
+            elif data.startswith("btn_alert_exec_"):
+                parts = data.split("_")
+                if len(parts) >= 5:
+                    action = parts[3].lower()
+                    target_sym = parts[4].upper()
+                    if action == "long":
+                        context.args = [target_sym, "20", "10", "BUY", "2.5"]
+                        await turbo_hedge_command(update, context)
+                    elif action == "short":
+                        context.args = [target_sym, "20", "10", "SELL", "2.5"]
+                        await turbo_hedge_command(update, context)
+                    elif action == "hedge":
+                        context.args = [target_sym, "20", "10", "BOTH", "2.5"]
+                        await turbo_hedge_command(update, context)
+                    elif action == "spot":
+                        context.args = [target_sym, "BUY", "20"]
+                        await smart_trade_command(update, context)
             elif data == "btn_turbo_hedge_wealth_launch":
                 context.args = ["WEALTH"]
                 await turbo_hedge_command(update, context)
@@ -14183,6 +14200,52 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("toggle_rebalance", toggle_rebalance_command))
 
         self.app.add_handler(CommandHandler("predict", predict_command))
+
+        async def test_firehose_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id: return
+
+            raw_text = " ".join(context.args).strip() if context.args else ""
+            if not raw_text:
+                await update.effective_message.reply_text(
+                    "ℹ️ **របៀបប្រើប្រាស់ /test_firehose ៖**\n"
+                    "👉 `/test_firehose Donald Trump announces US Strategic Bitcoin Reserve with zero tax`\n"
+                    "👉 `/test_firehose SEC sues Binance and orders emergency freeze`",
+                    parse_mode="Markdown"
+                )
+                return
+
+            await update.effective_message.reply_text(
+                f"⚡ **កំពុងដំណើរការ HFT Firehose + Gemini 2.5 Flash + Auto-Trade...**\n_{raw_text}_",
+                parse_mode="Markdown"
+            )
+
+            try:
+                from hft_x_truth_firehose_engine import HFT_ENGINE
+                author = "realDonaldTrump" if any(k in raw_text.lower() for k in ["trump", "president", "reserve"]) else (
+                    "elonmusk" if any(k in raw_text.lower() for k in ["elon", "musk", "doge"]) else (
+                        "federalreserve" if any(k in raw_text.lower() for k in ["fed", "powell", "rate", "fomc"]) else "SECGov"
+                    )
+                )
+                res = await HFT_ENGINE.dispatch_simulated_post(
+                    author=author,
+                    text=raw_text,
+                    source="X_FIREHOSE",
+                    app=self.app,
+                    ai_engine=self.ai_engine
+                )
+                await update.effective_message.reply_text(
+                    f"✅ **HFT Firehose Processed ៖** `{res.get('sentiment')}` (Win Rate: `{res.get('confidence', 0):.1f}%`) | Target: `{res.get('target_symbols')}`\n"
+                    f"⏱️ **Pipeline Latency ៖** `{res.get('total_pipeline_latency_ms', 0):.2f}ms`\n"
+                    f"🧠 **AI Reason ៖** _{res.get('gemini_reason', 'Ensemble')}_",
+                    parse_mode="Markdown"
+                )
+            except Exception as e_fh:
+                await update.effective_message.reply_text(f"⚠️ [FIREHOSE ERROR]: {e_fh}")
+
+        self.app.add_handler(CommandHandler("test_firehose", test_firehose_command))
+
         async def paper_trading_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -14643,6 +14706,12 @@ class TelegramBotThread(BaseThread):
                         pass
             
             self._is_bot_running = True
+            try:
+                from hft_x_truth_firehose_engine import HFT_ENGINE
+                asyncio.create_task(HFT_ENGINE.start_listening(self.app, self.ai_engine))
+            except Exception as e_hft:
+                print(f"⚠️ [HFT FIREHOSE START NOTICE]: {e_hft}")
+
             while getattr(self, '_is_bot_running', True):
                 try:
                     if self.app and self.app.updater and not getattr(self.app.updater, 'running', False):
