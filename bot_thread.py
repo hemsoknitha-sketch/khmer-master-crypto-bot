@@ -2429,13 +2429,28 @@ class TelegramBotThread(BaseThread):
                                 await update.callback_query.answer("✅ របាយការណ៍បច្ចុប្បន្នភាពស្រេចហើយ!", show_alert=False)
                             except Exception:
                                 pass
+                        elif "can't parse entities" in err_str or "parse" in err_str:
+                            try:
+                                await update.callback_query.edit_message_text(text=msg, parse_mode=None, reply_markup=keyboard)
+                            except Exception:
+                                pass
                         else:
                             try:
                                 await update.callback_query.message.reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
-                            except Exception:
-                                pass
+                            except Exception as rep_err:
+                                if "can't parse entities" in str(rep_err).lower() or "parse" in str(rep_err).lower():
+                                    try:
+                                        await update.callback_query.message.reply_text(text=msg, parse_mode=None, reply_markup=keyboard)
+                                    except Exception:
+                                        pass
                 else:
-                    await (update.effective_message or update.message).reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                    try:
+                        await (update.effective_message or update.message).reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception as send_err:
+                        if "can't parse entities" in str(send_err).lower() or "parse" in str(send_err).lower():
+                            await (update.effective_message or update.message).reply_text(text=msg, parse_mode=None, reply_markup=keyboard)
+                        else:
+                            raise send_err
             except Exception as e:
                 err_txt = f"⚠️ Error generating report: {e}"
                 if update.callback_query:
