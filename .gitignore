@@ -31,3 +31,5 @@ ico_silent_logs.txt
 /*.keras
 /*.h5
 
+# Scratch scripts & temporary tests
+scratch/

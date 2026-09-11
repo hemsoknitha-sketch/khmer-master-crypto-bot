@@ -46,11 +46,13 @@ def is_symbol_in_cooldown(symbol: str) -> bool:
 def is_close_successful(res) -> bool:
     if not res or not isinstance(res, dict):
         return False
+    if res.get("closed") is False or res.get("status") == "error":
+        return False
     if res.get("status") in ["success", "NEW", "FILLED"] or res.get("closed") is True:
         return True
     if res.get("orderId") or (isinstance(res.get("res"), dict) and res["res"].get("orderId")):
         return True
-    if res.get("message") == "No open position found":
+    if res.get("message") == "No open position found" and res.get("status") == "success":
         return True
     return False
 _monitoring_cache = set()
@@ -179,9 +181,9 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 "CHIPUSDT", "METAUSDT", "AAOIUSDT", "MRVLUSDT", "CRWVUSDT", "ZAMAUSDT", "PLTRUSDT", "TSMUSDT", "AMDUSDT", 
                 "TQQQUSDT", "SQQQUSDT", "ARMUSDT", "TSLAUSDT", "NATGASUSDT", "INXUSDT", "AMZNUSDT", "AAPLUSDT", "MSFTUSDT", 
                 "NVDAUSDT", "MSTRUSDT", "BABAUSDT", "ROBOUSDT", "NBISUSDT", "SHAZUSDT", "KORUUSDT", "DRAMUSDT", "SNXXUSDT", 
-                "MUUUSDT", "BEUSDT", "SKHYUSDT", "SKHYNIXUSDT", "SAMSUNGUSDT", "WDCUSDT", "ORCLUSDT", "AIAUSDT", "MUBARAKUSDT", 
+                "MUUUSDT", "MUUSDT", "BEUSDT", "SKHYUSDT", "SKHYNIXUSDT", "SAMSUNGUSDT", "WDCUSDT", "ORCLUSDT", "AIAUSDT", "MUBARAKUSDT", 
                 "HYPEUSDT", "LITEUSDT", "DEXEUSDT", "BZUSDT", "CLUSDT", "XAUUSDT", "XAGUSDT", "TRUMPUSDT", "HFTUSDT", "GWEIUSDT", 
-                "EPICUSDT", "USD1USDT"
+                "EPICUSDT", "USD1USDT", "SPCXUSDT", "OPENAIUSDT", "FIGMAUSDT", "STRIPEUSDT", "BYTEDANCEUSDT", "ANTHROPICUSDT"
             }
             EXCLUDED_SYMBOLS = TRADFI_STOCK_SYMBOLS
             monitoring_set = get_binance_monitoring_symbols()
@@ -1951,7 +1953,8 @@ async def monitor_turbo_hedge_bots(app):
                             except Exception as e:
                                 print(f"Error sending breaker notification: {e}")
 
-                    elif is_tp1_hit and scale_out_level == 0:
+                    tp1_scaled_out = False
+                    if not is_hard_circuit_breaker and is_tp1_hit and scale_out_level == 0:
                         # ⚡ TP1 MICRO-SCALP RAPID HARVESTER (50% Qty Scale-Out)
                         can_split = (notional_val * 0.50 >= 10.50) if is_spot else (notional_val * 0.50 >= 5.05)
                         if can_split:
@@ -1962,6 +1965,7 @@ async def monitor_turbo_hedge_bots(app):
                                 part_res = await asyncio.to_thread(trading_engine.close_partial_futures_position, keys[0], keys[1], symbol, 0.50)
 
                             if isinstance(part_res, dict) and part_res.get("status") == "success":
+                                tp1_scaled_out = True
                                 db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "1")
                                 partial_pnl = net_pnl_usdt * 0.50
                                 tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
@@ -1988,8 +1992,10 @@ async def monitor_turbo_hedge_bots(app):
                                     except Exception as e:
                                         print(f"Error sending TP1 notification: {e}")
                                 continue
-                        else:
-                            # Notional too small to split into 50% (< $5.05 min notional) -> Harvest 100% full profit at TP1
+
+                        # If cannot split or partial scale-out unconfirmed, escalate to 100% full profit harvest immediately!
+                        if not tp1_scaled_out:
+                            print(f"🚀 [TP1 HARVEST ESCALATION] {symbol}: Cannot split or partial close unconfirmed -> Escalating to 100% full profit harvest!")
                             is_tp_harvested = True
 
                     elif is_breakeven_triggered or is_tp_harvested or is_peak_locked:

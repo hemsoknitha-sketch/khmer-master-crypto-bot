@@ -1549,20 +1549,44 @@ def close_all_futures_positions(api_key: str, api_secret: str) -> dict:
                         close_side = "SELL" if amt > 0 else "BUY"
                         abs_qty = abs(amt)
 
-                        # Market close position
+                        pos_side = pos.get("positionSide")
+                        if not pos_side or pos_side == "BOTH":
+                            if is_hedge_mode(api_key, api_secret):
+                                pos_side = "LONG" if amt > 0 else "SHORT"
+
+                        # Market close position with Hedge Mode & reduceOnly safety
                         endpoint_order = "/fapi/v1/order"
                         timestamp_ord = (int(time.time() * 1000) + TIME_OFFSET)
-                        payload = urlencode({
+                        ord_params = {
                             "symbol": sym,
                             "side": close_side,
                             "type": "MARKET",
                             "quantity": abs_qty,
-                            "reduceOnly": "true",
                             "recvWindow": 60000,
                             "timestamp": timestamp_ord
-                        })
+                        }
+                        if pos_side in ["LONG", "SHORT"]:
+                            ord_params["positionSide"] = pos_side
+                        else:
+                            ord_params["reduceOnly"] = "true"
+
+                        payload = urlencode(ord_params)
                         sig_ord = generate_signature(api_secret, payload)
                         ord_res = requests.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
+
+                        # Auto-Recovery from -4061 (Position side mismatch)
+                        if "-4061" in ord_res.text:
+                            ord_params["positionSide"] = "LONG" if close_side == "SELL" else "SHORT"
+                            ord_params.pop("reduceOnly", None)
+                            payload2 = urlencode(ord_params)
+                            sig_ord2 = generate_signature(api_secret, payload2)
+                            ord_res = requests.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
+                        elif "-1106" in ord_res.text:
+                            ord_params.pop("reduceOnly", None)
+                            payload2 = urlencode(ord_params)
+                            sig_ord2 = generate_signature(api_secret, payload2)
+                            ord_res = requests.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
+
                         if ord_res.status_code == 200:
                             closed_count += 1
                             print(f"🛑 [EMERGENCY CLOSE SUCCESS] Closed Futures Position for {sym}: {close_side} {abs_qty}")
@@ -1574,6 +1598,7 @@ def close_all_futures_positions(api_key: str, api_secret: str) -> dict:
 def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str) -> dict:
     """
     Emergency Close: Market-closes active futures position for a specific symbol on Binance.
+    Full support for Hedge Mode, Dual-Side Position, LOT_SIZE formatting, and Auto-Recovery.
     """
     if not api_key or not api_secret:
         return {"status": "error", "closed": False, "error": "No API keys provided"}
@@ -1590,6 +1615,8 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
         headers = {"X-MBX-APIKEY": api_key}
         res = HFT_SESSION.get(f"{FUTURES_URL}{endpoint_pos}?{params_pos}&signature={sig_pos}", headers=headers, timeout=5)
 
+        found_active_pos = False
+        last_close_err = ""
         if res.status_code == 200:
             positions = res.json()
             if isinstance(positions, list):
@@ -1597,39 +1624,69 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                     if pos.get("symbol") == symbol:
                         amt = float(pos.get("positionAmt", 0))
                         if amt != 0:
+                            found_active_pos = True
                             close_side = "SELL" if amt > 0 else "BUY"
-                            # Formatted quantity withLOT_SIZE precision handling
+                            # Formatted quantity with LOT_SIZE precision handling
                             abs_qty = get_futures_max_sellable_qty(symbol, abs(amt))
                             if abs_qty <= 0:
                                 abs_qty = abs(amt)
 
+                            pos_side = pos.get("positionSide")
+                            if not pos_side or pos_side == "BOTH":
+                                if is_hedge_mode(api_key, api_secret):
+                                    pos_side = "LONG" if amt > 0 else "SHORT"
+
                             endpoint_order = "/fapi/v1/order"
                             timestamp_ord = (int(time.time() * 1000) + TIME_OFFSET)
-                            payload = urlencode({
+                            ord_params = {
                                 "symbol": symbol,
                                 "side": close_side,
                                 "type": "MARKET",
                                 "quantity": abs_qty,
-                                "reduceOnly": "true",
                                 "recvWindow": 60000,
                                 "timestamp": timestamp_ord
-                            })
+                            }
+                            if pos_side in ["LONG", "SHORT"]:
+                                ord_params["positionSide"] = pos_side
+                            else:
+                                ord_params["reduceOnly"] = "true"
+
+                            payload = urlencode(ord_params)
                             sig_ord = generate_signature(api_secret, payload)
                             ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
+                            
+                            # Auto-Recovery from -4061 (Position side mismatch)
+                            if "-4061" in ord_res.text:
+                                retry_side = "LONG" if close_side == "SELL" else "SHORT"
+                                ord_params["positionSide"] = retry_side
+                                ord_params.pop("reduceOnly", None)
+                                payload = urlencode(ord_params)
+                                sig_ord = generate_signature(api_secret, payload)
+                                ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
+                            elif "-1106" in ord_res.text:
+                                ord_params.pop("reduceOnly", None)
+                                payload = urlencode(ord_params)
+                                sig_ord = generate_signature(api_secret, payload)
+                                ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
+
                             if ord_res.status_code == 200:
                                 print(f"🚀 [BINANCE MARKET CLOSE SUCCESS (<20ms)] {symbol} {close_side} Qty: {abs_qty} -> OrderId: {ord_res.json().get('orderId')}")
                                 return {"status": "success", "closed": True, "res": ord_res.json()}
                             
                             # Fallback 1: Try closePosition=true (Binance 100% full-position close bypass)
                             timestamp_ord2 = (int(time.time() * 1000) + TIME_OFFSET)
-                            payload2 = urlencode({
+                            ord_params2 = {
                                 "symbol": symbol,
                                 "side": close_side,
                                 "type": "MARKET",
                                 "closePosition": "true",
                                 "recvWindow": 60000,
                                 "timestamp": timestamp_ord2
-                            })
+                            }
+                            if pos_side in ["LONG", "SHORT"]:
+                                ord_params2["positionSide"] = pos_side
+
+                            payload2 = urlencode(ord_params2)
                             sig_ord2 = generate_signature(api_secret, payload2)
                             ord_res2 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
                             if ord_res2.status_code == 200:
@@ -1640,22 +1697,32 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                             fallback_qty = float(int(abs_qty))
                             if fallback_qty > 0:
                                 timestamp_ord3 = (int(time.time() * 1000) + TIME_OFFSET)
-                                payload3 = urlencode({
+                                ord_params3 = {
                                     "symbol": symbol,
                                     "side": close_side,
                                     "type": "MARKET",
                                     "quantity": fallback_qty,
-                                    "reduceOnly": "true",
                                     "recvWindow": 60000,
                                     "timestamp": timestamp_ord3
-                                })
+                                }
+                                if pos_side in ["LONG", "SHORT"]:
+                                    ord_params3["positionSide"] = pos_side
+                                else:
+                                    ord_params3["reduceOnly"] = "true"
+
+                                payload3 = urlencode(ord_params3)
                                 sig_ord3 = generate_signature(api_secret, payload3)
                                 ord_res3 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload3}&signature={sig_ord3}", headers=headers, timeout=5)
                                 if ord_res3.status_code == 200:
                                     print(f"🚀 [BINANCE MARKET CLOSE INTEGER FALLBACK SUCCESS (<20ms)] {symbol} {close_side} Qty: {fallback_qty} -> OrderId: {ord_res3.json().get('orderId')}")
                                     return {"status": "success", "closed": True, "res": ord_res3.json()}
 
+                            last_close_err = ord_res.text
                             print(f"⚠️ [BINANCE MARKET CLOSE FAIL] {symbol}: {ord_res.text}")
+
+        # If an active futures position was found but close failed, report error (never falsely claim 'No open position')
+        if found_active_pos:
+            return {"status": "error", "closed": False, "error": f"Active position found for {symbol} but market close failed: {last_close_err}"}
 
         # Fallback 3: If no Futures position found, check and execute Spot Market SELL for 100% full spot position
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
@@ -1736,14 +1803,23 @@ def close_partial_futures_position(api_key: str, api_secret: str, symbol: str, r
                             else:
                                 ord_params["positionSide"] = pos_side_setting
 
+                            if ord_params.get("positionSide") in ["LONG", "SHORT"]:
+                                ord_params.pop("reduceOnly", None)
+
                             payload = urlencode(ord_params)
                             sig_ord = generate_signature(api_secret, payload)
                             ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
 
-                            # Auto-Recovery from -4061
+                            # Auto-Recovery from -4061 (Position side mismatch)
                             if "-4061" in ord_res.text:
                                 retry_side = "LONG" if close_side == "SELL" else "SHORT"
                                 ord_params["positionSide"] = retry_side
+                                ord_params.pop("reduceOnly", None)
+                                payload2 = urlencode(ord_params)
+                                sig_ord2 = generate_signature(api_secret, payload2)
+                                ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
+                            elif "-1106" in ord_res.text:
+                                ord_params.pop("reduceOnly", None)
                                 payload2 = urlencode(ord_params)
                                 sig_ord2 = generate_signature(api_secret, payload2)
                                 ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
@@ -1989,6 +2065,11 @@ def set_futures_margin_type(api_key: str, api_secret: str, symbol: str, margin_t
     global _MARGIN_TYPE_CACHE
     if not api_key or not api_secret:
         return {"status": "error", "error": "No API keys provided"}
+
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+
     cache_key = f"{api_key[-6:]}_{symbol}_{margin_type}"
     if cache_key in _MARGIN_TYPE_CACHE:
         return {"status": "success", "marginType": margin_type, "cached": True}
@@ -2002,8 +2083,10 @@ def set_futures_margin_type(api_key: str, api_secret: str, symbol: str, margin_t
         if res.status_code == 200 or "-4046" in res.text: # -4046: No need to change margin type
             _MARGIN_TYPE_CACHE.add(cache_key)
             return {"status": "success", "marginType": margin_type}
-    except Exception:
-        pass
+        else:
+            print(f"⚠️ [BINANCE MARGIN TYPE] Setting {symbol} to {margin_type} note: {res.text}")
+    except Exception as e:
+        print(f"Error setting margin type: {e}")
     return {"status": "skipped"}
 
 _SET_LEVERAGE_CACHE = {}
@@ -2017,12 +2100,12 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
     if not api_key or not api_secret:
         return {"status": "error", "error": "No API keys provided"}
 
-    ensure_oneway_position_mode(api_key, api_secret)
-    set_futures_margin_type(api_key, api_secret, symbol, "ISOLATED")
-
     symbol = symbol.upper().strip()
     if not symbol.endswith("USDT"):
         symbol += "USDT"
+
+    ensure_oneway_position_mode(api_key, api_secret)
+    set_futures_margin_type(api_key, api_secret, symbol, "ISOLATED")
 
     max_allowed = get_futures_max_leverage(api_key, api_secret, symbol)
     target_leverage = min(leverage, max_allowed)
