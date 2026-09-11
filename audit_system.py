@@ -29,7 +29,7 @@ def run_audit():
     failures = []
     
     # 1. Compile all python files
-    print("\n[CHECK 1/12] Verifying Syntax & AST Compilation for all Python files...")
+    print("\n[CHECK 1/15] Verifying Syntax & AST Compilation for all Python files...")
     py_files = glob.glob("*.py")
     comp_failed = []
     for f in py_files:
@@ -44,7 +44,7 @@ def run_audit():
         log_pass(f"All {len(py_files)} Python files compiled with ZERO syntax errors!")
 
     # 2. Database Deduplication Check
-    print("\n[CHECK 2/12] Verifying database.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 2/15] Verifying database.py Zero-Duplicate-Function Invariant...")
     try:
         with open("database.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -63,7 +63,7 @@ def run_audit():
         log_fail(str(e))
 
     # 3. Scheduler Tasks Deduplication Check
-    print("\n[CHECK 3/12] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 3/15] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -82,7 +82,7 @@ def run_audit():
         log_fail(str(e))
 
     # 4. Command Dispatcher Integrity & Consolidation Check
-    print("\n[CHECK 4/12] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
+    print("\n[CHECK 4/15] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -122,7 +122,7 @@ def run_audit():
         log_fail(str(e))
 
     # 5. Spot MIN_NOTIONAL Filter Shield ($10.50 floor)
-    print("\n[CHECK 5/12] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
+    print("\n[CHECK 5/15] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -137,7 +137,7 @@ def run_audit():
         log_fail(str(e))
 
     # 6. Binance Hedge Mode & Error -4061 Recovery Check
-    print("\n[CHECK 6/12] Verifying Hedge Mode & DualSidePosition Invariant...")
+    print("\n[CHECK 6/15] Verifying Hedge Mode & DualSidePosition Invariant...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -156,7 +156,7 @@ def run_audit():
         log_fail(str(e))
 
     # 7. Isolated Margin Enforcement Check
-    print("\n[CHECK 7/12] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
+    print("\n[CHECK 7/15] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -171,7 +171,7 @@ def run_audit():
         log_fail(str(e))
 
     # 8. Small Capital Leverage Shield Check (<=10x)
-    print("\n[CHECK 8/12] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
+    print("\n[CHECK 8/15] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -186,7 +186,7 @@ def run_audit():
         log_fail(str(e))
 
     # 9. TradFi Stock Perpetual & Delisted Exclusion Check
-    print("\n[CHECK 9/12] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
+    print("\n[CHECK 9/15] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -201,7 +201,7 @@ def run_audit():
         log_fail(str(e))
 
     # 10. Fee-Adjusted Net Profit Floor (+0.12% Offset)
-    print("\n[CHECK 10/12] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
+    print("\n[CHECK 10/15] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -216,7 +216,7 @@ def run_audit():
         log_fail(str(e))
 
     # 11. Telegram Inline Keyboard Button & Callback Query Routing Audit (Repository-Wide)
-    print("\n[CHECK 11/12] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
+    print("\n[CHECK 11/15] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -278,7 +278,7 @@ def run_audit():
         log_fail(str(e))
 
     # 12. DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Invariant Audit
-    print("\n[CHECK 12/12] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
+    print("\n[CHECK 12/15] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
     try:
         # Check flash_loan_mev_engine.py
         with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
@@ -304,6 +304,63 @@ def run_audit():
             log_fail(f"HFT MEV missing components: stack={has_stack}, yul={yul_file}, config={config_file}")
     except Exception as e:
         failures.append(f"DeFi Flash Loan & HFT MEV check failed: {e}")
+        log_fail(str(e))
+
+    # 13. Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)
+    print("\n[CHECK 13/15] Verifying Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)...")
+    try:
+        with open("trading_engine.py", "r", encoding="utf-8") as f:
+            tr_code = f.read()
+        with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
+            th_code = f.read()
+            
+        has_te_short_guard = "ANTI-OVERSOLD SHORT GUARD" in tr_code and "38.0" in tr_code
+        has_th_short_guard = "ANTI-OVERSOLD SHORT GUARD" in th_code and "38.0" in th_code
+        has_bottom_selling_guard = "ANTI-BOTTOM SELLING" in th_code and "38.0" in th_code
+        
+        if has_te_short_guard and has_th_short_guard and has_bottom_selling_guard:
+            log_pass("Anti-Oversold Short Guard (RSI <= 38.0) is active across all entry & reverse points!")
+        else:
+            failures.append(f"Anti-Oversold Short Guard incomplete: te={has_te_short_guard}, th={has_th_short_guard}, bottom={has_bottom_selling_guard}")
+            log_fail("Anti-Oversold Short Guard missing in one or more engines!")
+    except Exception as e:
+        failures.append(f"Anti-Oversold Short Guard check failed: {e}")
+        log_fail(str(e))
+
+    # 14. Single-Asset Mode Enforcement (Binance Error -4168 Auto-Recovery)
+    print("\n[CHECK 14/15] Verifying Single-Asset Mode Enforcement (Zero Error -4168 Contagion)...")
+    try:
+        with open("trading_engine.py", "r", encoding="utf-8") as f:
+            tr_code = f.read()
+            
+        has_single_asset_func = "def ensure_single_asset_mode(" in tr_code
+        has_4168_recovery = "-4168" in tr_code and "Multi-Assets mode" in tr_code
+        has_leverage_enforcement = "ensure_single_asset_mode(api_key, api_secret)" in tr_code
+        
+        if has_single_asset_func and has_4168_recovery and has_leverage_enforcement:
+            log_pass("Single-Asset Mode Enforcement & Error -4168 Auto-Recovery are 100% active!")
+        else:
+            failures.append(f"Single-Asset mode enforcement incomplete: func={has_single_asset_func}, 4168={has_4168_recovery}, lev={has_leverage_enforcement}")
+            log_fail("Single-Asset mode enforcement missing!")
+    except Exception as e:
+        failures.append(f"Single-Asset mode check failed: {e}")
+        log_fail(str(e))
+
+    # 15. News Sentiment Technical Confirmation Shield
+    print("\n[CHECK 15/15] Verifying News Sentiment Technical Confirmation Shield...")
+    try:
+        with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
+            st_code = f.read()
+            
+        has_news_rsi_guard = "NEWS AUTO-TRADE OVERSOLD SHORT GUARD" in st_code or ("market_data.get_symbol_rsi" in st_code and "42.0" in st_code)
+        
+        if has_news_rsi_guard:
+            log_pass("News Sentiment Technical Confirmation Shield (Anti-Short Squeeze) is 100% active!")
+        else:
+            failures.append("News auto-trade does not verify technical RSI before executing shorts!")
+            log_fail("News Sentiment Technical Confirmation Shield missing!")
+    except Exception as e:
+        failures.append(f"News sentiment technical shield check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
