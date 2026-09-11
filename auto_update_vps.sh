@@ -18,6 +18,11 @@ else
     cd "$(dirname "$0")"
 fi
 
+# Auto-fix permissions if root previously owned some objects
+if [ -d ".git" ] && [ "$(id -u)" -ne 0 ]; then
+    sudo chown -R "$USER:$USER" . 2>/dev/null || true
+fi
+
 echo "🔍 [GCP VPS AUTO-UPDATE] Checking for new code commits on GitHub..."
 git fetch origin main >/dev/null 2>&1
 
