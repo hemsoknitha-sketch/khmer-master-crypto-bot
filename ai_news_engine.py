@@ -19,21 +19,25 @@ HEADERS = {
     "Cache-Control": "no-cache"
 }
 
+from ui_standards import DIVIDER_HEAVY
+
 BULLISH_KEYWORDS = [
-    "inflow", "inflows", "surge", "surges", "soar", "soars", "jump", "jumps", 
-    "rally", "rallies", "record", "high", "highs", "strongest", "bull", "bullish", 
-    "breakout", "accumulate", "accumulation", "accumulating", "buying", "adopt", 
-    "adoption", "approve", "approval", "gain", "gains", "pump", "boost", "boosts", 
-    "institutional", "expansion", "rebound", "rebounds", "recover", "recovery", 
-    "all-time high", "ath", "green", "milestone", "upgrade", "partnership"
+    "inflow", "inflows", "record inflow", "approve", "approved", "approval", "greenlight", "launch", "launched", 
+    "debut", "debuts", "expand", "expansion", "partnership", "soar", "soars", "surge", "surges", "jump", "jumps", 
+    "rally", "rallies", "record", "high", "highs", "strongest", "bull", "bullish", "all-time high", "ath", 
+    "breakout", "accumulate", "accumulation", "accumulating", "buying", "buyback", "adopt", "adoption", 
+    "rebound", "rebounds", "recover", "recovery", "treasury reserve", "milestone", "gain", "gains", "pump", "boost"
 ]
 BEARISH_KEYWORDS = [
-    "outflow", "outflows", "crash", "crashes", "dump", "dumps", "plunge", "plunges", 
-    "hack", "hacked", "exploit", "exploited", "ban", "banned", "lawsuit", "sue", 
-    "sued", "fraud", "scam", "bankrupt", "bankruptcy", "liquidation", "liquidated", 
-    "collapse", "collapses", "bear", "bearish", "drop", "drops", "fall", "falls", 
-    "crackdown", "panic", "selloff", "bleeding", "investigation", "penalty", "fine",
-    "decline", "warn", "threat"
+    "put down", "shut down", "shutdown", "close", "closing", "liquidate", "liquidating", "liquidation",
+    "terminate", "terminating", "termination", "delist", "delisting", "withdraw", "withdrawing", "withdrawn",
+    "reject", "rejection", "deny", "denial", "payout", "payouts", "unwind", "redeem", "redemption",
+    "fail", "failure", "failed", "cancel", "cancelled", "halt", "halted", "drop etf", "abandon", "abandoned",
+    "low net assets", "illiquid", "insolvent", "insolvency", "bankrupt", "bankruptcy", "outflow", "outflows",
+    "dump", "dumps", "crash", "crashes", "plunge", "plunges", "bleeding", "collapse", "collapses",
+    "investigation", "subpoena", "lawsuit", "sue", "sued", "fraud", "scam", "hack", "hacked", "exploit",
+    "exploited", "fine", "penalty", "crackdown", "ban", "banned", "bear", "bearish", "selloff", "panic",
+    "drop", "drops", "fall", "falls", "decline", "declines", "threat", "risk off", "de-risk"
 ]
 
 class NewsReportResult(str):
@@ -48,7 +52,23 @@ class NewsReportResult(str):
 
 def evaluate_headline_sentiment(title: str) -> str:
     title_lower = title.lower()
-    bull_count = sum(1 for kw in BULLISH_KEYWORDS if kw in title_lower)
+    
+    # Check critical bearish triggers
+    critical_bearish = ["put down", "shut down", "closing", "liquidat", "delist", "terminate", "reject", "deny", "bankrupt"]
+    for cb in critical_bearish:
+        if cb in title_lower:
+            return "BEARISH"
+
+    negation_patterns = [r'\b(?:not|did not|no|failed to|unable to|loss of|lack of|without|cannot|less than)\b[^\.\,\;\!\?]{0,40}\b']
+    bull_count = 0
+    for kw in BULLISH_KEYWORDS:
+        if kw in title_lower:
+            negated = any(re.search(neg + re.escape(kw), title_lower) for neg in negation_patterns)
+            if not negated:
+                bull_count += 1
+            else:
+                return "BEARISH"
+
     bear_count = sum(1 for kw in BEARISH_KEYWORDS if kw in title_lower)
 
     if bull_count > bear_count:
@@ -287,14 +307,14 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
                 f"3. For Khmer language, include standard English technical terms in parentheses (e.g., សាច់ប្រាក់ងាយស្រួល (Liquidity), លំហូរទុនស្ថាប័ន (Institutional Inflows)). Paragraph 1 must begin directly with the dateline location (e.g. 'ទីក្រុងញូវយ៉ក ៖'). Paragraph 3 must end with '៕'.\n"
                 f"4. Format the final output strictly as follows:\n\n"
                 f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
-                f"═══════════════════════════════\n\n"
+                f"{DIVIDER_HEAVY}\n\n"
                 f"🔥 **TOP BREAKING HEADLINES:**\n"
                 f"1. 🟢 [ Translated Title 1 ](URL)\n"
                 f"2. 🔴 [ Translated Title 2 ](URL)\n\n"
                 f"[Full Narrative Paragraph 1: Executive Event Context & Dateline City]\n\n"
                 f"[Full Narrative Paragraph 2: Quantitative & Macro Liquidity Evidence Synthesis]\n\n"
                 f"[Full Narrative Paragraph 3: Regulatory Compliance & Systemic Stability Outlook ending with ៕]\n\n"
-                f"═══════════════════════════════\n"
+                f"{DIVIDER_HEAVY}\n"
                 f"📊 **INSTITUTIONAL VERDICT**\n"
                 f"• Target Asset ៖ {sym_str or 'GLOBAL CRYPTO MARKET'}\n"
                 f"• Sentiment Index ៖ {sentiment_badge}\n"
@@ -312,10 +332,14 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             print(f"⚠️ [NEWS AI TRANSLATION FALLBACK]: {e}")
 
     # Fallback 3-Paragraph Journalistic News
+    strat_stance_en = "Institutional de-risking and distribution. Pause spot accumulation or deploy Short/Hedge protection." if is_bearish else "Controlled institutional accumulation with strong spot bid depth."
+    strat_stance_zh = "机构资金避险减仓，主流资金回撤防守。建议暂停盲目抄底，采取 Short/Hedge 对冲防线。" if is_bearish else "受控机构吸筹，现货支撑买盘强劲。"
+    strat_stance_km = "សម្ពាធលក់កាត់បន្ថយហានិភ័យ (Institutional De-risking) ពីស្ថាប័នធំៗ។ ផ្អាកការទិញសន្សំ ឬការពារហានិភ័យតាមយុទ្ធសាស្ត្រ Short/Hedge!" if is_bearish else "លំហូរសាច់ប្រាក់ពីវិនិយោគិនធំៗ (Institutional Inflows) កំពុងជំរុញឱ្យមាន Momentum ឡើងលើប្រកបដោយស្ថិរភាព។"
+
     if user_lang == 'en':
         msg = (
             f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
-            "═══════════════════════════════\n\n"
+            f"{DIVIDER_HEAVY}\n\n"
             "🔥 **TOP BREAKING HEADLINES:**\n"
         )
         for idx, item in enumerate(news_list, 1):
@@ -326,18 +350,18 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             f"\nNEW YORK — Global institutional orderflow signals controlled accumulation across primary digital asset markets. Key moving average supports have absorbed spot selling, reflecting persistent long-term capital commitments from tier-1 liquidity providers.\n\n"
             "Recent macroeconomic data indicates tightening credit conditions in traditional risk assets, while major layer-1 protocols absorb steady institutional inflows. On-chain metrics reveal exchange reserves hitting multi-month lows, confirming sustained whale accumulation into cold storage custody solutions.\n\n"
             "From a regulatory governance perspective, international supervisory authorities are formalizing compliance standards to ensure systemic market integrity. These frameworks provide institutional participants with the legal certainty required for durable capital deployment across volatile market cycles.\n\n"
-            "═══════════════════════════════\n"
+            f"{DIVIDER_HEAVY}\n"
             "📊 **INSTITUTIONAL VERDICT**\n"
             f"• **Target Asset**: `{sym_str or 'GLOBAL CRYPTO MARKET'}`\n"
             f"• **AGI Sentiment Index**: `{sentiment_badge}`\n"
             f"• **Confidence Score**: `{min(98.5, max(82.0, score + 20)):.1f}%` Win Rate Probability\n"
-            f"• **Strategic Stance**: Controlled institutional accumulation with strong spot bid depth.\n\n"
+            f"• **Strategic Stance**: {strat_stance_en}\n\n"
             f"👉 **Recommended Execution ៖** `` `/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 <PIN>` ``"
         )
     elif user_lang == 'zh':
         msg = (
             f"📰 **APEX SUPER AGI v13.00 | 全球加密新闻雷达{sym_title}** 🌐\n"
-            "═══════════════════════════════\n\n"
+            f"{DIVIDER_HEAVY}\n\n"
             "🔥 **最新突发新闻头条：**\n"
         )
         for idx, item in enumerate(news_list, 1):
@@ -348,18 +372,18 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             f"\n纽约讯 — 全球机构资金流向显示在关键均线支撑位存在强劲买盘，主流数字资产市场处于受控吸筹阶段。一级流动性提供商持续吸纳现货抛压，展现出坚实的长期资本配置意愿。\n\n"
             "近期宏观经济数据显示传统风险资产流动性紧缩，而核心 Layer-1 公链生态持续吸引 ETF 与结构化资本稳定流入。链上深度指标显示各大交易所储备金降至数月低位，证实巨鲸正在加速向冷钱包托管系统归集资产。\n\n"
             "在合规与风险防范层面，国际监管机构正进一步完善反洗钱与客户资产隔离制度，旨在巩固金融系统整体稳定性，并为机构级投资者参与加密市场提供更加明晰的法律与制度保障。\n\n"
-            "═══════════════════════════════\n"
+            f"{DIVIDER_HEAVY}\n"
             "📊 **机构最终裁决 (INSTITUTIONAL VERDICT)**\n"
             f"• **目标资产**: `{sym_str or '全球加密货币市场'}`\n"
             f"• **AGI 情绪指数**: `{sentiment_badge}`\n"
             f"• **AI 胜率置信度**: `{min(98.5, max(82.0, score + 20)):.1f}%`\n"
-            f"• **战略立场**: 受控机构吸筹，现货支撑买盘强劲。\n\n"
+            f"• **战略立场**: {strat_stance_zh}\n\n"
             f"👉 **推荐一键执行 ៖** `` `/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 <PIN>` ``"
         )
     else:
         msg = (
             f"📰 **APEX SUPER AGI v13.00 | GLOBAL NEWS RADAR{sym_title}** 🌐\n"
-            "═══════════════════════════════\n\n"
+            f"{DIVIDER_HEAVY}\n\n"
             "🔥 **ព័ត៌មានក្តៅៗចុងក្រោយ (TOP BREAKING HEADLINES) ៖**\n"
         )
         for idx, item in enumerate(news_list, 1):
@@ -370,12 +394,12 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
             f"\nទីក្រុងញូវយ៉ក ៖ យោងតាមទិន្នន័យចុងក្រោយនៃទីផ្សារទ្រព្យឌីជីថលសកល ការវិភាគបរិមាណវិស័យទៅលើ «{sym_str or 'GLOBAL CRYPTO MARKET'}» បានបង្ហាញពីសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងរឹងមាំ ខណៈដែលលំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) កំពុងជំរុញឱ្យមានរលកទិញសន្សំទ្រង់ទ្រាយធំប្រកបដោយស្ថិរភាព។\n\n"
             "ទិន្នន័យម៉ាក្រូសេដ្ឋកិច្ច និងសៀវភៅបញ្ជាទិញ (Order Book Depth) បង្ហាញថា ទីផ្សារ Risk-On កំពុងស្រូបយកទុនយ៉ាងច្រើន ខណៈដែលស្ថាប័នគ្រប់គ្រងមូលនិធិធំៗបន្តបង្កើនការទិញសន្សំ (Whale Accumulation) ចូលទៅកាន់ Cold Storage យ៉ាងគំហុក ដែលកាត់បន្ថយសម្ពាធផ្គត់ផ្គង់នៅលើផ្សារជួញដូរធំៗ (Exchange Reserves) ដល់កម្រិតទាបបំផុតជាប្រវត្តិសាស្ត្រ។\n\n"
             "ទាក់ទងនឹងទិដ្ឋភាពច្បាប់ និងការការពារហានិភ័យ និយ័តករអន្តរជាតិកំពុងពង្រឹងក្របខ័ណ្ឌអនុលោមភាព (Regulatory Compliance) ដើម្បីធានាបាននូវស្ថិរភាពប្រព័ន្ធហិរញ្ញវត្ថុជារួម (Systemic Stability) ដែលផ្តល់នូវទំនុកចិត្តយ៉ាងរឹងមាំសម្រាប់វិនិយោគិនក្នុងការចូលរួមចំណែកក្នុងទីផ្សាររយៈពេលវែង៕\n\n"
-            "═══════════════════════════════\n"
+            f"{DIVIDER_HEAVY}\n"
             "📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
             f"• **ទ្រព្យសកម្មគោលដៅ** ៖ `{sym_str or 'GLOBAL CRYPTO MARKET'}`\n"
             f"• **សន្ទស្សន៍ព័ត៌មាន AGI** ៖ `{sentiment_badge}`\n"
             f"• **អត្រាជោគជ័យនៃការវិភាគ (Win Rate Confidence)** ៖ `{min(98.5, max(82.0, score + 20)):.1f}%`\n"
-            "• **ជំហរយុទ្ធសាស្ត្រ** ៖ លំហូរសាច់ប្រាក់ពីវិនិយោគិនធំៗ (Institutional Inflows) កំពុងជំរុញឱ្យមាន Momentum ឡើងលើប្រកបដោយស្ថិរភាព។\n\n"
+            f"• **ជំហរយុទ្ធសាស្ត្រ** ៖ {strat_stance_km}\n\n"
             f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Execution) ៖**\n`` `/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 <PIN>` ``"
         )
 

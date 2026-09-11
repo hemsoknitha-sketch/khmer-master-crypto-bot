@@ -4634,6 +4634,14 @@ class TelegramBotThread(BaseThread):
                 sym = data.replace("btn_alert_exec_short_", "")
                 context.args = [sym, "20", "10", "SELL", "2.5"]
                 await turbo_hedge_command(update, context)
+            elif data.startswith("btn_alert_exec_hedge_"):
+                sym = data.replace("btn_alert_exec_hedge_", "")
+                context.args = ["HEDGE", sym, "50"]
+                await turbo_hedge_command(update, context)
+            elif data.startswith("btn_alert_exec_spot_"):
+                sym = data.replace("btn_alert_exec_spot_", "")
+                context.args = ["SPOT", sym, "50"]
+                await turbo_hedge_command(update, context)
             elif data.startswith("btn_scalp_"):
                 sym = data.replace("btn_scalp_", "")
                 context.args = [sym]

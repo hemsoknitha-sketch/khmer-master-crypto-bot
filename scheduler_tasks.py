@@ -667,8 +667,12 @@ async def check_crypto_news(app: Application, ai_engine):
             
             # Dynamic Asset, Bias, and Footnote Command Calculation
             title_lower = (title + " " + description).lower()
-            target_sym = "BTCUSDT"
-            for sym, keywords in [
+            # Multi-Tier Institutional News Intelligence Evaluation (Super Fast & Super Smart)
+            t_lower = title.lower()
+            d_lower = description.lower()
+
+            # 1. Target Coin Resolution (Expanded Multi-Asset Mapping)
+            coin_map = [
                 ("BTCUSDT", ["btc", "bitcoin"]),
                 ("ETHUSDT", ["eth", "ethereum"]),
                 ("SOLUSDT", ["sol", "solana"]),
@@ -676,58 +680,211 @@ async def check_crypto_news(app: Application, ai_engine):
                 ("XRPUSDT", ["xrp", "ripple"]),
                 ("DOGEUSDT", ["doge", "dogecoin"]),
                 ("ADAUSDT", ["ada", "cardano"]),
-                ("AVAXUSDT", ["avax", "avalanche"])
-            ]:
-                if any(k in title_lower for k in keywords):
+                ("AVAXUSDT", ["avax", "avalanche"]),
+                ("SUIUSDT", ["sui"]),
+                ("PEPEUSDT", ["pepe"]),
+                ("SHIBUSDT", ["shib", "shiba"]),
+                ("LINKUSDT", ["link", "chainlink"]),
+                ("NEARUSDT", ["near"]),
+                ("APTUSDT", ["apt", "aptos"]),
+            ]
+            target_sym = "BTCUSDT"
+            for sym, keywords in coin_map:
+                if any(re.search(r'\b' + re.escape(k) + r'\b', t_lower) for k in keywords):
                     target_sym = sym
                     break
+            if target_sym == "BTCUSDT":
+                for sym, keywords in coin_map:
+                    if any(re.search(r'\b' + re.escape(k) + r'\b', d_lower) for k in keywords):
+                        target_sym = sym
+                        break
 
-            # Weighted Institutional Sentiment Evaluation (5x Headline Dominance)
-            BULLISH_KEYWORDS = [
-                "inflow", "inflows", "surge", "surges", "soar", "soars", "jump", "jumps", 
-                "rally", "rallies", "record", "high", "highs", "strongest", "bull", "bullish", 
-                "breakout", "accumulate", "accumulation", "accumulating", "buying", "adopt", 
-                "adoption", "approve", "approval", "gain", "gains", "pump", "boost", "boosts", 
-                "institutional", "expansion", "rebound", "rebounds", "recover", "recovery", 
-                "all-time high", "ath", "green", "milestone"
+            # 2. Institutional Lexical Engine with Critical Triggers & Negation Guards
+            INSTITUTIONAL_BEARISH_KEYWORDS = [
+                "put down", "shut down", "shutdown", "close", "closing", "liquidate", "liquidating", "liquidation",
+                "terminate", "terminating", "termination", "delist", "delisting", "withdraw", "withdrawing", "withdrawn",
+                "reject", "rejection", "deny", "denial", "payout", "payouts", "unwind", "redeem", "redemption",
+                "fail", "failure", "failed", "cancel", "cancelled", "halt", "halted", "drop etf", "abandon", "abandoned",
+                "low net assets", "illiquid", "insolvent", "insolvency", "bankrupt", "bankruptcy", "outflow", "outflows",
+                "dump", "dumps", "crash", "crashes", "plunge", "plunges", "bleeding", "collapse", "collapses",
+                "investigation", "subpoena", "lawsuit", "sue", "sued", "fraud", "scam", "hack", "hacked", "exploit",
+                "exploited", "fine", "penalty", "crackdown", "ban", "banned", "bear", "bearish", "selloff", "panic",
+                "drop", "drops", "fall", "falls", "decline", "declines", "threat", "risk off", "de-risk"
             ]
-            BEARISH_KEYWORDS = [
-                "outflow", "outflows", "crash", "crashes", "dump", "dumps", "plunge", "plunges", 
-                "hack", "hacked", "exploit", "exploited", "ban", "banned", "lawsuit", "sue", 
-                "sued", "fraud", "scam", "bankrupt", "bankruptcy", "liquidation", "liquidated", 
-                "collapse", "collapses", "bear", "bearish", "drop", "drops", "fall", "falls", 
-                "crackdown", "panic", "selloff", "bleeding", "investigation", "penalty", "fine"
+
+            INSTITUTIONAL_BULLISH_KEYWORDS = [
+                "inflow", "inflows", "record inflow", "approve", "approved", "approval", "greenlight", "launch", "launched",
+                "debut", "debuts", "expand", "expansion", "partnership", "soar", "soars", "surge", "surges", "jump", "jumps",
+                "rally", "rallies", "record", "high", "highs", "strongest", "bull", "bullish", "all-time high", "ath",
+                "breakout", "accumulate", "accumulation", "accumulating", "buying", "buyback", "adopt", "adoption",
+                "rebound", "rebounds", "recover", "recovery", "treasury reserve", "milestone", "gain", "gains", "pump", "boost"
             ]
-            t_lower = title.lower()
-            d_lower = description.lower()
-            bull_score = sum(5 for kw in BULLISH_KEYWORDS if kw in t_lower) + sum(1 for kw in BULLISH_KEYWORDS if kw in d_lower)
-            bear_score = sum(5 for kw in BEARISH_KEYWORDS if kw in t_lower) + sum(1 for kw in BEARISH_KEYWORDS if kw in d_lower)
-            is_bearish = bear_score > bull_score
-            trade_side = "SELL" if is_bearish else "BUY"
-            market_bias_km = "🔴 BEARISH DISTRIBUTION (លក់កាត់បន្ថយហានិភ័យ)" if is_bearish else "🟢 BULLISH ACCUMULATION (ទិញសន្សំតាមស្ថាប័ន)"
-            market_bias_en = "🔴 BEARISH DISTRIBUTION (De-risking)" if is_bearish else "🟢 BULLISH ACCUMULATION (Institutional Inflows)"
-            market_bias_zh = "🔴 看跌减仓 (规避风险)" if is_bearish else "🟢 看涨吸筹 (机构净流入)"
-            win_rate = round(min(98.8, max(85.0, score * 10 + 4.5)), 1)
-            footnote_cmd = f"/turbo_hedge {target_sym} 20 10 {trade_side} 2.5 1234"
+
+            NEGATION_PATTERNS = [
+                r'\b(?:not|did not|didn\'t|fail(?:ed)? to|unable to|no|loss of|lack of|without|cannot|less than)\b[^\.\,\;\!\?]{0,40}\b'
+            ]
+
+            critical_bearish_triggers = [
+                "put down", "shut down", "closing", "liquidat", "delist", "terminate",
+                "reject", "deny", "unwind", "subpoena", "lawsuit", "bankrupt", "low net assets"
+            ]
+            critical_bullish_triggers = [
+                "approved", "greenlight", "record inflow", "adoption", "treasury reserve", "all-time high"
+            ]
+
+            bear_score = 0
+            bull_score = 0
+
+            # Title evaluation (Heavy 15x weight)
+            for kw in INSTITUTIONAL_BEARISH_KEYWORDS:
+                if kw in t_lower:
+                    bear_score += 15 if any(ct in kw for ct in critical_bearish_triggers) else 10
+            for kw in INSTITUTIONAL_BULLISH_KEYWORDS:
+                if kw in t_lower:
+                    negated = any(re.search(neg + re.escape(kw), t_lower) for neg in NEGATION_PATTERNS)
+                    if negated:
+                        bear_score += 8
+                    else:
+                        bull_score += 15 if any(ct in kw for ct in critical_bullish_triggers) else 10
+
+            # Description evaluation (Strict Negation Guard)
+            for kw in INSTITUTIONAL_BEARISH_KEYWORDS:
+                if kw in d_lower:
+                    bear_score += 4
+            for kw in INSTITUTIONAL_BULLISH_KEYWORDS:
+                if kw in d_lower:
+                    negated = any(re.search(neg + re.escape(kw), d_lower) for neg in NEGATION_PATTERNS)
+                    if negated:
+                        bear_score += 4
+                    else:
+                        bull_score += 2
+
+            # 3. Multi-Model AI Engine Fast Classification
+            ai_bias = None
+            ai_confidence = 88.0
+            if ai_engine and hasattr(ai_engine, "analyze_opportunity"):
+                try:
+                    eval_prompt = (
+                        f"You are the Chief Risk Officer at an institutional crypto fund.\n"
+                        f"Evaluate this breaking news for quantitative trading:\n"
+                        f"HEADLINE: {title}\n"
+                        f"DETAILS: {description[:400]}\n"
+                        f"TARGET: {target_sym}\n\n"
+                        f"CRITICAL RULE: If an ETF or asset is being 'put down', closed, shut down, rejected, or liquidating, it is strongly BEARISH, NEVER bullish.\n\n"
+                        f"Reply strictly in this format:\n"
+                        f"VERDICT: [BULLISH/BEARISH/NEUTRAL]\n"
+                        f"ACTION: [BUY/SELL/HEDGE]\n"
+                        f"CONFIDENCE: [70-98]"
+                    )
+                    ai_eval_res = await asyncio.to_thread(ai_engine.analyze_opportunity, eval_prompt)
+                    v_m = re.search(r"VERDICT:\s*(BULLISH|BEARISH|NEUTRAL)", ai_eval_res, re.IGNORECASE)
+                    c_m = re.search(r"CONFIDENCE:\s*(\d+)", ai_eval_res, re.IGNORECASE)
+                    if v_m:
+                        ai_bias = v_m.group(1).upper()
+                    if c_m:
+                        ai_confidence = float(c_m.group(1))
+                except Exception as e:
+                    print(f"⚠️ [AI NEWS SENTIMENT NOTICE]: {e}")
+
+            # 4. Synthesize Multi-Model Verdict
+            if ai_bias:
+                if ai_bias == "BEARISH":
+                    sentiment = "BEARISH"
+                    trade_side = "SELL"
+                elif ai_bias == "BULLISH":
+                    if bear_score > bull_score + 10:
+                        sentiment = "BEARISH"
+                        trade_side = "SELL"
+                    else:
+                        sentiment = "BULLISH"
+                        trade_side = "BUY"
+                else:
+                    sentiment = "NEUTRAL"
+                    trade_side = "HEDGE"
+                win_rate = round(min(98.5, max(85.0, ai_confidence)), 1)
+            else:
+                if bear_score > bull_score:
+                    sentiment = "BEARISH"
+                    trade_side = "SELL"
+                    win_rate = round(min(97.5, max(88.0, 85.0 + (bear_score - bull_score) * 0.5)), 1)
+                elif bull_score > bear_score:
+                    sentiment = "BULLISH"
+                    trade_side = "BUY"
+                    win_rate = round(min(97.5, max(88.0, 85.0 + (bull_score - bear_score) * 0.5)), 1)
+                else:
+                    sentiment = "NEUTRAL"
+                    trade_side = "HEDGE"
+                    win_rate = 85.0
+
+            # 5. Market Bias Strings & Footnote Command
+            if sentiment == "BEARISH":
+                market_bias_km = "🔴 BEARISH DISTRIBUTION (ស្ថាប័នកាត់បន្ថយហានិភ័យ / បិទបញ្ចប់ ETF)"
+                market_bias_en = "🔴 BEARISH DISTRIBUTION (Institutional De-risking / ETF Closure)"
+                market_bias_zh = "🔴 机构减仓避险 (ETF清盘清算)"
+                footnote_cmd = f"/turbo_hedge {target_sym} 20 10 SELL 2.5 1234"
+            elif sentiment == "BULLISH":
+                market_bias_km = "🟢 BULLISH ACCUMULATION (ទិញសន្សំតាមស្ថាប័ន)"
+                market_bias_en = "🟢 BULLISH ACCUMULATION (Institutional Inflows)"
+                market_bias_zh = "🟢 看涨吸筹 (机构净流入)"
+                footnote_cmd = f"/turbo_hedge {target_sym} 20 10 BUY 2.5 1234"
+            else:
+                market_bias_km = "⚪ VOLATILITY EXPANSION (យុទ្ធសាស្ត្រ HEDGE ការពារហានិភ័យ 0%)"
+                market_bias_en = "⚪ VOLATILITY EXPANSION (Delta-Neutral 0% Risk Hedge)"
+                market_bias_zh = "⚪ 波动率扩张 (Delta中性对冲)"
+                footnote_cmd = f"/turbo_hedge HEDGE {target_sym} 50"
+
             source_name = get_source_name(link)
             kh_date_str = format_khmer_datetime()
 
-            print(f"News: '{title}' - Impact Score: {score}/10 | Target: {target_sym} {trade_side} | Image: {image_url}")
+            # 6. Interactive 1-Tap Action Keyboard (Invariant 11 Compliance)
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            from ui_standards import DIVIDER_HEAVY
+            sym_display = target_sym.replace("USDT", "")
+            if trade_side == "SELL":
+                news_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(f"🔻 Short {sym_display} ($20 10x)", callback_data=f"btn_alert_exec_short_{target_sym}"),
+                        InlineKeyboardButton(f"🛡️ Hedge {sym_display} (0% Risk)", callback_data=f"btn_alert_exec_hedge_{target_sym}")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                    ]
+                ])
+            elif trade_side == "BUY":
+                news_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(f"🚀 Long {sym_display} ($20 10x)", callback_data=f"btn_alert_exec_long_{target_sym}"),
+                        InlineKeyboardButton(f"🛒 Spot Buy {sym_display}", callback_data=f"btn_alert_exec_spot_{target_sym}")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                    ]
+                ])
+            else:
+                news_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(f"🛡️ Hedge {sym_display} (0% Risk)", callback_data=f"btn_alert_exec_hedge_{target_sym}"),
+                        InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
+                    ]
+                ])
+
+            print(f"News: '{title}' - Impact Score: {score}/10 | Target: {target_sym} {trade_side} ({sentiment}) | Image: {image_url}")
             if score >= 7:
-                def get_news_text(lang):
+                async def process_news_alert_and_auto_trade(chat_id, lang):
                     raw_l = str(lang or 'khmer').lower()
                     if raw_l in ['km', 'khmer']: user_l = 'khmer'
                     elif raw_l in ['zh', 'chinese', 'cn']: user_l = 'chinese'
                     else: user_l = 'english'
 
+                    # 1. Compose alert text with Invariant 13 Mobile-Fit Dividers (━━━━━━━━━━━━)
                     if user_l == 'khmer':
                         alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
-                        alert_msg += "══════════════════════════\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n"
                         alert_msg += f"📰 **{title}**\n\n"
                         alert_msg += f"🌐 **ប្រភព ៖** {source_name} | 📅 **{kh_date_str}**\n"
-                        alert_msg += "══════════════════════════\n\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n\n"
                         alert_msg += f"{texts['khmer']}\n\n"
-                        alert_msg += "══════════════════════════\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n"
                         alert_msg += "📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
                         alert_msg += f"• **ទិសដៅទីផ្សារ (Market Bias) ៖** {market_bias_km}\n"
                         alert_msg += f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{win_rate}%`\n"
@@ -738,12 +895,12 @@ async def check_crypto_news(app: Application, ai_engine):
                     elif user_l == 'chinese':
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
-                        alert_msg += "══════════════════════════\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n"
                         alert_msg += f"📰 **{title}**\n\n"
                         alert_msg += f"🌐 **来源 ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
-                        alert_msg += "══════════════════════════\n\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n\n"
                         alert_msg += f"{texts['chinese']}\n\n"
-                        alert_msg += "══════════════════════════\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n"
                         alert_msg += "📊 **机构最终裁决 (INSTITUTIONAL VERDICT) ៖**\n"
                         alert_msg += f"• **市场偏向 (Market Bias) ៖** {market_bias_zh}\n"
                         alert_msg += f"• **AI 胜率置信度 ៖** `{win_rate}%`\n"
@@ -754,12 +911,12 @@ async def check_crypto_news(app: Application, ai_engine):
                     else:
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
-                        alert_msg += "══════════════════════════\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n"
                         alert_msg += f"📰 **{title}**\n\n"
                         alert_msg += f"🌐 **Source ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
-                        alert_msg += "══════════════════════════\n\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n\n"
                         alert_msg += f"{texts['english']}\n\n"
-                        alert_msg += "══════════════════════════\n"
+                        alert_msg += f"{DIVIDER_HEAVY}\n"
                         alert_msg += "📊 **INSTITUTIONAL VERDICT ៖**\n"
                         alert_msg += f"• **Market Bias ៖** {market_bias_en}\n"
                         alert_msg += f"• **AI Confidence Win Rate ៖** `{win_rate}%`\n"
@@ -767,9 +924,66 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += "👉 **1-Tap Action Execution ៖**\n"
                         alert_msg += f"`` `{footnote_cmd}` ``\n\n"
                         alert_msg += f"🔗 [Read Full Article]({link})"
-                    return alert_msg
-                    
-                await parallel_broadcast(app, vip_users_lang, get_news_text, photo_path=image_url)
+
+                    # 2. Hands-Free 24/7 Automated Investing for Auto-Trade Users
+                    auto_trade_note = ""
+                    try:
+                        config = db.get_auto_trade_config(chat_id)
+                        if config and config.get("enabled") and score >= 8:
+                            if db.can_user_buy(chat_id):
+                                keys = db.get_user_api(chat_id)
+                                if keys:
+                                    api_key, api_secret = keys
+                                    trade_amount = float(config.get("amount", 30.0))
+                                    trailing_pct = float(config.get("trailing_pct", 2.5))
+                                    user_lev = 10 # Small capital protection clamp (Invariant 8)
+
+                                    if trade_side == "SELL":
+                                        fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
+                                        trade_amount = min(trade_amount, fut_bal)
+                                        if trade_amount >= 5.0:
+                                            res = await asyncio.to_thread(
+                                                trading_engine.place_futures_short,
+                                                api_key, api_secret, target_sym, trade_amount, user_lev
+                                            )
+                                            if res and "error" not in str(res).lower():
+                                                entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
+                                                qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
+                                                if qty > 0 and entry_price > 0:
+                                                    db.add_active_trade(chat_id, target_sym, qty, entry_price, trailing_pct)
+                                                auto_trade_note = (
+                                                    f"\n\n⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យាជួញដូរ (24/7 Auto-Pilot Executed) ៖**\n"
+                                                    f"✅ បានបើកកិច្ចសន្យា Short `{target_sym}` (${trade_amount:.2f} USDT | {user_lev}x Lev | Trailing SL {trailing_pct}%) ដោយស្វ័យប្រវត្តិតាមស្ថាប័នជោគជ័យ!"
+                                                ) if user_l == 'khmer' else (
+                                                    f"\n\n⚡ **24/7 Auto-Pilot Executed ៖**\n"
+                                                    f"✅ Automated Short `{target_sym}` (${trade_amount:.2f} | {user_lev}x Lev | {trailing_pct}% Trailing SL) triggered successfully!"
+                                                )
+                                    elif trade_side == "BUY":
+                                        trade_amount = max(10.50, trade_amount) # Spot MIN_NOTIONAL floor (Invariant 1)
+                                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
+                                        if spot_bal >= trade_amount:
+                                            res = await asyncio.to_thread(
+                                                trading_engine.place_market_buy,
+                                                api_key, api_secret, target_sym, trade_amount
+                                            )
+                                            if res and "error" not in str(res).lower():
+                                                buy_price = float(res.get("price", 0.0))
+                                                qty = float(res.get("origQty", 0.0))
+                                                if qty > 0 and buy_price > 0:
+                                                    db.add_active_trade(chat_id, target_sym, qty, buy_price, trailing_pct)
+                                                auto_trade_note = (
+                                                    f"\n\n⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យាជួញដូរ (24/7 Auto-Pilot Executed) ៖**\n"
+                                                    f"✅ បានបើកកិច្ចសន្យា Spot Buy `{target_sym}` (${trade_amount:.2f} USDT) ដោយស្វ័យប្រវត្តិតាមស្ថាប័នជោគជ័យ!"
+                                                ) if user_l == 'khmer' else (
+                                                    f"\n\n⚡ **24/7 Auto-Pilot Executed ៖**\n"
+                                                    f"✅ Automated Spot Buy `{target_sym}` (${trade_amount:.2f}) triggered successfully!"
+                                                )
+                    except Exception as e_auto:
+                        print(f"⚠️ [NEWS AUTO-TRADE NOTICE for {chat_id}]: {e_auto}")
+
+                    return alert_msg + auto_trade_note
+
+                await parallel_broadcast(app, vip_users_lang, process_news_alert_and_auto_trade, photo_path=image_url, reply_markup=news_kb)
     except Exception as e:
         print(f"Error checking crypto news: {e}")
 
