@@ -72,6 +72,7 @@ CANONICAL_ARTIFACTS = [
     "brain_config.json",
     "brain_dca.pkl",
     "brain_graph.pkl",
+    "brain_hmm_regime.pkl",
     "brain_lightgbm.pkl",
     "brain_moe_router.pkl",
     "brain_nn.keras",

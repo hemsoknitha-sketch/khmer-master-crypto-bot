@@ -1,3 +1,4 @@
+import os
 import requests
 import pandas as pd
 import numpy as np
@@ -700,24 +701,81 @@ def calculate_fibonacci_proximity(df: pd.DataFrame, window: int = 50) -> dict:
     except Exception:
         return {"fib_bias": 0.0, "in_golden_pocket": False, "fib_618": 0.0}
 
+_10_PILLAR_MODELS = None
+
+def get_10_pillar_ml_models():
+    """
+    Institutional Singleton Cache for the 10-Pillar ML Deep Ensemble:
+    - brain_scaler.pkl (Standard Normalizer)
+    - brain_xgb.pkl (XGBoost Classifier)
+    - brain_catboost.pkl (CatBoost Classifier)
+    - brain_lightgbm.pkl (LightGBM Classifier)
+    - brain_moe_router.pkl (Mixture-of-Experts Router)
+    - brain_hmm_regime.pkl (HMM Market Regime Classifier)
+    """
+    global _10_PILLAR_MODELS
+    if _10_PILLAR_MODELS is not None:
+        return _10_PILLAR_MODELS
+    try:
+        models_dir = os.path.join(os.path.dirname(__file__), "models")
+        scaler_path = os.path.join(models_dir, "brain_scaler.pkl")
+        xgb_path = os.path.join(models_dir, "brain_xgb.pkl")
+        if not (os.path.exists(scaler_path) and os.path.exists(xgb_path)):
+            return None
+
+        import joblib
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            scaler = joblib.load(scaler_path)
+            xgb = joblib.load(xgb_path)
+            cb = joblib.load(os.path.join(models_dir, "brain_catboost.pkl")) if os.path.exists(os.path.join(models_dir, "brain_catboost.pkl")) else None
+            lgb = joblib.load(os.path.join(models_dir, "brain_lightgbm.pkl")) if os.path.exists(os.path.join(models_dir, "brain_lightgbm.pkl")) else None
+            moe = joblib.load(os.path.join(models_dir, "brain_moe_router.pkl")) if os.path.exists(os.path.join(models_dir, "brain_moe_router.pkl")) else None
+            hmm = joblib.load(os.path.join(models_dir, "brain_hmm_regime.pkl")) if os.path.exists(os.path.join(models_dir, "brain_hmm_regime.pkl")) else None
+
+        _10_PILLAR_MODELS = {
+            "scaler": scaler,
+            "xgb": xgb,
+            "cb": cb,
+            "lgb": lgb,
+            "moe": moe,
+            "hmm": hmm
+        }
+        return _10_PILLAR_MODELS
+    except Exception:
+        return None
+
 def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: int = 100) -> dict:
     """
     Unified 10-Pillar Feature Extractor for /turbo_hedge and Super Smart AI Models.
-    Calculates deterministic quantitative metrics in < 15ms per candidate asset.
+    Fuses deterministic quantitative metrics with 10-Pillar ML Deep Ensemble (XGB, CatBoost, LightGBM, MoE, HMM).
     """
     symbol = str(symbol).upper().strip()
     try:
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-        res = requests.get(url, timeout=5)
-        if res.status_code != 200:
-            return {"error": f"HTTP {res.status_code}", "symbol": symbol, "confluence_score": 50.0}
+        endpoints = [
+            f"https://data-api.binance.vision/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
+            f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
+            f"https://api.binance.us/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        ]
+        df = None
+        for url in endpoints:
+            try:
+                res = requests.get(url, timeout=5)
+                if res.status_code == 200:
+                    raw = res.json()
+                    if isinstance(raw, list) and len(raw) > 0:
+                        cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume',
+                                'close_time', 'quote_vol', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore']
+                        df = pd.DataFrame(raw, columns=cols)
+                        for c in ['open', 'high', 'low', 'close', 'volume', 'taker_buy_base', 'taker_buy_quote']:
+                            df[c] = pd.to_numeric(df[c])
+                        break
+            except Exception:
+                continue
 
-        raw = res.json()
-        cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume',
-                'close_time', 'quote_vol', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore']
-        df = pd.DataFrame(raw, columns=cols)
-        for c in ['open', 'high', 'low', 'close', 'volume', 'taker_buy_base', 'taker_buy_quote']:
-            df[c] = pd.to_numeric(df[c])
+        if df is None or len(df) == 0:
+            return {"error": "Failed to fetch klines from all mirrors", "symbol": symbol, "confluence_score": 50.0}
 
         curr_price = float(df['close'].iloc[-1])
 
@@ -766,7 +824,7 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
         # 10. Fibonacci Retracement
         fib_data = calculate_fibonacci_proximity(df)
 
-        # Multi-Factor Confluence Weighted Score (0.0 to 100.0%)
+        # Vectorized Multi-Factor Technical Score (0.0 to 100.0%)
         bull_weights = (
             struct['bias'] * 20.0 +
             snr['bias'] * 10.0 +
@@ -778,8 +836,61 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
             hist_accel * 5.0 +
             fib_data['fib_bias'] * 5.0
         )
+        raw_tech_confluence = max(0.0, min(100.0, 50.0 + (bull_weights / 2.0)))
 
-        confluence_pct = max(0.0, min(100.0, 50.0 + (bull_weights / 2.0)))
+        # 🏛️ Deep ML Ensemble Inference (HMM, XGBoost, CatBoost, LightGBM, MoE Router)
+        ml_models = get_10_pillar_ml_models()
+        ml_prob = raw_tech_confluence
+        regime_name = "NEUTRAL"
+        ml_active = False
+
+        if ml_models is not None:
+            try:
+                high_20 = float(df['high'].rolling(min(20, len(df))).max().iloc[-1])
+                low_20 = float(df['low'].rolling(min(20, len(df))).min().iloc[-1])
+                dist_high = (high_20 - curr_price) / (curr_price + 1e-10)
+                dist_low = (curr_price - low_20) / (curr_price + 1e-10)
+                sweep_score = 1.0 if sweep.get('type') == 'BULLISH' else (-1.0 if sweep.get('type') == 'BEARISH' else 0.0)
+                fvg_score = 1.0 if snr.get('fvg_type') == 'BULLISH' else (-1.0 if snr.get('fvg_type') == 'BEARISH' else 0.0)
+                fib_proximity = fib_data.get('proximity_score', 0.5)
+
+                feat_vec = np.array([[
+                    ema_score,
+                    atr_val / (curr_price + 1e-10),
+                    cvd_imbalance,
+                    vwap_data.get('zscore', 0.0),
+                    rsi_val,
+                    curr_hist,
+                    hist_accel,
+                    dist_high,
+                    dist_low,
+                    sweep_score,
+                    fvg_score,
+                    fib_proximity
+                ]])
+
+                feat_scaled = ml_models['scaler'].transform(feat_vec)
+                p_xgb = ml_models['xgb'].predict_proba(feat_scaled)[0, 1] if ml_models.get('xgb') else 0.5
+                p_cb = ml_models['cb'].predict_proba(feat_scaled)[0, 1] if ml_models.get('cb') else p_xgb
+                p_lgb = ml_models['lgb'].predict_proba(feat_scaled)[0, 1] if ml_models.get('lgb') else p_xgb
+                p_moe = ml_models['moe'].predict_proba(feat_scaled)[0, 1] if ml_models.get('moe') else p_xgb
+
+                ml_prob = float((p_xgb * 0.35 + p_cb * 0.25 + p_lgb * 0.25 + p_moe * 0.15) * 100.0)
+
+                if ml_models.get('hmm'):
+                    reg_id = int(ml_models['hmm'].predict(feat_scaled[:, :4])[0])
+                    regime_map = {0: "BEARISH_REGIME", 1: "RANGE_ACCUMULATION", 2: "BULLISH_TREND"}
+                    regime_name = regime_map.get(reg_id, "NEUTRAL")
+
+                ml_active = True
+            except Exception:
+                pass
+
+        # 50/50 Institutional Confluence Fusion
+        if ml_active:
+            confluence_pct = round(0.50 * raw_tech_confluence + 0.50 * ml_prob, 1)
+        else:
+            confluence_pct = round(raw_tech_confluence, 1)
 
         return {
             "symbol": symbol,
@@ -794,8 +905,11 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
             "cvd_imbalance": float(cvd_imbalance),
             "vwap_zscore": vwap_data['zscore'],
             "fib_golden_pocket": fib_data['in_golden_pocket'],
-            "confluence_score": round(confluence_pct, 1),
-            "suggested_direction": "BUY" if confluence_pct >= 65.0 else ("SELL" if confluence_pct <= 35.0 else "HOLD"),
+            "regime": regime_name,
+            "ml_win_rate_pct": round(ml_prob, 1),
+            "ml_active": ml_active,
+            "confluence_score": confluence_pct,
+            "suggested_direction": "BUY" if confluence_pct >= 62.0 else ("SELL" if confluence_pct <= 38.0 else "HOLD"),
             "status": "success"
         }
     except Exception as e:
