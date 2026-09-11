@@ -732,6 +732,24 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                         if cvd_abs == "BULLISH_ABSORPTION" and side == "BUY":
                             confidence = min(98.0, confidence + 4.0)
 
+                    # Higher Timeframe (HTF) D1/H4 Direction Alignment Shield:
+                    d1_trend = pillar_res.get("d1_trend", "NEUTRAL")
+                    h4_trend = pillar_res.get("h4_trend", "NEUTRAL")
+                    if side == "BUY" and d1_trend == "BEARISH" and h4_trend == "BEARISH":
+                        print(f"🛑 [HTF MACRO SHIELD] {symbol}: BUY suppressed because D1 & H4 are in strong Bearish Trend!")
+                        side = "SKIP"
+                        confidence = 50.0
+                    elif side == "SELL" and d1_trend == "BULLISH" and h4_trend == "BULLISH":
+                        print(f"🛑 [HTF MACRO SHIELD] {symbol}: SELL suppressed because D1 & H4 are in strong Bullish Trend!")
+                        side = "SKIP"
+                        confidence = 50.0
+
+                    # EQH / EQL Liquidity Target Booster:
+                    if side == "BUY" and pillar_res.get("has_eqh"):
+                        confidence = min(98.0, confidence + 2.5)
+                    elif side == "SELL" and pillar_res.get("has_eql"):
+                        confidence = min(98.0, confidence + 2.5)
+
                     # ICT Session Low-Liquidity Dead Zone Protection:
                     if ict_session == "DEAD_ZONE" and side != "SKIP":
                         if confidence < 65.0:
