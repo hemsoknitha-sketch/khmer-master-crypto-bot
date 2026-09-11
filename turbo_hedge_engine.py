@@ -660,10 +660,10 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.4% above EMA5 -> Waiting for Pullback!")
-                elif side == "SELL" and (change_24h <= -20.0 or rsi14 <= 30.0):
+                elif side == "SELL" and (change_24h <= -15.0 or rsi14 <= 38.0):
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -20% or RSI {rsi14:.1f} <= 30 -> Blocked SELL!")
+                    print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -15% or RSI {rsi14:.1f} <= 38.0 -> Blocked SELL!")
                 elif side == "SELL" and not is_spot_mode and price < ema5_1m * 0.996:
                     # Price extended > 0.4% below 1m EMA5 -> Wait for Bounce Retracement!
                     side = "SKIP"
@@ -1143,6 +1143,17 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
             print(f"🛡️ [TURBO HEDGE OVERTRADE GUARD] {symbol} {side} position is already active on Binance. Skipping duplicate order stacking.")
             return {"status": "success", "message": "Position already active"}
 
+        # 🛡️ ANTI-OVERSOLD SHORT GUARD: Strictly block SELL / SHORT if 15m RSI <= 38.0
+        if side.upper() == "SELL":
+            rsi_val = market_data.get_symbol_rsi(symbol, interval="15m")
+            if rsi_val <= 38.0:
+                print(f"🛑 [ANTI-OVERSOLD SHORT GUARD] {symbol}: 15m RSI {rsi_val:.1f} <= 38.0 (Bottom Trap Zone). Aborting SHORT order!")
+                return {
+                    "status": "error",
+                    "reason": "ANTI_OVERSOLD_SHORT_GUARD",
+                    "message": f"15m RSI ({rsi_val:.1f}) is <= 38.0 (Oversold Bottom). Aborted SHORT to protect capital from short squeeze!"
+                }
+
         price = trading_engine.get_current_price(symbol)
         if price <= 0:
             url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
@@ -1249,6 +1260,18 @@ def execute_direct_reverse_flip(api_key: str, api_secret: str, symbol: str, amou
         # Check current active position quantity
         pnl_info = trading_engine.get_futures_position_pnl(api_key, api_secret, symbol)
         current_qty = abs(pnl_info.get("positionAmt", 0.0)) if pnl_info.get("has_position") else 0.0
+
+        # 🛡️ ANTI-OVERSOLD SHORT GUARD: If target_side is SELL, check 15m RSI
+        if target_side.upper() == "SELL":
+            rsi_val = market_data.get_symbol_rsi(symbol, interval="15m")
+            if rsi_val <= 38.0:
+                print(f"🛑 [ANTI-OVERSOLD SHORT GUARD] {symbol}: 15m RSI {rsi_val:.1f} <= 38.0 (Bottom Trap Zone). Closing position only; aborting reverse flip into SHORT trap!")
+                trading_engine.close_futures_position_for_symbol(api_key, api_secret, symbol)
+                return {
+                    "status": "success",
+                    "reason": "ANTI_OVERSOLD_SHORT_GUARD",
+                    "message": f"Closed position cleanly; aborted SELL flip because 15m RSI ({rsi_val:.1f}) is <= 38.0 (Oversold Bottom Trap Zone)."
+                }
 
         # Calculate new target quantity
         price = trading_engine.get_current_price(symbol)

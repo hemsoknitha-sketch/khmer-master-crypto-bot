@@ -1186,6 +1186,16 @@ def place_futures_short(api_key: str, api_secret: str, symbol: str, margin_usdt:
                 return {"error": f"Insufficient USDT Futures Balance (Available: {available_balance:.2f} USDT). Minimum required: $5.00"}
                 
     current_price = get_current_price(symbol)
+
+    # 🛡️ ANTI-OVERSOLD SHORT GUARD: If 15m RSI <= 38.0, block new SHORT (prevents selling the bottom / short squeeze trap)
+    try:
+        import market_data
+        rsi_val = market_data.get_symbol_rsi(symbol, interval="15m")
+        if rsi_val <= 38.0:
+            print(f"🛑 [ANTI-OVERSOLD SHORT GUARD] {symbol}: 15m RSI {rsi_val:.1f} <= 38.0 (Bottom Trap Zone). Blocked SHORT to prevent Short Squeeze trap!")
+            return {"error": f"SHORT aborted: {symbol} RSI ({rsi_val:.1f}) is <= 38.0 (Oversold Trap Zone).", "status": "error"}
+    except Exception:
+        pass
     
     # Apply dynamic risk management
     risk = calculate_dynamic_risk(margin_usdt, current_price, vol_target, leverage, "SELL")
@@ -2055,12 +2065,43 @@ def ensure_oneway_position_mode(api_key: str, api_secret: str) -> bool:
         pass
     return False
 
+_SINGLE_ASSET_MODE_CACHE = set()
+
+def ensure_single_asset_mode(api_key: str, api_secret: str) -> bool:
+    """
+    Ensures user Binance Futures account is set to Single-Asset Mode (multiAssetsMargin = False).
+    Eliminates Error -4168 (Unable to adjust to isolated-margin mode under Multi-Assets mode)
+    and enables 100% strict ISOLATED margin mode enforcement across all futures positions.
+    """
+    global _SINGLE_ASSET_MODE_CACHE
+    if not api_key or not api_secret:
+        return False
+    cache_key = api_key[-6:]
+    if cache_key in _SINGLE_ASSET_MODE_CACHE:
+        return True
+    try:
+        endpoint = "/fapi/v1/multiAssetsMargin"
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = urlencode({"multiAssetsMargin": "false", "recvWindow": 60000, "timestamp": timestamp})
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint}?{params}&signature={sig}", headers=headers, timeout=5)
+        if res.status_code == 200 or "-4046" in res.text or "No need to change" in res.text:
+            _SINGLE_ASSET_MODE_CACHE.add(cache_key)
+            return True
+        elif "-4168" in res.text:
+            pass
+    except Exception as e:
+        print(f"Error ensuring Single-Asset mode: {e}")
+    return False
+
 _MARGIN_TYPE_CACHE = set()
 
 def set_futures_margin_type(api_key: str, api_secret: str, symbol: str, margin_type: str = "ISOLATED") -> dict:
     """
     Sets margin type (ISOLATED or CROSSED) for a symbol on Binance Futures API.
     Prevents cross-wallet liquidations by enforcing isolated margin mode per position.
+    Auto-recovers from -4168 by switching Multi-Assets mode to Single-Asset mode.
     """
     global _MARGIN_TYPE_CACHE
     if not api_key or not api_secret:
@@ -2083,6 +2124,18 @@ def set_futures_margin_type(api_key: str, api_secret: str, symbol: str, margin_t
         if res.status_code == 200 or "-4046" in res.text: # -4046: No need to change margin type
             _MARGIN_TYPE_CACHE.add(cache_key)
             return {"status": "success", "marginType": margin_type}
+        elif "-4168" in res.text or "Multi-Assets mode" in res.text:
+            # 🛡️ Auto-Recovery from -4168: Switch Multi-Assets mode to Single-Asset mode, then retry ISOLATED
+            ensure_single_asset_mode(api_key, api_secret)
+            timestamp2 = int(time.time() * 1000) + TIME_OFFSET
+            params2 = urlencode({"symbol": symbol, "marginType": margin_type.upper(), "recvWindow": 60000, "timestamp": timestamp2})
+            sig2 = generate_signature(api_secret, params2)
+            res2 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint}?{params2}&signature={sig2}", headers=headers, timeout=5)
+            if res2.status_code == 200 or "-4046" in res2.text:
+                _MARGIN_TYPE_CACHE.add(cache_key)
+                return {"status": "success", "marginType": margin_type}
+            else:
+                print(f"⚠️ [BINANCE MARGIN TYPE -4168 AUTO-RETRY] Setting {symbol} to {margin_type} note: {res2.text}")
         else:
             print(f"⚠️ [BINANCE MARGIN TYPE] Setting {symbol} to {margin_type} note: {res.text}")
     except Exception as e:
@@ -2095,6 +2148,7 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
     """
     Sets initial leverage and margin mode for a symbol on Binance Futures API (/fapi/v1/leverage).
     Super Smart & Super Fast: Skips redundant API calls if leverage is already set on Binance!
+    Enforces One-Way Mode, Single-Asset Mode, and ISOLATED Margin Mode.
     """
     global _SET_LEVERAGE_CACHE
     if not api_key or not api_secret:
@@ -2105,6 +2159,7 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
         symbol += "USDT"
 
     ensure_oneway_position_mode(api_key, api_secret)
+    ensure_single_asset_mode(api_key, api_secret)
     set_futures_margin_type(api_key, api_secret, symbol, "ISOLATED")
 
     max_allowed = get_futures_max_leverage(api_key, api_secret, symbol)

@@ -170,8 +170,24 @@ def fetch_binance_data(symbol: str = "BTCUSDT", interval: str = "1d", limit: int
         except Exception as e:
             return None, f"Error processing data for {symbol}: {str(e)}", symbol
             
-    # If all URLs fail
     return None, f"Network Error: Could not connect to Binance API. Last Error: {last_error}", symbol
+
+def get_symbol_rsi(symbol: str, interval: str = "15m", window: int = 14) -> float:
+    """
+    Returns latest RSI for a symbol. Returns 50.0 on error or insufficient data.
+    Ultra-fast, institutional-grade safeguard for Anti-Oversold and Anti-Peak shields.
+    """
+    try:
+        res = fetch_binance_data(symbol, interval=interval, limit=window + 15)
+        if res and isinstance(res, tuple) and len(res) >= 1:
+            df = res[0]
+            if df is not None and not df.empty and 'rsi' in df.columns:
+                rsi_val = df['rsi'].iloc[-1]
+                if not pd.isna(rsi_val):
+                    return float(rsi_val)
+    except Exception:
+        pass
+    return 50.0
 
 def generate_chart(df: pd.DataFrame, symbol: str, filepath: str = "chart.png"):
     """

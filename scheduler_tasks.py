@@ -942,22 +942,34 @@ async def check_crypto_news(app: Application, ai_engine):
                                         fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
                                         trade_amount = min(trade_amount, fut_bal)
                                         if trade_amount >= 5.0:
-                                            res = await asyncio.to_thread(
-                                                trading_engine.place_futures_short,
-                                                api_key, api_secret, target_sym, trade_amount, user_lev
-                                            )
-                                            if res and "error" not in str(res).lower():
-                                                entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
-                                                qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
-                                                if qty > 0 and entry_price > 0:
-                                                    db.add_active_trade(chat_id, target_sym, qty, entry_price, trailing_pct)
+                                            # 🛡️ Anti-Oversold Short Guard for News Auto-Trade
+                                            rsi_val = await asyncio.to_thread(market_data.get_symbol_rsi, target_sym, "15m")
+                                            if rsi_val <= 42.0:
+                                                print(f"🛑 [NEWS AUTO-TRADE OVERSOLD SHORT GUARD] {target_sym}: 15m RSI {rsi_val:.1f} <= 42.0. Aborting news auto-short!")
                                                 auto_trade_note = (
-                                                    f"\n\n⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យាជួញដូរ (24/7 Auto-Pilot Executed) ៖**\n"
-                                                    f"✅ បានបើកកិច្ចសន្យា Short `{target_sym}` (${trade_amount:.2f} USDT | {user_lev}x Lev | Trailing SL {trailing_pct}%) ដោយស្វ័យប្រវត្តិតាមស្ថាប័នជោគជ័យ!"
+                                                    f"\n\n🛡️ **ស្វ័យប្រវត្តិកិច្ចសន្យាត្រូវបានផ្អាក (Risk Shield Triggered) ៖**\n"
+                                                    f"⚠️ មិនបើក Short `{target_sym}` ឡើយ ព្រោះ RSI 15m ({rsi_val:.1f}) ស្ថិតក្នុងតំបន់ Oversold Bottom ខ្លាចរងគ្រោះដោយសារ Short Squeeze!"
                                                 ) if user_l == 'khmer' else (
-                                                    f"\n\n⚡ **24/7 Auto-Pilot Executed ៖**\n"
-                                                    f"✅ Automated Short `{target_sym}` (${trade_amount:.2f} | {user_lev}x Lev | {trailing_pct}% Trailing SL) triggered successfully!"
+                                                    f"\n\n🛡️ **Auto-Short Suppressed (Risk Shield) ៖**\n"
+                                                    f"⚠️ Auto Short `{target_sym}` blocked because 15m RSI ({rsi_val:.1f}) is oversold (Short Squeeze Risk)!"
                                                 )
+                                            else:
+                                                res = await asyncio.to_thread(
+                                                    trading_engine.place_futures_short,
+                                                    api_key, api_secret, target_sym, trade_amount, user_lev
+                                                )
+                                                if res and "error" not in str(res).lower():
+                                                    entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
+                                                    qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
+                                                    if qty > 0 and entry_price > 0:
+                                                        db.add_active_trade(chat_id, target_sym, qty, entry_price, trailing_pct)
+                                                    auto_trade_note = (
+                                                        f"\n\n⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យាជួញដូរ (24/7 Auto-Pilot Executed) ៖**\n"
+                                                        f"✅ បានបើកកិច្ចសន្យា Short `{target_sym}` (${trade_amount:.2f} USDT | {user_lev}x Lev | Trailing SL {trailing_pct}%) ដោយស្វ័យប្រវត្តិតាមស្ថាប័នជោគជ័យ!"
+                                                    ) if user_l == 'khmer' else (
+                                                        f"\n\n⚡ **24/7 Auto-Pilot Executed ៖**\n"
+                                                        f"✅ Automated Short `{target_sym}` (${trade_amount:.2f} | {user_lev}x Lev | {trailing_pct}% Trailing SL) triggered successfully!"
+                                                    )
                                     elif trade_side == "BUY":
                                         trade_amount = max(10.50, trade_amount) # Spot MIN_NOTIONAL floor (Invariant 1)
                                         spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
