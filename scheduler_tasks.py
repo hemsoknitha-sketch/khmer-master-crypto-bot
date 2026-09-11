@@ -4755,43 +4755,40 @@ async def trailing_guard_monitor(app: Application):
     except Exception as e:
         print(f"⚠️ [TRAILING GUARD MONITOR ERROR]: {e}")
 
-async def build_executive_summary_report(chat_id: int):
+async def build_executive_summary_report(chat_id: int, timeframe: str = "daily", engine_filter: str = None):
     """
-    Super Smart & Institutional 24-Hour Executive Summary Report Builder.
-    Aggregates Spot balance, Futures margin, 24-hour realized PnL, win rates,
-    and 5 core Super Smart engines status with 1-Tap Copyable activation syntaxes.
+    Super Smart & Institutional Mobile-Responsive Executive Summary Report Builder.
+    Supports Multi-Timeframe (daily, monthly, yearly, lifetime) and Multi-Engine attribution.
+    Enforces 22-char separator lines for zero mobile line-wrapping.
     """
-    import localization as loc
     import trading_engine
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    from datetime import datetime
 
     user_lang = db.get_user_language(chat_id) or 'km'
-    if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+    if user_lang in ['km', 'khmer', '0', '1', 'auto'] or str(user_lang).isdigit():
         user_lang = 'km'
-    elif user_lang in ['en', 'english']:
-        user_lang = 'en'
-    elif user_lang in ['zh', 'chinese']:
-        user_lang = 'zh'
     else:
-        user_lang = 'km'
+        user_lang = 'en'
 
-    # Check 5 Super Smart engines
-    is_hyper = db.is_hyper_trade_enabled(chat_id)
-    is_arb = db.is_auto_arb_enabled(chat_id)
-    is_sweep = db.is_sweep_auto_enabled(chat_id)
-    is_funding = db.is_funding_harvester_enabled(chat_id)
-    is_guard = db.is_trailing_guard_enabled(chat_id)
-
-    # 24-Hour Performance summary from DB
-    summary = await asyncio.to_thread(db.get_user_24h_summary, chat_id)
-    total_pnl = summary.get("total_pnl", 0.0)
-    total_trades = summary.get("total_trades", 0)
-    win_rate = summary.get("win_rate", 100.0)
+    # Multi-timeframe performance summary
+    data = await asyncio.to_thread(db.get_user_multi_timeframe_report_data, chat_id, timeframe, engine_filter)
+    tf_label = data.get("timeframe_label", "24H Daily")
+    growth_label = data.get("growth_label", "24h Growth")
+    tot_pnl = data.get("total_pnl", 0.0)
+    tot_fees = data.get("total_fees", 0.0)
+    tot_funding = data.get("total_funding", 0.0)
+    net_profit = data.get("net_profit", 0.0)
+    tot_trades = data.get("total_trades", 0)
+    win_rate = data.get("win_rate", 100.0)
+    engines = data.get("engines", {})
+    recent_trades = data.get("recent_trades", [])
 
     # Balance Query
     keys = db.get_user_api(chat_id)
     free_usdt = 0.0
     futures_margin = 0.0
+    avail_margin = 0.0
     if keys:
         try:
             acc = await asyncio.to_thread(trading_engine.get_account_balance_spot, keys[0], keys[1])
@@ -4801,61 +4798,151 @@ async def build_executive_summary_report(chat_id: int):
         try:
             fut_acc = await asyncio.to_thread(trading_engine.get_futures_account_balance, keys[0], keys[1])
             futures_margin = float(fut_acc.get("totalWalletBalance", 0.0))
+            avail_margin = float(fut_acc.get("availableBalance", 0.0))
         except Exception:
             pass
 
-    # Dynamic PIN for 1-Tap copy
-    user_pin = db.get_user_pin(chat_id) or "1234"
-    if not user_pin or not str(user_pin).isalnum() or len(str(user_pin)) > 8:
-        user_pin = "1234"
+    total_equity = free_usdt + futures_margin
+    base_cap = total_equity if total_equity > 0 else 100.0
+    growth_pct = round((net_profit / base_cap * 100.0), 2)
 
-    if user_lang == 'en':
-        lbl_copy = "1-Tap Copy to Activate"
-    elif user_lang == 'zh':
-        lbl_copy = "一键复制开启"
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    sep = "━━━━━━━━━━━━━━━━━━━━━━"
+    dash_sep = "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
+    line_sep = "──────────────────────"
+
+    title_filter = f" | {data['engine_filter'].upper()}" if data.get("engine_filter") else ""
+
+    msg_lines = [
+        f"👑 **APEX VIP {tf_label.upper()} AUDIT** 👑",
+        f"⏰ `{now_str} UTC+7`{title_filter}",
+        f"🛡️ **Status ៖** `VIP Clearance Active`",
+        sep,
+        f"💰 **ទុនជាក់ស្តែង (EQUITY)**",
+        f"💵 Spot      : `${free_usdt:,.2f}`",
+        f"📈 Futures   : `${futures_margin:,.2f}`",
+        f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
+        f"💎 Net Total : `${total_equity:,.2f}`",
+        sep,
+        f"⚙️ **ទុនតាមមុខងារ (ENGINES)**"
+    ]
+
+    turbo_pnl = engines.get("turbo_hedge", {}).get("pnl", 0.0)
+    turbo_act = "ACTIVE" if engines.get("turbo_hedge", {}).get("active") else "STANDBY"
+    msg_lines.extend([
+        f"\n🚀 **/turbo_hedge** `[{turbo_act}]`",
+        f"├ 💵 ទុនបម្រុង : `$800.00 USDT`",
+        f"├ ⚙️ Leverage  : `10x (Isolated)`",
+        f"└ 🌾 PnL/Yield : `{turbo_pnl:+,.2f} USDT`"
+    ])
+
+    smartx_pnl = engines.get("smart_x", {}).get("pnl", 0.0)
+    smartx_act = "ACTIVE" if engines.get("smart_x", {}).get("active") else "STANDBY"
+    msg_lines.extend([
+        f"\n🧠 **/smart_x** `[{smartx_act}]`",
+        f"├ 💵 ទុនបម្រុង : `$650.00 USDT`",
+        f"├ 🎯 AI Regime : `SweetSpot HFT`",
+        f"└ 💎 PnL       : `{smartx_pnl:+,.2f} USDT`"
+    ])
+
+    trade_pnl = engines.get("smart_trade", {}).get("pnl", 0.0)
+    trade_act = "ACTIVE" if engines.get("smart_trade", {}).get("active") else "STANDBY"
+    msg_lines.extend([
+        f"\n📊 **/smart_trade** `[{trade_act}]`",
+        f"├ 💵 ទុនបម្រុង : `$500.00 USDT`",
+        f"├ 🛡️ Spot Floor: `Min $10.50`",
+        f"└ 📈 PnL       : `{trade_pnl:+,.2f} USDT`"
+    ])
+
+    swap_pnl = engines.get("smart_swap", {}).get("pnl", 0.0)
+    swap_act = "ACTIVE" if engines.get("smart_swap", {}).get("active") else "STANDBY"
+    msg_lines.extend([
+        f"\n⚡ **/smart_swap** `[{swap_act}]`",
+        f"├ 💵 DEX Snipes: `Solana / EVM`",
+        f"└ 💎 PnL       : `{swap_pnl:+,.2f} USDT`",
+        sep,
+        f"📋 **សកម្មភាពជួញដូរ ({tf_label})**"
+    ])
+
+    if not recent_trades:
+        msg_lines.append("🟢 `ទុនរៀបរយ - គ្មាន Position ត្រាំ`")
     else:
-        lbl_copy = "1-Tap Copy ដើម្បបើកដំណើរការ"
+        for idx, t in enumerate(recent_trades[:3], 1):
+            pnl_emoji = "🟩" if t["pnl"] >= 0 else "🟥"
+            msg_lines.extend([
+                f"\n🔹 **{idx}. យុទ្ធសាស្ត្រ {t['engine'].upper()}**",
+                f"┌ 🪙 **{t['symbol']}** | {t['side']}",
+                f"├ 🆔 Order   : `{t['id']}`",
+                f"├ 🏷️ Type    : `{t['type']}`",
+                f"├ 📦 Qty     : `{t['qty']}`",
+                f"├ 💵 In/Out  : `${t['entry_price']:,.2f}` ➔ `${t['exit_price']:,.2f}`",
+                f"├ ⏰ Time    : `{t['time'][5:]}`",
+                f"├ {pnl_emoji} PnL     : `{t['pnl']:+,.2f}` (`{t['roi']:+,.1f}%`)",
+                f"├ 💸 Fee     : `-${t['commission']:,.2f}`",
+                f"├ 🌾 Fund    : `{t['funding']:+,.2f}`",
+                f"└ 💎 **Net**  : **`{t['net_pnl']:+,.2f} USDT`**"
+            ])
+            if idx < min(3, len(recent_trades)):
+                msg_lines.append(dash_sep)
 
-    # Format 1-Tap copyable monospace command blocks (zero entity parsing errors)
-    hyper_txt = "🟢 ACTIVE" if is_hyper else f"🔴 OFF\n   └ {lbl_copy} ៖  `/hyper_trade ON 10 {user_pin}`"
-    arb_txt = "🟢 ACTIVE" if is_arb else f"🔴 OFF\n   └ {lbl_copy} ៖  `/auto_arb ON 50 {user_pin}`"
-    sweep_txt = "🟢 ACTIVE" if is_sweep else f"🔴 OFF\n   └ {lbl_copy} ៖  `/sweep_auto ON 50 {user_pin}`"
-    funding_txt = "🟢 ACTIVE" if is_funding else f"🔴 OFF\n   └ {lbl_copy} ៖  `/funding_harvester ON {user_pin}`"
-    guard_txt = "🟢 ACTIVE" if is_guard else f"🔴 OFF\n   └ {lbl_copy} ៖  `/trailing_guard ON {user_pin}`"
+    turbo_roi = (turbo_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+    smartx_roi = (smartx_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+    trade_roi = (trade_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+    swap_roi = (swap_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
 
-    pnl_formatted = f"+${total_pnl:,.2f} USDT" if total_pnl >= 0 else f"-${abs(total_pnl):,.2f} USDT"
+    net_sign = "+" if net_profit >= 0 else ""
+    growth_sign = "+" if growth_pct >= 0 else ""
 
-    msg = loc.get_text(
-        user_lang,
-        'daily_executive_summary_report',
-        spot_bal=free_usdt,
-        futures_bal=futures_margin,
-        pnl_formatted=pnl_formatted,
-        total_pnl=total_pnl,
-        trades_24h=total_trades,
-        win_rate=win_rate,
-        hyper_status=hyper_txt,
-        arb_status=arb_txt,
-        sweep_status=sweep_txt,
-        funding_status=funding_txt,
-        guard_status=guard_txt
-    )
+    msg_lines.extend([
+        sep,
+        f"🏆 **សរុបលទ្ធផលសុទ្ធ ({tf_label.upper()})**",
+        f"🎯 សរុប Trades : `{tot_trades} Executed`",
+        f"✅ Win Rate    : `{win_rate:.1f}%`",
+        f"💰 Gross PnL   : `{tot_pnl:+,.2f}`",
+        f"💸 Total Fee   : `-${tot_fees:,.2f}`",
+        f"🌾 Net Funding : `{tot_funding:+,.2f}`",
+        line_sep,
+        f"💎 **NET PROFIT : {net_sign}${net_profit:,.2f} USDT**",
+        f"📈 **{growth_label} : {growth_sign}{growth_pct:.2f}% Net**",
+        f"├ 🚀 **/turbo_hedge** : `{turbo_pnl:+,.2f} ({turbo_roi:+.2f}%)`",
+        f"├ 🧠 **/smart_x**     : `{smartx_pnl:+,.2f} ({smartx_roi:+.2f}%)`",
+        f"├ 📊 **/smart_trade** : `{trade_pnl:+,.2f} ({trade_roi:+.2f}%)`",
+        f"└ ⚡ **/smart_swap**  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
+        sep,
+        f"_Khmer Master Crypto_",
+        f"_APEX SUPER BRAIN AI_",
+        f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+    ])
 
+    msg = "\n".join([line for line in msg_lines if line != ""])
+
+    cur_tf = timeframe or "daily"
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🔄 Refresh Report", callback_data="btn_executive_report"),
-            InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+            InlineKeyboardButton("📅 24H Daily", callback_data="btn_report_daily"),
+            InlineKeyboardButton("🗓️ Monthly", callback_data="btn_report_monthly")
         ],
         [
-            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-            InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
+            InlineKeyboardButton("📆 Yearly", callback_data="btn_report_yearly"),
+            InlineKeyboardButton("♾️ Lifetime", callback_data="btn_report_lifetime")
         ],
         [
-            InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+            InlineKeyboardButton("🚀 Turbo Hedge", callback_data="btn_report_turbo_hedge"),
+            InlineKeyboardButton("🧠 SmartX", callback_data="btn_report_smart_x")
+        ],
+        [
+            InlineKeyboardButton("⚡ Smart Swap", callback_data="btn_report_smart_swap"),
+            InlineKeyboardButton("📊 Smart Trade", callback_data="btn_report_smart_trade")
+        ],
+        [
+            InlineKeyboardButton("🔄 Refresh", callback_data=f"btn_report_{cur_tf}"),
+            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
         ]
     ])
 
     return msg, keyboard
+
 
 async def daily_executive_summary_report(app: Application):
     """

@@ -2330,7 +2330,7 @@ class TelegramBotThread(BaseThread):
                     await query.message.reply_text(hard_card, parse_mode="Markdown", reply_markup=nav_keyboard)
                 self.log_signal.emit(f"🔴 Hard Stop executed for user {chat_id} ({closed_count} positions closed).")
 
-        async def executive_summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id:
                 return
@@ -2343,9 +2343,39 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
 
+            args = [str(a).lower().strip() for a in (getattr(context, "args", []) or [])]
+            cb_data = update.callback_query.data if update.callback_query else ""
+            timeframe = "daily"
+            engine_filter = None
+
+            if cb_data and cb_data.startswith("btn_report_"):
+                suffix = cb_data.replace("btn_report_", "").lower().strip()
+                if suffix in ["daily", "monthly", "yearly", "lifetime"]:
+                    timeframe = suffix
+                elif suffix in ["turbo_hedge", "smart_x", "smart_swap", "smart_trade"]:
+                    engine_filter = suffix
+            elif args:
+                arg0 = args[0]
+                if arg0 in ["daily", "24h", "1d", "day"]:
+                    timeframe = "daily"
+                elif arg0 in ["monthly", "30d", "month", "1m"]:
+                    timeframe = "monthly"
+                elif arg0 in ["yearly", "365d", "year", "1y"]:
+                    timeframe = "yearly"
+                elif arg0 in ["lifetime", "all", "total", "infinite", "ever"]:
+                    timeframe = "lifetime"
+                elif arg0 in ["turbo_hedge", "turbo", "hedge"]:
+                    engine_filter = "turbo_hedge"
+                elif arg0 in ["smartx", "smart_x"]:
+                    engine_filter = "smart_x"
+                elif arg0 in ["smart_swap", "smartswap", "swap", "dex"]:
+                    engine_filter = "smart_swap"
+                elif arg0 in ["smart_trade", "smarttrade", "spot"]:
+                    engine_filter = "smart_trade"
+
             try:
                 import scheduler_tasks
-                msg, keyboard = await scheduler_tasks.build_executive_summary_report(chat_id)
+                msg, keyboard = await scheduler_tasks.build_executive_summary_report(chat_id, timeframe=timeframe, engine_filter=engine_filter)
                 if update.callback_query:
                     try:
                         await update.callback_query.edit_message_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
@@ -2354,7 +2384,7 @@ class TelegramBotThread(BaseThread):
                 else:
                     await (update.effective_message or update.message).reply_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception as e:
-                err_txt = f"⚠️ Error generating executive report: {e}"
+                err_txt = f"⚠️ Error generating report: {e}"
                 if update.callback_query:
                     try:
                         await update.callback_query.answer(err_txt, show_alert=True)
@@ -2362,6 +2392,9 @@ class TelegramBotThread(BaseThread):
                         pass
                 else:
                     await (update.effective_message or update.message).reply_text(err_txt)
+
+        executive_summary_command = report_command
+
 
         async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else update.callback_query.message.chat.id
@@ -3617,28 +3650,7 @@ class TelegramBotThread(BaseThread):
             await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
-        async def executive_summary_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            query = update.callback_query
-            if query:
-                await query.answer()
-                chat_id = query.message.chat_id
-            else:
-                chat_id = update.effective_chat.id
-
-            try:
-                from scheduler_tasks import build_executive_summary_report
-                msg, keyboard = await build_executive_summary_report(chat_id)
-                if query:
-                    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                else:
-                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
-            except Exception as e:
-                err_msg = f"⚠️ កំហុសក្នុងការបង្កើតរបាយការណ៍ 24H Executive Report: {e}"
-                if query:
-                    await query.message.reply_text(err_msg)
-                else:
-                    await update.message.reply_text(err_msg)
+        # executive_summary_command is aliased to canonical report_command above
 
         async def cancel_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -4453,8 +4465,13 @@ class TelegramBotThread(BaseThread):
                 await toggle_breaker_command(update, context)
             elif data == "btn_admin_nuke":
                 await admin_nuke_command(update, context)
-            elif data in ["btn_executive_report", "btn_report_refresh"]:
-                await executive_summary_command(update, context)
+            elif data in [
+                "btn_executive_report", "btn_report_refresh", "btn_report_daily", 
+                "btn_report_monthly", "btn_report_yearly", "btn_report_lifetime", 
+                "btn_report_turbo_hedge", "btn_report_smart_x", "btn_report_smart_swap", 
+                "btn_report_smart_trade"
+            ] or data.startswith("btn_report_"):
+                await report_command(update, context)
             elif data in ["btn_menu_portfolio", "btn_portfolio"]:
                 context.args = []
                 await portfolio_command(update, context)
@@ -13854,6 +13871,7 @@ class TelegramBotThread(BaseThread):
 
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
+        self.app.add_handler(CommandHandler("report", report_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
 
         from telegram.ext import CallbackQueryHandler
