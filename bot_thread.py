@@ -4515,10 +4515,12 @@ class TelegramBotThread(BaseThread):
                 context.args = ["STOP", "ALL", "1234"]
                 await smart_swap_command(update, context)
             elif data in ["btn_infinity_grid_launch", "btn_infinity_grid"]:
+                context.args = []
                 await infinity_grid_command(update, context)
             elif data in ["btn_snipe_launch", "btn_snipe"]:
                 await smart_listing_sniper_command(update, context)
             elif data == "btn_funding_harvester":
+                context.args = []
                 await funding_harvester_command(update, context)
             elif data in ["btn_gold_radar", "btn_gold_radar_refresh"]:
                 await gold_radar_command(update, context)
@@ -12224,7 +12226,13 @@ class TelegramBotThread(BaseThread):
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-            if not args and not update.callback_query:
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
+
+            if not args:
                 toggle_btn = (
                     InlineKeyboardButton("🔴 Turn OFF Infinity Matrix", callback_data="btn_infinity_matrix_off_prompt")
                     if is_active else
@@ -12291,8 +12299,17 @@ class TelegramBotThread(BaseThread):
                         "`` `/infinity_matrix SOL 100 1234` ``\n\n"
                         "👉 **បិទដំណើរការ Infinity Matrix ៖**\n`` `/infinity_matrix OFF 1234` ``"
                     )
+                if update.callback_query and update.callback_query.message:
+                    try:
+                        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                        return
+                    except Exception:
+                        pass
                 if msg_target:
                     await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            if not args:
                 return
 
             action = str(args[0]).upper().strip()
@@ -12400,7 +12417,13 @@ class TelegramBotThread(BaseThread):
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-            if not args and not update.callback_query:
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
+
+            if not args:
                 import funding_harvester_engine
                 scan_res = await asyncio.to_thread(funding_harvester_engine.scan_top_funding_rates)
                 
@@ -12486,8 +12509,17 @@ class TelegramBotThread(BaseThread):
                         "👉 **បើកដំណើរការ Delta-Neutral Harvester (ទុន $100) ៖**\n`` `/funding_harvester ON 100 1234` ``\n\n"
                         "👉 **បិទដំណើរការ Harvester ៖**\n`` `/funding_harvester OFF 1234` ``"
                     )
+                if update.callback_query and update.callback_query.message:
+                    try:
+                        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                        return
+                    except Exception:
+                        pass
                 if msg_target:
                     await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            if not args:
                 return
 
             action = str(args[0]).upper().strip()
