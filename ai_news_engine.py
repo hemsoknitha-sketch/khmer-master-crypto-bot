@@ -1,4 +1,6 @@
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import xml.etree.ElementTree as ET
 import time
 import re
@@ -140,8 +142,6 @@ def fetch_live_news(symbol: str = None, limit: int = 5) -> list:
                     })
                     if len(news_items) >= limit:
                         break
-        except Exception:
-            continue
         except Exception:
             continue
 
