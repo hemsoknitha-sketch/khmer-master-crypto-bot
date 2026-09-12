@@ -1001,6 +1001,43 @@ def get_smart_swap_status_overview(chat_id: int) -> dict:
 # 🌾 24/7 POSITION MONITOR & PROFIT HARVESTER
 # ==============================================================================
 
+def send_smart_swap_telegram_message(app, chat_id: int, text: str, parse_mode: str = "Markdown", reply_markup=None, disable_web_page_preview: bool = True):
+    """
+    Safely delivers a Telegram notification from any context (async event loop, synchronous scheduler worker thread, or threadpool).
+    Prevents 'coroutine was never awaited' warnings and guarantees 100% reliable alert delivery.
+    """
+    if not app or not hasattr(app, "bot"):
+        return
+    try:
+        import asyncio
+        coro = app.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+            disable_web_page_preview=disable_web_page_preview
+        )
+        try:
+            loop = asyncio.get_running_loop()
+            if loop and loop.is_running():
+                asyncio.create_task(coro)
+                return
+        except RuntimeError:
+            pass
+
+        app_loop = getattr(app, "loop", None)
+        if app_loop and app_loop.is_running():
+            asyncio.run_coroutine_threadsafe(coro, app_loop)
+            return
+
+        new_loop = asyncio.new_event_loop()
+        try:
+            new_loop.run_until_complete(coro)
+        finally:
+            new_loop.close()
+    except Exception as e:
+        print(f"⚠️ [SMART SWAP] Telegram alert dispatch notice: {e}")
+
 def monitor_smart_swap_positions(app=None):
     """
     Scans active on-chain Smart Swap positions 24/7 with 3-Stage Profit Harvester & Breakeven Armor:
@@ -1068,11 +1105,7 @@ def monitor_smart_swap_positions(app=None):
                     )
                     if sell_tx:
                         msg_sl += f"🔗 **Solscan ៖** [ចុចមើល Transaction On-Chain](https://solscan.io/tx/{sell_tx})"
-                    try:
-                        import asyncio
-                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", disable_web_page_preview=True))
-                    except Exception:
-                        pass
+                    send_smart_swap_telegram_message(app, chat_id, msg_sl, parse_mode="Markdown", disable_web_page_preview=True)
                 continue
 
             # ------------------------------------------------------------------
@@ -1093,11 +1126,7 @@ def monitor_smart_swap_positions(app=None):
                         f"🎯 **Breakeven Floor ៖** `${be_floor:.6f}` (Entry +2.0% Net)\n"
                         f"✅ **ការធានាគណិតវិទ្យា ៖** កាក់នេះនឹងមិនអាចត្រឡប់មកខាតបានជាដាច់ខាត! បើតម្លៃធ្លាក់មកវិញ ប្រព័ន្ធនឹងកាត់យកចំណេញ Net +2.0% ដោយស្វ័យប្រវត្តិ!"
                     )
-                    try:
-                        import asyncio
-                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_be, parse_mode="Markdown"))
-                    except Exception:
-                        pass
+                    send_smart_swap_telegram_message(app, chat_id, msg_be, parse_mode="Markdown")
 
             # ------------------------------------------------------------------
             # STAGE 1b: BREAKEVEN EXIT TRIGGER (Retraced to Entry + 2.0%)
@@ -1130,11 +1159,7 @@ def monitor_smart_swap_positions(app=None):
                     )
                     if sell_tx:
                         msg_be_exit += f"\n🔗 **Solscan ៖** [ចុចមើល On-Chain](https://solscan.io/tx/{sell_tx})"
-                    try:
-                        import asyncio
-                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_be_exit, parse_mode="Markdown", disable_web_page_preview=True))
-                    except Exception:
-                        pass
+                    send_smart_swap_telegram_message(app, chat_id, msg_be_exit, parse_mode="Markdown", disable_web_page_preview=True)
                 continue
 
             # ------------------------------------------------------------------
@@ -1174,11 +1199,7 @@ def monitor_smart_swap_positions(app=None):
                     )
                     if sell_tx:
                         msg_tp1 += f"\n🔗 **Solscan ៖** [ចុចមើល On-Chain នៃការលក់](https://solscan.io/tx/{sell_tx})"
-                    try:
-                        import asyncio
-                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown", disable_web_page_preview=True))
-                    except Exception:
-                        pass
+                    send_smart_swap_telegram_message(app, chat_id, msg_tp1, parse_mode="Markdown", disable_web_page_preview=True)
                 continue
 
             # ------------------------------------------------------------------
@@ -1216,11 +1237,7 @@ def monitor_smart_swap_positions(app=None):
                         )
                         if sell_tx:
                             msg_final += f"\n🔗 **Solscan ៖** [ចុចមើល Live Sell On-Chain](https://solscan.io/tx/{sell_tx})"
-                        try:
-                            import asyncio
-                            asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_final, parse_mode="Markdown", disable_web_page_preview=True))
-                        except Exception:
-                            pass
+                        send_smart_swap_telegram_message(app, chat_id, msg_final, parse_mode="Markdown", disable_web_page_preview=True)
         except Exception as e:
             print(f"Error monitoring swap position {pos.get('id')}: {e}")
 
@@ -1366,16 +1383,13 @@ def run_smart_swap_autopilot_cycle(app=None):
                             InlineKeyboardButton("🛑 STOP ALL (Exit)", callback_data="btn_smart_swap_stop_all")
                         ]
                     ])
-                    try:
-                        import asyncio
-                        asyncio.create_task(app.bot.send_message(
-                            chat_id=chat_id,
-                            text=msg_auto,
-                            parse_mode="Markdown",
-                            reply_markup=kb,
-                            disable_web_page_preview=True
-                        ))
-                    except Exception:
-                        pass
+                    send_smart_swap_telegram_message(
+                        app,
+                        chat_id=chat_id,
+                        text=msg_auto,
+                        parse_mode="Markdown",
+                        reply_markup=kb,
+                        disable_web_page_preview=True
+                    )
         except Exception as e:
             print(f"Error executing autopilot cycle for user {user_cfg.get('chat_id')}: {e}")

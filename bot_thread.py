@@ -221,6 +221,7 @@ class TelegramBotThread(BaseThread):
             connection_pool_size=500
         )
         self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(64).post_init(post_init).build()
+        self.app.loop = self.loop
 
         
         async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
