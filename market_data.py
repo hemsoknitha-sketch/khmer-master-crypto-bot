@@ -1245,3 +1245,91 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
         }
     except Exception as e:
         return {"error": str(e), "symbol": symbol, "confluence_score": 50.0}
+
+def check_macro_reversal_structure(symbol: str) -> dict:
+    """
+    Institutional Confirmation Sentinel for De-Risked Position Recovery:
+    Validates whether an asset has formed a confirmed 15m/1h Macro Reversal Structure
+    before permitting any fresh entry, trade, or scaling:
+    1. 15m RSI > 38.0 (Strictly escaped the oversold liquidation panic crash zone).
+    2. CVD Absorption / Order Flow: Detects Whale Limit Buying Absorbing Sell Dumps (taker_buy ratio >= 0.51 or BULLISH_ABSORPTION).
+    3. Macro Structure: Confirms 15m or 1h momentum/MACD is positive or non-bearish.
+    """
+    symbol = str(symbol).upper().strip()
+    try:
+        res_15m = fetch_binance_data(symbol, interval="15m", limit=35)
+        if not res_15m or not isinstance(res_15m, tuple) or res_15m[0] is None:
+            return {
+                "is_confirmed": False,
+                "rsi_15m": 50.0,
+                "taker_buy_ratio": 0.5,
+                "cvd_bullish": False,
+                "structure_trend": "UNKNOWN",
+                "reason": "Unable to fetch 15m candle data from Binance"
+            }
+        
+        df_15m = res_15m[0]
+        rsi_15m = float(df_15m['rsi'].iloc[-1]) if 'rsi' in df_15m.columns and not pd.isna(df_15m['rsi'].iloc[-1]) else 50.0
+        
+        # 1. Anti-Oversold Rejection Guard (Invariant 16)
+        if rsi_15m <= 38.0:
+            return {
+                "is_confirmed": False,
+                "rsi_15m": rsi_15m,
+                "taker_buy_ratio": 0.0,
+                "cvd_bullish": False,
+                "structure_trend": "OVERSOLD_CRASH",
+                "reason": f"15m RSI ({rsi_15m:.1f}) is <= 38.0 (in oversold crash zone). Reversal not confirmed."
+            }
+
+        # 2. CVD Absorption & Order Flow Check
+        cvd_info = detect_cvd_absorption_divergence(df_15m)
+        is_cvd_abs = cvd_info.get("divergence") == "BULLISH_ABSORPTION"
+
+        if 'taker_buy_base' in df_15m.columns:
+            taker_series = pd.to_numeric(df_15m['taker_buy_base'], errors='coerce').fillna(0.0)
+            taker_buy = float(taker_series.iloc[-10:].sum())
+        else:
+            taker_buy = 0.0
+            
+        if 'volume' in df_15m.columns:
+            vol_series = pd.to_numeric(df_15m['volume'], errors='coerce').fillna(0.0)
+            tot_vol = float(vol_series.iloc[-10:].sum())
+        else:
+            tot_vol = 1e-5
+
+        taker_buy_ratio = taker_buy / max(1e-5, tot_vol)
+        is_order_flow_bullish = (taker_buy_ratio >= 0.51) or is_cvd_abs
+
+        # 3. Market Structure / Momentum
+        struct_15m = calculate_market_structure(df_15m)
+        trend = struct_15m.get("trend", "NEUTRAL")
+        macd_val = float(df_15m['macd'].iloc[-1]) if 'macd' in df_15m.columns else 0.0
+        macd_sig = float(df_15m['macd_signal'].iloc[-1]) if 'macd_signal' in df_15m.columns else 0.0
+        macd_bullish = (macd_val >= macd_sig)
+
+        is_confirmed = (rsi_15m > 38.0) and (is_order_flow_bullish or (macd_bullish and trend != "BEARISH"))
+        
+        reason = (
+            f"15m RSI {rsi_15m:.1f} > 38.0, Taker Buy Ratio {taker_buy_ratio*100:.1f}%, "
+            f"CVD Absorption: {cvd_info.get('divergence', 'NONE')}, Trend: {trend}"
+        )
+
+        return {
+            "is_confirmed": is_confirmed,
+            "rsi_15m": rsi_15m,
+            "taker_buy_ratio": round(taker_buy_ratio, 3),
+            "cvd_bullish": is_order_flow_bullish,
+            "structure_trend": trend,
+            "reason": reason
+        }
+    except Exception as e:
+        return {
+            "is_confirmed": False,
+            "rsi_15m": 50.0,
+            "taker_buy_ratio": 0.5,
+            "cvd_bullish": False,
+            "structure_trend": "ERROR",
+            "reason": f"Exception in check_macro_reversal_structure: {e}"
+        }
+

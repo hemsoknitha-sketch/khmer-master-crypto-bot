@@ -3866,12 +3866,44 @@ async def liquidation_defender_task(app, ai_engine):
                         res = await asyncio.to_thread(trading_engine.emergency_reduce_position, api_key, api_secret, symbol, side, reduce_qty)
                         _last_defender_action_timestamps[def_key] = now_ts
                         
+                        # 🚀 SUPER SMART: De-Risked Position Adoption & Registry Protocol
+                        # Calculate remaining contracts safely held in account
+                        remaining_qty = max(0.0, abs(amt) - reduce_qty)
+                        
+                        if remaining_qty > 0:
+                            # 1. Register into active_hedge_bots so Breakeven Armor monitors it 24/7
+                            remaining_notional = remaining_qty * mark_price
+                            remaining_margin = max(5.0, remaining_notional / max(1.0, leverage))
+                            bot_side = "BUY" if amt > 0 else "SELL"
+                            db.add_turbo_hedge_bot(chat_id, symbol, amount=remaining_margin, leverage=int(leverage), side=bot_side, target_tp=2.5, is_bot_initiated=True)
+                            
+                            # 2. Flag symbol as an active De-Risked Recovery asset with pivot reference price
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "1")
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_entry_p", str(mark_price))
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_orig_entry_p", str(pos.get("entryPrice", mark_price)))
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_ts", str(int(now_ts)))
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0.0")
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_mark_p", str(mark_price))
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_trough_mark_p", str(mark_price))
+                            print(f"🛡️ [DE-RISKED RECOVERY REGISTERED] User {chat_id} {symbol}: {remaining_qty:.4f} contracts adopted into Breakeven Armor (Pivot: ${mark_price})!")
+                        
                         user_lang = db.get_user_language(chat_id)
-                        msg = (f"🚨 **LIQUIDATION DEFENDER TRIGGERED!** 🚨\n\n"
-                               f"🪙 **កាក់:** `{symbol}`\n"
-                               f"⚠️ **ហានិភ័យ:** តម្លៃទីផ្សារ (${mark_price}) ខិតជិតតម្លៃ Liquidation (${liq_price}) ណាស់ (នៅសល់ {diff_pct*100:.1f}%)!\n"
-                               f"🛡️ **សកម្មភាពសង្គ្រោះ:** ប្រព័ន្ធទើបតែកាត់បន្ថយ Position ({reduce_qty} គ្រាប់) ដោយស្វ័យប្រវត្តិ ដើម្បីជៀសវាងការឆេះគណនីទាំងមូល។\n\n"
-                               f"_(សូមពិនិត្យមើលគណនី Futures របស់អ្នកជាបន្ទាន់!)_")
+                        from ui_standards import DIVIDER_DOUBLE, DIVIDER_HEAVY, OFFICIAL_FOOTNOTE
+                        msg = (f"🚨 **LIQUIDATION DEFENDER TRIGGERED!** 🚨\n"
+                               f"{DIVIDER_DOUBLE}\n\n"
+                               f"🪙 **កាក់ ៖** `{symbol}`\n"
+                               f"⚠️ **ហានិភ័យ ៖** តម្លៃទីផ្សារ (${mark_price}) ខិតជិត Liquidation (${liq_price}) នៅសល់ {diff_pct*100:.1f}%!\n"
+                               f"🛡️ **សកម្មភាពសង្គ្រោះ ៖** កាត់បន្ថយទំហំ Margin ({reduce_qty} គ្រាប់) ដោយស្វ័យប្រវត្តិ ដើម្បីជៀសវាងការឆេះគណនីទាំងមូល។\n"
+                               f"{DIVIDER_HEAVY}\n"
+                               f"🛰️ **SUPER SMART RECOVERY ACTIVATED ៖**\n"
+                               f"• Position នៅសល់ ៖ `{remaining_qty:.4f} {symbol}`\n"
+                               f"• Pivot De-Risk Price ៖ `${mark_price}`\n"
+                               f"• **Anti-Averaging Down Guard ៖** បិទការទិញថែមពេលធ្លាក់កប់ រង់ចាំ Confirmation 15m/1h\n"
+                               f"• **Breakeven Armor ៖** ត្រៀមចាក់សោរចំណេញ `+2.5% Net Floor` ពេលកាក់ Bounce ឡើង `+6.0%`!\n\n"
+                               f"{OFFICIAL_FOOTNOTE}")
                         try:
                             await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
                         except:

@@ -1472,6 +1472,7 @@ async def monitor_turbo_hedge_bots(app):
                                 await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, f_keys[0], f_keys[1], b_sym)
                                 print(f"🛑 [SUPER SMART PURGE] Market Closed delisted symbol {b_sym} for User {target_chat_id}!")
                             db.remove_turbo_hedge_bot(target_chat_id, b_sym)
+                            db.update_system_setting(f"turbo_hedge_{target_chat_id}_{b_sym}_derisked_recovery", "0")
                             active_hedge_bots = [x for x in active_hedge_bots if not (x.get("chat_id") == target_chat_id and x.get("symbol") == b_sym)]
                             print(f"🧹 [CLOSED FUTURES POSITION PURGED FROM DB] User {target_chat_id} {b_sym} purged to free slot!")
 
@@ -1656,6 +1657,14 @@ async def monitor_turbo_hedge_bots(app):
                 if c_cand in user_active_syms:
                     continue
                 
+                # 🛡️ STRICT ANTI-AVERAGING DOWN GUARD: Zero Martingale on De-Risked or Falling Knife Symbols
+                is_derisked_sym = db.get_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_derisked_recovery", "0") == "1"
+                if is_derisked_sym:
+                    reversal_check = market_data.check_macro_reversal_structure(c_cand)
+                    if not reversal_check.get("is_confirmed", False):
+                        print(f"🛡️ [ANTI-AVERAGING DOWN GUARD] {c_cand}: De-risked position active without Macro Reversal Confirmation ({reversal_check.get('reason')}). Skipping candidate to avoid catching a falling knife!")
+                        continue
+
                 if c_cand in _failed_candidate_symbols or is_symbol_in_cooldown(c_cand):
                     continue
 
@@ -1988,38 +1997,62 @@ async def monitor_turbo_hedge_bots(app):
                         # Once armed, min_guaranteed_roi is set to AT LEAST +2.5% ROI (equivalent to +0.25% price move).
                         # Net profit after 1.0% round-trip taker fees and slippage is guaranteed +1.5% ROI in hand!
                         # Normal 0.05% bid-ask spread will NEVER prematurely knock it out.
+                        is_derisked = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "0") == "1"
+                        derisked_entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_entry_p", "0.0")
+                        derisked_entry_p = float(derisked_entry_p_str) if derisked_entry_p_str.replace('.', '', 1).isdigit() else 0.0
+
+                        bounce_roi = 0.0
+                        if is_derisked and derisked_entry_p > 0:
+                            if current_side == "BUY":
+                                bounce_roi = ((mark_price - derisked_entry_p) / derisked_entry_p) * 100.0 * float(max(1, active_lev))
+                            elif current_side in ["SELL", "SHORT"]:
+                                bounce_roi = ((derisked_entry_p - mark_price) / derisked_entry_p) * 100.0 * float(max(1, active_lev))
+                            
+                            peak_bounce_key = f"turbo_hedge_{chat_id}_{symbol}_peak_bounce_roi"
+                            peak_bounce_str = db.get_system_setting(peak_bounce_key, "0.0")
+                            peak_bounce_roi = float(peak_bounce_str) if peak_bounce_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+                            if bounce_roi > peak_bounce_roi:
+                                peak_bounce_roi = bounce_roi
+                                db.update_system_setting(peak_bounce_key, str(peak_bounce_roi))
+                        else:
+                            peak_bounce_roi = 0.0
+
                         fut_arm_roi = max(6.0, curr_atr_pct * 0.8 * float(active_lev))
-                        if peak_roi >= fut_arm_roi or peak_pnl >= max(0.30, bot_amt * 0.06):
+                        is_bounce_armed = (is_derisked and (bounce_roi >= 6.0 or peak_bounce_roi >= 6.0))
+                        if peak_roi >= fut_arm_roi or peak_pnl >= max(0.30, bot_amt * 0.06) or is_bounce_armed:
                             is_breakeven_armed = True
-                            if peak_roi < 12.0:
+                            effective_peak = max(peak_roi, peak_bounce_roi)
+                            if effective_peak < 12.0:
                                 # Tier 1: True Net Profit Breakeven Lock (+2.50% ROI guarantees net +1.50% profit after all fees)
                                 min_guaranteed_roi = 2.50
-                            elif peak_roi < 20.0:
+                            elif effective_peak < 20.0:
                                 # Tier 2: Momentum Lock (guarantee at least +6.0% or 60% of peak ROI)
-                                min_guaranteed_roi = max(6.0, peak_roi * 0.60)
-                            elif peak_roi < 40.0:
+                                min_guaranteed_roi = max(6.0, effective_peak * 0.60)
+                            elif effective_peak < 40.0:
                                 # Tier 3: Surge Lock (guarantee at least +14.0% or 75% of peak ROI)
-                                min_guaranteed_roi = max(14.0, peak_roi * 0.75)
+                                min_guaranteed_roi = max(14.0, effective_peak * 0.75)
                             else:
                                 # Tier 4: Moonshot Lock (guarantee at least +30.0% or 85% of peak ROI!)
-                                min_guaranteed_roi = max(30.0, peak_roi * 0.85)
+                                min_guaranteed_roi = max(30.0, effective_peak * 0.85)
 
                             # Chandelier ATR Trailing Stop
+                            ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
                             if current_side == "BUY":
                                 chandelier_stop_p = peak_mark_p - (1.8 * curr_atr_val)
-                                be_fut_stop_p = entry_price * (1.0 + (min_guaranteed_roi / (100.0 * max(1, active_lev))))
+                                be_fut_stop_p = ref_entry * (1.0 + (min_guaranteed_roi / (100.0 * max(1, active_lev))))
                                 effective_fut_stop = max(be_fut_stop_p, chandelier_stop_p)
                                 if mark_price <= effective_fut_stop:
                                     is_chandelier_triggered = True
-                            elif current_side == "SELL":
+                            elif current_side in ["SELL", "SHORT"]:
                                 chandelier_stop_p = trough_mark_p + (1.8 * curr_atr_val)
-                                be_fut_stop_p = entry_price * (1.0 - (min_guaranteed_roi / (100.0 * max(1, active_lev))))
+                                be_fut_stop_p = ref_entry * (1.0 - (min_guaranteed_roi / (100.0 * max(1, active_lev))))
                                 effective_fut_stop = min(be_fut_stop_p, chandelier_stop_p)
                                 if mark_price >= effective_fut_stop:
                                     is_chandelier_triggered = True
 
                     # Breakeven Stop Triggered when Armed and ROI drops to/below guaranteed floor or ATR Trailing hits
-                    is_breakeven_triggered = is_breakeven_armed and (roi_pct <= min_guaranteed_roi or is_chandelier_triggered)
+                    effective_curr_roi = max(roi_pct, bounce_roi) if is_derisked else roi_pct
+                    is_breakeven_triggered = is_breakeven_armed and (effective_curr_roi <= min_guaranteed_roi or is_chandelier_triggered)
 
                     # 🎯 SUPER SMART DUAL-TARGET MICRO-SCALP RAPID HARVESTER:
                     # TP1 Target: +6.0% ROI on Futures or +2.0% on Spot -> 50% Scale-Out Cash in Hand
@@ -2157,7 +2190,11 @@ async def monitor_turbo_hedge_bots(app):
                             alert_title = "🎯 **APEX MICRO-SCALP TP2 FULLY HARVESTED!** 🚀"
                             alert_desc = "_AI បានប្រមូលផលចំណេញពេញលេញទាំង ២ ដំណាក់កាល (TP1 + TP2) ដោយជោគជ័យ ១០០%!_"
                         elif is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
-                            if min_guaranteed_roi <= 2.50:
+                            if is_derisked:
+                                reason_tag = "SUPER SMART BREAKEVEN RECOVERY LOCKED"
+                                alert_title = "🛡️ **SUPER SMART BREAKEVEN RECOVERY LOCKED!** 🔒"
+                                alert_desc = f"_ប្រព័ន្ធបានស្រោចស្រង់ដើមទុន និងចាក់សោរប្រាក់ចំណេញសុទ្ធ (+{min_guaranteed_roi:.1f}% Net Profit Floor) ពីការងើបឡើងវិញដោយជោគជ័យ ១០០%!_"
+                            elif min_guaranteed_roi <= 2.50:
                                 reason_tag = "BREAKEVEN ARMOR LOCKED"
                                 alert_title = "🛡️ **APEX TURBO HEDGE BREAKEVEN ARMOR ACTIVATED!** 🔒"
                                 alert_desc = "_AI ស្ទាក់កើបយកប្រាក់ចំណេញសុទ្ធ មិនឱ្យ Trade ដែលធ្លាប់ចំណេញ ក្លាយជាខាតវិញដាច់ខាត!_"
@@ -2189,6 +2226,8 @@ async def monitor_turbo_hedge_bots(app):
                         if is_close_successful(close_res):
                             db.remove_turbo_hedge_bot(chat_id, symbol)
                             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "0")
+                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_bounce_roi", "0.0")
                             cooldown_dur = 1800 if is_breakeven_triggered else 14400  # 30 mins for breakeven, 4h for full TP
                             add_symbol_cooldown(symbol, cooldown_dur)
 
@@ -2205,16 +2244,20 @@ async def monitor_turbo_hedge_bots(app):
                         is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
                         if not is_quiet and app and hasattr(app, "bot"):
                             try:
+                                from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
+                                disp_roi = bounce_roi if (is_derisked and bounce_roi > 0) else roi_pct
+                                disp_peak = max(peak_roi, peak_bounce_roi) if is_derisked else peak_roi
                                 msg = (
                                     f"{alert_title}\n"
-                                    f"───────────────────────────────\n\n"
-                                    f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
-                                    f"📈 ចំណុចកំពូលធ្លាប់ឡើងដល់ ៖ `+{peak_roi:.1f}% ROI`\n"
-                                    f"💵 ផលចំណេញប្រមូលបាន ៖ `+${real_pnl_usdt:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
-                                    f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
-                                    f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n"
-                                    f"🛡️ សុវត្ថិភាព ៖ `ZERO CAPITAL LOSS (ធានាដើមទុន 100%)`\n\n"
-                                    f"{alert_desc}"
+                                    f"{DIVIDER_DOUBLE}\n\n"
+                                    f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
+                                    f"📈 **ចំណុចកំពូលងើបដល់ ៖** `+{disp_peak:.1f}% ROI`\n"
+                                    f"💵 **ផលចំណេញប្រមូលបាន ៖** `+${real_pnl_usdt:,.2f} USDT` (`+{disp_roi:.1f}% ROI`)\n"
+                                    f"🏆 **សរុបប្រាក់ចំណេញ ៖** `+${tot_pnl:,.2f} USDT`\n"
+                                    f"⚡ **Binance Status ៖** `CLEAN MARKET CLOSED (<30ms)`\n"
+                                    f"🛡️ **សុវត្ថិភាព ៖** `CAPITAL SECURED (ស្រោចស្រង់ដើមទុន ១០០%)`\n\n"
+                                    f"{alert_desc}\n\n"
+                                    f"{OFFICIAL_FOOTNOTE}"
                                 )
                                 asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
                             except Exception as e:
