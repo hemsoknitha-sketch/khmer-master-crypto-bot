@@ -4466,6 +4466,9 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_swap_auto_20":
                 context.args = ["AUTO", "20", "1234"]
                 await smart_swap_command(update, context)
+            elif data == "btn_smart_swap_auto_new_20":
+                context.args = ["AUTO", "NEW", "20", "1234"]
+                await smart_swap_command(update, context)
             elif data == "btn_smart_swap_sol_50":
                 context.args = ["AUTO", "50", "SOLANA", "1234"]
                 await smart_swap_command(update, context)
@@ -10699,8 +10702,8 @@ class TelegramBotThread(BaseThread):
                         InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off")
                     ],
                     [
-                        InlineKeyboardButton("⚡ Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20"),
-                        InlineKeyboardButton("🚀 Solana Sniper ($50)", callback_data="btn_smart_swap_sol_50")
+                        InlineKeyboardButton("⚡ Auto Momentum ($20)", callback_data="btn_smart_swap_auto_20"),
+                        InlineKeyboardButton("🚀 Early Breakout ($20)", callback_data="btn_smart_swap_auto_new_20")
                     ],
                     [
                         InlineKeyboardButton("🥞 BSC Gem Sniper ($20)", callback_data="btn_smart_swap_bsc_20"),
@@ -10721,45 +10724,45 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     menu_text = (
-                        "⚡ **KHMER MASTER CRYPTO | /smart_swap INSTITUTIONAL ON-CHAIN ENGINE** 🛡️\n"
-                        "══════════════════════════\n\n"
-                        "💡 **Special Recommendation:** `/smart_swap` is the institutional-grade multi-chain DEX aggregator & AI sniper engine on **Solana, Ethereum, and BNB Chain**.\n\n"
-                        "📊 **6-PILLAR INSTITUTIONAL ON-CHAIN ARCHITECTURE:**\n"
-                        "• 🛡️ **Sub-Second Honeypot & Rug-Pull AI Shield (<15ms):** Real-time bytecode audit for freeze authority, mint authority, and LP lock.\n"
-                        "• 🧠 **32 Wall Street AI Brain Models:** Volume velocity & smart money inflow scanning powered by PatchTST and XGBoost.\n"
-                        "• 🚀 **Jupiter Aggregator v6 & 1inch Routing:** Splits trades across Raydium, Orca, Meteora, Phoenix & PancakeSwap.\n"
-                        "• ⚡ **Private MEV Sandwich Shield:** Zero mempool exposure via Jito Bundles (Solana) & Flashbots Protect (EVM).\n"
-                        "• 💰 **PPO Dynamic Micro-Scalp Harvester:** 50% TP1 (+40% ROI) retrieves 100% initial capital; remaining 50% trails as risk-free moonbag!\n"
-                        "• 🔄 **24/7 Autonomous Auto-Pilot Loop:** Continuously scans & snipes breakout gems whenever capital is free!\n\n"
-                        "👉 **1-TAP COMMAND EXECUTIONS:**\n"
-                        "• `/smart_swap autopilot ON 20 1234` — Activate 24/7 recurring loop ($20/trade, auto-compounding)\n"
-                        "• `/smart_swap autopilot OFF 1234` — Stop 24/7 recurring auto-sniping loop\n"
-                        "• `/smart_swap wallet` — Dedicated Bot Hot Wallet & SOL deposit address for live on-chain trading\n"
-                        "• `/smart_swap auto 20 1234` — Auto-scan & snipe highest momentum verified gem with $20 USD\n"
-                        "• `/smart_swap SOL SOL USDC 1.5 1234` — Direct DEX swap SOL to USDC at best aggregator rate\n"
-                        "• `/smart_swap status` — Monitor active on-chain swap positions & live PnL\n"
-                        "• `/smart_swap stop all 1234` — Instant market exit of all active gems back to native SOL/USDT"
+                        f"⚡ **KHMER MASTER CRYPTO | /smart_swap INSTITUTIONAL ON-CHAIN ENGINE** 🛡️\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n\n"
+                        f"💡 **Special Recommendation:** `/smart_swap` is the institutional-grade multi-chain DEX aggregator & AI sniper engine on **Solana, Ethereum, and BNB Chain**.\n\n"
+                        f"📊 **6-PILLAR INSTITUTIONAL ON-CHAIN ARCHITECTURE:**\n"
+                        f"• 🛡️ **Sub-Second Honeypot & Rug-Pull AI Shield (<15ms):** Real-time bytecode audit for freeze authority, mint authority, and LP lock.\n"
+                        f"• 🧠 **32 Wall Street AI Brain Models:** Volume velocity & smart money inflow scanning powered by PatchTST and XGBoost.\n"
+                        f"• 🚀 **Jupiter Aggregator v6 & 1inch Routing:** Splits trades across Raydium, Orca, Meteora, Phoenix & PancakeSwap.\n"
+                        f"• ⚡ **Private MEV Sandwich Shield:** Zero mempool exposure via Jito Bundles (Solana) & Flashbots Protect (EVM).\n"
+                        f"• 💰 **3-Stage Profit Harvester + Breakeven Armor:** +8% arms Breakeven (+2% net), TP1 (+35%) recovers 100% capital into SOL, 50% Moonbag trails 12% from peak!\n"
+                        f"• 🔄 **24/7 Autonomous Auto-Pilot Loop:** Continuously scans & snipes breakout gems whenever capital is free!\n\n"
+                        f"👉 **1-TAP COMMAND EXECUTIONS:**\n"
+                        f"• `/smart_swap auto 20 1234` — Snipe highest momentum verified gem ($20 USD)\n"
+                        f"• `/smart_swap auto new 20 1234` — Snipe fresh early breakout gem with 100% Anti-Scam Shield\n"
+                        f"• `/smart_swap autopilot ON 20 1234` — Activate 24/7 recurring loop ($20/trade)\n"
+                        f"• `/smart_swap autopilot OFF 1234` — Stop 24/7 recurring auto-sniping loop\n"
+                        f"• `/smart_swap wallet` — Dedicated Bot Hot Wallet & SOL deposit address for live trading\n"
+                        f"• `/smart_swap status` — Monitor active on-chain swap positions & live PnL\n"
+                        f"• `/smart_swap stop all 1234` — Instant market exit of all active gems back to native SOL/USDT"
                     )
                 else:
                     menu_text = (
-                        "⚡ **KHMER MASTER CRYPTO | /smart_swap ម៉ាស៊ីនជួញដូរ ON-CHAIN SUPER SMART** 🛡️\n"
-                        "══════════════════════════\n\n"
-                        "💡 **ការណែនាំពិសេស ៖** `/smart_swap` គឺជាម៉ាស៊ីនជួញដូរ DEX Aggregator និង AI Gem Sniper កំពូលនៅលើបណ្តាញ **Solana, Ethereum, និង BNB Chain**!\n\n"
-                        "📊 **ស្ថាបត្យកម្ម INSTITUTIONAL ON-CHAIN កំពូលទាំង ៦ ៖**\n"
-                        "• 🛡️ **Honeypot & Rug-Pull AI Shield (<15ms) ៖** ពិនិត្យ Smart Contract អូតូ (Freeze Authority, Mint Authority និង LP Locked 100%)\n"
-                        "• 🧠 **32 Wall Street AI Brain Models ៖** ស្កេនលុយធំ Smart Money Inflow និង Volume Velocity តាមម៉ូដែល PatchTST + XGBoost\n"
-                        "• 🚀 **Jupiter Aggregator v6 & 1inch Router ៖** បំបែកផ្លូវជួញដូរល្អបំផុតលើ Raydium, Orca, Meteora, Phoenix និង PancakeSwap\n"
-                        "• ⚡ **Private MEV Sandwich Shield ៖** ការពារការលួច Front-run / Sandwich តាមរយៈ Jito Private Bundles & Flashbots Protect\n"
-                        "• 💰 **PPO Dynamic Trailing Harvester ៖** TP1 (+40% ROI) លក់ 50% ដកយកដើមទុន ១០០% មកវិញភ្លាមៗ រីឯ 50% ទៀតក្លាយជា Moonbag គ្មានហានិភ័យ!\n"
-                        "• 🔄 **24/7 Continuous Auto-Pilot Loop ៖** ដើរស្កេន និងបាញ់ទិញកាក់ Gem វិលជុំស្វ័យប្រវត្តិ ២៤/៧ រាល់ពេលកាបូបមានទុនទំនេរ!\n\n"
-                        "👉 **បញ្ជាផ្ទាល់តាមពាក្យគន្លឹះ (1-Tap Executions) ៖**\n"
-                        "• `/smart_swap autopilot ON 20 1234` — បើកដំណើរការវិលជុំ ២៤/៧ បាញ់កាក់ Gem អូតូ (ទុន $20/Trade)\n"
-                        "• `/smart_swap autopilot OFF 1234` — បិទដំណើរការវិលជុំ ២៤/៧ វិញ\n"
-                        "• `/smart_swap wallet` — ពិនិត្យកាបូប Hot Wallet របស់ Bot និងអាសយដ្ឋានផ្ញើ SOL ដើម្បីទិញកាក់ On-Chain ពិត\n"
-                        "• `/smart_swap auto 20 1234` — ស្កេននិងទិញកាក់ Gem ផ្ទុះខ្លាំងបំផុតដោយស្វ័យប្រវត្តិទុន $20 USD\n"
-                        "• `/smart_swap SOL SOL USDC 1.5 1234` — Swap ផ្ទាល់ពី SOL ទៅ USDC ក្នុងអត្រា aggregator ចំណេញបំផុត\n"
-                        "• `/smart_swap status` — ពិនិត្យមើលស្ថានភាពកាក់កំពុងកាន់កាប់ និងប្រាក់ចំណេញ PnL Live\n"
-                        "• `/smart_swap stop all 1234` — បិទលក់កាក់ទាំងអស់ប្តូរយកដើមទុន SOL/USDT មកវិញភ្លាមៗ"
+                        f"⚡ **KHMER MASTER CRYPTO | /smart_swap ម៉ាស៊ីនជួញដូរ ON-CHAIN SUPER SMART** 🛡️\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n\n"
+                        f"💡 **ការណែនាំពិសេស ៖** `/smart_swap` គឺជាម៉ាស៊ីនជួញដូរ DEX Aggregator និង AI Gem Sniper កំពូលនៅលើបណ្តាញ **Solana, Ethereum, និង BNB Chain**!\n\n"
+                        f"📊 **ស្ថាបត្យកម្ម INSTITUTIONAL ON-CHAIN កំពូលទាំង ៦ ៖**\n"
+                        f"• 🛡️ **Honeypot & Rug-Pull AI Shield (<15ms) ៖** ពិនិត្យ Smart Contract អូតូ (Freeze Authority, Mint Authority និង LP Locked 100%)\n"
+                        f"• 🧠 **32 Wall Street AI Brain Models ៖** ស្កេនលុយធំ Smart Money Inflow និង Volume Velocity តាមម៉ូដែល PatchTST + XGBoost\n"
+                        f"• 🚀 **Jupiter Aggregator v6 & 1inch Router ៖** បំបែកផ្លូវជួញដូរល្អបំផុតលើ Raydium, Orca, Meteora, Phoenix និង PancakeSwap\n"
+                        f"• ⚡ **Private MEV Sandwich Shield ៖** ការពារការលួច Front-run / Sandwich តាមរយៈ Jito Private Bundles & Flashbots Protect\n"
+                        f"• 💰 **3-Stage Harvester + Breakeven Armor ៖** +8% ចាក់សោរ Breakeven (+2% Net), TP1 (+35%) ដកដើម ១០០% ចូលកាបូប SOL, 50% Moonbag Trailing 12% តាមដានចំណុចកំពូល!\n"
+                        f"• 🔄 **24/7 Continuous Auto-Pilot Loop ៖** ដើរស្កេន និងបាញ់ទិញកាក់ Gem វិលជុំស្វ័យប្រវត្តិ ២៤/៧ រាល់ពេលកាបូបមានទុនទំនេរ!\n\n"
+                        f"👉 **បញ្ជាផ្ទាល់តាមពាក្យគន្លឹះ (1-Tap Executions) ៖**\n"
+                        f"• `/smart_swap auto 20 1234` — ស្កេននិងទិញកាក់ Momentum កំពូល ($20 USD)\n"
+                        f"• `/smart_swap auto new 20 1234` — ស្កេនទិញកាក់ Early Breakout ថ្មីៗដោយមានប្រព័ន្ធ Anti-Scam Shield\n"
+                        f"• `/smart_swap autopilot ON 20 1234` — បើកដំណើរការវិលជុំ ២៤/៧ បាញ់កាក់ Gem អូតូ ($20/Trade)\n"
+                        f"• `/smart_swap autopilot OFF 1234` — បិទដំណើរការវិលជុំ ២៤/៧ វិញ\n"
+                        f"• `/smart_swap wallet` — ពិនិត្យកាបូប Hot Wallet របស់ Bot និងអាសយដ្ឋានផ្ញើ SOL\n"
+                        f"• `/smart_swap status` — ពិនិត្យមើលស្ថានភាពកាក់កំពុងកាន់កាប់ និង Breakeven Armor\n"
+                        f"• `/smart_swap stop all 1234` — បិទលក់កាក់ទាំងអស់ប្តូរយកដើមទុន SOL/USDT មកវិញភ្លាមៗ On-Chain"
                     )
 
                 if msg_target:
@@ -11139,30 +11142,47 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text(stop_msg, parse_mode="Markdown")
                 return
 
-            # 3b. AUTOPILOT [ON/OFF/STATUS] [AMOUNT] [PIN] (e.g. /smart_swap autopilot ON 20 1234)
+            # 3b. AUTOPILOT [ON/OFF/STATUS] [AMOUNT] [PIN] (e.g. /smart_swap autopilot ON 20 1234 or /smart_swap autopilot new ON 20 1234)
             if subcmd in ["AUTOPILOT", "PILOT"]:
-                action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
+                action = "STATUS"
+                pilot_mode = "AUTO"
                 amount_usd = 20.0
                 pin_input = "1234"
                 
                 # Check arguments
-                for a in args[2:]:
-                    if str(a).replace('.', '', 1).isdigit():
-                        if "." in str(a) or float(a) > 4:
-                            try: amount_usd = float(a)
+                all_tokens_upper = [str(a).upper().strip() for a in args[1:]]
+                if "NEW" in all_tokens_upper:
+                    pilot_mode = "NEW"
+                if "ON" in all_tokens_upper:
+                    action = "ON"
+                elif "OFF" in all_tokens_upper:
+                    action = "OFF"
+                elif "STATUS" in all_tokens_upper:
+                    action = "STATUS"
+                elif len(args) > 1 and str(args[1]).upper().strip() in ["ON", "OFF", "STATUS"]:
+                    action = str(args[1]).upper().strip()
+
+                for a in args[1:]:
+                    a_str = str(a).strip()
+                    if a_str.upper() in ["ON", "OFF", "STATUS", "NEW", "AUTO"]:
+                        continue
+                    if a_str.replace('.', '', 1).isdigit():
+                        if "." in a_str or float(a_str) > 4:
+                            try: amount_usd = float(a_str)
                             except: pass
-                        elif len(str(a)) == 4 and str(a).isdigit():
-                            pin_input = str(a).strip()
-                    elif len(str(a)) == 4 and str(a).isdigit():
-                        pin_input = str(a).strip()
+                        elif len(a_str) == 4 and a_str.isdigit():
+                            pin_input = a_str
+                    elif len(a_str) == 4 and a_str.isdigit():
+                        pin_input = a_str
 
                 if action == "ON":
                     if not (update.callback_query or db.verify_user_pin(chat_id, pin_input)):
                         if msg_target:
-                            await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap autopilot ON 20 1234`)", parse_mode="Markdown")
+                            await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap autopilot ON 20 1234` ឬ `/smart_swap autopilot new ON 20 1234`)", parse_mode="Markdown")
                         return
 
-                    res = smart_swap_engine.toggle_smart_swap_autopilot(chat_id, enable=True, amount_usd=amount_usd, max_positions=2, pin=pin_input)
+                    res = smart_swap_engine.toggle_smart_swap_autopilot(chat_id, enable=True, amount_usd=amount_usd, max_positions=2, pin=pin_input, mode=pilot_mode)
+                    mode_display = "Early Breakout Radar (10m-24h, LP Locked ≥95%)" if pilot_mode == "NEW" else "High-Liquidity Momentum (Liq ≥$50k, LP Locked ≥90%)"
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                     kb = InlineKeyboardMarkup([
                         [
@@ -11176,12 +11196,14 @@ class TelegramBotThread(BaseThread):
                     ])
                     on_msg = (
                         f"🚀 **APEX SMART SWAP | 24/7 AUTONOMOUS AUTO-PILOT ENABLED** 🛰️\n"
-                        f"───────────────────────────────\n\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                         f"• ស្ថានភាព ៖ `🟢 ACTIVE 24/7 (កំពុងដំណើរការវិលជុំជាប់រហូត)`\n"
+                        f"• ប្រព័ន្ធស្កេន (Mode) ៖ `{pilot_mode}` ({mode_display})\n"
                         f"• ទុនវិនិយោគ / Trade ៖ `${res.get('amount_usd', amount_usd):.2f} USD`\n"
                         f"• Max Concurrency ៖ `{res.get('max_positions', 2)} កាក់ក្នុងពេលតែមួយ`\n"
                         f"• បណ្តាញ ៖ `Solana Mainnet (Jupiter v6 + Jito Private MEV)`\n"
-                        f"• យុទ្ធសាស្ត្រ ៖ `TP1 +40% (ដកដើម ១០០%) | Trailing Moonbag 50%`\n"
+                        f"• ប្រព័ន្ធការពារ ៖ `Zero-Trust Honeypot Shield (<15ms Bytecode Gate)`\n"
+                        f"• យុទ្ធសាស្ត្រ ៖ `Breakeven Armor (+8%) | TP1 +35% (ដកដើម ១០០%) | Trailing Moonbag 50%`\n"
                         f"• ប្រតិបត្តិការ ៖ `រាល់ពេលកាក់ចាស់ Take Profit ដកដើមរួច ម៉ាស៊ីននឹងស្កេនបាញ់កាក់ Gem ថ្មីភ្លាមៗ`\n\n"
                         f"💡 *ប្រព័ន្ធនឹងដើរស្កេន និងកើបចំណេញដោយស្វ័យប្រវត្ត ២៤/៧ រហូតដល់លោកអ្នកចុច OFF!*"
                     )
@@ -11200,7 +11222,7 @@ class TelegramBotThread(BaseThread):
                     ])
                     off_msg = (
                         f"🛑 **APEX SMART SWAP | 24/7 AUTO-PILOT DISABLED** 🔒\n"
-                        f"───────────────────────────────\n\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                         f"• ស្ថានភាព ៖ `🔴 DISABLED (បានបិទការចូលទិញវិលជុំ ២៤/៧)`\n"
                         f"• កាក់ដែលកំពុងកាន់កាប់ ៖ `នៅតែបន្ត Trailing Stop និង Take Profit ធម្មតា`\n\n"
                         f"💡 *លោកអ្នកអាចបើកឡើងវិញគ្រប់ពេលដោយវាយ `/smart_swap autopilot ON 20 1234` ឬចុចប៊ូតុងខាងក្រោម ៖*"
@@ -11214,6 +11236,8 @@ class TelegramBotThread(BaseThread):
                     cfg = db.get_smart_swap_autopilot_config(chat_id)
                     active_swaps = db.get_active_smart_swaps(chat_id=chat_id) or []
                     st_str = "🟢 ACTIVE 24/7 (កំពុងរត់)" if cfg.get("enabled") else "🔴 STANDBY (បានបិទ)"
+                    saved_mode = cfg.get("mode", "AUTO")
+                    mode_disp = "Early Breakout Radar (10m-24h)" if saved_mode == "NEW" else "High-Liquidity Momentum"
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                     btn_toggle = InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off") if cfg.get("enabled") else InlineKeyboardButton("⚡ បើក Auto-Pilot 24/7", callback_data="btn_smart_swap_autopilot_on")
                     kb = InlineKeyboardMarkup([
@@ -11222,51 +11246,65 @@ class TelegramBotThread(BaseThread):
                     ])
                     stat_msg = (
                         f"🛰️ **APEX SMART SWAP | 24/7 AUTONOMOUS AUTO-PILOT STATUS** 📊\n"
-                        f"───────────────────────────────\n\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                         f"• ស្ថានភាពបច្ចុប្បន្ន ៖ `{st_str}`\n"
+                        f"• ប្រព័ន្ធស្កេន (Mode) ៖ `{saved_mode}` ({mode_disp})\n"
                         f"• ទុនវិនិយោគ / Trade ៖ `${cfg.get('amount', 20.0):.2f} USD`\n"
                         f"• កាក់កំពុងកាន់កាប់ ៖ `{len(active_swaps)} / {cfg.get('max_positions', 2)} កាក់`\n"
                         f"• បណ្តាញជួញដូរ ៖ `{cfg.get('chain', 'SOLANA')}`\n"
                         f"• ប្រព័ន្ធការពារ ៖ `Jito Private MEV + Sub-Second Honeypot Shield`\n\n"
-                        f"💡 *វាយ `/smart_swap autopilot ON 20 1234` ដើម្បីបើក ឬ `/smart_swap autopilot OFF 1234` ដើម្បីបិទ*"
+                        f"💡 *វាយ `/smart_swap autopilot ON 20 1234` ឬ `/smart_swap autopilot new ON 20 1234` ដើម្បីបើក*"
                     )
                     if msg_target:
                         await msg_target.reply_text(stat_msg, parse_mode="Markdown", reply_markup=kb)
                     return
 
-            # 4. AUTO [AMOUNT] [PIN] (e.g. /smart_swap auto 20 1234)
+            # 4. AUTO [AMOUNT] [PIN] or AUTO NEW [AMOUNT] [PIN] (e.g. /smart_swap auto 20 1234 or /smart_swap auto new 20 1234)
             if subcmd == "AUTO":
                 amount_usd = 20.0
                 pin_input = "1234"
                 chain_choice = "SOLANA"
+                swap_mode = "AUTO"
 
-                if len(args) > 1:
-                    try:
-                        amount_usd = float(args[1])
-                    except ValueError:
-                        amount_usd = 20.0
+                remaining_tokens = []
+                for a in args[1:]:
+                    tok = str(a).strip()
+                    if tok.upper() == "NEW":
+                        swap_mode = "NEW"
+                    elif tok.upper() in ["SOL", "SOLANA", "BSC", "BNB", "ETH"]:
+                        chain_choice = "SOLANA" if tok.upper() in ["SOL", "SOLANA"] else "BSC"
+                    else:
+                        remaining_tokens.append(tok)
 
-                if len(args) > 2:
-                    if args[2].isdigit():
-                        pin_input = str(args[2]).strip()
-                    elif str(args[2]).upper() in ["SOL", "SOLANA", "BSC", "BNB", "ETH"]:
-                        chain_choice = "SOLANA" if str(args[2]).upper() in ["SOL", "SOLANA"] else "BSC"
-                        if len(args) > 3 and args[3].isdigit():
-                            pin_input = str(args[3]).strip()
+                for tok in remaining_tokens:
+                    if tok.replace('.', '', 1).isdigit():
+                        if "." in tok or float(tok) > 4:
+                            try:
+                                amount_usd = float(tok)
+                            except ValueError:
+                                pass
+                        elif len(tok) == 4 and tok.isdigit():
+                            pin_input = tok
+                    elif len(tok) == 4 and tok.isdigit():
+                        pin_input = tok
 
                 if not (update.callback_query or db.verify_user_pin(chat_id, pin_input)):
                     if msg_target:
-                        await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap auto 20 1234`)", parse_mode="Markdown")
+                        await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap auto 20 1234` ឬ `/smart_swap auto new 20 1234`)", parse_mode="Markdown")
                     return
 
+                mode_title = "EARLY BREAKOUT RADAR" if swap_mode == "NEW" else "MOMENTUM GEM SNIPER"
+                mode_desc = "10m-24h Early Gems, LP Locked ≥95%" if swap_mode == "NEW" else "High-Liquidity Breakouts, LP Locked ≥90%"
                 ack_msg = None
                 if msg_target:
                     ack_msg = await msg_target.reply_text(
-                        f"⚡ **[SMART SWAP GEM SNIPER LAUNCHED]** 🛰️\n"
+                        f"⚡ **[SMART SWAP {mode_title} LAUNCHED]** 🛰️\n"
+                        f"• Mode ៖ `{swap_mode}` ({mode_desc})\n"
                         f"• Chain ៖ `{chain_choice}`\n"
                         f"• Capital ៖ `${amount_usd:.2f} USD`\n"
                         f"• AI Consensus ៖ `32 Wall Street Models Scanning DexScreener & Birdeye...`\n"
-                        f"• Honeypot Shield ៖ `Sub-Second Bytecode Verification Active (<15ms)...`",
+                        f"• Honeypot Shield ៖ `Sub-Second Bytecode Verification Active (<15ms)...`\n"
+                        f"• Profit Armor ៖ `Breakeven Armor (+8%) + 3-Stage Profit Harvester`",
                         parse_mode="Markdown"
                     )
 
@@ -11277,7 +11315,8 @@ class TelegramBotThread(BaseThread):
                             chat_id=chat_id,
                             amount_usd=amount_usd,
                             chain=chain_choice,
-                            pin=pin_input
+                            pin=pin_input,
+                            mode=swap_mode
                         )
                         if res.get("status") == "success":
                             gem_name = res.get("gem_name", "GEM")
@@ -11294,6 +11333,7 @@ class TelegramBotThread(BaseThread):
                             bot_sol = res.get("bot_sol_balance", 0.0)
                             tx_h = res.get("tx_hash", "ONCHAIN_TX")
                             recipient_addr = res.get("recipient") or res.get("bot_wallet") or str(chat_id)
+                            lp_lock = res.get("lp_locked_pct", 100.0)
 
                             if is_live:
                                 exec_line = "⚡ **Execution ៖** `🟢 LIVE ON-CHAIN MAINNET (Jupiter DEX)`"
@@ -11308,21 +11348,24 @@ class TelegramBotThread(BaseThread):
 
                             card = (
                                 f"⚡ **KHMER MASTER CRYPTO | SMART SWAP GEM SNIPER SUCCESS** 🚀\n"
-                                f"───────────────────────────────\n\n"
+                                f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                                 f"🪙 **កាក់គោលដៅ (Target Gem) ៖** `{gem_name}` ({chain_out})\n"
+                                f"🏷️ **ប្រព័ន្ធស្កេន (Radar Mode) ៖** `{swap_mode}` ({'Early Breakout' if swap_mode == 'NEW' else 'Momentum'})\n"
                                 f"💰 **ទំហំដើមទុនវិនិយោគ ៖** `${amt_u:,.2f} USD`\n"
                                 f"🎯 **ចំនួនកាក់ទទួលបាន ៖** `{t_qty:,.4f} {gem_name}`\n"
                                 f"💵 **តម្លៃចូលទិញ (Entry Price) ៖** `${e_price:.6f}`\n"
                                 f"🧠 **AI Momentum Score ៖** `{ai_sc}/100` (PatchTST + XGBoost)\n"
                                 f"📈 **5m Buy Velocity ៖** `{b_vel:.1f}x` (ចំនួនអ្នកទិញច្រើនជាងអ្នកលក់)\n"
                                 f"🛡️ **Honeypot Audit ៖** `100% ស្អាតគ្មានហានិភ័យ (Freeze/Mint Revoked)`\n"
+                                f"🔒 **Liquidity Lock ៖** `{lp_lock:.1f}% Locked`\n"
                                 f"{exec_line}\n"
                                 f"🛡️ **MEV Protection ៖** `{mev}` (គ្មានការលួច Front-run)\n"
-                                f"🌾 **24/7 Profit Harvester ៖** `TP1 +40% (ដកដើមទុន ១០០%) | Moonbag 50% Trailing`\n"
+                                f"🌾 **Breakeven Armor ៖** `Active (+8% -> Breakeven Locked Entry +2%)`\n"
+                                f"💰 **Profit Harvester ៖** `TP1 +35% (ដកដើមទុន ១០០%) | Trailing Moonbag 50%`\n"
                                 f"💼 **Settlement Vault ៖** `{recipient_addr[:6]}...{recipient_addr[-4:]}`\n"
                                 f"🔗 **Tx Reference ៖** `{tx_h}`\n"
                                 f"{live_tx_line}\n\n"
-                                f"🔄 **ប្រព័ន្ធ AI កំពុងតាមដានតម្លៃ 24/7 ដើម្បីកើបផលចំណេញអូតូ...**"
+                                f"🔄 **ប្រព័ន្ធ AI កំពុងតាមដានតម្លៃ 24/7 ដើម្បីការពារដើមទុន & កើបផលចំណេញអូតូ...**"
                             )
                             card_kb = InlineKeyboardMarkup([
                                 [

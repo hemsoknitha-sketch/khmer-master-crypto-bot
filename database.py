@@ -1712,11 +1712,13 @@ def get_active_smart_swaps(chat_id: int = None, chain: str = None) -> list:
     except Exception:
         return []
 
-def update_smart_swap_peak(swap_id: int, current_price: float, scale_out_level: int = None):
-    """Updates the highest peak price or scale-out status reached by an active smart swap."""
+def update_smart_swap_peak(swap_id: int, current_price: float, scale_out_level: int = None, remaining_qty: float = None):
+    """Updates the highest peak price, scale-out status, or remaining quantity of an active smart swap."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    if scale_out_level is not None:
+    if scale_out_level is not None and remaining_qty is not None:
+        cursor.execute("UPDATE active_smart_swaps SET peak_price = MAX(peak_price, ?), scale_out_level = ?, token_qty = ? WHERE id = ?", (float(current_price), int(scale_out_level), float(remaining_qty), int(swap_id)))
+    elif scale_out_level is not None:
         cursor.execute("UPDATE active_smart_swaps SET peak_price = MAX(peak_price, ?), scale_out_level = ? WHERE id = ?", (float(current_price), int(scale_out_level), int(swap_id)))
     else:
         cursor.execute("UPDATE active_smart_swaps SET peak_price = MAX(peak_price, ?) WHERE id = ?", (float(current_price), int(swap_id)))
@@ -4506,14 +4508,18 @@ def restore_state_snapshot() -> dict:
 # 🚀 SMART SWAP 24/7 AUTONOMOUS CONTINUOUS AUTO-PILOT SETTINGS
 # ==============================================================================
 
-def set_smart_swap_autopilot_config(chat_id: int, enabled: bool, amount: float = 20.0, max_positions: int = 2, chain: str = "SOLANA"):
+def set_smart_swap_autopilot_config(chat_id: int, enabled: bool, amount: float = 20.0, max_positions: int = 2, chain: str = "SOLANA", mode: str = "AUTO", **kwargs):
     """
     Saves or updates 24/7 Smart Swap Auto-Pilot configuration for a user.
+    Supports mode='AUTO' (high liquidity momentum) or mode='NEW' (early breakout).
     """
+    if "amount_usd" in kwargs and kwargs["amount_usd"] is not None:
+        amount = kwargs["amount_usd"]
     update_system_setting(f"smart_swap_autopilot_{chat_id}_enabled", "1" if enabled else "0")
     update_system_setting(f"smart_swap_autopilot_{chat_id}_amount", str(amount))
     update_system_setting(f"smart_swap_autopilot_{chat_id}_max_pos", str(max_positions))
     update_system_setting(f"smart_swap_autopilot_{chat_id}_chain", str(chain).upper())
+    update_system_setting(f"smart_swap_autopilot_{chat_id}_mode", str(mode).upper())
 
 def get_smart_swap_autopilot_config(chat_id: int) -> dict:
     """
@@ -4523,6 +4529,7 @@ def get_smart_swap_autopilot_config(chat_id: int) -> dict:
     amt_str = get_system_setting(f"smart_swap_autopilot_{chat_id}_amount", "20.0")
     max_pos_str = get_system_setting(f"smart_swap_autopilot_{chat_id}_max_pos", "2")
     chain = get_system_setting(f"smart_swap_autopilot_{chat_id}_chain", "SOLANA")
+    mode = get_system_setting(f"smart_swap_autopilot_{chat_id}_mode", "AUTO")
     try:
         amt = float(amt_str)
     except Exception:
@@ -4535,7 +4542,8 @@ def get_smart_swap_autopilot_config(chat_id: int) -> dict:
         "enabled": enabled,
         "amount": amt,
         "max_positions": max_pos,
-        "chain": chain
+        "chain": chain,
+        "mode": mode
     }
 
 def get_all_active_smart_swap_autopilots() -> list:

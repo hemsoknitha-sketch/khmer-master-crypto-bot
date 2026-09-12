@@ -565,6 +565,15 @@ def execute_jupiter_live_swap(
             "required_sol": round((amount_lamports + 5000000) / 1e9, 4),
             "current_sol": bal_info["sol_balance"]
         }
+    elif not is_sol_input and (bal_info["lamports"] < 2000000): # 0.002 SOL reserve for transaction fee when selling SPL tokens
+        return {
+            "status": "error",
+            "reason": "INSUFFICIENT_SOL_GAS",
+            "msg": f"កាបូប {pub[:6]}...{pub[-4:]} មានសមតុល្យ SOL តិចជាង 0.002 SOL មិនគ្រប់គ្រាន់សម្រាប់បង់ថ្លៃ Gas ពេលលក់កាក់ឡើយ។",
+            "bot_wallet": pub,
+            "required_sol": 0.002,
+            "current_sol": bal_info["sol_balance"]
+        }
 
     # 1. Fetch Route Quote
     quote_url = (
@@ -663,3 +672,77 @@ def execute_jupiter_live_swap(
         "price_impact_pct": round(price_impact, 4),
         "bot_wallet": pub
     }
+
+def get_user_spl_token_balance(chat_id: int, token_mint: str) -> dict:
+    """
+    Queries on-chain SPL token account balance for a user's dedicated Solana wallet.
+    Returns amount_raw (atomic integer units), ui_amount (float), and decimals (int).
+    """
+    priv, pub = get_or_create_user_solana_wallet(chat_id)
+    token_mint_str = str(token_mint).strip()
+    try:
+        payload = {
+            "jsonrpc": "2.0",
+            "id": int(time.time()),
+            "method": "getTokenAccountsByOwner",
+            "params": [
+                pub,
+                {"mint": token_mint_str},
+                {"encoding": "jsonParsed"}
+            ]
+        }
+        req = urllib.request.Request(
+            SOLANA_RPC_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            value = data.get("result", {}).get("value", [])
+            if value:
+                token_amount_info = value[0].get("account", {}).get("data", {}).get("parsed", {}).get("info", {}).get("tokenAmount", {})
+                raw_amt = int(token_amount_info.get("amount", 0))
+                ui_amt = float(token_amount_info.get("uiAmount", 0.0) or 0.0)
+                decimals = int(token_amount_info.get("decimals", 6))
+                return {"amount_raw": raw_amt, "ui_amount": ui_amt, "decimals": decimals}
+    except Exception as e:
+        print(f"[SPL_TOKEN_BAL] Error querying token balance for user {chat_id}: {e}")
+    return {"amount_raw": 0, "ui_amount": 0.0, "decimals": 6}
+
+def execute_live_token_sell_to_sol(
+    chat_id: int,
+    token_mint: str,
+    amount_token_raw: int = None,
+    slippage_bps: int = 150
+) -> dict:
+    """
+    Executes a real on-chain SELL order of an SPL token back to native SOL via Jupiter DEX:
+    - Automatically signs with user's dedicated Ed25519 keypair.
+    - wrapAndUnwrapSol=True automatically deposits native SOL directly into user's wallet.
+    - Returns tx_hash, solscan_url, and received SOL lamports.
+    """
+    priv, pub = get_or_create_user_solana_wallet(chat_id)
+    sol_mint = "So11111111111111111111111111111111111111112"
+    token_mint_str = str(token_mint).strip()
+    
+    if not amount_token_raw or int(amount_token_raw) <= 0:
+        bal_data = get_user_spl_token_balance(chat_id, token_mint_str)
+        amount_token_raw = bal_data.get("amount_raw", 0)
+        
+    if not amount_token_raw or int(amount_token_raw) <= 0:
+        return {
+            "status": "error",
+            "reason": "ZERO_TOKEN_BALANCE",
+            "msg": f"No on-chain SPL token balance found for {token_mint_str} to sell."
+        }
+        
+    return execute_jupiter_live_swap(
+        from_mint=token_mint_str,
+        to_mint=sol_mint,
+        amount_lamports=int(amount_token_raw),
+        slippage_bps=slippage_bps,
+        wrap_unwrap_sol=True,
+        signing_priv_key=priv,
+        user_pubkey=pub
+    )
+
