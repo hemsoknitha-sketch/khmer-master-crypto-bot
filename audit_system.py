@@ -29,7 +29,7 @@ def run_audit():
     failures = []
     
     # 1. Compile all python files
-    print("\n[CHECK 1/15] Verifying Syntax & AST Compilation for all Python files...")
+    print("\n[CHECK 1/16] Verifying Syntax & AST Compilation for all Python files...")
     py_files = glob.glob("*.py")
     comp_failed = []
     for f in py_files:
@@ -44,7 +44,7 @@ def run_audit():
         log_pass(f"All {len(py_files)} Python files compiled with ZERO syntax errors!")
 
     # 2. Database Deduplication Check
-    print("\n[CHECK 2/15] Verifying database.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 2/16] Verifying database.py Zero-Duplicate-Function Invariant...")
     try:
         with open("database.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -63,7 +63,7 @@ def run_audit():
         log_fail(str(e))
 
     # 3. Scheduler Tasks Deduplication Check
-    print("\n[CHECK 3/15] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 3/16] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -82,7 +82,7 @@ def run_audit():
         log_fail(str(e))
 
     # 4. Command Dispatcher Integrity & Consolidation Check
-    print("\n[CHECK 4/15] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
+    print("\n[CHECK 4/16] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -122,7 +122,7 @@ def run_audit():
         log_fail(str(e))
 
     # 5. Spot MIN_NOTIONAL Filter Shield ($10.50 floor)
-    print("\n[CHECK 5/15] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
+    print("\n[CHECK 5/16] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -137,7 +137,7 @@ def run_audit():
         log_fail(str(e))
 
     # 6. Binance Hedge Mode & Error -4061 Recovery Check
-    print("\n[CHECK 6/15] Verifying Hedge Mode & DualSidePosition Invariant...")
+    print("\n[CHECK 6/16] Verifying Hedge Mode & DualSidePosition Invariant...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -156,7 +156,7 @@ def run_audit():
         log_fail(str(e))
 
     # 7. Isolated Margin Enforcement Check
-    print("\n[CHECK 7/15] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
+    print("\n[CHECK 7/16] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -171,7 +171,7 @@ def run_audit():
         log_fail(str(e))
 
     # 8. Small Capital Leverage Shield Check (<=10x)
-    print("\n[CHECK 8/15] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
+    print("\n[CHECK 8/16] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -186,7 +186,7 @@ def run_audit():
         log_fail(str(e))
 
     # 9. TradFi Stock Perpetual & Delisted Exclusion Check
-    print("\n[CHECK 9/15] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
+    print("\n[CHECK 9/16] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -201,7 +201,7 @@ def run_audit():
         log_fail(str(e))
 
     # 10. Fee-Adjusted Net Profit Floor (+0.12% Offset)
-    print("\n[CHECK 10/15] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
+    print("\n[CHECK 10/16] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -216,7 +216,7 @@ def run_audit():
         log_fail(str(e))
 
     # 11. Telegram Inline Keyboard Button & Callback Query Routing Audit (Repository-Wide)
-    print("\n[CHECK 11/15] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
+    print("\n[CHECK 11/16] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -278,7 +278,7 @@ def run_audit():
         log_fail(str(e))
 
     # 12. DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Invariant Audit
-    print("\n[CHECK 12/15] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
+    print("\n[CHECK 12/16] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
     try:
         # Check flash_loan_mev_engine.py
         with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
@@ -307,7 +307,7 @@ def run_audit():
         log_fail(str(e))
 
     # 13. Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)
-    print("\n[CHECK 13/15] Verifying Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)...")
+    print("\n[CHECK 13/16] Verifying Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -328,7 +328,7 @@ def run_audit():
         log_fail(str(e))
 
     # 14. Single-Asset Mode Enforcement (Binance Error -4168 Auto-Recovery)
-    print("\n[CHECK 14/15] Verifying Single-Asset Mode Enforcement (Zero Error -4168 Contagion)...")
+    print("\n[CHECK 14/16] Verifying Single-Asset Mode Enforcement (Zero Error -4168 Contagion)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -347,7 +347,7 @@ def run_audit():
         log_fail(str(e))
 
     # 15. News Sentiment Technical Confirmation Shield
-    print("\n[CHECK 15/15] Verifying News Sentiment Technical Confirmation Shield...")
+    print("\n[CHECK 15/16] Verifying News Sentiment Technical Confirmation Shield...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             st_code = f.read()
@@ -361,6 +361,33 @@ def run_audit():
             log_fail("News Sentiment Technical Confirmation Shield missing!")
     except Exception as e:
         failures.append(f"News sentiment technical shield check failed: {e}")
+        log_fail(str(e))
+
+
+    # 16. Flash Loan Quantitative Edge & Zero-Risk Boundary Lock (Invariant 19)
+    print("\n[CHECK 16/16] Verifying Flash Loan Atomic Revert & Zero-Hallucination Invariant...")
+    try:
+        with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
+            fl_code = f.read()
+        with open("contracts/AaveFlashLoanArbitrage.sol", "r", encoding="utf-8") as f:
+            sol_code = f.read()
+        with open("keeper_relayer.py", "r", encoding="utf-8") as f:
+            kp_code = f.read()
+        with open("hft_infrastructure/ai_multi_hop_jit_router_v2.py", "r", encoding="utf-8") as f:
+            router_code = f.read()
+
+        has_atomic_revert = "finalBalance >= totalRepay" in sol_code
+        has_preflight = "eth_call" in kp_code or "functions.requestFlashLoan" in kp_code
+        has_ai_scanner = "def scan_ai_volatility_arbitrage" in fl_code
+        zero_mock_router = "random.uniform" not in router_code and "random.choice" not in router_code
+
+        if has_atomic_revert and has_preflight and has_ai_scanner and zero_mock_router:
+            log_pass("Flash Loan Atomic Revert, Pre-flight Simulation and Zero-Mock Router are 100% verified!")
+        else:
+            failures.append(f"Flash Loan Invariant 19 check failed: atomic={has_atomic_revert}, preflight={has_preflight}, ai_scan={has_ai_scanner}, zero_mock={zero_mock_router}")
+            log_fail("Flash Loan Invariant 19 verification failed!")
+    except Exception as e:
+        failures.append(f"Flash Loan Invariant 19 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

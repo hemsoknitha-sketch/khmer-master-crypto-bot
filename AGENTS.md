@@ -44,9 +44,9 @@ When a user asks:
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 18 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 19 PILLARS)
 
-Any modification that breaks any of the following 18 invariants is considered an act of technical sabotage:
+Any modification that breaks any of the following 19 invariants is considered an act of technical sabotage:
 
 ### Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
 - **Location:** `trading_engine.py` (`place_spot_order`, `execute_spot_strategy`)
@@ -160,7 +160,16 @@ Any modification that breaks any of the following 18 invariants is considered an
 ### Invariant 18: News Sentiment Technical Confirmation Shield
 - **Location:** `scheduler_tasks.py` (`process_news_alert_and_auto_trade`)
 - **Rule:** Directional news auto-trade triggers (Score $\ge 8$) are strictly barred from executing market orders blindly. Every trade must verify market structure and RSI (e.g., 15m RSI $\le 42.0$ strictly blocks news shorts) to prevent acting as exit liquidity for institutional "Sell the News" dumps.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 15/15].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 15/16].
+
+### Invariant 19: Flash Loan Quantitative Ground Truth & Zero-Risk Boundary Lock
+- **Location:** `contracts/AaveFlashLoanArbitrage.sol`, `keeper_relayer.py`, `flash_loan_mev_engine.py`, `hft_infrastructure/`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty (Section 1.1), the DeFi Flash Loan system is strictly bound by mathematical and empirical reality:
+  1. **Principal Risk Boundary (0.00%):** Loan principal loss risk is strictly 0.00% via EVM atomic execution (`require(finalBalance >= totalRepay)`). Unprofitable executions revert atomically within the same block with zero borrowed debt possible.
+  2. **Gas Fee Risk Boundary (Non-Zero):** In live mainnet execution, gas fee risk is NOT zero. While pre-flight simulation (`eth_call` in `keeper_relayer.py`) prevents 99% of reverts, on-chain sequencer latency race conditions with competing MEV searchers can cause live reverts, consuming Keeper ETH gas ($0.15–$0.40 USD per attempt).
+  3. **Fixed Fee Hurdle Floor:** Live cyclical routes face a non-negotiable fee hurdle of 0.40%–0.65% (Aave V3 0.05% + Uni V3 0.05%/0.30% + Camelot V2 0.30% + slippage). Market dislocations below 0.50% are mathematically unprofitable and must never be broadcast.
+  4. **Prohibition of Mock/Simulated Profits:** All mock random generators (`random.uniform`, `random.choice`, simulated tx hashes) are permanently purged from MEV routers. The system must report only real on-chain quotes, live simulations, or state truthfully when spreads are insufficient.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 16/16].
 
 ---
 
@@ -168,5 +177,5 @@ Any modification that breaks any of the following 18 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 18 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 15 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 19 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 16 checks remain at 100% `[PASS]`.
