@@ -64,6 +64,12 @@ def mask_sensitive_data(text: str) -> str:
     return text
 
 
+MAIN_BOT_LOOP = None
+
+def get_main_bot_loop():
+    global MAIN_BOT_LOOP
+    return MAIN_BOT_LOOP
+
 class TelegramBotThread(BaseThread):
     if not IS_HEADLESS_VPS:
         try:
@@ -137,7 +143,9 @@ class TelegramBotThread(BaseThread):
             # Fix STATUS_STACK_BUFFER_OVERRUN in background QThread
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
             
+        global MAIN_BOT_LOOP
         self.loop = asyncio.new_event_loop()
+        MAIN_BOT_LOOP = self.loop
         asyncio.set_event_loop(self.loop)
             
         async def post_init(application):
@@ -221,7 +229,10 @@ class TelegramBotThread(BaseThread):
             connection_pool_size=500
         )
         self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(64).post_init(post_init).build()
-        self.app.loop = self.loop
+        try:
+            self.app.bot_data["loop"] = self.loop
+        except Exception:
+            pass
 
         
         async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:

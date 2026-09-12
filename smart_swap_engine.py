@@ -1025,7 +1025,15 @@ def send_smart_swap_telegram_message(app, chat_id: int, text: str, parse_mode: s
         except RuntimeError:
             pass
 
-        app_loop = getattr(app, "loop", None)
+        app_loop = None
+        if hasattr(app, "bot_data") and isinstance(app.bot_data, dict):
+            app_loop = app.bot_data.get("loop")
+        if not app_loop:
+            try:
+                import bot_thread
+                app_loop = getattr(bot_thread, "MAIN_BOT_LOOP", None)
+            except Exception:
+                pass
         if app_loop and app_loop.is_running():
             asyncio.run_coroutine_threadsafe(coro, app_loop)
             return

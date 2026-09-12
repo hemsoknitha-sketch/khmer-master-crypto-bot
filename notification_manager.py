@@ -32,14 +32,27 @@ async def send_smart_notification(app, chat_id: int, text: str, category: str = 
     
     # 3. SEND TO TELEGRAM
     try:
-        if app and app.loop:
-            # Check if we are already in an event loop
+        if app and hasattr(app, "bot"):
             try:
                 loop = asyncio.get_running_loop()
-                await app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
+                if loop and loop.is_running():
+                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode))
+                    return
             except RuntimeError:
-                # We are not in an async context, schedule it threadsafe
-                asyncio.run_coroutine_threadsafe(app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode), app.loop)
+                pass
+
+            app_loop = None
+            if hasattr(app, "bot_data") and isinstance(app.bot_data, dict):
+                app_loop = app.bot_data.get("loop")
+            if not app_loop:
+                try:
+                    import bot_thread
+                    app_loop = getattr(bot_thread, "MAIN_BOT_LOOP", None)
+                except Exception:
+                    pass
+
+            if app_loop and app_loop.is_running():
+                asyncio.run_coroutine_threadsafe(app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode), app_loop)
     except Exception as e:
         logger.error(f"Failed to send telegram message to {chat_id}: {e}")
 
