@@ -1586,8 +1586,12 @@ def close_all_futures_positions(api_key: str, api_secret: str) -> dict:
 
                         # Auto-Recovery from -4061 (Position side mismatch)
                         if "-4061" in ord_res.text:
-                            ord_params["positionSide"] = "LONG" if close_side == "SELL" else "SHORT"
-                            ord_params.pop("reduceOnly", None)
+                            if ord_params.get("positionSide") in ["LONG", "SHORT"]:
+                                ord_params.pop("positionSide", None)
+                                ord_params["reduceOnly"] = "true"
+                            else:
+                                ord_params["positionSide"] = "LONG" if close_side == "SELL" else "SHORT"
+                                ord_params.pop("reduceOnly", None)
                             payload2 = urlencode(ord_params)
                             sig_ord2 = generate_signature(api_secret, payload2)
                             ord_res = requests.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
@@ -1667,9 +1671,15 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                             
                             # Auto-Recovery from -4061 (Position side mismatch)
                             if "-4061" in ord_res.text:
-                                retry_side = "LONG" if close_side == "SELL" else "SHORT"
-                                ord_params["positionSide"] = retry_side
-                                ord_params.pop("reduceOnly", None)
+                                if ord_params.get("positionSide") in ["LONG", "SHORT"]:
+                                    ord_params.pop("positionSide", None)
+                                    ord_params["reduceOnly"] = "true"
+                                    pos_side = "BOTH"
+                                else:
+                                    retry_side = "LONG" if amt > 0 else "SHORT"
+                                    ord_params["positionSide"] = retry_side
+                                    ord_params.pop("reduceOnly", None)
+                                    pos_side = retry_side
                                 payload = urlencode(ord_params)
                                 sig_ord = generate_signature(api_secret, payload)
                                 ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
@@ -1699,6 +1709,14 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                             payload2 = urlencode(ord_params2)
                             sig_ord2 = generate_signature(api_secret, payload2)
                             ord_res2 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
+                            if "-4061" in ord_res2.text:
+                                if ord_params2.get("positionSide"):
+                                    ord_params2.pop("positionSide", None)
+                                else:
+                                    ord_params2["positionSide"] = "LONG" if amt > 0 else "SHORT"
+                                payload2 = urlencode(ord_params2)
+                                sig_ord2 = generate_signature(api_secret, payload2)
+                                ord_res2 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
                             if ord_res2.status_code == 200:
                                 print(f"🚀 [BINANCE MARKET CLOSE FULL-POSITION FALLBACK SUCCESS (<20ms)] {symbol} {close_side} -> OrderId: {ord_res2.json().get('orderId')}")
                                 return {"status": "success", "closed": True, "res": ord_res2.json()}
@@ -1822,9 +1840,13 @@ def close_partial_futures_position(api_key: str, api_secret: str, symbol: str, r
 
                             # Auto-Recovery from -4061 (Position side mismatch)
                             if "-4061" in ord_res.text:
-                                retry_side = "LONG" if close_side == "SELL" else "SHORT"
-                                ord_params["positionSide"] = retry_side
-                                ord_params.pop("reduceOnly", None)
+                                if ord_params.get("positionSide") in ["LONG", "SHORT"]:
+                                    ord_params.pop("positionSide", None)
+                                    ord_params["reduceOnly"] = "true"
+                                else:
+                                    retry_side = "LONG" if close_side == "SELL" else "SHORT"
+                                    ord_params["positionSide"] = retry_side
+                                    ord_params.pop("reduceOnly", None)
                                 payload2 = urlencode(ord_params)
                                 sig_ord2 = generate_signature(api_secret, payload2)
                                 ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)

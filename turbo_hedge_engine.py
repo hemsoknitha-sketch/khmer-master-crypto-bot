@@ -1940,7 +1940,13 @@ async def monitor_turbo_hedge_bots(app):
                         target_dollar_tp = max(0.50, bot_amt * (effective_tp_pct / 100.0))
                         retain_ratio = 0.90 if peak_roi >= 100.0 else (0.85 if peak_roi >= 50.0 else 0.80)
                         # Dynamic Trailing Trigger: Lock peak profit when price pulls back slightly from maximum surge peak
-                        is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and ((peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)))
+                        # Enhanced Guard: Once profit reaches $1.50 - $4.00+ (+15% to +40%+ ROI), lock profit on any pullback >= 15%
+                        is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and (
+                            (peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or 
+                            (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or
+                            (peak_pnl >= 1.50 and net_pnl_usdt <= (peak_pnl * 0.85)) or
+                            (peak_pnl >= 2.00 and net_pnl_usdt <= max(1.00, peak_pnl * 0.80))
+                        )
                         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
 
                     # 1. Fetch live 15m ATR for symbol to drive dynamic volatility-adaptive stops
@@ -2189,7 +2195,7 @@ async def monitor_turbo_hedge_bots(app):
                             print(f"🚀 [TP1 HARVEST ESCALATION] {symbol}: Cannot split or partial close unconfirmed -> Escalating to 100% full profit harvest!")
                             is_tp_harvested = True
 
-                    elif is_breakeven_triggered or is_tp_harvested or is_peak_locked:
+                    if is_breakeven_triggered or is_tp_harvested or is_peak_locked:
                         if scale_out_level == 1:
                             reason_tag = "TP2 TRAILING MOONSHOT (FINAL 50%)"
                             alert_title = "🎯 **APEX MICRO-SCALP TP2 FULLY HARVESTED!** 🚀"
