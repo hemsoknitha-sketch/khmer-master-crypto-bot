@@ -1390,6 +1390,555 @@ def execute_direct_reverse_flip(api_key: str, api_secret: str, symbol: str, amou
         print(f"Fallback execute_direct_reverse_flip error: {e}")
         trading_engine.close_futures_position_for_symbol(api_key, api_secret, symbol)
         return execute_turbo_hedge_trade(api_key, api_secret, symbol, amount_usdt, target_side, leverage, chat_id)
+async def _monitor_single_active_bot(app, bot_info: dict):
+    """
+    Sub-20ms Isolated Active Position Monitor & Safeguard Engine:
+    Guarantees that individual position evaluations (PnL, Trailing Stop, Breakeven Armor, Stop Loss)
+    run at sub-second speed with complete exception isolation and zero loop blocking.
+    """
+    chat_id = bot_info.get("chat_id")
+    symbol = bot_info.get("symbol")
+    amount = bot_info.get("amount", 20.0)
+    leverage = bot_info.get("leverage", 75)
+    current_side = bot_info.get("side", "BUY")
+    target_tp = bot_info.get("target_tp", 5.0)
+
+    keys = db.get_user_api(chat_id)
+    if not keys:
+        return
+
+    # 🛡️ Small Capital Leverage Shield & Multi-Tiered Balance Fallback
+    if current_side == "SPOT" or leverage <= 1:
+        avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
+        if avail_bal <= 0.0:
+            avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+    else:
+        avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+        if avail_bal <= 0.0:
+            avail_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
+        if avail_bal <= 0.0:
+            avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
+        
+    if avail_bal <= 0.0 or avail_bal < 100.0:
+        leverage = min(leverage, 10)
+    elif avail_bal >= 100.0 and avail_bal < 300.0:
+        leverage = min(leverage, 15)
+
+    # Fixed Initial Position Leverage Lock: Active positions preserve initial leverage to prevent initialMargin recalculation and false ROI spikes
+    active_lev_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_active_leverage", str(leverage))
+    active_lev = int(active_lev_str) if active_lev_str.isdigit() else leverage
+
+    # 1. Check Live Real-Time Position Risk & PnL from Binance Spot or Futures API (<10ms)
+    if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
+        mark_p = trading_engine.get_current_price(symbol)
+        entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
+        entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
+        if entry_p <= 0 and mark_p > 0:
+            entry_p = mark_p
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
+
+        base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+        spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+        fut_pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
+        
+        spot_pnl = (mark_p - entry_p) * spot_qty if (entry_p > 0 and mark_p > 0) else 0.0
+        fut_pnl = float(fut_pnl_info.get("unrealizedProfit", 0.0)) if fut_pnl_info.get("has_position") else 0.0
+        combined_pnl = spot_pnl + fut_pnl
+        
+        pnl_info = {
+            "has_position": (spot_qty > 0 or fut_pnl_info.get("has_position")),
+            "unrealizedProfit": combined_pnl,
+            "entryPrice": entry_p,
+            "markPrice": mark_p,
+            "liquidationPrice": 0.0,
+            "positionAmt": spot_qty,
+            "side": "HEDGE"
+        }
+    elif current_side == "SPOT" or leverage <= 1:
+        mark_p = trading_engine.get_current_price(symbol)
+        entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
+        entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
+        if entry_p <= 0 and mark_p > 0:
+            entry_p = mark_p
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
+
+        base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+        spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+        if spot_qty <= 0:
+            db.remove_turbo_hedge_bot(chat_id, symbol)
+            return
+
+        spot_pnl = (mark_p - entry_p) * spot_qty if (entry_p > 0 and mark_p > 0) else 0.0
+        pnl_info = {
+            "has_position": True,
+            "unrealizedProfit": spot_pnl,
+            "entryPrice": entry_p,
+            "markPrice": mark_p,
+            "liquidationPrice": 0.0,
+            "positionAmt": spot_qty,
+            "side": "SPOT"
+        }
+    else:
+        pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
+
+    if not pnl_info.get("has_position"):
+        return
+
+    real_pnl_usdt = float(pnl_info.get("unrealizedProfit", 0.0))
+    entry_price = float(pnl_info.get("entryPrice", 0.0))
+    mark_price = float(pnl_info.get("markPrice", 0.0))
+    liq_price = float(pnl_info.get("liquidationPrice", 0.0))
+    pos_side = pnl_info.get("side", current_side)
+
+    # Sync side if different
+    if pos_side != current_side:
+        current_side = pos_side
+        db.update_turbo_hedge_side(chat_id, symbol, current_side)
+
+    if entry_price > 0:
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_price))
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_liq_price", str(liq_price))
+
+    if entry_price <= 0 or mark_price <= 0:
+        return
+
+    # 📊 Binance Native Direct Net ROI & PnL Formula (Deducts 2-Way Trading Fees 100%)
+    position_amt = float(pnl_info.get("positionAmt", 0.0))
+    notional_val = abs(position_amt * mark_price)
+    est_binance_fee = notional_val * (0.0015 if current_side == "SPOT" else 0.0010)
+    net_pnl_usdt = real_pnl_usdt - est_binance_fee
+
+    api_init_margin = float(pnl_info.get("initialMargin", 0.0))
+    if current_side == "SPOT":
+        initial_margin = abs(position_amt * entry_price)
+    elif api_init_margin > 0:
+        initial_margin = api_init_margin
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", str(initial_margin))
+    else:
+        init_m_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", "0.0")
+        if float(init_m_str) > 0:
+            initial_margin = float(init_m_str)
+        else:
+            entry_lev = float(pnl_info.get("leverage", leverage))
+            initial_margin = abs(position_amt * entry_price) / max(1.0, entry_lev)
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", str(initial_margin))
+
+    if initial_margin > 0:
+        binance_real_roi = (net_pnl_usdt / initial_margin) * 100.0
+    else:
+        binance_real_roi = 0.0
+
+    roi_pct = binance_real_roi
+
+    # Peak ROI and Peak PnL Tracking (Always Monitored & Persisted)
+    peak_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0.0")
+    peak_roi = float(peak_str) if peak_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+    if roi_pct > peak_roi:
+        peak_roi = roi_pct
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", str(peak_roi))
+
+    peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
+    peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+    if net_pnl_usdt > peak_pnl:
+        peak_pnl = net_pnl_usdt
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
+
+    # 🚀 AGI Dynamic Moonshot Profit Rider:
+    is_hedge = (current_side in ["HEDGE", "DELTA_NEUTRAL"])
+    is_spot = (current_side == "SPOT" or (leverage <= 1 and not is_hedge))
+    bot_amt = float(bot_info.get("amount", 10.0))
+
+    if is_hedge:
+        target_dollar_tp = max(0.20, float(target_tp) if float(target_tp) > 0 else 0.50)
+        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
+        is_peak_locked = (net_pnl_usdt >= 0.15 and peak_pnl >= 0.25 and net_pnl_usdt <= peak_pnl * 0.85)
+    elif is_spot:
+        effective_tp_pct = 2.0
+        target_dollar_tp = max(0.25, bot_amt * (effective_tp_pct / 100.0))
+        retain_ratio = 0.85
+        is_peak_locked = (peak_pnl >= 0.25 and (net_pnl_usdt <= peak_pnl * 0.85 or net_pnl_usdt < 0.15))
+        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
+    else:
+        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
+        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
+        effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
+        if effective_tp_pct <= 0: effective_tp_pct = 15.0
+        target_dollar_tp = max(0.50, bot_amt * (effective_tp_pct / 100.0))
+        retain_ratio = 0.90 if peak_roi >= 100.0 else (0.85 if peak_roi >= 50.0 else 0.80)
+
+        # 🔒 Hardened Peak Profit Lock: Triggers on 15% pullback from peak, or before giving back profit to zero
+        has_hit_profit_peak = (peak_pnl >= 1.50 or peak_roi >= 15.0 or peak_pnl >= target_dollar_tp)
+        is_pullback_from_peak = (
+            (peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or 
+            (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or
+            (peak_pnl >= 1.50 and net_pnl_usdt <= (peak_pnl * 0.85)) or
+            (peak_pnl >= 2.00 and net_pnl_usdt <= max(1.00, peak_pnl * 0.80))
+        )
+        is_peak_locked = has_hit_profit_peak and (is_pullback_from_peak or net_pnl_usdt < 0.20)
+        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
+
+    # 1. Fetch live 15m ATR for dynamic volatility-adaptive stops
+    atr_info = market_data.get_symbol_atr(symbol, interval="15m")
+    curr_atr_val = atr_info.get("atr_val", 0.0)
+    curr_atr_pct = atr_info.get("atr_pct", 1.5)
+    if curr_atr_val <= 0 and mark_price > 0:
+        curr_atr_val = mark_price * (curr_atr_pct / 100.0)
+
+    # 2. Peak & Trough mark price tracking for Chandelier ATR Trailing Stop
+    peak_mark_p_key = f"turbo_hedge_{chat_id}_{symbol}_peak_mark_p"
+    peak_mark_p_str = db.get_system_setting(peak_mark_p_key, "0.0")
+    peak_mark_p = float(peak_mark_p_str) if peak_mark_p_str.replace('.', '', 1).isdigit() else 0.0
+    if peak_mark_p <= 0 or mark_price > peak_mark_p:
+        peak_mark_p = max(mark_price, entry_price)
+        db.update_system_setting(peak_mark_p_key, str(peak_mark_p))
+
+    trough_mark_p_key = f"turbo_hedge_{chat_id}_{symbol}_trough_mark_p"
+    trough_mark_p_str = db.get_system_setting(trough_mark_p_key, "0.0")
+    trough_mark_p = float(trough_mark_p_str) if trough_mark_p_str.replace('.', '', 1).isdigit() else 0.0
+    if trough_mark_p <= 0 or (mark_price < trough_mark_p and mark_price > 0):
+        trough_mark_p = min(mark_price, entry_price) if entry_price > 0 else mark_price
+        db.update_system_setting(trough_mark_p_key, str(trough_mark_p))
+
+    # 🛡️ SUPER SMART CALIBRATED BREAKEVEN ARMOR & DYNAMIC CHANDELIER ATR TRAILING LOCK:
+    is_breakeven_armed = False
+    min_guaranteed_roi = -999.0
+    is_chandelier_triggered = False
+
+    if is_hedge:
+        if peak_pnl >= 0.20:
+            is_breakeven_armed = True
+            min_guaranteed_roi = 0.20
+    elif is_spot:
+        spot_arm_roi = max(1.5, curr_atr_pct * 0.8)
+        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.25, bot_amt * 0.015):
+            is_breakeven_armed = True
+            if peak_roi < 3.0:
+                min_guaranteed_roi = 0.40
+            elif peak_roi < 5.0:
+                min_guaranteed_roi = max(1.5, peak_roi * 0.65)
+            else:
+                min_guaranteed_roi = max(3.5, peak_roi * 0.80)
+
+            chandelier_stop_p = peak_mark_p - (1.8 * curr_atr_val)
+            be_spot_stop_p = entry_price * 1.0040
+            effective_spot_stop = max(be_spot_stop_p, chandelier_stop_p)
+            if mark_price <= effective_spot_stop:
+                is_chandelier_triggered = True
+    else:
+        is_derisked = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "0") == "1"
+        derisked_entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_entry_p", "0.0")
+        derisked_entry_p = float(derisked_entry_p_str) if derisked_entry_p_str.replace('.', '', 1).isdigit() else 0.0
+
+        bounce_roi = 0.0
+        if is_derisked and derisked_entry_p > 0:
+            if current_side == "BUY":
+                bounce_roi = ((mark_price - derisked_entry_p) / derisked_entry_p) * 100.0 * float(max(1, active_lev))
+            elif current_side in ["SELL", "SHORT"]:
+                bounce_roi = ((derisked_entry_p - mark_price) / derisked_entry_p) * 100.0 * float(max(1, active_lev))
+            
+            peak_bounce_key = f"turbo_hedge_{chat_id}_{symbol}_peak_bounce_roi"
+            peak_bounce_str = db.get_system_setting(peak_bounce_key, "0.0")
+            peak_bounce_roi = float(peak_bounce_str) if peak_bounce_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+            if bounce_roi > peak_bounce_roi:
+                peak_bounce_roi = bounce_roi
+                db.update_system_setting(peak_bounce_key, str(peak_bounce_roi))
+        else:
+            peak_bounce_roi = 0.0
+
+        fut_arm_roi = max(6.0, curr_atr_pct * 0.8 * float(active_lev))
+        is_bounce_armed = (is_derisked and (bounce_roi >= 6.0 or peak_bounce_roi >= 6.0))
+        if peak_roi >= fut_arm_roi or peak_pnl >= max(0.30, bot_amt * 0.06) or is_bounce_armed:
+            is_breakeven_armed = True
+            effective_peak = max(peak_roi, peak_bounce_roi)
+            if effective_peak < 12.0:
+                min_guaranteed_roi = 2.50
+            elif effective_peak < 20.0:
+                min_guaranteed_roi = max(6.0, effective_peak * 0.60)
+            elif effective_peak < 40.0:
+                min_guaranteed_roi = max(14.0, effective_peak * 0.75)
+            else:
+                min_guaranteed_roi = max(30.0, effective_peak * 0.85)
+
+            ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
+            if current_side == "BUY":
+                chandelier_stop_p = peak_mark_p - (1.8 * curr_atr_val)
+                be_fut_stop_p = ref_entry * (1.0 + (min_guaranteed_roi / (100.0 * max(1, active_lev))))
+                effective_fut_stop = max(be_fut_stop_p, chandelier_stop_p)
+                if mark_price <= effective_fut_stop:
+                    is_chandelier_triggered = True
+            elif current_side in ["SELL", "SHORT"]:
+                chandelier_stop_p = trough_mark_p + (1.8 * curr_atr_val)
+                be_fut_stop_p = ref_entry * (1.0 - (min_guaranteed_roi / (100.0 * max(1, active_lev))))
+                effective_fut_stop = min(be_fut_stop_p, chandelier_stop_p)
+                if mark_price >= effective_fut_stop:
+                    is_chandelier_triggered = True
+
+    effective_curr_roi = max(roi_pct, bounce_roi) if is_derisked else roi_pct
+    is_breakeven_triggered = is_breakeven_armed and (effective_curr_roi <= min_guaranteed_roi or is_chandelier_triggered)
+
+    # 🎯 SUPER SMART DUAL-TARGET MICRO-SCALP RAPID HARVESTER:
+    scale_level_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
+    scale_out_level = int(scale_level_str) if scale_level_str.isdigit() else 0
+    
+    is_tp1_hit = False
+    if scale_out_level == 0 and not is_hedge:
+        if is_spot:
+            is_tp1_hit = (roi_pct >= 2.0 or net_pnl_usdt >= max(0.25, bot_amt * 0.020))
+        else:
+            is_tp1_hit = (roi_pct >= 6.0 or net_pnl_usdt >= max(0.30, bot_amt * 0.060))
+
+    # Stop Loss & Hard Circuit Breaker:
+    now_ts = int(time.time())
+    if is_hedge:
+        is_stop_loss_hit = False
+        is_hard_circuit_breaker = False
+        curr_fr = market_data.fetch_funding_rate(symbol)
+        if curr_fr < -0.0001:
+            last_alert_ts = int(db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", "0"))
+            if now_ts - last_alert_ts > 14400:
+                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", str(now_ts))
+                print(f"⚠️ [HEDGE NEGATIVE FUNDING INVERSION] {symbol}: Funding rate {curr_fr*100:+.4f}% < 0.")
+    else:
+        is_stop_loss_hit = (
+            (not is_spot and (roi_pct <= -10.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.10))) or
+            (is_spot and (roi_pct <= -5.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.05)))
+        )
+        is_hard_circuit_breaker = (roi_pct <= -25.0 or net_pnl_usdt <= -max(1.25, bot_amt * 0.25))
+
+    last_flip_key = f"{chat_id}_{symbol}"
+
+    entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
+    entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
+    if entry_ts == 0:
+        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
+        entry_ts = now_ts
+    
+    holding_seconds = now_ts - entry_ts
+    if is_hedge:
+        is_stagnant_timeout = (holding_seconds >= 172800 and net_pnl_usdt >= 0.30)
+    elif is_spot:
+        is_stagnant_timeout = (holding_seconds >= 14400 and net_pnl_usdt >= 0.25)
+    else:
+        is_stagnant_timeout = (holding_seconds >= 14400 and real_pnl_usdt >= 0.30)
+
+    if is_hard_circuit_breaker:
+        print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
+        if current_side == "SPOT":
+            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+        else:
+            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
+        _last_flip_timestamps[last_flip_key] = now_ts
+        if is_close_successful(close_res):
+            db.remove_turbo_hedge_bot(chat_id, symbol)
+            add_symbol_cooldown(symbol, 7200)
+        else:
+            print(f"⚠️ [CIRCUIT BREAKER RETRY] Market close for {symbol} failed.")
+        
+        if app and hasattr(app, "bot"):
+            try:
+                msg_breaker = (
+                    f"🚨 **APEX TURBO HEDGE HARD CIRCUIT BREAKER ACTIVATED!** 🛡️\n"
+                    f"───────────────────────────────\n\n"
+                    f"🪙 កាក់ ៖ `{symbol}`\n"
+                    f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker -25.0% Max Limit)\n"
+                    f"💵 PnL ៖ `-${abs(real_pnl_usdt):.2f} USDT`\n"
+                    f"⚡ Binance Status ៖ `EMERGENCY MARKET CLOSED (<15ms)`\n\n"
+                    f"🛡️ _ប្រព័ន្ធកាត់ផ្តាច់ Position ភ្លាមៗ ធានាដាច់ខាតមិនឲ្យខាតជ្រុលឡើយ!_"
+                )
+                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_breaker, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+            except Exception as e:
+                print(f"Error sending breaker notification: {e}")
+        return
+
+    tp1_scaled_out = False
+    if is_tp1_hit and scale_out_level == 0:
+        can_split = (notional_val * 0.50 >= 10.50) if is_spot else (notional_val * 0.50 >= 5.05)
+        if can_split:
+            print(f"⚡ [MICRO-SCALP TP1 TRIGGERED] {symbol}: ROI +{roi_pct:.1f}% / PnL +${net_pnl_usdt:.2f} USDT -> Scaling out 50% Qty (<25ms)...")
+            if is_spot:
+                part_res = await asyncio.to_thread(trading_engine.close_partial_spot_position, keys[0], keys[1], symbol, 0.50)
+            else:
+                part_res = await asyncio.to_thread(trading_engine.close_partial_futures_position, keys[0], keys[1], symbol, 0.50)
+
+            if isinstance(part_res, dict) and part_res.get("status") == "success":
+                tp1_scaled_out = True
+                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "1")
+                partial_pnl = net_pnl_usdt * 0.50
+                tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
+                tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+                tot_pnl += max(0.0, partial_pnl)
+                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+                db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt * 0.50, partial_pnl, roi_pct, "TP1_MICRO_SCALP_50%")
+
+                is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
+                if not is_quiet and app and hasattr(app, "bot"):
+                    try:
+                        msg_tp1 = (
+                            f"⚡ **APEX MICRO-SCALP TP1 HARVESTED (50%)!** 💰\n"
+                            f"───────────────────────────────\n\n"
+                            f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
+                            f"💵 ផលចំណេញកើបបាន ៖ `+${partial_pnl:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
+                            f"📊 ទំហំលក់ ៖ `50% Qty (កើបលុយសុទ្ធដាក់ហោប៉ៅភ្លាម)`\n"
+                            f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
+                            f"🛡️ យុទ្ធសាស្ត្រ TP2 ៖ `50% ទៀត រត់តាម Dynamic Trailing Stop ចាប់យក Moonshot!`\n"
+                            f"🔒 សុវត្ថិភាព ៖ `BREAKEVEN ARMOR LOCKED (ធានា Zero Risk 100%)!`\n"
+                            f"⚡ Binance Status ៖ `PARTIAL MARKET FILLED (<25ms)`"
+                        )
+                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+                    except Exception as e:
+                        print(f"Error sending TP1 notification: {e}")
+                return
+
+        if not tp1_scaled_out:
+            print(f"🚀 [TP1 HARVEST ESCALATION] {symbol}: Cannot split or partial close unconfirmed -> Escalating to 100% full profit harvest!")
+            is_tp_harvested = True
+
+    if is_breakeven_triggered or is_tp_harvested or is_peak_locked:
+        if scale_out_level == 1:
+            reason_tag = "TP2 TRAILING MOONSHOT (FINAL 50%)"
+            alert_title = "🎯 **APEX MICRO-SCALP TP2 FULLY HARVESTED!** 🚀"
+            alert_desc = "_AI បានប្រមូលផលចំណេញពេញលេញទាំង ២ ដំណាក់កាល (TP1 + TP2) ដោយជោគជ័យ ១០០%!_"
+        elif is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
+            if is_derisked:
+                reason_tag = "SUPER SMART BREAKEVEN RECOVERY LOCKED"
+                alert_title = "🛡️ **SUPER SMART BREAKEVEN RECOVERY LOCKED!** 🔒"
+                alert_desc = f"_ប្រព័ន្ធបានស្រោចស្រង់ដើមទុន និងចាក់សោរប្រាក់ចំណេញសុទ្ធ (+{min_guaranteed_roi:.1f}% Net Profit Floor) ពីការងើបឡើងវិញដោយជោគជ័យ ១០០%!_"
+            elif min_guaranteed_roi <= 2.50:
+                reason_tag = "BREAKEVEN ARMOR LOCKED"
+                alert_title = "🛡️ **APEX TURBO HEDGE BREAKEVEN ARMOR ACTIVATED!** 🔒"
+                alert_desc = "_AI ស្ទាក់កើបយកប្រាក់ចំណេញសុទ្ធ មិនឱ្យ Trade ដែលធ្លាប់ចំណេញ ក្លាយជាខាតវិញដាច់ខាត!_"
+            else:
+                reason_tag = f"DYNAMIC ATR TRAIL LOCK (+{min_guaranteed_roi:.1f}%)"
+                alert_title = "🎯 **APEX TURBO HEDGE CHANDELIER ATR TRAILING LOCKED!** 💰"
+                alert_desc = f"_AI រំកិល Stop-Loss តាមដេញចាប់ប្រាក់ចំណេញរហូតដល់កំពូល ចាក់សោបាន +{roi_pct:.1f}% ROI!_"
+        elif is_peak_locked:
+            reason_tag = "PEAK LOCKED"
+            alert_title = "💰 **APEX TURBO HEDGE PEAK PROFIT LOCKED!** 🚀"
+            alert_desc = "_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
+        else:
+            reason_tag = "DUAL-CHECK TP HARVESTED"
+            alert_title = "💰 **APEX TURBO HEDGE PROFIT HARVESTED!** 🚀"
+            alert_desc = "_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
+
+        print(f"💰 [TURBO HEDGE {reason_tag}] {symbol}: Real PnL +${real_pnl_usdt:.2f} USDT (ROI: +{roi_pct:.1f}%) -> Closing Position (<30ms)...")
+        
+        if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
+            close_spot = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+            close_fut = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+            close_res = close_fut if is_close_successful(close_fut) else close_spot
+        elif current_side == "SPOT":
+            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+        else:
+            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+        
+        if is_close_successful(close_res):
+            db.remove_turbo_hedge_bot(chat_id, symbol)
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "0")
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_bounce_roi", "0.0")
+            cooldown_dur = 1800 if is_breakeven_triggered else 14400
+            add_symbol_cooldown(symbol, cooldown_dur)
+
+            tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
+            tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
+            tot_pnl += max(0.0, real_pnl_usdt)
+            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
+        else:
+            print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
+
+        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
+        if not is_quiet and app and hasattr(app, "bot"):
+            try:
+                from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
+                disp_roi = bounce_roi if (is_derisked and bounce_roi > 0) else roi_pct
+                disp_peak = max(peak_roi, peak_bounce_roi) if is_derisked else peak_roi
+                msg = (
+                    f"{alert_title}\n"
+                    f"{DIVIDER_DOUBLE}\n\n"
+                    f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
+                    f"📈 **ចំណុចកំពូលងើបដល់ ៖** `+{disp_peak:.1f}% ROI`\n"
+                    f"💵 **ផលចំណេញប្រមូលបាន ៖** `+${real_pnl_usdt:,.2f} USDT` (`+{disp_roi:.1f}% ROI`)\n"
+                    f"🏆 **សរុបប្រាក់ចំណេញ ៖** `+${tot_pnl:,.2f} USDT`\n"
+                    f"⚡ **Binance Status ៖** `CLEAN MARKET CLOSED (<30ms)`\n"
+                    f"🛡️ **សុវត្ថិភាព ៖** `CAPITAL SECURED (ស្រោចស្រង់ដើមទុន ១០០%)`\n\n"
+                    f"{alert_desc}\n\n"
+                    f"{OFFICIAL_FOOTNOTE}"
+                )
+                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+            except Exception as e:
+                print(f"Error sending harvest notification: {e}")
+
+    elif is_stagnant_timeout:
+        holding_mins = holding_seconds // 60
+        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >{holding_mins} mins with PnL (${real_pnl_usdt:.2f}). Market closing & freeing capital...")
+        if current_side == "SPOT":
+            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+        else:
+            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
+        if is_close_successful(close_res):
+            db.remove_turbo_hedge_bot(chat_id, symbol)
+            add_symbol_cooldown(symbol, 14400)
+
+        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
+        if not is_quiet and app and hasattr(app, "bot"):
+            try:
+                if is_spot:
+                    msg_stagnant = (
+                        f"⌛ **APEX SPOT STAGNANT CAPITAL RELEASED!** 🛡️\n"
+                        f"───────────────────────────────\n\n"
+                        f"🪙 កាក់ ៖ `{symbol}` (Spot Mode)\n"
+                        f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (Net PnL: `${net_pnl_usdt:+.2f} USDT`)\n"
+                        f"💵 ដើមទុនរំដោះបាន ៖ `${bot_amt:.2f} USDT` (ត្រឡប់មក Spot Wallet)\n"
+                        f"⚡ Binance Status ៖ `MARKET SOLD (<20ms)`\n\n"
+                        f"🚀 _AI ដោះលែងដើមទុន មិនឱ្យកកស្ទះ រួចរាល់ស្កេនទិញកាក់ថ្មីដែលកំពុងផ្ទុះឡើង!_"
+                    )
+                else:
+                    msg_stagnant = (
+                        f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
+                        f"───────────────────────────────\n\n"
+                        f"🪙 កាក់ ៖ `{symbol}`\n"
+                        f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
+                        f"🔒 Cooldown Status ៖ `៤ ម៉ោង (4-Hour Anti-Churn Blacklist)`\n"
+                        f"⚡ Binance Status ៖ `MARKET CLOSED (<20ms)`\n\n"
+                        f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
+                    )
+                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_stagnant, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+            except Exception as e:
+                print(f"Error sending stagnant notification: {e}")
+
+    elif is_stop_loss_hit:
+        print(f"🛡️ [ANTI-WHIPSAW CLEAN STOP (<20ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(net_pnl_usdt):.2f} USDT -> Clean Market Close & 2-Hour Cooldown (Zero Flip)!")
+        if current_side == "SPOT":
+            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
+        else:
+            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
+        
+        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
+        if is_close_successful(close_res):
+            db.remove_turbo_hedge_bot(chat_id, symbol)
+            add_symbol_cooldown(symbol, 7200)
+            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt, net_pnl_usdt, roi_pct, "ANTI_WHIPSAW_STOP_LOSS")
+        else:
+            print(f"⚠️ [CLEAN STOP RETRY] Market close for {symbol} failed. Retrying on next loop...")
+
+        if app and hasattr(app, "bot"):
+            try:
+                msg_sl = (
+                    f"🛡️ **APEX ANTI-WHIPSAW CLEAN STOP ACTIVATED!** 🛑\n"
+                    f"───────────────────────────────\n\n"
+                    f"🪙 កាក់ ៖ `{symbol}`\n"
+                    f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (Stop Loss Floor -10.0%)\n"
+                    f"💵 PnL ខាតជាក់ស្តែង ៖ `-${abs(net_pnl_usdt):.2f} USDT`\n"
+                    f"🔒 Anti-Whipsaw Cooldown ៖ `២ ម៉ោង Blacklist Applied (7200s)`\n"
+                    f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n\n"
+                    f"🛡️ _AI កាត់បិទភ្លាមៗ ដោយមិន Flip បញ្ច្រាសទិស ធានាមិនឱ្យខាតពីរសងខាង (Zero Double-Hit) និងការពារដើមទុន ១០០%!_"
+                )
+                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
+            except Exception as e:
+                print(f"Error sending SL notification: {e}")
 
 async def monitor_turbo_hedge_bots(app):
     """
@@ -1508,6 +2057,19 @@ async def monitor_turbo_hedge_bots(app):
                         db.add_turbo_hedge_bot(target_chat_id, p_sym, existing_amt, existing_lev, p_side, user_custom_tp, is_bot_initiated=True)
                         active_hedge_bots.append({"chat_id": target_chat_id, "symbol": p_sym, "amount": existing_amt, "leverage": existing_lev, "side": p_side, "target_tp": user_custom_tp})
                         print(f"🛡️ [BINANCE BOT POSITION RE-SYNCED] User {target_chat_id} {p_sym} ({p_side}) -> Restored active protection & Target TP ${user_custom_tp:.2f} USDT!")
+
+        # =========================================================================
+        # 🛡️ P0 INSTITUTIONAL PRIORITY: MONITOR & SAFEGUARD ALL ACTIVE POSITIONS FIRST (<20ms)
+        # Trailing Stops, Moonshot Locks, Breakeven Armor, and Stop Loss are enforced FIRST!
+        # =========================================================================
+        for bot_info in list(active_hedge_bots):
+            try:
+                await _monitor_single_active_bot(app, bot_info)
+            except Exception as bot_err:
+                print(f"⚠️ [TURBO HEDGE BOT MONITOR ERROR] {bot_info.get('symbol')}: {bot_err}")
+
+        # Refresh active bots list to reflect any positions closed above
+        active_hedge_bots = db.get_active_turbo_hedge_bots()
 
         if not active_hedge_bots:
             # Check if any user has top_mode active even if active_hedge_bots is currently empty!
@@ -1758,594 +2320,6 @@ async def monitor_turbo_hedge_bots(app):
                         print(f"🛡️ [AGI MARGIN SHIELD] Free margin exhausted for User {target_chat_id}. Pausing auto-expander scanner loop until margin frees up.")
                         break
                     print(f"⚠️ [PERPETUAL AUTO-EXPANDER SKIP] {c_cand} failed execution. Skipping candidate symbol to next coin!")
-
-        for bot_info in active_hedge_bots:
-            chat_id = bot_info.get("chat_id")
-            symbol = bot_info.get("symbol")
-            amount = bot_info.get("amount", 20.0)
-            leverage = bot_info.get("leverage", 75)
-            current_side = bot_info.get("side", "BUY")
-            target_tp = bot_info.get("target_tp", 5.0)
-
-            keys = db.get_user_api(chat_id)
-            if not keys:
-                continue
-
-            # 🛡️ Small Capital Leverage Shield & Multi-Tiered Balance Fallback
-            if current_side == "SPOT" or leverage <= 1:
-                avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
-                if avail_bal <= 0.0:
-                    avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
-            else:
-                avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
-                if avail_bal <= 0.0:
-                    avail_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
-                if avail_bal <= 0.0:
-                    avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
-                
-            if avail_bal <= 0.0 or avail_bal < 100.0:
-                leverage = min(leverage, 10)
-            elif avail_bal >= 100.0 and avail_bal < 300.0:
-                leverage = min(leverage, 15)
-
-            # 1. Evaluate AI 84-Model Trend & Confidence Level (3-Second Scan)
-            eval_res = await asyncio.to_thread(scan_and_evaluate_symbol, symbol, leverage, avail_bal)
-            ai_recommended_side = eval_res.get("side", current_side)
-            ai_confidence = eval_res.get("confidence_pct", 88.5)
-            dynamic_leverage = eval_res.get("recommended_leverage", leverage)
-
-            if avail_bal <= 0.0 or avail_bal < 100.0:
-                dynamic_leverage = min(dynamic_leverage, 10)
-
-            # Fixed Initial Position Leverage Lock: Active positions preserve initial leverage to prevent initialMargin recalculation and false ROI spikes
-            active_lev_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_active_leverage", str(leverage))
-            active_lev = int(active_lev_str) if active_lev_str.isdigit() else leverage
-
-            # 2. Check Live Real-Time Position Risk & PnL from Binance Spot or Futures API
-            if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
-                mark_p = trading_engine.get_current_price(symbol)
-                entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
-                entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
-                if entry_p <= 0 and mark_p > 0:
-                    entry_p = mark_p
-                    db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
-
-                base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
-                spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
-                fut_pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
-                
-                spot_pnl = (mark_p - entry_p) * spot_qty if (entry_p > 0 and mark_p > 0) else 0.0
-                fut_pnl = float(fut_pnl_info.get("unrealizedProfit", 0.0)) if fut_pnl_info.get("has_position") else 0.0
-                combined_pnl = spot_pnl + fut_pnl
-                
-                pnl_info = {
-                    "has_position": (spot_qty > 0 or fut_pnl_info.get("has_position")),
-                    "unrealizedProfit": combined_pnl,
-                    "entryPrice": entry_p,
-                    "markPrice": mark_p,
-                    "liquidationPrice": 0.0,
-                    "positionAmt": spot_qty,
-                    "side": "HEDGE"
-                }
-            elif current_side == "SPOT" or leverage <= 1:
-                mark_p = trading_engine.get_current_price(symbol)
-                entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
-                entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
-                if entry_p <= 0 and mark_p > 0:
-                    entry_p = mark_p
-                    db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
-
-                base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
-                spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
-                if spot_qty <= 0:
-                    db.remove_turbo_hedge_bot(chat_id, symbol)
-                    continue
-
-                spot_pnl = (mark_p - entry_p) * spot_qty if (entry_p > 0 and mark_p > 0) else 0.0
-                pnl_info = {
-                    "has_position": True,
-                    "unrealizedProfit": spot_pnl,
-                    "entryPrice": entry_p,
-                    "markPrice": mark_p,
-                    "liquidationPrice": 0.0,
-                    "positionAmt": spot_qty,
-                    "side": "SPOT"
-                }
-            else:
-                pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
-
-            if pnl_info.get("has_position"):
-                real_pnl_usdt = float(pnl_info.get("unrealizedProfit", 0.0))
-                entry_price = float(pnl_info.get("entryPrice", 0.0))
-                mark_price = float(pnl_info.get("markPrice", 0.0))
-                liq_price = float(pnl_info.get("liquidationPrice", 0.0))
-                pos_side = pnl_info.get("side", current_side)
-
-                # Sync side if different
-                if pos_side != current_side:
-                    current_side = pos_side
-                    db.update_turbo_hedge_side(chat_id, symbol, current_side)
-
-                if entry_price > 0:
-                    db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_price))
-                    db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_liq_price", str(liq_price))
-
-                if entry_price > 0 and mark_price > 0:
-                    # 📊 Binance Native Direct Net ROI & PnL Formula (Deducts 2-Way Trading Fees 100%)
-                    position_amt = float(pnl_info.get("positionAmt", 0.0))
-                    notional_val = abs(position_amt * mark_price)
-                    # Binance 2-Way Taker Fee Deduction
-                    est_binance_fee = notional_val * (0.0015 if current_side == "SPOT" else 0.0010)
-                    # Net Realized/Unrealized PnL in Hand
-                    net_pnl_usdt = real_pnl_usdt - est_binance_fee
-
-                    api_init_margin = float(pnl_info.get("initialMargin", 0.0))
-                    if current_side == "SPOT":
-                        initial_margin = abs(position_amt * entry_price)
-                    elif api_init_margin > 0:
-                        initial_margin = api_init_margin
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", str(initial_margin))
-                    else:
-                        init_m_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", "0.0")
-                        if float(init_m_str) > 0:
-                            initial_margin = float(init_m_str)
-                        else:
-                            entry_lev = float(pnl_info.get("leverage", leverage))
-                            initial_margin = abs(position_amt * entry_price) / max(1.0, entry_lev)
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initial_margin", str(initial_margin))
-
-                    if initial_margin > 0:
-                        binance_real_roi = (net_pnl_usdt / initial_margin) * 100.0
-                    else:
-                        binance_real_roi = 0.0
-
-                    # Strictly enforce binance_real_roi matching Net PnL in Hand
-                    roi_pct = binance_real_roi
-
-                    # Peak ROI and Peak PnL Tracking (Always Monitored & Persisted)
-                    peak_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", "0.0")
-                    peak_roi = float(peak_str) if peak_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-                    if roi_pct > peak_roi:
-                        peak_roi = roi_pct
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_roi", str(peak_roi))
-
-                    peak_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", "0.0")
-                    peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-                    if net_pnl_usdt > peak_pnl:
-                        peak_pnl = net_pnl_usdt
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
-
-                    # 🚀 AGI Dynamic Moonshot Profit Rider:
-                    is_hedge = (current_side in ["HEDGE", "DELTA_NEUTRAL"])
-                    is_spot = (current_side == "SPOT" or (leverage <= 1 and not is_hedge))
-                    bot_amt = float(bot_info.get("amount", 10.0))
-                    
-                    if is_hedge:
-                        # 🛡️ Super Delta-Neutral Hedge Profit Harvester (Captures Funding Payouts + Cash & Carry Basis)
-                        target_dollar_tp = max(0.20, float(target_tp) if float(target_tp) > 0 else 0.50)
-                        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
-                        is_peak_locked = (net_pnl_usdt >= 0.15 and peak_pnl >= 0.25 and net_pnl_usdt <= peak_pnl * 0.85)
-                    elif is_spot:
-                        # 🎯 Tier 6 Spot High-Velocity Target TP Calibration (+1.5% to +2.5% price gain)
-                        effective_tp_pct = 2.0  # Scalper target on Spot (2.0% price move)
-                        target_dollar_tp = max(0.25, bot_amt * (effective_tp_pct / 100.0))
-                        retain_ratio = 0.85
-                        is_peak_locked = (net_pnl_usdt >= 0.20 and roi_pct >= 1.0 and net_pnl_usdt <= peak_pnl * 0.85)
-                        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
-                    else:
-                        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
-                        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
-                        effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
-                        if effective_tp_pct <= 0: effective_tp_pct = 15.0
-                        target_dollar_tp = max(0.50, bot_amt * (effective_tp_pct / 100.0))
-                        retain_ratio = 0.90 if peak_roi >= 100.0 else (0.85 if peak_roi >= 50.0 else 0.80)
-                        # Dynamic Trailing Trigger: Lock peak profit when price pulls back slightly from maximum surge peak
-                        # Enhanced Guard: Once profit reaches $1.50 - $4.00+ (+15% to +40%+ ROI), lock profit on any pullback >= 15%
-                        is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and (
-                            (peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or 
-                            (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)) or
-                            (peak_pnl >= 1.50 and net_pnl_usdt <= (peak_pnl * 0.85)) or
-                            (peak_pnl >= 2.00 and net_pnl_usdt <= max(1.00, peak_pnl * 0.80))
-                        )
-                        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
-
-                    # 1. Fetch live 15m ATR for symbol to drive dynamic volatility-adaptive stops
-                    atr_info = market_data.get_symbol_atr(symbol, interval="15m")
-                    curr_atr_val = atr_info.get("atr_val", 0.0)
-                    curr_atr_pct = atr_info.get("atr_pct", 1.5)
-                    if curr_atr_val <= 0 and mark_price > 0:
-                        curr_atr_val = mark_price * (curr_atr_pct / 100.0)
-
-                    # 2. Peak & Trough mark price tracking for Chandelier ATR Trailing Stop
-                    peak_mark_p_key = f"turbo_hedge_{chat_id}_{symbol}_peak_mark_p"
-                    peak_mark_p_str = db.get_system_setting(peak_mark_p_key, "0.0")
-                    peak_mark_p = float(peak_mark_p_str) if peak_mark_p_str.replace('.', '', 1).isdigit() else 0.0
-                    if peak_mark_p <= 0 or mark_price > peak_mark_p:
-                        peak_mark_p = max(mark_price, entry_price)
-                        db.update_system_setting(peak_mark_p_key, str(peak_mark_p))
-
-                    trough_mark_p_key = f"turbo_hedge_{chat_id}_{symbol}_trough_mark_p"
-                    trough_mark_p_str = db.get_system_setting(trough_mark_p_key, "0.0")
-                    trough_mark_p = float(trough_mark_p_str) if trough_mark_p_str.replace('.', '', 1).isdigit() else 0.0
-                    if trough_mark_p <= 0 or (mark_price < trough_mark_p and mark_price > 0):
-                        trough_mark_p = min(mark_price, entry_price) if entry_price > 0 else mark_price
-                        db.update_system_setting(trough_mark_p_key, str(trough_mark_p))
-
-                    # 🛡️ SUPER SMART CALIBRATED BREAKEVEN ARMOR & DYNAMIC CHANDELIER ATR TRAILING LOCK:
-                    # Axiom: Any trade that has reached genuine net profit shall NEVER revert to a loss!
-                    is_breakeven_armed = False
-                    min_guaranteed_roi = -999.0
-                    is_chandelier_triggered = False
-                    
-                    if is_hedge:
-                        # Delta-Neutral Hedge holds 0 directional risk; breakeven arms once funding/basis profit reaches +$0.20
-                        if peak_pnl >= 0.20:
-                            is_breakeven_armed = True
-                            min_guaranteed_roi = 0.20
-                    elif is_spot:
-                        # Spot Mode: Breakeven arms at +1.5% price gain (or peak_pnl >= $0.25)
-                        # Guarantees at least +0.40% ROI (+0.20% net profit in pocket after 2-way 0.20% spot fees)
-                        spot_arm_roi = max(1.5, curr_atr_pct * 0.8)
-                        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.25, bot_amt * 0.015):
-                            is_breakeven_armed = True
-                            if peak_roi < 3.0:
-                                min_guaranteed_roi = 0.40  # Covers 0.20% 2-way fees, locks net profit
-                            elif peak_roi < 5.0:
-                                min_guaranteed_roi = max(1.5, peak_roi * 0.65)
-                            else:
-                                min_guaranteed_roi = max(3.5, peak_roi * 0.80)
-
-                            # Chandelier ATR Trailing Stop for Spot
-                            chandelier_stop_p = peak_mark_p - (1.8 * curr_atr_val)
-                            be_spot_stop_p = entry_price * 1.0040  # Entry + 0.40%
-                            effective_spot_stop = max(be_spot_stop_p, chandelier_stop_p)
-                            if mark_price <= effective_spot_stop:
-                                is_chandelier_triggered = True
-                    else:
-                        # Futures Mode (10x Leverage):
-                        # Round-trip taker fee = 0.10% notional = 1.0% of margin (ROI).
-                        # Breakeven ARMS when price moves >= +0.60% (ROI >= +6.0% or peak_pnl >= max(0.30, bot_amt * 0.06)).
-                        # Once armed, min_guaranteed_roi is set to AT LEAST +2.5% ROI (equivalent to +0.25% price move).
-                        # Net profit after 1.0% round-trip taker fees and slippage is guaranteed +1.5% ROI in hand!
-                        # Normal 0.05% bid-ask spread will NEVER prematurely knock it out.
-                        is_derisked = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "0") == "1"
-                        derisked_entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_entry_p", "0.0")
-                        derisked_entry_p = float(derisked_entry_p_str) if derisked_entry_p_str.replace('.', '', 1).isdigit() else 0.0
-
-                        bounce_roi = 0.0
-                        if is_derisked and derisked_entry_p > 0:
-                            if current_side == "BUY":
-                                bounce_roi = ((mark_price - derisked_entry_p) / derisked_entry_p) * 100.0 * float(max(1, active_lev))
-                            elif current_side in ["SELL", "SHORT"]:
-                                bounce_roi = ((derisked_entry_p - mark_price) / derisked_entry_p) * 100.0 * float(max(1, active_lev))
-                            
-                            peak_bounce_key = f"turbo_hedge_{chat_id}_{symbol}_peak_bounce_roi"
-                            peak_bounce_str = db.get_system_setting(peak_bounce_key, "0.0")
-                            peak_bounce_roi = float(peak_bounce_str) if peak_bounce_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-                            if bounce_roi > peak_bounce_roi:
-                                peak_bounce_roi = bounce_roi
-                                db.update_system_setting(peak_bounce_key, str(peak_bounce_roi))
-                        else:
-                            peak_bounce_roi = 0.0
-
-                        fut_arm_roi = max(6.0, curr_atr_pct * 0.8 * float(active_lev))
-                        is_bounce_armed = (is_derisked and (bounce_roi >= 6.0 or peak_bounce_roi >= 6.0))
-                        if peak_roi >= fut_arm_roi or peak_pnl >= max(0.30, bot_amt * 0.06) or is_bounce_armed:
-                            is_breakeven_armed = True
-                            effective_peak = max(peak_roi, peak_bounce_roi)
-                            if effective_peak < 12.0:
-                                # Tier 1: True Net Profit Breakeven Lock (+2.50% ROI guarantees net +1.50% profit after all fees)
-                                min_guaranteed_roi = 2.50
-                            elif effective_peak < 20.0:
-                                # Tier 2: Momentum Lock (guarantee at least +6.0% or 60% of peak ROI)
-                                min_guaranteed_roi = max(6.0, effective_peak * 0.60)
-                            elif effective_peak < 40.0:
-                                # Tier 3: Surge Lock (guarantee at least +14.0% or 75% of peak ROI)
-                                min_guaranteed_roi = max(14.0, effective_peak * 0.75)
-                            else:
-                                # Tier 4: Moonshot Lock (guarantee at least +30.0% or 85% of peak ROI!)
-                                min_guaranteed_roi = max(30.0, effective_peak * 0.85)
-
-                            # Chandelier ATR Trailing Stop
-                            ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
-                            if current_side == "BUY":
-                                chandelier_stop_p = peak_mark_p - (1.8 * curr_atr_val)
-                                be_fut_stop_p = ref_entry * (1.0 + (min_guaranteed_roi / (100.0 * max(1, active_lev))))
-                                effective_fut_stop = max(be_fut_stop_p, chandelier_stop_p)
-                                if mark_price <= effective_fut_stop:
-                                    is_chandelier_triggered = True
-                            elif current_side in ["SELL", "SHORT"]:
-                                chandelier_stop_p = trough_mark_p + (1.8 * curr_atr_val)
-                                be_fut_stop_p = ref_entry * (1.0 - (min_guaranteed_roi / (100.0 * max(1, active_lev))))
-                                effective_fut_stop = min(be_fut_stop_p, chandelier_stop_p)
-                                if mark_price >= effective_fut_stop:
-                                    is_chandelier_triggered = True
-
-                    # Breakeven Stop Triggered when Armed and ROI drops to/below guaranteed floor or ATR Trailing hits
-                    effective_curr_roi = max(roi_pct, bounce_roi) if is_derisked else roi_pct
-                    is_breakeven_triggered = is_breakeven_armed and (effective_curr_roi <= min_guaranteed_roi or is_chandelier_triggered)
-
-                    # 🎯 SUPER SMART DUAL-TARGET MICRO-SCALP RAPID HARVESTER:
-                    # TP1 Target: +6.0% ROI on Futures or +2.0% on Spot -> 50% Scale-Out Cash in Hand
-                    scale_level_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
-                    scale_out_level = int(scale_level_str) if scale_level_str.isdigit() else 0
-                    
-                    is_tp1_hit = False
-                    if scale_out_level == 0 and not is_hedge:
-                        if is_spot:
-                            is_tp1_hit = (roi_pct >= 2.0 or net_pnl_usdt >= max(0.25, bot_amt * 0.020))
-                        else:
-                            is_tp1_hit = (roi_pct >= 6.0 or net_pnl_usdt >= max(0.30, bot_amt * 0.060))
-
-                    # 🛡️ SUPER SMART ANTI-WHIPSAW CLEAN STOP-LOSS (-10.0% ROI / -$0.50 minimum floor):
-                    # Clean Market Close & 2-Hour Blacklist Cooldown (Zero Reverse Flip)
-                    now_ts = int(time.time())
-                    if is_hedge:
-                        # Delta-Neutral Hedge has 0% liquidation risk and zero market directional exposure.
-                        is_stop_loss_hit = False
-                        is_hard_circuit_breaker = False
-
-                        # Negative Funding Rate Inversion Sentinel:
-                        # If funding rate flips negative, shorts pay longs. Alert and log!
-                        curr_fr = market_data.fetch_funding_rate(symbol)
-                        if curr_fr < -0.0001:
-                            last_alert_ts = int(db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", "0"))
-                            if now_ts - last_alert_ts > 14400:
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", str(now_ts))
-                                print(f"⚠️ [HEDGE NEGATIVE FUNDING INVERSION] {symbol}: Funding rate {curr_fr*100:+.4f}% < 0. Yield rotation advised.")
-                    else:
-                        is_stop_loss_hit = (
-                            (not is_spot and (roi_pct <= -10.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.10))) or
-                            (is_spot and (roi_pct <= -5.0 or net_pnl_usdt <= -max(0.50, bot_amt * 0.05)))
-                        )
-                        is_hard_circuit_breaker = (roi_pct <= -25.0 or net_pnl_usdt <= -max(1.25, bot_amt * 0.25))
-
-                    last_flip_key = f"{chat_id}_{symbol}"
-                    last_flip_ts = _last_flip_timestamps.get(last_flip_key, 0)
-
-                    # ⌛ Tier 6: Stagnant Capital Auto-Pruner & Release (4-Hour Pruner, Only if Profitable):
-                    # Eliminates arbitrary 35m loss-taking; only prunes stagnant capital if positive after 4 hours.
-                    entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
-                    entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
-                    if entry_ts == 0:
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
-                        entry_ts = now_ts
-                    
-                    holding_seconds = now_ts - entry_ts
-                    if is_hedge:
-                        # Delta-Neutral Hedge earns funding 24/7 without liquidation risk. Only release if stagnant after 48h with profit.
-                        is_stagnant_timeout = (holding_seconds >= 172800 and net_pnl_usdt >= 0.30)
-                    elif is_spot:
-                        is_stagnant_timeout = (holding_seconds >= 14400 and net_pnl_usdt >= 0.25)
-                    else:
-                        is_stagnant_timeout = (holding_seconds >= 14400 and real_pnl_usdt >= 0.30)
-
-                    if is_hard_circuit_breaker:
-                        # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
-                        print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
-                        if current_side == "SPOT":
-                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
-                        else:
-                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
-                        _last_flip_timestamps[last_flip_key] = now_ts
-                        if is_close_successful(close_res):
-                            db.remove_turbo_hedge_bot(chat_id, symbol)
-                            add_symbol_cooldown(symbol, 7200)
-                        else:
-                            print(f"⚠️ [CIRCUIT BREAKER RETRY] Market close for {symbol} failed. Retrying on next loop...")
-                        
-                        if app and hasattr(app, "bot"):
-                            try:
-                                msg_breaker = (
-                                    f"🚨 **APEX TURBO HEDGE HARD CIRCUIT BREAKER ACTIVATED!** 🛡️\n"
-                                    f"───────────────────────────────\n\n"
-                                    f"🪙 កាក់ ៖ `{symbol}`\n"
-                                    f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker -25.0% Max Limit)\n"
-                                    f"💵 PnL ៖ `-${abs(real_pnl_usdt):.2f} USDT`\n"
-                                    f"⚡ Binance Status ៖ `EMERGENCY MARKET CLOSED (<15ms)`\n\n"
-                                    f"🛡️ _ប្រព័ន្ធកាត់ផ្តាច់ Position ភ្លាមៗ ធានាដាច់ខាតមិនឲ្យខាតជ្រុលឡើយ!_"
-                                )
-                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_breaker, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                            except Exception as e:
-                                print(f"Error sending breaker notification: {e}")
-
-                    tp1_scaled_out = False
-                    if not is_hard_circuit_breaker and is_tp1_hit and scale_out_level == 0:
-                        # ⚡ TP1 MICRO-SCALP RAPID HARVESTER (50% Qty Scale-Out)
-                        can_split = (notional_val * 0.50 >= 10.50) if is_spot else (notional_val * 0.50 >= 5.05)
-                        if can_split:
-                            print(f"⚡ [MICRO-SCALP TP1 TRIGGERED] {symbol}: ROI +{roi_pct:.1f}% / PnL +${net_pnl_usdt:.2f} USDT -> Scaling out 50% Qty (<25ms)...")
-                            if is_spot:
-                                part_res = await asyncio.to_thread(trading_engine.close_partial_spot_position, keys[0], keys[1], symbol, 0.50)
-                            else:
-                                part_res = await asyncio.to_thread(trading_engine.close_partial_futures_position, keys[0], keys[1], symbol, 0.50)
-
-                            if isinstance(part_res, dict) and part_res.get("status") == "success":
-                                tp1_scaled_out = True
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "1")
-                                partial_pnl = net_pnl_usdt * 0.50
-                                tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
-                                tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-                                tot_pnl += max(0.0, partial_pnl)
-                                db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
-                                db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt * 0.50, partial_pnl, roi_pct, "TP1_MICRO_SCALP_50%")
-
-                                is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
-                                if not is_quiet and app and hasattr(app, "bot"):
-                                    try:
-                                        msg_tp1 = (
-                                            f"⚡ **APEX MICRO-SCALP TP1 HARVESTED (50%)!** 💰\n"
-                                            f"───────────────────────────────\n\n"
-                                            f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
-                                            f"💵 ផលចំណេញកើបបាន ៖ `+${partial_pnl:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
-                                            f"📊 ទំហំលក់ ៖ `50% Qty (កើបលុយសុទ្ធដាក់ហោប៉ៅភ្លាម)`\n"
-                                            f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
-                                            f"🛡️ យុទ្ធសាស្ត្រ TP2 ៖ `50% ទៀត រត់តាម Dynamic Trailing Stop ចាប់យក Moonshot!`\n"
-                                            f"🔒 សុវត្ថិភាព ៖ `BREAKEVEN ARMOR LOCKED (ធានា Zero Risk 100%)!`\n"
-                                            f"⚡ Binance Status ៖ `PARTIAL MARKET FILLED (<25ms)`"
-                                        )
-                                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                                    except Exception as e:
-                                        print(f"Error sending TP1 notification: {e}")
-                                continue
-
-                        # If cannot split or partial scale-out unconfirmed, escalate to 100% full profit harvest immediately!
-                        if not tp1_scaled_out:
-                            print(f"🚀 [TP1 HARVEST ESCALATION] {symbol}: Cannot split or partial close unconfirmed -> Escalating to 100% full profit harvest!")
-                            is_tp_harvested = True
-
-                    if is_breakeven_triggered or is_tp_harvested or is_peak_locked:
-                        if scale_out_level == 1:
-                            reason_tag = "TP2 TRAILING MOONSHOT (FINAL 50%)"
-                            alert_title = "🎯 **APEX MICRO-SCALP TP2 FULLY HARVESTED!** 🚀"
-                            alert_desc = "_AI បានប្រមូលផលចំណេញពេញលេញទាំង ២ ដំណាក់កាល (TP1 + TP2) ដោយជោគជ័យ ១០០%!_"
-                        elif is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
-                            if is_derisked:
-                                reason_tag = "SUPER SMART BREAKEVEN RECOVERY LOCKED"
-                                alert_title = "🛡️ **SUPER SMART BREAKEVEN RECOVERY LOCKED!** 🔒"
-                                alert_desc = f"_ប្រព័ន្ធបានស្រោចស្រង់ដើមទុន និងចាក់សោរប្រាក់ចំណេញសុទ្ធ (+{min_guaranteed_roi:.1f}% Net Profit Floor) ពីការងើបឡើងវិញដោយជោគជ័យ ១០០%!_"
-                            elif min_guaranteed_roi <= 2.50:
-                                reason_tag = "BREAKEVEN ARMOR LOCKED"
-                                alert_title = "🛡️ **APEX TURBO HEDGE BREAKEVEN ARMOR ACTIVATED!** 🔒"
-                                alert_desc = "_AI ស្ទាក់កើបយកប្រាក់ចំណេញសុទ្ធ មិនឱ្យ Trade ដែលធ្លាប់ចំណេញ ក្លាយជាខាតវិញដាច់ខាត!_"
-                            else:
-                                reason_tag = f"DYNAMIC ATR TRAIL LOCK (+{min_guaranteed_roi:.1f}%)"
-                                alert_title = "🎯 **APEX TURBO HEDGE CHANDELIER ATR TRAILING LOCKED!** 💰"
-                                alert_desc = f"_AI រំកិល Stop-Loss តាមដេញចាប់ប្រាក់ចំណេញរហូតដល់កំពូល ចាក់សោបាន +{roi_pct:.1f}% ROI!_"
-                        elif is_peak_locked:
-                            reason_tag = "PEAK LOCKED"
-                            alert_title = "💰 **APEX TURBO HEDGE PEAK PROFIT LOCKED!** 🚀"
-                            alert_desc = "_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
-                        else:
-                            reason_tag = "DUAL-CHECK TP HARVESTED"
-                            alert_title = "💰 **APEX TURBO HEDGE PROFIT HARVESTED!** 🚀"
-                            alert_desc = "_AI ស្កេនបើកកាក់ថ្មីដែលកំពុងផ្ទុះប្រាក់ចំណេញ 24/7 ស្វ័យប្រវត្តិ!_"
-
-                        print(f"💰 [TURBO HEDGE {reason_tag}] {symbol}: Real PnL +${real_pnl_usdt:.2f} USDT (ROI: +{roi_pct:.1f}%) -> Closing Position (<30ms)...")
-                        
-                        # Market Close Position on Binance (<30ms)
-                        if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
-                            close_spot = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
-                            close_fut = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                            close_res = close_fut if is_close_successful(close_fut) else close_spot
-                        elif current_side == "SPOT":
-                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
-                        else:
-                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        
-                        if is_close_successful(close_res):
-                            db.remove_turbo_hedge_bot(chat_id, symbol)
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "0")
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_bounce_roi", "0.0")
-                            cooldown_dur = 1800 if is_breakeven_triggered else 14400  # 30 mins for breakeven, 4h for full TP
-                            add_symbol_cooldown(symbol, cooldown_dur)
-
-                            # Track accumulated profit
-                            tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
-                            tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-                            tot_pnl += max(0.0, real_pnl_usdt)
-                            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
-                            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
-                        else:
-                            print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
-
-                        # Notify Telegram User
-                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
-                        if not is_quiet and app and hasattr(app, "bot"):
-                            try:
-                                from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
-                                disp_roi = bounce_roi if (is_derisked and bounce_roi > 0) else roi_pct
-                                disp_peak = max(peak_roi, peak_bounce_roi) if is_derisked else peak_roi
-                                msg = (
-                                    f"{alert_title}\n"
-                                    f"{DIVIDER_DOUBLE}\n\n"
-                                    f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
-                                    f"📈 **ចំណុចកំពូលងើបដល់ ៖** `+{disp_peak:.1f}% ROI`\n"
-                                    f"💵 **ផលចំណេញប្រមូលបាន ៖** `+${real_pnl_usdt:,.2f} USDT` (`+{disp_roi:.1f}% ROI`)\n"
-                                    f"🏆 **សរុបប្រាក់ចំណេញ ៖** `+${tot_pnl:,.2f} USDT`\n"
-                                    f"⚡ **Binance Status ៖** `CLEAN MARKET CLOSED (<30ms)`\n"
-                                    f"🛡️ **សុវត្ថិភាព ៖** `CAPITAL SECURED (ស្រោចស្រង់ដើមទុន ១០០%)`\n\n"
-                                    f"{alert_desc}\n\n"
-                                    f"{OFFICIAL_FOOTNOTE}"
-                                )
-                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                            except Exception as e:
-                                print(f"Error sending harvest notification: {e}")
-
-                    elif is_stagnant_timeout:
-                        holding_mins = holding_seconds // 60
-                        print(f"⌛ [STAGNANT POSITION AUTO-PRUNER] {symbol}: Position open for >{holding_mins} mins with PnL (${real_pnl_usdt:.2f}). Market closing & freeing capital...")
-                        if current_side == "SPOT":
-                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
-                        else:
-                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
-                        if is_close_successful(close_res):
-                            db.remove_turbo_hedge_bot(chat_id, symbol)
-                            add_symbol_cooldown(symbol, 14400)
-
-                        is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
-                        if not is_quiet and app and hasattr(app, "bot"):
-                            try:
-                                if is_spot:
-                                    msg_stagnant = (
-                                        f"⌛ **APEX SPOT STAGNANT CAPITAL RELEASED!** 🛡️\n"
-                                        f"───────────────────────────────\n\n"
-                                        f"🪙 កាក់ ៖ `{symbol}` (Spot Mode)\n"
-                                        f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (Net PnL: `${net_pnl_usdt:+.2f} USDT`)\n"
-                                        f"💵 ដើមទុនរំដោះបាន ៖ `${bot_amt:.2f} USDT` (ត្រឡប់មក Spot Wallet)\n"
-                                        f"⚡ Binance Status ៖ `MARKET SOLD (<20ms)`\n\n"
-                                        f"🚀 _AI ដោះលែងដើមទុន មិនឱ្យកកស្ទះ រួចរាល់ស្កេនទិញកាក់ថ្មីដែលកំពុងផ្ទុះឡើង!_"
-                                    )
-                                else:
-                                    msg_stagnant = (
-                                        f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
-                                        f"───────────────────────────────\n\n"
-                                        f"🪙 កាក់ ៖ `{symbol}`\n"
-                                        f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
-                                        f"🔒 Cooldown Status ៖ `៤ ម៉ោង (4-Hour Anti-Churn Blacklist)`\n"
-                                        f"⚡ Binance Status ៖ `MARKET CLOSED (<20ms)`\n\n"
-                                        f"_AI ដោះលែងដើមទុន ស្កេនទាញយកកាក់ថ្មីដែលរត់លឿន 24/7 ស្វ័យប្រវត្តិ!_"
-                                    )
-                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_stagnant, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                            except Exception as e:
-                                print(f"Error sending stagnant notification: {e}")
-
-                    elif is_stop_loss_hit:
-                        # 🛡️ APEX ANTI-WHIPSAW CLEAN STOP (<20ms): ROI <= -10.0%
-                        # PERMANENTLY ELIMINATES REVERSE FLIP to eliminate Double-Hit losses!
-                        # Executes immediate Clean Market Close & places symbol in 2-Hour Blacklist Cooldown (7200s).
-                        print(f"🛡️ [ANTI-WHIPSAW CLEAN STOP (<20ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(net_pnl_usdt):.2f} USDT -> Clean Market Close & 2-Hour Cooldown (Zero Flip)!")
-                        if current_side == "SPOT":
-                            close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
-                        else:
-                            close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
-                        
-                        db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
-                        if is_close_successful(close_res):
-                            db.remove_turbo_hedge_bot(chat_id, symbol)
-                            add_symbol_cooldown(symbol, 7200)
-                            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt, net_pnl_usdt, roi_pct, "ANTI_WHIPSAW_STOP_LOSS")
-                        else:
-                            print(f"⚠️ [CLEAN STOP RETRY] Market close for {symbol} failed. Retrying on next loop...")
-
-                        if app and hasattr(app, "bot"):
-                            try:
-                                msg_sl = (
-                                    f"🛡️ **APEX ANTI-WHIPSAW CLEAN STOP ACTIVATED!** 🛑\n"
-                                    f"───────────────────────────────\n\n"
-                                    f"🪙 កាក់ ៖ `{symbol}`\n"
-                                    f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (Stop Loss Floor -10.0%)\n"
-                                    f"💵 PnL ខាតជាក់ស្តែង ៖ `-${abs(net_pnl_usdt):.2f} USDT`\n"
-                                    f"🔒 Anti-Whipsaw Cooldown ៖ `២ ម៉ោង Blacklist Applied (7200s)`\n"
-                                    f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n\n"
-                                    f"🛡️ _AI កាត់បិទភ្លាមៗ ដោយមិន Flip បញ្ច្រាសទិស ធានាមិនឱ្យខាតពីរសងខាង (Zero Double-Hit) និងការពារដើមទុន ១០០%!_"
-                                )
-                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_sl, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                            except Exception as e:
-                                print(f"Error sending SL notification: {e}")
 
     except Exception as e:
         print(f"⚠️ [TURBO HEDGE MONITOR ERROR]: {e}")

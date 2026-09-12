@@ -209,7 +209,7 @@ def get_futures_max_sellable_qty(symbol: str, raw_qty: float) -> float:
             return float(math.floor(raw_qty))
         factor = 10 ** precision
         max_sellable = math.floor(raw_qty * factor) / factor
-        return max_sellable
+        return round(max_sellable, precision)
     return round(raw_qty, 3)
 
 def get_max_sellable_qty(symbol: str, raw_balance: float) -> float:
@@ -1640,10 +1640,23 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                         if amt != 0:
                             found_active_pos = True
                             close_side = "SELL" if amt > 0 else "BUY"
-                            # Formatted quantity with LOT_SIZE precision handling
+                            # Formatted quantity with exact LOT_SIZE stepSize precision handling
+                            sym_f_info = get_futures_symbol_info(symbol)
+                            step_size = None
+                            prec = 3
+                            if sym_f_info:
+                                for f in sym_f_info.get('filters', []):
+                                    if f.get('filterType') == 'LOT_SIZE':
+                                        step_size = float(f.get('stepSize', 0.001))
+                                        import math
+                                        prec = max(0, int(round(-math.log10(step_size)))) if step_size > 0 else 3
+                                        break
+                            
                             abs_qty = get_futures_max_sellable_qty(symbol, abs(amt))
                             if abs_qty <= 0:
                                 abs_qty = abs(amt)
+
+                            formatted_qty = f"{abs_qty:.{prec}f}" if prec > 0 else str(int(abs_qty))
 
                             pos_side = pos.get("positionSide")
                             if not pos_side or pos_side == "BOTH":
@@ -1656,7 +1669,7 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                                 "symbol": symbol,
                                 "side": close_side,
                                 "type": "MARKET",
-                                "quantity": abs_qty,
+                                "quantity": formatted_qty,
                                 "recvWindow": 60000,
                                 "timestamp": timestamp_ord
                             }
@@ -1690,60 +1703,25 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                                 ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload}&signature={sig_ord}", headers=headers, timeout=5)
 
                             if ord_res.status_code == 200:
-                                print(f"🚀 [BINANCE MARKET CLOSE SUCCESS (<20ms)] {symbol} {close_side} Qty: {abs_qty} -> OrderId: {ord_res.json().get('orderId')}")
+                                print(f"🚀 [BINANCE MARKET CLOSE SUCCESS (<20ms)] {symbol} {close_side} Qty: {formatted_qty} -> OrderId: {ord_res.json().get('orderId')}")
                                 return {"status": "success", "closed": True, "res": ord_res.json()}
-                            
-                            # Fallback 1: Try closePosition=true (Binance 100% full-position close bypass)
-                            timestamp_ord2 = (int(time.time() * 1000) + TIME_OFFSET)
-                            ord_params2 = {
-                                "symbol": symbol,
-                                "side": close_side,
-                                "type": "MARKET",
-                                "closePosition": "true",
-                                "recvWindow": 60000,
-                                "timestamp": timestamp_ord2
-                            }
-                            if pos_side in ["LONG", "SHORT"]:
-                                ord_params2["positionSide"] = pos_side
 
-                            payload2 = urlencode(ord_params2)
-                            sig_ord2 = generate_signature(api_secret, payload2)
-                            ord_res2 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
-                            if "-4061" in ord_res2.text:
-                                if ord_params2.get("positionSide"):
-                                    ord_params2.pop("positionSide", None)
-                                else:
-                                    ord_params2["positionSide"] = "LONG" if amt > 0 else "SHORT"
-                                payload2 = urlencode(ord_params2)
-                                sig_ord2 = generate_signature(api_secret, payload2)
-                                ord_res2 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
-                            if ord_res2.status_code == 200:
-                                print(f"🚀 [BINANCE MARKET CLOSE FULL-POSITION FALLBACK SUCCESS (<20ms)] {symbol} {close_side} -> OrderId: {ord_res2.json().get('orderId')}")
-                                return {"status": "success", "closed": True, "res": ord_res2.json()}
-                            
-                            # Fallback 2: Retry with integer quantity
-                            fallback_qty = float(int(abs_qty))
-                            if fallback_qty > 0:
-                                timestamp_ord3 = (int(time.time() * 1000) + TIME_OFFSET)
-                                ord_params3 = {
-                                    "symbol": symbol,
-                                    "side": close_side,
-                                    "type": "MARKET",
-                                    "quantity": fallback_qty,
-                                    "recvWindow": 60000,
-                                    "timestamp": timestamp_ord3
-                                }
-                                if pos_side in ["LONG", "SHORT"]:
-                                    ord_params3["positionSide"] = pos_side
-                                else:
-                                    ord_params3["reduceOnly"] = "true"
-
-                                payload3 = urlencode(ord_params3)
-                                sig_ord3 = generate_signature(api_secret, payload3)
-                                ord_res3 = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload3}&signature={sig_ord3}", headers=headers, timeout=5)
-                                if ord_res3.status_code == 200:
-                                    print(f"🚀 [BINANCE MARKET CLOSE INTEGER FALLBACK SUCCESS (<20ms)] {symbol} {close_side} Qty: {fallback_qty} -> OrderId: {ord_res3.json().get('orderId')}")
-                                    return {"status": "success", "closed": True, "res": ord_res3.json()}
+                            # Auto-Recovery from -1013 (LOT_SIZE) or -1111 (Precision over maximum):
+                            if "-1013" in ord_res.text or "-1111" in ord_res.text:
+                                for fallback_prec in [max(0, prec - 1), 0]:
+                                    import math
+                                    fb_factor = 10 ** fallback_prec
+                                    fb_qty = math.floor(abs(amt) * fb_factor) / fb_factor if fallback_prec > 0 else float(int(abs(amt)))
+                                    if fb_qty > 0:
+                                        fb_qty_str = f"{fb_qty:.{fallback_prec}f}" if fallback_prec > 0 else str(int(fb_qty))
+                                        ord_params["quantity"] = fb_qty_str
+                                        ord_params["timestamp"] = (int(time.time() * 1000) + TIME_OFFSET)
+                                        payload_fb = urlencode(ord_params)
+                                        sig_fb = generate_signature(api_secret, payload_fb)
+                                        ord_res_fb = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload_fb}&signature={sig_fb}", headers=headers, timeout=5)
+                                        if ord_res_fb.status_code == 200:
+                                            print(f"🚀 [BINANCE MARKET CLOSE PRECISION FALLBACK SUCCESS (<20ms)] {symbol} {close_side} Qty: {fb_qty_str} -> OrderId: {ord_res_fb.json().get('orderId')}")
+                                            return {"status": "success", "closed": True, "res": ord_res_fb.json()}
 
                             last_close_err = ord_res.text
                             print(f"⚠️ [BINANCE MARKET CLOSE FAIL] {symbol}: {ord_res.text}")
@@ -1801,10 +1779,24 @@ def close_partial_futures_position(api_key: str, api_secret: str, symbol: str, r
                         amt = float(pos.get("positionAmt", 0))
                         if amt != 0:
                             close_side = "SELL" if amt > 0 else "BUY"
+                            
+                            sym_f_info = get_futures_symbol_info(symbol)
+                            step_size = None
+                            prec = 3
+                            if sym_f_info:
+                                for f in sym_f_info.get('filters', []):
+                                    if f.get('filterType') == 'LOT_SIZE':
+                                        step_size = float(f.get('stepSize', 0.001))
+                                        import math
+                                        prec = max(0, int(round(-math.log10(step_size)))) if step_size > 0 else 3
+                                        break
+
                             raw_partial_qty = abs(amt) * ratio
                             partial_qty = get_futures_max_sellable_qty(symbol, raw_partial_qty)
                             if partial_qty <= 0:
                                 partial_qty = raw_partial_qty
+
+                            formatted_partial_qty = f"{partial_qty:.{prec}f}" if prec > 0 else str(int(partial_qty))
 
                             # Verify Notional >= $5.05
                             mark_p = get_current_price(symbol)
@@ -1818,7 +1810,7 @@ def close_partial_futures_position(api_key: str, api_secret: str, symbol: str, r
                                 "symbol": symbol,
                                 "side": close_side,
                                 "type": "MARKET",
-                                "quantity": partial_qty,
+                                "quantity": formatted_partial_qty,
                                 "reduceOnly": "true",
                                 "recvWindow": 60000,
                                 "timestamp": timestamp_ord
@@ -1843,10 +1835,12 @@ def close_partial_futures_position(api_key: str, api_secret: str, symbol: str, r
                                 if ord_params.get("positionSide") in ["LONG", "SHORT"]:
                                     ord_params.pop("positionSide", None)
                                     ord_params["reduceOnly"] = "true"
+                                    pos_side = "BOTH"
                                 else:
                                     retry_side = "LONG" if close_side == "SELL" else "SHORT"
                                     ord_params["positionSide"] = retry_side
                                     ord_params.pop("reduceOnly", None)
+                                    pos_side = retry_side
                                 payload2 = urlencode(ord_params)
                                 sig_ord2 = generate_signature(api_secret, payload2)
                                 ord_res = HFT_SESSION.post(f"{FUTURES_URL}{endpoint_order}?{payload2}&signature={sig_ord2}", headers=headers, timeout=5)
