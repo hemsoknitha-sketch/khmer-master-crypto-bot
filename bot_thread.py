@@ -1254,7 +1254,7 @@ class TelegramBotThread(BaseThread):
                     if user_lang == 'km':
                         kp_msg = (
                             "⛽ **SUPER ADMIN | KEEPER RELAYER MASTER VAULT** 👑\n"
-                            "══════════════════════════\n\n"
+                            "════════════\n\n"
                             "💼 **១. ព័ត៌មានកាបូប Web3 (Admin MetaMask) ៖**\n"
                             f"• អាសយដ្ឋាន ៖ {user_addr_display}{unified_note_km}\n"
                             f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
@@ -1267,17 +1267,17 @@ class TelegramBotThread(BaseThread):
                             f"• 🌐 BNB Smart Chain ៖ {k_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet ៖ {k_eth_str}\n"
                             f"• 💵 Gas សរុបលើ Keeper ៖ {k_tot_str}\n\n"
-                            "══════════════════════════\n"
+                            "════════════\n"
                             f"📡 **ស្ថានភាពបច្ចុប្បន្ន ៖** `{fund_badge_km}`\n"
                             f"⚙️ **របៀបប្រតិបត្តិការ ៖** `{kp_mode}`\n"
                             f"📜 **Aave V3 Smart Contract ៖** `{contract_addr}`\n\n"
-                            "══════════════════════════\n"
+                            "════════════\n"
                             f"{guidance_km}"
                         )
                     else:
                         kp_msg = (
                             "⛽ **SUPER ADMIN | KEEPER RELAYER MASTER VAULT** 👑\n"
-                            "══════════════════════════\n\n"
+                            "════════════\n\n"
                             "💼 **1. Admin Linked Web3 Wallet (MetaMask):**\n"
                             f"• Address: {user_addr_display}{unified_note_en}\n"
                             f"• 🌐 Arbitrum One: {u_arb_str}\n"
@@ -1290,11 +1290,11 @@ class TelegramBotThread(BaseThread):
                             f"• 🌐 BNB Smart Chain: {k_bsc_str}\n"
                             f"• 🌐 Ethereum Mainnet: {k_eth_str}\n"
                             f"• 💵 Total Keeper Gas: {k_tot_str}\n\n"
-                            "══════════════════════════\n"
+                            "════════════\n"
                             f"📡 **Status:** `{fund_badge_en}`\n"
                             f"⚙️ **Execution Mode:** `{kp_mode}`\n"
                             f"📜 **Aave V3 Smart Contract:** `{contract_addr}`\n\n"
-                            "══════════════════════════\n"
+                            "════════════\n"
                             f"{guidance_en}"
                         )
 
@@ -1311,7 +1311,7 @@ class TelegramBotThread(BaseThread):
                     if user_lang == 'km':
                         kp_msg = (
                             "⛽ **KEEPER RELAYER & WEB3 WALLET DASHBOARD (VIP)** ⚡\n"
-                            "══════════════════════════\n\n"
+                            "════════════\n\n"
                             "💼 **១. ព័ត៌មានកាបូប Web3 (MetaMask) ផ្ទាល់ខ្លួនរបស់អ្នក ៖**\n"
                             f"• អាសយដ្ឋាន ៖ {user_addr_display}\n"
                             f"• 🌐 Arbitrum One ៖ {u_arb_str}\n"
@@ -1325,7 +1325,7 @@ class TelegramBotThread(BaseThread):
                             f"• 📡 ស្ថានភាពបច្ចុប្បន្ន ៖ `{fund_badge_km}`\n"
                             "• 🎁 ថ្លៃសេវា Gas សម្រាប់ VIP ៖ `ឥតគិតថ្លៃ $0.00 (Gas Fee 100% Subsidized by Khmer Master Crypto)`\n"
                             f"• 📜 Aave V3 Smart Contract ៖ `{contract_addr}`\n\n"
-                            "══════════════════════════\n"
+                            "════════════\n"
                             "✅ **ស្ថានភាពល្អឥតខ្ចោះ ៖** ម៉ាស៊ីនបម្រើ Keeper Relayer កំពុងរ៉ាប់រងថ្លៃ Gas ១០០% សម្រាប់លោកអ្នក! លោកអ្នកមិនបាច់បង់ថ្លៃ Gas ឡើយ។ ប្រព័ន្ធកំពុងដំណើរការ Live Flash Loan Arbitrage ហើយផ្ទេរប្រាក់ចំណេញសុទ្ធជា USDT ត្រង់ចូល MetaMask របស់អ្នក!\n\n"
                             "👉 **បើកដំណើរការកើបលុយពិត ២៤/៧ ៖** ``/flash_loan 24/7``\n"
                             "👉 **ឬតេស្តសាកល្បងកម្ចី $1M ៖** ``/flash_loan SIM 1000000``"
@@ -1333,7 +1333,7 @@ class TelegramBotThread(BaseThread):
                     else:
                         kp_msg = (
                             "⛽ **VIP WEB3 SETTLEMENT & KEEPER RELAYER DASHBOARD** ⚡\n"
-                            "══════════════════════════\n\n"
+                            "════════════\n\n"
                             "💼 **1. Your Linked Personal Web3 Wallet (MetaMask):**\n"
                             f"• Address: {user_addr_display}\n"
                             f"• 🌐 Arbitrum One: {u_arb_str}\n"
@@ -1347,7 +1347,7 @@ class TelegramBotThread(BaseThread):
                             f"• 📡 Gas Status: `{fund_badge_en}`\n"
                             "• 🎁 VIP Gas Fee: `$0.00 (100% Subsidized by Khmer Master Crypto)`\n"
                             f"• 📜 Aave V3 Smart Contract: `{contract_addr}`\n\n"
-                            "══════════════════════════\n"
+                            "════════════\n"
                             "✅ **Optimal Status!** The platform's Keeper Relayer covers 100% of all transaction gas on your behalf! Real net profits are routed directly to your MetaMask wallet!\n\n"
                             "👉 **Activate 24/7 Autonomous Flash Loan:** ``/flash_loan 24/7``\n"
                             "👉 **Simulate $1M Flash Loan:** ``/flash_loan SIM 1000000``"
@@ -1439,7 +1439,7 @@ class TelegramBotThread(BaseThread):
                 if user_lang == 'km':
                     scan_msg = (
                         "⚡️ **LIVE ARBITRUM DEX POOLS & FLASH LOAN RADAR** ⚡️\n"
-                        "══════════════════════════\n\n"
+                        "════════════\n\n"
                         "🏦 **AAVE V3 POOL LIQUIDITY (កម្ចីគ្មានទ្រព្យបញ្ចាំ) ៖**\n"
                         "• USDT Pool: `$480,250,000` | Aave Fee: `0.05%`\n"
                         "• USDC Pool: `$520,100,000` | Uniswap Fee: `0.01%`\n"
@@ -1464,7 +1464,7 @@ class TelegramBotThread(BaseThread):
                 else:
                     scan_msg = (
                         "⚡️ **LIVE ARBITRUM DEX POOLS & FLASH LOAN RADAR** ⚡️\n"
-                        "══════════════════════════\n\n"
+                        "════════════\n\n"
                         "🏦 **AAVE V3 POOL LIQUIDITY (Zero Collateral Borrow) :**\n"
                         "• USDT Pool: `$480,250,000` | Aave Fee: `0.05%`\n"
                         "• USDC Pool: `$520,100,000` | Uniswap Fee: `0.01%`\n"
@@ -1498,7 +1498,7 @@ class TelegramBotThread(BaseThread):
             if user_lang == 'km':
                 msg = (
                     "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
-                    "══════════════════════════\n\n"
+                    "════════════\n\n"
                     f"📡 **ស្ថានភាពប្រព័ន្ធ 24/7** ៖ `{auto_badge_km}`\n"
                     f"🏆 **ប្រាក់ចំណេញកើបបានសរុប** ៖ `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} ប្រតិបត្តិការ)\n"
                     "🏦 **ស្ថាបត្យកម្ម FLASH LOAN & DEX ARBITRAGE ៖**\n"
@@ -1531,7 +1531,7 @@ class TelegramBotThread(BaseThread):
             else:
                 msg = (
                     "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
-                    "══════════════════════════\n\n"
+                    "════════════\n\n"
                     f"📡 **24/7 System Status**: `{auto_badge}`\n"
                     f"🏆 **Total Cumulative Profit**: `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} trades)\n"
                     "🏦 **INSTITUTIONAL FLASH LOAN ARCHITECTURE:**\n"
