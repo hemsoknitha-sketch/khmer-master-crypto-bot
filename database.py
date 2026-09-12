@@ -3124,6 +3124,163 @@ def get_user_turbo_hedge_bots(chat_id: int) -> list:
             bots.append({"chat_id": chat_id, "symbol": sym, "amount": amt, "leverage": lev, "side": side, "target_tp": target_tp})
     return bots
 
+# =========================================================================
+# 🌊 INSTITUTIONAL SUPER SMART /AUTO_TRADE MACRO ENGINE DATABASE LAYER
+# Dedicated storage for Macro Waterfall & Institutional Breakout Swings
+# Operates symbiotically with /turbo_hedge with zero duplicate functions
+# =========================================================================
+
+def add_macro_trade(chat_id: int, symbol: str, amount: float, leverage: int, side: str, target_tp: float, entry_price: float = 0.0, strategy: str = "WATERFALL_RETEST"):
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT") and symbol != "ALL":
+        symbol += "USDT"
+    now_ts = int(time.time())
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_status", "ACTIVE")
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_amount", str(amount))
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_leverage", str(leverage))
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_side", side)
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_target_tp", str(target_tp))
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_entry_price", str(entry_price))
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_entry_timestamp", str(now_ts))
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_strategy", strategy)
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_roi", "0.0")
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_pnl", "0.0")
+
+def get_active_macro_trades() -> list:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'macro_trade_%_status' AND value = 'ACTIVE'")
+    rows = cursor.fetchall()
+    conn.close()
+    trades = []
+    for r in rows:
+        parts = r[0].split("_")
+        if len(parts) >= 4:
+            try:
+                cid = int(parts[2])
+                sym = parts[3]
+                amt = float(get_system_setting(f"macro_trade_{cid}_{sym}_amount", "30.0"))
+                lev = int(get_system_setting(f"macro_trade_{cid}_{sym}_leverage", "3"))
+                side = get_system_setting(f"macro_trade_{cid}_{sym}_side", "BUY")
+                target_tp = float(get_system_setting(f"macro_trade_{cid}_{sym}_target_tp", "20.0"))
+                entry_p = float(get_system_setting(f"macro_trade_{cid}_{sym}_entry_price", "0.0"))
+                strat = get_system_setting(f"macro_trade_{cid}_{sym}_strategy", "WATERFALL_RETEST")
+                trades.append({
+                    "chat_id": cid, "symbol": sym, "amount": amt, "leverage": lev,
+                    "side": side, "target_tp": target_tp, "entry_price": entry_p, "strategy": strat
+                })
+            except Exception:
+                pass
+    return trades
+
+def get_user_macro_trades(chat_id: int) -> list:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE ? AND value = 'ACTIVE'", (f"macro_trade_{chat_id}_%_status",))
+    rows = cursor.fetchall()
+    conn.close()
+    trades = []
+    for r in rows:
+        parts = r[0].split("_")
+        if len(parts) >= 4:
+            try:
+                sym = parts[3]
+                amt = float(get_system_setting(f"macro_trade_{chat_id}_{sym}_amount", "30.0"))
+                lev = int(get_system_setting(f"macro_trade_{chat_id}_{sym}_leverage", "3"))
+                side = get_system_setting(f"macro_trade_{chat_id}_{sym}_side", "BUY")
+                target_tp = float(get_system_setting(f"macro_trade_{chat_id}_{sym}_target_tp", "20.0"))
+                entry_p = float(get_system_setting(f"macro_trade_{chat_id}_{sym}_entry_price", "0.0"))
+                strat = get_system_setting(f"macro_trade_{chat_id}_{sym}_strategy", "WATERFALL_RETEST")
+                trades.append({
+                    "chat_id": chat_id, "symbol": sym, "amount": amt, "leverage": lev,
+                    "side": side, "target_tp": target_tp, "entry_price": entry_p, "strategy": strat
+                })
+            except Exception:
+                pass
+    return trades
+
+def remove_macro_trade(chat_id: int, symbol: str):
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT") and symbol != "ALL":
+        symbol += "USDT"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if symbol == "ALL":
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"macro_trade_{chat_id}_%",))
+    else:
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"macro_trade_{chat_id}_{symbol}_%",))
+        cursor.execute("DELETE FROM system_settings WHERE key = ?", (f"macro_trade_{chat_id}_{symbol}",))
+    conn.commit()
+    conn.close()
+    for key_suffix in ["status", "amount", "leverage", "side", "target_tp", "entry_price", "entry_timestamp", "peak_roi", "peak_pnl", "strategy"]:
+        cache_delete(f"macro_trade_{chat_id}_{symbol}_{key_suffix}")
+
+def stop_macro_trade(chat_id: int, symbol: str):
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT") and symbol != "ALL":
+        symbol += "USDT"
+    if symbol == "ALL":
+        remove_macro_trade(chat_id, "ALL")
+    else:
+        update_system_setting(f"macro_trade_{chat_id}_{symbol}_status", "STOPPED")
+
+def update_macro_trade_peak(chat_id: int, symbol: str, peak_roi: float, peak_pnl: float):
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_roi", str(peak_roi))
+    update_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
+
+def get_macro_auto_trade_config(chat_id: int) -> dict:
+    enabled_val = get_system_setting(f"macro_auto_trade_{chat_id}_enabled", "")
+    if enabled_val == "":
+        enabled = is_auto_trade_enabled(chat_id)
+    else:
+        enabled = (enabled_val == "1")
+    amt_str = get_system_setting(f"macro_auto_trade_{chat_id}_amount", "30.0")
+    amount = float(amt_str) if amt_str.replace('.', '', 1).isdigit() else 30.0
+    lev_str = get_system_setting(f"macro_auto_trade_{chat_id}_leverage", "3")
+    leverage = int(lev_str) if lev_str.isdigit() else 3
+    tp_str = get_system_setting(f"macro_auto_trade_{chat_id}_target_tp", "20.0")
+    target_tp = float(tp_str) if tp_str.replace('.', '', 1).isdigit() else 20.0
+    return {
+        "enabled": enabled,
+        "amount": amount,
+        "leverage": leverage,
+        "target_tp": target_tp
+    }
+
+def set_macro_auto_trade_config(chat_id: int, enabled: bool, amount: float = 30.0, leverage: int = 3, target_tp: float = 20.0):
+    update_system_setting(f"macro_auto_trade_{chat_id}_enabled", "1" if enabled else "0")
+    update_system_setting(f"macro_auto_trade_{chat_id}_amount", str(amount))
+    update_system_setting(f"macro_auto_trade_{chat_id}_leverage", str(min(5, max(3, leverage))))
+    update_system_setting(f"macro_auto_trade_{chat_id}_target_tp", str(target_tp))
+    toggle_auto_trade(chat_id, enabled)
+
+def is_macro_auto_trade_enabled(chat_id: int) -> bool:
+    return get_macro_auto_trade_config(chat_id).get("enabled", False)
+
+def get_macro_auto_trade_users() -> list:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT chat_id FROM users WHERE auto_trade_enabled = 1 AND is_vip = 1")
+    rows = cursor.fetchall()
+    conn.close()
+    users = set([r[0] for r in rows])
+    conn2 = get_db_connection()
+    cursor2 = conn2.cursor()
+    cursor2.execute("SELECT key, value FROM system_settings WHERE key LIKE 'macro_auto_trade_%_enabled' AND value = '1'")
+    rows2 = cursor2.fetchall()
+    conn2.close()
+    for r in rows2:
+        parts = r[0].split("_")
+        if len(parts) >= 4:
+            try:
+                users.add(int(parts[3]))
+            except Exception:
+                pass
+    return list(users)
+
 def get_pre_pump_users():
     conn = get_db_connection()
     cursor = conn.cursor()

@@ -4829,6 +4829,32 @@ async def smart_swap_monitor(app: Application):
         except Exception as e:
             print(f"⚠️ [SMART SWAP MONITOR TASK ERROR]: {e}")
 
+_macro_auto_trade_lock = asyncio.Lock()
+_last_macro_scan_cycle = 0.0
+
+async def macro_auto_trade_monitor(app: Application):
+    """
+    Continuous 15-Second Background Monitor for Super Smart /auto_trade Engine.
+    1. Monitors and Trailing-locks Macro Positions (+15%, +25%, +35%+ ROI).
+    2. Periodically scans Macro Waterfall Breakdowns & Breakout expansions.
+    """
+    global _last_macro_scan_cycle
+    if _macro_auto_trade_lock.locked():
+        return
+    async with _macro_auto_trade_lock:
+        try:
+            import time
+            import macro_auto_trade_engine
+            await macro_auto_trade_engine.monitor_macro_auto_trades(app)
+
+            # Periodically scan for new macro opportunities every 30 seconds
+            now = time.time()
+            if now - _last_macro_scan_cycle >= 30.0:
+                _last_macro_scan_cycle = now
+                await macro_auto_trade_engine.run_macro_auto_trade_scanner_cycle(app)
+        except Exception as e:
+            print(f"⚠️ [MACRO AUTO-TRADE MONITOR TASK ERROR]: {e}")
+
 
 _last_arb_harvest_time = {}
 

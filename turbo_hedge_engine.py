@@ -1921,6 +1921,14 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             db.remove_turbo_hedge_bot(chat_id, symbol)
             add_symbol_cooldown(symbol, 7200)
             db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt, net_pnl_usdt, roi_pct, "ANTI_WHIPSAW_STOP_LOSS")
+            try:
+                import macro_auto_trade_engine
+                asyncio.create_task(asyncio.to_thread(
+                    macro_auto_trade_engine.handle_turbo_hedge_stop_loss_signal,
+                    chat_id, symbol, current_side, net_pnl_usdt
+                ))
+            except Exception:
+                pass
         else:
             print(f"⚠️ [CLEAN STOP RETRY] Market close for {symbol} failed. Retrying on next loop...")
 

@@ -4684,8 +4684,20 @@ class TelegramBotThread(BaseThread):
                 context.args = [sym]
                 await scalp_command(update, context)
             elif data.startswith("btn_auto_trade_"):
-                act = "ON" if "on" in data else "OFF"
-                context.args = [act]
+                if data in ["btn_auto_trade_on", "btn_auto_trade_on_prompt"]:
+                    context.args = ["ON"]
+                elif data in ["btn_auto_trade_off", "btn_auto_trade_off_prompt"]:
+                    context.args = ["OFF"]
+                elif data.startswith("btn_auto_trade_amt_"):
+                    amt_str = data.replace("btn_auto_trade_amt_", "")
+                    context.args = ["SET", amt_str]
+                elif data.startswith("btn_auto_trade_lev_"):
+                    lev_str = data.replace("btn_auto_trade_lev_", "")
+                    context.args = ["LEVERAGE", lev_str]
+                elif data == "btn_auto_trade_trades":
+                    context.args = ["STATUS"]
+                else:
+                    context.args = []
                 await auto_trade_command(update, context)
             elif data.startswith("btn_hyper_trade_"):
                 act = "ON" if "on" in data else "OFF"
@@ -11952,49 +11964,62 @@ class TelegramBotThread(BaseThread):
 
             # 🌟 Institutional Flagship Routing: /smart_trade routes directly to turbo_hedge_command!
             # Also route any trading subcommands (TOP, SPOT, HEDGE, STOP, coins, etc.) directly to turbo_hedge_command!
-            if cmd_text.startswith("/smart_trade") or (args and len(args) > 0 and str(args[0]).upper().strip() not in ["ON", "OFF"]):
+            if cmd_text.startswith("/smart_trade") or (args and len(args) > 0 and str(args[0]).upper().strip() not in ["ON", "OFF", "SET", "LEVERAGE", "STATUS"]):
                 return await turbo_hedge_command(update, context)
 
-            cfg = db.get_auto_trade_config(chat_id)
-            is_enabled = bool(cfg.get("enabled", False)) if isinstance(cfg, dict) else False
-            amount = float(cfg.get("amount", 30.0)) if isinstance(cfg, dict) else 30.0
-            trailing_pct = float(cfg.get("trailing_pct", 4.0)) if isinstance(cfg, dict) else 4.0
-            max_trades = int(cfg.get("max_active_trades", 10)) if isinstance(cfg, dict) else 10
+            macro_cfg = db.get_macro_auto_trade_config(chat_id)
+            is_enabled = bool(macro_cfg.get("enabled", False))
+            amount = float(macro_cfg.get("amount", 30.0))
+            leverage = int(macro_cfg.get("leverage", 3))
+            target_tp = float(macro_cfg.get("target_tp", 20.0))
+            active_macro_trades = db.get_user_macro_trades(chat_id) or []
             current_status = f"🟢 ACTIVE (`${amount:,.2f} USDT`)" if is_enabled else "🔴 INACTIVE (បិទ)"
 
             if not args or len(args) == 0:
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                from ui_standards import DIVIDER_HEAVY, DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
 
                 toggle_btn = (
-                    InlineKeyboardButton("🔴 Turn OFF Auto Trade", callback_data="btn_auto_trade_off_prompt")
+                    InlineKeyboardButton("🔴 Turn OFF Auto Trade", callback_data="btn_auto_trade_off")
                     if is_enabled else
-                    InlineKeyboardButton("🟢 Turn ON Auto Trade", callback_data="btn_auto_trade_on_prompt")
+                    InlineKeyboardButton("🟢 Turn ON Auto Trade", callback_data="btn_auto_trade_on")
                 )
 
+                trades_btn_label = f"📊 Active Trades ({len(active_macro_trades)})"
+
                 keyboard = InlineKeyboardMarkup([
-                    [toggle_btn, InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch")],
+                    [toggle_btn, InlineKeyboardButton(trades_btn_label, callback_data="btn_auto_trade_trades")],
                     [
-                        InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                        InlineKeyboardButton(f"{'✅ ' if amount == 30.0 else ''}💰 $30", callback_data="btn_auto_trade_amt_30"),
+                        InlineKeyboardButton(f"{'✅ ' if amount == 50.0 else ''}💰 $50", callback_data="btn_auto_trade_amt_50"),
+                        InlineKeyboardButton(f"{'✅ ' if amount == 100.0 else ''}💰 $100", callback_data="btn_auto_trade_amt_100")
                     ],
                     [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                        InlineKeyboardButton(f"{'✅ ' if leverage == 3 else ''}🛡️ 3x Buffer", callback_data="btn_auto_trade_lev_3"),
+                        InlineKeyboardButton(f"{'✅ ' if leverage == 5 else ''}⚡ 5x Buffer", callback_data="btn_auto_trade_lev_5")
+                    ],
+                    [
+                        InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
 
                 msg = (
-                    "⚙️ **APEX SUPER AGI TURBO BRAIN v13.00 | VIP AUTO-TRADE ENGINE** 🤖\n"
-                    "══════════════════════════\n\n"
-                    "📊 **EXECUTIVE AUTO-TRADE CONFIGURATION:**\n"
-                    f"• **System Status**: {current_status}\n"
-                    f"• **Trade Amount / Order**: `${amount:,.2f} USDT`\n"
-                    f"• **Max HFT Active Limit**: `{max_trades} Trades Simultaneously`\n"
-                    f"• **Trailing Profit Lock**: `{trailing_pct:.1f}% Dynamic Trailing Lock`\n"
-                    "• **Signal Consensus**: `100% TURBO AGI Multi-Timeframe AI Consensus`\n"
-                    "• **Safety Guards**: `Automatic Risk-Balance Protection Clamping`\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/auto_trade ON 50 1234` ``\n\n"
-                    "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/auto_trade OFF 1234` ``"
+                    "🌊 **APEX SUPER SMART /AUTO_TRADE ENGINE** 🤖\n"
+                    f"{DIVIDER_DOUBLE}\n\n"
+                    f"📊 **EXECUTIVE MACRO CONFIGURATION:**\n"
+                    f"• **System Status** ៖ {current_status}\n"
+                    f"• **Strategy Architecture** ៖ `Macro Waterfall & Breakout Hunter`\n"
+                    f"• **Margin Safety Buffer** ៖ `ISOLATED ({leverage}x Lev ~33% Safety Room)`\n"
+                    f"• **Capital / Order** ៖ `${amount:,.2f} USDT`\n"
+                    f"• **Target TP Floor** ៖ `+{target_tp:.1f}% Macro Expansion`\n"
+                    f"• **Active Macro Swings** ៖ `{len(active_macro_trades)}/3 Positions`\n"
+                    f"• **Symbiotic Link** ៖ `Zero Opposing Conflict with /turbo_hedge`\n\n"
+                    f"📋 **1-TAP COMMAND EXECUTIONS:**\n"
+                    f"👉 **បើកដំណើរការ ៖** `` `/auto_trade ON <ទុន>` ``\n"
+                    f"👉 **បិទដំណើរការ ៖** `` `/auto_trade OFF` ``\n\n"
+                    f"🛡️ _ប្រព័ន្ធចាប់យករលកបាក់ទំនប់ 1H/4H ដោយមិន Short បាត ធានាការពារដើមទុន ១០០%!_\n\n"
+                    f"{OFFICIAL_FOOTNOTE}"
                 )
                 await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
@@ -12002,51 +12027,87 @@ class TelegramBotThread(BaseThread):
 
             action = str(args[0]).upper().strip()
             if action == "OFF":
-                pin = str(args[1]).strip() if len(args) >= 2 else ""
-                stored_pin = db.get_user_pin(chat_id)
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
-                    return
-                db.set_auto_trade_config(chat_id, False, 30.0, 4.0, 10)
-                await (update.effective_message or update.message).reply_text("🛑 **VIP Auto-Trade Engine ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
+                db.set_macro_auto_trade_config(chat_id, False, amount, leverage, target_tp)
+                await (update.effective_message or update.message).reply_text(
+                    f"🛑 **SUPER SMART /AUTO_TRADE DEACTIVATED!** 🛑\n{DIVIDER_HEAVY}\n\n_ម៉ាស៊ីន Macro Waterfall & Breakout ត្រូវបានបិទដោយជោគជ័យ!_",
+                    parse_mode="Markdown"
+                )
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
-                self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Auto-Trade.")
+                self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Macro Auto-Trade.")
                 return
 
             if action == "ON":
-                if len(args) < 3:
-                    await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_trade ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_trade ON 50 1234` ``", parse_mode="Markdown")
-                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
-                    return
-                try:
-                    trade_amt = float(args[1])
-                    pin = str(args[2]).strip()
-                except ValueError:
-                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
-                    return
-
-                stored_pin = db.get_user_pin(chat_id)
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
-                    return
-
-                db.set_auto_trade_config(chat_id, True, trade_amt, 4.0, 10)
+                trade_amt = amount
+                if len(args) >= 2:
+                    try:
+                        trade_amt = float(args[1])
+                    except ValueError:
+                        pass
+                trade_amt = max(15.0, min(500.0, trade_amt))
+                db.set_macro_auto_trade_config(chat_id, True, trade_amt, leverage, target_tp)
                 msg = (
-                    "✅ **VIP Auto-Trade Engine ត្រូវបានបើកដំណើរការ!** ⚙️\n\n"
-                    f"💵 **ទុនទិញជួញដូរ/Order** ៖ `${trade_amt:,.2f} USDT`\n"
-                    f"🎯 **Trailing Profit Lock** ៖ `4.0%` | 📊 **Max Limits** ៖ `10 Active Trades`\n"
-                    "⚡ **យុទ្ធសាស្រ្ត** ៖ `Sub-Second AI Consensus Signal Execution`\n\n"
-                    "_Bot នឹងស្កេន និងអនុវត្តការទិញលក់ 24/7 ស្វ័យប្រវត្តិ!_"
+                    f"✅ **SUPER SMART /AUTO_TRADE ACTIVATED!** 🌊\n"
+                    f"{DIVIDER_DOUBLE}\n\n"
+                    f"💵 **ទុនវិនិយោគ / Order** ៖ `${trade_amt:,.2f} USDT`\n"
+                    f"🛡️ **Margin Mode** ៖ `{leverage}x ISOLATED (~33% Safety Room)`\n"
+                    f"🎯 **Target TP Floor** ៖ `+{target_tp:.1f}% Macro Expansion`\n"
+                    f"🔗 **Symbiotic Link** ៖ `Zero Opposing Conflict with /turbo_hedge Active`\n\n"
+                    f"_Bot នឹងស្កេន និងចាប់យករលកបាក់ទំនប់ 1H/4H 24/7 ដោយស្វ័យប្រវត្តិ!_\n\n"
+                    f"{OFFICIAL_FOOTNOTE}"
                 )
                 await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
-                self.log_signal.emit(f"🤖 VIP User {chat_id} ENABLED Auto-Trade (Amount: {trade_amt}, Max: 10).")
+                self.log_signal.emit(f"🤖 VIP User {chat_id} ENABLED Macro Auto-Trade (${trade_amt}).")
+                return
+
+            if action == "SET":
+                if len(args) >= 2:
+                    try:
+                        new_amt = float(args[1])
+                        db.set_macro_auto_trade_config(chat_id, is_enabled, new_amt, leverage, target_tp)
+                        context.args = []
+                        return await auto_trade_command(update, context)
+                    except ValueError:
+                        pass
+
+            if action == "LEVERAGE":
+                if len(args) >= 2:
+                    try:
+                        new_lev = int(args[1])
+                        db.set_macro_auto_trade_config(chat_id, is_enabled, amount, new_lev, target_tp)
+                        context.args = []
+                        return await auto_trade_command(update, context)
+                    except ValueError:
+                        pass
+
+            if action == "STATUS":
+                from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
+                if not active_macro_trades:
+                    msg_status = (
+                        f"📊 **ACTIVE MACRO POSITIONS**\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
+                        f"• គ្មាន Position កំពុងបើកដំណើរការក្នុង /auto_trade នៅឡើយទេ។\n"
+                        f"• ប្រព័ន្ធកំពុងរង់ចាំស្កេនចាប់យករលកបាក់ទំនប់ 1H/4H 24/7!\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
+                    )
+                else:
+                    items = []
+                    for t in active_macro_trades:
+                        items.append(f"• `{t.get('symbol')}` ៖ {t.get('side')} (${t.get('amount'):.1f} USDT, {t.get('leverage')}x ISOLATED) -> Strat: `{t.get('strategy')}`")
+                    pos_text = "\n".join(items)
+                    msg_status = (
+                        f"📊 **ACTIVE MACRO POSITIONS ({len(active_macro_trades)}/3)**\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
+                        f"{pos_text}\n\n"
+                        f"🛡️ _គ្រប់គ្រងដោយ Dynamic Trailing Profit Lock និង Breakeven Armor!_\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
+                    )
+                await (update.effective_message or update.message).reply_text(msg_status, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
             # Invalid usage prompt
-            await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_trade ON <ទុន> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/auto_trade ON 50 1234` ``", parse_mode="Markdown")
+            await (update.effective_message or update.message).reply_text("⚠️ របៀបប្រើប្រាស់: `` `/auto_trade ON <ទុន>` ``\nឧទាហរណ៍ ៖ `` `/auto_trade ON 50` ``", parse_mode="Markdown")
             await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             return
 
@@ -14668,6 +14729,17 @@ class TelegramBotThread(BaseThread):
             coalesce=True,
             args=[self.app],
             id='smart_swap_monitor'
+        )
+
+        # 1c. Super Smart /auto_trade Macro Waterfall & Breakout Monitor (Every 15 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.macro_auto_trade_monitor,
+            'interval',
+            seconds=15,
+            max_instances=2,
+            coalesce=True,
+            args=[self.app],
+            id='macro_auto_trade_monitor'
         )
 
         # 2. Unified Smart Grid Matrix Monitor (Every 15 seconds)
