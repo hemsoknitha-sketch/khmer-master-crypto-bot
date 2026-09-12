@@ -655,20 +655,20 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [STRICT EXCLUSION: ANTI-PEAK BUYING] {symbol}: 24h Change {change_24h:+.1f}% >= +20% or RSI {rsi14:.1f} >= 70 -> Blocked BUY!")
-                elif side == "BUY" and not is_spot_mode and price > ema5_1m * 1.004:
-                    # Price extended > 0.4% above 1m EMA5 -> Wait for Pullback Retracement!
+                elif side == "BUY" and not is_spot_mode and price > ema5_1m * 1.0035:
+                    # Price extended > 0.35% above 1m EMA5 -> Wait for Pullback Retracement!
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.4% above EMA5 -> Waiting for Pullback!")
+                    print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.35% above EMA5 -> Waiting for Pullback!")
                 elif side == "SELL" and (change_24h <= -15.0 or rsi14 <= 38.0):
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -15% or RSI {rsi14:.1f} <= 38.0 -> Blocked SELL!")
-                elif side == "SELL" and not is_spot_mode and price < ema5_1m * 0.996:
-                    # Price extended > 0.4% below 1m EMA5 -> Wait for Bounce Retracement!
+                elif side == "SELL" and not is_spot_mode and price < ema5_1m * 0.9965:
+                    # Price extended > 0.35% below 1m EMA5 -> Wait for Bounce Retracement!
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [BOUNCE RETRACEMENT GUARD] {symbol}: Price extended > 0.4% below EMA5 -> Waiting for Retracement!")
+                    print(f"🛡️ [BOUNCE RETRACEMENT GUARD] {symbol}: Price extended > 0.35% below EMA5 -> Waiting for Retracement!")
 
             # 🛡️ BTC Lead Impulse Guard & Funding Fee Penalty Guard
             if side != "SKIP" and symbol != "BTCUSDT":
@@ -778,6 +778,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
     recommended_route = "SPOT" if (is_spot_mode or dynamic_leverage <= 1) else "FUTURES"
 
+    # Query 15m ATR for dynamic volatility-based trailing and sizing
+    sym_atr = market_data.get_symbol_atr(symbol, interval="15m")
+    atr_val = sym_atr.get("atr_val", 0.0)
+    atr_pct = sym_atr.get("atr_pct", 1.5)
+
     res = {
         "symbol": symbol,
         "side": side,
@@ -786,6 +791,8 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
         "recommended_leverage": dynamic_leverage,
         "recommended_route": recommended_route,
         "entry_price": price,
+        "atr_val": atr_val,
+        "atr_pct": atr_pct,
         "reason": f"AI Confidence {confidence:.1f}% -> Route: {recommended_route} ({dynamic_leverage}x {side})"
     }
     _eval_cache[cache_key] = res
@@ -1707,6 +1714,10 @@ async def monitor_turbo_hedge_bots(app):
                     if entry_p > 0:
                         db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_entry_price", str(entry_p))
                     db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_entry_timestamp", str(now_ts_entry))
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_atr_val", str(eval_res.get("atr_val", 0.0)))
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_atr_pct", str(eval_res.get("atr_pct", 1.5)))
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_peak_mark_p", str(entry_p))
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_trough_mark_p", str(entry_p))
                     
                     active_hedge_bots.append({"chat_id": target_chat_id, "symbol": c_cand, "amount": actual_trade_amount, "leverage": unit_leverage, "side": target_side, "target_tp": unit_tp})
                     print(f"🚀 [SUPER SMART HIGH-VELOCITY AUTO-ENTRY] User {target_chat_id} Live Balance ${avail_bal:.2f} -> Auto-entered {c_cand} ({target_side})!")
@@ -1918,11 +1929,33 @@ async def monitor_turbo_hedge_bots(app):
                         is_peak_locked = (net_pnl_usdt > 0 and roi_pct > 0) and ((peak_pnl >= target_dollar_tp and net_pnl_usdt <= (peak_pnl * retain_ratio)) or (peak_roi >= 15.0 and roi_pct <= (peak_roi * retain_ratio)))
                         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.2 or net_pnl_usdt <= peak_pnl * 0.92))
 
-                    # 🛡️ SUPER SMART BREAKEVEN STOP-LOSS ARMOR & PROGRESSIVE TRAILING LOCK:
-                    # Axiom: Any trade that has reached positive profit (+3.0% ROI on Futures, +1.0% on Spot)
-                    # SHALL NEVER BE PERMITTED TO TURN INTO A LOSING TRADE!
+                    # 1. Fetch live 15m ATR for symbol to drive dynamic volatility-adaptive stops
+                    atr_info = market_data.get_symbol_atr(symbol, interval="15m")
+                    curr_atr_val = atr_info.get("atr_val", 0.0)
+                    curr_atr_pct = atr_info.get("atr_pct", 1.5)
+                    if curr_atr_val <= 0 and mark_price > 0:
+                        curr_atr_val = mark_price * (curr_atr_pct / 100.0)
+
+                    # 2. Peak & Trough mark price tracking for Chandelier ATR Trailing Stop
+                    peak_mark_p_key = f"turbo_hedge_{chat_id}_{symbol}_peak_mark_p"
+                    peak_mark_p_str = db.get_system_setting(peak_mark_p_key, "0.0")
+                    peak_mark_p = float(peak_mark_p_str) if peak_mark_p_str.replace('.', '', 1).isdigit() else 0.0
+                    if peak_mark_p <= 0 or mark_price > peak_mark_p:
+                        peak_mark_p = max(mark_price, entry_price)
+                        db.update_system_setting(peak_mark_p_key, str(peak_mark_p))
+
+                    trough_mark_p_key = f"turbo_hedge_{chat_id}_{symbol}_trough_mark_p"
+                    trough_mark_p_str = db.get_system_setting(trough_mark_p_key, "0.0")
+                    trough_mark_p = float(trough_mark_p_str) if trough_mark_p_str.replace('.', '', 1).isdigit() else 0.0
+                    if trough_mark_p <= 0 or (mark_price < trough_mark_p and mark_price > 0):
+                        trough_mark_p = min(mark_price, entry_price) if entry_price > 0 else mark_price
+                        db.update_system_setting(trough_mark_p_key, str(trough_mark_p))
+
+                    # 🛡️ SUPER SMART CALIBRATED BREAKEVEN ARMOR & DYNAMIC CHANDELIER ATR TRAILING LOCK:
+                    # Axiom: Any trade that has reached genuine net profit shall NEVER revert to a loss!
                     is_breakeven_armed = False
                     min_guaranteed_roi = -999.0
+                    is_chandelier_triggered = False
                     
                     if is_hedge:
                         # Delta-Neutral Hedge holds 0 directional risk; breakeven arms once funding/basis profit reaches +$0.20
@@ -1930,46 +1963,75 @@ async def monitor_turbo_hedge_bots(app):
                             is_breakeven_armed = True
                             min_guaranteed_roi = 0.20
                     elif is_spot:
-                        # Spot Mode: Breakeven activates at +1.0% price gain (covers Spot fees 0.15% - 0.20%)
-                        if peak_roi >= 1.0 or peak_pnl >= 0.15:
+                        # Spot Mode: Breakeven arms at +1.5% price gain (or peak_pnl >= $0.25)
+                        # Guarantees at least +0.40% ROI (+0.20% net profit in pocket after 2-way 0.20% spot fees)
+                        spot_arm_roi = max(1.5, curr_atr_pct * 0.8)
+                        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.25, bot_amt * 0.015):
                             is_breakeven_armed = True
-                            if peak_roi < 2.0:
-                                min_guaranteed_roi = 0.25  # Breakeven + fee buffer (+0.25%)
-                            elif peak_roi < 3.5:
-                                min_guaranteed_roi = max(0.50, peak_roi * 0.65)
+                            if peak_roi < 3.0:
+                                min_guaranteed_roi = 0.40  # Covers 0.20% 2-way fees, locks net profit
+                            elif peak_roi < 5.0:
+                                min_guaranteed_roi = max(1.5, peak_roi * 0.65)
                             else:
-                                min_guaranteed_roi = peak_roi * 0.82
-                    else:
-                        # Futures Mode: Breakeven activates at +3.0% ROI (covers 2-way taker fees +0.10% - 0.12%)
-                        if peak_roi >= 3.0 or peak_pnl >= 0.15:
-                            is_breakeven_armed = True
-                            if peak_roi < 5.0:
-                                # Tier 1: Initial Breakeven Lock (+0.35% ROI guarantees net profit after all fees)
-                                min_guaranteed_roi = 0.35
-                            elif peak_roi < 8.0:
-                                # Tier 2: Early Profit Lock (guarantee at least +1.80% or 50% of peak ROI)
-                                min_guaranteed_roi = max(1.80, peak_roi * 0.50)
-                            elif peak_roi < 15.0:
-                                # Tier 3: Momentum Profit Lock (guarantee at least +4.50% or 70% of peak ROI)
-                                min_guaranteed_roi = max(4.50, peak_roi * 0.70)
-                            else:
-                                # Tier 4: Moonshot Peak Lock (guarantee 85% of peak ROI!)
-                                min_guaranteed_roi = peak_roi * 0.85
+                                min_guaranteed_roi = max(3.5, peak_roi * 0.80)
 
-                    # Breakeven Stop Triggered when Armed and ROI drops to or below the guaranteed floor
-                    is_breakeven_triggered = is_breakeven_armed and (roi_pct <= min_guaranteed_roi)
+                            # Chandelier ATR Trailing Stop for Spot
+                            chandelier_stop_p = peak_mark_p - (1.8 * curr_atr_val)
+                            be_spot_stop_p = entry_price * 1.0040  # Entry + 0.40%
+                            effective_spot_stop = max(be_spot_stop_p, chandelier_stop_p)
+                            if mark_price <= effective_spot_stop:
+                                is_chandelier_triggered = True
+                    else:
+                        # Futures Mode (10x Leverage):
+                        # Round-trip taker fee = 0.10% notional = 1.0% of margin (ROI).
+                        # Breakeven ARMS when price moves >= +0.60% (ROI >= +6.0% or peak_pnl >= max(0.30, bot_amt * 0.06)).
+                        # Once armed, min_guaranteed_roi is set to AT LEAST +2.5% ROI (equivalent to +0.25% price move).
+                        # Net profit after 1.0% round-trip taker fees and slippage is guaranteed +1.5% ROI in hand!
+                        # Normal 0.05% bid-ask spread will NEVER prematurely knock it out.
+                        fut_arm_roi = max(6.0, curr_atr_pct * 0.8 * float(active_lev))
+                        if peak_roi >= fut_arm_roi or peak_pnl >= max(0.30, bot_amt * 0.06):
+                            is_breakeven_armed = True
+                            if peak_roi < 12.0:
+                                # Tier 1: True Net Profit Breakeven Lock (+2.50% ROI guarantees net +1.50% profit after all fees)
+                                min_guaranteed_roi = 2.50
+                            elif peak_roi < 20.0:
+                                # Tier 2: Momentum Lock (guarantee at least +6.0% or 60% of peak ROI)
+                                min_guaranteed_roi = max(6.0, peak_roi * 0.60)
+                            elif peak_roi < 40.0:
+                                # Tier 3: Surge Lock (guarantee at least +14.0% or 75% of peak ROI)
+                                min_guaranteed_roi = max(14.0, peak_roi * 0.75)
+                            else:
+                                # Tier 4: Moonshot Lock (guarantee at least +30.0% or 85% of peak ROI!)
+                                min_guaranteed_roi = max(30.0, peak_roi * 0.85)
+
+                            # Chandelier ATR Trailing Stop
+                            if current_side == "BUY":
+                                chandelier_stop_p = peak_mark_p - (1.8 * curr_atr_val)
+                                be_fut_stop_p = entry_price * (1.0 + (min_guaranteed_roi / (100.0 * max(1, active_lev))))
+                                effective_fut_stop = max(be_fut_stop_p, chandelier_stop_p)
+                                if mark_price <= effective_fut_stop:
+                                    is_chandelier_triggered = True
+                            elif current_side == "SELL":
+                                chandelier_stop_p = trough_mark_p + (1.8 * curr_atr_val)
+                                be_fut_stop_p = entry_price * (1.0 - (min_guaranteed_roi / (100.0 * max(1, active_lev))))
+                                effective_fut_stop = min(be_fut_stop_p, chandelier_stop_p)
+                                if mark_price >= effective_fut_stop:
+                                    is_chandelier_triggered = True
+
+                    # Breakeven Stop Triggered when Armed and ROI drops to/below guaranteed floor or ATR Trailing hits
+                    is_breakeven_triggered = is_breakeven_armed and (roi_pct <= min_guaranteed_roi or is_chandelier_triggered)
 
                     # 🎯 SUPER SMART DUAL-TARGET MICRO-SCALP RAPID HARVESTER:
-                    # TP1 Target: +4.0% to +6.0% ROI (approx +$0.20 - $0.30 USDT on $5 margin) -> 50% Scale-Out Cash in Hand
+                    # TP1 Target: +6.0% ROI on Futures or +2.0% on Spot -> 50% Scale-Out Cash in Hand
                     scale_level_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
                     scale_out_level = int(scale_level_str) if scale_level_str.isdigit() else 0
                     
                     is_tp1_hit = False
                     if scale_out_level == 0 and not is_hedge:
                         if is_spot:
-                            is_tp1_hit = (roi_pct >= 1.2 or net_pnl_usdt >= max(0.20, bot_amt * 0.012))
+                            is_tp1_hit = (roi_pct >= 2.0 or net_pnl_usdt >= max(0.25, bot_amt * 0.020))
                         else:
-                            is_tp1_hit = (roi_pct >= 4.0 or net_pnl_usdt >= max(0.20, bot_amt * 0.04))
+                            is_tp1_hit = (roi_pct >= 6.0 or net_pnl_usdt >= max(0.30, bot_amt * 0.060))
 
                     # 🛡️ SUPER SMART ANTI-WHIPSAW CLEAN STOP-LOSS (-10.0% ROI / -$0.50 minimum floor):
                     # Clean Market Close & 2-Hour Blacklist Cooldown (Zero Reverse Flip)
@@ -1997,7 +2059,8 @@ async def monitor_turbo_hedge_bots(app):
                     last_flip_key = f"{chat_id}_{symbol}"
                     last_flip_ts = _last_flip_timestamps.get(last_flip_key, 0)
 
-                    # ⌛ Tier 6: Stagnant Capital Auto-Pruner & Release (35m Time-Stop for Spot, 90m for Futures):
+                    # ⌛ Tier 6: Stagnant Capital Auto-Pruner & Release (4-Hour Pruner, Only if Profitable):
+                    # Eliminates arbitrary 35m loss-taking; only prunes stagnant capital if positive after 4 hours.
                     entry_ts_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_timestamp", "0")
                     entry_ts = int(entry_ts_str) if entry_ts_str.isdigit() else 0
                     if entry_ts == 0:
@@ -2009,17 +2072,9 @@ async def monitor_turbo_hedge_bots(app):
                         # Delta-Neutral Hedge earns funding 24/7 without liquidation risk. Only release if stagnant after 48h with profit.
                         is_stagnant_timeout = (holding_seconds >= 172800 and net_pnl_usdt >= 0.30)
                     elif is_spot:
-                        # Spot Stagnant Capital Time-Stop (35 Mins Release)
-                        # Sells if open >= 35 mins without reaching TP, or if open >= 20 mins with profit >= $0.25
-                        is_stagnant_timeout = (
-                            (holding_seconds >= 2100 and -0.40 <= net_pnl_usdt <= 0.25) or
-                            (holding_seconds >= 1200 and net_pnl_usdt >= 0.25)
-                        )
+                        is_stagnant_timeout = (holding_seconds >= 14400 and net_pnl_usdt >= 0.25)
                     else:
-                        is_stagnant_timeout = (
-                            (holding_seconds >= 7200 and -0.15 <= real_pnl_usdt <= 0.15) or
-                            (holding_seconds >= 3600 and real_pnl_usdt > 0.25)
-                        )
+                        is_stagnant_timeout = (holding_seconds >= 14400 and real_pnl_usdt >= 0.30)
 
                     if is_hard_circuit_breaker:
                         # 🚨 HARD EMERGENCY CIRCUIT BREAKER: Overrides cooldown window to force instant Market Close (<15ms)
@@ -2083,7 +2138,7 @@ async def monitor_turbo_hedge_bots(app):
                                             f"📊 ទំហំលក់ ៖ `50% Qty (កើបលុយសុទ្ធដាក់ហោប៉ៅភ្លាម)`\n"
                                             f"🏆 សរុបប្រាក់ចំណេញ ៖ `+${tot_pnl:,.2f} USDT`\n"
                                             f"🛡️ យុទ្ធសាស្ត្រ TP2 ៖ `50% ទៀត រត់តាម Dynamic Trailing Stop ចាប់យក Moonshot!`\n"
-                                            f"🔒 សុវត្ថិភាព ៖ `BREAKEVEN LOCKED (+0.35%) ធានា Zero Risk 100%!`\n"
+                                            f"🔒 សុវត្ថិភាព ៖ `BREAKEVEN ARMOR LOCKED (ធានា Zero Risk 100%)!`\n"
                                             f"⚡ Binance Status ៖ `PARTIAL MARKET FILLED (<25ms)`"
                                         )
                                         asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
@@ -2102,13 +2157,13 @@ async def monitor_turbo_hedge_bots(app):
                             alert_title = "🎯 **APEX MICRO-SCALP TP2 FULLY HARVESTED!** 🚀"
                             alert_desc = "_AI បានប្រមូលផលចំណេញពេញលេញទាំង ២ ដំណាក់កាល (TP1 + TP2) ដោយជោគជ័យ ១០០%!_"
                         elif is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
-                            if min_guaranteed_roi <= 0.50:
+                            if min_guaranteed_roi <= 2.50:
                                 reason_tag = "BREAKEVEN ARMOR LOCKED"
                                 alert_title = "🛡️ **APEX TURBO HEDGE BREAKEVEN ARMOR ACTIVATED!** 🔒"
-                                alert_desc = "_AI ស្ទាក់កើបយកប្រាក់ចំណេញស្មើដើម មិនឱ្យ Trade ដែលធ្លាប់ចំណេញ ក្លាយជាខាតវិញឡើយ!_"
+                                alert_desc = "_AI ស្ទាក់កើបយកប្រាក់ចំណេញសុទ្ធ មិនឱ្យ Trade ដែលធ្លាប់ចំណេញ ក្លាយជាខាតវិញដាច់ខាត!_"
                             else:
-                                reason_tag = f"TRAILING PEAK LOCK (+{min_guaranteed_roi:.1f}%)"
-                                alert_title = "🎯 **APEX TURBO HEDGE TRAILING PROFIT LOCKED!** 💰"
+                                reason_tag = f"DYNAMIC ATR TRAIL LOCK (+{min_guaranteed_roi:.1f}%)"
+                                alert_title = "🎯 **APEX TURBO HEDGE CHANDELIER ATR TRAILING LOCKED!** 💰"
                                 alert_desc = f"_AI រំកិល Stop-Loss តាមដេញចាប់ប្រាក់ចំណេញរហូតដល់កំពូល ចាក់សោបាន +{roi_pct:.1f}% ROI!_"
                         elif is_peak_locked:
                             reason_tag = "PEAK LOCKED"

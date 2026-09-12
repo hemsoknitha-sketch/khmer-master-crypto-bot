@@ -193,6 +193,45 @@ def get_symbol_rsi(symbol: str, interval: str = "15m", window: int = 14) -> floa
         pass
     return 50.0
 
+_atr_cache = {}
+_atr_cache_time = {}
+
+def get_symbol_atr(symbol: str, interval: str = "15m", window: int = 14) -> dict:
+    """
+    Returns latest ATR (Average True Range) and ATR percentage for a symbol.
+    Uses a 10-second memory cache to provide sub-millisecond responses without hitting API limits.
+    Returns: {"atr_val": float, "atr_pct": float, "current_price": float}
+    """
+    symbol = str(symbol).upper().strip()
+    cache_key = f"{symbol}_{interval}_{window}"
+    now = time.time()
+    if cache_key in _atr_cache and (now - _atr_cache_time.get(cache_key, 0)) < 10.0:
+        return _atr_cache[cache_key]
+
+    default_res = {"atr_val": 0.0, "atr_pct": 1.5, "current_price": 0.0}
+    try:
+        res = fetch_binance_data(symbol, interval=interval, limit=window + 20)
+        if res and isinstance(res, tuple) and len(res) >= 1:
+            df = res[0]
+            if df is not None and not df.empty and len(df) >= window:
+                atr_s = calculate_atr(df, window=window)
+                curr_p = float(df['close'].iloc[-1])
+                last_atr = float(atr_s.iloc[-1]) if not pd.isna(atr_s.iloc[-1]) else curr_p * 0.015
+                atr_pct = (last_atr / curr_p) * 100.0 if curr_p > 0 else 1.5
+                out = {
+                    "atr_val": round(last_atr, 6),
+                    "atr_pct": round(atr_pct, 2),
+                    "current_price": curr_p
+                }
+                _atr_cache[cache_key] = out
+                _atr_cache_time[cache_key] = now
+                return out
+    except Exception:
+        pass
+
+    return default_res
+
+
 def generate_chart(df: pd.DataFrame, symbol: str, filepath: str = "chart.png"):
     """
     Generates a dark-themed chart with Price and RSI and saves it as an image.
