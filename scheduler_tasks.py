@@ -5472,7 +5472,8 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
 
     if cur_eng != "all":
         eng_pnl = engines.get(cur_eng, {}).get("pnl", 0.0)
-        eng_roi = (eng_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+        eng_net_roi = (net_profit / base_cap * 100.0) if base_cap > 0 else 0.0
+        eng_roi_sign = "+" if eng_net_roi >= 0 else ""
         eng_title = cur_eng.replace('_', ' ').upper()
         msg_lines.extend([
             sep,
@@ -5484,7 +5485,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"🌾 Net Funding : `{tot_funding:+,.2f}`",
             line_sep,
             f"💎 *NET PROFIT : {net_sign}${net_profit:,.2f} USDT*",
-            f"📈 *{growth_label} : {growth_sign}{eng_roi:.2f}% Net*",
+            f"📈 *{growth_label} : {eng_roi_sign}{eng_net_roi:.2f}% Net*",
             sep,
             OFFICIAL_FOOTNOTE
         ])
