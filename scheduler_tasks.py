@@ -4730,33 +4730,64 @@ async def hyper_trade_monitor(app: Application):
 
 async def gold_turbo_monitor(app: Application):
     """
-    🥇 Apex Gold Turbo Monitor for PAXGUSDT 25x-50x Leverage & Uncapped Peak Lock.
+    🥇 Apex Super Smart Gold AGI Autonomous Monitor (Fused /smartx + /gold_turbo).
+    Operates with:
+    - 25 Wall Street ML Brain Models (CatBoost, LightGBM, XGBoost, MoE, PINN)
+    - MacroEventNLPGuard (Pre-event 15m Freeze on US CPI/NFP/FOMC)
+    - Anti-Oversold Short Guard (15m RSI <= 38.0 Bottom Trap Protection)
+    - Invariant 8: Small Capital Leverage Shield (< $100 -> max 10x)
+    - Unified Auto-Registration into Turbo Hedge Monitor for Trailing Peak Lock
     """
     try:
         if db.is_defender_active():
             return
 
-        import gold_turbo_engine
-        gold_res = await asyncio.to_thread(gold_turbo_engine.scan_gold_turbo_opportunity)
-        if gold_res.get("signal") == "EXECUTE_GOLD_TURBO" and gold_res.get("win_rate_pct", 0) >= 85.0:
-            win_rate = gold_res.get("win_rate_pct")
-            side = gold_res.get("side", "BUY")
-            dynamic_lev = gold_res.get("dynamic_leverage", 25)
+        import smart_x_engine
+        
+        # 1. Macro News Shield Check (Zero trades during CPI/NFP/FOMC shock windows)
+        macro_guard = smart_x_engine.MacroEventNLPGuard.check_macro_guard()
+        if macro_guard.get("is_frozen"):
+            return
 
-            vip_users = db.get_all_vip_users()
-            for chat_id in vip_users:
-                cfg = db.get_gold_turbo_config(chat_id)
-                if cfg.get("is_enabled"):
-                    keys = db.get_user_api(chat_id)
-                    if keys:
-                        amount = cfg.get("amount_per_trade", 15.0)
-                        await asyncio.to_thread(
-                            gold_turbo_engine.execute_gold_turbo_order,
-                            keys[0], keys[1], amount, side, dynamic_lev
-                        )
-                        print(f"🥇 [GOLD TURBO EXECUTION] PAXGUSDT {side} Leverage: {dynamic_lev}x Win Rate: {win_rate}%")
+        # 2. Scan Dual-Mode Opportunities (TURBO & SONIC)
+        turbo_res = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "PAXGUSDT", mode="TURBO")
+        sonic_res = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "PAXGUSDT", mode="SONIC")
+
+        vip_users = db.get_all_vip_users()
+        for chat_id in vip_users:
+            keys = db.get_user_api(chat_id)
+            if not keys or not keys[0] or not keys[1]:
+                continue
+
+            cfg = db.get_gold_turbo_config(chat_id) if hasattr(db, 'get_gold_turbo_config') else {}
+            is_legacy_turbo = bool(cfg.get("is_enabled"))
+            is_smartx_active = (db.get_system_setting(f"smart_x_{chat_id}_active", "0") == "1")
+            smartx_mode = db.get_system_setting(f"smart_x_{chat_id}_mode", "SONIC").upper()
+
+            # Execute TURBO Momentum if enabled
+            if (is_legacy_turbo or (is_smartx_active and smartx_mode == "TURBO")) and turbo_res.get("side") in ["BUY", "SELL"] and turbo_res.get("confidence_pct", 0) >= 85.0:
+                amount = float(db.get_system_setting(f"smart_x_{chat_id}_amount", "0")) or float(cfg.get("amount_per_trade", 15.0))
+                lev = int(db.get_system_setting(f"smart_x_{chat_id}_leverage", "0")) or int(turbo_res.get("dynamic_leverage", 25))
+                side = turbo_res["side"]
+                exec_res = await asyncio.to_thread(
+                    smart_x_engine.execute_smart_x_futures,
+                    chat_id, "PAXGUSDT", side, amount, lev, 1.5, "TURBO"
+                )
+                print(f"🥇 [SUPER SMART GOLD TURBO] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
+
+            # Execute SONIC Scalp if enabled
+            elif is_smartx_active and smartx_mode != "TURBO" and sonic_res.get("side") in ["BUY", "SELL"] and sonic_res.get("confidence_pct", 0) >= 85.0:
+                amount = float(db.get_system_setting(f"smart_x_{chat_id}_amount", "20.0"))
+                lev = int(db.get_system_setting(f"smart_x_{chat_id}_leverage", "10"))
+                side = sonic_res["side"]
+                exec_res = await asyncio.to_thread(
+                    smart_x_engine.execute_smart_x_futures,
+                    chat_id, "PAXGUSDT", side, amount, lev, 2.5, "SONIC"
+                )
+                print(f"👑 [SUPER SMART GOLD SONIC] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
+
     except Exception as e:
-        print(f"⚠️ [GOLD TURBO MONITOR ERROR]: {e}")
+        print(f"⚠️ [SUPER SMART GOLD MONITOR ERROR]: {e}")
 
 _turbo_hedge_lock = asyncio.Lock()
 

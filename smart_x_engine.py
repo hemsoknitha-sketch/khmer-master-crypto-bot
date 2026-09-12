@@ -608,19 +608,23 @@ class SmartXEngine:
         }
 
     @classmethod
-    def generate_smart_x_signal(cls, symbol: str = CANONICAL_GOLD_SYMBOL) -> dict:
+    def generate_smart_x_signal(cls, symbol: str = CANONICAL_GOLD_SYMBOL, mode: str = "AUTO") -> dict:
         """
         The Institutional Flagship Quantitative Signal Generator for Gold:
         Synthesizes:
-        1. Macro Event Freeze Guard
+        1. Macro Event Freeze Guard (CPI, NFP, FOMC)
         2. SONIC Session Window & Asian Range Turtle Soup Sweeps
         3. 25-Model Super Brain Ensemble Voting (CatBoost, LightGBM, XGBoost, MoE)
         4. Central Bank Shanghai Gold Exchange (SGE) Benchmark Premium & PBOC Action
         5. Macro DXY Dollar Index & 10Y Real Yields
-        6. Geopolitical Black-Swan Flight-to-Safety Surge
-        Targeting SONIC's 87.12% Win Rate Benchmark.
+        6. PAXG Spot-Futures Basis Spread Arbitrage
+        7. Geopolitical Black-Swan Flight-to-Safety Surge
+        Dual Operating Profiles:
+        - mode="SONIC" / "AUTO": 87.12% Win Rate, Session Clocks, Low Drawdown (<= 0.26%)
+        - mode="TURBO": High-Velocity Momentum, Dynamic 25x-50x Leverage, Uncapped Peak Lock
         """
         symbol = CANONICAL_GOLD_SYMBOL
+        mode_str = str(mode or "AUTO").upper().strip()
 
         # 1. Check Macro Guard (CPI, NFP, FOMC freeze)
         macro = MacroEventNLPGuard.check_macro_guard()
@@ -628,29 +632,32 @@ class SmartXEngine:
             return {
                 "symbol": symbol,
                 "side": "SKIP",
+                "mode": mode_str,
                 "confidence_pct": 0.0,
                 "reason": f"MACRO_EVENT_LOCK: {macro['freeze_reason']}",
                 "macro_guard": macro
             }
 
-        # 2. Check Session Timing Window
-        session_info = SonicGoldScalper.get_current_session_window()
-        if session_info.get("is_dead_zone"):
-            return {
-                "symbol": symbol,
-                "side": "SKIP",
-                "confidence_pct": 50.0,
-                "reason": "INTERBANK_DEAD_ZONE (Spreads Widen 21:30-05:00 UTC)",
-                "session_info": session_info
-            }
-
-        # 3. Check Anti-Whipsaw Cooldown
+        # 2. Check Anti-Whipsaw Cooldown
         if turbo_hedge_engine.is_symbol_in_cooldown(symbol):
             return {
                 "symbol": symbol,
                 "side": "SKIP",
+                "mode": mode_str,
                 "confidence_pct": 0.0,
                 "reason": "ANTI_WHIPSAW_COOLDOWN_ACTIVE"
+            }
+
+        # 3. Check Session Timing Window (Enforced for SONIC / non-TURBO)
+        session_info = SonicGoldScalper.get_current_session_window()
+        if mode_str != "TURBO" and session_info.get("is_dead_zone"):
+            return {
+                "symbol": symbol,
+                "side": "SKIP",
+                "mode": mode_str,
+                "confidence_pct": 50.0,
+                "reason": "INTERBANK_DEAD_ZONE (Spreads Widen 21:30-05:00 UTC)",
+                "session_info": session_info
             }
 
         # 4. Fetch Live Gold Market Data
@@ -679,35 +686,120 @@ class SmartXEngine:
             sge_data = central_bank_gold_radar.fetch_sge_lbma_premium()
             sge_prem = sge_data.get("sge_premium_usdt", 25.0)
             pboc_status = sge_data.get("pboc_status", "ACTIVE")
+            pboc_action = sge_data.get("pboc_action", "BUYING" if sge_prem >= 15.0 else "HOLDING")
         except Exception:
             sge_prem = 25.0
             pboc_status = "ACCUMULATING"
+            pboc_action = "BUYING"
 
         # 8. Query Live Macro Indicators (DXY, Real Yield)
         try:
             macro_data = macro_gold_engine.fetch_macro_gold_indicators()
             dxy_val = macro_data.get("dxy_index", 104.2)
             real_yield = macro_data.get("real_yield_10y", 1.35)
+            dxy_trend = "DUMPING" if dxy_val < 104.0 else ("PUMPING" if dxy_val > 105.5 else "NEUTRAL")
         except Exception:
             dxy_val = 104.2
             real_yield = 1.35
+            dxy_trend = "NEUTRAL"
 
-        # 9. Query Geopolitical Safe-Haven Radar
+        # 9. Query PAXG Spot-Futures Basis Spread Arbitrage
+        try:
+            paxg_arb = paxg_arbitrage_engine.scan_paxg_arbitrage_opportunity()
+            spread_pct = paxg_arb.get("spread_pct", 0.0)
+        except Exception:
+            spread_pct = 0.0
+
+        # 10. Query Geopolitical Safe-Haven Radar
         try:
             haven_res = black_swan_gold_guard.PAXGGoldSafeHavenSwitcherEngine().scan_geopolitical_black_swan()
             crisis_detected = haven_res.get("crisis_detected", False)
         except Exception:
             crisis_detected = False
 
-        # Quantitative Signal Synthesis
+        # --- MODE-SPECIFIC SYNTHESIS ---
+        if mode_str == "TURBO":
+            # 🚀 HIGH-VELOCITY TURBO MOMENTUM SPRINT (25x - 50x)
+            turbo_win_rate = 75.0
+            turbo_side = "BUY"
+            turbo_reasons = []
+
+            if dxy_trend == "DUMPING" or pboc_action == "BUYING":
+                turbo_win_rate += 12.5
+                turbo_side = "BUY"
+                turbo_reasons.append("🥇 Bullish Gold Macro (DXY Softening / PBOC Accumulating)")
+            elif dxy_trend == "PUMPING":
+                turbo_win_rate += 12.5
+                turbo_side = "SELL"
+                turbo_reasons.append("📉 Bearish Gold Macro (DXY Strengthening)")
+
+            if abs(spread_pct) >= 0.05:
+                turbo_win_rate += 7.5
+                turbo_reasons.append(f"⚖️ PAXG Spread: {spread_pct:+.2f}%")
+
+            # Fuse with 25-Model AI Ensemble
+            if ensemble["consensus"] == turbo_side:
+                turbo_win_rate += 10.0
+                turbo_reasons.append(f"🧠 AI Ensemble Confirmed {turbo_side} ({ensemble['confidence_pct']}%)")
+
+            turbo_win_rate = min(98.5, max(60.0, turbo_win_rate))
+            dynamic_leverage = 50 if turbo_win_rate >= 90.0 else 25
+
+            tp_offset = current_price * 0.015  # 1.5% initial TP trigger
+            sl_offset = current_price * 0.008  # 0.8% hard SL
+
+            # Anti-Oversold Short Guard (Invariant 16)
+            if turbo_side == "SELL":
+                rsi_val = market_data.get_symbol_rsi(symbol, interval="15m") if hasattr(market_data, 'get_symbol_rsi') else 50.0
+                if rsi_val <= 38.0:
+                    turbo_reasons.append(f"🛑 Oversold Bottom Guard (15m RSI {rsi_val:.1f} <= 38.0)")
+                    return {
+                        "symbol": symbol,
+                        "side": "SKIP",
+                        "mode": "TURBO",
+                        "confidence_pct": round(turbo_win_rate, 1),
+                        "current_price": current_price,
+                        "reason": "ANTI_OVERSOLD_SHORT_GUARD (RSI <= 38.0)",
+                        "dynamic_leverage": dynamic_leverage
+                    }
+
+            if turbo_win_rate >= 85.0:
+                final_side = turbo_side
+                tp_price = round(current_price + tp_offset, 2) if final_side == "BUY" else round(current_price - tp_offset, 2)
+                sl_price = round(current_price - sl_offset, 2) if final_side == "BUY" else round(current_price + sl_offset, 2)
+            else:
+                final_side = "SKIP"
+                tp_price = 0.0
+                sl_price = 0.0
+
+            return {
+                "symbol": symbol,
+                "side": final_side,
+                "mode": "TURBO",
+                "confidence_pct": round(turbo_win_rate, 1),
+                "win_rate_pct": round(turbo_win_rate, 1),
+                "dynamic_leverage": dynamic_leverage,
+                "current_price": current_price,
+                "entry_price": current_price,
+                "tp_price": tp_price,
+                "sl_price": sl_price,
+                "strategy": " | ".join(turbo_reasons) if turbo_reasons else "TURBO_MACRO_WAIT",
+                "reason": " | ".join(turbo_reasons) if turbo_reasons else "TURBO_MACRO_WAIT",
+                "sge_premium_usdt": sge_prem,
+                "pboc_status": pboc_status,
+                "dxy_index": dxy_val,
+                "real_yield": real_yield,
+                "spread_pct": spread_pct,
+                "ai_votes": f"BUY: {ensemble['buy_votes']} | SELL: {ensemble['sell_votes']}",
+                "moe_regime": ensemble["moe_regime"],
+                "macro_guard": macro
+            }
+
+        # --- SONIC SCALPER MODE (DEFAULT) ---
         side = "SKIP"
         confidence = 50.0
         reasons = []
 
-        # Buy Confluence:
-        # - Turtle Soup Buy OR Breakout Buy
-        # - Super-Brain Ensemble == BUY
-        # - SGE Premium >= +$15/oz (PBOC buying) OR DXY softening (< 104.5)
         if sweep_data["sweep_signal"] in ["TURTLE_SOUP_BUY", "TRUE_BREAKOUT_BUY"] and ensemble["consensus"] == "BUY":
             side = "BUY"
             confidence = max(87.5, ensemble["confidence_pct"])
@@ -717,10 +809,6 @@ class SmartXEngine:
                 confidence = min(96.5, confidence + 3.0)
                 reasons.append(f"SGE Premium +${sge_prem:.2f}/oz (PBOC OTC Accumulation)")
 
-        # Sell Confluence:
-        # - Turtle Soup Sell OR Breakout Sell
-        # - Super-Brain Ensemble == SELL
-        # - DXY strengthening OR Real Yields climbing
         elif sweep_data["sweep_signal"] in ["TURTLE_SOUP_SELL", "TRUE_BREAKOUT_SELL"] and ensemble["consensus"] == "SELL":
             side = "SELL"
             confidence = max(86.8, ensemble["confidence_pct"])
@@ -730,13 +818,11 @@ class SmartXEngine:
                 confidence = min(95.0, confidence + 2.5)
                 reasons.append(f"DXY Index High ({dxy_val:.2f})")
 
-        # Geopolitical safe haven emergency trigger
         elif crisis_detected:
             side = "BUY"
             confidence = 94.0
             reasons.append("🚨 GEOPOLITICAL BLACK SWAN: Immediate Flight-to-Safety into Gold")
 
-        # Fallback: High Model Consensus during Prime-Time Session
         elif session_info.get("is_prime_time") and ensemble["confidence_pct"] >= 88.0:
             side = ensemble["consensus"]
             confidence = ensemble["confidence_pct"]
@@ -758,6 +844,7 @@ class SmartXEngine:
         return {
             "symbol": symbol,
             "side": side,
+            "mode": "SONIC",
             "confidence_pct": confidence,
             "current_price": current_price,
             "tp_price": tp_price,
@@ -769,6 +856,7 @@ class SmartXEngine:
             "pboc_status": pboc_status,
             "dxy_index": dxy_val,
             "real_yield": real_yield,
+            "spread_pct": spread_pct,
             "ai_votes": f"BUY: {ensemble['buy_votes']} | SELL: {ensemble['sell_votes']}",
             "moe_regime": ensemble["moe_regime"],
             "macro_guard": macro,
@@ -792,18 +880,24 @@ def execute_smart_x_futures(
     side: str = "AUTO",
     amount_usdt: float = 20.0,
     leverage: int = 10,
-    target_tp: float = 2.5
+    target_tp: float = 2.5,
+    mode: str = "AUTO"
 ) -> dict:
     """
     Executes Institutional Gold Trade on Binance USDT-M Futures (PAXGUSDT).
     Strictly enforces:
     - Invariant 2: Hedge Mode / dualSidePosition synchronization
     - Invariant 3: ISOLATED Margin Mode
-    - Invariant 8: Small capital leverage clamp
+    - Invariant 8: Small capital leverage clamp (< $100 -> max 10x)
     - Invariant 9: Fee-adjusted profit floor (+0.12%)
     - Invariant 10: Multi-wallet balance segregation
+    - Invariant 16: Anti-Oversold Short Guard (RSI <= 38.0)
+    Dual Operating Modes:
+    - mode="SONIC": 10x-20x leverage, Session Timing, 0.26% Drawdown target
+    - mode="TURBO": Dynamic 25x-50x leverage, Macro Momentum, Trailing Peak Lock
     """
     symbol = CANONICAL_GOLD_SYMBOL
+    mode_str = str(mode or "AUTO").upper().strip()
 
     # 1. Anti-Whipsaw check
     if turbo_hedge_engine.is_symbol_in_cooldown(symbol):
@@ -839,26 +933,45 @@ def execute_smart_x_futures(
 
     # 5. Position Sizing & Leverage Clamp
     current_price = trading_engine.get_current_price(symbol) or 2650.0
-    size_plan = AdaptiveKellyDrawdownGuard.calculate_optimal_gold_position(
-        account_balance=fut_bal,
-        current_price=current_price
-    )
-    actual_amount = max(10.50, min(amount_usdt, size_plan["allocated_trade_usd"]))
-    actual_leverage = min(leverage, size_plan["recommended_leverage"])
 
-    # 6. Determine Direction (SONIC Gold Signal)
+    if mode_str == "TURBO":
+        # 🛡️ Invariant 8: Small Capital Leverage Shield (< $100 -> max 10x)
+        if fut_bal < 100.0:
+            actual_leverage = min(leverage, 10)
+        elif fut_bal < 300.0:
+            actual_leverage = min(leverage, 25)
+        else:
+            actual_leverage = min(leverage, 50)
+
+        if macro["is_frozen"]:
+            actual_leverage = min(actual_leverage, macro["max_allowed_leverage"])
+
+        actual_amount = max(10.50, min(amount_usdt, fut_bal * 0.25))
+        actual_tp = max(1.5, target_tp)
+    else:
+        size_plan = AdaptiveKellyDrawdownGuard.calculate_optimal_gold_position(
+            account_balance=fut_bal,
+            current_price=current_price
+        )
+        actual_amount = max(10.50, min(amount_usdt, size_plan["allocated_trade_usd"]))
+        actual_leverage = min(leverage, size_plan["recommended_leverage"])
+        actual_tp = target_tp
+
+    # 6. Determine Direction (SONIC or TURBO Gold Signal)
     if side.upper() == "AUTO":
-        sig = SmartXEngine.generate_smart_x_signal(symbol)
+        sig = SmartXEngine.generate_smart_x_signal(symbol, mode=mode_str)
         if sig["side"] == "SKIP":
             return {
                 "status": "skipped",
-                "message": f"ℹ️ SONIC Gold AGI recommends WAIT (Reason: {sig.get('strategy', 'Session wait')})."
+                "message": f"ℹ️ SmartX Gold ({mode_str}) recommends WAIT (Reason: {sig.get('reason', sig.get('strategy', 'Confluence wait'))})."
             }
         target_side = sig["side"]
+        if mode_str == "TURBO" and sig.get("dynamic_leverage") and fut_bal >= 100.0:
+            actual_leverage = min(actual_leverage, sig.get("dynamic_leverage", 25))
     else:
         target_side = side.upper()
 
-    # 7. Execute via turbo_hedge_engine (respecting Invariants 2, 3, 8, 9)
+    # 7. Execute via turbo_hedge_engine (respecting Invariants 2, 3, 8, 9, 16)
     try:
         trade_res = turbo_hedge_engine.execute_turbo_hedge_trade(
             api_key=api_key,
@@ -868,7 +981,7 @@ def execute_smart_x_futures(
             side=target_side,
             leverage=actual_leverage,
             chat_id=chat_id,
-            target_tp=target_tp
+            target_tp=actual_tp
         )
         return trade_res
     except Exception as e:

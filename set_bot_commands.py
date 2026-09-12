@@ -31,7 +31,6 @@ async def set_menu_commands():
         BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
         BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
         BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-        BotCommand("gold_turbo", "🥇 PAXG Macro Gold Correlation Radar"),
         BotCommand("snipe", "🎯 Smart Listing Token Sniper"),
         BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
         BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),

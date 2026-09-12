@@ -4439,6 +4439,9 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_x_gold":
                 context.args = ["GOLD", "20", "10", "AUTO"]
                 await smart_x_command(update, context)
+            elif data == "btn_smart_x_turbo":
+                context.args = ["TURBO", "20", "25", "AUTO"]
+                await smart_x_command(update, context)
             elif data == "btn_smart_x_btc":
                 context.args = ["GOLD", "20", "10", "AUTO"]
                 await smart_x_command(update, context)
@@ -9138,41 +9141,58 @@ class TelegramBotThread(BaseThread):
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
+            div = "━━━━━━━━━━━━"
             args = context.args
             cfg = db.get_gold_turbo_config(chat_id)
             is_enabled = bool(cfg.get("is_enabled", False)) if isinstance(cfg, dict) else False
-            current_status = "🟢 ACTIVE (ស្វ័យប្រវត្តិ 24/7)" if is_enabled else "🔴 INACTIVE (បិទ)"
+            is_smartx_active = (db.get_system_setting(f"smart_x_{chat_id}_active", "0") == "1")
+            smartx_mode = db.get_system_setting(f"smart_x_{chat_id}_mode", "SONIC").upper()
+            is_turbo_active = is_enabled or (is_smartx_active and smartx_mode == "TURBO")
+
+            current_status = "🟢 ACTIVE (ស្វ័យប្រវត្តិ 24/7)" if is_turbo_active else "🔴 INACTIVE (បិទ)"
 
             if not args or len(args) == 0:
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 
                 toggle_btn = (
                     InlineKeyboardButton("🔴 Turn OFF Gold Turbo", callback_data="btn_gold_turbo_off_prompt")
-                    if is_enabled else
+                    if is_turbo_active else
                     InlineKeyboardButton("🟢 Turn ON Gold Turbo", callback_data="btn_gold_turbo_on_prompt")
                 )
                 
                 keyboard = InlineKeyboardMarkup([
-                    [toggle_btn, InlineKeyboardButton("🏆 Macro Gold Radar", callback_data="btn_gold_radar_refresh")],
+                    [toggle_btn, InlineKeyboardButton("🚀 Go to /smartx", callback_data="btn_smart_x_turbo")],
                     [
-                        InlineKeyboardButton("🏓 Scalp PAXG/USDT", callback_data="btn_scalp_PAXGUSDT"),
+                        InlineKeyboardButton("🏆 Macro Gold Radar", callback_data="btn_smart_x_radar"),
+                        InlineKeyboardButton("🧠 25 AI Models", callback_data="btn_smart_x_metrics")
+                    ],
+                    [
+                        InlineKeyboardButton("🏓 SONIC Scalp", callback_data="btn_smart_x_gold"),
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
                 
                 msg = (
-                    "🥇 **APEX SUPER AGI TURBO BRAIN v13.00 | GOLD TURBO ENGINE** 🥇\n"
-                    "══════════════════════════\n\n"
-                    "📊 **EXECUTIVE GOLD TURBO CONFIGURATION:**\n"
-                    f"• **System Status**: {current_status}\n"
-                    "• **Target Asset**: `PAXGUSDT` (Tokenized Physical Gold 24/7)\n"
-                    "• **Leverage Matrix**: `Dynamic 25x ➔ 50x`\n"
-                    "• **Target Profit Lock**: `Uncapped Dynamic Trailing Peak Lock (+2,500%+ ROI)`\n"
-                    "• **Macro Matrix**: `DXY Index / Shanghai SGE Gold / PBOC Reserves ACTIVE`\n"
-                    "• **Execution Engine**: `Sub-50ms HFT Signal Scan & Auto-Hedge`\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/gold_turbo ON 1234` ``\n\n"
-                    "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/gold_turbo OFF 1234` ``"
+                    "🥇 *APEX SUPER SMART GOLD AGI SUITE* 👑\n"
+                    f"{div}\n"
+                    "💡 *ដំណឹងសំខាន់ (Unified Engine Notice) ៖*\n"
+                    "មុខងារ `/gold_turbo` ត្រូវបានបញ្ចូលគ្នាយ៉ាងពេញលេញទៅក្នុង **`/smartx`** (Flagship Institutional Gold Quant Suite) ដើម្បីបង្កើនប្រសិទ្ធភាព និងសុវត្ថិភាពដល់ចំណុចកំពូល!\n\n"
+                    f"• **ស្ថានភាពម៉ាស៊ីន** ៖ {current_status}\n"
+                    "• **ទ្រព្យសកម្ម** ៖ `PAXGUSDT (Digital Physical Gold)`\n"
+                    "• **យុទ្ធសាស្រ្ត** ៖ `Macro Turbo Sprint (Dynamic 25x-50x)`\n"
+                    "• **ខែលការពារ** ៖ `CPI/NFP/FOMC Freeze + Anti-Oversold Guard`\n"
+                    f"{div}\n"
+                    "📋 *ពាក្យបញ្ជា 1-TAP COPYABLE ៖*\n\n"
+                    "👉 🚀 *បើក Turbo Sprint ($20, 25x) ៖*\n"
+                    "`/smartx TURBO 20 25 1234`\n\n"
+                    "👉 🛡️ *បើក SONIC Scalp ($20, 10x) ៖*\n"
+                    "`/smartx GOLD 20 10 AUTO 1234`\n\n"
+                    "👉 🛒 *ទិញ Spot Gold (0% Liquidation) ៖*\n"
+                    "`/smartx SPOT 50 1234`\n\n"
+                    "👉 🛑 *បិទដំណើរការ Gold Turbo ៖*\n"
+                    "`/gold_turbo OFF 1234`\n"
+                    f"{div}\n"
+                    "_Khmer Master Crypto | APEX SUPER BRAIN AI_"
                 )
                 await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
@@ -9190,6 +9210,8 @@ class TelegramBotThread(BaseThread):
                     await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_gold_turbo_config(chat_id, False, 15.0)
+                if db.get_system_setting(f"smart_x_{chat_id}_mode", "SONIC") == "TURBO":
+                    db.update_system_setting(f"smart_x_{chat_id}_active", "0")
                 await (update.effective_message or update.message).reply_text("🛑 **Apex Gold Turbo Engine ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
@@ -9205,12 +9227,19 @@ class TelegramBotThread(BaseThread):
                     await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                     return
                 db.set_gold_turbo_config(chat_id, True, 15.0)
+                db.update_system_setting(f"smart_x_{chat_id}_active", "1")
+                db.update_system_setting(f"smart_x_{chat_id}_mode", "TURBO")
+                db.update_system_setting(f"smart_x_{chat_id}_amount", "15.0")
+                db.update_system_setting(f"smart_x_{chat_id}_leverage", "25")
                 msg = (
-                    "✅ **Apex Gold Turbo Engine ត្រូវបានបើកដំណើរការ!** 🥇\n\n"
-                    "🪙 **ទ្រព្យសកម្ម** ៖ `PAXGUSDT (Digital Gold)`\n"
-                    "🎯 **យុទ្ធសាស្រ្ត** ៖ `Dynamic 25x-50x Leverage + Uncapped Trailing Peak Lock (+2,500%+ ROI)`\n"
-                    "📊 **Macro Radar** ៖ `DXY Index + Shanghai SGE Premium Active`\n\n"
-                    "⚡ _Bot នឹងស្កេន និងប្រមូលផលចំណេញលើមាស 24/7 ស្វ័យប្រវត្តិ!_"
+                    "✅ **Apex Super Smart Gold Turbo ត្រូវបានបើកដំណើរការ!** 🥇\n"
+                    f"{div}\n"
+                    "🪙 **ទ្រព្យសកម្ម** ៖ `PAXGUSDT (Digital Physical Gold)`\n"
+                    "🎯 **យុទ្ធសាស្រ្ត** ៖ `Dynamic 25x-50x Leverage + Uncapped Trailing Peak Lock`\n"
+                    "📊 **Macro Radar** ៖ `DXY Index + Shanghai SGE Premium + PBOC Reserves Active`\n"
+                    "🛡️ **ការការពារ** ៖ `CPI/NFP/FOMC Freeze Shield + Anti-Oversold Short Guard`\n"
+                    f"{div}\n"
+                    "⚡ _Bot ដំណើរការវិភាគ AI ២៥ ម៉ូដែល និងស្កេនចាប់រលកចំណេញ ២៤/៧ ស្វ័យប្រវត្តិ!_"
                 )
                 await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
@@ -10229,19 +10258,19 @@ class TelegramBotThread(BaseThread):
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 keyboard = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("🥇 Launch Gold Futures", callback_data="btn_smart_x_gold"),
-                        InlineKeyboardButton("🛒 Spot Gold Buy", callback_data="btn_smart_x_spot")
+                        InlineKeyboardButton("🛡️ SONIC Scalp", callback_data="btn_smart_x_gold"),
+                        InlineKeyboardButton("🚀 TURBO Sprint", callback_data="btn_smart_x_turbo")
                     ],
                     [
-                        InlineKeyboardButton("📡 Live Gold Radar (SGE)", callback_data="btn_smart_x_radar"),
-                        InlineKeyboardButton("🧠 25 AI Models Voting", callback_data="btn_smart_x_metrics")
+                        InlineKeyboardButton("🛒 Spot Gold Buy", callback_data="btn_smart_x_spot"),
+                        InlineKeyboardButton("🤖 Auto 24/7 Sniper", callback_data="btn_smart_x_auto")
                     ],
                     [
-                        InlineKeyboardButton("🤖 Auto 24/7 Gold Sniper", callback_data="btn_smart_x_auto"),
-                        InlineKeyboardButton("🛑 STOP Engine", callback_data="btn_smart_x_stop_all")
+                        InlineKeyboardButton("📡 Macro & SGE Radar", callback_data="btn_smart_x_radar"),
+                        InlineKeyboardButton("🧠 25 AI Models Vote", callback_data="btn_smart_x_metrics")
                     ],
                     [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🛑 STOP Engine", callback_data="btn_smart_x_stop_all"),
                         InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
@@ -10252,15 +10281,22 @@ class TelegramBotThread(BaseThread):
                         f"{div}\n"
                         "🥇 *100% PURE INSTITUTIONAL GOLD (XAUUSD / PAXG)*\n"
                         f"{div}\n"
+                        "💡 *THREE UNIFIED OPERATING MODES:*\n"
+                        "• 🚀 *TURBO Sprint*: Dynamic 25x-50x, Macro Breakouts, Trailing Peak Lock\n"
+                        "• 🛡️ *SONIC Scalp*: 10x-20x Leverage, Max Drawdown <= 0.26%, 4 Session Clocks\n"
+                        "• 🛒 *SPOT Physical*: Physical LBMA Tokenized Gold (0% Liquidation Risk)\n"
+                        f"{div}\n"
                         "📡 *INSTITUTIONAL MACRO & SGE RADAR*\n"
-                        "• Shanghai Gold Exchange (SGE) LBMA Premium\n"
+                        "• Shanghai Gold Exchange (SGE) LBMA Premium ($/oz)\n"
                         "• PBOC Central Bank Physical Gold Accumulation\n"
                         "• US 10Y Real Yields & DXY Dollar Matrix\n"
                         "• Pre-Event 15m Freeze Shield (CPI, NFP, FOMC)\n"
                         f"{div}\n"
                         "📋 *1-TAP COPYABLE EXECUTIONS*\n\n"
-                        "👉 🚀 *Gold Futures Scalper (Auto Direction 24/7):*\n"
-                        "`/smartx GOLD 20 10 AUTO 1234`\n\n"
+                        "👉 🚀 *Turbo Momentum Sprint ($20, 25x-50x):*\n"
+                        "`/smartx TURBO 20 25 1234`\n\n"
+                        "👉 🛡️ *SONIC Institutional Scalper ($20, 10x):*\n"
+                        "`/smartx SONIC 20 10 1234`\n\n"
                         "👉 🛒 *Spot Gold Macro Buy (0% Liquidation):*\n"
                         "`/smartx SPOT 50 1234`\n\n"
                         "👉 🤖 *Auto 24/7 Gold Session Sniper (Perpetual):*\n"
@@ -10280,6 +10316,11 @@ class TelegramBotThread(BaseThread):
                         f"{div}\n"
                         "🥇 *100% 专注机构级黄金 (XAUUSD / PAXG)*\n"
                         f"{div}\n"
+                        "💡 *三大统一运行模式：*\n"
+                        "• 🚀 *TURBO 冲刺*: 动态 25x-50x 杠杆，捕捉宏观突破，移动止盈锁定\n"
+                        "• 🛡️ *SONIC 超短*: 10x-20x 杠杆，最大回撤 <= 0.26%，4 大跨银行交易时区\n"
+                        "• 🛒 *SPOT 现货*: 现货实物黄金配置 (0% 强平风险)\n"
+                        f"{div}\n"
                         "📡 *央行与上海黄金交易所 (SGE) 溢价雷达*\n"
                         "• SGE vs LBMA 现货黄金溢价监测 ($/oz)\n"
                         "• 中国央行 (PBOC) 场外实物黄金囤积监控\n"
@@ -10287,8 +10328,10 @@ class TelegramBotThread(BaseThread):
                         "• CPI/NFP/FOMC 重大数据提前15分钟硬熔断\n"
                         f"{div}\n"
                         "📋 *一键复制指令：*\n\n"
-                        "👉 🚀 *黄金合约日内超短线 (AI自动方向 24/7):*\n"
-                        "`/smartx GOLD 20 10 AUTO 1234`\n\n"
+                        "👉 🚀 *TURBO 动量冲刺 ($20, 25x-50x):*\n"
+                        "`/smartx TURBO 20 25 1234`\n\n"
+                        "👉 🛡️ *SONIC 机构级超短线 ($20, 10x):*\n"
+                        "`/smartx SONIC 20 10 1234`\n\n"
                         "👉 🛒 *现货黄金宏观定投 (0% 强平风险):*\n"
                         "`/smartx SPOT 50 1234`\n\n"
                         "👉 🤖 *24/7 全天候黄金时区狙击器:*\n"
@@ -10308,6 +10351,11 @@ class TelegramBotThread(BaseThread):
                         f"{div}\n"
                         "🥇 *100% ផ្តោតលើមាសស្ថាប័នសុទ្ធសាធ (XAUUSD / PAXG)*\n"
                         f"{div}\n"
+                        "💡 *របៀបដំណើរការទាំង ៣ (Three Unified Modes) ៖*\n"
+                        "• 🚀 **TURBO Sprint** ៖ Dynamic 25x-50x, Trailing Peak Lock (+2,500%+ ROI)\n"
+                        "• 🛡️ **SONIC Scalp** ៖ Leverage 10x-20x, Max Drawdown <= 0.26%, 4 Session Clocks\n"
+                        "• 🛒 **SPOT Physical** ៖ ទិញមាស Physical LBMA ទុកក្នុងកាបូប (ហានិភ័យ 0%)\n"
+                        f"{div}\n"
                         "📡 *RADAR ធនាគារកណ្តាល & SGE PREMIUM*\n"
                         "• Shanghai Gold Exchange (SGE) Premium $/oz\n"
                         "• ធនាគារកណ្តាលចិន (PBOC) ប្រមូលទិញមាស Physical\n"
@@ -10315,8 +10363,10 @@ class TelegramBotThread(BaseThread):
                         "• Pre-Event 15m Freeze Shield (CPI, NFP, FOMC)\n"
                         f"{div}\n"
                         "📋 *ពាក្យបញ្ជា 1-TAP COPYABLE EXECUTIONS*\n\n"
-                        "👉 🚀 *Gold Futures Scalper (ទិសដៅ AUTO ២៤/៧) ៖*\n"
-                        "`/smartx GOLD 20 10 AUTO 1234`\n\n"
+                        "👉 🚀 *Turbo Momentum Sprint ($20, 25x-50x) ៖*\n"
+                        "`/smartx TURBO 20 25 1234`\n\n"
+                        "👉 🛡️ *SONIC Institutional Scalper ($20, 10x) ៖*\n"
+                        "`/smartx SONIC 20 10 1234`\n\n"
                         "👉 🛒 *Spot Gold Macro Buy (0% Liquidation) ៖*\n"
                         "`/smartx SPOT 50 1234`\n\n"
                         "👉 🤖 *Auto 24/7 Gold Session Sniper (Perpetual) ៖*\n"
@@ -10482,8 +10532,9 @@ class TelegramBotThread(BaseThread):
                     await delete_sensitive_message(context, chat_id, update, user_lang)
                     return
 
-                # Stop 24/7 Gold Engine
+                # Stop 24/7 Gold Engine (Both Unified and Legacy configs)
                 db.update_system_setting(f"smart_x_{chat_id}_active", "0")
+                db.set_gold_turbo_config(chat_id, False, 15.0)
                 db.update_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0")
                 db.remove_all_turbo_hedge_bots(chat_id)
 
@@ -10543,6 +10594,7 @@ class TelegramBotThread(BaseThread):
 
             tokens_upper = [t.upper().strip() for t in work_args]
             is_spot = ("SPOT" in tokens_upper)
+            is_turbo = ("TURBO" in tokens_upper)
             is_auto_247 = any(t in ["AUTO", "SNIPER", "24/7"] for t in tokens_upper)
 
             user_side = "AUTO"
@@ -10551,7 +10603,7 @@ class TelegramBotThread(BaseThread):
                     user_side = t.upper().strip()
                     break
 
-            clean_tokens = [t for t in work_args if t.upper().strip() not in ["SPOT", "FUTURES", "GOLD", "PAXG", "PAXGUSDT", "AUTO", "BUY", "SELL"]]
+            clean_tokens = [t for t in work_args if t.upper().strip() not in ["SPOT", "FUTURES", "GOLD", "PAXG", "PAXGUSDT", "AUTO", "BUY", "SELL", "TURBO", "SONIC"]]
             num_tokens = []
             for t in clean_tokens:
                 try:
@@ -10560,8 +10612,8 @@ class TelegramBotThread(BaseThread):
                     pass
 
             amount = 50.0 if is_spot else 20.0
-            leverage = 1 if is_spot else 10
-            target_tp = 2.5
+            leverage = 1 if is_spot else (25 if is_turbo else 10)
+            target_tp = 1.5 if is_turbo else 2.5
 
             if is_spot:
                 leverage = 1
@@ -10602,53 +10654,63 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
-            elif is_auto_247:
-                # 24/7 PERPETUAL GOLD SESSION SNIPER
+            elif is_auto_247 or is_turbo:
+                # 24/7 PERPETUAL GOLD SESSION SNIPER / TURBO SPRINT
                 spot_ok, fut_ok = await asyncio.to_thread(trading_engine.check_user_api_permissions, keys[0], keys[1])
                 if not fut_ok:
                     if msg_target:
                         await msg_target.reply_text("🛑 *បរាជ័យ ៖ Binance API មិនទាន់បើកសិទ្ធិ Futures Trading ទេ។*\n💡 សូមប្រើ Spot ៖ `/smartx SPOT 50 1234`", parse_mode="Markdown")
                     return
 
+                mode_label = "TURBO" if is_turbo else "SONIC"
                 db.update_system_setting(f"smart_x_{chat_id}_active", "1")
+                db.update_system_setting(f"smart_x_{chat_id}_mode", mode_label)
                 db.update_system_setting(f"smart_x_{chat_id}_target", target_symbol)
                 db.update_system_setting(f"smart_x_{chat_id}_amount", str(amount))
                 db.update_system_setting(f"smart_x_{chat_id}_leverage", str(leverage))
 
+                if is_turbo:
+                    db.set_gold_turbo_config(chat_id, True, amount)
+
+                strategy_desc = (
+                    "TURBO Sprint (Dynamic 25x-50x, Uncapped Trailing Peak Lock)"
+                    if is_turbo else
+                    "SONIC Scalp (87.12% Win, 0.26% Max DD, 4 Session Clocks)"
+                )
+
                 ack_text = (
-                    "👑 *SMARTX 24/7 GOLD SNIPER ACTIVATED!* 🚀\n"
+                    f"👑 *SMARTX 24/7 GOLD ({mode_label}) ACTIVATED!* 🚀\n"
                     f"{div}\n"
                     f"🥇 *Asset*        : `PAXGUSDT (XAUUSD)`\n"
                     f"💰 *Capital/Trade*: `${amount:,.2f} USDT` ({leverage}x ISOLATED)\n"
-                    f"🎯 *Strategy*     : `SONIC Scalp (87.12% Win, 0.26% Max DD)`\n"
-                    f"⏰ *Session Watch*: `Tokyo Fix, London Open, NY Open, London Close`\n"
-                    f"🛡️ *Risk Ceiling* : `1-3m Time-Stop Scratch | +$2.50 to +$10/oz TP`\n"
+                    f"🎯 *Strategy*     : `{strategy_desc}`\n"
+                    f"⏰ *Risk Shield*  : `Macro CPI/NFP/FOMC Freeze + Anti-Oversold Guard`\n"
                     f"{div}\n"
-                    "⚡ _កំពុងវិភាគម៉ូដែល AI ទាំង ២៥ និងរង់ចាំ Session Sweep ដើម្បីបើក Trade ស្វ័យប្រវត្តិ..._"
+                    f"⚡ _កំពុងវិភាគម៉ូដែល AI ទាំង ២៥ និងរង់ចាំ Signal ដើម្បីបើក Trade ស្វ័យប្រវត្តិ..._"
                 )
                 if msg_target:
                     await msg_target.reply_text(ack_text, parse_mode="Markdown")
 
                 async def _background_smart_x_gold_sniper():
                     try:
-                        sig = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, target_symbol)
+                        sig = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, target_symbol, mode=mode_label)
                         if sig.get("side") in ["BUY", "SELL"]:
                             exec_res = await asyncio.to_thread(
                                 smart_x_engine.execute_smart_x_futures,
-                                chat_id, target_symbol, sig["side"], amount, leverage, target_tp
+                                chat_id, target_symbol, sig["side"], amount, leverage, target_tp, mode_label
                             )
-                            if exec_res.get("status") == "success" or exec_res.get("orderId"):
+                            if exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId"):
                                 p = await asyncio.to_thread(trading_engine.get_current_price, target_symbol)
                                 notif = (
-                                    "👑 *[SMARTX GOLD AUTO-SNIPER ENTRY]* 🎯\n"
+                                    f"👑 *[SMARTX GOLD {mode_label} ENTRY]* 🎯\n"
                                     f"{div}\n"
                                     f"• Direction  : `{sig['side']} ({sig.get('confidence_pct')}% Conf)`\n"
                                     f"• Entry Price: `${p:,.2f}`\n"
                                     f"• Capital    : `${amount:.2f} USDT` ({leverage}x)\n"
-                                    f"• Target TP  : `+$2.50 to +$10.00/oz`\n"
+                                    f"• Target TP  : `{'Uncapped Trailing Lock' if is_turbo else '+$2.50 to +$10.00/oz'}`\n"
                                     f"• Protection : `Breakeven Lock @ +3% | Time-Stop Active`\n"
                                     f"{div}\n"
-                                    "_SONIC High-Frequency Engine Active 24/7._"
+                                    f"_{mode_label} High-Frequency Engine Active 24/7._"
                                 )
                                 try:
                                     await context.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
@@ -10669,13 +10731,15 @@ class TelegramBotThread(BaseThread):
                         await msg_target.reply_text("🛑 *បរាជ័យ ៖ Binance API មិនទាន់បើកសិទ្ធិ Futures Trading ទេ។*\n💡 សូមប្រើ Spot ៖ `/smartx SPOT 50 1234`", parse_mode="Markdown")
                     return
 
+                exec_mode = "TURBO" if is_turbo else "SONIC"
                 exec_res = await asyncio.to_thread(
                     smart_x_engine.execute_smart_x_futures,
-                    chat_id, target_symbol, user_side, amount, leverage, target_tp
+                    chat_id, target_symbol, user_side, amount, leverage, target_tp, exec_mode
                 )
 
                 if exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId"):
                     entry_p = await asyncio.to_thread(trading_engine.get_current_price, target_symbol)
+                    strat_name = "TURBO Macro Momentum Sprint" if is_turbo else "SONIC Re-Engineered (87.12% Win Rate)"
                     resp_msg = (
                         "👑 *[SMARTX GOLD FUTURES EXECUTED]* 🚀\n"
                         f"{div}\n"
@@ -10684,7 +10748,7 @@ class TelegramBotThread(BaseThread):
                         f"• Capital    : `${amount:.2f} USDT` ({leverage}x ISOLATED)\n"
                         f"• Entry Price: `${entry_p:,.2f}`\n"
                         f"• Protection : `Breakeven Lock @ +3% ROI | Time-Stop Active`\n"
-                        f"• Strategy   : `SONIC Re-Engineered (87.12% Win Rate)`\n"
+                        f"• Strategy   : `{strat_name}`\n"
                         f"{div}\n"
                         "✅ _Position active in HFT Turbo Hedge Monitor._"
                     )
@@ -14528,7 +14592,6 @@ class TelegramBotThread(BaseThread):
                     BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
                     BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
                     BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-                    BotCommand("gold_turbo", "🥇 PAXG Macro Gold Correlation Radar"),
                     BotCommand("snipe", "🎯 Smart Listing Token Sniper"),
                     BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
                     BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
