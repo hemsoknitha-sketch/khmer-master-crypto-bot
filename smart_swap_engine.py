@@ -381,6 +381,47 @@ def get_solana_jupiter_quote(input_mint: str, output_mint: str, amount_atomic: i
             "raw_quote": {"simulated": True, "source": "DexScreener Direct AMM", "fallback_reason": str(e)}
         }
 
+def get_solana_token_decimals(token_mint: str) -> int:
+    """Dynamically resolves on-chain decimals for any Solana token via RPC or canonical lookup."""
+    mint_str = str(token_mint or "").strip()
+    mint_upper = mint_str.upper()
+    if mint_upper in ["SO11111111111111111111111111111111111111112", "SOL", "WSOL"]:
+        return 9
+    if mint_upper in ["USDT", "USDC", "USD", "RAY", "4K3DYJZVZP8EMZWUXBBCJEVWSKKK59S5ICNLY3QRKX6R"]:
+        return 6
+    if mint_upper in ["BONK", "DEZXAZ8Z7PNRNRJJZ3WXBORGIXCA6XJNB7YAB1PPB263"]:
+        return 5
+
+    try:
+        import solana_trading_wallet
+        rpc_url = getattr(solana_trading_wallet, "SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+        payload = {
+            "jsonrpc": "2.0",
+            "id": int(time.time()),
+            "method": "getTokenSupply",
+            "params": [mint_str]
+        }
+        req = urllib.request.Request(
+            rpc_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            dec = data.get("result", {}).get("value", {}).get("decimals")
+            if dec is not None:
+                return int(dec)
+    except Exception:
+        pass
+    
+    # Standard fallback on Solana SPL: 6 decimals (pump.fun, raydium new pools)
+    return 6
+
+LEGACY_MAJOR_TOKENS = {
+    "SOL", "WSOL", "USDT", "USDC", "USD", "RAY", "JUP", "BONK", "WIF", "PYTH", "ORCA",
+    "BNB", "WBNB", "BTC", "ETH", "CAKE", "BUSD"
+}
+
 def get_token_price_usd(chain: str, token_symbol_or_mint: str) -> float:
     """
     Fetches real-time price in USD:
@@ -460,83 +501,97 @@ def scan_onchain_momentum_gems(chain: str = "SOLANA", limit: int = 8, mode: str 
     min_txns = 10 if mode_upper == "NEW" else 15
     min_buy_ratio = 2.0 if mode_upper == "NEW" else 1.6
 
-    # 1. Query DexScreener Profiles / High-Momentum Pairs
+    token_addresses = []
+
+    # 1. Query DexScreener Trending Boosts (Real high-velocity breakout pairs)
     try:
-        res = SWAP_SESSION.get("https://api.dexscreener.com/token-profiles/latest/v1", timeout=4)
-        if res.status_code == 200:
-            raw_tokens = res.json()
-            token_addresses = []
-            for t in raw_tokens[:30]:
-                chain_id = str(t.get("chainId", "")).upper()
-                if (chain_upper == "SOLANA" and chain_id == "SOLANA") or (chain_upper in ["BSC", "BNB"] and chain_id in ["BSC", "BNB"]):
+        r_boosts = SWAP_SESSION.get("https://api.dexscreener.com/token-boosts/top/v1", timeout=3.5)
+        if r_boosts.status_code == 200:
+            for t in r_boosts.json()[:30]:
+                cid = str(t.get("chainId", "")).upper()
+                if (chain_upper == "SOLANA" and cid == "SOLANA") or (chain_upper in ["BSC", "BNB"] and cid in ["BSC", "BNB"]):
                     token_addresses.append(t.get("tokenAddress"))
+    except Exception:
+        pass
 
-            # Query pair statistics for discovered tokens
-            if token_addresses:
-                joined_addrs = ",".join(token_addresses[:20])
-                p_res = SWAP_SESSION.get(f"https://api.dexscreener.com/latest/dex/tokens/{joined_addrs}", timeout=4)
-                if p_res.status_code == 200:
-                    pairs = p_res.json().get("pairs", [])
-                    for p in pairs:
-                        liq = float(p.get("liquidity", {}).get("usd", 0.0))
-                        vol_24h = float(p.get("volume", {}).get("h24", 0.0))
-                        buys_5m = int(p.get("txns", {}).get("m5", {}).get("buys", 0))
-                        sells_5m = int(p.get("txns", {}).get("sells", {}).get("m5", 0) if isinstance(p.get("txns", {}).get("sells"), dict) else p.get("txns", {}).get("m5", {}).get("sells", 0))
-                        price_usd = float(p.get("priceUsd", 0.0))
-                        base_token = p.get("baseToken", {})
-                        sym = base_token.get("symbol", "UNKNOWN")
-                        addr = base_token.get("address", "")
+    # 2. Query DexScreener Latest Profiles
+    try:
+        res = SWAP_SESSION.get("https://api.dexscreener.com/token-profiles/latest/v1", timeout=3.5)
+        if res.status_code == 200:
+            for t in res.json()[:30]:
+                cid = str(t.get("chainId", "")).upper()
+                if (chain_upper == "SOLANA" and cid == "SOLANA") or (chain_upper in ["BSC", "BNB"] and cid in ["BSC", "BNB"]):
+                    token_addresses.append(t.get("tokenAddress"))
+    except Exception:
+        pass
 
-                        # Safety Filters
-                        if liq >= min_liq and vol_24h >= min_vol and price_usd > 0 and (buys_5m + sells_5m) >= min_txns:
-                            buy_ratio = buys_5m / max(1, sells_5m)
-                            if buy_ratio < min_buy_ratio:
-                                continue
+    unique_tokens = list(dict.fromkeys([str(a).strip() for a in token_addresses if a]))[:30]
 
-                            # Pre-audit token security (Fail-Closed Zero-Trust)
-                            sec = evaluate_token_security(chain_upper, addr, required_liq=min_liq, mode=mode_upper)
-                            if not sec.get("is_safe", False):
-                                continue
+    # Query pair statistics for discovered tokens
+    if unique_tokens:
+        try:
+            joined_addrs = ",".join(unique_tokens[:25])
+            p_res = SWAP_SESSION.get(f"https://api.dexscreener.com/latest/dex/tokens/{joined_addrs}", timeout=4)
+            if p_res.status_code == 200:
+                pairs = p_res.json().get("pairs", [])
+                for p in pairs:
+                    base_token = p.get("baseToken", {})
+                    sym = str(base_token.get("symbol", "UNKNOWN")).strip()
+                    addr = str(base_token.get("address", "")).strip()
 
-                            vol_ratio = vol_24h / max(1000.0, liq)
+                    # Strictly exclude legacy/old coins when user specifically selected NEW mode
+                    if mode_upper == "NEW" and (sym.upper() in LEGACY_MAJOR_TOKENS or addr.upper() in [SOLANA_TOKENS.get(k, "").upper() for k in SOLANA_TOKENS]):
+                        continue
 
-                            # AI Momentum Score (0-100)
-                            score = 55.0
-                            if buy_ratio >= 2.0: score += min(25.0, (buy_ratio / 3.0) * 25.0)
-                            if vol_ratio >= 1.0: score += min(20.0, (vol_ratio / 2.0) * 20.0)
+                    liq = float(p.get("liquidity", {}).get("usd", 0.0) or 0.0)
+                    vol_24h = float(p.get("volume", {}).get("h24", 0.0) or 0.0)
+                    buys_5m = int(p.get("txns", {}).get("m5", {}).get("buys", 0) or 0)
+                    sells_5m = int(p.get("txns", {}).get("sells", {}).get("m5", 0) if isinstance(p.get("txns", {}).get("sells"), dict) else (p.get("txns", {}).get("m5", {}).get("sells", 0) or 0))
+                    price_usd = float(p.get("priceUsd", 0.0) or 0.0)
 
-                            candidates.append({
-                                "symbol": sym,
-                                "address": addr,
-                                "pair_address": p.get("pairAddress", ""),
-                                "dex": p.get("dexId", "DEX"),
-                                "price_usd": price_usd,
-                                "liquidity_usd": liq,
-                                "volume_24h": vol_24h,
-                                "buy_velocity_5m": round(buy_ratio, 2),
-                                "score": round(min(98.5, score), 1),
-                                "mode": mode_upper,
-                                "lp_locked_pct": sec.get("lp_locked_pct", 100.0)
-                            })
-    except Exception as e:
-        print(f"Error in scan_onchain_momentum_gems ({mode_upper}): {e}")
+                    # Safety Filters
+                    if liq >= min_liq and vol_24h >= min_vol and price_usd > 0 and (buys_5m + sells_5m) >= min_txns:
+                        buy_ratio = buys_5m / max(1, sells_5m)
+                        if buy_ratio < min_buy_ratio:
+                            continue
 
-    # Fallback to institutional liquid tokens if no new pairs meet criteria
-    if not candidates:
+                        # Pre-audit token security (Fail-Closed Zero-Trust)
+                        sec = evaluate_token_security(chain_upper, addr, required_liq=min_liq, mode=mode_upper)
+                        if not sec.get("is_safe", False):
+                            continue
+
+                        vol_ratio = vol_24h / max(1000.0, liq)
+
+                        # AI Momentum Score (0-100)
+                        score = 55.0
+                        if buy_ratio >= 2.0: score += min(25.0, (buy_ratio / 3.0) * 25.0)
+                        if vol_ratio >= 1.0: score += min(20.0, (vol_ratio / 2.0) * 20.0)
+
+                        candidates.append({
+                            "symbol": sym,
+                            "address": addr,
+                            "pair_address": p.get("pairAddress", ""),
+                            "dex": p.get("dexId", "DEX"),
+                            "price_usd": price_usd,
+                            "liquidity_usd": liq,
+                            "volume_24h": vol_24h,
+                            "buy_velocity_5m": round(buy_ratio, 2),
+                            "score": round(min(98.5, score), 1),
+                            "mode": mode_upper,
+                            "lp_locked_pct": sec.get("lp_locked_pct", 100.0)
+                        })
+        except Exception as e:
+            print(f"Error in scan_onchain_momentum_gems ({mode_upper}): {e}")
+
+    # Fallback to institutional liquid tokens ONLY for AUTO mode, NEVER for NEW mode!
+    if not candidates and mode_upper != "NEW":
         if chain_upper == "SOLANA":
-            if mode_upper == "NEW":
-                # For NEW mode, if no fresh pair passes strict zero-trust audit, return high-velocity verified gems
-                candidates = [
-                    {"symbol": "RAY", "address": SOLANA_TOKENS["RAY"], "dex": "Raydium", "price_usd": 1.75, "liquidity_usd": 18000000, "buy_velocity_5m": 2.2, "score": 93.0, "mode": "NEW", "lp_locked_pct": 100.0},
-                    {"symbol": "BONK", "address": SOLANA_TOKENS["BONK"], "dex": "Raydium", "price_usd": 0.000018, "liquidity_usd": 15000000, "buy_velocity_5m": 2.5, "score": 91.5, "mode": "NEW", "lp_locked_pct": 100.0}
-                ]
-            else:
-                candidates = [
-                    {"symbol": "JUP", "address": SOLANA_TOKENS["JUP"], "dex": "Raydium", "price_usd": 0.85, "liquidity_usd": 25000000, "buy_velocity_5m": 2.1, "score": 92.0, "mode": "AUTO", "lp_locked_pct": 100.0},
-                    {"symbol": "RAY", "address": SOLANA_TOKENS["RAY"], "dex": "Raydium", "price_usd": 1.75, "liquidity_usd": 18000000, "buy_velocity_5m": 1.9, "score": 88.5, "mode": "AUTO", "lp_locked_pct": 100.0},
-                    {"symbol": "BONK", "address": SOLANA_TOKENS["BONK"], "dex": "Raydium", "price_usd": 0.000018, "liquidity_usd": 15000000, "buy_velocity_5m": 2.4, "score": 91.0, "mode": "AUTO", "lp_locked_pct": 100.0},
-                    {"symbol": "WIF", "address": SOLANA_TOKENS["WIF"], "dex": "Raydium", "price_usd": 1.90, "liquidity_usd": 30000000, "buy_velocity_5m": 2.8, "score": 94.0, "mode": "AUTO", "lp_locked_pct": 100.0}
-                ]
+            candidates = [
+                {"symbol": "JUP", "address": SOLANA_TOKENS["JUP"], "dex": "Raydium", "price_usd": 0.85, "liquidity_usd": 25000000, "buy_velocity_5m": 2.1, "score": 92.0, "mode": "AUTO", "lp_locked_pct": 100.0},
+                {"symbol": "RAY", "address": SOLANA_TOKENS["RAY"], "dex": "Raydium", "price_usd": 1.75, "liquidity_usd": 18000000, "buy_velocity_5m": 1.9, "score": 88.5, "mode": "AUTO", "lp_locked_pct": 100.0},
+                {"symbol": "BONK", "address": SOLANA_TOKENS["BONK"], "dex": "Raydium", "price_usd": 0.000018, "liquidity_usd": 15000000, "buy_velocity_5m": 2.4, "score": 91.0, "mode": "AUTO", "lp_locked_pct": 100.0},
+                {"symbol": "WIF", "address": SOLANA_TOKENS["WIF"], "dex": "Raydium", "price_usd": 1.90, "liquidity_usd": 30000000, "buy_velocity_5m": 2.8, "score": 94.0, "mode": "AUTO", "lp_locked_pct": 100.0}
+            ]
         else:
             candidates = [
                 {"symbol": "CAKE", "address": BSC_TOKENS["CAKE"], "dex": "PancakeSwap", "price_usd": 2.20, "liquidity_usd": 50000000, "buy_velocity_5m": 2.0, "score": 89.0, "mode": mode_upper, "lp_locked_pct": 100.0}
@@ -622,7 +677,7 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
             return {"status": "error", "reason": "JUPITER_QUOTE_FAILED", "msg": quote.get("msg", "Route calculation error")}
 
         out_amount_raw = quote["out_amount"]
-        out_decimals = 6 if ("USD" in to_token.upper() or "BONK" in to_token.upper()) else 9
+        out_decimals = get_solana_token_decimals(to_addr)
         out_qty = out_amount_raw / (10 ** out_decimals)
         price_impact = quote["price_impact_pct"]
         route_steps = quote["route_steps"]
@@ -660,6 +715,15 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
                     simulated_tx = live_res["tx_hash"]
                     solscan_link = live_res["solscan_url"]
                     print(f"🚀 [USER {chat_id} LIVE ON-CHAIN SWAP CONFIRMED] Tx: {simulated_tx} | {solscan_link}")
+                    # Fetch live on-chain balance to guarantee 100% accurate tokens and entry price
+                    try:
+                        time.sleep(1.2)
+                        spl_bal = solana_trading_wallet.get_user_spl_token_balance(chat_id, to_addr)
+                        if spl_bal.get("ui_amount", 0.0) > 0:
+                            out_qty = spl_bal["ui_amount"]
+                            effective_price = amount_usd / max(0.000001, out_qty)
+                    except Exception as e_bal:
+                        print(f"⚠️ [LIVE SPL BAL VERIFICATION ERROR]: {e_bal}")
                 else:
                     live_err = live_res.get("msg", "Jupiter Swap rejected")
                     print(f"⚠️ [USER {chat_id} LIVE SWAP ERROR] {live_err}")
@@ -742,6 +806,17 @@ def execute_auto_smart_swap_sniper(chat_id: int, chain: str = "SOLANA", amount_u
     mode_upper = str(mode or "AUTO").upper().strip()
     gems = scan_onchain_momentum_gems(chain_upper, limit=10, mode=mode_upper)
     if not gems:
+        if mode_upper == "NEW":
+            return {
+                "status": "error",
+                "reason": "NO_SAFE_NEW_GEMS",
+                "msg": (
+                    "🛡️ **[ZERO-TRUST SAFETY NOTICE]**\n\n"
+                    "⚠️ បច្ចុប្បន្ននេះពុំទាន់មានកាក់ទើបបង្កើតថ្មី (New Breakout Gems) ណាដែលឆ្លងផុតការត្រួតពិនិត្យសុវត្ថិភាព 100% Zero-Trust (LP Locked ≥95%, Mint/Freeze Revoked, No Honeypot) នៅឡើយទេ។\n\n"
+                    "👉 ប្រព័ន្ធបានផ្អាកការជួញដូរជាបណ្តោះអាសន្ន ដើម្បី **ការពារដើមទុនរបស់អ្នក ១០០% មិនឱ្យបាត់បង់** លើកាក់ Scam/Rug-pull!\n"
+                    "💡 សូមសាកល្បងម្តងទៀតនៅប៉ុន្មាននាទីក្រោយ ឬវាយ `/smart_swap auto 20 1234` ដើម្បីជួញដូរកាក់ដែលមាន High Liquidity Momentum!"
+                )
+            }
         return {"status": "error", "reason": "NO_QUALIFIED_GEMS", "msg": f"No breakout tokens currently meet safety criteria for mode [{mode_upper}]."}
 
     from_token = "SOL" if chain_upper == "SOLANA" else "USDT"
