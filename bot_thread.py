@@ -11166,14 +11166,26 @@ class TelegramBotThread(BaseThread):
                     a_str = str(a).strip()
                     if a_str.upper() in ["ON", "OFF", "STATUS", "NEW", "AUTO"]:
                         continue
-                    if a_str.replace('.', '', 1).isdigit():
-                        if "." in a_str or float(a_str) > 4:
-                            try: amount_usd = float(a_str)
-                            except: pass
-                        elif len(a_str) == 4 and a_str.isdigit():
-                            pin_input = a_str
-                    elif len(a_str) == 4 and a_str.isdigit():
+                    # 1. Smart Unpacker: Handle concatenated Amount+PIN (e.g., '51234' -> $5 + PIN '1234', '201234' -> $20 + PIN '1234')
+                    if len(a_str) >= 5 and (a_str.replace('.', '', 1).isdigit() or a_str.isdigit()):
+                        cand_pin = a_str[-4:]
+                        cand_amt = a_str[:-4]
+                        if cand_pin.isdigit() and db.verify_user_pin(chat_id, cand_pin):
+                            pin_input = cand_pin
+                            try:
+                                amount_usd = float(cand_amt)
+                                continue
+                            except ValueError:
+                                pass
+
+                    # 2. Check 4-digit PIN first so it does not falsely trigger amount_usd
+                    if len(a_str) == 4 and a_str.isdigit() and (db.verify_user_pin(chat_id, a_str) or a_str in ["1234", "0000"]):
                         pin_input = a_str
+                    elif a_str.replace('.', '', 1).isdigit():
+                        try:
+                            amount_usd = float(a_str)
+                        except ValueError:
+                            pass
 
                 if action == "ON":
                     if not (update.callback_query or db.verify_user_pin(chat_id, pin_input)):
@@ -11277,16 +11289,26 @@ class TelegramBotThread(BaseThread):
                         remaining_tokens.append(tok)
 
                 for tok in remaining_tokens:
-                    if tok.replace('.', '', 1).isdigit():
-                        if "." in tok or float(tok) > 4:
+                    # 1. Smart Unpacker: Handle concatenated Amount+PIN (e.g., '51234' -> $5 + PIN '1234', '201234' -> $20 + PIN '1234')
+                    if len(tok) >= 5 and (tok.replace('.', '', 1).isdigit() or tok.isdigit()):
+                        cand_pin = tok[-4:]
+                        cand_amt = tok[:-4]
+                        if cand_pin.isdigit() and db.verify_user_pin(chat_id, cand_pin):
+                            pin_input = cand_pin
                             try:
-                                amount_usd = float(tok)
+                                amount_usd = float(cand_amt)
+                                continue
                             except ValueError:
                                 pass
-                        elif len(tok) == 4 and tok.isdigit():
-                            pin_input = tok
-                    elif len(tok) == 4 and tok.isdigit():
+
+                    # 2. Check 4-digit PIN first so it does not falsely trigger amount_usd
+                    if len(tok) == 4 and tok.isdigit() and (db.verify_user_pin(chat_id, tok) or tok in ["1234", "0000"]):
                         pin_input = tok
+                    elif tok.replace('.', '', 1).isdigit():
+                        try:
+                            amount_usd = float(tok)
+                        except ValueError:
+                            pass
 
                 if not (update.callback_query or db.verify_user_pin(chat_id, pin_input)):
                     if msg_target:

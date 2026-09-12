@@ -382,14 +382,59 @@ def get_solana_jupiter_quote(input_mint: str, output_mint: str, amount_atomic: i
         }
 
 def get_token_price_usd(chain: str, token_symbol_or_mint: str) -> float:
-    """Fetches real-time price in USD from DexScreener or Jupiter."""
-    addr = resolve_token_address(chain, token_symbol_or_mint)
+    """
+    Fetches real-time price in USD:
+    1. Fast-path via institutional Binance market engine for major base tokens (SOL, BNB, ETH).
+    2. Zero-drift USD stablecoin evaluation (USDT, USDC).
+    3. Multi-chain DexScreener with target-chain filtering and highest liquidity selection.
+    """
+    sym_or_mint = str(token_symbol_or_mint or "").strip()
+    sym_upper = sym_or_mint.upper()
+    chain_upper = str(chain or "SOLANA").upper().strip()
+
+    # 1. Native / Major Anchor Fast-Path via Binance Real-Time Engine
+    if sym_upper in ["SOL", "WSOL", "SO11111111111111111111111111111111111111112"]:
+        try:
+            import trading_engine
+            p = trading_engine.get_current_price("SOLUSDT")
+            if p > 0:
+                return float(p)
+        except Exception:
+            pass
+    elif sym_upper in ["BNB", "WBNB", "0XBB4CDB9CBD36B01BD1CBAEBF2DE08D9173BC095C"]:
+        try:
+            import trading_engine
+            p = trading_engine.get_current_price("BNBUSDT")
+            if p > 0:
+                return float(p)
+        except Exception:
+            pass
+    elif sym_upper in ["ETH", "WETH"]:
+        try:
+            import trading_engine
+            p = trading_engine.get_current_price("ETHUSDT")
+            if p > 0:
+                return float(p)
+        except Exception:
+            pass
+    elif sym_upper in ["USDT", "USDC", "USD"]:
+        return 1.0
+
+    # 2. DexScreener On-Chain AMM Resolution with Target Chain Filtering
+    addr = resolve_token_address(chain_upper, sym_or_mint)
     try:
         res = SWAP_SESSION.get(f"https://api.dexscreener.com/latest/dex/tokens/{addr}", timeout=3)
         if res.status_code == 200:
             pairs = res.json().get("pairs", [])
             if pairs:
-                return float(pairs[0].get("priceUsd", 0.0))
+                target_chain = "solana" if chain_upper == "SOLANA" else ("bsc" if chain_upper in ["BSC", "BNB"] else chain_upper.lower())
+                matching_pairs = [p for p in pairs if str(p.get("chainId", "")).lower() == target_chain]
+                pool_candidates = matching_pairs if matching_pairs else pairs
+                # Pick the pair with the deepest liquidity to avoid distorted pricing
+                best_pair = max(pool_candidates, key=lambda p: float((p.get("liquidity") or {}).get("usd", 0) or 0))
+                price_val = float(best_pair.get("priceUsd", 0.0) or 0.0)
+                if price_val > 0:
+                    return price_val
     except Exception:
         pass
     return 0.0
