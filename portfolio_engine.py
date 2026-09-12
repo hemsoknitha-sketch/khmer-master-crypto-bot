@@ -145,9 +145,9 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
 
     if keys:
         try:
-            fut_bal, fut_unreal = trading_engine.get_futures_balance_detailed(keys[0], keys[1], "USDT")
+            fut_bal, fut_status = trading_engine.get_futures_balance_detailed(keys[0], keys[1], "USDT")
             futures_wallet_usdt = float(fut_bal or 0.0)
-            futures_unrealized_pnl = float(fut_unreal or 0.0)
+            futures_unrealized_pnl = 0.0
             futures_positions_raw = trading_engine.get_futures_positions(keys[0], keys[1]) or []
             
             for p in futures_positions_raw:
@@ -174,6 +174,7 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
                         "pnl_usd": unRealizedProfit,
                         "roi_pct": roi_pct
                     })
+                    futures_unrealized_pnl += unRealizedProfit
         except Exception as e:
             print(f"[PORTFOLIO] Futures position query error: {e}")
 
