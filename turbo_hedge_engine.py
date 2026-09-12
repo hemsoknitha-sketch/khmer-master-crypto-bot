@@ -1141,7 +1141,7 @@ def execute_super_delta_neutral_hedge(api_key: str, api_secret: str, symbol: str
         "liquidation_risk": "0.0%"
     }
 
-def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount_usdt: float, side: str = "BUY", leverage: int = 75, chat_id: int = 0) -> dict:
+def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount_usdt: float, side: str = "BUY", leverage: int = 75, chat_id: int = 0, target_tp: float = 2.5, **kwargs) -> dict:
     """
     Executes instant Turbo Hedge order on Binance Futures or Spot with specified leverage (1x - 75x).
     - Overtrade Guard: Keyed by (chat_id, symbol) to prevent double order stacking per user.
@@ -1302,6 +1302,11 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
 
         if isinstance(res, dict) and (res.get("status") in ["success", "NEW", "FILLED"] or res.get("orderId")):
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
+            if chat_id > 0:
+                try:
+                    db.add_turbo_hedge_bot(chat_id, symbol, amount_usdt, effective_leverage, side, target_tp=target_tp, is_bot_initiated=True)
+                except Exception as db_err:
+                    print(f"⚠️ [TURBO HEDGE BOT DB NOTICE]: {db_err}")
         print(f"🛡️ [TURBO HEDGE EXECUTION] {symbol} {side} Qty: {qty} Leverage: {effective_leverage}x -> Res: {res}")
         return res
     except Exception as e:
