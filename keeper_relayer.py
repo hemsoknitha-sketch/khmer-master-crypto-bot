@@ -35,6 +35,12 @@ except ImportError:
 # Arbitrum One Mainnet Infrastructure Constants
 ARBITRUM_RPC_PRIMARY = "https://arb1.arbitrum.io/rpc"
 ARBITRUM_RPC_FALLBACK = "https://rpc.ankr.com/arbitrum"
+ARBITRUM_RPC_CLUSTER = [
+    "https://arb1.arbitrum.io/rpc",
+    "https://rpc.ankr.com/arbitrum",
+    "https://arbitrum-one.publicnode.com",
+    "https://1rpc.io/arb"
+]
 ARBITRUM_CHAIN_ID = 42161
 ARBITRUM_EXPLORER_TX = "https://arbiscan.io/tx/"
 
@@ -233,19 +239,17 @@ class KeeperRelayerEngine:
         self.min_gas_eth = 0.001 # ~ $2.50 to $3.50 ETH floor for transaction safety
 
     def _init_web3(self):
-        """Initializes high-performance Web3 connection to Arbitrum One if available."""
+        """Initializes high-performance Web3 connection with Multi-RPC cluster failover."""
         if not HAS_WEB3 or Web3 is None:
             return None
-        try:
-            w3 = Web3(Web3.HTTPProvider(ARBITRUM_RPC_PRIMARY, request_kwargs={'timeout': 10}))
-            if w3.is_connected():
-                return w3
-        except Exception:
-            pass
-        try:
-            return Web3(Web3.HTTPProvider(ARBITRUM_RPC_FALLBACK, request_kwargs={'timeout': 10}))
-        except Exception:
-            return None
+        for rpc_url in ARBITRUM_RPC_CLUSTER:
+            try:
+                w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={'timeout': 4}))
+                if w3.is_connected():
+                    return w3
+            except Exception:
+                continue
+        return None
 
     def _load_or_create_keeper_key(self) -> str:
         """
@@ -539,11 +543,16 @@ class KeeperRelayerEngine:
             safe_hurdle_usd = max(0.50, min(min_net_profit_usd * 0.10, 2.0))
             min_profit_units = int(safe_hurdle_usd * (10 ** decimals))
 
-            # Encode parameters: (address intermediateToken, uint24 poolFee, uint256 minProfit, address recipient, uint8 dexRoute)
+            # Dynamic Low-Fee Tier Selector (Super Smart Hurdle Reducer)
             if pool_fee is None or pool_fee <= 0:
-                if intermediate_token.upper() in ["USDC", "USDT"]:
-                    pool_fee = 100 # 0.01% fee for stablecoins
-                elif intermediate_token.upper() in ["ARB", "WETH", "WBTC"]:
+                stablecoins = {"USDT", "USDC", "USDC.E", "DAI", "FRAX", "USDE", "USDV", "CRVUSD"}
+                bluechips = {"WETH", "ETH", "WBTC", "BTC", "ARB", "LINK"}
+                t_in = str(borrow_asset or "").upper()
+                t_out = str(intermediate_token or "").upper()
+
+                if t_in in stablecoins and t_out in stablecoins:
+                    pool_fee = 100 # 0.01% fee for pegged stablecoins (Slashes fee hurdle from 0.65% down to 0.07%)
+                elif (t_in in bluechips or t_in in stablecoins) and (t_out in bluechips or t_out in stablecoins):
                     pool_fee = 500 # 0.05% fee for blue chips
                 else:
                     pool_fee = 3000 # 0.30% fee for altcoins
@@ -607,9 +616,41 @@ class KeeperRelayerEngine:
                     "notice": f"Pre-flight simulation reverted on Arbitrum (Zero Txn Fee spent): Spread insufficient to cover fees."
                 }
 
-            # Build EIP-1559 Transaction
+            # Gas Price Ceiling & Profit Ratio Guards (Super Smart Gas Preserver)
             nonce = self.w3.eth.get_transaction_count(self.keeper_address)
             gas_price = self.w3.eth.gas_price
+            gas_price_gwei = float(gas_price) / 1e9
+
+            if gas_price_gwei > 0.35:
+                return {
+                    "success": False,
+                    "mode": "GAS_PRICE_CEILING_HALT",
+                    "tx_hash": None,
+                    "explorer_url": None,
+                    "net_profit_usd": 0.0,
+                    "recipient": user_recipient,
+                    "gas_used": 0,
+                    "gas_saved_eth": 0.000008,
+                    "error": f"Gas price {gas_price_gwei:.3f} Gwei exceeds 0.35 Gwei ceiling",
+                    "notice": f"Execution halted to protect keeper funds: Gas price {gas_price_gwei:.3f} Gwei exceeds 0.35 Gwei ceiling."
+                }
+
+            est_gas_usd = (850_000 * gas_price / 1e18) * 2550.0
+            if min_net_profit_usd > 0 and est_gas_usd > (min_net_profit_usd * 0.75):
+                return {
+                    "success": False,
+                    "mode": "GAS_COST_PROFIT_RATIO_HALT",
+                    "tx_hash": None,
+                    "explorer_url": None,
+                    "net_profit_usd": 0.0,
+                    "recipient": user_recipient,
+                    "gas_used": 0,
+                    "gas_saved_eth": 0.000008,
+                    "error": f"Estimated gas (${est_gas_usd:.2f}) exceeds 75% of profit (${min_net_profit_usd:.2f})",
+                    "notice": f"Execution halted: Estimated gas (${est_gas_usd:.2f}) exceeds 75% of expected profit (${min_net_profit_usd:.2f})."
+                }
+
+            # Build EIP-1559 Transaction
 
             tx = contract.functions.requestFlashLoan(
                 Web3.to_checksum_address(token_in_addr),
@@ -663,6 +704,24 @@ class KeeperRelayerEngine:
                 "error": str(e),
                 "notice": f"Mainnet execution reverted or failed: {e}"
             }
+
+    def check_and_replenish_keeper_gas(self) -> dict:
+        """
+        Monitors Keeper Wallet ETH gas on Arbitrum One.
+        Alerts when balance < 0.0015 ETH and computes required replenishment amount.
+        """
+        status = self.get_status_overview()
+        bal_eth = status.get("arbitrum_gas_eth", 0.0)
+        is_low = bal_eth < 0.0015
+        needed_eth = max(0.0, 0.003 - bal_eth)
+        return {
+            "keeper_address": self.keeper_address,
+            "current_eth": bal_eth,
+            "usd_est": status.get("gas_usd_est", 0.0),
+            "is_low_gas": is_low,
+            "recommended_topup_eth": round(needed_eth, 5),
+            "status": "LOW_GAS_WARNING" if is_low else "GAS_OPTIMAL"
+        }
 
     def deploy_contract(self) -> dict:
         """Deploys AaveFlashLoanArbitrage contract to Arbitrum One using Keeper wallet."""

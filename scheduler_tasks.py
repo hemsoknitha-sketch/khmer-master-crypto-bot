@@ -5852,16 +5852,26 @@ async def flash_loan_autonomous_engine(app: Application):
         import flash_loan_mev_engine
         engine = flash_loan_mev_engine.flash_loan_engine
 
-        # 1. Scan AI Volatility & Momentum Dislocation opportunities first (Top Priority)
-        ai_vol_items = await asyncio.to_thread(engine.scan_ai_volatility_arbitrage)
-        profitable_items = [it for it in ai_vol_items if it.get("net_profit_usd", 0.0) > 0.0]
+        # 1. Scan Ultra-Low Fee Pegged Stablecoin Arbitrage (Fee Hurdle ~0.08%, Highest Efficiency)
+        pegged_items = await asyncio.to_thread(engine.scan_pegged_stablecoin_arbitrage)
+        profitable_items = [it for it in pegged_items if it.get("net_profit_usd", 0.0) > 0.0]
 
-        # 2. If no high-volatility dislocation, scan DexScreener Arbitrum 99+ pools
+        # 2. Scan AI Volatility & Momentum Dislocation opportunities on Arbitrum Altcoins
+        if not profitable_items:
+            ai_vol_items = await asyncio.to_thread(engine.scan_ai_volatility_arbitrage)
+            profitable_items = [it for it in ai_vol_items if it.get("net_profit_usd", 0.0) > 0.0]
+
+        # 3. Scan CEX Lead-Lag Predictive Impulses (500ms - 2,500ms Lead Advantage)
+        if not profitable_items:
+            cex_items = await asyncio.to_thread(engine.scan_cex_lead_lag_predictive)
+            profitable_items = [it for it in cex_items if it.get("estimated_lead_profit_usd", 0.0) >= 1.0]
+
+        # 4. If no high-volatility dislocation, scan DexScreener Arbitrum 99+ pools
         if not profitable_items:
             dex_items = await asyncio.to_thread(engine.scan_dexscreener_arbitrum_opportunities)
             profitable_items = [it for it in dex_items if it.get("net_profit_usd", 0.0) > 0.0]
 
-        # 3. Fallback to CeDeFi matrix with strict live gas preservation
+        # 5. Fallback to CeDeFi matrix with strict live gas preservation
         if not profitable_items:
             import keeper_relayer
             is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
@@ -5887,18 +5897,18 @@ async def flash_loan_autonomous_engine(app: Application):
 
             # Fairly assign opportunity across multiple discovered pools
             top_op = profitable_items[user_idx % len(profitable_items)]
-            net_profit = top_op.get("net_profit_usd", 0.0)
+            net_profit = top_op.get("net_profit_usd", 0.0) or top_op.get("estimated_lead_profit_usd", 0.0)
             symbol = top_op.get("symbol", "ETHUSDT")
-            pair = top_op.get("pair", "WETH/USDT")
+            pair = top_op.get("pair", top_op.get("symbol", "WETH/USDT"))
             borrow_asset = top_op.get("borrow_asset", "USDT")
             intermediate_token = top_op.get("intermediate_token", top_op.get("token", "WETH"))
             token_out_address = top_op.get("token_addr", top_op.get("addr", ""))
             chain = top_op.get("chain", "ARBITRUM")
             loan_amt = top_op.get("optimal_loan_usd", 50000.0)
-            spread_pct = top_op.get("gross_spread_pct", 0.28)
-            dex_source = top_op.get("dex_source", "Uniswap V3")
-            fee_hurdle = float(top_op.get("fee_hurdle", 0.18))
-            pool_fee_val = top_op.get("pool_fee", 500)
+            spread_pct = top_op.get("gross_spread_pct", top_op.get("predicted_dex_dislocation_pct", 0.28))
+            dex_source = top_op.get("dex_source", top_op.get("route_desc", "Uniswap V3"))
+            fee_hurdle = float(top_op.get("fee_hurdle", top_op.get("fee_hurdle_pct", 0.18)))
+            pool_fee_val = top_op.get("pool_fee", 100 if "PEG" in str(top_op.get("strategy_type", "")) else 500)
             dex_route_val = top_op.get("dex_route", 1)
 
             raw_lang = db.get_user_language(chat_id)

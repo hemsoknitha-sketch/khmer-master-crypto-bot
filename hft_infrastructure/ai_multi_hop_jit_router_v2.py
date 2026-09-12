@@ -65,6 +65,14 @@ class MultiHopJITRouterV2:
                 "intermediate_token": "USDC"
             },
             {
+                "name": "BALANCER-0FEE-USDC-USDT-USDC",
+                "path": ["USDC", "USDT", "USDC"],
+                "dex_sequence": ["Balancer V2 (0% Flash Fee)", "Uniswap V3 (1 bps)", "Camelot V2"],
+                "fee_hurdle_pct": 0.06,  # 0.00% Flash Loan Fee + 0.01% Uni pool + 0.05% Camelot/Curve
+                "default_loan_usd": 100000.0,
+                "intermediate_token": "USDT"
+            },
+            {
                 "name": "USDT-WETH-GMX-USDT",
                 "path": ["USDT", "WETH", "GMX", "USDT"],
                 "dex_sequence": ["Uniswap V3", "Camelot V2", "Uniswap V3"],
