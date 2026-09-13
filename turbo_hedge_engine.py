@@ -8,6 +8,7 @@ import trading_engine
 import hyper_trade_engine
 import ai_engine
 import market_data
+import symbiotic_volatility_harvester as svh
 
 # Overtrade Guard: Execution Tracker keyed by (chat_id, symbol) to prevent double order stacking
 _active_executing_keys = set()
@@ -638,7 +639,6 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     confidence = 50.0
                     if not is_macro_uptrend and not is_macro_downtrend:
                         try:
-                            import symbiotic_volatility_harvester as svh
                             regime_data = svh.classify_volatility_regime(symbol, interval="15m")
                             if regime_data.get("regime") == svh.REGIME_WILD_CHOP and 36.0 <= rsi14 <= 64.0:
                                 chop_side = "BUY" if rsi14 < 48.0 else "SELL"

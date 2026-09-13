@@ -28,6 +28,7 @@ from urllib.parse import urlencode
 import database as db
 import trading_engine
 import market_data
+import symbiotic_volatility_harvester as svh
 from ui_standards import DIVIDER_HEAVY, DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
 
 # TradFi and Non-Perpetual Exclusion Shield (Invariant 7)
@@ -231,7 +232,6 @@ def is_symbol_safe_for_macro_trade(chat_id: int, symbol: str, proposed_side: str
                 
                 # Check Symbiotic Harvester status
                 if db.is_symbiotic_harvester_enabled(chat_id):
-                    import symbiotic_volatility_harvester as svh
                     sym_ok, sym_reason, _ = svh.evaluate_symbiotic_coordination(chat_id, symbol, "macro_auto_trade", proposed_side)
                     if not sym_ok:
                         return False, sym_reason
