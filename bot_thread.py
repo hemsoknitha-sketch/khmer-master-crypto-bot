@@ -11974,6 +11974,9 @@ class TelegramBotThread(BaseThread):
                 return await turbo_hedge_command(update, context)
 
             try:
+                from ui_standards import DIVIDER_HEAVY, DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE, DIVIDER_LIGHT, DIVIDER_DASH
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
                 macro_cfg = db.get_macro_auto_trade_config(chat_id)
                 is_enabled = bool(macro_cfg.get("enabled", False))
                 amount = float(macro_cfg.get("amount", 30.0))
@@ -11983,9 +11986,6 @@ class TelegramBotThread(BaseThread):
                 current_status = f"🟢 ACTIVE (`${amount:,.2f} USDT`)" if is_enabled else "🔴 INACTIVE (បិទ)"
 
                 if not args or len(args) == 0:
-                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                    from ui_standards import DIVIDER_HEAVY, DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
-
                     toggle_btn = (
                         InlineKeyboardButton("🔴 Turn OFF Auto Trade", callback_data="btn_auto_trade_off")
                         if is_enabled else
@@ -12039,7 +12039,8 @@ class TelegramBotThread(BaseThread):
                     db.set_macro_auto_trade_config(chat_id, False, amount, leverage, target_tp)
                     off_msg = (
                         f"🛑 **SUPER SMART /AUTO_TRADE DEACTIVATED!** 🛑\n{DIVIDER_HEAVY}\n\n"
-                        f"_ម៉ាស៊ីន Macro Waterfall & Breakout ត្រូវបានបិទដោយជោគជ័យ!_"
+                        f"_ម៉ាស៊ីន Macro Waterfall & Breakout ត្រូវបានបិទដោយជោគជ័យ!_\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
                     )
                     await send_reply_or_edit(update, context, off_msg, parse_mode="Markdown")
                     self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Macro Auto-Trade.")
@@ -12089,7 +12090,6 @@ class TelegramBotThread(BaseThread):
                             pass
 
                 if action == "STATUS":
-                    from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
                     if not active_macro_trades:
                         msg_status = (
                             f"📊 **ACTIVE MACRO POSITIONS**\n"
@@ -12114,7 +12114,13 @@ class TelegramBotThread(BaseThread):
                     return
 
                 # Invalid usage prompt
-                usage_msg = "⚠️ របៀបប្រើប្រាស់: `/auto_trade ON <ទុន>`\nឧទាហរណ៍ ៖ `/auto_trade ON 50`"
+                usage_msg = (
+                    f"⚠️ **របៀបប្រើប្រាស់ /auto_trade:**\n{DIVIDER_HEAVY}\n\n"
+                    f"👉 **បើកដំណើរការ ៖** `/auto_trade ON <ទុន>` (ឧ. `/auto_trade ON 50`)\n"
+                    f"👉 **បិទដំណើរការ ៖** `/auto_trade OFF`\n"
+                    f"👉 **មើលស្ថានភាព ៖** `/auto_trade STATUS`\n\n"
+                    f"{OFFICIAL_FOOTNOTE}"
+                )
                 await send_reply_or_edit(update, context, usage_msg, parse_mode="Markdown")
                 return
 
