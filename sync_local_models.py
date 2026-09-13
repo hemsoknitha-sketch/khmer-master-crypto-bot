@@ -93,11 +93,7 @@ CANONICAL_ARTIFACTS = [
     "production_hyperparameters.json",
     "hft_infrastructure/MEV_Arbitrage.yul",
     "hft_infrastructure/Optimized_MEV_Arbitrage.yul",
-    "hft_infrastructure/ai_multi_hop_jit_router.py",
-    "hft_infrastructure/ai_multi_hop_jit_router_v2.py",
-    "hft_infrastructure/hft_server_config.json",
-    "hft_infrastructure/private_mempool_integration.py",
-    "hft_infrastructure/private_mempool_integration_v2.py"
+    "hft_infrastructure/hft_server_config.json"
 ]
 
 def generate_local_master_fusion_fallback(filename):
@@ -180,17 +176,20 @@ def sync_all_models():
     try:
         print(f"[DISCOVERY] Querying Hugging Face Model Repository: {HF_REPO_ID}...")
         raw_list = list_repo_files(repo_id=HF_REPO_ID, repo_type="model", token=HF_TOKEN if HF_TOKEN else None)
-        remote_files = [f for f in raw_list if not f.startswith(".")]
-        print(f"  └─ Discovered {len(remote_files)} remote files on Hugging Face Hub.")
+        # Exclude hidden files and any Python source files (Python code belongs to Git/GitHub)
+        remote_files = [f for f in raw_list if not f.startswith(".") and not f.endswith(".py")]
+        print(f"  └─ Discovered {len(remote_files)} remote model files on Hugging Face Hub.")
     except Exception as e:
         print(f"  └─ [NOTICE] Could not query remote file list ({e}). Using canonical artifact list.")
         remote_files = CANONICAL_ARTIFACTS
 
-    # Target union of canonical + discovered remote
-    target_files = list(dict.fromkeys(CANONICAL_ARTIFACTS + remote_files))
+    # Target union of canonical + discovered remote (strictly excluding Python files)
+    target_files = [f for f in list(dict.fromkeys(CANONICAL_ARTIFACTS + remote_files)) if not f.endswith(".py")]
     synced_count = 0
 
     for filename in target_files:
+        if filename.endswith(".py"):
+            continue
         try:
             print(f"[SYNC] Downloading {filename} from Hugging Face Hub...")
             downloaded_path = hf_hub_download(
