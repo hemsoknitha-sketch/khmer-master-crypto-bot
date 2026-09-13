@@ -3281,6 +3281,60 @@ def get_macro_auto_trade_users() -> list:
                 pass
     return list(users)
 
+# =========================================================================
+# 🌊 SYMBIOTIC DUAL-ENGINE VOLATILITY HARVESTER DATABASE LAYER
+# =========================================================================
+
+def record_symbiotic_micro_profit(chat_id: int, symbol: str, profit_usdt: float) -> float:
+    """
+    Records realized micro-scalp profit from /turbo_hedge for an asset
+    that has an active /auto_trade position. Systematically accumulates profit
+    to lower the effective break-even price of the Macro position.
+    """
+    symbol = str(symbol).upper().strip()
+    key = f"symbiotic_profit_{chat_id}_{symbol}"
+    current_profit_str = get_system_setting(key, "0.0")
+    try:
+        current_profit = float(current_profit_str)
+    except Exception:
+        current_profit = 0.0
+    new_total = current_profit + max(0.0, float(profit_usdt))
+    update_system_setting(key, str(round(new_total, 4)))
+    return new_total
+
+def get_symbiotic_micro_profit(chat_id: int, symbol: str) -> float:
+    """
+    Retrieves cumulative micro-scalp profits for an active symbiotic pair.
+    """
+    symbol = str(symbol).upper().strip()
+    key = f"symbiotic_profit_{chat_id}_{symbol}"
+    val_str = get_system_setting(key, "0.0")
+    try:
+        return float(val_str)
+    except Exception:
+        return 0.0
+
+def clear_symbiotic_micro_profit(chat_id: int, symbol: str):
+    """
+    Resets cumulative micro-scalp profit when the macro position is closed.
+    """
+    symbol = str(symbol).upper().strip()
+    key = f"symbiotic_profit_{chat_id}_{symbol}"
+    update_system_setting(key, "0.0")
+
+def set_symbiotic_harvester_enabled(chat_id: int, enabled: bool):
+    """
+    Toggles the Symbiotic Dual-Engine Volatility Harvester for the user.
+    """
+    update_system_setting(f"symbiotic_harvester_{chat_id}_enabled", "1" if enabled else "0")
+
+def is_symbiotic_harvester_enabled(chat_id: int) -> bool:
+    """
+    Returns True if Symbiotic Harvester is active (default True for VIP admins).
+    """
+    val = get_system_setting(f"symbiotic_harvester_{chat_id}_enabled", "1")
+    return val in ["1", "true", "True"]
+
 def get_pre_pump_users():
     conn = get_db_connection()
     cursor = conn.cursor()

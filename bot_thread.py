@@ -4701,6 +4701,16 @@ class TelegramBotThread(BaseThread):
                 else:
                     context.args = []
                 await auto_trade_command(update, context)
+            elif data == "btn_symbiotic_toggle":
+                curr_sym = db.is_symbiotic_harvester_enabled(chat_id)
+                db.set_symbiotic_harvester_enabled(chat_id, not curr_sym)
+                status_txt = "🟢 ACTIVATED" if not curr_sym else "⚪ DEACTIVATED"
+                try:
+                    await update.callback_query.answer(f"🌊 Symbiotic Volatility Harvester: {status_txt}")
+                except Exception:
+                    pass
+                context.args = []
+                await auto_trade_command(update, context)
             elif data.startswith("btn_hyper_trade_"):
                 act = "ON" if "on" in data else "OFF"
                 context.args = [act]
@@ -11993,6 +12003,11 @@ class TelegramBotThread(BaseThread):
                     )
 
                     trades_btn_label = f"📊 Active Trades ({len(active_macro_trades)})"
+                    is_symbiotic = db.is_symbiotic_harvester_enabled(chat_id)
+                    symbiotic_btn = InlineKeyboardButton(
+                        f"{'✅ ' if is_symbiotic else ''}🌊 Symbiotic Harvester",
+                        callback_data="btn_symbiotic_toggle"
+                    )
 
                     keyboard = InlineKeyboardMarkup([
                         [toggle_btn, InlineKeyboardButton(trades_btn_label, callback_data="btn_auto_trade_trades")],
@@ -12003,7 +12018,8 @@ class TelegramBotThread(BaseThread):
                         ],
                         [
                             InlineKeyboardButton(f"{'✅ ' if leverage == 3 else ''}🛡️ 3x Buffer", callback_data="btn_auto_trade_lev_3"),
-                            InlineKeyboardButton(f"{'✅ ' if leverage == 5 else ''}⚡ 5x Buffer", callback_data="btn_auto_trade_lev_5")
+                            InlineKeyboardButton(f"{'✅ ' if leverage == 5 else ''}⚡ 5x Buffer", callback_data="btn_auto_trade_lev_5"),
+                            symbiotic_btn
                         ],
                         [
                             InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
@@ -12011,6 +12027,7 @@ class TelegramBotThread(BaseThread):
                         ]
                     ])
 
+                    sym_status_txt = "🟢 ACTIVE (Kaufman ER + Avellaneda-Stoikov)" if is_symbiotic else "⚪ INACTIVE"
                     msg = (
                         "🌊 **APEX SUPER SMART /AUTO_TRADE ENGINE** 🤖\n"
                         f"{DIVIDER_DOUBLE}\n\n"
@@ -12021,7 +12038,8 @@ class TelegramBotThread(BaseThread):
                         f"• **Capital / Order** ៖ `${amount:,.2f} USDT`\n"
                         f"• **Target TP Floor** ៖ `+{target_tp:.1f}% Macro Expansion`\n"
                         f"• **Active Macro Swings** ៖ `{len(active_macro_trades)}/3 Positions`\n"
-                        f"• **Symbiotic Link** ៖ `Zero Opposing Conflict with /turbo_hedge`\n\n"
+                        f"• **Symbiotic Harvester** ៖ `{sym_status_txt}`\n"
+                        f"• **Dynamic Profit Loop** ៖ `Micro Scalps systematically reduce Macro Break-Even`\n\n"
                         f"📋 **1-TAP COMMAND EXECUTIONS:**\n"
                         f"👉 **បើកដំណើរការ ៖** `/auto_trade ON <ទុន>`\n"
                         f"👉 **បិទដំណើរការ ៖** `/auto_trade OFF`\n\n"

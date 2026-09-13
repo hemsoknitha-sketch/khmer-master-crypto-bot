@@ -637,6 +637,19 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     side = "SKIP"
                     confidence = 50.0
                     if not is_macro_uptrend and not is_macro_downtrend:
+                        try:
+                            import symbiotic_volatility_harvester as svh
+                            regime_data = svh.classify_volatility_regime(symbol, interval="15m")
+                            if regime_data.get("regime") == svh.REGIME_WILD_CHOP and 36.0 <= rsi14 <= 64.0:
+                                chop_side = "BUY" if rsi14 < 48.0 else "SELL"
+                                # Strict Invariant 16 Anti-Oversold Short Guard
+                                if chop_side == "SELL" and rsi14 <= 38.0:
+                                    chop_side = "SKIP"
+                                if chop_side != "SKIP":
+                                    print(f"🌊 [AVELLANEDA-STOIKOV CHOP SCALPER] {symbol}: ER {regime_data.get('er'):.2f} <= 0.35 -> Adaptive Mean-Reversion {chop_side} Activated!")
+                                    return {"side": chop_side, "confidence_pct": 88.0, "recommended_leverage": min(10, requested_leverage), "strategy": "AVELLANEDA_STOIKOV_CHOP"}
+                        except Exception:
+                            pass
                         print(f"⚪ [15M/1H CHOP SUPPRESSION] {symbol}: 15m/1h Sideways / Choppy Range (15m Bull: {is_15m_uptrend}, 1h Bull: {is_1h_uptrend}) -> SKIPPED!")
                     else:
                         print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Entry Misaligned with 15m/1h Macro Trend -> SKIPPED!")
@@ -1769,6 +1782,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
                 tot_pnl += max(0.0, partial_pnl)
                 db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+                db.record_symbiotic_micro_profit(chat_id, symbol, partial_pnl)
                 db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt * 0.50, partial_pnl, roi_pct, "TP1_MICRO_SCALP_50%")
 
                 is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
@@ -1844,6 +1858,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             tot_pnl = float(tot_pnl_str) if tot_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
             tot_pnl += max(0.0, real_pnl_usdt)
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
+            db.record_symbiotic_micro_profit(chat_id, symbol, real_pnl_usdt)
             db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
         else:
             print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
@@ -1854,6 +1869,8 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
                 disp_roi = bounce_roi if (is_derisked and bounce_roi > 0) else roi_pct
                 disp_peak = max(peak_roi, peak_bounce_roi) if is_derisked else peak_roi
+                sym_profit = db.get_symbiotic_micro_profit(chat_id, symbol)
+                sym_line = f"🌊 **Symbiotic Feedback ៖** `+${sym_profit:.2f} USDT` (ទម្លាក់ Break-even នៃ Macro Trade)\n" if sym_profit > 0 else ""
                 msg = (
                     f"{alert_title}\n"
                     f"{DIVIDER_DOUBLE}\n\n"
@@ -1861,6 +1878,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                     f"📈 **ចំណុចកំពូលងើបដល់ ៖** `+{disp_peak:.1f}% ROI`\n"
                     f"💵 **ផលចំណេញប្រមូលបាន ៖** `+${real_pnl_usdt:,.2f} USDT` (`+{disp_roi:.1f}% ROI`)\n"
                     f"🏆 **សរុបប្រាក់ចំណេញ ៖** `+${tot_pnl:,.2f} USDT`\n"
+                    f"{sym_line}"
                     f"⚡ **Binance Status ៖** `CLEAN MARKET CLOSED (<30ms)`\n"
                     f"🛡️ **សុវត្ថិភាព ៖** `CAPITAL SECURED (ស្រោចស្រង់ដើមទុន ១០០%)`\n\n"
                     f"{alert_desc}\n\n"

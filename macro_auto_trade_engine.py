@@ -220,7 +220,7 @@ def is_symbol_safe_for_macro_trade(chat_id: int, symbol: str, proposed_side: str
     if not symbol.endswith("USDT"):
         symbol += "USDT"
 
-    # 1. Check /turbo_hedge active positions
+    # 1. Check /turbo_hedge active positions and Symbiotic Pairing
     try:
         turbo_bots = db.get_active_turbo_hedge_bots() or []
         for tb in turbo_bots:
@@ -228,9 +228,17 @@ def is_symbol_safe_for_macro_trade(chat_id: int, symbol: str, proposed_side: str
                 active_turbo_side = str(tb.get("side", "")).upper()
                 norm_proposed = "BUY" if proposed_side in ["BUY", "LONG"] else "SELL"
                 norm_turbo = "BUY" if active_turbo_side in ["BUY", "LONG"] else "SELL"
-                if norm_proposed != norm_turbo:
-                    return False, f"OPPOSING_TURBO_HEDGE_POSITION ({symbol} is {active_turbo_side} in /turbo_hedge)"
-                return False, f"ALREADY_ACTIVE_IN_TURBO_HEDGE ({symbol})"
+                
+                # Check Symbiotic Harvester status
+                if db.is_symbiotic_harvester_enabled(chat_id):
+                    import symbiotic_volatility_harvester as svh
+                    sym_ok, sym_reason, _ = svh.evaluate_symbiotic_coordination(chat_id, symbol, "macro_auto_trade", proposed_side)
+                    if not sym_ok:
+                        return False, sym_reason
+                else:
+                    if norm_proposed != norm_turbo:
+                        return False, f"OPPOSING_TURBO_HEDGE_POSITION ({symbol} is {active_turbo_side} in /turbo_hedge)"
+                    return False, f"ALREADY_ACTIVE_IN_TURBO_HEDGE ({symbol})"
     except Exception as e:
         print(f"Error checking turbo hedge conflict: {e}")
 
@@ -390,7 +398,9 @@ async def monitor_macro_auto_trades(app):
             pos_amt = float(pnl_info.get("positionAmt", 0.0))
 
             init_margin = abs(pos_amt * entry_p) / max(1, leverage) if entry_p > 0 else amount
-            roi_pct = (real_pnl / max(1.0, init_margin)) * 100.0
+            micro_profit = db.get_symbiotic_micro_profit(chat_id, symbol)
+            effective_pnl = real_pnl + micro_profit
+            roi_pct = (effective_pnl / max(1.0, init_margin)) * 100.0
 
             # Track peak ROI & peak PnL
             peak_roi_str = db.get_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_roi", "0.0")
@@ -401,8 +411,8 @@ async def monitor_macro_auto_trades(app):
 
             peak_pnl_str = db.get_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_pnl", "0.0")
             peak_pnl = float(peak_pnl_str) if peak_pnl_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 0.0
-            if real_pnl > peak_pnl:
-                peak_pnl = real_pnl
+            if effective_pnl > peak_pnl:
+                peak_pnl = effective_pnl
                 db.update_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
             # Profit Harvesting Logic
@@ -410,34 +420,37 @@ async def monitor_macro_auto_trades(app):
             is_stop_loss = False
             reason_tag = ""
 
-            # Stop Loss Floor: -10.0% ROI
-            if roi_pct <= -10.0 or real_pnl <= -max(2.5, amount * 0.10):
+            # Stop Loss Floor: -10.0% ROI (guarded by micro-profit offset)
+            if roi_pct <= -10.0 or effective_pnl <= -max(2.5, amount * 0.10):
                 is_stop_loss = True
                 reason_tag = "MACRO_STOP_LOSS"
 
             # Tiered Trailing Profit Lock
             if peak_roi >= 15.0:
                 retain_ratio = 0.85 if peak_roi >= 35.0 else (0.80 if peak_roi >= 25.0 else 0.70)
-                if roi_pct <= (peak_roi * retain_ratio) or (real_pnl <= peak_pnl * retain_ratio) or (real_pnl < 0.50):
+                if roi_pct <= (peak_roi * retain_ratio) or (effective_pnl <= peak_pnl * retain_ratio) or (effective_pnl < 0.50):
                     is_take_profit = True
                     reason_tag = f"MACRO_TRAILING_PEAK_LOCK (+{roi_pct:.1f}%)"
 
             if is_take_profit or is_stop_loss:
-                print(f"🌊 [MACRO TRADE EXIT] {symbol}: Real PnL ${real_pnl:+.2f} (ROI: {roi_pct:+.1f}%) -> {reason_tag}")
+                print(f"🌊 [MACRO TRADE EXIT] {symbol}: Real PnL ${real_pnl:+.2f} (Micro Offset: +${micro_profit:.2f}, Effective: ${effective_pnl:+.2f}, ROI: {roi_pct:+.1f}%) -> {reason_tag}")
                 close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                 db.remove_macro_trade(chat_id, symbol)
+                db.clear_symbiotic_micro_profit(chat_id, symbol)
 
                 if app and hasattr(app, "bot"):
                     try:
                         title = "🎯 **SUPER SMART MACRO PROFIT HARVESTED!** 💰" if is_take_profit else "🛡️ **SUPER SMART MACRO STOP LOSS ACTIVATED!** 🛑"
                         icon = "💵" if is_take_profit else "🛑"
+                        offset_line = f"🌊 **Micro Scalp Offset ៖** `+${micro_profit:.2f} USDT`\n" if micro_profit > 0 else ""
                         msg = (
                             f"{title}\n"
                             f"{DIVIDER_HEAVY}\n\n"
                             f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
                             f"📊 **យុទ្ធសាស្ត្រ ៖** `{strategy}`\n"
                             f"📈 **កំពូលងើបដល់ ៖** `+{peak_roi:.1f}% ROI`\n"
-                            f"{icon} **ផលចំណេញជាក់ស្តែង ៖** `${real_pnl:+.2f} USDT` (`{roi_pct:+.1f}% ROI`)\n"
+                            f"{icon} **ផលចំណេញសរុប ៖** `${effective_pnl:+.2f} USDT` (`{roi_pct:+.1f}% ROI`)\n"
+                            f"{offset_line}"
                             f"🛡️ **Margin Mode ៖** `ISOLATED ({leverage}x Lev)`\n"
                             f"⚡ **Binance Status ៖** `CLEAN MARKET CLOSED (<30ms)`\n\n"
                             f"{OFFICIAL_FOOTNOTE}"
