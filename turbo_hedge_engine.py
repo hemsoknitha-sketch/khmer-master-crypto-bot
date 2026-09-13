@@ -2093,6 +2093,8 @@ async def monitor_turbo_hedge_bots(app):
                 await _monitor_single_active_bot(app, bot_info)
             except Exception as bot_err:
                 print(f"⚠️ [TURBO HEDGE BOT MONITOR ERROR] {bot_info.get('symbol')}: {bot_err}")
+                if "malformed" in str(bot_err).lower():
+                    db.check_and_heal_malformed_db(bot_err)
 
         # Refresh active bots list to reflect any positions closed above
         active_hedge_bots = db.get_active_turbo_hedge_bots()
@@ -2349,6 +2351,8 @@ async def monitor_turbo_hedge_bots(app):
 
     except Exception as e:
         print(f"⚠️ [TURBO HEDGE MONITOR ERROR]: {e}")
+        if "malformed" in str(e).lower():
+            db.check_and_heal_malformed_db(e)
 
 def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
     """
@@ -2479,7 +2483,12 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
         }
     except Exception as e:
         print(f"Error in stop_turbo_hedge_engine: {e}")
-        db.stop_turbo_hedge_bot(chat_id, symbol)
+        if "malformed" in str(e).lower():
+            db.check_and_heal_malformed_db(e)
+        try:
+            db.stop_turbo_hedge_bot(chat_id, symbol)
+        except Exception:
+            pass
         return {"status": "error", "error": str(e), "symbol": symbol, "closed_positions": [], "total_pnl": 0.0}
 
 

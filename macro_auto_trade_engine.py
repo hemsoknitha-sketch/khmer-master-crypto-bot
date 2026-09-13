@@ -560,3 +560,9 @@ async def run_macro_auto_trade_scanner_cycle(app):
 
     except Exception as e:
         print(f"⚠️ [MACRO SCANNER CYCLE ERROR]: {e}")
+        if "malformed" in str(e).lower():
+            try:
+                import database as db
+                db.check_and_heal_malformed_db(e)
+            except Exception:
+                pass

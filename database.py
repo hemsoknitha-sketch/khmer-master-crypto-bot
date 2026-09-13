@@ -27,12 +27,45 @@ def cache_delete(key: str):
     if key in MEMORY_CACHE:
         del MEMORY_CACHE[key]
 
+_LAST_DB_AUTO_REPAIR_TS = 0
+
+def check_and_heal_malformed_db(error: Exception = None) -> bool:
+    """
+    Checks if an exception indicates SQLite database corruption.
+    If so, invokes the zero-data-loss SQLite auto-healer and repairs the database on the fly.
+    """
+    global _LAST_DB_AUTO_REPAIR_TS
+    err_str = str(error).lower() if error else ""
+    if not error or "malformed" in err_str or "disk image" in err_str or "corrupt" in err_str or "file is encrypted" in err_str:
+        now = time.time()
+        if now - _LAST_DB_AUTO_REPAIR_TS > 20: # 20s throttle
+            _LAST_DB_AUTO_REPAIR_TS = now
+            print(f"🛡️ [DATABASE AUTO-HEAL] Detected malformed database: {error}. Launching auto-repair...")
+            try:
+                import repair_database
+                success = repair_database.auto_repair_database(DB_FILE)
+                if success:
+                    print("✅ [DATABASE AUTO-HEAL] Database healed cleanly in-process!")
+                return success
+            except Exception as repair_err:
+                print(f"⚠️ [DATABASE AUTO-HEAL] Auto-repair failed: {repair_err}")
+    return False
+
 def get_db_connection():
-    conn = sqlite3.connect(DB_FILE, timeout=30.0) # Increased timeout
-    conn.execute('PRAGMA journal_mode=WAL;') # Enable Write-Ahead Logging (10x Speed)
-    conn.execute('PRAGMA synchronous=NORMAL;')
-    conn.execute('PRAGMA busy_timeout=30000;') # Wait up to 30 seconds for lock
-    return conn
+    try:
+        conn = sqlite3.connect(DB_FILE, timeout=30.0) # Increased timeout
+        conn.execute('PRAGMA journal_mode=WAL;') # Enable Write-Ahead Logging (10x Speed)
+        conn.execute('PRAGMA synchronous=NORMAL;')
+        conn.execute('PRAGMA busy_timeout=30000;') # Wait up to 30 seconds for lock
+        return conn
+    except sqlite3.DatabaseError as e:
+        if check_and_heal_malformed_db(e):
+            conn = sqlite3.connect(DB_FILE, timeout=30.0)
+            conn.execute('PRAGMA journal_mode=WAL;')
+            conn.execute('PRAGMA synchronous=NORMAL;')
+            conn.execute('PRAGMA busy_timeout=30000;')
+            return conn
+        raise e
 
 def set_circuit_breaker_status(status: bool):
     conn = get_db_connection()
