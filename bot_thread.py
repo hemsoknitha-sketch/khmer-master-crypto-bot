@@ -10073,21 +10073,27 @@ class TelegramBotThread(BaseThread):
                     # 🛡️ Reserve 40% Free Margin Safety Buffer to prevent liquidation / over-leveraging
                     safe_avail_bal = avail_bal * (0.95 if is_spot else 0.60)
 
-                    # Tiered Active Coin Clamping based on Total Balance:
-                    if avail_bal < 20.0:
-                        tiered_cap = 1
-                    elif avail_bal < 50.0:
+                    # Tiered Active Coin Clamping based on Total Balance (Dynamic Scaler up to 15 coins max):
+                    if avail_bal < 30.0:
                         tiered_cap = 2
-                    elif avail_bal < 100.0:
+                    elif avail_bal < 60.0:
                         tiered_cap = 3
+                    elif avail_bal < 120.0:
+                        tiered_cap = 5
+                    elif avail_bal < 250.0:
+                        tiered_cap = 8
+                    elif avail_bal < 400.0:
+                        tiered_cap = 12
                     else:
-                        tiered_cap = min(10, top_count)
+                        tiered_cap = 15
+
+                    target_top_cap = min(15, max(1, top_count))
 
                     if safe_avail_bal < eff_amt or avail_bal < eff_amt:
                         print(f"🛡️ [CAPITAL SAFETY GUARD] Free margin (${avail_bal:.2f} USDT) or safe buffer (${safe_avail_bal:.2f} USDT) is less than required per-coin amount (${eff_amt:.2f} USDT). Aborting new coin placement.")
                         num_coins = 0
                     else:
-                        num_coins = max(1, min(tiered_cap, int(safe_avail_bal / eff_amt)))
+                        num_coins = max(1, min(target_top_cap, tiered_cap, int(safe_avail_bal / eff_amt)))
                     
                     executed_syms = []
                     success_count = 0

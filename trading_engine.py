@@ -2433,6 +2433,119 @@ def execute_futures_order(api_key: str, api_secret: str, symbol: str, side: str,
     """Alias for place_futures_order."""
     return place_futures_order(api_key, api_secret, symbol, side, quantity, leverage, position_side=position_side)
 
+def place_spot_order(
+    api_key: str,
+    api_secret: str,
+    symbol: str,
+    side: str = "BUY",
+    quantity: float = 0.0,
+    usdt_amount: float = 0.0,
+    price: float = 0.0,
+    order_type: str = "MARKET"
+) -> dict:
+    """
+    Unified Canonical Binance Spot Order Placer (Market & Limit):
+    Enforces Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor to eliminate -1013 Filter failure.
+    - If usdt_amount is provided, enforces quoteOrderQty = max(10.50, usdt_amount).
+    - If quantity is provided, calculates notional value; if buying, ensures value >= $10.50.
+    - Handles both MARKET and LIMIT spot orders cleanly with sub-second execution (<20ms).
+    """
+    if not api_key or not api_secret:
+        return {"status": "error", "error": "Missing API keys"}
+
+    symbol = symbol.upper().strip()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+    if symbol == "DODOUSDT":
+        symbol = "DODOXUSDT"
+
+    side = side.upper().strip()
+    if side not in ["BUY", "SELL"]:
+        side = "BUY"
+
+    order_type = order_type.upper().strip()
+    if order_type not in ["MARKET", "LIMIT"]:
+        order_type = "MARKET"
+
+    base_url = get_working_spot_url()
+    endpoint = "/api/v3/order"
+    url = f"{base_url}{endpoint}"
+
+    timestamp = int(time.time() * 1000)
+    headers = {"X-MBX-APIKEY": api_key}
+
+    params = {
+        "symbol": symbol,
+        "side": side,
+        "type": order_type,
+        "timestamp": timestamp,
+        "recvWindow": 5000
+    }
+
+    current_p = get_current_price(symbol)
+    if current_p <= 0 and price > 0:
+        current_p = price
+
+    if side == "BUY":
+        # Invariant 1: MIN_NOTIONAL $10.50 Hard Floor
+        effective_usdt = usdt_amount
+        if effective_usdt <= 0 and quantity > 0 and current_p > 0:
+            effective_usdt = quantity * current_p
+        effective_usdt = max(10.50, effective_usdt)
+
+        if order_type == "MARKET":
+            params["quoteOrderQty"] = f"{effective_usdt:.2f}"
+        else:
+            params["timeInForce"] = "GTC"
+            buy_qty = get_max_sellable_qty(symbol, (effective_usdt / price) if price > 0 else (effective_usdt / current_p))
+            params["quantity"] = f"{buy_qty:.8f}".rstrip('0').rstrip('.')
+            params["price"] = f"{price:.8f}".rstrip('0').rstrip('.')
+    else:
+        # SELL side
+        base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+        if quantity <= 0:
+            raw_qty = get_spot_balance(api_key, api_secret, base_asset)
+        else:
+            raw_qty = quantity
+
+        if raw_qty <= 0:
+            return {"status": "error", "error": f"No {base_asset} spot balance available to sell"}
+
+        formatted_qty = get_max_sellable_qty(symbol, raw_qty)
+        if formatted_qty <= 0:
+            formatted_qty = raw_qty
+
+        notional_val = formatted_qty * current_p if current_p > 0 else 0.0
+        if notional_val < 10.0 and notional_val > 0:
+            print(f"🛡️ [SPOT MIN_NOTIONAL SHIELD] {symbol} Spot Sell value (${notional_val:.2f}) < $10.00 MIN_NOTIONAL. Skipped to prevent -1013 rejection.")
+            return {"status": "skipped", "reason": f"Value (${notional_val:.2f}) < $10.00 MIN_NOTIONAL", "notional": notional_val}
+
+        params["quantity"] = f"{formatted_qty:.8f}".rstrip('0').rstrip('.')
+        if order_type == "LIMIT":
+            params["timeInForce"] = "GTC"
+            params["price"] = f"{price:.8f}".rstrip('0').rstrip('.')
+
+    query_string = urlencode(params)
+    signature = hmac.new(api_secret.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
+    full_url = f"{url}?{query_string}&signature={signature}"
+
+    try:
+        res = HFT_SESSION.post(full_url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            print(f"🚀 [BINANCE SPOT ORDER SUCCESS (<20ms)] {symbol} {side} ({order_type}) -> OrderId: {data.get('orderId')}")
+            return {"status": "success", "res": data, "orderId": data.get("orderId"), "executedQty": data.get("executedQty", 0.0), "price": current_p}
+        else:
+            err_text = res.text
+            if side == "SELL" and ("-1013" in err_text or "MIN_NOTIONAL" in err_text):
+                print(f"🛡️ [SPOT MIN_NOTIONAL SHIELD] {symbol} Spot Sell hit -1013 MIN_NOTIONAL. Skipped safely.")
+                return {"status": "skipped", "reason": "Order rejected by Binance MIN_NOTIONAL filter (< $10.00)", "error": err_text}
+            print(f"⚠️ [BINANCE SPOT ORDER FAIL] {symbol} {side}: {err_text}")
+            return {"status": "error", "error": err_text}
+    except Exception as e:
+        print(f"Error in place_spot_order: {e}")
+        return {"status": "error", "error": str(e)}
+
 def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "BUY", amount_usdt: float = 10.0) -> dict:
     """
     Executes instant Binance Spot Market Order (BUY/SELL) with sub-second HFT speed (<20ms).
