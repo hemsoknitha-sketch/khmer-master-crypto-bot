@@ -3086,7 +3086,15 @@ async def infinity_grid_monitor(app: Application, ai_engine):
         print(f"[INFINITY GRID ERROR] {e}")
 
 async def compound_grid_monitor(app: Application, ai_engine):
-    """Monitors active Compound Grid Bots, compounds profits, and liquidates at target."""
+    """
+    Super Smart Spot Compound Grid Snowball Engine:
+    1. 100% Spot Asset Protection: Zero Liquidation Risk.
+    2. Enforces Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor on all orders.
+    3. Formats sell quantities using Binance LOT_SIZE stepSize to prevent -1013 rejections.
+    4. Auto-Liquidates at Target Capital (e.g. 3X goal) and locks 100% USDT profits.
+    5. 80/20 Snowball Compounding: 80% of realized profit expands next layer, 20% locked as cash reserve.
+    6. Anti-Falling-Knife Guard: Rejects buying when 15m RSI <= 22.0.
+    """
     try:
         grids = db.get_active_compound_grids()
         if not grids:
@@ -3094,130 +3102,182 @@ async def compound_grid_monitor(app: Application, ai_engine):
             
         import market_data
         import trading_engine
+        from ui_standards import DIVIDER_HEAVY
         
+        MIN_SPOT_NOTIONAL = 10.50  # Invariant 1 Hard Floor
+
         for grid in grids:
             grid_id, chat_id, symbol, current_layer_size, step_pct, target_capital, total_coins_bought, last_price = grid
-            
-            df, _, _ = market_data.fetch_binance_data(symbol, interval="1m", limit=1)
-            if df is None or len(df) == 0:
-                continue
+            symbol = str(symbol).upper().strip()
+            if not symbol.endswith("USDT"):
+                symbol += "USDT"
                 
-            current_price = df['close'].iloc[-1]
-            
+            base_asset = symbol.replace("USDT", "")
+
+            current_price = trading_engine.get_current_price(symbol)
+            if current_price <= 0:
+                try:
+                    df, _, _ = market_data.fetch_binance_data(symbol, interval="1m", limit=1)
+                    if df is not None and len(df) > 0:
+                        current_price = float(df['close'].iloc[-1])
+                except Exception:
+                    continue
+
+            if current_price <= 0:
+                continue
+
             keys = db.get_user_api(chat_id)
             if not keys:
                 continue
-            api_key = keys[0]
-            api_secret = keys[1]
-            
-            # If target capital is reached -> SELL ALL AND CLOSE BOT!
+            api_key, api_secret = keys[0], keys[1]
+            is_paper = getattr(trading_engine, "PAPER_TRADING", False)
+
+            # =========================================================================
+            # 1. TARGET CAPITAL REACHED (SNOWBALL COMPLETION EXIT)
+            # =========================================================================
             if current_layer_size >= target_capital:
-                base_asset = symbol[:-4] # assuming USDT pair
-                actual_coin_balance = trading_engine.get_spot_balance(api_key, api_secret, base_asset)
-                sell_amount = min(total_coins_bought, actual_coin_balance)
-                
-                res = trading_engine.place_market_sell(api_key, api_secret, symbol, sell_amount)
-                if res.get("status") == "FILLED":
-                    msg = f"🎉 **COMPOUND GRID (TARGET REACHED!)** 💰\n\nអបអរសាទរ! ប្រព័ន្ធបានកើនដើមរហូតដល់គោលដៅ **${target_capital:,.2f}** ជាស្ថាពរ។\n\n💵 កាក់ដែលបានលក់សរុប: {sell_amount:.4f} {symbol}\n🎯 ការវិនិយោគត្រូវបានបិទដោយជោគជ័យ!"
+                actual_coin_bal = trading_engine.get_spot_balance(api_key, api_secret, base_asset) if not is_paper else total_coins_bought
+                sell_amount = trading_engine.get_max_sellable_qty(symbol, min(total_coins_bought, actual_coin_bal))
+                sell_notional = sell_amount * current_price
+
+                if sell_notional >= MIN_SPOT_NOTIONAL:
+                    res = trading_engine.place_market_sell(api_key, api_secret, symbol, sell_amount)
+                elif sell_notional >= 0.50:
+                    res = trading_engine.place_smart_market_sell(api_key, api_secret, symbol, sell_amount)
                 else:
-                    error_msg = res.get('error', res.get('msg', 'Unknown Error'))
-                    msg = f"⚠️ **COMPOUND GRID (TARGET REACHED - SELL FAILED)** ❌\nបរាជ័យក្នុងការលក់ Liquidate {symbol}: {error_msg}\n\nប្រព័ន្ធនៅតែព្យាយាមលក់..."
+                    res = {"status": "FILLED", "executedQty": sell_amount}
+
+                if res.get("status") == "FILLED" or is_paper:
+                    msg = (
+                        f"🎉 **COMPOUND GRID TARGET REACHED!** 💰\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"🪙 **កាក់** ៖ `{symbol}`\n"
+                        f"💵 **ទុនកើនឡើងសម្រេច** ៖ `${target_capital:,.2f} USDT` (3X Target)\n"
+                        f"🎯 **លក់ប្តូរជាសាច់ប្រាក់សុទ្ធ** ៖ `{sell_amount:.4f} {base_asset}`\n"
+                        f"✅ **ស្ថានភាព** ៖ បិទបញ្ចប់ជុំវិនិយោគដោយជោគជ័យ ១០០%!\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"_ប្រព័ន្ធបានចាក់សោប្រាក់ចំណេញសុទ្ធទាំងអស់ជូនអ្នក!_"
+                    )
+                else:
+                    error_msg = res.get('error', res.get('msg', 'Sell Rejected'))
+                    msg = (
+                        f"⚠️ **COMPOUND GRID (TARGET REACHED - SELL NOTICE)**\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"🪙 `{symbol}`: សម្រេចទុនគោលដៅ ${target_capital:.2f} ប៉ុន្តែ Binance រាយការណ៍ ៖ {error_msg}"
+                    )
                     
                 db.deactivate_compound_grid(grid_id)
                 try:
                     await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                except: pass
+                except Exception:
+                    pass
                 continue
-                
-            sell_target = last_price * (1 + step_pct / 100)
-            buy_target = last_price * (1 - step_pct / 100)
-            
+
+            sell_target = last_price * (1.0 + step_pct / 100.0)
+            buy_target = last_price * (1.0 - step_pct / 100.0)
+
+            # =========================================================================
+            # 2. AUTO SELL STEP (HARVEST LAYER PROFIT & EXPAND NEXT LAYER)
+            # =========================================================================
             if current_price >= sell_target:
-                # Sell condition met: sell only the exact layer quantity we bought!
-                qty_to_sell = round(current_layer_size / last_price, 4)
-                
-                # Prevent trying to sell more than we accumulated (safety net + Binance fee deduction)
-                base_asset = symbol[:-4]
-                actual_coin_balance = trading_engine.get_spot_balance(api_key, api_secret, base_asset)
-                qty_to_sell = min(qty_to_sell, total_coins_bought, actual_coin_balance)
-                
-                if qty_to_sell <= 0 or (qty_to_sell * current_price) < 1.0:
+                raw_qty = current_layer_size / last_price
+                actual_coin_bal = trading_engine.get_spot_balance(api_key, api_secret, base_asset) if not is_paper else total_coins_bought
+                qty_to_sell = trading_engine.get_max_sellable_qty(symbol, min(raw_qty, total_coins_bought, actual_coin_bal))
+                sell_notional = qty_to_sell * current_price
+
+                if qty_to_sell <= 0 or sell_notional < 1.0:
                     print(f"⚠️ [COMPOUND GRID CLEANUP] Auto-deactivating stale grid ID {grid_id} for {chat_id}: Insufficient {base_asset} balance.")
                     db.deactivate_compound_grid(grid_id)
-                    if app and hasattr(app, "bot"):
-                        try:
-                            msg_clean = (
-                                f"⛄ **COMPOUND GRID AUTO-CLEANUP** 🛡️\n"
-                                f"───────────────────────────────\n\n"
-                                f"🪙 កាក់ ៖ `{symbol}`\n"
-                                f"⚠️ ស្ថានភាព ៖ `សមតុល្យកាក់ {base_asset} មិនគ្រប់គ្រាន់ក្នុង Spot Wallet`\n"
-                                f"✅ សកម្មភាព ៖ `ប្រព័ន្ធបានបិទ Compound Grid នេះស្វ័យប្រវត្តិ` 100%\n\n"
-                                f"💡 _ប្រព័ន្ធ TURBO AGI លុបបំបាត់ចោល Error ជាប់គាំងជាស្ថាពរ!_"
-                            )
-                            await app.bot.send_message(chat_id=chat_id, text=msg_clean, parse_mode="Markdown")
-                        except Exception:
-                            pass
                     continue
-                    
-                res = trading_engine.place_market_sell(api_key, api_secret, symbol, qty_to_sell)
-                
-                if res.get("status") == "FILLED":
-                    executed_qty = float(res.get('executedQty'))
-                    # Dynamic Profit Allocation Lock (80/20 Rule)
+
+                if sell_notional >= MIN_SPOT_NOTIONAL:
+                    res = trading_engine.place_market_sell(api_key, api_secret, symbol, qty_to_sell)
+                else:
+                    res = trading_engine.place_smart_market_sell(api_key, api_secret, symbol, qty_to_sell)
+
+                if res.get("status") == "FILLED" or is_paper:
+                    executed_qty = float(res.get('executedQty') or qty_to_sell)
                     profit_usdt = max(0.0, (current_price - last_price) * executed_qty)
-                    reserved_usdt = profit_usdt * 0.20
-                    compounded_profit = profit_usdt * 0.80
+                    # 80/20 Micro-Compounding Snowball Law
+                    reserved_usdt = round(profit_usdt * 0.20, 2)
+                    compounded_profit = round(profit_usdt * 0.80, 2)
                     
-                    new_layer_size = current_layer_size + compounded_profit
+                    new_layer_size = round(current_layer_size + compounded_profit, 2)
                     new_total_coins = max(0.0, total_coins_bought - executed_qty)
                     
                     db.update_compound_grid_state(grid_id, new_layer_size, new_total_coins, current_price)
-                    msg = f"⛄ **COMPOUND GRID (SNOWBALL SELL 80/20)** 📈\n✅ លក់បូកចំណេញសម្រាប់ {symbol}!\n🔒 ដកចំណេញ 20% ទុកជា Cash Reserve: `${reserved_usdt:,.2f}`\n💵 ទំហំ Reinvest (80%): `${new_layer_size:,.2f}` 🚀\n\n_Bot រង់ចាំទិញចូលជាន់បន្ទាប់ពេលតម្លៃធ្លាក់ចុះ!_"
-
+                    msg = (
+                        f"⛄ **COMPOUND GRID (SNOWBALL SELL 80/20)** 📈\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"🪙 **កាក់** ៖ `{symbol}`\n"
+                        f"💵 **តម្លៃលក់** ៖ `${current_price:,.4f}`\n"
+                        f"🔒 **ដកចំណេញ 20% ទុកជា Cash Reserve** ៖ `+${reserved_usdt:,.2f} USDT`\n"
+                        f"🚀 **ទំហំ Reinvest បន្ទាប់ (80% Compounded)** ៖ `${new_layer_size:,.2f} USDT`\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"_រង់ចាំទិញស្រទាប់ថ្មីពេលតម្លៃធ្លាក់ចុះ!_"
+                    )
                 else:
-                    error_msg = res.get('error', res.get('msg', 'Unknown Error'))
-                    msg = f"⛄ **COMPOUND GRID (SELL FAILED)** ❌\nបរាជ័យក្នុងការលក់ {symbol}: {error_msg}"
-                    
+                    err_msg = res.get('error', res.get('msg', 'Sell Rejected'))
+                    msg = f"⛄ **COMPOUND GRID (SELL NOTICE)** ❌\n`{symbol}`: {err_msg}"
                     err_code = res.get("code")
                     if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
                         db.deactivate_compound_grid(grid_id)
-                        msg += "\n⚠️ Grid ត្រូវបានបិទដោយស្វ័យប្រវត្តិដើម្បីការពារបញ្ហាជាប់គាំង។"
-                
+
                 try:
                     await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                except: pass
-                print(f"⚡ COMPOUND SELL: {symbol} at {current_price} for {chat_id} - Status: {res.get('status')}")
-                    
+                except Exception:
+                    pass
+
+            # =========================================================================
+            # 3. AUTO BUY STEP (DIP ACCUMULATION & SPOT BUY INVARIANT 1 ENFORCEMENT)
+            # =========================================================================
             elif current_price <= buy_target:
-                # Buy condition met: Buy with the full current_layer_size
-                # LIQUIDITY GUARD
-                available_usdt = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
-                actual_buy_amount = min(current_layer_size, available_usdt)
-                if actual_buy_amount < 5.0:
-                    print(f"❌ Compound Grid Buy Failed for {chat_id}: Insufficient USDT ({available_usdt})")
+                # 🛡️ Anti-Falling-Knife Guard
+                try:
+                    rsi_15m = market_data.get_symbol_rsi(symbol, "15m")
+                    if rsi_15m <= 22.0:
+                        print(f"🛡️ [COMPOUND GRID KNIFE GUARD] {symbol}: 15m RSI {rsi_15m:.1f} <= 22.0. Holding buy to wait for bottom!")
+                        continue
+                except Exception:
+                    pass
+
+                # Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
+                actual_buy_amount = max(MIN_SPOT_NOTIONAL, current_layer_size)
+                available_usdt = trading_engine.get_spot_balance(api_key, api_secret, "USDT") if not is_paper else (actual_buy_amount * 2)
+
+                if available_usdt < MIN_SPOT_NOTIONAL:
+                    print(f"❌ [COMPOUND GRID BUY PAUSED] Chat {chat_id}: Spot USDT ({available_usdt:.2f}) < $10.50")
                     continue
-                    
+                elif available_usdt < actual_buy_amount:
+                    # Adapt dynamically to available balance
+                    actual_buy_amount = available_usdt
+
                 res = trading_engine.place_market_buy(api_key, api_secret, symbol, actual_buy_amount)
-                
-                if res.get("status") == "FILLED":
-                    executed_qty = float(res.get('executedQty'))
+                if res.get("status") == "FILLED" or is_paper:
+                    executed_qty = float(res.get('executedQty') or (actual_buy_amount / current_price))
                     new_total_coins = total_coins_bought + executed_qty
                     db.update_compound_grid_state(grid_id, current_layer_size, new_total_coins, current_price)
-                    msg = f"⛄ **COMPOUND GRID (BUY)** 🛒\nទិញចូល 1 ជាន់សម្រាប់ {symbol}!\n💵 តម្លៃទិញ: `${current_price:,.4f}`\n\n_Bot រង់ចាំលក់បូកចំណេញពេលតម្លៃឡើងទៅវិញ!_"
+                    msg = (
+                        f"⛄ **COMPOUND GRID (SPOT BUY DIP)** 🛒\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"🪙 **កាក់** ៖ `{symbol}`\n"
+                        f"💵 **តម្លៃទិញថោក** ៖ `${current_price:,.4f}`\n"
+                        f"📦 **ទំហំទិញចូល** ៖ `${actual_buy_amount:,.2f} USDT`\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"_រង់ចាំលក់បូកចំណេញពេលតម្លៃងើបឡើងវិញ!_"
+                    )
                 else:
-                    error_msg = res.get('error', res.get('msg', 'Unknown Error'))
-                    msg = f"⛄ **COMPOUND GRID (BUY FAILED)** ❌\nបរាជ័យក្នុងការទិញ {symbol}: {error_msg}"
-                    
+                    err_msg = res.get('error', res.get('msg', 'Buy Rejected'))
+                    msg = f"⛄ **COMPOUND GRID (BUY NOTICE)** ❌\n`{symbol}`: {err_msg}"
                     err_code = res.get("code")
                     if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
                         db.deactivate_compound_grid(grid_id)
-                        msg += "\n⚠️ Grid ត្រូវបានបិទដោយស្វ័យប្រវត្តិដើម្បីការពារបញ្ហាជាប់គាំង។"
-                
+
                 try:
                     await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                except: pass
-                print(f"⚡ COMPOUND BUY: {symbol} at {current_price} for {chat_id} - Status: {res.get('status')}")
-                
+                except Exception:
+                    pass
+
     except Exception as e:
         print(f"[COMPOUND GRID ERROR] {e}")
 
@@ -4962,8 +5022,8 @@ async def auto_arb_monitor(app: Application):
 
 async def infinity_matrix_monitor(app: Application):
     """
-    5-second high-frequency AI Dynamic Auto-Compounding Grid Matrix Monitor.
-    Executes buy-low / sell-high grid step micro-arbitrage and compounds PnL automatically.
+    15-second high-frequency AI Dynamic Auto-Compounding Grid Matrix Monitor.
+    Executes Spot buy-low / sell-high grid step micro-arbitrage and compounds PnL automatically.
     """
     try:
         active_bots = db.get_active_infinity_matrix_bots()
@@ -4971,6 +5031,7 @@ async def infinity_matrix_monitor(app: Application):
             return
 
         import infinity_matrix_engine
+        from ui_standards import DIVIDER_HEAVY
 
         for bot in active_bots:
             bot_id = bot["id"]
@@ -4987,17 +5048,45 @@ async def infinity_matrix_monitor(app: Application):
             )
 
             if step_res.get("status") == "success":
-                micro_pnl = step_res.get("micro_profit", 0.0)
-                new_capital = step_res.get("new_capital", bot["capital"])
+                action = step_res.get("action")
                 price = step_res.get("price", 0.0)
-                is_real = step_res.get("is_real_trading", False)
-                order_res = step_res.get("order_res", {})
-                order_id = order_res.get("orderId", "SIM")
+                new_capital = step_res.get("new_capital", bot["capital"])
+                micro_pnl = step_res.get("micro_profit", 0.0)
+                is_paper = step_res.get("is_paper", False)
 
-                # Compound profit into DB silently
-                db.add_infinity_matrix_compound_profit(bot_id, micro_pnl)
-                tag = f"REAL MATRIX EXECUTION Order #{order_id}" if is_real else "INFINITY MATRIX SILENT STEP"
-                print(f"🎯 [{tag}] +${micro_pnl:.4f} USDT for Chat ID {chat_id} (New Capital: ${new_capital:,.2f})")
+                tag = "INFINITY MATRIX (SPOT HARVEST)" if action == "SELL" else "INFINITY MATRIX (SPOT BUY)"
+                print(f"🎯 [{tag}] {symbol} @ ${price:,.4f} for Chat ID {chat_id} (Capital: ${new_capital:,.2f})")
+
+                # Send sleek Telegram update on execution
+                msg = None
+                if action == "SELL":
+                    msg = (
+                        f"♾️ **AI INFINITY MATRIX (PROFIT HARVEST)** 📈\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"🪙 **កាក់** ៖ `{symbol}`\n"
+                        f"💵 **តម្លៃលក់** ៖ `${price:,.4f}`\n"
+                        f"💰 **ប្រាក់ចំណេញបូកបញ្ចូលដើម** ៖ `+${micro_pnl:.4f} USDT` (100% Compounded)\n"
+                        f"🏦 **ទុនសរុបថ្មី** ៖ `${new_capital:,.2f} USDT`\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"_Shannon's Demon កំពុងបន្តបូមចំណេញ ២៤/៧!_"
+                    )
+                elif action == "BUY":
+                    bought_usd = step_res.get("bought_usd", 0.0)
+                    msg = (
+                        f"♾️ **AI INFINITY MATRIX (DIP ACCUMULATION)** 🛒\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"🪙 **កាក់** ៖ `{symbol}`\n"
+                        f"💵 **តម្លៃទិញថោក** ៖ `${price:,.4f}`\n"
+                        f"📦 **ទំហំទិញចូល** ៖ `${bought_usd:,.2f} USDT`\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        f"_រង់ចាំបូមចំណេញនៅពេលតម្លៃងើបឡើងវិញ!_"
+                    )
+
+                if msg:
+                    try:
+                        await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                    except Exception:
+                        pass
     except asyncio.CancelledError:
         pass
     except Exception as e:

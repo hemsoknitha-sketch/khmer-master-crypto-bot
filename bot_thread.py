@@ -14826,6 +14826,17 @@ class TelegramBotThread(BaseThread):
             id='infinity_matrix_monitor'
         )
 
+        # 2b. Exponential Compound Grid Snowball Monitor (Every 15 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.compound_grid_monitor,
+            'interval',
+            seconds=15,
+            max_instances=3,
+            coalesce=True,
+            args=[self.app, self.ai_engine],
+            id='compound_grid_monitor'
+        )
+
         # 3. Gold Guard & Macro Radar Monitor (Every 30 seconds)
         self.scheduler.add_job(
             scheduler_tasks.gold_turbo_monitor,
