@@ -104,7 +104,7 @@ def generate_arbitrage_report(user_lang: str = "khmer", ai_engine=None) -> str:
             f" ⚡ **SIGNAL:** `{signal}`\n\n"
             f"💡 **AI QUANTITATIVE REPORT (របាយការណ៍ស្ថាប័ន):**\n"
             f"{ai_analysis}\n\n"
-            f"⚡ _វាយបញ្ជា `/paxg_arbitrage` ឬ `/scalp PAXGUSDT 100 1.5 <PIN>` ដើម្បីប្រមូលចំណេញ Risk-Free ស្វ័យប្រវត្តិ!_"
+            f"⚡ _វាយបញ្ជា `/paxg_arbitrage` ឬ `/scalp PAXGUSDT 100 1.5 1234` ដើម្បីប្រមូលចំណេញ Risk-Free ស្វ័យប្រវត្តិ!_"
         )
     else:
         report = (
@@ -119,7 +119,7 @@ def generate_arbitrage_report(user_lang: str = "khmer", ai_engine=None) -> str:
             f" ⚡ **SIGNAL:** `{signal}`\n\n"
             f"💡 **AI QUANTITATIVE REPORT:**\n"
             f"{ai_analysis}\n\n"
-            f"⚡ _Use `/paxg_arbitrage` or `/scalp PAXGUSDT 100 1.5 <PIN>` to execute risk-free arbitrage!_"
+            f"⚡ _Use `/paxg_arbitrage` or `/scalp PAXGUSDT 100 1.5 1234` to execute risk-free arbitrage!_"
         )
 
     return report

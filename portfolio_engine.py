@@ -542,9 +542,9 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     if lang == "en":
         header = (
             "👑 **KHMER MASTER CRYPTO | INSTITUTIONAL SUPER SMART PORTFOLIO** 🛡️\n"
-            "══════════════════════════════════════\n"
+            "════════════\n"
             f"💼 **ACCOUNT CLEARANCE:** `ID: {chat_id}` | `{badge_mode}`\n"
-            "══════════════════════════════════════\n\n"
+            "════════════\n\n"
             "💰 **CONSOLIDATED NET CAPITAL OVERVIEW:**\n"
             f"• 💎 **Total Net Portfolio Value:** `${net_worth:,.2f} USD`\n"
             f"• 🎯 **Active Capital at Work:** `${invested:,.2f} USD`\n"
@@ -556,14 +556,14 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             f"• 🟣 **Phantom Vault (Withdraw):** {short_pvault_en}\n"
             f"{evm_line_en}"
             f"• 🌐 **Total On-Chain Net Capital:** `${data['total_onchain_capital']:,.2f} USD`\n"
-            "──────────────────────────────────────\n\n"
+            "────────────\n\n"
         )
     else:
         header = (
             "👑 **KHMER MASTER CRYPTO | របាយការណ៍វិនិយោគរួម SUPER SMART PORTFOLIO** 🛡️\n"
-            "══════════════════════════════════════\n"
+            "════════════\n"
             f"💼 **គណនីវិនិយោគិន ៖** `ID: {chat_id}` | `{badge_mode}`\n"
-            "══════════════════════════════════════\n\n"
+            "════════════\n\n"
             "💰 **ទិដ្ឋភាពរួមដើមទុន និងប្រាក់ចំណេញសរុប ៖**\n"
             f"• 💎 **ទ្រព្យសរុបក្នុងប្រព័ន្ធ (Net Worth) ៖** `${net_worth:,.2f} USD`\n"
             f"• 🎯 **ដើមទុនកំពុងវិនិយោគជាក់ស្តែង ៖** `${invested:,.2f} USD`\n"
@@ -575,7 +575,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             f"• 🟣 **Phantom Vault (ដកប្រាក់) ៖** {short_pvault_km}\n"
             f"{evm_line_km}"
             f"• 🌐 **ទុនជួញដូរ On-Chain សរុប ៖** `${data['total_onchain_capital']:,.2f} USD`\n"
-            "──────────────────────────────────────\n\n"
+            "────────────\n\n"
         )
 
     # =========================================================================
@@ -769,23 +769,23 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     # 3. INTERACTIVE FOOTER
     # =========================================================================
     footer = (
-        "──────────────────────────────────────\n"
+        "────────────\n"
         "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh ឬបញ្ជា Stop/Launch ភ្លាមៗ ៖*"
     ) if lang == "km" else (
-        "──────────────────────────────────────\n"
+        "────────────\n"
         "💡 *Use the interactive buttons below to refresh or manage positions:*"
     )
 
     if include_vitals:
         vitals_block = (
-            "──────────────────────────────────────\n"
+            "────────────\n"
             "🖥️ **ស្ថានភាពម៉ាស៊ីនបម្រើការ (VPS Vitals & Health):**\n"
             f"• ⏳ Uptime ៖ `{data['uptime_str']}`\n"
             f"• 🧠 CPU Load ៖ `{data['cpu_usage']:.1f}%` (Dynamic Core)\n"
             f"• 📊 RAM Usage ៖ `{data['ram_usage_mb']} MB / {data['ram_total_mb']} MB ({data['ram_pct']:.1f}%)`\n"
             f"• 💾 Database Size ៖ `{data['db_size_mb']:.2f} MB` (SQLite WAL High-Speed Mode)\n"
         ) if lang == "km" else (
-            "──────────────────────────────────────\n"
+            "────────────\n"
             "🖥️ **VPS HARDWARE & SYSTEM HEALTH:**\n"
             f"• ⏳ Uptime: `{data['uptime_str']}`\n"
             f"• 🧠 CPU Load: `{data['cpu_usage']:.1f}%` (Multi-Core Dynamic)\n"
@@ -834,9 +834,9 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
     if lang == "en":
         lines = [
             "⚡ **KHMER MASTER CRYPTO | SUPER SMART ON-CHAIN DEX PORTFOLIO** 🚀",
-            "══════════════════════════════════════",
+            "════════════",
             f"💼 **ACCOUNT CLEARANCE:** `ID: {chat_id}` | `{badge_mode}`",
-            "══════════════════════════════════════\n",
+            "════════════\n",
             "💰 **ON-CHAIN CAPITAL & DEX METRICS:**",
             f"• 💎 **Total On-Chain Net Capital:** `${total_onchain:,.2f} USD`",
             f"• 🎯 **Active in DEX Breakout Gems:** `${active_swaps_usd:,.2f} USD` ({len(swaps)} active)",
@@ -853,7 +853,7 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
             lines.append("  *(100% Non-Custodial Zero-Risk destination for automated profit taking)*\n")
         else:
             lines.append("• 🟣 **Phantom Profit Settlement Vault:** `Not Linked`")
-            lines.append("  *(Execute `/smart_swap bind_phantom <address>` to set your profit destination)*\n")
+            lines.append("  *(Execute `/smart_swap bind_phantom 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU` to set your profit destination)*\n")
 
         lines.append("📊 **ACTIVE ON-CHAIN GEM POSITIONS:**")
         if swaps:
@@ -875,16 +875,16 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
             "• 🛡️ **Anti-MEV:** `Jito Private Bundle (Zero Sandwich & Front-run Immune)`",
             "• 🔍 **Honeypot Shield:** `Sub-Second Pre-Trade Security Audit (Freeze/Mint Revoked)`",
             "• 🌾 **Profit Harvester:** `TP1 +40% (100% Capital Lock) + 50% Trailing Moonbag`\n",
-            "──────────────────────────────────────",
+            "────────────",
             "💡 *Use the interactive buttons below to snipe gems, check wallet, or exit market:*"
         ])
         return "\n".join(lines)
     else:
         lines = [
             "⚡ **KHMER MASTER CRYPTO | SUPER SMART ON-CHAIN DEX PORTFOLIO** 🚀",
-            "══════════════════════════════════════",
+            "════════════",
             f"💼 **គណនីវិនិយោគិន ៖** `ID: {chat_id}` | `{badge_mode}`",
-            "══════════════════════════════════════\n",
+            "════════════\n",
             "💰 **ទិដ្ឋភាពទុនជួញដូរ On-Chain (DEX Capital Overview) ៖**",
             f"• 💎 **ទុន On-Chain សរុប ៖** `${total_onchain:,.2f} USD`",
             f"• 🎯 **កំពុងវិនិយោគក្នុង DEX Gems ៖** `${active_swaps_usd:,.2f} USD` ({len(swaps)} កាក់សកម្ម)",
@@ -903,7 +903,7 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
             lines.append("  *(រាល់ពេលដកចំណេញ នឹងរត់ចូល Phantom ផ្ទាល់ខ្លួនភ្លាមៗ សុវត្ថិភាព ១០០%)*\n")
         else:
             lines.append("• 🟣 **Phantom Profit Settlement Vault ៖** `មិនទាន់ភ្ជាប់`")
-            lines.append("  *(វាយ `/smart_swap bind_phantom <address>` ដើម្បីភ្ជាប់កាបូបដកប្រាក់)*\n")
+            lines.append("  *(វាយ `/smart_swap bind_phantom 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU` ដើម្បីភ្ជាប់កាបូបដកប្រាក់)*\n")
 
         lines.append("📊 **ស្ថានភាពកាក់ Gem On-Chain កំពុងជួញដូរ (Active Positions) ៖**")
         if swaps:
@@ -925,7 +925,7 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
             "• 🛡️ **Anti-MEV ៖** `Jito Private Bundle (ការពារការលួច Front-run & Sandwich)`",
             "• 🔍 **Honeypot Shield ៖** `Sub-Second Security Audit (Freeze & Mint Revoked)`",
             "• 🌾 **Profit Harvester ៖** `TP1 +40% (Lock ដើមទុន ១០០%) + Moonbag 50% Trailing`\n",
-            "──────────────────────────────────────",
+            "────────────",
             "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បីបញ្ជា Auto Gem Sniper, ពិនិត្យកាបូប ឬ Stop Market ភ្លាមៗ ៖*"
         ])
         return "\n".join(lines)

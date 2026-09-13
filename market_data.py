@@ -317,7 +317,7 @@ def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
                     change = float(coin['priceChangePercent'])
                     price = float(coin['lastPrice'])
                     volume = float(coin['quoteVolume'])
-                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (Price: `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ Launch Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (Price: `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ Launch Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 1234` ``\n"
                     
                 summary += "\n🔻 **TOP 5 VOLATILE LOSERS (DIP REBOUND):**\n"
                 for i, coin in enumerate(top_losers):
@@ -326,7 +326,7 @@ def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
                     change = float(coin['priceChangePercent'])
                     price = float(coin['lastPrice'])
                     volume = float(coin['quoteVolume'])
-                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (Price: `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ Launch Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (Price: `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ Launch Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 1234` ``\n"
             elif user_lang == 'zh':
                 summary = "🔥 **24小时涨幅榜 TOP 5 (动量拉盘):**\n"
                 for i, coin in enumerate(top_gainers):
@@ -335,7 +335,7 @@ def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
                     change = float(coin['priceChangePercent'])
                     price = float(coin['lastPrice'])
                     volume = float(coin['quoteVolume'])
-                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (价格: `${price:,.4f}` | 成交额: `${volume/1e6:.2f}M`)\n   ⚡ 一键启动 ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (价格: `${price:,.4f}` | 成交额: `${volume/1e6:.2f}M`)\n   ⚡ 一键启动 ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 1234` ``\n"
                     
                 summary += "\n🔻 **24小时跌幅榜 TOP 5 (抄底反弹):**\n"
                 for i, coin in enumerate(top_losers):
@@ -344,7 +344,7 @@ def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
                     change = float(coin['priceChangePercent'])
                     price = float(coin['lastPrice'])
                     volume = float(coin['quoteVolume'])
-                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (价格: `${price:,.4f}` | 成交额: `${volume/1e6:.2f}M`)\n   ⚡ 一键启动 ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (价格: `${price:,.4f}` | 成交额: `${volume/1e6:.2f}M`)\n   ⚡ 一键启动 ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 1234` ``\n"
             else:
                 summary = "🔥 **បញ្ជីកាក់ឡើងថ្លៃខ្លាំងបំផុត (TOP 5 GAINERS - MOMENTUM PUMP):**\n"
                 for i, coin in enumerate(top_gainers):
@@ -353,7 +353,7 @@ def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
                     change = float(coin['priceChangePercent'])
                     price = float(coin['lastPrice'])
                     volume = float(coin['quoteVolume'])
-                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (តម្លៃ ៖ `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ 1-Tap Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    summary += f"{i+1}. 🟢 **{full_sym}** ៖ +{change:.2f}% (តម្លៃ ៖ `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ 1-Tap Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 1234` ``\n"
                     
                 summary += "\n🔻 **បញ្ជីកាក់ធ្លាក់ចុះខ្លាំងបំផុត (TOP 5 LOSERS - DIP REBOUND):**\n"
                 for i, coin in enumerate(top_losers):
@@ -362,7 +362,7 @@ def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
                     change = float(coin['priceChangePercent'])
                     price = float(coin['lastPrice'])
                     volume = float(coin['quoteVolume'])
-                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (តម្លៃ ៖ `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ 1-Tap Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 <PIN>` ``\n"
+                    summary += f"{i+1}. 🔴 **{full_sym}** ៖ {change:.2f}% (តម្លៃ ៖ `${price:,.4f}` | Vol: `${volume/1e6:.2f}M`)\n   ⚡ 1-Tap Command ៖ `` `/turbo_hedge {symbol} 20 10 BUY 2.5 1234` ``\n"
                 
             return summary
 

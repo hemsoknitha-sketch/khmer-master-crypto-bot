@@ -323,7 +323,7 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
         if is_restricted_loc or "restricted location" in last_error_msg.lower():
             restricted_card = (
                 "❌ **បរាជ័យ ៖ Binance API មិនអនុញ្ញាតតភ្ជាប់ពី IP អាមេរិក (US Restricted IP Location)**\n"
-                "═══════════════════════════════\n\n"
+                "════════════\n\n"
                 "💡 **មូលហេតុបច្ចេកទេស (Root Cause) ៖**\n"
                 "ម៉ាស៊ីន VPS របស់អ្នកស្ថិតក្នុងតំបន់សហរដ្ឋអាមេរិក (US Region) ដែល Binance.com ច្បាប់កំណត់មិនអនុញ្ញាតឲ្យតភ្ជាប់ API ពី US IP Address ឡើយ។\n\n"
                 "🚀 **វិធីសាស្ត្រដោះស្រាយងាយៗ ៣ យ៉ាង (3 Instant Solutions) ៖**\n\n"
@@ -331,7 +331,7 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
                 "• បង្កើត/ប្តូរម៉ាស៊ីន GCP VPS របស់អ្នកទៅតំបន់អាស៊ី ៖ `asia-southeast1` (Singapore) ឬ `asia-east1` (Taiwan) ដើមី្បតភ្ជាប់ Binance API លឿនបំផុត (<5ms) និងគ្មានការបិទបាំង IP ឡើយ!\n\n"
                 "2️⃣ **ជម្រើសទី ២ ៖ ប្រើប្រាស់ Bybit API ជំនួស**\n"
                 "• ប្រព័ន្ធគាំទ្រ Bybit API ដែលគ្មានការកម្រិត IP អាមេរិក ដោយវាយបញ្ជា ៖\n"
-                "`` `/add_bybit_api <BYBIT_KEY> <BYBIT_SECRET> <PIN>` ``\n\n"
+                "`` `/add_bybit_api your_bybit_key your_bybit_secret 1234` ``\n\n"
                 "3️⃣ **ជម្រើសទី ៣ ៖ ភ្ជាប់ VPN / Proxy លើ VPS**\n"
                 "• ដំឡើង Proxy លើ VPS និងកំណត់ `HTTP_PROXY` ក្នុង `.env`។"
             )

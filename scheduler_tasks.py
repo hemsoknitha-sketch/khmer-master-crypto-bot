@@ -2572,7 +2572,7 @@ async def daily_database_backup_job(app: Application):
 
             caption_text = (
                 "🛡️ **[AUTO-BACKUP]** ទិន្នន័យ Database ចុងក្រោយបំផុតត្រូវបានរក្សាទុកដោយសុវត្ថិភាព!\n"
-                "══════════════════════════\n"
+                "════════════\n"
                 "⏰ **កាលវិភាគ** ៖ ម៉ោង ០២:០០ ព្រឹក (ម៉ោងនៅភ្នំពេញ ប្រទេសកម្ពុជា)\n"
                 "💾 **របាយការណ៍** ៖ រក្សាទុក និងផ្ញើជូន Admin តែម្តងគត់ក្នុងរយៈពេល ២៤ ម៉ោង\n"
                 "🔒 **សុវត្ថិភាព** ៖ VIP Users & All Positions 100% Preserved"
@@ -2846,7 +2846,7 @@ async def retrain_super_brain_task(app, ai_engine):
                 
             admin_msg = (
                 f"🧠 **APEX SUPER BRAIN RETRAINING COMPLETED** 🧠\n"
-                f"───────────────────────────────\n"
+                f"────────────\n"
                 f"✅ **ម៉ូដែល AI Machine Learning ត្រូវបាន Train បន្ថែមជោគជ័យ!**\n\n"
                 f"📊 **MODEL ACCURACY & PERFORMANCE METRICS:**\n"
                 f"• Target Features: `{feature_count} Indicators (RSI, ATR, Trend, OrderBook)`\n"
@@ -2919,7 +2919,7 @@ async def ai_scalper_monitor(app, ai_engine):
                                 ai_scalper_monitor.highest_prices.pop(scalp_id, None)
                                 heal_msg = (
                                     f"🛡️ **AI SCALPER AUTO-HEALING & BALANCE SYNC** 🛡️\n"
-                                    f"───────────────────────────────\n"
+                                    f"────────────\n"
                                     f"🪙 Ticker: `{symbol}`\n"
                                     f"⚠️ កាក់ `{base_asset}` មិនមានក្នុង Spot Wallet ឡើយ (អាចត្រូវបានលក់ ឬផ្លាស់ប្តូររួចរាល់លើ Binance)។\n\n"
                                     f"🔄 Bot បានធ្វើបច្ចុប្បន្នភាព State ទៅជា `WAITING_TO_BUY` ដោយស្វ័យប្រវត្តិ ដើម្បជៀសវាង Error Loop និងរង់ចាំទិញជុំថ្មី!\n"
@@ -3021,7 +3021,7 @@ async def infinity_grid_monitor(app: Application, ai_engine):
                         try:
                             msg_clean = (
                                 f"🕸️ **INFINITY GRID AUTO-CLEANUP** 🛡️\n"
-                                f"───────────────────────────────\n\n"
+                                f"────────────\n\n"
                                 f"🪙 កាក់ ៖ `{symbol}`\n"
                                 f"⚠️ ស្ថានភាព ៖ `សមតុល្យកាក់ {base_asset} មិនគ្រប់គ្រាន់ក្នុង Spot Wallet`\n"
                                 f"✅ សកម្មភាព ៖ `ប្រព័ន្ធបានបិទ Infinity Grid នេះស្វ័យប្រវត្តិ` 100%\n\n"
@@ -3310,13 +3310,13 @@ async def opportunity_sniper_monitor(app: Application, ai_engine):
         
         msg = (
             f"🚀 **APEX OPPORTUNITY SNIPER BRIEFING** 🛡️\n"
-            f"───────────────────────────────\n\n"
+            f"────────────\n\n"
             f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
             f"📈 ការប្រែប្រួល Volatility ៖ `{coin['priceChangePercent']:.2f}%`\n"
             f"💵 តម្លៃបច្ចុប្បន្ន ៖ `${coin['lastPrice']:.4f}`\n\n"
             f"💡 **ការវិភាគយុទ្ធសាស្ត្រ AI ៖**\n{explanation}\n\n"
             f"⚡ **1-Tap Copy Command បញ្ជាទិញ VIP ៖**\n"
-            f"`` `/turbo_hedge {symbol.replace('USDT','')} 30 50 BUY 5 <PIN>` ``"
+            f"`` `/turbo_hedge {symbol.replace('USDT','')} 30 50 BUY 5 1234` ``"
         )
         
         # Broadcast to all VIPs using parallel_broadcast
@@ -3380,7 +3380,7 @@ Keep it exciting and professional.
             msg += f"📰 **ប្រធានបទ:** {title}\\n\\n"
             msg += f"🧠 **ការវិភាគគ្រឹះរឹងមាំពី AI (Fundamental Analysis):**\\n"
             msg += f"{analysis}\\n\\n"
-            msg += f"⚡ **ត្រៀមខ្លួន:** អ្នកអាចប្រើបញ្ជា `/infinity_grid {symbol} 10 1.0 100 <PIN>` ឬ `/scalp {symbol} 100 1.5 <PIN>` ភ្លាមៗនៅពេលទីផ្សារបើក!"
+            msg += f"⚡ **ត្រៀមខ្លួន:** អ្នកអាចប្រើបញ្ជា `/infinity_grid {symbol} 10 1.0 100 1234` ឬ `/scalp {symbol} 100 1.5 1234` ភ្លាមៗនៅពេលទីផ្សារបើក!"
             
             await parallel_broadcast(app, vip_users, msg)
                     
@@ -4522,7 +4522,7 @@ async def pre_pump_daily_train_job(app: Application):
         # Always log & dispatch alert to Super Admin Console (ID: 859271875)
         admin_alert_msg = (
             "🧠 **APEX TURBO AGI | 2:00 AM UTC+7 PRE-PUMP DAILY TRAIN COMPLETED** 🚀\n"
-            "══════════════════════════\n\n"
+            "════════════\n\n"
             "⚡ **AI Deep-Learning Training Summary:**\n"
             "• **Schedule**: `2:00 AM (UTC+7 / Phnom Penh Time)` ⏰\n"
             "• **Coins Analyzed**: `300+ Binance Spot & Futures Pairs` 📊\n"
@@ -4546,7 +4546,7 @@ async def pre_pump_daily_train_job(app: Application):
                 if user_lang == 'km':
                     user_msg = (
                         "🚀 **TURBO AGI PRE-PUMP ENGINE | ការបណ្តុះបណ្តាលប្រចាំថ្ងៃ 2:00 AM (UTC+7)** 🧠\n"
-                        "══════════════════════════\n\n"
+                        "════════════\n\n"
                         "✅ **ប្រព័ន្ធ AI Pre-Pump Sniper បានបណ្តុះបណ្តាល និងអាប់គ្រេដ Algorithm ជោគជ័យ ៖**\n"
                         "• **ទិន្នន័យបានស្កេន** ៖ `៣០០+ កាក់ Spot/Futures លើ Binance` 📊\n"
                         "• **ល្បឿនបញ្ជូន Signal** ៖ `Sub-50ms (កម្រិត Millisecond)` ⚡\n"
@@ -4556,7 +4556,7 @@ async def pre_pump_daily_train_job(app: Application):
                 else:
                     user_msg = (
                         "🚀 **TURBO AGI PRE-PUMP ENGINE | 2:00 AM (UTC+7) DAILY TRAIN COMPLETED** 🧠\n"
-                        "══════════════════════════\n\n"
+                        "════════════\n\n"
                         "✅ **Pre-Pump Sniper AI Engine successfully completed daily training cycle:**\n"
                         "• **Coins Analyzed**: `300+ Binance Spot & Futures Pairs` 📊\n"
                         "• **Signal Execution**: `Sub-50ms Millisecond Latency` ⚡\n"
@@ -5888,10 +5888,10 @@ async def biweekly_apex_brain_train_job(app: Application, ai_engine=None):
 
         report_msg = (
             "🧠 **APEX SUPER BRAIN AI MODELS | 16-MODEL RETRAINING COMPLETED** 🚀\n"
-            "══════════════════════════\n"
+            "════════════\n"
             f"⏰ **Timestamp ៖** `{now_str} (UTC+7)`\n"
             "🛡️ **Admin Target ៖** `Super Admin Console (ID: 859271875)`\n"
-            "══════════════════════════\n\n"
+            "════════════\n\n"
             "📊 **16-MODEL RETRAINING MATRIX (100% VERIFIED) ៖**\n"
             "1. `brain_price.pkl` (XGBoost Regressor) ៖ `🟢 TRAINED`\n"
             "2. `brain_trend.pkl` (Random Forest Classifier) ៖ `🟢 TRAINED`\n"
@@ -5965,10 +5965,10 @@ async def vip_8hour_executive_report_job(app: Application):
 
                 report_text = (
                     f"🤖 **APEX SUPER AGI v13.00 | 8-HOUR VIP EXECUTIVE REPORT** 🤖\n"
-                    f"══════════════════════════\n"
+                    f"════════════\n"
                     f"⏰ **កាលបរិច្ឆេទ ៖** `{now_str} (UTC+7)`\n"
                     f"🛡️ **VIP CLEARANCE ៖** `VERIFIED` | 🚀 `REAL LIVE TRADING`\n"
-                    f"══════════════════════════\n\n"
+                    f"════════════\n\n"
                 )
 
                 if not user_bots:
@@ -5999,7 +5999,7 @@ async def vip_8hour_executive_report_job(app: Application):
                         )
 
                 report_text += (
-                    f"══════════════════════════\n"
+                    f"════════════\n"
                     f"💰 **សមតុល្យទុនចុងក្រោយ (LIVE EQUITY SUMMARY)**\n"
                     f"💵 **Wallet Balance ៖** `${wallet_bal:,.2f} USDT`\n"
                     f"🏦 **Free Margin ៖** `${avail_bal:,.2f} USDT`\n"
@@ -6028,7 +6028,7 @@ async def vip_8hour_executive_report_job(app: Application):
                     report_text += f"💰 **សរុបផលចំណេញកើបបាន ៨ ម៉ោង ៖** `+${tot_8h_pnl:,.2f} USDT`\n"
 
                 report_text += (
-                    f"══════════════════════════\n"
+                    f"════════════\n"
                     f"💡 _របាយការណ៍សរុបស្វ័យប្រវត្តិរៀងរាល់ ៨ ម៉ោងម្តង ជូន VIP Users!_"
                 )
 

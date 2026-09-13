@@ -497,7 +497,7 @@ def withdraw_user_sol(
             return {
                 "status": "error",
                 "reason": "NO_PHANTOM_LINKED",
-                "msg": "លោកអ្នកមិនទាន់បានភ្ជាប់ Phantom Wallet ផ្ទាល់ខ្លួននៅឡើយទេ។ សូមចុច '🔗 ភ្ជាប់ Phantom Wallet' ឬវាយ `/smart_swap bind_phantom <address>` ជាមុនសិន។"
+                "msg": "លោកអ្នកមិនទាន់បានភ្ជាប់ Phantom Wallet ផ្ទាល់ខ្លួននៅឡើយទេ។ សូមចុច '🔗 ភ្ជាប់ Phantom Wallet' ឬវាយ `/smart_swap bind_phantom 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU` ជាមុនសិន។"
             }
         dest_addr = phantom_vault
 

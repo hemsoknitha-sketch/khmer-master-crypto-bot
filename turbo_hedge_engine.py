@@ -1752,7 +1752,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             try:
                 msg_breaker = (
                     f"🚨 **APEX TURBO HEDGE HARD CIRCUIT BREAKER ACTIVATED!** 🛡️\n"
-                    f"───────────────────────────────\n\n"
+                    f"────────────\n\n"
                     f"🪙 កាក់ ៖ `{symbol}`\n"
                     f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker -25.0% Max Limit)\n"
                     f"💵 PnL ៖ `-${abs(real_pnl_usdt):.2f} USDT`\n"
@@ -1790,7 +1790,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                     try:
                         msg_tp1 = (
                             f"⚡ **APEX MICRO-SCALP TP1 HARVESTED (50%)!** 💰\n"
-                            f"───────────────────────────────\n\n"
+                            f"────────────\n\n"
                             f"🪙 កាក់គោលដៅ ៖ `{symbol}`\n"
                             f"💵 ផលចំណេញកើបបាន ៖ `+${partial_pnl:,.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
                             f"📊 ទំហំលក់ ៖ `50% Qty (កើបលុយសុទ្ធដាក់ហោប៉ៅភ្លាម)`\n"
@@ -1906,7 +1906,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 if is_spot:
                     msg_stagnant = (
                         f"⌛ **APEX SPOT STAGNANT CAPITAL RELEASED!** 🛡️\n"
-                        f"───────────────────────────────\n\n"
+                        f"────────────\n\n"
                         f"🪙 កាក់ ៖ `{symbol}` (Spot Mode)\n"
                         f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (Net PnL: `${net_pnl_usdt:+.2f} USDT`)\n"
                         f"💵 ដើមទុនរំដោះបាន ៖ `${bot_amt:.2f} USDT` (ត្រឡប់មក Spot Wallet)\n"
@@ -1916,7 +1916,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 else:
                     msg_stagnant = (
                         f"⌛ **APEX TURBO HEDGE STAGNANT POSITION PRUNED!** 🛡️\n"
-                        f"───────────────────────────────\n\n"
+                        f"────────────\n\n"
                         f"🪙 កាក់ ៖ `{symbol}`\n"
                         f"⏱️ រយៈពេលត្រាំ ៖ `> {holding_mins} នាទី` (PnL: `${real_pnl_usdt:+.2f} USDT`)\n"
                         f"🔒 Cooldown Status ៖ `៤ ម៉ោង (4-Hour Anti-Churn Blacklist)`\n"
@@ -1954,7 +1954,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             try:
                 msg_sl = (
                     f"🛡️ **APEX ANTI-WHIPSAW CLEAN STOP ACTIVATED!** 🛑\n"
-                    f"───────────────────────────────\n\n"
+                    f"────────────\n\n"
                     f"🪙 កាក់ ៖ `{symbol}`\n"
                     f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (Stop Loss Floor -10.0%)\n"
                     f"💵 PnL ខាតជាក់ស្តែង ៖ `-${abs(net_pnl_usdt):.2f} USDT`\n"
@@ -2173,7 +2173,7 @@ async def monitor_turbo_hedge_bots(app):
                         try:
                             msg_recovery = (
                                 f"🚨 **APEX AGI VIP PROFIT RECOVERY PROTOCOL ACTIVATED!** 🛡️⚡\n"
-                                f"───────────────────────────────\n\n"
+                                f"────────────\n\n"
                                 f"📡 **Equity Drawdown Sensor ៖** `{drawdown_pct:.1f}%` (Peak: `${peak_wallet:.2f}` ➔ Current: `${wallet_bal:.2f}`)\n"
                                 f"🎯 **AGI Action ៖** `Switched to Precision Confluence Gate (>=85.0% Conf)`\n"
                                 f"🐋 **Whale Radar & Funding Fee ៖** `x1000 Supercharged Precision Priority`\n"
@@ -2331,7 +2331,7 @@ async def monitor_turbo_hedge_bots(app):
                         try:
                             msg_expand = (
                                 f"🚀 **SUPER SMART TURBO HEDGE PERPETUAL AUTO-ENTRY!** 🛡️\n"
-                                f"───────────────────────────────\n\n"
+                                f"────────────\n\n"
                                 f"🪙 កាក់បន្ថែមអូតូ ៖ `{c_cand}` ({target_side})\n"
                                 f"💵 Live Balance ស្កេនឃើញ ៖ `${avail_bal:,.2f} USDT`\n"
                                 f"💰 ទុនវិនិយោគ / កាក់ ៖ `${actual_trade_amount:,.2f} USDT` (`{unit_leverage}x Lev`)\n"
