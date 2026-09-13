@@ -449,14 +449,22 @@ async def monitor_macro_auto_trades(app):
     except Exception as e:
         print(f"⚠️ [MACRO AUTO-TRADE MONITOR ERROR]: {e}")
 
+_last_macro_heartbeat = {}
+_last_empty_heartbeat = 0.0
+
 async def run_macro_auto_trade_scanner_cycle(app):
     """
     Periodic 30-Second Scanner Cycle for Macro Opportunities.
     Evaluates candidate symbols for all users with macro auto-trade enabled.
     """
+    global _last_empty_heartbeat
     try:
         macro_users = db.get_macro_auto_trade_users()
+        now_time = time.time()
         if not macro_users:
+            if now_time - _last_empty_heartbeat >= 180.0:
+                _last_empty_heartbeat = now_time
+                print("🌊 [MACRO AUTO-TRADE] Radar Active (0 users currently enrolled in /auto_trade ON. Top HFT /turbo_hedge is handling active positions).")
             return
 
         for chat_id in macro_users:
@@ -465,6 +473,11 @@ async def run_macro_auto_trade_scanner_cycle(app):
                 continue
 
             user_trades = db.get_user_macro_trades(chat_id) or []
+            last_hb = _last_macro_heartbeat.get(chat_id, 0.0)
+            if now_time - last_hb >= 120.0:
+                _last_macro_heartbeat[chat_id] = now_time
+                print(f"🌊 [MACRO AUTO-TRADE RADAR] User {chat_id}: Active ({len(user_trades)}/2 Macro Swings) | 15 Coins Watchdog Active | Status: Standing by (Market range-bound / zero oversold shorting).")
+
             if len(user_trades) >= 2:
                 continue
 
@@ -473,6 +486,8 @@ async def run_macro_auto_trade_scanner_cycle(app):
                 waterfall_res = await asyncio.to_thread(scan_macro_waterfall_opportunity, sym)
                 if waterfall_res.get("signal"):
                     safe, reason = is_symbol_safe_for_macro_trade(chat_id, sym, "SHORT")
+                    if not safe:
+                        print(f"🛡️ [MACRO AUTO-TRADE SKIPPED] {sym}: {reason}")
                     if safe:
                         trade_amt = cfg.get("amount", 30.0)
                         lev = cfg.get("leverage", 3)
@@ -503,6 +518,8 @@ async def run_macro_auto_trade_scanner_cycle(app):
                 breakout_res = await asyncio.to_thread(scan_macro_breakout_opportunity, sym)
                 if breakout_res.get("signal"):
                     safe, reason = is_symbol_safe_for_macro_trade(chat_id, sym, "BUY")
+                    if not safe:
+                        print(f"🛡️ [MACRO AUTO-TRADE SKIPPED] {sym}: {reason}")
                     if safe:
                         trade_amt = cfg.get("amount", 30.0)
                         lev = cfg.get("leverage", 3)
