@@ -4701,20 +4701,32 @@ class TelegramBotThread(BaseThread):
                 context.args = [sym]
                 await scalp_command(update, context)
             elif data.startswith("btn_auto_trade_"):
+                ans_txt = None
                 if data in ["btn_auto_trade_on", "btn_auto_trade_on_prompt"]:
                     context.args = ["ON"]
+                    ans_txt = "✅ Auto Trade: បានបើកដំណើរការ (ACTIVE)!"
                 elif data in ["btn_auto_trade_off", "btn_auto_trade_off_prompt"]:
                     context.args = ["OFF"]
+                    ans_txt = "🛑 Auto Trade: ត្រូវបានបិទ (INACTIVE)!"
                 elif data.startswith("btn_auto_trade_amt_"):
                     amt_str = data.replace("btn_auto_trade_amt_", "")
                     context.args = ["SET", amt_str]
+                    ans_txt = f"💰 បានកំណត់ទុន៖ ${amt_str} USDT!"
                 elif data.startswith("btn_auto_trade_lev_"):
                     lev_str = data.replace("btn_auto_trade_lev_", "")
                     context.args = ["LEVERAGE", lev_str]
+                    ans_txt = f"🛡️ បានកំណត់ Margin Buffer៖ {lev_str}x ISOLATED!"
                 elif data == "btn_auto_trade_trades":
                     context.args = ["STATUS"]
                 else:
                     context.args = []
+                try:
+                    if ans_txt:
+                        await update.callback_query.answer(ans_txt)
+                    else:
+                        await update.callback_query.answer()
+                except Exception:
+                    pass
                 await auto_trade_command(update, context)
             elif data == "btn_symbiotic_toggle":
                 curr_sym = db.is_symbiotic_harvester_enabled(chat_id)
