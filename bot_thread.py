@@ -11812,6 +11812,71 @@ class TelegramBotThread(BaseThread):
                 self.log_signal.emit(f"⛄ Super Smart Compound Grid Activated for {chat_id}: {symbol}")
                 return
 
+            # 4-arg format: /compound_grid <COIN> <INVEST_AMOUNT> <STEP_PCT> <PIN>
+            if len(args) == 4:
+                try:
+                    amt_to_invest = float(args[1])
+                    step_pct = float(args[2])
+                    pin = str(args[3]).strip()
+                except ValueError:
+                    await (update.effective_message or update.message).reply_text("❌ សូមបញ្ចូលចំនួនលុយ ភាគរយ និង PIN ជាលេខឲ្យបានត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                    return
+
+                if step_pct < 0.5:
+                    step_pct = 0.5
+                elif step_pct > 25.0:
+                    step_pct = 25.0
+
+                stored_pin = db.get_user_pin(chat_id)
+                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                    return
+
+                import requests
+                try:
+                    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+                    res = await asyncio.to_thread(requests.get, url, timeout=5)
+                    entry_price = float(res.json()['price'])
+                except Exception:
+                    await (update.effective_message or update.message).reply_text(f"❌ បរាជ័យក្នុងការទាញយកតម្លៃសម្រាប់ {symbol}")
+                    return
+
+                target_capital = amt_to_invest * 3.0  # AI default 3X target
+
+                trade_status = "⚠️ មិនមាន API សម្រាប់ធ្វើការទិញទេ (Demo Mode)"
+                keys = db.get_user_api(chat_id)
+                executed_qty = 0.0
+                if keys:
+                    import trading_engine
+                    res_buy = await asyncio.to_thread(trading_engine.place_market_buy, keys[0], keys[1], symbol, amt_to_invest)
+                    if res_buy.get('status') == 'FILLED':
+                        executed_qty = float(res_buy.get('executedQty', amt_to_invest / entry_price))
+                        trade_status = f"✅ **អនុម័តដោយ Binance:** បានទិញ {executed_qty:.4f} {symbol} រួចរាល់!"
+                    else:
+                        err_msg = res_buy.get('error', res_buy.get('msg', 'Unknown Error'))
+                        await (update.effective_message or update.message).reply_text(f"❌ បរាជ័យក្នុងការទិញ {symbol}: {err_msg}")
+                        return
+                else:
+                    executed_qty = amt_to_invest / entry_price
+
+                db.add_compound_grid(chat_id, symbol, amt_to_invest, step_pct, target_capital, executed_qty, entry_price)
+
+                msg = (
+                    "✅ **AI Compound Grid (Custom Step) ត្រូវបានបើកដំណើរការ!** ⛄\n\n"
+                    f"🪙 **កាក់** ៖ `{symbol}`\n"
+                    f"💵 **លុយវិនិយោគ** ៖ `${amt_to_invest:,.2f} USDT`\n"
+                    f"🎯 **គម្លាតសំណាញ់ (User Custom)** ៖ `{step_pct:.2f}%`\n"
+                    f"💰 **គោលដៅដកដើមសរុប** ៖ `${target_capital:,.2f} USDT (3X Target)`\n\n"
+                    f"{trade_status}\n\n"
+                    "_ប្រព័ន្ធនឹងទិញ Dip និងលក់បូកចំណេញចូលដើមតាមគម្លាតដែលអ្នកបានកំណត់ ២៤/៧!_"
+                )
+                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                self.log_signal.emit(f"⛄ Custom Step Compound Grid Activated for {chat_id}: {symbol} ({step_pct}%)")
+                return
+
             # 5-arg format: /compound_grid <COIN> <STEP_AMOUNT> <STEP_PCT> <TARGET_CAPITAL> <PIN>
             if len(args) == 5:
                 try:
@@ -11873,9 +11938,11 @@ class TelegramBotThread(BaseThread):
             # Invalid argument count usage display
             usage = (
                 "⚠️ **របៀបប្រើប្រាស់ Spot Snowball Compound Grid ៖**\n\n"
+                "👉 **កំណត់ភាគរយតាមចិត្តចង់បាន (Custom Step % & Auto 3X) ៖**\n`` `/compound_grid AVAX 100 3.0 1234` ``\n"
+                "`` `/compound_grid XRP 50 2.5 1234` ``\n\n"
                 "👉 **AI Smart Auto 3X Compound Grid ៖**\n`` `/compound_grid XRP 100 1234` ``\n"
                 "`` `/compound_grid BTC 200 1234` ``\n\n"
-                "👉 **Custom Step Compound Grid ៖**\n`` `/compound_grid XRP 10 1.0 100 1234` ``\n\n"
+                "👉 **Custom ទាំងស្រុង (ទុន១ជាន់, គម្លាត%, គោលដៅទុន) ៖**\n`` `/compound_grid AVAX 15 3.0 100 1234` ``\n\n"
                 "👉 **បិទដំណើរការ Compound Grid ៖**\n`` `/compound_grid OFF 1234` ``"
             )
             await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
