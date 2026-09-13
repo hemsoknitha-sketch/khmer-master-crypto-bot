@@ -3896,6 +3896,7 @@ class TelegramBotThread(BaseThread):
 
             args = context.args if hasattr(context, 'args') else []
             target_symbol = None
+            image_url = None
             if args and len(args) > 0:
                 raw_sym = str(args[0]).upper().strip()
                 if raw_sym and raw_sym not in ['NONE', 'ALL', 'SCAN']:
@@ -10791,6 +10792,7 @@ class TelegramBotThread(BaseThread):
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+            is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
 
             args = context.args
             if not args or len(args) == 0:
@@ -11594,7 +11596,7 @@ class TelegramBotThread(BaseThread):
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
-
+            args = context.args if hasattr(context, 'args') and context.args is not None else []
             if not args or len(args) == 0:
                 active_grids = db.get_active_compound_grids_by_user(chat_id)
                 has_active = len(active_grids) > 0 if isinstance(active_grids, list) else False
@@ -14804,8 +14806,8 @@ class TelegramBotThread(BaseThread):
 
         job_defaults = {
             'coalesce': True,
-            'max_instances': 1,
-            'misfire_grace_time': 15
+            'max_instances': 2,
+            'misfire_grace_time': 90
         }
         self.scheduler = AsyncIOScheduler(event_loop=self.loop, job_defaults=job_defaults)
         
