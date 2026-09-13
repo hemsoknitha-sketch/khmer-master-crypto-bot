@@ -409,16 +409,31 @@ class TelegramBotThread(BaseThread):
             return True
 
         async def send_reply_or_edit(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, **kwargs):
-            if update and update.callback_query and update.callback_query.message:
-                try:
-                    return await update.callback_query.message.edit_text(text, **kwargs)
-                except Exception:
-                    return await update.callback_query.message.reply_text(text, **kwargs)
-            elif update and update.effective_message:
-                return await update.effective_message.reply_text(text, **kwargs)
-            elif update and update.effective_chat:
-                return await context.bot.send_message(chat_id=update.effective_chat.id, text=text, **kwargs)
-            return None
+            async def _send_payload(t: str, **kw):
+                if update and update.callback_query and update.callback_query.message:
+                    try:
+                        return await update.callback_query.message.edit_text(t, **kw)
+                    except Exception:
+                        return await update.callback_query.message.reply_text(t, **kw)
+                elif update and update.effective_message:
+                    return await update.effective_message.reply_text(t, **kw)
+                elif update and update.effective_chat:
+                    return await context.bot.send_message(chat_id=update.effective_chat.id, text=t, **kw)
+                return None
+
+            try:
+                return await _send_payload(text, **kwargs)
+            except Exception as e:
+                # If Telegram fails to parse entities (e.g. Can't parse entities), fallback to plain text cleanly!
+                err_str = str(e).lower()
+                if "parse entities" in err_str or kwargs.get("parse_mode"):
+                    clean_kw = {k: v for k, v in kwargs.items() if k != "parse_mode"}
+                    clean_text = text.replace("*", "").replace("`", "").replace("_", "").replace("~", "")
+                    try:
+                        return await _send_payload(clean_text, **clean_kw)
+                    except Exception:
+                        pass
+                raise e
 
         async def flash_crash_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -12034,7 +12049,7 @@ class TelegramBotThread(BaseThread):
                         f"📊 **EXECUTIVE MACRO CONFIGURATION:**\n"
                         f"• **System Status** ៖ {current_status}\n"
                         f"• **Strategy Architecture** ៖ `Macro Waterfall & Breakout Hunter`\n"
-                        f"• **Margin Safety Buffer** ៖ `ISOLATED ({leverage}x Lev ~33% Safety Room)`\n"
+                        f"• **Margin Safety Buffer** ៖ `ISOLATED ({leverage}x Lev 33% Safety Room)`\n"
                         f"• **Capital / Order** ៖ `${amount:,.2f} USDT`\n"
                         f"• **Target TP Floor** ៖ `+{target_tp:.1f}% Macro Expansion`\n"
                         f"• **Active Macro Swings** ៖ `{len(active_macro_trades)}/3 Positions`\n"
@@ -12046,10 +12061,7 @@ class TelegramBotThread(BaseThread):
                         f"🛡️ _ប្រព័ន្ធចាប់យករលកបាក់ទំនប់ 1H/4H ដោយមិន Short បាត ធានាការពារដើមទុន ១០០%!_\n\n"
                         f"{OFFICIAL_FOOTNOTE}"
                     )
-                    try:
-                        await send_reply_or_edit(update, context, msg, parse_mode="Markdown", reply_markup=keyboard)
-                    except Exception:
-                        await send_reply_or_edit(update, context, msg.replace("*", "").replace("`", "").replace("_", ""), reply_markup=keyboard)
+                    await send_reply_or_edit(update, context, msg, parse_mode="Markdown", reply_markup=keyboard)
                     return
 
                 action = str(args[0]).upper().strip()
@@ -12057,7 +12069,7 @@ class TelegramBotThread(BaseThread):
                     db.set_macro_auto_trade_config(chat_id, False, amount, leverage, target_tp)
                     off_msg = (
                         f"🛑 **SUPER SMART /AUTO_TRADE DEACTIVATED!** 🛑\n{DIVIDER_HEAVY}\n\n"
-                        f"_ម៉ាស៊ីន Macro Waterfall & Breakout ត្រូវបានបិទដោយជោគជ័យ!_\n\n"
+                        f"🛡️ _ម៉ាស៊ីន Macro Waterfall & Breakout ត្រូវបានបិទដោយជោគជ័យ!_\n\n"
                         f"{OFFICIAL_FOOTNOTE}"
                     )
                     await send_reply_or_edit(update, context, off_msg, parse_mode="Markdown")
@@ -12077,10 +12089,10 @@ class TelegramBotThread(BaseThread):
                         f"✅ **SUPER SMART /AUTO_TRADE ACTIVATED!** 🌊\n"
                         f"{DIVIDER_DOUBLE}\n\n"
                         f"💵 **ទុនវិនិយោគ / Order** ៖ `${trade_amt:,.2f} USDT`\n"
-                        f"🛡️ **Margin Mode** ៖ `{leverage}x ISOLATED (~33% Safety Room)`\n"
+                        f"🛡️ **Margin Mode** ៖ `{leverage}x ISOLATED (33% Safety Room)`\n"
                         f"🎯 **Target TP Floor** ៖ `+{target_tp:.1f}% Macro Expansion`\n"
                         f"🔗 **Symbiotic Link** ៖ `Zero Opposing Conflict with /turbo_hedge Active`\n\n"
-                        f"_Bot នឹងស្កេន និងចាប់យករលកបាក់ទំនប់ 1H/4H 24/7 ដោយស្វ័យប្រវត្តិ!_\n\n"
+                        f"🛡️ _Bot នឹងស្កេន និងចាប់យករលកបាក់ទំនប់ 1H/4H 24/7 ដោយស្វ័យប្រវត្តិ!_\n\n"
                         f"{OFFICIAL_FOOTNOTE}"
                     )
                     await send_reply_or_edit(update, context, on_msg, parse_mode="Markdown")
