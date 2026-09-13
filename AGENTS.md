@@ -44,9 +44,9 @@ When a user asks:
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 22 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 23 PILLARS)
 
-Any modification that breaks any of the following 19 invariants is considered an act of technical sabotage:
+Any modification that breaks any of the following 23 invariants is considered an act of technical sabotage:
 
 ### Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
 - **Location:** `trading_engine.py` (`place_spot_order`, `execute_spot_strategy`)
@@ -194,13 +194,28 @@ Any modification that breaks any of the following 19 invariants is considered an
   2. **Command Alias Parity:** Every multi-word command must register both underscored and continuous aliases (e.g., `auto_trade` and `autotrade`, `smart_trade` and `smarttrade`, `smart_x` and `smartx`, `smart_swap` and `smartswap`).
   3. **Mandatory Tactile Toast Feedback:** Every `InlineKeyboardButton` callback query MUST be immediately acknowledged with `await update.callback_query.answer(...)` containing descriptive toast text (e.g. `✅ Auto Trade: បានបើកដំណើរការ!`, `💰 បានកំណត់ទុន៖ $50 USDT!`) so mobile users receive instant visual and haptic confirmation without interface confusion.
 
+### Invariant 23: Telegram Bot Menu Command Parity & Institutional Menu Hierarchy Standard
+- **Location:** `bot_commands_registry.py`, `bot_thread.py`, `set_bot_commands.py`, `force_clear_and_set_commands.py`
+- **Rule:**
+  1. **Strict Command Parity & Zero Missing Handlers:** Every command registered in the Telegram Bot Menu MUST have an active, operational `CommandHandler` (plus canonical continuous alias) in `bot_thread.py` that executes accurately according to its institutional mathematical specifications. Zero unmapped commands or missing handlers are tolerated.
+  2. **Institutional Menu Hierarchy Standard:** The public Telegram Bot Menu (`set_my_commands`) must be strictly organized in institutional logical tiers:
+     - Header & Navigation: `/start`, `/menu`
+     - Spot Investment Engines (100% Spot, 0% Liquidation Risk): `/compound_grid`, `/infinity_matrix`, `/smart_trade`
+     - Futures & Hedge Engines: `/turbo_hedge`, `/smartx`, `/scalp`, `/auto_trade`
+     - CeDeFi & Arbitrage Engines: `/flash_loan`, `/smart_swap`, `/cross_arb`, `/funding_harvester`, `/web3_wallet`
+     - Market Intelligence & Radars: `/whales`, `/flash_crash`, `/pre_pump`, `/news`, `/analyze`, `/predict`, `/top`
+     - Portfolio, Risk & Account Security: `/balance`, `/portfolio`, `/status`, `/report`, `/paper_trading`, `/alert`, `/stop`, `/set_pin`, `/reset_pin`
+  3. **Bottom Placement for Admin Commands:** Super Admin exclusive commands (`/admin`, `/admin_users`, `/admin_license`, `/admin_broadcast`, `/admin_stats`, `/admin_config`, `/admin_nuke`, `/health`, `/sync_brain`) must strictly be appended at the BOTTOM of the Admin menu, never at the top, ensuring user-facing investment engines remain prominent.
+  4. **Zero Phantom / Obsolete Commands:** Deprecated, replaced, or ghost commands (e.g. `/snipe`) must be 100% expunged from all menu registries so they never linger in Telegram user clients.
+  5. **Permanent Core Inclusion:** All core trading, investment, intelligence, and safety commands must permanently remain in the Bot Menu unless the Admin explicitly requests removal.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 22 Invariants or the Fiduciary Honesty Covenant.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 23 Invariants or the Fiduciary Honesty Covenant.
 4. **Step 4:** Re-run `python audit_system.py` to confirm that all 16 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash

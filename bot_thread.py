@@ -169,41 +169,10 @@ class TelegramBotThread(BaseThread):
             except Exception as e_del:
                 print(f"⚠️ [MENU CLEANUP] Delete notice: {e_del}")
 
-            # Public VIP User Command List (Super Smart & Super Beautiful Menu)
-            public_commands = [
-                BotCommand("start", "🚀 Start Bot & Choose Language"),
-                BotCommand("menu", "🎛️ Interactive Master Control Panel"),
-                BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
-                BotCommand("wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
-                BotCommand("set_web3_wallet", "💼 Configure Web3 Settlement Wallet"),
-                BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
-                BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
-                BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
-                BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
-                BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-                BotCommand("gold_guard", "🏆 PAXG Gold Wealth Protection Switcher"),
-                BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
-                BotCommand("smart_swap", "⚡ Multi-Chain DEX & AI Gem Sniper"),
-                BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
-                BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
-                BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
-                BotCommand("balance", "💰 Check Spot & Futures Balance"),
-                BotCommand("report", "📊 VIP Audit Report (Daily/Monthly/Yearly/Engines)"),
-                BotCommand("status", "📊 View Active Trades & PnL"),
-                BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
-                BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
-                BotCommand("alert", "🔔 Set Price Alert"),
-                BotCommand("stop", "🛑 Stop Trading / Market Close"),
-                BotCommand("reset_pin", "🔒 Super Smart 2FA PIN Reset & Recovery"),
-                BotCommand("set_pin", "🔒 Configure 2FA Security PIN"),
-            ]
-
-            # Full Super Admin Command List
-            admin_commands = [
-                BotCommand("admin", "👑 Open Super Admin Control Panel"),
-                BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
-                BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
-            ] + public_commands
+            # Public VIP & Super Admin Command Lists (Canonical Ground Truth Registry - Invariant 23)
+            import bot_commands_registry
+            public_commands = bot_commands_registry.get_public_bot_commands()
+            admin_commands = bot_commands_registry.get_admin_bot_commands()
 
             try:
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
@@ -4765,7 +4734,7 @@ class TelegramBotThread(BaseThread):
             elif data.startswith("btn_infinity_matrix_"):
                 act = "ON" if "on" in data else "OFF"
                 context.args = [act]
-                await infinity_grid_command(update, context)
+                await infinity_matrix_command(update, context)
             elif data.startswith("btn_pre_pump_"):
                 act = "ON" if "on" in data else "OFF"
                 context.args = [act]
@@ -11626,14 +11595,106 @@ class TelegramBotThread(BaseThread):
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
-            args = context.args
             if not args or len(args) == 0:
-                usage = (
-                    "⚠️ **របៀបប្រើប្រាស់ Compound Grid:**\n\n"
-                    "👉 **AI Smart Auto 3X Compound:**\n`` `/compound_grid <កាក់> <ទំហំលុយវិនិយោគ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 100 1234` ``\n\n"
-                    "👉 **Custom Step Compound:**\n`` `/compound_grid <កាក់> <ទំហំទិញ១ជាន់> <ភាគរយគម្លាត> <ដើមទុនគោលដៅ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 10 1.0 100 1234` ``"
+                active_grids = db.get_active_compound_grids_by_user(chat_id)
+                has_active = len(active_grids) > 0 if isinstance(active_grids, list) else False
+                status_str = f"🟢 ACTIVE ({len(active_grids)} Active Snowball Grids)" if has_active else "🔴 INACTIVE (គ្មាន Grid ដំណើរការទេ)"
+
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("♾️ Launch Infinity Matrix", callback_data="btn_infinity_matrix_on_prompt"),
+                        InlineKeyboardButton("🛡️ Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                    ],
+                    [
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                grid_details = ""
+                if has_active:
+                    lines = []
+                    for g in active_grids[:5]:
+                        g_sym = g[1] if len(g) > 1 else "N/A"
+                        g_size = float(g[2]) if len(g) > 2 else 0.0
+                        g_step = float(g[3]) if len(g) > 3 else 0.0
+                        g_target = float(g[4]) if len(g) > 4 else 0.0
+                        lines.append(f"• `{g_sym}` ៖ ទុន `${g_size:.2f}` | គម្លាត `{g_step}%` | គោលដៅ `${g_target:.2f}`")
+                    grid_details = "\n📊 **Active Grids Running:**\n" + "\n".join(lines) + "\n"
+
+                if user_lang == 'en':
+                    usage = (
+                        "📈 **KHMER MASTER CRYPTO | SPOT SNOWBALL COMPOUND GRID v13.00** 📈\n"
+                        "══════════════════════════\n\n"
+                        "📊 **SPOT COMPOUND ARCHITECTURE (100% Spot, Zero Liquidation):**\n"
+                        f"• **System Status**: {status_str}\n"
+                        "• **Execution Mode**: `Spot Only (1x, No Leverage, 0% Liquidation Risk)`\n"
+                        "• **Compounding Law**: `100% micro-profits automatically reinvested into coin accumulation`\n"
+                        "• **Safety Guards**: `Binance $10.50 MIN_NOTIONAL Floor + LOT_SIZE Precision Filter`\n"
+                        f"{grid_details}\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **AI Smart Auto 3X Compound Grid ($100 USDT) ៖**\n`` `/compound_grid XRP 100 1234` ``\n"
+                        "`` `/compound_grid BTC 200 1234` ``\n"
+                        "`` `/compound_grid SOL 50 1234` ``\n\n"
+                        "👉 **Turn OFF Compound Grid ៖**\n`` `/compound_grid OFF 1234` ``"
+                    )
+                elif user_lang == 'zh':
+                    usage = (
+                        "📈 **KHMER MASTER CRYPTO | 现货滚雪球复利网格 (Compound Grid) v13.00** 📈\n"
+                        "══════════════════════════\n\n"
+                        "📊 **现货复利架构 (100% 现货，零爆仓风险)：**\n"
+                        f"• **系统状态**: {status_str}\n"
+                        "• **执行模式**: `纯现货 (1x 无杠杆，0% 爆仓风险)`\n"
+                        "• **复利机制**: `每笔网格盈利 100% 自动滚雪球再投资，持续积累优质代币`\n"
+                        "• **风控护盾**: `币安 $10.50 MIN_NOTIONAL 门槛 + 精度自适应过滤`\n"
+                        f"{grid_details}\n"
+                        "📋 **一键复制指令：**\n\n"
+                        "👉 **AI 智能 3X 自动复利网格 ($100 USDT) ៖**\n`` `/compound_grid XRP 100 1234` ``\n"
+                        "`` `/compound_grid BTC 200 1234` ``\n"
+                        "`` `/compound_grid SOL 50 1234` ``\n\n"
+                        "👉 **关闭复利网格 ៖**\n`` `/compound_grid OFF 1234` ``"
+                    )
+                else:
+                    usage = (
+                        "📈 **KHMER MASTER CRYPTO | SPOT SNOWBALL COMPOUND GRID v13.00** 📈\n"
+                        "══════════════════════════\n\n"
+                        "📊 **ស្ថាបត្យកម្មវិនិយោគ SPOT COMPOUND (Spot 100% គ្មាន Liquidation) ៖**\n"
+                        f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
+                        "• **ទម្រង់ប្រតិបត្តិ ៖** `Spot Only (1x មិនប្រើ Leverage គ្មានហានិភ័យ Liquidation 0%)`\n"
+                        "• **ក្បួនលុយបង្កើតលុយ ៖** `រាល់ពេលលក់ចំណេញ ប្រព័ន្ធយកលុយចំណេញទាំងអស់ទៅទិញកាក់បន្ថែម (Snowball Law) ២៤/៧`\n"
+                        "• **សុវត្ថិភាពទុន ៖** `Binance $10.50 MIN_NOTIONAL Floor + LOT_SIZE Precision Filter`\n"
+                        f"{grid_details}\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
+                        "👉 **បើក AI Smart Auto 3X Compound Grid (ទុន $100) ៖**\n`` `/compound_grid XRP 100 1234` ``\n"
+                        "`` `/compound_grid BTC 200 1234` ``\n"
+                        "`` `/compound_grid SOL 50 1234` ``\n\n"
+                        "👉 **បិទដំណើរការ Compound Grid ៖**\n`` `/compound_grid OFF 1234` ``"
+                    )
+                await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                return
+
+            action = str(args[0]).upper().strip()
+            if action in ["OFF", "STOP"]:
+                pin = str(args[1]).strip() if len(args) >= 2 else ""
+                stored_pin = db.get_user_pin(chat_id)
+                is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
+                if stored_pin and pin and not security.verify_pin(pin, chat_id, stored_pin) and not is_admin:
+                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
+                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                    return
+                active_grids = db.get_active_compound_grids_by_user(chat_id)
+                count = len(active_grids) if active_grids else 0
+                if active_grids:
+                    for g in active_grids:
+                        db.deactivate_compound_grid(g[0])
+                msg_off = (
+                    f"🛑 **AI Spot Snowball Compound Grid ត្រូវបានបិទដោយជោគជ័យ!** (បិទចំនួន {count} Grids)"
+                    if user_lang == 'km' else
+                    f"🛑 **AI Spot Snowball Compound Grid Deactivated Successfully!** ({count} Grids Stopped)"
                 )
-                await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
+                await (update.effective_message or update.message).reply_text(msg_off, parse_mode="Markdown")
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
 
@@ -11772,9 +11833,11 @@ class TelegramBotThread(BaseThread):
 
             # Invalid argument count usage display
             usage = (
-                "⚠️ **របៀបប្រើប្រាស់ Compound Grid:**\n\n"
-                "👉 **AI Smart Auto 3X Compound:**\n`` `/compound_grid <កាក់> <ទំហំលុយវិនិយោគ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 100 1234` ``\n\n"
-                "👉 **Custom Step Compound:**\n`` `/compound_grid <កាក់> <ទំហំទិញ១ជាន់> <ភាគរយគម្លាត> <ដើមទុនគោលដៅ> <PIN>` ``\nឧទាហរណ៍ ៖ `` `/compound_grid XRP 10 1.0 100 1234` ``"
+                "⚠️ **របៀបប្រើប្រាស់ Spot Snowball Compound Grid ៖**\n\n"
+                "👉 **AI Smart Auto 3X Compound Grid ៖**\n`` `/compound_grid XRP 100 1234` ``\n"
+                "`` `/compound_grid BTC 200 1234` ``\n\n"
+                "👉 **Custom Step Compound Grid ៖**\n`` `/compound_grid XRP 10 1.0 100 1234` ``\n\n"
+                "👉 **បិទដំណើរការ Compound Grid ៖**\n`` `/compound_grid OFF 1234` ``"
             )
             await (update.effective_message or update.message).reply_text(usage, parse_mode="Markdown")
             await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
@@ -14473,7 +14536,11 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
         self.app.add_handler(CommandHandler("fundingharvester", funding_harvester_command))
         self.app.add_handler(CommandHandler("whales", whales_command))
-        self.app.add_handler(CommandHandler("infinity_matrix", infinity_grid_command))
+        self.app.add_handler(CommandHandler("infinity_matrix", infinity_matrix_command))
+        self.app.add_handler(CommandHandler("infinitymatrix", infinity_matrix_command))
+        self.app.add_handler(CommandHandler("infinity_grid", infinity_grid_command))
+        self.app.add_handler(CommandHandler("compound_grid", compound_grid_command))
+        self.app.add_handler(CommandHandler("compoundgrid", compound_grid_command))
         self.app.add_handler(CommandHandler("flash_crash", flash_crash_command))
         self.app.add_handler(CommandHandler("gold_turbo", gold_turbo_command))
         self.app.add_handler(CommandHandler("gold_guard", gold_radar_command))
@@ -14715,47 +14782,9 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
 
-                public_commands = [
-                    BotCommand("start", "🚀 Start Bot & Choose Language"),
-                    BotCommand("menu", "🎛️ Interactive Master Control Panel"),
-                    BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
-                    BotCommand("flash_loan_keeper", "⚡ DeFi Flash Loan 0-Risk Keeper"),
-                    BotCommand("web3_wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
-                    BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
-                    BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
-                    BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
-                    BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
-                    BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-                    BotCommand("snipe", "🎯 Smart Listing Token Sniper"),
-                    BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Sniper"),
-                    BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
-                    BotCommand("smart_swap", "⚡ Multi-Chain DEX & AI Gem Sniper"),
-                    BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
-                    BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
-                    BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
-                    BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
-                    BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
-                    BotCommand("balance", "💰 Check Spot & Futures Balance"),
-                    BotCommand("portfolio", "💼 Unified Portfolio & Net PnL"),
-                    BotCommand("report", "📊 VIP Audit Report (Daily/Monthly/Yearly/Engines)"),
-                    BotCommand("status", "📊 View Active Trades & PnL"),
-                    BotCommand("paper_trading", "🧪 Toggle Paper vs Live Trading"),
-                    BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
-                    BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
-                    BotCommand("alert", "🔔 Set Price Alert"),
-                    BotCommand("stop", "🛑 Stop Trading / Market Close"),
-                ]
-                admin_commands = [
-                    BotCommand("admin", "👑 Open Super Admin Control Panel"),
-                    BotCommand("admin_users", "👥 View Registered Users Directory"),
-                    BotCommand("admin_license", "🔑 Grant or Renew VIP License"),
-                    BotCommand("admin_broadcast", "📢 Broadcast Urgent Message to Users"),
-                    BotCommand("admin_stats", "📊 View Platform Volume & Stats"),
-                    BotCommand("admin_config", "⚙️ Modify Live System Parameters"),
-                    BotCommand("admin_nuke", "☢️ Emergency Panic Nuke & Shutdown"),
-                    BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
-                    BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
-                ] + public_commands
+                import bot_commands_registry
+                public_commands = bot_commands_registry.get_public_bot_commands()
+                admin_commands = bot_commands_registry.get_admin_bot_commands()
 
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())

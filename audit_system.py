@@ -117,6 +117,37 @@ def run_audit():
         if "staus" in cmd_names:
             failures.append("Typo /staus still found in bot_thread.py!")
             log_fail("Typo /staus still found!")
+
+        # Verify Invariant 23 (Bot Menu Command Parity & Institutional Hierarchy)
+        import bot_commands_registry
+        reg_public = [c.command for c in bot_commands_registry.get_public_bot_commands()]
+        reg_admin = [c.command for c in bot_commands_registry.get_admin_bot_commands()]
+        
+        if "snipe" in reg_public or "snipe" in reg_admin:
+            failures.append("Phantom command /snipe still found in bot_commands_registry!")
+            log_fail("Phantom command /snipe still found in bot_commands_registry!")
+        else:
+            log_pass("Phantom command /snipe 100% expunged from Bot Menu registry!")
+
+        if "compound_grid" not in cmd_names:
+            failures.append("bot_thread.py missing /compound_grid command handler!")
+            log_fail("Missing /compound_grid command handler!")
+        else:
+            log_pass("Spot Snowball /compound_grid command handler is registered and active!")
+
+        if "infinity_matrix" not in cmd_names:
+            failures.append("bot_thread.py missing /infinity_matrix command handler!")
+            log_fail("Missing /infinity_matrix command handler!")
+        else:
+            log_pass("Spot Dynamic Fibonacci /infinity_matrix command handler is registered and active!")
+
+        # Verify all registry commands have handlers in bot_thread.py
+        missing_handlers = [c for c in reg_admin if c not in cmd_names]
+        if missing_handlers:
+            failures.append(f"bot_thread.py missing command handlers for registry commands: {missing_handlers}")
+            log_fail(f"Missing CommandHandlers for: {missing_handlers}")
+        else:
+            log_pass("100% of Bot Menu commands have active CommandHandlers registered (Invariant 23 Certified)!")
     except Exception as e:
         failures.append(f"bot_thread.py command check failed: {e}")
         log_fail(str(e))

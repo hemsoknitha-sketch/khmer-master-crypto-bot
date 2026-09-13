@@ -20,49 +20,9 @@ async def set_menu_commands():
         return
 
     bot = Bot(token=TOKEN)
-    public_commands = [
-        BotCommand("start", "🚀 Start Bot & Choose Language"),
-        BotCommand("menu", "🎛️ Interactive Master Control Panel"),
-        BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
-        BotCommand("flash_loan_keeper", "⚡ DeFi Flash Loan 0-Risk Keeper"),
-        BotCommand("web3_wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
-        BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
-        BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
-        BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
-        BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
-        BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-        BotCommand("pre_pump", "🐋 Pre-Pump Accumulation & 33 AI Listing Engine"),
-        BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
-        BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
-        BotCommand("smart_swap", "⚡ Institutional Multi-Chain DEX & AI Sniper"),
-        BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
-        BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
-        BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
-        BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
-        BotCommand("balance", "💰 Check Spot & Futures Balance"),
-        BotCommand("portfolio", "💼 Unified Portfolio & Net PnL"),
-        BotCommand("report", "📊 VIP Audit Report (Daily/Monthly/Yearly/Engines)"),
-        BotCommand("status", "📊 View Active Trades & PnL"),
-        BotCommand("paper_trading", "🧪 Toggle Paper vs Live Trading"),
-        BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
-        BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
-        BotCommand("alert", "🔔 Set Price Alert"),
-        BotCommand("stop", "🛑 Stop Trading / Market Close"),
-        BotCommand("reset_pin", "🔒 Super Smart 2FA PIN Reset & Recovery"),
-        BotCommand("set_pin", "🔒 Configure 2FA Security PIN"),
-    ]
-
-    admin_commands = [
-        BotCommand("admin", "👑 Open Super Admin Control Panel"),
-        BotCommand("admin_users", "👥 View Registered Users Directory"),
-        BotCommand("admin_license", "🔑 Grant or Renew VIP License"),
-        BotCommand("admin_broadcast", "📢 Broadcast Urgent Message to Users"),
-        BotCommand("admin_stats", "📊 View Platform Volume & Stats"),
-        BotCommand("admin_config", "⚙️ Modify Live System Parameters"),
-        BotCommand("admin_nuke", "☢️ Emergency Panic Nuke & Shutdown"),
-        BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
-        BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
-    ] + public_commands
+    import bot_commands_registry
+    public_commands = bot_commands_registry.get_public_bot_commands()
+    admin_commands = bot_commands_registry.get_admin_bot_commands()
 
 
     try:

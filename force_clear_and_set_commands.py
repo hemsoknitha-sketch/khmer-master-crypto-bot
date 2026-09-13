@@ -45,34 +45,9 @@ async def force_reset_menu():
     except Exception as e_del:
         print(f"  └─ Delete notice: {e_del}")
 
-    public_commands = [
-        BotCommand("start", "🚀 Start Bot & Choose Language"),
-        BotCommand("menu", "🎛️ Interactive Master Control Panel"),
-        BotCommand("flash_loan", "⚡ MEV & Flash Loan 0-Risk Arbitrage"),
-        BotCommand("set_web3_wallet", "💼 Configure Web3 Settlement Wallet"),
-        BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
-        BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
-        BotCommand("whales", "🐋 Whale Orderflow Front-Running Radar"),
-        BotCommand("infinity_matrix", "📈 Dynamic Compound Infinity Matrix"),
-        BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
-        BotCommand("turbo_hedge", "🛡️ Super Smart & Institutional Hedge Engine"),
-        BotCommand("smartx", "👑 Institutional AI Multi-Asset Suite (Gold & Crypto)"),
-        BotCommand("analyze", "🧠 5-Agent AGI Market Analysis"),
-        BotCommand("predict", "📈 Wall Street ML 24h Prediction"),
-        BotCommand("balance", "💰 Check Spot & Futures Balance"),
-        BotCommand("status", "📊 View Active Trades & PnL"),
-        BotCommand("report", "📊 VIP Audit Report (Daily/Monthly/Yearly/Engines)"),
-        BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
-        BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
-        BotCommand("alert", "🔔 Set Price Alert"),
-        BotCommand("stop", "🛑 Stop Trading / Market Close"),
-    ]
-
-    admin_commands = [
-        BotCommand("admin", "👑 Open Super Admin Control Panel"),
-        BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
-        BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
-    ] + public_commands
+    import bot_commands_registry
+    public_commands = bot_commands_registry.get_public_bot_commands()
+    admin_commands = bot_commands_registry.get_admin_bot_commands()
 
     print("✨ [2/3] Registering v13.00 Absolute Ultimate AGI Public VIP Commands...")
     try:
