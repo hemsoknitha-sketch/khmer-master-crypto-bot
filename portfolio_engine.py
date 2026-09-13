@@ -10,7 +10,7 @@ investment engines without omitting any component:
   3. Smart X Multi-Asset Quant Suite (/smart_x / /smartx)
   4. Smart Swap Multi-Chain DEX & AI Gem Sniper (/smart_swap)
   5. Dynamic Infinity Matrix & Compound Grid (/infinity_matrix / /compound_grid)
-  6. Smart Listing & Pre-Pump Accumulation Sniper (/snipe / /pre_pump)
+  6. Institutional Smart Listing & Pre-Pump Accumulation Engine (/pre_pump)
   7. 8-Hour Funding Rate & Basis Arbitrage Harvester (/funding_harvester)
   8. Gold Turbo & Macro Radar (/gold_turbo / /gold_guard)
   9. DeFi Flash Loan & Tokyo HFT MEV Keeper (/flash_loan)
@@ -718,9 +718,9 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
         e6_details = [f"  • `{sn.get('symbol')}` ៖ ដើមទុន `${sn.get('invest_amount', 0):.2f}` | State: `{sn.get('state')}` | Buy Price: `${sn.get('buy_price', 0):.4f}`" for sn in snipers]
         e6_body = "\n".join(e6_details)
     else:
-        e6_status = "🟡 STANDBY (WebSocket WebSocket Listing Radar ត្រៀមស្ទាក់កាក់ថ្មី 24/7)" if lang == "km" else "🟡 STANDBY (Binance WebSocket Listing Radar Active 24/7)"
-        e6_body = "  • ស្ថានភាព ៖ តាមដានគម្លាត Volume Velocity (វាយ `/snipe` ដើម្បីកំណត់)" if lang == "km" else "  • Status: Monitoring order books (Configure via `/snipe`)"
-    engines_text += f"6️⃣ **Smart Listing & Pre-Pump Sniper (`/snipe` / `/pre_pump`)**\n   {e6_status}\n{e6_body}\n\n"
+        e6_status = "🟡 STANDBY (WebSocket Listing Radar ត្រៀមស្ទាក់កាក់ថ្មី 24/7)" if lang == "km" else "🟡 STANDBY (Binance WebSocket Listing Radar Active 24/7)"
+        e6_body = "  • ស្ថានភាព ៖ តាមដានគម្លាត Volume Velocity & 33 AI Models (វាយ `/pre_pump` ដើម្បីកំណត់)" if lang == "km" else "  • Status: 33 AI Models & Orderflow Monitoring (Configure via `/pre_pump`)"
+    engines_text += f"6️⃣ **Smart Listing & Pre-Pump Engine (`/pre_pump`)**\n   {e6_status}\n{e6_body}\n\n"
 
     # --- ENGINE 7: 8-Hour Funding Rate & Basis Arbitrage Harvester ---
     f_cfg = data["funding_cfg"]

@@ -4620,37 +4620,80 @@ async def pre_pump_sniper_monitor(app, ai_engine):
         res = results[i]
         if isinstance(res, tuple) and res[0] is True:
             current_price = res[1]
-            print(f"🎯 [PRE-PUMP SNIPER] Trifecta Signal detected for {symbol} at ${current_price}!")
+            meta = res[2] if len(res) > 2 else {}
+            side = meta.get("side", "BUY")
+            stage = meta.get("stage", "FUTURES_PRECISION")
+            character = meta.get("character", "WHALE_ACCUMULATION")
+            conf = meta.get("confidence_pct", 85.0)
+            rec_leverage = meta.get("recommended_leverage", 10)
+
+            print(f"🎯 [PRE-PUMP & 33 AI MODELS] Signal triggered for {symbol} at ${current_price}! Character: {character}, Action: {stage} {side}, Conf: {conf}%, Lev: {rec_leverage}x")
             
             # Execute trades for all opted-in VIP users
             for chat_id, invest_amount in pre_pump_users:
-                # Basic trade logic similar to auto_trade
                 keys = await asyncio.to_thread(db.get_user_api, chat_id)
-                if not keys: continue
+                if not keys:
+                    continue
                 api_key, api_secret = keys
                 
                 # Check active trades limit
                 active_trades = await asyncio.to_thread(db.get_active_trades, chat_id)
-                if len(active_trades) >= 10: # We use a hard limit of 10 for safety
+                if len(active_trades) >= 10:  # Hard limit of 10 for safety
                     continue
                     
-                already_trading = any(t['symbol'] == symbol for t in active_trades)
+                already_trading = any(t.get('symbol') == symbol for t in active_trades)
                 if already_trading:
                     continue
-                    
+
+                # Invariant 8: Small capital clamp (< $100 -> max 10x)
+                effective_leverage = min(10, rec_leverage) if invest_amount < 100.0 else rec_leverage
+                
                 # Calculate qty
                 qty = await asyncio.to_thread(trading_engine.calculate_buy_quantity, api_key, api_secret, symbol, invest_amount, current_price)
                 if qty > 0:
-                    # Place order
-                    order = await asyncio.to_thread(trading_engine.place_market_buy, api_key, api_secret, symbol, qty)
-                    if "error" not in order and "code" not in order:
-                        # 1.5% Hard Stop Loss
-                        await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, current_price, current_price, 1.5)
-                        
-                        user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
-                        from localization import get_text
-                        try: await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                        except: pass
+                    order_success = False
+                    if stage == "SPOT_BUY_SCOUT":
+                        # Stage 1: Spot Buy Scout (Safe early price discovery, zero liquidation risk)
+                        order = await asyncio.to_thread(trading_engine.place_spot_order, api_key, api_secret, symbol, "BUY", qty)
+                        if "error" not in order and "code" not in order:
+                            order_success = True
+                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, current_price, current_price, 1.5)
+                    else:
+                        # Stage 2: High-Confidence Precision Futures Entry (BUY Long or SELL Short)
+                        if side == "SELL":
+                            # Invariant 16: Anti-Oversold Short Guard
+                            if meta.get("rsi_15m", 50.0) <= 38.0:
+                                print(f"🛡️ [PRE-PUMP SHORT GUARD] Skipped short on {symbol}: 15m RSI <= 38.0!")
+                                continue
+                            order = await asyncio.to_thread(trading_engine.place_futures_short, api_key, api_secret, symbol, qty, effective_leverage)
+                        else:
+                            order = await asyncio.to_thread(trading_engine.place_futures_order, api_key, api_secret, symbol, "BUY", qty, effective_leverage)
+
+                        if "error" not in order and "code" not in order and order.get("status") != "error":
+                            order_success = True
+                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, current_price, current_price, 1.5)
+
+                    if order_success:
+                        action_badge = "🟢 LONG (BUY)" if side == "BUY" else "🔴 SHORT (SELL)"
+                        mode_badge = "🪙 SPOT SCOUT" if stage == "SPOT_BUY_SCOUT" else f"⚡ FUTURES {effective_leverage}x"
+                        msg = (
+                            f"🚀 **PRE-PUMP & 33 AI MODELS EXECUTION** 🔥\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"• **កាក់ (Symbol) ៖** `{symbol}`\n"
+                            f"• **យុទ្ធសាស្ត្រ ៖** `{character}`\n"
+                            f"• **របៀបជួញដូរ ៖** `{mode_badge}` | `{action_badge}`\n"
+                            f"• **AI Confidence ៖** `{conf}%`\n"
+                            f"• **ទុនវិនិយោគ ៖** `${invest_amount:,.2f} USDT`\n"
+                            f"• **តម្លៃចូល (Entry) ៖** `${current_price:,.4f}`\n"
+                            f"• **Stop-Loss ៖** `1.5%`\n"
+                            f"• **Zero Bag-Holding ៖** `HFT Trailing Lock (+0.12% Net Floor)`\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                        )
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
 
 
 async def macro_gold_monitor(app: Application):

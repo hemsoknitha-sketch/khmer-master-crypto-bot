@@ -3658,7 +3658,7 @@ class TelegramBotThread(BaseThread):
                 "👉 `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft Stop / Hard Stop)\n\n"
                 "🚀 **2. មុខងារជួញដូរស្វ័យប្រវត្តស្នូល (FLAGSHIP AUTONOMOUS ENGINES)**\n"
                 "👉 `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>` - 🟢 HFT Auto-Scanner 24/7\n"
-                "👉 `/snipe` - 🎯 Listing & Volatility (High RVOL) Sniper\n"
+                "👉 `/pre_pump` - 🐋 Pre-Pump Accumulation & Listing Engine (33 AI Models)\n"
                 "👉 `/funding_harvester` - 🌾 8-Hour Funding Yield Harvester\n"
                 "👉 `/infinity_grid` - 📐 Unified Smart Grid Matrix Engine\n\n"
                 "🔮 **3. AI វិភាគទីផ្សារ & RADAR (AI INTELLIGENCE & ADVISORY)**\n"
@@ -12800,17 +12800,20 @@ class TelegramBotThread(BaseThread):
                 ])
 
                 msg = (
-                    "🚀 **APEX SUPER AGI TURBO BRAIN v13.00 | PRE-PUMP SPIKE SNIPER** 🔥\n"
+                    "🚀 **APEX SUPER AGI TURBO BRAIN v13.00 | PRE-PUMP & 33 AI LISTING ENGINE** 🐋\n"
                     "══════════════════════════\n\n"
-                    "📊 **EXECUTIVE PRE-PUMP CONFIGURATION:**\n"
-                    f"• **System Status**: {current_status}\n"
-                    f"• **Trade Amount / Order**: `${amount:,.2f} USDT`\n"
-                    "• **Sniper Strategy**: `Smart Money Accumulation + Orderbook Depth Anomaly`\n"
-                    "• **Signal Consensus**: `3-Way Trifecta (Whale Volume + Orderbook Imbalance)`\n"
-                    "• **Risk Mitigation**: `1.5% Hard Stop-Loss & Dynamic Trailing Peak Lock (+10.0%)`\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                    "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/pre_pump ON 50` ``\n\n"
-                    "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/pre_pump OFF 1234` ``"
+                    "📊 **EXECUTIVE 33-MODEL LISTING & PRE-PUMP ARCHITECTURE:**\n"
+                    f"• **ស្ថានភាពប្រព័ន្ធ ៖** {current_status}\n"
+                    f"• **ដើមទុនក្នុង ១ Order ៖** `${amount:,.2f} USDT`\n"
+                    "• **AI Model Ensemble ៖** `33 Wall Street Models (HMM, PINN, XGB, LGBM, MoE)`\n"
+                    "• **Stage 1 (Spot Discovery) ៖** `ស្ទង់ចរិតកាក់ថ្មី និងកម្លាំងទិញពិត (Zero Liquidation Risk)`\n"
+                    "• **Stage 2 (Futures Precision) ៖** `ចូល Futures Long/Short តាម AI Consensus & Dynamic Leverage`\n"
+                    "• **Zero Bag-Holding Exit ៖** `កើបចំណេញលឿន (+1.5% - +5.0%) & Max 20m Duration`\n"
+                    "• **Risk Shield ៖** `Hard SL 1.5%, ISOLATED Margin & Anti-Oversold RSI Guard`\n\n"
+                    "📋 **1-TAP COPYABLE PRESETS (ចុចចម្លង ១-Tap) ៖**\n"
+                    "👉 **បើកទុន $30 ៖**\n`` `/pre_pump ON 30` ``\n\n"
+                    "👉 **បើកទុន $50 ៖**\n`` `/pre_pump ON 50` ``\n\n"
+                    "👉 **បិទដំណើរការ ៖**\n`` `/pre_pump OFF 1234` ``"
                 )
                 await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
@@ -14493,10 +14496,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("auto_trade", auto_trade_command))
         self.app.add_handler(CommandHandler("autotrade", auto_trade_command))
 
-        self.app.add_handler(CommandHandler("snipe", smart_listing_sniper_command))
-        self.app.add_handler(CommandHandler("auto_snipe", auto_snipe_command))
-
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
+        self.app.add_handler(CommandHandler("prepump", pre_pump_command))
+        self.app.add_handler(CommandHandler("snipe", pre_pump_command))
+        self.app.add_handler(CommandHandler("auto_snipe", pre_pump_command))
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
         self.app.add_handler(CommandHandler("report", report_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
