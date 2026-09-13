@@ -209,14 +209,43 @@ Any modification that breaks any of the following 23 invariants is considered an
   4. **Zero Phantom / Obsolete Commands:** Deprecated, replaced, or ghost commands (e.g. `/snipe`) must be 100% expunged from all menu registries so they never linger in Telegram user clients.
   5. **Permanent Core Inclusion:** All core trading, investment, intelligence, and safety commands must permanently remain in the Bot Menu unless the Admin explicitly requests removal.
 
+### Invariant 24: The Golden 85% Profit Ratchet, Breakeven Armor & 100% Clean Cash Profit Harvest Lock
+- **Location:** `turbo_hedge_engine.py` (`monitor_turbo_hedge_pnl`)
+- **Rule:**
+  1. **Purge of Drop-Down to +$0.50 Floor:** The archaic behavior where floating profits were allowed to plummet from peak back down to +$0.50 is 100% permanently eliminated.
+  2. **The Golden 85% Profit Ratchet:** As a position generates floating profit and establishes higher peak profit, the trailing stop ratchets up aggressively, permanently locking in at least **85% of peak profit** (`ratchet_roe = max_seen_pnl_pct * 0.85`). If price retraces by 15% from its highest peak, the engine executes an immediate market close to secure the 85% profit chunk into pure USDT.
+  3. **Breakeven Armor at +3.0% ROE:** As soon as an active position achieves $\ge +3.0\%$ ROE (+0.30% unleveraged price move at 10x leverage), the Stop-Loss is instantly shifted to entry price + fees (+0.12%), guaranteeing that a winning trade NEVER turns into a losing trade under any circumstances.
+  4. **100% Clean Cash Profit Harvest:** When take-profit or ratchet conditions trigger, the position is cleanly closed to pure USDT cash. Unrealized gains are fully realized without reinvestment delay or cross-currency lockup.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 17/18].
+
+### Invariant 25: Dynamic Small Capital Fortress ($5/Coin Scaler) & Zero Blind Investing Guarantee
+- **Location:** `turbo_hedge_engine.py` (`monitor_turbo_hedge_bots`, `scan_and_evaluate_symbol`), `bot_thread.py` (`auto_trade_command`)
+- **Rule:**
+  1. **Small Capital Fortress ($5/Coin Scaling Floor):** Futures trading enables position sizing down to $5.00+ USDT with a dedicated 35% margin cushion reserved (`safe_avail_bal = avail_bal * 0.65`) for safe liquidation distance. Total concurrent coins scale dynamically:
+     - Balance $< \$25$: max 2 coins ($10 margin)
+     - Balance $< \$45$: max 4 coins ($20 margin)
+     - Balance $< \$75$: max 8 coins ($40 margin)
+     - Balance $< \$115$: max 12 coins ($60 margin)
+     - Balance $\ge \$115$ (e.g. $121): **up to 15 coins maximum** ($75 margin + $46 cushion).
+  2. **Zero Blind Investing Guarantee:** The capital scaler dictates only the *maximum ceiling*, never forced entry. Every single order (from coin 1 to coin 15) MUST independently pass the **7-Layer Institutional Confluence Gate**:
+     - Layer 1: 15m & 1h Macro Trend EMA50 confluence (both timeframes must agree).
+     - Layer 2: 5m Intermediate Trend (EMA20 vs EMA50).
+     - Layer 3: 1m Short-term Momentum & Velocity (EMA5 vs EMA15).
+     - Layer 4: Strict RSI Sweet-Spot (42–68 for BUY, 38.5–65 for SELL; RSI $\le 38.0$ bottom shorting strictly rejected under Invariant 16).
+     - Layer 5: Volume Delta Spike ($\ge 1.15\times$).
+     - Layer 6: Anti-FOMO Pullback Retracement Shield (never chase green candles extended >0.35% above 1m EMA5).
+     - Layer 7: AI Model Confidence Gate $\ge 88.0\%$ ($\ge 89.0\%$ in VIP Recovery Mode).
+  3. **Staggered Entry Shield:** Enforces a minimum 15-second delay between position entries to prevent simultaneous execution slippage into flash volatility.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 18/18].
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 23 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 16 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 25 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 18 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
