@@ -130,20 +130,23 @@ Any modification that breaks any of the following 19 invariants is considered an
     ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!
     ```
 
-### Invariant 15: Linux VPS Deployment & Execution Integrity
-- **Location:** VPS Environment (`/opt/khmer-master-crypto-bot`)
-- **Rule:** On Linux VPS (Ubuntu/Debian), scripts must be executed via `.sh` (e.g. `bash auto_update_vps.sh`), never Windows `.bat`.
-  - Canonical VPS update command (Stops active SQLite WAL file locks before pulling):
+### Invariant 15: Google Cloud Linux VPS Deployment, Zero-Data-Loss & Auto-Git Sync Standard
+- **Location:** Repository Root & VPS Environment (`/opt/khmer-master-crypto-bot`)
+- **Rule:**
+  1. **Mandatory Post-Change Git Push (ដាច់ខាតត្រូវតែ Push Git ភ្លាមៗ):** Every completed code modification, bug fix, or feature enhancement MUST be immediately tested via `python audit_system.py`, committed, and pushed to `origin main` on GitHub (and Hugging Face if applicable). Leaving uncommitted or unpushed local modifications is strictly prohibited.
+  2. **Mandatory VPS Update Command in Output (ណែនាំកូដបញ្ជា Update ទៅ VPS ដោយស្វ័យប្រវត្តិ):** At the end of every response where code is modified or pushed, the AI assistant MUST automatically and unconditionally provide the founder/user with the exact 1-tap executable command to update and restart the Google Cloud VPS node, without requiring the user to ask or remind you.
+  3. **Zero Data Loss Protection:** On Linux VPS (Ubuntu/Debian), scripts must be executed via `.sh` (e.g. `bash auto_update_vps.sh`), never Windows `.bat`. Active SQLite databases (`*.db`, `bot_database.db`) and `.env` credentials must be 100% preserved.
+  - Canonical VPS update command (Automated Script - Recommended):
     ```bash
-    sudo systemctl stop khmer-master-crypto-bot && git pull origin main && sudo systemctl start khmer-master-crypto-bot
+    cd /opt/khmer-master-crypto-bot && bash auto_update_vps.sh
+    ```
+  - Direct Systemd One-Liner (Stops active SQLite WAL file locks before pulling):
+    ```bash
+    sudo systemctl stop khmer-master-crypto-bot && cd /opt/khmer-master-crypto-bot && git pull origin main && sudo systemctl start khmer-master-crypto-bot
     ```
   - Alternative with permission reset (suppressing ephemeral SQLite `-shm`/`-wal` warnings):
     ```bash
-    sudo chown -R $USER:$USER /opt/khmer-master-crypto-bot 2>/dev/null || true; git pull origin main && sudo systemctl restart khmer-master-crypto-bot
-    ```
-  - Or automated script:
-    ```bash
-    bash auto_update_vps.sh
+    sudo chown -R $USER:$USER /opt/khmer-master-crypto-bot 2>/dev/null || true; cd /opt/khmer-master-crypto-bot && git pull origin main && sudo systemctl restart khmer-master-crypto-bot
     ```
   - Never execute log text streams in the bash prompt.
 
@@ -179,3 +182,12 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
 3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 19 Invariants or the Fiduciary Honesty Covenant.
 4. **Step 4:** Re-run `python audit_system.py` to confirm that all 16 checks remain at 100% `[PASS]`.
+5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
+   ```bash
+   git add . && git commit -m "<Clear, professional commit description>" && git push origin main
+   ```
+6. **Step 6 (MANDATORY VPS UPDATE DIRECTIVE IN OUTPUT):** Conclude your response by providing the exact 1-tap command for the founder to update the Google Cloud VPS node:
+   ```bash
+   cd /opt/khmer-master-crypto-bot && bash auto_update_vps.sh
+   ```
+   *(This directive is permanent, immutable, and must be followed in every future session without prompting).*

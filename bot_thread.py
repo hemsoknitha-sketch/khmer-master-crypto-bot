@@ -3232,7 +3232,9 @@ class TelegramBotThread(BaseThread):
             """Executes auto trade if user has enabled VIP auto trading and AI signal is STRONG BULLISH/BEARISH."""
             try:
                 auto_cfg = db.get_user_config(chat_id, "auto_trade") if hasattr(db, 'get_user_config') else None
-                if not auto_cfg or not auto_cfg.get("is_enabled"):
+                macro_cfg = db.get_macro_auto_trade_config(chat_id) if hasattr(db, 'get_macro_auto_trade_config') else {}
+                is_active = (auto_cfg and (auto_cfg.get("enabled") or auto_cfg.get("is_enabled"))) or macro_cfg.get("enabled", False)
+                if not is_active:
                     return
 
                 keys = db.get_user_api(chat_id)
@@ -3248,8 +3250,8 @@ class TelegramBotThread(BaseThread):
 
                 if not action: return
 
-                amount = auto_cfg.get("amount", 20.0)
-                leverage = auto_cfg.get("leverage", 5)
+                amount = float(macro_cfg.get("amount") or (auto_cfg.get("amount") if auto_cfg else 30.0) or 30.0)
+                leverage = int(macro_cfg.get("leverage") or (auto_cfg.get("leverage") if auto_cfg else 3) or 3)
 
                 import trading_engine
                 res = await asyncio.to_thread(trading_engine.execute_hyper_trade_strategy, api_key, api_secret, symbol, action, leverage, amount)
