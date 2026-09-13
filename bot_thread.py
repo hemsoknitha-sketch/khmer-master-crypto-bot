@@ -12055,9 +12055,15 @@ class TelegramBotThread(BaseThread):
                         f"• **Active Macro Swings** ៖ `{len(active_macro_trades)}/3 Positions`\n"
                         f"• **Symbiotic Harvester** ៖ `{sym_status_txt}`\n"
                         f"• **Dynamic Profit Loop** ៖ `Micro Scalps systematically reduce Macro Break-Even`\n\n"
-                        f"📋 **1-TAP COMMAND EXECUTIONS:**\n"
-                        f"👉 **បើកដំណើរការ ៖** `/auto_trade ON <ទុន>`\n"
-                        f"👉 **បិទដំណើរការ ៖** `/auto_trade OFF`\n\n"
+                        f"📋 **1-TAP COPYABLE COMMANDS (ចុច Copy ភ្លាមៗ):**\n"
+                        f"• បើកទុន $30 ៖ `/auto_trade ON 30`\n"
+                        f"• បើកទុន $50 ៖ `/auto_trade ON 50`\n"
+                        f"• បើកទុន $100 ៖ `/auto_trade ON 100`\n"
+                        f"• បិទដំណើរការ ៖ `/auto_trade OFF`\n"
+                        f"• ពិនិត្យ Positions ៖ `/auto_trade STATUS`\n"
+                        f"• កំណត់ Leverage ៖ `/auto_trade LEVERAGE 3`\n"
+                        f"• ឈ្មោះកាត់ Alias ៖ `/autotrade ON 30`\n\n"
+                        f"💡 _អ្នកក៏អាចចុចប៊ូតុងខាងក្រោម (1-Tap) ភ្លាមៗ ដោយមិនបាច់វាយអក្សរ!_\n\n"
                         f"🛡️ _ប្រព័ន្ធចាប់យករលកបាក់ទំនប់ 1H/4H ដោយមិន Short បាត ធានាការពារដើមទុន ១០០%!_\n\n"
                         f"{OFFICIAL_FOOTNOTE}"
                     )
@@ -14473,6 +14479,7 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("smartswap", smart_swap_command))
         self.app.add_handler(CommandHandler("scalp", scalp_command))
         self.app.add_handler(CommandHandler("auto_trade", auto_trade_command))
+        self.app.add_handler(CommandHandler("autotrade", auto_trade_command))
 
         self.app.add_handler(CommandHandler("snipe", smart_listing_sniper_command))
         self.app.add_handler(CommandHandler("auto_snipe", auto_snipe_command))
