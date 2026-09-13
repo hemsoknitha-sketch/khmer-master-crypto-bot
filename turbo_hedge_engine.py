@@ -2190,18 +2190,31 @@ async def monitor_turbo_hedge_bots(app):
 
             # Dynamic 3-Second Capital Scaler (Up to 15 coins max if capital allows):
             # Mathematically scaled to balance while preserving liquidation safety
-            if wallet_bal < 30.0:
-                tiered_cap = 2
-            elif wallet_bal < 60.0:
-                tiered_cap = 3
-            elif wallet_bal < 120.0:
-                tiered_cap = 5
-            elif wallet_bal < 250.0:
-                tiered_cap = 8
-            elif wallet_bal < 400.0:
-                tiered_cap = 12
+            if effective_amount <= 5.5:
+                # Optimized for Small Capital Fortress ($5/coin):
+                if wallet_bal < 25.0:
+                    tiered_cap = 2
+                elif wallet_bal < 45.0:
+                    tiered_cap = 4
+                elif wallet_bal < 75.0:
+                    tiered_cap = 8
+                elif wallet_bal < 115.0:
+                    tiered_cap = 12
+                else:
+                    tiered_cap = 15  # $115+ USDT safely supports up to 15 coins ($75 margin + $40+ cushion)
             else:
-                tiered_cap = 15
+                if wallet_bal < 30.0:
+                    tiered_cap = 2
+                elif wallet_bal < 60.0:
+                    tiered_cap = 3
+                elif wallet_bal < 120.0:
+                    tiered_cap = 5
+                elif wallet_bal < 200.0:
+                    tiered_cap = 8
+                elif wallet_bal < 300.0:
+                    tiered_cap = 12
+                else:
+                    tiered_cap = 15
 
             target_coin_limit = min(15, max(1, user_top_count))
             max_allowed_coins = max(1, min(target_coin_limit, max_coins_by_capital, tiered_cap))

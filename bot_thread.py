@@ -10074,18 +10074,30 @@ class TelegramBotThread(BaseThread):
                     safe_avail_bal = avail_bal * (0.95 if is_spot else 0.60)
 
                     # Tiered Active Coin Clamping based on Total Balance (Dynamic Scaler up to 15 coins max):
-                    if avail_bal < 30.0:
-                        tiered_cap = 2
-                    elif avail_bal < 60.0:
-                        tiered_cap = 3
-                    elif avail_bal < 120.0:
-                        tiered_cap = 5
-                    elif avail_bal < 250.0:
-                        tiered_cap = 8
-                    elif avail_bal < 400.0:
-                        tiered_cap = 12
+                    if eff_amt <= 5.5:
+                        if avail_bal < 25.0:
+                            tiered_cap = 2
+                        elif avail_bal < 45.0:
+                            tiered_cap = 4
+                        elif avail_bal < 75.0:
+                            tiered_cap = 8
+                        elif avail_bal < 115.0:
+                            tiered_cap = 12
+                        else:
+                            tiered_cap = 15  # $115+ USDT safely supports up to 15 coins ($75 margin + $40+ cushion)
                     else:
-                        tiered_cap = 15
+                        if avail_bal < 30.0:
+                            tiered_cap = 2
+                        elif avail_bal < 60.0:
+                            tiered_cap = 3
+                        elif avail_bal < 120.0:
+                            tiered_cap = 5
+                        elif avail_bal < 200.0:
+                            tiered_cap = 8
+                        elif avail_bal < 300.0:
+                            tiered_cap = 12
+                        else:
+                            tiered_cap = 15
 
                     target_top_cap = min(15, max(1, top_count))
 
