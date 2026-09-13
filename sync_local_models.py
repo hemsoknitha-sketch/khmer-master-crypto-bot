@@ -205,7 +205,8 @@ def sync_all_models():
                 root_hft_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hft_infrastructure")
                 os.makedirs(root_hft_dir, exist_ok=True)
                 dest = os.path.join(root_hft_dir, os.path.basename(filename))
-                if os.path.exists(downloaded_path):
+                # Only copy if destination does not already exist, preserving institutional git-tracked code
+                if not os.path.exists(dest) and os.path.exists(downloaded_path):
                     shutil.copy2(downloaded_path, dest)
             synced_count += 1
         except Exception as e:
