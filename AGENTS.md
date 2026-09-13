@@ -44,7 +44,7 @@ When a user asks:
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 19 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 22 PILLARS)
 
 Any modification that breaks any of the following 19 invariants is considered an act of technical sabotage:
 
@@ -174,13 +174,33 @@ Any modification that breaks any of the following 19 invariants is considered an
   4. **Prohibition of Mock/Simulated Profits:** All mock random generators (`random.uniform`, `random.choice`, simulated tx hashes) are permanently purged from MEV routers. The system must report only real on-chain quotes, live simulations, or state truthfully when spreads are insufficient.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 16/16].
 
+### Invariant 20: SQLite WAL Mode Zero-Corruption & Autonomous In-Process Auto-Healer Protocol
+- **Location:** `database.py` (`check_and_heal_malformed_db`, `get_db_connection`), `repair_database.py`, `auto_update_vps.sh`
+- **Rule:**
+  1. `auto_update_vps.sh` MUST always stop systemd service (`sudo systemctl stop khmer-master-crypto-bot`) BEFORE taking database backups or pulling git commits to flush WAL writes to disk cleanly.
+  2. Backup scripts must back up all SQLite database files (`bot_database.db*` including `-wal` and `-shm`), never `.db` alone.
+  3. The codebase must maintain autonomous in-process recovery via `repair_database.py` (3-tier recovery: In-Place Checkpoint, SQLite CLI, Pure-Python Table-by-Table Data Rescuer in `immutable=1` mode) so any corrupted B-tree page is healed on the fly with 100% zero data loss of VIP users, API keys, or active trades.
+
+### Invariant 21: Python Function-Scope Global Import Hygiene (Anti-Shadowing / Zero-UnboundLocalError Guard)
+- **Location:** All `.py` files across repository
+- **Rule:**
+  1. Never place `import <module> as <alias>` inside inner function scopes, `try/except` blocks, or loops if that `<alias>` (such as `db`, `trading_engine`, `loc`) is already imported or referenced at module level.
+  2. In Python, any assignment or import of a name inside a function marks that name as local for the entire function scope, causing fatal `UnboundLocalError: cannot access local variable '<alias>' where it is not associated with a value` on all earlier usages. Always reference the top-level module import directly.
+
+### Invariant 22: Telegram 1-Tap Copyable Monospace Preset & Interactive Mobile Toast Feedback Standard
+- **Location:** `bot_thread.py` (`auto_trade_command`, callback query handlers, all command handlers)
+- **Rule:**
+  1. **Zero Unexecutable Placeholders:** Never output commands containing abstract placeholders like `<ទុន>` or `<amount>` in user-facing copyable blocks. All commands must be provided as concrete, executable monospace presets (e.g. `` `/auto_trade ON 30` ``, `` `/auto_trade ON 50` ``) wrapped in backticks for 1-tap clipboard copying on mobile.
+  2. **Command Alias Parity:** Every multi-word command must register both underscored and continuous aliases (e.g., `auto_trade` and `autotrade`, `smart_trade` and `smarttrade`, `smart_x` and `smartx`, `smart_swap` and `smartswap`).
+  3. **Mandatory Tactile Toast Feedback:** Every `InlineKeyboardButton` callback query MUST be immediately acknowledged with `await update.callback_query.answer(...)` containing descriptive toast text (e.g. `✅ Auto Trade: បានបើកដំណើរការ!`, `💰 បានកំណត់ទុន៖ $50 USDT!`) so mobile users receive instant visual and haptic confirmation without interface confusion.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 19 Invariants or the Fiduciary Honesty Covenant.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 22 Invariants or the Fiduciary Honesty Covenant.
 4. **Step 4:** Re-run `python audit_system.py` to confirm that all 16 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
