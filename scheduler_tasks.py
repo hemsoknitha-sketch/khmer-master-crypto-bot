@@ -2976,6 +2976,10 @@ async def ai_scalper_monitor(app, ai_engine):
     except Exception as e:
         print(f"[SCALPER ERROR] {e}")
 
+# Anti-Spam Notification Throttle for Grid & Spot Engines (30-minute deduplication cooldown)
+_GRID_ERROR_NOTICE_COOLDOWN = {}   # {(chat_id, grid_tag, err_text): last_sent_ts}
+_GRID_ERROR_COOLDOWN_SEC = 1800    # 30 minutes between duplicate error notices
+
 async def infinity_grid_monitor(app: Application, ai_engine):
     """Monitors active Infinity Grid Bots and executes dynamic ping-pong layers."""
     try:
@@ -3053,6 +3057,10 @@ async def infinity_grid_monitor(app: Application, ai_engine):
                 print(f"⚡ INFINITY SELL: {symbol} at {current_price} for {chat_id} - Status: {res.get('status')}")
                     
             elif current_price <= buy_target:
+                # 🛡️ Global Circuit Breaker Guard: Silently hold spot buys during market crashes
+                if hasattr(db, 'is_circuit_breaker_active') and db.is_circuit_breaker_active():
+                    continue
+
                 # Buy condition met
                 if current_investment + amount_per_layer <= max_investment:
                     # LIQUIDITY GUARD
@@ -3067,19 +3075,37 @@ async def infinity_grid_monitor(app: Application, ai_engine):
                     if res.get("status") == "FILLED":
                         new_inv = current_investment + amount_per_layer
                         db.update_infinity_grid_state(grid_id, new_inv, current_price)
+                        # Clear error cooldown on successful buy
+                        for k in list(_GRID_ERROR_NOTICE_COOLDOWN.keys()):
+                            if k[0] == chat_id and k[1] == f"inf_{grid_id}":
+                                _GRID_ERROR_NOTICE_COOLDOWN.pop(k, None)
                         msg = f"🕸️ **INFINITY GRID (BUY)** ⚡\nទិញចូល 1 ជាន់សម្រាប់ {symbol}!\n💵 តម្លៃទិញ: `${current_price:,.4f}`\n\n_Bot រង់ចាំលក់យកចំណេញពេលតម្លៃឡើងទៅវិញ!_"
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                        except: pass
                     else:
                         error_msg = res.get('error', res.get('msg', 'Unknown Error'))
-                        msg = f"🕸️ **INFINITY GRID (BUY FAILED)** ❌\nបរាជ័យក្នុងការទិញ {symbol}: {error_msg}"
-                        
+                        # 🛡️ Silently suppress Circuit Breaker rejections from Telegram (already alerted at trigger)
+                        if str(error_msg).upper() in ["CIRCUIT_BREAKER_ACTIVE", "DEFENDER_CIRCUIT_BREAKER_ACTIVE"] or "CIRCUIT BREAKER" in str(error_msg).upper():
+                            continue
+
                         err_code = res.get("code")
                         if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
                             db.deactivate_infinity_grid(grid_id)
-                            msg += "\n⚠️ Grid ត្រូវបានបិទដោយស្វ័យប្រវត្តិដើម្បីការពារបញ្ហាជាប់គាំង។"
+
+                        cache_key = (chat_id, f"inf_{grid_id}", str(error_msg).strip())
+                        now_ts = time.time()
+                        if now_ts - _GRID_ERROR_NOTICE_COOLDOWN.get(cache_key, 0) >= _GRID_ERROR_COOLDOWN_SEC:
+                            _GRID_ERROR_NOTICE_COOLDOWN[cache_key] = now_ts
+                            msg = f"🕸️ **INFINITY GRID (BUY FAILED)** ❌\nបរាជ័យក្នុងការទិញ {symbol}: {error_msg}"
+                            if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
+                                msg += "\n⚠️ Grid ត្រូវបានបិទដោយស្វ័យប្រវត្តិដើម្បីការពារបញ្ហាជាប់គាំង។"
+                            try:
+                                await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                            except: pass
+                        else:
+                            print(f"⏳ [INFINITY GRID BUY NOTICE THROTTLED] Suppressed duplicate error for {symbol}: {error_msg}")
                     
-                    try:
-                        await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                    except: pass
                     print(f"⚡ INFINITY BUY: {symbol} at {current_price} for {chat_id} - Status: {res.get('status')}")
                 
     except Exception as e:
@@ -3206,6 +3232,11 @@ async def compound_grid_monitor(app: Application, ai_engine):
                     new_total_coins = max(0.0, total_coins_bought - executed_qty)
                     
                     db.update_compound_grid_state(grid_id, new_layer_size, new_total_coins, current_price)
+                    # Clear error cooldown on successful sell
+                    for k in list(_GRID_ERROR_NOTICE_COOLDOWN.keys()):
+                        if k[0] == chat_id and k[1] == f"comp_{grid_id}":
+                            _GRID_ERROR_NOTICE_COOLDOWN.pop(k, None)
+
                     msg = (
                         f"⛄ **COMPOUND GRID (SNOWBALL SELL 80/20)** 📈\n"
                         f"{DIVIDER_HEAVY}\n"
@@ -3216,22 +3247,36 @@ async def compound_grid_monitor(app: Application, ai_engine):
                         f"{DIVIDER_HEAVY}\n"
                         f"_រង់ចាំទិញស្រទាប់ថ្មីពេលតម្លៃធ្លាក់ចុះ!_"
                     )
+                    try:
+                        await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                    except Exception:
+                        pass
                 else:
                     err_msg = res.get('error', res.get('msg', 'Sell Rejected'))
-                    msg = f"⛄ **COMPOUND GRID (SELL NOTICE)** ❌\n`{symbol}`: {err_msg}"
                     err_code = res.get("code")
                     if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
                         db.deactivate_compound_grid(grid_id)
 
-                try:
-                    await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                except Exception:
-                    pass
+                    cache_key = (chat_id, f"comp_{grid_id}", str(err_msg).strip())
+                    now_ts = time.time()
+                    if now_ts - _GRID_ERROR_NOTICE_COOLDOWN.get(cache_key, 0) >= _GRID_ERROR_COOLDOWN_SEC:
+                        _GRID_ERROR_NOTICE_COOLDOWN[cache_key] = now_ts
+                        msg = f"⛄ **COMPOUND GRID (SELL NOTICE)** ❌\n`{symbol}`: {err_msg}"
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
+                    else:
+                        print(f"⏳ [COMPOUND GRID SELL NOTICE THROTTLED] Suppressed duplicate error for {symbol}: {err_msg}")
 
             # =========================================================================
             # 3. AUTO BUY STEP (DIP ACCUMULATION & SPOT BUY INVARIANT 1 ENFORCEMENT)
             # =========================================================================
             elif current_price <= buy_target:
+                # 🛡️ Global Circuit Breaker Guard: Silently hold spot accumulation during market crashes
+                if hasattr(db, 'is_circuit_breaker_active') and db.is_circuit_breaker_active():
+                    continue
+
                 # 🛡️ Anti-Falling-Knife Guard
                 try:
                     rsi_15m = market_data.get_symbol_rsi(symbol, "15m")
@@ -3257,6 +3302,11 @@ async def compound_grid_monitor(app: Application, ai_engine):
                     executed_qty = float(res.get('executedQty') or (actual_buy_amount / current_price))
                     new_total_coins = total_coins_bought + executed_qty
                     db.update_compound_grid_state(grid_id, current_layer_size, new_total_coins, current_price)
+                    # Clear error cooldown on successful buy
+                    for k in list(_GRID_ERROR_NOTICE_COOLDOWN.keys()):
+                        if k[0] == chat_id and k[1] == f"comp_{grid_id}":
+                            _GRID_ERROR_NOTICE_COOLDOWN.pop(k, None)
+
                     msg = (
                         f"⛄ **COMPOUND GRID (SPOT BUY DIP)** 🛒\n"
                         f"{DIVIDER_HEAVY}\n"
@@ -3266,17 +3316,31 @@ async def compound_grid_monitor(app: Application, ai_engine):
                         f"{DIVIDER_HEAVY}\n"
                         f"_រង់ចាំលក់បូកចំណេញពេលតម្លៃងើបឡើងវិញ!_"
                     )
+                    try:
+                        await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                    except Exception:
+                        pass
                 else:
                     err_msg = res.get('error', res.get('msg', 'Buy Rejected'))
-                    msg = f"⛄ **COMPOUND GRID (BUY NOTICE)** ❌\n`{symbol}`: {err_msg}"
+                    # 🛡️ Silently suppress Circuit Breaker rejections from Telegram (already alerted at trigger)
+                    if str(err_msg).upper() in ["CIRCUIT_BREAKER_ACTIVE", "DEFENDER_CIRCUIT_BREAKER_ACTIVE"] or "CIRCUIT BREAKER" in str(err_msg).upper():
+                        continue
+
                     err_code = res.get("code")
                     if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
                         db.deactivate_compound_grid(grid_id)
 
-                try:
-                    await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-                except Exception:
-                    pass
+                    cache_key = (chat_id, f"comp_{grid_id}", str(err_msg).strip())
+                    now_ts = time.time()
+                    if now_ts - _GRID_ERROR_NOTICE_COOLDOWN.get(cache_key, 0) >= _GRID_ERROR_COOLDOWN_SEC:
+                        _GRID_ERROR_NOTICE_COOLDOWN[cache_key] = now_ts
+                        msg = f"⛄ **COMPOUND GRID (BUY NOTICE)** ❌\n`{symbol}`: {err_msg}"
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
+                    else:
+                        print(f"⏳ [COMPOUND GRID BUY NOTICE THROTTLED] Suppressed duplicate error for {symbol}: {err_msg}")
 
     except Exception as e:
         print(f"[COMPOUND GRID ERROR] {e}")
