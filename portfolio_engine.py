@@ -267,16 +267,17 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     except Exception as e:
         print(f"[PORTFOLIO] Smart swaps query error: {e}")
 
-    # 6. Active Infinity Grids
+    # 6. Active Infinity & Compound Grids (Multi-Table Aggregator)
     active_grids = []
     try:
+        # 6a. Legacy infinity_grid_bots
         raw_grids = db.get_active_infinity_grids_by_user(chat_id) or []
         for g in raw_grids:
-            # (id, symbol, amount_per_layer, step_pct, max_investment, current_investment, last_price)
             g_id, sym, layer_amt, step_pct, max_inv, curr_inv, last_p = g[:7]
             curr_p = trading_engine.get_current_price(sym) or float(last_p)
             active_grids.append({
                 "id": g_id,
+                "type": "INFINITY_GRID",
                 "symbol": sym,
                 "layer_amount": float(layer_amt),
                 "step_pct": float(step_pct),
@@ -285,6 +286,48 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
                 "last_price": float(last_p),
                 "current_price": float(curr_p)
             })
+
+        # 6b. Spot Snowball Compound Grids (compound_grids table)
+        if hasattr(db, 'get_active_compound_grids_by_user'):
+            c_grids = db.get_active_compound_grids_by_user(chat_id) or []
+            for cg in c_grids:
+                cg_id, c_sym, c_layer, c_step, c_target, c_coins, c_last_p = cg[:7]
+                curr_p = trading_engine.get_current_price(c_sym) or float(c_last_p)
+                active_grids.append({
+                    "id": cg_id,
+                    "type": "COMPOUND_GRID",
+                    "symbol": c_sym,
+                    "layer_amount": float(c_layer),
+                    "step_pct": float(c_step),
+                    "max_investment": float(c_target),
+                    "current_investment": float(c_coins) * curr_p if float(c_coins) > 0 else float(c_layer),
+                    "last_price": float(c_last_p),
+                    "current_price": float(curr_p)
+                })
+
+        # 6c. Dynamic Infinity Matrix Bots (infinity_matrix_bots table)
+        if hasattr(db, 'get_user_infinity_matrix_bots'):
+            im_bots = db.get_user_infinity_matrix_bots(chat_id) or []
+            for ib in im_bots:
+                if isinstance(ib, (list, tuple)) and len(ib) >= 4:
+                    ib_id = ib[0]
+                    ib_sym = ib[2]
+                    ib_cap = float(ib[3])
+                    ib_pnl = float(ib[4]) if len(ib) > 4 else 0.0
+                    ib_grids = int(ib[5]) if len(ib) > 5 else 100
+                    curr_p = trading_engine.get_current_price(ib_sym) or 0.0
+                    active_grids.append({
+                        "id": ib_id,
+                        "type": "INFINITY_MATRIX",
+                        "symbol": ib_sym,
+                        "layer_amount": ib_cap / max(1, ib_grids),
+                        "step_pct": 1.0,
+                        "max_investment": ib_cap,
+                        "current_investment": ib_cap,
+                        "last_price": curr_p,
+                        "current_price": curr_p,
+                        "accumulated_pnl": ib_pnl
+                    })
     except Exception as e:
         print(f"[PORTFOLIO] Infinity grids query error: {e}")
 
@@ -298,6 +341,10 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     except Exception as e:
         print(f"[PORTFOLIO] Snipers query error: {e}")
 
+    # 7b. Pre-Pump Radar Config
+    is_pre_pump_enabled = db.is_pre_pump_enabled(chat_id) if hasattr(db, 'is_pre_pump_enabled') else False
+    pre_pump_cfg = db.get_pre_pump_config(chat_id) if hasattr(db, 'get_pre_pump_config') else {}
+
     # 8. Funding Harvester
     funding_cfg = db.get_funding_harvester_config(chat_id) if hasattr(db, 'get_funding_harvester_config') else {"enabled": False, "amount": 50.0}
 
@@ -307,6 +354,10 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     # 8c. Smart X Quant Config
     smart_x_active = (db.get_system_setting(f"smart_x_{chat_id}_active", "0") == "1") if hasattr(db, 'get_system_setting') else False
     smart_x_target = db.get_system_setting(f"smart_x_{chat_id}_target", "GOLD") if hasattr(db, 'get_system_setting') else "GOLD"
+
+    # 8d. Auto Trade / Smart Trade Spot Config
+    is_auto_trade_enabled = db.is_auto_trade_enabled(chat_id) if hasattr(db, 'is_auto_trade_enabled') else False
+    macro_auto_cfg = db.get_macro_auto_trade_config(chat_id) if hasattr(db, 'get_macro_auto_trade_config') else {}
 
     # 9. Flash Loan Keeper & Strategy
     is_flash_loan_auto = db.is_user_flash_loan_auto(chat_id) if hasattr(db, 'is_user_flash_loan_auto') else False
@@ -482,6 +533,10 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "gold_turbo_cfg": gold_turbo_cfg,
         "smart_x_active": smart_x_active,
         "smart_x_target": smart_x_target,
+        "is_auto_trade_enabled": is_auto_trade_enabled,
+        "macro_auto_cfg": macro_auto_cfg,
+        "is_pre_pump_enabled": is_pre_pump_enabled,
+        "pre_pump_cfg": pre_pump_cfg,
         "is_flash_loan_auto": is_flash_loan_auto,
         "flash_loan_pnl": flash_loan_pnl,
         "is_defender_active": is_defender_active,
@@ -604,16 +659,31 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
 
     # --- ENGINE 2: Super Smart Trade Suite (Spot Breakout & Top Gainers) ---
     sp_trades = data["active_spot_trades"]
+    macro_auto_cfg = data.get("macro_auto_cfg", {})
+    is_auto_on = macro_auto_cfg.get("enabled", False) or data.get("is_auto_trade_enabled", False)
+    auto_amt = macro_auto_cfg.get("amount", 30.0)
+
     if sp_trades:
-        e2_status = f"🟢 ACTIVE ({len(sp_trades)} កាក់កំពុងជួញដូរ)" if lang == "km" else f"🟢 ACTIVE ({len(sp_trades)} Spot Positions)"
+        e2_status = f"🟢 ACTIVE / INVESTED ({len(sp_trades)} កាក់កំពុងជួញដូរ)" if lang == "km" else f"🟢 ACTIVE / INVESTED ({len(sp_trades)} Spot Positions)"
         e2_details = []
         for st in sp_trades:
             s_sign = "+" if st['pnl_usd'] >= 0 else ""
             e2_details.append(f"  • `{st['symbol']}` ៖ ដើមទុន `${st['invested_usd']:.2f}` | Entry: `${st['buy_price']:.4f}` | Mark: `${st['current_price']:.4f}` | PnL: `{s_sign}${st['pnl_usd']:.2f}` (`{st['roi_pct']:+.2f}%`)")
+        if is_auto_on:
+            e2_details.append(f"  • 🔄 Auto-Trade Scanner ៖ `🟢 ACTIVE (${auto_amt:.0f} USDT/Trade | 24/7 Scanning)`")
         e2_body = "\n".join(e2_details)
+    elif is_auto_on:
+        e2_status = "🟢 ACTIVE / SCANNING (ស្កេនរកកាក់ Spot Breakout 24/7)" if lang == "km" else "🟢 ACTIVE / SCANNING (Scanning Spot Breakouts 24/7)"
+        e2_body = (
+            f"  • 🔄 Auto-Trade Scanner ៖ `🟢 ACTIVE (${auto_amt:.0f} USDT/Trade)`\n"
+            f"  • ស្ថានភាព ៖ ម៉ាស៊ីន AI កំពុងស្កេន Top Gainers & Pullbacks (រង់ចាំទិញពេល Breakout ពិតប្រាកដ)"
+        ) if lang == "km" else (
+            f"  • 🔄 Auto-Trade Scanner: `🟢 ACTIVE (${auto_amt:.0f} USDT/Trade)`\n"
+            f"  • Status: Scanning Top Gainers & Pullbacks 24/7 (Awaiting prime breakout setup)"
+        )
     else:
         e2_status = "🟡 STANDBY (ស្កេនរកកាក់ Spot Breakout & Top Gainers 24/7)" if lang == "km" else "🟡 STANDBY (Scanning Spot Breakouts 24/7)"
-        e2_body = "  • ស្ថានភាព ៖ គ្មានកាក់ Spot កំពុងជួញដូរ (វាយ `/smart_trade auto 20 1234` ដើម្បីចាប់ផ្តើម)" if lang == "km" else "  • Status: Ready to execute `/smart_trade auto 20 1234`"
+        e2_body = "  • ស្ថានភាព ៖ គ្មានកាក់ Spot កំពុងជួញដូរ (វាយ `/auto_trade ON 30` ឬ `/smart_trade auto 20 1234` ដើម្បីចាប់ផ្តើម)" if lang == "km" else "  • Status: Standby (Execute `/auto_trade ON 30` or `/smart_trade auto 20 1234`)"
     engines_text += f"2️⃣ **Super Smart Trade Suite (`/smart_trade` / `auto_trade`)**\n   {e2_status}\n{e2_body}\n\n"
 
     # --- ENGINE 3: Smart X Multi-Asset Quant Suite (Gold & BTC) ---
@@ -667,7 +737,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     pnl_hist_str_en = f"\n  • 🏆 Realized DEX Profit ៖ `+${realized_swap_pnl:,.2f} USD` ({swaps_cnt} completed trades)" if swaps_cnt > 0 else ""
 
     if swaps:
-        e4_status = f"🟢 ACTIVE ({len(swaps)} On-Chain Gems កំពុងកើបចំណេញ)" if lang == "km" else f"🟢 ACTIVE ({len(swaps)} On-Chain Gems)"
+        e4_status = f"🟢 ACTIVE / INVESTED ({len(swaps)} On-Chain Gems កំពុងកើបចំណេញ)" if lang == "km" else f"🟢 ACTIVE / INVESTED ({len(swaps)} On-Chain Gems)"
         e4_details = []
         for s in swaps:
             sw_sign = "+" if s['pnl_usd'] >= 0 else ""
@@ -678,6 +748,24 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
                 f"    🌾 TP/SL: `TP1 +40% (ដកដើម ១០០%) | Trailing Stop Active` | Mint: `{short_addr}`"
             )
         e4_body = ("\n".join(e4_details) + ap_str_km + pnl_hist_str_km) if lang == "km" else ("\n".join(e4_details) + ap_str_en + pnl_hist_str_en)
+    elif is_ap_on:
+        e4_status = "🟢 ACTIVE / HUNTING (24/7 Solana & DEX Auto-Pilot)" if lang == "km" else "🟢 ACTIVE / HUNTING (24/7 Solana & DEX Auto-Pilot)"
+        sol_bal_text = f"`{sol_bal:.4f} SOL` (${sol_usd:.2f} USD)"
+        e4_body = (
+            f"  • 💳 កាបូបជួញដូរ Solana ៖ {sol_bal_text} | {short_sol}\n"
+            f"  • 🟣 Phantom Settlement Vault ៖ {short_pvault_km}\n"
+            f"  • 🛡️ សុវត្ថិភាព ៖ Jito Private MEV Shield & Honeypot AI Shield សកម្ម ១០០%\n"
+            f"  • ស្ថានភាព ៖ ម៉ាស៊ីន Auto-Pilot កំពុងស្កេន DexScreener & Jupiter Breakout Firehose 24/7"
+            f"{ap_str_km}"
+            f"{pnl_hist_str_km}"
+        ) if lang == "km" else (
+            f"  • 💳 Solana Hot Wallet: {sol_bal_text} | {short_sol}\n"
+            f"  • 🟣 Phantom Settlement Vault: {short_pvault_en}\n"
+            f"  • 🛡️ Protection: Jito Private MEV Shield & Honeypot AI Active 100%\n"
+            f"  • Status: Auto-Pilot hunting DexScreener & Jupiter Firehose 24/7"
+            f"{ap_str_en}"
+            f"{pnl_hist_str_en}"
+        )
     else:
         e4_status = "🟡 STANDBY (ស្កេន DexScreener & Jupiter Breakout Firehose 24/7)" if lang == "km" else "🟡 STANDBY (Scanning DEX Breakout Firehose 24/7)"
         sol_bal_text = f"`{sol_bal:.4f} SOL` (${sol_usd:.2f} USD)"
@@ -701,25 +789,40 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     # --- ENGINE 5: Dynamic Infinity Matrix & Compound Grid ---
     grids = data["active_grids"]
     if grids:
-        e5_status = f"🟢 ACTIVE ({len(grids)} Grids កំពុងរាយសំណាញ់)" if lang == "km" else f"🟢 ACTIVE ({len(grids)} Infinity Grids)"
+        e5_status = f"🟢 ACTIVE ({len(grids)} សំណាញ់កំពុងកើបចំណេញ)" if lang == "km" else f"🟢 ACTIVE ({len(grids)} Active Grids)"
         e5_details = []
         for g in grids:
-            e5_details.append(f"  • `{g['symbol']}` ៖ ដើមទុន `${g['current_investment']:.2f}` / Max `${g['max_investment']:.2f}` | Layer: `${g['layer_amount']:.2f}` (Step: {g['step_pct']}%)")
+            g_type = g.get("type", "GRID")
+            tag = "Snowball 3X" if g_type == "COMPOUND_GRID" else ("Matrix 100" if g_type == "INFINITY_MATRIX" else "Grid")
+            e5_details.append(f"  • `{g['symbol']}` ({tag}) ៖ ដើមទុន `${g['current_investment']:.2f}` / Max `${g['max_investment']:.2f}` | Layer: `${g['layer_amount']:.2f}` (Step: {g['step_pct']}%)")
         e5_body = "\n".join(e5_details)
     else:
         e5_status = "🟡 STANDBY (ត្រៀមសំណាញ់វិនិយោគ Grid 3X Compound)" if lang == "km" else "🟡 STANDBY (Ready for 3X Compound Deployment)"
-        e5_body = "  • ស្ថានភាព ៖ គ្មាន Grid សកម្ម (វាយ `/compound_grid XRP 100 1234` ដើម្បីដាក់សំណាញ់)" if lang == "km" else "  • Status: Ready to deploy via `/compound_grid`"
+        e5_body = "  • ស្ថានភាព ៖ គ្មាន Grid សកម្ម (វាយ `/compound_grid AVAX 100 3.0 1234` ឬ `/infinity_matrix ON 100 1234` ដើម្បីដាក់សំណាញ់)" if lang == "km" else "  • Status: Ready to deploy via `/compound_grid` or `/infinity_matrix`"
     engines_text += f"5️⃣ **Dynamic Infinity Matrix & Compound Grid (`/infinity_matrix`)**\n   {e5_status}\n{e5_body}\n\n"
 
     # --- ENGINE 6: Smart Listing & Pre-Pump Sniper ---
     snipers = data["user_snipers"]
+    is_pre_pump_on = data.get("is_pre_pump_enabled", False)
+    pre_pump_cfg = data.get("pre_pump_cfg", {})
+    pp_amt = pre_pump_cfg.get("amount", 50.0)
+
     if snipers:
         e6_status = f"🟢 ACTIVE SNIPER ({len(snipers)} កាក់កំពុងស្ទាក់ចាប់)" if lang == "km" else f"🟢 ACTIVE SNIPER ({len(snipers)} Targets)"
         e6_details = [f"  • `{sn.get('symbol')}` ៖ ដើមទុន `${sn.get('invest_amount', 0):.2f}` | State: `{sn.get('state')}` | Buy Price: `${sn.get('buy_price', 0):.4f}`" for sn in snipers]
         e6_body = "\n".join(e6_details)
+    elif is_pre_pump_on:
+        e6_status = "🟢 ACTIVE / RADAR (Whale Pre-Pump Radar កំពុងស្ទាក់ចាប់ 24/7)" if lang == "km" else "🟢 ACTIVE / RADAR (Whale Pre-Pump Radar Active 24/7)"
+        e6_body = (
+            f"  • 🐋 Whale Radar ៖ `🟢 ACTIVE (${pp_amt:.0f} USDT/Target)`\n"
+            f"  • ស្ថានភាព ៖ 33 AI Models & WebSocket Orderflow Velocity កំពុងស្កេនចាប់កាក់ Whale Pump ២៤/៧"
+        ) if lang == "km" else (
+            f"  • 🐋 Whale Radar: `🟢 ACTIVE (${pp_amt:.0f} USDT/Target)`\n"
+            f"  • Status: 33 AI Models & WebSocket Orderflow Velocity monitoring Whale Pumps 24/7"
+        )
     else:
         e6_status = "🟡 STANDBY (WebSocket Listing Radar ត្រៀមស្ទាក់កាក់ថ្មី 24/7)" if lang == "km" else "🟡 STANDBY (Binance WebSocket Listing Radar Active 24/7)"
-        e6_body = "  • ស្ថានភាព ៖ តាមដានគម្លាត Volume Velocity & 33 AI Models (វាយ `/pre_pump` ដើម្បីកំណត់)" if lang == "km" else "  • Status: 33 AI Models & Orderflow Monitoring (Configure via `/pre_pump`)"
+        e6_body = "  • ស្ថានភាព ៖ តាមដានគម្លាត Volume Velocity & 33 AI Models (វាយ `/pre_pump ON 50 1234` ដើម្បីបើក)" if lang == "km" else "  • Status: 33 AI Models & Orderflow Monitoring (Configure via `/pre_pump ON 50 1234`)"
     engines_text += f"6️⃣ **Smart Listing & Pre-Pump Engine (`/pre_pump`)**\n   {e6_status}\n{e6_body}\n\n"
 
     # --- ENGINE 7: 8-Hour Funding Rate & Basis Arbitrage Harvester ---
