@@ -2799,6 +2799,19 @@ def update_active_trade_highest(trade_id, current_highest):
     conn.commit()
     conn.close()
 
+def is_symbol_occupied_anywhere(symbol: str) -> bool:
+    """Checks if a symbol is currently occupied by any engine across all active trades."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM active_trades WHERE symbol = ?", (symbol,))
+        count = cursor.fetchone()[0]
+        return count > 0
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
 # remove_active_trade is defined above
 
 # --- Auto Trade Engine ---

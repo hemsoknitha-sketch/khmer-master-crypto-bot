@@ -12657,7 +12657,7 @@ class TelegramBotThread(BaseThread):
                 if user_lang == 'en':
                     msg = (
                         "🌾 **INSTITUTIONAL DELTA-NEUTRAL FUNDING YIELD HARVESTER v13.00** 🌾\n"
-                        "══════════════════════════\n\n"
+                        "════════════\n\n"
                         "📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
                         f"• **System Status**: {status_str}\n"
                         "• **AI Ensemble Models**: `HMM Market Regime` + `RL Dynamic PPO Agent`\n"
@@ -12673,7 +12673,7 @@ class TelegramBotThread(BaseThread):
                 elif user_lang == 'zh':
                     msg = (
                         "🌾 **机构级 1:1 Delta-Neutral 资金费率无风险套利引擎 v13.00** 🌾\n"
-                        "══════════════════════════\n\n"
+                        "════════════\n\n"
                         "📊 **机构级资金费率收割器配置：**\n"
                         f"• **当前状态**: {status_str}\n"
                         "• **AI 模型协同**: `HMM Market Regime` + `RL Dynamic PPO Agent`\n"
@@ -12689,7 +12689,7 @@ class TelegramBotThread(BaseThread):
                 else:
                     msg = (
                         "🌾 **INSTITUTIONAL DELTA-NEUTRAL FUNDING YIELD HARVESTER v13.00** 🌾\n"
-                        "══════════════════════════\n\n"
+                        "════════════\n\n"
                         "📊 **EXECUTIVE HARVESTER CONFIGURATION (ស្ថាបត្យកម្មវិនិយោគ 0% RISK) ៖**\n"
                         f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
                         "• **AI Models សហការ ៖** `HMM Market Regime` + `RL Dynamic PPO Agent`\n"
@@ -14471,6 +14471,7 @@ class TelegramBotThread(BaseThread):
         # 🌾 Institutional High-Yield & Arbitrage Engines (Dedicated Handlers, Zero-Duplicate)
         self.app.add_handler(CommandHandler("cross_arb", cross_arb_command))
         self.app.add_handler(CommandHandler("funding_harvester", funding_harvester_command))
+        self.app.add_handler(CommandHandler("fundingharvester", funding_harvester_command))
         self.app.add_handler(CommandHandler("whales", whales_command))
         self.app.add_handler(CommandHandler("infinity_matrix", infinity_grid_command))
         self.app.add_handler(CommandHandler("flash_crash", flash_crash_command))

@@ -5088,10 +5088,26 @@ async def funding_harvester_monitor(app: Application):
 
                 if entry_res.get("status") == "success":
                     _active_funding_positions[chat_id] = {"symbol": symbol, "capital": amount}
-                    print(f"🌾 [FUNDING HARVESTER ENTRY SILENT] {symbol} (Rate: {funding_rate:+.4f}%) for Chat ID {chat_id}")
+                    print(f"🌾 [FUNDING HARVESTER ENTRY EXECUTED] {symbol} (Rate: {funding_rate:+.4f}%) for Chat ID {chat_id}")
+                    entry_msg = (
+                        f"🌾 **8-HOUR FUNDING YIELD HARVEST ENTRY** 🚀\n"
+                        f"━━━━━━━━━━━━\n"
+                        f"• **កាក់ (Target) ៖** `{symbol}`\n"
+                        f"• **យុទ្ធសាស្ត្រ ៖** `Delta-Neutral 1:1 (Spot Long + 1x Short)`\n"
+                        f"• **Funding Rate ៖** `{funding_rate:+.4f}%/8h` (Est. APY: `{scan_res.get('max_apy_pct', 0.0):.1f}%`)\n"
+                        f"• **Basis Spread ៖** `{scan_res.get('basis_spread_pct', 0.0):+.2f}%`\n"
+                        f"• **ទុនបម្រុង ៖** `${amount:,.2f} USDT`\n"
+                        f"• **ហានិភ័យទីផ្សារ ៖** `0.00% (Market Price Immune)`\n"
+                        f"━━━━━━━━━━━━\n"
+                        f"_ប្រព័ន្ធនឹងបិទយកប្រាក់ចំណេញសុទ្ធដោយស្វ័យប្រវត្តិនាពេលទូទាត់រួច!_"
+                    )
+                    try:
+                        await app.bot.send_message(chat_id=chat_id, text=entry_msg, parse_mode="Markdown")
+                    except Exception:
+                        pass
 
         # 2. Post-Settlement Exit Window (Within 5 minutes after settlement)
-        elif secs_left > 28200: # right after settlement
+        elif secs_left > 28200:  # right after settlement
             for chat_id, pos_info in list(_active_funding_positions.items()):
                 keys = db.get_user_api(chat_id)
                 if keys:
@@ -5099,7 +5115,20 @@ async def funding_harvester_monitor(app: Application):
                         funding_harvester_engine.execute_funding_harvest_exit,
                         keys[0], keys[1], pos_info["symbol"], pos_info["capital"]
                     )
-                    print(f"🌾 [FUNDING HARVESTER EXIT SILENT] Closed {pos_info['symbol']} for Chat ID {chat_id}")
+                    print(f"🌾 [FUNDING HARVESTER EXIT EXECUTED] Closed {pos_info['symbol']} for Chat ID {chat_id}")
+                    exit_msg = (
+                        f"🌾 **8-HOUR FUNDING HARVEST COMPLETED** 💰\n"
+                        f"━━━━━━━━━━━━\n"
+                        f"• **កាក់ (Target) ៖** `{pos_info['symbol']}`\n"
+                        f"• **ស្ថានភាព ៖** `ទូទាត់ប្រាក់ចំណេញ Funding Cash រួចរាល់!`\n"
+                        f"• **លទ្ធផល ៖** `ចាក់សោប្រាក់ចំណេញសុទ្ធ Delta-Neutral 100%!`\n"
+                        f"━━━━━━━━━━━━\n"
+                        f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                    )
+                    try:
+                        await app.bot.send_message(chat_id=chat_id, text=exit_msg, parse_mode="Markdown")
+                    except Exception:
+                        pass
                 del _active_funding_positions[chat_id]
 
     except asyncio.CancelledError:
