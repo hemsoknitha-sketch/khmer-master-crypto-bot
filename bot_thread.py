@@ -10156,8 +10156,8 @@ class TelegramBotThread(BaseThread):
                         f"💰 Target Profit ៖ `+${target_tp:.2f} USDT / Trade`\n"
                         f"🛡️ សុវត្ថិភាព ៖ `Breakeven Armor @ +3% | Micro-Scalp TP1 50% | Sweet-Spot (+3% ដល់ +12%)`\n"
                         f"⚡ Binance Status ៖ `{success_count} Coins Executed Instant (<100ms)`\n"
-                        f"🔄 **Perpetual Auto-Scanner** ៖ `ACTIVE (ស្កេន 24/7 រហូតគ្រប់ 10 កាក់)`\n\n"
-                        f"_AI ស្កេន Available Balance រៀងរាល់ ៣ វិនាទី ឲ្យតែមានលុយគ្រប់ នឹងបើកកាក់ថ្មីអូតូ មិនសម្រាកឡើយ រហូតដល់ 10 កាក់អតិបរមា ឬរហូតចុច /smart_trade STOP!_"
+                        f"🔄 **Perpetual Auto-Scanner** ៖ `ACTIVE (ស្កេន 24/7 រហូតគ្រប់ {target_top_cap} កាក់)`\n\n"
+                        f"_AI ស្កេន Available Balance រៀងរាល់ ៣ វិនាទី ឲ្យតែមានលុយគ្រប់ នឹងបើកកាក់ថ្មីអូតូ មិនសម្រាកឡើយ រហូតដល់ {target_top_cap} កាក់អតិបរមា ឬរហូតចុច /smart_trade STOP!_"
                     )
                     if ack_msg:
                         try:
@@ -12096,8 +12096,9 @@ class TelegramBotThread(BaseThread):
             self.log_signal.emit(f"🌊 VIP User {chat_id} executed /auto_trade command (args={args})")
 
             # 🌟 Institutional Flagship Routing: /smart_trade routes directly to turbo_hedge_command!
-            # Also route any trading subcommands (TOP, SPOT, HEDGE, STOP, coins, etc.) directly to turbo_hedge_command!
-            if cmd_text.startswith("/smart_trade") or (args and len(args) > 0 and str(args[0]).upper().strip() not in ["ON", "OFF", "SET", "LEVERAGE", "STATUS"]):
+            # Also route any trading subcommands (TOP, SPOT, HEDGE, STOP, coins, etc.) or PIN-authenticated executions directly to turbo_hedge_command!
+            has_pin = len(args) >= 3 and len(str(args[-1]).strip()) == 4 and str(args[-1]).strip().isdigit()
+            if cmd_text.startswith("/smart_trade") or has_pin or (args and len(args) > 0 and str(args[0]).upper().strip() not in ["ON", "OFF", "SET", "LEVERAGE", "STATUS"]):
                 return await turbo_hedge_command(update, context)
 
             try:
@@ -12191,7 +12192,7 @@ class TelegramBotThread(BaseThread):
                             trade_amt = float(args[1])
                         except ValueError:
                             pass
-                    trade_amt = max(15.0, min(500.0, trade_amt))
+                    trade_amt = max(5.0, min(500.0, trade_amt))
                     db.set_macro_auto_trade_config(chat_id, True, trade_amt, leverage, target_tp)
                     on_msg = (
                         f"✅ **SUPER SMART /AUTO_TRADE ACTIVATED!** 🌊\n"
