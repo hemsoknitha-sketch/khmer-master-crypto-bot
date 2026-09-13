@@ -61,6 +61,7 @@ echo "🛡️ [SAFEGUARD] VIP Database and .env backed up successfully."
 # 3. Reset and Pull Latest Code from GitHub
 echo "📥 [GIT] Pulling latest code from GitHub origin/main..."
 git reset --hard origin/main
+rm -f models/hft_infrastructure/*.py 2>/dev/null || true
 
 # 4. Restore VIP Database and .env
 if ls vps_db_backup/bot_database.db* 1> /dev/null 2>&1; then
