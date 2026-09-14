@@ -4931,8 +4931,69 @@ async def gold_turbo_monitor(app: Application):
             is_smartx_active = (db.get_system_setting(f"smart_x_{chat_id}_active", "0") == "1")
             smartx_mode = db.get_system_setting(f"smart_x_{chat_id}_mode", "SONIC").upper()
 
-            # Execute TURBO Momentum if enabled
-            if (is_legacy_turbo or (is_smartx_active and smartx_mode == "TURBO")) and turbo_res.get("side") in ["BUY", "SELL"] and turbo_res.get("confidence_pct", 0) >= 85.0:
+            # 1. Execute AGI AUTO Swarm (Dynamic MoE Regime Switching)
+            if is_smartx_active and smartx_mode in ["AUTO", "AGI"]:
+                moe_regime = turbo_res.get("moe_regime") or sonic_res.get("moe_regime") or "RANGE_CHOP"
+                if moe_regime in ["TRENDING_BULL", "TRENDING_BEAR"] and turbo_res.get("side") in ["BUY", "SELL"] and turbo_res.get("confidence_pct", 0) >= 85.0:
+                    amount = float(db.get_system_setting(f"smart_x_{chat_id}_amount", "20.0"))
+                    lev = int(db.get_system_setting(f"smart_x_{chat_id}_leverage", "0")) or int(turbo_res.get("dynamic_leverage", 25))
+                    side = turbo_res["side"]
+                    exec_res = await asyncio.to_thread(
+                        smart_x_engine.execute_smart_x_futures,
+                        chat_id, "XAUUSDT", side, amount, lev, 1.5, "TURBO"
+                    )
+                    print(f"🧠 [AGI AUTO -> TURBO] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
+                    if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
+                        try:
+                            p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                            notif = (
+                                "👑 *[SMARTX AGI AUTO -> TURBO SPRINT]* 🚀\n"
+                                "━━━━━━━━━━━━\n"
+                                f"• Direction  : `{side} ({turbo_res.get('confidence_pct')}% Conf)`\n"
+                                "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
+                                f"• Entry Price: `${p:,.2f}`\n"
+                                f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
+                                "• MoE Regime : `TRENDING_EXPANSION -> Routed to TURBO`\n"
+                                "• Target TP  : `Uncapped Trailing Lock`\n"
+                                "• Protection : `Breakeven Lock @ +3% | Time-Stop Active`\n"
+                                "━━━━━━━━━━━━\n"
+                                "_AGI Autonomous Swarm Engine Active 24/7._"
+                            )
+                            await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                        except Exception as err:
+                            print(f"Error sending auto turbo notif: {err}")
+
+                elif sonic_res.get("side") in ["BUY", "SELL"] and sonic_res.get("confidence_pct", 0) >= 85.0:
+                    amount = float(db.get_system_setting(f"smart_x_{chat_id}_amount", "20.0"))
+                    lev = int(db.get_system_setting(f"smart_x_{chat_id}_leverage", "10"))
+                    side = sonic_res["side"]
+                    exec_res = await asyncio.to_thread(
+                        smart_x_engine.execute_smart_x_futures,
+                        chat_id, "XAUUSDT", side, amount, lev, 2.5, "SONIC"
+                    )
+                    print(f"🧠 [AGI AUTO -> SONIC] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
+                    if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
+                        try:
+                            p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                            notif = (
+                                "👑 *[SMARTX AGI AUTO -> SONIC SCALP]* 🎯\n"
+                                "━━━━━━━━━━━━\n"
+                                f"• Direction  : `{side} ({sonic_res.get('confidence_pct')}% Conf)`\n"
+                                "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
+                                f"• Entry Price: `${p:,.2f}`\n"
+                                f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
+                                "• MoE Regime : `RANGE_CHOP -> Routed to SONIC Scalp`\n"
+                                "• Target TP  : `+$2.50 to +$10.00/oz`\n"
+                                "• Protection : `Breakeven Lock @ +3% | Time-Stop Active`\n"
+                                "━━━━━━━━━━━━\n"
+                                "_AGI Autonomous Swarm Engine Active 24/7._"
+                            )
+                            await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                        except Exception as err:
+                            print(f"Error sending auto sonic notif: {err}")
+
+            # 2. Execute TURBO Momentum if explicitly enabled
+            elif (is_legacy_turbo or (is_smartx_active and smartx_mode == "TURBO")) and turbo_res.get("side") in ["BUY", "SELL"] and turbo_res.get("confidence_pct", 0) >= 85.0:
                 amount = float(db.get_system_setting(f"smart_x_{chat_id}_amount", "0")) or float(cfg.get("amount_per_trade", 15.0))
                 lev = int(db.get_system_setting(f"smart_x_{chat_id}_leverage", "0")) or int(turbo_res.get("dynamic_leverage", 25))
                 side = turbo_res["side"]
@@ -4960,8 +5021,8 @@ async def gold_turbo_monitor(app: Application):
                     except Exception as err:
                         print(f"Error sending turbo gold notif: {err}")
 
-            # Execute SONIC Scalp if enabled
-            elif is_smartx_active and smartx_mode != "TURBO" and sonic_res.get("side") in ["BUY", "SELL"] and sonic_res.get("confidence_pct", 0) >= 85.0:
+            # 3. Execute SONIC Scalp if explicitly enabled
+            elif is_smartx_active and smartx_mode == "SONIC" and sonic_res.get("side") in ["BUY", "SELL"] and sonic_res.get("confidence_pct", 0) >= 85.0:
                 amount = float(db.get_system_setting(f"smart_x_{chat_id}_amount", "20.0"))
                 lev = int(db.get_system_setting(f"smart_x_{chat_id}_leverage", "10"))
                 side = sonic_res["side"]
