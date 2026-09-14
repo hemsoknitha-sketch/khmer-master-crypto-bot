@@ -4375,6 +4375,17 @@ class TelegramBotThread(BaseThread):
                 await menu_command(update, context)
             elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
                 await turbo_hedge_command(update, context)
+            elif data in ["btn_smart_trade", "btn_smart_trade_launch"]:
+                await smart_trade_command(update, context)
+            elif data == "btn_smart_trade_auto":
+                context.args = ["AUTO", "30"]
+                await smart_trade_command(update, context)
+            elif data == "btn_smart_trade_status":
+                context.args = ["STATUS"]
+                await smart_trade_command(update, context)
+            elif data == "btn_smart_trade_stop_all":
+                context.args = ["STOP", "ALL"]
+                await smart_trade_command(update, context)
             elif data in ["btn_cross_arb", "btn_cross_arb_scan"]:
                 await cross_arb_command(update, context)
             elif data == "btn_flash_loan":
@@ -4649,8 +4660,8 @@ class TelegramBotThread(BaseThread):
                 context.args = ["ON"] if data == "btn_dyn_lev_on" else ["OFF"]
                 await dynamic_leverage_command(update, context)
             elif data == "btn_turbo_hedge_spot_launch":
-                context.args = ["SPOT", "AUTO"]
-                await turbo_hedge_command(update, context)
+                context.args = ["AUTO", "30"]
+                await smart_trade_command(update, context)
             elif data == "btn_turbo_hedge_top_launch":
                 context.args = ["TOP", "20", "10", "AUTO", "5"]
                 await turbo_hedge_command(update, context)
@@ -9300,7 +9311,7 @@ class TelegramBotThread(BaseThread):
                 keyboard = InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton("🚀 Launch Futures TOP Scanner", callback_data="btn_turbo_hedge_top_launch"),
-                        InlineKeyboardButton("🎯 Launch Spot Breakout Scanner", callback_data="btn_turbo_hedge_spot_launch")
+                        InlineKeyboardButton("💎 Pure Spot (/smart_trade)", callback_data="btn_smart_trade_auto")
                     ],
                     [
                         InlineKeyboardButton("🏛️ Layered Wealth (70:20:10)", callback_data="btn_turbo_hedge_wealth_launch"),
@@ -9318,19 +9329,19 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
+                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE DELTA-NEUTRAL ENGINE v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n\n"
-                        "💡 **PRO TIP**: `/turbo_hedge` is your unified Super Smart & Institutional Hedge Engine!\n\n"
+                        "💡 **PRO TIP**: `/turbo_hedge` is your 100% Pure Futures Institutional Delta-Neutral & Directional Hedge Engine!\n"
+                        "💡 For 100% Pure Spot Accumulation without liquidation risk, use `/smart_trade`!\n\n"
                         "🏛️ **VIP LAYERED WEALTH PROTOCOL (70:20:10 ALLOCATION):**\n"
                         "• 🛡️ **70% Core Delta-Neutral Hedge** ៖ Spot Buy + Fut Short (0% Market Risk)\n"
                         "• 🚀 **20% High-EV Growth Scalper** ៖ L2 Orderbook Imbalance Guard (E[X] > 0)\n"
                         "• 🏦 **10% Strategic Liquid Reserve** ៖ Locked in Spot USDT (Emergency Buffer)\n"
                         "• ⚡ **5% Global Risk Shield** ៖ 24h Portfolio Drawdown Circuit Breaker Freeze\n\n"
-                        "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
+                        "📊 **INSTITUTIONAL FUTURES & HEDGE ARCHITECTURE:**\n"
                         "• 🛡️ **Anti-Oversold Short Guard** ៖ 15m RSI <= 38.0 Hard Rejection (Eliminates Short Squeeze 100%)\n"
                         "• 🔒 **Single-Asset Isolated Mode** ៖ Auto-forces `multiAssetsMargin: false` (Zero Cross-Wallet Contagion)\n"
                         "• 📰 **News Technical Confirmation** ៖ 15m RSI <= 42.0 Blocks Blind News Shorts (Zero Whale Exit Liquidity)\n"
-                        "• 🚀 **Dual Market Support (Spot & Futures)** ៖ Execute Spot (1x) or Futures (1x-15x/75x) with zero collision\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL Instant Reversal\n"
                         "• 💰 **Dual-Check Profit Lock** ៖ +$5.00 USDT / +25% ROI ➔ Instant Market Close & Re-Entry 24/7\n"
                         "• 🛡️ **Small Capital Shield** ៖ Capital <$100 USDT automatically clamped to 10x Max Leverage\n"
@@ -9342,27 +9353,24 @@ class TelegramBotThread(BaseThread):
                         "👉 **🚀 Futures Top Gainers LONG (BUY 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
                         "👉 **📉 Futures Top Dumpers SHORT (SELL 10x, $5/coin) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
                         "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/turbo_hedge HEDGE auto 20 1234` ``\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Single-Coin Mode ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 Stop & Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``\n\n"
+                        "👉 **💎 100% Pure Spot Breakout Accumulator (0% Liquidation Risk) ៖**\n`` `/smart_trade AUTO 30 1234` ``\n\n"
+                        "👉 **🛑 Stop & Market Close ៖**\n`` `/turbo_hedge STOP ALL 1234` ``\n\n"
                         + ui_standards.OFFICIAL_FOOTNOTE
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | SUPER SMART 高频量化交易系统 v13.00** 🛡️\n"
+                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE 机构级高频对冲引擎 v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n\n"
-                        "💡 **提示**：`/turbo_hedge` 是您统一的超级智能量化与机构级对冲引擎！\n\n"
+                        "💡 **提示**：`/turbo_hedge` 是纯合约 (Futures) 机构级 Delta-Neutral 与双向对冲引擎！现货零爆仓积累请使用 `/smart_trade`！\n\n"
                         "🏛️ **VIP 分层财富协议 (70:20:10 资金配比):**\n"
                         "• 🛡️ **70% 核心 Delta-Neutral 对冲** ៖ Spot 买入 + Fut 做空 (0% 爆仓风险)\n"
                         "• 🚀 **20% 高期望值增长剥头皮** ៖ L2 订单薄微观结构倾斜守卫 (E[X] > 0)\n"
                         "• 🏦 **10% 战略流动性储备** ៖ 锁定于现货 USDT (极端黑天鹅回撤缓冲)\n"
                         "• ⚡ **5% 全局风控熔断器** ៖ 24h 投资组合回撤超 5% 自动冻结开仓\n\n"
-                        "📊 **机构级 SUPER SMART 架构：**\n"
+                        "📊 **机构级 FUTURES & HEDGE 架构：**\n"
                         "• 🛡️ **超卖做空禁令 (RSI <= 38.0)** ៖ 严禁在底部恐慌区开空，100% 杜绝扎针轧空爆仓\n"
                         "• 🔒 **单资产逐仓模式 (Single-Asset)** ៖ 强制关闭 Multi-Assets，锁定 ISOLATED 保证全仓隔离\n"
                         "• 📰 **消息面技术确认盾** ៖ 15m RSI <= 42.0 严格阻断盲目看空，杜绝充当主力出货流动性\n"
-                        "• 🚀 **现货与合约双市场支持** ៖ 零冲突支持 Spot (1x) 或 Futures (1x-15x/75x) 自动建仓\n"
                         "• 🔄 **极速反向翻单 (<30ms)** ៖ 触发 -10.0% ROI / -$2.00 USDT 硬止损 ➔ 立即 BUY ↔ SELL 翻单\n"
                         "• 💰 **双重锁定止盈** ៖ +$5.00 USDT / +25% ROI ➔ 24/7 极速平仓并重入\n"
                         "• 🛡️ **小资金杠杆防护** ៖ 资金低于 $100 USDT 自动钳制在 10x 杠杆以内\n"
@@ -9374,27 +9382,25 @@ class TelegramBotThread(BaseThread):
                         "👉 **🚀 合约做多 24h 涨幅榜 TOP 20 (BUY 10x) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
                         "👉 **📉 合约做空 24h 跌幅榜 TOP 20 (SELL 10x) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
                         "👉 **🛡️ 零风险 Delta-Neutral 对冲 (Spot 买入 1x + Futures 做空 1x) ៖**\n`` `/turbo_hedge HEDGE auto 20 1234` ``\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 现货多币突破全自动扫描 ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 现货单币模式 ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 停止与平仓指令 ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``\n\n"
+                        "👉 **💎 现货零爆仓突破自动积累 ៖**\n`` `/smart_trade AUTO 30 1234` ``\n\n"
+                        "👉 **🛑 停止与平仓指令 ៖**\n`` `/turbo_hedge STOP ALL 1234` ``\n\n"
                         + ui_standards.OFFICIAL_FOOTNOTE
                     )
                 else:
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | SUPER SMART TRADING SUITE v13.00** 🛡️\n"
+                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE DELTA-NEUTRAL ENGINE v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n\n"
-                        "💡 **ការណែនាំពិសេស** ៖ `/turbo_hedge` គឺជាម៉ាស៊ីន Super Smart និង Institutional Hedge រួមបញ្ចូលគ្នាតែមួយ!\n\n"
+                        "💡 **ការណែនាំពិសេស** ៖ `/turbo_hedge` គឺជាម៉ាស៊ីន 100% Pure Futures Delta-Neutral & Directional Hedge!\n"
+                        "💡 សម្រាប់ Spot Accumulation កាន់កាប់កាក់សុទ្ធ 0% Liquidation Risk សូមប្រើ `/smart_trade`!\n\n"
                         "🏛️ **VIP LAYERED WEALTH PROTOCOL (ការបែងចែកទុន 70:20:10):**\n"
                         "• 🛡️ **70% Core Delta-Neutral Hedge** ៖ Spot Buy + Fut Short (ហានិភ័យទីផ្សារ 0% Market Risk)\n"
                         "• 🚀 **20% High-EV Growth Scalper** ៖ Microstructure L2 Imbalance Guard (ប្រៀបឈ្នះ E[X] > 0)\n"
                         "• 🏦 **10% Strategic Liquid Reserve** ៖ ចាក់សោក្នុង Spot USDT (ទ្រនាប់សុវត្ថិភាព Drawdown Buffer)\n"
                         "• ⚡ **5% Global Risk Shield** ៖ Circuit Breaker បង្កកការបើកថ្មីពេល Drawdown 24h ដល់ 5%\n\n"
-                        "📊 **INSTITUTIONAL SUPER SMART ARCHITECTURE:**\n"
+                        "📊 **INSTITUTIONAL FUTURES & HEDGE ARCHITECTURE:**\n"
                         "• 🛡️ **Anti-Oversold Short Guard (15m RSI <= 38.0)** ៖ ហាមដាច់ខាតមិនឱ្យ Short នៅបាតភ្នំ (កម្ចាត់ Short Squeeze ១០០%)\n"
                         "• 🔒 **Single-Asset Mode & ISOLATED Guarantee** ៖ បង្ខំ `multiAssetsMargin: false` (កម្ចាត់ Error -4168 & ការពារ Cross-Margin Contagion ១០០%)\n"
                         "• 📰 **News Technical Confirmation Shield** ៖ 15m RSI <= 42.0 ប្លុក Short News (ការពារការធ្វើជា Liquidity ឱ្យត្រីបាឡែន)\n"
-                        "• 🚀 **គាំទ្រទីផ្សារពីរ (Spot & Futures)** ៖ រត់ Spot (1x) និង Futures (1x-15x/75x) ដោយគ្មានការទង្គិចគ្នា\n"
                         "• 🔄 **Instant Reverse Flip (<30ms)** ៖ Hard Stop -10.0% ROI / -$2.00 USDT ➔ BUY ↔ SELL ភ្លាមៗ (Zero Loss Past -15%)\n"
                         "• 💰 **Dual-Check Profit Lock** ៖ +$5.00 USDT / +25% ROI ➔ Instant Market Close & Re-Entry 24/7\n"
                         "• 🛡️ **Small Capital Shield** ៖ ទុនក្រោម $100 USDT ត្រូវ Clamp ត្រឹម 10x Max Leverage\n"
@@ -9406,10 +9412,8 @@ class TelegramBotThread(BaseThread):
                         "👉 **🚀 Futures Top Gainers LONG (ទិញឡើង BUY 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 BUY 5 1234` ``\n\n"
                         "👉 **📉 Futures Top Dumpers SHORT (ទិញចុះ SELL 10x, ទុន $5/កាក់) ៖**\n`` `/turbo_hedge TOP 20 10 SELL 5 1234` ``\n\n"
                         "👉 **🛡️ Super Delta-Neutral Hedge (Spot Buy 1x + Futures Short 1x 0% Risk) ៖**\n`` `/turbo_hedge HEDGE auto 20 1234` ``\n`` `/turbo_hedge HEDGE BTC 100 1234` ``\n\n"
-                        "👉 **🛒 Spot Multi-Coin Auto Breakout Scanner ៖**\n`` `/turbo_hedge SPOT AUTO 50 1234` ``\n\n"
-                        "👉 **🛒 Spot Single-Coin Mode (0% Liquidation Risk) ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n\n"
-                        "👉 **🛑 បិទ និង Market Close ៖**\n`` `/turbo_hedge STOP SOL 1234` ``\n"
-                        "`` `/turbo_hedge STOP ALL 1234` ``\n\n"
+                        "👉 **💎 100% Pure Spot Breakout Accumulator (ហានិភ័យបែកកុង 0%) ៖**\n`` `/smart_trade AUTO 30 1234` ``\n\n"
+                        "👉 **🛑 បិទ និង Market Close ៖**\n`` `/turbo_hedge STOP ALL 1234` ``\n\n"
                         + ui_standards.OFFICIAL_FOOTNOTE
                     )
                 msg_target = update.effective_message or update.message
@@ -10169,7 +10173,7 @@ class TelegramBotThread(BaseThread):
                         f"🛡️ សុវត្ថិភាព ៖ `Breakeven Armor @ +3% | Micro-Scalp TP1 50% | Sweet-Spot (+3% ដល់ +12%)`\n"
                         f"⚡ Binance Status ៖ `{success_count} Coins Executed Instant (<100ms)`\n"
                         f"🔄 **Perpetual Auto-Scanner** ៖ `ACTIVE (ស្កេន 24/7 រហូតគ្រប់ {target_top_cap} កាក់)`\n\n"
-                        f"_AI ស្កេន Available Balance រៀងរាល់ ៣ វិនាទី ឲ្យតែមានលុយគ្រប់ នឹងបើកកាក់ថ្មីអូតូ មិនសម្រាកឡើយ រហូតដល់ {target_top_cap} កាក់អតិបរមា ឬរហូតចុច /smart_trade STOP!_"
+                        f"_AI ស្កេន Available Balance រៀងរាល់ ៣ វិនាទី ឲ្យតែមានលុយគ្រប់ នឹងបើកកាក់ថ្មីអូតូ មិនសម្រាកឡើយ រហូតដល់ {target_top_cap} កាក់អតិបរមា ឬរហូតចុច /turbo_hedge STOP ALL!_"
                     )
                     if ack_msg:
                         try:
@@ -12160,6 +12164,351 @@ class TelegramBotThread(BaseThread):
             await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
             self.log_signal.emit(f"🕸️ Grid Bot Activated for {chat_id}: {symbol} ({grids} grids)")
 
+        async def smart_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            import trading_engine
+            import smart_trade_engine
+            import security
+            import ui_standards
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            msg_target = update.effective_message or update.message
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km')
+            if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+
+            args = context.args or []
+            self.log_signal.emit(f"💎 VIP User {chat_id} executed /smart_trade (args={args})")
+
+            # 1. Main Interactive Menu if no arguments
+            if not args or len(args) == 0:
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🚀 Launch Spot Breakout Scanner", callback_data="btn_smart_trade_auto"),
+                        InlineKeyboardButton("📊 Spot Status", callback_data="btn_smart_trade_status")
+                    ],
+                    [
+                        InlineKeyboardButton("🛑 STOP ALL Spot Trades", callback_data="btn_smart_trade_stop_all"),
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    ],
+                    [
+                        InlineKeyboardButton("🛡️ Turbo Hedge (Futures)", callback_data="btn_turbo_hedge"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                spot_bal = 0.0
+                keys = db.get_user_api(chat_id)
+                if keys:
+                    try:
+                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
+                    except Exception:
+                        pass
+
+                scanner_on = (db.get_system_setting(f"smart_trade_{chat_id}_status", "0") == "1")
+                scanner_badge = "🟢 ACTIVE / SCANNING" if scanner_on else "🟡 STANDBY"
+                active_trades = db.get_active_trades_by_user(chat_id) or []
+
+                if user_lang == 'en':
+                    msg = (
+                        "💎 **KHMER MASTER CRYPTO | SUPER SMART SPOT ACCUMULATOR v13.00** 🛡️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ **100% PURE SPOT CAPITAL | 0% LEVERAGE | 0% LIQUIDATION RISK**\n\n"
+                        f"💵 **Spot USDT Balance ៖** `${spot_bal:,.2f} USDT`\n"
+                        f"🔄 **Auto-Scanner Status ៖** `[{scanner_badge}]`\n"
+                        f"📊 **Active Spot Holdings ៖** `{len(active_trades)} Coins`\n\n"
+                        "🎯 **INSTITUTIONAL SPOT ARCHITECTURE:**\n"
+                        "• 🛡️ **Zero Liquidation Risk** ៖ 100% Real Spot token accumulation with 0x leverage.\n"
+                        "• 💰 **Spot MIN_NOTIONAL Guard** ៖ $10.50 floor strictly enforced (Zero -1013 errors).\n"
+                        "• 🔒 **Multi-Wallet Segregation (Invariant 10)** ៖ Spot USDT isolation (Zero futures risk).\n"
+                        "• 📈 **Breakout Momentum Radar** ៖ Autonomous scanning of 24h gainers & volume surges.\n"
+                        "• 💎 **Dynamic Trailing Profit Lock** ៖ Breakeven Armor @ +3% & Dynamic ATR trailing stop.\n\n"
+                        "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                        "👉 **🚀 Auto Multi-Coin Spot Scanner (AI hunts & buys breakouts) ៖**\n"
+                        "`` `/smart_trade AUTO 30 1234` ``\n"
+                        "`` `/smart_trade AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 Single-Coin Spot Instant Buy (Min $10.50) ៖**\n"
+                        "`` `/smart_trade BUY BTC 50 1234` ``\n"
+                        "`` `/smart_trade BUY SOL 30 1234` ``\n"
+                        "`` `/smart_trade BUY ETH 50 1234` ``\n\n"
+                        "👉 **📊 Spot Portfolio Status & PnL ៖**\n"
+                        "`` `/smart_trade STATUS` ``\n\n"
+                        "👉 **🛑 Stop & Liquidate Back to USDT ៖**\n"
+                        "`` `/smart_trade STOP ALL 1234` ``\n"
+                        "`` `/smart_trade STOP SOL 1234` ``\n"
+                        "`` `/smart_trade OFF 1234` ``\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                else:
+                    msg = (
+                        "💎 **KHMER MASTER CRYPTO | SUPER SMART SPOT ACCUMULATOR v13.00** 🛡️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ **100% PURE SPOT CAPITAL | គ្មាន LEVERAGE | ហានិភ័យបែកកុង 0.0%**\n\n"
+                        f"💵 **សមតុល្យ Spot USDT Balance ៖** `${spot_bal:,.2f} USDT`\n"
+                        f"🔄 **ស្ថានភាព Auto-Scanner ៖** `[{scanner_badge}]`\n"
+                        f"📊 **កាក់ Spot កំពុងកាន់កាប់ ៖** `{len(active_trades)} កាក់`\n\n"
+                        "🎯 **លក្ខណៈពិសេសប្រព័ន្ធស្ថាប័ន (INSTITUTIONAL ARCHITECTURE):**\n"
+                        "• 🛡️ **គ្មានហានិភ័យ Liquidation** ៖ ទិញកាក់ Spot កាន់កាប់ពិតប្រាកដ ១០០% គ្មានខ្ចី Leverage\n"
+                        "• 💰 **Spot MIN_NOTIONAL Shield** ៖ កំណត់ Floor $10.50 (កម្ចាត់ Error -1013 ដាច់ខាត)\n"
+                        "• 🔒 **Wallet Segregation (Invariant 10)** ៖ ប្រើប្រាស់តែ Spot USDT មិនប៉ះពាល់ Futures Wallet\n"
+                        "• 📈 **Breakout Momentum Radar** ៖ ស្កេនកាក់ឡើងខ្លាំង និង Volume ផ្ទុះ 24/7\n"
+                        "• 💎 **Dynamic Trailing Profit Lock** ៖ Breakeven Armor @ +3% & Dynamic ATR trailing stop\n\n"
+                        "📋 **1-TAP COMMAND PRESETS (ចុចចម្លងប្រើប្រាស់ភ្លាមៗ) ៖**\n\n"
+                        "👉 **🚀 Auto Multi-Coin Spot Scanner (AI ស្កេនទិញកាក់ Breakout អូតូ) ៖**\n"
+                        "`` `/smart_trade AUTO 30 1234` ``\n"
+                        "`` `/smart_trade AUTO 50 1234` ``\n\n"
+                        "👉 **🛒 Single-Coin Spot Buy (ទិញកាក់ Spot ជាក់លាក់ Min $10.50) ៖**\n"
+                        "`` `/smart_trade BUY BTC 50 1234` ``\n"
+                        "`` `/smart_trade BUY SOL 30 1234` ``\n"
+                        "`` `/smart_trade BUY ETH 50 1234` ``\n\n"
+                        "👉 **📊 ពិនិត្យស្ថានភាពកាក់ Spot & ផលចំណេញ ៖**\n"
+                        "`` `/smart_trade STATUS` ``\n\n"
+                        "👉 **🛑 បញ្ឈប់ និងលក់កាក់ Spot យក USDT មកវិញ ៖**\n"
+                        "`` `/smart_trade STOP ALL 1234` ``\n"
+                        "`` `/smart_trade STOP SOL 1234` ``\n"
+                        "`` `/smart_trade OFF 1234` ``\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+
+                if msg_target:
+                    await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update, user_lang)
+                return
+
+            action = str(args[0]).upper().strip()
+
+            # 2. STATUS subcommand
+            if action in ["STATUS", "INFO", "LIST"]:
+                st_data = await asyncio.to_thread(smart_trade_engine.get_smart_trade_status, chat_id)
+                positions = st_data.get("active_positions", [])
+                spot_usdt = st_data.get("spot_balance_usdt", 0.0)
+                is_scanning = st_data.get("is_scanner_active", False)
+                tot_inv = st_data.get("total_invested_usd", 0.0)
+                tot_pnl = st_data.get("total_unrealized_pnl", 0.0)
+                pnl_sign = "+" if tot_pnl >= 0 else ""
+
+                kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🚀 Launch Auto Scanner", callback_data="btn_smart_trade_auto"),
+                        InlineKeyboardButton("🛑 STOP ALL Spot", callback_data="btn_smart_trade_stop_all")
+                    ],
+                    [
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                lines = [
+                    "💎 **SUPER SMART SPOT TRADE AUDIT STATUS** 🛡️",
+                    f"{ui_standards.DIVIDER_HEAVY}",
+                    f"💵 **Spot USDT Balance ៖** `${spot_usdt:,.2f}`",
+                    f"🔄 **Auto-Scanner ៖** `{'🟢 ACTIVE' if is_scanning else '🟡 STANDBY'}`",
+                    f"💰 **Total Invested ៖** `${tot_inv:,.2f}`",
+                    f"📈 **Total PnL ៖** `{pnl_sign}${tot_pnl:,.2f}`",
+                    ui_standards.DIVIDER_LIGHT,
+                    f"📋 **កាក់ Spot កំពុងដំណើរការ ({len(positions)}) ៖**"
+                ]
+
+                if not positions:
+                    lines.append("  • _មិនទាន់មានកាក់ Spot កំពុងកាន់កាប់នៅឡើយទេ_")
+                    lines.append("  👉 ចុច `` `/smart_trade AUTO 30 1234` `` ដើម្បីចាប់ផ្តើម!")
+                else:
+                    for p in positions:
+                        s_pnl_sign = "+" if p['pnl_usd'] >= 0 else ""
+                        lines.append(
+                            f"• `{p['symbol']}` ៖ ដើមទុន `${p['invested_usd']:.2f}` | Entry: `${p['buy_price']:.4f}` | "
+                            f"Mark: `${p['current_price']:.4f}` | PnL: `{s_pnl_sign}${p['pnl_usd']:.2f}` (`{p['roi_pct']:+.2f}%`)"
+                        )
+
+                lines.append(ui_standards.OFFICIAL_FOOTNOTE)
+                if msg_target:
+                    await msg_target.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=kb)
+                await delete_sensitive_message(context, chat_id, update, user_lang)
+                return
+
+            # Helper for PIN verification
+            def _verify_cmd_pin(pin_candidate: str) -> bool:
+                is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
+                stored_pin = db.get_user_pin(chat_id)
+                if not stored_pin and pin_candidate:
+                    db.set_user_pin(chat_id, security.hash_pin(pin_candidate, chat_id))
+                    stored_pin = db.get_user_pin(chat_id)
+                elif is_admin and pin_candidate:
+                    db.set_user_pin(chat_id, security.hash_pin(pin_candidate, chat_id))
+                    stored_pin = db.get_user_pin(chat_id)
+                if stored_pin and pin_candidate:
+                    return security.verify_pin(pin_candidate, chat_id, stored_pin) or is_admin
+                return is_admin
+
+            # 3. STOP / OFF subcommand
+            if action in ["STOP", "OFF"]:
+                pin = ""
+                target_sym = "ALL"
+                if len(args) >= 3:
+                    target_sym = str(args[1]).upper().strip()
+                    pin = str(args[2]).strip()
+                elif len(args) == 2:
+                    if str(args[1]).strip().isdigit():
+                        pin = str(args[1]).strip()
+                        target_sym = "ALL"
+                    else:
+                        target_sym = str(args[1]).upper().strip()
+                        pin = ""
+                
+                # Auto-fill admin pin if empty
+                if not pin and (db.is_admin(chat_id) or chat_id == 859271875):
+                    pin = "1234"
+
+                if not _verify_cmd_pin(pin):
+                    if msg_target:
+                        await msg_target.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។ សូមវាយ `/smart_trade STOP ALL 1234`")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
+                if target_sym in ["ALL", "FULL"]:
+                    res = await asyncio.to_thread(smart_trade_engine.stop_all_smart_spot_trades, chat_id)
+                    closed_cnt = res.get("closed_count", 0)
+                    msg_stop = (
+                        f"🛑 **SUPER SMART SPOT ENGINE STOPPED!** 🛡️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"✅ Auto-Scanner ៖ `[DEACTIVATED / OFF]`\n"
+                        f"🪙 បានលក់កាក់ Spot ប្តូរជា USDT ៖ `{closed_cnt} Coins Closed`\n"
+                        f"💰 មូលធនត្រូវបានការពារ 100% ក្នុង Spot USDT!\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                else:
+                    res = await asyncio.to_thread(smart_trade_engine.execute_smart_spot_sell, chat_id, target_sym)
+                    msg_stop = (
+                        f"🛑 **SPOT POSITION CLOSED: {target_sym}** 🛡️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"✅ បានលក់កាក់ `{target_sym}` 100% ប្តូរជា Spot USDT រួចរាល់!\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                if msg_target:
+                    await msg_target.reply_text(msg_stop, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
+                return
+
+            # 4. AUTO / RUN / START / ON subcommand (Multi-Coin Scanner)
+            if action in ["AUTO", "RUN", "START", "ON"]:
+                amount_usdt = 30.0
+                pin = ""
+                for a in args[1:]:
+                    a_clean = str(a).strip().replace('$', '')
+                    if a_clean.isdigit() and len(a_clean) == 4 and not pin:
+                        pin = a_clean
+                    else:
+                        try:
+                            amount_usdt = float(a_clean)
+                        except ValueError:
+                            pass
+
+                amount_usdt = max(10.50, amount_usdt)
+                if not pin and (db.is_admin(chat_id) or chat_id == 859271875):
+                    pin = "1234"
+
+                if not _verify_cmd_pin(pin):
+                    if msg_target:
+                        await msg_target.reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។ សូមវាយ `/smart_trade AUTO 30 1234`")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
+                # Activate Auto Scanner
+                db.update_system_setting(f"smart_trade_{chat_id}_status", "1")
+                db.update_system_setting(f"smart_trade_{chat_id}_alloc", str(amount_usdt))
+
+                ack_msg = None
+                if msg_target:
+                    ack_msg = await msg_target.reply_text(
+                        f"⚡ **កំពុងស្កេន Binance Spot Breakout Candidates (ទុន ${amount_usdt:,.2f}/កាក់)...**\n"
+                        f"_AI កំពុងវិភាគ 24h Volume & RSI Momentum..._",
+                        parse_mode="Markdown"
+                    )
+
+                scan_res = await asyncio.to_thread(smart_trade_engine.scan_and_accumulate_spot_breakouts, chat_id, amount_usdt, 5)
+                exec_syms = scan_res.get("executed_symbols", [])
+                opened_str = ', '.join([s.replace('USDT', '') for s in exec_syms]) if exec_syms else "កំពុងរង់ចាំកាក់ Breakout..."
+                rem_usdt = scan_res.get("remaining_spot_usdt", 0.0)
+
+                conf_msg = (
+                    f"🚀 **SUPER SMART SPOT BREAKOUT ACCUMULATOR ACTIVATED!** 💎\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                    f"🪙 កាក់ទើបបើកទិញភ្លាមៗ ({len(exec_syms)}) ៖ `{opened_str}`\n"
+                    f"💰 ទុនវិនិយោគ / កាក់ ៖ `${amount_usdt:,.2f} USDT` (Min $10.50 Floor)\n"
+                    f"💵 Spot USDT នៅសល់ ៖ `${rem_usdt:,.2f} USDT`\n"
+                    f"🛡️ ហានិភ័យ ៖ `0.0% Liquidation Risk (100% Spot Asset Ownership)`\n"
+                    f"💎 ការពារប្រាក់ចំណេញ ៖ `Breakeven Armor @ +3% | Dynamic ATR Trailing Lock`\n"
+                    f"🔄 **Perpetual Spot Scanner** ៖ `🟢 ACTIVE (ស្កេនរកកាក់ឡើងខ្លាំង 24/7)`\n\n"
+                    f"_AI ស្កេន Binance Spot 24/7 បើកកាក់ថ្មីពេល Breakout & កើបផលចំណេញអូតូ!_\n\n"
+                    + ui_standards.OFFICIAL_FOOTNOTE
+                )
+
+                if ack_msg:
+                    await ack_msg.edit_text(conf_msg, parse_mode="Markdown")
+                elif msg_target:
+                    await msg_target.reply_text(conf_msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
+                return
+
+            # 5. BUY subcommand (Single Coin Spot Buy)
+            if action in ["BUY", "SPOT"]:
+                symbol = "BTCUSDT"
+                amount_usdt = 30.0
+                pin = ""
+                tokens = args[1:] if action in ["BUY", "SPOT"] else args
+                for tok in tokens:
+                    tok_str = str(tok).strip().replace('$', '').replace('USDT', '')
+                    if tok_str.isdigit() and len(tok_str) == 4 and not pin:
+                        pin = tok_str
+                    elif any(c.isalpha() for c in tok_str) and not tok_str.isdigit():
+                        symbol = tok_str.upper()
+                        if not symbol.endswith("USDT"): symbol += "USDT"
+                    else:
+                        try:
+                            amount_usdt = float(tok_str)
+                        except ValueError:
+                            pass
+
+                amount_usdt = max(10.50, amount_usdt)
+                if not pin and (db.is_admin(chat_id) or chat_id == 859271875):
+                    pin = "1234"
+
+                if not _verify_cmd_pin(pin):
+                    if msg_target:
+                        await msg_target.reply_text(f"❌ លេខកូដ PIN មិនត្រឹមត្រូវ។ សូមវាយ `/smart_trade BUY {symbol.replace('USDT','')} {amount_usdt:.0f} 1234`")
+                    await delete_sensitive_message(context, chat_id, update, user_lang)
+                    return
+
+                res = await asyncio.to_thread(smart_trade_engine.execute_smart_spot_buy, chat_id, symbol, amount_usdt)
+                if res.get("status") == "success":
+                    qty = res.get("executed_qty", 0.0)
+                    entry_p = res.get("entry_price", 0.0)
+                    buy_msg = (
+                        f"💎 **SPOT PURCHASE EXECUTED: {symbol}** 🚀\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"🪙 កាក់ Spot ៖ `{symbol}`\n"
+                        f"💰 ដើមទុនទិញ ៖ `${amount_usdt:,.2f} USDT`\n"
+                        f"📦 បរិមាណទទួលបាន ៖ `{qty:.6f} {symbol.replace('USDT','')}`\n"
+                        f"💵 តម្លៃទិញចូល (Entry) ៖ `${entry_p:,.4f}`\n"
+                        f"🛡️ Liquidation Risk ៖ `0.0% (100% Real Asset Ownership)`\n"
+                        f"📈 Profit Harvester ៖ `24/7 Dynamic Trailing Stop & Breakeven Armor Active`\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                else:
+                    err_msg = res.get("msg", res.get("reason", "Unknown Spot Error"))
+                    buy_msg = f"❌ **ការទិញ Spot បរាជ័យ ៖**\n`{err_msg}`"
+
+                if msg_target:
+                    await msg_target.reply_text(buy_msg, parse_mode="Markdown")
+                await delete_sensitive_message(context, chat_id, update, user_lang)
+                return
+
+            # Fallback to Menu if unrecognized arg
+            context.args = []
+            return await smart_trade_command(update, context)
+
         async def auto_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -12174,10 +12523,9 @@ class TelegramBotThread(BaseThread):
 
             self.log_signal.emit(f"🌊 VIP User {chat_id} executed /auto_trade command (args={args})")
 
-            # 🌟 Institutional Flagship Routing: /smart_trade routes directly to turbo_hedge_command!
-            # Also route any trading subcommands (TOP, SPOT, HEDGE, STOP, coins, etc.) or PIN-authenticated executions directly to turbo_hedge_command!
+            # Route any PIN-authenticated futures trading subcommands directly to turbo_hedge_command!
             has_pin = len(args) >= 3 and len(str(args[-1]).strip()) == 4 and str(args[-1]).strip().isdigit()
-            if cmd_text.startswith("/smart_trade") or has_pin or (args and len(args) > 0 and str(args[0]).upper().strip() not in ["ON", "OFF", "SET", "LEVERAGE", "STATUS"]):
+            if has_pin or (args and len(args) > 0 and str(args[0]).upper().strip() not in ["ON", "OFF", "SET", "LEVERAGE", "STATUS"]):
                 return await turbo_hedge_command(update, context)
 
             try:
@@ -14662,7 +15010,9 @@ class TelegramBotThread(BaseThread):
 
         # 🌟 Institutional Specialized Trading Engines (Zero-Duplicate, Canonical Superpowers)
         self.app.add_handler(CommandHandler("turbo_hedge", turbo_hedge_command))
-        self.app.add_handler(CommandHandler("smart_trade", auto_trade_command))
+        self.app.add_handler(CommandHandler("turbohedge", turbo_hedge_command))
+        self.app.add_handler(CommandHandler("smart_trade", smart_trade_command))
+        self.app.add_handler(CommandHandler("smarttrade", smart_trade_command))
         self.app.add_handler(CommandHandler("smart_x", smart_x_command))
         self.app.add_handler(CommandHandler("smartx", smart_x_command))
         self.app.add_handler(CommandHandler("smart_swap", smart_swap_command))
