@@ -238,14 +238,22 @@ Any modification that breaks any of the following 23 invariants is considered an
   3. **Staggered Entry Shield:** Enforces a minimum 15-second delay between position entries to prevent simultaneous execution slippage into flash volatility.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 18/18].
 
+### Invariant 26: Sub-Mode Explicit State Segregation & Non-Collapsible Architecture Invariant
+- **Location:** `bot_thread.py`, `scheduler_tasks.py` (`gold_turbo_monitor`), `smart_x_engine.py`
+- **Rule:**
+  1. **Zero Silent Fallback Collapse (ហាមដាច់ខាតការទម្លាក់ Mode ច្រើនឱ្យនៅសល់តែមួយស្ងាត់ៗ):** Multi-mode command suites (`/smartx`, `/turbo_hedge`, `/smart_trade`) must strictly enforce explicit branching for EVERY discrete sub-mode. Ternary fallback defaults like `mode = A if is_a else B` that silently swallow additional states (such as `AUTO`, `SPOT`, etc.) are classified as architectural defects and strictly prohibited.
+  2. **Mandatory Live Telemetry Feedback (តម្រូវការចាក់បញ្ចូលទិន្នន័យ Live Telemetry):** Confirmation and acknowledgment messages must never use static, undifferentiated templates. Every sub-mode MUST output distinct, live telemetry (real-time price, session window, liquidity score, SGE premium, and active AI model consensus) so the user is immediately provided with unambiguous proof of which engine is operating.
+  3. **Dedicated Background Execution Routing (ការបែងចែកកូដរត់ Background ឱ្យដាច់ពីគ្នា):** Background monitors (such as `gold_turbo_monitor`) must maintain explicit, dedicated logic branches for every mode (e.g. `AUTO` must dynamically query MoE Regime Classification to route between `TURBO` expansion and `SONIC` session scalping, rather than defaulting to a single strategy).
+- **Enforcement:** Verified by `audit_system.py` [CHECK 19/19].
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 25 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 18 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 26 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 19 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
