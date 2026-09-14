@@ -10658,7 +10658,8 @@ class TelegramBotThread(BaseThread):
             tokens_upper = [t.upper().strip() for t in work_args]
             is_spot = ("SPOT" in tokens_upper)
             is_turbo = ("TURBO" in tokens_upper)
-            is_auto_247 = any(t in ["AUTO", "SNIPER", "24/7"] for t in tokens_upper)
+            is_sonic = ("SONIC" in tokens_upper)
+            is_auto_247 = any(t in ["AUTO", "SNIPER", "24/7", "SONIC"] for t in tokens_upper)
 
             user_side = "AUTO"
             for t in work_args:
@@ -10716,9 +10717,9 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
-            elif is_auto_247 or is_turbo:
+            elif (is_auto_247 or is_turbo or is_sonic) and user_side == "AUTO":
                 target_symbol = "XAUUSDT"
-                # 24/7 PERPETUAL GOLD SESSION SNIPER / TURBO SPRINT
+                # 24/7 PERPETUAL GOLD SESSION SNIPER / TURBO SPRINT / SONIC SCALP
                 spot_ok, fut_ok = await asyncio.to_thread(trading_engine.check_user_api_permissions, keys[0], keys[1])
                 if not fut_ok:
                     if msg_target:
@@ -10734,6 +10735,8 @@ class TelegramBotThread(BaseThread):
 
                 if is_turbo:
                     db.set_gold_turbo_config(chat_id, True, amount)
+                else:
+                    db.set_gold_turbo_config(chat_id, False, amount)
 
                 strategy_desc = (
                     "TURBO Sprint (Dynamic 25x-50x, Uncapped Trailing Peak Lock)"

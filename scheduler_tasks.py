@@ -4941,6 +4941,24 @@ async def gold_turbo_monitor(app: Application):
                     chat_id, "XAUUSDT", side, amount, lev, 1.5, "TURBO"
                 )
                 print(f"🥇 [SUPER SMART GOLD TURBO] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
+                if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
+                    try:
+                        p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                        notif = (
+                            "👑 *[SMARTX GOLD TURBO ENTRY]* 🎯\n"
+                            "━━━━━━━━━━━━\n"
+                            f"• Direction  : `{side} ({turbo_res.get('confidence_pct')}% Conf)`\n"
+                            "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
+                            f"• Entry Price: `${p:,.2f}`\n"
+                            f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
+                            "• Target TP  : `Uncapped Trailing Lock`\n"
+                            "• Protection : `Breakeven Lock @ +3% | Time-Stop Active`\n"
+                            "━━━━━━━━━━━━\n"
+                            "_TURBO High-Frequency Engine Active 24/7._"
+                        )
+                        await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                    except Exception as err:
+                        print(f"Error sending turbo gold notif: {err}")
 
             # Execute SONIC Scalp if enabled
             elif is_smartx_active and smartx_mode != "TURBO" and sonic_res.get("side") in ["BUY", "SELL"] and sonic_res.get("confidence_pct", 0) >= 85.0:
@@ -4952,6 +4970,24 @@ async def gold_turbo_monitor(app: Application):
                     chat_id, "XAUUSDT", side, amount, lev, 2.5, "SONIC"
                 )
                 print(f"👑 [SUPER SMART GOLD SONIC] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
+                if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
+                    try:
+                        p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                        notif = (
+                            "👑 *[SMARTX GOLD SONIC ENTRY]* 🎯\n"
+                            "━━━━━━━━━━━━\n"
+                            f"• Direction  : `{side} ({sonic_res.get('confidence_pct')}% Conf)`\n"
+                            "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
+                            f"• Entry Price: `${p:,.2f}`\n"
+                            f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
+                            "• Target TP  : `+$2.50 to +$10.00/oz`\n"
+                            "• Protection : `Breakeven Lock @ +3% | Time-Stop Active`\n"
+                            "━━━━━━━━━━━━\n"
+                            "_SONIC Institutional Scalp Engine Active 24/7._"
+                        )
+                        await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                    except Exception as err:
+                        print(f"Error sending sonic gold notif: {err}")
 
     except Exception as e:
         print(f"⚠️ [SUPER SMART GOLD MONITOR ERROR]: {e}")
