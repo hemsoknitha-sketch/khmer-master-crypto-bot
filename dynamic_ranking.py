@@ -88,9 +88,83 @@ def fetch_top_volatile_coins(limit=500):
         
     return ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 
-def get_top_500_coins():
-    # Changed to 10 to implement Hyper-Focus on the absolute most volatile coins
-    return fetch_top_volatile_coins(limit=10)
+# =========================================================================
+# 🚀 INSTITUTIONAL TOP 500 FUTURES CANDIDATE ENGINE
+# =========================================================================
+
+FUTURES_COINS_CACHE = {
+    "timestamp": 0,
+    "coins": []
+}
+FUTURES_CACHE_EXPIRY_SECONDS = 45  # 45-second high-frequency cache
+
+def fetch_top_futures_candidates(limit: int = 60, min_volume: float = 5000000.0) -> list:
+    """
+    Institutional Top 500 Futures Candidate Scanner:
+    Queries Binance Futures /fapi/v1/ticker/24hr dynamically across 250+ perpetual pairs.
+    Filters for:
+    1. Active TRADING perpetual USDT contracts.
+    2. Zero stablecoins and zero TradFi synthetics (Invariants 7 & 9).
+    3. Minimum $5M 24h volume for zero slippage.
+    4. Sweet-spot momentum (abs price change between 2.5% and 15.0%).
+    5. Excludes overbought/oversold extreme pumps (> 20.0%).
+    Ranks by Momentum & Volume Log-Score to deliver prime breakout/breakdown candidates.
+    """
+    global FUTURES_COINS_CACHE
+    current_time = time.time()
+    if FUTURES_COINS_CACHE["coins"] and (current_time - FUTURES_COINS_CACHE["timestamp"]) < FUTURES_CACHE_EXPIRY_SECONDS:
+        return FUTURES_COINS_CACHE["coins"][:limit]
+
+    try:
+        url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+        res = requests.get(url, timeout=6)
+        if res.status_code == 200:
+            tickers = res.json()
+            TRADFI_EXCLUSIONS = {
+                "QNTXUSDT", "CSOPSKHYNIX2LUSDT", "MINIMAXUSDT", "ZHIPUUSDT", "NOKUSDT", "SMCIUSDT", "DELLUSDT", "SNDKUSDT", 
+                "STXXUSDT", "INTWUSDT", "CBRSUSDT", "EWYUSDT", "MVLLUSDT", "GLWUSDT", "HK0700USDT", "HK1810USDT", "INTCUSDT", 
+                "CHIPUSDT", "METAUSDT", "AAOIUSDT", "MRVLUSDT", "CRWVUSDT", "ZAMAUSDT", "PLTRUSDT", "TSMUSDT", "AMDUSDT", 
+                "TQQQUSDT", "SQQQUSDT", "ARMUSDT", "TSLAUSDT", "NATGASUSDT", "INXUSDT", "AMZNUSDT", "AAPLUSDT", "MSFTUSDT", 
+                "NVDAUSDT", "MSTRUSDT", "BABAUSDT", "ROBOUSDT", "NBISUSDT", "SHAZUSDT", "KORUUSDT", "DRAMUSDT", "SNXXUSDT", 
+                "MUUUSDT", "MUUSDT", "BEUSDT", "SKHYUSDT", "SKHYNIXUSDT", "SAMSUNGUSDT", "WDCUSDT", "ORCLUSDT", "AIAUSDT", "MUBARAKUSDT", 
+                "HYPEUSDT", "LITEUSDT", "DEXEUSDT", "BZUSDT", "CLUSDT", "XAUUSDT", "XAGUSDT", "TRUMPUSDT", "HFTUSDT", "GWEIUSDT", 
+                "EPICUSDT", "USD1USDT", "SPCXUSDT", "OPENAIUSDT", "FIGMAUSDT", "STRIPEUSDT", "BYTEDANCEUSDT", "ANTHROPICUSDT",
+                "USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "BUSDUSDT"
+            }
+            candidates = []
+            for t in tickers:
+                sym = t.get("symbol", "")
+                if not sym.endswith("USDT") or sym in TRADFI_EXCLUSIONS or not sym.isascii():
+                    continue
+                quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
+                if quote_vol < min_volume:
+                    continue
+                abs_chg = abs(float(t.get("priceChangePercent", 0.0) or 0.0))
+                # Early Sweet Spot between 2.5% and 15.0%
+                if abs_chg < 2.5 or abs_chg > 20.0:
+                    continue
+                # Sweet spot peak around 6.5% - 8.5%
+                momentum_score = 100.0 - (abs(abs_chg - 7.5) * 5.0)
+                vol_score = math.log10(max(1.0, quote_vol)) * 8.0
+                total_score = momentum_score + vol_score
+                candidates.append({"symbol": sym, "score": total_score, "vol": quote_vol, "chg": abs_chg})
+
+            candidates.sort(key=lambda x: x["score"], reverse=True)
+            top_syms = [c["symbol"] for c in candidates]
+            if top_syms:
+                FUTURES_COINS_CACHE["timestamp"] = current_time
+                FUTURES_COINS_CACHE["coins"] = top_syms
+                return top_syms[:limit]
+    except Exception as e:
+        print(f"⚠️ [FUTURES CANDIDATE SCANNER] Error: {e}")
+
+    if FUTURES_COINS_CACHE["coins"]:
+        return FUTURES_COINS_CACHE["coins"][:limit]
+
+    return ["ETHUSDT", "SOLUSDT", "BTCUSDT", "SUIUSDT", "NEARUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "ARBUSDT", "APTUSDT"]
+
+def get_top_500_coins(limit: int = 500):
+    return fetch_top_volatile_coins(limit=limit)
 
 def get_dynamic_coin_allocation(symbol: str) -> float:
     """

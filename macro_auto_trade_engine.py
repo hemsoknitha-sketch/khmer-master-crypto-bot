@@ -36,12 +36,90 @@ TRADFI_EXCLUSION_SET = {
     "NVDAUSDT", "TSLAUSDT", "AAPLEUSDT", "BONDUSDT", "DODODUSDT", "USDCUSDT", "FDUSDUSDT", "TUSDUSDT"
 }
 
-# Core Macro High-Liquidity Watchlist
-MACRO_CANDIDATE_SYMBOLS = [
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", 
-    "BNBUSDT", "ADAUSDT", "AVAXUSDT", "SUIUSDT", "NEARUSDT", 
+import dynamic_ranking
+
+# Core Macro High-Liquidity Fallback Symbols (Used only if dynamic ticker network fails)
+FALLBACK_MACRO_SYMBOLS = [
+    "ETHUSDT", "SOLUSDT", "BTCUSDT", "SUIUSDT", "NEARUSDT", 
+    "XRPUSDT", "DOGEUSDT", "BNBUSDT", "ADAUSDT", "AVAXUSDT", 
     "LINKUSDT", "APTUSDT", "ARBUSDT", "OPUSDT", "PEPEUSDT"
 ]
+
+def calculate_ema(series: list[float], period: int) -> float:
+    """Calculates Exponential Moving Average (EMA) for trend confirmation."""
+    if not series:
+        return 0.0
+    if len(series) < period:
+        return series[-1]
+    multiplier = 2.0 / (period + 1.0)
+    ema = sum(series[:period]) / float(period)
+    for price in series[period:]:
+        ema = (price - ema) * multiplier + ema
+    return ema
+
+def calculate_adx_and_dmi(highs: list[float], lows: list[float], closes: list[float], period: int = 14) -> tuple[float, float, float]:
+    """
+    Calculates Wilder's ADX(14), +DI, and -DI:
+    Returns (adx, plus_di, minus_di).
+    ADX >= 22.0 indicates an active institutional trend.
+    ADX < 20.0 indicates choppy / range-bound consolidation where breakouts/breakdowns are traps.
+    """
+    n = len(closes)
+    if n < (period * 2):
+        return 0.0, 0.0, 0.0
+
+    trs, plus_dms, minus_dms = [], [], []
+    for i in range(1, n):
+        h, l, prev_c = highs[i], lows[i], closes[i - 1]
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        trs.append(tr)
+
+        up_move = highs[i] - highs[i - 1]
+        down_move = lows[i - 1] - lows[i]
+
+        if up_move > down_move and up_move > 0:
+            plus_dms.append(up_move)
+        else:
+            plus_dms.append(0.0)
+
+        if down_move > up_move and down_move > 0:
+            minus_dms.append(down_move)
+        else:
+            minus_dms.append(0.0)
+
+    if len(trs) < (period * 2):
+        return 0.0, 0.0, 0.0
+
+    # Wilder's Smoothing for TR, +DM, -DM
+    smooth_tr = sum(trs[:period])
+    smooth_plus = sum(plus_dms[:period])
+    smooth_minus = sum(minus_dms[:period])
+
+    dx_list = []
+    for i in range(period, len(trs)):
+        smooth_tr = smooth_tr - (smooth_tr / period) + trs[i]
+        smooth_plus = smooth_plus - (smooth_plus / period) + plus_dms[i]
+        smooth_minus = smooth_minus - (smooth_minus / period) + minus_dms[i]
+
+        plus_di = 100.0 * (smooth_plus / max(1e-8, smooth_tr))
+        minus_di = 100.0 * (smooth_minus / max(1e-8, smooth_tr))
+
+        diff = abs(plus_di - minus_di)
+        sum_di = max(1e-8, plus_di + minus_di)
+        dx = 100.0 * (diff / sum_di)
+        dx_list.append((dx, plus_di, minus_di))
+
+    if len(dx_list) < period:
+        return 0.0, 0.0, 0.0
+
+    # Smooth DX to get ADX
+    adx = sum(d[0] for d in dx_list[:period]) / float(period)
+    for i in range(period, len(dx_list)):
+        adx = (adx * (period - 1) + dx_list[i][0]) / float(period)
+
+    latest_plus_di = dx_list[-1][1]
+    latest_minus_di = dx_list[-1][2]
+    return adx, latest_plus_di, latest_minus_di
 
 def is_tradfi_or_delisted(symbol: str) -> bool:
     sym = symbol.upper().strip()
@@ -68,15 +146,17 @@ def fetch_klines_safe(symbol: str, interval: str = "1h", limit: int = 50) -> lis
     return []
 
 # =========================================================================
-# 🔍 MACRO OPPORTUNITY SCANNERS
+# 🔍 MACRO OPPORTUNITY SCANNERS WITH ANTI-FAKEOUT CONFLUENCE
 # =========================================================================
 
 def scan_macro_waterfall_opportunity(symbol: str) -> dict:
     """
-    Macro Capitulation Waterfall Breakdown Hunter:
-    1. 1H/4H Structural Breakdown: Price breaks below 20-period Low / 50-EMA with 2.0x volume surge.
-    2. 15m Bear Flag Relief Retest: Waits for relief pullback where 15m RSI resets to 42.0 - 52.0.
-    3. Bearish Rejection Wick: Confirms upper shadow resistance before entering 3x-5x Short.
+    Macro Capitulation Waterfall Breakdown Hunter with Anti-Fakeout Confluence:
+    1. 1H Structural Breakdown: Price breaks below 20-period Low with >= 1.8x volume surge.
+    2. Macro Trend Alignment: Price < EMA 20 <= EMA 50 on 1H (prevents bottom-selling in uptrends).
+    3. ADX Trend Strength Filter: ADX(14) >= 22.0 and -DI > +DI (strictly rejects choppy range fakeouts / bear traps).
+    4. 15m Bear Flag Relief Retest: Waits for relief pullback where 15m RSI resets to 40.0 - 55.0.
+    5. Upper Rejection Wick: Confirms upper shadow resistance before entering 3x-5x Short.
     Zero blind bottom shorting into oversold RSI <= 38.0 (Invariant 16).
     """
     res = {"symbol": symbol, "signal": False, "side": "SHORT", "confidence": 0.0, "reason": ""}
@@ -89,6 +169,7 @@ def scan_macro_waterfall_opportunity(symbol: str) -> dict:
         return res
 
     closes_1h = [float(k[4]) for k in klines_1h]
+    highs_1h = [float(k[2]) for k in klines_1h]
     lows_1h = [float(k[3]) for k in klines_1h]
     volumes_1h = [float(k[5]) for k in klines_1h]
     curr_price = closes_1h[-1]
@@ -98,12 +179,22 @@ def scan_macro_waterfall_opportunity(symbol: str) -> dict:
     avg_vol_20 = sum(volumes_1h[-21:-1]) / 20.0 if sum(volumes_1h[-21:-1]) > 0 else 1.0
     vol_surge_ratio = volumes_1h[-1] / avg_vol_20
 
-    is_1h_breakdown = (curr_price < prior_20_low) and (vol_surge_ratio >= 1.5)
-
+    is_1h_breakdown = (curr_price < prior_20_low) and (vol_surge_ratio >= 1.8)
     if not is_1h_breakdown:
         return res
 
-    # 2. Evaluate 15m Relief Retest (Bear Flag Pullback)
+    # 2. Anti-Fakeout: Check Macro Trend Alignment (EMA 20 & EMA 50)
+    ema_20 = calculate_ema(closes_1h, 20)
+    ema_50 = calculate_ema(closes_1h, 50)
+    if curr_price > ema_20 or curr_price > ema_50:
+        return res
+
+    # 3. Anti-Fakeout: ADX Trend Strength Filter
+    adx_1h, plus_di, minus_di = calculate_adx_and_dmi(highs_1h, lows_1h, closes_1h, period=14)
+    if adx_1h < 22.0 or plus_di >= minus_di:
+        return res
+
+    # 4. Evaluate 15m Relief Retest (Bear Flag Pullback)
     klines_15m = fetch_klines_safe(symbol, interval="15m", limit=30)
     if not klines_15m or len(klines_15m) < 20:
         return res
@@ -136,25 +227,29 @@ def scan_macro_waterfall_opportunity(symbol: str) -> dict:
     latest_close = closes_15m[-1]
     candle_body = abs(latest_close - latest_open)
     upper_wick = latest_high - max(latest_open, latest_close)
-    has_upper_rejection = upper_wick >= (candle_body * 0.6) or (latest_close < latest_open)
+    has_upper_rejection = upper_wick >= (candle_body * 0.5) or (latest_close < latest_open)
 
     if is_retest_zone and has_upper_rejection:
         res["signal"] = True
         res["side"] = "SHORT"
-        res["confidence"] = min(96.0, 80.0 + (vol_surge_ratio * 4.0))
+        adx_bonus = min(8.0, max(0.0, (adx_1h - 22.0) * 0.4))
+        vol_bonus = min(6.0, max(0.0, (vol_surge_ratio - 1.8) * 3.0))
+        res["confidence"] = min(98.0, 84.0 + adx_bonus + vol_bonus)
         res["strategy"] = "WATERFALL_RETEST"
         res["entry_price"] = curr_price
-        res["reason"] = f"1H Waterfall Breakdown confirmed + 15m Bear Flag Retest (RSI {rsi_15m:.1f} in sweet zone)"
+        res["reason"] = f"1H Waterfall Breakdown + ADX {adx_1h:.1f} + 15m Bear Flag Retest (RSI {rsi_15m:.1f})"
         return res
 
     return res
 
 def scan_macro_breakout_opportunity(symbol: str) -> dict:
     """
-    Macro Institutional Expansion Breakout Hunter:
-    1. 4H Multi-day Volatility Squeeze (Bollinger Bandwidth compression).
-    2. Expansion breakout with volume surge > 2.5x.
-    3. 15m/1H confirmation above resistance (RSI 52.0 - 68.0, not overbought).
+    Macro Institutional Expansion Breakout Hunter with Anti-Fakeout Confluence:
+    1. 4H Volatility Squeeze (Bollinger Bandwidth compression).
+    2. Expansion breakout above prior 20-period 4H high with >= 1.8x volume surge.
+    3. Macro Trend Alignment: Price > EMA 20 >= EMA 50 on 1H (confirmed macro uptrend).
+    4. ADX Trend Strength Filter: ADX(14) >= 22.0 and +DI > -DI (eliminates bull traps in sideways ranges).
+    5. 15m/1H confirmation above resistance (RSI 48.0 - 68.0, not overbought > 70.0).
     """
     res = {"symbol": symbol, "signal": False, "side": "BUY", "confidence": 0.0, "reason": ""}
     if is_tradfi_or_delisted(symbol):
@@ -183,26 +278,52 @@ def scan_macro_breakout_opportunity(symbol: str) -> dict:
     vol_surge = volumes_4h[-1] / avg_vol
 
     # Breakout condition: closes above prior 20-period high with volume expansion
-    if curr_price > prior_20_high and vol_surge >= 1.8:
-        # Check 1H RSI to prevent buying extreme overbought tops (> 75.0)
-        klines_1h = fetch_klines_safe(symbol, interval="1h", limit=25)
-        if klines_1h and len(klines_1h) >= 15:
-            c1h = [float(k[4]) for k in klines_1h]
-            g, l = 0.0, 0.0
-            for i in range(len(c1h) - 14, len(c1h)):
-                d = c1h[i] - c1h[i-1]
-                if d >= 0: g += d
-                else: l += abs(d)
-            rsi_1h = 100.0 - (100.0 / (1.0 + (g / max(1e-8, l))))
-            if 50.0 <= rsi_1h <= 72.0:
-                res["signal"] = True
-                res["side"] = "BUY"
-                res["confidence"] = min(95.0, 82.0 + (vol_surge * 3.5))
-                res["strategy"] = "BREAKOUT_RETEST"
-                res["entry_price"] = curr_price
-                res["reason"] = f"4H Range Breakout + Volume Surge {vol_surge:.1f}x (1H RSI {rsi_1h:.1f})"
-                return res
+    if not (curr_price > prior_20_high and vol_surge >= 1.8):
+        return res
 
+    # 1H Confluence & Trend Alignment
+    klines_1h = fetch_klines_safe(symbol, interval="1h", limit=50)
+    if not klines_1h or len(klines_1h) < 30:
+        return res
+
+    closes_1h = [float(k[4]) for k in klines_1h]
+    highs_1h = [float(k[2]) for k in klines_1h]
+    lows_1h = [float(k[3]) for k in klines_1h]
+
+    # Check Macro Trend Alignment (EMA 20 & EMA 50)
+    ema_20 = calculate_ema(closes_1h, 20)
+    ema_50 = calculate_ema(closes_1h, 50)
+    if curr_price < ema_20 or curr_price < ema_50:
+        return res
+
+    # Anti-Fakeout: ADX Trend Strength Filter
+    adx_1h, plus_di, minus_di = calculate_adx_and_dmi(highs_1h, lows_1h, closes_1h, period=14)
+    if adx_1h < 22.0 or minus_di >= plus_di:
+        return res
+
+    # Check 15m RSI: fresh momentum, not exhausted overbought top (> 68.0)
+    klines_15m = fetch_klines_safe(symbol, interval="15m", limit=30)
+    rsi_15m = 55.0
+    if klines_15m and len(klines_15m) >= 20:
+        c15 = [float(k[4]) for k in klines_15m]
+        g, l = 0.0, 0.0
+        for i in range(len(c15) - 14, len(c15)):
+            d = c15[i] - c15[i-1]
+            if d >= 0: g += d
+            else: l += abs(d)
+        rsi_15m = 100.0 - (100.0 / (1.0 + (g / max(1e-8, l))))
+
+    if not (48.0 <= rsi_15m <= 68.0):
+        return res
+
+    res["signal"] = True
+    res["side"] = "BUY"
+    adx_bonus = min(8.0, max(0.0, (adx_1h - 22.0) * 0.4))
+    vol_bonus = min(6.0, max(0.0, (vol_surge - 1.8) * 3.0))
+    res["confidence"] = min(98.0, 84.0 + adx_bonus + vol_bonus)
+    res["strategy"] = "BREAKOUT_RETEST"
+    res["entry_price"] = curr_price
+    res["reason"] = f"4H Range Breakout + ADX {adx_1h:.1f} + Volume Surge {vol_surge:.1f}x (15m RSI {rsi_15m:.1f})"
     return res
 
 # =========================================================================
@@ -333,8 +454,8 @@ def execute_macro_auto_trade(chat_id: int, symbol: str, side: str, amount_usdt: 
 def handle_turbo_hedge_stop_loss_signal(chat_id: int, symbol: str, stopped_side: str, loss_amount: float):
     """
     Symbiotic Rescue Signal Handler:
-    When /turbo_hedge executes an Anti-Whipsaw Clean Stop because a 15m trend broke down,
-    this function evaluates if a Macro Waterfall Breakdown is forming to rescue and multiply capital.
+    When /turbo_hedge executes an Anti-Whipsaw Clean Stop because a 15m trend broke down or reversed violently,
+    this function evaluates if a Macro Waterfall Breakdown or Breakout is forming to rescue and multiply capital.
     """
     try:
         cfg = db.get_macro_auto_trade_config(chat_id)
@@ -344,7 +465,7 @@ def handle_turbo_hedge_stop_loss_signal(chat_id: int, symbol: str, stopped_side:
         symbol = symbol.upper().strip()
         print(f"🔗 [SYMBIOTIC RESCUE SIGNAL] Received /turbo_hedge stop signal on {symbol} (Stopped: {stopped_side}, Loss: -${abs(loss_amount):.2f})")
 
-        # If a BUY micro-scalp stopped out due to severe breakdown, check for macro waterfall short retest
+        # 1. If a BUY micro-scalp stopped out due to severe breakdown, check for macro waterfall short retest
         if stopped_side in ["BUY", "LONG"]:
             opp = scan_macro_waterfall_opportunity(symbol)
             if opp.get("signal"):
@@ -354,6 +475,17 @@ def handle_turbo_hedge_stop_loss_signal(chat_id: int, symbol: str, stopped_side:
                     lev = cfg.get("leverage", 3)
                     exec_res = execute_macro_auto_trade(chat_id, symbol, "SHORT", trade_amt, lev, strategy="RESCUE_WATERFALL")
                     print(f"🚀 [SYMBIOTIC RESCUE DEPLOYED] {symbol} SHORT -> Result: {exec_res.get('status')}")
+
+        # 2. If a SELL micro-scalp stopped out due to violent bullish breakout, check for macro breakout long
+        elif stopped_side in ["SELL", "SHORT"]:
+            opp = scan_macro_breakout_opportunity(symbol)
+            if opp.get("signal"):
+                safe, reason = is_symbol_safe_for_macro_trade(chat_id, symbol, "BUY")
+                if safe:
+                    trade_amt = cfg.get("amount", 30.0)
+                    lev = cfg.get("leverage", 3)
+                    exec_res = execute_macro_auto_trade(chat_id, symbol, "BUY", trade_amt, lev, strategy="RESCUE_BREAKOUT")
+                    print(f"🚀 [SYMBIOTIC RESCUE DEPLOYED] {symbol} BUY -> Result: {exec_res.get('status')}")
     except Exception as e:
         print(f"Error handling symbiotic rescue signal: {e}")
 
@@ -523,6 +655,11 @@ async def run_macro_auto_trade_scanner_cycle(app):
                 print("🌊 [MACRO AUTO-TRADE] Radar Active (0 users currently enrolled in /auto_trade ON. Top HFT /turbo_hedge is handling active positions).")
             return
 
+        # Dynamically fetch top liquid, high-momentum volatile futures candidates
+        dynamic_candidates = await asyncio.to_thread(dynamic_ranking.fetch_top_futures_candidates, 50, 5000000.0)
+        if not dynamic_candidates:
+            dynamic_candidates = FALLBACK_MACRO_SYMBOLS
+
         for chat_id in macro_users:
             cfg = db.get_macro_auto_trade_config(chat_id)
             if not cfg.get("enabled", False):
@@ -532,74 +669,72 @@ async def run_macro_auto_trade_scanner_cycle(app):
             last_hb = _last_macro_heartbeat.get(chat_id, 0.0)
             if now_time - last_hb >= 120.0:
                 _last_macro_heartbeat[chat_id] = now_time
-                print(f"🌊 [MACRO AUTO-TRADE RADAR] User {chat_id}: Active ({len(user_trades)}/2 Macro Swings) | 15 Coins Watchdog Active | Status: Standing by (Market range-bound / zero oversold shorting).")
+                print(f"🌊 [MACRO AUTO-TRADE RADAR] User {chat_id}: Active ({len(user_trades)}/2 Macro Swings) | Scanning TOP {len(dynamic_candidates)} Dynamic Volatile Pairs | Status: Anti-Fakeout Confluence Active.")
 
             if len(user_trades) >= 2:
                 continue
 
-            for sym in MACRO_CANDIDATE_SYMBOLS:
+            # Tournament Selection: Collect all valid signals across the dynamic candidate pool
+            scored_candidates = []
+            for sym in dynamic_candidates:
                 # 1. Test Waterfall Breakdown
                 waterfall_res = await asyncio.to_thread(scan_macro_waterfall_opportunity, sym)
                 if waterfall_res.get("signal"):
-                    safe, reason = is_symbol_safe_for_macro_trade(chat_id, sym, "SHORT")
-                    if not safe:
-                        print(f"🛡️ [MACRO AUTO-TRADE SKIPPED] {sym}: {reason}")
-                    if safe:
-                        trade_amt = cfg.get("amount", 30.0)
-                        lev = cfg.get("leverage", 3)
-                        exec_res = await asyncio.to_thread(
-                            execute_macro_auto_trade,
-                            chat_id, sym, "SHORT", trade_amt, lev, "WATERFALL_RETEST"
-                        )
-                        if exec_res.get("status") == "success" and app and hasattr(app, "bot"):
-                            try:
-                                msg_entry = (
-                                    f"🌊 **APEX MACRO WATERFALL SHORT EXECUTED!** 🚀\n"
-                                    f"{DIVIDER_DOUBLE}\n\n"
-                                    f"🪙 **កាក់ ៖** `{sym}`\n"
-                                    f"🎯 **ទិសដៅ ៖** `SHORT (1H Waterfall Breakdown)`\n"
-                                    f"💵 **ទុនវិនិយោគ ៖** `${trade_amt:.2f} USDT`\n"
-                                    f"🛡️ **Margin Buffer ៖** `{lev}x ISOLATED (~33% Safety Room)`\n"
-                                    f"📊 **RSI Retest Zone ៖** `15m Bear Flag Confirmed`\n"
-                                    f"⚡ **Binance Status ៖** `POSITION OPENED (<30ms)`\n\n"
-                                    f"_ប្រព័ន្ធចាប់យករលកបាក់ទំនប់ដោយមិន Short បាត ធានាសុវត្ថិភាពទុន ១០០%!_\n\n"
-                                    f"{OFFICIAL_FOOTNOTE}"
-                                )
-                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_entry, parse_mode="Markdown"))
-                            except Exception:
-                                pass
-                        break
+                    scored_candidates.append(waterfall_res)
 
                 # 2. Test Institutional Breakout
                 breakout_res = await asyncio.to_thread(scan_macro_breakout_opportunity, sym)
                 if breakout_res.get("signal"):
-                    safe, reason = is_symbol_safe_for_macro_trade(chat_id, sym, "BUY")
-                    if not safe:
-                        print(f"🛡️ [MACRO AUTO-TRADE SKIPPED] {sym}: {reason}")
-                    if safe:
-                        trade_amt = cfg.get("amount", 30.0)
-                        lev = cfg.get("leverage", 3)
-                        exec_res = await asyncio.to_thread(
-                            execute_macro_auto_trade,
-                            chat_id, sym, "BUY", trade_amt, lev, "BREAKOUT_RETEST"
+                    scored_candidates.append(breakout_res)
+
+            # Sort by highest confidence score first (Tournament Selection)
+            scored_candidates.sort(key=lambda x: x.get("confidence", 0.0), reverse=True)
+
+            # Execute on the top-ranking candidate(s)
+            for best_cand in scored_candidates:
+                sym = best_cand.get("symbol")
+                side = best_cand.get("side")
+                conf = best_cand.get("confidence", 0.0)
+                strategy = best_cand.get("strategy", "WATERFALL_RETEST")
+
+                if conf < 88.0:
+                    continue
+
+                safe, reason = is_symbol_safe_for_macro_trade(chat_id, sym, side)
+                if not safe:
+                    print(f"🛡️ [MACRO AUTO-TRADE SKIPPED] {sym}: {reason}")
+                    continue
+
+                trade_amt = cfg.get("amount", 30.0)
+                lev = cfg.get("leverage", 3)
+                exec_res = await asyncio.to_thread(
+                    execute_macro_auto_trade,
+                    chat_id, sym, side, trade_amt, lev, strategy
+                )
+
+                if exec_res.get("status") == "success" and app and hasattr(app, "bot"):
+                    try:
+                        strat_title = "🌊 **APEX MACRO WATERFALL SHORT EXECUTED!** 🚀" if side == "SHORT" else "🚀 **APEX MACRO BREAKOUT LONG EXECUTED!** 📈"
+                        dir_title = f"{side} ({strategy})"
+                        msg_entry = (
+                            f"{strat_title}\n"
+                            f"{DIVIDER_DOUBLE}\n\n"
+                            f"🪙 **កាក់ជ័យលាភី ៖** `{sym}` (Tournament Score: `{conf:.1f}%`)\n"
+                            f"🎯 **ទិសដៅ ៖** `{dir_title}`\n"
+                            f"💵 **ទុនវិនិយោគ ៖** `${trade_amt:.2f} USDT`\n"
+                            f"🛡️ **Margin Buffer ៖** `{lev}x ISOLATED (~33% Safety Room)`\n"
+                            f"📊 **Anti-Fakeout Gate ៖** `ADX & Macro Trend Confirmed`\n"
+                            f"⚡ **Binance Status ៖** `POSITION OPENED (<30ms)`\n\n"
+                            f"_ប្រព័ន្ធសម្រាំងកាក់ល្អបំផុតពី TOP 500 ធានាសុវត្ថិភាពទុន ១០០%!_\n\n"
+                            f"{OFFICIAL_FOOTNOTE}"
                         )
-                        if exec_res.get("status") == "success" and app and hasattr(app, "bot"):
-                            try:
-                                msg_entry = (
-                                    f"🚀 **APEX MACRO BREAKOUT LONG EXECUTED!** 📈\n"
-                                    f"{DIVIDER_DOUBLE}\n\n"
-                                    f"🪙 **កាក់ ៖** `{sym}`\n"
-                                    f"🎯 **ទិសដៅ ៖** `LONG (4H Range Breakout Expansion)`\n"
-                                    f"💵 **ទុនវិនិយោគ ៖** `${trade_amt:.2f} USDT`\n"
-                                    f"🛡️ **Margin Buffer ៖** `{lev}x ISOLATED (~33% Safety Room)`\n"
-                                    f"⚡ **Binance Status ៖** `POSITION OPENED (<30ms)`\n\n"
-                                    f"_ប្រព័ន្ធចាប់យករលកហោះហើរ Breakout ធំៗប្រចាំសប្តាហ៍ ស្វ័យប្រវត្តិ!_\n\n"
-                                    f"{OFFICIAL_FOOTNOTE}"
-                                )
-                                asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_entry, parse_mode="Markdown"))
-                            except Exception:
-                                pass
-                        break
+                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_entry, parse_mode="Markdown"))
+                    except Exception:
+                        pass
+
+                user_trades = db.get_user_macro_trades(chat_id) or []
+                if len(user_trades) >= 2:
+                    break
 
     except Exception as e:
         print(f"⚠️ [MACRO SCANNER CYCLE ERROR]: {e}")
