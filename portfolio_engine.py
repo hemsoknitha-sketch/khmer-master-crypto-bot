@@ -231,6 +231,27 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     except Exception as e:
         print(f"[PORTFOLIO] Turbo hedge bots query error: {e}")
 
+    # 4b. Turbo Hedge TOP Mode (Futures AGI Auto Decision 24/7)
+    turbo_top_mode = False
+    turbo_top_count = 5
+    turbo_top_amount = 20.0
+    turbo_top_leverage = 10
+    turbo_top_side = "AUTO"
+    turbo_top_tp = 20.0
+    try:
+        turbo_top_mode = (db.get_system_setting(f"turbo_hedge_{chat_id}_top_mode", "0") == "1")
+        val_cnt = db.get_system_setting(f"turbo_hedge_{chat_id}_top_count", "5")
+        turbo_top_count = int(val_cnt) if str(val_cnt).isdigit() else 5
+        val_amt = db.get_system_setting(f"turbo_hedge_{chat_id}_top_amount", "20.0")
+        turbo_top_amount = float(val_amt) if val_amt.replace('.', '', 1).isdigit() else 20.0
+        val_lev = db.get_system_setting(f"turbo_hedge_{chat_id}_top_leverage", "10")
+        turbo_top_leverage = int(val_lev) if str(val_lev).isdigit() else 10
+        turbo_top_side = db.get_system_setting(f"turbo_hedge_{chat_id}_top_side", "AUTO").upper()
+        val_tp = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "20.0")
+        turbo_top_tp = float(val_tp) if val_tp.replace('.', '', 1).isdigit() else 20.0
+    except Exception as e:
+        print(f"[PORTFOLIO] Turbo TOP mode query error: {e}")
+
     # 5. Active Smart Swaps (On-Chain DEX Solana / EVM)
     active_smart_swaps = []
     try:
@@ -528,6 +549,12 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "user_snipers": user_snipers,
 
         # Engine Flags
+        "turbo_top_mode": turbo_top_mode,
+        "turbo_top_count": turbo_top_count,
+        "turbo_top_amount": turbo_top_amount,
+        "turbo_top_leverage": turbo_top_leverage,
+        "turbo_top_side": turbo_top_side,
+        "turbo_top_tp": turbo_top_tp,
         "smart_swap_autopilot": smart_swap_autopilot_cfg,
         "funding_cfg": funding_cfg,
         "gold_turbo_cfg": gold_turbo_cfg,
@@ -639,23 +666,119 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     engines_text = "📊 **ស្ថានភាពដំណើរការម៉ាស៊ីនវិនិយោគទាំង ១០ (10-ENGINE AUDIT):**\n\n" if lang == "km" else "📊 **OPERATIONAL STATUS OF ALL 10 ENGINES:**\n\n"
 
     # --- ENGINE 1: Turbo Hedge & Delta-Neutral HFT Engine ---
-    tb_bots = data["user_turbo_bots"]
-    fut_pos = data["active_futures_positions"]
-    if tb_bots or fut_pos:
-        e1_status = "🟢 ACTIVE / INVESTED (កំពុងវិនិយោគពិតប្រាកដ)" if lang == "km" else "🟢 ACTIVE / INVESTED"
-        e1_details = []
-        for b in tb_bots:
-            e1_details.append(f"  • `{b['symbol']}` ({b['side']} {b['leverage']}x) ៖ ដើមទុន `${b['amount_usd']:.2f}` | Entry: `${b['entry_price']:.4f}` | Mark: `${b['current_price']:.4f}` | TP: `+{b['target_tp_pct']}%`")
+    tb_bots = data.get("user_turbo_bots", [])
+    fut_pos = data.get("active_futures_positions", [])
+    top_mode = data.get("turbo_top_mode", False)
+    top_amt = data.get("turbo_top_amount", 20.0)
+    top_lev = data.get("turbo_top_leverage", 10)
+    top_side = data.get("turbo_top_side", "AUTO")
+    top_cnt = data.get("turbo_top_count", 5)
+    top_tp = data.get("turbo_top_tp", 20.0)
+
+    top_amt_str = f"{int(top_amt)}" if top_amt.is_integer() else f"{top_amt}"
+    top_cmd_preset = f"`/turbo_hedge TOP {top_amt_str} {top_lev} {top_side} {top_cnt} 1234`"
+
+    # 1. Delta-Neutral Pair Hedging
+    active_dn_bots = [b for b in tb_bots if b.get("side") == "HEDGE"]
+    if lang == "km":
+        if active_dn_bots:
+            dn_text = f"   🟢 ACTIVE / HEDGING ({len(active_dn_bots)} Pairs កំពុងកើបចំណេញ 24/7)\n"
+            for b in active_dn_bots:
+                dn_text += f"  • `{b['symbol']}` ({b['side']} {b['leverage']}x) ៖ ដើមទុន `${b['amount_usd']:.2f}` | Entry: `${b['entry_price']:.4f}` | Mark: `${b['current_price']:.4f}` | TP: `+{b['target_tp_pct']}%`\n"
+        else:
+            dn_text = (
+                "   🟡 STANDBY (រង់ចាំឱកាស ស្កេន Basis & Funding 24/7)\n"
+                "  • ស្ថានភាព ៖ រង់ចាំសញ្ញាបញ្ជា `/turbo_hedge HEDGE auto 20 1234`\n"
+            )
+
+        # 2. Futures AGI Auto Decision (TOP Mode)
+        if top_mode:
+            agi_text = (
+                "🧠 **Futures AGI Auto Decision (AI ស្កេន & សម្រេចចិត្ត BUY/SELL ស្វ័យប្រវត្តិ 24/7)**\n"
+                f"   {top_cmd_preset}\n"
+                "   🟢 ACTIVE (កំពុងស្គែនរកកាក់ចូល Position 24/7)\n"
+                f"  • ប៉ារ៉ាម៉ែត្រ ៖ ទុន `${top_amt:.0f}` | `{top_lev}x` | Side: `{top_side}` | ស្កេន: `Top 1-{top_cnt} Gainers` | TP: `+{top_tp:.0f}%`\n"
+            )
+        else:
+            agi_text = (
+                "🧠 **Futures AGI Auto Decision (AI ស្កេន & សម្រេចចិត្ត BUY/SELL ស្វ័យប្រវត្តិ 24/7)**\n"
+                f"   {top_cmd_preset}\n"
+                "   ⚪ STANDBY (រង់ចាំសញ្ញាបញ្ជាបើកដំណើរការ 24/7)\n"
+            )
+
+        # 3. Invested Positions (កាក់កំពុងវិនិយោគ)
+        invested_items = []
+        for b in [b for b in tb_bots if b.get("side") != "HEDGE"]:
+            invested_items.append(f"  • `{b['symbol']}` ({b['side']} {b['leverage']}x) ៖ ដើមទុន `${b['amount_usd']:.2f}` | Entry: `${b['entry_price']:.4f}` | Mark: `${b['current_price']:.4f}` | TP: `+{b['target_tp_pct']}%`")
         for p in fut_pos:
-            # If not already detailed in tb_bots
             if not any(b['symbol'] == p['symbol'] for b in tb_bots):
                 e_pnl_sign = "+" if p['pnl_usd'] >= 0 else ""
-                e1_details.append(f"  • `{p['symbol']}` ({p['side']} {p['leverage']}x ISOLATED) ៖ Margin `${p['margin_usd']:.2f}` | Entry: `${p['entry_price']:.4f}` | Mark: `${p['mark_price']:.4f}` | PnL: `{e_pnl_sign}${p['pnl_usd']:.2f}` (`{p['roi_pct']:+.1f}%`)")
-        e1_body = "\n".join(e1_details)
+                side_label = "BUY" if p['side'] in ["LONG", "BUY"] else "SELL"
+                price_fmt = f"${p['entry_price']:,.4f}" if p['entry_price'] >= 1 else f"${p['entry_price']:,.6f}"
+                mark_fmt = f"${p['mark_price']:,.4f}" if p['mark_price'] >= 1 else f"${p['mark_price']:,.6f}"
+                invested_items.append(f"  • `{p['symbol']}` (Futures {side_label} {p['leverage']}x ISOLATED) ៖ Margin `${p['margin_usd']:.2f}` | Entry: `{price_fmt}` | Mark: `{mark_fmt}` | PnL: `{e_pnl_sign}${p['pnl_usd']:.2f}` (`{p['roi_pct']:+.1f}%`)")
+
+        if invested_items:
+            inv_text = "💼 **កាក់កំពុងវិនិយោគជាក់ស្តែង ៖**\n" + "\n".join(invested_items)
+        else:
+            inv_text = "💼 **កាក់កំពុងវិនិយោគជាក់ស្តែង ៖**\n  • គ្មាន Position កំពុងត្រាំ (Free Margin 100% សុវត្ថិភាព)"
+
+        engines_text += (
+            f"1️⃣ **Turbo Hedge & Delta-Neutral HFT Engine (`/turbo_hedge`)**\n"
+            f"{dn_text}"
+            f"{agi_text}"
+            f"{inv_text}\n\n"
+        )
     else:
-        e1_status = "🟡 STANDBY (រង់ចាំឱកាស ស្កេន Basis & Funding 24/7)" if lang == "km" else "🟡 STANDBY (Scanning Basis & Funding 24/7)"
-        e1_body = "  • ស្ថានភាព ៖ រង់ចាំសញ្ញាបញ្ជា `/turbo_hedge HEDGE auto 20 1234`" if lang == "km" else "  • Status: Standby for command `/turbo_hedge HEDGE auto 20 1234`"
-    engines_text += f"1️⃣ **Turbo Hedge & Delta-Neutral HFT Engine (`/turbo_hedge`)**\n   {e1_status}\n{e1_body}\n\n"
+        # English rendering
+        if active_dn_bots:
+            dn_text = f"   🟢 ACTIVE / HEDGING ({len(active_dn_bots)} Pairs Hedging 24/7)\n"
+            for b in active_dn_bots:
+                dn_text += f"  • `{b['symbol']}` ({b['side']} {b['leverage']}x): Capital `${b['amount_usd']:.2f}` | Entry: `${b['entry_price']:.4f}` | Mark: `${b['current_price']:.4f}` | TP: `+{b['target_tp_pct']}%`\n"
+        else:
+            dn_text = (
+                "   🟡 STANDBY (Scanning Basis & Funding Opportunities 24/7)\n"
+                "  • Status: Standby for command `/turbo_hedge HEDGE auto 20 1234`\n"
+            )
+
+        # 2. Futures AGI Auto Decision (TOP Mode)
+        if top_mode:
+            agi_text = (
+                "🧠 **Futures AGI Auto Decision (AI Scan & Auto BUY/SELL 24/7)**\n"
+                f"   {top_cmd_preset}\n"
+                "   🟢 ACTIVE (Scanning market & entering positions 24/7)\n"
+                f"  • Config: Capital `${top_amt:.0f}` | `{top_lev}x` | Side: `{top_side}` | Scan: `Top 1-{top_cnt} Gainers` | TP: `+{top_tp:.0f}%`\n"
+            )
+        else:
+            agi_text = (
+                "🧠 **Futures AGI Auto Decision (AI Scan & Auto BUY/SELL 24/7)**\n"
+                f"   {top_cmd_preset}\n"
+                "   ⚪ STANDBY (Standby for execution command 24/7)\n"
+            )
+
+        # 3. Invested Positions
+        invested_items = []
+        for b in [b for b in tb_bots if b.get("side") != "HEDGE"]:
+            invested_items.append(f"  • `{b['symbol']}` ({b['side']} {b['leverage']}x): Capital `${b['amount_usd']:.2f}` | Entry: `${b['entry_price']:.4f}` | Mark: `${b['current_price']:.4f}` | TP: `+{b['target_tp_pct']}%`")
+        for p in fut_pos:
+            if not any(b['symbol'] == p['symbol'] for b in tb_bots):
+                e_pnl_sign = "+" if p['pnl_usd'] >= 0 else ""
+                side_label = "BUY" if p['side'] in ["LONG", "BUY"] else "SELL"
+                price_fmt = f"${p['entry_price']:,.4f}" if p['entry_price'] >= 1 else f"${p['entry_price']:,.6f}"
+                mark_fmt = f"${p['mark_price']:,.4f}" if p['mark_price'] >= 1 else f"${p['mark_price']:,.6f}"
+                invested_items.append(f"  • `{p['symbol']}` (Futures {side_label} {p['leverage']}x ISOLATED): Margin `${p['margin_usd']:.2f}` | Entry: `{price_fmt}` | Mark: `{mark_fmt}` | PnL: `{e_pnl_sign}${p['pnl_usd']:.2f}` (`{p['roi_pct']:+.1f}%`)")
+
+        if invested_items:
+            inv_text = "💼 **Active Invested Positions:**\n" + "\n".join(invested_items)
+        else:
+            inv_text = "💼 **Active Invested Positions:**\n  • No active positions (100% Free Margin Protected)"
+
+        engines_text += (
+            f"1️⃣ **Turbo Hedge & Delta-Neutral HFT Engine (`/turbo_hedge`)**\n"
+            f"{dn_text}"
+            f"{agi_text}"
+            f"{inv_text}\n\n"
+        )
 
     # --- ENGINE 2: Super Smart Trade Suite (Spot Breakout & Top Gainers) ---
     sp_trades = data["active_spot_trades"]
