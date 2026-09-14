@@ -1417,17 +1417,17 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     if not keys:
         return
 
-    # 🛡️ Small Capital Leverage Shield & Multi-Tiered Balance Fallback
+    # 🛡️ Small Capital Leverage Shield & Multi-Tiered Balance Fallback (Non-Blocking)
     if current_side == "SPOT" or leverage <= 1:
-        avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
+        avail_bal = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
         if avail_bal <= 0.0:
-            avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+            avail_bal = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
     else:
-        avail_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+        avail_bal = await asyncio.to_thread(trading_engine.get_futures_available_balance, keys[0], keys[1])
         if avail_bal <= 0.0:
-            avail_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
+            avail_bal = await asyncio.to_thread(trading_engine.get_futures_free_margin, keys[0], keys[1])
         if avail_bal <= 0.0:
-            avail_bal = trading_engine.get_spot_balance(keys[0], keys[1], "USDT")
+            avail_bal = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
         
     if avail_bal <= 0.0 or avail_bal < 100.0:
         leverage = min(leverage, 10)
@@ -1448,11 +1448,11 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
 
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
-        spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+        spot_qty = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], base_asset)
         fut_pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
         
         spot_pnl = (mark_p - entry_p) * spot_qty if (entry_p > 0 and mark_p > 0) else 0.0
-        fut_pnl = float(fut_pnl_info.get("unrealizedProfit", 0.0)) if fut_pnl_info.get("has_position") else 0.0
+        fut_pnl = float(fut_pnl_info.get("unrealizedProfit", fut_pnl_info.get("unRealizedProfit", 0.0))) if fut_pnl_info.get("has_position") else 0.0
         combined_pnl = spot_pnl + fut_pnl
         
         pnl_info = {
@@ -1465,7 +1465,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             "side": "HEDGE"
         }
     elif current_side == "SPOT" or leverage <= 1:
-        mark_p = trading_engine.get_current_price(symbol)
+        mark_p = await asyncio.to_thread(trading_engine.get_current_price, symbol)
         entry_p_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", "0.0")
         entry_p = float(entry_p_str) if entry_p_str.replace('.', '', 1).isdigit() else 0.0
         if entry_p <= 0 and mark_p > 0:
@@ -1473,7 +1473,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_entry_price", str(entry_p))
 
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
-        spot_qty = trading_engine.get_spot_balance(keys[0], keys[1], base_asset)
+        spot_qty = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], base_asset)
         if spot_qty <= 0:
             db.remove_turbo_hedge_bot(chat_id, symbol)
             return
@@ -1494,11 +1494,24 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     if not pnl_info.get("has_position"):
         return
 
-    real_pnl_usdt = float(pnl_info.get("unrealizedProfit", 0.0))
     entry_price = float(pnl_info.get("entryPrice", 0.0))
     mark_price = float(pnl_info.get("markPrice", 0.0))
     liq_price = float(pnl_info.get("liquidationPrice", 0.0))
     pos_side = pnl_info.get("side", current_side)
+    position_amt = float(pnl_info.get("positionAmt", 0.0))
+
+    # 🛡️ Multi-Tiered Realized/Unrealized PnL & Mathematical Price Verification Shield
+    real_pnl_usdt = float(pnl_info.get("unrealizedProfit", pnl_info.get("unRealizedProfit", 0.0)))
+    if mark_price > 0 and entry_price > 0 and position_amt != 0:
+        if current_side in ["BUY", "LONG"]:
+            calc_math_pnl = (mark_price - entry_price) * position_amt
+        elif current_side in ["SELL", "SHORT"]:
+            calc_math_pnl = (entry_price - mark_price) * abs(position_amt)
+        else:
+            calc_math_pnl = 0.0
+        # If exchange reported 0.0 due to API casing or discrepancy, use mathematical PnL
+        if real_pnl_usdt == 0.0 or (calc_math_pnl > 0 and real_pnl_usdt < 0) or abs(calc_math_pnl - real_pnl_usdt) > 0.30:
+            real_pnl_usdt = calc_math_pnl
 
     # Sync side if different
     if pos_side != current_side:
@@ -1513,7 +1526,6 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         return
 
     # 📊 Binance Native Direct Net ROI & PnL Formula (Deducts 2-Way Trading Fees 100%)
-    position_amt = float(pnl_info.get("positionAmt", 0.0))
     notional_val = abs(position_amt * mark_price)
     est_binance_fee = notional_val * (0.0015 if current_side == "SPOT" else 0.0010)
     net_pnl_usdt = real_pnl_usdt - est_binance_fee
@@ -1592,8 +1604,8 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         # Target TP: If net PnL reaches target dollar TP (e.g. $1.00 - $2.50) and pulls back slightly (>=5%), or exceeds target
         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.1 or net_pnl_usdt <= peak_pnl * 0.95))
 
-    # 1. Fetch live 15m ATR for dynamic volatility-adaptive stops
-    atr_info = market_data.get_symbol_atr(symbol, interval="15m")
+    # 1. Fetch live 15m ATR for dynamic volatility-adaptive stops (Non-Blocking)
+    atr_info = await asyncio.to_thread(market_data.get_symbol_atr, symbol, interval="15m")
     curr_atr_val = atr_info.get("atr_val", 0.0)
     curr_atr_pct = atr_info.get("atr_pct", 1.5)
     if curr_atr_val <= 0 and mark_price > 0:
@@ -1723,6 +1735,11 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         else:
             # Futures: Hits target at >= $1.00 net or >= 6.0% ROI
             is_tp1_hit = (net_pnl_usdt >= 1.00 or roi_pct >= 6.0 or net_pnl_usdt >= max(0.30, bot_amt * 0.060))
+
+    # 📊 Real-Time Zero-Blind Heartbeat Log for Active Positions (Invariant 24)
+    if peak_pnl >= 0.30 or net_pnl_usdt >= 0.30:
+        guaranteed_disp = guaranteed_floor if (not is_hedge and not is_spot and has_hit_profit_peak) else (min_guaranteed_pnl if is_breakeven_armed else 0.0)
+        print(f"📊 [TURBO HEDGE TRACKING] {symbol}: Real PnL +${real_pnl_usdt:.2f} (Net: +${net_pnl_usdt:.2f}, ROI: +{roi_pct:.1f}%) | Peak: +${peak_pnl:.2f} | Ratchet Floor: ${guaranteed_disp:.2f} | Mark: {mark_price:.5f}")
 
     # Stop Loss & Hard Circuit Breaker:
     now_ts = int(time.time())
@@ -2413,7 +2430,7 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
                     p_sym = pos.get("symbol")
                     p_amt = float(pos.get("positionAmt", 0))
                     if p_amt != 0:
-                        pnl = float(pos.get("unrealizedProfit", 0))
+                        pnl = float(pos.get("unRealizedProfit", pos.get("unrealizedProfit", 0.0)) or 0.0)
                         total_pnl_realized += pnl
                         # Market Close Position on Binance (<30ms)
                         close_res = trading_engine.close_futures_position_for_symbol(keys[0], keys[1], p_sym)
@@ -2443,7 +2460,7 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
                 
                 pos_info = trading_engine.get_futures_position_pnl(keys[0], keys[1], symbol)
                 if pos_info.get("has_position"):
-                    fut_pnl = float(pos_info.get("unrealizedProfit", 0))
+                    fut_pnl = float(pos_info.get("unrealizedProfit", pos_info.get("unRealizedProfit", 0.0)) or 0.0)
                     total_pnl_realized += fut_pnl
                     close_res_fut = trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
                     closed_details.append({"symbol": f"{symbol} (Futures)", "amt": pos_info.get("positionAmt"), "pnl": fut_pnl, "res": close_res_fut})
@@ -2467,7 +2484,7 @@ def stop_turbo_hedge_engine(chat_id: int, symbol: str = "ALL") -> dict:
             else:
                 pos_info = trading_engine.get_futures_position_pnl(keys[0], keys[1], symbol)
                 if pos_info.get("has_position"):
-                    pnl = float(pos_info.get("unrealizedProfit", 0))
+                    pnl = float(pos_info.get("unrealizedProfit", pos_info.get("unRealizedProfit", 0.0)) or 0.0)
                     total_pnl_realized += pnl
                     close_res = trading_engine.close_futures_position_for_symbol(keys[0], keys[1], symbol)
                     closed_details.append({"symbol": symbol, "amt": pos_info.get("positionAmt"), "pnl": pnl, "res": close_res})

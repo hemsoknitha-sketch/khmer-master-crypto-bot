@@ -1935,15 +1935,22 @@ def get_futures_position_pnl(api_key: str, api_secret: str, symbol: str) -> dict
                         if pos.get("symbol") == symbol:
                             amt = float(pos.get("positionAmt", 0))
                             if amt != 0:
-                                pnl = float(pos.get("unrealizedProfit", 0))
                                 entry_p = float(pos.get("entryPrice", 0))
                                 mark_p = float(pos.get("markPrice", 0))
+                                raw_pnl = pos.get("unRealizedProfit", pos.get("unrealizedProfit"))
+                                if raw_pnl is not None and float(raw_pnl) != 0.0:
+                                    pnl = float(raw_pnl)
+                                elif mark_p > 0 and entry_p > 0:
+                                    pnl = (mark_p - entry_p) * amt if amt > 0 else (entry_p - mark_p) * abs(amt)
+                                else:
+                                    pnl = float(raw_pnl or 0.0)
                                 liq_p = float(pos.get("liquidationPrice", 0))
                                 init_m = float(pos.get("positionInitialMargin", pos.get("isolatedMargin", 0)))
                                 lev = int(pos.get("leverage", 10))
                                 return {
                                     "has_position": True,
                                     "unrealizedProfit": pnl,
+                                    "unRealizedProfit": pnl,
                                     "entryPrice": entry_p,
                                     "markPrice": mark_p,
                                     "liquidationPrice": liq_p,
