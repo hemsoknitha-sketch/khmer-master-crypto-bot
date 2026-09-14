@@ -6109,7 +6109,8 @@ async def vip_8hour_executive_report_job(app: Application):
                 recent_trades = db.get_recent_harvested_trades(chat_id, hours=8)
                 if recent_trades:
                     report_text += "🏆 **បញ្ជីកាក់បានកើបចំណេញក្នុង ៨ ម៉ោង (8-HOUR HARVESTED HISTORY) ៖**\n\n"
-                    tot_8h_pnl = 0.0
+                    tot_8h_gross = 0.0
+                    tot_8h_fees = 0.0
                     for h_idx, t in enumerate(recent_trades, 1):
                         h_sym = t.get("symbol", "")
                         h_side = t.get("side", "BUY")
@@ -6117,15 +6118,38 @@ async def vip_8hour_executive_report_job(app: Application):
                         h_exit = float(t.get("exit_price", 0.0))
                         h_pnl = float(t.get("pnl", 0.0))
                         h_roi = float(t.get("pnl_percent", 0.0))
-                        tot_8h_pnl += h_pnl
+                        h_qty = float(t.get("qty", 0.0))
                         
-                        h_emoji = "🟩" if h_pnl >= 0 else "🟥"
+                        # Calculate VIP0 round-trip exchange fees (0.05% entry + 0.05% exit)
+                        if h_qty > 0:
+                            trade_notional = (h_entry + h_exit) * h_qty
+                        elif h_roi != 0:
+                            est_inv = abs(h_pnl) / (abs(h_roi) / 100.0)
+                            trade_notional = est_inv * 2.0
+                        else:
+                            trade_notional = 50.0
+                        
+                        trade_fee = max(0.02, round(trade_notional * 0.0005, 2))
+                        net_trade_pnl = round(h_pnl - trade_fee, 2)
+                        tot_8h_gross += h_pnl
+                        tot_8h_fees += trade_fee
+                        
+                        h_emoji = "🟩" if net_trade_pnl >= 0 else "🟥"
                         report_text += (
                             f"**{h_idx}. {h_sym}** ({h_side})\n"
                             f"   💵 **Entry ៖** `${h_entry:,.4f}` ➔ **Harvest ៖** `${h_exit:,.4f}`\n"
-                            f"   {h_emoji} **Harvested PnL ៖** `${h_pnl:+,.2f} USDT` (`{h_roi:+,.1f}% ROI`)\n\n"
+                            f"   • Gross PnL ៖ `${h_pnl:+,.2f} USDT` | 💳 Fee ៖ `-${trade_fee:.2f} USDT`\n"
+                            f"   {h_emoji} **Net Harvested ៖** `${net_trade_pnl:+,.2f} USDT` (`{h_roi:+,.1f}% ROI`)\n\n"
                         )
-                    report_text += f"💰 **សរុបផលចំណេញកើបបាន ៨ ម៉ោង ៖** `+${tot_8h_pnl:,.2f} USDT`\n"
+                    net_8h_total = round(tot_8h_gross - tot_8h_fees, 2)
+                    tot_emoji = "🟩" if net_8h_total >= 0 else "🟥"
+                    report_text += (
+                        f"════════════\n"
+                        f"💰 **សរុបផលចំណេញកើបបាន ៨ ម៉ោង (8-HOUR RECAP) ៖**\n"
+                        f"• 📈 **ផលចំណេញដុល (Gross PnL) ៖** `${tot_8h_gross:+,.2f} USDT`\n"
+                        f"• 💳 **សរុបថ្លៃសេវា (Exchange Fees) ៖** `-${tot_8h_fees:,.2f} USDT`\n"
+                        f"• {tot_emoji} **ផលចំណេញសុទ្ធពិតប្រាកដ (Net PnL) ៖** `${net_8h_total:+,.2f} USDT`\n"
+                    )
 
                 report_text += (
                     f"════════════\n"

@@ -2259,7 +2259,7 @@ def get_recent_harvested_trades(chat_id: int, hours: int = 8) -> list:
         from datetime import datetime, timedelta
         cutoff_time = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute(
-            "SELECT symbol, side, entry_price, exit_price, pnl, pnl_percent, exit_time FROM trade_history WHERE chat_id = ? AND exit_time >= ? ORDER BY id DESC",
+            "SELECT symbol, side, entry_price, exit_price, pnl, pnl_percent, exit_time, qty FROM trade_history WHERE chat_id = ? AND exit_time >= ? ORDER BY id DESC",
             (chat_id, cutoff_time)
         )
         rows = cursor.fetchall()
@@ -2272,7 +2272,8 @@ def get_recent_harvested_trades(chat_id: int, hours: int = 8) -> list:
                 "exit_price": r[3],
                 "pnl": r[4],
                 "pnl_percent": r[5],
-                "exit_time": r[6]
+                "exit_time": r[6],
+                "qty": float(r[7]) if len(r) > 7 and r[7] is not None else 0.0
             })
     except Exception as e:
         print(f"Error in get_recent_harvested_trades: {e}")

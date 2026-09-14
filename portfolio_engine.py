@@ -689,21 +689,22 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     # --- ENGINE 3: Smart X Multi-Asset Quant Suite (Gold & BTC) ---
     smart_x_active = data.get("smart_x_active", False)
     smart_x_target = data.get("smart_x_target", "GOLD")
-    paxg_pos = [p for p in fut_pos if "PAXG" in p.get("symbol", "")] + [s for s in sp_trades if "PAXG" in s.get("symbol", "")]
+    gold_pos = [p for p in fut_pos if any(k in p.get("symbol", "") for k in ["XAU", "PAXG"])] + [s for s in sp_trades if any(k in s.get("symbol", "") for k in ["XAU", "PAXG"])]
     btc_pos = [p for p in fut_pos if "BTC" in p.get("symbol", "")] + [s for s in sp_trades if "BTC" in s.get("symbol", "")]
-    smart_x_bots = [b for b in tb_bots if "PAXG" in b.get("symbol", "") or "BTC" in b.get("symbol", "")]
+    smart_x_bots = [b for b in tb_bots if any(k in b.get("symbol", "") for k in ["XAU", "PAXG", "BTC"])]
 
-    if smart_x_active or paxg_pos or btc_pos or smart_x_bots:
+    if smart_x_active or gold_pos or btc_pos or smart_x_bots:
         e3_status = "🟢 ACTIVE / INVESTED (ម៉ាស៊ីន AI Quant កំពុងជួញដូរ)" if lang == "km" else "🟢 ACTIVE / INVESTED"
         e3_details = []
-        if paxg_pos:
-            for p in paxg_pos:
+        if gold_pos:
+            for p in gold_pos:
                 p_pnl = p.get('pnl_usd', 0.0)
                 p_sign = "+" if p_pnl >= 0 else ""
                 p_margin = p.get('margin_usd', p.get('invested_usd', 0.0))
                 p_side = p.get('side', 'BUY')
                 p_lev = p.get('leverage', 10)
-                e3_details.append(f"  • `PAXGUSDT` (Gold Quant {p_side} {p_lev}x) ៖ Margin `${p_margin:.2f}` | Entry: `${p.get('entry_price', 0):.2f}` | PnL: `{p_sign}${p_pnl:.2f}` (`{p.get('roi_pct', 0.0):+.1f}%`)")
+                p_sym = p.get('symbol', 'XAUUSDT')
+                e3_details.append(f"  • `{p_sym}` (Gold Quant {p_side} {p_lev}x) ៖ Margin `${p_margin:.2f}` | Entry: `${p.get('entry_price', 0):.4f}` | Mark: `${p.get('mark_price', p.get('current_price', 0)):.4f}` | PnL: `{p_sign}${p_pnl:.2f}` (`{p.get('roi_pct', 0.0):+.1f}%`)")
         elif btc_pos:
             for p in btc_pos:
                 p_pnl = p.get('pnl_usd', 0.0)
@@ -838,9 +839,9 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     # --- ENGINE 8: Gold Turbo & Macro Radar ---
     gold_cfg = data.get("gold_turbo_cfg", {})
     gold_on = gold_cfg.get("is_enabled", False)
-    if gold_on:
+    if gold_on or smart_x_active:
         e8_status = "🟢 ACTIVE (ដំណើរការ HFT Gold Turbo 24/7)" if lang == "km" else "🟢 ACTIVE (HFT Gold Turbo Active 24/7)"
-        e8_body = f"  • ដើមទុន / Trade ៖ `${gold_cfg.get('amount_per_trade', 15.0):.2f} USDT` ({gold_cfg.get('max_leverage', 25)}x Lev) | AI Win-Rate Threshold: 85%" if lang == "km" else f"  • Capital / Trade: ${gold_cfg.get('amount_per_trade', 15.0):.2f} USDT"
+        e8_body = f"  • ដើមទុន / Trade ៖ `${gold_cfg.get('amount_per_trade', 100.0):.2f} USDT` ({gold_cfg.get('max_leverage', 25)}x Lev) | AI Win-Rate Threshold: 85%" if lang == "km" else f"  • Capital / Trade: ${gold_cfg.get('amount_per_trade', 100.0):.2f} USDT"
     else:
         e8_status = "🟡 STANDBY (រង់ចាំការបើកដំណើរការ)" if lang == "km" else "🟡 STANDBY (Awaiting Activation)"
         e8_body = "  • ស្ថានភាព ៖ ម៉ាស៊ីន Macro Standby (វាយ `/gold_turbo ON 1234` ដើម្បីបើក)" if lang == "km" else "  • Status: Standby (Activate via `/gold_turbo ON 1234`)"
