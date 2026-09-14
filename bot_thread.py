@@ -12203,9 +12203,12 @@ class TelegramBotThread(BaseThread):
                 keys = db.get_user_api(chat_id)
                 if keys:
                     try:
-                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
+                        spot_bal = await asyncio.wait_for(
+                            asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT"),
+                            timeout=3.0
+                        )
                     except Exception:
-                        pass
+                        spot_bal = 0.0
 
                 scanner_on = (db.get_system_setting(f"smart_trade_{chat_id}_status", "0") == "1")
                 scanner_badge = "🟢 ACTIVE / SCANNING" if scanner_on else "🟡 STANDBY"
@@ -12221,7 +12224,7 @@ class TelegramBotThread(BaseThread):
                         f"📊 **Active Spot Holdings ៖** `{len(active_trades)} Coins`\n\n"
                         "🎯 **INSTITUTIONAL SPOT ARCHITECTURE:**\n"
                         "• 🛡️ **Zero Liquidation Risk** ៖ 100% Real Spot token accumulation with 0x leverage.\n"
-                        "• 💰 **Spot MIN_NOTIONAL Guard** ៖ $10.50 floor strictly enforced (Zero -1013 errors).\n"
+                        "• 💰 **Spot MIN-NOTIONAL Guard** ៖ $10.50 floor strictly enforced (Zero -1013 errors).\n"
                         "• 🔒 **Multi-Wallet Segregation (Invariant 10)** ៖ Spot USDT isolation (Zero futures risk).\n"
                         "• 📈 **Breakout Momentum Radar** ៖ Autonomous scanning of 24h gainers & volume surges.\n"
                         "• 💎 **Dynamic Trailing Profit Lock** ៖ Breakeven Armor @ +3% & Dynamic ATR trailing stop.\n\n"
@@ -12251,7 +12254,7 @@ class TelegramBotThread(BaseThread):
                         f"📊 **កាក់ Spot កំពុងកាន់កាប់ ៖** `{len(active_trades)} កាក់`\n\n"
                         "🎯 **លក្ខណៈពិសេសប្រព័ន្ធស្ថាប័ន (INSTITUTIONAL ARCHITECTURE):**\n"
                         "• 🛡️ **គ្មានហានិភ័យ Liquidation** ៖ ទិញកាក់ Spot កាន់កាប់ពិតប្រាកដ ១០០% គ្មានខ្ចី Leverage\n"
-                        "• 💰 **Spot MIN_NOTIONAL Shield** ៖ កំណត់ Floor $10.50 (កម្ចាត់ Error -1013 ដាច់ខាត)\n"
+                        "• 💰 **Spot MIN-NOTIONAL Shield** ៖ កំណត់ Floor $10.50 (កម្ចាត់ Error -1013 ដាច់ខាត)\n"
                         "• 🔒 **Wallet Segregation (Invariant 10)** ៖ ប្រើប្រាស់តែ Spot USDT មិនប៉ះពាល់ Futures Wallet\n"
                         "• 📈 **Breakout Momentum Radar** ៖ ស្កេនកាក់ឡើងខ្លាំង និង Volume ផ្ទុះ 24/7\n"
                         "• 💎 **Dynamic Trailing Profit Lock** ៖ Breakeven Armor @ +3% & Dynamic ATR trailing stop\n\n"
@@ -12272,9 +12275,21 @@ class TelegramBotThread(BaseThread):
                         + ui_standards.OFFICIAL_FOOTNOTE
                     )
 
-                if msg_target:
-                    await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update, user_lang)
+                try:
+                    if msg_target:
+                        await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    elif chat_id:
+                        await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception as e_dispatch:
+                    self.log_signal.emit(f"⚠️ /smart_trade Markdown dispatch error: {e_dispatch}, delivering plain text fallback...")
+                    try:
+                        clean_text = msg.replace("**", "").replace("*", "").replace("`", "")
+                        if msg_target:
+                            await msg_target.reply_text(clean_text, reply_markup=keyboard)
+                        elif chat_id:
+                            await context.bot.send_message(chat_id=chat_id, text=clean_text, reply_markup=keyboard)
+                    except Exception as e_dispatch2:
+                        self.log_signal.emit(f"❌ /smart_trade delivery fallback failed: {e_dispatch2}")
                 return
 
             action = str(args[0]).upper().strip()
@@ -12313,7 +12328,7 @@ class TelegramBotThread(BaseThread):
 
                 if not positions:
                     lines.append("  • _មិនទាន់មានកាក់ Spot កំពុងកាន់កាប់នៅឡើយទេ_")
-                    lines.append("  👉 ចុច `` `/smart_trade AUTO 30 1234` `` ដើម្បីចាប់ផ្តើម!")
+                    lines.append("  👉 ចុច `` `/smart\\_trade AUTO 30 1234` `` ដើម្បីចាប់ផ្តើម!")
                 else:
                     for p in positions:
                         s_pnl_sign = "+" if p['pnl_usd'] >= 0 else ""
@@ -12323,9 +12338,22 @@ class TelegramBotThread(BaseThread):
                         )
 
                 lines.append(ui_standards.OFFICIAL_FOOTNOTE)
-                if msg_target:
-                    await msg_target.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=kb)
-                await delete_sensitive_message(context, chat_id, update, user_lang)
+                status_text = "\n".join(lines)
+                try:
+                    if msg_target:
+                        await msg_target.reply_text(status_text, parse_mode="Markdown", reply_markup=kb)
+                    elif chat_id:
+                        await context.bot.send_message(chat_id=chat_id, text=status_text, parse_mode="Markdown", reply_markup=kb)
+                except Exception as e_status_dispatch:
+                    self.log_signal.emit(f"⚠️ /smart_trade STATUS markdown error: {e_status_dispatch}, falling back to plain text...")
+                    try:
+                        clean_status = status_text.replace("**", "").replace("*", "").replace("`", "")
+                        if msg_target:
+                            await msg_target.reply_text(clean_status, reply_markup=kb)
+                        elif chat_id:
+                            await context.bot.send_message(chat_id=chat_id, text=clean_status, reply_markup=kb)
+                    except Exception as e_status_dispatch2:
+                        self.log_signal.emit(f"❌ /smart_trade STATUS fallback failed: {e_status_dispatch2}")
                 return
 
             # Helper for PIN verification
