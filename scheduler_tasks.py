@@ -2000,13 +2000,7 @@ async def process_single_trailing_stop(app, ai_engine, trade):
     profit_pct = trading_engine.calculate_net_pnl_pct(buy_price, current_price) if buy_price and buy_price > 0 else 0.0
     
     if profit_pct >= 5.0 and scale_out_level == 0:
-        prompt = f"We are holding {symbol} and it's currently up {profit_pct:.2f}%. Should we take 20% profit now (SCALE OUT) or HOLD for more gains based on current momentum? Answer exactly 'SCALE OUT' or 'HOLD'."
-        ai_resp = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
-        if "HOLD" in ai_resp.upper():
-            print(f"AI decided to HOLD {symbol} at {profit_pct:.2f}% profit instead of scaling out early.")
-            return
-            
-        sell_qty = initial_qty * 0.20
+        sell_qty = initial_qty * 0.50
         if sell_qty <= qty:
             keys = await asyncio.to_thread(db.get_user_api, chat_id)
             if keys:
@@ -2025,7 +2019,17 @@ async def process_single_trailing_stop(app, ai_engine, trade):
                     await asyncio.to_thread(db.update_trade_qty_and_scale, trade_id, new_qty, 1)
                     qty = new_qty
                     user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
-                    alert_msg = loc.get_text(user_lang, 'scale_out_success', level=1, symbol=symbol, price=current_price, profit_pct=profit_pct, sold_qty=sell_qty, remaining_qty=qty)
+                    from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
+                    alert_msg = (
+                        f"🎯 **APEX TP1 50% BANK CASH HARVESTED!** 💰\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
+                        f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
+                        f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `50% Qty Sold` (`+{profit_pct:.2f}% Net`)\n"
+                        f"🛡️ **ស្ថានភាពទុន ៖** `50% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
+                        f"🔒 **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
+                        f"🚀 **Moonbag 50% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
+                    )
                     try: await app.bot.send_message(chat_id=chat_id, text=alert_msg, parse_mode="Markdown")
                     except: pass
                 elif "error" in result or "code" in result:
@@ -2034,39 +2038,6 @@ async def process_single_trailing_stop(app, ai_engine, trade):
                         await asyncio.to_thread(db.update_trade_qty_and_scale, trade_id, qty, 1)
                         try: await app.bot.send_message(chat_id=chat_id, text=f"⚠️ រំលងការលក់ Scale Out កម្រិត 1 សម្រាប់ {symbol} ដោយសារកំហុស។")
                         except: pass
-
-    elif profit_pct >= 10.0 and scale_out_level == 1:
-        prompt = f"We are holding {symbol} and it's currently up {profit_pct:.2f}%. Should we take another 30% profit now (SCALE OUT) or HOLD for more gains? Answer exactly 'SCALE OUT' or 'HOLD'."
-        ai_resp = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
-        if "HOLD" in ai_resp.upper():
-            return
-            
-        sell_qty = initial_qty * 0.30
-        if sell_qty <= qty:
-            keys = await asyncio.to_thread(db.get_user_api, chat_id)
-            if keys:
-                api_key, api_secret = keys[0], keys[1]
-                base_asset = symbol[:-4]
-                actual_coin_balance = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, base_asset)
-                actual_sell_qty = min(sell_qty, actual_coin_balance)
-                
-                if actual_sell_qty > 0:
-                    result = await asyncio.to_thread(trading_engine.place_market_sell, api_key, api_secret, symbol, actual_sell_qty)
-                else:
-                    result = {"error": "Insufficient Coin Balance (Asset Guard)"}
-                    
-                if "status" in result and result["status"] == "FILLED":
-                    new_qty = qty - sell_qty
-                    await asyncio.to_thread(db.update_trade_qty_and_scale, trade_id, new_qty, 2)
-                    qty = new_qty
-                    user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
-                    alert_msg = loc.get_text(user_lang, 'scale_out_success', level=2, symbol=symbol, price=current_price, profit_pct=profit_pct, sold_qty=sell_qty, remaining_qty=qty)
-                    try: await app.bot.send_message(chat_id=chat_id, text=alert_msg, parse_mode="Markdown")
-                    except: pass
-                elif "error" in result or "code" in result:
-                    err_code = result.get("code")
-                    if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
-                        await asyncio.to_thread(db.update_trade_qty_and_scale, trade_id, qty, 2)
 
     # --- Trailing Stop-Loss Logic ---
     if current_price > current_highest:
@@ -2079,6 +2050,16 @@ async def process_single_trailing_stop(app, ai_engine, trade):
     trailing_peak_lock = (net_profit_pct > 1.0) and (current_price <= current_highest * 0.999)
     
     stop_loss_price = current_highest * (1 - (stop_loss_pct / 100.0))
+    # Invariant 24: If already scaled out (Moonbag 50%), Stop Loss is unconditionally locked to Breakeven (+0.12% Net)
+    # and ratchets 85% of peak profit when in significant moonshot
+    if scale_out_level >= 1 and buy_price and buy_price > 0:
+        breakeven_p = buy_price * 1.0012
+        peak_gain_pct = ((current_highest - buy_price) / buy_price) * 100.0
+        if peak_gain_pct >= 15.0:
+            ratchet_p = buy_price * (1.0 + (peak_gain_pct * 0.85 / 100.0))
+            stop_loss_price = max(stop_loss_price, ratchet_p, breakeven_p)
+        else:
+            stop_loss_price = max(stop_loss_price, breakeven_p)
     
     if (current_price <= stop_loss_price or trailing_peak_lock) and qty > 0:
 

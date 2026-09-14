@@ -1609,9 +1609,9 @@ def close_all_futures_positions(api_key: str, api_secret: str) -> dict:
         print(f"Error in close_all_futures_positions: {e}")
         return {"status": "error", "closed_count": closed_count, "error": str(e)}
 
-def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str) -> dict:
+def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str, close_ratio: float = 1.0) -> dict:
     """
-    Emergency Close: Market-closes active futures position for a specific symbol on Binance.
+    Emergency & Partial Close: Market-closes active futures position (full or partial ratio) for a specific symbol on Binance.
     Full support for Hedge Mode, Dual-Side Position, LOT_SIZE formatting, and Auto-Recovery.
     """
     if not api_key or not api_secret:
@@ -1652,9 +1652,18 @@ def close_futures_position_for_symbol(api_key: str, api_secret: str, symbol: str
                                         prec = max(0, int(round(-math.log10(step_size)))) if step_size > 0 else 3
                                         break
                             
-                            abs_qty = get_futures_max_sellable_qty(symbol, abs(amt))
+                            ratio = max(0.01, min(1.0, float(close_ratio)))
+                            target_amt = abs(amt) * ratio
+                            abs_qty = get_futures_max_sellable_qty(symbol, target_amt)
                             if abs_qty <= 0:
-                                abs_qty = abs(amt)
+                                abs_qty = target_amt
+
+                            # If partial close is below $5.00 min notional, fallback to full position
+                            mark_p_est = float(pos.get("markPrice", 0.0))
+                            if mark_p_est > 0 and (abs_qty * mark_p_est < 5.0) and ratio < 1.0:
+                                abs_qty = get_futures_max_sellable_qty(symbol, abs(amt))
+                                if abs_qty <= 0:
+                                    abs_qty = abs(amt)
 
                             formatted_qty = f"{abs_qty:.{prec}f}" if prec > 0 else str(int(abs_qty))
 
@@ -2553,11 +2562,11 @@ def place_spot_order(
         print(f"Error in place_spot_order: {e}")
         return {"status": "error", "error": str(e)}
 
-def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "BUY", amount_usdt: float = 10.0) -> dict:
+def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "BUY", amount_usdt: float = 10.0, close_ratio: float = 1.0) -> dict:
     """
     Executes instant Binance Spot Market Order (BUY/SELL) with sub-second HFT speed (<20ms).
     - BUY: Uses quoteOrderQty (amount_usdt) to buy exact dollar value cleanly.
-    - SELL: Fetches spot base asset balance and executes 100% full spot position sell.
+    - SELL: Fetches spot base asset balance and executes full or partial (close_ratio) spot position sell.
     """
     symbol = symbol.upper().strip()
     if not symbol.endswith("USDT"):
@@ -2589,18 +2598,28 @@ def execute_spot_trade(api_key: str, api_secret: str, symbol: str, side: str = "
         amount_usdt = max(10.50, amount_usdt)
         params["quoteOrderQty"] = f"{amount_usdt:.2f}"
     else:
-        # Fetch base asset spot balance to sell full position with LOT_SIZE precision
+        # Fetch base asset spot balance to sell full or partial position with LOT_SIZE precision
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
         raw_qty = get_spot_balance(api_key, api_secret, base_asset)
         if raw_qty <= 0:
             return {"status": "error", "error": f"No {base_asset} spot balance available to sell"}
-        formatted_qty = get_max_sellable_qty(symbol, raw_qty)
+        
+        ratio = max(0.01, min(1.0, float(close_ratio)))
+        target_qty = raw_qty * ratio
+        formatted_qty = get_max_sellable_qty(symbol, target_qty)
         if formatted_qty <= 0:
-            formatted_qty = raw_qty
+            formatted_qty = target_qty
         
         # Pre-Flight Spot MIN_NOTIONAL Filter Shield
         current_p = get_current_price(symbol)
         notional_val = formatted_qty * current_p if current_p > 0 else 0.0
+        # If partial close drops below Binance Spot $10.00 MIN_NOTIONAL, fallback to full position
+        if notional_val < 10.0 and ratio < 1.0:
+            full_notional = raw_qty * current_p if current_p > 0 else 0.0
+            if full_notional >= 10.0:
+                formatted_qty = get_max_sellable_qty(symbol, raw_qty)
+                notional_val = full_notional
+
         if notional_val < 10.0 and notional_val > 0:
             print(f"🛡️ [SPOT MIN_NOTIONAL SHIELD] {symbol} holding value (${notional_val:.2f}) < $10.00 MIN_NOTIONAL. Skipped sell to protect capital against risky top-up buys.")
             return {"status": "skipped", "reason": f"Value (${notional_val:.2f}) is below Binance Spot $10.00 MIN_NOTIONAL filter", "notional": notional_val}

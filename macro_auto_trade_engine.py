@@ -415,20 +415,62 @@ async def monitor_macro_auto_trades(app):
                 peak_pnl = effective_pnl
                 db.update_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
+            # Scale-out tracking
+            scale_lvl_key = f"macro_trade_{chat_id}_{symbol}_scale_out_level"
+            scale_lvl_str = db.get_system_setting(scale_lvl_key, "0")
+            scale_lvl = int(scale_lvl_str) if scale_lvl_str.isdigit() else 0
+
+            # TP1: Scale out 50% at >= +12.0% ROI or >= +$1.00 net PnL (Bank Cash)
+            if scale_lvl == 0 and (roi_pct >= 12.0 or effective_pnl >= 1.00):
+                print(f"💰 [MACRO TP1 50% BANK CASH] {symbol}: Profit target reached (${effective_pnl:+.2f}, ROI: +{roi_pct:.1f}%) -> Closing 50% position (<30ms)...")
+                close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
+                if close_res.get("closed") or close_res.get("status") == "success":
+                    db.update_system_setting(scale_lvl_key, "1")
+                    print(f"✅ [MACRO TP1 SUCCESS] {symbol}: 50% Position Banked! Remaining 50% converted to Risk-Free Moonbag.")
+                    if app and hasattr(app, "bot"):
+                        try:
+                            msg_tp1 = (
+                                f"🎯 **MACRO AUTO-TRADE TP1 50% CASH HARVESTED!** 💰\n"
+                                f"{DIVIDER_HEAVY}\n\n"
+                                f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
+                                f"📊 **យុទ្ធសាស្ត្រ ៖** `{strategy}`\n"
+                                f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `+${(effective_pnl * 0.5):.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
+                                f"🛡️ **ស្ថានភាពទុន ៖** `50% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
+                                f"🔒 **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
+                                f"🚀 **Moonbag 50% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
+                                f"{OFFICIAL_FOOTNOTE}"
+                            )
+                            asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown"))
+                        except Exception as e:
+                            print(f"Error sending macro TP1 notification: {e}")
+                    continue
+
             # Profit Harvesting Logic
             is_take_profit = False
             is_stop_loss = False
             reason_tag = ""
 
-            # Stop Loss Floor: -10.0% ROI (guarded by micro-profit offset)
-            if roi_pct <= -10.0 or effective_pnl <= -max(2.5, amount * 0.10):
-                is_stop_loss = True
-                reason_tag = "MACRO_STOP_LOSS"
+            # Stop Loss Floor:
+            # If scale_lvl == 1, Stop Loss is unconditionally locked to Breakeven (+0.12% Net Floor)
+            if scale_lvl == 1:
+                if effective_pnl <= 0.05 or roi_pct <= 0.5:
+                    is_stop_loss = True
+                    reason_tag = "MACRO_BREAKEVEN_PROTECT"
+            else:
+                if roi_pct <= -6.0 or effective_pnl <= -max(1.5, amount * 0.06):
+                    is_stop_loss = True
+                    reason_tag = "MACRO_STOP_LOSS"
 
-            # Tiered Trailing Profit Lock
-            if peak_roi >= 15.0:
-                retain_ratio = 0.85 if peak_roi >= 35.0 else (0.80 if peak_roi >= 25.0 else 0.70)
-                if roi_pct <= (peak_roi * retain_ratio) or (effective_pnl <= peak_pnl * retain_ratio) or (effective_pnl < 0.50):
+            # Tiered Trailing Profit Lock with Target $3.50+ Golden 85% Ratchet
+            if peak_pnl >= 3.50 or peak_roi >= 35.0:
+                retain_ratio = 0.85
+                guaranteed_floor = max(3.50, peak_pnl * retain_ratio)
+                if effective_pnl <= guaranteed_floor or roi_pct <= (peak_roi * retain_ratio):
+                    is_take_profit = True
+                    reason_tag = f"MACRO_GOLDEN_85%_PEAK_LOCK (+${effective_pnl:.2f})"
+            elif peak_roi >= 15.0 or peak_pnl >= 1.50:
+                retain_ratio = 0.80 if peak_roi >= 25.0 else 0.70
+                if roi_pct <= (peak_roi * retain_ratio) or (effective_pnl <= peak_pnl * retain_ratio) or (effective_pnl < 0.35):
                     is_take_profit = True
                     reason_tag = f"MACRO_TRAILING_PEAK_LOCK (+{roi_pct:.1f}%)"
 
@@ -436,6 +478,7 @@ async def monitor_macro_auto_trades(app):
                 print(f"🌊 [MACRO TRADE EXIT] {symbol}: Real PnL ${real_pnl:+.2f} (Micro Offset: +${micro_profit:.2f}, Effective: ${effective_pnl:+.2f}, ROI: {roi_pct:+.1f}%) -> {reason_tag}")
                 close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                 db.remove_macro_trade(chat_id, symbol)
+                db.update_system_setting(scale_lvl_key, "0")
                 db.clear_symbiotic_micro_profit(chat_id, symbol)
 
                 if app and hasattr(app, "bot"):
