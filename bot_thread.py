@@ -10341,12 +10341,12 @@ class TelegramBotThread(BaseThread):
                     msg = (
                         "👑 *KHMER MASTER CRYPTO | SMARTX GOLD QUANT*\n"
                         f"{div}\n"
-                        "🥇 *100% PURE INSTITUTIONAL GOLD (XAUUSD / PAXG)*\n"
+                        "🥇 *INSTITUTIONAL GOLD MATRIX (XAUUSDT Futures / PAXGUSDT Spot)*\n"
                         f"{div}\n"
-                        "💡 *THREE UNIFIED OPERATING MODES:*\n"
-                        "• 🚀 *TURBO Sprint*: Dynamic 25x-50x, Macro Breakouts, Trailing Peak Lock\n"
-                        "• 🛡️ *SONIC Scalp*: 10x-20x Leverage, Max Drawdown <= 0.26%, 4 Session Clocks\n"
-                        "• 🛒 *SPOT Physical*: Physical LBMA Tokenized Gold (0% Liquidation Risk)\n"
+                        "💡 *THREE DEDICATED OPERATING MODES:*\n"
+                        "• 🚀 *TURBO Sprint*: `XAUUSDT` (Dynamic 25x-50x, 40x Deep Liquidity, Trailing Lock)\n"
+                        "• 🛡️ *SONIC Scalp*: `XAUUSDT` (10x-20x Leverage, Max Drawdown <= 0.26%, 4 Session Clocks)\n"
+                        "• 🛒 *SPOT Physical*: `PAXGUSDT` (100% Physical LBMA Gold, 0% Liquidation Risk)\n"
                         f"{div}\n"
                         "📡 *INSTITUTIONAL MACRO & SGE RADAR*\n"
                         "• Shanghai Gold Exchange (SGE) LBMA Premium ($/oz)\n"
@@ -10355,19 +10355,19 @@ class TelegramBotThread(BaseThread):
                         "• Pre-Event 15m Freeze Shield (CPI, NFP, FOMC)\n"
                         f"{div}\n"
                         "📋 *1-TAP COPYABLE EXECUTIONS*\n\n"
-                        "👉 🚀 *Turbo Momentum Sprint ($20, 25x-50x):*\n"
+                        "👉 🚀 *Turbo Momentum Sprint ($20, 25x-50x on XAUUSDT):*\n"
                         "`/smartx TURBO 20 25 1234`\n\n"
-                        "👉 🛡️ *SONIC Institutional Scalper ($20, 10x):*\n"
+                        "👉 🛡️ *SONIC Institutional Scalper ($20, 10x on XAUUSDT):*\n"
                         "`/smartx SONIC 20 10 1234`\n\n"
-                        "👉 🛒 *Spot Gold Macro Buy (0% Liquidation):*\n"
+                        "👉 🛒 *Spot Gold Macro Buy (0% Liquidation on PAXGUSDT):*\n"
                         "`/smartx SPOT 50 1234`\n\n"
-                        "👉 🤖 *Auto 24/7 Gold Session Sniper (Perpetual):*\n"
+                        "👉 🤖 *Auto 24/7 Gold Session Sniper (Perpetual XAUUSDT):*\n"
                         "`/smartx AUTO 20 10 1234`\n\n"
                         "👉 📡 *Live Macro & SGE Gold Radar:*\n"
                         "`/smartx RADAR`\n\n"
                         "👉 🧠 *25 AI Models Consensus & Regime:*\n"
                         "`/smartx METRICS`\n\n"
-                        "👉 🛑 *Stop & Close All Positions:*\n"
+                        "👉 🛑 *Stop & Close All Gold Positions:*\n"
                         "`/smartx STOP ALL 1234`\n"
                         f"{div}\n"
                         f"{footnote}"
@@ -10376,12 +10376,12 @@ class TelegramBotThread(BaseThread):
                     msg = (
                         "👑 *KHMER MASTER CRYPTO | SMARTX 机构黄金量化*\n"
                         f"{div}\n"
-                        "🥇 *100% 专注机构级黄金 (XAUUSD / PAXG)*\n"
+                        "🥇 *机构黄金双引擎 (XAUUSDT 合约 / PAXGUSDT 现货)*\n"
                         f"{div}\n"
-                        "💡 *三大统一运行模式：*\n"
-                        "• 🚀 *TURBO 冲刺*: 动态 25x-50x 杠杆，捕捉宏观突破，移动止盈锁定\n"
-                        "• 🛡️ *SONIC 超短*: 10x-20x 杠杆，最大回撤 <= 0.26%，4 大跨银行交易时区\n"
-                        "• 🛒 *SPOT 现货*: 现货实物黄金配置 (0% 强平风险)\n"
+                        "💡 *三大专属运行模式：*\n"
+                        "• 🚀 *TURBO 冲刺*: `XAUUSDT` (动态 25x-50x 杠杆，40倍深厚流动性，移动止盈)\n"
+                        "• 🛡️ *SONIC 超短*: `XAUUSDT` (10x-20x 杠杆，最大回撤 <= 0.26%，4 大跨银行交易时区)\n"
+                        "• 🛒 *SPOT 现货*: `PAXGUSDT` (100% 伦敦金库实物黄金，0% 强平风险)\n"
                         f"{div}\n"
                         "📡 *央行与上海黄金交易所 (SGE) 溢价雷达*\n"
                         "• SGE vs LBMA 现货黄金溢价监测 ($/oz)\n"
@@ -10390,19 +10390,19 @@ class TelegramBotThread(BaseThread):
                         "• CPI/NFP/FOMC 重大数据提前15分钟硬熔断\n"
                         f"{div}\n"
                         "📋 *一键复制指令：*\n\n"
-                        "👉 🚀 *TURBO 动量冲刺 ($20, 25x-50x):*\n"
+                        "👉 🚀 *TURBO 动量冲刺 ($20, 25x-50x on XAUUSDT):*\n"
                         "`/smartx TURBO 20 25 1234`\n\n"
-                        "👉 🛡️ *SONIC 机构级超短线 ($20, 10x):*\n"
+                        "👉 🛡️ *SONIC 机构级超短线 ($20, 10x on XAUUSDT):*\n"
                         "`/smartx SONIC 20 10 1234`\n\n"
-                        "👉 🛒 *现货黄金宏观定投 (0% 强平风险):*\n"
+                        "👉 🛒 *现货黄金实物配置 (PAXGUSDT 0% 强平):*\n"
                         "`/smartx SPOT 50 1234`\n\n"
-                        "👉 🤖 *24/7 全天候黄金时区狙击器:*\n"
+                        "👉 🤖 *24/7 全天候黄金时区狙击器 (XAUUSDT):*\n"
                         "`/smartx AUTO 20 10 1234`\n\n"
                         "👉 📡 *查看实时宏观与 SGE 黄金溢价:*\n"
                         "`/smartx RADAR`\n\n"
                         "👉 🧠 *25 模型共识投票与状态:*\n"
                         "`/smartx METRICS`\n\n"
-                        "👉 🛑 *紧急平仓并停止所有运行:*\n"
+                        "👉 🛑 *紧急平仓并停止所有黄金运行:*\n"
                         "`/smartx STOP ALL 1234`\n"
                         f"{div}\n"
                         f"{footnote}"
@@ -10411,12 +10411,12 @@ class TelegramBotThread(BaseThread):
                     msg = (
                         "👑 *KHMER MASTER CRYPTO | SMARTX GOLD QUANT*\n"
                         f"{div}\n"
-                        "🥇 *100% ផ្តោតលើមាសស្ថាប័នសុទ្ធសាធ (XAUUSD / PAXG)*\n"
+                        "🥇 *100% ផ្តោតលើមាសស្ថាប័ន (XAUUSDT Futures / PAXGUSDT Spot)*\n"
                         f"{div}\n"
-                        "💡 *របៀបដំណើរការទាំង ៣ (Three Unified Modes) ៖*\n"
-                        "• 🚀 **TURBO Sprint** ៖ Dynamic 25x-50x, Trailing Peak Lock (+2,500%+ ROI)\n"
-                        "• 🛡️ **SONIC Scalp** ៖ Leverage 10x-20x, Max Drawdown <= 0.26%, 4 Session Clocks\n"
-                        "• 🛒 **SPOT Physical** ៖ ទិញមាស Physical LBMA ទុកក្នុងកាបូប (ហានិភ័យ 0%)\n"
+                        "💡 *របៀបដំណើរការទាំង ៣ (Three Dedicated Modes) ៖*\n"
+                        "• 🚀 **TURBO Sprint** ៖ `XAUUSDT` (Dynamic 25x-50x, Trailing Peak Lock +2,500%+ ROI)\n"
+                        "• 🛡️ **SONIC Scalp** ៖ `XAUUSDT` (Leverage 10x-20x, Max Drawdown <= 0.26%, 4 Session Clocks)\n"
+                        "• 🛒 **SPOT Physical** ៖ `PAXGUSDT` (ទិញមាស Physical LBMA ទុកក្នុងកាបូប, ហានិភ័យ 0%)\n"
                         f"{div}\n"
                         "📡 *RADAR ធនាគារកណ្តាល & SGE PREMIUM*\n"
                         "• Shanghai Gold Exchange (SGE) Premium $/oz\n"
@@ -10425,13 +10425,13 @@ class TelegramBotThread(BaseThread):
                         "• Pre-Event 15m Freeze Shield (CPI, NFP, FOMC)\n"
                         f"{div}\n"
                         "📋 *ពាក្យបញ្ជា 1-TAP COPYABLE EXECUTIONS*\n\n"
-                        "👉 🚀 *Turbo Momentum Sprint ($20, 25x-50x) ៖*\n"
+                        "👉 🚀 *Turbo Momentum Sprint ($20, 25x-50x លើ XAUUSDT) ៖*\n"
                         "`/smartx TURBO 20 25 1234`\n\n"
-                        "👉 🛡️ *SONIC Institutional Scalper ($20, 10x) ៖*\n"
+                        "👉 🛡️ *SONIC Institutional Scalper ($20, 10x លើ XAUUSDT) ៖*\n"
                         "`/smartx SONIC 20 10 1234`\n\n"
-                        "👉 🛒 *Spot Gold Macro Buy (0% Liquidation) ៖*\n"
+                        "👉 🛒 *Spot Gold Macro Buy (0% Liquidation លើ PAXGUSDT) ៖*\n"
                         "`/smartx SPOT 50 1234`\n\n"
-                        "👉 🤖 *Auto 24/7 Gold Session Sniper (Perpetual) ៖*\n"
+                        "👉 🤖 *Auto 24/7 Gold Session Sniper (Perpetual XAUUSDT) ៖*\n"
                         "`/smartx AUTO 20 10 1234`\n\n"
                         "👉 📡 *Live Macro & SGE Gold Radar ៖*\n"
                         "`/smartx RADAR`\n\n"
@@ -10451,8 +10451,8 @@ class TelegramBotThread(BaseThread):
 
             # Subcommand: RADAR (Shanghai Gold Exchange Premium, PBOC, Macro Yields)
             if action in ["RADAR", "SGE", "MACRO"]:
-                current_p = await asyncio.to_thread(trading_engine.get_current_price, "PAXGUSDT")
-                if current_p <= 0: current_p = 2650.0
+                xau_p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT") or 4320.0
+                paxg_p = await asyncio.to_thread(trading_engine.get_current_price, "PAXGUSDT") or 4320.0
 
                 try:
                     sge_data = await asyncio.to_thread(central_bank_gold_radar.fetch_sge_lbma_premium)
@@ -10483,13 +10483,14 @@ class TelegramBotThread(BaseThread):
                 radar_text = (
                     "📡 *INSTITUTIONAL GOLD MACRO RADAR*\n"
                     f"{div}\n"
-                    f"🥇 *Live Gold Spot (PAXG)*: `${current_p:,.2f}`\n"
-                    f"🇨🇳 *SGE Premium vs LBMA*  : `+${sge_prem:.2f}/oz`\n"
-                    f"🏦 *PBOC Central Bank Flow*: `{pboc_status}`\n"
-                    f"💵 *US Dollar Index (DXY)* : `{dxy:.2f}`\n"
-                    f"📈 *US 10Y Real Yield*    : `{real_yield:.2f}%`\n"
-                    f"🛡️ *Geopolitical Crisis*   : `{'🚨 ' + threat_level if crisis_detected else '🟢 ' + threat_level}`\n"
-                    f"📰 *Macro Event Shield*    : `{'🚨 FROZEN' if macro_guard['is_frozen'] else '🟢 CLEAR (Max ' + str(macro_guard['max_allowed_leverage']) + 'x)'}`\n"
+                    f"🥇 *Futures Gold (XAUUSDT)* : `${xau_p:,.2f}`\n"
+                    f"🛒 *Spot Physical (PAXGUSDT)*: `${paxg_p:,.2f}`\n"
+                    f"🇨🇳 *SGE Premium vs LBMA*    : `+${sge_prem:.2f}/oz`\n"
+                    f"🏦 *PBOC Central Bank Flow*  : `{pboc_status}`\n"
+                    f"💵 *US Dollar Index (DXY)*   : `{dxy:.2f}`\n"
+                    f"📈 *US 10Y Real Yield*      : `{real_yield:.2f}%`\n"
+                    f"🛡️ *Geopolitical Crisis*     : `{'🚨 ' + threat_level if crisis_detected else '🟢 ' + threat_level}`\n"
+                    f"📰 *Macro Event Shield*      : `{'🚨 FROZEN' if macro_guard['is_frozen'] else '🟢 CLEAR (Max ' + str(macro_guard['max_allowed_leverage']) + 'x)'}`\n"
                     f"{div}\n"
                     "💡 *Institutional Edge*:\n"
                     "• SGE Premium > +$15/oz confirms relentless physical demand from Asia.\n"
@@ -10504,7 +10505,7 @@ class TelegramBotThread(BaseThread):
 
             # Subcommand: METRICS (25 AI Models, Regime, Session Sweeps)
             if action in ["METRICS", "STATUS", "CHECK"]:
-                sig = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "PAXGUSDT")
+                sig = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "XAUUSDT")
                 session_info = await asyncio.to_thread(smart_x_engine.SonicGoldScalper.get_current_session_window)
                 macro = sig.get("macro_guard", {})
                 ensemble = sig.get("ensemble", {})
@@ -10513,11 +10514,11 @@ class TelegramBotThread(BaseThread):
                 metrics_text = (
                     "📊 *SMARTX GOLD AI METRICS & REGIME*\n"
                     f"{div}\n"
-                    f"🥇 *Symbol*: `PAXGUSDT (XAUUSD)` | `${sig.get('current_price', 0.0):,.2f}`\n"
+                    f"🥇 *Futures Target*: `XAUUSDT (TradFi Perpetual)` | `${sig.get('current_price', 0.0):,.2f}`\n"
                     f"⏰ *Session Window*: `{session_info.get('session_name', 'ACTIVE')}`\n"
                     f"   └ Liquidity Score: `{session_info.get('liquidity_score', 8)}/10`\n"
                     f"🎯 *Signal*: `{sig.get('side', 'WAIT')}` (`{sig.get('confidence_pct', 0.0)}%` Conf)\n"
-                    f"🔀 *MoE Regime*: `{sig.get('regime', 'BALANCED')}`\n"
+                    f"🔀 *MoE Regime*: `{sig.get('regime', sig.get('moe_regime', 'BALANCED'))}`\n"
                     f"🏹 *Asian Sweep*: `{sweep.get('signal', 'NONE')}` ({sweep.get('type', 'CONSOLIDATION')})\n"
                     f"📰 *Macro Guard*: `{'🚨 FROZEN' if macro.get('is_frozen') else '🟢 ACTIVE'}`\n"
                     f"{div}\n"
@@ -10617,7 +10618,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     "🛑 *[SMARTX GOLD] ENGINE STOPPED*\n"
                     f"{div}\n"
-                    f"🥇 *Target Asset* : `PAXGUSDT (XAUUSD)`\n"
+                    f"🥇 *Target Assets* : `XAUUSDT (Futures) & PAXGUSDT (Spot)`\n"
                     f"🔒 *Positions Closed*: `{closed_count}` on Binance\n"
                     f"💵 *Realized PnL*  : `{pnl_sign}${total_pnl:.2f} USDT`\n"
                     f"{div}\n"
@@ -10692,16 +10693,15 @@ class TelegramBotThread(BaseThread):
                 elif len(num_tokens) == 1:
                     amount = max(5.0, num_tokens[0])
 
-            target_symbol = "PAXGUSDT"
-
             if is_spot:
+                target_symbol = "PAXGUSDT"
                 # SPOT PHYSICAL GOLD ACCUMULATION (0% LIQUIDATION RISK)
                 res = await asyncio.to_thread(smart_x_engine.execute_smart_x_spot, chat_id, target_symbol, amount)
                 if res.get("status") == "success":
                     resp_msg = (
                         "👑 *[SMARTX SPOT GOLD ACCUMULATION]* 🥇\n"
                         f"{div}\n"
-                        f"• Asset       : `PAXG (Physical Gold)`\n"
+                        f"• Asset       : `PAXGUSDT (Physical Gold)`\n"
                         f"• Capital     : `${res.get('amount_usdt', amount):.2f} USDT`\n"
                         f"• Entry Price : `${res.get('entry_price', 0.0):,.2f}`\n"
                         f"• Qty Bought  : `{res.get('qty', 0.0):.6f} PAXG`\n"
@@ -10717,6 +10717,7 @@ class TelegramBotThread(BaseThread):
                 return
 
             elif is_auto_247 or is_turbo:
+                target_symbol = "XAUUSDT"
                 # 24/7 PERPETUAL GOLD SESSION SNIPER / TURBO SPRINT
                 spot_ok, fut_ok = await asyncio.to_thread(trading_engine.check_user_api_permissions, keys[0], keys[1])
                 if not fut_ok:
@@ -10743,7 +10744,7 @@ class TelegramBotThread(BaseThread):
                 ack_text = (
                     f"👑 *SMARTX 24/7 GOLD ({mode_label}) ACTIVATED!* 🚀\n"
                     f"{div}\n"
-                    f"🥇 *Asset*        : `PAXGUSDT (XAUUSD)`\n"
+                    f"🥇 *Asset*        : `XAUUSDT (Perpetual Futures)`\n"
                     f"💰 *Capital/Trade*: `${amount:,.2f} USDT` ({leverage}x ISOLATED)\n"
                     f"🎯 *Strategy*     : `{strategy_desc}`\n"
                     f"⏰ *Risk Shield*  : `Macro CPI/NFP/FOMC Freeze + Anti-Oversold Guard`\n"
@@ -10767,6 +10768,7 @@ class TelegramBotThread(BaseThread):
                                     f"👑 *[SMARTX GOLD {mode_label} ENTRY]* 🎯\n"
                                     f"{div}\n"
                                     f"• Direction  : `{sig['side']} ({sig.get('confidence_pct')}% Conf)`\n"
+                                    f"• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                                     f"• Entry Price: `${p:,.2f}`\n"
                                     f"• Capital    : `${amount:.2f} USDT` ({leverage}x)\n"
                                     f"• Target TP  : `{'Uncapped Trailing Lock' if is_turbo else '+$2.50 to +$10.00/oz'}`\n"
@@ -10786,6 +10788,7 @@ class TelegramBotThread(BaseThread):
                 return
 
             else:
+                target_symbol = "XAUUSDT"
                 # DIRECT GOLD FUTURES TRADE
                 spot_ok, fut_ok = await asyncio.to_thread(trading_engine.check_user_api_permissions, keys[0], keys[1])
                 if not fut_ok:
@@ -10805,7 +10808,7 @@ class TelegramBotThread(BaseThread):
                     resp_msg = (
                         "👑 *[SMARTX GOLD FUTURES EXECUTED]* 🚀\n"
                         f"{div}\n"
-                        f"• Symbol     : `PAXGUSDT (XAUUSD)`\n"
+                        f"• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                         f"• Direction  : `{user_side}`\n"
                         f"• Capital    : `${amount:.2f} USDT` ({leverage}x ISOLATED)\n"
                         f"• Entry Price: `${entry_p:,.2f}`\n"

@@ -33,8 +33,10 @@ import central_bank_gold_radar
 import paxg_arbitrage_engine
 import black_swan_gold_guard
 
-# Canonical Gold Instrument on Binance
-CANONICAL_GOLD_SYMBOL = "PAXGUSDT"
+# Canonical Gold Instruments on Binance (Strict Segregation Standard)
+CANONICAL_FUTURES_GOLD_SYMBOL = "XAUUSDT"  # 100% Dedicated for Binance Futures / Auto / Turbo / Sonic Scalp (40x Deep Liquidity)
+CANONICAL_SPOT_GOLD_SYMBOL = "PAXGUSDT"    # 100% Dedicated for Binance Spot / Buy (Physical LBMA Gold in London Vaults, 0% Liquidation)
+CANONICAL_GOLD_SYMBOL = CANONICAL_FUTURES_GOLD_SYMBOL
 
 # ============================================================================
 # 1. 25-MODEL SUPER-BRAIN LOADER & HOT-RELOAD MANAGER
@@ -271,14 +273,17 @@ class SonicGoldScalper:
         return active_session
 
     @classmethod
-    def analyze_asian_range_sweeps(cls, symbol: str = CANONICAL_GOLD_SYMBOL, klines_15m: list = None) -> dict:
+    def analyze_asian_range_sweeps(cls, symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL, klines_15m: list = None) -> dict:
         """
         Calculates Asian Range High/Low and identifies Turtle Soup sweeps.
         Asian range = candles between 00:00 UTC and 08:00 UTC.
         """
         if not klines_15m:
             try:
-                url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=48"
+                if str(symbol).upper().strip() == "XAUUSDT":
+                    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval=15m&limit=48"
+                else:
+                    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=48"
                 resp = trading_engine.HFT_SESSION.get(url, timeout=3.5)
                 if resp.status_code == 200:
                     klines_15m = resp.json()
@@ -449,11 +454,14 @@ class SmartXEngine:
     """
 
     @staticmethod
-    def extract_features(symbol: str = CANONICAL_GOLD_SYMBOL, klines_15m: list = None) -> np.ndarray:
+    def extract_features(symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL, klines_15m: list = None) -> np.ndarray:
         """Constructs 10 standardized institutional features for the ML Brain."""
         if not klines_15m:
             try:
-                url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=40"
+                if str(symbol).upper().strip() == "XAUUSDT":
+                    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval=15m&limit=40"
+                else:
+                    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=40"
                 r = trading_engine.HFT_SESSION.get(url, timeout=3.5)
                 if r.status_code == 200:
                     klines_15m = r.json()
@@ -506,7 +514,7 @@ class SmartXEngine:
         ]])
 
     @classmethod
-    def evaluate_ai_ensemble(cls, symbol: str = CANONICAL_GOLD_SYMBOL, feat_vec: np.ndarray = None) -> dict:
+    def evaluate_ai_ensemble(cls, symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL, feat_vec: np.ndarray = None) -> dict:
         """
         Queries all loaded Wall Street Gradient Boosting models:
         - CatBoost
@@ -608,7 +616,7 @@ class SmartXEngine:
         }
 
     @classmethod
-    def generate_smart_x_signal(cls, symbol: str = CANONICAL_GOLD_SYMBOL, mode: str = "AUTO") -> dict:
+    def generate_smart_x_signal(cls, symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL, mode: str = "AUTO") -> dict:
         """
         The Institutional Flagship Quantitative Signal Generator for Gold:
         Synthesizes:
@@ -620,11 +628,16 @@ class SmartXEngine:
         6. PAXG Spot-Futures Basis Spread Arbitrage
         7. Geopolitical Black-Swan Flight-to-Safety Surge
         Dual Operating Profiles:
-        - mode="SONIC" / "AUTO": 87.12% Win Rate, Session Clocks, Low Drawdown (<= 0.26%)
-        - mode="TURBO": High-Velocity Momentum, Dynamic 25x-50x Leverage, Uncapped Peak Lock
+        - mode="SONIC" / "AUTO": 87.12% Win Rate, Session Clocks, Low Drawdown (<= 0.26%) on XAUUSDT
+        - mode="TURBO": High-Velocity Momentum, Dynamic 25x-50x Leverage on XAUUSDT
+        - mode="SPOT": Dedicated Spot Physical Gold Accumulation on PAXGUSDT (0% Liquidation)
         """
-        symbol = CANONICAL_GOLD_SYMBOL
         mode_str = str(mode or "AUTO").upper().strip()
+        # Strict Segregation: Spot mode is 100% PAXGUSDT; Futures/Auto/Turbo/Sonic is 100% XAUUSDT!
+        if mode_str == "SPOT" or str(symbol).upper().strip() in ["PAXG", "PAXGUSDT"]:
+            symbol = CANONICAL_SPOT_GOLD_SYMBOL
+        else:
+            symbol = CANONICAL_FUTURES_GOLD_SYMBOL
 
         # 1. Check Macro Guard (CPI, NFP, FOMC freeze)
         macro = MacroEventNLPGuard.check_macro_guard()
@@ -664,7 +677,11 @@ class SmartXEngine:
         klines_15m = []
         current_price = 0.0
         try:
-            r15 = trading_engine.HFT_SESSION.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=48", timeout=3.5)
+            if symbol == "XAUUSDT":
+                kline_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval=15m&limit=48"
+            else:
+                kline_url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=48"
+            r15 = trading_engine.HFT_SESSION.get(kline_url, timeout=3.5)
             if r15.status_code == 200:
                 klines_15m = r15.json()
                 current_price = float(klines_15m[-1][4])
@@ -672,7 +689,7 @@ class SmartXEngine:
             current_price = trading_engine.get_current_price(symbol)
 
         if current_price <= 0:
-            current_price = 2650.0  # Fallback reference
+            current_price = 4320.0  # Fallback reference
 
         # 5. Analyze Asian Range Turtle Soup Sweeps
         sweep_data = SonicGoldScalper.analyze_asian_range_sweeps(symbol, klines_15m)
@@ -876,7 +893,7 @@ class SmartXEngine:
 
 def execute_smart_x_futures(
     chat_id: int,
-    symbol: str = CANONICAL_GOLD_SYMBOL,
+    symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL,
     side: str = "AUTO",
     amount_usdt: float = 20.0,
     leverage: int = 10,
@@ -884,7 +901,8 @@ def execute_smart_x_futures(
     mode: str = "AUTO"
 ) -> dict:
     """
-    Executes Institutional Gold Trade on Binance USDT-M Futures (PAXGUSDT).
+    Executes Institutional Gold Trade on Binance USDT-M Futures (XAUUSDT).
+    Strict Segregation Standard: Futures is 100% locked to XAUUSDT (TradFi Perpetual, 40x Liquidity).
     Strictly enforces:
     - Invariant 2: Hedge Mode / dualSidePosition synchronization
     - Invariant 3: ISOLATED Margin Mode
@@ -896,7 +914,7 @@ def execute_smart_x_futures(
     - mode="SONIC": 10x-20x leverage, Session Timing, 0.26% Drawdown target
     - mode="TURBO": Dynamic 25x-50x leverage, Macro Momentum, Trailing Peak Lock
     """
-    symbol = CANONICAL_GOLD_SYMBOL
+    symbol = CANONICAL_FUTURES_GOLD_SYMBOL
     mode_str = str(mode or "AUTO").upper().strip()
 
     # 1. Anti-Whipsaw check
@@ -993,15 +1011,15 @@ def execute_smart_x_futures(
 
 def execute_smart_x_spot(
     chat_id: int,
-    symbol: str = CANONICAL_GOLD_SYMBOL,
+    symbol: str = CANONICAL_SPOT_GOLD_SYMBOL,
     amount_usdt: float = 20.0
 ) -> dict:
     """
     Executes Institutional Gold Trade on Binance Spot (PAXGUSDT).
-    Physical London Good Delivery Gold backstop (0% liquidation risk).
+    Strict Segregation Standard: Spot is 100% locked to PAXGUSDT (Physical LBMA Gold, 0% Liquidation).
     Enforces Invariant 1: MIN_NOTIONAL $10.50 floor.
     """
-    symbol = CANONICAL_GOLD_SYMBOL
+    symbol = CANONICAL_SPOT_GOLD_SYMBOL
 
     if turbo_hedge_engine.is_symbol_in_cooldown(symbol):
         return {

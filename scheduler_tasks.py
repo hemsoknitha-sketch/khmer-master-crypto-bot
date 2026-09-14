@@ -4917,8 +4917,8 @@ async def gold_turbo_monitor(app: Application):
             return
 
         # 2. Scan Dual-Mode Opportunities (TURBO & SONIC)
-        turbo_res = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "PAXGUSDT", mode="TURBO")
-        sonic_res = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "PAXGUSDT", mode="SONIC")
+        turbo_res = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "XAUUSDT", mode="TURBO")
+        sonic_res = await asyncio.to_thread(smart_x_engine.SmartXEngine.generate_smart_x_signal, "XAUUSDT", mode="SONIC")
 
         vip_users = db.get_all_vip_users()
         for chat_id in vip_users:
@@ -4938,7 +4938,7 @@ async def gold_turbo_monitor(app: Application):
                 side = turbo_res["side"]
                 exec_res = await asyncio.to_thread(
                     smart_x_engine.execute_smart_x_futures,
-                    chat_id, "PAXGUSDT", side, amount, lev, 1.5, "TURBO"
+                    chat_id, "XAUUSDT", side, amount, lev, 1.5, "TURBO"
                 )
                 print(f"🥇 [SUPER SMART GOLD TURBO] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
 
@@ -4949,7 +4949,7 @@ async def gold_turbo_monitor(app: Application):
                 side = sonic_res["side"]
                 exec_res = await asyncio.to_thread(
                     smart_x_engine.execute_smart_x_futures,
-                    chat_id, "PAXGUSDT", side, amount, lev, 2.5, "SONIC"
+                    chat_id, "XAUUSDT", side, amount, lev, 2.5, "SONIC"
                 )
                 print(f"👑 [SUPER SMART GOLD SONIC] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
 
