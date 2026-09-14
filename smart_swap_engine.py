@@ -26,6 +26,8 @@ if hasattr(sys.stdout, 'reconfigure'):
         pass
 
 import database as db
+from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
+
 
 # HTTP Session with Keep-Alive & Low Latency
 SWAP_SESSION = requests.Session()
@@ -1048,12 +1050,12 @@ def send_smart_swap_telegram_message(app, chat_id: int, text: str, parse_mode: s
 
 def monitor_smart_swap_positions(app=None):
     """
-    Scans active on-chain Smart Swap positions 24/7 with 3-Stage Profit Harvester & Breakeven Armor:
-    - Stage 0: Emergency Stop-Loss (<= -10.0% ROI) -> Live on-chain sell back to SOL (preserving 90% capital).
-    - Stage 1: Breakeven Armor (>= +8.0% ROI) -> Sets scale_out_level = 1, hard stop locked at Entry + 2.0% Net.
-      * Breakeven Trigger: If price pulls back <= Entry + 2.0%, sells 100% on-chain to SOL without loss.
-    - Stage 2: TP1 Capital Recovery (>= +35.0% ROI) -> Sells 50% on-chain to SOL to recover 100% initial capital into wallet.
-    - Stage 3: Dynamic Chandelier Trailing (50% Moonbag) -> Sells remaining 50% on 12% pullback from peak.
+    Scans active on-chain Smart Swap positions 24/7 with Super Smart 2-Stage Scale-Out:
+    - Stage 0: Emergency Stop-Loss (<= -10.0% ROI) -> Live on-chain sell back to native coin (preserving 90% capital).
+    - Stage 1: Breakeven Armor (>= +12.0% ROI) -> Sets scale_out_level = 1, Stop Loss locked at Entry + 2.0% Net.
+      * Breakeven Trigger: If price pulls back <= Entry + 2.0%, sells 100% on-chain to native coin without loss.
+    - Stage 2: TP1 50% Bank Cash (>= +30.0% ROI or >= $1.50 Net) -> Sells 50% on-chain to bank 100% initial capital into wallet.
+    - Stage 3: The Golden 85% Ratchet (50% Moonbag) -> Sells remaining 50% when price breaches 85% of peak gains.
     """
     active_swaps = db.get_active_smart_swaps()
     if not active_swaps:
@@ -1117,9 +1119,9 @@ def monitor_smart_swap_positions(app=None):
                 continue
 
             # ------------------------------------------------------------------
-            # STAGE 1: BREAKEVEN ARMOR (Arm at ROI >= +8.0%, Floor = Entry + 2.0%)
+            # STAGE 1: BREAKEVEN ARMOR (Arm at ROI >= +12.0% or Net PnL >= +$0.50)
             # ------------------------------------------------------------------
-            if roi_pct >= 8.0 and scale_lvl == 0:
+            if (roi_pct >= 12.0 or pnl_usd >= 0.50) and scale_lvl == 0:
                 print(f"🛡️ [SMART SWAP BREAKEVEN ARMED] {sym}: ROI +{roi_pct:.1f}% -> Locking Stop at Entry + 2.0% Net Profit!")
                 db.update_smart_swap_peak(swap_id, curr_p, scale_out_level=1)
                 scale_lvl = 1
@@ -1128,11 +1130,12 @@ def monitor_smart_swap_positions(app=None):
                     be_floor = entry_p * 1.02
                     msg_be = (
                         f"🛡️ **APEX SMART SWAP | BREAKEVEN ARMOR ARMED!** 🔒\n"
-                        f"━━━━━━━━━━━━\n\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
                         f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
                         f"📈 **ROI បច្ចុប្បន្ន ៖** `+{roi_pct:.1f}%`\n"
                         f"🎯 **Breakeven Floor ៖** `${be_floor:.6f}` (Entry +2.0% Net)\n"
-                        f"✅ **ការធានាគណិតវិទ្យា ៖** កាក់នេះនឹងមិនអាចត្រឡប់មកខាតបានជាដាច់ខាត! បើតម្លៃធ្លាក់មកវិញ ប្រព័ន្ធនឹងកាត់យកចំណេញ Net +2.0% ដោយស្វ័យប្រវត្តិ!"
+                        f"✅ **ការធានាគណិតវិទ្យា ៖** កាក់នេះនឹងមិនអាចត្រឡប់មកខាតបានជាដាច់ខាត! បើតម្លៃធ្លាក់មកវិញ ប្រព័ន្ធនឹងកាត់យកចំណេញ Net +2.0% ដោយស្វ័យប្រវត្តិ!\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
                     )
                     send_smart_swap_telegram_message(app, chat_id, msg_be, parse_mode="Markdown")
 
@@ -1159,11 +1162,12 @@ def monitor_smart_swap_positions(app=None):
                 if app and hasattr(app, "bot"):
                     msg_be_exit = (
                         f"🛡️ **APEX SMART SWAP | BREAKEVEN PROFIT SECURED** 💰\n"
-                        f"━━━━━━━━━━━━\n\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
                         f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
                         f"💵 **ផលចំណេញសុទ្ធ ៖** `+${be_pnl:,.2f} USD` (ROI: `+{be_roi:.1f}%`)\n"
                         f"⚡ **សកម្មភាព ៖** `លក់ On-Chain ត្រឡប់មកកាន់ Native SOL រួចរាល់`\n"
-                        f"🛡️ **លទ្ធផល ៖** `ដើមទុនមានសុវត្ថិភាព ១០០% (Zero Drawdown Win)`"
+                        f"🛡️ **លទ្ធផល ៖** `ដើមទុនមានសុវត្ថិភាព ១០០% (Zero Drawdown Win)`\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
                     )
                     if sell_tx:
                         msg_be_exit += f"\n🔗 **Solscan ៖** [ចុចមើល On-Chain](https://solscan.io/tx/{sell_tx})"
@@ -1171,10 +1175,10 @@ def monitor_smart_swap_positions(app=None):
                 continue
 
             # ------------------------------------------------------------------
-            # STAGE 2: TP1 CAPITAL RECOVERY (+35% to +40% ROI) -> Sell 50% to recover initial capital
+            # STAGE 2: TP1 50% BANK CASH (ROI >= +25.0% or Net PnL >= +$1.50)
             # ------------------------------------------------------------------
-            if roi_pct >= 35.0 and scale_lvl in [0, 1]:
-                print(f"🎯 [SMART SWAP TP1 HARVEST] {sym}: ROI +{roi_pct:.1f}% -> Selling 50% to secure 100% initial capital!")
+            if (roi_pct >= 25.0 or pnl_usd >= max(1.50, amt_usd * 0.25)) and scale_lvl in [0, 1]:
+                print(f"🎯 [SMART SWAP TP1 50% BANK CASH] {sym}: ROI +{roi_pct:.1f}% -> Selling 50% to bank cash into native wallet!")
                 db.update_smart_swap_peak(swap_id, curr_p, scale_out_level=2, remaining_qty=qty * 0.50)
                 harvested_usd = (curr_p * (qty * 0.50))
                 sell_tx = ""
@@ -1197,13 +1201,15 @@ def monitor_smart_swap_positions(app=None):
 
                 if app and hasattr(app, "bot"):
                     msg_tp1 = (
-                        f"⚡ **APEX SMART SWAP | TP1 CAPITAL RECOVERED!** 💰\n"
-                        f"━━━━━━━━━━━━\n\n"
+                        f"⚡ **APEX SMART SWAP | TP1 50% BANK CASH HARVESTED!** 💰\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
                         f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
                         f"📈 **ROI បច្ចុប្បន្ន ៖** `+{roi_pct:.1f}%`\n"
-                        f"💵 **ដើមទុនដកចេញ ៖** `+${harvested_usd:,.2f} USD` (ដើមទុនស្រង់ចេញ ១០០% ចូលកាបូប SOL!)\n"
-                        f"🚀 **Moonbag នៅសល់ ៖** `50% Qty (ទុកកើប Moonshot ដោយគ្មានហានិភ័យ)`\n"
-                        f"🛡️ **MEV Status ៖** `Jito Private Bundle Live Execution`"
+                        f"💵 **សាច់ប្រាក់ដកចេញ ៖** `+${harvested_usd:,.2f} USD` (ដកទុនដើម 100% ចូលកាបូប SOL ភ្លាម!)\n"
+                        f"🔒 **Breakeven Armor ៖** `LOCKED (+2.0% Net Floor)`\n"
+                        f"🚀 **Moonbag នៅសល់ ៖** `50% Qty (Trailing តាម Golden 85% Ratchet ដេញតាម Moonshot!)`\n"
+                        f"🛡️ **MEV Status ៖** `Jito Private Bundle Live Execution`\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
                     )
                     if sell_tx:
                         msg_tp1 += f"\n🔗 **Solscan ៖** [ចុចមើល On-Chain នៃការលក់](https://solscan.io/tx/{sell_tx})"
@@ -1211,12 +1217,24 @@ def monitor_smart_swap_positions(app=None):
                 continue
 
             # ------------------------------------------------------------------
-            # STAGE 3: DYNAMIC CHANDELIER TRAILING ON 50% MOONBAG
+            # STAGE 3: THE GOLDEN 85% RATCHET TRAILING ON 50% MOONBAG
             # ------------------------------------------------------------------
             if scale_lvl == 2:
+                # 1. Update peak price for moonbag
+                if curr_p > peak_p:
+                    peak_p = curr_p
+                    db.update_smart_swap_peak(swap_id, peak_p)
+
+                # 2. Golden 85% Ratchet Floor (Locks 85% of peak gains, max 15% pullback from peak)
+                ratchet_floor_p = peak_p * 0.85
+                be_floor_p = entry_p * 1.02  # Breakeven + fees floor
+                effective_stop_p = max(be_floor_p, ratchet_floor_p)
+
                 pullback_pct = ((peak_p - curr_p) / peak_p) * 100.0 if peak_p > 0 else 0.0
-                if pullback_pct >= 12.0 or roi_pct <= 5.0:
-                    print(f"💰 [SMART SWAP MOONBAG FINAL HARVEST] {sym}: Pullback {pullback_pct:.1f}% from peak -> Closing remaining 50%!")
+                is_ratchet_triggered = (curr_p <= effective_stop_p) or (pullback_pct >= 15.0)
+
+                if is_ratchet_triggered:
+                    print(f"💰 [SMART SWAP GOLDEN 85% MOONBAG EXIT] {sym}: Price hit Ratchet Floor (${effective_stop_p:.6f}, Pullback {pullback_pct:.1f}%) -> Closing remaining 50%!")
                     final_pnl = (curr_p - entry_p) * (qty * 0.50)
                     sell_tx = ""
 
@@ -1231,17 +1249,19 @@ def monitor_smart_swap_positions(app=None):
                             print(f"Error in live moonbag exit for {sym}: {e_mb}")
 
                     db.remove_active_smart_swap(swap_id)
-                    db.log_smart_swap_history(chat_id, chain, sym, "MOONBAG_FINAL_CLOSE", amt_usd * 0.50, final_pnl, roi_pct, sell_tx or f"final_{swap_id}")
+                    db.log_smart_swap_history(chat_id, chain, sym, "GOLDEN_85%_MOONBAG_CLOSE", amt_usd * 0.50, final_pnl, roi_pct, sell_tx or f"final_{swap_id}")
 
                     if app and hasattr(app, "bot"):
                         msg_final = (
-                            f"🏆 **APEX SMART SWAP | MOONBAG FULLY HARVESTED!** 🚀\n"
-                            f"━━━━━━━━━━━━\n\n"
-                            f"🪙 **កាក់ ៖** `{sym}`\n"
+                            f"🏆 **APEX SMART SWAP | GOLDEN 85% MOONBAG HARVESTED!** 🚀\n"
+                            f"{DIVIDER_DOUBLE}\n\n"
+                            f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
                             f"📈 **កំពូលធ្លាប់ឡើងដល់ ៖** `${peak_p:.6f}` (Pullback: `{pullback_pct:.1f}%`)\n"
                             f"💵 **ប្រាក់ចំណេញសុទ្ធ ៖** `+${final_pnl:,.2f} USD` (ROI: `+{roi_pct:.1f}%`)\n"
-                            f"⚡ **ស្ថានភាព ៖** `លក់ On-Chain ប្តូរមកជា Native SOL រួចរាល់`\n"
-                            f"🛡️ **សុវត្ថិភាព ៖** `ZERO CAPITAL RISK (Pure House Money Profit)`"
+                            f"🔒 **Ratchet Floor ៖** `ចាក់សោរ 85% នៃចំណេញកំពូល (Golden 85% Standard)`\n"
+                            f"⚡ **ស្ថានភាព ៖** `លក់ On-Chain ប្តូរមកជា Native SOL រួចរាល់ 100%`\n"
+                            f"🛡️ **សុវត្ថិភាព ៖** `ZERO CAPITAL RISK (Pure House Money Profit)`\n\n"
+                            f"{OFFICIAL_FOOTNOTE}"
                         )
                         if sell_tx:
                             msg_final += f"\n🔗 **Solscan ៖** [ចុចមើល Live Sell On-Chain](https://solscan.io/tx/{sell_tx})"
@@ -1374,10 +1394,10 @@ def run_smart_swap_autopilot_cycle(app=None):
                         f"💰 **ទុនវិនិយោគ ៖** `${amount_usd:.2f} USD` (Slot: `{len(active_swaps)+1}/{max_pos}`)\n"
                         f"🧠 **AI Momentum Score ៖** `{ai_score}/100` (Buy Velocity: `{buy_vel:.1f}x`)\n"
                         f"🛡️ **MEV Shield ៖** `Jito Private Bundle Confirmed (Anti-Sandwich)`\n"
-                        f"🌾 **យុទ្ធសាស្ត្រកើបចំណេញ ៖**\n"
-                        f"  • `🛡️ Breakeven Armor ៖ +8% ចាក់សោរចំណេញ +2% Net`\n"
-                        f"  • `🎯 TP1 +35% ៖ លក់ 50% ដកដើមទុន ១០០% សុវត្ថិភាព`\n"
-                        f"  • `🚀 Moonbag 50% ៖ Trailing 12% តាមដានចំណុចកំពូល`\n"
+                        f"🌾 **យុទ្ធសាស្ត្រកើបចំណេញ (2-Stage Scale-Out) ៖**\n"
+                        f"  • `🛡️ Breakeven Armor ៖ +12% ចាក់សោរចំណេញ +2% Net Floor`\n"
+                        f"  • `🎯 TP1 +25% ៖ លក់ 50% ដកទុនដើម 100% យកប្រាក់សុទ្ធចូលកាបូប`\n"
+                        f"  • `🚀 Moonbag 50% ៖ Trailing តាម Golden 85% Ratchet ដេញតាមកំពូល`\n"
                         f"⚡ **ដំណើរការ ៖** វិលជុំស្វ័យប្រវត្តិតាមដានទីផ្សារ ២៤/៧ ជាប់រហូត!{link_str}"
                     )
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
