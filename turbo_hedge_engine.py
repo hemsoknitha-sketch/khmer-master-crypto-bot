@@ -1413,6 +1413,10 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     current_side = bot_info.get("side", "BUY")
     target_tp = bot_info.get("target_tp", 5.0)
 
+    # 🛡️ Initialize Scale-Out Level at top of scope (Invariant 21: Zero UnboundLocalError Guard)
+    scale_level_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
+    scale_out_level = int(scale_level_str) if scale_level_str.isdigit() else 0
+
     keys = db.get_user_api(chat_id)
     if not keys:
         return
