@@ -9736,7 +9736,15 @@ class TelegramBotThread(BaseThread):
 
             symbol_raw = raw_args[0].upper().strip()
             last_tok = str(raw_args[-1]).strip()
-            if len(raw_args) >= 3 and len(last_tok) == 4 and last_tok.isdigit():
+            stored_pin = db.get_user_pin(chat_id)
+            is_last_tok_pin = False
+            if len(raw_args) >= 3 and last_tok.isdigit() and (4 <= len(last_tok) <= 6):
+                if stored_pin:
+                    is_last_tok_pin = security.verify_pin(last_tok, chat_id, stored_pin) or (len(raw_args) >= 4)
+                else:
+                    is_last_tok_pin = True
+
+            if is_last_tok_pin:
                 pin = last_tok
                 inner_args = raw_args[1:-1]
             else:
@@ -9905,6 +9913,12 @@ class TelegramBotThread(BaseThread):
                             leverage = int(nums[1])
                         elif len(nums) == 1:
                             amount = float(nums[0])
+
+            # 🛡️ P0 TARGET TP SANITY CLAMP:
+            # Prevents unconsumed/misparsed PINs or huge numbers from hijacking target_tp
+            if target_tp > 50.0 or target_tp < 0.2:
+                print(f"⚠️ [TURBO HEDGE TP SANITIZER] Abnormal target_tp {target_tp}% detected for user {chat_id} (likely misparsed PIN). Safely clamped to institutional default 2.5%!")
+                target_tp = 2.5
 
             is_admin = db.is_admin(chat_id) or (chat_id == 859271875)
             stored_pin = db.get_user_pin(chat_id)
@@ -11377,8 +11391,8 @@ class TelegramBotThread(BaseThread):
                             except ValueError:
                                 pass
 
-                    # 2. Check 4-digit PIN first so it does not falsely trigger amount_usd
-                    if len(a_str) == 4 and a_str.isdigit() and (db.verify_user_pin(chat_id, a_str) or a_str in ["1234", "0000"]):
+                    # 2. Check 4-6 digit PIN first so it does not falsely trigger amount_usd
+                    if (4 <= len(a_str) <= 6) and a_str.isdigit() and (db.verify_user_pin(chat_id, a_str) or a_str in ["1234", "0000"]):
                         pin_input = a_str
                     elif a_str.replace('.', '', 1).isdigit():
                         try:
@@ -11500,8 +11514,8 @@ class TelegramBotThread(BaseThread):
                             except ValueError:
                                 pass
 
-                    # 2. Check 4-digit PIN first so it does not falsely trigger amount_usd
-                    if len(tok) == 4 and tok.isdigit() and (db.verify_user_pin(chat_id, tok) or tok in ["1234", "0000"]):
+                    # 2. Check 4-6 digit PIN first so it does not falsely trigger amount_usd
+                    if (4 <= len(tok) <= 6) and tok.isdigit() and (db.verify_user_pin(chat_id, tok) or tok in ["1234", "0000"]):
                         pin_input = tok
                     elif tok.replace('.', '', 1).isdigit():
                         try:
@@ -12483,7 +12497,7 @@ class TelegramBotThread(BaseThread):
                 pin = ""
                 for a in args[1:]:
                     a_clean = str(a).strip().replace('$', '')
-                    if a_clean.isdigit() and len(a_clean) == 4 and not pin:
+                    if a_clean.isdigit() and (4 <= len(a_clean) <= 6) and not pin:
                         pin = a_clean
                     else:
                         try:
@@ -12546,7 +12560,7 @@ class TelegramBotThread(BaseThread):
                 tokens = args[1:] if action in ["BUY", "SPOT"] else args
                 for tok in tokens:
                     tok_str = str(tok).strip().replace('$', '').replace('USDT', '')
-                    if tok_str.isdigit() and len(tok_str) == 4 and not pin:
+                    if tok_str.isdigit() and (4 <= len(tok_str) <= 6) and not pin:
                         pin = tok_str
                     elif any(c.isalpha() for c in tok_str) and not tok_str.isdigit():
                         symbol = tok_str.upper()
@@ -12610,7 +12624,8 @@ class TelegramBotThread(BaseThread):
             self.log_signal.emit(f"🌊 VIP User {chat_id} executed /auto_trade command (args={args})")
 
             # Route any PIN-authenticated futures trading subcommands directly to turbo_hedge_command!
-            has_pin = len(args) >= 3 and len(str(args[-1]).strip()) == 4 and str(args[-1]).strip().isdigit()
+            last_tok_str = str(args[-1]).strip() if args else ""
+            has_pin = len(args) >= 3 and (4 <= len(last_tok_str) <= 6) and last_tok_str.isdigit()
             if has_pin or (args and len(args) > 0 and str(args[0]).upper().strip() not in ["ON", "OFF", "SET", "LEVERAGE", "STATUS"]):
                 return await turbo_hedge_command(update, context)
 

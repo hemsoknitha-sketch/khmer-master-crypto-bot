@@ -1583,8 +1583,15 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     else:
         user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "2.5")
         user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 2.5
+        if user_custom_tp > 50.0 or user_custom_tp < 0.2:
+            user_custom_tp = 2.5
+            try:
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", "2.5")
+            except Exception:
+                pass
         effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
-        if effective_tp_pct <= 0: effective_tp_pct = 2.5
+        if effective_tp_pct <= 0 or effective_tp_pct > 50.0:
+            effective_tp_pct = 2.5
         target_dollar_tp = max(0.50, bot_amt * (effective_tp_pct / 100.0))
 
         # 🏆 THE GOLDEN PROFIT RATCHET & ZERO-PROFIT-BLEED ARMOR (Strict Invariant)
@@ -2087,6 +2094,8 @@ async def monitor_turbo_hedge_bots(app):
                         if not user_custom_tp_str:
                             user_custom_tp_str = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5")
                         user_custom_tp = float(user_custom_tp_str) if user_custom_tp_str.replace('.', '', 1).isdigit() else 2.5
+                        if user_custom_tp > 50.0 or user_custom_tp < 0.2:
+                            user_custom_tp = 2.5
 
                         db.add_turbo_hedge_bot(target_chat_id, p_sym, existing_amt, existing_lev, p_side, user_custom_tp, is_bot_initiated=True)
                         active_hedge_bots.append({"chat_id": target_chat_id, "symbol": p_sym, "amount": existing_amt, "leverage": existing_lev, "side": p_side, "target_tp": user_custom_tp})
@@ -2197,7 +2206,14 @@ async def monitor_turbo_hedge_bots(app):
             unit_amount = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_amount", "10.0"))
             unit_leverage = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_leverage", "10"))
             user_side_input = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_side", "AUTO")
-            unit_tp = float(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5"))
+            unit_tp_val = db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5")
+            unit_tp = float(unit_tp_val) if unit_tp_val.replace('.', '', 1).isdigit() else 2.5
+            if unit_tp > 50.0 or unit_tp < 0.2:
+                unit_tp = 2.5
+                try:
+                    db.update_system_setting(f"turbo_hedge_{target_chat_id}_top_tp", "2.5")
+                except Exception:
+                    pass
             user_top_count = int(db.get_system_setting(f"turbo_hedge_{target_chat_id}_top_count", "10"))
 
             # 🛡️ Dynamic 3-Second Capital Evaluation & Margin Cushion Shield:

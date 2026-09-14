@@ -247,8 +247,10 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         val_lev = db.get_system_setting(f"turbo_hedge_{chat_id}_top_leverage", "10")
         turbo_top_leverage = int(val_lev) if str(val_lev).isdigit() else 10
         turbo_top_side = db.get_system_setting(f"turbo_hedge_{chat_id}_top_side", "AUTO").upper()
-        val_tp = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "20.0")
-        turbo_top_tp = float(val_tp) if val_tp.replace('.', '', 1).isdigit() else 20.0
+        val_tp = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "2.5")
+        turbo_top_tp = float(val_tp) if val_tp.replace('.', '', 1).isdigit() else 2.5
+        if turbo_top_tp > 50.0 or turbo_top_tp < 0.2:
+            turbo_top_tp = 2.5
     except Exception as e:
         print(f"[PORTFOLIO] Turbo TOP mode query error: {e}")
 
