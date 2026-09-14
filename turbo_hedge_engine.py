@@ -1631,6 +1631,12 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     min_guaranteed_roi = -999.0
     min_guaranteed_pnl = -999.0
     is_chandelier_triggered = False
+    is_derisked = False
+    derisked_entry_p = 0.0
+    bounce_roi = 0.0
+    peak_bounce_roi = 0.0
+    has_hit_profit_peak = False
+    guaranteed_floor = 0.0
 
     if is_hedge:
         if peak_pnl >= 0.20:
