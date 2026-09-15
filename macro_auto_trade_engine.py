@@ -422,29 +422,51 @@ def execute_macro_auto_trade(chat_id: int, symbol: str, side: str, amount_usdt: 
     # 3. Set Leverage
     trading_engine.set_futures_leverage(api_key, api_secret, symbol, leverage)
 
+    current_price = trading_engine.get_current_price(symbol)
+    if not current_price or current_price <= 0:
+        return {"status": "error", "message": f"Cannot fetch current price for {symbol}"}
+
     # 4. Execute Order
     if side in ["SHORT", "SELL"]:
         order_res = trading_engine.place_futures_short(api_key, api_secret, symbol, amount_usdt, leverage)
     else:
-        order_res = trading_engine.place_futures_order(api_key, api_secret, symbol, "BUY", amount_usdt, leverage)
+        # Calculate exact coin quantity from margin and leverage: Notional = Margin * Leverage
+        target_notional = max(5.10, amount_usdt * leverage)
+        raw_qty = target_notional / current_price
+        formatted_qty = trading_engine.get_futures_max_sellable_qty(symbol, raw_qty)
+        if formatted_qty <= 0:
+            formatted_qty = 1.0
+        order_res = trading_engine.place_futures_order(api_key, api_secret, symbol, "BUY", formatted_qty, leverage)
 
     if order_res and "error" not in order_res and "code" not in order_res:
         entry_price = float(order_res.get("avgPrice", 0.0))
         if entry_price <= 0:
-            entry_price = trading_engine.get_current_price(symbol)
+            entry_price = current_price
+
+        # Calculate actual executed margin from order response
+        res_data = order_res.get("res", {}) if isinstance(order_res.get("res"), dict) else order_res
+        actual_qty = float(res_data.get("origQty") or res_data.get("executedQty") or order_res.get("executedQty") or 0.0)
+        cum_quote = float(res_data.get("cumQuote") or 0.0)
+        if cum_quote > 0 and leverage > 0:
+            actual_margin = round(cum_quote / leverage, 2)
+        elif actual_qty > 0 and entry_price > 0 and leverage > 0:
+            actual_margin = round((actual_qty * entry_price) / leverage, 2)
+        else:
+            actual_margin = amount_usdt
 
         target_tp = 25.0
-        db.add_macro_trade(chat_id, symbol, amount_usdt, leverage, side, target_tp, entry_price, strategy)
-        print(f"🌊 [MACRO AUTO-TRADE EXECUTED] Chat: {chat_id} | {symbol} {side} (${amount_usdt:.1f}, {leverage}x ISOLATED) -> Strat: {strategy}")
+        db.add_macro_trade(chat_id, symbol, actual_margin, leverage, side, target_tp, entry_price, strategy)
+        print(f"🌊 [MACRO AUTO-TRADE EXECUTED] Chat: {chat_id} | {symbol} {side} (${actual_margin:.2f} Margin, {leverage}x ISOLATED) -> Strat: {strategy}")
         return {
             "status": "success",
             "symbol": symbol,
             "side": side,
-            "amount": amount_usdt,
+            "amount": actual_margin,
             "leverage": leverage,
             "entry_price": entry_price,
             "strategy": strategy,
-            "order_res": order_res
+            "order_res": order_res,
+            "actual_qty": actual_qty
         }
     else:
         err_msg = order_res.get("msg", str(order_res)) if isinstance(order_res, dict) else str(order_res)
@@ -723,12 +745,13 @@ async def run_macro_auto_trade_scanner_cycle(app):
                     try:
                         strat_title = "🌊 **APEX MACRO WATERFALL SHORT EXECUTED!** 🚀" if side == "SHORT" else "🚀 **APEX MACRO BREAKOUT LONG EXECUTED!** 📈"
                         dir_title = f"{side} ({strategy})"
+                        actual_invested = float(exec_res.get("amount") or trade_amt)
                         msg_entry = (
                             f"{strat_title}\n"
                             f"{DIVIDER_DOUBLE}\n\n"
                             f"🪙 **កាក់ជ័យលាភី ៖** `{sym}` (Tournament Score: `{conf:.1f}%`)\n"
                             f"🎯 **ទិសដៅ ៖** `{dir_title}`\n"
-                            f"💵 **ទុនវិនិយោគ ៖** `${trade_amt:.2f} USDT`\n"
+                            f"💵 **ទុនវិនិយោគ ៖** `${actual_invested:.2f} USDT`\n"
                             f"🛡️ **Margin Buffer ៖** `{lev}x ISOLATED (~33% Safety Room)`\n"
                             f"📊 **Anti-Fakeout Gate ៖** `ADX & Macro Trend Confirmed`\n"
                             f"⚡ **Binance Status ៖** `POSITION OPENED (<30ms)`\n\n"
