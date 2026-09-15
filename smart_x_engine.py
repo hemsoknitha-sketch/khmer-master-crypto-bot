@@ -396,11 +396,11 @@ class AdaptiveKellyDrawdownGuard:
         account_balance: float,
         current_price: float,
         win_rate: float = 0.8712,
-        risk_reward: float = 2.5
+        risk_reward: float = 5.5
     ) -> dict:
         # Half-Kelly safety scaling
         p = max(0.60, min(0.92, win_rate))
-        b = max(1.5, risk_reward)
+        b = max(2.5, risk_reward)
         raw_kelly = (p * (b + 1.0) - 1.0) / b
         safe_kelly = max(0.02, raw_kelly * 0.40)  # Conservative scaling for gold preservation
 
@@ -424,9 +424,9 @@ class AdaptiveKellyDrawdownGuard:
         if macro_guard["is_frozen"]:
             recommended_lev = min(recommended_lev, macro_guard["max_allowed_leverage"])
 
-        # Dynamic Gold Scalp TP & SL Offsets (Aligned with SONIC's +$2 to +$10/oz profit targets)
-        tp_offset_usd = round(current_price * 0.0022, 2)  # ~$5.50/oz on $2500 gold
-        sl_offset_usd = round(current_price * 0.0014, 2)  # ~$3.50/oz on $2500 gold
+        # Asymmetric 5.5R Gold Scalp TP & SL Offsets (5.5R Expansion vs 1R Invalidation)
+        tp_offset_usd = round(current_price * 0.0055, 2)  # ~$14.50/oz on $2650 gold (5.5R Expansion)
+        sl_offset_usd = round(current_price * 0.0010, 2)  # ~$2.65/oz on $2650 gold (Tight 1R Invalidation)
 
         return {
             "account_balance": account_balance,
@@ -435,7 +435,8 @@ class AdaptiveKellyDrawdownGuard:
             "tp_offset_usd": tp_offset_usd,
             "sl_offset_usd": sl_offset_usd,
             "max_daily_drawdown_limit_usd": round(max_daily_risk_usd, 2),
-            "half_kelly_fraction": round(safe_kelly, 4)
+            "half_kelly_fraction": round(safe_kelly, 4),
+            "risk_reward_ratio": "1:5.5"
         }
 
 
@@ -880,9 +881,10 @@ class SmartXEngine:
             "sonic_benchmarks": {
                 "target_win_rate": "87.12%",
                 "target_max_dd": "0.26%",
+                "target_risk_reward": "1:5.5 Asymmetric",
                 "avg_trade_length": "14.4 mins",
-                "profit_target_oz": "+$2.50 to +$10.00/oz",
-                "stop_loss_time": "1-3 min scratch"
+                "profit_target_oz": "+$12.50 to +$25.00/oz (5R-6R)",
+                "stop_loss_time": "1-3 min scratch (-$2.65/oz max)"
             }
         }
 
@@ -897,7 +899,7 @@ def execute_smart_x_futures(
     side: str = "AUTO",
     amount_usdt: float = 20.0,
     leverage: int = 10,
-    target_tp: float = 2.5,
+    target_tp: float = 15.0,
     mode: str = "AUTO"
 ) -> dict:
     """
@@ -965,7 +967,7 @@ def execute_smart_x_futures(
             actual_leverage = min(actual_leverage, macro["max_allowed_leverage"])
 
         actual_amount = max(10.50, min(amount_usdt, fut_bal * 0.25))
-        actual_tp = max(1.5, target_tp)
+        actual_tp = max(15.0, target_tp)
     else:
         size_plan = AdaptiveKellyDrawdownGuard.calculate_optimal_gold_position(
             account_balance=fut_bal,
@@ -973,7 +975,7 @@ def execute_smart_x_futures(
         )
         actual_amount = max(10.50, min(amount_usdt, size_plan["allocated_trade_usd"]))
         actual_leverage = min(leverage, size_plan["recommended_leverage"])
-        actual_tp = target_tp
+        actual_tp = max(15.0, target_tp)
 
     # 6. Determine Direction (SONIC or TURBO Gold Signal)
     if side.upper() == "AUTO":
