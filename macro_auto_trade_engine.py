@@ -427,16 +427,25 @@ def execute_macro_auto_trade(chat_id: int, symbol: str, side: str, amount_usdt: 
         return {"status": "error", "message": f"Cannot fetch current price for {symbol}"}
 
     # 4. Execute Order
-    if side in ["SHORT", "SELL"]:
-        order_res = trading_engine.place_futures_short(api_key, api_secret, symbol, amount_usdt, leverage)
-    else:
-        # Calculate exact coin quantity from margin and leverage: Notional = Margin * Leverage
-        target_notional = max(5.10, amount_usdt * leverage)
+    target_notional = max(5.20, amount_usdt * leverage)
+    raw_qty = target_notional / current_price
+    formatted_qty = trading_engine.get_futures_max_sellable_qty(symbol, raw_qty)
+    if (formatted_qty * current_price) < 5.05:
+        target_notional = 6.00
         raw_qty = target_notional / current_price
         formatted_qty = trading_engine.get_futures_max_sellable_qty(symbol, raw_qty)
         if formatted_qty <= 0:
-            formatted_qty = 1.0
-        order_res = trading_engine.place_futures_order(api_key, api_secret, symbol, "BUY", formatted_qty, leverage)
+            sym_info = trading_engine.get_futures_symbol_info(symbol)
+            step_sz = 1.0
+            if sym_info:
+                for f in sym_info.get("filters", []):
+                    if f.get("filterType") == "LOT_SIZE":
+                        step_sz = float(f.get("stepSize", 1.0))
+                        break
+            formatted_qty = step_sz
+
+    order_side = "SELL" if side in ["SHORT", "SELL"] else "BUY"
+    order_res = trading_engine.place_futures_order(api_key, api_secret, symbol, order_side, formatted_qty, leverage)
 
     if order_res and "error" not in order_res and "code" not in order_res:
         entry_price = float(order_res.get("avgPrice", 0.0))
@@ -574,24 +583,24 @@ async def monitor_macro_auto_trades(app):
             scale_lvl_str = db.get_system_setting(scale_lvl_key, "0")
             scale_lvl = int(scale_lvl_str) if scale_lvl_str.isdigit() else 0
 
-            # TP1: Scale out 25% at >= +15.0% ROI or >= +$1.25 net PnL (Bank 25% Cash / 75% Runner)
-            if scale_lvl == 0 and (roi_pct >= 15.0 or effective_pnl >= 1.25):
-                print(f"💰 [MACRO TP1 25% BANK CASH] {symbol}: 2.5R target reached (${effective_pnl:+.2f}, ROI: +{roi_pct:.1f}%) -> Closing 25% position (<30ms)...")
-                close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.25)
+            # TP1: Scale out 50% at >= +6.0% ROI or >= +$0.60 net PnL (Bank 50% Cash / 50% Runner)
+            if scale_lvl == 0 and (roi_pct >= 6.0 or effective_pnl >= 0.60):
+                print(f"💰 [MACRO TP1 50% BANK CASH] {symbol}: Profit target reached (${effective_pnl:+.2f}, ROI: +{roi_pct:.1f}%) -> Closing 50% position (<30ms)...")
+                close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
                 if close_res.get("closed") or close_res.get("status") == "success":
                     db.update_system_setting(scale_lvl_key, "1")
-                    print(f"✅ [MACRO TP1 SUCCESS] {symbol}: 25% Position Banked! Remaining 75% converted to Asymmetric 5R-6R Moonbag.")
+                    print(f"✅ [MACRO TP1 SUCCESS] {symbol}: 50% Position Banked! Remaining 50% converted to Risk-Free Moonbag.")
                     if app and hasattr(app, "bot"):
                         try:
                             msg_tp1 = (
-                                f"🎯 **MACRO AUTO-TRADE TP1 25% CASH HARVESTED!** 💰\n"
+                                f"🎯 **MACRO AUTO-TRADE TP1 50% CASH HARVESTED!** 💰\n"
                                 f"{DIVIDER_HEAVY}\n\n"
                                 f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
                                 f"📊 **យុទ្ធសាស្ត្រ ៖** `{strategy}`\n"
-                                f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `+${(effective_pnl * 0.25):.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
-                                f"🛡️ **ស្ថានភាពទុន ៖** `25% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
+                                f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `+${(effective_pnl * 0.50):.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
+                                f"🛡️ **ស្ថានភាពទុន ៖** `50% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
                                 f"🔒 **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
-                                f"🚀 **Moonbag 75% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $2.50-$3.50+ (5R-6R) ជាមួយ Golden 85% Ratchet!`\n\n"
+                                f"🚀 **Moonbag 50% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $2.50-$3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
                                 f"{OFFICIAL_FOOTNOTE}"
                             )
                             asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown"))
@@ -611,8 +620,9 @@ async def monitor_macro_auto_trades(app):
                     is_stop_loss = True
                     reason_tag = "MACRO_BREAKEVEN_PROTECT"
             else:
-                # 🛡️ Strict 1R Dollar Risk Cap: Loss is strictly capped at -$0.75 USDT max
-                if roi_pct <= -6.0 or effective_pnl <= -0.75:
+                # 🛡️ Dynamic Volatility-Adaptive Stop Loss:
+                # Allows room for fees & micro-spread before invalidation
+                if roi_pct <= -12.0 or effective_pnl <= -max(1.50, amount * 0.12):
                     is_stop_loss = True
                     reason_tag = "MACRO_STOP_LOSS"
 

@@ -745,12 +745,12 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     # Higher Timeframe (HTF) D1/H4 Direction Alignment Shield:
                     d1_trend = pillar_res.get("d1_trend", "NEUTRAL")
                     h4_trend = pillar_res.get("h4_trend", "NEUTRAL")
-                    if side == "BUY" and (d1_trend == "BEARISH" or h4_trend == "BEARISH"):
-                        print(f"🛑 [HTF MACRO SHIELD] {symbol}: BUY suppressed because HTF (D1: {d1_trend}, H4: {h4_trend}) is in Bearish Trend!")
+                    if side == "BUY" and d1_trend == "BEARISH" and h4_trend == "BEARISH":
+                        print(f"🛑 [HTF MACRO SHIELD] {symbol}: BUY suppressed because D1 & H4 are in strong Bearish Trend!")
                         side = "SKIP"
                         confidence = 50.0
-                    elif side == "SELL" and (d1_trend == "BULLISH" or h4_trend == "BULLISH"):
-                        print(f"🛑 [HTF MACRO SHIELD] {symbol}: SELL suppressed because HTF (D1: {d1_trend}, H4: {h4_trend}) is in Bullish Trend!")
+                    elif side == "SELL" and d1_trend == "BULLISH" and h4_trend == "BULLISH":
+                        print(f"🛑 [HTF MACRO SHIELD] {symbol}: SELL suppressed because D1 & H4 are in strong Bullish Trend!")
                         side = "SKIP"
                         confidence = 50.0
 
@@ -1585,34 +1585,34 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         is_peak_locked = (peak_pnl >= 0.25 and (net_pnl_usdt <= peak_pnl * 0.85 or net_pnl_usdt < 0.15))
         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
     else:
-        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
-        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
-        if user_custom_tp > 50.0 or user_custom_tp < 2.0:
-            user_custom_tp = 15.0
+        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "5.0")
+        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 5.0
+        if user_custom_tp > 50.0 or user_custom_tp < 1.0:
+            user_custom_tp = 5.0
             try:
-                db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", "5.0")
             except Exception:
                 pass
         effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
         if effective_tp_pct <= 0 or effective_tp_pct > 50.0:
-            effective_tp_pct = 15.0
-        # Asymmetric 5R Target: Minimum $2.50+ net target (5x Risk of $0.50)
-        target_dollar_tp = max(2.50, bot_amt * 0.25)
+            effective_tp_pct = 5.0
+        # Dynamic Target: Minimum $0.80+ net target
+        target_dollar_tp = max(0.80, bot_amt * (effective_tp_pct / 100.0))
 
-        # 🏆 THE GOLDEN PROFIT RATCHET & ASYMMETRIC 5R-6R BREAKEVEN ARMOR (Strict Invariant)
-        # 1. Any position reaching +$1.50+ USDT (3R) enters Golden Ratchet mode.
+        # 🏆 THE GOLDEN PROFIT RATCHET & BREAKEVEN ARMOR (Strict Invariant)
+        # 1. Any position reaching +$0.80+ USDT enters Golden Ratchet mode.
         # 2. Retains at least 85% of peak profit (Max 15% pullback from peak).
-        # 3. Under NO circumstances can a trade with peak >= $2.50 bleed below $2.10 net (Locks 5R!).
-        has_hit_profit_peak = (peak_pnl >= 2.50 or peak_roi >= 25.0 or peak_pnl >= target_dollar_tp)
+        # 3. Under NO circumstances can a trade with peak >= $1.50 bleed below $1.20 net.
+        has_hit_profit_peak = (peak_pnl >= 1.50 or peak_roi >= 15.0 or peak_pnl >= target_dollar_tp)
         is_pullback_from_peak = False
         if has_hit_profit_peak:
             pullback_threshold = peak_pnl * 0.85
-            guaranteed_floor = max(2.10, pullback_threshold)
+            guaranteed_floor = max(1.20, pullback_threshold)
             if net_pnl_usdt <= guaranteed_floor:
                 is_pullback_from_peak = True
 
         is_peak_locked = has_hit_profit_peak and is_pullback_from_peak
-        # Target TP: If net PnL reaches target dollar TP (e.g. $2.50 - $3.50+) and pulls back slightly (>=5%), or exceeds target
+        # Target TP: If net PnL reaches target dollar TP and pulls back slightly (>=5%), or exceeds target
         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.1 or net_pnl_usdt <= peak_pnl * 0.95))
 
     # 1. Fetch live 15m ATR for dynamic volatility-adaptive stops (Non-Blocking)
@@ -1694,15 +1694,14 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         else:
             peak_bounce_roi = 0.0
 
-        fut_arm_roi = max(5.0, curr_atr_pct * 0.5 * float(active_lev))
-        is_bounce_armed = (is_derisked and (bounce_roi >= 6.0 or peak_bounce_roi >= 6.0))
-        # 🛡️ Arm Breakeven Armor at +1.5R ($0.75 net) or 5.0% ROI
-        if peak_roi >= fut_arm_roi or peak_pnl >= 0.75 or is_bounce_armed or scale_out_level == 1:
+        fut_arm_roi = max(3.5, curr_atr_pct * 0.35 * float(active_lev))
+        is_bounce_armed = (is_derisked and (bounce_roi >= 4.0 or peak_bounce_roi >= 4.0))
+        # 🛡️ Arm Breakeven Armor at +$0.40 net or 4.0% ROI
+        if peak_roi >= fut_arm_roi or peak_pnl >= 0.40 or is_bounce_armed or scale_out_level == 1:
             is_breakeven_armed = True
             effective_peak = max(peak_roi, peak_bounce_roi)
 
-            # 🛡️ THE ASYMMETRIC 5R-6R PROFIT RATCHET BREAKEVEN LADDER:
-            # Enforces Minimum $3.50+ Guaranteed Profit Floor on Moonbag & Dynamic 85% Peak Retention
+            # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER:
             if peak_pnl >= 3.50 or effective_peak >= 35.0:
                 min_guaranteed_pnl = max(3.00, peak_pnl * 0.85)  # Locks $3.00+ floor and 85% of peak (6R)
                 min_guaranteed_roi = max(30.0, effective_peak * 0.85)
@@ -1713,11 +1712,14 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 min_guaranteed_pnl = max(1.20, peak_pnl * 0.80)  # Locks 3R ($1.20+ net floor)
                 min_guaranteed_roi = max(12.0, effective_peak * 0.80)
             elif peak_pnl >= 0.75:
-                min_guaranteed_pnl = 0.25  # Breakeven Armor locked (+0.12% fees floor - Zero Loss Guarantee)
-                min_guaranteed_roi = max(3.0, effective_peak * 0.50)
+                min_guaranteed_pnl = max(0.50, peak_pnl * 0.70)
+                min_guaranteed_roi = max(5.0, effective_peak * 0.70)
+            elif peak_pnl >= 0.40:
+                min_guaranteed_pnl = 0.15  # Breakeven Armor locked (+0.12% fees floor - Zero Loss Guarantee)
+                min_guaranteed_roi = max(2.0, effective_peak * 0.50)
             else:
-                min_guaranteed_pnl = 0.15
-                min_guaranteed_roi = 1.5
+                min_guaranteed_pnl = 0.12
+                min_guaranteed_roi = 1.2
 
             ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
             # Volatility-Adaptive Chandelier ATR Multiplier: 2.0x for runner wave, 1.5x at peak
@@ -1749,10 +1751,10 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     is_tp1_hit = False
     if not is_hedge:
         if is_spot:
-            is_tp1_hit = (roi_pct >= 4.0 or net_pnl_usdt >= max(0.50, bot_amt * 0.040))
+            is_tp1_hit = (roi_pct >= 2.5 or net_pnl_usdt >= max(0.35, bot_amt * 0.025))
         else:
-            # Futures Asymmetric TP1: Hits TP1 target at >= +$1.25 net (+2.5R) or >= 12.0% ROI
-            is_tp1_hit = (net_pnl_usdt >= 1.25 or roi_pct >= 12.0)
+            # Futures Dynamic TP1: Hits TP1 target at >= +$0.50 net or >= +5.0% ROI
+            is_tp1_hit = (net_pnl_usdt >= 0.50 or roi_pct >= 5.0)
 
     # 📊 Real-Time Zero-Blind Heartbeat Log for Active Positions (Invariant 24)
     if peak_pnl >= 0.30 or net_pnl_usdt >= 0.30:
@@ -1772,18 +1774,23 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", str(now_ts))
                 print(f"⚠️ [HEDGE NEGATIVE FUNDING INVERSION] {symbol}: Funding rate {curr_fr*100:+.4f}% < 0.")
     else:
-        # If already scaled out (Moonbag 75%), position is protected by Breakeven Armor (+0.12% Net Floor)
+        # If already scaled out (Moonbag 50%), position is protected by Breakeven Armor (+0.12% Net Floor)
         if scale_out_level == 1:
             is_stop_loss_hit = (net_pnl_usdt <= 0.10 or roi_pct <= 1.0)
         else:
-            # 🛡️ Strict 1R Dollar Risk Cap: Loss is strictly capped at -$0.50 max
-            max_loss_cap = 0.50
+            # 🛡️ Dynamic Volatility-Adaptive Stop Loss:
+            # Allows adequate room for exchange fees and market bid-ask spread
+            sl_roi_thresh = -max(10.0, curr_atr_pct * 1.2 * float(active_lev))
+            sl_dollar_thresh = -max(1.20, bot_amt * 0.12)
             is_stop_loss_hit = (
-                (not is_spot and (net_pnl_usdt <= -max_loss_cap or roi_pct <= -5.0)) or
-                (is_spot and (net_pnl_usdt <= -max_loss_cap or roi_pct <= -3.5))
+                (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
+                (is_spot and (net_pnl_usdt <= -max(1.0, bot_amt * 0.05) or roi_pct <= -5.0))
             )
-        # Hard Circuit Breaker: Absolute emergency ceiling at -$0.75 (Permanently blocks -$2.62 or -$3.47 leaks)
-        is_hard_circuit_breaker = (net_pnl_usdt <= -0.75 or roi_pct <= -10.0)
+        # Hard Circuit Breaker: Absolute emergency safety ceiling at -18.0% ROI or -$1.80
+        is_hard_circuit_breaker = (
+            (not is_spot and (net_pnl_usdt <= -max(1.80, bot_amt * 0.18) or roi_pct <= -18.0)) or
+            (is_spot and (net_pnl_usdt <= -max(1.50, bot_amt * 0.08) or roi_pct <= -8.0))
+        )
 
     last_flip_key = f"{chat_id}_{symbol}"
 
@@ -1799,8 +1806,8 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     elif is_spot:
         is_stagnant_timeout = (holding_seconds >= 14400 and net_pnl_usdt >= 0.25)
     else:
-        # Stagnant 45-Minute Auto-Pruner: If position is flat or drifting negative after 45 mins, market close!
-        is_stagnant_timeout = (holding_seconds >= 2700 and real_pnl_usdt <= 0.10)
+        # Stagnant 3-Hour Auto-Pruner: Give positions 3 hours (10,800s) to develop trend
+        is_stagnant_timeout = (holding_seconds >= 10800 and real_pnl_usdt <= 0.10)
 
     if is_hard_circuit_breaker:
         print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(net_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
@@ -1822,7 +1829,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                     f"🚨 **APEX TURBO HEDGE HARD CIRCUIT BREAKER ACTIVATED!** 🛡️\n"
                     f"────────────\n\n"
                     f"🪙 កាក់ ៖ `{symbol}`\n"
-                    f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker -$0.75 Limit)\n"
+                    f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker Emergency Ceiling)\n"
                     f"💵 PnL សរុបរួមថ្លៃសេវា ៖ `-${abs(net_pnl_usdt):.2f} USDT`\n"
                     f"⚡ Binance Status ៖ `EMERGENCY MARKET CLOSED (<15ms)`\n\n"
                     f"🛡️ _ប្រព័ន្ធកាត់ផ្តាច់ Position ភ្លាមៗ ធានាដាច់ខាតមិនឲ្យខាតជ្រុលឡើយ!_"
@@ -1832,36 +1839,36 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 print(f"Error sending breaker notification: {e}")
         return
 
-    # 🎯 2-STAGE SCALE-OUT (25% BANK CASH TP1 + 75% MOONBAG TRAILING)
+    # 🎯 2-STAGE SCALE-OUT (50% BANK CASH TP1 + 50% MOONBAG TRAILING)
     if is_tp1_hit and scale_out_level == 0:
-        print(f"💰 [TP1 25% BANK CASH] {symbol}: Target profit reached (PnL: +${net_pnl_usdt:.2f} USDT, ROI: +{roi_pct:.1f}%) -> Selling 25% Qty to Bank Cash (<30ms)...")
+        print(f"💰 [TP1 50% BANK CASH] {symbol}: Target profit reached (PnL: +${net_pnl_usdt:.2f} USDT, ROI: +{roi_pct:.1f}%) -> Selling 50% Qty to Bank Cash (<30ms)...")
         if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
-            close_spot = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL", 10.0, 0.25)
-            close_fut = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.25)
+            close_spot = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL", 10.0, 0.50)
+            close_fut = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
             partial_res = close_fut if is_close_successful(close_fut) else close_spot
         elif current_side == "SPOT":
-            partial_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL", 10.0, 0.25)
+            partial_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL", 10.0, 0.50)
         else:
-            partial_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.25)
+            partial_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
             
         if is_close_successful(partial_res):
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "1")
-            db.record_symbiotic_micro_profit(chat_id, symbol, max(0.25, net_pnl_usdt * 0.25))
-            print(f"✅ [TP1 25% CASH HARVESTED] {symbol}: 25% Banked cleanly! Remaining 75% converted to Risk-Free Moonbag Trailing.")
+            db.record_symbiotic_micro_profit(chat_id, symbol, max(0.20, net_pnl_usdt * 0.50))
+            print(f"✅ [TP1 50% CASH HARVESTED] {symbol}: 50% Banked cleanly! Remaining 50% converted to Risk-Free Moonbag Trailing.")
             
             is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
             if not is_quiet and app and hasattr(app, "bot"):
                 try:
                     from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
                     msg_tp1 = (
-                        f"🎯 **APEX TP1 25% BANK CASH HARVESTED!** 💰\n"
+                        f"🎯 **APEX TP1 50% BANK CASH HARVESTED!** 💰\n"
                         f"{DIVIDER_DOUBLE}\n\n"
                         f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
-                        f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `+${max(0.25, net_pnl_usdt * 0.25):.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
-                        f"🛡️ **ស្ថានភាពទុន ៖** `25% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
+                        f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `+${max(0.20, net_pnl_usdt * 0.5):.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
+                        f"🛡️ **ស្ថានភាពទុន ៖** `50% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
                         f"🔒 **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
-                        f"🚀 **Moonbag 75% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $2.50-$3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
-                        f"⚡ _AI បានដកប្រាក់ដើម 25% និងចំណេញដាក់ចូលកាបូបជោគជ័យ! Position 75% ទៀតក្លាយជា Zero-Risk Runner ដេញចាប់កំពូល 5R-6R!_\n\n"
+                        f"🚀 **Moonbag 50% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $2.50-$3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
+                        f"⚡ _AI បានដកប្រាក់ដើម 50% និងចំណេញដាក់ចូលកាបូបជោគជ័យ! Position 50% ទៀតក្លាយជា Zero-Risk Runner ដេញចាប់កំពូល!_\n\n"
                         f"{OFFICIAL_FOOTNOTE}"
                     )
                     asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
@@ -1869,14 +1876,14 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                     print(f"Error sending TP1 notification: {e}")
             return
 
-    # In Moonbag mode, harvest final 75% if extreme moonshot target reached (> $10.00 or > 100% ROI)
-    if is_tp1_hit and scale_out_level == 1 and (net_pnl_usdt >= 5.0 or roi_pct >= 50.0):
+    # In Moonbag mode, harvest final 50% if extreme moonshot target reached (> $5.00 or > 50% ROI)
+    if is_tp1_hit and scale_out_level == 1 and (net_pnl_usdt >= 3.50 or roi_pct >= 35.0):
         print(f"🚀 [TP2 MOONSHOT FULL HARVEST] {symbol}: Ultimate moonshot target reached (PnL: +${net_pnl_usdt:.2f} USDT, ROI: +{roi_pct:.1f}%) -> 100% Clean Cash Harvest!")
         is_tp_harvested = True
 
     if is_breakeven_triggered or is_tp_harvested or is_peak_locked:
         if scale_out_level == 1:
-            reason_tag = "TP2 TRAILING MOONSHOT (FINAL 75%)"
+            reason_tag = "TP2 TRAILING MOONSHOT (FINAL 50%)"
             alert_title = "🏆 **APEX MOONSHOT TP2 FULLY HARVESTED!** 🚀"
             alert_desc = "_AI បានចាក់សោរកើបផលចំណេញពេញលេញទាំង ២ ដំណាក់កាល (TP1 50% + TP2 Moonbag 50%) ដោយជោគជ័យ ១០០%!_"
         elif is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
