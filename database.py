@@ -4166,8 +4166,16 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
             if is_win:
                 engines[eng_key]["wins"] += 1
 
-            notional = max(10.5, trade_qty * in_price)
-            fee_est = round(notional * 0.0008, 2)
+            # Robust institutional notional & fee calculation:
+            # Prevents distorted phantom fees if trade_qty was logged in USDT instead of base coins
+            raw_notional = trade_qty * in_price
+            if raw_notional > 500.0 and in_price > 20.0 and trade_qty <= 100.0:
+                # trade_qty represents USDT margin/allocation
+                notional = min(300.0, max(10.5, trade_qty * 3.0))
+            else:
+                notional = max(10.5, min(500.0, raw_notional if raw_notional > 0 else 10.5))
+
+            fee_est = round(min(0.35, max(0.01, notional * 0.0008)), 2)
             total_fees += fee_est
 
             if len(recent_trades) < 5:

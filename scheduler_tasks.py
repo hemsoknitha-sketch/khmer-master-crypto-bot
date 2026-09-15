@@ -5778,14 +5778,17 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             side_clean = str(t.get('side', 'BUY')).replace('_', '')
             order_id = str(t.get('id', '')).replace('`', '').replace('_', '')
             t_type = str(t.get('type', '')).replace('`', '').replace('_', ' ')
-            t_qty = str(t.get('qty', '')).replace('`', '')
+            in_p_val = float(t.get('entry_price', 0.0) or 0.0)
+            out_p_val = float(t.get('exit_price', 0.0) or 0.0)
+            in_str = f"${in_p_val:,.6f}" if in_p_val < 0.001 else (f"${in_p_val:,.4f}" if in_p_val < 1.0 else f"${in_p_val:,.2f}")
+            out_str = f"${out_p_val:,.6f}" if out_p_val < 0.001 else (f"${out_p_val:,.4f}" if out_p_val < 1.0 else f"${out_p_val:,.2f}")
             msg_lines.extend([
                 f"\n🔹 *{idx}. យុទ្ធសាស្ត្រ {eng_display}*",
                 f"┌ 🪙 *{sym_clean}* | {side_clean}",
                 f"├ 🆔 Order   : `{order_id}`",
                 f"├ 🏷️ Type    : `{t_type}`",
                 f"├ 📦 Qty     : `{t_qty}`",
-                f"├ 💵 In/Out  : `${t['entry_price']:,.2f}` ➔ `${t['exit_price']:,.2f}`",
+                f"├ 💵 In/Out  : `{in_str}` ➔ `{out_str}`",
                 f"├ ⏰ Time    : `{t['time'][5:]}`",
                 f"├ {pnl_emoji} PnL     : `{t['pnl']:+,.2f}` (`{t['roi']:+,.1f}%`)",
                 f"├ 💸 Fee     : `-${t['commission']:,.2f}`",

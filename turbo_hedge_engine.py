@@ -1925,7 +1925,8 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             tot_pnl += max(0.0, real_pnl_usdt)
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", str(tot_pnl))
             db.record_symbiotic_micro_profit(chat_id, symbol, real_pnl_usdt)
-            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, amount, real_pnl_usdt, roi_pct, reason_tag)
+            hist_qty = abs(position_amt) if (position_amt and abs(position_amt) > 0) else (amount / entry_price if entry_price > 0 else amount)
+            db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, hist_qty, real_pnl_usdt, roi_pct, reason_tag)
         else:
             print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
 
