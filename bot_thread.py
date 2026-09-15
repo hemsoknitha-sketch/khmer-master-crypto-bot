@@ -10673,7 +10673,7 @@ class TelegramBotThread(BaseThread):
             is_spot = ("SPOT" in tokens_upper)
             is_turbo = ("TURBO" in tokens_upper)
             is_sonic = ("SONIC" in tokens_upper)
-            is_auto_247 = any(t in ["AUTO", "SNIPER", "24/7", "SONIC"] for t in tokens_upper)
+            is_auto_247 = any(t in ["AUTO", "SNIPER", "24/7", "SONIC", "ON", "START"] for t in tokens_upper)
 
             user_side = "AUTO"
             for t in work_args:
@@ -10681,7 +10681,7 @@ class TelegramBotThread(BaseThread):
                     user_side = t.upper().strip()
                     break
 
-            clean_tokens = [t for t in work_args if t.upper().strip() not in ["SPOT", "FUTURES", "GOLD", "PAXG", "PAXGUSDT", "AUTO", "BUY", "SELL", "TURBO", "SONIC"]]
+            clean_tokens = [t for t in work_args if t.upper().strip() not in ["SPOT", "FUTURES", "GOLD", "PAXG", "PAXGUSDT", "AUTO", "BUY", "SELL", "TURBO", "SONIC", "ON", "START"]]
             num_tokens = []
             for t in clean_tokens:
                 try:
@@ -10744,7 +10744,7 @@ class TelegramBotThread(BaseThread):
                     mode_label = "TURBO"
                 elif is_sonic:
                     mode_label = "SONIC"
-                elif any(t in ["AUTO", "SNIPER", "24/7"] for t in tokens_upper):
+                elif any(t in ["AUTO", "SNIPER", "24/7", "ON", "START"] for t in tokens_upper):
                     mode_label = "AUTO"
                 else:
                     mode_label = "SONIC"
