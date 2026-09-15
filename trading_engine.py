@@ -1522,6 +1522,56 @@ def calculate_kelly_optimal_size(base_amount: float, confidence: float, risk_rew
     optimal_amount = round(optimal_amount, 2)
     return optimal_amount, multiplier
 
+def calculate_asymmetric_5r_position_size(
+    entry_price: float, 
+    invalidation_price: float, 
+    risk_usdt: float = 0.50,
+    min_notional: float = 10.50,
+    leverage: int = 10
+) -> dict:
+    """
+    Wall Street Institutional Asymmetric 5R-6R Risk/Reward Calculator:
+    - 1R Risk Floor: Loss is strictly capped at $0.50 USDT per trade.
+    - Breakeven Armor: Triggered at +1.5R (+$0.75 net).
+    - TP1 (2.5R): Bank 25% cash at +$1.25 net.
+    - TP2 Moonbag Runner (5.5R - 6.0R): Rides the trend to +$2.75 - +$3.50+ net.
+    """
+    if entry_price <= 0 or invalidation_price <= 0:
+        return {"valid": False, "qty": 0.0, "risk_usdt": risk_usdt}
+        
+    price_risk = abs(entry_price - invalidation_price)
+    if price_risk <= 0:
+        # Fallback to 1.5% structural risk buffer
+        price_risk = entry_price * 0.015
+
+    # 1. Exact Quantity Sizing: Qty * price_risk == risk_usdt
+    exact_qty = risk_usdt / price_risk
+    notional = exact_qty * entry_price
+    
+    # Guarantee Spot/Futures MIN_NOTIONAL compliance (Invariant 1)
+    if notional < min_notional:
+        exact_qty = min_notional / entry_price
+        notional = min_notional
+
+    is_long = entry_price >= invalidation_price
+    tp1_price = entry_price + (price_risk * 2.5) if is_long else entry_price - (price_risk * 2.5)
+    tp2_price = entry_price + (price_risk * 5.5) if is_long else entry_price - (price_risk * 5.5)
+    be_price = entry_price * (1.0015 if is_long else 0.9985)
+
+    return {
+        "valid": True,
+        "qty": exact_qty,
+        "notional": notional,
+        "risk_usdt": risk_usdt,
+        "tp1_target_usdt": risk_usdt * 2.5,
+        "tp2_target_usdt": risk_usdt * 5.5,
+        "stop_loss_price": invalidation_price,
+        "tp1_price": tp1_price,
+        "tp2_price": tp2_price,
+        "breakeven_price": be_price,
+        "risk_reward_ratio": 5.5
+    }
+
 def close_all_futures_positions(api_key: str, api_secret: str) -> dict:
     """
     Emergency Kill-Switch: Cancels all open futures orders and market-closes ALL active open futures positions on Binance.

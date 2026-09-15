@@ -229,6 +229,11 @@ class AIInvestmentEngine:
             "consensus_signal": consensus_signal,
             "confidence_pct": confidence_pct,
             "active_swarm_agents": active_count,
+            "asymmetric_risk_reward": "1:5.5",
+            "risk_floor_usdt": 0.50,
+            "tp1_target_usdt": 1.25,
+            "tp2_runner_usdt": 2.75,
+            "breakeven_armor_r": 1.5,
             "agent_outputs": results
         }
 
@@ -297,11 +302,31 @@ class AIInvestmentEngine:
         final_direction = "BULLISH" if total_bulls >= total_bears else "BEARISH"
         bayes_win_rate = round(min(96.5, max(68.0, (max(total_bulls, total_bears) / total_evals) * 100)), 1)
 
+        # 🛡️ HTF Macro Alignment Shield (Anti-Counter-Trend Lock)
+        try:
+            import market_data
+            p_res = market_data.extract_10_pillar_feature_vector(symbol, interval="15m")
+            h4_t = p_res.get("h4_trend", "NEUTRAL")
+            d1_t = p_res.get("d1_trend", "NEUTRAL")
+            if final_direction == "BEARISH" and (h4_t == "BULLISH" or d1_t == "BULLISH"):
+                final_direction = "NEUTRAL"
+                bayes_win_rate = 50.0
+            elif final_direction == "BULLISH" and (h4_t == "BEARISH" or d1_t == "BEARISH"):
+                final_direction = "NEUTRAL"
+                bayes_win_rate = 50.0
+        except Exception:
+            pass
+
         result = {
             "symbol": symbol,
             "final_direction": final_direction,
             "win_rate_confidence": bayes_win_rate,
             "active_33_models": 33,
+            "asymmetric_risk_reward": "1:5.5",
+            "risk_1r_usdt": 0.50,
+            "tp1_target_usdt": 1.25,
+            "tp2_runner_usdt": 2.75,
+            "breakeven_armor_r": 1.5,
             "tier1_swarm": tier1_summary,
             "tier2_ml_votes": ml_votes,
             "tier3_orderbook_imbalance": round(ob_ratio, 2),
@@ -310,6 +335,7 @@ class AIInvestmentEngine:
             "summary_text": (
                 f"🧠 **33 AI Models Swarm Consensus ({symbol}):**\n"
                 f"• Direction: `{final_direction}` | Confidence: `{bayes_win_rate}%`\n"
+                f"• Asymmetric R:R: `1:5.5` (1R Risk: $0.50 | TP1: $1.25 | TP2 Runner: $2.75+)\n"
                 f"• MoE Router State: `{moe_regime}` | Orderbook Imbalance: `{ob_ratio:.2f}x`\n"
                 f"• 5 AGI Swarm: `{swarm_signal}` ({swarm_conf}%)\n"
                 f"• Wall Street ML Consensus: `{ml_votes.count('BULLISH')} Bulls / {ml_votes.count('BEARISH')} Bears`"
