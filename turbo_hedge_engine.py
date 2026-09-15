@@ -1803,7 +1803,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         is_stagnant_timeout = (holding_seconds >= 2700 and real_pnl_usdt <= 0.10)
 
     if is_hard_circuit_breaker:
-        print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(real_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
+        print(f"🚨 [HARD CIRCUIT BREAKER (<15ms)] {symbol}: ROI {roi_pct:.1f}% / PnL -${abs(net_pnl_usdt):.2f} USDT -> Instant Emergency Market Close!")
         if current_side == "SPOT":
             close_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL")
         else:
@@ -1823,7 +1823,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                     f"────────────\n\n"
                     f"🪙 កាក់ ៖ `{symbol}`\n"
                     f"🛑 ROI កាត់ផ្តាច់ ៖ `{roi_pct:.1f}%` (Hard Breaker -$0.75 Limit)\n"
-                    f"💵 PnL ៖ `-${abs(real_pnl_usdt):.2f} USDT`\n"
+                    f"💵 PnL សរុបរួមថ្លៃសេវា ៖ `-${abs(net_pnl_usdt):.2f} USDT`\n"
                     f"⚡ Binance Status ៖ `EMERGENCY MARKET CLOSED (<15ms)`\n\n"
                     f"🛡️ _ប្រព័ន្ធកាត់ផ្តាច់ Position ភ្លាមៗ ធានាដាច់ខាតមិនឲ្យខាតជ្រុលឡើយ!_"
                 )
