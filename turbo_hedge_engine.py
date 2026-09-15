@@ -2365,11 +2365,18 @@ async def monitor_turbo_hedge_bots(app):
                     continue
 
                 is_spot = (user_side_input == "SPOT")
-                c_info = await asyncio.to_thread(trading_engine.get_symbol_info, c_cand)
-                if not c_info or c_info.get("status") != "TRADING" or (is_spot and not c_info.get("isSpotTradingAllowed", True)):
-                    print(f"🚫 [SPOT DELIST GUARD] Rejected candidate {c_cand}: Symbol is delisted or not trading on Binance!")
-                    _failed_candidate_symbols.add(c_cand)
-                    continue
+                if is_spot:
+                    c_info = await asyncio.to_thread(trading_engine.get_symbol_info, c_cand)
+                    if not c_info or c_info.get("status") != "TRADING" or not c_info.get("isSpotTradingAllowed", True):
+                        print(f"🚫 [SPOT DELIST GUARD] Rejected candidate {c_cand}: Symbol is delisted or not trading on Binance Spot!")
+                        _failed_candidate_symbols.add(c_cand)
+                        continue
+                else:
+                    c_info = await asyncio.to_thread(trading_engine.get_futures_symbol_info, c_cand)
+                    if not c_info or c_info.get("status") != "TRADING":
+                        print(f"🚫 [FUTURES DELIST GUARD] Rejected candidate {c_cand}: Symbol is delisted or not trading on Binance Futures!")
+                        _failed_candidate_symbols.add(c_cand)
+                        continue
 
                 eval_res = await asyncio.to_thread(scan_and_evaluate_symbol, c_cand, unit_leverage, avail_bal, is_spot_mode=is_spot)
                 
