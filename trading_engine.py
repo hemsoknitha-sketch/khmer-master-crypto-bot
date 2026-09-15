@@ -672,6 +672,148 @@ def get_earn_balance(api_key: str, api_secret: str, asset: str = "USDT") -> floa
         print(f"⚠️ [GET EARN BALANCE ERROR]: {e}")
         return 0.0
 
+def get_usdt_deposit_address(api_key: str, api_secret: str, network: str = "ARBITRUM") -> dict:
+    """
+    Fetches the user's Binance deposit address for USDT on the specified network (Default: Arbitrum One).
+    Endpoint: GET /sapi/v1/capital/deposit/address
+    """
+    if PAPER_TRADING:
+        return {
+            "success": True,
+            "address": "0x71C8363837918fb1935eB0D1b89Ec08aA5742f56",
+            "tag": "",
+            "network": network,
+            "coin": "USDT",
+            "url": "https://arbiscan.io/address/0x71C8363837918fb1935eB0D1b89Ec08aA5742f56"
+        }
+    try:
+        endpoint = "/sapi/v1/capital/deposit/address"
+        timestamp = (int(time.time() * 1000) + TIME_OFFSET)
+        params = {
+            "coin": "USDT",
+            "network": network,
+            "recvWindow": 60000,
+            "timestamp": timestamp
+        }
+        query_string = urlencode(params)
+        signature = generate_signature(api_secret, query_string)
+        headers = {"X-MBX-APIKEY": api_key}
+        spot_urls = [BASE_URL, "https://api.binance.com", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{query_string}&signature={signature}"
+                res = requests.get(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    if isinstance(data, dict) and data.get("address"):
+                        return {
+                            "success": True,
+                            "address": data["address"],
+                            "tag": data.get("tag", ""),
+                            "network": network,
+                            "coin": "USDT",
+                            "url": data.get("url", f"https://arbiscan.io/address/{data['address']}")
+                        }
+                elif res.status_code in [400, 401, 403]:
+                    try:
+                        err_json = res.json()
+                        err_msg = err_json.get("msg", f"HTTP {res.status_code}")
+                    except Exception:
+                        err_msg = f"HTTP {res.status_code}"
+                    return {"success": False, "error": err_msg}
+            except Exception:
+                continue
+        return {"success": False, "error": "Cannot connect to Binance Deposit endpoint"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def transfer_spot_to_futures(api_key: str, api_secret: str, amount: float, asset: str = "USDT") -> dict:
+    """
+    Transfers funds from Binance Spot account to USDT-M Futures account (type=1).
+    Endpoint: POST /sapi/v1/futures/transfer
+    """
+    if PAPER_TRADING:
+        return {"success": True, "tranId": 99999999, "amount": amount, "asset": asset}
+    if amount <= 0:
+        return {"success": False, "error": "Amount must be greater than 0"}
+    try:
+        endpoint = "/sapi/v1/futures/transfer"
+        timestamp = (int(time.time() * 1000) + TIME_OFFSET)
+        amt_str = f"{amount:.4f}".rstrip('0').rstrip('.')
+        payload = urlencode({
+            "asset": asset,
+            "amount": amt_str,
+            "type": 1,
+            "recvWindow": 60000,
+            "timestamp": timestamp
+        })
+        signature = generate_signature(api_secret, payload)
+        headers = {"X-MBX-APIKEY": api_key}
+        spot_urls = [BASE_URL, "https://api.binance.com", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{payload}&signature={signature}"
+                res = requests.post(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    return {"success": True, "tranId": data.get("tranId"), "amount": amt_str, "asset": asset}
+                else:
+                    try:
+                        err_json = res.json()
+                        err_msg = err_json.get("msg", f"HTTP {res.status_code}")
+                    except Exception:
+                        err_msg = f"HTTP {res.status_code}"
+                    return {"success": False, "error": err_msg}
+            except Exception:
+                continue
+        return {"success": False, "error": "Cannot connect to Binance Transfer endpoint"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def transfer_futures_to_spot(api_key: str, api_secret: str, amount: float, asset: str = "USDT") -> dict:
+    """
+    Transfers funds from USDT-M Futures account to Spot account (type=2).
+    Endpoint: POST /sapi/v1/futures/transfer
+    """
+    if PAPER_TRADING:
+        return {"success": True, "tranId": 99999999, "amount": amount, "asset": asset}
+    if amount <= 0:
+        return {"success": False, "error": "Amount must be greater than 0"}
+    try:
+        endpoint = "/sapi/v1/futures/transfer"
+        timestamp = (int(time.time() * 1000) + TIME_OFFSET)
+        amt_str = f"{amount:.4f}".rstrip('0').rstrip('.')
+        payload = urlencode({
+            "asset": asset,
+            "amount": amt_str,
+            "type": 2,
+            "recvWindow": 60000,
+            "timestamp": timestamp
+        })
+        signature = generate_signature(api_secret, payload)
+        headers = {"X-MBX-APIKEY": api_key}
+        spot_urls = [BASE_URL, "https://api.binance.com", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{payload}&signature={signature}"
+                res = requests.post(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    return {"success": True, "tranId": data.get("tranId"), "amount": amt_str, "asset": asset}
+                else:
+                    try:
+                        err_json = res.json()
+                        err_msg = err_json.get("msg", f"HTTP {res.status_code}")
+                    except Exception:
+                        err_msg = f"HTTP {res.status_code}"
+                    return {"success": False, "error": err_msg}
+            except Exception:
+                continue
+        return {"success": False, "error": "Cannot connect to Binance Transfer endpoint"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def get_futures_positions(api_key: str, api_secret: str) -> list:
     if PAPER_TRADING:
         return []

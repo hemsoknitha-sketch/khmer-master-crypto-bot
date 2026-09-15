@@ -2665,6 +2665,22 @@ class TelegramBotThread(BaseThread):
 
             is_paper = getattr(trading_engine, "PAPER_TRADING", False)
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE API"
+
+            refuel_hint = ""
+            if spot_cash_usdt >= 0.5:
+                if user_lang == 'en':
+                    refuel_hint = f"\n💡 *Spot Cash Ready:* `${spot_cash_usdt:,.2f} USDT` in Spot. Tap **[⚡ Transfer Spot ➔ Futures]** below to fund your trading!\n"
+                elif user_lang == 'zh':
+                    refuel_hint = f"\n💡 *现货余额可用:* 现货中有 `${spot_cash_usdt:,.2f} USDT`。点击下方 **[⚡ 划转至合约]** 即可即时注资！\n"
+                else:
+                    refuel_hint = f"\n💡 *មានទុន Spot អាចផ្ទេរបាន ៖* លោកអ្នកមាន `${spot_cash_usdt:,.2f} USDT` ក្នុង Spot។ ចុចប៊ូតុង **[⚡ ផ្ទេរ Spot ➔ Futures]** ខាងក្រោមដើម្បីបញ្ចូលទៅ Futures ភ្លាមៗ!\n"
+            elif futures_balance < 5.0:
+                if user_lang == 'en':
+                    refuel_hint = "\n💡 *Low Futures Balance:* Tap **[📥 Deposit Arbitrum USDT]** to top up with ultra-low gas fee (~$0.02)!\n"
+                elif user_lang == 'zh':
+                    refuel_hint = "\n💡 *合约资金偏低:* 点击下方 **[📥 充值 Arbitrum USDT]** 获取充值地址，Gas 费极低（约 $0.02）！\n"
+                else:
+                    refuel_hint = "\n💡 *ទុន Futures ជិតអស់ ៖* ចុចប៊ូតុង **[📥 ដាក់ប្រាក់ Arbitrum USDT]** ខាងក្រោមដើម្បីបាញ់ចូលជាមួយថ្លៃ Gas ថោកបំផុត (~$0.02)!\n"
                 
             if user_lang == 'en':
                 msg = (
@@ -2676,6 +2692,7 @@ class TelegramBotThread(BaseThread):
                     f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
                     f"{paxg_vault_str}"
                     f"{futures_str}"
+                    f"{refuel_hint}"
                     f"{funding_str}"
                     f"{earn_str}"
                     f"🏦 **Portfolio / Margin Wallet:** `${margin_balance:,.2f} USDT`\n"
@@ -2692,6 +2709,7 @@ class TelegramBotThread(BaseThread):
                     f"📊 **现货持仓敞口:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
                     f"{paxg_vault_str}"
                     f"{futures_str}"
+                    f"{refuel_hint}"
                     f"{funding_str}"
                     f"{earn_str}"
                     f"🏦 **杠杆/组合保证金:** `${margin_balance:,.2f} USDT`\n"
@@ -2708,12 +2726,39 @@ class TelegramBotThread(BaseThread):
                     f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
                     f"{paxg_vault_str}"
                     f"{futures_str}"
+                    f"{refuel_hint}"
                     f"{funding_str}"
                     f"{earn_str}"
                     f"🏦 **Portfolio / Margin Wallet:** `${margin_balance:,.2f} USDT`\n"
                     "════════════\n"
                     f"💎 **ទ្រព្យសកម្មសរុប (Binance Total Net Equity):** `${total_net_equity:,.2f} USDT`"
                 )
+
+            deposit_btn_txt = "📥 Deposit Arbitrum USDT" if user_lang == 'en' else ("📥 充值 Arbitrum USDT" if user_lang == 'zh' else "📥 ដាក់ប្រាក់ Arbitrum USDT")
+            transfer_btn_txt = f"⚡ Transfer Spot ➔ Futures (${spot_cash_usdt:,.2f})" if user_lang == 'en' else (f"⚡ 划转至合约 (${spot_cash_usdt:,.2f})" if user_lang == 'zh' else f"⚡ ផ្ទេរ Spot ➔ Futures (${spot_cash_usdt:,.2f})")
+
+            keyboard = [
+                [
+                    InlineKeyboardButton(deposit_btn_txt, callback_data="btn_deposit_arbitrum"),
+                    InlineKeyboardButton(transfer_btn_txt, callback_data="btn_transfer_spot_to_futures")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_balance_refresh"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar")
+                ],
+                [
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
                 
             target_msg = update.message if update.message else (update.callback_query.message if update.callback_query else None)
             if target_msg:
@@ -4618,6 +4663,100 @@ class TelegramBotThread(BaseThread):
                 await portfolio_command(update, context)
             elif data == "btn_balance_refresh":
                 await balance_command(update, context)
+            elif data == "btn_deposit_arbitrum":
+                try:
+                    await update.callback_query.answer("📥 កំពុងទាញយកអាសយដ្ឋាន Arbitrum One...")
+                except Exception:
+                    pass
+                keys = db.get_user_api(chat_id)
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                dep_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("⚡ ផ្ទេរ Spot ➔ Futures", callback_data="btn_transfer_spot_to_futures"),
+                        InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_balance_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                    ]
+                ])
+                if not keys:
+                    msg = (
+                        "📥 **BINANCE USDT DEPOSIT (ARBITRUM ONE)** 🌐\n"
+                        "━━━━━━━━━━━━\n"
+                        "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
+                        "💡 *សូមភ្ជាប់ API Keys របស់អ្នកជាមុនសិនតាមរយៈប៊ូតុង [🔑 Add Binance API] ខាងក្រោម ៖*"
+                    )
+                else:
+                    addr_info = await asyncio.to_thread(trading_engine.get_usdt_deposit_address, keys[0], keys[1], "ARBITRUM")
+                    if addr_info.get("success") and addr_info.get("address"):
+                        dep_address = addr_info["address"]
+                        msg = (
+                            "📥 **BINANCE USDT DEPOSIT (ARBITRUM ONE)** 🌐\n"
+                            "━━━━━━━━━━━━\n"
+                            "🪙 **រូបិយប័ណ្ណ ៖** `USDT`\n"
+                            "🌐 **បណ្តាញ (Network) ៖** `Arbitrum One` (Layer 2)\n"
+                            "⛽ **ថ្លៃសេវា Gas Fee ៖** `~$0.02 - $0.05` (លឿន & ថោកបំផុត!)\n\n"
+                            "📫 **អាសយដ្ឋានដាក់ប្រាក់ (1-Tap Copy) ៖**\n"
+                            f"`{dep_address}`\n\n"
+                            "━━━━━━━━━━━━\n"
+                            "💡 **ជំហានដំណើរការងាយៗ ៖**\n"
+                            "1. ចុច Copy អាសយដ្ឋានខាងលើ រួចផ្ញើ **USDT (Arbitrum One)** ពីកាបូបរបស់អ្នក (MetaMask, TrustWallet ឬ Exchange ផ្សេងៗ)។\n"
+                            "2. នៅពេលប្រាក់មកដល់ វានឹងចូលក្នុង **Spot Wallet** ដោយសុវត្ថិភាព។\n"
+                            "3. រួចចុចប៊ូតុង **[ ⚡ ផ្ទេរ Spot ➔ Futures ]** ខាងក្រោម ប្រាក់នឹងចូល Futures ភ្លាមៗ (ឥតគិតថ្លៃសេវា 0%)!\n"
+                        )
+                    else:
+                        err_text = addr_info.get("error", "API Permission Required")
+                        msg = (
+                            "📥 **BINANCE USDT DEPOSIT (ARBITRUM ONE)** 🌐\n"
+                            "━━━━━━━━━━━━\n"
+                            f"ℹ️ **ស្ថានភាព API ៖** `{err_text}`\n\n"
+                            "💡 **របៀបយកអាសយដ្ឋានដាក់ប្រាក់ពី Binance App (ងាយស្រួល ១០០%) ៖**\n"
+                            "1. បើក **Binance App** ➔ ចុច **Deposit** (ដាក់ប្រាក់)\n"
+                            "2. ជ្រើសរើស **USDT**\n"
+                            "3. ជ្រើសរើសបណ្តាញ (Network) ៖ **Arbitrum One**\n"
+                            "4. Copy អាសយដ្ឋាននោះ រួចផ្ញើប្រាក់ USDT 5$ ចូលមក។\n\n"
+                            "✨ **ពេលប្រាក់មកដល់ ៖**\n"
+                            "វានឹងស្ថិតក្នុង Spot Wallet។ លោកអ្នកគ្រាន់តែចូល `/balance` រួចចុច **[ ⚡ ផ្ទេរ Spot ➔ Futures ]** នោះប្រាក់នឹងចូលទៅជួញដូរ Futures ភ្លាមៗ!"
+                        )
+                target_msg = update.effective_message
+                if target_msg:
+                    await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=dep_kb)
+
+            elif data == "btn_transfer_spot_to_futures":
+                keys = db.get_user_api(chat_id)
+                if not keys:
+                    try:
+                        await update.callback_query.answer("❌ មិនទាន់ភ្ជាប់ API Keys ឡើយ!", show_alert=True)
+                    except Exception:
+                        pass
+                else:
+                    spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT")
+                    if spot_bal <= 0.05:
+                        try:
+                            await update.callback_query.answer(
+                                f"⚠️ Spot Wallet មិនទាន់មានលុយទេ (${spot_bal:.2f} USDT)!\nសូមចុច [📥 ដាក់ប្រាក់ Arbitrum USDT] ជាមុនសិន។",
+                                show_alert=True
+                            )
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            await update.callback_query.answer(f"⚡ កំពុងផ្ទេរ ${spot_bal:,.2f} USDT ចូល Futures...")
+                        except Exception:
+                            pass
+                        res = await asyncio.to_thread(trading_engine.transfer_spot_to_futures, keys[0], keys[1], spot_bal, "USDT")
+                        if res.get("success"):
+                            try:
+                                await update.callback_query.answer(f"✅ ផ្ទេរជោគជ័យ! ${spot_bal:,.2f} USDT បានចូល Futures រួចរាល់!", show_alert=True)
+                            except Exception:
+                                pass
+                            await balance_command(update, context)
+                        else:
+                            err_msg = res.get("error", "Unknown error")
+                            try:
+                                await update.callback_query.answer(f"❌ ផ្ទេរបរាជ័យ៖ {err_msg}", show_alert=True)
+                            except Exception:
+                                pass
             elif data == "btn_toggle_rebalance_toggle":
                 await toggle_rebalance_command(update, context)
             elif data in ["btn_admin_portfolio_prompt", "btn_admin_portfolio"]:
