@@ -1753,22 +1753,20 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         is_chandelier_triggered
     )
 
-    # 🎯 SUPER SMART DUAL-TARGET MICRO-SCALP RAPID HARVESTER:
-    scale_level_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
-    scale_out_level = int(scale_level_str) if scale_level_str.isdigit() else 0
-    
-    is_tp1_hit = False
+    # 🎯 100% PURE FULL-POSITION RUNNER (50% Premature Scale-Out 100% Disabled):
+    # Position runs 100% full-size under Breakeven Armor & Golden 85% Ratchet.
+    # Target harvest triggers only on macro profit target (>= +35% ROI / >= +$3.50 net) or Golden 85% Ratchet pullback.
+    is_tp_harvested = False
     if not is_hedge:
         if is_spot:
-            is_tp1_hit = (roi_pct >= 2.5 or net_pnl_usdt >= max(0.35, bot_amt * 0.025))
+            is_tp_harvested = (roi_pct >= 20.0 or net_pnl_usdt >= max(2.50, bot_amt * 0.20))
         else:
-            # Futures Dynamic TP1: Hits TP1 target at >= +$0.50 net or >= +5.0% ROI
-            is_tp1_hit = (net_pnl_usdt >= 0.50 or roi_pct >= 5.0)
+            is_tp_harvested = (net_pnl_usdt >= max(3.50, bot_amt * 0.35) or roi_pct >= 35.0)
 
     # 📊 Real-Time Zero-Blind Heartbeat Log for Active Positions (Invariant 24)
     if peak_pnl >= 0.30 or net_pnl_usdt >= 0.30:
         guaranteed_disp = guaranteed_floor if (not is_hedge and not is_spot and has_hit_profit_peak) else (min_guaranteed_pnl if is_breakeven_armed else 0.0)
-        mode_label = "MOONBAG 75%" if scale_out_level == 1 else "INITIAL 100%"
+        mode_label = "100% FULL POSITION"
         print(f"📊 [TURBO HEDGE TRACKING ({mode_label})] {symbol}: Real PnL +${real_pnl_usdt:.2f} (Net: +${net_pnl_usdt:.2f}, ROI: +{roi_pct:.1f}%) | Peak: +${peak_pnl:.2f} | Ratchet Floor: ${guaranteed_disp:.2f} | Mark: {mark_price:.5f}")
 
     # Stop Loss & Hard Circuit Breaker (Tightened to 1R -$0.50 USD Cap to guarantee Asymmetric Edge):
@@ -1783,8 +1781,8 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", str(now_ts))
                 print(f"⚠️ [HEDGE NEGATIVE FUNDING INVERSION] {symbol}: Funding rate {curr_fr*100:+.4f}% < 0.")
     else:
-        # If Breakeven Armor is armed or already scaled out (Moonbag 50%), position is strictly protected by Breakeven Armor (+0.12% Net Floor)
-        if is_breakeven_armed or scale_out_level == 1:
+        # If Breakeven Armor is armed, position is strictly protected by Breakeven Armor (+0.12% Net Floor)
+        if is_breakeven_armed:
             is_stop_loss_hit = (net_pnl_usdt <= min_guaranteed_pnl or roi_pct <= min_guaranteed_roi)
         else:
             # 🛡️ Asymmetric Risk-to-Reward (R:R >= 1:2.5) Clamped Stop Loss:
@@ -1848,13 +1846,11 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 print(f"Error sending breaker notification: {e}")
         return
 
-    is_tp_harvested = is_tp1_hit
-
     # 🎯 100% PURE FULL-POSITION RUNNER (50% Premature Scale-Out 100% Disabled)
     # Positions are preserved at 100% full size under Breakeven Armor & Golden 85% Ratchet.
     # 100% CLEAN CASH HARVEST: When target TP or Ratchet pullback occurs, full closure is executed!
-    if is_breakeven_triggered or is_tp_harvested or is_peak_locked:
-        if is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
+    if is_breakeven_triggered or is_tp_harvested:
+        if is_breakeven_triggered and not is_tp_harvested:
             if is_derisked:
                 reason_tag = "SUPER SMART BREAKEVEN RECOVERY LOCKED"
                 alert_title = "🛡️ **SUPER SMART BREAKEVEN RECOVERY LOCKED!** 🔒"
@@ -1863,14 +1859,14 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 reason_tag = "BREAKEVEN ARMOR LOCKED"
                 alert_title = "🛡️ **APEX TURBO HEDGE BREAKEVEN ARMOR ACTIVATED!** 🔒"
                 alert_desc = "_AI ស្ទាក់កើបយកប្រាក់ចំណេញសុទ្ធ មិនឱ្យ Trade ដែលធ្លាប់ចំណេញ ក្លាយជាខាតវិញដាច់ខាត!_"
+            elif peak_pnl >= 0.50 or peak_roi >= 5.0:
+                reason_tag = "THE GOLDEN PROFIT RATCHET LOCK (100% FULL POSITION)"
+                alert_title = "💰 **APEX GOLDEN 85% PROFIT FULL HARVEST!** 🚀"
+                alert_desc = "_AI បានចាក់សោរកើបប្រាក់ចំណេញ ៨៥% នៃចំណុចកំពូលលើទុន ១០០% ពេញលេញ ធានាមិនឱ្យរបូតមកខាតបង់ឡើយ!_"
             else:
                 reason_tag = f"DYNAMIC ATR TRAIL LOCK (+{min_guaranteed_roi:.1f}%)"
                 alert_title = "🎯 **APEX TURBO HEDGE CHANDELIER ATR TRAILING LOCKED!** 💰"
                 alert_desc = f"_AI រំកិល Stop-Loss តាមដេញចាប់ប្រាក់ចំណេញរហូតដល់កំពូល ចាក់សោបាន +{roi_pct:.1f}% ROI!_"
-        elif is_peak_locked:
-            reason_tag = "GOLDEN 85% PEAK LOCKED (100% FULL POSITION)"
-            alert_title = "💰 **APEX GOLDEN 85% PROFIT FULL HARVEST!** 🚀"
-            alert_desc = "_AI បានចាក់សោរកើបប្រាក់ចំណេញ ៨៥% នៃចំណុចកំពូលលើទុន ១០០% ពេញលេញ ធានាមិនឱ្យរបូតមកខាតបង់ឡើយ!_"
         else:
             reason_tag = f"TARGET TP HARVEST (+{roi_pct:.1f}% ROI)"
             alert_title = "🎯 **APEX TURBO HEDGE TARGET PROFIT HARVESTED!** 💰"
