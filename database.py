@@ -157,6 +157,17 @@ def init_db():
     )''')
     cursor.execute('''INSERT OR IGNORE INTO system_settings (key, value) VALUES ('circuit_breaker', '0')''')
     
+    # Community Groups & Channels Registry
+    cursor.execute('''CREATE TABLE IF NOT EXISTS community_groups (
+        chat_id INTEGER PRIMARY KEY,
+        title TEXT,
+        chat_type TEXT,
+        added_by INTEGER,
+        status TEXT DEFAULT 'active',
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+
     # Admin Audit Log
     cursor.execute('''CREATE TABLE IF NOT EXISTS admin_audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3030,6 +3041,71 @@ def turn_off_all_auto_trades():
     cursor.execute("UPDATE users SET auto_trade_enabled = 0")
     conn.commit()
     conn.close()
+
+def register_community_group(chat_id: int, title: str = "", chat_type: str = "group", added_by: int = 0, status: str = "active") -> bool:
+    """Registers or updates a community group or channel for automated intelligence distribution."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS community_groups (
+            chat_id INTEGER PRIMARY KEY,
+            title TEXT,
+            chat_type TEXT,
+            added_by INTEGER,
+            status TEXT DEFAULT 'active',
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        cursor.execute('''
+            INSERT INTO community_groups (chat_id, title, chat_type, added_by, status, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                title = excluded.title,
+                chat_type = excluded.chat_type,
+                status = excluded.status,
+                is_active = 1
+        ''', (chat_id, title, chat_type, added_by, status))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error registering community group {chat_id}: {e}")
+        return False
+
+def deactivate_community_group(chat_id: int) -> bool:
+    """Deactivates a community group when the bot is kicked or removed, preventing Forbidden errors."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE community_groups SET is_active = 0, status = "inactive" WHERE chat_id = ?', (chat_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error deactivating community group {chat_id}: {e}")
+        return False
+
+def get_active_community_groups() -> list:
+    """Returns list of active community groups and channels [(chat_id, title, chat_type), ...]."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS community_groups (
+            chat_id INTEGER PRIMARY KEY,
+            title TEXT,
+            chat_type TEXT,
+            added_by INTEGER,
+            status TEXT DEFAULT 'active',
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        cursor.execute('SELECT chat_id, title, chat_type FROM community_groups WHERE is_active = 1')
+        res = cursor.fetchall()
+        conn.close()
+        return res
+    except Exception as e:
+        print(f"Error fetching active community groups: {e}")
+        return []
 
 def log_admin_action(admin_id: int, action: str, target: str, details: str):
     """Immutable Security Audit Logger for Admin & Security actions."""

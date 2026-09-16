@@ -134,10 +134,9 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
 def get_alert_target_recipients(alert_type: str = "general") -> tuple[list, bool]:
     """
     Determines where high-frequency intelligence alerts (News, Whale Wall, Macro)
-    should be delivered.
-    If 'alert_group_id' is configured in SQLite system_settings or TELEGRAM_ALERT_GROUP_ID env,
-    delivers alerts directly to that Telegram Group or Channel, sparing private bot users
-    from notification spam.
+    should be delivered across all connected Communities, Groups, and Channels.
+    If 'alert_group_id' or community groups exist in SQLite, delivers alerts
+    directly to those Telegram Groups/Channels, sparing private bot users from notification spam.
     Returns: (recipients_list, is_group_only)
     """
     import os
@@ -146,20 +145,36 @@ def get_alert_target_recipients(alert_type: str = "general") -> tuple[list, bool
     group_id_str = db.get_system_setting("alert_group_id", "") or os.getenv("TELEGRAM_ALERT_GROUP_ID", "")
     group_id_str = str(group_id_str).strip()
 
-    routing_mode = str(db.get_system_setting("alert_routing_mode", "GROUP_ONLY" if group_id_str else "PRIVATE_ONLY")).upper().strip()
-
+    target_groups = []
     if group_id_str:
-        try:
-            group_id = int(group_id_str)
-            if routing_mode == "GROUP_ONLY":
-                # Route exclusively to Group/Channel, zero private user spam!
-                return [(group_id, "khmer")], True
-            elif routing_mode == "BOTH":
-                vip_users = db.get_vip_users_with_lang() or []
-                recipients = [(group_id, "khmer")] + [u for u in vip_users if (u[0] if isinstance(u, (tuple, list)) else u) != group_id]
-                return recipients, False
-        except ValueError:
-            pass
+        for p in group_id_str.split(","):
+            p_clean = p.strip()
+            if p_clean:
+                try:
+                    target_groups.append(int(p_clean))
+                except ValueError:
+                    pass
+
+    # Collect from dynamic community groups table
+    if hasattr(db, 'get_active_community_groups'):
+        comm_groups = db.get_active_community_groups() or []
+        for cg in comm_groups:
+            gid = cg[0] if isinstance(cg, (tuple, list)) else cg
+            if gid not in target_groups:
+                target_groups.append(gid)
+
+    routing_mode = str(db.get_system_setting("alert_routing_mode", "GROUP_ONLY" if target_groups else "PRIVATE_ONLY")).upper().strip()
+
+    if target_groups:
+        group_recipients = [(gid, "khmer") for gid in target_groups]
+        if routing_mode == "GROUP_ONLY":
+            # Route exclusively to Communities & Groups, zero private user spam!
+            return group_recipients, True
+        elif routing_mode == "BOTH":
+            vip_users = db.get_vip_users_with_lang() or []
+            existing_gids = set(target_groups)
+            recipients = group_recipients + [u for u in vip_users if (u[0] if isinstance(u, (tuple, list)) else u) not in existing_gids]
+            return recipients, False
 
     vip_users = db.get_vip_users_with_lang() or []
     return vip_users, False

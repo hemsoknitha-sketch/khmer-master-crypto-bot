@@ -32,7 +32,7 @@ else:
     except ImportError:
         BaseThread = object
 
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ChatMemberHandler
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from ai_engine import AIInvestmentEngine
 import database as db
@@ -6683,6 +6683,81 @@ class TelegramBotThread(BaseThread):
             )
             if update.effective_message:
                 await update.effective_message.reply_text(success_text, parse_mode="Markdown")
+
+        async def my_chat_member_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            Autonomous Community & Channel Event Listener.
+            Automatically detects when Bot is added to or removed from a Telegram Group, Supergroup, or Channel.
+            """
+            result = update.my_chat_member
+            if not result:
+                return
+
+            chat = result.chat
+            new_status = getattr(result.new_chat_member, 'status', None)
+            chat_id = chat.id
+            chat_title = chat.title or "Unknown Community"
+            chat_type = chat.type  # 'group', 'supergroup', 'channel'
+            user_who_added = result.from_user.id if result.from_user else 0
+
+            if new_status in ["administrator", "member"]:
+                # Bot added or promoted! Auto-register to community database!
+                if hasattr(db, 'register_community_group'):
+                    db.register_community_group(chat_id, chat_title, chat_type, user_who_added, str(new_status))
+                self.log_signal.emit(f"👥 [COMMUNITY CONNECTED] Bot added to {chat_type} '{chat_title}' (ID: {chat_id}) by User {user_who_added} as {new_status}!")
+                
+                # Send welcome message if bot has permission
+                if chat_type in ["group", "supergroup"]:
+                    from ui_standards import DIVIDER_HEAVY
+                    welcome_text = (
+                        "🤖 **KHMER MASTER CRYPTO BOT CONNECTED!** ⚡\n"
+                        f"{DIVIDER_HEAVY}\n\n"
+                        f"🏛️ **Community Name ៖** `{chat_title}`\n"
+                        f"🆔 **Community ID ៖** `{chat_id}`\n"
+                        f"⚡ **Status ៖** `🟢 ACTIVE AI RADAR NODE`\n\n"
+                        "📊 **Institutional Features Activated ៖**\n"
+                        "• 🐋 Whale Wall Orderbook Radar (<50ms L2)\n"
+                        "• 📰 High-Impact Breaking News & AI Verdict\n"
+                        "• 🌊 Macro & On-Chain Whale Movements\n"
+                        f"{DIVIDER_HEAVY}\n"
+                        "💡 _Bot បានភ្ជាប់ការបញ្ជូនសារ Radar & Intelligence ចូលក្នុង Community នេះដោយជោគជ័យ!_"
+                    )
+                    try:
+                        await context.bot.send_message(chat_id=chat_id, text=welcome_text, parse_mode="Markdown")
+                    except Exception as e_w:
+                        print(f"Community welcome notice: {e_w}")
+
+            elif new_status in ["left", "kicked"]:
+                # Bot removed or kicked! Auto-deactivate to prevent future Forbidden errors!
+                if hasattr(db, 'deactivate_community_group'):
+                    db.deactivate_community_group(chat_id)
+                self.log_signal.emit(f"🚪 [COMMUNITY DISCONNECTED] Bot removed from {chat_type} '{chat_title}' (ID: {chat_id}) -> Auto-Deactivated.")
+
+        async def admin_communities_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            user_id = update.effective_user.id if update.effective_user else chat_id
+            if not (user_id == 859271875 or db.is_admin(user_id)):
+                await update.effective_message.reply_text("⛔ **ACCESS DENIED**: Restricted to Super Admin.", parse_mode="Markdown")
+                return
+
+            comm_groups = db.get_active_community_groups() if hasattr(db, 'get_active_community_groups') else []
+            from ui_standards import DIVIDER_HEAVY
+            lines = [
+                "🏛️ **CONNECTED TELEGRAM COMMUNITIES & CHANNELS** 📡",
+                DIVIDER_HEAVY,
+                f"📊 **Total Active Communities ៖** `{len(comm_groups)}`\n"
+            ]
+            if not comm_groups:
+                lines.append("ℹ️ _មិនទាន់មាន Community ឬ Channel ណាមួយត្រូវបានភ្ជាប់នៅឡើយទេ។ សូមចុច 'Add Bot to a Community' ឬ Add Bot ចូល Group/Channel ដើម្បីភ្ជាប់ស្វ័យប្រវត្តិ!_")
+            else:
+                for idx, cg in enumerate(comm_groups, 1):
+                    gid, title, ctype = cg[0], cg[1], cg[2]
+                    lines.append(f"{idx}. `{title}` ({ctype})\n   🆔 `{gid}`")
+
+            lines.append(f"\n{DIVIDER_HEAVY}")
+            lines.append("💡 _គ្រប់សារ Radar & News ទាំងអស់នឹងត្រូវបញ្ជូនទៅកាន់ Communities ខាងលើនេះដោយស្វ័យប្រវត្តិតាមអត្រា ២៥ សារ/វិនាទី!_")
+            await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
 
         async def admin_nuke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -15350,6 +15425,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("get_group_id", group_id_command))
         self.app.add_handler(CommandHandler("set_alert_group", set_alert_group_command))
         self.app.add_handler(CommandHandler("setalertgroup", set_alert_group_command))
+        self.app.add_handler(CommandHandler("communities", admin_communities_command))
+        self.app.add_handler(CommandHandler("admin_communities", admin_communities_command))
+        self.app.add_handler(ChatMemberHandler(my_chat_member_callback, ChatMemberHandler.MY_CHAT_MEMBER))
         self.app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
         self.app.add_handler(CommandHandler("analyze", analyze_command))
         self.app.add_handler(CommandHandler("alert", alert_command))
