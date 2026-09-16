@@ -953,11 +953,39 @@ class TelegramBotThread(BaseThread):
                 return
 
             # Sub-action: CEDEFI MATRIX (/flash_loan CEDEFI or callback)
-            if (args and args[0].upper() in ["CEDEFI", "CEDEFI_EXEC", "CEDEFI_TRADE"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_cedefi"):
-                # Handle CeDeFi Execution if command is /flash_loan CEDEFI_EXEC <SYMBOL> <AMOUNT>
-                if args and args[0].upper() in ["CEDEFI_EXEC", "CEDEFI_TRADE"] and len(args) >= 2:
-                    exec_sym = args[1].upper()
-                    exec_amt = float(args[2]) if len(args) >= 3 else 20.0
+            if (args and args[0].upper() in ["CEDEFI", "CEDEFI_EXEC", "CEDEFI_TRADE"]) or (update.callback_query and update.callback_query.data in ["btn_flash_loan_cedefi", "btn_cedefi_auto_on", "btn_cedefi_auto_off", "btn_cedefi_exec_link", "btn_cedefi_exec_arb"]):
+                # Handle CeDeFi Auto Toggle: /flash_loan CEDEFI AUTO ON|OFF or button
+                if (args and len(args) >= 2 and args[0].upper() == "CEDEFI" and args[1].upper() == "AUTO") or (update.callback_query and update.callback_query.data in ["btn_cedefi_auto_on", "btn_cedefi_auto_off"]):
+                    if update.callback_query:
+                        turn_on = (update.callback_query.data == "btn_cedefi_auto_on")
+                    else:
+                        turn_on = True if (len(args) < 3 or args[2].upper() != "OFF") else False
+                    db.set_system_setting(f"flash_loan_cedefi_auto_{chat_id}", "1" if turn_on else "0")
+                    status_toast = "✅ CeDeFi Auto: បានបើកដំណើរការ!" if turn_on else "🔴 CeDeFi Auto: បានបិទដំណើរការ!"
+                    if update.callback_query:
+                        try: await update.callback_query.answer(status_toast)
+                        except Exception: pass
+                    status_text = "🟢 **បានបើកដំណើរការ CeDeFi Spot Auto-Execution (កើបលុយពិតលើ Binance Spot)!**\n\n_ប្រព័ន្ធនឹងទិញ Spot លើ Binance ស្វ័យប្រវត្តិនៅពេលរកឃើញគម្លាតតម្លៃ Net Yield >= +0.15% ធៀបនឹង DEX!_" if turn_on else "🔴 **បានបិទដំណើរការ CeDeFi Spot Auto-Execution!**"
+                    if user_lang != 'km':
+                        status_text = "🟢 **CeDeFi Spot Auto-Execution TURNED ON (Settles real profits on Binance Spot)!**\n\n_System will automatically buy on Binance Spot when net yield >= +0.15% against DEX!_" if turn_on else "🔴 **CeDeFi Spot Auto-Execution TURNED OFF!**"
+                    if msg_target:
+                        await msg_target.reply_text(status_text, parse_mode="Markdown")
+                    return
+
+                # Handle CeDeFi Execution if command is /flash_loan CEDEFI_EXEC <SYMBOL> <AMOUNT> or callback
+                if (args and args[0].upper() in ["CEDEFI_EXEC", "CEDEFI_TRADE"] and len(args) >= 2) or (update.callback_query and update.callback_query.data in ["btn_cedefi_exec_link", "btn_cedefi_exec_arb"]):
+                    if update.callback_query and update.callback_query.data == "btn_cedefi_exec_link":
+                        exec_sym, exec_amt = "LINKUSDT", 20.0
+                        try: await update.callback_query.answer("⚡ កំពុងទិញ LINKUSDT លើ Binance Spot...")
+                        except Exception: pass
+                    elif update.callback_query and update.callback_query.data == "btn_cedefi_exec_arb":
+                        exec_sym, exec_amt = "ARBUSDT", 20.0
+                        try: await update.callback_query.answer("⚡ កំពុងទិញ ARBUSDT លើ Binance Spot...")
+                        except Exception: pass
+                    else:
+                        exec_sym = args[1].upper()
+                        exec_amt = float(args[2]) if len(args) >= 3 else 20.0
+
                     import flash_loan_mev_engine
                     exec_res = flash_loan_mev_engine.flash_loan_engine.execute_cedefi_arbitrage(
                         chat_id=chat_id,
@@ -965,14 +993,14 @@ class TelegramBotThread(BaseThread):
                         action="BUY_BINANCE_SELL_DEX",
                         amount_usdt=exec_amt
                     )
-                    mode_txt = "🟢 LIVE MAINNET" if exec_res["mode"] == "LIVE_MAINNET_CEDEFI" else "🧪 VERIFIED SIMULATION"
+                    mode_txt = "🟢 LIVE MAINNET (Binance Spot)" if exec_res["mode"] == "LIVE_MAINNET_CEDEFI" else "🧪 VERIFIED SIMULATION"
                     succ_msg = (
                         f"🌐 **CEDEFI ARBITRAGE EXECUTED!** ({mode_txt})\n"
                         "════════════\n\n"
                         f"🪙 **Symbol** ៖ `{exec_res['symbol']}`\n"
                         f"💵 **ទុនវិនិយោគ** ៖ `${exec_res['amount_usdt']:.2f} USDT`\n"
                         f"⚡ **Order ID** ៖ `{exec_res['order_id']}`\n"
-                        f"📈 **ប្រាក់ចំណេញសុទ្ធ** ៖ `+${exec_res.get('net_profit_usd', 0.0):.2f} USDT`\n"
+                        f"📈 **ប្រាក់ចំណេញសុទ្ធ** ៖ `+${exec_res.get('net_profit_usd', 0.0):.3f} USDT`\n"
                         f"ℹ️ **ស្ថានភាព** ៖ `{exec_res['notice']}`\n\n"
                         "💡 _កិច្ចសន្យា Spot និង DEX ត្រូវបានគូផ្គងដោយស្វ័យប្រវត្តិកាត់បន្ថយ Risk មកសល់ 0%!_"
                     )
@@ -983,11 +1011,31 @@ class TelegramBotThread(BaseThread):
                 import flash_loan_mev_engine
                 cedefi_items = flash_loan_mev_engine.flash_loan_engine.scan_cedefi_arbitrage_matrix()
 
+                # Dedicated CeDeFi Interactive Control Keyboard
+                cedefi_auto_state = (db.get_system_setting(f"flash_loan_cedefi_auto_{chat_id}", "1") != "0")
+                cedefi_toggle_btn = (
+                    InlineKeyboardButton("🔴 Turn OFF CeDeFi Auto", callback_data="btn_cedefi_auto_off")
+                    if cedefi_auto_state else
+                    InlineKeyboardButton("🟢 Turn ON CeDeFi Auto (Spot)", callback_data="btn_cedefi_auto_on")
+                )
+                cedefi_keyboard = InlineKeyboardMarkup([
+                    [cedefi_toggle_btn],
+                    [
+                        InlineKeyboardButton("⚡ Buy LINK ($20)", callback_data="btn_cedefi_exec_link"),
+                        InlineKeyboardButton("⚡ Buy ARB ($20)", callback_data="btn_cedefi_exec_arb")
+                    ],
+                    [
+                        InlineKeyboardButton("🔄 Refresh CeDeFi Matrix", callback_data="btn_flash_loan_cedefi"),
+                        InlineKeyboardButton("🔙 Back to Flash Loan", callback_data="btn_flash_loan")
+                    ]
+                ])
+
                 if user_lang == 'km':
                     cedefi_msg = (
                         "🌐 **CEDEFI HYBRID ARBITRAGE LIVE MATRIX v13.00** 🌐\n"
                         "════════════\n\n"
-                        "⚡ **ស្កេនគម្លាតតម្លៃផ្ទាល់ Binance Spot Orderbook ↔ DEX Pools ៖**\n\n"
+                        "⚡ **ស្កេនគម្លាតតម្លៃផ្ទាល់ Binance Spot Orderbook ↔ DEX Pools ៖**\n"
+                        f"🤖 **CeDeFi Spot Auto-Execution ៖** `{'🟢 ON (កើបលុយពិតលើ Binance Spot)' if cedefi_auto_state else '🔴 OFF'}`\n\n"
                     )
                     for item in cedefi_items:
                         status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
@@ -1000,7 +1048,7 @@ class TelegramBotThread(BaseThread):
                             f"  • ប្រាក់ចំណេញសុទ្ធរំពឹងទុក ៖ `+${item['net_profit_usd']:,.2f} USDT`\n\n"
                         )
                     cedefi_msg += (
-                        "👉 **1-Tap Scan ឡើងវិញ ៖**\n`` `/flash_loan CEDEFI` ``\n\n"
+                        "👉 **1-Tap បញ្ជា Auto-Trade ៖**\n`` `/flash_loan CEDEFI AUTO ON` ``\n\n"
                         "👉 **1-Tap បញ្ជាទិញ-លក់ CeDeFi ($20) ៖**\n`` `/flash_loan CEDEFI_EXEC LINKUSDT 20` ``\n\n"
                         f"💼 **កាបូបទទួលប្រាក់ចំណេញ** ៖ {wallet_display}\n\n"
                         "💡 _CeDeFi Arbitrage ចាប់យកឱកាសចំណេញភ្លាមៗមុនពេល On-Chain និង CEX ធ្វើសមតុល្យតម្លៃគ្នា!_"
@@ -1009,7 +1057,8 @@ class TelegramBotThread(BaseThread):
                     cedefi_msg = (
                         "🌐 **CEDEFI HYBRID ARBITRAGE LIVE MATRIX v13.00** 🌐\n"
                         "════════════\n\n"
-                        "⚡ **Real-Time Arbitrage: Binance Spot Orderbook vs DEX Pools:**\n\n"
+                        "⚡ **Real-Time Arbitrage: Binance Spot Orderbook vs DEX Pools:**\n"
+                        f"🤖 **CeDeFi Spot Auto-Execution:** `{'🟢 ON (Settles Real Money on Binance)' if cedefi_auto_state else '🔴 OFF'}`\n\n"
                     )
                     for item in cedefi_items:
                         status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
@@ -1022,17 +1071,17 @@ class TelegramBotThread(BaseThread):
                             f"  • Expected Net Profit: `+${item['net_profit_usd']:,.2f} USDT`\n\n"
                         )
                     cedefi_msg += (
-                        "👉 **1-Tap Rescan:**\n`` `/flash_loan CEDEFI` ``\n\n"
+                        "👉 **1-Tap Auto-Trade Command:**\n`` `/flash_loan CEDEFI AUTO ON` ``\n\n"
                         "👉 **1-Tap CeDeFi Execute ($20):**\n`` `/flash_loan CEDEFI_EXEC LINKUSDT 20` ``\n\n"
                         f"💼 **Settlement Wallets**: {wallet_display}\n\n"
                         "💡 _CeDeFi arbitrage captures price disparities between Binance Spot and on-chain liquidity pools!_"
                     )
 
                 if sent_cedefi:
-                    try: await sent_cedefi.edit_text(cedefi_msg, parse_mode="Markdown", reply_markup=keyboard)
-                    except Exception: await send_long_message(context, chat_id, cedefi_msg, reply_markup=keyboard)
+                    try: await sent_cedefi.edit_text(cedefi_msg, parse_mode="Markdown", reply_markup=cedefi_keyboard)
+                    except Exception: await send_long_message(context, chat_id, cedefi_msg, reply_markup=cedefi_keyboard)
                 else:
-                    await send_long_message(context, chat_id, cedefi_msg, reply_markup=keyboard)
+                    await send_long_message(context, chat_id, cedefi_msg, reply_markup=cedefi_keyboard)
                 return
 
             # Sub-action: BASE NETWORK MULTI-DEX SCANNER (/flash_loan BASE or callback)
@@ -4855,6 +4904,18 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_cedefi":
                 context.args = ["CEDEFI"]
+                await flash_loan_command(update, context)
+            elif data == "btn_cedefi_auto_on":
+                context.args = ["CEDEFI", "AUTO", "ON"]
+                await flash_loan_command(update, context)
+            elif data == "btn_cedefi_auto_off":
+                context.args = ["CEDEFI", "AUTO", "OFF"]
+                await flash_loan_command(update, context)
+            elif data == "btn_cedefi_exec_link":
+                context.args = ["CEDEFI_EXEC", "LINKUSDT", "20"]
+                await flash_loan_command(update, context)
+            elif data == "btn_cedefi_exec_arb":
+                context.args = ["CEDEFI_EXEC", "ARBUSDT", "20"]
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_base":
                 context.args = ["BASE"]

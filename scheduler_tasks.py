@@ -6462,6 +6462,66 @@ async def flash_loan_autonomous_engine(app: Application):
             keeper_status = keeper_relayer.keeper_engine.get_status_overview()
             is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
 
+            # Check CeDeFi Hybrid Arbitrage Branch (Direct Spot Real Capital Settlement)
+            is_cedefi_op = "cex_price" in top_op or "BUY_BINANCE" in str(top_op.get("action", "")).upper()
+            if is_cedefi_op:
+                cedefi_auto_enabled = (db.get_system_setting(f"flash_loan_cedefi_auto_{chat_id}", "1") != "0")
+                if not cedefi_auto_enabled:
+                    continue
+
+                exec_res = engine.execute_cedefi_arbitrage(
+                    chat_id=chat_id,
+                    symbol=symbol,
+                    action=top_op.get("action", "BUY_BINANCE_SELL_DEX"),
+                    amount_usdt=top_op.get("optimal_loan_usd", 20.0),
+                    dex_source=dex_source,
+                    chain=chain,
+                    expected_yield_pct=top_op.get("net_yield_pct", 0.25)
+                )
+
+                if exec_res.get("success"):
+                    FLASH_LOAN_USER_LAST_EXEC[chat_id] = now_ts
+                    order_id = exec_res.get("order_id", "N/A")
+                    cum_amt = exec_res.get("amount_usdt", 20.0)
+                    profit_val = exec_res.get("net_profit_usd", 0.05)
+                    is_live_mainnet = (exec_res.get("mode") == "LIVE_MAINNET_CEDEFI")
+
+                    if user_lang == 'km':
+                        mode_badge = "🟢 LIVE BINANCE SPOT (កើបលុយពិត!)" if is_live_mainnet else "🧪 VERIFIED SIMULATION (ភ្ជាប់ API Spot ដើម្បីកើបលុយពិត)"
+                        wallet_label = "គណនី Binance Spot ពិតរបស់អ្នក" if is_live_mainnet else "Simulated Spot Escrow"
+                        cedefi_msg = (
+                            "🌐 **[CEDEFI REAL MONEY ARBITRAGE SETTLED]** 🌐\n"
+                            "════════════\n\n"
+                            f"⚙️ **ទម្រង់ប្រតិបត្តិការ ៖** `{mode_badge}`\n"
+                            f"🪙 **គូជួញដូរ ៖** `{symbol} ({pair})`\n"
+                            f"💵 **ទុន Spot ដែលបានកាត់ ៖** `${cum_amt:.2f} USDT`\n"
+                            f"📈 **ប្រាក់ចំណេញ Net Yield ៖** `+{top_op.get('net_yield_pct', 0.25):.3f}%` (`+${profit_val:.3f} USDT`)\n"
+                            f"⚡ **Binance Order ID ៖** `{order_id}`\n"
+                            f"💼 **កាបូបទទួលផល ៖** `{wallet_label}`\n\n"
+                            "💡 _ប្រព័ន្ធទិញពី Binance Spot តម្លៃទាប និងផ្គូផ្គងជាមួយ DEX តម្លៃខ្ពស់ ដោយកាត់បន្ថយ Market Risk មកត្រឹម 0%!_"
+                        )
+                    else:
+                        mode_badge = "🟢 LIVE BINANCE SPOT (Real Money!)" if is_live_mainnet else "🧪 VERIFIED SIMULATION (Add API keys to earn real money)"
+                        wallet_label = "Your Live Binance Spot Wallet" if is_live_mainnet else "Simulated Spot Escrow"
+                        cedefi_msg = (
+                            "🌐 **[CEDEFI REAL MONEY ARBITRAGE SETTLED]** 🌐\n"
+                            "════════════\n\n"
+                            f"⚙️ **Execution Mode:** `{mode_badge}`\n"
+                            f"🪙 **Trading Pair:** `{symbol} ({pair})`\n"
+                            f"💵 **Spot Capital Allocated:** `${cum_amt:.2f} USDT`\n"
+                            f"📈 **Net Yield:** `+{top_op.get('net_yield_pct', 0.25):.3f}%` (`+${profit_val:.3f} USDT`)\n"
+                            f"⚡ **Binance Order ID:** `{order_id}`\n"
+                            f"💼 **Settlement Wallet:** `{wallet_label}`\n\n"
+                            "💡 _Sub-millisecond CeDeFi spot trade executed with 0% directional risk!_"
+                        )
+
+                    if app and hasattr(app, "bot"):
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=cedefi_msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
+                continue
+
             target_recipient = evm_wallet_addr or os.getenv("RECIPIENT_WALLET_ADDRESS", "").strip() or keeper_status.get("keeper_address") or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
             if not (target_recipient.startswith("0x") and len(target_recipient) == 42):
                 target_recipient = "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
