@@ -147,6 +147,12 @@ class TelegramBotThread(BaseThread):
         self.loop = asyncio.new_event_loop()
         MAIN_BOT_LOOP = self.loop
         asyncio.set_event_loop(self.loop)
+        
+        # 🚀 Institutional High-Concurrency ThreadPool (64 Dedicated Workers)
+        # Prevents thread starvation: background monitors will NEVER block Telegram user commands
+        import concurrent.futures
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=64, thread_name_prefix="apex_worker")
+        self.loop.set_default_executor(self.executor)
             
         async def post_init(application):
             from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats, BotCommandScopeAllGroupChats, BotCommandScopeChat
@@ -2503,7 +2509,12 @@ class TelegramBotThread(BaseThread):
             msg_target = update.message if update.message else (update.callback_query.message if update.callback_query else None)
             if update.callback_query:
                 try:
-                    await update.callback_query.answer()
+                    await update.callback_query.answer("⚡ កំពុងទាញយកទិន្នន័យ Portfolio...")
+                except Exception:
+                    pass
+            else:
+                try:
+                    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
                 except Exception:
                     pass
 

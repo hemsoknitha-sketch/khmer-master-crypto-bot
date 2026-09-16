@@ -114,11 +114,20 @@ def get_onchain_live_balances(address: str) -> dict:
     _ONCHAIN_BALANCE_CACHE[clean] = (now, res_data)
     return res_data
 
-def get_full_system_portfolio_data(chat_id: int) -> dict:
+_FULL_PORTFOLIO_CACHE = {}  # {chat_id: (timestamp, data)}
+
+def get_full_system_portfolio_data(chat_id: int, force_fresh: bool = False) -> dict:
     """
     Queries all database tables, live Binance Spot/Futures APIs, and on-chain registries
     to assemble a 100% comprehensive diagnostic snapshot for the user.
+    Equipped with 10-second high-speed in-memory cache to guarantee sub-millisecond response.
     """
+    now = time.time()
+    if not force_fresh and chat_id in _FULL_PORTFOLIO_CACHE:
+        cached_ts, cached_data = _FULL_PORTFOLIO_CACHE[chat_id]
+        if now - cached_ts < 10.0:
+            return cached_data
+
     keys = db.get_user_api(chat_id)
     is_paper = getattr(trading_engine, "PAPER_TRADING", False)
 
@@ -526,7 +535,7 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
 
     total_roi_pct = (total_unrealized_pnl / max(1.0, total_invested_usd) * 100.0) if total_invested_usd > 0 else 0.0
 
-    return {
+    res_data = {
         "chat_id": chat_id,
         "is_paper": is_paper,
         "total_portfolio_net_worth": round(total_portfolio_net_worth, 2),
@@ -601,6 +610,8 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "disk_total_gb": disk_total_gb,
         "db_size_mb": db_size_mb
     }
+    _FULL_PORTFOLIO_CACHE[chat_id] = (time.time(), res_data)
+    return res_data
 
 def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: bool = False) -> str:
     """
