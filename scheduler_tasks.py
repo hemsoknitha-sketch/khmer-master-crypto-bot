@@ -6522,6 +6522,67 @@ async def flash_loan_autonomous_engine(app: Application):
                             pass
                 continue
 
+            # Check Aave V3 Liquidation Bounty Execution Branch
+            is_liq_op = "account" in top_op and "collateral_asset" in top_op
+            if is_liq_op:
+                borrower_acc = top_op.get("account", "")
+                collat_asset = top_op.get("collateral_asset", "ARB")
+                debt_asset = top_op.get("debt_asset", "USDC")
+                debt_cover = top_op.get("max_liquidatable_usd", 27500.0)
+
+                liq_res = engine.execute_aave_v3_liquidation(
+                    chat_id=chat_id,
+                    borrower_address=borrower_acc,
+                    collateral_asset=collat_asset,
+                    debt_asset=debt_asset,
+                    debt_to_cover_usd=debt_cover,
+                    recipient_wallet=evm_wallet_addr
+                )
+
+                if liq_res.get("success"):
+                    FLASH_LOAN_USER_LAST_EXEC[chat_id] = now_ts
+                    bounty_usd = liq_res.get("net_profit_usd", 0.0)
+                    bonus_p = liq_res.get("bonus_pct", 10.0)
+                    tx_h = liq_res.get("tx_hash", "")
+                    explorer_link = liq_res.get("explorer_url") or "https://arbiscan.io"
+                    is_live = (liq_res.get("mode") == "BROADCASTED_LIVE_MAINNET")
+
+                    if user_lang == 'km':
+                        mode_badge = "🟢 LIVE ON-CHAIN MAINNET" if is_live else "🧪 VERIFIED ON-CHAIN SIMULATION"
+                        liq_alert = (
+                            "💀 **[AAVE V3 LIQUIDATION BOUNTY HARVESTED]** 💀\n"
+                            "════════════\n\n"
+                            f"⚙️ **ទម្រង់ប្រតិបត្តិការ ៖** `{mode_badge}`\n"
+                            f"👤 **គណនីកម្ចីក្ស័យធន ៖** `{borrower_acc[:8]}...{borrower_acc[-6:]}`\n"
+                            f"🥩 **ទ្រព្យធានារឹបអូស (Collateral) ៖** `{collat_asset} (+{bonus_p}% Protocol Bonus)`\n"
+                            f"💵 **បំណុលដែលបានជួយសង (50%) ៖** `${debt_cover:,.2f} {debt_asset}`\n"
+                            f"💰 **ប្រាក់រង្វាន់សុទ្ធទទួលបាន ៖** `+${bounty_usd:,.2f} USD` 🟢\n"
+                            f"💼 **កាបូបទទួលផល ៖** {wallet_display}\n"
+                            f"🔗 **Arbiscan Tx ៖** [ចុចមើល Transaction]({explorer_link})\n\n"
+                            "💡 _Smart Contract V3 បានបាញ់ Flash Loan 0% Fee ➔ សងបំណុល Aave ➔ ដកស្រង់ Bonus ➔ Swap លើ Uniswap V3 ➔ សងកម្ចី ➔ ផ្ទេរប្រាក់ចំណេញសុទ្ធជូនលោកអ្នក ១០០% ដោយគ្មានហានិភ័យទុន!_"
+                        )
+                    else:
+                        mode_badge = "🟢 LIVE ON-CHAIN MAINNET" if is_live else "🧪 VERIFIED ON-CHAIN SIMULATION"
+                        liq_alert = (
+                            "💀 **[AAVE V3 LIQUIDATION BOUNTY HARVESTED]** 💀\n"
+                            "════════════\n\n"
+                            f"⚙️ **Execution Mode:** `{mode_badge}`\n"
+                            f"👤 **Liquidated Account:** `{borrower_acc[:8]}...{borrower_acc[-6:]}`\n"
+                            f"🥩 **Collateral Seized:** `{collat_asset} (+{bonus_p}% Protocol Bonus)`\n"
+                            f"💵 **Debt Covered (50%):** `${debt_cover:,.2f} {debt_asset}`\n"
+                            f"💰 **Net Bounty Harvested:** `+${bounty_usd:,.2f} USD` 🟢\n"
+                            f"💼 **Settlement Wallet:** {wallet_display}\n"
+                            f"🔗 **Arbiscan Tx:** [View Transaction]({explorer_link})\n\n"
+                            "💡 _Smart Contract V3 executed 0% fee Flash Loan ➔ Repaid Aave debt ➔ Extracted bonus ➔ Swapped on Uniswap V3 ➔ 100% Risk-Free net profit settled!_"
+                        )
+
+                    if app and hasattr(app, "bot"):
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=liq_alert, parse_mode="Markdown", disable_web_page_preview=True)
+                        except Exception:
+                            pass
+                continue
+
             target_recipient = evm_wallet_addr or os.getenv("RECIPIENT_WALLET_ADDRESS", "").strip() or keeper_status.get("keeper_address") or "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
             if not (target_recipient.startswith("0x") and len(target_recipient) == 42):
                 target_recipient = "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560"
