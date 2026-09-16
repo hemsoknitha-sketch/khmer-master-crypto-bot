@@ -876,7 +876,177 @@ async def check_crypto_news(app: Application, ai_engine):
                     elif raw_l in ['zh', 'chinese', 'cn']: user_l = 'chinese'
                     else: user_l = 'english'
 
-                    # 1. Compose alert text with Invariant 13 Mobile-Fit Dividers (━━━━━━━━━━━━)
+                    # 1. Check & Execute 24/7 Automated Trading First
+                    auto_trade_state = None  # None, "EXECUTED", "BLOCKED_RSI", "INSUFFICIENT_BAL"
+                    exec_info = {}
+                    try:
+                        config = db.get_auto_trade_config(chat_id)
+                        if config and config.get("enabled") and score >= 8:
+                            if db.can_user_buy(chat_id):
+                                keys = db.get_user_api(chat_id)
+                                if keys:
+                                    api_key, api_secret = keys
+                                    trade_amount = float(config.get("amount", 30.0))
+                                    trailing_pct = float(config.get("trailing_pct", 2.5))
+                                    user_lev = 10  # Small capital protection clamp (Invariant 8)
+
+                                    if trade_side == "SELL":
+                                        fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
+                                        trade_amount = min(trade_amount, fut_bal)
+                                        if trade_amount >= 5.0:
+                                            # 🛡️ Anti-Oversold Short Guard for News Auto-Trade (Invariant 16)
+                                            rsi_val = await asyncio.to_thread(market_data.get_symbol_rsi, target_sym, "15m")
+                                            if rsi_val <= 42.0:
+                                                print(f"🛑 [NEWS AUTO-TRADE OVERSOLD SHORT GUARD] {target_sym}: 15m RSI {rsi_val:.1f} <= 42.0. Aborting news auto-short!")
+                                                auto_trade_state = "BLOCKED_RSI"
+                                                exec_info = {"rsi": rsi_val, "symbol": target_sym}
+                                            else:
+                                                res = await asyncio.to_thread(
+                                                    trading_engine.place_futures_short,
+                                                    api_key, api_secret, target_sym, trade_amount, user_lev
+                                                )
+                                                if res and "error" not in str(res).lower():
+                                                    entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
+                                                    if entry_price == 0.0:
+                                                        entry_price = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
+                                                    qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
+                                                    if qty > 0 and entry_price > 0:
+                                                        db.add_active_trade(chat_id, target_sym, qty, entry_price, trailing_pct)
+                                                    auto_trade_state = "EXECUTED"
+                                                    exec_info = {
+                                                        "engine": "/auto_trade (Futures Short)",
+                                                        "symbol": target_sym,
+                                                        "amount": trade_amount,
+                                                        "leverage": user_lev,
+                                                        "price": entry_price,
+                                                        "trailing": trailing_pct
+                                                    }
+                                    elif trade_side == "BUY":
+                                        trade_amount = max(10.50, trade_amount)  # Spot MIN_NOTIONAL floor (Invariant 1)
+                                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
+                                        if spot_bal >= trade_amount:
+                                            res = await asyncio.to_thread(
+                                                trading_engine.place_market_buy,
+                                                api_key, api_secret, target_sym, trade_amount
+                                            )
+                                            if res and "error" not in str(res).lower():
+                                                buy_price = float(res.get("price", 0.0))
+                                                if buy_price == 0.0:
+                                                    buy_price = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
+                                                qty = float(res.get("origQty", 0.0))
+                                                if qty > 0 and buy_price > 0:
+                                                    db.add_active_trade(chat_id, target_sym, qty, buy_price, trailing_pct)
+                                                auto_trade_state = "EXECUTED"
+                                                exec_info = {
+                                                    "engine": "/auto_trade (Spot Buy / Zero Liquidation)",
+                                                    "symbol": target_sym,
+                                                    "amount": trade_amount,
+                                                    "leverage": 1,
+                                                    "price": buy_price,
+                                                    "trailing": trailing_pct
+                                                }
+                                    elif trade_side == "HEDGE":
+                                        # 🛡️ Delta-Neutral 0% Risk Hedge Auto-Pilot
+                                        import turbo_hedge_engine
+                                        fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
+                                        hedge_amt = min(trade_amount, fut_bal)
+                                        if hedge_amt >= 5.0:
+                                            res = await asyncio.to_thread(
+                                                turbo_hedge_engine.execute_turbo_hedge_trade,
+                                                api_key, api_secret, target_sym, hedge_amt, side="HEDGE", leverage=user_lev, chat_id=chat_id
+                                            )
+                                            if res and res.get("status") not in ["error", "skipped"]:
+                                                curr_p = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
+                                                auto_trade_state = "EXECUTED"
+                                                exec_info = {
+                                                    "engine": "/turbo_hedge (Delta-Neutral 0% Risk)",
+                                                    "symbol": target_sym,
+                                                    "amount": hedge_amt,
+                                                    "leverage": user_lev,
+                                                    "price": curr_p,
+                                                    "trailing": trailing_pct
+                                                }
+                    except Exception as e_auto:
+                        print(f"⚠️ [NEWS AUTO-TRADE NOTICE for {chat_id}]: {e_auto}")
+
+                    # 2. Build Execution / Action Section
+                    if auto_trade_state == "EXECUTED":
+                        if user_l == 'khmer':
+                            action_section = (
+                                f"⚡ **ស្ថានភាពប្រតិបត្តិការស្វ័យប្រវត្តិ (24/7 AUTO-PILOT EXECUTION) ៖**\n"
+                                f"• **ស្ថានភាព ៖** 🟢 `បានបើកដំណើរការវិនិយោគ AUTO រួចរាល់ដោយជោគជ័យ!`\n"
+                                f"• **មុខងារ (Engine) ៖** `{exec_info.get('engine')}`\n"
+                                f"• **ទ្រព្យសកម្ម (Symbol) ៖** `{exec_info.get('symbol')}`\n"
+                                f"• **ទំហំទុន & Leverage ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x ISOLATED`\n"
+                                f"• **តម្លៃចូល (Entry Price) ៖** `${exec_info.get('price', 0):,.4f}`\n"
+                                f"• **ការពារហានិភ័យ ៖** `Dynamic Trailing Lock (+0.12% Net Floor)`\n\n"
+                                f"💡 _ប្រព័ន្ធបានចាប់ឱកាស និងបើក Position ជូនស្វ័យប្រវត្តិភ្លាមៗ មិនបាច់រង់ចាំចុចឡើយ!_"
+                            )
+                        elif user_l == 'chinese':
+                            action_section = (
+                                f"⚡ **自动跟单执行状态 (24/7 AUTO-PILOT EXECUTION) ៖**\n"
+                                f"• **状态 ៖** 🟢 `已自动成功建仓完毕!`\n"
+                                f"• **执行引擎 ៖** `{exec_info.get('engine')}`\n"
+                                f"• **目标资产 ៖** `{exec_info.get('symbol')}`\n"
+                                f"• **资金规模 & 杠杆 ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x 逐仓`\n"
+                                f"• **入场价格 ៖** `${exec_info.get('price', 0):,.4f}`\n"
+                                f"• **风控体系 ៖** `动态追踪止盈锁利 (+0.12% 净利润底线)`\n\n"
+                                f"💡 _AI 已毫秒级全自动抢跑建仓，无需手动点击确认!_"
+                            )
+                        else:
+                            action_section = (
+                                f"⚡ **24/7 AUTO-PILOT EXECUTION STATUS ៖**\n"
+                                f"• **Status ៖** 🟢 `Automated Position Opened Successfully!`\n"
+                                f"• **Engine ៖** `{exec_info.get('engine')}`\n"
+                                f"• **Symbol ៖** `{exec_info.get('symbol')}`\n"
+                                f"• **Capital & Leverage ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x ISOLATED`\n"
+                                f"• **Entry Price ៖** `${exec_info.get('price', 0):,.4f}`\n"
+                                f"• **Risk Shield ៖** `Dynamic Trailing Lock (+0.12% Net Profit Floor)`\n\n"
+                                f"💡 _AI has executed the trade on your behalf without manual waiting!_"
+                            )
+                    elif auto_trade_state == "BLOCKED_RSI":
+                        if user_l == 'khmer':
+                            action_section = (
+                                f"🛡️ **ការការពារហានិភ័យស្វ័យប្រវត្តិ (RISK SHIELD TRIGGERED) ៖**\n"
+                                f"• **ស្ថានភាព ៖** ⚠️ `ផ្អាកការបើក Short ដោយស្វ័យប្រវត្តិ`\n"
+                                f"• **មូលហេតុ ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) ស្ថិតក្នុងតំបន់ Oversold (ហានិភ័យ Short Squeeze)`\n"
+                                f"• **ការពារដើមទុន ៖** `អនុលោមតាមក្បួន Invariant 16 មិនលក់បាតទីផ្សារដាច់ខាត`"
+                            )
+                        elif user_l == 'chinese':
+                            action_section = (
+                                f"🛡️ **风控防线已拦截 (RISK SHIELD TRIGGERED) ៖**\n"
+                                f"• **状态 ៖** ⚠️ `已自动拦截本次做空`\n"
+                                f"• **原因 ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) 处于超卖底部 (防空头挤压 Short Squeeze)`\n"
+                                f"• **资产保护 ៖** `坚决执行 Invariant 16 绝不在恐慌底部追空`"
+                            )
+                        else:
+                            action_section = (
+                                f"🛡️ **AUTO-TRADE RISK SHIELD TRIGGERED ៖**\n"
+                                f"• **Status ៖** ⚠️ `Automated Short Suppressed`\n"
+                                f"• **Reason ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) is oversold (Short Squeeze Risk)`\n"
+                                f"• **Capital Shield ៖** `Invariant 16: Zero bottom selling in panic zones`"
+                            )
+                    else:
+                        if user_l == 'khmer':
+                            action_section = (
+                                f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _បើក /auto_trade ON 30 ឬ /turbo_hedge ON 50 ដើម្បីឱ្យ AI ចូលជួញដូរស្វ័យប្រវត្តិភ្លាមៗពេលមានដំណឹង!_"
+                            )
+                        elif user_l == 'chinese':
+                            action_section = (
+                                f"👉 **一键快捷执行 ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _开启 /auto_trade ON 30 或 /turbo_hedge ON 50 即可享受新闻毫秒级自动建仓!_"
+                            )
+                        else:
+                            action_section = (
+                                f"👉 **1-Tap Action Execution ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _Enable /auto_trade ON 30 or /turbo_hedge ON 50 for instant automated news trading!_"
+                            )
+
+                    # 3. Compose Final Alert Message with Invariant 13 Dividers
                     if user_l == 'khmer':
                         alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
                         alert_msg += f"{DIVIDER_HEAVY}\n"
@@ -889,8 +1059,7 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"• **ទិសដៅទីផ្សារ (Market Bias) ៖** {market_bias_km}\n"
                         alert_msg += f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{win_rate}%`\n"
                         alert_msg += f"• **ទ្រព្យសកម្មគោលដៅ ៖** `{target_sym}`\n\n"
-                        alert_msg += "👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
-                        alert_msg += f"`` `{footnote_cmd}` ``\n\n"
+                        alert_msg += f"{action_section}\n\n"
                         alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({link})"
                     elif user_l == 'chinese':
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -905,8 +1074,7 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"• **市场偏向 (Market Bias) ៖** {market_bias_zh}\n"
                         alert_msg += f"• **AI 胜率置信度 ៖** `{win_rate}%`\n"
                         alert_msg += f"• **目标资产 ៖** `{target_sym}`\n\n"
-                        alert_msg += "👉 **一键快捷执行 ៖**\n"
-                        alert_msg += f"`` `{footnote_cmd}` ``\n\n"
+                        alert_msg += f"{action_section}\n\n"
                         alert_msg += f"🔗 [阅读完整新闻]({link})"
                     else:
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -921,79 +1089,10 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"• **Market Bias ៖** {market_bias_en}\n"
                         alert_msg += f"• **AI Confidence Win Rate ៖** `{win_rate}%`\n"
                         alert_msg += f"• **Target Asset ៖** `{target_sym}`\n\n"
-                        alert_msg += "👉 **1-Tap Action Execution ៖**\n"
-                        alert_msg += f"`` `{footnote_cmd}` ``\n\n"
+                        alert_msg += f"{action_section}\n\n"
                         alert_msg += f"🔗 [Read Full Article]({link})"
 
-                    # 2. Hands-Free 24/7 Automated Investing for Auto-Trade Users
-                    auto_trade_note = ""
-                    try:
-                        config = db.get_auto_trade_config(chat_id)
-                        if config and config.get("enabled") and score >= 8:
-                            if db.can_user_buy(chat_id):
-                                keys = db.get_user_api(chat_id)
-                                if keys:
-                                    api_key, api_secret = keys
-                                    trade_amount = float(config.get("amount", 30.0))
-                                    trailing_pct = float(config.get("trailing_pct", 2.5))
-                                    user_lev = 10 # Small capital protection clamp (Invariant 8)
-
-                                    if trade_side == "SELL":
-                                        fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
-                                        trade_amount = min(trade_amount, fut_bal)
-                                        if trade_amount >= 5.0:
-                                            # 🛡️ Anti-Oversold Short Guard for News Auto-Trade
-                                            rsi_val = await asyncio.to_thread(market_data.get_symbol_rsi, target_sym, "15m")
-                                            if rsi_val <= 42.0:
-                                                print(f"🛑 [NEWS AUTO-TRADE OVERSOLD SHORT GUARD] {target_sym}: 15m RSI {rsi_val:.1f} <= 42.0. Aborting news auto-short!")
-                                                auto_trade_note = (
-                                                    f"\n\n🛡️ **ស្វ័យប្រវត្តិកិច្ចសន្យាត្រូវបានផ្អាក (Risk Shield Triggered) ៖**\n"
-                                                    f"⚠️ មិនបើក Short `{target_sym}` ឡើយ ព្រោះ RSI 15m ({rsi_val:.1f}) ស្ថិតក្នុងតំបន់ Oversold Bottom ខ្លាចរងគ្រោះដោយសារ Short Squeeze!"
-                                                ) if user_l == 'khmer' else (
-                                                    f"\n\n🛡️ **Auto-Short Suppressed (Risk Shield) ៖**\n"
-                                                    f"⚠️ Auto Short `{target_sym}` blocked because 15m RSI ({rsi_val:.1f}) is oversold (Short Squeeze Risk)!"
-                                                )
-                                            else:
-                                                res = await asyncio.to_thread(
-                                                    trading_engine.place_futures_short,
-                                                    api_key, api_secret, target_sym, trade_amount, user_lev
-                                                )
-                                                if res and "error" not in str(res).lower():
-                                                    entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
-                                                    qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
-                                                    if qty > 0 and entry_price > 0:
-                                                        db.add_active_trade(chat_id, target_sym, qty, entry_price, trailing_pct)
-                                                    auto_trade_note = (
-                                                        f"\n\n⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យាជួញដូរ (24/7 Auto-Pilot Executed) ៖**\n"
-                                                        f"✅ បានបើកកិច្ចសន្យា Short `{target_sym}` (${trade_amount:.2f} USDT | {user_lev}x Lev | Trailing SL {trailing_pct}%) ដោយស្វ័យប្រវត្តិតាមស្ថាប័នជោគជ័យ!"
-                                                    ) if user_l == 'khmer' else (
-                                                        f"\n\n⚡ **24/7 Auto-Pilot Executed ៖**\n"
-                                                        f"✅ Automated Short `{target_sym}` (${trade_amount:.2f} | {user_lev}x Lev | {trailing_pct}% Trailing SL) triggered successfully!"
-                                                    )
-                                    elif trade_side == "BUY":
-                                        trade_amount = max(10.50, trade_amount) # Spot MIN_NOTIONAL floor (Invariant 1)
-                                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
-                                        if spot_bal >= trade_amount:
-                                            res = await asyncio.to_thread(
-                                                trading_engine.place_market_buy,
-                                                api_key, api_secret, target_sym, trade_amount
-                                            )
-                                            if res and "error" not in str(res).lower():
-                                                buy_price = float(res.get("price", 0.0))
-                                                qty = float(res.get("origQty", 0.0))
-                                                if qty > 0 and buy_price > 0:
-                                                    db.add_active_trade(chat_id, target_sym, qty, buy_price, trailing_pct)
-                                                auto_trade_note = (
-                                                    f"\n\n⚡ **ស្វ័យប្រវត្តិកិច្ចសន្យាជួញដូរ (24/7 Auto-Pilot Executed) ៖**\n"
-                                                    f"✅ បានបើកកិច្ចសន្យា Spot Buy `{target_sym}` (${trade_amount:.2f} USDT) ដោយស្វ័យប្រវត្តិតាមស្ថាប័នជោគជ័យ!"
-                                                ) if user_l == 'khmer' else (
-                                                    f"\n\n⚡ **24/7 Auto-Pilot Executed ៖**\n"
-                                                    f"✅ Automated Spot Buy `{target_sym}` (${trade_amount:.2f}) triggered successfully!"
-                                                )
-                    except Exception as e_auto:
-                        print(f"⚠️ [NEWS AUTO-TRADE NOTICE for {chat_id}]: {e_auto}")
-
-                    return alert_msg + auto_trade_note
+                    return alert_msg
 
                 await parallel_broadcast(app, vip_users_lang, process_news_alert_and_auto_trade, photo_path=image_url, reply_markup=news_kb)
     except Exception as e:
