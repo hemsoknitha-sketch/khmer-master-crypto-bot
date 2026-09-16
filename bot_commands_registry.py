@@ -34,6 +34,7 @@ def get_public_bot_commands():
         BotCommand("compound_grid", "📈 100% Spot Snowball Compound Grid"),
         BotCommand("infinity_matrix", "♾️ 100% Spot Dynamic Fibonacci Matrix"),
         BotCommand("smart_trade", "💎 Institutional Spot Auto Accumulator"),
+        BotCommand("spot_harvest", "🏦 Auto Spot Profit Wealth Harvester"),
 
         # --- [3] FUTURES & HEDGE ENGINES (Delta-Neutral & Precision Execution) ---
         BotCommand("turbo_hedge", "🛡️ Institutional Dual-Side Delta-Neutral Hedge"),

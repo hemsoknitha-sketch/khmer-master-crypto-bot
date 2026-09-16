@@ -1912,6 +1912,17 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             db.record_symbiotic_micro_profit(chat_id, symbol, real_pnl_usdt)
             hist_qty = abs(position_amt) if (position_amt and abs(position_amt) > 0) else (amount / entry_price if entry_price > 0 else amount)
             db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, hist_qty, real_pnl_usdt, roi_pct, reason_tag)
+
+            # 🏦 SUPER SMART OPTION B: Auto Spot Profit Harvester Hook (Sweeps Futures Profits >= $10 into Spot BTC/PAXG)
+            if real_pnl_usdt > 0:
+                try:
+                    import spot_profit_harvester
+                    asyncio.create_task(asyncio.to_thread(
+                        spot_profit_harvester.check_and_harvest_futures_profit,
+                        chat_id, keys[0], keys[1], real_pnl_usdt, app
+                    ))
+                except Exception as h_err:
+                    print(f"⚠️ [AUTO SPOT PROFIT HARVEST TRIGGER ERROR] {h_err}")
         else:
             print(f"⚠️ [PROFIT HARVEST RETRY] Market close for {symbol} failed. Retrying harvest on next loop...")
 

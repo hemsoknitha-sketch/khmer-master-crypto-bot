@@ -5029,3 +5029,124 @@ def get_all_active_smart_swap_autopilots() -> list:
                 pass
     return active
 
+
+def record_spot_wealth_harvest(chat_id: int, target_symbol: str, amount_usdt: float, qty_bought: float, price: float, tx_id: str = "") -> bool:
+    """
+    Records an automated Spot Profit Wealth Harvest transaction in SQLite.
+    Stores historical record of Futures profits converted into long-term Spot assets (BTC/PAXG).
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS spot_wealth_harvests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            symbol TEXT,
+            amount_usdt REAL,
+            qty REAL,
+            price REAL,
+            tx_id TEXT,
+            timestamp TEXT
+        )''')
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''INSERT INTO spot_wealth_harvests 
+            (chat_id, symbol, amount_usdt, qty, price, tx_id, timestamp) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)''',
+            (chat_id, target_symbol, amount_usdt, qty_bought, price, str(tx_id), now_str)
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error recording spot wealth harvest: {e}")
+        return False
+
+
+def get_spot_wealth_harvest_history(chat_id: int, limit: int = 20) -> list:
+    """
+    Retrieves the list of Spot Wealth Harvest transactions for a user.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS spot_wealth_harvests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            symbol TEXT,
+            amount_usdt REAL,
+            qty REAL,
+            price REAL,
+            tx_id TEXT,
+            timestamp TEXT
+        )''')
+        cursor.execute('''SELECT symbol, amount_usdt, qty, price, tx_id, timestamp 
+            FROM spot_wealth_harvests 
+            WHERE chat_id = ? 
+            ORDER BY id DESC LIMIT ?''', (chat_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        results = []
+        for r in rows:
+            results.append({
+                "symbol": r[0],
+                "amount_usdt": r[1],
+                "qty": r[2],
+                "price": r[3],
+                "tx_id": r[4],
+                "timestamp": r[5]
+            })
+        return results
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error fetching spot wealth harvest history: {e}")
+        return []
+
+
+def get_total_spot_wealth_harvested(chat_id: int) -> dict:
+    """
+    Computes total USD value, total BTC, and total PAXG harvested into Spot wallet for a user.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS spot_wealth_harvests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            symbol TEXT,
+            amount_usdt REAL,
+            qty REAL,
+            price REAL,
+            tx_id TEXT,
+            timestamp TEXT
+        )''')
+        cursor.execute('''SELECT symbol, SUM(amount_usdt), SUM(qty), COUNT(*) 
+            FROM spot_wealth_harvests 
+            WHERE chat_id = ? 
+            GROUP BY symbol''', (chat_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        total_usd = 0.0
+        btc_qty = 0.0
+        paxg_qty = 0.0
+        harvest_count = 0
+        
+        for r in rows:
+            sym, sum_usd, sum_qty, count = r[0], float(r[1] or 0.0), float(r[2] or 0.0), int(r[3] or 0)
+            total_usd += sum_usd
+            harvest_count += count
+            if "BTC" in sym:
+                btc_qty += sum_qty
+            elif "PAXG" in sym or "GOLD" in sym:
+                paxg_qty += sum_qty
+                
+        return {
+            "total_usd": round(total_usd, 2),
+            "btc_qty": round(btc_qty, 8),
+            "paxg_qty": round(paxg_qty, 6),
+            "harvest_count": harvest_count
+        }
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error getting total spot wealth harvested: {e}")
+        return {"total_usd": 0.0, "btc_qty": 0.0, "paxg_qty": 0.0, "harvest_count": 0}
+
+

@@ -40,6 +40,7 @@ import localization as loc
 import security
 import trading_engine
 import ui_standards
+import spot_profit_harvester
 
 def mask_sensitive_data(text: str) -> str:
     """Masks API keys and PINs from user commands before logging."""
@@ -5427,6 +5428,66 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await auto_trade_command(update, context)
+            elif data in ["btn_spot_harvest_toggle", "btn_spot_harvest_btc", "btn_spot_harvest_paxg", "btn_spot_harvest_dyn", "btn_spot_harvest_now"] or data.startswith("btn_spot_harvest_"):
+                import spot_profit_harvester
+                if data == "btn_spot_harvest_toggle":
+                    cfg = spot_profit_harvester.get_user_harvest_config(chat_id)
+                    cur_en = bool(cfg.get("enabled", True))
+                    spot_profit_harvester.set_user_harvest_config(chat_id, enabled=not cur_en)
+                    toast = "🟢 Auto Spot Harvest: បានបើកដំណើរការ!" if not cur_en else "🛑 Auto Spot Harvest: ត្រូវបានបិទ!"
+                    try:
+                        await update.callback_query.answer(toast)
+                    except Exception:
+                        pass
+                    context.args = []
+                    await spot_harvest_command(update, context)
+                elif data == "btn_spot_harvest_btc":
+                    spot_profit_harvester.set_user_harvest_config(chat_id, target_asset="BTC")
+                    try:
+                        await update.callback_query.answer("🪙 កំណត់គោលដៅសន្សំ ៖ BTC (Digital Gold)")
+                    except Exception:
+                        pass
+                    context.args = []
+                    await spot_harvest_command(update, context)
+                elif data == "btn_spot_harvest_paxg":
+                    spot_profit_harvester.set_user_harvest_config(chat_id, target_asset="PAXG")
+                    try:
+                        await update.callback_query.answer("🥇 កំណត់គោលដៅសន្សំ ៖ PAXG (Physical Gold LBMA)")
+                    except Exception:
+                        pass
+                    context.args = []
+                    await spot_harvest_command(update, context)
+                elif data == "btn_spot_harvest_dyn":
+                    spot_profit_harvester.set_user_harvest_config(chat_id, target_asset="DYNAMIC")
+                    try:
+                        await update.callback_query.answer("⚖️ កំណត់គោលដៅសន្សំ ៖ DYNAMIC (BTC/Gold Ratio Macro Auto-Select)")
+                    except Exception:
+                        pass
+                    context.args = []
+                    await spot_harvest_command(update, context)
+                elif data == "btn_spot_harvest_now":
+                    try:
+                        await update.callback_query.answer("⚡ កំពុងដកចំណេញទិញ Spot...")
+                    except Exception:
+                        pass
+                    keys = db.get_user_api(chat_id)
+                    if keys:
+                        res = await asyncio.to_thread(
+                            spot_profit_harvester.check_and_harvest_futures_profit,
+                            chat_id, keys[0], keys[1], realized_pnl=0.0, app=self.app, force=True
+                        )
+                        if res.get("status") != "success":
+                            reason = res.get("error", res.get("reason", "Threshold not met"))
+                            txt = f"ℹ️ មិនទាន់ដល់លក្ខខណ្ឌសន្សំ ៖ {reason}" if user_lang == 'km' else f"ℹ️ Harvest condition not met: {reason}"
+                            try:
+                                await update.callback_query.answer(txt, show_alert=True)
+                            except Exception:
+                                pass
+                    context.args = []
+                    await spot_harvest_command(update, context)
+                else:
+                    context.args = []
+                    await spot_harvest_command(update, context)
             elif data.startswith("btn_hyper_trade_"):
                 act = "ON" if "on" in data else "OFF"
                 context.args = [act]
@@ -13449,6 +13510,215 @@ class TelegramBotThread(BaseThread):
             context.args = []
             return await smart_trade_command(update, context)
 
+        async def spot_harvest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit(): user_lang = 'km'
+            elif user_lang in ['en', 'english']: user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']: user_lang = 'zh'
+            else: user_lang = 'km'
+
+            args = context.args or []
+            msg_target = update.effective_message or update.message
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import spot_profit_harvester
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
+
+            if args:
+                subcmd = str(args[0]).upper().strip()
+                if subcmd in ["ON", "START", "ENABLE", "TRUE"]:
+                    cfg = spot_profit_harvester.set_user_harvest_config(chat_id, enabled=True)
+                    tgt = cfg.get("target_asset", "DYNAMIC")
+                    succ_msg = (
+                        f"🟢 **AUTO SPOT PROFIT HARVESTER ACTIVATED!** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"• **ស្ថានភាព (Status)** ៖ `🟢 ACTIVE (ដំណើរការ)`\n"
+                        f"• **គោលដៅសន្សំ (Target)** ៖ `{tgt} (Spot Wallet)`\n"
+                        f"• **លក្ខខណ្ឌដកចំណេញ (Threshold)** ៖ `≥ $10.00 USDT`\n"
+                        f"• **សុវត្ថិភាពទុន (Risk)** ៖ `0.00% Liquidation Risk (Spot HODL)`\n\n"
+                        f"💡 _រាល់ពេល Futures កើបចំណេញបាន ≥ $10 USDT ប្រព័ន្ធនឹងដកចំណេញនោះដោយស្វ័យប្រវត្តិទៅទិញសន្សំ Spot {tgt} ទុកជាទ្រព្យសម្បត្តិយូរអង្វែង!_\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(succ_msg, parse_mode="Markdown")
+                    return
+
+                elif subcmd in ["OFF", "STOP", "DISABLE", "FALSE"]:
+                    spot_profit_harvester.set_user_harvest_config(chat_id, enabled=False)
+                    off_msg = (
+                        f"🛑 **AUTO SPOT PROFIT HARVESTER DEACTIVATED!** 🛑\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"• **ស្ថានភាព** ៖ `🔴 INACTIVE (បានបិទ)`\n"
+                        f"• **ចំណាំ** ៖ ប្រាក់ចំណេញពី Futures នឹងមិនត្រូវបានដកទៅទិញ Spot ដោយស្វ័យប្រវត្តិនោះឡើយ។\n\n"
+                        f"👉 _ដើម្បីបើកដំណើរការឡើងវិញ ៖_ `/spot_harvest ON`\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(off_msg, parse_mode="Markdown")
+                    return
+
+                elif subcmd in ["BTC", "BITCOIN"]:
+                    spot_profit_harvester.set_user_harvest_config(chat_id, target_asset="BTC")
+                    btc_msg = (
+                        f"🪙 **TARGET WEALTH ASSET SET TO BITCOIN (BTC)!** 🚀\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"• **ទ្រព្យគោលដៅ** ៖ `BTCUSDT (Digital Gold)`\n"
+                        f"• **យុទ្ធសាស្ត្រ** ៖ `100% Spot Asset Accumulation`\n"
+                        f"• **លក្ខខណ្ឌដកចំណេញ** ៖ `≥ $10.00 USDT`\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(btc_msg, parse_mode="Markdown")
+                    return
+
+                elif subcmd in ["PAXG", "GOLD"]:
+                    spot_profit_harvester.set_user_harvest_config(chat_id, target_asset="PAXG")
+                    paxg_msg = (
+                        f"🥇 **TARGET WEALTH ASSET SET TO PHYSICAL GOLD (PAXG)!** 🏆\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"• **ទ្រព្យគោលដៅ** ៖ `PAXGUSDT (LBMA Physical Gold in London Vaults)`\n"
+                        f"• **យុទ្ធសាស្ត្រ** ៖ `100% Spot Asset Accumulation`\n"
+                        f"• **លក្ខខណ្ឌដកចំណេញ** ៖ `≥ $10.00 USDT`\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(paxg_msg, parse_mode="Markdown")
+                    return
+
+                elif subcmd in ["DYNAMIC", "AUTO", "MACRO"]:
+                    spot_profit_harvester.set_user_harvest_config(chat_id, target_asset="DYNAMIC")
+                    dyn_msg = (
+                        f"⚖️ **TARGET WEALTH ASSET SET TO DYNAMIC RATIO!** 🧠\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                        f"• **ទ្រព្យគោលដៅ** ៖ `DYNAMIC (BTC / PAXG Gold Macro Auto-Selection)`\n"
+                        f"• **យុទ្ធសាស្ត្រ** ៖ `Auto-evaluate BTC/Gold Ratio (>35x -> PAXG, <20x -> BTC)`\n"
+                        f"• **លក្ខខណ្ឌដកចំណេញ** ៖ `≥ $10.00 USDT`\n\n"
+                        + ui_standards.OFFICIAL_FOOTNOTE
+                    )
+                    if msg_target:
+                        await msg_target.reply_text(dyn_msg, parse_mode="Markdown")
+                    return
+
+                elif subcmd in ["NOW", "SWEEP", "HARVEST", "FORCE"]:
+                    keys = db.get_user_api(chat_id)
+                    if not keys:
+                        if msg_target:
+                            await msg_target.reply_text("❌ សូមភ្ជាប់ API Key ជាមុនសិនតាមរយៈ `/add_api`!")
+                        return
+                    if msg_target:
+                        await msg_target.reply_text("⚡ **កំពុងត្រួតពិនិត្យប្រាក់ចំណេញ និងដកទិញ Spot ភ្លាមៗ...**", parse_mode="Markdown")
+                    h_res = await asyncio.to_thread(
+                        spot_profit_harvester.check_and_harvest_futures_profit,
+                        chat_id, keys[0], keys[1], realized_pnl=0.0, app=self.app, force=True
+                    )
+                    if h_res.get("status") == "success":
+                        sym = h_res.get("symbol", "BTCUSDT")
+                        amt = h_res.get("harvest_amount", 0.0)
+                        qty = h_res.get("qty_bought", 0.0)
+                        p_bought = h_res.get("price", 0.0)
+                        done_msg = (
+                            f"✅ **MANUAL SPOT PROFIT HARVEST COMPLETED!** 💎\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                            f"💵 **បានដកពី Futures ៖** `${amt:,.2f} USDT`\n"
+                            f"🪙 **ទិញសន្សំ Spot ៖** `+{qty:.6f} {sym.replace('USDT', '')}`\n"
+                            f"📈 **តម្លៃជាមធ្យម ៖** `${p_bought:,.2f} USDT`\n"
+                            f"🛡️ **Liquidation Risk ៖** `0.00% (100% Real Asset)`\n\n"
+                            + ui_standards.OFFICIAL_FOOTNOTE
+                        )
+                        if msg_target:
+                            await msg_target.reply_text(done_msg, parse_mode="Markdown")
+                    else:
+                        err_reason = h_res.get("error", h_res.get("reason", "No profit threshold met"))
+                        if msg_target:
+                            await msg_target.reply_text(f"ℹ️ **ស្ថានភាពដកចំណេញ ៖** `{err_reason}`", parse_mode="Markdown")
+                    return
+
+            # Default: Interactive Dashboard View
+            cfg = spot_profit_harvester.get_user_harvest_config(chat_id)
+            is_enabled = bool(cfg.get("enabled", True))
+            target_asset = str(cfg.get("target_asset", "DYNAMIC")).upper()
+            unharvested = float(cfg.get("unharvested_pool", 0.0))
+            total_usd = float(cfg.get("total_harvested_usd", 0.0))
+
+            totals = db.get_total_spot_wealth_harvested(chat_id)
+            btc_total = totals.get("btc_qty", 0.0)
+            paxg_total = totals.get("paxg_qty", 0.0)
+            cum_usd = totals.get("total_usd", total_usd)
+            count_h = totals.get("harvest_count", 0)
+
+            status_str = "🟢 ACTIVE (ដំណើរការស្វ័យប្រវត្តិ)" if is_enabled else "🔴 INACTIVE (បានបិទ)"
+
+            toggle_btn = (
+                InlineKeyboardButton("🔴 Turn OFF Harvester", callback_data="btn_spot_harvest_toggle")
+                if is_enabled else
+                InlineKeyboardButton("🟢 Turn ON Harvester", callback_data="btn_spot_harvest_toggle")
+            )
+            btc_btn = InlineKeyboardButton(f"{'✅ ' if target_asset == 'BTC' else ''}🪙 BTC (Bitcoin)", callback_data="btn_spot_harvest_btc")
+            paxg_btn = InlineKeyboardButton(f"{'✅ ' if target_asset in ['PAXG', 'GOLD'] else ''}🥇 PAXG (Gold)", callback_data="btn_spot_harvest_paxg")
+            dyn_btn = InlineKeyboardButton(f"{'✅ ' if target_asset == 'DYNAMIC' else ''}⚖️ Dynamic (Macro Auto)", callback_data="btn_spot_harvest_dyn")
+            now_btn = InlineKeyboardButton("⚡ Harvest Now (Manual Sweep)", callback_data="btn_spot_harvest_now")
+
+            keyboard = InlineKeyboardMarkup([
+                [toggle_btn, now_btn],
+                [btc_btn, paxg_btn],
+                [dyn_btn],
+                [
+                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar"),
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                ],
+                [
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            pool_pct = min(100.0, (unharvested / 10.00) * 100.0)
+
+            dashboard_card = (
+                f"🏦 **APEX AUTO SPOT PROFIT WEALTH HARVESTER** 💎\n"
+                f"{ui_standards.DIVIDER_DOUBLE}\n\n"
+                f"📊 **EXECUTIVE HARVESTER CONFIGURATION:**\n"
+                f"• **ស្ថានភាពប្រព័ន្ធ** ៖ {status_str}\n"
+                f"• **គោលដៅសន្សំ (Target)** ៖ `{target_asset}` (100% Spot)\n"
+                f"• **លក្ខខណ្ឌដកចំណេញ (Threshold)** ៖ `≥ $10.00 USDT`\n"
+                f"• **កម្រិតសន្សំពេលនេះ (Current Pool)** ៖ `${unharvested:,.2f} / $10.00 USDT` (`{pool_pct:.1f}%`)\n"
+                f"• **ហានិភ័យ Liquidation** ៖ `0.00% (Real Physical & Digital Assets)`\n\n"
+                f"📈 **ស្ថិតិទ្រព្យសម្បត្តិ Spot ដែលបានសន្សំសរុប (HODL):**\n"
+                f"• 🪙 **សរុប Bitcoin (BTC)** ៖ `{btc_total:.6f} BTC`\n"
+                f"• 🥇 **សរុប Physical Gold (PAXG)** ៖ `{paxg_total:.4f} PAXG`\n"
+                f"• 💰 **សរុបប្រាក់ចំណេញបានបង្វែរ** ៖ `${cum_usd:,.2f} USDT`\n"
+                f"• 🔄 **ចំនួនដង Harvested** ៖ `{count_h}` ដង\n\n"
+                f"📋 **1-TAP COPYABLE COMMANDS (ចុច Copy ភ្លាមៗ):**\n"
+                f"• បើកដំណើរការ ៖ `/spot_harvest ON`\n"
+                f"• បិទដំណើរការ ៖ `/spot_harvest OFF`\n"
+                f"• សន្សំតែ BTC ៖ `/spot_harvest BTC`\n"
+                f"• សន្សំតែ មាស PAXG ៖ `/spot_harvest PAXG`\n"
+                f"• សន្សំបែប Macro Dynamic ៖ `/spot_harvest DYNAMIC`\n"
+                f"• បញ្ជាដកចំណេញភ្លាមៗ ៖ `/spot_harvest NOW`\n"
+                f"• ឈ្មោះកាត់ Alias ៖ `/wealth_harvest`\n\n"
+                f"💡 _រាល់ពេល Futures កើបចំណេញបានលើសពី $10 USDT ប្រព័ន្ធនឹងដកចំណេញនោះដោយស្វ័យប្រវត្តិទៅទិញសន្សំ Spot BTC ឬ PAXG (មាស) ទុកក្នុងកាបូប Spot ដើម្បីបង្កើតជាទ្រព្យសម្បត្តិយូរអង្វែង!_\n\n"
+                + ui_standards.OFFICIAL_FOOTNOTE
+            )
+
+            if update.callback_query and update.callback_query.message:
+                try:
+                    await update.callback_query.edit_message_text(dashboard_card, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+                except Exception:
+                    pass
+            if msg_target:
+                await msg_target.reply_text(dashboard_card, parse_mode="Markdown", reply_markup=keyboard)
+            return
+
         async def auto_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -15985,6 +16255,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("scalp", scalp_command))
         self.app.add_handler(CommandHandler("auto_trade", auto_trade_command))
         self.app.add_handler(CommandHandler("autotrade", auto_trade_command))
+        self.app.add_handler(CommandHandler("spot_harvest", spot_harvest_command))
+        self.app.add_handler(CommandHandler("spotharvest", spot_harvest_command))
+        self.app.add_handler(CommandHandler("wealth_harvest", spot_harvest_command))
+        self.app.add_handler(CommandHandler("wealthharvest", spot_harvest_command))
 
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
         self.app.add_handler(CommandHandler("prepump", pre_pump_command))
