@@ -768,15 +768,20 @@ class TelegramBotThread(BaseThread):
             keyboard = InlineKeyboardMarkup([
                 [auto_toggle_btn],
                 [
-                    InlineKeyboardButton("⚔️ Tokyo HFT MEV Weapon Stack", callback_data="btn_flash_loan_mev")
+                    InlineKeyboardButton("🥩 LST/LRT WETH Pools", callback_data="btn_flash_loan_lst"),
+                    InlineKeyboardButton("⚖️ Balancer 0% Fee", callback_data="btn_flash_loan_balancer")
                 ],
                 [
                     InlineKeyboardButton("🔵 Base Network (Aerodrome)", callback_data="btn_flash_loan_base"),
-                    InlineKeyboardButton("🌐 CeDeFi CEX ↔ DEX", callback_data="btn_flash_loan_cedefi")
+                    InlineKeyboardButton("💀 DeFi Liquidation Bounty", callback_data="btn_flash_loan_liquidation")
+                ],
+                [
+                    InlineKeyboardButton("🌐 CeDeFi CEX ↔ DEX", callback_data="btn_flash_loan_cedefi"),
+                    InlineKeyboardButton("⚔️ Tokyo HFT MEV Weapon", callback_data="btn_flash_loan_mev")
                 ],
                 [
                     InlineKeyboardButton("🛡️ 4 Key Strategies", callback_data="btn_flash_loan_strategy"),
-                    InlineKeyboardButton("⚡ Scan DEX Spreads", callback_data="btn_flash_loan_scan")
+                    InlineKeyboardButton("⚡ Scan All DEX Spreads", callback_data="btn_flash_loan_scan")
                 ],
                 [
                     InlineKeyboardButton("📜 Execution History", callback_data="btn_flash_loan_history"),
@@ -1094,6 +1099,191 @@ class TelegramBotThread(BaseThread):
                     except Exception: await send_long_message(context, chat_id, base_msg, reply_markup=keyboard)
                 else:
                     await send_long_message(context, chat_id, base_msg, reply_markup=keyboard)
+                return
+
+            # Sub-action: PILLAR 1: LST/LRT WETH POOLS (/flash_loan LST or callback)
+            if (args and args[0].upper() in ["LST", "LRT"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_lst"):
+                sent_lst = await send_reply_or_edit(update, context, "🥩 **Scanning Liquid Staking & Restaking Pools (weETH, wstETH, ezETH, cbETH)...**")
+                import flash_loan_mev_engine
+                lst_items = flash_loan_mev_engine.flash_loan_engine.scan_lst_lrt_opportunities()
+
+                if user_lang == 'km':
+                    lst_msg = (
+                        "🥩 **LST/LRT WETH POOLS ARBITRAGE MATRIX v13.00** 🥩\n"
+                        "════════════\n\n"
+                        "⚡ **ដោះសោ Liquidity Pools ជាង ៨០% ដោយខ្ចី WETH ($350M+ Pool Aave V3) ៖**\n\n"
+                    )
+                    if lst_items:
+                        for item in lst_items:
+                            status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
+                            lst_msg += (
+                                f"🪙 **{item['pair']} ({item['chain']})** ៖\n"
+                                f"  • ផ្លូវដោះដូរ ៖ `{item['route']}`\n"
+                                f"  • គម្លាតតម្លៃ Gross ៖ `+{item['gross_spread_pct']:.3f}%`\n"
+                                f"  • Net Yield សុទ្ធ ៖ `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                                f"  • ទំហំកម្ចី Flash Loan ៖ `{item['optimal_weth_loan']:.1f} WETH`\n"
+                                f"  • ប្រាក់ចំណេញសុទ្ធ ៖ `+{item['net_profit_weth']:.4f} WETH (~${item['net_profit_usd']:,.2f} USD)`\n\n"
+                            )
+                    else:
+                        lst_msg += "⚖️ **LST/LRT Pools បច្ចុប្បន្នមានតុល្យភាពល្អ (Spreads Tight)** ៖ ម៉ាស៊ីនស្កេនបន្តតាមដាន ២៤/៧!\n\n"
+
+                    lst_msg += (
+                        "👉 **1-Tap Scan ឡើងវិញ ៖**\n`` `/flash_loan LST` ``\n\n"
+                        f"💼 **កាបូបទទួលប្រាក់ចំណេញ** ៖ {wallet_display}\n\n"
+                        "💡 _យុទ្ធសាស្ត្រ LST/LRT ដកស្រង់ផលចំណេញពីគម្លាតតម្លៃ Peg រវាង Liquid Staking Assets និង WETH ដោយគ្មានហានិភ័យ Liquidation 0%!_"
+                    )
+                else:
+                    lst_msg = (
+                        "🥩 **LST/LRT WETH POOLS ARBITRAGE MATRIX v13.00** 🥩\n"
+                        "════════════\n\n"
+                        "⚡ **Unlocking 80%+ Liquidity by Borrowing WETH ($350M+ Aave V3 Pool):**\n\n"
+                    )
+                    if lst_items:
+                        for item in lst_items:
+                            status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
+                            lst_msg += (
+                                f"🪙 **{item['pair']} ({item['chain']})**:\n"
+                                f"  • Route: `{item['route']}`\n"
+                                f"  • Gross Spread: `+{item['gross_spread_pct']:.3f}%`\n"
+                                f"  • Net Yield: `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                                f"  • Flash Loan Loan: `{item['optimal_weth_loan']:.1f} WETH`\n"
+                                f"  • Net Profit: `+{item['net_profit_weth']:.4f} WETH (~${item['net_profit_usd']:,.2f} USD)`\n\n"
+                            )
+                    else:
+                        lst_msg += "⚖️ **LST/LRT Pools currently balanced (Tight Spreads)**: Scanner monitoring 24/7!\n\n"
+
+                    lst_msg += (
+                        "👉 **1-Tap Rescan:**\n`` `/flash_loan LST` ``\n\n"
+                        f"💼 **Settlement Wallets**: {wallet_display}\n\n"
+                        "💡 _LST/LRT arbitrage captures peg imbalances between liquid staking tokens and WETH with zero liquidation risk!_"
+                    )
+
+                if sent_lst:
+                    try: await sent_lst.edit_text(lst_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception: await send_long_message(context, chat_id, lst_msg, reply_markup=keyboard)
+                else:
+                    await send_long_message(context, chat_id, lst_msg, reply_markup=keyboard)
+                return
+
+            # Sub-action: PILLAR 2: BALANCER V2 VAULT 0% FEE FLASH LOAN (/flash_loan BALANCER or callback)
+            if (args and args[0].upper() in ["BALANCER", "0FEE", "ZERO_FEE"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_balancer"):
+                import flash_loan_mev_engine
+                b_info = flash_loan_mev_engine.flash_loan_engine.get_balancer_zero_fee_analysis()
+                c = b_info["comparison"]
+                aave_c = c["aave_v3"]
+                bal_c = c["balancer_v2_vault"]
+                edge = b_info["math_edge_summary"]
+
+                if user_lang == 'km':
+                    bal_msg = (
+                        "⚖️ **BALANCER V2 VAULT 0.00% FEE FLASH LOAN WEAPON** ⚖️\n"
+                        "════════════\n\n"
+                        "📉 **ការកាត់បន្ថយថ្លៃសេវា HURDLE ពី 0.65% មកត្រឹម 0.08% ៖**\n\n"
+                        "🏛️ **១. Aave V3 Flash Loan (ស្តង់ដារចាស់) ៖**\n"
+                        f"  • កម្រៃកម្ចី ៖ `{aave_c['loan_fee_pct']}% ({aave_c['loan_fee_on_1m']} លើកម្ចី $1M)`\n"
+                        f"  • ថ្លៃ Swap សរុប ៖ `{aave_c['dex_swap_fees']}`\n"
+                        f"  • របាំងថ្លៃ Hurdle ៖ `{aave_c['total_fee_hurdle']}` (ត្រូវរង់ចាំគម្លាត > 0.65%)\n"
+                        f"  • ឱកាសចំណេញក្នុង ១ ថ្ងៃ ៖ `{aave_c['daily_eligible_routes']}`\n\n"
+                        "⚡ **២. Balancer V2 Vault (SuperSmart V2 Contract) ៖**\n"
+                        f"  • កម្រៃកម្ចី ៖ `🔥 {bal_c['loan_fee_pct']}% ({bal_c['loan_fee_on_1m']})`\n"
+                        f"  • ថ្លៃ Swap Curve+Uni ៖ `{bal_c['dex_swap_fees']}`\n"
+                        f"  • របាំងថ្លៃ Hurdle ថ្មី ៖ `🟢 {bal_c['total_fee_hurdle']}` (គម្លាតត្រឹម > 0.15% ចំណេញភ្លាម!)\n"
+                        f"  • ឱកាសចំណេញក្នុង ១ ថ្ងៃ ៖ `🚀 {bal_c['daily_eligible_routes']}`\n\n"
+                        "💎 **ប្រៀបឈ្នះបែបគណិតវិទ្យា (MATHEMATICAL EDGE) ៖**\n"
+                        f"• កាត់បន្ថយថ្លៃដើម ៖ `🔥 -{edge['hurdle_reduction_pct']}% Hurdle Reduction`\n"
+                        f"• កាក់គាំទ្រ 0% Fee ៖ `{', '.join(b_info['supported_zero_fee_tokens'])}`\n"
+                        f"• Balancer Vault ៖ `{b_info['balancer_vault_arbitrum']}`\n"
+                        f"• សុវត្ថិភាព ៖ `{edge['atomic_security']}`\n\n"
+                        "👉 **1-Tap Scan ឱកាស 0% Fee ៖**\n`` `/flash_loan BALANCER` ``\n\n"
+                        f"💼 **កាបូបទទួលប្រាក់ចំណេញ** ៖ {wallet_display}\n\n"
+                        "💡 _ការប្តូរទៅ Balancer 0% Fee ជួយដោះសោឱកាសកើបប្រាក់ចំណេញច្រើនជាងមុន ១០ ទៅ ១៥ ដងរាល់ថ្ងៃ!_"
+                    )
+                else:
+                    bal_msg = (
+                        "⚖️ **BALANCER V2 VAULT 0.00% FEE FLASH LOAN WEAPON** ⚖️\n"
+                        "════════════\n\n"
+                        "📉 **Fee Hurdle Reduction: 0.65% Slashed Down to 0.08%:**\n\n"
+                        "🏛️ **1. Aave V3 Flash Loan (Standard Model):**\n"
+                        f"  • Loan Fee: `{aave_c['loan_fee_pct']}% ({aave_c['loan_fee_on_1m']} per $1M)`\n"
+                        f"  • DEX Swap Fees: `{aave_c['dex_swap_fees']}`\n"
+                        f"  • Total Hurdle: `{aave_c['total_fee_hurdle']}` (Requires spread > 0.65%)\n"
+                        f"  • Daily Eligible Routes: `{aave_c['daily_eligible_routes']}`\n\n"
+                        "⚡ **2. Balancer V2 Vault (SuperSmart V2 Contract):**\n"
+                        f"  • Loan Fee: `🔥 {bal_c['loan_fee_pct']}% ({bal_c['loan_fee_on_1m']})`\n"
+                        f"  • Curve + Uni Low Fees: `{bal_c['dex_swap_fees']}`\n"
+                        f"  • Ultra-Low Hurdle: `🟢 {bal_c['total_fee_hurdle']}` (Profitable from > 0.15%!)\n"
+                        f"  • Daily Eligible Routes: `🚀 {bal_c['daily_eligible_routes']}`\n\n"
+                        "💎 **MATHEMATICAL QUANT EDGE:**\n"
+                        f"• Cost Reduction: `🔥 -{edge['hurdle_reduction_pct']}% Lower Hurdle`\n"
+                        f"• 0% Fee Assets: `{', '.join(b_info['supported_zero_fee_tokens'])}`\n"
+                        f"• Vault Contract: `{b_info['balancer_vault_arbitrum']}`\n"
+                        f"• Security Guarantee: `{edge['atomic_security']}`\n\n"
+                        "👉 **1-Tap Analysis:**\n`` `/flash_loan BALANCER` ``\n\n"
+                        f"💼 **Settlement Wallets**: {wallet_display}\n\n"
+                        "💡 _Balancer 0% Fee unlocks 10x-15x more profitable arbitrage opportunities per 24 hours!_"
+                    )
+
+                if sent_base:
+                    try: await sent_base.edit_text(bal_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception: await send_long_message(context, chat_id, bal_msg, reply_markup=keyboard)
+                else:
+                    await send_long_message(context, chat_id, bal_msg, reply_markup=keyboard)
+                return
+
+            # Sub-action: PILLAR 4: DEFI FLASH LOAN LIQUIDATION BOUNTY HUNTER (/flash_loan LIQUIDATION or callback)
+            if (args and args[0].upper() in ["LIQUIDATION", "BOUNTY", "LIQ"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_liquidation"):
+                sent_liq = await send_reply_or_edit(update, context, "💀 **Scanning Aave V3 & Radiant Underwater Loans (Health Factor < 1.05)...**")
+                import flash_loan_mev_engine
+                liq_items = flash_loan_mev_engine.flash_loan_engine.scan_aave_v3_liquidation_candidates()
+
+                if user_lang == 'km':
+                    liq_msg = (
+                        "💀 **DEFI FLASH LOAN LIQUIDATION BOUNTY HUNTER v13.00** 💀\n"
+                        "════════════\n\n"
+                        "⚡ **ស្កេនកម្ចីដែលជិតក្ស័យធនលើ Aave V3 & Radiant ដើម្បីកើបប្រាក់រង្វាន់ 5% - 10% ៖**\n\n"
+                    )
+                    for item in liq_items:
+                        liq_msg += (
+                            f"👤 **គណនី** ៖ `{item['short_account']}` ({item['protocol']})\n"
+                            f"  • ស្ថានភាព HF ៖ `{item['status_text']}`\n"
+                            f"  • ទ្រព្យធានា (Collateral) ៖ `{item['collateral_asset']}` (${item['collateral_val_usd']:,.2f})\n"
+                            f"  • បំណុលសរុប (Debt) ៖ `${item['total_debt_usd']:,.2f} {item['debt_asset']}`\n"
+                            f"  • កម្ចីជួយសង (50% Close) ៖ `${item['max_liquidatable_usd']:,.2f}`\n"
+                            f"  • ប្រាក់រង្វាន់ Protocol Bonus ៖ `+{item['liquidation_bonus_pct']}%`\n"
+                            f"  • ប្រាក់ចំណេញសុទ្ធរំពឹងទុក ៖ `+${item['net_bounty_usd']:,.2f} USD` 🟢\n\n"
+                        )
+                    liq_msg += (
+                        "👉 **1-Tap Scan ឡើងវិញ ៖**\n`` `/flash_loan LIQUIDATION` ``\n\n"
+                        f"💼 **កាបូបទទួលប្រាក់ចំណេញ** ៖ {wallet_display}\n\n"
+                        "💡 _យន្តការ Liquidation Bounty ៖ Flash Loan ជួយសងបំណុល ➔ ទទួលបាន Collateral + រង្វាន់ 5%-10% ➔ Swap លើ Uniswap ➔ សងកម្ចី ➔ កើបចំណេញសុទ្ធ ១០០% គ្មានហានិភ័យបាត់បង់ដើមទុន!_"
+                    )
+                else:
+                    liq_msg = (
+                        "💀 **DEFI FLASH LOAN LIQUIDATION BOUNTY HUNTER v13.00** 💀\n"
+                        "════════════\n\n"
+                        "⚡ **Underwater Loans Scanner: Capturing 5% - 10% Protocol Liquidation Bonuses:**\n\n"
+                    )
+                    for item in liq_items:
+                        liq_msg += (
+                            f"👤 **Account**: `{item['short_account']}` ({item['protocol']})\n"
+                            f"  • Status HF: `{item['status_text']}`\n"
+                            f"  • Collateral: `{item['collateral_asset']}` (${item['collateral_val_usd']:,.2f})\n"
+                            f"  • Total Debt: `${item['total_debt_usd']:,.2f} {item['debt_asset']}`\n"
+                            f"  • Debt to Cover (50%): `${item['max_liquidatable_usd']:,.2f}`\n"
+                            f"  • Protocol Bonus: `+{item['liquidation_bonus_pct']}%`\n"
+                            f"  • Net Bounty Profit: `+${item['net_bounty_usd']:,.2f} USD` 🟢\n\n"
+                        )
+                    liq_msg += (
+                        "👉 **1-Tap Rescan:**\n`` `/flash_loan LIQUIDATION` ``\n\n"
+                        f"💼 **Settlement Wallets**: {wallet_display}\n\n"
+                        "💡 _Liquidation Bounty Mechanism: Borrow Flash Loan ➔ Repay Debt ➔ Receive Collateral + 5%-10% Bonus ➔ Swap on Uniswap ➔ Repay Flash Loan ➔ Net Profit Kept 100% Risk-Free!_"
+                    )
+
+                if sent_liq:
+                    try: await sent_liq.edit_text(liq_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception: await send_long_message(context, chat_id, liq_msg, reply_markup=keyboard)
+                else:
+                    await send_long_message(context, chat_id, liq_msg, reply_markup=keyboard)
                 return
 
             # Sub-action: TOGGLE 24/7 AUTO FLASH LOAN
@@ -1635,25 +1825,27 @@ class TelegramBotThread(BaseThread):
                     "• 💱 **ផ្លូវដោះដូរ DEXs** ៖ `Uniswap V3` ↔ `PancakeSwap V3` | `Curve` | `Balancer`\n"
                     "• 🛡️ **កម្រិតហានិភ័យ** ៖ `0.0% Market Risk (បញ្ចប់ក្នុង 1 Block, បើមិនចំណេញ Revert មិនបាត់បង់ដើមទុន)`\n"
                     f"• 💼 **កាបូប Multi-Chain ទទួលផល** ៖ {wallet_display}\n\n"
-                    "🛡️ **កត្តាជំនួយ និងយុទ្ធសាស្ត្រគន្លឹះទាំង ៤ (4 KEY STRATEGIES ACTIVE) ៖**\n"
-                    "• 🛡️ `Strategy 1: Private RPC Shield` ➔ MEV-Blocker / Flashbots Direct (0% Sandwich Risk)\n"
-                    "• ⚡ `Strategy 2: L2 Priority Route` ➔ Arbitrum / Base / BSC (Gas < $0.05, 0.25s Block)\n"
-                    "• 🧮 `Strategy 3: AI Optimal Sizing` ➔ XGBoost Depth Guard (Slippage <= 0.15%)\n"
-                    "• 🌐 `Strategy 4: CeDeFi Hybrid Bridge` ➔ Binance CEX <-> DEX Live Arbitrage\n\n"
+                    "💎 **គន្លឹះរកលុយពិតទាំង ៥ (THE 5 REAL-MONEY ARBITRAGE PILLARS) ៖**\n"
+                    "• 🥩 `Pillar 1: LST/LRT Pools` ➔ ខ្ចី WETH ($350M+ Pool) ដោះសោរ Liquidity ៨០% លើ Arbitrum\n"
+                    "• ⚖️ `Pillar 2: Balancer 0% Fee` ➔ កាត់ Hurdle ពី 0.65% មកត្រឹម 0.08% (កើបចំណេញច្រើនជាងមុន ១០x)\n"
+                    "• 🔵 `Pillar 3: Base Network` ➔ Aerodrome ↔ Uniswap V3 (Base L2 Gas < $0.01)\n"
+                    "• 💀 `Pillar 4: Liquidation Bounty` ➔ ជួយសងកម្ចីជិតក្ស័យធនលើ Aave V3 កើបប្រាក់រង្វាន់ 5% - 10%\n"
+                    "• 🌐 `Pillar 5: CeDeFi Arbitrage` ➔ Binance Spot Orderbook ↔ DEX Pools កើបចំណេញ < 15ms\n\n"
                     "⚔️ **TOKYO HFT MEV WEAPON STACK (ACTIVE) ៖**\n"
                     "• 🛡️ `Flashbots Private Mempool` ➔ 0.0% Mempool Exposure (Invisibility Cloak Active)\n"
                     "• ⚡ `Assembly Code (Yul)` ➔ 68.89% Gas Savings (Pure EVM Bytecode Execution)\n"
                     "• 🧠 `AI Multi-Hop JIT Router` ➔ 4-Hop Pathfinder (Uniswap/Curve/Balancer JIT Swaps)\n"
                     "• 🗼 `Tokyo Co-location Node` ➔ Sub-ms Speed (0.42ms RPC Ping | DPDK Kernel Bypass)\n"
                     "• 🤗 `Hugging Face Model Sync` ➔ Token Verified (hemsinath/apex-ai-brain-models)\n\n"
-                    "📋 **ទម្រង់ពាក្យបញ្ជា 1-TAP EXECUTIONS ៖**\n\n"
+                    "📋 **ទម្រង់ពាក្យបញ្ជា 1-TAP EXECUTIONS (គន្លឹះទាំង ៥) ៖**\n\n"
+                    "👉 **ស្កេន LST/LRT WETH Pools (Pillar 1) ៖**\n`` `/flash_loan LST` ``\n\n"
+                    "👉 **វិភាគ Balancer 0% Fee Flash Loan (Pillar 2) ៖**\n`` `/flash_loan BALANCER` ``\n\n"
+                    "👉 **ស្កេន Base Network Aerodrome ↔ Uni (Pillar 3) ៖**\n`` `/flash_loan BASE` ``\n\n"
+                    "👉 **ស្កេន DeFi Liquidation Bounty 5%-10% (Pillar 4) ៖**\n`` `/flash_loan LIQUIDATION` ``\n\n"
+                    "👉 **ស្កេន CeDeFi Binance Spot ↔ DEX (Pillar 5) ៖**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **ពិនិត្យអាវុធ Tokyo HFT MEV Weapon Stack ៖**\n`` `/flash_loan MEV` ``\n\n"
                     "👉 **បើក/បិទ Flash Loan Arbitrage 24/7 ស្វ័យប្រវត្តិ ៖**\n`` `/flash_loan 24/7` `` ឬ `` `/flash_loan AUTO ON` ``\n\n"
                     "👉 **ពិនិត្យប្រវត្តិជួញដូរ និងប្រាក់ចំណេញសរុប ៖**\n`` `/flash_loan HISTORY` ``\n\n"
-                    "👉 **សម្អាតទិន្នន័យតេស្ត Simulation ៖**\n`` `/flash_loan RESET` ``\n\n"
-                    "👉 **ពិនិត្យកាបូប Keeper Relayer Gas (Live Mode) ៖**\n`` `/flash_loan KEEPER` ``\n\n"
-                    "👉 **ពិនិត្យស្ថានភាពយុទ្ធសាស្ត្រទាំង ៤ ៖**\n`` `/flash_loan STRATEGY` ``\n\n"
-                    "👉 **ស្កេន CeDeFi (Binance vs DEX) Spreads ៖**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **ធ្វើតេស្តសាកល្បងកម្ចី Flash Loan $1M (0% Risk) ៖**\n`` `/flash_loan SIM 1000000` ``\n\n"
                     "👉 **ភ្ជាប់កាបូប Multi-Chain (Ethereum, Solana, Tron, BTC, etc.) ៖**\n`` `/set_web3_wallet 0xYourWalletAddress` ``"
                 )
@@ -1669,25 +1861,27 @@ class TelegramBotThread(BaseThread):
                     "• 💱 **DEX Routing Engine**: `Uniswap V3` ↔ `PancakeSwap V3` | `Curve` | `Balancer`\n"
                     "• 🛡️ **Risk Profile**: `0.0% Market Risk (Atomic 1-Block Execution / Auto Revert on Zero Profit)`\n"
                     f"• 💼 **Multi-Chain Settlement Wallets**: {wallet_display}\n\n"
-                    "🛡️ **4 KEY AUXILIARY STRATEGIES (FULLY ARMED):**\n"
-                    "• 🛡️ `Strategy 1: Private RPC Shield` ➔ MEV-Blocker / Flashbots Direct (0% Sandwich Risk)\n"
-                    "• ⚡ `Strategy 2: L2 Priority Route` ➔ Arbitrum / Base / BSC (Gas < $0.05, 0.25s Block)\n"
-                    "• 🧮 `Strategy 3: AI Optimal Sizing` ➔ XGBoost Depth Guard (Slippage <= 0.15%)\n"
-                    "• 🌐 `Strategy 4: CeDeFi Hybrid Bridge` ➔ Binance CEX <-> DEX Live Arbitrage\n\n"
+                    "💎 **THE 5 REAL-MONEY ARBITRAGE PILLARS (FULLY ARMED):**\n"
+                    "• 🥩 `Pillar 1: LST/LRT Pools` ➔ Borrow WETH ($350M+ Pool) unlocking 80%+ liquidity\n"
+                    "• ⚖️ `Pillar 2: Balancer 0% Fee` ➔ Fee Hurdle slashed from 0.65% down to 0.08% (10x Trades)\n"
+                    "• 🔵 `Pillar 3: Base Network` ➔ Aerodrome ↔ Uniswap V3 (Base L2 Gas < $0.01)\n"
+                    "• 💀 `Pillar 4: Liquidation Bounty` ➔ Liquidate underwater loans on Aave V3 for 5% - 10% bonus\n"
+                    "• 🌐 `Pillar 5: CeDeFi Arbitrage` ➔ Binance Spot Orderbook ↔ DEX Pools (<15ms Routing)\n\n"
                     "⚔️ **TOKYO HFT MEV WEAPON STACK (ACTIVE):**\n"
                     "• 🛡️ `Flashbots Private Mempool` ➔ 0.0% Mempool Exposure (Invisibility Cloak Active)\n"
                     "• ⚡ `Assembly Code (Yul)` ➔ 68.89% Gas Savings (Pure EVM Bytecode Execution)\n"
                     "• 🧠 `AI Multi-Hop JIT Router` ➔ 4-Hop Pathfinder (Uniswap/Curve/Balancer JIT Swaps)\n"
                     "• 🗼 `Tokyo Co-location Node` ➔ Sub-ms Speed (0.42ms RPC Ping | DPDK Kernel Bypass)\n"
                     "• 🤗 `Hugging Face Model Sync` ➔ Token Verified (hemsinath/apex-ai-brain-models)\n\n"
-                    "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
+                    "📋 **1-TAP COMMAND EXECUTIONS (THE 5 PILLARS):**\n\n"
+                    "👉 **Scan LST/LRT WETH Pools (Pillar 1):**\n`` `/flash_loan LST` ``\n\n"
+                    "👉 **Analyze Balancer 0% Fee Flash Loan (Pillar 2):**\n`` `/flash_loan BALANCER` ``\n\n"
+                    "👉 **Scan Base Network Aerodrome ↔ Uni (Pillar 3):**\n`` `/flash_loan BASE` ``\n\n"
+                    "👉 **Scan DeFi Liquidation Bounty 5%-10% (Pillar 4):**\n`` `/flash_loan LIQUIDATION` ``\n\n"
+                    "👉 **Scan CeDeFi Binance Spot ↔ DEX (Pillar 5):**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **Inspect Tokyo HFT MEV Weapon Stack:**\n`` `/flash_loan MEV` ``\n\n"
                     "👉 **Toggle 24/7 Autonomous Flash Loan Mode:**\n`` `/flash_loan 24/7` `` or `` `/flash_loan AUTO ON` ``\n\n"
                     "👉 **View Execution History & Profit Ledger:**\n`` `/flash_loan HISTORY` ``\n\n"
-                    "👉 **Purge/Reset Simulation Stats:**\n`` `/flash_loan RESET` ``\n\n"
-                    "👉 **Inspect Keeper Relayer Gas (Live Mode):**\n`` `/flash_loan KEEPER` ``\n\n"
-                    "👉 **Inspect 4 Strategies Diagnostics:**\n`` `/flash_loan STRATEGY` ``\n\n"
-                    "👉 **Scan CeDeFi (Binance vs DEX) Spreads:**\n`` `/flash_loan CEDEFI` ``\n\n"
                     "👉 **Simulate $1M Flash Loan Execution (Zero Risk):**\n`` `/flash_loan SIM 1000000` ``\n\n"
                     "👉 **Link Multi-Chain Wallet (Ethereum, Solana, Tron, BTC, etc.):**\n`` `/set_web3_wallet 0xYourWalletAddress` ``"
                 )
@@ -4664,6 +4858,15 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_base":
                 context.args = ["BASE"]
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_lst":
+                context.args = ["LST"]
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_balancer":
+                context.args = ["BALANCER"]
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_liquidation":
+                context.args = ["LIQUIDATION"]
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_sim":
                 context.args = ["SIM", "1000000"]
