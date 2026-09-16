@@ -2711,6 +2711,16 @@ async def order_book_sniper(app: Application, ai_engine):
                     break
                     
             if whale_wall_found:
+                # 🛡️ Anti-Spoofing Guard: Filter out spoofed fake walls cancelled < 500ms
+                try:
+                    import orderbook_anti_spoofing
+                    spoof_res = orderbook_anti_spoofing.detect_spoofing(symbol, bids, asks, wall_threshold_usdt=wall_threshold)
+                    if spoof_res.get("is_spoofing", False):
+                        print(f"🛡️ [ANTI-SPOOFING] Ignored Fake Whale Wall on {symbol}: ${spoof_res.get('spoof_usdt', 0):,.0f} vanished!")
+                        continue
+                except Exception:
+                    pass
+
                 last_wall = order_book_sniper.last_walls.get(symbol, 0)
                 # Check if it's a new wall (price differs by > 0.5%)
                 if target_price > 0 and (last_wall == 0 or abs(last_wall - target_price) / target_price > 0.005):
@@ -2724,36 +2734,36 @@ async def order_book_sniper(app: Application, ai_engine):
                         clean_lang = loc.normalize_lang(lang)
                         if clean_lang == 'khmer':
                             return (
-                                f"🐋 **ប្រព័ន្ធស្ទាក់ចាប់ត្រីបាឡែន (WHALE WALL DETECTED)!**\n\n"
+                                f"🐋 **ប្រព័ន្ធស្ទាក់ចាប់ត្រីបាឡែន (WHALE WALL RADAR)!**\n\n"
                                 f"🪙 **{symbol}**\n"
                                 f"💵 ជញ្ជាំងទិញត្រីបាឡែន: `${target_price:,.4f}`\n"
-                                f"💰 ទំហំទុន: `${whale_usdt:,.0f} USDT`\n\n"
-                                f"⚡ **សកម្មភាព AI (Front-Run Execution):**\n"
-                                f"• AI បានស្ទាក់ទិញមុនត្រីបាឡែននៅ: `${front_run_price:,.4f}` (+0.05% Limit)\n"
+                                f"💰 ទំហំទុនកក់ទុក: `${whale_usdt:,.0f} USDT`\n\n"
+                                f"⚡ **ការវិភាគ AI (Target Front-Run):**\n"
+                                f"• ថ្លៃគោលដៅស្ទាក់ទិញមុន: `${front_run_price:,.4f}` (+0.05% Limit)\n"
                                 f"• គោលដៅប្រមូលចំណេញ: `+5%` ទៅ `+20%` តាម Peak-Lock Trailing\n\n"
-                                f"💡 _ចំណាំ: ចលនា Whale Pump កើតឡើងលឿនកម្រិត Millisecond (<50ms)។ បើក /pre_pump & /auto_trade ដើម្បីឲ្យ AI ប្រតិបត្តិការទិញ-លក់ស្វ័យប្រវត្តិ ជំនួសការចូលទិញដោយដៃ!_"
+                                f"💡 _ចំណាំ: នេះជាសារ Radar ចាប់ជញ្ជាំងបញ្ជាទិញពិតលើ Binance L2 Orderbook (<50ms)។ ដើម្បីឱ្យ AI បើកការជួញដូរជាក់ស្តែងស្វ័យប្រវត្តិលើគណនី សូមបើក_ `/pre_pump ON 30` _ឬ_ `/auto_trade ON 30` _!_"
                             )
                         elif clean_lang == 'chinese':
                             return (
-                                f"🐋 **检测到巨鲸买单墙 (WHALE WALL DETECTED)!**\n\n"
+                                f"🐋 **检测到巨鲸买单墙 (WHALE WALL RADAR)!**\n\n"
                                 f"🪙 **{symbol}**\n"
                                 f"💵 巨鲸挂单买价: `${target_price:,.4f}`\n"
                                 f"💰 资金规模: `${whale_usdt:,.0f} USDT`\n\n"
-                                f"⚡ **AI 抢跑执行 (Front-Run Execution):**\n"
-                                f"• AI 已提前挂单抢跑: `${front_run_price:,.4f}` (+0.05% Limit)\n"
+                                f"⚡ **AI 抢跑计算 (Target Front-Run):**\n"
+                                f"• AI 目标抢跑挂单价: `${front_run_price:,.4f}` (+0.05% Limit)\n"
                                 f"• 目标止盈: `+5%` 至 `+20%` 动态追盈\n\n"
-                                f"💡 _提示: 开启 /pre_pump 和 /auto_trade 可实现毫秒级自动抢跑跟单!_"
+                                f"💡 _提示: 开启 `/pre_pump ON 30` 或 `/auto_trade ON 30` 可实现毫秒级自动入场!_"
                             )
                         else:
                             return (
-                                f"🐋 **Whale Wall Detected!**\n\n"
+                                f"🐋 **Whale Wall Detected (WHALE WALL RADAR)!**\n\n"
                                 f"🪙 **{symbol}**\n"
                                 f"💵 Buy Wall Price: `${target_price:,.4f}`\n"
                                 f"💰 Wall Value: `${whale_usdt:,.0f} USDT`\n\n"
-                                f"⚡ **AI Front-Run Action:**\n"
-                                f"• AI Front-Running entry: `${front_run_price:,.4f}`\n"
+                                f"⚡ **AI Target Front-Run:**\n"
+                                f"• Calculated Front-Run Entry: `${front_run_price:,.4f}` (+0.05% Limit)\n"
                                 f"• Profit Target: `+5%` to `+20%` via Peak-Lock Trailing\n\n"
-                                f"💡 _Enable /pre_pump and /auto_trade to execute sub-50ms automated trades without manual delay!_"
+                                f"💡 _Note: Real-time L2 orderbook radar. Enable `/pre_pump ON 30` or `/auto_trade ON 30` for autonomous execution!_"
                             )
                         
                     await parallel_broadcast(app, vip_users, get_whale_wall_text)
