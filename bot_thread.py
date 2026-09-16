@@ -2195,14 +2195,14 @@ class TelegramBotThread(BaseThread):
                 )
                 await context.bot.send_message(chat_id=chat_id, text=confirm_msg, parse_mode="Markdown", reply_markup=reply_markup)
 
-        async def send_long_message(context, chat_id, text, reply_markup=None):
+        async def send_long_message(context, chat_id, text, reply_markup=None, reply_to_message_id=None):
             """Helper to send messages longer than 4096 chars and handle Markdown parsing errors."""
             if not isinstance(text, str): text = str(text or "")
             if len(text) <= 4000:
                 try:
-                    await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=reply_markup)
+                    await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=reply_markup, reply_to_message_id=reply_to_message_id)
                 except Exception:
-                    await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup) # Fallback without markdown
+                    await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, reply_to_message_id=reply_to_message_id) # Fallback without markdown
                 return
 
             paragraphs = text.split('\n')
@@ -2210,17 +2210,18 @@ class TelegramBotThread(BaseThread):
             for p in paragraphs:
                 if len(current_msg) + len(p) + 1 > 4000:
                     try:
-                        await context.bot.send_message(chat_id=chat_id, text=current_msg, parse_mode="Markdown")
+                        await context.bot.send_message(chat_id=chat_id, text=current_msg, parse_mode="Markdown", reply_to_message_id=reply_to_message_id)
                     except Exception:
-                        await context.bot.send_message(chat_id=chat_id, text=current_msg)
+                        await context.bot.send_message(chat_id=chat_id, text=current_msg, reply_to_message_id=reply_to_message_id)
                     current_msg = p + "\n"
+                    reply_to_message_id = None # only reply on first chunk
                 else:
                     current_msg += p + "\n"
             if current_msg.strip():
                 try:
-                    await context.bot.send_message(chat_id=chat_id, text=current_msg, parse_mode="Markdown", reply_markup=reply_markup)
+                    await context.bot.send_message(chat_id=chat_id, text=current_msg, parse_mode="Markdown", reply_markup=reply_markup, reply_to_message_id=reply_to_message_id)
                 except Exception:
-                    await context.bot.send_message(chat_id=chat_id, text=current_msg, reply_markup=reply_markup)
+                    await context.bot.send_message(chat_id=chat_id, text=current_msg, reply_markup=reply_markup, reply_to_message_id=reply_to_message_id)
 
 
 
@@ -3544,28 +3545,25 @@ class TelegramBotThread(BaseThread):
                 self.active_tasks.discard(chat_id)
                 return
 
-            # ⚡ Instant VIP Executive Greeting Handler (<15ms, $0.00 Cost, Zero Prompt Leakage)
+            # ⚡ Instant VIP Executive Direct Reply Greeting Handler (<15ms, $0.00 Cost, Zero Prompt Leakage)
             clean_greeting = re.sub(r'@[A-Za-z0-9_]+', '', trimmed_text).strip().lower()
             greeting_keywords = [
                 'សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ', 'ជំរាបសួរអ្នកគ្រូ', 'ជំរាបសួរលោកគ្រូ',
                 'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'suosdey'
             ]
             if clean_greeting in greeting_keywords or clean_greeting.replace(' ', '') in ['សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ']:
-                from ui_standards import DIVIDER_HEAVY
+                from ui_standards import DIVIDER_DOUBLE
                 greeting_card = (
-                    "✨ **ស្វាគមន៍មកកាន់ APEX TURBO AGI STRATEGIST!** ⚡\n"
-                    f"{DIVIDER_HEAVY}\n"
-                    "សូមគោរពជម្រាបសួរ! ខ្ញុំជា **Apex Quantitative & Institutional AI** នៃ Khmer Master Crypto ដំណើរការវិភាគទិន្នន័យ On-Chain, Orderbook និងសេដ្ឋកិច្ចសកល ២៤/៧។\n\n"
-                    "📊 **សេវាកម្មស្ថាប័នដែលអាចបញ្ជាបានភ្លាមៗ ៖**\n"
-                    "• 🔍 **វិភាគកាក់ស៊ីជម្រៅ ៖** `` `/analyze BTC` `` ឬវាយឈ្មោះកាក់ផ្ទាល់\n"
-                    "• 💎 **Spot 0% Liquidation ៖** `` `/smart_trade` `` ឬ `` `/compound_grid` ``\n"
-                    "• 🛡️ **Futures Hedge ការពារទុន ៖** `` `/turbo_hedge` `` ឬ `` `/smartx` ``\n"
-                    "• 🐋 **Orderbook L2 Whale Radar ៖** `` `/whales` `` ឬ `` `/top` ``\n"
-                    "• 📰 **ព័ត៌មានទាន់ហេតុការណ៍ AI ៖** `` `/news` ``\n"
-                    f"{DIVIDER_HEAVY}\n"
-                    "💡 _សូមវាយឈ្មោះកាក់ (ឧ. BTC, ETH, SOL) ឬសួរសំណួរជាក់ស្តែង ដើម្បីទទួលបានការវិភាគបែបវិជ្ជាជីវៈកម្រិតស្ថាប័នភ្លាមៗ!_"
+                    "✨ **មគ្គុទ្ទេសក៍គ្រីបតូខ្មែរ**\n"
+                    "**Khmer Master Crypto | Turbo Apex AGI!**\n"
+                    f"{DIVIDER_DOUBLE}\n"
+                    "ជាប្រព័ន្ធវិភាគបរិមាណវិស័យ និងយុទ្ធសាស្ត្រ រាល់ការវិភាគ និងការសម្រេចចិត្តនឹងត្រូវធ្វើឡើងតាមរយៈការសំយោគទិន្នន័យពហុវិមាត្រ ដើម្បីផ្តល់ចំណេះដឹងបន្ថែមជូនលោកអ្នក!\n\n"
+                    "👉 _សូមឆ្លើយតប ឬសួរសំនួរដោយ Reply សារនេះ!_"
                 )
-                await context.bot.send_message(chat_id=chat_id, text=greeting_card, parse_mode="Markdown")
+                if update.effective_message:
+                    await update.effective_message.reply_text(greeting_card, parse_mode="Markdown")
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=greeting_card, parse_mode="Markdown")
                 self.active_tasks.discard(chat_id)
                 return
 
@@ -3590,8 +3588,9 @@ class TelegramBotThread(BaseThread):
 
                 db.add_chat_history(chat_id, 'model', analysis_result)
                 
-                await send_long_message(context, chat_id, analysis_result)
-                self.log_signal.emit(f"✅ Replied to VIP Chat ID: {chat_id}")
+                reply_msg_id = update.effective_message.message_id if update.effective_message else None
+                await send_long_message(context, chat_id, analysis_result, reply_to_message_id=reply_msg_id)
+                self.log_signal.emit(f"✅ Replied directly to VIP Chat ID: {chat_id}")
             finally:
                 self.active_tasks.discard(chat_id)
 
