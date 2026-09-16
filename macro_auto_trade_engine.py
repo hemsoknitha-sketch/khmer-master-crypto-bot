@@ -589,12 +589,12 @@ async def monitor_macro_auto_trades(app):
 
             # 🛡️ Breakeven Armor (Strict Invariant 24):
             # The instant peak ROI hits >= +3.0% or net PnL >= +$0.30,
-            # Breakeven Armor activates immediately, unconditionally guaranteeing +0.12% Net Floor.
+            # Breakeven Armor activates immediately, unconditionally guaranteeing >= +2.0% Net ROI Floor.
             is_be_armed = (peak_roi >= 3.0 or roi_pct >= 3.0 or effective_pnl >= 0.30)
             if is_be_armed:
-                if effective_pnl <= 0.12 or roi_pct <= 1.2:
+                if effective_pnl <= 0.20 or roi_pct <= 2.0:
                     is_stop_loss = True
-                    reason_tag = "MACRO_BREAKEVEN_ARMOR_PROTECT (+0.12% Net Floor)"
+                    reason_tag = "MACRO_BREAKEVEN_ARMOR_PROTECT (+2.0% Net Floor)"
             else:
                 # 🛡️ Asymmetric Risk-to-Reward (R:R >= 1:2.5) Clamped Stop Loss:
                 # Initial risk is tightly capped at -4.0% ROI / -$0.50 floor before invalidation

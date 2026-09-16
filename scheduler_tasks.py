@@ -2169,17 +2169,18 @@ async def process_single_trailing_stop(app, ai_engine, trade):
         await asyncio.to_thread(db.update_active_trade_highest, trade_id, current_price)
         current_highest = current_price
         
-    # ⚡ Sub-Second 0.1% Retracement Trailing Take-Profit Peak Lock:
-    # If in net profit (> 1.0%) and current_price drops by 0.1% from peak (current_price <= current_highest * 0.999)
+    # ⚡ Super Smart Take Profit Hurdle (>= +2.5% to +3.5% Net ROI):
+    # Prevents micro-scalping at +0.4% - +1.0% which gets eroded by exchange fees.
+    # Lets winning runners develop to >= +2.5% - +3.5% before ratcheting gains with healthy 0.7% retracement buffer (0.993).
     net_profit_pct = trading_engine.calculate_net_pnl_pct(buy_price, current_price) if buy_price and buy_price > 0 else 0.0
-    trailing_peak_lock = (net_profit_pct > 1.0) and (current_price <= current_highest * 0.999)
+    trailing_peak_lock = (net_profit_pct >= 2.5) and (current_price <= current_highest * 0.993)
     
     stop_loss_price = current_highest * (1 - (stop_loss_pct / 100.0))
     # Invariant 24: Breakeven Armor & Golden 85% Profit Ratchet
     # If peak gain hits >= +3.0%, Stop Loss is unconditionally locked to Breakeven (+0.12% Net Floor)
     # and ratchets 85% of peak profit once peak gain >= 5.0%
     if buy_price and buy_price > 0:
-        breakeven_p = buy_price * 1.0012
+        breakeven_p = buy_price * 1.0025  # Minimum +0.25% fee-clearing floor
         peak_gain_pct = ((current_highest - buy_price) / buy_price) * 100.0
         if peak_gain_pct >= 5.0:
             ratchet_p = buy_price * (1.0 + (peak_gain_pct * 0.85 / 100.0))
@@ -6376,7 +6377,7 @@ async def flash_loan_autonomous_engine(app: Application):
         # 4. PILLAR 5: Scan CeDeFi Asymmetric Arbitrage (Binance Spot Orderbook vs DEX Pools)
         if not profitable_items:
             cedefi_items = await asyncio.to_thread(engine.scan_cedefi_arbitrage_matrix)
-            profitable_items = [it for it in cedefi_items if it.get("gross_spread_pct", 0.0) >= 0.15 and it.get("net_profit_usd", 0.0) > 0.0]
+            profitable_items = [it for it in cedefi_items if it.get("net_yield_pct", 0.0) >= 0.20 and it.get("net_profit_usd", 0.0) > 0.0]
 
         # 5. Scan Ultra-Low Fee Pegged Stablecoin Arbitrage (Fee Hurdle ~0.08%)
         if not profitable_items:
@@ -6469,11 +6470,14 @@ async def flash_loan_autonomous_engine(app: Application):
                 if not cedefi_auto_enabled:
                     continue
 
+                raw_amt = top_op.get("optimal_loan_usd", 20.0)
+                safe_amount_usdt = min(30.0, max(10.50, float(raw_amt)))
+
                 exec_res = engine.execute_cedefi_arbitrage(
                     chat_id=chat_id,
                     symbol=symbol,
                     action=top_op.get("action", "BUY_BINANCE_SELL_DEX"),
-                    amount_usdt=top_op.get("optimal_loan_usd", 20.0),
+                    amount_usdt=safe_amount_usdt,
                     dex_source=dex_source,
                     chain=chain,
                     expected_yield_pct=top_op.get("net_yield_pct", 0.25)

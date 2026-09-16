@@ -1659,21 +1659,21 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             min_guaranteed_roi = 0.20
             min_guaranteed_pnl = 0.15
     elif is_spot:
-        spot_arm_roi = max(1.5, curr_atr_pct * 0.8)
-        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.25, bot_amt * 0.015):
+        spot_arm_roi = max(2.5, curr_atr_pct * 0.8)  # Upgraded to >= +2.5% ROI Hurdle
+        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.35, bot_amt * 0.025):
             is_breakeven_armed = True
-            if peak_roi < 3.0:
-                min_guaranteed_roi = 0.40
-                min_guaranteed_pnl = 0.20
+            if peak_roi < 3.5:
+                min_guaranteed_roi = 1.80  # Net guaranteed floor >= +1.80% ROI (outperforming exchange fees)
+                min_guaranteed_pnl = 0.25
             elif peak_roi < 5.0:
-                min_guaranteed_roi = max(1.5, peak_roi * 0.70)
-                min_guaranteed_pnl = max(0.30, peak_pnl * 0.70)
+                min_guaranteed_roi = max(2.5, peak_roi * 0.75)
+                min_guaranteed_pnl = max(0.40, peak_pnl * 0.75)
             else:
-                min_guaranteed_roi = max(3.5, peak_roi * 0.85)
-                min_guaranteed_pnl = max(0.50, peak_pnl * 0.85)
+                min_guaranteed_roi = max(4.0, peak_roi * 0.85)
+                min_guaranteed_pnl = max(0.60, peak_pnl * 0.85)
 
             chandelier_stop_p = peak_mark_p - (1.5 * curr_atr_val)
-            be_spot_stop_p = entry_price * 1.0040
+            be_spot_stop_p = entry_price * 1.0060
             effective_spot_stop = max(be_spot_stop_p, chandelier_stop_p)
             if mark_price <= effective_spot_stop:
                 is_chandelier_triggered = True
@@ -1727,12 +1727,12 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 min_guaranteed_pnl = max(0.40, ratchet_pnl_85)  # Locks 85% of peak ($0.40+ net floor)
                 min_guaranteed_roi = max(4.0, ratchet_roi_85)
             elif peak_pnl >= 0.30 or effective_peak >= 3.0:
-                # 🛡️ Invariant 24: Breakeven Armor locked at +3.0% ROI -> Entry Price + 0.12% Net Profit Floor
-                min_guaranteed_pnl = 0.15  # Breakeven Armor locked (+0.12% fees floor - Zero Loss Guarantee)
-                min_guaranteed_roi = max(1.5, effective_peak * 0.50)
+                # 🛡️ Invariant 24: Breakeven Armor locked at +3.0% ROI -> Super Smart Take Profit Hurdle (>= +2.2% to +2.5% ROI Floor)
+                min_guaranteed_pnl = max(0.25, peak_pnl * 0.75)  # Breakeven Armor locked (Net Profit Floor >= +$0.25 USDT - Zero Loss Guarantee)
+                min_guaranteed_roi = max(2.2, effective_peak * 0.75)
             else:
-                min_guaranteed_pnl = 0.12
-                min_guaranteed_roi = 1.2
+                min_guaranteed_pnl = 0.20
+                min_guaranteed_roi = 2.0
 
             ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
             # Volatility-Adaptive Chandelier ATR Multiplier: 2.0x for runner wave, 1.5x at peak

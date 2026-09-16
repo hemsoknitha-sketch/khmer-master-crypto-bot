@@ -326,7 +326,7 @@ def init_db():
             chat_id INTEGER PRIMARY KEY,
             is_enabled BOOLEAN NOT NULL DEFAULT 0,
             amount_per_trade REAL DEFAULT 10.0,
-            take_profit_pct REAL DEFAULT 0.5,
+            take_profit_pct REAL DEFAULT 2.5,
             stop_loss_pct REAL DEFAULT 1.0,
             updated_at TEXT
         )
@@ -3693,7 +3693,7 @@ def stop_all_active_bots(chat_id: int):
 
 deactivate_all_bots = stop_all_active_bots
 
-def set_hyper_trade_config(chat_id: int, enabled: bool, amount: float = 10.0, tp_pct: float = 0.5, sl_pct: float = 1.0):
+def set_hyper_trade_config(chat_id: int, enabled: bool, amount: float = 10.0, tp_pct: float = 2.5, sl_pct: float = 1.0):
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().isoformat()
