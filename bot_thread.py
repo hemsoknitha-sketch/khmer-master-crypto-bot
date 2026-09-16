@@ -3546,12 +3546,24 @@ class TelegramBotThread(BaseThread):
                 return
 
             # ⚡ Instant VIP Executive Direct Reply Greeting Handler (<15ms, $0.00 Cost, Zero Prompt Leakage)
-            clean_greeting = re.sub(r'@[A-Za-z0-9_]+', '', trimmed_text).strip().lower()
-            greeting_keywords = [
-                'សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ', 'ជំរាបសួរអ្នកគ្រូ', 'ជំរាបសួរលោកគ្រូ',
-                'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'suosdey'
-            ]
-            if clean_greeting in greeting_keywords or clean_greeting.replace(' ', '') in ['សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ']:
+            def _check_is_greeting(raw_msg: str) -> bool:
+                if not raw_msg: return False
+                clean = re.sub(r'@[A-Za-z0-9_]+', '', raw_msg).strip()
+                clean = re.sub(r'[^\w\s\u1780-\u17FF]', '', clean).strip().lower()
+                has_query = any(q in clean for q in [
+                    'btc', 'eth', 'sol', 'usdt', 'ទិញ', 'លក់', 'ឡើង', 'ចុះ', 'ថ្លៃ', 'តម្លៃ',
+                    'វិភាគ', 'analyz', 'trade', 'buy', 'sell', 'how', 'when', 'what', 'why'
+                ])
+                if has_query:
+                    return False
+                greeting_tokens = [
+                    'សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ', 'ជំរាបសួរអ្នកគ្រូ', 'ជំរាបសួរលោកគ្រូ',
+                    'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'suosdey'
+                ]
+                words = clean.split()
+                return len(words) <= 5 and any(g in clean for g in greeting_tokens)
+
+            if _check_is_greeting(trimmed_text):
                 from ui_standards import DIVIDER_DOUBLE
                 greeting_card = (
                     "✨ **មគ្គុទ្ទេសក៍គ្រីបតូខ្មែរ**\n"

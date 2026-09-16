@@ -826,6 +826,27 @@ class AIInvestmentEngine:
 
     def chat_with_user(self, user_input: str, history: list = None) -> str:
         """Stateful call that respects chat history."""
+        # ⚡ Greeting Interceptor: Always return official institutional card directly
+        raw_t = re.sub(r'@[A-Za-z0-9_]+', '', user_input or "").strip()
+        clean_t = re.sub(r'[^\w\s\u1780-\u17FF]', '', raw_t).strip().lower()
+        has_query = any(q in clean_t for q in [
+            'btc', 'eth', 'sol', 'usdt', 'ទិញ', 'លក់', 'ឡើង', 'ចុះ', 'ថ្លៃ', 'តម្លៃ',
+            'វិភាគ', 'analyz', 'trade', 'buy', 'sell', 'how', 'when', 'what', 'why'
+        ])
+        greeting_tokens = [
+            'សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ', 'ជំរាបសួរអ្នកគ្រូ', 'ជំរាបសួរលោកគ្រូ',
+            'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'suosdey'
+        ]
+        if not has_query and len(clean_t.split()) <= 5 and any(g in clean_t for g in greeting_tokens):
+            from ui_standards import DIVIDER_DOUBLE
+            return (
+                "✨ **មគ្គុទ្ទេសក៍គ្រីបតូខ្មែរ**\n"
+                "**Khmer Master Crypto | Turbo Apex AGI!**\n"
+                f"{DIVIDER_DOUBLE}\n"
+                "ជាប្រព័ន្ធវិភាគបរិមាណវិស័យ និងយុទ្ធសាស្ត្រ រាល់ការវិភាគ និងការសម្រេចចិត្តនឹងត្រូវធ្វើឡើងតាមរយៈការសំយោគទិន្នន័យពហុវិមាត្រ ដើម្បីផ្តល់ចំណេះដឹងបន្ថែមជូនលោកអ្នក!\n\n"
+                "👉 _សូមឆ្លើយតប ឬសួរសំនួរដោយ Reply សារនេះ!_"
+            )
+
         cache_key = hashlib.md5(user_input.encode('utf-8')).hexdigest()
         if cache_key in self._cache:
             cache_time, cached_response = self._cache[cache_key]
