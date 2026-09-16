@@ -131,6 +131,39 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
         await asyncio.gather(*tasks, return_exceptions=True)
         await asyncio.sleep(1.0)
 
+def get_alert_target_recipients(alert_type: str = "general") -> tuple[list, bool]:
+    """
+    Determines where high-frequency intelligence alerts (News, Whale Wall, Macro)
+    should be delivered.
+    If 'alert_group_id' is configured in SQLite system_settings or TELEGRAM_ALERT_GROUP_ID env,
+    delivers alerts directly to that Telegram Group or Channel, sparing private bot users
+    from notification spam.
+    Returns: (recipients_list, is_group_only)
+    """
+    import os
+    import database as db
+
+    group_id_str = db.get_system_setting("alert_group_id", "") or os.getenv("TELEGRAM_ALERT_GROUP_ID", "")
+    group_id_str = str(group_id_str).strip()
+
+    routing_mode = str(db.get_system_setting("alert_routing_mode", "GROUP_ONLY" if group_id_str else "PRIVATE_ONLY")).upper().strip()
+
+    if group_id_str:
+        try:
+            group_id = int(group_id_str)
+            if routing_mode == "GROUP_ONLY":
+                # Route exclusively to Group/Channel, zero private user spam!
+                return [(group_id, "khmer")], True
+            elif routing_mode == "BOTH":
+                vip_users = db.get_vip_users_with_lang() or []
+                recipients = [(group_id, "khmer")] + [u for u in vip_users if (u[0] if isinstance(u, (tuple, list)) else u) != group_id]
+                return recipients, False
+        except ValueError:
+            pass
+
+    vip_users = db.get_vip_users_with_lang() or []
+    return vip_users, False
+
 async def daily_market_brief(app: Application, ai_engine):
     """Fetches market data and broadcasts a morning summary to all VIP users."""
     print("🌅 Running Daily Market Brief...")
@@ -1097,7 +1130,8 @@ async def check_crypto_news(app: Application, ai_engine):
 
                     return alert_msg
 
-                await parallel_broadcast(app, vip_users_lang, process_news_alert_and_auto_trade, photo_path=image_url, reply_markup=news_kb)
+                target_recipients, _ = get_alert_target_recipients("news")
+                await parallel_broadcast(app, target_recipients, process_news_alert_and_auto_trade, photo_path=image_url, reply_markup=news_kb)
     except Exception as e:
         print(f"Error checking crypto news: {e}")
 
@@ -1438,7 +1472,8 @@ async def check_whale_trades(app: Application):
                     else:
                         return loc.get_text(user_lang, 'whale_withdrawal_alert', value=value, symbol=token_symbol)
 
-                await parallel_broadcast(app, vip_users_lang, get_whale_text, reply_markup=alert_kb)
+                target_recipients, _ = get_alert_target_recipients("whales")
+                await parallel_broadcast(app, target_recipients, get_whale_text, reply_markup=alert_kb)
                         
     except Exception as e:
         print(f"Error checking whale trades: {e}")
@@ -2766,7 +2801,8 @@ async def order_book_sniper(app: Application, ai_engine):
                                 f"💡 _Note: Real-time L2 orderbook radar. Enable `/pre_pump ON 30` or `/auto_trade ON 30` for autonomous execution!_"
                             )
                         
-                    await parallel_broadcast(app, vip_users, get_whale_wall_text)
+                    target_recipients, _ = get_alert_target_recipients("whale_wall")
+                    await parallel_broadcast(app, target_recipients, get_whale_wall_text)
 
     except asyncio.CancelledError:
         pass

@@ -6426,6 +6426,258 @@ class TelegramBotThread(BaseThread):
             self.log_signal.emit(f"🚨 Admin {chat_id} issued SIGNAL {action} {symbol} to {success_count} VIPs.")
             return
 
+        async def admin_config_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'km'
+            elif user_lang in ['en', 'english']:
+                user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']:
+                user_lang = 'zh'
+            else:
+                user_lang = 'km'
+
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                if update.callback_query:
+                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                else:
+                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
+                return
+
+            args = context.args if hasattr(context, 'args') else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🛡️ Defender Status", callback_data="btn_defender_status"),
+                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh")
+                ],
+                [
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ],
+                [
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ]
+            ])
+
+            if not args or len(args) < 2:
+                # Fetch key system parameters
+                global_reb = db.get_system_setting("global_rebalance", "1") if hasattr(db, 'get_system_setting') else "1"
+                breaker_val = db.get_system_setting("circuit_breaker", "1") if hasattr(db, 'get_system_setting') else "1"
+                max_lev_limit = db.get_system_setting("max_leverage_limit", "20") if hasattr(db, 'get_system_setting') else "20"
+                hft_speed = db.get_system_setting("hft_speed_ms", "10") if hasattr(db, 'get_system_setting') else "10"
+                max_slippage = db.get_system_setting("max_slippage_pct", "0.5") if hasattr(db, 'get_system_setting') else "0.5"
+                alert_grp = db.get_system_setting("alert_group_id", "Not set (Private DMs)")
+                routing_mode = db.get_system_setting("alert_routing_mode", "GROUP_ONLY" if alert_grp != "Not set (Private DMs)" else "PRIVATE_ONLY")
+
+                if user_lang == 'en':
+                    msg = (
+                        "⚙️ **APEX SUPER AGI v13.00 | REAL-TIME SYSTEM CONFIG RADAR** ⚡\n"
+                        "════════════\n\n"
+                        "📊 **ACTIVE SYSTEM PARAMETERS:**\n"
+                        f"• `global_rebalance` ៖ `{global_reb}` ({'🟢 Active (Auto Rebalance ON)' if global_reb == '1' else '🔴 Disabled'})\n"
+                        f"• `circuit_breaker` ៖ `{breaker_val}` ({'🛡️ Active Protection (2% Guard)' if breaker_val == '1' else '🔴 Off'})\n"
+                        f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (Max Futures Leverage Ceiling)\n"
+                        f"• `hft_speed_ms` ៖ `{hft_speed} ms` (Sub-Second HFT Engine Speed)\n"
+                        f"• `max_slippage_pct` ៖ `{max_slippage}%` (Max Slippage Tolerance Guard)\n"
+                        f"• `alert_group_id` ៖ `{alert_grp}` (Telegram Alert Group/Channel)\n"
+                        f"• `alert_routing_mode` ៖ `{routing_mode}` (GROUP_ONLY / BOTH / PRIVATE_ONLY)\n\n"
+                        "📋 **1-TAP PARAMETER CONTROL SYNTAX:**\n"
+                        "👉 **Route Alerts & Whale Wall Radar to Group ID:**\n"
+                        "`` `/admin_config alert_group_id -100xxxxxxxxxx` ``\n\n"
+                        "👉 **Set Alert Routing Mode (GROUP_ONLY / BOTH):**\n"
+                        "`` `/admin_config alert_routing_mode GROUP_ONLY` ``\n\n"
+                        "👉 **Toggle Global Rebalance (1/0):**\n"
+                        "`` `/admin_config global_rebalance 1` ``\n\n"
+                        "👉 **Set Max Leverage Ceiling Limit:**\n"
+                        "`` `/admin_config max_leverage_limit 20` ``\n\n"
+                        "👉 **Set HFT Engine Execution Speed (ms):**\n"
+                        "`` `/admin_config hft_speed_ms 10` ``\n"
+                        "════════════\n"
+                        "💡 _Tap Refresh Config or Admin Panel below to inspect live updates:_"
+                    )
+                elif user_lang == 'zh':
+                    msg = (
+                        "⚙️ **APEX SUPER AGI v13.00 | 实时系统参数控制台** ⚡\n"
+                        "════════════\n\n"
+                        "📊 **当前激活系统参数：**\n"
+                        f"• `global_rebalance` ៖ `{global_reb}` ({'🟢 开启 (自动再平衡开启)' if global_reb == '1' else '🔴 已禁用'})\n"
+                        f"• `circuit_breaker` ៖ `{breaker_val}` ({'🛡️ 保护激活 (2% 熔断阀门)' if breaker_val == '1' else '🔴 已关闭'})\n"
+                        f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (合约杠杆上限保护)\n"
+                        f"• `hft_speed_ms` ៖ `{hft_speed} ms` (高频引擎执行速度)\n"
+                        f"• `max_slippage_pct` ៖ `{max_slippage}%` (最大滑点容忍上限)\n"
+                        f"• `alert_group_id` ៖ `{alert_grp}` (行情与巨鲸雷达推送群组)\n"
+                        f"• `alert_routing_mode` ៖ `{routing_mode}` (GROUP_ONLY / BOTH)\n\n"
+                        "📋 **1-TAP 参数修改命令：**\n"
+                        "👉 **设置新闻与巨鲸雷达专属群组 ID：**\n"
+                        "`` `/admin_config alert_group_id -100xxxxxxxxxx` ``\n\n"
+                        "👉 **设置推送模式 (GROUP_ONLY / BOTH)：**\n"
+                        "`` `/admin_config alert_routing_mode GROUP_ONLY` ``\n\n"
+                        "👉 **设置全局再平衡开关 (1/0)：**\n"
+                        "`` `/admin_config global_rebalance 1` ``\n\n"
+                        "👉 **设置合约杠杆上限 (x)：**\n"
+                        "`` `/admin_config max_leverage_limit 20` ``\n\n"
+                        "👉 **设置 HFT 引擎速度 (ms)：**\n"
+                        "`` `/admin_config hft_speed_ms 10` ``\n"
+                        "════════════\n"
+                        "💡 _点击下方刷新配置或 Super Admin 面板即可进行实时调试：_"
+                    )
+                else:
+                    msg = (
+                        "⚙️ **APEX SUPER AGI v13.00 | REAL-TIME SYSTEM CONFIG RADAR** ⚡\n"
+                        "════════════\n\n"
+                        "📊 **REAL-TIME SYSTEM PARAMETERS ៖**\n"
+                        f"• `global_rebalance` ៖ `{global_reb}` ({'🟢 Active (Auto Rebalance ON)' if global_reb == '1' else '🔴 Disabled'})\n"
+                        f"• `circuit_breaker` ៖ `{breaker_val}` ({'🛡️ Active Protection (2% Guard)' if breaker_val == '1' else '🔴 Off'})\n"
+                        f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (Max Futures Leverage Ceiling)\n"
+                        f"• `hft_speed_ms` ៖ `{hft_speed} ms` (HFT Execution Engine Speed)\n"
+                        f"• `max_slippage_pct` ៖ `{max_slippage}%` (Slippage Tolerance Guard)\n"
+                        f"• `alert_group_id` ៖ `{alert_grp}` (Telegram Alert Group/Channel)\n"
+                        f"• `alert_routing_mode` ៖ `{routing_mode}` (GROUP_ONLY / BOTH / PRIVATE_ONLY)\n\n"
+                        "📋 **1-TAP PARAMETER CONTROL SYNTAX ៖**\n"
+                        "👉 **កំណត់ Group ID ទទួលសារ News & Whale Wall Radar ៖**\n"
+                        "`` `/admin_config alert_group_id -100xxxxxxxxxx` ``\n\n"
+                        "👉 **កំណត់ទម្រង់បញ្ជូន (GROUP_ONLY / BOTH / PRIVATE_ONLY) ៖**\n"
+                        "`` `/admin_config alert_routing_mode GROUP_ONLY` ``\n\n"
+                        "👉 **កំណត់ Global Rebalance (1/0) ៖**\n"
+                        "`` `/admin_config global_rebalance 1` ``\n\n"
+                        "👉 **កំណត់ Max Leverage Ceiling Limit ៖**\n"
+                        "`` `/admin_config max_leverage_limit 20` ``\n\n"
+                        "👉 **កំណត់ HFT Speed (ms) ៖**\n"
+                        "`` `/admin_config hft_speed_ms 10` ``\n\n"
+                        "════════════\n"
+                        "💡 _ចុច Refresh Config ឬ Admin Panel ខាងក្រោម ដើម្បីគ្រប់គ្រងប្រព័ន្ធរ៉ាន់ Real-Time ៖_"
+                    )
+
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+                else:
+                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            key = str(args[0]).strip()
+            value = str(args[1]).strip()
+
+            db.update_system_setting(key, value)
+
+            if hasattr(db, 'log_admin_action'):
+                db.log_admin_action(chat_id, "CONFIG_UPDATE", key, f"Updated value to {value}")
+
+            if user_lang == 'en':
+                success_msg = (
+                    "⚙️ **APEX SYSTEM CONFIGURATION UPDATED!** ⚡\n"
+                    "════════════\n\n"
+                    f"🔑 **Parameter Key**: `{key}`\n"
+                    f"💎 **New Active Value**: `{value}`\n"
+                    "⚡ **Status**: `REAL-TIME PERSISTED TO DATABASE` 🟢\n"
+                    "════════════\n"
+                    "💡 _All trading engines have updated their operating parameters dynamically!_"
+                )
+            elif user_lang == 'zh':
+                success_msg = (
+                    "⚙️ **系统参数成功修改！** ⚡\n"
+                    "════════════\n\n"
+                    f"🔑 **参数名称**: `{key}`\n"
+                    f"💎 **全新生效数值**: `{value}`\n"
+                    "⚡ **状态**: `实时持久化至数据库` 🟢\n"
+                    "════════════\n"
+                    "💡 _所有交易引擎已动态同步最新运行参数！_"
+                )
+            else:
+                success_msg = (
+                    "⚙️ **SYSTEM CONFIGURATION UPDATED!** ⚡\n"
+                    "════════════\n\n"
+                    f"🔑 **Parameter Key** ៖ `{key}`\n"
+                    f"💎 **New Active Value** ៖ `{value}`\n"
+                    "⚡ **Status** ៖ `REAL-TIME PERSISTED TO DATABASE` 🟢\n"
+                    "════════════\n"
+                    "💡 _គ្រប់ Trading Engines ទាំងអស់បានអាប់ឌែត និងអនុវត្ត Parameter ថ្មីនេះភ្លាមៗ!_"
+                )
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
+                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
+
+            self.log_signal.emit(f"⚙️ Admin {chat_id} UPDATED system config {key} -> {value}.")
+            return
+
+        async def group_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            chat = update.effective_chat
+            chat_id = chat.id if chat else None
+            chat_title = chat.title if chat and chat.title else "Private Chat"
+            chat_type = chat.type if chat else "private"
+
+            if chat_type in ["group", "supergroup", "channel"]:
+                msg = (
+                    "💎 **TELEGRAM GROUP / CHANNEL ID RADAR** 📡\n"
+                    "════════════\n"
+                    f"🏷️ **ឈ្មោះ Group** ៖ `{chat_title}`\n"
+                    f"🆔 **Group ID** ៖ `{chat_id}`\n"
+                    f"📋 **ប្រភេទ Chat** ៖ `{chat_type}`\n"
+                    "════════════\n\n"
+                    "👉 **បញ្ជា 1-Tap ដើម្បីបង្វែរសារ Alert ព័ត៌មាន & Whale Wall មកក្នុង Group នេះ ៖**\n"
+                    f"`` `/admin_config alert_group_id {chat_id}` ``\n\n"
+                    "💡 _បន្ទាប់ពីកំណត់រួច សារ Alert ព័ត៌មានទាន់ហេតុការណ៍ និង Radar ត្រីបាឡែនទាំងអស់ នឹងត្រូវផ្ញើមកក្នុង Group នេះទាំងស្រុង ដោយមិនផ្ញើរំខានចូល Bot ឯកជនរបស់សមាជិកឡើយ!_"
+                )
+            else:
+                msg = (
+                    "ℹ️ **TELEGRAM CHAT ID RADAR** 📡\n"
+                    "════════════\n"
+                    f"🆔 `ID: {chat_id}` (នេះជា Chat ឯកជន)\n\n"
+                    "💡 *ដើម្បីដឹង Group ID សូម Add Bot នេះចូលទៅក្នុង Telegram Group / Channel របស់អ្នក រួចវាយពាក្យ `/group_id` នៅក្នុង Group នោះ!*"
+                )
+            if update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown")
+
+        async def set_alert_group_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                await update.effective_message.reply_text("⛔ **ACCESS DENIED**: Restricted to Super Admin.", parse_mode="Markdown")
+                return
+
+            args = context.args if hasattr(context, 'args') and context.args else []
+            target_gid = str(args[0]).strip() if args else str(update.effective_chat.id)
+
+            db.update_system_setting("alert_group_id", target_gid)
+            db.update_system_setting("alert_routing_mode", "GROUP_ONLY")
+
+            success_text = (
+                "🎯 **ALERT & WHALE WALL RADAR GROUP CONFIGURED!** 📡\n"
+                "════════════\n"
+                f"🆔 **Active Alert Group ID** ៖ `{target_gid}`\n"
+                f"🔀 **Routing Mode** ៖ `GROUP_ONLY` (100% Zero Private DM Spam)\n"
+                "════════════\n\n"
+                "✅ *ចាប់ពីពេលនេះតទៅ ៖*\n"
+                "• 📰 ដំណឹងទាន់ហេតុការណ៍ Crypto News (RSS + AI Analysis)\n"
+                "• 🐋 Whale Wall L2 Orderbook Radar (<50ms Front-Run)\n"
+                "• 🌊 On-Chain Whale Movements & Macro Events\n"
+                "👉 **ទាំងអស់នឹងត្រូវបញ្ជូនមកក្នុង Group ID នេះទាំងស្រុង! គណនី Bot ឯកជនរបស់ VIP User ម្នាក់ៗនឹងលែងទទួលសាររំខានទៀតហើយ!**"
+            )
+            if update.effective_message:
+                await update.effective_message.reply_text(success_text, parse_mode="Markdown")
+
         async def admin_nuke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -7083,183 +7335,6 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             else:
                 await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
-            return
-
-        async def admin_config_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if not await verify_user(update): return
-            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
-            if not chat_id: return
-
-            raw_lang = db.get_user_language(chat_id)
-            user_lang = str(raw_lang or 'km').lower().strip()
-            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
-                user_lang = 'km'
-            elif user_lang in ['en', 'english']:
-                user_lang = 'en'
-            elif user_lang in ['zh', 'chinese']:
-                user_lang = 'zh'
-            else:
-                user_lang = 'km'
-
-            if not (chat_id == 859271875 or db.is_admin(chat_id)):
-                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
-                if update.callback_query:
-                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
-                else:
-                    await update.effective_message.reply_text(err_msg, parse_mode="Markdown")
-                return
-
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🔄 Refresh Config", callback_data="btn_admin_config"),
-                    InlineKeyboardButton("🛡️ Toggle Breaker", callback_data="btn_toggle_breaker_toggle")
-                ],
-                [
-                    InlineKeyboardButton("📊 System Stats & PnL", callback_data="btn_admin_stats_refresh"),
-                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
-                ],
-                [
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                ]
-            ])
-
-            args = context.args if hasattr(context, 'args') else []
-
-            if not args or len(args) < 2:
-                # Fetch key system parameters
-                global_reb = db.get_system_setting("global_rebalance", "1") if hasattr(db, 'get_system_setting') else "1"
-                breaker_val = db.get_system_setting("circuit_breaker", "1") if hasattr(db, 'get_system_setting') else "1"
-                max_lev_limit = db.get_system_setting("max_leverage_limit", "20") if hasattr(db, 'get_system_setting') else "20"
-                hft_speed = db.get_system_setting("hft_speed_ms", "10") if hasattr(db, 'get_system_setting') else "10"
-                max_slippage = db.get_system_setting("max_slippage_pct", "0.5") if hasattr(db, 'get_system_setting') else "0.5"
-
-                if user_lang == 'en':
-                    msg = (
-                        "⚙️ **APEX SUPER AGI v13.00 | REAL-TIME SYSTEM CONFIG RADAR** ⚡\n"
-                        "════════════\n\n"
-                        "📊 **ACTIVE SYSTEM PARAMETERS:**\n"
-                        f"• `global_rebalance` ៖ `{global_reb}` ({'🟢 Active (Auto Rebalance ON)' if global_reb == '1' else '🔴 Disabled'})\n"
-                        f"• `circuit_breaker` ៖ `{breaker_val}` ({'🛡️ Active Protection (2% Guard)' if breaker_val == '1' else '🔴 Off'})\n"
-                        f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (Max Futures Leverage Ceiling)\n"
-                        f"• `hft_speed_ms` ៖ `{hft_speed} ms` (Sub-Second HFT Engine Speed)\n"
-                        f"• `max_slippage_pct` ៖ `{max_slippage}%` (Max Slippage Tolerance Guard)\n\n"
-                        "📋 **1-TAP PARAMETER CONTROL SYNTAX:**\n"
-                        "👉 **Toggle Global Rebalance (1/0):**\n"
-                        "`` `/admin_config global_rebalance 1` ``\n\n"
-                        "👉 **Set Max Leverage Ceiling Limit:**\n"
-                        "`` `/admin_config max_leverage_limit 20` ``\n\n"
-                        "👉 **Set HFT Engine Execution Speed (ms):**\n"
-                        "`` `/admin_config hft_speed_ms 10` ``\n"
-                        "════════════\n"
-                        "💡 _Tap Refresh Config or Admin Panel below to inspect live updates:_"
-                    )
-                elif user_lang == 'zh':
-                    msg = (
-                        "⚙️ **APEX SUPER AGI v13.00 | 实时系统参数控制台** ⚡\n"
-                        "════════════\n\n"
-                        "📊 **当前激活系统参数：**\n"
-                        f"• `global_rebalance` ៖ `{global_reb}` ({'🟢 开启 (自动再平衡开启)' if global_reb == '1' else '🔴 已禁用'})\n"
-                        f"• `circuit_breaker` ៖ `{breaker_val}` ({'🛡️ 保护激活 (2% 熔断阀门)' if breaker_val == '1' else '🔴 已关闭'})\n"
-                        f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (合约杠杆上限保护)\n"
-                        f"• `hft_speed_ms` ៖ `{hft_speed} ms` (高频引擎执行速度)\n"
-                        f"• `max_slippage_pct` ៖ `{max_slippage}%` (最大滑点容忍上限)\n\n"
-                        "📋 **1-TAP 参数修改命令：**\n"
-                        "👉 **设置全局再平衡开关 (1/0)：**\n"
-                        "`` `/admin_config global_rebalance 1` ``\n\n"
-                        "👉 **设置合约杠杆上限 (x)：**\n"
-                        "`` `/admin_config max_leverage_limit 20` ``\n\n"
-                        "👉 **设置 HFT 引擎速度 (ms)：**\n"
-                        "`` `/admin_config hft_speed_ms 10` ``\n"
-                        "════════════\n"
-                        "💡 _点击下方刷新配置或 Super Admin 面板即可进行实时调试：_"
-                    )
-                else:
-                    msg = (
-                        "⚙️ **APEX SUPER AGI v13.00 | REAL-TIME SYSTEM CONFIG RADAR** ⚡\n"
-                        "════════════\n\n"
-                        "📊 **REAL-TIME SYSTEM PARAMETERS ៖**\n"
-                        f"• `global_rebalance` ៖ `{global_reb}` ({'🟢 Active (Auto Rebalance ON)' if global_reb == '1' else '🔴 Disabled'})\n"
-                        f"• `circuit_breaker` ៖ `{breaker_val}` ({'🛡️ Active Protection (2% Guard)' if breaker_val == '1' else '🔴 Off'})\n"
-                        f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (Max Futures Leverage Ceiling)\n"
-                        f"• `hft_speed_ms` ៖ `{hft_speed} ms` (HFT Execution Engine Speed)\n"
-                        f"• `max_slippage_pct` ៖ `{max_slippage}%` (Slippage Tolerance Guard)\n\n"
-                        "📋 **1-TAP PARAMETER CONTROL SYNTAX ៖**\n"
-                        "👉 **កំណត់ Global Rebalance (1/0) ៖**\n"
-                        "`` `/admin_config global_rebalance 1` ``\n\n"
-                        "👉 **កំណត់ Max Leverage Ceiling Limit ៖**\n"
-                        "`` `/admin_config max_leverage_limit 20` ``\n\n"
-                        "👉 **កំណត់ HFT Speed (ms) ៖**\n"
-                        "`` `/admin_config hft_speed_ms 10` ``\n"
-                        "════════════\n"
-                        "💡 _ចុច Refresh Config ឬ Admin Panel ខាងក្រោម ដើម្បីគ្រប់គ្រងប្រព័ន្ធរ៉ាន់ Real-Time ៖_"
-                    )
-
-                if update.callback_query:
-                    try:
-                        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                    except Exception:
-                        await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
-                elif update.effective_message:
-                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                    await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-                else:
-                    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
-                return
-
-            key = str(args[0]).strip()
-            value = str(args[1]).strip()
-
-            db.update_system_setting(key, value)
-
-            if hasattr(db, 'log_admin_action'):
-                db.log_admin_action(chat_id, "CONFIG_UPDATE", key, f"Updated value to {value}")
-
-            if user_lang == 'en':
-                success_msg = (
-                    "⚙️ **APEX SYSTEM CONFIGURATION UPDATED!** ⚡\n"
-                    "════════════\n\n"
-                    f"🔑 **Parameter Key**: `{key}`\n"
-                    f"💎 **New Active Value**: `{value}`\n"
-                    "⚡ **Status**: `REAL-TIME PERSISTED TO DATABASE` 🟢\n"
-                    "════════════\n"
-                    "💡 _All trading engines have updated their operating parameters dynamically!_"
-                )
-            elif user_lang == 'zh':
-                success_msg = (
-                    "⚙️ **系统参数成功修改！** ⚡\n"
-                    "════════════\n\n"
-                    f"🔑 **参数名称**: `{key}`\n"
-                    f"💎 **全新生效数值**: `{value}`\n"
-                    "⚡ **状态**: `已实时保存至数据库金库` 🟢\n"
-                    "════════════\n"
-                    "💡 _所有交易引擎已实时应用全新运行参数！_"
-                )
-            else:
-                success_msg = (
-                    "⚙️ **SYSTEM CONFIGURATION UPDATED!** ⚡\n"
-                    "════════════\n\n"
-                    f"🔑 **Parameter Key** ៖ `{key}`\n"
-                    f"💎 **New Active Value** ៖ `{value}`\n"
-                    "⚡ **Status** ៖ `REAL-TIME PERSISTED TO DATABASE` 🟢\n"
-                    "════════════\n"
-                    "💡 _គ្រប់ Trading Engines ទាំងអស់បានអាប់ឌែត និងអនុវត្ត Parameter ថ្មីនេះភ្លាមៗ!_"
-                )
-
-            if update.callback_query:
-                try:
-                    await update.callback_query.edit_message_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
-                except Exception:
-                    await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
-            elif update.effective_message:
-                await update.effective_message.reply_text(success_msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
-            else:
-                await context.bot.send_message(chat_id=chat_id, text=success_msg, parse_mode="Markdown", reply_markup=keyboard)
-
-            self.log_signal.emit(f"⚙️ Admin {chat_id} UPDATED system config {key} -> {value}.")
             return
 
         async def admin_view_portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -15264,6 +15339,11 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("admin_config", admin_config_command))
         self.app.add_handler(CommandHandler("admin_broadcast", admin_broadcast_command))
         self.app.add_handler(CommandHandler("admin_view_portfolio", admin_view_portfolio_command))
+        self.app.add_handler(CommandHandler("group_id", group_id_command))
+        self.app.add_handler(CommandHandler("groupid", group_id_command))
+        self.app.add_handler(CommandHandler("get_group_id", group_id_command))
+        self.app.add_handler(CommandHandler("set_alert_group", set_alert_group_command))
+        self.app.add_handler(CommandHandler("setalertgroup", set_alert_group_command))
         self.app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
         self.app.add_handler(CommandHandler("analyze", analyze_command))
         self.app.add_handler(CommandHandler("alert", alert_command))
