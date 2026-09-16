@@ -15797,23 +15797,23 @@ class TelegramBotThread(BaseThread):
             id='ping_hf_space_job'
         )
 
-        # 🐋 Pre-Pump & 33 AI Models Autonomous Sniper Monitor (Every 20 seconds)
+        # 🐋 Pre-Pump & 33 AI Models Autonomous Sniper Monitor (Optimized 45s Cadence)
         self.scheduler.add_job(
             scheduler_tasks.pre_pump_sniper_monitor,
             'interval',
-            seconds=20,
-            max_instances=2,
+            seconds=45,
+            max_instances=3,
             coalesce=True,
             args=[self.app, self.ai_engine],
             id='pre_pump_sniper_monitor'
         )
 
-        # 🌊 Order Book Whale Wall Front-Run Sniper (Every 30 seconds)
+        # 🌊 Order Book Whale Wall Front-Run Sniper (Optimized 45s Cadence)
         self.scheduler.add_job(
             scheduler_tasks.order_book_sniper,
             'interval',
-            seconds=30,
-            max_instances=2,
+            seconds=45,
+            max_instances=3,
             coalesce=True,
             args=[self.app, self.ai_engine],
             id='order_book_sniper'
