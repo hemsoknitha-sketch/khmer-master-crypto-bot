@@ -672,6 +672,100 @@ def get_earn_balance(api_key: str, api_secret: str, asset: str = "USDT") -> floa
         print(f"⚠️ [GET EARN BALANCE ERROR]: {e}")
         return 0.0
 
+def get_total_earn_exposure(api_key: str, api_secret: str) -> tuple[float, dict]:
+    """
+    Fetches all Binance Simple Earn / Flexible Savings positions and calculates total USDT value.
+    This directly captures Binance Auto-Invest (AIP) holdings, as AIP recurring purchases are automatically
+    deposited into Simple Earn Flexible Products.
+    Returns: (total_earn_usdt, breakdown_dict)
+    """
+    try:
+        if PAPER_TRADING:
+            return 0.0, {}
+        endpoint = "/sapi/v1/simple-earn/flexible/position"
+        timestamp = (int(time.time() * 1000) + TIME_OFFSET)
+        payload = urlencode({
+            "size": 100,
+            "recvWindow": 60000,
+            "timestamp": timestamp
+        })
+        signature = generate_signature(api_secret, payload)
+        headers = {"X-MBX-APIKEY": api_key}
+        prices = get_all_prices()
+        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{payload}&signature={signature}"
+                res = requests.get(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    try:
+                        data = res.json()
+                    except Exception:
+                        continue
+                    rows = data.get('rows', []) if isinstance(data, dict) else []
+                    total_val = 0.0
+                    breakdown = {}
+                    for r in rows:
+                        asset = str(r.get('asset', ''))
+                        amt = float(r.get('totalAmount', 0.0) or 0.0)
+                        if amt <= 0:
+                            continue
+                        if asset in ["USDT", "USDC", "FDUSD", "BUSD"]:
+                            total_val += amt
+                            breakdown[asset] = {"qty": amt, "value_usdt": amt}
+                        else:
+                            pair = f"{asset}USDT"
+                            p = prices.get(pair, 0.0)
+                            v = amt * p
+                            if v >= 0.50:
+                                total_val += v
+                                breakdown[asset] = {"qty": amt, "price": p, "value_usdt": v}
+                    return round(total_val, 2), breakdown
+            except Exception:
+                continue
+        return 0.0, {}
+    except Exception as e:
+        print(f"⚠️ [GET TOTAL EARN EXPOSURE ERROR]: {e}")
+        return 0.0, {}
+
+def get_auto_invest_plans(api_key: str, api_secret: str) -> list:
+    """
+    Fetches active Binance Auto-Invest Plans (AIP / Recurring Investment).
+    Endpoint: GET /sapi/v1/lending/auto-invest/plan/list
+    """
+    try:
+        if PAPER_TRADING:
+            return []
+        endpoint = "/sapi/v1/lending/auto-invest/plan/list"
+        timestamp = (int(time.time() * 1000) + TIME_OFFSET)
+        payload = urlencode({
+            "planType": "ALL",
+            "recvWindow": 60000,
+            "timestamp": timestamp
+        })
+        signature = generate_signature(api_secret, payload)
+        headers = {"X-MBX-APIKEY": api_key}
+        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        for s_base in spot_urls:
+            try:
+                url = f"{s_base}{endpoint}?{payload}&signature={signature}"
+                res = requests.get(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    try:
+                        data = res.json()
+                    except Exception:
+                        continue
+                    if isinstance(data, dict):
+                        return data.get("plans", []) or []
+                    elif isinstance(data, list):
+                        return data
+            except Exception:
+                continue
+        return []
+    except Exception as e:
+        print(f"⚠️ [GET AUTO INVEST PLANS ERROR]: {e}")
+        return []
+
 def get_usdt_deposit_address(api_key: str, api_secret: str, network: str = "ARBITRUM") -> dict:
     """
     Fetches the user's Binance deposit address for USDT on the specified network (Default: Arbitrum One).

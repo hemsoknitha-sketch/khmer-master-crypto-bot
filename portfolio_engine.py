@@ -178,6 +178,19 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         except Exception as e:
             print(f"[PORTFOLIO] Futures position query error: {e}")
 
+    # 2b. Binance Simple Earn & Auto-Invest (AIP) & Funding Wallets
+    earn_total_usdt = 0.0
+    earn_breakdown = {}
+    funding_wallet_usdt = 0.0
+    aip_plans = []
+    if keys:
+        try:
+            earn_total_usdt, earn_breakdown = trading_engine.get_total_earn_exposure(keys[0], keys[1])
+            funding_wallet_usdt = float(trading_engine.get_funding_balance(keys[0], keys[1], "USDT") or 0.0)
+            aip_plans = trading_engine.get_auto_invest_plans(keys[0], keys[1]) or []
+        except Exception as e:
+            print(f"[PORTFOLIO] Earn/Funding/AIP query error: {e}")
+
     # 3. Active Spot Trades (From DB)
     active_spot_trades = []
     try:
@@ -483,9 +496,11 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
     # =========================================================================
     total_spot_capital = spot_usdt_free + spot_alt_exposure
     total_futures_capital = futures_wallet_usdt + futures_unrealized_pnl
+    total_earn_capital = earn_total_usdt
+    total_funding_capital = funding_wallet_usdt
     active_swaps_usd = sum(s["current_val_usd"] for s in active_smart_swaps)
     total_onchain_capital = round(active_swaps_usd + user_sol_usd + evm_bal_usd, 2)
-    total_portfolio_net_worth = round(total_spot_capital + total_futures_capital + total_onchain_capital, 2)
+    total_portfolio_net_worth = round(total_spot_capital + total_futures_capital + total_earn_capital + total_funding_capital + total_onchain_capital, 2)
 
     total_invested_usd = 0.0
     total_unrealized_pnl = 0.0
@@ -525,6 +540,11 @@ def get_full_system_portfolio_data(chat_id: int) -> dict:
         "spot_holdings": spot_holdings,
         "futures_wallet_usdt": round(futures_wallet_usdt, 2),
         "futures_unrealized_pnl": round(futures_unrealized_pnl, 2),
+        "earn_total_usdt": round(earn_total_usdt, 2),
+        "earn_breakdown": earn_breakdown,
+        "funding_wallet_usdt": round(funding_wallet_usdt, 2),
+        "aip_plans_count": len(aip_plans),
+        "aip_plans": aip_plans,
         "total_onchain_capital": round(total_onchain_capital, 2),
         "web3_wallets": web3_wallets,
         "primary_web3": primary_web3,
@@ -620,6 +640,17 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     evm_line_en = f"• 🌐 **Arbitrum/EVM Web3:** `${evm_u:,.2f} USD` ({evm_det})\n" if (evm_u > 0 or evm_det) else ""
     evm_line_km = f"• 🌐 **Arbitrum/EVM Web3 ៖** `${evm_u:,.2f} USD` ({evm_det})\n" if (evm_u > 0 or evm_det) else ""
 
+    earn_u = data.get("earn_total_usdt", 0.0)
+    earn_breakdown = data.get("earn_breakdown", {})
+    aip_cnt = data.get("aip_plans_count", 0)
+    earn_det = f" ({len(earn_breakdown)} Assets | AIP: {aip_cnt} Plans)" if (earn_breakdown or aip_cnt > 0) else ""
+    earn_line_en = f"• 🌾 **Binance Simple Earn & AIP:** `${earn_u:,.2f} USDT`{earn_det}\n" if (earn_u > 0 or aip_cnt > 0) else ""
+    earn_line_km = f"• 🌾 **Binance Simple Earn & AIP ៖** `${earn_u:,.2f} USDT`{earn_det}\n" if (earn_u > 0 or aip_cnt > 0) else ""
+
+    fund_u = data.get("funding_wallet_usdt", 0.0)
+    fund_line_en = f"• 👛 **Binance Funding Wallet:** `${fund_u:,.2f} USDT`\n" if fund_u > 0 else ""
+    fund_line_km = f"• 👛 **Binance Funding Wallet ៖** `${fund_u:,.2f} USDT`\n" if fund_u > 0 else ""
+
     # =========================================================================
     # 1. HEADER & EXECUTIVE CAPITAL SUMMARY
     # =========================================================================
@@ -636,6 +667,8 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             "🏦 **MULTI-WALLET BALANCES:**\n"
             f"• 🟡 **Binance Spot:** `${data['spot_usdt_free']:,.2f} USDT` free | `${data['spot_alt_exposure']:,.2f}` in Coins\n"
             f"• ⚡ **Binance Futures:** `${data['futures_wallet_usdt']:,.2f} USDT` balance (PnL: `${data['futures_unrealized_pnl']:+,.2f}`)\n"
+            f"{earn_line_en}"
+            f"{fund_line_en}"
             f"• ⚡ **Solana Trading Wallet:** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL` | {short_sol}) [Dedicated Hot Wallet]\n"
             f"• 🟣 **Phantom Vault (Withdraw):** {short_pvault_en}\n"
             f"{evm_line_en}"
@@ -655,6 +688,8 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             "🏦 **សមតុល្យតាមកាបូបនីមួយៗ (Multi-Wallet Balances) ៖**\n"
             f"• 🟡 **Binance Spot ៖** `${data['spot_usdt_free']:,.2f} USDT` សេរី | `${data['spot_alt_exposure']:,.2f}` កំពុងកាន់កាក់\n"
             f"• ⚡ **Binance Futures ៖** `${data['futures_wallet_usdt']:,.2f} USDT` ក្នុងកាបូប (PnL: `${data['futures_unrealized_pnl']:+,.2f}`)\n"
+            f"{earn_line_km}"
+            f"{fund_line_km}"
             f"• ⚡ **Solana Trading Wallet ៖** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL` | {short_sol}) [កាបូបជួញដូរផ្ទាល់ខ្លួន]\n"
             f"• 🟣 **Phantom Vault (ដកប្រាក់) ៖** {short_pvault_km}\n"
             f"{evm_line_km}"
