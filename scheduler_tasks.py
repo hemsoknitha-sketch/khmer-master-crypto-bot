@@ -6359,32 +6359,44 @@ async def flash_loan_autonomous_engine(app: Application):
         import flash_loan_mev_engine
         engine = flash_loan_mev_engine.flash_loan_engine
 
-        # 1. Scan Ultra-Low Fee Pegged Stablecoin Arbitrage (Fee Hurdle ~0.08%, Highest Efficiency)
-        pegged_items = await asyncio.to_thread(engine.scan_pegged_stablecoin_arbitrage)
-        profitable_items = [it for it in pegged_items if it.get("net_profit_usd", 0.0) > 0.0]
+        # 1. PILLAR 1: Scan Dedicated LST/LRT WETH Pools (Highest Arbitrum Liquidity $350M+)
+        lst_items = await asyncio.to_thread(engine.scan_lst_lrt_opportunities)
+        profitable_items = [it for it in lst_items if it.get("net_profit_usd", 0.0) > 0.0]
 
-        # 2. Scan AI Volatility & Momentum Dislocation opportunities on Arbitrum Altcoins
+        # 2. PILLAR 3: Scan Base Network Opportunities (Sub-cent gas fees)
+        if not profitable_items:
+            base_items = await asyncio.to_thread(engine.scan_dexscreener_base_opportunities)
+            profitable_items = [it for it in base_items if it.get("net_profit_usd", 0.0) > 0.0]
+
+        # 3. PILLAR 4: Scan Aave V3 / Radiant Liquidation Bounties (5% - 10% Protocol Bonus)
+        if not profitable_items:
+            liq_items = await asyncio.to_thread(engine.scan_aave_v3_liquidation_candidates)
+            profitable_items = [it for it in liq_items if it.get("status") == "LIQUIDATE_NOW_READY" and it.get("net_bounty_usd", 0.0) > 0.0]
+
+        # 4. PILLAR 5: Scan CeDeFi Asymmetric Arbitrage (Binance Spot Orderbook vs DEX Pools)
+        if not profitable_items:
+            cedefi_items = await asyncio.to_thread(engine.scan_cedefi_arbitrage_matrix)
+            profitable_items = [it for it in cedefi_items if it.get("gross_spread_pct", 0.0) >= 0.15 and it.get("net_profit_usd", 0.0) > 0.0]
+
+        # 5. Scan Ultra-Low Fee Pegged Stablecoin Arbitrage (Fee Hurdle ~0.08%)
+        if not profitable_items:
+            pegged_items = await asyncio.to_thread(engine.scan_pegged_stablecoin_arbitrage)
+            profitable_items = [it for it in pegged_items if it.get("net_profit_usd", 0.0) > 0.0]
+
+        # 6. Scan AI Volatility & Momentum Dislocation opportunities on Arbitrum Altcoins
         if not profitable_items:
             ai_vol_items = await asyncio.to_thread(engine.scan_ai_volatility_arbitrage)
             profitable_items = [it for it in ai_vol_items if it.get("net_profit_usd", 0.0) > 0.0]
 
-        # 3. Scan CEX Lead-Lag Predictive Impulses (500ms - 2,500ms Lead Advantage)
+        # 7. Scan CEX Lead-Lag Predictive Impulses (500ms - 2,500ms Lead Advantage)
         if not profitable_items:
             cex_items = await asyncio.to_thread(engine.scan_cex_lead_lag_predictive)
             profitable_items = [it for it in cex_items if it.get("estimated_lead_profit_usd", 0.0) >= 1.0]
 
-        # 4. If no high-volatility dislocation, scan DexScreener Arbitrum 99+ pools
+        # 8. Fallback to DexScreener Arbitrum 99+ pools
         if not profitable_items:
             dex_items = await asyncio.to_thread(engine.scan_dexscreener_arbitrum_opportunities)
             profitable_items = [it for it in dex_items if it.get("net_profit_usd", 0.0) > 0.0]
-
-        # 5. Fallback to CeDeFi matrix with strict live gas preservation
-        if not profitable_items:
-            import keeper_relayer
-            is_live_ready = keeper_relayer.keeper_engine.is_live_ready()
-            min_hurdle = 0.45 if is_live_ready else 0.20
-            cedefi_items = await asyncio.to_thread(engine.scan_cedefi_arbitrage_matrix)
-            profitable_items = [it for it in cedefi_items if it.get("gross_spread_pct", 0.0) >= min_hurdle and it.get("net_profit_usd", 0.0) > 0.0]
 
         if not profitable_items:
             return
