@@ -6464,7 +6464,8 @@ async def flash_loan_autonomous_engine(app: Application):
                     user_recipient=target_recipient,
                     dex_route=dex_route_val,
                     pool_fee=pool_fee_val,
-                    token_out_address=token_out_address
+                    token_out_address=token_out_address,
+                    token_in_address=top_op.get("token_in_addr", "")
                 )
                 tx_hash = exec_res.get("tx_hash", "")
                 explorer_link = exec_res.get("explorer_url") or (f"https://arbiscan.io/address/{target_recipient}" if target_recipient.startswith("0x") else "https://arbiscan.io")
@@ -6541,6 +6542,14 @@ async def flash_loan_autonomous_engine(app: Application):
             tot_trades = pnl_summary.get("total_trades", 1)
             tot_pnl = pnl_summary.get("total_net_profit_usd", net_profit)
 
+            # Build dynamic loan display
+            if borrow_asset == "WETH":
+                loan_display = f"{loan_amt / 2400.0:.2f} WETH (~${loan_amt:,.2f} USD)"
+            elif borrow_asset == "USDC":
+                loan_display = f"${loan_amt:,.2f} USDC"
+            else:
+                loan_display = f"${loan_amt:,.2f} USDT"
+
             # Build Telegram notification
             ai_score_str = f"{top_op.get('ai_volatility_score', 86.5):.1f}/100" if "ai_volatility_score" in top_op else "92.0/100"
             if user_lang == 'km':
@@ -6552,8 +6561,8 @@ async def flash_loan_autonomous_engine(app: Application):
                     f"🌐 **បណ្ដាញ Blockchain ៖** `{chain} (Atomic 1-Block)`\n"
                     f"🧠 **AI Volatility Score ៖** `{ai_score_str} (Dislocation Verified)`\n"
                     f"🏦 **ប្រភព Liquidity ៖** `Aave V3 Protocol ($1.5B+ Pool)`\n"
-                    f"💰 **ទំហំប្រាក់កម្ចី Flash Loan ៖** `${loan_amt:,.2f} USDT`\n"
-                    f"💱 **ផ្លូវដោះដូរ Arbitrage ៖** `Binance CEX` ↔ `{dex_source}`\n"
+                    f"💰 **ទំហំប្រាក់កម្ចី Flash Loan ៖** `{loan_display}`\n"
+                    f"💱 **ផ្លូវដោះដូរ Arbitrage ៖** `{dex_source}`\n"
                     f"📈 **គម្លាតចំណេញ (Gross Spread) ៖** `+{spread_pct:.3f}%`\n"
                     f"🏆 **ប្រាក់ចំណេញសុទ្ធពិតប្រាកដ (NET PROFIT) ៖** `+${net_profit:,.2f} USDT` 🟢\n\n"
                     f"💼 **កាបូបទទួលប្រាក់ចំណេញ ៖** {wallet_display}\n"
@@ -6573,8 +6582,8 @@ async def flash_loan_autonomous_engine(app: Application):
                     f"🌐 **Execution Chain:** `{chain} (Atomic 1-Block)`\n"
                     f"🧠 **AI Volatility Score:** `{ai_score_str} (Dislocation Verified)`\n"
                     f"🏦 **Liquidity Source:** `Aave V3 Protocol ($1.5B+ Pool)`\n"
-                    f"💰 **Flash Loan Borrowed:** `${loan_amt:,.2f} USDT`\n"
-                    f"💱 **Arbitrage Route:** `Binance CEX` ↔ `{dex_source}`\n"
+                    f"💰 **Flash Loan Borrowed:** `{loan_display}`\n"
+                    f"💱 **Arbitrage Route:** `{dex_source}`\n"
                     f"📈 **Gross Price Spread:** `+{spread_pct:.3f}%`\n"
                     f"🏆 **Pure Net Profit:** `+${net_profit:,.2f} USDT` 🟢\n\n"
                     f"💼 **Settlement Wallet:** {wallet_display}\n"

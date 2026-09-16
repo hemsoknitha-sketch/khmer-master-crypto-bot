@@ -473,6 +473,21 @@ class KeeperRelayerEngine:
         res["total_usd"] = round(total_usd, 2)
         return res
 
+    def get_reference_price_usd(self, asset: str) -> float:
+        """Fetches reference USD price for asset to accurately scale native loan units."""
+        asset_clean = str(asset or "").upper()
+        if "USD" in asset_clean:
+            return 1.0
+        try:
+            import requests
+            symbol = "ETHUSDT" if asset_clean in ["WETH", "ETH"] else ("BTCUSDT" if asset_clean in ["WBTC", "BTC"] else f"{asset_clean}USDT")
+            r = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}", timeout=2.0)
+            if r.status_code == 200:
+                return float(r.json().get("price", 2400.0 if "ETH" in asset_clean else 75000.0))
+        except Exception:
+            pass
+        return 2400.0 if "ETH" in asset_clean else (75000.0 if "BTC" in asset_clean else 1.0)
+
     def execute_onchain_flash_loan(
         self,
         borrow_asset: str,
@@ -532,16 +547,30 @@ class KeeperRelayerEngine:
                         "notice": f"Execution halted to protect capital: '{intermediate_token}' address missing."
                     }
 
-            # USDT decimals = 6
-            decimals = 6 if "USD" in borrow_asset.upper() else 18
-            loan_units = int(amount_usd * (10 ** decimals))
+            # Reference price & decimal normalization across WETH, WBTC, USDC, USDT
+            borrow_upper = str(borrow_asset or "USDT").upper()
+            ref_price_usd = self.get_reference_price_usd(borrow_upper)
+            if borrow_upper in ["USDT", "USDC", "USDC.E"]:
+                decimals = 6
+            elif borrow_upper in ["WETH", "ETH"]:
+                decimals = 18
+            elif borrow_upper in ["WBTC", "BTC"]:
+                decimals = 8
+            elif borrow_upper in ["DAI", "FRAX"]:
+                decimals = 18
+            else:
+                decimals = 18
+
+            # Convert USD loan amount to native token units
+            amount_native = float(amount_usd) / max(0.0001, ref_price_usd)
+            loan_units = int(amount_native * (10 ** decimals))
 
             # Institutional Safe Hurdle Floor:
             # Enforce on-chain minimum profit hurdle of $0.50 - $2.00 (or 10% of expected profit)
-            # to mathematically guarantee positive net return (E[X] > 0) without triggering
-            # spurious reverts caused by micro price fluctuations. 100% of actual profit is sent to recipient!
+            # Scaled to native token units so WETH/WBTC does not require astronomical unit values!
             safe_hurdle_usd = max(0.50, min(min_net_profit_usd * 0.10, 2.0))
-            min_profit_units = int(safe_hurdle_usd * (10 ** decimals))
+            safe_hurdle_native = safe_hurdle_usd / max(0.0001, ref_price_usd)
+            min_profit_units = int(safe_hurdle_native * (10 ** decimals))
 
             # Dynamic Low-Fee Tier Selector (Super Smart Hurdle Reducer)
             if pool_fee is None or pool_fee <= 0:

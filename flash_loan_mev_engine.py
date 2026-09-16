@@ -307,17 +307,17 @@ class FlashLoanMEVEngine:
         Dynamically detects both 2-pool direct arbitrage and 3-hop / 4-hop cyclic multi-hop routes.
         """
         arbitrum_99_tokens = [
-            # 1. Majors & Stablecoins
-            {"sym": "USDCUSDT", "pair": "USDT/USDC", "token": "USDC", "addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.08, "default_loan": 50000.0},
-            {"sym": "USDCEUSDT","pair": "USDT/USDC.e","token": "USDC.e","addr": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", "pool_fee": 100, "fee_hurdle": 0.08, "default_loan": 50000.0},
-            {"sym": "DAIUSDT",  "pair": "USDT/DAI",  "token": "DAI",  "addr": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 40000.0},
-            {"sym": "FRAXUSDT", "pair": "USDT/FRAX", "token": "FRAX", "addr": "0x17FCB070E22d7419741b6BE5900a444161730606", "pool_fee": 100, "fee_hurdle": 0.12, "default_loan": 30000.0},
-            {"sym": "MIMUSDT",  "pair": "USDT/MIM",  "token": "MIM",  "addr": "0xFEa7a6a0B346362BF88A8e0A8864424b4b1922fA", "pool_fee": 500, "fee_hurdle": 0.25, "default_loan": 25000.0},
-            {"sym": "LUSDUSDT", "pair": "USDT/LUSD", "token": "LUSD", "addr": "0x93b346b6BC2548dA6A1E7d98E9a421B42541425b", "pool_fee": 500, "fee_hurdle": 0.20, "default_loan": 20000.0},
-            {"sym": "USDEUSDT", "pair": "USDT/USDe", "token": "USDe", "addr": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 50000.0},
-            {"sym": "USDVUSDT", "pair": "USDT/USDV", "token": "USDV", "addr": "0x0E573Ce273da571743624571083086d8BEbEc255", "pool_fee": 100, "fee_hurdle": 0.12, "default_loan": 30000.0},
-            {"sym": "CRVUSDUSDT","pair":"USDT/crvUSD","token":"crvUSD","addr":"0x4988a896b1227218e4A686fdE5EabdcAbd91571f", "pool_fee": 100, "fee_hurdle": 0.12, "default_loan": 30000.0},
-            {"sym": "DOLAUSDT", "pair": "USDT/DOLA", "token": "DOLA", "addr": "0x6A7661795C374c0bFC635934efAddFf3A7Ee23b6", "pool_fee": 500, "fee_hurdle": 0.25, "default_loan": 20000.0},
+            # 1. Majors & Pegged Stablecoins (Borrow USDC or USDT directly)
+            {"sym": "USDTUSDC", "pair": "USDT/USDC", "token": "USDT", "borrow_asset": "USDC", "addr": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "token_in_addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.08, "default_loan": 50000.0},
+            {"sym": "USDCEUSDC","pair": "USDC.e/USDC","token": "USDC.e","borrow_asset": "USDC", "addr": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", "token_in_addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.08, "default_loan": 50000.0},
+            {"sym": "DAIUSDC",  "pair": "DAI/USDC",  "token": "DAI",  "borrow_asset": "USDC", "addr": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1", "token_in_addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 40000.0},
+            {"sym": "FRAXUSDC", "pair": "FRAX/USDC", "token": "FRAX", "borrow_asset": "USDC", "addr": "0x17FCB070E22d7419741b6BE5900a444161730606", "token_in_addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 30000.0},
+            {"sym": "USDEUSDC", "pair": "USDe/USDC", "token": "USDe", "borrow_asset": "USDC", "addr": "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", "token_in_addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 40000.0},
+            {"sym": "USDVUSDC", "pair": "USDV/USDC", "token": "USDV", "borrow_asset": "USDC", "addr": "0x0E573Ce273da571743624571083086d8BEbEc255", "token_in_addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.12, "default_loan": 30000.0},
+            {"sym": "CRVUSDUSDC","pair":"crvUSD/USDC","token":"crvUSD","borrow_asset": "USDC","addr":"0x4988a896b1227218e4A686fdE5EabdcAbd91571f", "token_in_addr": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 30000.0},
+            {"sym": "MIMUSDT",  "pair": "USDT/MIM",  "token": "MIM",  "borrow_asset": "USDT", "addr": "0xFEa7a6a0B346362BF88A8e0A8864424b4b1922fA", "token_in_addr": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "pool_fee": 500, "fee_hurdle": 0.25, "default_loan": 25000.0},
+            {"sym": "LUSDUSDT", "pair": "USDT/LUSD", "token": "LUSD", "borrow_asset": "USDT", "addr": "0x93b346b6BC2548dA6A1E7d98E9a421B42541425b", "token_in_addr": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "pool_fee": 500, "fee_hurdle": 0.20, "default_loan": 20000.0},
+            {"sym": "DOLAUSDT", "pair": "USDT/DOLA", "token": "DOLA", "borrow_asset": "USDT", "addr": "0x6A7661795C374c0bFC635934efAddFf3A7Ee23b6", "token_in_addr": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", "pool_fee": 500, "fee_hurdle": 0.25, "default_loan": 20000.0},
 
             # 2. Blue Chips & Liquid Staking
             {"sym": "ETHUSDT",  "pair": "WETH/USDT", "token": "WETH", "addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 500, "fee_hurdle": 0.18, "default_loan": 50000.0},
@@ -366,11 +366,11 @@ class FlashLoanMEVEngine:
             {"sym": "HOPUSDT",  "pair": "HOP/USDT",  "token": "HOP",  "addr": "0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC", "pool_fee": 3000,"fee_hurdle": 0.45, "default_loan": 10000.0},
             {"sym": "CELRUSDT", "pair": "CELR/USDT", "token": "CELR", "addr": "0x47d95393a6A99e91F60520603f908e7e31bEeb92", "pool_fee": 3000,"fee_hurdle": 0.45, "default_loan": 10000.0},
 
-            # 4. Liquid Restaking, Modular & Layer-2 Assets
-            {"sym": "WSTETHUSDT","pair":"wstETH/USDT","token":"wstETH","addr":"0x5979D7b546E38E414F7E9822514be443A4800529", "pool_fee": 500, "fee_hurdle": 0.20, "default_loan": 40000.0},
-            {"sym": "RETHUSDT", "pair": "rETH/USDT", "token": "rETH", "addr": "0xEC5dCb5Dbf4B114C9d0F65BcCAb49EC54F6A0867", "pool_fee": 500, "fee_hurdle": 0.25, "default_loan": 30000.0},
-            {"sym": "EZETHUSDT","pair": "ezETH/USDT","token":"ezETH", "addr": "0x2416092f143378750bb29b79eD961ab1954E5033", "pool_fee": 500, "fee_hurdle": 0.25, "default_loan": 30000.0},
-            {"sym": "WEETHUSDT","pair": "weETH/USDT","token":"weETH", "addr": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe", "pool_fee": 500, "fee_hurdle": 0.25, "default_loan": 30000.0},
+            # 4. Liquid Staking & Restaking (LST/LRT - Borrow WETH directly from Aave V3 $350M+ Pool)
+            {"sym": "WEETHWETH", "pair": "weETH/WETH", "token": "weETH", "borrow_asset": "WETH", "addr": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe", "token_in_addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 12000.0},
+            {"sym": "WSTETHWETH","pair": "wstETH/WETH","token": "wstETH","borrow_asset": "WETH", "addr": "0x5979D7b546E38E414F7E9822514be443A4800529", "token_in_addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 100, "fee_hurdle": 0.10, "default_loan": 25000.0},
+            {"sym": "EZETHWETH", "pair": "ezETH/WETH", "token": "ezETH", "borrow_asset": "WETH", "addr": "0x2416092f143378750bb29b79eD961ab1954E5033", "token_in_addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 500, "fee_hurdle": 0.15, "default_loan": 12000.0},
+            {"sym": "RETHWETH",  "pair": "rETH/WETH",  "token": "rETH",  "borrow_asset": "WETH", "addr": "0xEC5dCb5Dbf4B114C9d0F65BcCAb49EC54F6A0867", "token_in_addr": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", "pool_fee": 500, "fee_hurdle": 0.15, "default_loan": 12000.0},
             {"sym": "ZROUSDT",  "pair": "ZRO/USDT",  "token": "ZRO",  "addr": "0x6985884C43924282a40Cd499252f8E9164Ce5c1E", "pool_fee": 3000,"fee_hurdle": 0.35, "default_loan": 25000.0},
             {"sym": "EIGENUSDT","pair": "EIGEN/USDT","token":"EIGEN","addr": "0x599026e6A512fde1B79E33989c93Ac3945F3779e", "pool_fee": 3000,"fee_hurdle": 0.35, "default_loan": 25000.0},
             {"sym": "ONDOUSDT", "pair": "ONDO/USDT", "token": "ONDO", "addr": "0xfaba6f8e4a5e8ab82f62fe7c39859fa577269be3", "pool_fee": 3000,"fee_hurdle": 0.35, "default_loan": 25000.0},
@@ -591,12 +591,15 @@ class FlashLoanMEVEngine:
                 net_profit_usd = 0.0
                 status = "INSUFFICIENT_LIQUIDITY"
 
+            b_asset = item.get("borrow_asset", "USDT")
+            t_in_addr = item.get("token_in_addr") or ("0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" if b_asset == "WETH" else ("0xaf88d065e77c8cC2239327C5EDb3A432268e5831" if b_asset == "USDC" else "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"))
             results.append({
                 "symbol": sym,
                 "pair": pair,
                 "token": token,
                 "token_addr": item.get("addr", ""),
-                "borrow_asset": "USDT",
+                "borrow_asset": b_asset,
+                "token_in_addr": t_in_addr,
                 "intermediate_token": token,
                 "chain": "ARBITRUM",
                 "dex_source": route_desc,
