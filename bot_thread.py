@@ -13749,10 +13749,22 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
 
-            # Detect configured WebApp URL or fallback
+            # Detect configured WebApp URL or fallback with dynamic detection
             env_url = os.getenv("TELEGRAM_MINI_APP_URL") or os.getenv("WEB_GUI_URL")
+            if not env_url or "localhost" in env_url or "127.0.0.1" in env_url:
+                # Check for dynamic tunnel file on VPS
+                for path in ["/tmp/cloudflared_url.txt", "/opt/khmer-master-crypto-bot/.cloudflare_tunnel_url", os.path.expanduser("~/.cloudflare_tunnel_url")]:
+                    if os.path.exists(path):
+                        try:
+                            with open(path, "r", encoding="utf-8") as f:
+                                t_url = f.read().strip()
+                                if t_url.startswith("https://"):
+                                    env_url = t_url
+                                    break
+                        except Exception:
+                            pass
+
             env_port = os.getenv("WEB_GUI_PORT", "8080")
-            
             if not env_url:
                 env_url = f"http://localhost:{env_port}"
             
@@ -13766,13 +13778,12 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("📱 បើកផ្ទាំង Mini App Dashboard", web_app=WebAppInfo(url=app_url))
                 ])
                 keyboard_rows.append([
-                    InlineKeyboardButton("🌐 បើកលើ Browser ផ្ទាល់", url=app_url),
+                    InlineKeyboardButton("🌐 បើកលើ Browser ក្រៅ", url=app_url),
                     InlineKeyboardButton("🔄 Refresh Data", callback_data="btn_webapp_refresh")
                 ])
             else:
                 keyboard_rows.append([
-                    InlineKeyboardButton("🌐 បើកផ្ទាំង Web GUI Dashboard", url=app_url),
-                    InlineKeyboardButton("🔄 Refresh Data", callback_data="btn_webapp_refresh")
+                    InlineKeyboardButton("🔄 ពិនិត្យឡើងវិញ (Refresh)", callback_data="btn_webapp_refresh")
                 ])
 
             keyboard_rows.append([
@@ -13786,6 +13797,20 @@ class TelegramBotThread(BaseThread):
 
             keyboard = InlineKeyboardMarkup(keyboard_rows)
 
+            if is_https:
+                url_section = (
+                    f"🔗 **Web Dashboard HTTPS URL ៖**\n`{app_url}`\n\n"
+                    f"💡 _ចុចលើប៊ូតុង **[ 📱 បើកផ្ទាំង Mini App Dashboard ]** ខាងក្រោមដើម្បីបើកផ្ទាំងបញ្ជាភ្លាមៗ!_"
+                )
+            else:
+                url_section = (
+                    f"⚠️ **ត្រូវការ Cloudflare HTTPS Tunnel ៖**\n"
+                    f"ដើម្បីបើកផ្ទាំង Mini App ផ្ទាល់ក្នុង Telegram ទូរស័ព្ទដៃ Telegram តម្រូវឱ្យប្រើប្រាស់ HTTPS URL។\n\n"
+                    f"👉 **ដំណើរការកូដ ១ បន្ទាត់នេះលើ VPS ដើម្បីបើក ៖**\n"
+                    f"`cd /opt/khmer-master-crypto-bot && bash setup_cloudflare_tunnel.sh`\n\n"
+                    f"_(បន្ទាប់ពី Run រួច ចុច **Refresh** នោះប៊ូតុងនឹងបង្ហាញភ្លាមៗ)_"
+                )
+
             gui_msg = (
                 f"📱 **APEX TELEGRAM MINI APP WEB GUI DASHBOARD** 💎\n"
                 f"{ui_standards.DIVIDER_DOUBLE}\n\n"
@@ -13795,8 +13820,7 @@ class TelegramBotThread(BaseThread):
                 f"• 🏦 **Spot Wealth Vault** ៖ តាមដានការសន្សំ BTC & Physical Gold PAXG (0% Liquidation Risk)\n"
                 f"• 🤖 **5-Agent AI Swarm Radar** ៖ DeepSeek R1 + Llama 3 + CatBoost Alpha Predictions\n"
                 f"• 🎛️ **10 Engine Matrix Control** ៖ ត្រួតពិនិត្យ និងបញ្ជាដំណើរការគ្រប់ម៉ាស៊ីនវិនិយោគ\n\n"
-                f"🔗 **Web Dashboard URL ៖**\n`{app_url}`\n\n"
-                f"💡 _ចុចលើប៊ូតុងខាងក្រោមដើម្បីបើកផ្ទាំង Mini App GUI Dashboard ផ្ទាល់ក្នុង Telegram!_\n\n"
+                f"{url_section}\n\n"
                 + ui_standards.OFFICIAL_FOOTNOTE
             )
 
