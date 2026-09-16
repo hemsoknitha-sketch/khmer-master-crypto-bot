@@ -1757,11 +1757,13 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     # Position runs 100% full-size under Breakeven Armor & Golden 85% Ratchet.
     # Target harvest triggers only on macro profit target (>= +35% ROI / >= +$3.50 net) or Golden 85% Ratchet pullback.
     is_tp_harvested = False
-    if not is_hedge:
-        if is_spot:
-            is_tp_harvested = (roi_pct >= 20.0 or net_pnl_usdt >= max(2.50, bot_amt * 0.20))
-        else:
-            is_tp_harvested = (net_pnl_usdt >= max(3.50, bot_amt * 0.35) or roi_pct >= 35.0)
+    if is_hedge:
+        target_dollar_tp = max(0.20, float(target_tp) if float(target_tp) > 0 else 0.50)
+        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
+    elif is_spot:
+        is_tp_harvested = (roi_pct >= 20.0 or net_pnl_usdt >= max(2.50, bot_amt * 0.20))
+    else:
+        is_tp_harvested = (net_pnl_usdt >= max(3.50, bot_amt * 0.35) or roi_pct >= 35.0)
 
     # 📊 Real-Time Zero-Blind Heartbeat Log for Active Positions (Invariant 24)
     if peak_pnl >= 0.30 or net_pnl_usdt >= 0.30:
