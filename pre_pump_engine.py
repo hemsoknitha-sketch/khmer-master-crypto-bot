@@ -21,8 +21,8 @@ class PrePumpEngine:
 
     async def analyze_volume_anomaly(self, symbol, current_ticker):
         """
-        Detect if there is a sudden volume spike (accumulation)
-        without a massive price pump (price change < 2%).
+        Detect if there is a sudden volume spike / silent accumulation
+        without an extreme price breakout (price change between -3.0% and +2.5%).
         """
         if not current_ticker or not isinstance(current_ticker, dict):
             return False
@@ -33,8 +33,8 @@ class PrePumpEngine:
         except (ValueError, TypeError):
             return False
 
-        # We only care about accumulation BEFORE the massive pump (e.g. price change between -3% and +2%)
-        if price_change_pct > 2.0 or price_change_pct < -3.0:
+        # Accumulation happens before breakout: price flat between -3.0% and +2.5%
+        if price_change_pct > 2.5 or price_change_pct < -3.0:
             return False
 
         ts = time.time()
@@ -49,65 +49,92 @@ class PrePumpEngine:
         self.volume_history[symbol] = history
 
         if len(history) < 2:
+            # Check 15m kline volume anomaly if historical snapshot is warm-up phase
+            try:
+                klines_res = await asyncio.to_thread(requests.get, f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=15", timeout=3.5)
+                if klines_res.status_code == 200:
+                    k_data = klines_res.json()
+                    if len(k_data) >= 10:
+                        vols = [float(k[5]) for k in k_data] # quote asset volume
+                        avg_vol = np.mean(vols[:-1])
+                        latest_vol = vols[-1]
+                        if avg_vol > 0 and (latest_vol / avg_vol) >= 2.0:
+                            return True
+            except Exception:
+                pass
             return False
 
-        # Calculate volume change over the tracked period
+        # Calculate rolling 24h volume increase over the 15-minute tracking window
         oldest_volume = history[0]["volume"]
-        
         if oldest_volume <= 0:
             return False
 
         volume_increase = ((current_volume - oldest_volume) / oldest_volume) * 100
 
-        # If volume spiked by > 500% in the last 15 mins, and price is flat -> Accumulation!
-        if volume_increase > 500.0:
+        # In 15 minutes, a >= 3.0% increase in 24h rolling volume corresponds to a >= 2.9x volume velocity surge!
+        if volume_increase >= 3.0:
             return True
 
         return False
 
     async def detect_whale_wall_front_run(self, symbol):
         """
-        Scans orderbook bid walls for Whale Buy Walls >= $100,000 USDT
-        and returns (has_whale_wall, front_run_entry_price, wall_usdt).
+        Scans orderbook bid walls for Whale Buy Walls:
+        - BTCUSDT / ETHUSDT: >= $100,000 USDT
+        - Altcoins: >= $25,000 USDT
+        Returns (has_whale_wall, front_run_entry_price, wall_usdt).
         """
         depth = await asyncio.to_thread(md.get_order_book_depth, symbol, 100)
-        if not depth or "bids" not in depth or "asks" not in depth:
+        if not depth:
+            return False, 0.0, 0.0
+
+        # Correctly unpack tuple (bids, asks) or dict
+        bids, asks = (depth[0], depth[1]) if isinstance(depth, tuple) and len(depth) >= 2 else (depth.get("bids", []), depth.get("asks", []))
+        if not bids or not asks:
             return False, 0.0, 0.0
             
         try:
             import orderbook_anti_spoofing
-            spoof_res = orderbook_anti_spoofing.detect_spoofing(symbol, depth["bids"], depth["asks"])
+            spoof_res = orderbook_anti_spoofing.detect_spoofing(symbol, bids, asks)
             if spoof_res.get("is_spoofing", False):
                 print(f"🛡️ [ANTI-SPOOFING] Ignored Whale Wall Front-Run on {symbol}: Fake Wall detected (${spoof_res.get('spoof_usdt', 0):,.0f})")
                 return False, 0.0, 0.0
         except Exception:
             pass
 
-        for price_str, qty_str in depth["bids"]:
+        # Dynamic wall threshold: $100k for BTC/ETH, $25k for Altcoins
+        wall_threshold = 100000.0 if symbol in ["BTCUSDT", "ETHUSDT"] else 25000.0
+
+        for item in bids:
             try:
-                price = float(price_str)
-                qty = float(qty_str)
+                price = float(item[0])
+                qty = float(item[1])
                 wall_usdt = price * qty
                 
-                if wall_usdt >= 100000.0:
+                if wall_usdt >= wall_threshold:
                     front_run_entry = price * 1.0005  # Front-run limit order at +0.05%
                     return True, front_run_entry, wall_usdt
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, IndexError):
                 continue
                 
         return False, 0.0, 0.0
 
     async def check_orderbook_imbalance(self, symbol):
         """
-        Check if there are massive buy walls compared to sell walls (Imbalance >= 3.5x).
+        Check if there are massive buy walls compared to sell walls (Imbalance >= 2.5x).
         """
         depth = await asyncio.to_thread(md.get_order_book_depth, symbol, 100)
-        if not depth or "bids" not in depth or "asks" not in depth:
+        if not depth:
+            return False
+
+        # Correctly unpack tuple (bids, asks) or dict
+        bids, asks = (depth[0], depth[1]) if isinstance(depth, tuple) and len(depth) >= 2 else (depth.get("bids", []), depth.get("asks", []))
+        if not bids or not asks:
             return False
 
         try:
-            total_bids_vol = sum(float(p) * float(q) for p, q in depth["bids"])
-            total_asks_vol = sum(float(p) * float(q) for p, q in depth["asks"])
+            total_bids_vol = sum(float(item[0]) * float(item[1]) for item in bids)
+            total_asks_vol = sum(float(item[0]) * float(item[1]) for item in asks)
         except Exception:
             return False
 
@@ -116,8 +143,8 @@ class PrePumpEngine:
 
         imbalance_ratio = total_bids_vol / total_asks_vol
 
-        # If buy volume is at least 3.5x sell volume -> Strong Buy Wall
-        if imbalance_ratio >= 3.5:
+        # If buy volume is at least 2.5x sell volume -> Strong Buy Wall
+        if imbalance_ratio >= 2.5:
             return True
 
         return False

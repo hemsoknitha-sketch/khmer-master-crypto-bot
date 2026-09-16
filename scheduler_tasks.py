@@ -2580,8 +2580,8 @@ async def order_book_sniper(app: Application, ai_engine):
         import market_data
 # import asyncio # removed local shadowing
         
-        # Fetch Top 15 volatile coins asynchronously offloaded to worker thread
-        volatile_coins = await asyncio.to_thread(market_data.fetch_top_volatile_coins, 15, 3.0)
+        # Fetch Top 25 volatile coins asynchronously offloaded to worker thread
+        volatile_coins = await asyncio.to_thread(market_data.fetch_top_volatile_coins, 25, 2.0)
         if not volatile_coins: return
         
         if not hasattr(order_book_sniper, "last_walls"):
@@ -2597,9 +2597,12 @@ async def order_book_sniper(app: Application, ai_engine):
             target_price = 0
             whale_usdt = 0
             
+            # Dynamic Whale Wall Threshold: $100,000 for BTC/ETH; $25,000 for Altcoins
+            wall_threshold = 100000.0 if symbol in ["BTCUSDT", "ETHUSDT"] else 25000.0
+            
             for price, qty in bids:
                 value = price * qty
-                if value >= 100000: # $100k Whale Wall threshold
+                if value >= wall_threshold:
                     whale_wall_found = True
                     target_price = price
                     whale_usdt = value
@@ -4627,13 +4630,18 @@ async def pre_pump_sniper_monitor(app, ai_engine):
     if not pre_pump_users:
         return
 
-    # Check top 300 volatile coins
-    symbols = dynamic_ranking.get_top_500_coins()[:300]
+    # Scan top 35 active futures candidates (highest liquidity & momentum sweet-spot)
+    symbols = await asyncio.to_thread(dynamic_ranking.fetch_top_futures_candidates, 35)
+    if not symbols:
+        symbols = await asyncio.to_thread(dynamic_ranking.get_top_500_coins, 35)
     
-    tasks = []
-    for symbol in symbols:
-        tasks.append(pre_pump_engine.evaluate_trifecta_signal(symbol))
-        
+    # Evaluate with concurrency limiter (semaphore 6) to guarantee zero API rate-limiting
+    sem = asyncio.Semaphore(6)
+    async def bounded_eval(sym):
+        async with sem:
+            return await pre_pump_engine.evaluate_trifecta_signal(sym)
+
+    tasks = [bounded_eval(sym) for sym in symbols]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     for i, symbol in enumerate(symbols):

@@ -15786,6 +15786,39 @@ class TelegramBotThread(BaseThread):
             id='ping_hf_space_job'
         )
 
+        # 🐋 Pre-Pump & 33 AI Models Autonomous Sniper Monitor (Every 20 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.pre_pump_sniper_monitor,
+            'interval',
+            seconds=20,
+            max_instances=2,
+            coalesce=True,
+            args=[self.app, self.ai_engine],
+            id='pre_pump_sniper_monitor'
+        )
+
+        # 🌊 Order Book Whale Wall Front-Run Sniper (Every 30 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.order_book_sniper,
+            'interval',
+            seconds=30,
+            max_instances=2,
+            coalesce=True,
+            args=[self.app, self.ai_engine],
+            id='order_book_sniper'
+        )
+
+        # ⚙️ Pre-Pump 33-Model Weights Daily Synchronizer (2:00 AM Phnom Penh)
+        self.scheduler.add_job(
+            scheduler_tasks.pre_pump_daily_train_job,
+            'cron',
+            hour=2,
+            minute=0,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id='pre_pump_daily_train_job'
+        )
+
         self.log_signal.emit("⚙️ Pre-Pump Daily Train job scheduled at 2:00 AM (UTC+7).")
 
         self.scheduler.start()
