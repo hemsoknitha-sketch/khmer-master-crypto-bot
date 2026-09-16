@@ -946,26 +946,9 @@ async def check_crypto_news(app: Application, ai_engine):
                                                     "trailing": trailing_pct
                                                 }
                                     elif trade_side == "HEDGE":
-                                        # 🛡️ Delta-Neutral 0% Risk Hedge Auto-Pilot
-                                        import turbo_hedge_engine
-                                        fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
-                                        hedge_amt = min(trade_amount, fut_bal)
-                                        if hedge_amt >= 5.0:
-                                            res = await asyncio.to_thread(
-                                                turbo_hedge_engine.execute_turbo_hedge_trade,
-                                                api_key, api_secret, target_sym, hedge_amt, side="HEDGE", leverage=user_lev, chat_id=chat_id
-                                            )
-                                            if res and res.get("status") not in ["error", "skipped"]:
-                                                curr_p = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
-                                                auto_trade_state = "EXECUTED"
-                                                exec_info = {
-                                                    "engine": "/turbo_hedge (Delta-Neutral 0% Risk)",
-                                                    "symbol": target_sym,
-                                                    "amount": hedge_amt,
-                                                    "leverage": user_lev,
-                                                    "price": curr_p,
-                                                    "trailing": trailing_pct
-                                                }
+                                        # 🛡️ Volatility Expansion is strictly kept as Informational Market Advisory (Zero Auto-Order)
+                                        # Protects user margin from unexpected dual-side locks: HEDGE is NEVER auto-executed.
+                                        pass
                     except Exception as e_auto:
                         print(f"⚠️ [NEWS AUTO-TRADE NOTICE for {chat_id}]: {e_auto}")
 
@@ -1027,24 +1010,44 @@ async def check_crypto_news(app: Application, ai_engine):
                                 f"• **Capital Shield ៖** `Invariant 16: Zero bottom selling in panic zones`"
                             )
                     else:
-                        if user_l == 'khmer':
-                            action_section = (
-                                f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
-                                f"`` `{footnote_cmd}` ``\n\n"
-                                f"💡 _បើក /auto_trade ON 30 ឬ /turbo_hedge ON 50 ដើម្បីឱ្យ AI ចូលជួញដូរស្វ័យប្រវត្តិភ្លាមៗពេលមានដំណឹង!_"
-                            )
-                        elif user_l == 'chinese':
-                            action_section = (
-                                f"👉 **一键快捷执行 ៖**\n"
-                                f"`` `{footnote_cmd}` ``\n\n"
-                                f"💡 _开启 /auto_trade ON 30 或 /turbo_hedge ON 50 即可享受新闻毫秒级自动建仓!_"
-                            )
+                        if trade_side == "HEDGE":
+                            if user_l == 'khmer':
+                                action_section = (
+                                    f"👉 **ជម្រើសបញ្ជាជួញដូរ (1-Tap Optional Execution) ៖**\n"
+                                    f"`` `{footnote_cmd}` ``\n\n"
+                                    f"💡 _សេចក្តីបញ្ជាក់ ៖ ដំណឹងនេះជាប្រភេទ Volatility Expansion (ទីផ្សាររលកបោកខ្លាំង) ប្រព័ន្ធរក្សាទុកជាការជូនដំណឹង (Advisory Only) មិនបើក Auto-Hedge ដោយស្វ័យប្រវត្តិនាំឱ្យកកទុនឡើយ! អ្នកអាចចុចបើកដោយដៃតាមការស្ម័គ្រចិត្ត។_"
+                                )
+                            elif user_l == 'chinese':
+                                action_section = (
+                                    f"👉 **自选对冲指令 (1-Tap Optional Execution) ៖**\n"
+                                    f"`` `{footnote_cmd}` ``\n\n"
+                                    f"💡 _提示 ៖ 本消息属于波动率扩张（震荡洗盘），系统仅作预警提示（坚决不自动锁仓对冲），避免占用可用资金。您可按需手动点击执行。_"
+                                )
+                            else:
+                                action_section = (
+                                    f"👉 **Optional Action Execution (1-Tap Copyable) ៖**\n"
+                                    f"`` `{footnote_cmd}` ``\n\n"
+                                    f"💡 _Notice: Volatility Expansion events are strictly Advisory Only (Zero Auto-Hedge to prevent locking margin). You may execute manually at your discretion._"
+                                )
                         else:
-                            action_section = (
-                                f"👉 **1-Tap Action Execution ៖**\n"
-                                f"`` `{footnote_cmd}` ``\n\n"
-                                f"💡 _Enable /auto_trade ON 30 or /turbo_hedge ON 50 for instant automated news trading!_"
-                            )
+                            if user_l == 'khmer':
+                                action_section = (
+                                    f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
+                                    f"`` `{footnote_cmd}` ``\n\n"
+                                    f"💡 _បើក /auto_trade ON 30 ឬ /turbo_hedge ON 50 ដើម្បីឱ្យ AI ចូលជួញដូរស្វ័យប្រវត្តិភ្លាមៗពេលមានដំណឹង!_"
+                                )
+                            elif user_l == 'chinese':
+                                action_section = (
+                                    f"👉 **一键快捷执行 ៖**\n"
+                                    f"`` `{footnote_cmd}` ``\n\n"
+                                    f"💡 _开启 /auto_trade ON 30 或 /turbo_hedge ON 50 即可享受新闻毫秒级自动建仓!_"
+                                )
+                            else:
+                                action_section = (
+                                    f"👉 **1-Tap Action Execution ៖**\n"
+                                    f"`` `{footnote_cmd}` ``\n\n"
+                                    f"💡 _Enable /auto_trade ON 30 or /turbo_hedge ON 50 for instant automated news trading!_"
+                                )
 
                     # 3. Compose Final Alert Message with Invariant 13 Dividers
                     if user_l == 'khmer':
