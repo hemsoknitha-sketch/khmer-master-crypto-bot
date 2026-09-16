@@ -692,6 +692,8 @@ class FlashLoanMEVEngine:
 
             buy_p = buy_venue["price_weth"]
             sell_p = sell_venue["price_weth"]
+            buy_liq = buy_venue.get("liquidity_usd", 10000.0)
+            sell_liq = sell_venue.get("liquidity_usd", 10000.0)
             gross_spread_pct = ((sell_p - buy_p) / buy_p) * 100.0
 
             # Filter out anomalous spikes
