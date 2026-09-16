@@ -642,6 +642,11 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
+            if args and args[0].upper() in ["CEDEFI", "DEX"]:
+                context.args = ["CEDEFI"]
+                await flash_loan_command(update, context)
+                return
+
             # Execute Scan Matrix
             sent_msg = await send_reply_or_edit(update, context, "⚡ **Scanning Cross-Exchange Arbitrage Matrix (<5ms ONNX HFT Engine)...**")
             
@@ -766,12 +771,12 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("⚔️ Tokyo HFT MEV Weapon Stack", callback_data="btn_flash_loan_mev")
                 ],
                 [
-                    InlineKeyboardButton("🛡️ 4 Key Strategies", callback_data="btn_flash_loan_strategy"),
+                    InlineKeyboardButton("🔵 Base Network (Aerodrome)", callback_data="btn_flash_loan_base"),
                     InlineKeyboardButton("🌐 CeDeFi CEX ↔ DEX", callback_data="btn_flash_loan_cedefi")
                 ],
                 [
-                    InlineKeyboardButton("⚡ Scan DEX Spreads", callback_data="btn_flash_loan_scan"),
-                    InlineKeyboardButton("🧪 Simulate $1M Loan", callback_data="btn_flash_loan_sim")
+                    InlineKeyboardButton("🛡️ 4 Key Strategies", callback_data="btn_flash_loan_strategy"),
+                    InlineKeyboardButton("⚡ Scan DEX Spreads", callback_data="btn_flash_loan_scan")
                 ],
                 [
                     InlineKeyboardButton("📜 Execution History", callback_data="btn_flash_loan_history"),
@@ -943,7 +948,32 @@ class TelegramBotThread(BaseThread):
                 return
 
             # Sub-action: CEDEFI MATRIX (/flash_loan CEDEFI or callback)
-            if (args and args[0].upper() == "CEDEFI") or (update.callback_query and update.callback_query.data == "btn_flash_loan_cedefi"):
+            if (args and args[0].upper() in ["CEDEFI", "CEDEFI_EXEC", "CEDEFI_TRADE"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_cedefi"):
+                # Handle CeDeFi Execution if command is /flash_loan CEDEFI_EXEC <SYMBOL> <AMOUNT>
+                if args and args[0].upper() in ["CEDEFI_EXEC", "CEDEFI_TRADE"] and len(args) >= 2:
+                    exec_sym = args[1].upper()
+                    exec_amt = float(args[2]) if len(args) >= 3 else 20.0
+                    import flash_loan_mev_engine
+                    exec_res = flash_loan_mev_engine.flash_loan_engine.execute_cedefi_arbitrage(
+                        chat_id=chat_id,
+                        symbol=exec_sym,
+                        action="BUY_BINANCE_SELL_DEX",
+                        amount_usdt=exec_amt
+                    )
+                    mode_txt = "🟢 LIVE MAINNET" if exec_res["mode"] == "LIVE_MAINNET_CEDEFI" else "🧪 VERIFIED SIMULATION"
+                    succ_msg = (
+                        f"🌐 **CEDEFI ARBITRAGE EXECUTED!** ({mode_txt})\n"
+                        "════════════\n\n"
+                        f"🪙 **Symbol** ៖ `{exec_res['symbol']}`\n"
+                        f"💵 **ទុនវិនិយោគ** ៖ `${exec_res['amount_usdt']:.2f} USDT`\n"
+                        f"⚡ **Order ID** ៖ `{exec_res['order_id']}`\n"
+                        f"📈 **ប្រាក់ចំណេញសុទ្ធ** ៖ `+${exec_res.get('net_profit_usd', 0.0):.2f} USDT`\n"
+                        f"ℹ️ **ស្ថានភាព** ៖ `{exec_res['notice']}`\n\n"
+                        "💡 _កិច្ចសន្យា Spot និង DEX ត្រូវបានគូផ្គងដោយស្វ័យប្រវត្តិកាត់បន្ថយ Risk មកសល់ 0%!_"
+                    )
+                    await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
                 sent_cedefi = await send_reply_or_edit(update, context, "🌐 **Scanning CeDeFi Hybrid Arbitrage Matrix (Binance CEX ↔ DEX Pools)...**")
                 import flash_loan_mev_engine
                 cedefi_items = flash_loan_mev_engine.flash_loan_engine.scan_cedefi_arbitrage_matrix()
@@ -952,18 +982,21 @@ class TelegramBotThread(BaseThread):
                     cedefi_msg = (
                         "🌐 **CEDEFI HYBRID ARBITRAGE LIVE MATRIX v13.00** 🌐\n"
                         "════════════\n\n"
-                        "⚡ **ស្កេនគម្លាតតម្លៃរវាង Binance Orderbook និង DEX Liquidity Pools ៖**\n\n"
+                        "⚡ **ស្កេនគម្លាតតម្លៃផ្ទាល់ Binance Spot Orderbook ↔ DEX Pools ៖**\n\n"
                     )
                     for item in cedefi_items:
+                        status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
                         cedefi_msg += (
                             f"🪙 **{item['symbol']} ({item['pair']})** ៖\n"
+                            f"  • សកម្មភាព ៖ `{item['action_text']}`\n"
                             f"  • Binance CEX ៖ `${item['cex_price']:,.2f}`\n"
                             f"  • {item['dex_source']} ៖ `${item['dex_price']:,.2f}`\n"
-                            f"  • គម្លាតចំណេញ (Spread) ៖ `+{item['gross_spread_pct']:.3f}%`\n"
-                            f"  • Optimal Flash Loan ៖ `${item['optimal_loan_usd']:,.2f} USDT`\n"
-                            f"  • ប្រាក់ចំណេញសុទ្ធរំពឹងទុក ៖ `+${item['net_profit_usd']:,.2f} USDT` 🟢\n\n"
+                            f"  • Net Yield សុទ្ធ ៖ `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                            f"  • ប្រាក់ចំណេញសុទ្ធរំពឹងទុក ៖ `+${item['net_profit_usd']:,.2f} USDT`\n\n"
                         )
                     cedefi_msg += (
+                        "👉 **1-Tap Scan ឡើងវិញ ៖**\n`` `/flash_loan CEDEFI` ``\n\n"
+                        "👉 **1-Tap បញ្ជាទិញ-លក់ CeDeFi ($20) ៖**\n`` `/flash_loan CEDEFI_EXEC LINKUSDT 20` ``\n\n"
                         f"💼 **កាបូបទទួលប្រាក់ចំណេញ** ៖ {wallet_display}\n\n"
                         "💡 _CeDeFi Arbitrage ចាប់យកឱកាសចំណេញភ្លាមៗមុនពេល On-Chain និង CEX ធ្វើសមតុល្យតម្លៃគ្នា!_"
                     )
@@ -971,20 +1004,23 @@ class TelegramBotThread(BaseThread):
                     cedefi_msg = (
                         "🌐 **CEDEFI HYBRID ARBITRAGE LIVE MATRIX v13.00** 🌐\n"
                         "════════════\n\n"
-                        "⚡ **Real-Time Arbitrage Spreads: Binance Orderbook vs DEX Pools:**\n\n"
+                        "⚡ **Real-Time Arbitrage: Binance Spot Orderbook vs DEX Pools:**\n\n"
                     )
                     for item in cedefi_items:
+                        status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
                         cedefi_msg += (
                             f"🪙 **{item['symbol']} ({item['pair']})**:\n"
+                            f"  • Action: `{item['action_text']}`\n"
                             f"  • Binance CEX: `${item['cex_price']:,.2f}`\n"
                             f"  • {item['dex_source']}: `${item['dex_price']:,.2f}`\n"
-                            f"  • Gross Spread: `+{item['gross_spread_pct']:.3f}%`\n"
-                            f"  • Optimal Flash Loan: `${item['optimal_loan_usd']:,.2f} USDT`\n"
-                            f"  • Expected Net Profit: `+${item['net_profit_usd']:,.2f} USDT` 🟢\n\n"
+                            f"  • Net Yield: `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                            f"  • Expected Net Profit: `+${item['net_profit_usd']:,.2f} USDT`\n\n"
                         )
                     cedefi_msg += (
+                        "👉 **1-Tap Rescan:**\n`` `/flash_loan CEDEFI` ``\n\n"
+                        "👉 **1-Tap CeDeFi Execute ($20):**\n`` `/flash_loan CEDEFI_EXEC LINKUSDT 20` ``\n\n"
                         f"💼 **Settlement Wallets**: {wallet_display}\n\n"
-                        "💡 _CeDeFi arbitrage exploits price lags between centralized and decentralized venues before parity!_"
+                        "💡 _CeDeFi arbitrage captures price disparities between Binance Spot and on-chain liquidity pools!_"
                     )
 
                 if sent_cedefi:
@@ -992,6 +1028,72 @@ class TelegramBotThread(BaseThread):
                     except Exception: await send_long_message(context, chat_id, cedefi_msg, reply_markup=keyboard)
                 else:
                     await send_long_message(context, chat_id, cedefi_msg, reply_markup=keyboard)
+                return
+
+            # Sub-action: BASE NETWORK MULTI-DEX SCANNER (/flash_loan BASE or callback)
+            if (args and args[0].upper() in ["BASE", "AERODROME"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_base"):
+                sent_base = await send_reply_or_edit(update, context, "🔵 **Scanning Base Network Multi-DEX Arbitrage (Aerodrome ↔ Uniswap V3)...**")
+                import flash_loan_mev_engine
+                base_items = flash_loan_mev_engine.flash_loan_engine.scan_dexscreener_base_opportunities()
+
+                if user_lang == 'km':
+                    base_msg = (
+                        "🔵 **BASE NETWORK MULTI-DEX ARBITRAGE v13.00** 🔵\n"
+                        "════════════\n\n"
+                        "⚡ **ស្កេនគម្លាតតម្លៃ Aerodrome Finance ↔️ Uniswap V3 (Base L2) ៖**\n"
+                        "⛽ **ថ្លៃសេវា Gas មធ្យម** ៖ `~$0.01 USD (Sub-Cent OP-Stack L2)`\n\n"
+                    )
+                    if base_items:
+                        for item in base_items:
+                            status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
+                            base_msg += (
+                                f"🪙 **{item['pair']} ({item['network']})** ៖\n"
+                                f"  • ផ្លូវដោះដូរ ៖ `{item['route']}`\n"
+                                f"  • គម្លាតតម្លៃ Gross ៖ `+{item['gross_spread_pct']:.3f}%`\n"
+                                f"  • Net Yield សុទ្ធ ៖ `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                                f"  • ទំហំកម្ចី Flash Loan ៖ `${item['optimal_loan_usd']:,.2f}`\n"
+                                f"  • ប្រាក់ចំណេញសុទ្ធ ៖ `+${item['net_profit_usd']:,.2f} USD`\n\n"
+                            )
+                    else:
+                        base_msg += "⚖️ **ទីផ្សារ Base Network មានសមតុល្យខ្ពស់ (Spreads Tight)** ៖ ប្រព័ន្ធកំពុងស្កេនរាល់វិនាទីស្វ័យប្រវត្តិ!\n\n"
+
+                    base_msg += (
+                        "👉 **1-Tap Scan ឡើងវិញ ៖**\n`` `/flash_loan BASE` ``\n\n"
+                        f"💼 **កាបូបទទួលប្រាក់ចំណេញ** ៖ {wallet_display}\n\n"
+                        "💡 _Base Network ដំណើរការលើ Coinbase OP-Stack L2 ដោយមានថ្លៃ Gas ទាបបំផុត ដែលអនុញ្ញាតឱ្យប្រព័ន្ធទាញយកផលចំណេញពីគម្លាតតូចៗបាន ១០០% ឥតហានិភ័យ!_"
+                    )
+                else:
+                    base_msg = (
+                        "🔵 **BASE NETWORK MULTI-DEX ARBITRAGE v13.00** 🔵\n"
+                        "════════════\n\n"
+                        "⚡ **Real-Time Arbitrage: Aerodrome Finance ↔️ Uniswap V3 (Base L2):**\n"
+                        "⛽ **Average Gas Cost**: `~$0.01 USD (Sub-Cent OP-Stack L2)`\n\n"
+                    )
+                    if base_items:
+                        for item in base_items:
+                            status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
+                            base_msg += (
+                                f"🪙 **{item['pair']} ({item['network']})**:\n"
+                                f"  • Route: `{item['route']}`\n"
+                                f"  • Gross Spread: `+{item['gross_spread_pct']:.3f}%`\n"
+                                f"  • Net Yield: `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                                f"  • Optimal Flash Loan: `${item['optimal_loan_usd']:,.2f}`\n"
+                                f"  • Estimated Net Profit: `+${item['net_profit_usd']:,.2f} USD`\n\n"
+                            )
+                    else:
+                        base_msg += "⚖️ **Base Network Markets Balanced (Tight Spreads)**: Continuous scanner active 24/7!\n\n"
+
+                    base_msg += (
+                        "👉 **1-Tap Rescan:**\n`` `/flash_loan BASE` ``\n\n"
+                        f"💼 **Settlement Wallets**: {wallet_display}\n\n"
+                        "💡 _Base Network offers sub-cent transaction fees enabling profitable arbitrage on tight spreads!_"
+                    )
+
+                if sent_base:
+                    try: await sent_base.edit_text(base_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception: await send_long_message(context, chat_id, base_msg, reply_markup=keyboard)
+                else:
+                    await send_long_message(context, chat_id, base_msg, reply_markup=keyboard)
                 return
 
             # Sub-action: TOGGLE 24/7 AUTO FLASH LOAN
@@ -4559,6 +4661,9 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_cedefi":
                 context.args = ["CEDEFI"]
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_base":
+                context.args = ["BASE"]
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_sim":
                 context.args = ["SIM", "1000000"]

@@ -1958,6 +1958,41 @@ def record_flash_loan_trade(chat_id: int, symbol: str, pair: str, chain: str, lo
     except Exception:
         return 0
 
+def record_cedefi_arbitrage_trade(chat_id: int, symbol: str, pair: str, cex_source: str, dex_source: str, chain: str, trade_side: str, trade_amount_usdt: float, gross_spread_pct: float, net_profit_usd: float, cex_order_id: str = None, status: str = "COMPLETED") -> int:
+    """Records an executed or simulated CeDeFi Hybrid Arbitrage trade into database."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_cedefi_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            pair TEXT NOT NULL,
+            cex_source TEXT NOT NULL,
+            dex_source TEXT NOT NULL,
+            chain TEXT NOT NULL,
+            trade_side TEXT NOT NULL,
+            trade_amount_usdt REAL NOT NULL,
+            gross_spread_pct REAL NOT NULL,
+            net_profit_usd REAL NOT NULL,
+            cex_order_id TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )''')
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            '''INSERT INTO user_cedefi_trades 
+               (chat_id, symbol, pair, cex_source, dex_source, chain, trade_side, trade_amount_usdt, gross_spread_pct, net_profit_usd, cex_order_id, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (chat_id, symbol, pair, cex_source, dex_source, chain, trade_side, float(trade_amount_usdt), float(gross_spread_pct), float(net_profit_usd), str(cex_order_id or ""), str(status), now_str)
+        )
+        trade_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return trade_id
+    except Exception:
+        return 0
+
 def reset_user_flash_loan_trades(chat_id: int = None) -> int:
     """Purges simulated/paper trading records from user_flash_loan_trades table."""
     try:
