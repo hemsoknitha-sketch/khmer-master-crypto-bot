@@ -148,8 +148,8 @@ def execute_smart_spot_buy(chat_id: int, symbol: str, amount_usdt: float) -> Dic
     if executed_qty <= 0.0 and curr_p > 0:
         executed_qty = amount_usdt / curr_p
 
-    # Add to canonical active_trades table for trailing stop / auto-profit harvester
-    db.add_active_trade(chat_id, symbol, executed_qty, curr_p, stop_loss_pct=3.0)
+    # Add to canonical active_trades table for trailing stop / auto-profit harvester (1R Micro-Risk Clamp: 1.2%)
+    db.add_active_trade(chat_id, symbol, executed_qty, curr_p, stop_loss_pct=1.2)
     db.update_system_setting(f"smart_trade_{chat_id}_{symbol}_entry_price", str(curr_p))
     db.update_system_setting(f"smart_trade_{chat_id}_{symbol}_qty", str(executed_qty))
 

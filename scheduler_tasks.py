@@ -2029,10 +2029,10 @@ async def sentiment_sniper(app: Application, ai_engine):
                                         print(f"🚫 [AUTO TRADE] Skipped {symbol_to_trade}: Confidence ({confidence}%) < 88.0% Super Smart High-Winrate Threshold.")
                                         return
 
-                                    # AI Kelly Criterion Optimal Capital Allocator
-                                    rr_ratio = 2.5 if confidence >= 88.0 else 2.0
+                                    # AI Kelly Criterion Optimal Capital Allocator (5X Asymmetric Target R:R >= 5.0)
+                                    rr_ratio = 5.0 if confidence >= 88.0 else 4.0
                                     computed_amount, kelly_mult = trading_engine.calculate_kelly_optimal_size(base_amount, confidence, risk_reward_ratio=rr_ratio, min_usdt=15.0, max_usdt=50.0)
-                                    stop_loss_pct = auto_config.get('trailing_pct', 10.0)
+                                    stop_loss_pct = 1.2  # 🛡️ 1R Micro-Risk Clamp (1.2% price floor)
 
 
 
@@ -2167,23 +2167,24 @@ async def process_single_trailing_stop(app, ai_engine, trade):
         await asyncio.to_thread(db.update_active_trade_highest, trade_id, current_price)
         current_highest = current_price
         
-    # ⚡ Super Smart Take Profit Hurdle (>= +2.5% to +3.5% Net ROI):
-    # Prevents micro-scalping at +0.4% - +1.0% which gets eroded by exchange fees.
-    # Lets winning runners develop to >= +2.5% - +3.5% before ratcheting gains with healthy 0.7% retracement buffer (0.993).
+    # ⚡ Super Smart 5X Take Profit Ratchet (R:R >= 5:1):
+    # Prevents premature micro-scalping so winning runners develop to >= +6.0% - +15.0%+ targets.
     net_profit_pct = trading_engine.calculate_net_pnl_pct(buy_price, current_price) if buy_price and buy_price > 0 else 0.0
-    trailing_peak_lock = (net_profit_pct >= 2.5) and (current_price <= current_highest * 0.993)
+    trailing_peak_lock = False
     
-    stop_loss_price = current_highest * (1 - (stop_loss_pct / 100.0))
-    # Invariant 24: Breakeven Armor & Golden 85% Profit Ratchet
-    # If peak gain hits >= +3.0%, Stop Loss is unconditionally locked to Breakeven (+0.12% Net Floor)
-    # and ratchets 85% of peak profit once peak gain >= 5.0%
+    # 🛡️ 1R Micro Stop-Loss (1.2% Price Floor):
+    eff_sl_pct = min(1.2, float(stop_loss_pct)) if stop_loss_pct else 1.2
+    stop_loss_price = current_highest * (1 - (eff_sl_pct / 100.0))
+    # Invariant 24: Breakeven Armor & Golden 85% Profit Ratchet (5X Asymmetry)
+    # Once peak gain hits >= 5.0%, ratchets 85% of peak profit permanently.
     if buy_price and buy_price > 0:
         breakeven_p = buy_price * 1.0025  # Minimum +0.25% fee-clearing floor
         peak_gain_pct = ((current_highest - buy_price) / buy_price) * 100.0
         if peak_gain_pct >= 5.0:
             ratchet_p = buy_price * (1.0 + (peak_gain_pct * 0.85 / 100.0))
             stop_loss_price = max(stop_loss_price, ratchet_p, breakeven_p)
-        elif peak_gain_pct >= 3.0 or scale_out_level >= 1:
+            trailing_peak_lock = (current_price <= ratchet_p)
+        elif scale_out_level >= 1:
             stop_loss_price = max(stop_loss_price, breakeven_p)
     
     if (current_price <= stop_loss_price or trailing_peak_lock) and qty > 0:
@@ -4449,7 +4450,7 @@ async def trailing_stop_engine_job(app: Application):
 
         ticker = await asyncio.to_thread(trading_engine.get_24h_ticker, symbol)
 
-        dynamic_stop_loss = 4.0 # Default mid-point
+        dynamic_stop_loss = 1.2 # 🛡️ 1R Micro-Risk Clamp (1.2% Spot Price Floor)
 
         if ticker:
 
@@ -4459,11 +4460,11 @@ async def trailing_stop_engine_job(app: Application):
 
                 if price_change >= 10.0:
 
-                    dynamic_stop_loss = 3.0 # High volatility -> tight stop
+                    dynamic_stop_loss = 1.0 # High volatility -> tight 1.0% stop
 
                 elif price_change <= 5.0:
 
-                    dynamic_stop_loss = 5.0 # Low volatility -> wider stop
+                    dynamic_stop_loss = 1.5 # Low volatility -> 1.5% stop
 
             except (ValueError, TypeError):
 

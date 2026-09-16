@@ -1784,24 +1784,23 @@ def calculate_kelly_optimal_size(
 def calculate_asymmetric_5r_position_size(
     entry_price: float, 
     invalidation_price: float, 
-    risk_usdt: float = 0.50,
+    risk_usdt: float = 0.25,
     min_notional: float = 10.50,
     leverage: int = 10
 ) -> dict:
     """
     Wall Street Institutional Asymmetric 5R-6R Risk/Reward Calculator:
-    - 1R Risk Floor: Loss is strictly capped at $0.50 USDT per trade.
-    - Breakeven Armor: Triggered at +1.5R (+$0.75 net).
-    - TP1 (2.5R): Bank 25% cash at +$1.25 net.
-    - TP2 Moonbag Runner (5.5R - 6.0R): Rides the trend to +$2.75 - +$3.50+ net.
+    - 1R Risk Floor: Loss is strictly micro-capped at $0.20 - $0.25 USDT per trade.
+    - Growth Milestone (3R): Bank cash / ratchet at +$0.75 net.
+    - TP2 Moonbag Runner (5.5R - 6.0R): Rides the trend to +$1.50 - +$3.50+ net (5X Asymmetric Edge).
     """
     if entry_price <= 0 or invalidation_price <= 0:
         return {"valid": False, "qty": 0.0, "risk_usdt": risk_usdt}
         
     price_risk = abs(entry_price - invalidation_price)
     if price_risk <= 0:
-        # Fallback to 1.5% structural risk buffer
-        price_risk = entry_price * 0.015
+        # Fallback to 1.2% structural risk buffer
+        price_risk = entry_price * 0.012
 
     # 1. Exact Quantity Sizing: Qty * price_risk == risk_usdt
     exact_qty = risk_usdt / price_risk
@@ -1813,8 +1812,8 @@ def calculate_asymmetric_5r_position_size(
         notional = min_notional
 
     is_long = entry_price >= invalidation_price
-    tp1_price = entry_price + (price_risk * 2.5) if is_long else entry_price - (price_risk * 2.5)
-    tp2_price = entry_price + (price_risk * 5.5) if is_long else entry_price - (price_risk * 5.5)
+    tp1_price = entry_price + (price_risk * 3.0) if is_long else entry_price - (price_risk * 3.0)
+    tp2_price = entry_price + (price_risk * 6.0) if is_long else entry_price - (price_risk * 6.0)
     be_price = entry_price * (1.0015 if is_long else 0.9985)
 
     return {
@@ -1822,13 +1821,13 @@ def calculate_asymmetric_5r_position_size(
         "qty": exact_qty,
         "notional": notional,
         "risk_usdt": risk_usdt,
-        "tp1_target_usdt": risk_usdt * 2.5,
-        "tp2_target_usdt": risk_usdt * 5.5,
+        "tp1_target_usdt": risk_usdt * 3.0,
+        "tp2_target_usdt": risk_usdt * 6.0,
         "stop_loss_price": invalidation_price,
         "tp1_price": tp1_price,
         "tp2_price": tp2_price,
         "breakeven_price": be_price,
-        "risk_reward_ratio": 5.5
+        "risk_reward_ratio": 6.0
     }
 
 def close_all_futures_positions(api_key: str, api_secret: str) -> dict:

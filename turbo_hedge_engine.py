@@ -514,9 +514,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     t_json = t_res.json()
                     change_24h = float(t_json.get("priceChangePercent", 0.0) or 0.0)
                     quote_volume_24h = float(t_json.get("quoteVolume", 0.0) or 0.0)
-                    # 🛡️ INSTITUTIONAL LIQUIDITY FLOOR: Minimum $8,000,000 USDT 24h volume required
-                    if quote_volume_24h > 0 and quote_volume_24h < 8000000.0:
-                        print(f"🛡️ [LOW 24H VOLUME SHIELD] {symbol}: 24h volume ${quote_volume_24h:,.0f} < $8,000,000 -> SKIPPED!")
+                    # 🛡️ INSTITUTIONAL LIQUIDITY FLOOR: Minimum $10,000,000 USDT 24h volume required (Anti-Chop Floor)
+                    if quote_volume_24h > 0 and quote_volume_24h < 10000000.0:
+                        print(f"🛡️ [LOW 24H VOLUME SHIELD] {symbol}: 24h volume ${quote_volume_24h:,.0f} < $10,000,000 -> SKIPPED!")
                         return {"side": "SKIP", "confidence_pct": 50.0, "reason": "LOW_24H_VOLUME"}
                 
                 if not is_spot_mode:
@@ -530,9 +530,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     d_data = d_res.json()
                     bids_val = sum([float(b[0]) * float(b[1]) for b in d_data.get("bids", [])])
                     asks_val = sum([float(a[0]) * float(a[1]) for a in d_data.get("asks", [])])
-                    # 🛡️ SLIPPAGE & THIN ORDERBOOK GUARD: Minimum $50,000 top-20 depth required
-                    if (bids_val + asks_val) > 0 and (bids_val + asks_val) < 50000.0:
-                        print(f"🛡️ [THIN ORDERBOOK SHIELD] {symbol}: Top 20 depth ${bids_val+asks_val:,.0f} < $50,000 -> SKIPPED!")
+                    # 🛡️ SLIPPAGE & THIN ORDERBOOK GUARD: Minimum $60,000 top-20 depth required
+                    if (bids_val + asks_val) > 0 and (bids_val + asks_val) < 60000.0:
+                        print(f"🛡️ [THIN ORDERBOOK SHIELD] {symbol}: Top 20 depth ${bids_val+asks_val:,.0f} < $60,000 -> SKIPPED!")
                         return {"side": "SKIP", "confidence_pct": 50.0, "reason": "THIN_ORDERBOOK_DEPTH"}
                     if bids_val >= 100000.0 and bids_val > 1.8 * max(1.0, asks_val):
                         whale_bid_wall = True
@@ -622,7 +622,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             else:
                 # 🎯 STRICT MATHEMATICAL CONFLUENCE (15m/1h Macro Trend + 5m Trend + 1m Momentum)
                 # Eliminates blind counter-trend entries ("ដាច់ខាតគ្មាន Position ណាមួយចូលភ្លាមខាតភ្លាម")
-                has_vol_confirmation = (vol_ratio >= 1.15 or change_24h != 0.0)
+                has_vol_confirmation = (vol_ratio >= 1.30 or abs(change_24h) >= 2.0)
                 if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and price_change_1m >= -0.02 and 42.0 <= rsi14 <= 68.0 and has_vol_confirmation:
                     side = "BUY"
                     base_conf = 88.0
@@ -1163,7 +1163,7 @@ def execute_super_delta_neutral_hedge(api_key: str, api_secret: str, symbol: str
         "liquidation_risk": "0.0%"
     }
 
-def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount_usdt: float, side: str = "BUY", leverage: int = 75, chat_id: int = 0, target_tp: float = 2.5, **kwargs) -> dict:
+def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount_usdt: float, side: str = "BUY", leverage: int = 75, chat_id: int = 0, target_tp: float = 15.0, **kwargs) -> dict:
     """
     Executes instant Turbo Hedge order on Binance Futures or Spot with specified leverage (1x - 75x).
     - Overtrade Guard: Keyed by (chat_id, symbol) to prevent double order stacking per user.
@@ -1597,35 +1597,35 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         is_peak_locked = (peak_pnl >= 0.25 and (net_pnl_usdt <= peak_pnl * 0.85 or net_pnl_usdt < 0.15))
         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
     else:
-        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "5.0")
-        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 5.0
-        if user_custom_tp > 50.0 or user_custom_tp < 1.0:
-            user_custom_tp = 5.0
+        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
+        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
+        if user_custom_tp > 50.0 or user_custom_tp < 5.0:
+            user_custom_tp = 15.0
             try:
-                db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", "5.0")
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
             except Exception:
                 pass
         effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
         if effective_tp_pct <= 0 or effective_tp_pct > 50.0:
-            effective_tp_pct = 5.0
-        # Dynamic Target: Minimum $0.80+ net target
-        target_dollar_tp = max(0.80, bot_amt * (effective_tp_pct / 100.0))
+            effective_tp_pct = 15.0
+        # Dynamic 5X Target: Minimum $1.50+ net target (5R Asymmetric Profit Floor)
+        target_dollar_tp = max(1.50, bot_amt * (effective_tp_pct / 100.0))
 
-        # 🏆 THE GOLDEN PROFIT RATCHET & BREAKEVEN ARMOR (Strict Invariant 24)
-        # 1. Any position reaching +$0.80+ USDT or +5.0% ROI enters Golden Ratchet mode.
+        # 🏆 THE GOLDEN PROFIT RATCHET & BREAKEVEN ARMOR (Strict Invariant 24 & 5X Asymmetric Standard)
+        # 1. Any position reaching +$0.60+ USDT or +5.0% ROI enters Golden Ratchet mode.
         # 2. Retains at least 85% of peak profit (Max 15% pullback from peak).
-        # 3. Under NO circumstances can a trade with peak >= $1.50 bleed below $1.20 net.
-        has_hit_profit_peak = (peak_pnl >= 0.80 or peak_roi >= 5.0 or peak_pnl >= target_dollar_tp)
+        # 3. Premature +2.5% / $0.25 exit 100% disabled so runners develop to 5R-15R targets (+15% to +50% ROI).
+        has_hit_profit_peak = (peak_pnl >= 0.60 or peak_roi >= 5.0 or peak_pnl >= target_dollar_tp)
         is_pullback_from_peak = False
         if has_hit_profit_peak:
             pullback_threshold = peak_pnl * 0.85
-            guaranteed_floor = max(0.65, pullback_threshold)
+            guaranteed_floor = max(0.40, pullback_threshold)
             if net_pnl_usdt <= guaranteed_floor:
                 is_pullback_from_peak = True
 
         is_peak_locked = has_hit_profit_peak and is_pullback_from_peak
         # Target TP: If net PnL reaches target dollar TP and pulls back slightly (>=5%), or exceeds target
-        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.1 or net_pnl_usdt <= peak_pnl * 0.95))
+        is_tp_harvested = (net_pnl_usdt >= target_dollar_tp and (is_peak_locked or peak_pnl >= target_dollar_tp * 1.1 or net_pnl_usdt <= peak_pnl * 0.92))
 
     # 1. Fetch live 15m ATR for dynamic volatility-adaptive stops (Non-Blocking)
     atr_info = await asyncio.to_thread(market_data.get_symbol_atr, symbol, interval="15m")
@@ -1667,21 +1667,18 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             min_guaranteed_roi = 0.20
             min_guaranteed_pnl = 0.15
     elif is_spot:
-        spot_arm_roi = max(2.5, curr_atr_pct * 0.8)  # Upgraded to >= +2.5% ROI Hurdle
-        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.35, bot_amt * 0.025):
+        spot_arm_roi = max(5.0, curr_atr_pct * 1.5)  # Upgraded to >= +5.0% ROI Hurdle for 5X Asymmetry
+        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.60, bot_amt * 0.05):
             is_breakeven_armed = True
-            if peak_roi < 3.5:
-                min_guaranteed_roi = 1.80  # Net guaranteed floor >= +1.80% ROI (outperforming exchange fees)
-                min_guaranteed_pnl = 0.25
-            elif peak_roi < 5.0:
-                min_guaranteed_roi = max(2.5, peak_roi * 0.75)
+            if peak_roi < 8.0:
+                min_guaranteed_roi = max(3.5, peak_roi * 0.75)
                 min_guaranteed_pnl = max(0.40, peak_pnl * 0.75)
             else:
-                min_guaranteed_roi = max(4.0, peak_roi * 0.85)
-                min_guaranteed_pnl = max(0.60, peak_pnl * 0.85)
+                min_guaranteed_roi = max(6.5, peak_roi * 0.85)
+                min_guaranteed_pnl = max(0.70, peak_pnl * 0.85)
 
-            chandelier_stop_p = peak_mark_p - (1.5 * curr_atr_val)
-            be_spot_stop_p = entry_price * 1.0060
+            chandelier_stop_p = peak_mark_p - (2.0 * curr_atr_val)
+            be_spot_stop_p = entry_price * 1.0120
             effective_spot_stop = max(be_spot_stop_p, chandelier_stop_p)
             if mark_price <= effective_spot_stop:
                 is_chandelier_triggered = True
@@ -1706,45 +1703,40 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         else:
             peak_bounce_roi = 0.0
 
-        fut_arm_roi = 3.0  # 🛡️ Strict Invariant 24: Breakeven Armor arms at +3.0% ROI
-        is_bounce_armed = (is_derisked and (bounce_roi >= 3.0 or peak_bounce_roi >= 3.0))
-        # 🛡️ Arm Breakeven Armor at +3.0% ROI or +$0.30 net or bounce armed
-        if peak_roi >= 3.0 or roi_pct >= 3.0 or peak_pnl >= 0.30 or is_bounce_armed or scale_out_level == 1:
+        is_bounce_armed = (is_derisked and (bounce_roi >= 5.0 or peak_bounce_roi >= 5.0))
+        # 🛡️ Arm Golden Ratchet at >= +5.0% ROI or >= +$0.60 net or bounce armed (Eliminates premature +2.5% exit)
+        if peak_roi >= 5.0 or roi_pct >= 5.0 or peak_pnl >= 0.60 or is_bounce_armed or scale_out_level == 1:
             is_breakeven_armed = True
             effective_peak = max(peak_roi, peak_bounce_roi)
 
-            # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER (Strict Invariant 24 & Golden 85% Ratchet Standard):
-            # Universal Golden 85% Ratchet: Once peak profit reaches >= $0.80 or effective_peak >= 5.0% ROI,
+            # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER (Strict Invariant 24 & 5X Asymmetric Standard):
+            # Universal Golden 85% Ratchet: Once peak profit reaches >= $0.60 or effective_peak >= 5.0% ROI,
             # at least 85% of peak profit is permanently ratcheted and protected.
             ratchet_pnl_85 = peak_pnl * 0.85
             ratchet_roi_85 = effective_peak * 0.85
 
             if peak_pnl >= 3.50 or effective_peak >= 35.0:
-                min_guaranteed_pnl = max(3.00, ratchet_pnl_85)  # Locks $3.00+ floor and 85% of peak (6R)
+                min_guaranteed_pnl = max(3.00, ratchet_pnl_85)  # Locks 15R+ ($3.00+ net floor)
                 min_guaranteed_roi = max(30.0, ratchet_roi_85)
             elif peak_pnl >= 2.50 or effective_peak >= 25.0:
-                min_guaranteed_pnl = max(2.10, ratchet_pnl_85)  # Locks 5R ($2.10+ net floor)
+                min_guaranteed_pnl = max(2.10, ratchet_pnl_85)  # Locks 10R ($2.10+ net floor)
                 min_guaranteed_roi = max(20.0, ratchet_roi_85)
             elif peak_pnl >= 1.50 or effective_peak >= 15.0:
-                min_guaranteed_pnl = max(1.20, ratchet_pnl_85)  # Locks 85% of peak (3R $1.20+ net floor)
+                min_guaranteed_pnl = max(1.20, ratchet_pnl_85)  # Locks 5R ($1.20+ net floor - 5x higher than max loss!)
                 min_guaranteed_roi = max(12.0, ratchet_roi_85)
             elif peak_pnl >= 0.80 or effective_peak >= 8.0:
-                min_guaranteed_pnl = max(0.65, ratchet_pnl_85)  # Locks 85% of peak ($0.65+ net floor)
+                min_guaranteed_pnl = max(0.65, ratchet_pnl_85)  # Locks 3R ($0.65+ net floor)
                 min_guaranteed_roi = max(6.5, ratchet_roi_85)
             elif peak_pnl >= 0.50 or effective_peak >= 5.0:
-                min_guaranteed_pnl = max(0.40, ratchet_pnl_85)  # Locks 85% of peak ($0.40+ net floor)
+                min_guaranteed_pnl = max(0.40, ratchet_pnl_85)  # Locks 2R ($0.40+ net floor)
                 min_guaranteed_roi = max(4.0, ratchet_roi_85)
-            elif peak_pnl >= 0.30 or effective_peak >= 3.0:
-                # 🛡️ Invariant 24: Breakeven Armor locked at +3.0% ROI -> Super Smart Take Profit Hurdle (>= +2.2% to +2.5% ROI Floor)
-                min_guaranteed_pnl = max(0.25, peak_pnl * 0.75)  # Breakeven Armor locked (Net Profit Floor >= +$0.25 USDT - Zero Loss Guarantee)
-                min_guaranteed_roi = max(2.2, effective_peak * 0.75)
             else:
-                min_guaranteed_pnl = 0.20
-                min_guaranteed_roi = 2.0
+                min_guaranteed_pnl = 0.35
+                min_guaranteed_roi = 3.5
 
             ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
-            # Volatility-Adaptive Chandelier ATR Multiplier: 2.0x for runner wave, 1.5x at peak
-            ch_mult = 1.5 if peak_pnl >= 2.50 else 2.0
+            # Volatility-Adaptive Chandelier ATR Multiplier: 2.5x for runner wave expansion, 2.0x at peak
+            ch_mult = 2.0 if peak_pnl >= 1.50 else 2.5
             if current_side == "BUY":
                 chandelier_stop_p = peak_mark_p - (ch_mult * curr_atr_val)
                 be_fut_stop_p = ref_entry * (1.0 + (min_guaranteed_roi / (100.0 * max(1, active_lev))))
@@ -1783,7 +1775,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         mode_label = "100% FULL POSITION"
         print(f"📊 [TURBO HEDGE TRACKING ({mode_label})] {symbol}: Real PnL +${real_pnl_usdt:.2f} (Net: +${net_pnl_usdt:.2f}, ROI: +{roi_pct:.1f}%) | Peak: +${peak_pnl:.2f} | Ratchet Floor: ${guaranteed_disp:.2f} | Mark: {mark_price:.5f}")
 
-    # Stop Loss & Hard Circuit Breaker (Tightened to 1R -$0.50 USD Cap to guarantee Asymmetric Edge):
+    # Stop Loss & Hard Circuit Breaker (Tightened to 1R -$0.20 to -$0.25 USD Cap to guarantee 5X Asymmetric Edge):
     now_ts = int(time.time())
     if is_hedge:
         is_stop_loss_hit = False
@@ -1799,18 +1791,18 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         if is_breakeven_armed:
             is_stop_loss_hit = (net_pnl_usdt <= min_guaranteed_pnl or roi_pct <= min_guaranteed_roi)
         else:
-            # 🛡️ Asymmetric Risk-to-Reward (R:R >= 1:2.5) Clamped Stop Loss:
-            # Initial risk is tightly capped at 1.0x-1.5x ATR / max 3.5% - 4.0% ROI / small dollar risk
-            sl_roi_thresh = -min(4.0, max(2.5, curr_atr_pct * 0.8 * float(active_lev)))
-            sl_dollar_thresh = -max(0.50, bot_amt * 0.04)
+            # 🛡️ Asymmetric 5X Risk-to-Reward (R:R >= 1:5.0) Clamped 1R Micro Stop Loss:
+            # Initial risk is tightly capped at max 1.5% - 1.8% ROI / -$0.20 to -$0.25 USD
+            sl_roi_thresh = -min(1.8, max(1.5, curr_atr_pct * 0.5 * float(active_lev)))
+            sl_dollar_thresh = -max(0.20, bot_amt * 0.02)
             is_stop_loss_hit = (
                 (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
-                (is_spot and (net_pnl_usdt <= -max(0.50, bot_amt * 0.02) or roi_pct <= -2.0))
+                (is_spot and (net_pnl_usdt <= -max(0.15, bot_amt * 0.012) or roi_pct <= -1.2))
             )
-        # Hard Circuit Breaker: Absolute emergency safety ceiling at -8.0% ROI or -$1.00
+        # Hard Circuit Breaker: Absolute emergency safety ceiling at -3.5% ROI or -$0.35 USD
         is_hard_circuit_breaker = (
-            (not is_spot and (net_pnl_usdt <= -max(1.00, bot_amt * 0.08) or roi_pct <= -8.0)) or
-            (is_spot and (net_pnl_usdt <= -max(1.00, bot_amt * 0.05) or roi_pct <= -5.0))
+            (not is_spot and (net_pnl_usdt <= -max(0.35, bot_amt * 0.035) or roi_pct <= -3.5)) or
+            (is_spot and (net_pnl_usdt <= -max(0.25, bot_amt * 0.025) or roi_pct <= -2.5))
         )
 
     last_flip_key = f"{chat_id}_{symbol}"
@@ -2000,7 +1992,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
         if is_close_successful(close_res):
             db.remove_turbo_hedge_bot(chat_id, symbol)
-            add_symbol_cooldown(symbol, 7200)
+            add_symbol_cooldown(symbol, 10800)
             db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt, net_pnl_usdt, roi_pct, "ANTI_WHIPSAW_STOP_LOSS")
             try:
                 import macro_auto_trade_engine
@@ -2019,9 +2011,9 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                     f"🛡️ **APEX ANTI-WHIPSAW CLEAN STOP ACTIVATED!** 🛑\n"
                     f"────────────\n\n"
                     f"🪙 កាក់ ៖ `{symbol}`\n"
-                    f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (Stop Loss Floor -10.0%)\n"
+                    f"🛑 ROI កាត់ខាត ៖ `{roi_pct:.1f}%` (1R Micro Stop Loss Floor)\n"
                     f"💵 PnL ខាតជាក់ស្តែង ៖ `-${abs(net_pnl_usdt):.2f} USDT`\n"
-                    f"🔒 Anti-Whipsaw Cooldown ៖ `២ ម៉ោង Blacklist Applied (7200s)`\n"
+                    f"🔒 Anti-Whipsaw Cooldown ៖ `៣ ម៉ោង Blacklist Applied (10800s)`\n"
                     f"⚡ Binance Status ៖ `CLEAN MARKET CLOSED (<30ms)`\n\n"
                     f"🛡️ _AI កាត់បិទភ្លាមៗ ដោយមិន Flip បញ្ច្រាសទិស ធានាមិនឱ្យខាតពីរសងខាង (Zero Double-Hit) និងការពារដើមទុន ១០០%!_"
                 )

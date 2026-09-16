@@ -967,7 +967,7 @@ def execute_smart_x_futures(
             actual_leverage = min(actual_leverage, macro["max_allowed_leverage"])
 
         actual_amount = max(10.50, min(amount_usdt, fut_bal * 0.25))
-        actual_tp = max(3.5, target_tp if target_tp > 0 else 5.0)
+        actual_tp = max(15.0, target_tp if target_tp > 0 else 15.0)
     else:
         size_plan = AdaptiveKellyDrawdownGuard.calculate_optimal_gold_position(
             account_balance=fut_bal,
@@ -975,7 +975,7 @@ def execute_smart_x_futures(
         )
         actual_amount = max(10.50, min(amount_usdt, size_plan["allocated_trade_usd"]))
         actual_leverage = min(leverage, size_plan["recommended_leverage"])
-        actual_tp = max(3.5, target_tp if target_tp > 0 else 5.0)
+        actual_tp = max(15.0, target_tp if target_tp > 0 else 15.0)
 
     # 6. Determine Direction (SONIC or TURBO Gold Signal)
     if side.upper() == "AUTO":
