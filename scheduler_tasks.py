@@ -2030,9 +2030,8 @@ async def sentiment_sniper(app: Application, ai_engine):
                                         return
 
                                     # AI Kelly Criterion Optimal Capital Allocator
-                                    import trading_engine
                                     rr_ratio = 2.5 if confidence >= 88.0 else 2.0
-                                    computed_amount, kelly_mult = trading_engine.calculate_kelly_optimal_size(base_amount, confidence, risk_reward_ratio=rr_ratio, min_usdt=15.0, max_usdt=30.0)
+                                    computed_amount, kelly_mult = trading_engine.calculate_kelly_optimal_size(base_amount, confidence, risk_reward_ratio=rr_ratio, min_usdt=15.0, max_usdt=50.0)
                                     stop_loss_pct = auto_config.get('trailing_pct', 10.0)
 
 
@@ -2040,7 +2039,6 @@ async def sentiment_sniper(app: Application, ai_engine):
 
                                     
                                     # LIQUIDITY GUARD
-                                    import trading_engine
                                     available_usdt = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
                                     amount_to_trade = min(computed_amount, available_usdt)
                                     

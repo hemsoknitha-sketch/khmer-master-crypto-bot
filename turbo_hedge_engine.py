@@ -2373,10 +2373,34 @@ async def monitor_turbo_hedge_bots(app):
                     continue
 
                 # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 88.0%)
-                min_conf_threshold = 89.0 if is_recovery_mode else 88.0
-                if eval_res.get("confidence_pct", 0) < min_conf_threshold:
-                    print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
+                cand_conf = float(eval_res.get("confidence_pct", 0.0) or 0.0)
+                min_conf_threshold = 89.0 if is_recovery_mode else 85.0
+                if cand_conf < min_conf_threshold:
+                    print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({cand_conf:.1f}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                     continue
+
+                # 🧠 Dynamic AI Kelly Position Auto-Scaler (Super Smart Option A)
+                # AI Confidence >= 92%: Golden Opportunity -> Scale to $30 - $50 USDT
+                # AI Confidence 85% - 91.9%: Standard Tier -> $15 USDT (or effective_amount)
+                # AI Confidence < 85%: Hard rejection (0.0 USDT)
+                dynamic_trade_amount, kelly_mult = trading_engine.calculate_kelly_optimal_size(
+                    base_amount=effective_amount,
+                    confidence=cand_conf,
+                    risk_reward_ratio=1.5,
+                    half_kelly=True,
+                    min_usdt=15.0 if avail_bal >= 50.0 else max(5.0, min(10.5, effective_amount)),
+                    max_usdt=50.0,
+                    avail_bal=avail_bal
+                )
+                if dynamic_trade_amount <= 0.0:
+                    print(f"⚠️ [AI KELLY AUTO-SCALER CUTOFF] {c_cand} Confidence ({cand_conf:.1f}%) < 85.0%. Trade entry blocked!")
+                    continue
+
+                actual_trade_amount = dynamic_trade_amount
+                if cand_conf >= 92.0:
+                    print(f"🌟 [AI KELLY GOLDEN OPPORTUNITY ({cand_conf:.1f}%)] {c_cand}: Scaled position to ${actual_trade_amount:.2f} USDT ({kelly_mult}x multiplier) for maximum profit extraction!")
+                else:
+                    print(f"⚡ [AI KELLY STANDARD TIER ({cand_conf:.1f}%)] {c_cand}: Allocated standard ${actual_trade_amount:.2f} USDT position.")
 
                 # ⏱️ 2. Staggered Entry Shield: Enforce 30-second delay between entries to prevent rapid-fire overtrading
                 now_t = time.time()

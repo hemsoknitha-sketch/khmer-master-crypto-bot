@@ -1725,18 +1725,31 @@ def calculate_net_pnl_pct(buy_price: float, current_price: float, buy_fee_pct: f
     _, net_pnl_pct = calculate_net_pnl(buy_price, current_price, 1.0, buy_fee_pct, sell_fee_pct, symbol, side=side)
     return net_pnl_pct
 
-def calculate_kelly_optimal_size(base_amount: float, confidence: float, risk_reward_ratio: float = 1.5, half_kelly: bool = True, min_usdt: float = 15.0, max_usdt: float = 30.0) -> tuple[float, float]:
+def calculate_kelly_optimal_size(
+    base_amount: float, 
+    confidence: float, 
+    risk_reward_ratio: float = 1.5, 
+    half_kelly: bool = True, 
+    min_usdt: float = 15.0, 
+    max_usdt: float = 50.0,
+    avail_bal: float = 0.0
+) -> tuple[float, float]:
     """
-    Calculates Optimal Position Size using the Kelly Criterion:
+    Dynamic AI Kelly Position Auto-Scaler (Super Smart Institutional Sizing):
     f* = (b * p - q) / b
     
     Enforces strict Institutional Rules:
-    1. Cutoff: Returns (0.0, 0.0) if confidence < 85.0% (Only high-confidence setups).
-    2. Bounded Sizing: Clamps per-trade capital strictly between min_usdt ($15.00) and max_usdt ($30.00) USDT.
+    1. Cutoff: Returns (0.0, 0.0) if confidence < 85.0% (Rejects low confidence/choppy setups).
+    2. Standard Tier (85.0% <= confidence < 92.0%): Allocates standard base capital ($15.00 USDT or base_amount).
+    3. Golden Opportunity Tier (confidence >= 92.0%): Dynamically scales up to $30.00 - $50.00 USDT to maximize profit extraction.
+    4. Small Capital & Margin Cushion Guard: If avail_bal > 0, clamps max trade to avail_bal * 0.35 (preserves 65% free margin buffer).
     """
-    if base_amount <= 0 or confidence < 85.0:
+    if confidence < 85.0:
         return 0.0, 0.0
     
+    if base_amount <= 0:
+        base_amount = 15.0
+
     p = max(0.01, min(0.99, confidence / 100.0))
     q = 1.0 - p
     b = max(0.5, risk_reward_ratio)
@@ -1744,17 +1757,27 @@ def calculate_kelly_optimal_size(base_amount: float, confidence: float, risk_rew
     # Kelly Formula: f* = (b * p - q) / b
     f_star = (b * p - q) / b
     
-    fraction = f_star * 0.5 if half_kelly else f_star
-    multiplier = fraction * 2.0
-    
-    if confidence >= 85.0 and b >= 1.5:
-        multiplier = max(1.5, multiplier * 1.25)
-        
-    multiplier = round(max(0.50, min(2.50, multiplier)), 2)
-    optimal_amount = base_amount * multiplier
-    
-    # Strictly bound trade size between $15.00 and $30.00 USDT
+    if confidence >= 92.0:
+        # Golden Opportunity Tier: Scaled smoothly between $30.00 and $50.00 USDT
+        conf_scale = min(1.0, max(0.0, (confidence - 92.0) / 6.5)) # 92.0% -> 0.0, 98.5% -> 1.0
+        golden_target = 30.0 + (conf_scale * (max_usdt - 30.0))
+        optimal_amount = max(golden_target, base_amount * 2.0)
+        multiplier = round(optimal_amount / max(1.0, base_amount), 2)
+    else:
+        # Standard Tier (85.0% - 91.9%): Standard $15.00 USDT or user base_amount
+        fraction = f_star * 0.5 if half_kelly else f_star
+        multiplier = fraction * 2.0
+        multiplier = round(max(1.0, min(1.35, multiplier)), 2)
+        optimal_amount = max(min_usdt, base_amount * multiplier)
+
+    # Upper clamp ceiling
     optimal_amount = max(min_usdt, min(max_usdt, optimal_amount))
+
+    # 🛡️ Small Capital Margin Cushion Protection: Never exceed 35% of free balance per coin if balance is known
+    if avail_bal > 0:
+        max_safe_margin = max(min_usdt, avail_bal * 0.35)
+        optimal_amount = min(optimal_amount, max_safe_margin)
+
     optimal_amount = round(optimal_amount, 2)
     return optimal_amount, multiplier
 
