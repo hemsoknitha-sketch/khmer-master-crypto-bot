@@ -503,13 +503,21 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
             # Fetch 24h Price Change %, Funding Rate, and Orderbook Depth
             change_24h = 0.0
+            quote_volume_24h = 0.0
             funding_rate = 0.0
             whale_bid_wall = False
             whale_ask_wall = False
             try:
-                t_res = HFT_SESSION.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
+                t_url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}" if is_spot_mode else f"https://fapi.binance.com/fapi/v1/ticker/24hr?symbol={symbol}"
+                t_res = HFT_SESSION.get(t_url, timeout=2)
                 if t_res.status_code == 200:
-                    change_24h = float(t_res.json().get("priceChangePercent", 0.0))
+                    t_json = t_res.json()
+                    change_24h = float(t_json.get("priceChangePercent", 0.0) or 0.0)
+                    quote_volume_24h = float(t_json.get("quoteVolume", 0.0) or 0.0)
+                    # 🛡️ INSTITUTIONAL LIQUIDITY FLOOR: Minimum $8,000,000 USDT 24h volume required
+                    if quote_volume_24h > 0 and quote_volume_24h < 8000000.0:
+                        print(f"🛡️ [LOW 24H VOLUME SHIELD] {symbol}: 24h volume ${quote_volume_24h:,.0f} < $8,000,000 -> SKIPPED!")
+                        return {"side": "SKIP", "confidence_pct": 50.0, "reason": "LOW_24H_VOLUME"}
                 
                 if not is_spot_mode:
                     fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
@@ -522,9 +530,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     d_data = d_res.json()
                     bids_val = sum([float(b[0]) * float(b[1]) for b in d_data.get("bids", [])])
                     asks_val = sum([float(a[0]) * float(a[1]) for a in d_data.get("asks", [])])
-                    # 🛡️ SLIPPAGE & THIN ORDERBOOK GUARD: Minimum $35,000 top-20 depth required
-                    if (bids_val + asks_val) > 0 and (bids_val + asks_val) < 35000.0:
-                        print(f"🛡️ [THIN ORDERBOOK SHIELD] {symbol}: Top 20 depth ${bids_val+asks_val:,.0f} < $35,000 -> SKIPPED!")
+                    # 🛡️ SLIPPAGE & THIN ORDERBOOK GUARD: Minimum $50,000 top-20 depth required
+                    if (bids_val + asks_val) > 0 and (bids_val + asks_val) < 50000.0:
+                        print(f"🛡️ [THIN ORDERBOOK SHIELD] {symbol}: Top 20 depth ${bids_val+asks_val:,.0f} < $50,000 -> SKIPPED!")
                         return {"side": "SKIP", "confidence_pct": 50.0, "reason": "THIN_ORDERBOOK_DEPTH"}
                     if bids_val >= 100000.0 and bids_val > 1.8 * max(1.0, asks_val):
                         whale_bid_wall = True
@@ -2370,11 +2378,11 @@ async def monitor_turbo_hedge_bots(app):
                     print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({eval_res.get('confidence_pct')}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                     continue
 
-                # ⏱️ 2. Staggered Entry Shield: Enforce 15-second delay between entries to prevent simultaneous slippage
+                # ⏱️ 2. Staggered Entry Shield: Enforce 30-second delay between entries to prevent rapid-fire overtrading
                 now_t = time.time()
                 last_t = getattr(monitor_turbo_hedge_bots, '_last_stagger_entry', 0)
-                if now_t - last_t < 15.0:
-                    print(f"⏱️ [STAGGERED ENTRY SHIELD] User {target_chat_id}: Pausing candidate loop (15s staggered delay).")
+                if now_t - last_t < 30.0:
+                    print(f"⏱️ [STAGGERED ENTRY SHIELD] User {target_chat_id}: Pausing candidate loop (30s staggered delay).")
                     break
 
                 target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side

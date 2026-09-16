@@ -2025,13 +2025,13 @@ async def sentiment_sniper(app: Application, ai_engine):
                                     
                                     base_amount = auto_config.get('amount', 50.0)
                                     
-                                    if confidence < 85.0:
-                                        print(f"🚫 [AUTO TRADE] Skipped {symbol_to_trade}: Confidence ({confidence}%) < 85.0% High-Winrate Threshold.")
+                                    if confidence < 88.0:
+                                        print(f"🚫 [AUTO TRADE] Skipped {symbol_to_trade}: Confidence ({confidence}%) < 88.0% Super Smart High-Winrate Threshold.")
                                         return
 
                                     # AI Kelly Criterion Optimal Capital Allocator
                                     import trading_engine
-                                    rr_ratio = 2.0 if confidence >= 85.0 else 1.5
+                                    rr_ratio = 2.5 if confidence >= 88.0 else 2.0
                                     computed_amount, kelly_mult = trading_engine.calculate_kelly_optimal_size(base_amount, confidence, risk_reward_ratio=rr_ratio, min_usdt=15.0, max_usdt=30.0)
                                     stop_loss_pct = auto_config.get('trailing_pct', 10.0)
 
