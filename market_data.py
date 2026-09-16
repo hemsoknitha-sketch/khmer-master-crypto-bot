@@ -423,30 +423,54 @@ def fetch_top_volatile_coins(limit: int = 5, min_change_pct: float = 10.0):
         print(f"Error fetching top volatile coins: {e}")
         return []
 
+_MD_SESSION = requests.Session()
+_MD_ADAPTER = requests.adapters.HTTPAdapter(pool_connections=25, pool_maxsize=50, max_retries=1)
+_MD_SESSION.mount("https://", _MD_ADAPTER)
+_MD_SESSION.mount("http://", _MD_ADAPTER)
+
 def get_order_book_depth(symbol: str, limit: int = 100):
     """
     Fetches the Level 2 Order Book depth from Binance to identify Whale Walls.
+    Seamlessly queries Spot API first, and automatically falls back to Futures API
+    for perpetual contracts (CRCLUSDT, CROSSUSDT, KASUSDT, etc.).
     Returns bids and asks as lists of [price, quantity] floats.
     """
-    base_urls = [
-        "https://data-api.binance.vision",
-        "https://api.binance.com",
-        "https://api1.binance.com",
-        "https://api2.binance.com",
-        "https://api3.binance.com"
+    symbol = str(symbol).upper().strip()
+    # 1. Try Spot Endpoints
+    spot_urls = [
+        f"https://data-api.binance.vision/api/v3/depth?symbol={symbol}&limit={limit}",
+        f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit={limit}"
     ]
-    for base_url in base_urls:
-        url = f"{base_url}/api/v3/depth?symbol={symbol}&limit={limit}"
+    for url in spot_urls:
         try:
-            response = requests.get(url, timeout=5)
-            response.raise_for_status()
-            data = response.json()
-            bids = [[float(price), float(qty)] for price, qty in data.get('bids', [])]
-            asks = [[float(price), float(qty)] for price, qty in data.get('asks', [])]
-            return bids, asks
-        except Exception as e:
+            response = _MD_SESSION.get(url, timeout=2.5)
+            if response.status_code == 200:
+                data = response.json()
+                bids = [[float(price), float(qty)] for price, qty in data.get('bids', [])]
+                asks = [[float(price), float(qty)] for price, qty in data.get('asks', [])]
+                return bids, asks
+            elif response.status_code == 400:
+                # Invalid symbol on Spot -> Break to try Futures endpoint immediately
+                break
+        except Exception:
             continue
-    print(f"Error fetching order book for {symbol}: Network Error")
+
+    # 2. Fallback to Futures (FAPI) Endpoints for perpetual contracts
+    futures_urls = [
+        f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit={limit}",
+        f"https://dapi.binance.com/dapi/v1/depth?symbol={symbol}&limit={limit}"
+    ]
+    for url in futures_urls:
+        try:
+            response = _MD_SESSION.get(url, timeout=2.5)
+            if response.status_code == 200:
+                data = response.json()
+                bids = [[float(price), float(qty)] for price, qty in data.get('bids', [])]
+                asks = [[float(price), float(qty)] for price, qty in data.get('asks', [])]
+                return bids, asks
+        except Exception:
+            continue
+
     return [], []
 
 def get_triangular_prices():
