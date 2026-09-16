@@ -29,6 +29,7 @@ def get_public_bot_commands():
         # --- [1] INITIATION & MASTER NAVIGATION ---
         BotCommand("start", "🚀 Start Bot & Choose Language"),
         BotCommand("menu", "🎛️ Interactive Master Control Panel"),
+        BotCommand("webapp", "📱 Telegram Mini App Web GUI Dashboard"),
 
         # --- [2] SPOT INVESTMENT ENGINES (100% Spot, 0% Liquidation Risk) ---
         BotCommand("compound_grid", "📈 100% Spot Snowball Compound Grid"),

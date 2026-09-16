@@ -33,7 +33,7 @@ else:
         BaseThread = object
 
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ChatMemberHandler
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from ai_engine import AIInvestmentEngine
 import database as db
 import localization as loc
@@ -41,6 +41,7 @@ import security
 import trading_engine
 import ui_standards
 import spot_profit_harvester
+import web_gui_server
 
 def mask_sensitive_data(text: str) -> str:
     """Masks API keys and PINs from user commands before logging."""
@@ -5488,6 +5489,13 @@ class TelegramBotThread(BaseThread):
                 else:
                     context.args = []
                     await spot_harvest_command(update, context)
+            elif data in ["btn_open_webapp", "btn_webapp_dashboard", "btn_webapp_refresh"] or data.startswith("btn_webapp_"):
+                try:
+                    await update.callback_query.answer("📱 កំពុងបើក Telegram Mini App Dashboard...")
+                except Exception:
+                    pass
+                context.args = []
+                await webapp_command(update, context)
             elif data.startswith("btn_hyper_trade_"):
                 act = "ON" if "on" in data else "OFF"
                 context.args = [act]
@@ -13719,6 +13727,89 @@ class TelegramBotThread(BaseThread):
                 await msg_target.reply_text(dashboard_card, parse_mode="Markdown", reply_markup=keyboard)
             return
 
+        async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit(): user_lang = 'km'
+            elif user_lang in ['en', 'english']: user_lang = 'en'
+            elif user_lang in ['zh', 'chinese']: user_lang = 'zh'
+            else: user_lang = 'km'
+
+            msg_target = update.effective_message or update.message
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+            import ui_standards
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
+
+            # Detect configured WebApp URL or fallback
+            env_url = os.getenv("TELEGRAM_MINI_APP_URL") or os.getenv("WEB_GUI_URL")
+            env_port = os.getenv("WEB_GUI_PORT", "8080")
+            
+            if not env_url:
+                env_url = f"http://localhost:{env_port}"
+            
+            # Format the personalized URL with chat_id
+            app_url = f"{env_url.rstrip('/')}/?chat_id={chat_id}"
+            is_https = env_url.lower().startswith("https://")
+            
+            keyboard_rows = []
+            if is_https:
+                keyboard_rows.append([
+                    InlineKeyboardButton("📱 បើកផ្ទាំង Mini App Dashboard", web_app=WebAppInfo(url=app_url))
+                ])
+                keyboard_rows.append([
+                    InlineKeyboardButton("🌐 បើកលើ Browser ផ្ទាល់", url=app_url),
+                    InlineKeyboardButton("🔄 Refresh Data", callback_data="btn_webapp_refresh")
+                ])
+            else:
+                keyboard_rows.append([
+                    InlineKeyboardButton("🌐 បើកផ្ទាំង Web GUI Dashboard", url=app_url),
+                    InlineKeyboardButton("🔄 Refresh Data", callback_data="btn_webapp_refresh")
+                ])
+
+            keyboard_rows.append([
+                InlineKeyboardButton("🏦 Spot Wealth Vault", callback_data="btn_spot_harvest_toggle"),
+                InlineKeyboardButton("⚡ Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+            ])
+            keyboard_rows.append([
+                InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+            ])
+
+            keyboard = InlineKeyboardMarkup(keyboard_rows)
+
+            gui_msg = (
+                f"📱 **APEX TELEGRAM MINI APP WEB GUI DASHBOARD** 💎\n"
+                f"{ui_standards.DIVIDER_DOUBLE}\n\n"
+                f"🌟 **ផ្ទាំងបញ្ជា Portfolio & Analytics លើទូរស័ព្ទដៃយ៉ាងស្រស់ស្អាត (Cyberpunk Quant GUI):**\n\n"
+                f"• 📊 **Real-Time Equity Curve** ៖ ខ្សែកោងកំណើនទុន និង Trailing PnL ២៤/៧\n"
+                f"• ⚡ **Live Orders & Positions** ៖ ពិនិត្យ Margin, Entry, Mark, ROI% គ្រប់ Position\n"
+                f"• 🏦 **Spot Wealth Vault** ៖ តាមដានការសន្សំ BTC & Physical Gold PAXG (0% Liquidation Risk)\n"
+                f"• 🤖 **5-Agent AI Swarm Radar** ៖ DeepSeek R1 + Llama 3 + CatBoost Alpha Predictions\n"
+                f"• 🎛️ **10 Engine Matrix Control** ៖ ត្រួតពិនិត្យ និងបញ្ជាដំណើរការគ្រប់ម៉ាស៊ីនវិនិយោគ\n\n"
+                f"🔗 **Web Dashboard URL ៖**\n`{app_url}`\n\n"
+                f"💡 _ចុចលើប៊ូតុងខាងក្រោមដើម្បីបើកផ្ទាំង Mini App GUI Dashboard ផ្ទាល់ក្នុង Telegram!_\n\n"
+                + ui_standards.OFFICIAL_FOOTNOTE
+            )
+
+            if update.callback_query and update.callback_query.message:
+                try:
+                    await update.callback_query.edit_message_text(gui_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+                except Exception:
+                    pass
+            if msg_target:
+                await msg_target.reply_text(gui_msg, parse_mode="Markdown", reply_markup=keyboard)
+            return
+
         async def auto_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -16259,6 +16350,11 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("spotharvest", spot_harvest_command))
         self.app.add_handler(CommandHandler("wealth_harvest", spot_harvest_command))
         self.app.add_handler(CommandHandler("wealthharvest", spot_harvest_command))
+        self.app.add_handler(CommandHandler("webapp", webapp_command))
+        self.app.add_handler(CommandHandler("gui", webapp_command))
+        self.app.add_handler(CommandHandler("dashboard", webapp_command))
+        self.app.add_handler(CommandHandler("miniapp", webapp_command))
+        self.app.add_handler(CommandHandler("portal", webapp_command))
 
         self.app.add_handler(CommandHandler("pre_pump", pre_pump_command))
         self.app.add_handler(CommandHandler("prepump", pre_pump_command))
@@ -16808,6 +16904,12 @@ class TelegramBotThread(BaseThread):
                 asyncio.create_task(HFT_ENGINE.start_listening(self.app, self.ai_engine))
             except Exception as e_hft:
                 print(f"⚠️ [HFT FIREHOSE START NOTICE]: {e_hft}")
+
+            try:
+                import web_gui_server
+                asyncio.create_task(web_gui_server.start_web_gui_server())
+            except Exception as e_web:
+                print(f"⚠️ [WEB GUI SERVER START NOTICE]: {e_web}")
 
             while getattr(self, '_is_bot_running', True):
                 try:
