@@ -239,9 +239,10 @@ class TelegramBotThread(BaseThread):
 
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return False
+            user_id = update.effective_user.id if update.effective_user else chat_id
 
             # Check Permanent Blacklist Status
-            if hasattr(db, 'is_user_blacklisted') and db.is_user_blacklisted(chat_id):
+            if hasattr(db, 'is_user_blacklisted') and (db.is_user_blacklisted(chat_id) or db.is_user_blacklisted(user_id)):
                 if update.callback_query:
                     try: await update.callback_query.answer("❌ គណនីរបស់អ្នកត្រូវបាន Blacklist ជាអចិន្ត្រៃយ៍!", show_alert=True)
                     except Exception: pass
@@ -256,16 +257,16 @@ class TelegramBotThread(BaseThread):
             
             if update.message and update.message.text and update.message.text.startswith('/'):
                 masked_text = mask_sensitive_data(update.message.text)
-                db.log_user_activity(chat_id, "command_used", masked_text)
+                db.log_user_activity(user_id, "command_used", masked_text)
                 
             # Register user automatically
-            db.register_user(chat_id, username)
+            db.register_user(user_id, username)
             
             # Check Admin Privilege
-            is_admin_user = db.is_admin(chat_id) or (chat_id == 859271875)
-            if chat_id == 859271875:
-                if not db.is_vip(chat_id):
-                    db.set_user_license(chat_id, "Lifetime")
+            is_admin_user = (user_id == 859271875) or db.is_admin(user_id) or (chat_id == 859271875) or db.is_admin(chat_id)
+            if user_id == 859271875:
+                if not db.is_vip(user_id):
+                    db.set_user_license(user_id, "Lifetime")
 
             now = time.time()
             max_tokens = 20.0 if is_admin_user else 3.0
@@ -357,15 +358,20 @@ class TelegramBotThread(BaseThread):
             bucket['tokens'] -= 1.0
             self.spam_tracker[chat_id] = bucket
 
-            # Check VIP Status for Non-Admins
-            if not is_admin_user and not db.is_vip(chat_id):
-                raw_lang = db.get_user_language(chat_id)
+            # Check VIP Status for Non-Admins (support group commands from VIP users or registered alert group)
+            is_vip = db.is_vip(user_id) or db.is_vip(chat_id) or is_admin_user
+            alert_gid = db.get_system_setting("alert_group_id", "") if hasattr(db, 'get_system_setting') else ""
+            if alert_gid and str(chat_id).strip() == str(alert_gid).strip():
+                is_vip = True
+
+            if not is_admin_user and not is_vip:
+                raw_lang = db.get_user_language(user_id) or db.get_user_language(chat_id)
                 user_lang = str(raw_lang or 'km')
                 if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
                 msg = loc.get_text(user_lang, 'access_denied')
                 if update.effective_message:
                     await update.effective_message.reply_text(msg, parse_mode="Markdown")
-                self.log_signal.emit(f"⚠️ Access Denied for User: {username} (ID: {chat_id})")
+                self.log_signal.emit(f"⚠️ Access Denied for User: {username} (User: {user_id}, Chat: {chat_id})")
                 return False
 
             return True
