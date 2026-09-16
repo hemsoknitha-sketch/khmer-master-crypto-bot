@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import re
 import hashlib
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -701,7 +702,6 @@ class AIInvestmentEngine:
         
     def _clean_response(self, text: str) -> str:
         if not text: return ""
-        import re
         
         # 1. Remove thinking/reflection blocks wrapped in tags or code fences
         text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
