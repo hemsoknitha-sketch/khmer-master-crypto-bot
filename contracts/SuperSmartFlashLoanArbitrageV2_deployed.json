@@ -1,0 +1,13 @@
+{
+  "contract_name": "SuperSmartFlashLoanArbitrageV2",
+  "contract_address": "0x321592f6039D9a1CB497766E0935735f786E9A89",
+  "tx_hash": "0x48cc1358511b7cab958b68a8a4bd465dfea5b0f94cfdb61e011b8564107f68ea",
+  "deployer": "0xe3833dDaf7fb92b3F0e0a57169C98bd9482e9560",
+  "gas_used": 1898358,
+  "cost_eth": 4.3662234e-05,
+  "timestamp": 1789561068,
+  "network": "Arbitrum One",
+  "chain_id": 42161,
+  "balancer_vault": "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+  "aave_provider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb"
+}

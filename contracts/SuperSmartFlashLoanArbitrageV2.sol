@@ -179,7 +179,7 @@ contract SuperSmartFlashLoanArbitrageV2 is IFlashLoanSimpleReceiver, IFlashLoanR
      * @notice Constructor initializes Arbitrum One Lending Pools & DEX Routers
      * Default Arbitrum Addresses:
      *   _addressProvider: 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb (Aave V3)
-     *   _balancerVault:   0xBA12222222228d8Ba531E78428213D70034ba53B (Balancer V2 Vault 0% fee)
+     *   _balancerVault:   0xBA12222222228d8Ba445958a75a0704d566BF2C8 (Balancer V2 Vault 0% fee)
      *   _uniswapRouter:   0xE592427A0AEce92De3Edee1F18E0157C05861564 (Uniswap V3)
      *   _camelotRouter:   0xc873fEcbd354f5A56E00E710B90EF4201db2448d (Camelot V2)
      *   _sushiRouter:     0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506 (SushiSwap V3)

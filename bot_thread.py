@@ -1225,7 +1225,8 @@ class TelegramBotThread(BaseThread):
                     "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": ("Wrapped Ether (WETH)", "Arbitrum One"),
                     "0x912ce59144191c1204e64559fe8253a0e49e6548": ("Arbitrum (ARB)", "Arbitrum One"),
                     "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": ("Wrapped BTC (WBTC)", "Arbitrum One"),
-                    "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract", "Arbitrum One"),
+                    "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract V1", "Arbitrum One"),
+                    "0x321592f6039d9a1cb497766e0935735f786e9a89": ("Khmer Master Flash Loan Contract V2", "Arbitrum One"),
                     "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One")
                 }
 
@@ -1734,7 +1735,8 @@ class TelegramBotThread(BaseThread):
                 "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": ("Wrapped Ether (WETH)", "Arbitrum One"),
                 "0x912ce59144191c1204e64559fe8253a0e49e6548": ("Arbitrum (ARB)", "Arbitrum One"),
                 "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": ("Wrapped BTC (WBTC)", "Arbitrum One"),
-                "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract", "Arbitrum One"),
+                "0x1b2efecab98fcc4c4d310e4c8f7470dec70c83b9": ("Khmer Master Flash Loan Contract V1", "Arbitrum One"),
+                "0x321592f6039d9a1cb497766e0935735f786e9a89": ("Khmer Master Flash Loan Contract V2", "Arbitrum One"),
                 "0x794a61358d6845594f94dc1db02a252b5b4814ad": ("Aave V3 Pool Contract", "Arbitrum One")
             }
 
