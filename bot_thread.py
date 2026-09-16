@@ -2231,16 +2231,15 @@ class TelegramBotThread(BaseThread):
             if not data.startswith("stopall_"):
                 return
                 
-            try:
-                await query.answer()
-            except Exception:
-                pass
-            
             parts = data.split("_")
             if len(parts) != 3: return
             _, action, target_id = parts
             
             if str(chat_id) != target_id and not db.is_admin(chat_id):
+                try:
+                    await query.answer("⚠️ មិនមានសិទ្ធិទេ!", show_alert=True)
+                except Exception:
+                    pass
                 await query.message.reply_text("⚠️ មិនមានសិទ្ធិទេ!")
                 return
 
@@ -2249,16 +2248,27 @@ class TelegramBotThread(BaseThread):
                 [
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Launch Turbo Hedge", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
                 ]
             ])
             
             target_chat_id = int(target_id)
             db.stop_all_active_bots(target_chat_id)
+            db.remove_all_turbo_hedge_bots(target_chat_id)
+            db.remove_macro_trade(target_chat_id, "ALL")
+            db.set_macro_auto_trade_config(target_chat_id, False)
             db.set_auto_snipe(target_chat_id, False, 0)
             db.set_delta_neutral_config(target_chat_id, False, 0)
 
-
             if action == "soft":
+                toast = "🟢 Soft Stop: រាល់ AI Bots ត្រូវបានផ្អាក! (រក្សាកាក់ក្នុង Wallet)" if user_lang == 'km' else ("🟢 Soft Stop: All AI Bots Paused!" if user_lang == 'en' else "🟢 软停止: 所有机器人已暂停！")
+                try:
+                    await query.answer(toast)
+                except Exception:
+                    pass
                 if user_lang == 'en':
                     soft_card = (
                         "✅ **APEX SUPER AGI v13.00 | SOFT STOP COMPLETED** 🟢\n"
@@ -2290,17 +2300,31 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(soft_card, parse_mode="Markdown", reply_markup=nav_keyboard)
                 except Exception:
                     await query.message.reply_text(soft_card, parse_mode="Markdown", reply_markup=nav_keyboard)
-                self.log_signal.emit(f"🟢 Soft Stop executed for user {chat_id}.")
+                self.log_signal.emit(f"🟢 Soft Stop executed for user {target_chat_id}.")
                 
             elif action == "hard":
-                keys = db.get_user_api(chat_id)
+                toast = "🔴 Hard Stop: កំពុង Market Close រាល់ Positions..." if user_lang == 'km' else ("🔴 Hard Stop: Closing All Positions..." if user_lang == 'en' else "🔴 强平硬停止: 正在执行全部市价平仓...")
+                try:
+                    await query.answer(toast)
+                except Exception:
+                    pass
+
+                keys = db.get_user_api(target_chat_id)
                 closed_count = 0
                 if keys:
+                    try:
+                        import turbo_hedge_engine
+                        th_res = await asyncio.to_thread(turbo_hedge_engine.stop_turbo_hedge_engine, target_chat_id, "ALL")
+                        if isinstance(th_res, dict):
+                            closed_count += th_res.get("count", len(th_res.get("closed_positions", [])))
+                    except Exception as e:
+                        print(f"Error executing turbo_hedge_engine on hard stop: {e}")
+
                     try:
                         import trading_engine
                         res = await asyncio.to_thread(trading_engine.close_all_futures_positions, keys[0], keys[1])
                         if isinstance(res, dict):
-                            closed_count = res.get("closed_count", 0)
+                            closed_count = max(closed_count, res.get("closed_count", 0))
                     except Exception as e:
                         print(f"Error executing hard stop position close: {e}")
 
@@ -2338,7 +2362,7 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(hard_card, parse_mode="Markdown", reply_markup=nav_keyboard)
                 except Exception:
                     await query.message.reply_text(hard_card, parse_mode="Markdown", reply_markup=nav_keyboard)
-                self.log_signal.emit(f"🔴 Hard Stop executed for user {chat_id} ({closed_count} positions closed).")
+                self.log_signal.emit(f"🔴 Hard Stop executed for user {target_chat_id} ({closed_count} positions closed).")
 
         async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -13797,6 +13821,9 @@ class TelegramBotThread(BaseThread):
                     return
 
             db.stop_all_active_bots(chat_id)
+            db.remove_all_turbo_hedge_bots(chat_id)
+            db.remove_macro_trade(chat_id, "ALL")
+            db.set_macro_auto_trade_config(chat_id, False)
             db.set_auto_snipe(chat_id, False, 0)
             db.set_delta_neutral_config(chat_id, False, 0)
 
@@ -13804,10 +13831,18 @@ class TelegramBotThread(BaseThread):
             closed_positions_count = 0
             if keys:
                 try:
+                    import turbo_hedge_engine
+                    th_res = await asyncio.to_thread(turbo_hedge_engine.stop_turbo_hedge_engine, chat_id, "ALL")
+                    if isinstance(th_res, dict):
+                        closed_positions_count += th_res.get("count", len(th_res.get("closed_positions", [])))
+                except Exception as e:
+                    print(f"Error in turbo_hedge_engine stop_all: {e}")
+
+                try:
                     import trading_engine
                     closed_res = await asyncio.to_thread(trading_engine.close_all_futures_positions, keys[0], keys[1])
                     if isinstance(closed_res, dict):
-                        closed_positions_count = closed_res.get("closed_count", 0)
+                        closed_positions_count = max(closed_positions_count, closed_res.get("closed_count", 0))
                 except Exception as e:
                     print(f"Error auto-closing futures positions on stop_all: {e}")
 
@@ -13980,10 +14015,20 @@ class TelegramBotThread(BaseThread):
 
             db.stop_bots_for_symbol(chat_id, target_symbol)
             db.deactivate_all_bots_by_symbol(chat_id, target_symbol)
+            db.remove_turbo_hedge_bot(chat_id, target_symbol)
+            db.remove_macro_trade(chat_id, target_symbol)
 
             keys = db.get_user_api(chat_id)
             closed_pos = False
             if keys:
+                try:
+                    import turbo_hedge_engine
+                    th_single = await asyncio.to_thread(turbo_hedge_engine.stop_turbo_hedge_engine, chat_id, target_symbol)
+                    if isinstance(th_single, dict) and len(th_single.get("closed_positions", [])) > 0:
+                        closed_pos = True
+                except Exception as e:
+                    print(f"Error in turbo_hedge_engine single stop: {e}")
+
                 try:
                     import trading_engine
                     res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], target_symbol)
@@ -14056,15 +14101,6 @@ class TelegramBotThread(BaseThread):
             else:
                 await (update.effective_message or update.message).reply_text(stop_card, parse_mode="Markdown", reply_markup=reply_markup)
             self.log_signal.emit(f"🛑 Targeted Stop executed for {chat_id} on symbol {target_symbol}.")
-
-        async def stop_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            query = update.callback_query
-            await query.answer()
-            chat_id = query.message.chat.id
-            db.stop_all_active_bots(chat_id)
-            db.set_auto_snipe(chat_id, False, 0)
-            db.set_delta_neutral_config(chat_id, False, 0)
-            await query.edit_message_text("🛑 **ប្រព័ន្ធវិនិយោគទាំងអស់ត្រូវបានបិទស្វ័យប្រវត្ត 100%!**", parse_mode="Markdown")
 
         async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -15273,6 +15309,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
         self.app.add_handler(CommandHandler("report", report_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
+        self.app.add_handler(CommandHandler("stop_all", stop_all_command))
+        self.app.add_handler(CommandHandler("stopall", stop_all_command))
 
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(stop_all_callback, pattern="^stopall_"))

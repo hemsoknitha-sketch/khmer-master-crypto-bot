@@ -2709,11 +2709,23 @@ def deactivate_all_bots_by_symbol(chat_id: int, symbol):
         cursor.execute("DELETE FROM active_shorts WHERE chat_id = ? AND symbol = ?", (chat_id, symbol))
         cursor.execute("UPDATE smart_dca SET is_active = 0 WHERE chat_id = ? AND symbol = ?", (chat_id, symbol))
         cursor.execute("UPDATE infinity_matrix_bots SET status = 'STOPPED' WHERE chat_id = ? AND symbol = ?", (chat_id, symbol))
+        # 9. Turbo Hedge & Macro Trade cleanup for target symbol
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"turbo_hedge_{chat_id}_{symbol}_%",))
+        cursor.execute("DELETE FROM system_settings WHERE key = ?", (f"turbo_hedge_{chat_id}_{symbol}",))
+        cursor.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"macro_trade_{chat_id}_{symbol}_%",))
+        cursor.execute("DELETE FROM system_settings WHERE key = ?", (f"macro_trade_{chat_id}_{symbol}",))
         conn.commit()
     except Exception as e:
         print(f"Error in deactivate_all_bots_by_symbol: {e}")
     finally:
         conn.close()
+    # Explicit cache invalidation
+    try:
+        for key_suffix in ["status", "amount", "leverage", "side", "target_tp", "entry_price", "entry_timestamp", "peak_roi", "peak_pnl", "initial_margin", "active_leverage", "liq_price", "entry_leverage"]:
+            cache_delete(f"turbo_hedge_{chat_id}_{symbol}_{key_suffix}")
+            cache_delete(f"macro_trade_{chat_id}_{symbol}_{key_suffix}")
+    except Exception:
+        pass
 
 
 
@@ -3500,6 +3512,28 @@ def stop_all_active_bots(chat_id: int):
             conn.execute("UPDATE price_alerts SET is_active = 0 WHERE chat_id = ? AND is_active = 1", (chat_id,))
         except Exception:
             pass
+
+        # 15. Stop All Turbo Hedge Bots & Reset Top Mode
+        try:
+            conn.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"turbo_hedge_{chat_id}_%",))
+            conn.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (f"turbo_hedge_{chat_id}_top_mode", "0"))
+        except Exception:
+            pass
+
+        # 16. Stop Macro Auto Trade & Symbiotic Harvester
+        try:
+            conn.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (f"macro_auto_trade_{chat_id}_enabled", "0"))
+            conn.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (f"symbiotic_harvester_{chat_id}_enabled", "0"))
+            conn.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"macro_trade_{chat_id}_%",))
+        except Exception:
+            pass
+
+        # 17. Purge Active Trailing Trades & Shorts
+        try:
+            conn.execute("DELETE FROM active_trades WHERE chat_id = ?", (chat_id,))
+            conn.execute("DELETE FROM active_shorts WHERE chat_id = ?", (chat_id,))
+        except Exception:
+            pass
         
         conn.commit()
     except Exception as e:
@@ -3507,6 +3541,14 @@ def stop_all_active_bots(chat_id: int):
         conn.rollback()
     finally:
         conn.close()
+
+    # Explicit cache invalidation
+    try:
+        cache_delete(f"turbo_hedge_{chat_id}_top_mode")
+        cache_delete(f"macro_auto_trade_{chat_id}_enabled")
+        cache_delete(f"symbiotic_harvester_{chat_id}_enabled")
+    except Exception:
+        pass
 
 deactivate_all_bots = stop_all_active_bots
 
