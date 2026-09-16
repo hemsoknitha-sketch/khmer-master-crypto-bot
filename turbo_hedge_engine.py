@@ -202,7 +202,7 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
 
                 # 🛡️ STRICT EXCLUSION: Hard reject coins that surged > +20% or dumped < -20%
                 # Eliminates chasing overextended pumps/dumps (IOST, FORM, FF, XAN, etc.) prone to whale whipsaws
-                if abs_change > 20.0 or abs_change < 2.5:
+                if abs_change > 20.0 or abs_change < 1.8:
                     continue
 
                 # Check trading status via symbol info if available
@@ -219,8 +219,8 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                         # Decays rapidly as it approaches the +20% exclusion threshold
                         breakout_score = 80.0 - ((abs_change - 12.0) * 8.0)
                     else:
-                        # 2.5% <= abs_change < 3.0%
-                        breakout_score = 60.0
+                        # 1.8% <= abs_change < 3.0% (Early stage breakout runners)
+                        breakout_score = 70.0
 
                     vol_score = math.log10(max(1.0, quote_vol)) * 10.0
                     candidates.append({
@@ -611,7 +611,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 # 🎯 STRICT MATHEMATICAL CONFLUENCE (15m/1h Macro Trend + 5m Trend + 1m Momentum)
                 # Eliminates blind counter-trend entries ("ដាច់ខាតគ្មាន Position ណាមួយចូលភ្លាមខាតភ្លាម")
                 has_vol_confirmation = (vol_ratio >= 1.15 or change_24h != 0.0)
-                if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.04 and 42.0 <= rsi14 <= 68.0 and has_vol_confirmation:
+                if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and price_change_1m >= -0.02 and 42.0 <= rsi14 <= 68.0 and has_vol_confirmation:
                     side = "BUY"
                     base_conf = 88.0
                     if vol_ratio >= 2.5:
@@ -624,7 +624,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     if whale_bid_wall: base_conf += 4.0
                     confidence = min(98.5, max(88.0, base_conf))
 
-                elif is_macro_downtrend and is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.04 and 38.5 <= rsi14 <= 65.0 and has_vol_confirmation:
+                elif is_macro_downtrend and is_5m_bearish and ema5_1m < ema15_1m and price_change_1m <= 0.02 and 38.5 <= rsi14 <= 65.0 and has_vol_confirmation:
                     # Strict Invariant 16 Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)
                     if rsi14 <= 38.0:
                         side = "SKIP"
@@ -2302,11 +2302,20 @@ async def monitor_turbo_hedge_bots(app):
             if len(_failed_candidate_symbols) > 10:
                 _failed_candidate_symbols.clear()
             if user_side_input == "SPOT":
-                top_coins = get_active_high_velocity_spot_coins(limit=15)
+                top_coins = get_active_high_velocity_spot_coins(limit=25)
             else:
-                top_coins = get_active_high_velocity_coins(limit=15)
+                top_coins = get_active_high_velocity_coins(limit=30)
 
-            for c_cand in top_coins[:10]:
+            # 🌊 SYMBIOTIC COGNITIVE INJECTION: Prioritize active Macro Auto-Trade assets
+            if db.is_symbiotic_harvester_enabled(target_chat_id):
+                user_macro_trades = db.get_user_macro_trades(target_chat_id) or []
+                macro_syms = [m.get("symbol") for m in user_macro_trades if m.get("symbol")]
+                for msym in reversed(macro_syms):
+                    if msym in top_coins:
+                        top_coins.remove(msym)
+                    top_coins.insert(0, msym)
+
+            for c_cand in top_coins[:20]:
                 await asyncio.sleep(0.02)
                 # 🛡️ STRICT IN-LOOP CAP CHECK: Re-evaluate active bot count before opening new trade
                 fresh_all = db.get_active_turbo_hedge_bots()
@@ -2365,6 +2374,13 @@ async def monitor_turbo_hedge_bots(app):
                     break
 
                 target_side = user_side_input if user_side_input in ["BUY", "SELL", "SPOT"] else eval_side
+
+                # 🌊 SYMBIOTIC DUAL-ENGINE HARVESTER COORDINATION (Zero Conflict Lock)
+                if db.is_symbiotic_harvester_enabled(target_chat_id):
+                    sym_ok, sym_reason, _ = svh.evaluate_symbiotic_coordination(target_chat_id, c_cand, "turbo_hedge", target_side)
+                    if not sym_ok:
+                        print(f"🌊 [SYMBIOTIC HARVESTER GUARD] {c_cand}: Skipped /turbo_hedge entry ({sym_reason})")
+                        continue
 
                 # 🛡️ SUPER SMART ANTI-OVERSOLD SHORT GUARD (RSI <= 38.0 Bottom Trap Rejection)
                 if target_side.upper() == "SELL":
