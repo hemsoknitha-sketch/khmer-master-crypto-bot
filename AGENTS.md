@@ -45,9 +45,9 @@ When a user asks:
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 23 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 27 PILLARS)
 
-Any modification that breaks any of the following 23 invariants is considered an act of technical sabotage:
+Any modification that breaks any of the following 27 invariants is considered an act of technical sabotage:
 
 ### Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
 - **Location:** `trading_engine.py` (`place_spot_order`, `execute_spot_strategy`)
