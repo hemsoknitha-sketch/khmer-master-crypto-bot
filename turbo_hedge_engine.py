@@ -210,7 +210,7 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 if sym_info and sym_info.get("status") != "TRADING":
                     continue
 
-                if quote_vol >= 5000000.0:  # Include highly liquid futures pairs >= $5M volume to eliminate slippage
+                if quote_vol >= 10000000.0:  # Tier 1 Liquidity Fortress: Strictly require >= $10M 24h volume to eliminate low-cap slippage
                     # 🎯 EARLY BREAKOUT SWEET-SPOT SCORING (+3.0% to +12.0% Golden Window)
                     if 3.0 <= abs_change <= 12.0:
                         # Maximum score in the prime early breakout window (peak around 7.0% - 8.0%)
@@ -522,6 +522,10 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     d_data = d_res.json()
                     bids_val = sum([float(b[0]) * float(b[1]) for b in d_data.get("bids", [])])
                     asks_val = sum([float(a[0]) * float(a[1]) for a in d_data.get("asks", [])])
+                    # 🛡️ SLIPPAGE & THIN ORDERBOOK GUARD: Minimum $35,000 top-20 depth required
+                    if (bids_val + asks_val) > 0 and (bids_val + asks_val) < 35000.0:
+                        print(f"🛡️ [THIN ORDERBOOK SHIELD] {symbol}: Top 20 depth ${bids_val+asks_val:,.0f} < $35,000 -> SKIPPED!")
+                        return {"side": "SKIP", "confidence_pct": 50.0, "reason": "THIN_ORDERBOOK_DEPTH"}
                     if bids_val >= 100000.0 and bids_val > 1.8 * max(1.0, asks_val):
                         whale_bid_wall = True
                     elif asks_val >= 100000.0 and asks_val > 1.8 * max(1.0, bids_val):
