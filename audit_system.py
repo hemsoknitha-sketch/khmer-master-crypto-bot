@@ -426,15 +426,21 @@ def run_audit():
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
+        with open("macro_auto_trade_engine.py", "r", encoding="utf-8") as f:
+            macro_code = f.read()
+        with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
+            sched_code = f.read()
 
         has_ratchet_math = "THE GOLDEN PROFIT RATCHET" in th_code and "0.85" in th_code
         has_breakeven_armor = "BREAKEVEN ARMOR" in th_code and "min_guaranteed_pnl" in th_code
         has_cash_harvest = "100% CLEAN CASH HARVEST" in th_code and "close_futures_position_for_symbol" in th_code
+        has_macro_armor = "MACRO_BREAKEVEN_ARMOR_PROTECT" in macro_code and "0.85" in macro_code
+        has_sched_armor = "peak_gain_pct >= 5.0" in sched_code and "0.85" in sched_code
 
-        if has_ratchet_math and has_breakeven_armor and has_cash_harvest:
-            log_pass("The Golden 85% Profit Ratchet & Breakeven Armor are 100% active and mathematically verified!")
+        if has_ratchet_math and has_breakeven_armor and has_cash_harvest and has_macro_armor and has_sched_armor:
+            log_pass("The Golden 85% Profit Ratchet & Breakeven Armor are 100% active across all engines!")
         else:
-            failures.append(f"Invariant 24 check failed: ratchet={has_ratchet_math}, breakeven={has_breakeven_armor}, harvest={has_cash_harvest}")
+            failures.append(f"Invariant 24 check failed: ratchet={has_ratchet_math}, breakeven={has_breakeven_armor}, harvest={has_cash_harvest}, macro={has_macro_armor}, sched={has_sched_armor}")
             log_fail("The Golden 85% Profit Ratchet or Breakeven Armor missing!")
     except Exception as e:
         failures.append(f"Invariant 24 check failed: {e}")

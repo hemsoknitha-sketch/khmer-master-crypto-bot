@@ -2050,15 +2050,16 @@ async def process_single_trailing_stop(app, ai_engine, trade):
     trailing_peak_lock = (net_profit_pct > 1.0) and (current_price <= current_highest * 0.999)
     
     stop_loss_price = current_highest * (1 - (stop_loss_pct / 100.0))
-    # Invariant 24: If already scaled out (Moonbag 50%), Stop Loss is unconditionally locked to Breakeven (+0.12% Net)
-    # and ratchets 85% of peak profit when in significant moonshot
-    if scale_out_level >= 1 and buy_price and buy_price > 0:
+    # Invariant 24: Breakeven Armor & Golden 85% Profit Ratchet
+    # If peak gain hits >= +3.0%, Stop Loss is unconditionally locked to Breakeven (+0.12% Net Floor)
+    # and ratchets 85% of peak profit once peak gain >= 5.0%
+    if buy_price and buy_price > 0:
         breakeven_p = buy_price * 1.0012
         peak_gain_pct = ((current_highest - buy_price) / buy_price) * 100.0
-        if peak_gain_pct >= 15.0:
+        if peak_gain_pct >= 5.0:
             ratchet_p = buy_price * (1.0 + (peak_gain_pct * 0.85 / 100.0))
             stop_loss_price = max(stop_loss_price, ratchet_p, breakeven_p)
-        else:
+        elif peak_gain_pct >= 3.0 or scale_out_level >= 1:
             stop_loss_price = max(stop_loss_price, breakeven_p)
     
     if (current_price <= stop_loss_price or trailing_peak_lock) and qty > 0:
@@ -4377,8 +4378,17 @@ async def trailing_stop_engine_job(app: Application):
                 
 
         # 2. Check if Trailing Stop is Triggered (Harvest & Compress Mode)
-
         trailing_stop_price = current_highest * (1 - (dynamic_stop_loss / 100))
+
+        # Invariant 24: Breakeven Armor & Golden 85% Profit Ratchet
+        if buy_price and buy_price > 0:
+            peak_gain_pct = ((current_highest - buy_price) / buy_price) * 100.0
+            breakeven_p = buy_price * 1.0012
+            if peak_gain_pct >= 5.0:
+                ratchet_p = buy_price * (1.0 + (peak_gain_pct * 0.85 / 100.0))
+                trailing_stop_price = max(trailing_stop_price, ratchet_p, breakeven_p)
+            elif peak_gain_pct >= 3.0:
+                trailing_stop_price = max(trailing_stop_price, breakeven_p)
 
         
 

@@ -289,8 +289,9 @@ class PrePumpEngine:
             "max_hold_minutes": 20,
             "rsi_15m": round(rsi_15m, 1),
             "stoch_k": round(stoch_k, 1),
-            "price_change_pct": round(price_change_pct, 2),
             "asymmetric_rr": "1:5.5",
+            "breakeven_armor_roi": 3.0,
+            "ratchet_ratio": 0.85,
             "risk_floor_usdt": 0.50,
             "tp1_target_usdt": 1.25,
             "tp2_target_usdt": 2.75

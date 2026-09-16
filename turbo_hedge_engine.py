@@ -1599,15 +1599,15 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         # Dynamic Target: Minimum $0.80+ net target
         target_dollar_tp = max(0.80, bot_amt * (effective_tp_pct / 100.0))
 
-        # 🏆 THE GOLDEN PROFIT RATCHET & BREAKEVEN ARMOR (Strict Invariant)
-        # 1. Any position reaching +$0.80+ USDT enters Golden Ratchet mode.
+        # 🏆 THE GOLDEN PROFIT RATCHET & BREAKEVEN ARMOR (Strict Invariant 24)
+        # 1. Any position reaching +$0.80+ USDT or +5.0% ROI enters Golden Ratchet mode.
         # 2. Retains at least 85% of peak profit (Max 15% pullback from peak).
         # 3. Under NO circumstances can a trade with peak >= $1.50 bleed below $1.20 net.
-        has_hit_profit_peak = (peak_pnl >= 1.50 or peak_roi >= 15.0 or peak_pnl >= target_dollar_tp)
+        has_hit_profit_peak = (peak_pnl >= 0.80 or peak_roi >= 5.0 or peak_pnl >= target_dollar_tp)
         is_pullback_from_peak = False
         if has_hit_profit_peak:
             pullback_threshold = peak_pnl * 0.85
-            guaranteed_floor = max(1.20, pullback_threshold)
+            guaranteed_floor = max(0.65, pullback_threshold)
             if net_pnl_usdt <= guaranteed_floor:
                 is_pullback_from_peak = True
 
@@ -1694,29 +1694,38 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         else:
             peak_bounce_roi = 0.0
 
-        fut_arm_roi = max(3.5, curr_atr_pct * 0.35 * float(active_lev))
-        is_bounce_armed = (is_derisked and (bounce_roi >= 4.0 or peak_bounce_roi >= 4.0))
-        # 🛡️ Arm Breakeven Armor at +$0.40 net or 4.0% ROI
-        if peak_roi >= fut_arm_roi or peak_pnl >= 0.40 or is_bounce_armed or scale_out_level == 1:
+        fut_arm_roi = 3.0  # 🛡️ Strict Invariant 24: Breakeven Armor arms at +3.0% ROI
+        is_bounce_armed = (is_derisked and (bounce_roi >= 3.0 or peak_bounce_roi >= 3.0))
+        # 🛡️ Arm Breakeven Armor at +3.0% ROI or +$0.30 net or bounce armed
+        if peak_roi >= 3.0 or roi_pct >= 3.0 or peak_pnl >= 0.30 or is_bounce_armed or scale_out_level == 1:
             is_breakeven_armed = True
             effective_peak = max(peak_roi, peak_bounce_roi)
 
-            # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER:
+            # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER (Strict Invariant 24 & Golden 85% Ratchet Standard):
+            # Universal Golden 85% Ratchet: Once peak profit reaches >= $0.80 or effective_peak >= 5.0% ROI,
+            # at least 85% of peak profit is permanently ratcheted and protected.
+            ratchet_pnl_85 = peak_pnl * 0.85
+            ratchet_roi_85 = effective_peak * 0.85
+
             if peak_pnl >= 3.50 or effective_peak >= 35.0:
-                min_guaranteed_pnl = max(3.00, peak_pnl * 0.85)  # Locks $3.00+ floor and 85% of peak (6R)
-                min_guaranteed_roi = max(30.0, effective_peak * 0.85)
-            elif peak_pnl >= 2.50:
-                min_guaranteed_pnl = max(2.10, peak_pnl * 0.85)  # Locks 5R ($2.10+ net floor)
-                min_guaranteed_roi = max(20.0, effective_peak * 0.85)
-            elif peak_pnl >= 1.50:
-                min_guaranteed_pnl = max(1.20, peak_pnl * 0.80)  # Locks 3R ($1.20+ net floor)
-                min_guaranteed_roi = max(12.0, effective_peak * 0.80)
-            elif peak_pnl >= 0.75:
-                min_guaranteed_pnl = max(0.50, peak_pnl * 0.70)
-                min_guaranteed_roi = max(5.0, effective_peak * 0.70)
-            elif peak_pnl >= 0.40:
+                min_guaranteed_pnl = max(3.00, ratchet_pnl_85)  # Locks $3.00+ floor and 85% of peak (6R)
+                min_guaranteed_roi = max(30.0, ratchet_roi_85)
+            elif peak_pnl >= 2.50 or effective_peak >= 25.0:
+                min_guaranteed_pnl = max(2.10, ratchet_pnl_85)  # Locks 5R ($2.10+ net floor)
+                min_guaranteed_roi = max(20.0, ratchet_roi_85)
+            elif peak_pnl >= 1.50 or effective_peak >= 15.0:
+                min_guaranteed_pnl = max(1.20, ratchet_pnl_85)  # Locks 85% of peak (3R $1.20+ net floor)
+                min_guaranteed_roi = max(12.0, ratchet_roi_85)
+            elif peak_pnl >= 0.80 or effective_peak >= 8.0:
+                min_guaranteed_pnl = max(0.65, ratchet_pnl_85)  # Locks 85% of peak ($0.65+ net floor)
+                min_guaranteed_roi = max(6.5, ratchet_roi_85)
+            elif peak_pnl >= 0.50 or effective_peak >= 5.0:
+                min_guaranteed_pnl = max(0.40, ratchet_pnl_85)  # Locks 85% of peak ($0.40+ net floor)
+                min_guaranteed_roi = max(4.0, ratchet_roi_85)
+            elif peak_pnl >= 0.30 or effective_peak >= 3.0:
+                # 🛡️ Invariant 24: Breakeven Armor locked at +3.0% ROI -> Entry Price + 0.12% Net Profit Floor
                 min_guaranteed_pnl = 0.15  # Breakeven Armor locked (+0.12% fees floor - Zero Loss Guarantee)
-                min_guaranteed_roi = max(2.0, effective_peak * 0.50)
+                min_guaranteed_roi = max(1.5, effective_peak * 0.50)
             else:
                 min_guaranteed_pnl = 0.12
                 min_guaranteed_roi = 1.2
@@ -1774,22 +1783,22 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_neg_fr_ts", str(now_ts))
                 print(f"⚠️ [HEDGE NEGATIVE FUNDING INVERSION] {symbol}: Funding rate {curr_fr*100:+.4f}% < 0.")
     else:
-        # If already scaled out (Moonbag 50%), position is protected by Breakeven Armor (+0.12% Net Floor)
-        if scale_out_level == 1:
-            is_stop_loss_hit = (net_pnl_usdt <= 0.10 or roi_pct <= 1.0)
+        # If Breakeven Armor is armed or already scaled out (Moonbag 50%), position is strictly protected by Breakeven Armor (+0.12% Net Floor)
+        if is_breakeven_armed or scale_out_level == 1:
+            is_stop_loss_hit = (net_pnl_usdt <= min_guaranteed_pnl or roi_pct <= min_guaranteed_roi)
         else:
-            # 🛡️ Dynamic Volatility-Adaptive Stop Loss:
-            # Allows adequate room for exchange fees and market bid-ask spread
-            sl_roi_thresh = -max(10.0, curr_atr_pct * 1.2 * float(active_lev))
-            sl_dollar_thresh = -max(1.20, bot_amt * 0.12)
+            # 🛡️ Asymmetric Risk-to-Reward (R:R >= 1:2.5) Clamped Stop Loss:
+            # Initial risk is tightly capped at 1.0x-1.5x ATR / max 3.5% - 4.0% ROI / small dollar risk
+            sl_roi_thresh = -min(4.0, max(2.5, curr_atr_pct * 0.8 * float(active_lev)))
+            sl_dollar_thresh = -max(0.50, bot_amt * 0.04)
             is_stop_loss_hit = (
                 (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
-                (is_spot and (net_pnl_usdt <= -max(1.0, bot_amt * 0.05) or roi_pct <= -5.0))
+                (is_spot and (net_pnl_usdt <= -max(0.50, bot_amt * 0.02) or roi_pct <= -2.0))
             )
-        # Hard Circuit Breaker: Absolute emergency safety ceiling at -18.0% ROI or -$1.80
+        # Hard Circuit Breaker: Absolute emergency safety ceiling at -8.0% ROI or -$1.00
         is_hard_circuit_breaker = (
-            (not is_spot and (net_pnl_usdt <= -max(1.80, bot_amt * 0.18) or roi_pct <= -18.0)) or
-            (is_spot and (net_pnl_usdt <= -max(1.50, bot_amt * 0.08) or roi_pct <= -8.0))
+            (not is_spot and (net_pnl_usdt <= -max(1.00, bot_amt * 0.08) or roi_pct <= -8.0)) or
+            (is_spot and (net_pnl_usdt <= -max(1.00, bot_amt * 0.05) or roi_pct <= -5.0))
         )
 
     last_flip_key = f"{chat_id}_{symbol}"

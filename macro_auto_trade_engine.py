@@ -583,8 +583,8 @@ async def monitor_macro_auto_trades(app):
             scale_lvl_str = db.get_system_setting(scale_lvl_key, "0")
             scale_lvl = int(scale_lvl_str) if scale_lvl_str.isdigit() else 0
 
-            # TP1: Scale out 50% at >= +6.0% ROI or >= +$0.60 net PnL (Bank 50% Cash / 50% Runner)
-            if scale_lvl == 0 and (roi_pct >= 6.0 or effective_pnl >= 0.60):
+            # TP1: Scale out 50% at >= +8.0% ROI or >= +$0.80 net PnL (Asymmetric R:R >= 1:2.5 Bank 50% Cash / 50% Runner)
+            if scale_lvl == 0 and (roi_pct >= 8.0 or effective_pnl >= 0.80):
                 print(f"💰 [MACRO TP1 50% BANK CASH] {symbol}: Profit target reached (${effective_pnl:+.2f}, ROI: +{roi_pct:.1f}%) -> Closing 50% position (<30ms)...")
                 close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
                 if close_res.get("closed") or close_res.get("status") == "success":
@@ -613,20 +613,24 @@ async def monitor_macro_auto_trades(app):
             is_stop_loss = False
             reason_tag = ""
 
-            # Stop Loss Floor:
-            # If scale_lvl == 1, Stop Loss is unconditionally locked to Breakeven (+0.12% Net Floor)
-            if scale_lvl == 1:
-                if effective_pnl <= 0.10 or roi_pct <= 1.0:
+            # 🛡️ Breakeven Armor (Strict Invariant 24):
+            # The instant peak ROI hits >= +3.0% or net PnL >= +$0.30 or scale_lvl == 1,
+            # Breakeven Armor activates immediately, unconditionally guaranteeing +0.12% Net Floor.
+            is_be_armed = (scale_lvl == 1 or peak_roi >= 3.0 or roi_pct >= 3.0 or effective_pnl >= 0.30)
+            if is_be_armed:
+                if effective_pnl <= 0.12 or roi_pct <= 1.2:
                     is_stop_loss = True
-                    reason_tag = "MACRO_BREAKEVEN_PROTECT"
+                    reason_tag = "MACRO_BREAKEVEN_ARMOR_PROTECT (+0.12% Net Floor)"
             else:
-                # 🛡️ Dynamic Volatility-Adaptive Stop Loss:
-                # Allows room for fees & micro-spread before invalidation
-                if roi_pct <= -12.0 or effective_pnl <= -max(1.50, amount * 0.12):
+                # 🛡️ Asymmetric Risk-to-Reward (R:R >= 1:2.5) Clamped Stop Loss:
+                # Initial risk is tightly capped at -4.0% ROI / -$0.50 floor before invalidation
+                if roi_pct <= -4.0 or effective_pnl <= -max(0.50, amount * 0.04):
                     is_stop_loss = True
-                    reason_tag = "MACRO_STOP_LOSS"
+                    reason_tag = "MACRO_ASYMMETRIC_STOP_LOSS (-4.0% ROI / 1R)"
 
-            # Tiered Trailing Profit Lock with Target $3.50+ Golden 85% Ratchet (5R-6R)
+            # 🏆 THE GOLDEN PROFIT RATCHET (Strict Invariant 24):
+            # Universal Golden 85% Ratchet: Once peak profit reaches >= $0.50 or effective_peak >= 5.0% ROI,
+            # at least 85% of peak profit is permanently ratcheted and protected.
             if peak_pnl >= 3.50 or peak_roi >= 35.0:
                 retain_ratio = 0.85
                 guaranteed_floor = max(3.00, peak_pnl * retain_ratio)
@@ -639,11 +643,18 @@ async def monitor_macro_auto_trades(app):
                 if effective_pnl <= guaranteed_floor or roi_pct <= (peak_roi * retain_ratio):
                     is_take_profit = True
                     reason_tag = f"MACRO_5R_PEAK_LOCK (+${effective_pnl:.2f})"
-            elif peak_roi >= 12.0 or peak_pnl >= 1.00:
-                retain_ratio = 0.75
-                if roi_pct <= (peak_roi * retain_ratio) or (effective_pnl <= peak_pnl * retain_ratio) or (effective_pnl < 0.25):
+            elif peak_pnl >= 0.80 or peak_roi >= 8.0:
+                retain_ratio = 0.85
+                guaranteed_floor = max(0.65, peak_pnl * retain_ratio)
+                if effective_pnl <= guaranteed_floor or roi_pct <= (peak_roi * retain_ratio):
                     is_take_profit = True
-                    reason_tag = f"MACRO_TRAILING_PEAK_LOCK (+{roi_pct:.1f}%)"
+                    reason_tag = f"MACRO_GOLDEN_85%_PEAK_LOCK (+${effective_pnl:.2f})"
+            elif peak_pnl >= 0.50 or peak_roi >= 5.0:
+                retain_ratio = 0.85
+                guaranteed_floor = max(0.40, peak_pnl * retain_ratio)
+                if effective_pnl <= guaranteed_floor or roi_pct <= (peak_roi * retain_ratio):
+                    is_take_profit = True
+                    reason_tag = f"MACRO_GOLDEN_85%_PEAK_LOCK (+${effective_pnl:.2f})"
 
             if is_take_profit or is_stop_loss:
                 print(f"🌊 [MACRO TRADE EXIT] {symbol}: Real PnL ${real_pnl:+.2f} (Micro Offset: +${micro_profit:.2f}, Effective: ${effective_pnl:+.2f}, ROI: {roi_pct:+.1f}%) -> {reason_tag}")
