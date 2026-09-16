@@ -588,9 +588,9 @@ async def monitor_macro_auto_trades(app):
             reason_tag = ""
 
             # 🛡️ Breakeven Armor (Strict Invariant 24):
-            # The instant peak ROI hits >= +3.0% or net PnL >= +$0.30 or scale_lvl == 1,
+            # The instant peak ROI hits >= +3.0% or net PnL >= +$0.30,
             # Breakeven Armor activates immediately, unconditionally guaranteeing +0.12% Net Floor.
-            is_be_armed = (scale_lvl == 1 or peak_roi >= 3.0 or roi_pct >= 3.0 or effective_pnl >= 0.30)
+            is_be_armed = (peak_roi >= 3.0 or roi_pct >= 3.0 or effective_pnl >= 0.30)
             if is_be_armed:
                 if effective_pnl <= 0.12 or roi_pct <= 1.2:
                     is_stop_loss = True
@@ -634,7 +634,6 @@ async def monitor_macro_auto_trades(app):
                 print(f"🌊 [MACRO TRADE EXIT] {symbol}: Real PnL ${real_pnl:+.2f} (Micro Offset: +${micro_profit:.2f}, Effective: ${effective_pnl:+.2f}, ROI: {roi_pct:+.1f}%) -> {reason_tag}")
                 close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                 db.remove_macro_trade(chat_id, symbol)
-                db.update_system_setting(scale_lvl_key, "0")
                 db.clear_symbiotic_micro_profit(chat_id, symbol)
 
                 if app and hasattr(app, "bot"):
