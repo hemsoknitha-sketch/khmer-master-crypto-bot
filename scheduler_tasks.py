@@ -1111,7 +1111,10 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{win_rate}%`\n"
                         alert_msg += f"• **ទ្រព្យសកម្មគោលដៅ ៖** `{target_sym}`\n\n"
                         alert_msg += f"{action_section}\n\n"
-                        alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({link})"
+                        alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({link})\n\n"
+                        alert_msg += f"{DIVIDER_LIGHT}\n"
+                        alert_msg += "💡 _ដំណឹងនេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម_\n"
+                        alert_msg += "_សូមធ្វើការសម្រេចចិត្តដោយមានទំនួលខុសត្រូវ!_"
                     elif user_l == 'chinese':
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
@@ -1126,7 +1129,10 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"• **AI 胜率置信度 ៖** `{win_rate}%`\n"
                         alert_msg += f"• **目标资产 ៖** `{target_sym}`\n\n"
                         alert_msg += f"{action_section}\n\n"
-                        alert_msg += f"🔗 [阅读完整新闻]({link})"
+                        alert_msg += f"🔗 [阅读完整新闻]({link})\n\n"
+                        alert_msg += f"{DIVIDER_LIGHT}\n"
+                        alert_msg += "💡 _此信息仅作为深入研究之参考基准_\n"
+                        alert_msg += "_请审慎评估风险并对投资决策负责！_"
                     else:
                         now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                         alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
@@ -1141,7 +1147,10 @@ async def check_crypto_news(app: Application, ai_engine):
                         alert_msg += f"• **AI Confidence Win Rate ៖** `{win_rate}%`\n"
                         alert_msg += f"• **Target Asset ៖** `{target_sym}`\n\n"
                         alert_msg += f"{action_section}\n\n"
-                        alert_msg += f"🔗 [Read Full Article]({link})"
+                        alert_msg += f"🔗 [Read Full Article]({link})\n\n"
+                        alert_msg += f"{DIVIDER_LIGHT}\n"
+                        alert_msg += "💡 _This intelligence serves as a foundation for further research._\n"
+                        alert_msg += "_Please exercise due diligence and trade responsibly!_"
 
                     return alert_msg
 
@@ -2749,8 +2758,13 @@ async def order_book_sniper(app: Application, ai_engine):
             target_price = 0
             whale_usdt = 0
             
-            # Dynamic Whale Wall Threshold: $100,000 for BTC/ETH; $25,000 for Altcoins
-            wall_threshold = 100000.0 if symbol in ["BTCUSDT", "ETHUSDT"] else 25000.0
+            # Super Smart Institutional Whale Wall Floor: default $500,000 USDT threshold
+            try:
+                configured_wall_min = float(db.get_system_setting("whale_wall_min_usd", "500000.0"))
+            except Exception:
+                configured_wall_min = 500000.0
+
+            wall_threshold = max(configured_wall_min, 1000000.0) if symbol in ["BTCUSDT", "ETHUSDT"] else configured_wall_min
             
             for price, qty in bids:
                 value = price * qty
@@ -2782,6 +2796,7 @@ async def order_book_sniper(app: Application, ai_engine):
                     
                     def get_whale_wall_text(lang):
                         clean_lang = loc.normalize_lang(lang)
+                        from ui_standards import DIVIDER_LIGHT
                         if clean_lang == 'khmer':
                             return (
                                 f"🐋 **ប្រព័ន្ធស្ទាក់ចាប់ត្រីបាឡែន (WHALE WALL RADAR)!**\n\n"
@@ -2791,7 +2806,10 @@ async def order_book_sniper(app: Application, ai_engine):
                                 f"⚡ **ការវិភាគ AI (Target Front-Run):**\n"
                                 f"• ថ្លៃគោលដៅស្ទាក់ទិញមុន: `${front_run_price:,.4f}` (+0.05% Limit)\n"
                                 f"• គោលដៅប្រមូលចំណេញ: `+5%` ទៅ `+20%` តាម Peak-Lock Trailing\n\n"
-                                f"💡 _ចំណាំ: នេះជាសារ Radar ចាប់ជញ្ជាំងបញ្ជាទិញពិតលើ Binance L2 Orderbook (<50ms)។ ដើម្បីឱ្យ AI បើកការជួញដូរជាក់ស្តែងស្វ័យប្រវត្តិលើគណនី សូមបើក_ `/pre_pump ON 30` _ឬ_ `/auto_trade ON 30` _!_"
+                                f"💡 _ចំណាំ: នេះជាសារ Radar ចាប់ជញ្ជាំងបញ្ជាទិញពិតលើ Binance L2 Orderbook (<50ms)។ ដើម្បីឱ្យ AI បើកការជួញដូរជាក់ស្តែងស្វ័យប្រវត្តិលើគណនី សូមបើក_ `/pre_pump ON 30` _ឬ_ `/auto_trade ON 30` _!_\n\n"
+                                f"{DIVIDER_LIGHT}\n"
+                                f"💡 _ដំណឹងនេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម_\n"
+                                f"_សូមធ្វើការសម្រេចចិត្តដោយមានទំនួលខុសត្រូវ!_"
                             )
                         elif clean_lang == 'chinese':
                             return (
@@ -2802,7 +2820,10 @@ async def order_book_sniper(app: Application, ai_engine):
                                 f"⚡ **AI 抢跑计算 (Target Front-Run):**\n"
                                 f"• AI 目标抢跑挂单价: `${front_run_price:,.4f}` (+0.05% Limit)\n"
                                 f"• 目标止盈: `+5%` 至 `+20%` 动态追盈\n\n"
-                                f"💡 _提示: 开启 `/pre_pump ON 30` 或 `/auto_trade ON 30` 可实现毫秒级自动入场!_"
+                                f"💡 _提示: 开启 `/pre_pump ON 30` 或 `/auto_trade ON 30` 可实现毫秒级自动入场!_\n\n"
+                                f"{DIVIDER_LIGHT}\n"
+                                f"💡 _此信息仅作为深入研究之参考基准_\n"
+                                f"_请审慎评估风险并对投资决策负责！_"
                             )
                         else:
                             return (
@@ -2813,7 +2834,10 @@ async def order_book_sniper(app: Application, ai_engine):
                                 f"⚡ **AI Target Front-Run:**\n"
                                 f"• Calculated Front-Run Entry: `${front_run_price:,.4f}` (+0.05% Limit)\n"
                                 f"• Profit Target: `+5%` to `+20%` via Peak-Lock Trailing\n\n"
-                                f"💡 _Note: Real-time L2 orderbook radar. Enable `/pre_pump ON 30` or `/auto_trade ON 30` for autonomous execution!_"
+                                f"💡 _Note: Real-time L2 orderbook radar. Enable `/pre_pump ON 30` or `/auto_trade ON 30` for autonomous execution!_\n\n"
+                                f"{DIVIDER_LIGHT}\n"
+                                f"💡 _This intelligence serves as a foundation for further research._\n"
+                                f"_Please exercise due diligence and trade responsibly!_"
                             )
                         
                     target_recipients, _ = get_alert_target_recipients("whale_wall")
