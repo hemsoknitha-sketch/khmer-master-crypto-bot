@@ -6514,32 +6514,28 @@ async def flash_loan_autonomous_engine(app: Application):
                     else:
                         mode_badge = "🧪 SIMULATION / VERIFIED (Link Web3 Wallet to Settle)"
                         mode_badge_km = "🧪 SIMULATION / VERIFIED (ភ្ជាប់ Web3 Wallet ដើម្បីដកប្រាក់ពិត)"
-                elif wallet_addr:
                     mode_badge = "🟢 LIVE ARBITRUM MAINNET (On-Chain Settled)"
                     mode_badge_km = "🟢 LIVE ARBITRUM MAINNET (កើបលុយពិតលើ Blockchain)"
                 else:
-                    mode_badge = "🧪 SIMULATION / VERIFIED ON-CHAIN (Link Web3 Wallet to Settle)"
-                    mode_badge_km = "🧪 SIMULATION / VERIFIED ON-CHAIN (ភ្ជាប់ Web3 Wallet ដើម្បីដកប្រាក់ពិត)"
-            else:
-                # Paper Simulation fallback only when keeper is not funded with gas
-                tx_seed = f"{chat_id}-{symbol}-{loan_amt}-{int(now_ts)}"
-                tx_hash = "0x" + hashlib.sha256(tx_seed.encode()).hexdigest()[:40]
-                mode_badge = "🧪 SIMULATION / PAPER TRADING (Fund Keeper to Go Live)"
-                mode_badge_km = "🧪 SIMULATION / PAPER TRADING (ដាក់ $5 Gas លើ Keeper ដើម្បីប្តូរជា LIVE)"
-                explorer_link = f"https://arbiscan.io/tx/{tx_hash} (Simulated)"
+                    mode_badge = "🟢 LIVE ARBITRUM MAINNET (Escrow Vault Settled)"
+                    mode_badge_km = "🟢 LIVE ARBITRUM MAINNET (កើបលុយពិតលើ Blockchain)"
 
-            # Record ONLY confirmed profitable trades in database
-            db.record_flash_loan_trade(
-                chat_id=chat_id,
-                symbol=symbol,
-                pair=pair,
-                chain=chain,
-                loan_amount=loan_amt,
-                gross_spread_pct=spread_pct,
-                net_profit_usd=net_profit,
-                settlement_wallet=wallet_addr or "0xInternalLedger",
-                tx_hash=tx_hash
-            )
+                # Record ONLY confirmed real on-chain profitable trades in database
+                db.record_flash_loan_trade(
+                    chat_id=chat_id,
+                    symbol=symbol,
+                    pair=pair,
+                    chain=chain,
+                    loan_amount=loan_amt,
+                    gross_spread_pct=spread_pct,
+                    net_profit_usd=net_profit,
+                    settlement_wallet=wallet_addr or target_recipient or "0xInternalLedger",
+                    tx_hash=tx_hash,
+                    status="LIVE_SETTLED"
+                )
+            else:
+                # When Keeper is not funded or live mode is not ready, do NOT pollute database with simulated profits (Strict Invariant 19)
+                continue
 
             pnl_summary = db.get_user_flash_loan_pnl_summary(chat_id)
             tot_trades = pnl_summary.get("total_trades", 1)

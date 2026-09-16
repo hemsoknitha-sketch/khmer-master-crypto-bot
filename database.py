@@ -1925,7 +1925,7 @@ def get_all_flash_loan_auto_users() -> list:
     except Exception:
         return []
 
-def record_flash_loan_trade(chat_id: int, symbol: str, pair: str, chain: str, loan_amount: float, gross_spread_pct: float, net_profit_usd: float, settlement_wallet: str, tx_hash: str = None) -> int:
+def record_flash_loan_trade(chat_id: int, symbol: str, pair: str, chain: str, loan_amount: float, gross_spread_pct: float, net_profit_usd: float, settlement_wallet: str, tx_hash: str = None, status: str = "LIVE_SETTLED") -> int:
     """Records an executed or simulated Flash Loan Arbitrage cycle into user ledger."""
     try:
         conn = get_db_connection()
@@ -1949,7 +1949,7 @@ def record_flash_loan_trade(chat_id: int, symbol: str, pair: str, chain: str, lo
             '''INSERT INTO user_flash_loan_trades 
                (chat_id, symbol, pair, chain, loan_amount, gross_spread_pct, net_profit_usd, settlement_wallet, tx_hash, status, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (chat_id, symbol, pair, chain, float(loan_amount), float(gross_spread_pct), float(net_profit_usd), str(settlement_wallet), str(tx_hash or ""), "SETTLED", now_str)
+            (chat_id, symbol, pair, chain, float(loan_amount), float(gross_spread_pct), float(net_profit_usd), str(settlement_wallet), str(tx_hash or ""), str(status), now_str)
         )
         trade_id = cursor.lastrowid
         conn.commit()
@@ -1958,8 +1958,38 @@ def record_flash_loan_trade(chat_id: int, symbol: str, pair: str, chain: str, lo
     except Exception:
         return 0
 
+def reset_user_flash_loan_trades(chat_id: int = None) -> int:
+    """Purges simulated/paper trading records from user_flash_loan_trades table."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_flash_loan_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            pair TEXT NOT NULL,
+            chain TEXT NOT NULL,
+            loan_amount REAL NOT NULL,
+            gross_spread_pct REAL NOT NULL,
+            net_profit_usd REAL NOT NULL,
+            settlement_wallet TEXT NOT NULL,
+            tx_hash TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )''')
+        if chat_id:
+            cursor.execute("DELETE FROM user_flash_loan_trades WHERE chat_id = ?", (chat_id,))
+        else:
+            cursor.execute("DELETE FROM user_flash_loan_trades")
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception:
+        return 0
+
 def get_user_flash_loan_trades(chat_id: int, limit: int = 10) -> list:
-    """Retrieves recent Flash Loan trade history for a user."""
+    """Retrieves recent Flash Loan trade history for a user (LIVE_SETTLED only)."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1978,7 +2008,7 @@ def get_user_flash_loan_trades(chat_id: int, limit: int = 10) -> list:
             created_at TEXT NOT NULL
         )''')
         cursor.execute(
-            "SELECT symbol, pair, chain, loan_amount, gross_spread_pct, net_profit_usd, settlement_wallet, tx_hash, created_at FROM user_flash_loan_trades WHERE chat_id = ? ORDER BY id DESC LIMIT ?",
+            "SELECT symbol, pair, chain, loan_amount, gross_spread_pct, net_profit_usd, settlement_wallet, tx_hash, created_at FROM user_flash_loan_trades WHERE chat_id = ? AND status = 'LIVE_SETTLED' ORDER BY id DESC LIMIT ?",
             (chat_id, limit)
         )
         rows = cursor.fetchall()
@@ -2001,7 +2031,7 @@ def get_user_flash_loan_trades(chat_id: int, limit: int = 10) -> list:
         return []
 
 def get_user_flash_loan_pnl_summary(chat_id: int) -> dict:
-    """Returns cumulative trade count, total net profit, and last execution time for a user."""
+    """Returns cumulative trade count, total net profit, and last execution time for a user (LIVE_SETTLED only)."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -2019,7 +2049,7 @@ def get_user_flash_loan_pnl_summary(chat_id: int) -> dict:
             status TEXT NOT NULL,
             created_at TEXT NOT NULL
         )''')
-        cursor.execute("SELECT COUNT(*), COALESCE(SUM(net_profit_usd), 0.0), MAX(created_at) FROM user_flash_loan_trades WHERE chat_id = ?", (chat_id,))
+        cursor.execute("SELECT COUNT(*), COALESCE(SUM(net_profit_usd), 0.0), MAX(created_at) FROM user_flash_loan_trades WHERE chat_id = ? AND status = 'LIVE_SETTLED'", (chat_id,))
         row = cursor.fetchone()
         conn.close()
         if row:

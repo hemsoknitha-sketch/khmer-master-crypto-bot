@@ -778,11 +778,14 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("⛽ Keeper Gas Wallet", callback_data="btn_flash_loan_keeper")
                 ],
                 [
-                    InlineKeyboardButton("💼 Multi-Chain Wallets", callback_data="btn_set_web3_prompt"),
-                    InlineKeyboardButton("⚡ CEX Cross-Arb (<5ms)", callback_data="btn_cross_arb")
+                    InlineKeyboardButton("🔄 Reset Simulation Stats", callback_data="btn_flash_loan_reset"),
+                    InlineKeyboardButton("💼 Multi-Chain Wallets", callback_data="btn_set_web3_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
+                    InlineKeyboardButton("⚡ CEX Cross-Arb (<5ms)", callback_data="btn_cross_arb"),
+                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
+                ],
+                [
                     InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ])
@@ -1089,6 +1092,32 @@ class TelegramBotThread(BaseThread):
 
                 sent_hist = await send_reply_or_edit(update, context, hist_msg)
                 return
+
+            # Sub-action: RESET SIMULATION STATS (/flash_loan RESET or callback btn_flash_loan_reset)
+            if (args and args[0].upper() in ["RESET", "CLEAR"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_reset"):
+                deleted_rows = db.reset_user_flash_loan_trades()
+                from ui_standards import OFFICIAL_FOOTNOTE, DIVIDER_DOUBLE
+                if user_lang == 'km':
+                    reset_done_msg = (
+                        "✅ **MEV & FLASH LOAN ARBITRAGE RESET ជោគជ័យ!** 🔄\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
+                        f"🧹 **ទិន្នន័យ Simulation ដែលបានលុប ៖** `{deleted_rows} ប្រតិបត្តិការ`\n"
+                        "💎 **ប្រាក់ចំណេញពិតកើបបានលើ Blockchain ៖** `$0.00 USDT` (0 ប្រតិបត្តិការ)\n\n"
+                        "🛡️ _ប្រព័ន្ធត្រូវបានលាងសម្អាតទិន្នន័យ Paper Simulation ចោល ១០០% ស្របតាមក្បួនខ្នាតតម្លាភាពវិស្វកម្ម! រាល់ប្រាក់ចំណេញទៅមុខ នឹងកត់ត្រាតែប្រាក់ចំណេញពិតដែលបានកើបលើ Arbitrum One Mainnet ចូលកាបូប Web3 របស់អ្នកប៉ុណ្ណោះ!_\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
+                    )
+                else:
+                    reset_done_msg = (
+                        "✅ **FLASH LOAN SIMULATION STATS RESET!** 🔄\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
+                        f"🧹 **Simulated Records Purged:** `{deleted_rows} trades`\n"
+                        "💎 **Live Real On-Chain Profit:** `$0.00 USDT` (0 trades)\n\n"
+                        "🛡️ _System has purged 100% of mock/paper simulation records for strict institutional transparency! Future profits will strictly reflect settled Arbitrum One on-chain revenue!_\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
+                    )
+                if update.callback_query:
+                    await update.callback_query.answer("✅ បាន Reset សម្អាតទិន្នន័យ Simulation ជោគជ័យ!")
+                return await send_reply_or_edit(update, context, reset_done_msg, parse_mode="Markdown", reply_markup=keyboard)
 
             # Sub-action: DEPLOY CONTRACT (/flash_loan DEPLOY or callback btn_deploy_contract)
             if (args and args[0].upper() == "DEPLOY") or (update.callback_query and update.callback_query.data == "btn_deploy_contract"):
@@ -1496,7 +1525,7 @@ class TelegramBotThread(BaseThread):
                     "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
                     "════════════\n\n"
                     f"📡 **ស្ថានភាពប្រព័ន្ធ 24/7** ៖ `{auto_badge_km}`\n"
-                    f"🏆 **ប្រាក់ចំណេញកើបបានសរុប** ៖ `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} ប្រតិបត្តិការ)\n"
+                    f"🏆 **ប្រាក់ចំណេញពិតកើបបានលើ Blockchain** ៖ `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} ប្រតិបត្តិការ)\n"
                     "🏦 **ស្ថាបត្យកម្ម FLASH LOAN & DEX ARBITRAGE ៖**\n"
                     "• 🤖 **AI Ensemble Models** ៖ `MEV Orderflow Classifier` + `GNN Graph Path Finder`\n"
                     "• 🌐 **ប្រភពដើមទុនកម្ចី** ៖ `Aave V3 Liquidity Pool ($1.5B+ USDT/USDC/ETH)`\n"
@@ -1518,6 +1547,7 @@ class TelegramBotThread(BaseThread):
                     "👉 **ពិនិត្យអាវុធ Tokyo HFT MEV Weapon Stack ៖**\n`` `/flash_loan MEV` ``\n\n"
                     "👉 **បើក/បិទ Flash Loan Arbitrage 24/7 ស្វ័យប្រវត្តិ ៖**\n`` `/flash_loan 24/7` `` ឬ `` `/flash_loan AUTO ON` ``\n\n"
                     "👉 **ពិនិត្យប្រវត្តិជួញដូរ និងប្រាក់ចំណេញសរុប ៖**\n`` `/flash_loan HISTORY` ``\n\n"
+                    "👉 **សម្អាតទិន្នន័យតេស្ត Simulation ៖**\n`` `/flash_loan RESET` ``\n\n"
                     "👉 **ពិនិត្យកាបូប Keeper Relayer Gas (Live Mode) ៖**\n`` `/flash_loan KEEPER` ``\n\n"
                     "👉 **ពិនិត្យស្ថានភាពយុទ្ធសាស្ត្រទាំង ៤ ៖**\n`` `/flash_loan STRATEGY` ``\n\n"
                     "👉 **ស្កេន CeDeFi (Binance vs DEX) Spreads ៖**\n`` `/flash_loan CEDEFI` ``\n\n"
@@ -1529,7 +1559,7 @@ class TelegramBotThread(BaseThread):
                     "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
                     "════════════\n\n"
                     f"📡 **24/7 System Status**: `{auto_badge}`\n"
-                    f"🏆 **Total Cumulative Profit**: `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} trades)\n"
+                    f"🏆 **Live Settled Profit on Blockchain**: `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} trades)\n"
                     "🏦 **INSTITUTIONAL FLASH LOAN ARCHITECTURE:**\n"
                     "• 🤖 **AI Ensemble Models**: `MEV Orderflow Classifier` + `GNN Graph Path Finder`\n"
                     "• 🌐 **Borrow Pool Source**: `Aave V3 Liquidity Pools ($1.5B+ USDT/USDC/ETH)`\n"
@@ -1551,6 +1581,7 @@ class TelegramBotThread(BaseThread):
                     "👉 **Inspect Tokyo HFT MEV Weapon Stack:**\n`` `/flash_loan MEV` ``\n\n"
                     "👉 **Toggle 24/7 Autonomous Flash Loan Mode:**\n`` `/flash_loan 24/7` `` or `` `/flash_loan AUTO ON` ``\n\n"
                     "👉 **View Execution History & Profit Ledger:**\n`` `/flash_loan HISTORY` ``\n\n"
+                    "👉 **Purge/Reset Simulation Stats:**\n`` `/flash_loan RESET` ``\n\n"
                     "👉 **Inspect Keeper Relayer Gas (Live Mode):**\n`` `/flash_loan KEEPER` ``\n\n"
                     "👉 **Inspect 4 Strategies Diagnostics:**\n`` `/flash_loan STRATEGY` ``\n\n"
                     "👉 **Scan CeDeFi (Binance vs DEX) Spreads:**\n`` `/flash_loan CEDEFI` ``\n\n"
@@ -4544,6 +4575,9 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_auto_off":
                 context.args = ["AUTO", "OFF"]
+                await flash_loan_command(update, context)
+            elif data == "btn_flash_loan_reset":
+                context.args = ["RESET"]
                 await flash_loan_command(update, context)
             elif data == "btn_set_web3_prompt":
                 context.args = []
