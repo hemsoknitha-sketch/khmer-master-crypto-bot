@@ -3544,9 +3544,36 @@ class TelegramBotThread(BaseThread):
                 self.active_tasks.discard(chat_id)
                 return
 
+            # ⚡ Instant VIP Executive Greeting Handler (<15ms, $0.00 Cost, Zero Prompt Leakage)
+            clean_greeting = re.sub(r'@[A-Za-z0-9_]+', '', trimmed_text).strip().lower()
+            greeting_keywords = [
+                'សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ', 'ជំរាបសួរអ្នកគ្រូ', 'ជំរាបសួរលោកគ្រូ',
+                'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'suosdey'
+            ]
+            if clean_greeting in greeting_keywords or clean_greeting.replace(' ', '') in ['សួស្ដី', 'សួស្តី', 'ជំរាបសួរ', 'ជម្រាបសួរ']:
+                from ui_standards import DIVIDER_HEAVY
+                greeting_card = (
+                    "✨ **ស្វាគមន៍មកកាន់ APEX TURBO AGI STRATEGIST!** ⚡\n"
+                    f"{DIVIDER_HEAVY}\n"
+                    "សូមគោរពជម្រាបសួរ! ខ្ញុំជា **Apex Quantitative & Institutional AI** នៃ Khmer Master Crypto ដំណើរការវិភាគទិន្នន័យ On-Chain, Orderbook និងសេដ្ឋកិច្ចសកល ២៤/៧។\n\n"
+                    "📊 **សេវាកម្មស្ថាប័នដែលអាចបញ្ជាបានភ្លាមៗ ៖**\n"
+                    "• 🔍 **វិភាគកាក់ស៊ីជម្រៅ ៖** `` `/analyze BTC` `` ឬវាយឈ្មោះកាក់ផ្ទាល់\n"
+                    "• 💎 **Spot 0% Liquidation ៖** `` `/smart_trade` `` ឬ `` `/compound_grid` ``\n"
+                    "• 🛡️ **Futures Hedge ការពារទុន ៖** `` `/turbo_hedge` `` ឬ `` `/smartx` ``\n"
+                    "• 🐋 **Orderbook L2 Whale Radar ៖** `` `/whales` `` ឬ `` `/top` ``\n"
+                    "• 📰 **ព័ត៌មានទាន់ហេតុការណ៍ AI ៖** `` `/news` ``\n"
+                    f"{DIVIDER_HEAVY}\n"
+                    "💡 _សូមវាយឈ្មោះកាក់ (ឧ. BTC, ETH, SOL) ឬសួរសំណួរជាក់ស្តែង ដើម្បីទទួលបានការវិភាគបែបវិជ្ជាជីវៈកម្រិតស្ថាប័នភ្លាមៗ!_"
+                )
+                await context.bot.send_message(chat_id=chat_id, text=greeting_card, parse_mode="Markdown")
+                self.active_tasks.discard(chat_id)
+                return
+
             try:
                 self.log_signal.emit(f"📩 Received message from {chat_id}: {user_input}")
-                await context.bot.send_message(chat_id=chat_id, text=loc.get_text(user_lang, 'processing_request'))
+                if chat_id > 0:
+                    # Only send intermediate processing notification in private chat, avoid group chat clutter!
+                    await context.bot.send_message(chat_id=chat_id, text=loc.get_text(user_lang, 'processing_request'))
                 
                 ai_input = user_input
                 if user_lang not in ['auto', 'en']:

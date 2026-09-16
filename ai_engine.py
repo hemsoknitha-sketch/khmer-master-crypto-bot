@@ -720,22 +720,27 @@ class AIInvestmentEngine:
         text = re.sub(r'Section\s*2\s*\([^)]*\)\s*:', 'ផ្នែកទី ២៖ ភស្តុតាងបរិមាណវិស័យ និងម៉ាក្រូសេដ្ឋកិច្ច (Quantitative and Macro Evidence)', text, flags=re.IGNORECASE)
         text = re.sub(r'Section\s*3\s*\([^)]*\)\s*:', 'ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (The Executive Action Command)', text, flags=re.IGNORECASE)
 
-        # 4. Slice off drafting headers if present
-        if "Final execution." in text:
-            idx = text.rfind("Final execution.")
-            text = text[idx + len("Final execution."):].strip()
-        elif "Final Output Generation:" in text:
-            idx = text.rfind("Final Output Generation:")
-            text = text[idx + len("Final Output Generation:"):]
-        elif "Drafting final Khmer text:" in text:
-            idx = text.rfind("Drafting final Khmer text:")
-            text = text[idx + len("Drafting final Khmer text:"):]
-        elif "Final Text:" in text:
-            idx = text.rfind("Final Text:")
-            text = text[idx + len("Final Text:"):]
-        elif "Final Polish:" in text:
-            idx = text.rfind("Final Polish:")
-            text = text[idx + len("Final Polish:"):].strip()
+        # 4. Slice off drafting / scratchpad / chain-of-thought headers if present
+        cot_slice_markers = [
+            r'\(proceed to output\)\.?',
+            r'proceed to output[\.\s:]*',
+            r'\*?final selection(?:\s*\([^)]*\))?[:\s]*',
+            r'\*?let\'s refine to be even more[^\n]*\n',
+            r'final execution\.',
+            r'final output generation:',
+            r'drafting final khmer text:',
+            r'final text:',
+            r'final polish:',
+            r'\*?final output:'
+        ]
+        for c_pat in cot_slice_markers:
+            m_list = list(re.finditer(c_pat, text, re.IGNORECASE))
+            if m_list:
+                last_m = m_list[-1]
+                candidate = text[last_m.end():].strip()
+                if len(candidate) > 25:
+                    text = candidate
+                    break
 
         # 5. If Khmer is expected and there is an isolated verdict followed by Khmer text, slice to the last verdict block
         verdict_blocks = list(re.finditer(r'(?:^|\n)\s*(BULLISH|BEARISH|NEUTRAL)\s*\n\s*([\u1780-\u17FF][^\n]*(?:\n\s*[\u1780-\u17FF][^\n]*)*)', text, flags=re.IGNORECASE))
@@ -777,7 +782,11 @@ class AIInvestmentEngine:
             "asset impact:", "verdict:", "reasoning", "start with", "follow with", "no fluff",
             "checking constraints", "in prompt engineering", "system prompt", "let's ensure",
             "total sentences", "khmer check", "final execution", "result:", "english word",
-            "higher ppi ->", "logic:", "note:", "prompt:"
+            "higher ppi ->", "logic:", "note:", "prompt:", "user greeting", "language constraint",
+            "the user is greeting", "however, as an", "option 1", "option 2", "option 3", "option 4",
+            "use terms like", "final selection", "let's refine", "khmer language?",
+            "no internal reflections?", "executive tone?", "no generic disclaimers?",
+            "(proceed to output)", "proceed to output", "proceeding to output"
         ]
 
         for line in lines:
@@ -794,7 +803,8 @@ class AIInvestmentEngine:
                 "self-correction during drafting", "fact check", "contextual interpretation",
                 "the user instruction says", "system prompt's structure", "i will apply this structure",
                 "language requirement:", "start your response with", "explain why in exactly",
-                "in prompt engineering", "user prompt explicitly", "most recent instruction"
+                "in prompt engineering", "user prompt explicitly", "most recent instruction",
+                "proceed to output", "user greeting:", "language constraint:"
             ]):
                 continue
 
@@ -802,6 +812,16 @@ class AIInvestmentEngine:
 
         result = "\n".join(cleaned_lines).strip()
         result = re.sub(r'\n{3,}', '\n\n', result)
+
+        # Telegram character ceiling clamp: Keep strictly within 100 - 3500 chars
+        if len(result) > 3500:
+            truncated = result[:3500]
+            last_break = max(truncated.rfind('\n\n'), truncated.rfind('\n'), truncated.rfind('.'))
+            if last_break > 2500:
+                result = truncated[:last_break].strip()
+            else:
+                result = truncated.strip()
+
         return result
 
     def chat_with_user(self, user_input: str, history: list = None) -> str:
