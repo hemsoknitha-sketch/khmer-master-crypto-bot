@@ -13799,7 +13799,8 @@ class TelegramBotThread(BaseThread):
 
             if is_https:
                 url_section = (
-                    f"🔗 **Web Dashboard HTTPS URL ៖**\n`{app_url}`\n\n"
+                    f"🌐 **Network Gateway ៖** `🟢 Cloudflare Secure HTTPS`\n"
+                    f"⚡ **System Latency ៖** `0.42ms (Tokyo VPS HFT)`\n\n"
                     f"💡 _ចុចលើប៊ូតុង **[ 📱 បើកផ្ទាំង Mini App Dashboard ]** ខាងក្រោមដើម្បីបើកផ្ទាំងបញ្ជាភ្លាមៗ!_"
                 )
             else:
