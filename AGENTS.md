@@ -1,6 +1,7 @@
 # KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 2.0.0 (Absolute Ground Truth Lock)  
-**Target Environment:** Python 3.11+ / Ubuntu 22.04+ VPS & Windows Desktop  
+**Document Version:** 2.1.0 (Absolute Ground Truth Lock)  
+**Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
+**Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
 
 ---
@@ -209,34 +210,19 @@ Any modification that breaks any of the following 23 invariants is considered an
   4. **Zero Phantom / Obsolete Commands:** Deprecated, replaced, or ghost commands (e.g. `/snipe`) must be 100% expunged from all menu registries so they never linger in Telegram user clients.
   5. **Permanent Core Inclusion:** All core trading, investment, intelligence, and safety commands must permanently remain in the Bot Menu unless the Admin explicitly requests removal.
 
-### Invariant 24: The Golden 85% Profit Ratchet, Breakeven Armor & 100% Clean Cash Profit Harvest Lock
-- **Location:** `turbo_hedge_engine.py` (`monitor_turbo_hedge_pnl`)
+### Invariant 24: The Golden 85% Profit Ratchet & Breakeven Armor Standard
+- **Location:** `turbo_hedge_engine.py` (`monitor_turbo_hedge_pnl`), `bot_thread.py`
 - **Rule:**
-  1. **Purge of Drop-Down to +$0.50 Floor:** The archaic behavior where floating profits were allowed to plummet from peak back down to +$0.50 is 100% permanently eliminated.
-  2. **The Golden 85% Profit Ratchet:** As a position generates floating profit and establishes higher peak profit, the trailing stop ratchets up aggressively, permanently locking in at least **85% of peak profit** (`ratchet_roe = max_seen_pnl_pct * 0.85`). If price retraces by 15% from its highest peak, the engine executes an immediate market close to secure the 85% profit chunk into pure USDT.
-  3. **Breakeven Armor at +3.0% ROE:** As soon as an active position achieves $\ge +3.0\%$ ROE (+0.30% unleveraged price move at 10x leverage), the Stop-Loss is instantly shifted to entry price + fees (+0.12%), guaranteeing that a winning trade NEVER turns into a losing trade under any circumstances.
-  4. **100% Clean Cash Profit Harvest:** When take-profit or ratchet conditions trigger, the position is cleanly closed to pure USDT cash. Unrealized gains are fully realized without reinvestment delay or cross-currency lockup.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 17/18].
+  1. **Breakeven Armor:** At +3.0% ROI, Stop Loss is unconditionally locked to Entry Price + Fees (+0.12% net profit floor). A winning position is strictly prohibited from degrading into a loss.
+  2. **Golden 85% Ratchet:** As trailing profits expand, 85% of peak unrealized profit is permanently ratcheted and protected.
+  3. **Clean Cash Harvest:** Upon reaching target parameters or trailing triggers, 100% clean cash closure must be executed without orphaned limit orders or residue margin.
 
-### Invariant 25: Dynamic Small Capital Fortress ($5/Coin Scaler) & Zero Blind Investing Guarantee
-- **Location:** `turbo_hedge_engine.py` (`monitor_turbo_hedge_bots`, `scan_and_evaluate_symbol`), `bot_thread.py` (`auto_trade_command`)
+### Invariant 25: Dynamic Small Capital Fortress & Zero Blind Investing Guarantee
+- **Location:** `turbo_hedge_engine.py` (`scan_and_evaluate_symbol`, `execute_turbo_hedge_trade`), `bot_thread.py`
 - **Rule:**
-  1. **Small Capital Fortress ($5/Coin Scaling Floor):** Futures trading enables position sizing down to $5.00+ USDT with a dedicated 35% margin cushion reserved (`safe_avail_bal = avail_bal * 0.65`) for safe liquidation distance. Total concurrent coins scale dynamically:
-     - Balance $< \$25$: max 2 coins ($10 margin)
-     - Balance $< \$45$: max 4 coins ($20 margin)
-     - Balance $< \$75$: max 8 coins ($40 margin)
-     - Balance $< \$115$: max 12 coins ($60 margin)
-     - Balance $\ge \$115$ (e.g. $121): **up to 15 coins maximum** ($75 margin + $46 cushion).
-  2. **Zero Blind Investing Guarantee:** The capital scaler dictates only the *maximum ceiling*, never forced entry. Every single order (from coin 1 to coin 15) MUST independently pass the **7-Layer Institutional Confluence Gate**:
-     - Layer 1: 15m & 1h Macro Trend EMA50 confluence (both timeframes must agree).
-     - Layer 2: 5m Intermediate Trend (EMA20 vs EMA50).
-     - Layer 3: 1m Short-term Momentum & Velocity (EMA5 vs EMA15).
-     - Layer 4: Strict RSI Sweet-Spot (42–68 for BUY, 38.5–65 for SELL; RSI $\le 38.0$ bottom shorting strictly rejected under Invariant 16).
-     - Layer 5: Volume Delta Spike ($\ge 1.15\times$).
-     - Layer 6: Anti-FOMO Pullback Retracement Shield (never chase green candles extended >0.35% above 1m EMA5).
-     - Layer 7: AI Model Confidence Gate $\ge 88.0\%$ ($\ge 89.0\%$ in VIP Recovery Mode).
-  3. **Staggered Entry Shield:** Enforces a minimum 15-second delay between position entries to prevent simultaneous execution slippage into flash volatility.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 18/18].
+  1. **Dynamic Small Capital Scaler:** For accounts with capital < $100, orders are strictly capped at $5.00–$5.50 per coin (tiered capacity $\le 15$ pairs) with an absolute 65% available balance margin cushion (`avail_bal * 0.65`).
+  2. **Zero Blind Investing Shield:** Entry requires multi-timeframe confirmation (1m/5m momentum strictly aligned with 15m/1h macro trend) and minimum institutional confidence hurdles.
+  3. **Staggered Order Entry:** A minimum stagger interval is enforced between automated executions to prevent high-frequency order clustering.
 
 ### Invariant 26: Sub-Mode Explicit State Segregation & Non-Collapsible Architecture Invariant
 - **Location:** `bot_thread.py`, `scheduler_tasks.py` (`gold_turbo_monitor`), `smart_x_engine.py`
@@ -244,7 +230,12 @@ Any modification that breaks any of the following 23 invariants is considered an
   1. **Zero Silent Fallback Collapse (ហាមដាច់ខាតការទម្លាក់ Mode ច្រើនឱ្យនៅសល់តែមួយស្ងាត់ៗ):** Multi-mode command suites (`/smartx`, `/turbo_hedge`, `/smart_trade`) must strictly enforce explicit branching for EVERY discrete sub-mode. Ternary fallback defaults like `mode = A if is_a else B` that silently swallow additional states (such as `AUTO`, `SPOT`, etc.) are classified as architectural defects and strictly prohibited.
   2. **Mandatory Live Telemetry Feedback (តម្រូវការចាក់បញ្ចូលទិន្នន័យ Live Telemetry):** Confirmation and acknowledgment messages must never use static, undifferentiated templates. Every sub-mode MUST output distinct, live telemetry (real-time price, session window, liquidity score, SGE premium, and active AI model consensus) so the user is immediately provided with unambiguous proof of which engine is operating.
   3. **Dedicated Background Execution Routing (ការបែងចែកកូដរត់ Background ឱ្យដាច់ពីគ្នា):** Background monitors (such as `gold_turbo_monitor`) must maintain explicit, dedicated logic branches for every mode (e.g. `AUTO` must dynamically query MoE Regime Classification to route between `TURBO` expansion and `SONIC` session scalping, rather than defaulting to a single strategy).
-- **Enforcement:** Verified by `audit_system.py` [CHECK 19/19].
+
+### Invariant 27: Google Cloud e2-standard-4 Hardware Profile & Hugging Face Cloud AI Brain Specification Lock
+- **Location:** Deployment Infrastructure, `systemd` service, `scheduler_tasks.py`, `ai_engine.py`, `hf_client.py`
+- **Rule:**
+  1. **Hardware Profile (GCP e2-standard-4):** The live production deployment operates on Google Cloud Platform `e2-standard-4` (4 vCPUs, 16 GB RAM) in Tokyo `asia-northeast1-a` with direct peering to Binance Asian liquidity clusters (< 10ms execution). The 16 GB RAM pool permanently eliminates Out-Of-Memory (OOM) risks, allowing the system to run high-throughput WebSocket streams and algorithmic scanners with zero reliance on high-latency swap memory.
+  2. **Cloud AI Hybrid Brain Integration (Hugging Face HF_TOKEN):** The system leverages the Hugging Face Cloud Inference API via dedicated `HF_TOKEN` / `HUGGINGFACE_TOKEN` to execute deep quantitative reasoning models (DeepSeek-R1, Llama-3-70B, Qwen-2.5-72B) in the cloud with zero VPS RAM bloat, keeping local VPS memory usage lean (< 45 MB local ONNX/XGBoost/LSTM runtime).
 
 ---
 
@@ -252,8 +243,8 @@ Any modification that breaks any of the following 23 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 26 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 19 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 27 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 20 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
