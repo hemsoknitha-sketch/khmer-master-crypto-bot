@@ -5684,16 +5684,24 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
         msg_lines.append("🟢 `ទុនរៀបរយ - គ្មាន Position ត្រាំ`")
     else:
         for idx, t in enumerate(recent_trades[:3], 1):
-            pnl_emoji = "🟩" if t["pnl"] >= 0 else "🟥"
+            pnl_val = float(t.get("pnl", 0.0) or 0.0)
+            pnl_emoji = "🟩" if pnl_val >= 0 else "🟥"
             eng_display = str(t.get('engine', '')).replace('_', ' ').upper()
             sym_clean = str(t.get('symbol', 'BTCUSDT')).replace('_', '')
             side_clean = str(t.get('side', 'BUY')).replace('_', '')
             order_id = str(t.get('id', '')).replace('`', '').replace('_', '')
             t_type = str(t.get('type', '')).replace('`', '').replace('_', ' ')
+            t_qty = str(t.get('qty', '0.000')).replace('`', '')
             in_p_val = float(t.get('entry_price', 0.0) or 0.0)
             out_p_val = float(t.get('exit_price', 0.0) or 0.0)
             in_str = f"${in_p_val:,.6f}" if in_p_val < 0.001 else (f"${in_p_val:,.4f}" if in_p_val < 1.0 else f"${in_p_val:,.2f}")
             out_str = f"${out_p_val:,.6f}" if out_p_val < 0.001 else (f"${out_p_val:,.4f}" if out_p_val < 1.0 else f"${out_p_val:,.2f}")
+            t_time = str(t.get('time', ''))
+            t_time_str = t_time[5:] if len(t_time) >= 5 else t_time
+            t_roi = float(t.get('roi', 0.0) or 0.0)
+            t_comm = float(t.get('commission', 0.0) or 0.0)
+            t_fund = float(t.get('funding', 0.0) or 0.0)
+            t_net = float(t.get('net_pnl', pnl_val) or 0.0)
             msg_lines.extend([
                 f"\n🔹 *{idx}. យុទ្ធសាស្ត្រ {eng_display}*",
                 f"┌ 🪙 *{sym_clean}* | {side_clean}",
@@ -5701,11 +5709,11 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
                 f"├ 🏷️ Type    : `{t_type}`",
                 f"├ 📦 Qty     : `{t_qty}`",
                 f"├ 💵 In/Out  : `{in_str}` ➔ `{out_str}`",
-                f"├ ⏰ Time    : `{t['time'][5:]}`",
-                f"├ {pnl_emoji} PnL     : `{t['pnl']:+,.2f}` (`{t['roi']:+,.1f}%`)",
-                f"├ 💸 Fee     : `-${t['commission']:,.2f}`",
-                f"├ 🌾 Fund    : `{t['funding']:+,.2f}`",
-                f"└ 💎 *Net*    : *{t['net_pnl']:+,.2f} USDT*"
+                f"├ ⏰ Time    : `{t_time_str}`",
+                f"├ {pnl_emoji} PnL     : `{pnl_val:+,.2f}` (`{t_roi:+,.1f}%`)",
+                f"├ 💸 Fee     : `-${t_comm:,.2f}`",
+                f"├ 🌾 Fund    : `{t_fund:+,.2f}`",
+                f"└ 💎 *Net*    : *{t_net:+,.2f} USDT*"
             ])
             if idx < min(3, len(recent_trades)):
                 msg_lines.append(dash_sep)
