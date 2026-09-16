@@ -527,6 +527,12 @@ class KeeperRelayerEngine:
         Submits on-chain flash loan arbitrage transaction on Arbitrum One.
         If conditions are not ready or simulation mode is active, returns deterministic simulation.
         """
+        # Dynamic Q* Safety Guard: Reject oversized loans before wasting eth_call gas
+        MAX_SAFE_LOAN_USD = 2500.0
+        if amount_usd > MAX_SAFE_LOAN_USD:
+            # Auto-scale down to safe range
+            amount_usd = min(amount_usd, MAX_SAFE_LOAN_USD)
+
         status = self.get_status_overview()
         user_recipient = (user_recipient or "").strip() or self.default_recipient
 

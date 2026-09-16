@@ -213,8 +213,10 @@ class FlashLoanMEVEngine:
         else:
             # Mathematical unconstrained optimal L = effective_spread / (2 * alpha)
             raw_optimal = effective_spread / (2.0 * max(alpha, 1e-9))
-            min_floor = 25_000.0 if any(k in pair for k in ["WETH", "WBTC", "BTC", "ETH"]) else 1_500.0
-            optimal_loan = min(max_cap, max(min_floor, raw_optimal))
+            min_floor = 500.0
+            q_max_slippage = 0.0005 / max(alpha, 1e-12)
+            optimal_loan = min(max_cap, max(min_floor, raw_optimal), q_max_slippage)
+            optimal_loan = min(optimal_loan, 2500.0) # Hard cap for pre-flight safety
             
             # Slippage at optimal loan size
             slippage_pct = round((optimal_loan * alpha) * 100.0, 3)
@@ -231,6 +233,25 @@ class FlashLoanMEVEngine:
             "net_profit_yield_usd": max(0.0, est_profit),
             "xgboost_depth_score": "+0.892 (Optimal Depth Confirmed)",
             "safety_verdict": "APPROVED_FOR_ATOMIC_EXECUTION" if est_profit > 50.0 else "CAPITAL_PRESERVED"
+        }
+
+    def _compute_q_star_dynamic_sizing(self, spread_pct: float, hurdle_pct: float, liq_buy: float, liq_sell: float) -> dict:
+        """
+        Dynamically calculates optimal flash loan size (Q*) constrained by 0.05% slippage maximum.
+        Limits the final USD output to a strict window of $500 - $2,500 for high success rate.
+        """
+        beta = (1.0 / (2.0 * max(liq_buy, 1.0))) + (1.0 / (2.0 * max(liq_sell, 1.0)))
+        eff_spread = max(0.0, (spread_pct - hurdle_pct) / 100.0)
+        raw_opt = eff_spread / (2.0 * beta) if beta > 0 else 0.0
+        q_slippage_safe = 0.0005 / max(beta, 1e-12)
+        
+        opt_loan = min(raw_opt, q_slippage_safe, 2500.0, min(liq_buy, liq_sell) * 0.04)
+        opt_loan = max(500.0, opt_loan) if eff_spread > 0 else 500.0
+        
+        est_slippage = (opt_loan * beta) * 100.0
+        return {
+            "optimal_loan_usd": round(opt_loan, 2),
+            "estimated_slippage_pct": round(est_slippage, 4)
         }
 
     # =========================================================================
@@ -360,7 +381,7 @@ class FlashLoanMEVEngine:
         Records audit trail into database (user_cedefi_trades).
         """
         import database as db
-        safe_amount = max(10.50, float(amount_usdt))
+        safe_amount = min(30.0, max(10.50, float(amount_usdt)))
         spot_side = "BUY" if "BUY_BINANCE" in str(action).upper() else "SELL"
         symbol_clean = str(symbol or "").upper().strip()
         if not symbol_clean.endswith("USDT"):
@@ -575,7 +596,8 @@ class FlashLoanMEVEngine:
                     continue
 
                 net_yield_pct = max(0.0, gross_spread_pct - fee_hurdle)
-                opt_loan = min(default_loan, min(liq1, liq2) * 0.15)
+                q_star = self._compute_q_star_dynamic_sizing(gross_spread_pct, fee_hurdle, liq1, liq2)
+                opt_loan = q_star["optimal_loan_usd"]
                 net_profit_usd = round(opt_loan * (net_yield_pct / 100.0), 2)
 
                 opportunities.append({
@@ -677,7 +699,9 @@ class FlashLoanMEVEngine:
                 continue
 
             net_yield_pct = max(0.0, gross_spread_pct - hurdle)
-            opt_weth = def_weth
+            q_star = self._compute_q_star_dynamic_sizing(gross_spread_pct, hurdle, buy_liq, sell_liq)
+            opt_usd = q_star["optimal_loan_usd"]
+            opt_weth = opt_usd / max(weth_usd, 1.0)
             net_profit_weth = opt_weth * (net_yield_pct / 100.0)
             net_profit_usd = net_profit_weth * weth_usd
 
@@ -1627,7 +1651,9 @@ class FlashLoanMEVEngine:
             est_profit_usd = 0.0
 
             if is_lead_signal:
-                loan_size = 35_000.0 if tok in ["ARB", "WETH"] else 15_000.0
+                # Predictive model uses assumed base pool depth of $150k
+                q_star = self._compute_q_star_dynamic_sizing(predicted_dislocation_pct, 0.40, 150_000.0, 150_000.0)
+                loan_size = q_star["optimal_loan_usd"]
                 hurdle = 0.40
                 if predicted_dislocation_pct > hurdle:
                     net_spread = predicted_dislocation_pct - hurdle - 0.08
@@ -1746,11 +1772,12 @@ class FlashLoanMEVEngine:
     # =========================================================================
     # HFT WEAPON PILLAR 3: AI MULTI-HOP JIT ROUTER (COMPLEX CYCLIC ROUTING)
     # =========================================================================
-    def execute_multi_hop_jit_arbitrage(self, borrow_amount: float = 500_000.0) -> dict:
+    def execute_multi_hop_jit_arbitrage(self, borrow_amount: float = 1500.0) -> dict:
         """
         Executes complex multi-hop cyclic arbitrage using AI pathfinder.
         Finds 4-hop routes across Uniswap V3, SushiSwap, Curve, and Balancer,
         acquiring Just-In-Time (JIT) liquidity from Aave V3.
+        Borrow amount is explicitly clamped to safe Q* bounds to prevent slippage.
         """
         route = ["USDT", "WETH", "ARB", "USDT"]
         margin_pct = 0.08
