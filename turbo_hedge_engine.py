@@ -1848,54 +1848,13 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 print(f"Error sending breaker notification: {e}")
         return
 
-    # 🎯 2-STAGE SCALE-OUT (50% BANK CASH TP1 + 50% MOONBAG TRAILING)
-    if is_tp1_hit and scale_out_level == 0:
-        print(f"💰 [TP1 50% BANK CASH] {symbol}: Target profit reached (PnL: +${net_pnl_usdt:.2f} USDT, ROI: +{roi_pct:.1f}%) -> Selling 50% Qty to Bank Cash (<30ms)...")
-        if current_side in ["HEDGE", "DELTA_NEUTRAL"]:
-            close_spot = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL", 10.0, 0.50)
-            close_fut = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
-            partial_res = close_fut if is_close_successful(close_fut) else close_spot
-        elif current_side == "SPOT":
-            partial_res = await asyncio.to_thread(trading_engine.execute_spot_trade, keys[0], keys[1], symbol, "SELL", 10.0, 0.50)
-        else:
-            partial_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
-            
-        if is_close_successful(partial_res):
-            db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "1")
-            db.record_symbiotic_micro_profit(chat_id, symbol, max(0.20, net_pnl_usdt * 0.50))
-            print(f"✅ [TP1 50% CASH HARVESTED] {symbol}: 50% Banked cleanly! Remaining 50% converted to Risk-Free Moonbag Trailing.")
-            
-            is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
-            if not is_quiet and app and hasattr(app, "bot"):
-                try:
-                    from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
-                    msg_tp1 = (
-                        f"🎯 **APEX TP1 50% BANK CASH HARVESTED!** 💰\n"
-                        f"{DIVIDER_DOUBLE}\n\n"
-                        f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
-                        f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `+${max(0.20, net_pnl_usdt * 0.5):.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
-                        f"🛡️ **ស្ថានភាពទុន ៖** `50% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
-                        f"🔒 **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
-                        f"🚀 **Moonbag 50% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $2.50-$3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
-                        f"⚡ _AI បានដកប្រាក់ដើម 50% និងចំណេញដាក់ចូលកាបូបជោគជ័យ! Position 50% ទៀតក្លាយជា Zero-Risk Runner ដេញចាប់កំពូល!_\n\n"
-                        f"{OFFICIAL_FOOTNOTE}"
-                    )
-                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown", read_timeout=5, write_timeout=5, connect_timeout=5))
-                except Exception as e:
-                    print(f"Error sending TP1 notification: {e}")
-            return
+    is_tp_harvested = is_tp1_hit
 
-    # In Moonbag mode, harvest final 50% if extreme moonshot target reached (> $5.00 or > 50% ROI)
-    if is_tp1_hit and scale_out_level == 1 and (net_pnl_usdt >= 3.50 or roi_pct >= 35.0):
-        print(f"🚀 [TP2 MOONSHOT FULL HARVEST] {symbol}: Ultimate moonshot target reached (PnL: +${net_pnl_usdt:.2f} USDT, ROI: +{roi_pct:.1f}%) -> 100% Clean Cash Harvest!")
-        is_tp_harvested = True
-
+    # 🎯 100% PURE FULL-POSITION RUNNER (50% Premature Scale-Out 100% Disabled)
+    # Positions are preserved at 100% full size under Breakeven Armor & Golden 85% Ratchet.
+    # 100% CLEAN CASH HARVEST: When target TP or Ratchet pullback occurs, full closure is executed!
     if is_breakeven_triggered or is_tp_harvested or is_peak_locked:
-        if scale_out_level == 1:
-            reason_tag = "TP2 TRAILING MOONSHOT (FINAL 50%)"
-            alert_title = "🏆 **APEX MOONSHOT TP2 FULLY HARVESTED!** 🚀"
-            alert_desc = "_AI បានចាក់សោរកើបផលចំណេញពេញលេញទាំង ២ ដំណាក់កាល (TP1 50% + TP2 Moonbag 50%) ដោយជោគជ័យ ១០០%!_"
-        elif is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
+        if is_breakeven_triggered and not (is_tp_harvested or is_peak_locked):
             if is_derisked:
                 reason_tag = "SUPER SMART BREAKEVEN RECOVERY LOCKED"
                 alert_title = "🛡️ **SUPER SMART BREAKEVEN RECOVERY LOCKED!** 🔒"
@@ -1909,13 +1868,13 @@ async def _monitor_single_active_bot(app, bot_info: dict):
                 alert_title = "🎯 **APEX TURBO HEDGE CHANDELIER ATR TRAILING LOCKED!** 💰"
                 alert_desc = f"_AI រំកិល Stop-Loss តាមដេញចាប់ប្រាក់ចំណេញរហូតដល់កំពូល ចាក់សោបាន +{roi_pct:.1f}% ROI!_"
         elif is_peak_locked:
-            reason_tag = "GOLDEN 85% PEAK LOCKED"
-            alert_title = "💰 **APEX GOLDEN 85% PROFIT LOCKED!** 🚀"
-            alert_desc = "_AI បានចាក់សោរប្រាក់ចំណេញ ៨៥% នៃចំណុចកំពូលជោគជ័យ ១០០% ធានាមិនឱ្យរបូតមកខាតបង់ឡើយ!_"
+            reason_tag = "GOLDEN 85% PEAK LOCKED (100% FULL POSITION)"
+            alert_title = "💰 **APEX GOLDEN 85% PROFIT FULL HARVEST!** 🚀"
+            alert_desc = "_AI បានចាក់សោរកើបប្រាក់ចំណេញ ៨៥% នៃចំណុចកំពូលលើទុន ១០០% ពេញលេញ ធានាមិនឱ្យរបូតមកខាតបង់ឡើយ!_"
         else:
-            reason_tag = "100% CLEAN CASH HARVESTED"
-            alert_title = "💰 **APEX 100% CLEAN CASH PROFIT HARVESTED!** 🚀"
-            alert_desc = "_AI បានកើបយកប្រាក់ចំណេញសុទ្ធ ១០០% ដាក់ចូលកាបូបជោគជ័យ ធានា Zero Risk & Free Slot!_"
+            reason_tag = f"TARGET TP HARVEST (+{roi_pct:.1f}% ROI)"
+            alert_title = "🎯 **APEX TURBO HEDGE TARGET PROFIT HARVESTED!** 💰"
+            alert_desc = "_AI បានកើបយកប្រាក់ចំណេញតាមគោលដៅ 100% Clean Cash ជោគជ័យ!_"
 
         print(f"💰 [TURBO HEDGE {reason_tag}] {symbol}: Real PnL +${real_pnl_usdt:.2f} USDT (ROI: +{roi_pct:.1f}%) -> Closing Position (<30ms)...")
         

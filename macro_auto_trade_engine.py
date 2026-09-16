@@ -578,35 +578,9 @@ async def monitor_macro_auto_trades(app):
                 peak_pnl = effective_pnl
                 db.update_system_setting(f"macro_trade_{chat_id}_{symbol}_peak_pnl", str(peak_pnl))
 
-            # Scale-out tracking
-            scale_lvl_key = f"macro_trade_{chat_id}_{symbol}_scale_out_level"
-            scale_lvl_str = db.get_system_setting(scale_lvl_key, "0")
-            scale_lvl = int(scale_lvl_str) if scale_lvl_str.isdigit() else 0
-
-            # TP1: Scale out 50% at >= +8.0% ROI or >= +$0.80 net PnL (Asymmetric R:R >= 1:2.5 Bank 50% Cash / 50% Runner)
-            if scale_lvl == 0 and (roi_pct >= 8.0 or effective_pnl >= 0.80):
-                print(f"💰 [MACRO TP1 50% BANK CASH] {symbol}: Profit target reached (${effective_pnl:+.2f}, ROI: +{roi_pct:.1f}%) -> Closing 50% position (<30ms)...")
-                close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol, 0.50)
-                if close_res.get("closed") or close_res.get("status") == "success":
-                    db.update_system_setting(scale_lvl_key, "1")
-                    print(f"✅ [MACRO TP1 SUCCESS] {symbol}: 50% Position Banked! Remaining 50% converted to Risk-Free Moonbag.")
-                    if app and hasattr(app, "bot"):
-                        try:
-                            msg_tp1 = (
-                                f"🎯 **MACRO AUTO-TRADE TP1 50% CASH HARVESTED!** 💰\n"
-                                f"{DIVIDER_HEAVY}\n\n"
-                                f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
-                                f"📊 **យុទ្ធសាស្ត្រ ៖** `{strategy}`\n"
-                                f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `+${(effective_pnl * 0.50):.2f} USDT` (`+{roi_pct:.1f}% ROI`)\n"
-                                f"🛡️ **ស្ថានភាពទុន ៖** `50% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
-                                f"🔒 **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
-                                f"🚀 **Moonbag 50% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $2.50-$3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
-                                f"{OFFICIAL_FOOTNOTE}"
-                            )
-                            asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_tp1, parse_mode="Markdown"))
-                        except Exception as e:
-                            print(f"Error sending macro TP1 notification: {e}")
-                    continue
+            # 🎯 100% PURE FULL-POSITION RUNNER (50% Premature Scale-Out 100% Disabled)
+            # Position is preserved at 100% full size under Breakeven Armor & Golden 85% Ratchet.
+            # Compounding gains run on 100% full size until Golden 85% Ratchet or Breakeven Armor triggers!
 
             # Profit Harvesting Logic
             is_take_profit = False

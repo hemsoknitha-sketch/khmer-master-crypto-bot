@@ -1999,45 +1999,9 @@ async def process_single_trailing_stop(app, ai_engine, trade):
     # --- Scale-Out Logic (Fee-Adjusted Net PnL) ---
     profit_pct = trading_engine.calculate_net_pnl_pct(buy_price, current_price) if buy_price and buy_price > 0 else 0.0
     
-    if profit_pct >= 5.0 and scale_out_level == 0:
-        sell_qty = initial_qty * 0.50
-        if sell_qty <= qty:
-            keys = await asyncio.to_thread(db.get_user_api, chat_id)
-            if keys:
-                api_key, api_secret = keys[0], keys[1]
-                base_asset = symbol[:-4]
-                actual_coin_balance = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, base_asset)
-                actual_sell_qty = min(sell_qty, actual_coin_balance)
-                
-                if actual_sell_qty > 0:
-                    result = await asyncio.to_thread(trading_engine.place_market_sell, api_key, api_secret, symbol, actual_sell_qty)
-                else:
-                    result = {"error": "Insufficient Coin Balance (Asset Guard)"}
-                    
-                if "status" in result and result["status"] == "FILLED":
-                    new_qty = qty - sell_qty
-                    await asyncio.to_thread(db.update_trade_qty_and_scale, trade_id, new_qty, 1)
-                    qty = new_qty
-                    user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
-                    from ui_standards import DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
-                    alert_msg = (
-                        f"🎯 **APEX TP1 50% BANK CASH HARVESTED!** 💰\n"
-                        f"{DIVIDER_DOUBLE}\n\n"
-                        f"🪙 **កាក់គោលដៅ ៖** `{symbol}`\n"
-                        f"💵 **សាច់ប្រាក់កើបចូលកាបូប ៖** `50% Qty Sold` (`+{profit_pct:.2f}% Net`)\n"
-                        f"🛡️ **ស្ថានភាពទុន ៖** `50% CASH IN WALLET (ស្រោចស្រង់ដើមទុន 100%)`\n"
-                        f"🔒 **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
-                        f"🚀 **Moonbag 50% ៖** `បើកផ្លូវ Trailing ដេញតាមកំពូល Target $3.50+ ជាមួយ Golden 85% Ratchet!`\n\n"
-                        f"{OFFICIAL_FOOTNOTE}"
-                    )
-                    try: await app.bot.send_message(chat_id=chat_id, text=alert_msg, parse_mode="Markdown")
-                    except: pass
-                elif "error" in result or "code" in result:
-                    err_code = result.get("code")
-                    if err_code in [-2010, -1013, -1111, -2015, -2014, -2011, -1021]:
-                        await asyncio.to_thread(db.update_trade_qty_and_scale, trade_id, qty, 1)
-                        try: await app.bot.send_message(chat_id=chat_id, text=f"⚠️ រំលងការលក់ Scale Out កម្រិត 1 សម្រាប់ {symbol} ដោយសារកំហុស។")
-                        except: pass
+    # 🎯 100% PURE FULL-POSITION RUNNER (50% Premature Scale-Out 100% Disabled)
+    # Positions are preserved at 100% full size under Breakeven Armor & Golden 85% Ratchet.
+    # Compounding gains run on 100% full size until Golden 85% Ratchet or Breakeven Armor triggers!
 
     # --- Trailing Stop-Loss Logic ---
     if current_price > current_highest:
@@ -4277,67 +4241,8 @@ async def trailing_stop_engine_job(app: Application):
 
         
 
-        # 0. DYNAMIC EXIT PROTOCOL: Scale-out 50% if profit >= 20%
-
-        if current_pnl_pct >= 20.0 and not scaled_out:
-
-            keys = db.get_user_api(chat_id)
-
-            if keys:
-
-                api_key, api_secret = keys
-
-                scale_out_qty = qty * 0.5
-
-                # LIQUIDITY GUARD
-                base_coin = symbol.replace("USDT", "")
-                actual_balance = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, base_coin)
-                safe_scale_out = min(scale_out_qty, actual_balance) if actual_balance > 0 else scale_out_qty
-
-                # Execute Market Sell for 50%
-                res = await asyncio.to_thread(trading_engine.place_market_sell, api_key, api_secret, symbol, safe_scale_out)
-
-                
-
-                if "error" not in res and "code" not in res:
-
-                    db.mark_trade_scaled_out(trade_id)
-
-                    db.update_active_trade_qty(trade_id, qty - scale_out_qty)
-
-                    
-
-                    # Widen trailing stop to give remaining capital room to run
-
-                    new_stop_loss = 15.0 # Widen to 15% from highest
-
-                    conn = db.get_db_connection()
-
-                    conn.execute("UPDATE active_trades SET stop_loss_pct = ? WHERE id = ?", (new_stop_loss, trade_id))
-
-                    conn.commit()
-
-                    conn.close()
-
-                    
-
-                    msg = (
-
-                        f"🚀 **DYNAMIC EXIT: 50% Profit Secured!**\n\n"
-
-                        f"🪙 **Symbol:** {symbol}\n"
-
-                        f"💰 **Sold:** 50% of holdings\n"
-
-                        f"📈 **Profit Locked:** +{current_pnl_pct:.2f}%\n"
-
-                        f"🛡️ **Status:** Letting the remaining 50% run with a {new_stop_loss}% dynamic trailing stop! 🏃‍♂️💨"
-
-                    )
-
-                    await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
-
-                    continue # Skip further processing this tick
+        # 🎯 100% PURE FULL-POSITION RUNNER (50% Premature Scale-Out 100% Disabled)
+        # Position is preserved at 100% full size under Breakeven Armor & Golden 85% Ratchet.
 
             
 
@@ -4975,9 +4880,8 @@ async def gold_turbo_monitor(app: Application):
                                 f"• Entry Price: `${p:,.2f}`\n"
                                 f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
                                 "• MoE Regime : `RANGE_CHOP -> Routed to SONIC Scalp`\n"
-                                "• Target TP1 : `50% Bank Cash @ +12% ROI / +$2.50/oz`\n"
-                                "• Moonbag    : `50% Qty Trailing (Golden 85% Ratchet)`\n"
-                                "• Protection : `Breakeven Armor @ +2.5% | Time-Stop Active`\n"
+                                "• Strategy   : `100% Full Position Runner (Golden 85% Ratchet)`\n"
+                                "• Protection : `Breakeven Armor @ +3.0% ROI (+0.12% Net Floor)`\n"
                                 "━━━━━━━━━━━━\n"
                                 "_AGI Autonomous Swarm Engine Active 24/7._"
                             )
@@ -5005,9 +4909,8 @@ async def gold_turbo_monitor(app: Application):
                             "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                             f"• Entry Price: `${p:,.2f}`\n"
                             f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
-                            "• Target TP1 : `50% Bank Cash @ +12% ROI / +$2.50/oz`\n"
-                            "• Moonbag    : `50% Qty Trailing (Golden 85% Ratchet)`\n"
-                            "• Protection : `Breakeven Armor @ +2.5% | Time-Stop Active`\n"
+                            "• Strategy   : `100% Full Position Runner (Golden 85% Ratchet)`\n"
+                            "• Protection : `Breakeven Armor @ +3.0% ROI (+0.12% Net Floor)`\n"
                             "━━━━━━━━━━━━\n"
                             "_TURBO High-Frequency Engine Active 24/7._"
                         )
@@ -5035,9 +4938,8 @@ async def gold_turbo_monitor(app: Application):
                             "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                             f"• Entry Price: `${p:,.2f}`\n"
                             f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
-                            "• Target TP1 : `50% Bank Cash @ +12% ROI / +$2.50/oz`\n"
-                            "• Moonbag    : `50% Qty Trailing (Golden 85% Ratchet)`\n"
-                            "• Protection : `Breakeven Armor @ +2.5% | Time-Stop Active`\n"
+                            "• Strategy   : `100% Full Position Runner (Golden 85% Ratchet)`\n"
+                            "• Protection : `Breakeven Armor @ +3.0% ROI (+0.12% Net Floor)`\n"
                             "━━━━━━━━━━━━\n"
                             "_SONIC Institutional Scalp Engine Active 24/7._"
                         )

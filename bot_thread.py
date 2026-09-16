@@ -11020,9 +11020,9 @@ class TelegramBotThread(BaseThread):
                         f"• Direction  : `{user_side}`\n"
                         f"• Capital    : `${amount:.2f} USDT` ({leverage}x ISOLATED)\n"
                         f"• Entry Price: `${entry_p:,.2f}`\n"
-                        f"• 2-Stage TP : `50% TP1 Bank Cash + 50% Moonbag (Golden 85% Ratchet)`\n"
-                        f"• Protection : `Breakeven Armor @ +2.5% ROI (+0.12% Net Floor)`\n"
-                        f"• Strategy   : `{strat_name}`\n"
+                        f"• Strategy   : `100% Full Position Runner (Golden 85% Ratchet)`\n"
+                        f"• Protection : `Breakeven Armor @ +3.0% ROI (+0.12% Net Floor)`\n"
+                        f"• Engine     : `{strat_name}`\n"
                         f"{div}\n"
                         "✅ _Position active in HFT Turbo Hedge Monitor._"
                     )
