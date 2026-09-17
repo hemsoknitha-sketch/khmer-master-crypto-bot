@@ -3058,12 +3058,16 @@ class TelegramBotThread(BaseThread):
                         InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
                     ],
                     [
-                        InlineKeyboardButton("⚡ Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                        InlineKeyboardButton("⚡ Smart Swap AI (DEX)", callback_data="btn_portfolio_smart_swap")
+                        InlineKeyboardButton("💎 24/7 Perpetual Wealth", callback_data="btn_wealth_menu"),
+                        InlineKeyboardButton("⚡ Turbo Hedge HFT", callback_data="btn_turbo_hedge")
                     ],
                     [
-                        InlineKeyboardButton("💳 Solana Hot Wallet", callback_data="btn_smart_swap_wallet"),
-                        InlineKeyboardButton("🎯 Auto Gem Sniper ($20)", callback_data="btn_smart_swap_auto_20")
+                        InlineKeyboardButton("🎯 Smart Trade / Auto", callback_data="btn_smart_trade"),
+                        InlineKeyboardButton("🧠 Smart X AI Quant", callback_data="btn_smart_x_auto")
+                    ],
+                    [
+                        InlineKeyboardButton("🌐 Smart Swap (DEX)", callback_data="btn_portfolio_smart_swap"),
+                        InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester")
                     ],
                     [
                         InlineKeyboardButton("🛑 STOP ALL (Exit Market)", callback_data="btn_smart_swap_stop_all"),

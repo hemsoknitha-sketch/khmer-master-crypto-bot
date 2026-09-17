@@ -404,6 +404,17 @@ def get_full_system_portfolio_data(chat_id: int, force_fresh: bool = False) -> d
     is_auto_trade_enabled = db.is_auto_trade_enabled(chat_id) if hasattr(db, 'is_auto_trade_enabled') else False
     macro_auto_cfg = db.get_macro_auto_trade_config(chat_id) if hasattr(db, 'get_macro_auto_trade_config') else {}
 
+    # 8e. 24/7 Perpetual Wealth Generator (/wealth / /wealth24/7)
+    perpetual_wealth_bot = {}
+    spot_wealth_stats = {}
+    try:
+        if hasattr(db, 'get_perpetual_wealth_bot'):
+            perpetual_wealth_bot = db.get_perpetual_wealth_bot(chat_id) or {}
+        if hasattr(db, 'get_total_spot_wealth_harvested'):
+            spot_wealth_stats = db.get_total_spot_wealth_harvested(chat_id) or {}
+    except Exception as e:
+        print(f"[PORTFOLIO] Perpetual wealth query error: {e}")
+
     # 9. Flash Loan Keeper & Strategy
     is_flash_loan_auto = db.is_user_flash_loan_auto(chat_id) if hasattr(db, 'is_user_flash_loan_auto') else False
     flash_loan_pnl = db.get_user_flash_loan_pnl_summary(chat_id) if hasattr(db, 'get_user_flash_loan_pnl_summary') else {"count": 0, "total_profit": 0.0}
@@ -599,6 +610,8 @@ def get_full_system_portfolio_data(chat_id: int, force_fresh: bool = False) -> d
         "flash_loan_pnl": flash_loan_pnl,
         "is_defender_active": is_defender_active,
         "circuit_breaker": circuit_breaker,
+        "perpetual_wealth_bot": perpetual_wealth_bot,
+        "spot_wealth_stats": spot_wealth_stats,
 
         # Hardware & Vitals
         "uptime_str": uptime_str,
@@ -709,11 +722,93 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
         )
 
     # =========================================================================
-    # 2. AUDIT OF ALL 10 INVESTMENT ENGINES (WITH ACTIVE ASSETS)
+    # 2. AUDIT OF ALL 11 INVESTMENT ENGINES (WITH ACTIVE ASSETS)
     # =========================================================================
-    engines_text = "📊 **ស្ថានភាពដំណើរការម៉ាស៊ីនវិនិយោគទាំង ១០ (10-ENGINE AUDIT):**\n\n" if lang == "km" else "📊 **OPERATIONAL STATUS OF ALL 10 ENGINES:**\n\n"
+    engines_text = "📊 **ស្ថានភាពដំណើរការម៉ាស៊ីនវិនិយោគទាំង ១១ (11-ENGINE SUPER SMART AUDIT) ៖**\n\n" if lang == "km" else "📊 **OPERATIONAL STATUS OF ALL 11 INVESTMENT ENGINES:**\n\n"
 
-    # --- ENGINE 1: Turbo Hedge & Delta-Neutral HFT Engine ---
+    # --- ENGINE 1: 24/7 Perpetual Wealth Generator (/wealth / /wealth24/7) ---
+    wb = data.get("perpetual_wealth_bot", {})
+    wb_status = wb.get("status", "STANDBY")
+    wb_cap = float(wb.get("capital", 50.0))
+    wb_lev = int(wb.get("leverage", 10))
+    wb_tp = float(wb.get("target_tp", 10.0))
+    wb_coins = wb.get("coins", [])
+    wb_pnl = float(wb.get("total_pnl", 0.0))
+    wb_wins = int(wb.get("win_count", 0))
+    wb_losses = int(wb.get("loss_count", 0))
+    spot_w = data.get("spot_wealth_stats", {})
+
+    fut_pos = data.get("active_futures_positions", [])
+
+    wealth_active_positions = []
+    for p in fut_pos:
+        sym = p.get("symbol", "")
+        if sym in wb_coins or wb_status == "ACTIVE":
+            is_be = (db.get_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0") == "1")
+            tp1_taken = (db.get_system_setting(f"wealth_tp1_taken_{chat_id}_{sym}", "0") == "1")
+            wealth_active_positions.append({
+                "symbol": sym,
+                "side": p.get("side", "BUY"),
+                "leverage": p.get("leverage", 10),
+                "margin_usd": p.get("margin_usd", 0.0),
+                "entry_price": p.get("entry_price", 0.0),
+                "mark_price": p.get("mark_price", 0.0),
+                "pnl_usd": p.get("pnl_usd", 0.0),
+                "roi_pct": p.get("roi_pct", 0.0),
+                "is_be_locked": is_be,
+                "tp1_taken": tp1_taken
+            })
+
+    if lang == "km":
+        if wb_status == "ACTIVE":
+            w_header = "   🟢 ACTIVE (កើបចំណេញ ២៤/៧ ដោយស្វ័យប្រវត្តិនឹង 33 AI Models)\n"
+            w_cfg = f"  • ប៉ារ៉ាម៉ែត្រ ៖ ដើមទុន `${wb_cap:.0f} USDT` | Leverage `{wb_lev}x ISOLATED` | Target TP: `+{wb_tp:.1f}%`\n"
+            w_strat = "  • យុទ្ធសាស្ត្រ ៖ `Breakeven Armor (+3% ROI) | TP1 50% Cash (+5% ROI) | Moonshot Ratchet 85%`\n"
+            if wealth_active_positions:
+                w_items = []
+                for wp in wealth_active_positions:
+                    p_sign = "+" if wp['pnl_usd'] >= 0 else ""
+                    badge = " [🛡️ Breakeven Armored]" if wp['is_be_locked'] else (" [🏆 TP1 Cash Locked]" if wp['tp1_taken'] else "")
+                    w_items.append(f"  • `{wp['symbol']}` (Futures {wp['side']} {wp['leverage']}x) ៖ Margin `${wp['margin_usd']:.2f}` | Entry: `${wp['entry_price']:.4f}` | Mark: `${wp['mark_price']:.4f}` | PnL: `{p_sign}${wp['pnl_usd']:.2f}` (`{wp['roi_pct']:+.1f}%`){badge}")
+                w_pos_str = "  • កាក់កំពុងច្បាមចំណេញ ៖\n" + "\n".join(w_items) + "\n"
+            else:
+                w_pos_str = "  • កាក់កំពុងច្បាមចំណេញ ៖ `កំពុងស្កេនរកកាក់ Golden Sweet-Spot (+3% ដល់ +14%) 24/7`\n"
+            w_pnl_str = f"  • 🏆 ផលចំណេញកើបបានសរុប ៖ `+${wb_pnl:,.2f} USDT` (ឈ្នះ {wb_wins} ដង / ចាញ់ {wb_losses} ដង)\n"
+            w_spot_str = f"  • 🪙 Spot BTC Auto-Accumulated ៖ `+${spot_w.get('total_usdt', 0.0):.2f} USDT` ({spot_w.get('count', 0)} ដង)\n" if spot_w.get('total_usdt', 0) > 0 else ""
+            w_body = w_cfg + w_strat + w_pos_str + w_pnl_str + w_spot_str
+        else:
+            w_header = "   ⚪ STANDBY (រង់ចាំសញ្ញាបញ្ជាបើកដំណើរការ ២៤/៧)\n"
+            w_body = (
+                "  • ពាក្យបញ្ជាបើក ៖ `/wealth ON 50`\n"
+                "  • យុទ្ធសាស្ត្រ ៖ Triple-Phase Autonomous Wealth Extraction (Pullback Retest + ADX >= 25.0)\n"
+            )
+        engines_text += f"1️⃣ **24/7 Perpetual Wealth Generator (`/wealth` / `/wealth24/7`)**\n{w_header}{w_body}\n"
+    else:
+        if wb_status == "ACTIVE":
+            w_header = "   🟢 ACTIVE (24/7 Continuous Capital Accumulation & Harvest)\n"
+            w_cfg = f"  • Parameters: Capital `${wb_cap:.0f} USDT` | `{wb_lev}x ISOLATED` | Target TP: `+{wb_tp:.1f}%`\n"
+            w_strat = "  • Strategy: `Breakeven Armor (+3% ROI) | TP1 50% Cash (+5% ROI) | Moonshot Ratchet 85%`\n"
+            if wealth_active_positions:
+                w_items = []
+                for wp in wealth_active_positions:
+                    p_sign = "+" if wp['pnl_usd'] >= 0 else ""
+                    badge = " [🛡️ Breakeven Armored]" if wp['is_be_locked'] else (" [🏆 TP1 Cash Locked]" if wp['tp1_taken'] else "")
+                    w_items.append(f"  • `{wp['symbol']}` (Futures {wp['side']} {wp['leverage']}x): Margin `${wp['margin_usd']:.2f}` | Entry: `${wp['entry_price']:.4f}` | Mark: `${wp['mark_price']:.4f}` | PnL: `{p_sign}${wp['pnl_usd']:.2f}` (`{wp['roi_pct']:+.1f}%`){badge}")
+                w_pos_str = "  • Active Wealth Positions:\n" + "\n".join(w_items) + "\n"
+            else:
+                w_pos_str = "  • Active Positions: `Scanning Golden Sweet-Spot (+3% to +14%) breakouts 24/7`\n"
+            w_pnl_str = f"  • 🏆 Cumulative Wealth PnL: `+${wb_pnl:,.2f} USDT` ({wb_wins} Wins / {wb_losses} Losses)\n"
+            w_spot_str = f"  • 🪙 Spot BTC Accumulated: `+${spot_w.get('total_usdt', 0.0):.2f} USDT` ({spot_w.get('count', 0)} harvests)\n" if spot_w.get('total_usdt', 0) > 0 else ""
+            w_body = w_cfg + w_strat + w_pos_str + w_pnl_str + w_spot_str
+        else:
+            w_header = "   ⚪ STANDBY (Ready for 24/7 Wealth Activation)\n"
+            w_body = (
+                "  • Launch Command: `/wealth ON 50`\n"
+                "  • Strategy: Triple-Phase Autonomous Wealth Extraction (Pullback Retest + ADX >= 25.0)\n"
+            )
+        engines_text += f"1️⃣ **24/7 Perpetual Wealth Generator (`/wealth` / `/wealth24/7`)**\n{w_header}{w_body}\n"
+
+    # --- ENGINE 2: Turbo Hedge & Delta-Neutral HFT Engine ---
     tb_bots = data.get("user_turbo_bots", [])
     fut_pos = data.get("active_futures_positions", [])
     top_mode = data.get("turbo_top_mode", False)
@@ -772,7 +867,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             inv_text = "💼 **កាក់កំពុងវិនិយោគជាក់ស្តែង ៖**\n  • គ្មាន Position កំពុងត្រាំ (Free Margin 100% សុវត្ថិភាព)"
 
         engines_text += (
-            f"1️⃣ **Turbo Hedge & Delta-Neutral HFT Engine (`/turbo_hedge`)**\n"
+            f"2️⃣ **Turbo Hedge & Delta-Neutral HFT Engine (`/turbo_hedge`)**\n"
             f"{dn_text}"
             f"{agi_text}"
             f"{inv_text}\n\n"
@@ -822,7 +917,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             inv_text = "💼 **Active Invested Positions:**\n  • No active positions (100% Free Margin Protected)"
 
         engines_text += (
-            f"1️⃣ **Turbo Hedge & Delta-Neutral HFT Engine (`/turbo_hedge`)**\n"
+            f"2️⃣ **Turbo Hedge & Delta-Neutral HFT Engine (`/turbo_hedge`)**\n"
             f"{dn_text}"
             f"{agi_text}"
             f"{inv_text}\n\n"
@@ -855,7 +950,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e2_status = "🟡 STANDBY (ស្កេនរកកាក់ Spot Breakout & Top Gainers 24/7)" if lang == "km" else "🟡 STANDBY (Scanning Spot Breakouts 24/7)"
         e2_body = "  • ស្ថានភាព ៖ គ្មានកាក់ Spot កំពុងជួញដូរ (វាយ `/auto_trade ON 30` ឬ `/smart_trade auto 20 1234` ដើម្បីចាប់ផ្តើម)" if lang == "km" else "  • Status: Standby (Execute `/auto_trade ON 30` or `/smart_trade auto 20 1234`)"
-    engines_text += f"2️⃣ **Super Smart Trade Suite (`/smart_trade` / `auto_trade`)**\n   {e2_status}\n{e2_body}\n\n"
+    engines_text += f"3️⃣ **Super Smart Trade Suite (`/smart_trade` / `auto_trade`)**\n   {e2_status}\n{e2_body}\n\n"
 
     # --- ENGINE 3: Smart X Multi-Asset Quant Suite (Gold & BTC) ---
     smart_x_active = data.get("smart_x_active", False)
@@ -893,7 +988,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e3_status = "🟡 STANDBY (រង់ចាំ London/NY Liquidity Sweep)" if lang == "km" else "🟡 STANDBY (Waiting for London/NY Sweep)"
         e3_body = "  • ស្ថានភាព ៖ រង់ចាំវាយលុក Asian Range Fakeout (វាយ `/smartx GOLD 20 10 AUTO 1234` ដើម្បីបើក)" if lang == "km" else "  • Status: Ready to launch via `/smartx GOLD 20 10 AUTO 1234`"
-    engines_text += f"3️⃣ **Smart X Quant Suite (`/smart_x` / `/smartx`)**\n   {e3_status}\n{e3_body}\n\n"
+    engines_text += f"4️⃣ **Smart X Quant Suite (`/smart_x` / `/smartx`)**\n   {e3_status}\n{e3_body}\n\n"
 
     # --- ENGINE 4: Smart Swap Multi-Chain DEX & AI Gem Sniper ---
     swaps = data["active_smart_swaps"]
@@ -956,7 +1051,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
             f"{ap_str_en}"
             f"{pnl_hist_str_en}"
         )
-    engines_text += f"4️⃣ **Smart Swap Multi-Chain DEX & AI Sniper (`/smart_swap`)**\n   {e4_status}\n{e4_body}\n\n"
+    engines_text += f"5️⃣ **Smart Swap Multi-Chain DEX & AI Sniper (`/smart_swap`)**\n   {e4_status}\n{e4_body}\n\n"
 
     # --- ENGINE 5: Dynamic Infinity Matrix & Compound Grid ---
     grids = data["active_grids"]
@@ -971,7 +1066,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e5_status = "🟡 STANDBY (ត្រៀមសំណាញ់វិនិយោគ Grid 3X Compound)" if lang == "km" else "🟡 STANDBY (Ready for 3X Compound Deployment)"
         e5_body = "  • ស្ថានភាព ៖ គ្មាន Grid សកម្ម (វាយ `/compound_grid AVAX 100 3.0 1234` ឬ `/infinity_matrix ON 100 1234` ដើម្បីដាក់សំណាញ់)" if lang == "km" else "  • Status: Ready to deploy via `/compound_grid` or `/infinity_matrix`"
-    engines_text += f"5️⃣ **Dynamic Infinity Matrix & Compound Grid (`/infinity_matrix`)**\n   {e5_status}\n{e5_body}\n\n"
+    engines_text += f"6️⃣ **Dynamic Infinity Matrix & Compound Grid (`/infinity_matrix` / `/compound_grid`)**\n   {e5_status}\n{e5_body}\n\n"
 
     # --- ENGINE 6: Smart Listing & Pre-Pump Sniper ---
     snipers = data["user_snipers"]
@@ -995,7 +1090,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e6_status = "🟡 STANDBY (WebSocket Listing Radar ត្រៀមស្ទាក់កាក់ថ្មី 24/7)" if lang == "km" else "🟡 STANDBY (Binance WebSocket Listing Radar Active 24/7)"
         e6_body = "  • ស្ថានភាព ៖ តាមដានគម្លាត Volume Velocity & 33 AI Models (វាយ `/pre_pump ON 50 1234` ដើម្បីបើក)" if lang == "km" else "  • Status: 33 AI Models & Orderflow Monitoring (Configure via `/pre_pump ON 50 1234`)"
-    engines_text += f"6️⃣ **Smart Listing & Pre-Pump Engine (`/pre_pump`)**\n   {e6_status}\n{e6_body}\n\n"
+    engines_text += f"7️⃣ **Smart Listing & Pre-Pump Engine (`/pre_pump`)**\n   {e6_status}\n{e6_body}\n\n"
 
     # --- ENGINE 7: 8-Hour Funding Rate & Basis Arbitrage Harvester ---
     f_cfg = data["funding_cfg"]
@@ -1005,7 +1100,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e7_status = "🟡 STANDBY (ត្រៀមកើបផលចំណេញ 30%-120% APY)" if lang == "km" else "🟡 STANDBY (30%-120% APY Yield Harvester Ready)"
         e7_body = "  • ស្ថានភាព ៖ រង់ចាំដំណើរការ (វាយ `/funding_harvester` ដើម្បីបើក)" if lang == "km" else "  • Status: Ready to launch via `/funding_harvester`"
-    engines_text += f"7️⃣ **8-Hour Funding Rate Harvester (`/funding_harvester`)**\n   {e7_status}\n{e7_body}\n\n"
+    engines_text += f"8️⃣ **8-Hour Funding Rate Harvester (`/funding_harvester`)**\n   {e7_status}\n{e7_body}\n\n"
 
     # --- ENGINE 8: Gold Turbo & Macro Radar ---
     gold_cfg = data.get("gold_turbo_cfg", {})
@@ -1016,7 +1111,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e8_status = "🟡 STANDBY (រង់ចាំការបើកដំណើរការ)" if lang == "km" else "🟡 STANDBY (Awaiting Activation)"
         e8_body = "  • ស្ថានភាព ៖ ម៉ាស៊ីន Macro Standby (វាយ `/gold_turbo ON 1234` ដើម្បីបើក)" if lang == "km" else "  • Status: Standby (Activate via `/gold_turbo ON 1234`)"
-    engines_text += f"8️⃣ **Gold Turbo & Macro Radar (`/gold_turbo` / `/gold_guard`)**\n   {e8_status}\n{e8_body}\n\n"
+    engines_text += f"9️⃣ **Gold Turbo & Macro Radar (`/gold_turbo` / `/gold_guard`)**\n   {e8_status}\n{e8_body}\n\n"
 
     # --- ENGINE 9: DeFi Flash Loan & Tokyo HFT MEV Keeper ---
     fl_active = data["is_flash_loan_auto"]
@@ -1027,7 +1122,7 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e9_status = "🟡 STANDBY (0-Capital Risk Flash Loan Arbitrage Ready)" if lang == "km" else "🟡 STANDBY (0-Capital Risk Flash Loan Ready)"
         e9_body = "  • ស្ថានភាព ៖ Aave v3 + Uniswap v3 Routing Active (វាយ `/flash_loan` ដើម្បីបើក)" if lang == "km" else "  • Status: Aave v3 Routing Ready (Execute `/flash_loan`)"
-    engines_text += f"9️⃣ **DeFi Flash Loan & Tokyo MEV Stack (`/flash_loan`)**\n   {e9_status}\n{e9_body}\n\n"
+    engines_text += f"🔟 **DeFi Flash Loan & Tokyo MEV Stack (`/flash_loan`)**\n   {e9_status}\n{e9_body}\n\n"
 
     # --- ENGINE 10: Liquidation Defender & Circuit Breaker ---
     def_on = data["is_defender_active"]
@@ -1038,17 +1133,25 @@ def render_portfolio_card(data: dict, user_lang: str = "km", include_vitals: boo
     else:
         e10_status = "🔴 CIRCUIT BREAKER TRIPPED" if lang == "km" else "🔴 CIRCUIT BREAKER TRIPPED"
         e10_body = "  • ស្ថានភាព ៖ ប្រព័ន្ធបានផ្អាកការជួញដូរជាបណ្តោះអាសន្នដើម្បីការពារដើមទុន" if lang == "km" else "  • Status: System paused to protect capital"
-    engines_text += f"🔟 **Liquidation Defender & Circuit Breaker Sentinel**\n   {e10_status}\n{e10_body}\n"
+    engines_text += f"1️⃣1️⃣ **Liquidation Defender & Circuit Breaker Sentinel**\n   {e10_status}\n{e10_body}\n"
 
     # =========================================================================
     # 3. INTERACTIVE FOOTER
     # =========================================================================
     footer = (
         "────────────\n"
-        "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh ឬបញ្ជា Stop/Launch ភ្លាមៗ ៖*"
+        "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh ឬបញ្ជា Stop/Launch ភ្លាមៗ ៖*\n"
+        "━━━━━━━━━━━━\n"
+        "_Khmer Master Crypto_\n"
+        "_APEX SUPER BRAIN AI_\n"
+        "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
     ) if lang == "km" else (
         "────────────\n"
-        "💡 *Use the interactive buttons below to refresh or manage positions:*"
+        "💡 *Use the interactive buttons below to refresh or manage positions:*\n"
+        "━━━━━━━━━━━━\n"
+        "_Khmer Master Crypto_\n"
+        "_APEX SUPER BRAIN AI_\n"
+        "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
     )
 
     if include_vitals:
