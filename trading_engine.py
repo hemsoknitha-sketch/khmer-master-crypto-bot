@@ -2632,7 +2632,7 @@ def get_futures_free_margin(api_key: str, api_secret: str) -> float:
         print(f"Error fetching futures free margin: {e}")
     return 0.0
 
-def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 25, position_side: str = None, reduce_only: bool = False, **kwargs) -> dict:
+def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 10, position_side: str = None, reduce_only: bool = False, **kwargs) -> dict:
     """
     Executes a market order on Binance Futures API (/fapi/v1/order).
     Automatically formats quantity to Binance's exact LOT_SIZE precision.
@@ -2748,7 +2748,8 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
         
         if res.status_code == 200:
             data = res.json()
-            print(f"🚀 [BINANCE FUTURES HFT ORDER SUCCESS (<30ms)] {symbol} {side} Qty: {quantity} Leverage: {leverage}x -> OrderId: {data.get('orderId')}")
+            order_tag = f" {side} (TP/CLOSE)" if reduce_only else f" {side}"
+            print(f"🚀 [BINANCE FUTURES HFT ORDER SUCCESS (<30ms)] {symbol}{order_tag} Qty: {quantity} Leverage: {leverage}x -> OrderId: {data.get('orderId')}")
             return {"status": "success", "res": data, "orderId": data.get('orderId')}
         
         # Handling Precision/Notional Overflow (-1111, -4164)
@@ -2765,7 +2766,8 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
             res_fb = _send_hft_order(fallback_qty, leverage)
             if res_fb.status_code == 200:
                 data_fb = res_fb.json()
-                print(f"🚀 [BINANCE FUTURES HFT ORDER FALLBACK SUCCESS (<30ms)] {symbol} {side} Qty: {fallback_qty} Leverage: {leverage}x -> OrderId: {data_fb.get('orderId')}")
+                order_tag = f" {side} (TP/CLOSE)" if reduce_only else f" {side}"
+                print(f"🚀 [BINANCE FUTURES HFT ORDER FALLBACK SUCCESS (<30ms)] {symbol}{order_tag} Qty: {fallback_qty} Leverage: {leverage}x -> OrderId: {data_fb.get('orderId')}")
                 return {"status": "success", "res": data_fb, "orderId": data_fb.get('orderId')}
             elif "-2019" in res_fb.text or "Margin is insufficient" in res_fb.text:
                 res = res_fb  # Delegate to AGI Margin Recovery below

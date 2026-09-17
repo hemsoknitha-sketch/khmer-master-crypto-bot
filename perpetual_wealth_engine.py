@@ -525,6 +525,7 @@ class PerpetualWealthGeneratorEngine:
                             symbol=sym,
                             side=side_to_close,
                             quantity=close_half_qty,
+                            leverage=leverage,
                             reduce_only=True,
                             position_side=pos_side
                         )
@@ -573,6 +574,7 @@ class PerpetualWealthGeneratorEngine:
                             symbol=sym,
                             side=side_to_close,
                             quantity=abs(amt),
+                            leverage=leverage,
                             reduce_only=True,
                             position_side=pos_side
                         )
@@ -623,6 +625,7 @@ class PerpetualWealthGeneratorEngine:
                             symbol=sym,
                             side=side_to_close,
                             quantity=abs(amt),
+                            leverage=leverage,
                             reduce_only=True,
                             position_side=pos_side
                         )
