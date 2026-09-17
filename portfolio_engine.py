@@ -1517,3 +1517,273 @@ def render_balance_card(data: dict, user_lang: str = "km") -> str:
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         )
 
+
+def get_admin_platform_status_data() -> dict:
+    """
+    Assembles a comprehensive, platform-wide surveillance snapshot across all
+    registered users and active VIP investors for the Bot Administrator.
+    """
+    import psutil
+    all_users = db.get_all_users() or []
+    total_users = len(all_users)
+
+    vip_users_list = []
+    for u in all_users:
+        u_id = int(u[0])
+        u_name = u[1] or ""
+        if db.is_vip(u_id) or u_id == 859271875:
+            vip_users_list.append((u_id, u_name))
+
+    total_vips = len(vip_users_list)
+    total_active_investors = 0
+    total_platform_capital = 0.0
+    total_platform_pnl = 0.0
+    total_open_positions_count = 0
+
+    vip_investor_details = []
+
+    for u_id, u_name in vip_users_list:
+        keys = db.get_user_api(u_id)
+        u_data = get_full_system_portfolio_data(u_id, force_fresh=False)
+
+        fut_positions = u_data.get("active_futures_positions", [])
+        spot_trades = u_data.get("active_spot_trades", [])
+        smart_swaps = u_data.get("active_smart_swaps", [])
+
+        user_invested = float(u_data.get("total_invested_usd", 0.0) or 0.0)
+        user_pnl = float(u_data.get("total_unrealized_pnl", 0.0) or 0.0)
+        user_net_worth = float(u_data.get("total_portfolio_net_worth", 0.0) or 0.0)
+        user_roi = float(u_data.get("total_roi_pct", 0.0) or 0.0)
+
+        wb = u_data.get("perpetual_wealth_bot", {})
+        wb_status = wb.get("status", "STANDBY")
+        tb_bots = u_data.get("user_turbo_bots", [])
+        macro_cfg = u_data.get("macro_auto_cfg", {})
+        is_spot_auto = bool(macro_cfg.get("enabled", False) or u_data.get("is_auto_trade_enabled", False))
+
+        all_open_positions = []
+        # Futures positions
+        for p in fut_positions:
+            all_open_positions.append({
+                "type": "FUTURES",
+                "symbol": str(p.get("symbol", "")),
+                "side": str(p.get("side", "BUY")),
+                "leverage": int(p.get("leverage", 10)),
+                "margin_usd": float(p.get("margin_usd", 0.0) or 0.0),
+                "entry_price": float(p.get("entry_price", 0.0) or 0.0),
+                "mark_price": float(p.get("mark_price", 0.0) or 0.0),
+                "pnl_usd": float(p.get("pnl_usd", 0.0) or 0.0),
+                "roi_pct": float(p.get("roi_pct", 0.0) or 0.0)
+            })
+        # Spot trades
+        for st in spot_trades:
+            all_open_positions.append({
+                "type": "SPOT",
+                "symbol": str(st.get("symbol", "")),
+                "side": "BUY",
+                "leverage": 1,
+                "margin_usd": float(st.get("invested_usd", 0.0) or 0.0),
+                "entry_price": float(st.get("buy_price", 0.0) or 0.0),
+                "mark_price": float(st.get("current_price", 0.0) or 0.0),
+                "pnl_usd": float(st.get("pnl_usd", 0.0) or 0.0),
+                "roi_pct": float(st.get("roi_pct", 0.0) or 0.0)
+            })
+        # DEX Swaps
+        for ss in smart_swaps:
+            all_open_positions.append({
+                "type": "DEX",
+                "symbol": str(ss.get("symbol", "")),
+                "side": "SWAP",
+                "leverage": 1,
+                "margin_usd": float(ss.get("amount_usd", 0.0) or 0.0),
+                "entry_price": float(ss.get("entry_price", 0.0) or 0.0),
+                "mark_price": float(ss.get("current_price", 0.0) or 0.0),
+                "pnl_usd": float(ss.get("pnl_usd", 0.0) or 0.0),
+                "roi_pct": float(ss.get("roi_pct", 0.0) or 0.0)
+            })
+
+        has_active = (len(all_open_positions) > 0 or user_invested > 0.5 or user_net_worth > 5.0 or wb_status == "ACTIVE" or len(tb_bots) > 0)
+        if has_active:
+            total_active_investors += 1
+            total_platform_capital += (user_invested if user_invested > 0 else user_net_worth)
+            total_platform_pnl += user_pnl
+            total_open_positions_count += len(all_open_positions)
+
+        vip_investor_details.append({
+            "chat_id": u_id,
+            "username": u_name,
+            "has_api": bool(keys),
+            "is_active": has_active,
+            "net_worth": user_net_worth,
+            "invested_capital": user_invested if user_invested > 0 else user_net_worth,
+            "floating_pnl": user_pnl,
+            "roi_pct": user_roi,
+            "open_positions": all_open_positions,
+            "wealth_status": wb_status,
+            "turbo_bots_count": len(tb_bots),
+            "spot_auto": is_spot_auto,
+            "spot_cash": float(u_data.get("spot_usdt_free", 0.0) or 0.0),
+            "futures_bal": float(u_data.get("futures_wallet_usdt", 0.0) or 0.0),
+            "sol_bal": float(u_data.get("user_sol_bal", 0.0) or 0.0)
+        })
+
+    # System vitals
+    cpu_usage = 0.0
+    ram_usage_mb = 0
+    ram_total_mb = 0
+    try:
+        cpu_usage = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        ram_usage_mb = int(mem.used / (1024 * 1024))
+        ram_total_mb = int(mem.total / (1024 * 1024))
+    except Exception:
+        pass
+
+    uptime_sec = int(time.time() - _START_TIME)
+    hours, remainder = divmod(uptime_sec, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    uptime_str = f"{hours}h {minutes}m {seconds}s"
+
+    db_size_mb = 0.0
+    try:
+        if os.path.exists(db.DB_FILE):
+            db_size_mb = round(os.path.getsize(db.DB_FILE) / (1024 * 1024), 2)
+    except Exception:
+        pass
+
+    return {
+        "total_users": total_users,
+        "total_vips": total_vips,
+        "total_active_investors": total_active_investors,
+        "total_platform_capital": total_platform_capital,
+        "total_platform_pnl": total_platform_pnl,
+        "total_open_positions_count": total_open_positions_count,
+        "vip_investors": vip_investor_details,
+        "uptime_str": uptime_str,
+        "cpu_usage": cpu_usage,
+        "ram_usage_mb": ram_usage_mb,
+        "ram_total_mb": ram_total_mb,
+        "db_size_mb": db_size_mb
+    }
+
+
+def render_admin_status_card(data: dict, user_lang: str = "km") -> str:
+    """
+    Renders an institutional Super Admin Master Status Surveillance Dashboard.
+    Exclusively audits platform-wide metrics, active VIP investors, positions, and live capital.
+    """
+    lang = "en" if str(user_lang).lower() in ["en", "english"] else "km"
+    tot_users = data.get("total_users", 0)
+    tot_vips = data.get("total_vips", 0)
+    tot_active = data.get("total_active_investors", 0)
+    tot_cap = float(data.get("total_platform_capital", 0.0) or 0.0)
+    tot_pnl = float(data.get("total_platform_pnl", 0.0) or 0.0)
+    tot_pos = data.get("total_open_positions_count", 0)
+
+    pnl_sign = "+" if tot_pnl >= 0 else ""
+    pnl_emoji = "🟩" if tot_pnl >= 0 else "🟥"
+
+    if lang == "km":
+        header = (
+            "👑 **KHMER MASTER CRYPTO | SUPER ADMIN LIVE SURVEILLANCE** 🛡️\n"
+            "════════════\n"
+            "👮 **សិទ្ធិបញ្ជាជាន់ខ្ពស់ ៖** `ADMIN MASTER STATUS COCKPIT`\n"
+            "════════════\n\n"
+            "🌐 **ទិដ្ឋភាពរួមទូទាំងប្រព័ន្ធ (PLATFORM MACRO AUDIT) ៖**\n"
+            f"• 👥 **Total Users ៖** `{tot_users} នាក់` (អ្នកចុះឈ្មោះសរុប)\n"
+            f"• 💎 **Total VIP Members ៖** `{tot_vips} នាក់` (សមាជិក VIP សកម្ម)\n"
+            f"• 🚀 **Total Live Investors ៖** `{tot_active} នាក់` (វិនិយោគិនមានទុន/កំពុងជួញដូរ)\n"
+            f"• 💰 **Total Platform Capital ៖** `${tot_cap:,.2f} USD` (ទុនវិនិយោគសរុបលើប្រព័ន្ធ)\n"
+            f"• {pnl_emoji} **Total Floating PnL ៖** `{pnl_sign}${tot_pnl:,.2f} USD` (ក្នុង {tot_pos} Positions)\n"
+            f"• 🖥️ **VPS Engine Health ៖** Uptime: `{data['uptime_str']}` | CPU: `{data['cpu_usage']:.1f}%` | RAM: `{data['ram_usage_mb']}/{data['ram_total_mb']} MB` | DB: `{data['db_size_mb']:.2f} MB WAL`\n"
+            "────────────\n\n"
+            "👥 **សវនកម្មវិនិយោគិន VIP ម្នាក់ៗ (VIP LIVE INVESTORS AUDIT) ៖**\n\n"
+        )
+    else:
+        header = (
+            "👑 **KHMER MASTER CRYPTO | SUPER ADMIN LIVE SURVEILLANCE** 🛡️\n"
+            "════════════\n"
+            "👮 **COMMAND CLEARANCE:** `ADMIN MASTER STATUS COCKPIT`\n"
+            "════════════\n\n"
+            "🌐 **PLATFORM-WIDE MACRO AUDIT:**\n"
+            f"• 👥 **Total Users:** `{tot_users} Users`\n"
+            f"• 💎 **Total VIP Members:** `{tot_vips} VIPs`\n"
+            f"• 🚀 **Total Live Investors:** `{tot_active} Active Investors`\n"
+            f"• 💰 **Total Platform Capital:** `${tot_cap:,.2f} USD`\n"
+            f"• {pnl_emoji} **Total Floating PnL:** `{pnl_sign}${tot_pnl:,.2f} USD` ({tot_pos} positions)\n"
+            f"• 🖥️ **VPS Engine Health:** Uptime: `{data['uptime_str']}` | CPU: `{data['cpu_usage']:.1f}%` | RAM: `{data['ram_usage_mb']}/{data['ram_total_mb']} MB` | DB: `{data['db_size_mb']:.2f} MB WAL`\n"
+            "────────────\n\n"
+            "👥 **VIP INVESTOR-BY-INVESTOR AUDIT:**\n\n"
+        )
+
+    vip_cards = []
+    idx = 1
+    for v in data.get("vip_investors", []):
+        u_id = v["chat_id"]
+        u_name = f"@{v['username']}" if v['username'] else "No username"
+        u_cap = v["invested_capital"]
+        u_pnl = v["floating_pnl"]
+        u_roi = v["roi_pct"]
+        u_sign = "+" if u_pnl >= 0 else ""
+        u_emoji = "🟩" if u_pnl >= 0 else "🟥"
+        positions = v["open_positions"]
+
+        pos_lines = []
+        if positions:
+            for p in positions:
+                p_s = "+" if p['pnl_usd'] >= 0 else ""
+                side_tag = f"{p['side']} {p['leverage']}x ISOLATED" if p['type'] == 'FUTURES' else p['type']
+                pos_lines.append(f"     └ `{p['symbol']}` ({side_tag}) ៖ Margin `${p['margin_usd']:.2f}` | Entry: `${p['entry_price']:.4f}` | Mark: `${p['mark_price']:.4f}` | PnL: `{p_s}${p['pnl_usd']:.2f}` (`{p['roi_pct']:+.1f}%`)")
+            pos_text = "\n".join(pos_lines)
+        else:
+            pos_text = "     └ _គ្មាន Position កំពុងត្រាំ (Free Margin 100% សុវត្ថិភាព) | Standby_" if lang == "km" else "     └ _No active positions (100% Free Margin Protected) | Standby_"
+
+        wealth_badge = "🟢 ACTIVE" if v["wealth_status"] == "ACTIVE" else "⚪ STANDBY"
+        turbo_badge = f"🟢 ACTIVE ({v['turbo_bots_count']} Bots)" if v['turbo_bots_count'] > 0 else "⚪ STANDBY"
+        spot_badge = "🟢 ACTIVE" if v["spot_auto"] else "⚪ STANDBY"
+
+        if lang == "km":
+            card = (
+                f"👑 **VIP #{idx} (ID: {u_id})** ({u_name}) ៖ `{len(positions)} opened positions`\n"
+                f"  • 🎯 **Total Investment Amount ៖** `${u_cap:,.2f} USDT`\n"
+                f"  • {u_emoji} **Profit/Loss ៖** `{u_sign}${u_pnl:,.2f} USD` (`{u_roi:+.2f}%`)\n"
+                f"  • 💼 **Position Opening ៖**\n{pos_text}\n"
+                f"  • ⚙️ **Engines State ៖** Wealth: `{wealth_badge}` | Turbo: `{turbo_badge}` | Spot: `{spot_badge}`\n"
+                f"  • 🏦 **Wallets ៖** Spot: `${v['spot_cash']:.2f}` | Futures: `${v['futures_bal']:.2f}` | SOL: `${v['sol_bal']:.3f}`"
+            )
+        else:
+            card = (
+                f"👑 **VIP #{idx} (ID: {u_id})** ({u_name}): `{len(positions)} opened positions`\n"
+                f"  • 🎯 **Total Investment Amount:** `${u_cap:,.2f} USDT`\n"
+                f"  • {u_emoji} **Profit/Loss:** `{u_sign}${u_pnl:,.2f} USD` (`{u_roi:+.2f}%`)\n"
+                f"  • 💼 **Position Opening:**\n{pos_text}\n"
+                f"  • ⚙️ **Engines State:** Wealth: `{wealth_badge}` | Turbo: `{turbo_badge}` | Spot: `{spot_badge}`\n"
+                f"  • 🏦 **Wallets:** Spot: `${v['spot_cash']:.2f}` | Futures: `${v['futures_bal']:.2f}` | SOL: `${v['sol_bal']:.3f}`"
+            )
+        vip_cards.append(card)
+        idx += 1
+
+    if not vip_cards:
+        cards_body = "ℹ️ _ពុំទាន់មានសមាជិក VIP ក្នុងប្រព័ន្ធនៅឡើយ_\n" if lang == "km" else "ℹ️ _No VIP members registered yet_\n"
+    else:
+        cards_body = "\n\n".join(vip_cards) + "\n\n"
+
+    footer = (
+        "────────────\n"
+        "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh របាយការណ៍ផ្សាយផ្ទាល់ ឬគ្រប់គ្រងប្រព័ន្ធ ៖*\n"
+        "━━━━━━━━━━━━\n"
+        "_Khmer Master Crypto_\n"
+        "_APEX SUPER BRAIN AI_\n"
+        "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+    ) if lang == "km" else (
+        "────────────\n"
+        "💡 *Use the buttons below to refresh live surveillance or manage platform:*\n"
+        "━━━━━━━━━━━━\n"
+        "_Khmer Master Crypto_\n"
+        "_APEX SUPER BRAIN AI_\n"
+        "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+    )
+
+    return header + cards_body + footer
+
+

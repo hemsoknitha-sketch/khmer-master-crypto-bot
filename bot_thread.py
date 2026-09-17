@@ -5186,6 +5186,8 @@ class TelegramBotThread(BaseThread):
                 await admin_stats_command(update, context)
             elif data == "btn_health_refresh":
                 await health_command(update, context)
+            elif data in ["btn_admin_status_refresh", "btn_status_refresh"]:
+                await status_command(update, context)
             elif data in ["btn_sync_brain", "btn_sync_brain_menu"]:
                 context.args = []
                 await sync_brain_command(update, context)
@@ -16077,10 +16079,48 @@ class TelegramBotThread(BaseThread):
 
         async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+
+            is_admin_user = (chat_id == 859271875 or db.is_admin(chat_id))
+            if is_admin_user:
+                if update.callback_query:
+                    try:
+                        await update.callback_query.answer("⚡ កំពុងទាញយកទិន្នន័យ Live Surveillance...")
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+                    except Exception:
+                        pass
+                import portfolio_engine
+                admin_data = await asyncio.to_thread(portfolio_engine.get_admin_platform_status_data)
+                admin_card = portfolio_engine.render_admin_status_card(admin_data, user_lang=user_lang)
+
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                admin_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh Surveillance", callback_data="btn_admin_status_refresh"),
+                        InlineKeyboardButton("👥 VIP Users", callback_data="btn_admin_users_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                if len(admin_card) > 4000:
+                    chunks = [admin_card[i:i+3900] for i in range(0, len(admin_card), 3900)]
+                    for idx, chunk in enumerate(chunks):
+                        kb = admin_kb if idx == len(chunks) - 1 else None
+                        await (update.effective_message or update.message).reply_text(chunk, parse_mode="Markdown", reply_markup=kb)
+                else:
+                    await (update.effective_message or update.message).reply_text(admin_card, parse_mode="Markdown", reply_markup=admin_kb)
+                return
 
             try:
                 import psutil
