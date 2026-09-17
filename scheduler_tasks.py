@@ -4285,7 +4285,7 @@ async def sweep_sniper_monitor(app):
                 api_key, api_secret = keys
                 # Check if we already have an active trade for this symbol to avoid spamming
                 active_trades = db.get_active_trades(chat_id)
-                if any(t[2] == symbol for t in active_trades): continue
+                if any((t[1] if isinstance(t, (tuple, list)) else (t.get('symbol') if hasattr(t, 'get') else getattr(t, 'symbol', None))) == symbol for t in active_trades): continue
                 # LIQUIDITY GUARD
                 available_usdt = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
                 actual_amount = min(amount, available_usdt)
@@ -4858,7 +4858,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                 if len(active_trades) >= 10:  # Hard limit of 10 for safety
                     continue
                     
-                already_trading = any(t.get('symbol') == symbol for t in active_trades)
+                already_trading = any((t[1] if isinstance(t, (tuple, list)) else (t.get('symbol') if hasattr(t, 'get') else getattr(t, 'symbol', None))) == symbol for t in active_trades)
                 if already_trading:
                     continue
 

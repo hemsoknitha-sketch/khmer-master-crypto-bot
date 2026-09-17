@@ -2281,13 +2281,45 @@ def update_active_trade_qty(trade_id: int, new_qty: float):
     conn.commit()
     conn.close()
 
+class ActiveTradeRecord(tuple):
+    """
+    Hybrid Tuple/Dict record for active trades.
+    Supports tuple indexing (t[0], t[1], unpack t[:6])
+    and dict-like access (t.get('symbol'), t['symbol']).
+    """
+    def __new__(cls, row):
+        return super().__new__(cls, row)
+
+    def get(self, key, default=None):
+        mapping = {
+            'id': 0,
+            'symbol': 1,
+            'qty': 2,
+            'buy_price': 3,
+            'current_highest': 4,
+            'stop_loss_pct': 5
+        }
+        idx = mapping.get(key)
+        if idx is not None and idx < len(self):
+            return self[idx]
+        return default
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            res = self.get(item)
+            if res is None:
+                raise KeyError(item)
+            return res
+        return super().__getitem__(item)
+
+
 def get_active_trades_by_user(chat_id: int):
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
     cursor = conn.cursor()
     cursor.execute("SELECT id, symbol, qty, buy_price, current_highest, stop_loss_pct FROM active_trades WHERE chat_id = ?", (chat_id,))
     res = cursor.fetchall()
     conn.close()
-    return res
+    return [ActiveTradeRecord(r) for r in res]
 
 # Backwards compatibility alias
 get_active_trades = get_active_trades_by_user
