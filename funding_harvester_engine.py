@@ -162,6 +162,11 @@ class InstitutionalFundingHarvesterEngine:
                     if rate_pct < self.min_harvest_rate_pct:
                         continue
 
+                    # Invariant 7 & Spot Existence Shield: Ensure symbol exists and trades on Binance Spot
+                    spot_info = trading_engine.get_symbol_info(sym)
+                    if not spot_info or spot_info.get("status") != "TRADING":
+                        continue
+
                     # Mutual Non-Aggression Gate: exclude symbols active in other engines
                     if not self.is_symbol_free_for_harvest(sym):
                         continue
@@ -236,11 +241,19 @@ class InstitutionalFundingHarvesterEngine:
             if qty <= 0:
                 qty = 0.01
 
-            # 1. Spot Market Buy
+            # 1. Spot Market Buy (Must succeed first!)
             spot_res = trading_engine.place_spot_order(api_key, api_secret, symbol, "BUY", qty)
+            if not spot_res or "error" in spot_res or "code" in spot_res or spot_res.get("status") not in ["FILLED", "NEW", "PARTIALLY_FILLED"]:
+                err_msg = spot_res.get("msg", spot_res.get("error", "Spot buy failed"))
+                print(f"⚠️ [FUNDING HARVEST PAIR ABORTED] {symbol} Spot buy failed: {err_msg}. Futures short aborted to prevent unhedged risk!")
+                return {"status": "error", "message": f"Spot buy failed: {err_msg}"}
 
-            # 2. Futures 1x Short
+            # 2. Futures 1x Short (Only executed after Spot buy succeeds)
             futures_res = trading_engine.place_futures_short(api_key, api_secret, symbol, qty, leverage=1)
+            if not futures_res or "error" in futures_res or "code" in futures_res or futures_res.get("status") == "error":
+                print(f"⚠️ [FUNDING HARVEST FUTURES SHORT FAILED] Rolling back spot buy for {symbol}...")
+                trading_engine.place_spot_order(api_key, api_secret, symbol, "SELL", qty)
+                return {"status": "error", "message": "Futures short failed, spot rolled back"}
 
             print(f"🌾 [FUNDING HARVESTER ENTRY EXECUTED] {symbol} | Spot: ${spot_cap} | Futures 1x Short: ${futures_cap} | Rate: {funding_rate_pct:+.4f}%")
 
@@ -269,7 +282,20 @@ class InstitutionalFundingHarvesterEngine:
                 price = 100.0
 
             spot_cap = max(10.50, round(capital_usdt * 0.5, 2))
-            qty = round((spot_cap / price), 4)
+            est_qty = round((spot_cap / price), 4)
+
+            # Query actual open futures position size for clean 100% cash closure
+            actual_fut_qty = 0.0
+            try:
+                positions = trading_engine.get_futures_positions(api_key, api_secret)
+                for p in (positions or []):
+                    if p.get("symbol") == symbol:
+                        actual_fut_qty = abs(float(p.get("positionAmt", 0.0)))
+                        break
+            except Exception:
+                pass
+
+            qty = actual_fut_qty if actual_fut_qty > 0 else est_qty
 
             # 1. Close Futures Short (Buy to cover)
             trading_engine.place_futures_order(api_key, api_secret, symbol, "BUY", qty, leverage=1)
