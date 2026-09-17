@@ -246,9 +246,10 @@ class TelegramBotThread(BaseThread):
             read_timeout=30.0,
             write_timeout=10.0,
             pool_timeout=10.0,
-            connection_pool_size=500
+            connection_pool_size=1000,
+            http_version="1.1"
         )
-        self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(64).post_init(post_init).build()
+        self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(128).post_init(post_init).build()
         try:
             self.app.bot_data["loop"] = self.loop
         except Exception:
@@ -17222,12 +17223,22 @@ class TelegramBotThread(BaseThread):
             await self.app.start()
             if self.app.updater:
                 try:
-                    await self.app.updater.start_polling(drop_pending_updates=True)
+                    await self.app.updater.start_polling(
+                        drop_pending_updates=True,
+                        poll_interval=0.0,
+                        timeout=20,
+                        allowed_updates=Update.ALL_TYPES
+                    )
                 except Exception as poll_err:
                     print(f"⚠️ [TELEGRAM POLLING INITIAL NOTICE]: {poll_err}. Retrying polling in 5s...")
                     await asyncio.sleep(5)
                     try:
-                        await self.app.updater.start_polling(drop_pending_updates=True)
+                        await self.app.updater.start_polling(
+                            drop_pending_updates=True,
+                            poll_interval=0.0,
+                            timeout=20,
+                            allowed_updates=Update.ALL_TYPES
+                        )
                     except Exception:
                         pass
             
@@ -17249,7 +17260,12 @@ class TelegramBotThread(BaseThread):
                     if self.app and self.app.updater and not getattr(self.app.updater, 'running', False):
                         print("⚠️ [TELEGRAM UPDATER AUTO-RECOVERY]: Restoring polling connection...")
                         await asyncio.sleep(3)
-                        await self.app.updater.start_polling(drop_pending_updates=True)
+                        await self.app.updater.start_polling(
+                            drop_pending_updates=True,
+                            poll_interval=0.0,
+                            timeout=20,
+                            allowed_updates=Update.ALL_TYPES
+                        )
                 except Exception as recovery_err:
                     print(f"⚠️ [UPDATER RECOVERY NOTICE]: {recovery_err}")
                     await asyncio.sleep(5)

@@ -976,62 +976,71 @@ def delete_arbitrage_api(chat_id: int, exchange: str = 'Bybit'):
     finally:
         conn.close()
 
-def has_api_keys(chat_id: int) -> bool:
-    """Checks if a user is VIP and if their license is still valid."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
-    cursor = conn.cursor()
-    cursor.execute("SELECT is_vip, license_expiry FROM users WHERE chat_id = ?", (chat_id,))
-    result = cursor.fetchone()
-
 def is_vip(chat_id: int) -> bool:
-    """Checks if a user is VIP and if their license is still valid."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    """Checks if a user is VIP and if their license is still valid with ultra-fast in-memory caching."""
+    cache_key = f"vip_{chat_id}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return bool(cached)
+
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT is_vip, license_expiry FROM users WHERE chat_id = ?", (chat_id,))
     result = cursor.fetchone()
     conn.close()
     
     if not result:
+        cache_set(cache_key, False, ttl_seconds=60)
         return False
         
     is_vip_status = bool(result[0])
     license_expiry = result[1]
     
     if not is_vip_status:
+        cache_set(cache_key, False, ttl_seconds=60)
         return False
         
     if license_expiry is None or license_expiry in ['lifetime', 'Administrator']:
+        cache_set(cache_key, True, ttl_seconds=120)
         return True
         
     try:
         expiry_date = datetime.strptime(license_expiry, "%Y-%m-%d %H:%M:%S")
         if datetime.now() > expiry_date:
             set_vip_status(chat_id, False) # Auto-revoke
+            cache_set(cache_key, False, ttl_seconds=60)
             return False
+        cache_set(cache_key, True, ttl_seconds=60)
         return True
     except ValueError:
+        cache_set(cache_key, False, ttl_seconds=60)
         return False
 
 def is_admin(chat_id: int) -> bool:
-    """Checks if a user is an Administrator (Super Admin or via License)."""
+    """Checks if a user is an Administrator (Super Admin or via License) with ultra-fast in-memory caching."""
     if chat_id == 859271875:
         return True
         
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    cache_key = f"admin_{chat_id}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return bool(cached)
+
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT license_expiry FROM users WHERE chat_id = ?", (chat_id,))
     result = cursor.fetchone()
     conn.close()
     
-    if result and result[0] == 'Administrator':
-        return True
-    return False
+    is_adm = bool(result and result[0] == 'Administrator')
+    cache_set(cache_key, is_adm, ttl_seconds=120)
+    return is_adm
 
 def get_all_admins() -> list:
     """Returns a list of chat_ids for all Administrators, including Super Admin."""
     admins = [859271875]
     
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT chat_id FROM users WHERE license_expiry = 'Administrator'")
     rows = cursor.fetchall()
@@ -1045,7 +1054,9 @@ def get_all_admins() -> list:
 
 def set_vip_status(chat_id: int, status: bool):
     """Updates the VIP status of a user."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    cache_delete(f"vip_{chat_id}")
+    cache_delete(f"admin_{chat_id}")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET is_vip = ? WHERE chat_id = ?", (status, chat_id))
     conn.commit()
@@ -1146,7 +1157,9 @@ def get_user_config(chat_id: int, config_type: str = "auto_trade"):
 
 def set_user_license(chat_id: int, duration_str: str):
     """Sets the user's license expiry based on duration string."""
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    cache_delete(f"vip_{chat_id}")
+    cache_delete(f"admin_{chat_id}")
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     if duration_str == "Revoke VIP":
