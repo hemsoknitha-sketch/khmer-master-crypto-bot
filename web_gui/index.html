@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Khmer Master Crypto - Apex Mini App Dashboard</title>
-    <!-- Google Fonts -->
+    <meta name="theme-color" content="#020b1e">
+    <meta name="description" content="Khmer Master Crypto APEX SUPER BRAIN AI - Institutional Web GUI Dashboard with Live 0.001ms HFT Execution">
+    <title>Khmer Master Crypto - APEX SUPER BRAIN AI Dashboard</title>
+    <!-- Google Fonts: Kantumruy Pro & Outfit & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Kantumruy+Pro:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Chart.js via CDN -->
@@ -15,42 +17,77 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Background Interactive Neural Network Synapses Canvas -->
+    <canvas id="neuralCanvas" class="neural-bg-canvas"></canvas>
+
+    <!-- Cambodia Flag Cybertech Gradient Overlays & Holographic Angkor Wat Silhouette -->
+    <div class="cambodia-flag-backdrop">
+        <div class="flag-stripe stripe-blue-top"></div>
+        <div class="flag-stripe stripe-red-center">
+            <div class="angkor-wat-hologram"></div>
+        </div>
+        <div class="flag-stripe stripe-blue-bottom"></div>
+        <div class="cyber-grid-overlay"></div>
+    </div>
+
     <div id="app" class="app-container">
-        <!-- Top Status / Navigation Header -->
+        <!-- Top Cyberpunk Institutional HUD Header -->
         <header class="app-header">
             <div class="brand-section">
-                <div class="brand-logo-badge">
-                    <span class="logo-icon">💎</span>
+                <div class="brand-crest-badge">
+                    <span class="crest-flag">🇰🇭</span>
+                    <span class="crest-icon">💎</span>
                     <span class="pulse-ring"></span>
                 </div>
                 <div class="brand-info">
-                    <div class="brand-title">
-                        <span class="title-main">KHMER MASTER</span>
-                        <span class="title-tag">APEX AGI v13</span>
+                    <div class="brand-title-row">
+                        <span class="brand-title-main">KHMER MASTER</span>
+                        <span class="brand-tag-ai">SUPER BRAIN AI</span>
                     </div>
-                    <div class="connection-status">
+                    <div class="brand-sub-status">
                         <span class="status-dot online"></span>
-                        <span id="system-status-text" class="status-label">Tokyo HFT Online &bull; 0.42ms</span>
+                        <span id="hft-sync-ticker" class="status-ticker">0.001ms TOKYO HFT SYNC &bull; LIVE</span>
                     </div>
                 </div>
             </div>
             <div class="header-actions">
-                <button id="btn-refresh" class="btn-icon" title="Refresh Data" aria-label="Refresh Data">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="vip-badge-pill" id="vip-status-pill">
+                    <span class="vip-crown">👑</span>
+                    <span class="vip-text">VIP TITANIUM</span>
+                </div>
+                <button id="btn-refresh" class="btn-icon" title="Refresh Live State" aria-label="Refresh Data">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                     </svg>
                 </button>
             </div>
         </header>
 
+        <!-- Sub-Header Live Clocks & HFT Ping Bar -->
+        <div class="hud-ticker-bar">
+            <div class="ticker-item"><span class="ticker-label">🇰🇭 PP:</span> <strong id="clock-cambodia">--:--:--</strong></div>
+            <div class="ticker-divider">|</div>
+            <div class="ticker-item"><span class="ticker-label">🇯🇵 TYO:</span> <strong id="clock-tokyo">--:--:--</strong></div>
+            <div class="ticker-divider">|</div>
+            <div class="ticker-item"><span class="ticker-label">⚡ LATENCY:</span> <strong id="latency-val" class="text-neon-cyan">0.001 ms</strong></div>
+            <div class="ticker-divider">|</div>
+            <div class="ticker-item"><span class="ticker-label">🛡️ MARGIN:</span> <strong class="text-neon-emerald">ISOLATED</strong></div>
+        </div>
+
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- TAB 1: OVERVIEW & PORTFOLIO -->
+
+            <!-- ======================================================== -->
+            <!-- TAB 1: OVERVIEW & REAL-TIME PORTFOLIO                   -->
+            <!-- ======================================================== -->
             <section id="tab-overview" class="tab-pane active">
                 <!-- Hero Net Worth Card -->
                 <div class="glass-card hero-card">
-                    <div class="hero-top">
-                        <span class="hero-label">ទ្រព្យសម្បត្តិសរុប (EST. NET WORTH)</span>
+                    <div class="hero-top-row">
+                        <div class="hero-title-group">
+                            <span class="hero-badge-tag">INSTITUTIONAL QUANTUM VAULT</span>
+                            <span class="hero-label">ទ្រព្យសម្បត្តិសរុប (EST. NET WORTH)</span>
+                        </div>
                         <span id="pnl-24h-badge" class="badge badge-success">+14.85% (24H)</span>
                     </div>
                     <div class="hero-balance-row">
@@ -58,10 +95,10 @@
                         <span id="total-balance-usd" class="hero-balance">0.00</span>
                         <span class="currency-unit">USDT</span>
                     </div>
-                    <div class="hero-subtext">
-                        <span>🛡️ Liquidation Defense: <strong>ACTIVE</strong></span>
+                    <div class="hero-subtext-bar">
+                        <span class="defense-badge">🛡️ Zero Spillover Shield: <strong>ACTIVE</strong></span>
                         <span class="divider-dot">&bull;</span>
-                        <span id="active-positions-count">0 កំពុងរត់</span>
+                        <span id="active-positions-count" class="positions-pill">0 Positions កំពុងរត់</span>
                     </div>
                     <div class="hero-stats-grid">
                         <div class="stat-mini-pill">
@@ -69,26 +106,26 @@
                             <span id="spot-usdt-val" class="mini-val">$0.00</span>
                         </div>
                         <div class="stat-mini-pill">
-                            <span class="mini-label">Futures USDT</span>
+                            <span class="mini-label">Futures Margin</span>
                             <span id="futures-usdt-val" class="mini-val">$0.00</span>
                         </div>
                         <div class="stat-mini-pill">
-                            <span class="mini-label">Spot Alts/BTC</span>
+                            <span class="mini-label">Spot BTC</span>
                             <span id="spot-alt-val" class="mini-val">$0.00</span>
                         </div>
                         <div class="stat-mini-pill highlight-gold">
-                            <span class="mini-label">Gold PAXG</span>
+                            <span class="mini-label">Gold PAXG Vault</span>
                             <span id="paxg-hold-val" class="mini-val">$0.00</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Interactive Equity Curve Chart Card -->
+                <!-- Interactive Equity Growth Curve Chart Card -->
                 <div class="glass-card chart-card">
                     <div class="card-header-flex">
                         <div class="card-title-group">
                             <h3 class="card-title">📈 ខ្សែកោងកំណើនទុន (Equity Growth Curve)</h3>
-                            <span class="card-subtitle">Real-time Trailing Cumulative PnL</span>
+                            <span class="card-subtitle">Real-time Trailing Cumulative Net Profit Trajectory</span>
                         </div>
                         <div class="timeframe-selector">
                             <button class="tf-btn" data-tf="1D">1D</button>
@@ -102,18 +139,20 @@
                     </div>
                 </div>
 
-                <!-- Asset Allocation Breakdown Donut -->
+                <!-- Asset Allocation Donut Breakdown -->
                 <div class="glass-card allocation-card">
                     <div class="card-header-flex">
-                        <h3 class="card-title">🍰 ការបែងចែកទុន (Asset Allocation)</h3>
-                        <span class="badge badge-cyber">Balanced</span>
+                        <div class="card-title-group">
+                            <h3 class="card-title">🍰 ការបែងចែកទុន (Asset Allocation)</h3>
+                            <span class="card-subtitle">Multi-Wallet Dynamic Risk Segregation</span>
+                        </div>
+                        <span class="badge badge-cyber">Balanced Matrix</span>
                     </div>
                     <div class="donut-chart-row">
                         <div class="donut-container">
                             <canvas id="allocationChart"></canvas>
                         </div>
                         <div class="allocation-legend" id="allocation-legend-container">
-                            <!-- Injected by JS -->
                             <div class="legend-item"><span class="legend-color" style="background:#00f2fe"></span><span>Futures Margin</span><strong id="leg-fut-pct">45%</strong></div>
                             <div class="legend-item"><span class="legend-color" style="background:#10b981"></span><span>Spot Cash USDT</span><strong id="leg-spot-pct">30%</strong></div>
                             <div class="legend-item"><span class="legend-color" style="background:#f59e0b"></span><span>Spot BTC Accumulator</span><strong id="leg-btc-pct">15%</strong></div>
@@ -123,45 +162,200 @@
                 </div>
             </section>
 
-            <!-- TAB 2: LIVE ACTIVE POSITIONS -->
-            <section id="tab-positions" class="tab-pane">
-                <div class="section-banner">
+            <!-- ======================================================== -->
+            <!-- TAB 2: 24/7 PERPETUAL WEALTH COCKPIT (/wealth)          -->
+            <!-- ======================================================== -->
+            <section id="tab-wealth-cockpit" class="tab-pane">
+                <div class="section-banner banner-wealth">
                     <div class="banner-title-row">
-                        <h2 class="section-heading">⚡ បញ្ជី Position កំពុងរត់ (Active Orders)</h2>
-                        <span id="pos-header-count" class="badge badge-accent">0 Active</span>
+                        <div class="banner-icon-wrap">💎</div>
+                        <div>
+                            <h2 class="section-heading">24/7 Perpetual Wealth Cockpit</h2>
+                            <span class="section-desc">Golden Sweet-Spot Momentum (+3% to +14% Long & -3% to -12% Short)</span>
+                        </div>
                     </div>
-                    <p class="section-desc">Delta-Neutral Hedge & Trailing TP Defense កំពុងការពារ ២៤/៧</p>
+                    <div class="engine-live-tag">
+                        <span class="status-dot pulsing-green"></span>
+                        <span>WEALTH 24/7 ONLINE</span>
+                    </div>
                 </div>
-                <div id="positions-list" class="cards-list">
-                    <!-- Populated dynamically by JS -->
-                    <div class="empty-state" id="pos-empty-state">
-                        <span class="empty-icon">🛡️</span>
-                        <h4>មិនទាន់មាន Position ណាដែលកំពុងបើកទេ</h4>
-                        <p>ប្រព័ន្ធកំពុងស្កេនរកឱកាស Safe Entry ជាមួយ R:R &ge; 1:2.5</p>
+
+                <!-- Active Trades In-Flight Section -->
+                <div class="glass-card active-wealth-card">
+                    <div class="card-header-flex">
+                        <h3 class="card-title">⚡ បញ្ជី Position កំពុងរត់ (Live Open Trades)</h3>
+                        <span id="wealth-pos-badge" class="badge badge-accent">0 Active</span>
+                    </div>
+                    <div id="wealth-trades-list" class="cards-list">
+                        <div class="empty-state" id="wealth-empty-state">
+                            <span class="empty-icon">🛡️</span>
+                            <h4>កំពុងស្កេនរកឱកាស Safe Entry...</h4>
+                            <p>ប្រព័ន្ធកំពុងស្វែងរក Golden Sweet Spot ជាមួយ 15m EMA20 Retracement Confluence</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sweet-Spot Radar Candidates -->
+                <div class="glass-card sweetspot-radar-card">
+                    <div class="card-header-flex">
+                        <div class="card-title-group">
+                            <h3 class="card-title">🎯 កាក់ក្នុងតំបន់ Golden Sweet-Spot Radar</h3>
+                            <span class="card-subtitle">Binance Futures Momentum Scanner (RVOL &ge; 1.5x & ADX &ge; 25.0)</span>
+                        </div>
+                        <span class="badge badge-cyber">Top Momentum</span>
+                    </div>
+                    <div id="sweetspot-candidates-list" class="radar-candidates-grid">
+                        <!-- Populated by JS -->
                     </div>
                 </div>
             </section>
 
-            <!-- TAB 3: OPTION B WEALTH HARVESTER VAULT -->
-            <section id="tab-wealth" class="tab-pane">
+            <!-- ======================================================== -->
+            <!-- TAB 3: 33 AI SUPER BRAIN & SENTIMENT MATRIX             -->
+            <!-- ======================================================== -->
+            <section id="tab-brain" class="tab-pane">
+                <div class="section-banner banner-brain">
+                    <div class="banner-title-row">
+                        <div class="banner-icon-wrap">🧠</div>
+                        <div>
+                            <h2 class="section-heading">33 AI Super Brain Neural Matrix</h2>
+                            <span class="section-desc">DeepSeek R1 + Llama 3 70B + Gemini 2.5 Flash + 12 Wall St ML Ensembles</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time AI Sentiment Confluence Gauge -->
+                <div class="glass-card brain-gauge-card">
+                    <div class="brain-gauge-header">
+                        <span class="card-title">🌐 AI Swarm Consensus Score</span>
+                        <span id="brain-sentiment-badge" class="badge badge-success">STRONG BULLISH (94.8%)</span>
+                    </div>
+                    <div class="gauge-dial-container">
+                        <div class="radial-score-box">
+                            <svg class="radial-svg" viewBox="0 0 120 120">
+                                <circle class="radial-bg" cx="60" cy="60" r="50"></circle>
+                                <circle id="radial-progress" class="radial-fill" cx="60" cy="60" r="50" style="stroke-dashoffset: 40;"></circle>
+                            </svg>
+                            <div class="radial-center-text">
+                                <span id="brain-score-val" class="score-number">94.8</span>
+                                <span class="score-unit">/ 100</span>
+                            </div>
+                        </div>
+                        <div class="gauge-details-column">
+                            <div class="gauge-detail-item">
+                                <span class="detail-label">15m Trend Strength (ADX):</span>
+                                <strong id="brain-adx-val" class="text-neon-emerald">32.4 (STRONG TREND &ge; 25.0)</strong>
+                            </div>
+                            <div class="gauge-detail-item">
+                                <span class="detail-label">Anti-Oversold Short Guard:</span>
+                                <strong class="text-neon-cyan">LOCKED (RSI &le; 38.0 Protected)</strong>
+                            </div>
+                            <div class="gauge-detail-item">
+                                <span class="detail-label">The Golden 85% Ratchet:</span>
+                                <strong class="text-neon-gold">ARMED (+3.0% ROI Breakeven)</strong>
+                            </div>
+                            <div class="gauge-detail-item">
+                                <span class="detail-label">Dynamic Capital Cushion:</span>
+                                <strong class="text-neon-emerald">65% Balance Reserve Safe</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 33 AI Super Brain Active Core Matrix -->
+                <div class="glass-card ai-agents-card">
+                    <div class="card-header-flex">
+                        <h3 class="card-title">🤖 33 Neural Agent Core Roster</h3>
+                        <span class="badge badge-cyber">33/33 Synchronized</span>
+                    </div>
+                    <div id="ai-agents-grid" class="agents-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================== -->
+            <!-- TAB 4: TOKYO HFT MEV & FLASH LOAN ARBITRAGE            -->
+            <!-- ======================================================== -->
+            <section id="tab-hft" class="tab-pane">
+                <div class="section-banner banner-hft">
+                    <div class="banner-title-row">
+                        <div class="banner-icon-wrap">⚡</div>
+                        <div>
+                            <h2 class="section-heading">Tokyo HFT MEV Flash Loan Radar</h2>
+                            <span class="section-desc">Aave V3 & Tokyo Co-location Relay (< 0.42ms RPC Latency)</span>
+                        </div>
+                    </div>
+                    <div class="engine-live-tag">
+                        <span class="status-dot pulsing-cyan"></span>
+                        <span>ATOMIC $0.00 RISK</span>
+                    </div>
+                </div>
+
+                <!-- MEV 4-Pillar Stack Card -->
+                <div class="glass-card mev-stack-card">
+                    <div class="card-header-flex">
+                        <h3 class="card-title">🏛️ 4-Pillar Tokyo Weapon Stack</h3>
+                        <span class="badge badge-accent">Sub-Millisecond Execution</span>
+                    </div>
+                    <div class="mev-pillars-grid">
+                        <div class="pillar-card">
+                            <div class="pillar-icon">🔒</div>
+                            <h4>Flashbots Private Relay</h4>
+                            <p>0% Mempool Front-Running Exposure</p>
+                        </div>
+                        <div class="pillar-card">
+                            <div class="pillar-icon">⚙️</div>
+                            <h4>Yul Low-Level Assembly</h4>
+                            <p>68.89% Gas Savings (~42k Gas)</p>
+                        </div>
+                        <div class="pillar-card">
+                            <div class="pillar-icon">🔄</div>
+                            <h4>4-Hop Cyclic Pathfinder</h4>
+                            <p>Aave V3 &rarr; Uni V3 &rarr; Camelot &rarr; Sushi</p>
+                        </div>
+                        <div class="pillar-card">
+                            <div class="pillar-icon">🗾</div>
+                            <h4>Tokyo Co-Location VPS</h4>
+                            <p>Sub-0.42ms Direct Node Latency</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Cyclic Arbitrage Opportunities Radar -->
+                <div class="glass-card cyclic-arb-card">
+                    <div class="card-header-flex">
+                        <h3 class="card-title">📡 ឱកាស Arbitrage កំពុងស្កេន (Live Cyclic Spreads)</h3>
+                        <span class="badge badge-success">Fee Hurdle Filtered</span>
+                    </div>
+                    <div id="mev-cycles-list" class="cycles-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================== -->
+            <!-- TAB 5: OPTION B SPOT WEALTH VAULT                       -->
+            <!-- ======================================================== -->
+            <section id="tab-wealth-vault" class="tab-pane">
                 <div class="glass-card wealth-hero-card">
                     <div class="wealth-hero-header">
                         <div class="wealth-icon-wrap">🏦</div>
                         <div class="wealth-hero-info">
-                            <h3>Spot Wealth Accumulator Vault</h3>
-                            <span>មុខងារបង្វែរចំណេញទិញសន្សំ BTC & Physical Gold</span>
+                            <h3>Option B Spot Wealth Accumulator Vault</h3>
+                            <span>មុខងារបង្វែរចំណេញពី Futures ទៅទិញសន្សំ Spot BTC & Physical Gold (PAXG)</span>
                         </div>
                     </div>
                     <div class="wealth-metrics-row">
                         <div class="wealth-metric-box">
-                            <span class="wm-label">🪙 Total Bitcoin</span>
+                            <span class="wm-label">🪙 Total Bitcoin Accumulated</span>
                             <span id="vault-btc-qty" class="wm-val text-cyan">0.000000 BTC</span>
-                            <span id="vault-btc-usd" class="wm-sub">≈ $0.00</span>
+                            <span id="vault-btc-usd" class="wm-sub">≈ $0.00 USD</span>
                         </div>
                         <div class="wealth-metric-box">
-                            <span class="wm-label">🥇 Physical Gold (PAXG)</span>
+                            <span class="wm-label">🥇 Physical Gold (PAXG Vault)</span>
                             <span id="vault-paxg-qty" class="wm-val text-gold">0.0000 PAXG</span>
-                            <span id="vault-paxg-usd" class="wm-sub">≈ $0.00</span>
+                            <span id="vault-paxg-usd" class="wm-sub">≈ $0.00 USD</span>
                         </div>
                     </div>
                     <!-- Current Sweep Threshold Meter -->
@@ -208,155 +402,131 @@
                 </div>
             </section>
 
-            <!-- TAB 4: AI SWARM MARKET RADAR -->
-            <section id="tab-radar" class="tab-pane">
-                <div class="section-banner">
+            <!-- ======================================================== -->
+            <!-- TAB 6: VIP ENGINE CONTROL CENTER                       -->
+            <!-- ======================================================== -->
+            <section id="tab-controls" class="tab-pane">
+                <div class="section-banner banner-control">
                     <div class="banner-title-row">
-                        <h2 class="section-heading">🤖 AI Swarm & Market Radars</h2>
-                        <span class="badge badge-cyber">5-Agent Ensemble</span>
+                        <div class="banner-icon-wrap">🎛️</div>
+                        <div>
+                            <h2 class="section-heading">VIP Engine Control Center</h2>
+                            <span class="section-desc">1-Click Control for Flagship Institutional Trading Engines</span>
+                        </div>
                     </div>
-                    <p class="section-desc">DeepSeek R1 + Llama 3 + CatBoost + XGBoost + HFT Orderbook</p>
+                    <span class="badge badge-accent">VIP Master Access</span>
                 </div>
 
-                <!-- Swarm Consensus Card -->
-                <div class="glass-card swarm-card">
-                    <div class="swarm-header">
-                        <span class="swarm-title">🧠 Institutional Market Consensus</span>
-                        <span id="swarm-verdict" class="badge badge-success">STRONG BULLISH (88%)</span>
-                    </div>
-                    <div class="swarm-meters-grid">
-                        <div class="swarm-meter-item">
-                            <span class="meter-name">DeepSeek R1 Reasoning</span>
-                            <div class="meter-bar"><div id="meter-ds-fill" class="meter-fill bg-cyan" style="width: 85%;"></div></div>
-                            <span id="meter-ds-val" class="meter-pct">85%</span>
-                        </div>
-                        <div class="swarm-meter-item">
-                            <span class="meter-name">Llama 3 70B Quant</span>
-                            <div class="meter-bar"><div id="meter-llama-fill" class="meter-fill bg-emerald" style="width: 90%;"></div></div>
-                            <span id="meter-llama-val" class="meter-pct">90%</span>
-                        </div>
-                        <div class="swarm-meter-item">
-                            <span class="meter-name">CatBoost Trend Filter</span>
-                            <div class="meter-bar"><div id="meter-cat-fill" class="meter-fill bg-gold" style="width: 82%;"></div></div>
-                            <span id="meter-cat-val" class="meter-pct">82%</span>
-                        </div>
-                        <div class="swarm-meter-item">
-                            <span class="meter-name">Tokyo MEV Orderbook Flow</span>
-                            <div class="meter-bar"><div id="meter-hft-fill" class="meter-fill bg-cyan" style="width: 94%;"></div></div>
-                            <span id="meter-hft-val" class="meter-pct">94%</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Top Ranked Coins Signal Radar -->
-                <div class="glass-card top-signals-card">
-                    <h4 class="card-title">🚀 កាក់ដែលមានសញ្ញាខ្លាំងបំផុត (Top AI Alpha)</h4>
-                    <div id="top-signals-list" class="signals-list">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- TAB 5: ENGINE MATRIX & CONTROL -->
-            <section id="tab-matrix" class="tab-pane">
-                <div class="section-banner">
-                    <div class="banner-title-row">
-                        <h2 class="section-heading">🎛️ ម៉ាទ្រីសមាស៊ីនវិនិយោគ (10 Engines)</h2>
-                        <span class="badge badge-accent">All Running</span>
-                    </div>
-                    <p class="section-desc">ត្រួតពិនិត្យ និងគ្រប់គ្រងម៉ាស៊ីនវិនិយោគស្វ័យប្រវត្តិកម្រិតស្ថាប័ន</p>
-                </div>
-                <div class="matrix-grid" id="engine-matrix-grid">
-                    <!-- Engine Item 1 -->
-                    <div class="glass-card engine-card">
-                        <div class="engine-card-header">
-                            <div class="engine-badge-icon">🛡️</div>
-                            <div class="engine-meta">
-                                <h4>Turbo Hedge HFT</h4>
-                                <span>Dual-Side Delta-Neutral Mode</span>
-                            </div>
-                            <span class="status-pill active">ACTIVE</span>
-                        </div>
-                        <p class="engine-desc">បិទហានិភ័យទីផ្សារឡើងចុះ កើបចំណេញខ្នាតមីក្រូ ២៤/៧ ជាមួយ 85% Profit Ratchet</p>
-                    </div>
-
-                    <!-- Engine Item 2 -->
-                    <div class="glass-card engine-card">
-                        <div class="engine-card-header">
+                <div class="engines-control-grid">
+                    <!-- Engine 1: Perpetual Wealth Generator -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
                             <div class="engine-badge-icon">💎</div>
-                            <div class="engine-meta">
-                                <h4>Super Smart Trade</h4>
-                                <span>100% Spot Accumulator</span>
+                            <div class="engine-ctrl-meta">
+                                <h4>24/7 Perpetual Wealth</h4>
+                                <span>Sweet-Spot Multi-Pair Breakout Engine</span>
                             </div>
-                            <span class="status-pill active">ACTIVE</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-wealth" checked data-engine="wealth">
+                                <span class="slider round"></span>
+                            </label>
                         </div>
-                        <p class="engine-desc">ទិញសន្សំ Spot Safe Entry ដោយគ្មាន Liquidation Risk ជាមួយ Dynamic Trailing SL</p>
+                        <p class="engine-ctrl-desc">ស្កេនរកកាក់ឡើង Sweet Spot +3% to +14% ឬ Short Breakout ជាមួយ 15m EMA20 Retracement</p>
                     </div>
 
-                    <!-- Engine Item 3 -->
-                    <div class="glass-card engine-card">
-                        <div class="engine-card-header">
-                            <div class="engine-badge-icon">🏦</div>
-                            <div class="engine-meta">
-                                <h4>Spot Wealth Harvester</h4>
-                                <span>Futures Profit &rarr; Spot BTC/Gold</span>
+                    <!-- Engine 2: Turbo Hedge HFT -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
+                            <div class="engine-badge-icon">🛡️</div>
+                            <div class="engine-ctrl-meta">
+                                <h4>Turbo Hedge HFT</h4>
+                                <span>Dual-Side Delta-Neutral Hedge</span>
                             </div>
-                            <span class="status-pill active">ACTIVE</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-hedge" checked data-engine="turbo_hedge">
+                                <span class="slider round"></span>
+                            </label>
                         </div>
-                        <p class="engine-desc">បង្វែររាល់ចំណេញលើសពី $10 ពី Futures ទៅទិញ Spot BTC ឬ មាស PAXG ទុកយូរអង្វែង</p>
+                        <p class="engine-ctrl-desc">បិទហានិភ័យទីផ្សារឡើងចុះ កើបចំណេញខ្នាតមីក្រូ ២៤/៧ ជាមួយ 85% Profit Ratchet</p>
                     </div>
 
-                    <!-- Engine Item 4 -->
-                    <div class="glass-card engine-card">
-                        <div class="engine-card-header">
-                            <div class="engine-badge-icon">⚡</div>
-                            <div class="engine-meta">
-                                <h4>DeFi Flash Loan MEV</h4>
-                                <span>Aave V3 & Tokyo Relayer</span>
+                    <!-- Engine 3: SmartX 5-Agent Swarm -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
+                            <div class="engine-badge-icon">🧠</div>
+                            <div class="engine-ctrl-meta">
+                                <h4>SmartX Swarm AI</h4>
+                                <span>5-Agent + 12 Wall Street ML Suite</span>
                             </div>
-                            <span class="status-pill active">ACTIVE</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-smartx" checked data-engine="smart_x">
+                                <span class="slider round"></span>
+                            </label>
                         </div>
-                        <p class="engine-desc">កម្ចីគ្មានទ្រព្យបញ្ចាំ $0.00 Principal Loss Risk ជាមួយ Atomic On-Chain Arbitrage</p>
+                        <p class="engine-ctrl-desc">វិភាគទីផ្សារដោយ DeepSeek-R1, Llama-3-70B, Gemini 2.5 Flash និង CatBoost Ensembles</p>
                     </div>
 
-                    <!-- Engine Item 5 -->
-                    <div class="glass-card engine-card">
-                        <div class="engine-card-header">
-                            <div class="engine-badge-icon">📈</div>
-                            <div class="engine-meta">
-                                <h4>Compound Grid & Fibonacci</h4>
-                                <span>Spot Snowball Matrix</span>
+                    <!-- Engine 4: Spot Snowball Compound Grid -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
+                            <div class="engine-badge-icon">❄️</div>
+                            <div class="engine-ctrl-meta">
+                                <h4>Compound Grid Spot</h4>
+                                <span>Snowball Multiplier (0% Liquidation)</span>
                             </div>
-                            <span class="status-pill active">ACTIVE</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-grid" checked data-engine="compound_grid">
+                                <span class="slider round"></span>
+                            </label>
                         </div>
-                        <p class="engine-desc">ក្រឡាចាក់ទុនស្វ័យប្រវត្តិតាមសមាមាត្រមាស Fibonacci កើបចំណេញគ្រប់រលក</p>
+                        <p class="engine-ctrl-desc">ក្រឡាចាក់ទុន Spot Snowball គ្មានហានិភ័យ Liquidation បង្កើនកាក់យូរអង្វែង</p>
+                    </div>
+
+                    <!-- Engine 5: Infinity Matrix Fibonacci -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
+                            <div class="engine-badge-icon">♾️</div>
+                            <div class="engine-ctrl-meta">
+                                <h4>Infinity Matrix Spot</h4>
+                                <span>Dynamic Fibonacci Grid</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-infinity" checked data-engine="infinity_matrix">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <p class="engine-ctrl-desc">ចាក់ទុនតាមសមាមាត្រមាស Fibonacci Golden Ratio ទិញទាប លក់ខ្ពស់ស្វ័យប្រវត្តិ</p>
                     </div>
                 </div>
             </section>
         </main>
 
-        <!-- Bottom Tab Navigation Bar -->
+        <!-- Bottom Cyberpunk Navigation Bar -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-tab="tab-overview">
                 <span class="nav-icon">📊</span>
                 <span class="nav-text">Overview</span>
             </button>
-            <button class="nav-item" data-tab="tab-positions">
-                <span class="nav-icon">⚡</span>
-                <span class="nav-text">Positions</span>
+            <button class="nav-item" data-tab="tab-wealth-cockpit">
+                <span class="nav-icon">💎</span>
+                <span class="nav-text">Wealth 24/7</span>
                 <span id="nav-pos-badge" class="nav-badge" style="display:none">0</span>
             </button>
-            <button class="nav-item" data-tab="tab-wealth">
+            <button class="nav-item" data-tab="tab-brain">
+                <span class="nav-icon">🧠</span>
+                <span class="nav-text">AI Brain</span>
+            </button>
+            <button class="nav-item" data-tab="tab-hft">
+                <span class="nav-icon">⚡</span>
+                <span class="nav-text">Tokyo MEV</span>
+            </button>
+            <button class="nav-item" data-tab="tab-wealth-vault">
                 <span class="nav-icon">🏦</span>
-                <span class="nav-text">Vault</span>
+                <span class="nav-text">Gold Vault</span>
             </button>
-            <button class="nav-item" data-tab="tab-radar">
-                <span class="nav-icon">🤖</span>
-                <span class="nav-text">Radar</span>
-            </button>
-            <button class="nav-item" data-tab="tab-matrix">
+            <button class="nav-item" data-tab="tab-controls">
                 <span class="nav-icon">🎛️</span>
-                <span class="nav-text">Engines</span>
+                <span class="nav-text">Controls</span>
             </button>
         </nav>
     </div>
