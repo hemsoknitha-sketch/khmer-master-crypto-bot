@@ -2624,12 +2624,13 @@ def get_futures_free_margin(api_key: str, api_secret: str) -> float:
         print(f"Error fetching futures free margin: {e}")
     return 0.0
 
-def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 25, position_side: str = None) -> dict:
+def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 25, position_side: str = None, reduce_only: bool = False, **kwargs) -> dict:
     """
     Executes a market order on Binance Futures API (/fapi/v1/order).
     Automatically formats quantity to Binance's exact LOT_SIZE precision.
     Includes Super Smart APEX TURBO AGI Dynamic Margin Auto-Recovery & Pre-Flight Free Margin Shield for Error -2019.
     Full support for both One-Way Mode and Hedge (Dual-Side) Mode (Error -4061 Auto-Recovery).
+    Full support for reduce_only exit parameter.
     Uses HFT_SESSION pre-warmed connection pool for sub-30ms micro-execution latency.
     """
     if not api_key or not api_secret:
@@ -2662,7 +2663,7 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
     try:
         p = get_current_price(symbol)
         free_margin = get_futures_free_margin(api_key, api_secret)
-        if free_margin > 0 and p > 0:
+        if free_margin > 0 and p > 0 and not reduce_only:
             safe_margin = free_margin * 0.85  # Retain 15% safety buffer for fees & PnL
             req_margin = (quantity * p) / max(1, leverage)
             
@@ -2710,6 +2711,9 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
                 eff_pos = None # Do not inject positionSide on One-Way mode
             if eff_pos and eff_pos in ["LONG", "SHORT"]:
                 ord_params["positionSide"] = eff_pos
+
+        if reduce_only and not ord_params.get("positionSide"):
+            ord_params["reduceOnly"] = "true"
 
         params = urlencode(ord_params)
         sig = generate_signature(api_secret, params)

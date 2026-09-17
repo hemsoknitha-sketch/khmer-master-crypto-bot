@@ -4546,9 +4546,9 @@ async def trailing_stop_engine_job(app: Application):
                 await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
             else:
                 print(f"⚠️ Binance Sell Failed for {symbol} Trailing Stop: {res}")
-                if isinstance(res, dict) and res.get("code") == -2010:
-                    print(f"🧹 Removed {symbol} from active trades (Insufficient Balance / Sold manually)")
-                    db.remove_active_trade(trade_id, current_price, "INSUFFICIENT_BALANCE_REMOVED")
+                if isinstance(res, dict) and res.get("code") in [-2010, -1121, -1013]:
+                    print(f"🧹 Auto-pruned {symbol} from active trades (Code {res.get('code')}: {res.get('msg', 'Invalid/Sold')})")
+                    db.remove_active_trade(trade_id, current_price, "INVALID_OR_ZERO_BALANCE_REMOVED")
 
 async def ai_order_execution_job(app: Application):
     import trading_engine
