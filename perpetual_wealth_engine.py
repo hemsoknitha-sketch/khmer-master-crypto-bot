@@ -182,13 +182,33 @@ class PerpetualWealthGeneratorEngine:
             rs = avg_gain / avg_loss if avg_loss > 0 else 1.0
             rsi_15m = 100.0 - (100.0 / (1.0 + rs))
 
-            # 3. Calculate EMA 50
-            k_factor = 2.0 / (50 + 1)
+            # 3. Calculate EMA 20 & EMA 50
+            k20 = 2.0 / (20 + 1)
+            k50 = 2.0 / (50 + 1)
+            ema20 = closes[0]
             ema50 = closes[0]
             for p in closes[1:]:
-                ema50 = (p * k_factor) + (ema50 * (1 - k_factor))
+                ema20 = (p * k20) + (ema20 * (1 - k20))
+                ema50 = (p * k50) + (ema50 * (1 - k50))
 
-            # 4. Check Invariant 16: Anti-Oversold Short Guard (15m RSI <= 38.0 strictly blocks SHORT)
+            # 4. Calculate Wilder's ADX(14) - Strict Chop Suppression
+            highs = [float(k[2]) for k in klines]
+            lows = [float(k[3]) for k in klines]
+            adx_15m = 25.0
+            if len(closes) >= 28:
+                adx_15m, _, _ = market_data.calculate_adx_and_dmi(highs, lows, closes, period=14)
+
+            if adx_15m < 25.0:
+                return {
+                    "is_valid": False,
+                    "reason": f"Insufficient Trend Strength (15m ADX {adx_15m:.1f} < 25.0 Chop Guard)"
+                }
+
+            # 5. Pullback Retracement Guard (Never buy candle tops, wait for 15m EMA20 test)
+            is_buy_pullback = (0.994 * ema20 <= current_price <= ema20 * 1.008)
+            is_sell_pullback = (ema20 * 0.992 <= current_price <= ema20 * 1.006)
+
+            # 6. Check Invariant 16: Anti-Oversold Short Guard (15m RSI <= 38.0 strictly blocks SHORT)
             if target_side == "SELL":
                 if rsi_15m <= 38.0:
                     return {
@@ -198,15 +218,19 @@ class PerpetualWealthGeneratorEngine:
                     }
                 if current_price > ema50:
                     return {"is_valid": False, "reason": "Price above EMA50 (Counter-trend Short rejected)"}
+                if not is_sell_pullback:
+                    return {"is_valid": False, "reason": "Waiting for bear pullback bounce into 15m EMA20 resistance"}
 
-            # 5. Check BUY guards (Anti-FOMO: reject overbought peak RSI > 78.0)
+            # 7. Check BUY guards (Anti-FOMO: reject overbought peak RSI > 78.0)
             if target_side == "BUY":
-                if rsi_15m > 78.0:
-                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 78.0 (Anti-FOMO)"}
-                if current_price < (ema50 * 0.992):
+                if rsi_15m > 75.0:
+                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 75.0 (Anti-FOMO)"}
+                if current_price < (ema50 * 0.994):
                     return {"is_valid": False, "reason": "Price below 15m EMA50 (Trend broken)"}
+                if not is_buy_pullback:
+                    return {"is_valid": False, "reason": "Waiting for healthy pullback retest onto 15m EMA20 support"}
 
-            # 6. Orderbook L2 depth check
+            # 8. Orderbook L2 depth check
             ob_ratio = 1.25
             try:
                 ob_url = f"{trading_engine.FUTURES_URL}/fapi/v1/depth?symbol={symbol}&limit=20"
@@ -234,9 +258,11 @@ class PerpetualWealthGeneratorEngine:
                 "is_valid": True,
                 "rsi_15m": rsi_15m,
                 "ema50_15m": ema50,
+                "ema20_15m": ema20,
+                "adx_15m": adx_15m,
                 "orderbook_ratio": ob_ratio,
                 "ai_score": ai_score,
-                "reason": "Optimal Confluence"
+                "reason": "Optimal Confluence (ADX >= 25.0 + Pullback Retest)"
             }
         except Exception as e:
             return {"is_valid": False, "reason": f"Error: {e}"}
@@ -455,12 +481,16 @@ class PerpetualWealthGeneratorEngine:
                     tp1_taken_key = f"wealth_tp1_done_{chat_id}_{sym}"
                     is_tp1_done = (db.get_system_setting(tp1_taken_key, "0") == "1")
 
+                    pos_margin = (abs(amt) * entry_price) / max(1, leverage) if entry_price > 0 else 5.0
+                    is_be_locked = (db.get_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0") == "1")
+
                     # Phase 1: Breakeven Armor (Invariant 24) at +3.0% ROI
                     # Protect winning trade so it never turns into a loss (+0.12% fees floor)
                     if roi_pct >= 3.0 and curr_peak >= 3.0:
                         be_locked_key = f"wealth_be_locked_{chat_id}_{sym}"
-                        if db.get_system_setting(be_locked_key, "0") != "1":
+                        if not is_be_locked:
                             db.update_system_setting(be_locked_key, "1")
+                            is_be_locked = True
                             print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.12% Fees Floor (ROI: +{roi_pct:.2f}%)")
 
                     # Phase 2: Micro-Scalp TP1 at +5.0% ROI -> Harvest 50% Size
@@ -561,10 +591,12 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending TP2 alert: {notif_err}")
 
-                    # Phase 4: Stop Loss Protection (-3.5% ROI)
-                    elif roi_pct <= -3.5:
+                    # Phase 4: Breakeven Defense Trigger (if locked) OR Dynamic Stop Loss Protection (Noise-resistant ~-18.0% ROI / Dynamic ATR Cushion)
+                    elif (is_be_locked and roi_pct <= 0.20) or roi_pct <= -18.0 or (pos_margin > 0 and unRealizedProfit <= -max(0.60, pos_margin * 0.22)):
                         side_to_close = "SELL" if amt > 0 else "BUY"
-                        print(f"🛑 [PERPETUAL WEALTH STOP LOSS] {sym} reached {roi_pct:.2f}% ROI. Executing Stop Loss to preserve capital...")
+                        is_be_exit = is_be_locked and roi_pct > -5.0
+                        reason_tag = "BREAKEVEN DEFENSE" if is_be_exit else "DYNAMIC STOP LOSS"
+                        print(f"🛑 [PERPETUAL WEALTH {reason_tag}] {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
                         trading_engine.place_futures_order(
                             api_key=api_key,
                             api_secret=api_secret,
@@ -577,8 +609,8 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(peak_roi_key, "0.0")
                         db.update_system_setting(tp1_taken_key, "0")
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
-                        db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=False)
-                        add_wealth_cooldown(sym, duration_seconds=3600)
+                        db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=(unRealizedProfit > 0))
+                        add_wealth_cooldown(sym, duration_seconds=1800 if is_be_exit else 3600)
 
                 db.update_perpetual_wealth_coins(chat_id, active_symbols)
 

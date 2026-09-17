@@ -631,9 +631,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
             # ✅ SMART INSTITUTIONAL MULTI-TIMEFRAME TREND FOLLOWING (15m RSI 24 - 76)
             else:
-                # 🛡️ 1. ADX Trend Strength Filter: Reject dead sideways chop (< 20.0 ADX)
-                if adx_15m < 20.0:
-                    print(f"🛡️ [CHOP REGIME SHIELD] {symbol}: 15m ADX {adx_15m:.1f} < 20.0 (Dead Sideways Chop). SKIPPED!")
+                # 🛡️ 1. ADX Trend Strength Filter: Strictly reject dead sideways chop (< 25.0 ADX)
+                if adx_15m < 25.0:
+                    print(f"🛡️ [CHOP REGIME SHIELD] {symbol}: 15m ADX {adx_15m:.1f} < 25.0 (Dead Sideways Chop / Insufficient Trend Momentum). SKIPPED!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "CHOPPY_SIDEWAYS_MARKET"}
 
                 # 🛡️ 2. Machine Learning Tri-Model Consensus Gate
@@ -641,13 +641,15 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 ml_bullish = ml_res.get("bullish", False)
                 ml_conf = ml_res.get("confidence", 75.0)
 
-                # 🛡️ 3. Anti-Overextension Guard (Never buy candle tops extended > 1.2% above EMA 20)
-                is_buy_extended = (ema20_15m > 0 and p_15m > ema20_15m * 1.012)
-                is_sell_extended = (ema20_15m > 0 and p_15m < ema20_15m * 0.988)
+                # 🛡️ 3. Pullback Retracement & Anti-Overextension Guard (Never buy candle tops extended > 0.6% above EMA 20)
+                is_buy_pullback = (ema20_15m > 0 and 0.994 * ema20_15m <= p_15m <= ema20_15m * 1.008 and price <= ema5_1m * 1.002)
+                is_sell_pullback = (ema20_15m > 0 and ema20_15m * 0.992 <= p_15m <= ema20_15m * 1.006 and price >= ema5_1m * 0.998)
+                is_buy_extended = (ema20_15m > 0 and p_15m > ema20_15m * 1.010)
+                is_sell_extended = (ema20_15m > 0 and p_15m < ema20_15m * 0.990)
 
                 has_vol_confirmation = (vol_ratio >= 1.25 or abs(change_24h) >= 1.5)
 
-                if is_macro_uptrend and is_5m_bullish and not btc_dumping and not is_buy_extended and 46.0 <= rsi14_15m <= 65.0 and ml_bullish and has_vol_confirmation:
+                if is_macro_uptrend and is_5m_bullish and not btc_dumping and not is_buy_extended and is_buy_pullback and 46.0 <= rsi14_15m <= 65.0 and ml_bullish and has_vol_confirmation:
                     side = "BUY"
                     base_conf = max(88.0, ml_conf)
                     if vol_ratio >= 2.0: base_conf += 4.0
@@ -655,7 +657,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     if whale_bid_wall: base_conf += 4.0
                     confidence = min(98.5, base_conf)
 
-                elif is_macro_downtrend and is_5m_bearish and not btc_surging and not is_sell_extended and 38.5 <= rsi14_15m <= 54.0 and not ml_bullish and has_vol_confirmation:
+                elif is_macro_downtrend and is_5m_bearish and not btc_surging and not is_sell_extended and is_sell_pullback and 38.5 <= rsi14_15m <= 54.0 and not ml_bullish and has_vol_confirmation:
                     # Strict Invariant 16 Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)
                     if rsi14_15m <= 38.0:
                         side = "SKIP"
@@ -673,7 +675,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     side = "SKIP"
                     confidence = 50.0
                     if is_buy_extended or is_sell_extended:
-                        print(f"🛡️ [ANTI-OVEREXTENSION GUARD] {symbol}: Price extended > 1.2% from 15m EMA20. Waiting for healthy pullback!")
+                        print(f"🛡️ [ANTI-OVEREXTENSION GUARD] {symbol}: Price extended from 15m EMA20. Waiting for healthy pullback!")
+                    elif not (is_buy_pullback or is_sell_pullback):
+                        print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Waiting for clean retest on 15m EMA20 Support/Resistance!")
                     elif btc_dumping:
                         print(f"🛡️ [BTC LEAD DUMP GUARD] {symbol}: BTC is dumping -> Longs strictly blocked!")
                     elif btc_surging:
@@ -1847,12 +1851,13 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             cushion_pct = dna_profile.get("noise_cushion_pct", 1.8)
             
             # Dynamic Volatility-Adaptive Stop Loss ROI:
-            # Clamped between 1.5% and 2.5% ROI according to coin ATR, keeping 1R <= $0.25 USD!
-            sl_roi_thresh = -min(2.5, max(1.5, curr_atr_pct * sl_mult * 0.45 * float(active_lev)))
-            sl_dollar_thresh = -max(0.20, bot_amt * 0.02)
+            # Sized with true 1.8x - 2.5x 15m ATR Volatility Cushion (equivalent to -1.5% to -2.8% price drop room)
+            # giving real breathing room beyond microstructure random noise while keeping dollar risk bounded!
+            sl_roi_thresh = -min(22.0, max(12.0, curr_atr_pct * sl_mult * float(active_lev)))
+            sl_dollar_thresh = -max(0.60, bot_amt * 0.18)
             raw_sl_hit = (
                 (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
-                (is_spot and (net_pnl_usdt <= -max(0.15, bot_amt * 0.012) or roi_pct <= -max(1.2, cushion_pct * 0.75)))
+                (is_spot and (net_pnl_usdt <= -max(0.35, bot_amt * 0.025) or roi_pct <= -max(2.0, cushion_pct * 1.2)))
             )
 
             if raw_sl_hit:
@@ -1869,10 +1874,10 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             else:
                 is_stop_loss_hit = False
 
-        # Hard Circuit Breaker: Absolute emergency safety ceiling at -3.5% ROI or -$0.35 USD
+        # Hard Circuit Breaker: Absolute emergency safety ceiling at -28.0% ROI or -$0.90 USD
         is_hard_circuit_breaker = (
-            (not is_spot and (net_pnl_usdt <= -max(0.35, bot_amt * 0.035) or roi_pct <= -3.5)) or
-            (is_spot and (net_pnl_usdt <= -max(0.25, bot_amt * 0.025) or roi_pct <= -2.5))
+            (not is_spot and (net_pnl_usdt <= -max(0.90, bot_amt * 0.25) or roi_pct <= -28.0)) or
+            (is_spot and (net_pnl_usdt <= -max(0.60, bot_amt * 0.04) or roi_pct <= -4.0))
         )
 
     last_flip_key = f"{chat_id}_{symbol}"

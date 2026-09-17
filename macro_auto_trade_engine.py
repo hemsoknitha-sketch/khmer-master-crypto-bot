@@ -189,9 +189,9 @@ def scan_macro_waterfall_opportunity(symbol: str) -> dict:
     if curr_price > ema_20 or curr_price > ema_50:
         return res
 
-    # 3. Anti-Fakeout: ADX Trend Strength Filter
+    # 3. Anti-Fakeout: ADX Trend Strength Filter (Strictly rejects choppy range fakeouts / bear traps)
     adx_1h, plus_di, minus_di = calculate_adx_and_dmi(highs_1h, lows_1h, closes_1h, period=14)
-    if adx_1h < 22.0 or plus_di >= minus_di:
+    if adx_1h < 25.0 or plus_di >= minus_di:
         return res
 
     # 4. Evaluate 15m Relief Retest (Bear Flag Pullback)
@@ -232,7 +232,7 @@ def scan_macro_waterfall_opportunity(symbol: str) -> dict:
     if is_retest_zone and has_upper_rejection:
         res["signal"] = True
         res["side"] = "SHORT"
-        adx_bonus = min(8.0, max(0.0, (adx_1h - 22.0) * 0.4))
+        adx_bonus = min(8.0, max(0.0, (adx_1h - 25.0) * 0.4))
         vol_bonus = min(6.0, max(0.0, (vol_surge_ratio - 1.8) * 3.0))
         res["confidence"] = min(98.0, 84.0 + adx_bonus + vol_bonus)
         res["strategy"] = "WATERFALL_RETEST"
@@ -296,9 +296,9 @@ def scan_macro_breakout_opportunity(symbol: str) -> dict:
     if curr_price < ema_20 or curr_price < ema_50:
         return res
 
-    # Anti-Fakeout: ADX Trend Strength Filter
+    # Anti-Fakeout: ADX Trend Strength Filter (Strictly rejects sideways consolidations < 25.0)
     adx_1h, plus_di, minus_di = calculate_adx_and_dmi(highs_1h, lows_1h, closes_1h, period=14)
-    if adx_1h < 22.0 or minus_di >= plus_di:
+    if adx_1h < 25.0 or minus_di >= plus_di:
         return res
 
     # Check 15m RSI: fresh momentum, not exhausted overbought top (> 68.0)
@@ -318,7 +318,7 @@ def scan_macro_breakout_opportunity(symbol: str) -> dict:
 
     res["signal"] = True
     res["side"] = "BUY"
-    adx_bonus = min(8.0, max(0.0, (adx_1h - 22.0) * 0.4))
+    adx_bonus = min(8.0, max(0.0, (adx_1h - 25.0) * 0.4))
     vol_bonus = min(6.0, max(0.0, (vol_surge - 1.8) * 3.0))
     res["confidence"] = min(98.0, 84.0 + adx_bonus + vol_bonus)
     res["strategy"] = "BREAKOUT_RETEST"
@@ -597,17 +597,17 @@ async def monitor_macro_auto_trades(app):
                     reason_tag = "MACRO_BREAKEVEN_ARMOR_PROTECT (+3.5% Net Floor)"
             else:
                 # 🧬 Asset-Specific Volatility Profiling & Dynamic ATR Volatility Cushion:
-                # Adapts stop distance to asset tier (1.8x - 2.5x ATR) to avoid noise stop-outs while capping dollar risk <= $0.25 USD
+                # Adapts stop distance to asset tier (1.8x - 2.5x ATR) to avoid noise stop-outs while capping dollar risk <= $0.60 USD
                 dna_prof = market_data.profile_asset_dna(symbol)
                 sl_mult = dna_prof.get("sl_atr_mult", 2.0)
                 curr_atr_pct = float(dna_prof.get("atr_pct", 1.5))
-                macro_sl_roi = -min(2.5, max(1.5, curr_atr_pct * sl_mult * 0.45 * 3.0)) # 3x-5x macro leverage
-                raw_macro_sl = (roi_pct <= macro_sl_roi or effective_pnl <= -max(0.25, amount * 0.025))
+                macro_sl_roi = -min(18.0, max(8.0, curr_atr_pct * sl_mult * float(leverage))) # 3x-5x macro leverage
+                raw_macro_sl = (roi_pct <= macro_sl_roi or effective_pnl <= -max(0.60, amount * 0.15))
                 
                 if raw_macro_sl:
                     # 🔍 3. Anti-Wick & Liquidity Sweep Shield
                     sweep_eval = market_data.evaluate_anti_wick_liquidity_sweep(
-                        symbol, side, entry_price, mark_price, roi_pct, macro_sl_roi
+                        symbol, side, entry_p, mark_p, roi_pct, macro_sl_roi
                     )
                     if sweep_eval.get("is_liquidity_sweep_fakeout", False):
                         is_stop_loss = False
