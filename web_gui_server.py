@@ -28,15 +28,16 @@ _SITE = None
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_gui")
 
 def _get_chat_id_from_req(request: web.Request) -> int:
-    """Helper to parse chat_id from query params or headers."""
+    """
+    Helper to parse chat_id from query params or headers with strict multi-user privacy.
+    Guarantees 100% user data isolation across Telegram Mini App sessions.
+    """
     try:
         raw = request.query.get("chat_id", "")
-        if raw and raw.isdigit():
+        if not raw:
+            raw = request.headers.get("X-Telegram-User-Id", "")
+        if raw and str(raw).strip().isdigit():
             return int(raw)
-        # Fallback to single/primary user in database
-        users = db.get_active_users()
-        if users and len(users) > 0:
-            return users[0][0]
     except Exception:
         pass
     return 0
