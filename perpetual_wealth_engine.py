@@ -320,26 +320,40 @@ class PerpetualWealthGeneratorEngine:
             return {"is_valid": False, "reason": f"Error: {e}"}
 
     @staticmethod
-    def calculate_asset_dna_sizing(total_capital: float, available_usdt: float) -> dict:
+    def calculate_asset_dna_sizing(total_capital: float, available_usdt: float, custom_margin: float = 0.0) -> dict:
         """
         Applies Invariant 8 (Small Capital Leverage Shield) and Invariant 25 (Dynamic Small Capital Fortress).
-        - Capital < $100 -> leverage clamped to <= 10x, margin per coin $4.00–$5.50.
-        - Risk per trade <= $0.25 on small accounts.
-        - Max simultaneous coins: min(12, int(total_capital / 5.0)).
+        - Capital < $100 -> leverage clamped to <= 10x.
+        - Risk per trade <= $0.25 on small accounts (or proportional to custom margin).
+        - If custom_margin > 0.0, user's designated margin per coin is respected within safety boundaries.
+        - Max simultaneous coins: min(12, int(total_capital / margin_per_coin)).
         """
         total_capital = max(10.50, float(total_capital))
         available_usdt = max(0.0, float(available_usdt))
+        custom_margin = float(custom_margin) if custom_margin else 0.0
 
         if total_capital < 100.0 or available_usdt < 100.0:
             leverage = 10  # Invariant 8: Strictly <= 10x for small capital
-            margin_per_coin = round(min(5.50, max(4.00, available_usdt * 0.12)), 2)
-            max_coins = max(1, min(10, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
-            max_risk_usd = 0.25
+            if custom_margin > 0.0:
+                safe_max_margin = max(5.00, available_usdt * 0.40)
+                margin_per_coin = round(max(5.00, min(custom_margin, safe_max_margin)), 2)
+                max_coins = max(1, min(10, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
+                max_risk_usd = round(margin_per_coin * 0.05, 2)
+            else:
+                margin_per_coin = round(min(5.50, max(4.00, available_usdt * 0.12)), 2)
+                max_coins = max(1, min(10, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
+                max_risk_usd = 0.25
         else:
             leverage = 15
-            margin_per_coin = round(min(25.0, max(10.0, total_capital * 0.05)), 2)
-            max_coins = max(2, min(15, int(total_capital / margin_per_coin) if margin_per_coin > 0 else 5))
-            max_risk_usd = round(margin_per_coin * 0.05, 2)
+            if custom_margin > 0.0:
+                safe_max_margin = max(10.0, available_usdt * 0.35)
+                margin_per_coin = round(max(5.00, min(custom_margin, safe_max_margin)), 2)
+                max_coins = max(2, min(15, int(total_capital / margin_per_coin) if margin_per_coin > 0 else 5))
+                max_risk_usd = round(margin_per_coin * 0.05, 2)
+            else:
+                margin_per_coin = round(min(25.0, max(10.0, total_capital * 0.05)), 2)
+                max_coins = max(2, min(15, int(total_capital / margin_per_coin) if margin_per_coin > 0 else 5))
+                max_risk_usd = round(margin_per_coin * 0.05, 2)
 
         return {
             "leverage": leverage,
@@ -350,13 +364,14 @@ class PerpetualWealthGeneratorEngine:
         }
 
     @staticmethod
-    def start_perpetual_wealth_bot(chat_id: int, capital: float = 50.0, leverage: int = 10, target_tp: float = 10.0, pin: str = "") -> dict:
+    def start_perpetual_wealth_bot(chat_id: int, capital: float = 50.0, leverage: int = 10, target_tp: float = 10.0, margin_per_coin: float = 0.0, pin: str = "") -> dict:
         """
         Starts the 24/7 Perpetual Wealth Generator for a user.
-        Validates 2FA PIN, API keys, and initializes database state.
+        Validates 2FA PIN, API keys, and initializes database state with custom or auto margin sizing.
         """
         chat_id = int(chat_id)
         capital = max(10.50, float(capital))
+        margin_per_coin = float(margin_per_coin) if margin_per_coin else 0.0
 
         # 1. Verify 2FA PIN if set
         user_pin = db.get_user_pin(chat_id)
@@ -402,7 +417,8 @@ class PerpetualWealthGeneratorEngine:
             status="ACTIVE",
             capital=capital,
             leverage=leverage,
-            target_tp=target_tp
+            target_tp=target_tp,
+            margin_per_coin=margin_per_coin
         )
 
         return {
@@ -411,6 +427,7 @@ class PerpetualWealthGeneratorEngine:
             "capital": capital,
             "leverage": leverage,
             "target_tp": target_tp,
+            "margin_per_coin": margin_per_coin,
             "available_usdt": avail_usdt
         }
 
@@ -695,8 +712,9 @@ class PerpetualWealthGeneratorEngine:
                     fut_bal = trading_engine.get_futures_balance(api_key, api_secret)
                     avail_usdt = float(fut_bal) if isinstance(fut_bal, (int, float)) else (float(fut_bal.get("available_balance", 0.0)) if isinstance(fut_bal, dict) else 0.0)
                     bot_cap = float(bot.get("capital", 50.0))
+                    custom_margin = float(bot.get("margin_per_coin", 0.0))
 
-                    sizing = PerpetualWealthGeneratorEngine.calculate_asset_dna_sizing(bot_cap, avail_usdt)
+                    sizing = PerpetualWealthGeneratorEngine.calculate_asset_dna_sizing(bot_cap, avail_usdt, custom_margin)
                     margin_per_coin = sizing["margin_per_coin"]
                     leverage = sizing["leverage"]
                     max_coins = sizing["max_coins"]

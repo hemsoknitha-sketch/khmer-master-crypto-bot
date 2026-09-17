@@ -897,6 +897,7 @@ def init_db():
             capital REAL DEFAULT 50.0,
             leverage INTEGER DEFAULT 10,
             target_tp REAL DEFAULT 10.0,
+            margin_per_coin REAL DEFAULT 0.0,
             active_coins TEXT DEFAULT '[]',
             total_realized_pnl REAL DEFAULT 0.0,
             win_count INTEGER DEFAULT 0,
@@ -909,6 +910,11 @@ def init_db():
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )
     ''')
+
+    try:
+        cursor.execute("ALTER TABLE perpetual_wealth_bots ADD COLUMN margin_per_coin REAL DEFAULT 0.0")
+    except Exception:
+        pass
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS perpetual_wealth_spot_bots (
@@ -5254,7 +5260,7 @@ def get_total_spot_wealth_harvested(chat_id: int) -> dict:
         return {"total_usd": 0.0, "btc_qty": 0.0, "paxg_qty": 0.0, "harvest_count": 0}
 
 
-def set_perpetual_wealth_bot(chat_id: int, status: str = 'ACTIVE', capital: float = 50.0, leverage: int = 10, target_tp: float = 10.0) -> bool:
+def set_perpetual_wealth_bot(chat_id: int, status: str = 'ACTIVE', capital: float = 50.0, leverage: int = 10, target_tp: float = 10.0, margin_per_coin: float = 0.0) -> bool:
     """Inserts or updates perpetual wealth bot state."""
     try:
         conn = get_db_connection()
@@ -5265,6 +5271,7 @@ def set_perpetual_wealth_bot(chat_id: int, status: str = 'ACTIVE', capital: floa
             capital REAL DEFAULT 50.0,
             leverage INTEGER DEFAULT 10,
             target_tp REAL DEFAULT 10.0,
+            margin_per_coin REAL DEFAULT 0.0,
             active_coins TEXT DEFAULT '[]',
             total_realized_pnl REAL DEFAULT 0.0,
             win_count INTEGER DEFAULT 0,
@@ -5276,16 +5283,21 @@ def set_perpetual_wealth_bot(chat_id: int, status: str = 'ACTIVE', capital: floa
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )''')
+        try:
+            cursor.execute("ALTER TABLE perpetual_wealth_bots ADD COLUMN margin_per_coin REAL DEFAULT 0.0")
+        except Exception:
+            pass
         cursor.execute('''
-            INSERT INTO perpetual_wealth_bots (chat_id, status, capital, leverage, target_tp, updated_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO perpetual_wealth_bots (chat_id, status, capital, leverage, target_tp, margin_per_coin, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(chat_id) DO UPDATE SET
                 status = excluded.status,
                 capital = excluded.capital,
                 leverage = excluded.leverage,
                 target_tp = excluded.target_tp,
+                margin_per_coin = excluded.margin_per_coin,
                 updated_at = CURRENT_TIMESTAMP
-        ''', (chat_id, status, capital, leverage, target_tp))
+        ''', (chat_id, status, capital, leverage, target_tp, margin_per_coin))
         conn.commit()
         conn.close()
         return True
@@ -5305,6 +5317,7 @@ def get_perpetual_wealth_bot(chat_id: int) -> dict:
             capital REAL DEFAULT 50.0,
             leverage INTEGER DEFAULT 10,
             target_tp REAL DEFAULT 10.0,
+            margin_per_coin REAL DEFAULT 0.0,
             active_coins TEXT DEFAULT '[]',
             total_realized_pnl REAL DEFAULT 0.0,
             win_count INTEGER DEFAULT 0,
@@ -5319,7 +5332,7 @@ def get_perpetual_wealth_bot(chat_id: int) -> dict:
         cursor.execute('''
             SELECT chat_id, status, capital, leverage, target_tp, active_coins,
                    total_realized_pnl, win_count, loss_count, cycles_completed,
-                   max_drawdown, peak_pnl, created_at, updated_at
+                   max_drawdown, peak_pnl, created_at, updated_at, margin_per_coin
             FROM perpetual_wealth_bots WHERE chat_id = ?
         ''', (chat_id,))
         row = cursor.fetchone()
@@ -5345,7 +5358,8 @@ def get_perpetual_wealth_bot(chat_id: int) -> dict:
                 "max_drawdown": row[10],
                 "peak_pnl": row[11],
                 "created_at": row[12],
-                "updated_at": row[13]
+                "updated_at": row[13],
+                "margin_per_coin": row[14] if len(row) > 14 and row[14] is not None else 0.0
             }
         return None
     except Exception as e:
@@ -5364,6 +5378,7 @@ def get_active_perpetual_wealth_bots() -> list:
             capital REAL DEFAULT 50.0,
             leverage INTEGER DEFAULT 10,
             target_tp REAL DEFAULT 10.0,
+            margin_per_coin REAL DEFAULT 0.0,
             active_coins TEXT DEFAULT '[]',
             total_realized_pnl REAL DEFAULT 0.0,
             win_count INTEGER DEFAULT 0,
@@ -5378,7 +5393,7 @@ def get_active_perpetual_wealth_bots() -> list:
         cursor.execute('''
             SELECT chat_id, status, capital, leverage, target_tp, active_coins,
                    total_realized_pnl, win_count, loss_count, cycles_completed,
-                   max_drawdown, peak_pnl
+                   max_drawdown, peak_pnl, margin_per_coin
             FROM perpetual_wealth_bots WHERE status = 'ACTIVE'
         ''')
         rows = cursor.fetchall()
@@ -5403,7 +5418,8 @@ def get_active_perpetual_wealth_bots() -> list:
                 "loss_count": r[8],
                 "cycles_completed": r[9],
                 "max_drawdown": r[10],
-                "peak_pnl": r[11]
+                "peak_pnl": r[11],
+                "margin_per_coin": r[12] if len(r) > 12 and r[12] is not None else 0.0
             })
         return bots
     except Exception as e:

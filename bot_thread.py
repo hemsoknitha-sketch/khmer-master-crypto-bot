@@ -16735,6 +16735,10 @@ class TelegramBotThread(BaseThread):
 
                 total_combined_pnl = fut_pnl + spot_pnl
 
+                fut_margin_val = bot_info.get("margin_per_coin", 0.0) if bot_info else 0.0
+                fut_margin_str = f"${fut_margin_val:.2f} USDT" if fut_margin_val > 0 else "Auto ($4.00–$5.50 USDT)"
+                fut_margin_str_en = f"${fut_margin_val:.2f} USDT" if fut_margin_val > 0 else "Auto ($4.00–$5.50 USDT)"
+
                 if user_lang == 'khmer':
                     msg = (
                         "💎 **APEX 24/7 PERPETUAL WEALTH GENERATOR** ⚡\n"
@@ -16749,6 +16753,7 @@ class TelegramBotThread(BaseThread):
                         "⚡ **[2] FUTURES WEALTH ENGINE (High Velocity 10x)**\n"
                         f"• ស្ថានភាព ៖ `{fut_badge}`\n"
                         f"• ទុនកំណត់ ៖ `${bot_info.get('capital', 50.0):.2f} USDT` (10x ISOLATED)\n"
+                        f"• Margin ក្នុង ១ កាក់ ៖ `{fut_margin_str}`\n"
                         f"• កាក់កំពុងច្បាម ៖ `{fut_coins_str}`\n"
                         f"• ចំណេញសុទ្ធកើបបាន ៖ `+${fut_pnl:,.2f} USDT` ({fut_win} ឈ្នះ | {fut_loss} ចាញ់)\n\n"
                         f"🏆 **ប្រាក់ចំណេញសរុបរួម ៖** `+${total_combined_pnl:,.2f} USDT` 💰\n\n"
@@ -16758,12 +16763,15 @@ class TelegramBotThread(BaseThread):
                         "3️⃣ **Golden Moonshot Ratchet ៖** Trailing 50% ដែលនៅសល់ចាក់សោ 85% នៃចំណេញកំពូល!\n"
                         "4️⃣ **24/7 Continuous Rotation ៖** វិលជុំស្វែងរកកាក់ Breakout ថ្មីៗដោយស្វ័យប្រវត្ត!\n\n"
                         "📋 **1-TAP COMMAND PRESETS ៖**\n"
-                        "👉 **បើក Spot ($50) ៖** `` `/wealth SPOT ON 50` ``\n"
-                        "👉 **បើក Spot ($100) ៖** `` `/wealth SPOT ON 100` ``\n"
+                        "👉 **បើក Spot ($50 | $15/កាក់) ៖** `` `/wealth SPOT ON 50` ``\n"
+                        "👉 **បើក Spot ($100 | $25/កាក់) ៖** `` `/wealth SPOT ON 100 25` ``\n"
+                        "👉 **បើក Spot ($200 | $50/កាក់) ៖** `` `/wealth SPOT ON 200 50` ``\n"
                         "👉 **បិទ Spot ៖** `` `/wealth SPOT OFF` ``\n"
-                        "👉 **បើក Futures ($50) ៖** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **បើក Futures ($50 | Auto Margin) ៖** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **បើក Futures ($100 | $15/កាក់) ៖** `` `/wealth FUTURES ON 100 15` ``\n"
+                        "👉 **បើក Futures ($200 | $25/កាក់) ៖** `` `/wealth FUTURES ON 200 25` ``\n"
                         "👉 **បិទ Futures ៖** `` `/wealth FUTURES OFF` ``\n"
-                        "👉 **បើកទាំងអស់ ($50) ៖** `` `/wealth ALL ON 50` ``\n"
+                        "👉 **បើកទាំងអស់ ($100 | $20/កាក់) ៖** `` `/wealth ALL ON 100 20` ``\n"
                         "👉 **បិទទាំងអស់ ៖** `` `/wealth ALL OFF` ``\n"
                         "════════════\n"
                         "💡 _ចុចប៊ូតុងខាងក្រោម ឬ copy command ដើម្បីដំណើរការភ្លាមៗ!_"
@@ -16782,6 +16790,7 @@ class TelegramBotThread(BaseThread):
                         "⚡ **[2] FUTURES WEALTH ENGINE (High Velocity 10x)**\n"
                         f"• Status: `{fut_badge_en}`\n"
                         f"• Capital: `${bot_info.get('capital', 50.0):.2f} USDT` (10x ISOLATED)\n"
+                        f"• Margin / Coin: `{fut_margin_str_en}`\n"
                         f"• Active Coins: `{fut_coins_str_en}`\n"
                         f"• Net Realized: `+${fut_pnl:,.2f} USDT` ({fut_win} W | {fut_loss} L)\n\n"
                         f"🏆 **Total Combined Realized PnL:** `+${total_combined_pnl:,.2f} USDT` 💰\n\n"
@@ -16791,12 +16800,15 @@ class TelegramBotThread(BaseThread):
                         "3️⃣ **Golden Moonshot Ratchet:** 50% balance trails price with 85% peak profit locked.\n"
                         "4️⃣ **24/7 Continuous Rotation:** Seamlessly cycles capital into new Sweet-Spot breakouts!\n\n"
                         "📋 **1-TAP COMMAND PRESETS:**\n"
-                        "👉 **Start Spot ($50):** `` `/wealth SPOT ON 50` ``\n"
-                        "👉 **Start Spot ($100):** `` `/wealth SPOT ON 100` ``\n"
+                        "👉 **Start Spot ($50 | $15/coin):** `` `/wealth SPOT ON 50` ``\n"
+                        "👉 **Start Spot ($100 | $25/coin):** `` `/wealth SPOT ON 100 25` ``\n"
+                        "👉 **Start Spot ($200 | $50/coin):** `` `/wealth SPOT ON 200 50` ``\n"
                         "👉 **Stop Spot:** `` `/wealth SPOT OFF` ``\n"
-                        "👉 **Start Futures ($50):** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **Start Futures ($50 | Auto Margin):** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **Start Futures ($100 | $15/coin):** `` `/wealth FUTURES ON 100 15` ``\n"
+                        "👉 **Start Futures ($200 | $25/coin):** `` `/wealth FUTURES ON 200 25` ``\n"
                         "👉 **Stop Futures:** `` `/wealth FUTURES OFF` ``\n"
-                        "👉 **Start All ($50):** `` `/wealth ALL ON 50` ``\n"
+                        "👉 **Start All ($100 | $20/coin):** `` `/wealth ALL ON 100 20` ``\n"
                         "👉 **Stop All:** `` `/wealth ALL OFF` ``\n"
                         "════════════\n"
                         "💡 _Tap the buttons below or copy commands to execute instantly!_"
@@ -16806,15 +16818,49 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
+            def _parse_wealth_params(param_args, default_cap=50.0, is_spot=False):
+                """Intelligently parses [capital, custom_amt_or_pin, pin] ensuring seamless UX."""
+                cap = default_cap
+                custom_amt = 0.0
+                pin = ""
+                user_pin = db.get_user_pin(chat_id)
+                import security
+
+                if len(param_args) >= 1:
+                    if str(param_args[0]).replace('.', '', 1).isdigit():
+                        cap = float(param_args[0])
+
+                if len(param_args) == 2:
+                    p1 = str(param_args[1]).strip()
+                    if user_pin and security.verify_pin(p1, chat_id, user_pin):
+                        pin = p1
+                    elif p1.replace('.', '', 1).isdigit():
+                        custom_amt = float(p1)
+                    else:
+                        pin = p1
+                elif len(param_args) >= 3:
+                    p1 = str(param_args[1]).strip()
+                    p2 = str(param_args[2]).strip()
+                    if p1.replace('.', '', 1).isdigit():
+                        custom_amt = float(p1)
+                    pin = p2
+
+                if is_spot:
+                    if custom_amt > 0.0:
+                        alloc = max(10.50, round(custom_amt, 2))
+                    else:
+                        alloc = max(10.50, round(cap * 0.30, 2))
+                    return cap, alloc, pin
+                else:
+                    return cap, custom_amt, pin
+
             subcmd = str(args[0]).upper().strip()
 
             # --- 1. SPOT SUITE ---
             if subcmd == "SPOT":
                 action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
                 if action in ["ON", "START", "RUN"]:
-                    cap_arg = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 50.0
-                    pin_arg = str(args[3]).strip() if len(args) > 3 else ""
-                    alloc_arg = max(10.50, round(cap_arg * 0.30, 2))
+                    cap_arg, alloc_arg, pin_arg = _parse_wealth_params(args[2:], default_cap=50.0, is_spot=True)
 
                     res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_spot_bot(
                         chat_id=chat_id,
@@ -16849,7 +16895,7 @@ class TelegramBotThread(BaseThread):
                         "💎 _Engine is actively scanning for Spot Sweet-Spot breakouts and harvesting 24/7!_"
                     )
                     await update.effective_message.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
-                    self.log_signal.emit(f"🟢 User {chat_id} started 24/7 Spot Wealth Generator with ${cap_arg:.2f} USDT.")
+                    self.log_signal.emit(f"🟢 User {chat_id} started 24/7 Spot Wealth Generator with ${cap_arg:.2f} USDT (${alloc_arg:.2f}/coin).")
 
                 elif action in ["OFF", "STOP"]:
                     pin_arg = str(args[2]).strip() if len(args) > 2 else ""
@@ -16876,26 +16922,27 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(stop_msg, parse_mode="Markdown", reply_markup=keyboard)
                     self.log_signal.emit(f"🛑 User {chat_id} stopped 24/7 Spot Wealth Generator.")
                 else:
-                    await update.effective_message.reply_text("⚠️ Usage: `/wealth SPOT ON 50` or `/wealth SPOT OFF`", parse_mode="Markdown")
+                    await update.effective_message.reply_text("⚠️ Usage: `/wealth SPOT ON 100 25` or `/wealth SPOT OFF`", parse_mode="Markdown")
 
             # --- 2. FUTURES SUITE ---
             elif subcmd == "FUTURES":
                 action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
                 if action in ["ON", "START", "RUN"]:
-                    cap_arg = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 50.0
-                    pin_arg = str(args[3]).strip() if len(args) > 3 else ""
+                    cap_arg, margin_arg, pin_arg = _parse_wealth_params(args[2:], default_cap=50.0, is_spot=False)
                     res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_bot(
-                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, pin=pin_arg
+                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, margin_per_coin=margin_arg, pin=pin_arg
                     )
                     if res.get("status") == "error":
                         await update.effective_message.reply_text(res.get("message", "❌ Error starting futures bot!"), parse_mode="Markdown")
                         return
 
+                    m_disp = f"${res['margin_per_coin']:.2f} USDT" if res.get('margin_per_coin', 0.0) > 0 else "Auto ($4.00–$5.50 USDT)"
                     succ_msg = (
                         "⚡ **24/7 FUTURES WEALTH GENERATOR ACTIVATED!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"💰 **ទុនកំណត់ (Capital) ៖** `${res['capital']:.2f} USDT`\n"
                         f"⚡ **Leverage សុវត្ថិភាព ៖** `{res['leverage']}x (ISOLATED Mode)`\n"
+                        f"🪙 **Margin ក្នុង ១ កាក់ ៖** `{m_disp}`\n"
                         f"💵 **សមតុល្យ Futures Available ៖** `${res['available_usdt']:.2f} USDT`\n"
                         f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -16905,13 +16952,14 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"💰 **Allocated Capital:** `${res['capital']:.2f} USDT`\n"
                         f"⚡ **Safety Leverage:** `{res['leverage']}x (ISOLATED Mode)`\n"
+                        f"🪙 **Margin per Coin:** `{m_disp}`\n"
                         f"💵 **Futures Available Balance:** `${res['available_usdt']:.2f} USDT`\n"
                         f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "💎 _Engine is actively scanning for Golden Sweet-Spot breakouts (+3% to +12%) and harvesting 24/7!_"
                     )
                     await update.effective_message.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
-                    self.log_signal.emit(f"⚡ User {chat_id} started 24/7 Futures Wealth Generator with ${cap_arg:.2f} USDT.")
+                    self.log_signal.emit(f"⚡ User {chat_id} started 24/7 Futures Wealth Generator with ${cap_arg:.2f} USDT ({m_disp}/coin).")
 
                 elif action in ["OFF", "STOP"]:
                     pin_arg = str(args[2]).strip() if len(args) > 2 else ""
@@ -16938,36 +16986,37 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(stop_msg, parse_mode="Markdown", reply_markup=keyboard)
                     self.log_signal.emit(f"🛑 User {chat_id} stopped 24/7 Futures Wealth Generator.")
                 else:
-                    await update.effective_message.reply_text("⚠️ Usage: `/wealth FUTURES ON 50` or `/wealth FUTURES OFF`", parse_mode="Markdown")
+                    await update.effective_message.reply_text("⚠️ Usage: `/wealth FUTURES ON 100 15` or `/wealth FUTURES OFF`", parse_mode="Markdown")
 
             # --- 3. ALL SUITE (Simultaneous Dual-Engine Execution) ---
             elif subcmd == "ALL":
                 action = str(args[1]).upper().strip() if len(args) > 1 else "ON"
                 if action in ["ON", "START"]:
-                    cap_arg = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 50.0
-                    pin_arg = str(args[3]).strip() if len(args) > 3 else ""
-                    alloc_spot = max(10.50, round(cap_arg * 0.30, 2))
+                    cap_arg, custom_amt, pin_arg = _parse_wealth_params(args[2:], default_cap=50.0, is_spot=False)
+                    alloc_spot = max(10.50, round(custom_amt, 2)) if custom_amt > 0 else max(10.50, round(cap_arg * 0.30, 2))
+                    margin_fut = custom_amt
 
                     res_fut = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_bot(
-                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, pin=pin_arg
+                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, margin_per_coin=margin_fut, pin=pin_arg
                     )
                     res_spot = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_spot_bot(
                         chat_id=chat_id, capital=cap_arg, allocation_per_coin=alloc_spot, target_tp=6.0, pin=pin_arg
                     )
 
+                    m_disp = f"${margin_fut:.2f} USDT" if margin_fut > 0 else "Auto ($4–$5.50)"
                     all_msg = (
                         "🚀 **24/7 DUAL-ENGINE WEALTH GENERATOR ACTIVATED!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        "🟢 **Spot 1x ៖** `ដំណើរការជោគជ័យ (0% Liquidation Risk)`\n"
-                        "⚡ **Futures 10x ៖** `ដំណើរការជោគជ័យ (ISOLATED Margin)`\n"
+                        f"🟢 **Spot 1x ៖** `Active (0% Liquidation) | ${alloc_spot:.2f}/កាក់`\n"
+                        f"⚡ **Futures 10x ៖** `Active (ISOLATED) | {m_disp}/កាក់`\n"
                         f"💰 **ទុនកំណត់រៀងៗខ្លួន ៖** `${cap_arg:.2f} USDT`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "💎 _ម៉ាស៊ីនទាំងពីរដំណើរការដំណាលគ្នាដោយបែងចែកកាបូបដាច់ពីគ្នា ១០០%!_"
                     ) if user_lang == 'khmer' else (
                         "🚀 **24/7 DUAL-ENGINE WEALTH GENERATOR ACTIVATED!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        "🟢 **Spot 1x:** `Active & Hunting (0% Liquidation Risk)`\n"
-                        "⚡ **Futures 10x:** `Active & Scalping (ISOLATED Margin)`\n"
+                        f"🟢 **Spot 1x:** `Active (0% Liquidation) | ${alloc_spot:.2f}/coin`\n"
+                        f"⚡ **Futures 10x:** `Active (ISOLATED) | {m_disp}/coin`\n"
                         f"💰 **Allocated per Engine:** `${cap_arg:.2f} USDT`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "💎 _Both engines running simultaneously with 100% wallet isolation!_"
@@ -16998,25 +17047,27 @@ class TelegramBotThread(BaseThread):
 
             # --- 4. BACKWARDS COMPATIBILITY (Defaults to Futures) ---
             elif subcmd in ["ON", "START", "RUN"]:
-                cap_arg = float(args[1]) if len(args) > 1 and args[1].replace('.', '', 1).isdigit() else 50.0
-                pin_arg = str(args[2]).strip() if len(args) > 2 else ""
+                cap_arg, margin_arg, pin_arg = _parse_wealth_params(args[1:], default_cap=50.0, is_spot=False)
 
                 res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_bot(
                     chat_id=chat_id,
                     capital=cap_arg,
                     leverage=10,
                     target_tp=10.0,
+                    margin_per_coin=margin_arg,
                     pin=pin_arg
                 )
                 if res.get("status") == "error":
                     await update.effective_message.reply_text(res.get("message", "❌ Error starting bot!"), parse_mode="Markdown")
                     return
 
+                m_disp = f"${res['margin_per_coin']:.2f} USDT" if res.get('margin_per_coin', 0.0) > 0 else "Auto ($4.00–$5.50 USDT)"
                 succ_msg = (
                     "🚀 **24/7 PERPETUAL WEALTH GENERATOR ACTIVATED!** 🟢\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💰 **ទុនកំណត់ (Capital) ៖** `${res['capital']:.2f} USDT`\n"
                     f"⚡ **Leverage សុវត្ថិភាព ៖** `{res['leverage']}x (ISOLATED Mode)`\n"
+                    f"🪙 **Margin ក្នុង ១ កាក់ ៖** `{m_disp}`\n"
                     f"💵 **សមតុល្យ Futures Available ៖** `${res['available_usdt']:.2f} USDT`\n"
                     f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -17026,13 +17077,14 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💰 **Allocated Capital:** `${res['capital']:.2f} USDT`\n"
                     f"⚡ **Safety Leverage:** `{res['leverage']}x (ISOLATED Mode)`\n"
+                    f"🪙 **Margin per Coin:** `{m_disp}`\n"
                     f"💵 **Futures Available Balance:** `${res['available_usdt']:.2f} USDT`\n"
                     f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     "💎 _Engine is actively scanning for Golden Sweet-Spot breakouts (+3% to +12%) and harvesting 24/7!_"
                 )
                 await update.effective_message.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
-                self.log_signal.emit(f"🚀 User {chat_id} started 24/7 Perpetual Wealth Generator with ${cap_arg:.2f} USDT.")
+                self.log_signal.emit(f"🚀 User {chat_id} started 24/7 Perpetual Wealth Generator with ${cap_arg:.2f} USDT ({m_disp}/coin).")
 
             elif subcmd in ["OFF", "STOP"]:
                 pin_arg = str(args[1]).strip() if len(args) > 1 else ""
