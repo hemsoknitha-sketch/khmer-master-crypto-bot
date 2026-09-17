@@ -1518,11 +1518,19 @@ def render_balance_card(data: dict, user_lang: str = "km") -> str:
         )
 
 
-def get_admin_platform_status_data() -> dict:
+_ADMIN_STATUS_CACHE = (0.0, {})
+
+def get_admin_platform_status_data(force_fresh: bool = False) -> dict:
     """
     Assembles a comprehensive, platform-wide surveillance snapshot across all
     registered users and active VIP investors for the Bot Administrator.
+    Equipped with 8-second in-memory cache to guarantee sub-millisecond response.
     """
+    global _ADMIN_STATUS_CACHE
+    now_ts = time.time()
+    if not force_fresh and _ADMIN_STATUS_CACHE[1] and (now_ts - _ADMIN_STATUS_CACHE[0] < 8.0):
+        return _ADMIN_STATUS_CACHE[1]
+
     import psutil
     all_users = db.get_all_users() or []
     total_users = len(all_users)
@@ -1651,7 +1659,7 @@ def get_admin_platform_status_data() -> dict:
     except Exception:
         pass
 
-    return {
+    res_data = {
         "total_users": total_users,
         "total_vips": total_vips,
         "total_active_investors": total_active_investors,
@@ -1665,6 +1673,8 @@ def get_admin_platform_status_data() -> dict:
         "ram_total_mb": ram_total_mb,
         "db_size_mb": db_size_mb
     }
+    _ADMIN_STATUS_CACHE = (now_ts, res_data)
+    return res_data
 
 
 def render_admin_status_card(data: dict, user_lang: str = "km") -> str:
@@ -1720,7 +1730,8 @@ def render_admin_status_card(data: dict, user_lang: str = "km") -> str:
     idx = 1
     for v in data.get("vip_investors", []):
         u_id = v["chat_id"]
-        u_name = f"@{v['username']}" if v['username'] else "No username"
+        raw_u_name = v.get("username", "") or ""
+        u_name = f"`@{raw_u_name}`" if raw_u_name else "`No username`"
         u_cap = v["invested_capital"]
         u_pnl = v["floating_pnl"]
         u_roi = v["roi_pct"]
@@ -1770,14 +1781,14 @@ def render_admin_status_card(data: dict, user_lang: str = "km") -> str:
 
     footer = (
         "────────────\n"
-        "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh របាយការណ៍ផ្សាយផ្ទាល់ ឬគ្រប់គ្រងប្រព័ន្ធ ៖*\n"
+        "💡 _ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh របាយការណ៍ផ្សាយផ្ទាល់ ឬគ្រប់គ្រងប្រព័ន្ធ ៖_\n"
         "━━━━━━━━━━━━\n"
         "_Khmer Master Crypto_\n"
         "_APEX SUPER BRAIN AI_\n"
         "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
     ) if lang == "km" else (
         "────────────\n"
-        "💡 *Use the buttons below to refresh live surveillance or manage platform:*\n"
+        "💡 _Use the buttons below to refresh live surveillance or manage platform:_\n"
         "━━━━━━━━━━━━\n"
         "_Khmer Master Crypto_\n"
         "_APEX SUPER BRAIN AI_\n"

@@ -16085,6 +16085,10 @@ class TelegramBotThread(BaseThread):
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
+            target_msg = update.effective_message or (update.callback_query.message if update.callback_query else None)
+            if not target_msg:
+                return
+
             is_admin_user = (chat_id == 859271875 or db.is_admin(chat_id))
             if is_admin_user:
                 if update.callback_query:
@@ -16097,30 +16101,42 @@ class TelegramBotThread(BaseThread):
                         await context.bot.send_chat_action(chat_id=chat_id, action="typing")
                     except Exception:
                         pass
-                import portfolio_engine
-                admin_data = await asyncio.to_thread(portfolio_engine.get_admin_platform_status_data)
-                admin_card = portfolio_engine.render_admin_status_card(admin_data, user_lang=user_lang)
 
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                admin_kb = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🔄 Refresh Surveillance", callback_data="btn_admin_status_refresh"),
-                        InlineKeyboardButton("👥 VIP Users", callback_data="btn_admin_users_refresh")
-                    ],
-                    [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
-                    ]
-                ])
+                try:
+                    import portfolio_engine
+                    admin_data = await asyncio.to_thread(portfolio_engine.get_admin_platform_status_data)
+                    admin_card = portfolio_engine.render_admin_status_card(admin_data, user_lang=user_lang)
 
-                if len(admin_card) > 4000:
-                    chunks = [admin_card[i:i+3900] for i in range(0, len(admin_card), 3900)]
-                    for idx, chunk in enumerate(chunks):
-                        kb = admin_kb if idx == len(chunks) - 1 else None
-                        await (update.effective_message or update.message).reply_text(chunk, parse_mode="Markdown", reply_markup=kb)
-                else:
-                    await (update.effective_message or update.message).reply_text(admin_card, parse_mode="Markdown", reply_markup=admin_kb)
-                return
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    admin_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔄 Refresh Surveillance", callback_data="btn_admin_status_refresh"),
+                            InlineKeyboardButton("👥 VIP Users", callback_data="btn_admin_users_refresh")
+                        ],
+                        [
+                            InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                        ]
+                    ])
+
+                    if len(admin_card) > 4000:
+                        chunks = [admin_card[i:i+3900] for i in range(0, len(admin_card), 3900)]
+                        for idx, chunk in enumerate(chunks):
+                            kb = admin_kb if idx == len(chunks) - 1 else None
+                            try:
+                                await target_msg.reply_text(chunk, parse_mode="Markdown", reply_markup=kb)
+                            except Exception:
+                                clean_chunk = chunk.replace('*', '').replace('`', '').replace('_', '')
+                                await target_msg.reply_text(clean_chunk, reply_markup=kb)
+                    else:
+                        try:
+                            await target_msg.reply_text(admin_card, parse_mode="Markdown", reply_markup=admin_kb)
+                        except Exception:
+                            clean_card = admin_card.replace('*', '').replace('`', '').replace('_', '')
+                            await target_msg.reply_text(clean_card, reply_markup=admin_kb)
+                    return
+                except Exception as admin_err:
+                    print(f"⚠️ [ADMIN STATUS ERROR] {admin_err}")
 
             try:
                 import psutil
@@ -16358,8 +16374,12 @@ class TelegramBotThread(BaseThread):
                     f"{inactive_str}\n\n"
                     "💡 _ចុចលើពាក្យបញ្ជាខាងលើតែម្តងដើម្បី Copy ចូល Telegram ភ្លាមៗ!_"
                 )
-            await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+            try:
+                await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception:
+                clean_msg = msg.replace('*', '').replace('`', '').replace('_', '')
+                await target_msg.reply_text(clean_msg, reply_markup=keyboard)
+            await delete_sensitive_message(context, chat_id, (target_msg.message_id if target_msg else None), user_lang)
             return
 
         self.app.add_handler(CommandHandler("menu", menu_command))
