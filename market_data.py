@@ -231,6 +231,89 @@ def get_symbol_atr(symbol: str, interval: str = "15m", window: int = 14) -> dict
 
     return default_res
 
+_dna_cache = {}
+_dna_cache_time = {}
+
+def profile_asset_dna(symbol: str, interval: str = "15m", window: int = 14) -> dict:
+    """
+    🧬 Super Smart Asset-Specific Volatility Profiler (Asset DNA):
+    Classifies coin market behavior into institutional risk & volatility tiers:
+    - Tier 1 (Macro Anchors): BTC, ETH, PAXG, XAUT (or atr_pct <= 1.3%) -> 1.8x ATR
+    - Tier 2 (High-Beta Momentum): SOL, SUI, AVAX, NEAR, BNB, LINK, TON, APT, etc. (1.3% < atr_pct <= 2.8%) -> 2.0x ATR
+    - Tier 3 (Ultra-High Volatility / Meme): PEPE, DOGE, SHIB, WIF, BONK, FLOKI, 1000PEPE, FET, NEIRO, etc. (atr_pct > 2.8%) -> 2.5x ATR
+    - Tier 4 (Physical Gold Safe-Haven): PAXG, XAUT (Low noise, 0% liquidation) -> 1.5x ATR
+
+    Calculates:
+    - Dynamic ATR Volatility Cushion (sl_atr_mult)
+    - Noise-immune Stop Loss Distance (noise_cushion_pct)
+    - Volatility-adjusted margin sizing to clamp risk to $1R <= $0.25 USD
+    """
+    sym = str(symbol).upper().strip()
+    cache_key = f"{sym}_{interval}_{window}"
+    now = time.time()
+    if cache_key in _dna_cache and (now - _dna_cache_time.get(cache_key, 0)) < 15.0:
+        return _dna_cache[cache_key]
+
+    atr_data = get_symbol_atr(sym, interval=interval, window=window)
+    atr_pct = float(atr_data.get("atr_pct", 1.5))
+    atr_val = float(atr_data.get("atr_val", 0.0))
+    curr_price = float(atr_data.get("current_price", 0.0))
+
+    # Known asset personality mappings
+    tier1_symbols = {"BTCUSDT", "ETHUSDT", "BTC", "ETH"}
+    tier4_gold = {"PAXGUSDT", "XAUTUSDT", "PAXG", "XAUT"}
+    tier3_memes = {
+        "1000PEPEUSDT", "PEPEUSDT", "DOGEUSDT", "SHIBUSDT", "1000SHIBUSDT",
+        "WIFUSDT", "BONKUSDT", "1000BONKUSDT", "FLOKIUSDT", "1000FLOKIUSDT",
+        "NEIROUSDT", "1000LUNCUSDT", "MEMEUSDT", "BOMEUSDT", "FETUSDT",
+        "PEPE", "DOGE", "SHIB", "WIF", "BONK", "FLOKI", "ACTUSDT", "PNUTUSDT"
+    }
+
+    if sym in tier4_gold:
+        tier_name = "TIER_4_GOLD"
+        sl_atr_mult = 1.5
+        noise_cushion_pct = max(0.8, atr_pct * 1.2)
+        max_lev = 20
+        margin_scale = 1.0
+        tier_desc = "Physical Gold Safe-Haven (Low Noise, Zero Liquidation)"
+    elif sym in tier1_symbols or atr_pct <= 1.3:
+        tier_name = "TIER_1_MACRO"
+        sl_atr_mult = 1.8
+        noise_cushion_pct = max(1.2, atr_pct * 1.5)
+        max_lev = 20
+        margin_scale = 1.0
+        tier_desc = "Macro Anchor (Smooth Trend, Low Noise)"
+    elif sym in tier3_memes or atr_pct > 2.8:
+        tier_name = "TIER_3_VOLATILE_MEME"
+        sl_atr_mult = 2.5
+        noise_cushion_pct = max(2.5, atr_pct * 2.2)
+        max_lev = 8
+        margin_scale = 0.60  # Scale down margin so dollar risk 1R remains <= $0.25
+        tier_desc = "Ultra-High Volatility / Meme (Wide Noise Wicks, 2.5x ATR Cushion)"
+    else:
+        tier_name = "TIER_2_MOMENTUM"
+        sl_atr_mult = 2.0
+        noise_cushion_pct = max(1.8, atr_pct * 1.8)
+        max_lev = 12
+        margin_scale = 0.85
+        tier_desc = "High-Beta Momentum (Active Wave Momentum, 2.0x ATR Cushion)"
+
+    res = {
+        "symbol": sym,
+        "atr_val": atr_val,
+        "atr_pct": atr_pct,
+        "current_price": curr_price,
+        "tier": tier_name,
+        "tier_desc": tier_desc,
+        "sl_atr_mult": sl_atr_mult,
+        "noise_cushion_pct": round(noise_cushion_pct, 2),
+        "max_recommended_lev": max_lev,
+        "margin_scale_factor": margin_scale
+    }
+    _dna_cache[cache_key] = res
+    _dna_cache_time[cache_key] = now
+    return res
+
 
 def generate_chart(df: pd.DataFrame, symbol: str, filepath: str = "chart.png"):
     """

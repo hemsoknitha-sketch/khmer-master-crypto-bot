@@ -596,11 +596,15 @@ async def monitor_macro_auto_trades(app):
                     is_stop_loss = True
                     reason_tag = "MACRO_BREAKEVEN_ARMOR_PROTECT (+3.5% Net Floor)"
             else:
-                # 🛡️ Asymmetric 5X Risk-to-Reward (R:R >= 1:5.0) Clamped 1R Micro Stop Loss:
-                # Initial risk is tightly capped at -1.8% ROI / -$0.25 floor before invalidation
-                if roi_pct <= -1.8 or effective_pnl <= -max(0.25, amount * 0.025):
+                # 🧬 Asset-Specific Volatility Profiling & Dynamic ATR Volatility Cushion:
+                # Adapts stop distance to asset tier (1.8x - 2.5x ATR) to avoid noise stop-outs while capping dollar risk <= $0.25 USD
+                dna_prof = market_data.profile_asset_dna(symbol)
+                sl_mult = dna_prof.get("sl_atr_mult", 2.0)
+                curr_atr_pct = float(dna_prof.get("atr_pct", 1.5))
+                macro_sl_roi = -min(2.5, max(1.5, curr_atr_pct * sl_mult * 0.45 * 3.0)) # 3x-5x macro leverage
+                if roi_pct <= macro_sl_roi or effective_pnl <= -max(0.25, amount * 0.025):
                     is_stop_loss = True
-                    reason_tag = "MACRO_ASYMMETRIC_STOP_LOSS (-1.8% ROI / 1R)"
+                    reason_tag = f"MACRO_ASYMMETRIC_STOP_LOSS ({macro_sl_roi:.1f}% ROI / 1R)"
 
             # 🏆 THE GOLDEN PROFIT RATCHET (Strict Invariant 24 & 5X Asymmetric Standard):
             # Universal Golden 85% Ratchet: Once peak profit reaches >= $0.50 or effective_peak >= 5.0% ROI,

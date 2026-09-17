@@ -1791,13 +1791,21 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         if is_breakeven_armed:
             is_stop_loss_hit = (net_pnl_usdt <= min_guaranteed_pnl or roi_pct <= min_guaranteed_roi)
         else:
-            # 🛡️ Asymmetric 5X Risk-to-Reward (R:R >= 1:5.0) Clamped 1R Micro Stop Loss:
-            # Initial risk is tightly capped at max 1.5% - 1.8% ROI / -$0.20 to -$0.25 USD
-            sl_roi_thresh = -min(1.8, max(1.5, curr_atr_pct * 0.5 * float(active_lev)))
+            # 🧬 Super Smart Asset-Specific Volatility Profiling & Dynamic ATR Volatility Cushion:
+            # - Tier 1 (Macro: BTC, ETH): 1.8x ATR (tight noise band)
+            # - Tier 2 (Momentum: SOL, SUI): 2.0x ATR
+            # - Tier 3 (Meme: PEPE, DOGE, WIF): 2.5x ATR (wide noise cushion to prevent premature wick stop-outs)
+            dna_profile = market_data.profile_asset_dna(symbol)
+            sl_mult = dna_profile.get("sl_atr_mult", 2.0)
+            cushion_pct = dna_profile.get("noise_cushion_pct", 1.8)
+            
+            # Dynamic Volatility-Adaptive Stop Loss ROI:
+            # Clamped between 1.5% and 2.5% ROI according to coin ATR, keeping 1R <= $0.25 USD!
+            sl_roi_thresh = -min(2.5, max(1.5, curr_atr_pct * sl_mult * 0.45 * float(active_lev)))
             sl_dollar_thresh = -max(0.20, bot_amt * 0.02)
             is_stop_loss_hit = (
                 (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
-                (is_spot and (net_pnl_usdt <= -max(0.15, bot_amt * 0.012) or roi_pct <= -1.2))
+                (is_spot and (net_pnl_usdt <= -max(0.15, bot_amt * 0.012) or roi_pct <= -max(1.2, cushion_pct * 0.75)))
             )
         # Hard Circuit Breaker: Absolute emergency safety ceiling at -3.5% ROI or -$0.35 USD
         is_hard_circuit_breaker = (
