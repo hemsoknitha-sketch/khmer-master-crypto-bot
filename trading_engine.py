@@ -2903,6 +2903,18 @@ def place_spot_order(
             effective_usdt = quantity * current_p
         effective_usdt = max(10.50, effective_usdt)
 
+        # Invariant 10: Multi-Wallet Balance Segregation
+        # Pre-flight verify Spot USDT balance to prevent -2010 Insufficient Balance error
+        spot_usdt_bal = get_spot_balance(api_key, api_secret, "USDT")
+        if spot_usdt_bal < effective_usdt:
+            print(f"🛡️ [SPOT BALANCE SHIELD] {symbol} Spot Buy skipped: Available Spot USDT (${spot_usdt_bal:.2f}) < Required (${effective_usdt:.2f}). Please transfer USDT to Spot Wallet.")
+            return {
+                "status": "error",
+                "code": -2010,
+                "msg": f"Account has insufficient Spot balance (${spot_usdt_bal:.2f} < ${effective_usdt:.2f}). Please transfer USDT to Spot Wallet.",
+                "error": "Account has insufficient balance for requested action."
+            }
+
         if order_type == "MARKET":
             params["quoteOrderQty"] = f"{effective_usdt:.2f}"
         else:

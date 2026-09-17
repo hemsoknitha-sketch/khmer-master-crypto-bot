@@ -4891,6 +4891,10 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                     order_success = False
                     if stage == "SPOT_BUY_SCOUT":
                         # Stage 1: Spot Buy Scout (Safe early price discovery, zero liquidation risk)
+                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
+                        if spot_bal < max(10.50, invest_amount):
+                            print(f"🛡️ [PRE-PUMP SPOT SCOUT SKIPPED] {symbol}: Available Spot USDT (${spot_bal:.2f}) < Required (${max(10.50, invest_amount):.2f}) for Chat ID {chat_id}.")
+                            continue
                         order = await asyncio.to_thread(trading_engine.place_spot_order, api_key, api_secret, symbol, "BUY", qty)
                         if "error" not in order and "code" not in order:
                             order_success = True
