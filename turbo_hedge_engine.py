@@ -463,8 +463,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
             # 2b. Macro 15m & 1h Trend Confluence (EMA 50 Multi-Timeframe Lock)
             closes_15m = [float(c[4]) for c in candles_15m] if candles_15m else []
+            highs_15m = [float(c[2]) for c in candles_15m] if candles_15m else []
+            lows_15m = [float(c[3]) for c in candles_15m] if candles_15m else []
             closes_1h = [float(c[4]) for c in candles_1h] if candles_1h else []
 
+            ema20_15m = calculate_series_ema(closes_15m, period=20) if closes_15m else 0.0
             ema50_15m = calculate_series_ema(closes_15m, period=50) if closes_15m else 0.0
             ema50_1h = calculate_series_ema(closes_1h, period=50) if closes_1h else 0.0
 
@@ -485,21 +488,27 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             vol_ratio = (vol_recent / max(1.0, vol_prev))
             price_change_1m = ((closes_1m[-1] - closes_1m[-2]) / closes_1m[-2]) * 100.0 if len(closes_1m) >= 2 else 0.0
 
-            # 4. RSI 14 (Relative Strength Index) Calculation on 1m
-            gains, losses = [], []
-            for i in range(1, len(closes_1m)):
-                diff = closes_1m[i] - closes_1m[i-1]
+            # 4. 🧠 True 15m RSI (Relative Strength Index) Calculation (Eliminates 1m Micro Noise Traps)
+            closes_for_rsi = closes_15m if len(closes_15m) >= 15 else closes_5m
+            gains_15m, losses_15m = [], []
+            for i in range(1, len(closes_for_rsi)):
+                diff = closes_for_rsi[i] - closes_for_rsi[i-1]
                 if diff >= 0:
-                    gains.append(diff)
-                    losses.append(0.0)
+                    gains_15m.append(diff)
+                    losses_15m.append(0.0)
                 else:
-                    gains.append(0.0)
-                    losses.append(abs(diff))
+                    gains_15m.append(0.0)
+                    losses_15m.append(abs(diff))
 
-            avg_gain = sum(gains[-14:]) / 14.0 if len(gains) >= 14 else 0.001
-            avg_loss = sum(losses[-14:]) / 14.0 if len(losses) >= 14 else 0.001
-            rs = avg_gain / max(0.00001, avg_loss)
-            rsi14 = 100.0 - (100.0 / (1.0 + rs))
+            avg_gain_15m = sum(gains_15m[-14:]) / 14.0 if len(gains_15m) >= 14 else 0.001
+            avg_loss_15m = sum(losses_15m[-14:]) / 14.0 if len(losses_15m) >= 14 else 0.001
+            rs_15m = avg_gain_15m / max(0.00001, avg_loss_15m)
+            rsi14_15m = 100.0 - (100.0 / (1.0 + rs_15m))
+
+            # 5. 🌊 15m ADX Trend Strength Filter (Eliminates 100% Choppy Sideways Consolidations)
+            adx_15m, plus_di, minus_di = 25.0, 0.0, 0.0
+            if len(closes_15m) >= 28 and len(highs_15m) >= 28 and len(lows_15m) >= 28:
+                adx_15m, plus_di, minus_di = market_data.calculate_adx_and_dmi(highs_15m, lows_15m, closes_15m, period=14)
 
             # Fetch 24h Price Change %, Funding Rate, and Orderbook Depth
             change_24h = 0.0
@@ -541,6 +550,19 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             except Exception:
                 pass
 
+            # 🛡️ BTC Macro Lead Impulse Check (Universal for Spot & Futures):
+            btc_dumping = False
+            btc_surging = False
+            try:
+                import btc_lead_guard
+                btc_st = btc_lead_guard.get_btc_impulse_status()
+                if btc_st.get("status") == "DUMPING":
+                    btc_dumping = True
+                elif btc_st.get("status") == "SURGING":
+                    btc_surging = True
+            except Exception:
+                pass
+
             # 🧠 5. APEX 6-TIER SUPER SMART SPOT TRADING ENGINE (100% Bag-Holding & Peak FOMO Shield):
             if is_spot_mode:
                 # 🛡️ STRICT 20% EXCLUSION SHIELD (+20% Peak & -20% Falling Knife Guard)
@@ -550,36 +572,26 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
 
                 # 🛡️ 15M/1H MACRO TREND CONFLUENCE GUARD (100% True Macro Uptrend Lock)
                 if not is_macro_uptrend:
-                    _log_spot_rejection(symbol, f"🛡️ [SPOT 15M/1H TREND GUARD] {symbol}: Rejected! 15m > EMA50: {is_15m_uptrend} ({p_15m:.4f} vs {ema50_15m:.4f}), 1h > EMA50: {is_1h_uptrend} ({p_1h:.4f} vs {ema50_1h:.4f}). Not in True Macro Uptrend!")
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT 15M/1H TREND GUARD] {symbol}: Rejected! 15m > EMA50: {is_15m_uptrend}, 1h > EMA50: {is_1h_uptrend}. Not in True Macro Uptrend!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "MACRO_TREND_NOT_UPTREND"}
 
-                # Tier 1: BTC Lead Impulse Guard
-                try:
-                    import btc_lead_guard
-                    btc_st = btc_lead_guard.get_btc_impulse_status()
-                    if btc_st.get("status") == "DUMPING":
-                        print(f"🛡️ [SPOT TIER 1 BTC GUARD] {symbol}: Skipped Spot buy (BTC is DUMPING)!")
-                        return {"side": "SKIP", "confidence_pct": 50.0, "reason": "BTC_DUMPING"}
-                except Exception:
-                    pass
+                if btc_dumping:
+                    print(f"🛡️ [SPOT TIER 1 BTC GUARD] {symbol}: Skipped Spot buy (BTC is DUMPING)!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "BTC_DUMPING"}
 
-                # Strict RSI Sweet-Spot: strictly 48.0 <= rsi14 <= 65.0
-                # Overbought (RSI > 65.0) -> Rejection to eliminate buying at the peak!
-                # Under-momentum (RSI < 48.0) -> Rejection
-                if rsi14 > 65.0:
-                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 OVERBOUGHT SHIELD] {symbol}: RSI {rsi14:.1f} > 65.0 (Peak Risk) -> Rejected!")
+                # Strict 15m RSI Sweet-Spot: strictly 48.0 <= rsi14_15m <= 65.0
+                if rsi14_15m > 65.0:
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 OVERBOUGHT SHIELD] {symbol}: 15m RSI {rsi14_15m:.1f} > 65.0 (Peak Risk) -> Rejected!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "OVERBOUGHT_PEAK_RISK"}
-                if rsi14 < 48.0 or not is_5m_bullish:
-                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 TREND MISALIGN] {symbol}: 5m Bull: {is_5m_bullish}, RSI: {rsi14:.1f} -> Rejected!")
+                if rsi14_15m < 48.0 or not is_5m_bullish:
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 3 TREND MISALIGN] {symbol}: 5m Bull: {is_5m_bullish}, 15m RSI: {rsi14_15m:.1f} -> Rejected!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "TREND_MISALIGNED"}
 
                 # Tier 4: Pullback Retracement Guard (Never Chase Green Candles)
-                # If price is extended > 0.3% above 1m EMA 5, wait for pullback!
                 if price > ema5_1m * 1.003:
-                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 4 PULLBACK GUARD] {symbol}: Price {price} extended >0.3% above EMA5 ({ema5_1m:.4f}). Waiting for Pullback Retracement!")
+                    _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 4 PULLBACK GUARD] {symbol}: Price extended >0.3% above EMA5. Waiting for Pullback Retracement!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "WAIT_FOR_PULLBACK"}
 
-                # Tier 5: Whale Orderbook Microstructure Guard
                 if not whale_bid_wall:
                     _log_spot_rejection(symbol, f"🛡️ [SPOT TIER 5 WHALE WALL GUARD] {symbol}: No Whale Bid Wall support -> Skipped!")
                     return {"side": "SKIP", "confidence_pct": 50.0, "reason": "NO_WHALE_BID_WALL"}
@@ -594,10 +606,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 confidence = min(98.5, max(88.0, ml_res.get("confidence", 88.0)))
                 return {"side": side, "confidence_pct": confidence, "recommended_leverage": 1}
 
-            # 🛡️ EXTREME OVERBOUGHT / OVERSOLD SAFETY SHIELD (RSI >= 78 or RSI <= 22)
-            # Never blindly counter-trend short/buy! Require Multi-Timeframe Confluence.
-            elif rsi14 >= 78.0:
-                if is_macro_downtrend and is_5m_bearish and ema5_1m < ema15_1m and price_change_1m < -0.10:
+            # 🛡️ EXTREME OVERBOUGHT / OVERSOLD SAFETY SHIELD (15m RSI >= 76 or RSI <= 24)
+            elif rsi14_15m >= 76.0:
+                if is_macro_downtrend and is_5m_bearish and ema5_1m < ema15_1m and not btc_surging:
                     side = "SELL"
                     base_conf = 88.0
                     if whale_ask_wall: base_conf += 4.0
@@ -605,10 +616,10 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 else:
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Overbought RSI {rsi14:.1f} without 15m/1h Macro Downtrend -> SKIPPED SHORT!")
+                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Overbought 15m RSI {rsi14_15m:.1f} without 15m/1h Macro Downtrend -> SKIPPED SHORT!")
 
-            elif rsi14 <= 22.0:
-                if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and price_change_1m > 0.10:
+            elif rsi14_15m <= 24.0:
+                if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and not btc_dumping:
                     side = "BUY"
                     base_conf = 88.0
                     if whale_bid_wall: base_conf += 4.0
@@ -616,52 +627,61 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                 else:
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Oversold RSI {rsi14:.1f} without 15m/1h Macro Uptrend -> SKIPPED BUY!")
+                    print(f"🛡️ [MULTI-TIMEFRAME SAFETY SHIELD] {symbol}: Oversold 15m RSI {rsi14_15m:.1f} without 15m/1h Macro Uptrend -> SKIPPED BUY!")
 
-            # ✅ SMART MULTI-TIMEFRAME TREND FOLLOWING (RSI 22 - 78)
+            # ✅ SMART INSTITUTIONAL MULTI-TIMEFRAME TREND FOLLOWING (15m RSI 24 - 76)
             else:
-                # 🎯 STRICT MATHEMATICAL CONFLUENCE (15m/1h Macro Trend + 5m Trend + 1m Momentum)
-                # Eliminates blind counter-trend entries ("ដាច់ខាតគ្មាន Position ណាមួយចូលភ្លាមខាតភ្លាម")
-                has_vol_confirmation = (vol_ratio >= 1.30 or abs(change_24h) >= 2.0)
-                if is_macro_uptrend and is_5m_bullish and ema5_1m > ema15_1m and price_change_1m >= -0.02 and 42.0 <= rsi14 <= 68.0 and has_vol_confirmation:
+                # 🛡️ 1. ADX Trend Strength Filter: Reject dead sideways chop (< 20.0 ADX)
+                if adx_15m < 20.0:
+                    print(f"🛡️ [CHOP REGIME SHIELD] {symbol}: 15m ADX {adx_15m:.1f} < 20.0 (Dead Sideways Chop). SKIPPED!")
+                    return {"side": "SKIP", "confidence_pct": 50.0, "reason": "CHOPPY_SIDEWAYS_MARKET"}
+
+                # 🛡️ 2. Machine Learning Tri-Model Consensus Gate
+                ml_res = evaluate_spot_ml_consensus(symbol, closes_1m, volumes_1m, closes_5m)
+                ml_bullish = ml_res.get("bullish", False)
+                ml_conf = ml_res.get("confidence", 75.0)
+
+                # 🛡️ 3. Anti-Overextension Guard (Never buy candle tops extended > 1.2% above EMA 20)
+                is_buy_extended = (ema20_15m > 0 and p_15m > ema20_15m * 1.012)
+                is_sell_extended = (ema20_15m > 0 and p_15m < ema20_15m * 0.988)
+
+                has_vol_confirmation = (vol_ratio >= 1.25 or abs(change_24h) >= 1.5)
+
+                if is_macro_uptrend and is_5m_bullish and not btc_dumping and not is_buy_extended and 46.0 <= rsi14_15m <= 65.0 and ml_bullish and has_vol_confirmation:
                     side = "BUY"
-                    base_conf = 88.0
-                    if vol_ratio >= 2.5:
-                        base_conf += 6.0  # 🚀 Institutional Volume Spike (> 2.5x)
-                    elif vol_ratio >= 1.8:
-                        base_conf += 4.0
-                    elif vol_ratio >= 1.2:
-                        base_conf += 2.0
+                    base_conf = max(88.0, ml_conf)
+                    if vol_ratio >= 2.0: base_conf += 4.0
                     if funding_rate < -0.0001: base_conf += 3.0
                     if whale_bid_wall: base_conf += 4.0
-                    confidence = min(98.5, max(88.0, base_conf))
+                    confidence = min(98.5, base_conf)
 
-                elif is_macro_downtrend and is_5m_bearish and ema5_1m < ema15_1m and price_change_1m <= 0.02 and 38.5 <= rsi14 <= 65.0 and has_vol_confirmation:
+                elif is_macro_downtrend and is_5m_bearish and not btc_surging and not is_sell_extended and 38.5 <= rsi14_15m <= 54.0 and not ml_bullish and has_vol_confirmation:
                     # Strict Invariant 16 Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)
-                    if rsi14 <= 38.0:
+                    if rsi14_15m <= 38.0:
                         side = "SKIP"
                         confidence = 50.0
-                        print(f"🛑 [SUPER SMART ANTI-OVERSOLD GUARD] {symbol}: RSI {rsi14:.1f} <= 38.0 -> SKIPPED SHORT!")
+                        print(f"🛑 [SUPER SMART ANTI-OVERSOLD GUARD] {symbol}: 15m RSI {rsi14_15m:.1f} <= 38.0 -> SKIPPED SHORT!")
                     else:
                         side = "SELL"
-                        base_conf = 88.0
-                        if vol_ratio >= 2.5:
-                            base_conf += 6.0  # 🚀 Institutional Volume Spike (> 2.5x)
-                        elif vol_ratio >= 1.8:
-                            base_conf += 4.0
-                        elif vol_ratio >= 1.2:
-                            base_conf += 2.0
+                        base_conf = max(88.0, ml_conf)
+                        if vol_ratio >= 2.0: base_conf += 4.0
                         if funding_rate > 0.0001: base_conf += 3.0
                         if whale_ask_wall: base_conf += 4.0
-                        confidence = min(98.5, max(88.0, base_conf))
+                        confidence = min(98.5, base_conf)
 
                 else:
                     side = "SKIP"
                     confidence = 50.0
-                    if not is_macro_uptrend and not is_macro_downtrend:
-                        print(f"⚪ [15M/1H CHOP SUPPRESSION] {symbol}: Sideways / Choppy Range (15m Bull: {is_15m_uptrend}, 1h Bull: {is_1h_uptrend}) -> SKIPPED!")
+                    if is_buy_extended or is_sell_extended:
+                        print(f"🛡️ [ANTI-OVEREXTENSION GUARD] {symbol}: Price extended > 1.2% from 15m EMA20. Waiting for healthy pullback!")
+                    elif btc_dumping:
+                        print(f"🛡️ [BTC LEAD DUMP GUARD] {symbol}: BTC is dumping -> Longs strictly blocked!")
+                    elif btc_surging:
+                        print(f"🛡️ [BTC LEAD SURGE GUARD] {symbol}: BTC is surging -> Shorts strictly blocked!")
+                    elif not is_macro_uptrend and not is_macro_downtrend:
+                        print(f"⚪ [15M/1H CHOP SUPPRESSION] {symbol}: Sideways Range (15m Bull: {is_15m_uptrend}, 1h Bull: {is_1h_uptrend}) -> SKIPPED!")
                     else:
-                        print(f"⚪ [MULTI-TIMEFRAME CHOP SUPPRESSION] {symbol}: 1m/5m Momentum Misaligned with 15m/1h Macro Trend -> SKIPPED!")
+                        print(f"⚪ [CONFLUENCE FILTER] {symbol}: Did not meet strict 6-pillar confluence (15m RSI: {rsi14_15m:.1f}, ML: {ml_conf:.1f}%) -> SKIPPED!")
 
             # 🛡️ 15m/1h Macro Trend Confluence & Strict Exclusion Guard
             if side != "SKIP":

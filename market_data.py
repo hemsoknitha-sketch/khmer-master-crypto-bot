@@ -34,6 +34,68 @@ def calculate_atr(df, window=14):
     atr = true_range.rolling(window).mean()
     return atr
 
+def calculate_adx_and_dmi(highs: list, lows: list, closes: list, period: int = 14) -> tuple:
+    """
+    Calculates Wilder's ADX(14), +DI, and -DI:
+    Returns (adx, plus_di, minus_di).
+    ADX >= 20.0 indicates an active institutional trend.
+    ADX < 20.0 indicates choppy / range-bound consolidation where breakouts/breakdowns are traps.
+    """
+    n = len(closes)
+    if n < (period * 2):
+        return 0.0, 0.0, 0.0
+
+    trs, plus_dms, minus_dms = [], [], []
+    for i in range(1, n):
+        h, l, prev_c = highs[i], lows[i], closes[i - 1]
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        trs.append(tr)
+
+        up_move = highs[i] - highs[i - 1]
+        down_move = lows[i - 1] - lows[i]
+
+        if up_move > down_move and up_move > 0:
+            plus_dms.append(up_move)
+        else:
+            plus_dms.append(0.0)
+
+        if down_move > up_move and down_move > 0:
+            minus_dms.append(down_move)
+        else:
+            minus_dms.append(0.0)
+
+    if len(trs) < (period * 2):
+        return 0.0, 0.0, 0.0
+
+    smooth_tr = sum(trs[:period])
+    smooth_plus = sum(plus_dms[:period])
+    smooth_minus = sum(minus_dms[:period])
+
+    dx_list = []
+    for i in range(period, len(trs)):
+        smooth_tr = smooth_tr - (smooth_tr / period) + trs[i]
+        smooth_plus = smooth_plus - (smooth_plus / period) + plus_dms[i]
+        smooth_minus = smooth_minus - (smooth_minus / period) + minus_dms[i]
+
+        plus_di = 100.0 * (smooth_plus / max(1e-8, smooth_tr))
+        minus_di = 100.0 * (smooth_minus / max(1e-8, smooth_tr))
+
+        diff = abs(plus_di - minus_di)
+        sum_di = max(1e-8, plus_di + minus_di)
+        dx = 100.0 * (diff / sum_di)
+        dx_list.append((dx, plus_di, minus_di))
+
+    if not dx_list:
+        return 0.0, 0.0, 0.0
+
+    adx_smooth = sum([d[0] for d in dx_list[:period]]) / float(period) if len(dx_list) >= period else dx_list[-1][0]
+    for i in range(period, len(dx_list)):
+        adx_smooth = (adx_smooth * (period - 1) + dx_list[i][0]) / float(period)
+
+    last_plus_di = dx_list[-1][1]
+    last_minus_di = dx_list[-1][2]
+    return round(adx_smooth, 2), round(last_plus_di, 2), round(last_minus_di, 2)
+
 def detect_patterns(df):
     """Detects simple candlestick patterns on the latest candles."""
     if len(df) < 2:
