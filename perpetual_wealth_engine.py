@@ -1197,12 +1197,14 @@ class PerpetualWealthGeneratorEngine:
                         db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), 1)
                         print(f"🛡️ [SPOT WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.25% Fees Floor (ROI: +{roi_pct:.2f}%)")
 
-                    # Phase 2: Micro-Scalp TP1 at +5.0% ROI -> Harvest 50% Size
+                    # Phase 2: Micro-Scalp TP1 at +5.0% ROI -> Adapt based on Capital Tier
+                    # Case 1: Capital >= $21 (half_notional >= 10.50) -> Scalp 50% Size
+                    # Case 2: Capital < $21 (half_notional < 10.50) -> 1-Shot Moonshot 50% Profit Lock (0% premature selling)
                     if roi_pct >= 5.0 and not is_tp1_done:
                         half_qty = rem_qty * 0.5
                         half_notional = half_qty * current_price
-                        # Invariant 1: Ensure sub-order >= $10.50
                         if half_notional >= 10.50:
+                            # Case 1: Large Capital (>= $21) -> Sell 50% safely per Invariant 1
                             print(f"🎯 [SPOT WEALTH TP1 HARVEST] {sym} reached +{roi_pct:.2f}% ROI! Selling 50% ({half_qty:.4f} units, ${half_notional:.2f} USDT)...")
                             sell_res = trading_engine.place_spot_order(
                                 api_key=api_key,
@@ -1222,7 +1224,7 @@ class PerpetualWealthGeneratorEngine:
                                     try:
                                         user_lang = db.get_user_language(chat_id)
                                         notif_text = (
-                                            "💎 **[24/7 SPOT WEALTH - TP1 HARVEST]** 🎯\n"
+                                            "💎 **[24/7 SPOT WEALTH - TP1 HARVEST (50%)]** 🎯\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
                                             f"📊 **ROI សម្រេចបាន ៖** `+{roi_pct:.2f}%` 🟢\n"
@@ -1230,9 +1232,10 @@ class PerpetualWealthGeneratorEngine:
                                             f"🛡️ **Breakeven Armor ៖** `LOCKED (+0.25% Net Floor)`\n"
                                             f"🚀 **50% Moonshot Ratchet ៖** `ACTIVE (85% Profit Trailing)`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _ប្រព័ន្ធកំពុងបន្ត Trailing លើ 50% ដែលនៅសល់ដើម្បីកើប Moonshot!_"
+                                            "💡 _ទុន >= $21.00: ប្រព័ន្ធកើបយក 50% ទុកក្នុងកាបូប និង Trailing 50% ដែលនៅសល់!_\n"
+                                            "💡 _ព័ត៌មានជំនួយ៖ បើកមុខងារ 'Use BNB for fees' លើ Binance ដើម្បីចំណេញសេវា 25% និងគ្មានសល់កន្ទុយកាក់!_"
                                         ) if user_lang == 'khmer' else (
-                                            "💎 **[24/7 SPOT WEALTH - TP1 HARVEST]** 🎯\n"
+                                            "💎 **[24/7 SPOT WEALTH - TP1 HARVEST (50%)]** 🎯\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
                                             f"📊 **Target ROI Reached:** `+{roi_pct:.2f}%` 🟢\n"
@@ -1240,16 +1243,58 @@ class PerpetualWealthGeneratorEngine:
                                             f"🛡️ **Breakeven Armor:** `LOCKED (+0.25% Net Floor)`\n"
                                             f"🚀 **50% Moonshot Ratchet:** `ACTIVE (85% Profit Trailing)`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _Spot engine is trailing remaining 50% for maximum moonshot!_"
+                                            "💡 _Capital >= $21: Harvested 50% to wallet, trailing remaining 50% for Moonshot!_\n"
+                                            "💡 _Tip: Enable 'Use BNB for fees' on Binance for 25% fee discount & zero dust!_"
                                         )
                                         asyncio.create_task(_async_send_wealth_alert(app, chat_id, notif_text, "Spot TP1 alert"))
                                     except Exception as notif_err:
                                         print(f"⚠️ Notice sending Spot TP1 alert: {notif_err}")
+                        else:
+                            # Case 2: Small Capital (< $21, e.g. $10.50, $15.00) -> 1-Shot Full Moonshot Exit Mode
+                            # DO NOT split 50% to prevent Binance Error -1013 Filter failure!
+                            # Lock Stop Loss to 50% of peak ROI (+2.50% Net Floor), ride 100% of coin!
+                            is_tp1_done = True
+                            db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, 1, int(is_be_locked))
+                            print(f"🛡️ [SPOT WEALTH 1-SHOT FULL MOONSHOT] {sym} reached +{roi_pct:.2f}% ROI! Sub-order < $10.50 (${half_notional:.2f}). Keeping 100% position riding, locking Stop Loss at 50% of peak (+{curr_peak * 0.50:.2f}%).")
 
-                    # Phase 3: Golden 85% Moonshot Ratchet (TP2)
+                            if app and hasattr(app, "bot"):
+                                try:
+                                    user_lang = db.get_user_language(chat_id)
+                                    notif_text = (
+                                        "🚀 **[24/7 SPOT WEALTH - 1-SHOT MOONSHOT LOCKED]** 💎\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
+                                        f"📊 **ROI សម្រេចបាន ៖** `+{roi_pct:.2f}%` 🟢\n"
+                                        f"🛡️ **Profit Armor Lock ៖** `+{(curr_peak * 0.50):.2f}% Floor` (ចាក់សោ 50% នៃចំណេញ)\n"
+                                        f"🚀 **យុទ្ធសាស្ត្រ Spot ៖** `100% Full Moonshot Ride (មិនពុះ 50%)`\n"
+                                        f"✨ **អត្ថប្រយោជន៍ ៖** `ការពារ Error -1013 & កើបចំណេញ ១០០% គ្មានសល់កន្ទុយកាក់`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        "💡 _ទុន < $21: រក្សាទំហំកាក់ ១០០% ពេញលេញ ពេលឡើងដល់ $\ge +6\%$ នឹងតម្លើង Ratchet 85% និងលក់ចេញ ១០០% ទាំងដុល!_\n"
+                                        "💡 _ព័ត៌មានជំនួយ៖ បើកមុខងារ 'Use BNB for fees' លើ Binance ដើម្បីចំណេញថ្លៃសេវា 25%!_"
+                                    ) if user_lang == 'khmer' else (
+                                        "🚀 **[24/7 SPOT WEALTH - 1-SHOT MOONSHOT LOCKED]** 💎\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
+                                        f"📊 **Target ROI Reached:** `+{roi_pct:.2f}%` 🟢\n"
+                                        f"🛡️ **Profit Armor Lock:** `+{(curr_peak * 0.50):.2f}% Floor` (50% Profit Locked)\n"
+                                        f"🚀 **Spot Strategy:** `100% Full Moonshot Ride (No 50% cut)`\n"
+                                        f"✨ **Advantage:** `Prevents Error -1013 & 100% Cash Exit Zero Dust`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        "💡 _Capital < $21: Keeping 100% size. At >= +6%, auto upgrades to 85% Ratchet, selling 100% on reversal!_\n"
+                                        "💡 _Tip: Enable 'Use BNB for fees' on Binance for 25% fee discount!_"
+                                    )
+                                    asyncio.create_task(_async_send_wealth_alert(app, chat_id, notif_text, "Spot 1-Shot Moonshot Lock alert"))
+                                except Exception as notif_err:
+                                    print(f"⚠️ Notice sending Spot 1-Shot alert: {notif_err}")
+
+                    # Phase 3: Golden 85% Moonshot Ratchet (or 50% Profit Lock exit)
                     target_bot_tp = float(bot.get("target_tp", 6.0))
-                    if (curr_peak >= 6.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= target_bot_tp:
-                        print(f"🏆 [SPOT WEALTH TP2 MOONSHOT RATCHET] {sym} Peak: +{curr_peak:.2f}%, Current: +{roi_pct:.2f}%. Harvesting remaining cash!")
+                    is_moonshot_tp2 = (curr_peak >= 6.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= target_bot_tp
+                    is_profit_lock_tp = (curr_peak >= 5.0 and curr_peak < 6.0 and roi_pct <= (curr_peak * 0.50))
+
+                    if is_moonshot_tp2 or is_profit_lock_tp:
+                        reason_lbl = "TP2 MOONSHOT RATCHET" if is_moonshot_tp2 else "50% PROFIT LOCK EXIT"
+                        print(f"🏆 [SPOT WEALTH {reason_lbl}] {sym} Peak: +{curr_peak:.2f}%, Current: +{roi_pct:.2f}%. Harvesting 100% remaining cash!")
                         sell_res = trading_engine.place_spot_order(
                             api_key=api_key,
                             api_secret=api_secret,
@@ -1266,29 +1311,33 @@ class PerpetualWealthGeneratorEngine:
                             try:
                                 user_lang = db.get_user_language(chat_id)
                                 harvest_msg = (
-                                    "🏆 **[24/7 SPOT WEALTH - MOONSHOT HARVESTED]** 💰\n"
+                                    f"🏆 **[24/7 SPOT WEALTH - {('MOONSHOT HARVESTED' if is_moonshot_tp2 else 'PROFIT HARVESTED')}]** 💰\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
                                     f"📈 **Peak ROI កំពូល ៖** `+{curr_peak:.2f}%` 🚀\n"
                                     f"💵 **Exit ROI ចុងក្រោយ ៖** `+{roi_pct:.2f}%` 🟢\n"
                                     f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${realized_pnl:,.2f} USDT`\n"
-                                    f"🔄 **ស្ថានភាពទុន ៖** `ដកទុន + ចំណេញត្រឡប់មក Spot Wallet`\n"
+                                    f"🔄 **ស្ថានភាពទុន ៖** `ដកទុន + ចំណេញ ១០០% ចូល Spot Wallet`\n"
+                                    f"🛡️ **កម្រិតការពារ ៖** `{'Golden 85% Moonshot Ratchet' if is_moonshot_tp2 else '50% Profit Lock (ការពារចំណេញ)'}`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _ប្រព័ន្ធកំពុងស្វែងរកកាក់ Spot Sweet-Spot បន្ទាប់ដើម្បីច្បាមចំណេញបន្ត!_"
+                                    "💡 _ប្រព័ន្ធ Spot បានលក់ចេញ ១០០% ទាំងដុលគ្មានសល់កន្ទុយកាក់ និងកំពុងស្វែងរកកាក់បន្ទាប់!_"
                                 ) if user_lang == 'khmer' else (
-                                    "🏆 **[24/7 SPOT WEALTH - MOONSHOT HARVESTED]** 💰\n"
+                                    f"🏆 **[24/7 SPOT WEALTH - {('MOONSHOT HARVESTED' if is_moonshot_tp2 else 'PROFIT HARVESTED')}]** 💰\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
                                     f"📈 **Peak ROI Achieved:** `+{curr_peak:.2f}%` 🚀\n"
                                     f"💵 **Harvest Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
                                     f"🏆 **Net Realized Profit:** `+${realized_pnl:,.2f} USDT`\n"
-                                    f"🔄 **Capital Status:** `Released & Ready in Spot Wallet`\n"
+                                    f"🔄 **Capital Status:** `100% Released & Ready in Spot Wallet`\n"
+                                    f"🛡️ **Protection Tier:** `{'Golden 85% Moonshot Ratchet' if is_moonshot_tp2 else '50% Profit Lock Exit'}`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _Hunting next Spot Sweet-Spot breakout immediately!_"
+                                    "💡 _Spot position 100% cleanly liquidated with zero leftover dust. Hunting next breakout!_"
                                 )
                                 asyncio.create_task(_async_send_wealth_alert(app, chat_id, harvest_msg, "Spot TP2 alert"))
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending Spot TP2 alert: {notif_err}")
+
+                        continue
 
                     # Phase 4: Stagnation Capital Liberation Trigger (Held > 4h without breakout)
                     # OR Breakeven Defense Trigger OR Dynamic Stop Loss (-6.0%)
@@ -1303,8 +1352,8 @@ class PerpetualWealthGeneratorEngine:
                             trade_age_seconds = 0.0
 
                     is_stagnant = (trade_age_seconds >= 14400.0 and curr_peak < 2.0 and -1.5 <= roi_pct <= 0.8)
-                    is_be_exit = is_be_locked and current_price <= (buy_price * 1.0025) and roi_pct > -1.0
-                    is_sl_exit = roi_pct <= -6.0
+                    is_be_exit = (is_be_locked and curr_peak < 5.0 and current_price <= (buy_price * 1.0025) and roi_pct > -1.0)
+                    is_sl_exit = (roi_pct <= -6.0)
 
                     if is_be_exit or is_sl_exit or is_stagnant:
                         if is_stagnant:
@@ -1352,6 +1401,8 @@ class PerpetualWealthGeneratorEngine:
                                 asyncio.create_task(_async_send_wealth_alert(app, chat_id, stag_msg, "Spot stagnation liberation"))
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending Spot stagnation alert: {notif_err}")
+
+                        continue
 
                     else:
                         db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), int(is_be_locked))
@@ -1425,6 +1476,22 @@ class PerpetualWealthGeneratorEngine:
                                 if app and hasattr(app, "bot"):
                                     try:
                                         user_lang = db.get_user_language(chat_id)
+                                        is_large_cap = (alloc_per_coin >= 21.0)
+                                        if is_large_cap:
+                                            tp1_km = "+5.0% ROI (Scalp 50% Harvest)"
+                                            tp2_km = "85% Trailing Ratchet (50% Moonshot)"
+                                            mode_km = "ទុន >= $21: កើប 50% ទុកក្នុងកាបូប & Trailing 50%"
+                                            tp1_en = "+5.0% ROI (Scalp 50% Harvest)"
+                                            tp2_en = "85% Trailing Ratchet (50% Moonshot)"
+                                            mode_en = "Capital >= $21: 50% Scalp + 50% Moonshot"
+                                        else:
+                                            tp1_km = "+5.0% ROI (Lock ចំណេញ 50% មិនកាត់កាក់)"
+                                            tp2_km = "85% Moonshot Ratchet (កើប ១០០% ទាំងដុល)"
+                                            mode_km = "ទុន < $21: 1-Shot Moonshot រក្សាទំហំ ១០០% ការពារ Error -1013"
+                                            tp1_en = "+5.0% ROI (Lock 50% Profit, 100% Coins Ride)"
+                                            tp2_en = "85% Moonshot Ratchet (100% Cash Harvest)"
+                                            mode_en = "Capital < $21: 1-Shot Full Moonshot (Zero Error -1013)"
+
                                         entry_msg = (
                                             "💎 **[24/7 SPOT WEALTH - POSITION OPENED]** 🟢\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1434,10 +1501,11 @@ class PerpetualWealthGeneratorEngine:
                                             f"📈 **24H Change ៖** `+{cand['price_change_pct']:.2f}%`\n"
                                             f"🧠 **AI Confluence Score ៖** `{cand['ai_score']:.1f}/10.0`\n"
                                             f"🛡️ **Breakeven Armor ៖** `ត្រៀម Lock នៅ +2.5% ROI`\n"
-                                            f"🎯 **Target TP1 (50%) ៖** `+5.0% ROI`\n"
-                                            f"🚀 **Target TP2 (Moonshot) ៖** `85% Trailing Lock`\n"
+                                            f"🎯 **Target TP1 ៖** `{tp1_km}`\n"
+                                            f"🚀 **Target TP2 ៖** `{tp2_km}`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _ម៉ាស៊ីន Spot កំពុងដំណើរការដោយសុវត្ថិភាព 0% Liquidation ២៤/៧!_"
+                                            f"✨ **របៀបដោះស្រាយ Spot ៖** `{mode_km}`\n"
+                                            "💡 _ព័ត៌មានជំនួយ៖ បើកមុខងារ 'Use BNB for fees' លើ Binance ដើម្បីចំណេញសេវា 25% និងលក់ ១០០% គ្មានសល់កន្ទុយកាក់!_"
                                         ) if user_lang == 'khmer' else (
                                             "💎 **[24/7 SPOT WEALTH - POSITION OPENED]** 🟢\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1447,10 +1515,11 @@ class PerpetualWealthGeneratorEngine:
                                             f"📈 **24H Sweet-Spot Change:** `+{cand['price_change_pct']:.2f}%`\n"
                                             f"🧠 **AI Confluence Score:** `{cand['ai_score']:.1f}/10.0`\n"
                                             f"🛡️ **Breakeven Armor:** `Armed for +2.5% ROI Lock`\n"
-                                            f"🎯 **Target TP1 (50%):** `+5.0% ROI`\n"
-                                            f"🚀 **Target TP2 (Moonshot):** `85% Trailing Ratchet`\n"
+                                            f"🎯 **Target TP1:** `{tp1_en}`\n"
+                                            f"🚀 **Target TP2:** `{tp2_en}`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _Autonomous Spot engine is guarding and harvesting profits with 0% liquidation!_"
+                                            f"✨ **Spot Engine Mode:** `{mode_en}`\n"
+                                            "💡 _Tip: Enable 'Use BNB for fees' on Binance for 25% fee discount & zero leftover dust!_"
                                         )
                                         asyncio.create_task(_async_send_wealth_alert(app, chat_id, entry_msg, "Spot entry alert"))
                                     except Exception as alert_err:
