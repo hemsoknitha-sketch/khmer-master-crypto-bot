@@ -1308,3 +1308,212 @@ def render_smart_swap_dex_portfolio_card(data: dict, user_lang: str = "km") -> s
         ])
         return "\n".join(lines)
 
+
+def render_balance_card(data: dict, user_lang: str = "km") -> str:
+    """
+    Renders an institutional-grade, highly aesthetic Telegram message
+    displaying real-time Live Balances across ALL Centralized and Decentralized
+    wallets for the user ID.
+    """
+    lang = "en" if str(user_lang).lower() in ["en", "english"] else "km"
+    chat_id = data["chat_id"]
+    is_paper = data.get("is_paper", False)
+    mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE API"
+
+    spot_cash = float(data.get("spot_usdt_free", 0.0) or 0.0)
+    spot_coins_val = float(data.get("spot_alt_exposure", 0.0) or 0.0)
+    spot_holdings = data.get("spot_holdings", {})
+
+    fut_bal = float(data.get("futures_wallet_usdt", 0.0) or 0.0)
+    fut_pnl = float(data.get("futures_unrealized_pnl", 0.0) or 0.0)
+    fut_positions = data.get("active_futures_positions", [])
+
+    # Calculate margin used in futures
+    margin_used = sum(float(p.get("margin_usd", 0.0) or 0.0) for p in fut_positions)
+    avail_margin = max(0.0, fut_bal + fut_pnl - margin_used)
+
+    earn_bal = float(data.get("earn_total_usdt", 0.0) or 0.0)
+    earn_breakdown = data.get("earn_breakdown", {})
+    aip_cnt = int(data.get("aip_plans_count", 0) or 0)
+
+    funding_bal = float(data.get("funding_wallet_usdt", 0.0) or 0.0)
+    margin_bal = float(data.get("margin_balance", 0.0) or 0.0)
+
+    # Web3 Wallets
+    sol_pubkey = data.get("user_sol_pubkey", "")
+    short_sol = f"`{sol_pubkey[:6]}...{sol_pubkey[-4:]}`" if sol_pubkey else "`N/A`"
+    sol_usd = float(data.get("user_sol_usd", 0.0) or 0.0)
+    sol_bal = float(data.get("user_sol_bal", 0.0) or 0.0)
+
+    p_vault = data.get("phantom_vault", "")
+    short_pvault = f"`{p_vault[:6]}...{p_vault[-4:]}`" if p_vault else ""
+    p_vault_usd = float(data.get("phantom_bal_usd", 0.0) or 0.0)
+
+    evm_bal_usd = float(data.get("evm_bal_usd", 0.0) or 0.0)
+    evm_det = data.get("evm_details_str", "")
+
+    total_onchain = float(data.get("total_onchain_capital", 0.0) or 0.0)
+
+    # Consolidated Net Portfolio Worth
+    total_net_equity = float(data.get("total_portfolio_net_worth", 0.0) or 0.0)
+    total_invested = float(data.get("total_invested_usd", 0.0) or 0.0)
+    total_unrealized_pnl = float(data.get("total_unrealized_pnl", 0.0) or 0.0)
+    roi_pct = float(data.get("total_roi_pct", 0.0) or 0.0)
+
+    pnl_sign = "+" if total_unrealized_pnl >= 0 else ""
+    pnl_emoji = "🟩" if total_unrealized_pnl >= 0 else "🟥"
+
+    # Spot Breakdown string
+    spot_coins_str = ""
+    paxg_str = ""
+    if spot_holdings and isinstance(spot_holdings, dict):
+        items = []
+        for c, info in spot_holdings.items():
+            val = float(info.get("value_usdt", 0.0) if isinstance(info, dict) else 0.0)
+            if val >= 0.5:
+                items.append(f"{c} (${val:,.2f})")
+            if "PAXG" in str(c):
+                qty = float(info.get("amount", 0.0) if isinstance(info, dict) else 0.0)
+                paxg_str = f"🥇 **PAXG Gold Vault ៖** `{qty:.4f} PAXG` (`${val:,.2f} USDT`)\n" if lang == "km" else f"🥇 **PAXG Gold Vault:** `{qty:.4f} PAXG` (`${val:,.2f} USDT`)\n"
+        if items:
+            lbl = "កាក់កំពុងកាន់កាប់" if lang == "km" else "Holdings"
+            spot_coins_str = f"\n   └ _{lbl}_ ៖ `{', '.join(items[:5])}`"
+
+    # Earn breakdown
+    earn_det_str = ""
+    if earn_bal > 0 or aip_cnt > 0:
+        earn_det_str = f" ({len(earn_breakdown)} Assets | AIP: {aip_cnt} Plans)"
+
+    # Refuel hint
+    if spot_cash >= 1.0:
+        refuel_hint = (
+            f"\n💡 *មានទុន Spot អាចផ្ទេរបាន ៖* លោកអ្នកមាន `${spot_cash:,.2f} USDT` ក្នុង Spot។ ចុចប៊ូតុង **[⚡ ផ្ទេរ Spot ➔ Futures]** ខាងក្រោមដើម្បីបញ្ចូលទៅ Futures ភ្លាមៗ!\n"
+            if lang == "km" else
+            f"\n💡 *Spot Cash Ready:* `${spot_cash:,.2f} USDT` available. Tap **[⚡ Transfer Spot ➔ Futures]** below to fund Futures!\n"
+        )
+    elif fut_bal < 5.0:
+        refuel_hint = (
+            "\n💡 *ទុន Futures ជិតអស់ ៖* ចុចប៊ូតុង **[📥 ដាក់ប្រាក់ Arbitrum USDT]** ខាងក្រោមដើម្បីបញ្ចូលទុនជាមួយថ្លៃ Gas ថោកបំផុត (~$0.02)!\n"
+            if lang == "km" else
+            "\n💡 *Low Futures Balance:* Tap **[📥 Deposit Arbitrum USDT]** below to top up with ultra-low gas fee (~$0.02)!\n"
+        )
+    else:
+        refuel_hint = ""
+
+    # Active positions snapshot
+    active_lines = []
+    # 1. Wealth & Futures Positions
+    for p in fut_positions:
+        p_sign = "+" if float(p.get("pnl_usd", 0) or 0) >= 0 else ""
+        side_lbl = "BUY" if p.get("side") in ["LONG", "BUY"] else "SELL"
+        active_lines.append(f"  • `{p['symbol']}` (Futures {side_lbl} {p['leverage']}x ISOLATED) ៖ Margin `${float(p['margin_usd']):.2f}` | PnL: `{p_sign}${float(p['pnl_usd']):.2f}` (`{float(p['roi_pct']):+.1f}%`)")
+    # 2. Spot Trades
+    for st in data.get("active_spot_trades", []):
+        s_sign = "+" if float(st.get("pnl_usd", 0) or 0) >= 0 else ""
+        active_lines.append(f"  • `{st['symbol']}` (Spot Buy) ៖ ទុន `${float(st['invested_usd']):.2f}` | PnL: `{s_sign}${float(st['pnl_usd']):.2f}` (`{float(st['roi_pct']):+.2f}%`)")
+    # 3. Smart Swaps
+    for ss in data.get("active_smart_swaps", []):
+        sw_sign = "+" if float(ss.get("pnl_usd", 0) or 0) >= 0 else ""
+        active_lines.append(f"  • `{ss['symbol']}` ({ss['chain']}) ៖ Value `${float(ss['current_val_usd']):.2f}` | PnL: `{sw_sign}${float(ss['pnl_usd']):.2f}` (`{float(ss['roi_pct']):+.1f}%`)")
+
+    if active_lines:
+        active_pos_str = (
+            "💼 **កាក់កំពុងជួញដូរជាក់ស្តែង (Active Invested Positions) ៖**\n" + "\n".join(active_lines[:6]) + "\n"
+            if lang == "km" else
+            "💼 **Active Invested Positions:**\n" + "\n".join(active_lines[:6]) + "\n"
+        )
+    else:
+        active_pos_str = (
+            "💼 **កាក់កំពុងជួញដូរជាក់ស្តែង ៖**\n  • គ្មាន Position ត្រាំ (Free Margin 100% សុវត្ថិភាព)\n"
+            if lang == "km" else
+            "💼 **Active Invested Positions:**\n  • No open positions (100% Free Margin Protected)\n"
+        )
+
+    earn_line_km = f"• 🌾 **Simple Earn & AIP ៖** `${earn_bal:,.2f} USDT`{earn_det_str}\n" if (earn_bal > 0 or aip_cnt > 0) else ""
+    earn_line_en = f"• 🌾 **Simple Earn & AIP:** `${earn_bal:,.2f} USDT`{earn_det_str}\n" if (earn_bal > 0 or aip_cnt > 0) else ""
+
+    funding_line_km = f"• 👛 **Funding Wallet (P2P/Pay) ៖** `${funding_bal:,.2f} USDT`\n" if funding_bal > 0 else ""
+    funding_line_en = f"• 👛 **Funding Wallet (P2P/Pay):** `${funding_bal:,.2f} USDT`\n" if funding_bal > 0 else ""
+
+    margin_line_km = f"• 🏦 **Portfolio Margin ៖** `${margin_bal:,.2f} USDT`\n" if margin_bal > 0 else ""
+    margin_line_en = f"• 🏦 **Portfolio Margin:** `${margin_bal:,.2f} USDT`\n" if margin_bal > 0 else ""
+
+    pvault_line_km = f"• 🟣 **Phantom Profit Vault ៖** `${p_vault_usd:,.2f} USD` ({short_pvault}) [ដកប្រាក់ចំណេញ]\n" if p_vault else "• 🟣 **Phantom Profit Vault ៖** `មិនទាន់ភ្ជាប់` (`/smart_swap bind_phantom <addr>`)\n"
+    pvault_line_en = f"• 🟣 **Phantom Profit Vault:** `${p_vault_usd:,.2f} USD` ({short_pvault}) [Profit Settlement]\n" if p_vault else "• 🟣 **Phantom Profit Vault:** `Not Linked` (`/smart_swap bind_phantom <addr>`)\n"
+
+    evm_line_km = f"• 🌐 **Arbitrum/EVM Web3 ៖** `${evm_bal_usd:,.2f} USD` ({evm_det})\n" if (evm_bal_usd > 0 or evm_det) else ""
+    evm_line_en = f"• 🌐 **Arbitrum/EVM Web3:** `${evm_bal_usd:,.2f} USD` ({evm_det})\n" if (evm_bal_usd > 0 or evm_det) else ""
+
+    if lang == "km":
+        return (
+            "💰 **KHMER MASTER CRYPTO | សមតុល្យគណនី SUPER SMART LIVE BALANCE** 🛡️\n"
+            "════════════\n"
+            f"💼 **គណនីវិនិយោគិន ៖** `ID: {chat_id}` | `{mode_badge}`\n"
+            "════════════\n\n"
+            "💎 **ទ្រព្យសកម្មសុទ្ធសរុបគ្រប់កាបូប (CONSOLIDATED NET EQUITY) ៖**\n"
+            f"• 👑 **ទ្រព្យសរុបទាំងអស់ (Total Net Worth) ៖** `${total_net_equity:,.2f} USD`\n"
+            f"• 🎯 **ទុនកំពុងដំណើរការ (Capital at Work) ៖** `${total_invested:,.2f} USD`\n"
+            f"• {pnl_emoji} **ផលចំណេញបណ្តោះអាសន្ន (Floating PnL) ៖** `{pnl_sign}${total_unrealized_pnl:,.2f} USD` (`{roi_pct:+.2f}%`)\n"
+            "────────────\n\n"
+            "🏦 **កាបូបកណ្តាល BINANCE (CENTRALIZED WALLETS) ៖**\n"
+            f"• 🟡 **Spot Wallet ៖** `${spot_cash:,.2f} USDT` សេរី | `${spot_coins_val:,.2f}` ក្នុងកាក់{spot_coins_str}\n"
+            f"{paxg_str}"
+            f"• ⚡ **Futures Wallet (USDT-M) ៖** `${fut_bal:,.2f} USDT`\n"
+            f"   └ _Margin កំពុងប្រើ_ ៖ `${margin_used:,.2f} USDT` | _Free Margin_ ៖ `${avail_margin:,.2f} USDT`\n"
+            f"   └ _Floating PnL_ ៖ `${fut_pnl:+,.2f} USDT` | _Margin Mode_ ៖ `100% ISOLATED ✅`\n"
+            f"{earn_line_km}"
+            f"{funding_line_km}"
+            f"{margin_line_km}"
+            f"{refuel_hint}"
+            "────────────\n\n"
+            "🌐 **កាបូបវិមជ្ឈការ ON-CHAIN (WEB3 & DEX WALLETS) ៖**\n"
+            f"• ⚡ **Solana Trading Wallet ៖** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL` | {short_sol}) [កាបូបជួញដូរ]\n"
+            f"{pvault_line_km}"
+            f"{evm_line_km}"
+            f"• 💎 **ទុន On-Chain សរុប ៖** `${total_onchain:,.2f} USD`\n"
+            "────────────\n\n"
+            f"{active_pos_str}"
+            "────────────\n"
+            "💡 *ចុចប៊ូតុងខាងក្រោមដើម្បី Refresh ឬផ្ទេរប្រាក់ភ្លាមៗ ៖*\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        )
+    else:
+        return (
+            "💰 **KHMER MASTER CRYPTO | SUPER SMART MULTI-WALLET LIVE BALANCE** 🛡️\n"
+            "════════════\n"
+            f"💼 **ACCOUNT CLEARANCE:** `ID: {chat_id}` | `{mode_badge}`\n"
+            "════════════\n\n"
+            "💎 **CONSOLIDATED MULTI-WALLET NET EQUITY:**\n"
+            f"• 👑 **Total Net Portfolio Value:** `${total_net_equity:,.2f} USD`\n"
+            f"• 🎯 **Active Capital at Work:** `${total_invested:,.2f} USD`\n"
+            f"• {pnl_emoji} **Total Floating PnL:** `{pnl_sign}${total_unrealized_pnl:,.2f} USD` (`{roi_pct:+.2f}%`)\n"
+            "────────────\n\n"
+            "🏦 **BINANCE CENTRALIZED WALLETS (CEX):**\n"
+            f"• 🟡 **Spot Wallet:** `${spot_cash:,.2f} USDT` free | `${spot_coins_val:,.2f}` in Coins{spot_coins_str}\n"
+            f"{paxg_str}"
+            f"• ⚡ **Futures Wallet (USDT-M):** `${fut_bal:,.2f} USDT`\n"
+            f"   └ _Margin Used_: `${margin_used:,.2f} USDT` | _Free Margin_: `${avail_margin:,.2f} USDT`\n"
+            f"   └ _Floating PnL_: `${fut_pnl:+,.2f} USDT` | _Margin Mode_: `100% ISOLATED ✅`\n"
+            f"{earn_line_en}"
+            f"{funding_line_en}"
+            f"{margin_line_en}"
+            f"{refuel_hint}"
+            "────────────\n\n"
+            "🌐 **ON-CHAIN DECENTRALIZED WALLETS (WEB3 & DEX):**\n"
+            f"• ⚡ **Solana Trading Wallet:** `${sol_usd:,.2f} USD` (`{sol_bal:.4f} SOL` | {short_sol}) [Hot Wallet]\n"
+            f"{pvault_line_en}"
+            f"{evm_line_en}"
+            f"• 💎 **Total On-Chain Net Capital:** `${total_onchain:,.2f} USD`\n"
+            "────────────\n\n"
+            f"{active_pos_str}"
+            "────────────\n"
+            "💡 *Use the interactive buttons below to refresh or transfer funds:*\n"
+            "━━━━━━━━━━━━\n"
+            "_Khmer Master Crypto_\n"
+            "_APEX SUPER BRAIN AI_\n"
+            "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        )
+

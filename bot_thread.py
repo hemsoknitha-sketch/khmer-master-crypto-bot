@@ -3100,32 +3100,30 @@ class TelegramBotThread(BaseThread):
                 user_lang = 'km'
             elif user_lang in ['en', 'english']:
                 user_lang = 'en'
-            elif user_lang in ['zh', 'chinese']:
-                user_lang = 'zh'
             else:
                 user_lang = 'km'
-            
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer("⚡ កំពុងទាញយកសមតុល្យគ្រប់កាបូប...")
+                except Exception:
+                    pass
+            else:
+                try:
+                    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+                except Exception:
+                    pass
+
             keys = db.get_user_api(chat_id)
             
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
+            keyboard_empty = [
                 [
-                    InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_balance_refresh"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
-                ],
-                [
-                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar")
-                ],
-                [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
-                ],
-                [
-                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup_empty = InlineKeyboardMarkup(keyboard_empty)
 
             if not keys:
                 if user_lang == 'en':
@@ -3134,13 +3132,6 @@ class TelegramBotThread(BaseThread):
                         "════════════\n"
                         "❌ **No Binance API Keys connected yet!**\n\n"
                         "💡 *Please tap **[🔑 Add Binance API]** below to bind your API Keys first:*"
-                    )
-                elif user_lang == 'zh':
-                    empty_msg = (
-                        "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 💰\n"
-                        "════════════\n"
-                        "❌ **尚未绑定 Binance API Keys！**\n\n"
-                        "💡 *请点击下方 **[🔑 Add Binance API]** 按钮绑定您的 API 密钥：*"
                     )
                 else:
                     empty_msg = (
@@ -3151,161 +3142,59 @@ class TelegramBotThread(BaseThread):
                     )
                 target_msg = update.message if update.message else (update.callback_query.message if update.callback_query else None)
                 if target_msg:
-                    await target_msg.reply_text(empty_msg, parse_mode="Markdown", reply_markup=reply_markup)
+                    await target_msg.reply_text(empty_msg, parse_mode="Markdown", reply_markup=reply_markup_empty)
                 return
                 
-            import trading_engine
+            import portfolio_engine
 
-            # High-Speed Parallel Query (<300ms) across all wallets
-            (
-                spot_cash_usdt,
-                (spot_trading_exposure, spot_breakdown),
-                (futures_balance, futures_status),
-                margin_balance,
-                funding_balance,
-                earn_balance
-            ) = await asyncio.gather(
-                asyncio.to_thread(trading_engine.get_spot_balance, keys[0], keys[1], "USDT"),
-                asyncio.to_thread(trading_engine.get_total_spot_exposure, keys[0], keys[1]),
-                asyncio.to_thread(trading_engine.get_futures_balance_detailed, keys[0], keys[1], "USDT"),
-                asyncio.to_thread(trading_engine.get_portfolio_margin_balance, keys[0], keys[1], "USDT"),
-                asyncio.to_thread(trading_engine.get_funding_balance, keys[0], keys[1], "USDT"),
-                asyncio.to_thread(trading_engine.get_earn_balance, keys[0], keys[1], "USDT")
-            )
-            
-            total_spot_val = spot_cash_usdt + spot_trading_exposure
-            total_net_equity = total_spot_val + futures_balance + margin_balance + funding_balance + earn_balance
-            
-            paxg_vault_str = ""
-            trading_details = ""
-            if spot_breakdown and isinstance(spot_breakdown, dict):
-                coins_str_list = []
-                for coin, info in spot_breakdown.items():
-                    coin_str = str(coin)
-                    val_usdt = float(info.get('value_usdt', 0.0) if isinstance(info, dict) else 0.0)
-                    coins_str_list.append(f"{coin_str} (${val_usdt:,.2f})")
-                    if "PAXG" in coin_str:
-                        qty = float(info.get('amount', 0.0) if isinstance(info, dict) else 0.0)
-                        paxg_vault_str = f"🥇 **PAXG Gold Vault (LBMA 24/7):** `{qty:.4f} PAXG` (`${val_usdt:,.2f} USDT`)\n"
-                if coins_str_list:
-                    sub_txt = "Trading Positions:" if user_lang == 'en' else ("持仓中:" if user_lang == 'zh' else "កាក់កំពុងជួញដូរ:")
-                    trading_details = f"\n   └ _{sub_txt}_ `{', '.join(coins_str_list)}`"
-                
-            funding_str = f"👛 **Funding Wallet (P2P/Pay):** `${funding_balance:,.2f} USDT`\n" if funding_balance > 0 else ""
-            earn_str = f"🌾 **Simple Earn Yield Wallet:** `${earn_balance:,.2f} USDT`\n" if earn_balance > 0 else ""
-            
-            if futures_balance > 0:
-                futures_str = f"📈 **Futures Wallet Balance:** `${futures_balance:,.2f} USDT`\n"
-            elif futures_status == "API_PERM_ERROR":
-                err_lbl = "(Enable Futures API permission required)" if user_lang == 'en' else ("(需开启合约 API 权限)" if user_lang == 'zh' else "(API Key មិនទាន់បើកសិទ្ធិ Enable Futures)")
-                futures_str = f"📈 **Futures Wallet:** `$0.00 USDT` ⚠️ *{err_lbl}*\n"
-            elif futures_status == "RESTRICTED_LOCATION":
-                err_lbl = "(VPS Location Restricted for Binance Futures - Change VPS Region to Asia)" if user_lang == 'en' else ("(合约受限地区 - 请切换 VPS 至亚洲节点)" if user_lang == 'zh' else "(VPS IP ស្ថិតក្នុងតំបន់ហាមឃាត់របស់ Binance Futures - សូមប្តូរ Server ទៅតំបន់អាស៊ី/Tokyo/Taiwan)")
-                futures_str = f"📈 **Futures Wallet:** `$0.00 USDT` 🚨 *{err_lbl}*\n"
-            else:
-                futures_str = f"📈 **Futures Wallet Balance:** `${futures_balance:,.2f} USDT`\n"
+            # Query live real-time multi-wallet data across all CEX and DEX wallets in parallel
+            data = await asyncio.to_thread(portfolio_engine.get_full_system_portfolio_data, chat_id, force_fresh=True)
+            msg = portfolio_engine.render_balance_card(data, user_lang=user_lang)
 
-            is_paper = getattr(trading_engine, "PAPER_TRADING", False)
-            mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE API"
-
-            refuel_hint = ""
-            if spot_cash_usdt >= 0.5:
-                if user_lang == 'en':
-                    refuel_hint = f"\n💡 *Spot Cash Ready:* `${spot_cash_usdt:,.2f} USDT` in Spot. Tap **[⚡ Transfer Spot ➔ Futures]** below to fund your trading!\n"
-                elif user_lang == 'zh':
-                    refuel_hint = f"\n💡 *现货余额可用:* 现货中有 `${spot_cash_usdt:,.2f} USDT`。点击下方 **[⚡ 划转至合约]** 即可即时注资！\n"
-                else:
-                    refuel_hint = f"\n💡 *មានទុន Spot អាចផ្ទេរបាន ៖* លោកអ្នកមាន `${spot_cash_usdt:,.2f} USDT` ក្នុង Spot។ ចុចប៊ូតុង **[⚡ ផ្ទេរ Spot ➔ Futures]** ខាងក្រោមដើម្បីបញ្ចូលទៅ Futures ភ្លាមៗ!\n"
-            elif futures_balance < 5.0:
-                if user_lang == 'en':
-                    refuel_hint = "\n💡 *Low Futures Balance:* Tap **[📥 Deposit Arbitrum USDT]** to top up with ultra-low gas fee (~$0.02)!\n"
-                elif user_lang == 'zh':
-                    refuel_hint = "\n💡 *合约资金偏低:* 点击下方 **[📥 充值 Arbitrum USDT]** 获取充值地址，Gas 费极低（约 $0.02）！\n"
-                else:
-                    refuel_hint = "\n💡 *ទុន Futures ជិតអស់ ៖* ចុចប៊ូតុង **[📥 ដាក់ប្រាក់ Arbitrum USDT]** ខាងក្រោមដើម្បីបាញ់ចូលជាមួយថ្លៃ Gas ថោកបំផុត (~$0.02)!\n"
-                
-            if user_lang == 'en':
-                msg = (
-                    "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
-                    "════════════\n"
-                    f"🛡️ **SECURITY CLEARANCE** ៖ `VERIFIED` | `{mode_badge}`\n"
-                    "════════════\n\n"
-                    f"💵 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
-                    f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
-                    f"{paxg_vault_str}"
-                    f"{futures_str}"
-                    f"{refuel_hint}"
-                    f"{funding_str}"
-                    f"{earn_str}"
-                    f"🏦 **Portfolio / Margin Wallet:** `${margin_balance:,.2f} USDT`\n"
-                    "════════════\n"
-                    f"💎 **Total Net Equity (Binance Assets):** `${total_net_equity:,.2f} USDT`"
-                )
-            elif user_lang == 'zh':
-                msg = (
-                    "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | 实时资金余额** 💰\n"
-                    "════════════\n"
-                    f"🛡️ **安全认证** ៖ `VERIFIED` | `{mode_badge}`\n"
-                    "════════════\n\n"
-                    f"💵 **现货可用余额 (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
-                    f"📊 **现货持仓敞口:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
-                    f"{paxg_vault_str}"
-                    f"{futures_str}"
-                    f"{refuel_hint}"
-                    f"{funding_str}"
-                    f"{earn_str}"
-                    f"🏦 **杠杆/组合保证金:** `${margin_balance:,.2f} USDT`\n"
-                    "════════════\n"
-                    f"💎 **Binance 总资产净值:** `${total_net_equity:,.2f} USDT`"
-                )
-            else:
-                msg = (
-                    "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
-                    "════════════\n"
-                    f"🛡️ **យន្តការសុវត្ថិភាព ៖** `VERIFIED` | `{mode_badge}`\n"
-                    "════════════\n\n"
-                    f"💵 **Spot Cash (Free USDT):** `${spot_cash_usdt:,.2f} USDT`\n"
-                    f"📊 **Spot Trading Exposure:** `${spot_trading_exposure:,.2f} USDT`{trading_details}\n"
-                    f"{paxg_vault_str}"
-                    f"{futures_str}"
-                    f"{refuel_hint}"
-                    f"{funding_str}"
-                    f"{earn_str}"
-                    f"🏦 **Portfolio / Margin Wallet:** `${margin_balance:,.2f} USDT`\n"
-                    "════════════\n"
-                    f"💎 **ទ្រព្យសកម្មសរុប (Binance Total Net Equity):** `${total_net_equity:,.2f} USDT`"
-                )
-
-            deposit_btn_txt = "📥 Deposit Arbitrum USDT" if user_lang == 'en' else ("📥 充值 Arbitrum USDT" if user_lang == 'zh' else "📥 ដាក់ប្រាក់ Arbitrum USDT")
-            transfer_btn_txt = f"⚡ Transfer Spot ➔ Futures (${spot_cash_usdt:,.2f})" if user_lang == 'en' else (f"⚡ 划转至合约 (${spot_cash_usdt:,.2f})" if user_lang == 'zh' else f"⚡ ផ្ទេរ Spot ➔ Futures (${spot_cash_usdt:,.2f})")
+            spot_cash = float(data.get("spot_usdt_free", 0.0) or 0.0)
+            deposit_btn_txt = "📥 Deposit Arbitrum USDT" if user_lang == 'en' else "📥 ដាក់ប្រាក់ Arbitrum USDT"
+            transfer_btn_txt = f"⚡ Transfer Spot ➔ Futures (${spot_cash:,.2f})" if user_lang == 'en' else f"⚡ ផ្ទេរ Spot ➔ Futures (${spot_cash:,.2f})"
 
             keyboard = [
                 [
-                    InlineKeyboardButton(deposit_btn_txt, callback_data="btn_deposit_arbitrum"),
-                    InlineKeyboardButton(transfer_btn_txt, callback_data="btn_transfer_spot_to_futures")
-                ],
-                [
                     InlineKeyboardButton("🔄 Refresh Balance", callback_data="btn_balance_refresh"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    InlineKeyboardButton("💼 Portfolio Audit", callback_data="btn_menu_portfolio")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar")
+                    InlineKeyboardButton(transfer_btn_txt, callback_data="btn_transfer_spot_to_futures"),
+                    InlineKeyboardButton(deposit_btn_txt, callback_data="btn_deposit_arbitrum")
                 ],
                 [
-                    InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
+                    InlineKeyboardButton("💎 24/7 Perpetual Wealth", callback_data="btn_wealth_menu"),
+                    InlineKeyboardButton("⚡ Turbo Hedge HFT", callback_data="btn_turbo_hedge")
                 ],
                 [
-                    InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                    InlineKeyboardButton("🎯 Smart Trade / Auto", callback_data="btn_smart_trade"),
+                    InlineKeyboardButton("💳 Solana Hot Wallet", callback_data="btn_smart_swap_wallet")
+                ],
+                [
+                    InlineKeyboardButton("🛑 STOP ALL (Exit Market)", callback_data="btn_smart_swap_stop_all"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
                 
             target_msg = update.message if update.message else (update.callback_query.message if update.callback_query else None)
             if target_msg:
-                await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
-            self.log_signal.emit(f"💳 VIP User {chat_id} checked their v13.00 live balance.")
+                if len(msg) > 4000:
+                    chunks = [msg[i:i+3900] for i in range(0, len(msg), 3900)]
+                    for idx, chk in enumerate(chunks):
+                        kb = reply_markup if idx == len(chunks) - 1 else None
+                        try:
+                            await target_msg.reply_text(chk, parse_mode="Markdown", reply_markup=kb)
+                        except Exception:
+                            await target_msg.reply_text(chk, reply_markup=kb)
+                else:
+                    try:
+                        await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+                    except Exception:
+                        await target_msg.reply_text(msg, reply_markup=reply_markup)
+            self.log_signal.emit(f"💳 VIP User {chat_id} checked their Super Smart live multi-wallet balance.")
 
 
 
