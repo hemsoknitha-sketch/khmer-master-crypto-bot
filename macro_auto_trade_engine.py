@@ -38,6 +38,9 @@ TRADFI_EXCLUSION_SET = {
 
 import dynamic_ranking
 
+# Anti-churn / failed margin backoff cooldown (symbol + chat_id)
+_macro_failed_margin_cooldown = {}
+
 # Core Macro High-Liquidity Fallback Symbols (Used only if dynamic ticker network fails)
 FALLBACK_MACRO_SYMBOLS = [
     "ETHUSDT", "SOLUSDT", "BTCUSDT", "SUIUSDT", "NEARUSDT", 
@@ -391,17 +394,23 @@ def is_symbol_safe_for_macro_trade(chat_id: int, symbol: str, proposed_side: str
     except Exception as e:
         print(f"Error checking macro trades count: {e}")
 
+    # Check failed margin cooldown
+    if time.time() < _macro_failed_margin_cooldown.get((chat_id, symbol), 0.0):
+        return False, f"MARGIN_COOLDOWN_ACTIVE ({symbol} backing off for 60s)"
+
     # 3. Check Wallet USDT Balance Buffer
     keys = db.get_user_api(chat_id)
     if not keys:
         return False, "NO_API_KEYS_CONFIGURED"
 
     try:
-        free_bal = trading_engine.get_futures_available_balance(keys[0], keys[1])
+        free_bal = trading_engine.get_futures_free_margin(keys[0], keys[1])
         cfg = db.get_macro_auto_trade_config(chat_id)
-        req_amount = cfg.get("amount", 30.0)
-        if free_bal < (req_amount + 12.0):
-            return False, f"INSUFFICIENT_FREE_MARGIN (Avail: ${free_bal:.2f}, Need: ${req_amount + 12.0:.2f})"
+        req_amount = float(cfg.get("amount", 30.0))
+        min_needed = min(req_amount, 8.0)
+        if free_bal < min_needed:
+            _macro_failed_margin_cooldown[(chat_id, symbol)] = time.time() + 60.0
+            return False, f"INSUFFICIENT_FREE_MARGIN (Avail: ${free_bal:.2f}, Need: ${min_needed:.2f})"
     except Exception as e:
         print(f"Error checking balance: {e}")
 
@@ -774,26 +783,30 @@ async def run_macro_auto_trade_scanner_cycle(app):
                     chat_id, sym, side, trade_amt, lev, strategy
                 )
 
-                if exec_res.get("status") == "success" and app and hasattr(app, "bot"):
-                    try:
-                        strat_title = "🌊 **APEX MACRO WATERFALL SHORT EXECUTED!** 🚀" if side == "SHORT" else "🚀 **APEX MACRO BREAKOUT LONG EXECUTED!** 📈"
-                        dir_title = f"{side} ({strategy})"
-                        actual_invested = float(exec_res.get("amount") or trade_amt)
-                        msg_entry = (
-                            f"{strat_title}\n"
-                            f"{DIVIDER_DOUBLE}\n\n"
-                            f"🪙 **កាក់ជ័យលាភី ៖** `{sym}` (Tournament Score: `{conf:.1f}%`)\n"
-                            f"🎯 **ទិសដៅ ៖** `{dir_title}`\n"
-                            f"💵 **ទុនវិនិយោគ ៖** `${actual_invested:.2f} USDT`\n"
-                            f"🛡️ **Margin Buffer ៖** `{lev}x ISOLATED (~33% Safety Room)`\n"
-                            f"📊 **Anti-Fakeout Gate ៖** `ADX & Macro Trend Confirmed`\n"
-                            f"⚡ **Binance Status ៖** `POSITION OPENED (<30ms)`\n\n"
-                            f"_ប្រព័ន្ធសម្រាំងកាក់ល្អបំផុតពី TOP 500 ធានាសុវត្ថិភាពទុន ១០០%!_\n\n"
-                            f"{OFFICIAL_FOOTNOTE}"
-                        )
-                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_entry, parse_mode="Markdown"))
-                    except Exception:
-                        pass
+                if exec_res.get("status") == "success":
+                    _macro_failed_margin_cooldown.pop((chat_id, sym), None)
+                    if app and hasattr(app, "bot"):
+                        try:
+                            strat_title = "🌊 **APEX MACRO WATERFALL SHORT EXECUTED!** 🚀" if side == "SHORT" else "🚀 **APEX MACRO BREAKOUT LONG EXECUTED!** 📈"
+                            dir_title = f"{side} ({strategy})"
+                            actual_invested = float(exec_res.get("amount") or trade_amt)
+                            msg_entry = (
+                                f"{strat_title}\n"
+                                f"{DIVIDER_DOUBLE}\n\n"
+                                f"🪙 **កាក់ជ័យលាភី ៖** `{sym}` (Tournament Score: `{conf:.1f}%`)\n"
+                                f"🎯 **ទិសដៅ ៖** `{dir_title}`\n"
+                                f"💵 **ទុនវិនិយោគ ៖** `${actual_invested:.2f} USDT`\n"
+                                f"🛡️ **Margin Buffer ៖** `{lev}x ISOLATED (~33% Safety Room)`\n"
+                                f"📊 **Anti-Fakeout Gate ៖** `ADX & Macro Trend Confirmed`\n"
+                                f"⚡ **Binance Status ៖** `POSITION OPENED (<30ms)`\n\n"
+                                f"_ប្រព័ន្ធសម្រាំងកាក់ល្អបំផុតពី TOP 500 ធានាសុវត្ថិភាពទុន ១០០%!_\n\n"
+                                f"{OFFICIAL_FOOTNOTE}"
+                            )
+                            asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg_entry, parse_mode="Markdown"))
+                        except Exception:
+                            pass
+                else:
+                    _macro_failed_margin_cooldown[(chat_id, sym)] = time.time() + 60.0
 
                 user_trades = db.get_user_macro_trades(chat_id) or []
                 if len(user_trades) >= 2:

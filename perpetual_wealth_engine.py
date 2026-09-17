@@ -57,13 +57,19 @@ def is_wealth_in_cooldown(symbol: str) -> bool:
     return time.time() < exp
 
 
-def get_monitoring_symbols_set() -> set:
-    """Retrieves Binance surveillance/monitoring symbols."""
+async def _async_send_wealth_alert(app, chat_id: int, text: str, alert_name: str = "wealth alert"):
+    """Non-blocking background Telegram notification sender with strict network timeout."""
     try:
-        import turbo_hedge_engine
-        return turbo_hedge_engine.get_binance_monitoring_symbols()
-    except Exception:
-        return set()
+        await app.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="Markdown",
+            read_timeout=5,
+            write_timeout=5,
+            connect_timeout=5
+        )
+    except Exception as err:
+        print(f"⚠️ Notice sending {alert_name}: {err}")
 
 
 class PerpetualWealthGeneratorEngine:
@@ -557,7 +563,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _Autonomous engine is trailing remaining 50% for maximum moonshot!_"
                                 )
-                                await app.bot.send_message(chat_id=chat_id, text=notif_text, parse_mode="Markdown")
+                                asyncio.create_task(_async_send_wealth_alert(app, chat_id, notif_text, "TP1 alert"))
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending TP1 alert: {notif_err}")
 
@@ -609,7 +615,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _Hunting the next Golden Sweet-Spot breakout immediately!_"
                                 )
-                                await app.bot.send_message(chat_id=chat_id, text=harvest_msg, parse_mode="Markdown")
+                                asyncio.create_task(_async_send_wealth_alert(app, chat_id, harvest_msg, "TP2 alert"))
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending TP2 alert: {notif_err}")
 
@@ -746,7 +752,7 @@ class PerpetualWealthGeneratorEngine:
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             "💡 _Autonomous 24/7 wealth engine is guarding and harvesting profits!_"
                                         )
-                                        await app.bot.send_message(chat_id=chat_id, text=entry_msg, parse_mode="Markdown")
+                                        asyncio.create_task(_async_send_wealth_alert(app, chat_id, entry_msg, "wealth entry alert"))
                                     except Exception as alert_err:
                                         print(f"⚠️ Notice sending wealth entry alert: {alert_err}")
 
