@@ -668,14 +668,7 @@ class PerpetualWealthGeneratorEngine:
                         _active_wealth_exec_keys.add(exec_key)
 
                         try:
-                            # 1. Enforce ISOLATED margin mode (Invariant 3)
-                            trading_engine.set_futures_margin_type(api_key, api_secret, sym, "ISOLATED")
-                            # 2. Enforce Single-Asset Mode (Invariant 17)
-                            trading_engine.ensure_single_asset_mode(api_key, api_secret)
-                            # 3. Set Leverage
-                            trading_engine.set_futures_leverage(api_key, api_secret, sym, leverage)
-
-                            # Calculate quantity
+                            # Calculate quantity (Margin mode & leverage are automatically enforced in place_futures_order)
                             last_price = cand["last_price"]
                             notional = margin_per_coin * leverage
                             raw_qty = notional / last_price if last_price > 0 else 0.0
