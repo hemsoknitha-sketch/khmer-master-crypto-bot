@@ -6276,8 +6276,10 @@ async def vip_8hour_executive_report_job(app: Application):
                 if not user_bots:
                     report_text += "🟢 **ស្ថានភាព Position ៖** `គ្មាន Position កំពុងត្រាំ - ទុនរៀបរយ ១០០%`\n\n"
                 else:
-                    report_text += "💼 **បញ្ជីកាក់កំពុងវិនិយោគ (ACTIVE PORTFOLIO) ៖**\n\n"
-                    for idx, b in enumerate(user_bots, 1):
+                    report_text += f"💼 **បញ្ជីកាក់កំពុងវិនិយោគ (ACTIVE PORTFOLIO - {len(user_bots)} Positions) ៖**\n\n"
+                    # Display up to 8 positions in detail to prevent message bloat
+                    display_bots = user_bots[:8]
+                    for idx, b in enumerate(display_bots, 1):
                         sym = b.get("symbol", "")
                         side = b.get("side", "BUY")
                         amt = float(b.get("amount", 0.0))
@@ -6299,6 +6301,8 @@ async def vip_8hour_executive_report_job(app: Application):
                             f"   💵 **Entry Price ៖** `${entry_p:,.4f}` | 💰 **Invest ៖** `${amt:,.2f}`\n"
                             f"   {pnl_emoji} **Profit/Loss ៖** `${pnl_val:+,.2f} USDT` (`{roi_val:+,.1f}% ROI`)\n\n"
                         )
+                    if len(user_bots) > 8:
+                        report_text += f"   └ ℹ️ _(និងមាន {len(user_bots) - 8} Positions សកម្មផ្សេងទៀតកំពុងគ្រប់គ្រងដោយ AI 24/7)_\n\n"
 
                 report_text += (
                     f"════════════\n"
@@ -6310,7 +6314,7 @@ async def vip_8hour_executive_report_job(app: Application):
 
                 recent_trades = db.get_recent_harvested_trades(chat_id, hours=8)
                 if recent_trades:
-                    report_text += "🏆 **បញ្ជីកាក់បានកើបចំណេញក្នុង ៨ ម៉ោង (8-HOUR HARVESTED HISTORY) ៖**\n\n"
+                    report_text += f"🏆 **បញ្ជីកាក់បានកើបចំណេញក្នុង ៨ ម៉ោង (8-HOUR HARVESTED - {len(recent_trades)} Trades) ៖**\n\n"
                     tot_8h_gross = 0.0
                     tot_8h_fees = 0.0
                     for h_idx, t in enumerate(recent_trades, 1):
@@ -6336,13 +6340,19 @@ async def vip_8hour_executive_report_job(app: Application):
                         tot_8h_gross += h_pnl
                         tot_8h_fees += trade_fee
                         
-                        h_emoji = "🟩" if net_trade_pnl >= 0 else "🟥"
-                        report_text += (
-                            f"**{h_idx}. {h_sym}** ({h_side})\n"
-                            f"   💵 **Entry ៖** `${h_entry:,.4f}` ➔ **Harvest ៖** `${h_exit:,.4f}`\n"
-                            f"   • Gross PnL ៖ `${h_pnl:+,.2f} USDT` | 💳 Fee ៖ `-${trade_fee:.2f} USDT`\n"
-                            f"   {h_emoji} **Net Harvested ៖** `${net_trade_pnl:+,.2f} USDT` (`{h_roi:+,.1f}% ROI`)\n\n"
-                        )
+                        # Display up to 8 trades in detail
+                        if h_idx <= 8:
+                            h_emoji = "🟩" if net_trade_pnl >= 0 else "🟥"
+                            report_text += (
+                                f"**{h_idx}. {h_sym}** ({h_side})\n"
+                                f"   💵 **Entry ៖** `${h_entry:,.4f}` ➔ **Harvest ៖** `${h_exit:,.4f}`\n"
+                                f"   • Gross PnL ៖ `${h_pnl:+,.2f} USDT` | 💳 Fee ៖ `-${trade_fee:.2f} USDT`\n"
+                                f"   {h_emoji} **Net Harvested ៖** `${net_trade_pnl:+,.2f} USDT` (`{h_roi:+,.1f}% ROI`)\n\n"
+                            )
+
+                    if len(recent_trades) > 8:
+                        report_text += f"   └ ℹ️ _(និងមាន {len(recent_trades) - 8} ប្រតិបត្តិការជោគជ័យផ្សេងទៀតត្រូវបានកើបចំណេញក្នុង ៨ ម៉ោងនេះ)_\n\n"
+
                     net_8h_total = round(tot_8h_gross - tot_8h_fees, 2)
                     tot_emoji = "🟩" if net_8h_total >= 0 else "🟥"
                     report_text += (
@@ -6355,11 +6365,41 @@ async def vip_8hour_executive_report_job(app: Application):
 
                 report_text += (
                     f"════════════\n"
-                    f"💡 _របាយការណ៍សរុបស្វ័យប្រវត្តិរៀងរាល់ ៨ ម៉ោងម្តង ជូន VIP Users!_"
+                    f"💡 _របាយការណ៍សរុបស្វ័យប្រវត្តិរៀងរាល់ ៨ ម៉ោងម្តង ជូន VIP Users!_\n"
+                    f"━━━━━━━━━━━━\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
                 )
 
                 if app and hasattr(app, "bot"):
-                    await app.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown")
+                    if len(report_text) <= 3900:
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown")
+                        except Exception:
+                            clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                            await app.bot.send_message(chat_id=chat_id, text=clean_txt)
+                    else:
+                        lines = report_text.split("\n")
+                        current_chunk = ""
+                        for line in lines:
+                            if len(current_chunk) + len(line) + 1 > 3800:
+                                if current_chunk:
+                                    try:
+                                        await app.bot.send_message(chat_id=chat_id, text=current_chunk, parse_mode="Markdown")
+                                    except Exception:
+                                        clean_txt = current_chunk.replace('*', '').replace('`', '').replace('_', '')
+                                        await app.bot.send_message(chat_id=chat_id, text=clean_txt)
+                                    current_chunk = line + "\n"
+                                    await asyncio.sleep(0.3)
+                            else:
+                                current_chunk += line + "\n"
+                        if current_chunk.strip():
+                            try:
+                                await app.bot.send_message(chat_id=chat_id, text=current_chunk, parse_mode="Markdown")
+                            except Exception:
+                                clean_txt = current_chunk.replace('*', '').replace('`', '').replace('_', '')
+                                await app.bot.send_message(chat_id=chat_id, text=clean_txt)
             except Exception as user_err:
                 print(f"Error sending 8h VIP report to {chat_id}: {user_err}")
     except Exception as e:
