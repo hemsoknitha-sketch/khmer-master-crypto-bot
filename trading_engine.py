@@ -957,6 +957,10 @@ def get_futures_positions(api_key: str, api_secret: str) -> list:
             continue
     return []
 
+def get_open_positions(api_key: str, api_secret: str) -> list:
+    """Canonical alias for get_futures_positions: queries Binance /fapi/v2/positionRisk."""
+    return get_futures_positions(api_key, api_secret)
+
 def emergency_reduce_position(api_key: str, api_secret: str, symbol: str, side: str, qty: float) -> dict:
     if PAPER_TRADING:
         return simulate_order_response(symbol, f"EMERGENCY_REDUCE_{side}", qty)
