@@ -1260,19 +1260,33 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         if price <= 0:
             return {"status": "error", "message": f"Failed to fetch price for {symbol}"}
 
+        # 🛡️ 2. Volatility-Adjusted Position Sizing (Asset-DNA Sizing Engine):
+        # Target Risk = $0.25 USDT (1R Micro Cap)
+        # Position Size (Qty) = Risk ($0.25) / Stop Distance ($)
+        dna = market_data.profile_asset_dna(symbol)
+        sl_mult = dna.get("sl_atr_mult", 2.0)
+        cushion_pct = dna.get("noise_cushion_pct", 1.8)
+        stop_dist_pct = max(cushion_pct, dna.get("atr_pct", 1.5) * sl_mult)
+        
+        # Volatility-adjusted margin sizing:
+        # High-Beta/Meme (PEPE/DOGE) uses smaller margin ($4-$6 USDT) to ensure dollar risk remains <= $0.25
+        # Low-Beta/Macro (BTC/ETH) uses standard margin ($10-$15 USDT)
+        target_notional_for_risk = 0.25 / max(0.01, (stop_dist_pct / 100.0))
+        target_margin_for_risk = target_notional_for_risk / max(1, effective_leverage)
+        scaled_amount = max(4.00, target_margin_for_risk * dna.get("margin_scale_factor", 1.0))
+        dynamic_amount_usdt = min(amount_usdt, scaled_amount)
+
         # 🛡️ Strict Margin Safety Shield:
-        # Require available free margin to be at least amount_usdt AND at least $10.00 USDT safety buffer.
-        # NEVER force-shrink trade amount to squeeze extra trades into tiny remaining margins ($2-$5)!
-        if avail_bal < amount_usdt or avail_bal < 10.0:
-            print(f"🛑 [STRICT MARGIN GUARD] Free margin (${avail_bal:.2f} USDT) is less than required capital (${amount_usdt:.2f} USDT) or $10.00 safety buffer. Aborted order to prevent liquidation.")
+        if avail_bal < dynamic_amount_usdt or avail_bal < 8.0:
+            print(f"🛑 [STRICT MARGIN GUARD] Free margin (${avail_bal:.2f} USDT) is less than required capital (${dynamic_amount_usdt:.2f} USDT) or $8.00 safety buffer. Aborted order to prevent liquidation.")
             return {
                 "status": "error",
                 "reason": "INSUFFICIENT_MARGIN_SAFETY_BUFFER",
-                "msg": f"Available free margin (${avail_bal:.2f} USDT) is below required ${amount_usdt:.2f} USDT or $10.00 safety buffer."
+                "msg": f"Available free margin (${avail_bal:.2f} USDT) is below required ${dynamic_amount_usdt:.2f} USDT or $8.00 safety buffer."
             }
 
         # Enforce Safe $6.50 Minimum Notional to prevent -4164 error after LOT_SIZE step floor rounding
-        notional = max(6.50, amount_usdt * effective_leverage)
+        notional = max(6.50, dynamic_amount_usdt * effective_leverage)
         qty = notional / price
 
         # Automatic Binance LOT_SIZE precision handling

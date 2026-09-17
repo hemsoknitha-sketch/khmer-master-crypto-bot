@@ -1783,24 +1783,38 @@ def calculate_kelly_optimal_size(
 
 def calculate_asymmetric_5r_position_size(
     entry_price: float, 
-    invalidation_price: float, 
+    invalidation_price: float = 0.0, 
+    symbol: str = "",
     risk_usdt: float = 0.25,
     min_notional: float = 10.50,
     leverage: int = 10
 ) -> dict:
     """
-    Wall Street Institutional Asymmetric 5R-6R Risk/Reward Calculator:
-    - 1R Risk Floor: Loss is strictly micro-capped at $0.20 - $0.25 USDT per trade.
-    - Growth Milestone (3R): Bank cash / ratchet at +$0.75 net.
-    - TP2 Moonbag Runner (5.5R - 6.0R): Rides the trend to +$1.50 - +$3.50+ net (5X Asymmetric Edge).
+    Wall Street Institutional Volatility-Adjusted 5R-6R Risk/Reward Calculator:
+    - Target Risk (1R): Strictly micro-capped at $0.20 - $0.25 USDT per trade.
+    - Position Size (Qty) = Risk ($0.25) / Stop Distance ($)
+    - Volatility Adjustment: High-Beta/Meme coins get wider stop distance + smaller margin ($4-$6).
+      Low-Beta/Macro coins get tighter stop distance + higher margin ($10-$15), yielding massive 5R ($1.50 - $3.50+).
     """
-    if entry_price <= 0 or invalidation_price <= 0:
+    if entry_price <= 0:
         return {"valid": False, "qty": 0.0, "risk_usdt": risk_usdt}
-        
+
+    if invalidation_price <= 0 and symbol:
+        try:
+            import market_data
+            dna = market_data.profile_asset_dna(symbol)
+            sl_mult = dna.get("sl_atr_mult", 2.0)
+            cushion_pct = dna.get("noise_cushion_pct", 1.8)
+            stop_dist_pct = max(cushion_pct, dna.get("atr_pct", 1.5) * sl_mult)
+            invalidation_price = entry_price * (1.0 - (stop_dist_pct / 100.0))
+        except Exception:
+            invalidation_price = entry_price * 0.985
+    elif invalidation_price <= 0:
+        invalidation_price = entry_price * 0.985
+
     price_risk = abs(entry_price - invalidation_price)
     if price_risk <= 0:
-        # Fallback to 1.2% structural risk buffer
-        price_risk = entry_price * 0.012
+        price_risk = entry_price * 0.015
 
     # 1. Exact Quantity Sizing: Qty * price_risk == risk_usdt
     exact_qty = risk_usdt / price_risk
@@ -1815,11 +1829,13 @@ def calculate_asymmetric_5r_position_size(
     tp1_price = entry_price + (price_risk * 3.0) if is_long else entry_price - (price_risk * 3.0)
     tp2_price = entry_price + (price_risk * 6.0) if is_long else entry_price - (price_risk * 6.0)
     be_price = entry_price * (1.0015 if is_long else 0.9985)
+    allocated_margin = notional / max(1, leverage)
 
     return {
         "valid": True,
         "qty": exact_qty,
         "notional": notional,
+        "allocated_margin": allocated_margin,
         "risk_usdt": risk_usdt,
         "tp1_target_usdt": risk_usdt * 3.0,
         "tp2_target_usdt": risk_usdt * 6.0,
