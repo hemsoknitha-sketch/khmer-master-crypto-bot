@@ -4828,12 +4828,14 @@ async def database_backup_job(app: Application):
     except Exception as e:
         print(f"Database Backup Error: {e}")
 
+PRE_PUMP_USER_COOLDOWN_CACHE = {}  # {(chat_id, symbol): timestamp}
+
 async def pre_pump_sniper_monitor(app, ai_engine):
     import database as db
     import trading_engine
     import dynamic_ranking
     from pre_pump_engine import pre_pump_engine
-# import asyncio # removed local shadowing
+    import time
     
     pre_pump_users = await asyncio.to_thread(db.get_pre_pump_users)
     if not pre_pump_users:
@@ -4853,6 +4855,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
     tasks = [bounded_eval(sym) for sym in symbols]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
+    now_ts = time.time()
     for i, symbol in enumerate(symbols):
         res = results[i]
         if isinstance(res, tuple) and res[0] is True:
@@ -4868,6 +4871,11 @@ async def pre_pump_sniper_monitor(app, ai_engine):
             
             # Execute trades for all opted-in VIP users
             for chat_id, invest_amount in pre_pump_users:
+                # Anti-Churning Cooldown: 30-minute cooldown per symbol per user
+                last_exec = PRE_PUMP_USER_COOLDOWN_CACHE.get((chat_id, symbol), 0)
+                if now_ts - last_exec < 1800:
+                    continue
+
                 keys = await asyncio.to_thread(db.get_user_api, chat_id)
                 if not keys:
                     continue
@@ -4881,6 +4889,15 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                 already_trading = any((t[1] if isinstance(t, (tuple, list)) else (t.get('symbol') if hasattr(t, 'get') else getattr(t, 'symbol', None))) == symbol for t in active_trades)
                 if already_trading:
                     continue
+
+                # Anti-Duplicate Spot Holding Shield: If already holding >= $5 worth on Spot, skip duplicate buys
+                if stage == "SPOT_BUY_SCOUT":
+                    base_asset = symbol[:-4] if symbol.endswith("USDT") else symbol
+                    actual_coin_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, base_asset)
+                    if actual_coin_bal * current_price >= 5.0:
+                        print(f"🛡️ [PRE-PUMP SPOT SHIELD] Already holding ${actual_coin_bal * current_price:.2f} of {symbol} for Chat ID {chat_id}. Skipping duplicate buy.")
+                        PRE_PUMP_USER_COOLDOWN_CACHE[(chat_id, symbol)] = now_ts
+                        continue
 
                 # Invariant 8: Small capital clamp (< $100 -> max 10x)
                 effective_leverage = min(10, rec_leverage) if invest_amount < 100.0 else rec_leverage
@@ -4898,7 +4915,8 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                         order = await asyncio.to_thread(trading_engine.place_spot_order, api_key, api_secret, symbol, "BUY", qty)
                         if "error" not in order and "code" not in order:
                             order_success = True
-                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, current_price, current_price, 1.5)
+                            PRE_PUMP_USER_COOLDOWN_CACHE[(chat_id, symbol)] = now_ts
+                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, buy_price=current_price, stop_loss_pct=1.5)
                     else:
                         # Stage 2: High-Confidence Precision Futures Entry (BUY Long or SELL Short)
                         if side == "SELL":
@@ -4912,7 +4930,8 @@ async def pre_pump_sniper_monitor(app, ai_engine):
 
                         if "error" not in order and "code" not in order and order.get("status") != "error":
                             order_success = True
-                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, current_price, current_price, 1.5)
+                            PRE_PUMP_USER_COOLDOWN_CACHE[(chat_id, symbol)] = now_ts
+                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, buy_price=current_price, stop_loss_pct=1.5)
 
                     if order_success:
                         action_badge = "🟢 LONG (BUY)" if side == "BUY" else "🔴 SHORT (SELL)"

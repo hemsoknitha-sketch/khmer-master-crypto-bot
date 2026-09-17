@@ -616,7 +616,7 @@ class PerpetualWealthGeneratorEngine:
                         side_to_close = "SELL" if amt > 0 else "BUY"
                         is_be_exit = is_be_locked and roi_pct > -5.0
                         reason_tag = "BREAKEVEN DEFENSE" if is_be_exit else "DYNAMIC STOP LOSS"
-                        print(f"🛑 [PERPETUAL WEALTH {reason_tag}] {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
+                        print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
                         trading_engine.place_futures_order(
                             api_key=api_key,
                             api_secret=api_secret,
