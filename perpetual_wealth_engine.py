@@ -699,14 +699,6 @@ class PerpetualWealthGeneratorEngine:
                             )
 
                             if order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")):
-                                db.add_active_trade(
-                                    chat_id=chat_id,
-                                    symbol=sym,
-                                    qty=qty,
-                                    buy_price=last_price,
-                                    stop_loss_pct=3.0
-                                )
-
                                 # Send Telegram alert
                                 if app and hasattr(app, "bot"):
                                     try:
