@@ -2927,10 +2927,11 @@ def place_spot_order(
     else:
         # SELL side
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
+        actual_free = get_spot_balance(api_key, api_secret, base_asset)
         if quantity <= 0:
-            raw_qty = get_spot_balance(api_key, api_secret, base_asset)
+            raw_qty = actual_free
         else:
-            raw_qty = quantity
+            raw_qty = min(quantity, actual_free) if actual_free > 0 else quantity
 
         if raw_qty <= 0:
             return {"status": "error", "error": f"No {base_asset} spot balance available to sell"}

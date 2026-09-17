@@ -1290,10 +1290,30 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending Spot TP2 alert: {notif_err}")
 
-                    # Phase 4: Breakeven Defense Trigger OR Dynamic Stop Loss (-6.0%)
-                    elif (is_be_locked and current_price <= (buy_price * 1.0025)) or roi_pct <= -6.0:
-                        is_be_exit = is_be_locked and roi_pct > -1.0
-                        reason_tag = "BREAKEVEN DEFENSE" if is_be_exit else "DYNAMIC STOP LOSS"
+                    # Phase 4: Stagnation Capital Liberation Trigger (Held > 4h without breakout)
+                    # OR Breakeven Defense Trigger OR Dynamic Stop Loss (-6.0%)
+                    trade_ts_str = tr.get("timestamp", "")
+                    trade_age_seconds = 0.0
+                    if trade_ts_str:
+                        try:
+                            from datetime import datetime
+                            trade_dt = datetime.strptime(trade_ts_str, "%Y-%m-%d %H:%M:%S")
+                            trade_age_seconds = (datetime.now() - trade_dt).total_seconds()
+                        except Exception:
+                            trade_age_seconds = 0.0
+
+                    is_stagnant = (trade_age_seconds >= 14400.0 and curr_peak < 2.0 and -1.5 <= roi_pct <= 0.8)
+                    is_be_exit = is_be_locked and current_price <= (buy_price * 1.0025) and roi_pct > -1.0
+                    is_sl_exit = roi_pct <= -6.0
+
+                    if is_be_exit or is_sl_exit or is_stagnant:
+                        if is_stagnant:
+                            reason_tag = "STAGNATION CAPITAL LIBERATION"
+                        elif is_be_exit:
+                            reason_tag = "BREAKEVEN DEFENSE"
+                        else:
+                            reason_tag = "DYNAMIC STOP LOSS"
+
                         print(f"🛑 [SPOT WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI. Executing Spot protection exit...")
                         trading_engine.place_spot_order(
                             api_key=api_key,
@@ -1305,7 +1325,33 @@ class PerpetualWealthGeneratorEngine:
                         realized_pnl = (current_price - buy_price) * rem_qty
                         db.close_perpetual_wealth_spot_trade(t_id)
                         db.update_perpetual_wealth_spot_pnl(chat_id, realized_pnl, is_win=(realized_pnl > 0))
-                        add_wealth_spot_cooldown(sym, duration_seconds=1800 if is_be_exit else 3600)
+                        add_wealth_spot_cooldown(sym, duration_seconds=1800 if (is_be_exit or is_stagnant) else 3600)
+
+                        if is_stagnant and app and hasattr(app, "bot"):
+                            try:
+                                user_lang = db.get_user_language(chat_id)
+                                stag_msg = (
+                                    "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
+                                    f"⏱️ **រយៈពេលកាន់កាប់ ៖** `{trade_age_seconds/3600:.1f} ម៉ោង (ទ្រឹងគ្មាន Momentum)`\n"
+                                    f"💵 **Exit ROI ៖** `{roi_pct:.2f}%`\n"
+                                    f"🔄 **ស្ថានភាពទុន ៖** `ដោះលែងទុនមកវិញ ១០០% ចូល Spot Wallet`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _ប្រព័ន្ធមិនត្រាំកាក់ឡើយ! កំពុងបង្វិលទុនទៅចាប់កាក់ Breakout ថ្មីភ្លាមៗ!_"
+                                ) if user_lang == 'khmer' else (
+                                    "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
+                                    f"⏱️ **Holding Duration:** `{trade_age_seconds/3600:.1f}h (Stagnant / No Momentum)`\n"
+                                    f"💵 **Exit ROI:** `{roi_pct:.2f}%`\n"
+                                    f"🔄 **Capital Status:** `100% Liberated back to Spot Wallet`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _Zero capital stagnation! Rotating immediately into active breakout candidates._"
+                                )
+                                asyncio.create_task(_async_send_wealth_alert(app, chat_id, stag_msg, "Spot stagnation liberation"))
+                            except Exception as notif_err:
+                                print(f"⚠️ Notice sending Spot stagnation alert: {notif_err}")
 
                     else:
                         db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), int(is_be_locked))
