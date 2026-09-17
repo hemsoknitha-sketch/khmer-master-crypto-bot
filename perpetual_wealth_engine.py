@@ -31,10 +31,18 @@ _active_wealth_exec_keys = set()
 _wealth_symbol_cooldowns = {}
 _last_wealth_scan_time = 0.0
 
+_WEALTH_TECH_CACHE = {}
+
 TRADFI_STOCK_SYMBOLS = {
     'NVDAUSDT', 'TSLAUSDT', 'AAPLUSDT', 'AAPLEUSDT', 'MSFTUSDT', 'AMZNUSDT', 'GOOGUSDT', 'METAUSDT',
     'COINUSDT', 'MSTRUSDT', 'PLTRUSDT', 'AMDUSDT', 'INTCUSDT', 'BABAUSDT', 'NFLXUSDT', 'QNTXUSDT',
-    'BONDUSDT', 'DODOUSDT', 'REEFUSDT', 'UNFIUSDT', 'IDEXUSDT', 'RENUSDT', 'FTTUSDT', 'LUNAUSDT', 'USTCUSDT'
+    'BONDUSDT', 'DODOUSDT', 'REEFUSDT', 'UNFIUSDT', 'IDEXUSDT', 'RENUSDT', 'FTTUSDT', 'LUNAUSDT', 'USTCUSDT',
+    'BEUSDT', 'ORCLUSDT', 'CBRSUSDT', 'NBISUSDT', 'ROBOUSDT', 'SHAZUSDT', 'KORUUSDT', 'DRAMUSDT', 'SNXXUSDT',
+    'MUUUSDT', 'MUUSDT', 'SKHYUSDT', 'SKHYNIXUSDT', 'SAMSUNGUSDT', 'WDCUSDT', 'AIAUSDT', 'MUBARAKUSDT',
+    'CSOPSKHYNIX2LUSDT', 'MINIMAXUSDT', 'ZHIPUUSDT', 'NOKUSDT', 'SMCIUSDT', 'DELLUSDT', 'SNDKUSDT', 'STXXUSDT',
+    'INTWUSDT', 'EWYUSDT', 'MVLLUSDT', 'GLWUSDT', 'HK0700USDT', 'HK1810USDT', 'CHIPUSDT', 'AAOIUSDT', 'MRVLUSDT',
+    'CRWVUSDT', 'ZAMAUSDT', 'TSMUSDT', 'TQQQUSDT', 'SQQQUSDT', 'ARMUSDT', 'NATGASUSDT', 'INXUSDT', 'USDCUSDT',
+    'FDUSDUSDT', 'TUSDUSDT', 'BUSDUSDT'
 }
 
 
@@ -151,9 +159,17 @@ class PerpetualWealthGeneratorEngine:
     @staticmethod
     def evaluate_symbol_technicals(symbol: str, target_side: str = "BUY") -> dict:
         """
-        Evaluates 15m/1h technical health, RSI, EMA50, and L2 Orderbook.
+        Evaluates 15m/1h technical health, RSI, EMA50, and L2 Orderbook with 30s TTL cache.
         Strictly enforces Invariant 16 (Anti-Oversold Short Guard RSI <= 38.0).
         """
+        global _WEALTH_TECH_CACHE
+        cache_key = f"{symbol}_{target_side}"
+        now_ts = time.time()
+        if cache_key in _WEALTH_TECH_CACHE:
+            ts, res = _WEALTH_TECH_CACHE[cache_key]
+            if now_ts - ts < 30.0:
+                return res
+
         try:
             # 1. Fetch 15m Klines
             k_url = f"{trading_engine.FUTURES_URL}/fapi/v1/klines?symbol={symbol}&interval=15m&limit=60"
@@ -254,7 +270,7 @@ class PerpetualWealthGeneratorEngine:
             elif target_side == "SELL" and current_price < ema50 and 40.0 <= rsi_15m <= 55.0:
                 ai_score = 9.1
 
-            return {
+            res_data = {
                 "is_valid": True,
                 "rsi_15m": rsi_15m,
                 "ema50_15m": ema50,
@@ -264,6 +280,8 @@ class PerpetualWealthGeneratorEngine:
                 "ai_score": ai_score,
                 "reason": "Optimal Confluence (ADX >= 25.0 + Pullback Retest)"
             }
+            _WEALTH_TECH_CACHE[cache_key] = (now_ts, res_data)
+            return res_data
         except Exception as e:
             return {"is_valid": False, "reason": f"Error: {e}"}
 

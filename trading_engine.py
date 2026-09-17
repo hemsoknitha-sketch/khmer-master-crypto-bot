@@ -2544,6 +2544,7 @@ def set_futures_margin_type(api_key: str, api_secret: str, symbol: str, margin_t
     return {"status": "skipped"}
 
 _SET_LEVERAGE_CACHE = {}
+_LEVERAGE_BANNED_UNTIL = 0.0
 
 def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: int = 25) -> dict:
     """
@@ -2551,7 +2552,7 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
     Super Smart & Super Fast: Skips redundant API calls if leverage is already set on Binance!
     Enforces One-Way Mode, Single-Asset Mode, and ISOLATED Margin Mode.
     """
-    global _SET_LEVERAGE_CACHE
+    global _SET_LEVERAGE_CACHE, _LEVERAGE_BANNED_UNTIL
     if not api_key or not api_secret:
         return {"status": "error", "error": "No API keys provided"}
 
@@ -2562,6 +2563,10 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
     cache_key = f"{api_key[-6:]}_{symbol}"
     if _SET_LEVERAGE_CACHE.get(cache_key) == leverage:
         return {"symbol": symbol, "leverage": leverage, "status": "cached"}
+
+    # If Binance has temporarily rate-limited the leverage endpoint, proceed with default exchange leverage
+    if time.time() < _LEVERAGE_BANNED_UNTIL:
+        return {"symbol": symbol, "leverage": leverage, "status": "cooldown_proceed"}
 
     ensure_oneway_position_mode(api_key, api_secret)
     ensure_single_asset_mode(api_key, api_secret)
@@ -2593,6 +2598,10 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
                 return res.json()
             elif "4028" in res.text:
                 continue
+            elif "-1003" in res.text:
+                _LEVERAGE_BANNED_UNTIL = time.time() + 60.0
+                print(f"ℹ️ [BINANCE LEVERAGE NOTICE] Leverage API temporarily throttled (-1003). Proceeding with current leverage.")
+                return {"status": "cooldown_proceed", "symbol": symbol, "leverage": lev}
             else:
                 print(f"⚠️ [BINANCE LEVERAGE FAIL] {res.text}")
                 return {"error": res.text}
