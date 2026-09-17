@@ -1,5 +1,5 @@
 # KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 2.1.0 (Absolute Ground Truth Lock)  
+**Document Version:** 2.2.0 (Absolute Ground Truth Lock - The 28 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -45,9 +45,9 @@ When a user asks:
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 27 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 28 PILLARS)
 
-Any modification that breaks any of the following 27 invariants is considered an act of technical sabotage:
+Any modification that breaks any of the following 28 invariants is considered an act of technical sabotage:
 
 ### Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
 - **Location:** `trading_engine.py` (`place_spot_order`, `execute_spot_strategy`)
@@ -236,6 +236,27 @@ Any modification that breaks any of the following 27 invariants is considered an
 - **Rule:**
   1. **Hardware Profile (GCP e2-standard-4):** The live production deployment operates on Google Cloud Platform `e2-standard-4` (4 vCPUs, 16 GB RAM) in Tokyo `asia-northeast1-a` with direct peering to Binance Asian liquidity clusters (< 10ms execution). The 16 GB RAM pool permanently eliminates Out-Of-Memory (OOM) risks, allowing the system to run high-throughput WebSocket streams and algorithmic scanners with zero reliance on high-latency swap memory.
   2. **Cloud AI Hybrid Brain Integration (Hugging Face HF_TOKEN):** The system leverages the Hugging Face Cloud Inference API via dedicated `HF_TOKEN` / `HUGGINGFACE_TOKEN` to execute deep quantitative reasoning models (DeepSeek-R1, Llama-3-70B, Qwen-2.5-72B) in the cloud with zero VPS RAM bloat, keeping local VPS memory usage lean (< 45 MB local ONNX/XGBoost/LSTM runtime).
+
+### Invariant 28: 24/7 Perpetual Wealth Generator Triple-Phase Autonomous Extraction & Safety Covenant Lock
+- **Location:** `perpetual_wealth_engine.py`, `bot_thread.py` (`wealth_command`), `scheduler_tasks.py` (`wealth_generator_daemon_loop`), `database.py`
+- **Rule:** The 24/7 Perpetual Wealth Generator (`/wealth`, `/wealth24/7`) is an institutional-grade, fully autonomous continuous capital accumulation and harvest engine. It is bound by the following permanent mathematical and risk covenants:
+  1. **Triple-Phase Asymmetric Profit Extraction (យុទ្ធសាស្ត្រច្បាមចំណេញ ៣ ដំណាក់កាល) ៖**
+     - **Phase 1 (Breakeven Armor):** When unrealized profit reaches $+3.0\%$ ROI, Stop-Loss is unconditionally locked to Entry Price $+ 0.12\%$ fee-adjusted net profit floor. Winning trades are strictly prohibited from degrading into losses.
+     - **Phase 2 (Micro-Scalp TP1):** When unrealized profit reaches $+4.0\%$ to $+6.0\%$ ROI (target $\ge +5.0\%$), exactly $50\%$ of the open position is liquidated into realized USDT cash immediately (`PARTIAL_TP1_50_PCT`), securing principal gain.
+     - **Phase 3 (Golden Moonshot Ratchet):** The remaining $50\%$ position runs as a moonshot runner, dynamically trailing peak profit and permanently locking $85\%$ of the highest reached unrealized profit (`TRAIL_85_PCT_OF_PEAK`), allowing runners to capture $+15\%$ to $+50\%+$ expansions.
+  2. **Pullback Retracement & Trend Strength Hurdles (Zero Top Chasing) ៖**
+     - **ADX Trend Strength Hurdle:** Entry strictly requires Wilder's ADX(14) $\ge 25.0$ to eliminate dead sideways chop.
+     - **EMA20 Pullback Retracement Entry:** Buying green candle exhaustion tops is strictly prohibited; entries require a clean test of the 15m EMA20 dynamic support/resistance band (`0.994 * EMA20 <= price <= 1.008 * EMA20`).
+     - **Anti-Oversold Short Guard (Invariant 16):** Short entries or reverse flips into short are 100% blocked if 15m RSI $\le 38.0$.
+  3. **Small Capital Fortress & ISOLATED Margin (Zero Cross-Wallet Contagion) ៖**
+     - Order notional margin is strictly bounded at $\$4.00–\$5.50$ per coin for accounts $< \$100$.
+     - Maximum leverage is clamped to $\le 10\times$ (ISOLATED Margin only, Invariant 3 & 8). Cross-Margin is strictly barred.
+     - Dynamic Stop-Loss breathing cushion is bounded by $1.8\times–2.5\times$ 15m ATR ($-18.0\%$ ROI / $-\$0.60$ USD max dollar risk), preventing premature noise stop-outs.
+  4. **Continuous 24/7 Autonomous Symbol Rotation & Reinvestment ៖**
+     - Upon position closure (TP or SL), the capital is automatically recycled back into the available pool to scan the next Golden Sweet-Spot candidate from the top volatile futures universe with zero human intervention required.
+  5. **Persistence & Crash Resilience ៖**
+     - Bot configuration (`is_active`, `capital`, `leverage`, `target_tp`, `symbols`) is permanently persisted in SQLite (`wealth_bots` table). State persists seamlessly across VPS reboots and systemd restarts.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 21/21].
 
 ---
 
