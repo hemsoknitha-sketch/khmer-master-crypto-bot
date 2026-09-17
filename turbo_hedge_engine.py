@@ -1817,10 +1817,25 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             # Clamped between 1.5% and 2.5% ROI according to coin ATR, keeping 1R <= $0.25 USD!
             sl_roi_thresh = -min(2.5, max(1.5, curr_atr_pct * sl_mult * 0.45 * float(active_lev)))
             sl_dollar_thresh = -max(0.20, bot_amt * 0.02)
-            is_stop_loss_hit = (
+            raw_sl_hit = (
                 (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
                 (is_spot and (net_pnl_usdt <= -max(0.15, bot_amt * 0.012) or roi_pct <= -max(1.2, cushion_pct * 0.75)))
             )
+
+            if raw_sl_hit:
+                # 🔍 3. ANTI-WICK & LIQUIDITY SWEEP SHIELD:
+                # Validates against sub-second flash wicks, pin-bar candle rejections, and Whale Limit CVD absorption
+                sweep_eval = market_data.evaluate_anti_wick_liquidity_sweep(
+                    symbol, current_side, entry_price, mark_price, roi_pct, sl_roi_thresh
+                )
+                if sweep_eval.get("is_liquidity_sweep_fakeout", False):
+                    is_stop_loss_hit = False
+                    print(f"🛡️ [ANTI-WICK LIQUIDITY SWEEP SHIELD] {symbol}: {sweep_eval.get('reason')} -> Stop Loss suppressed, position protected!")
+                else:
+                    is_stop_loss_hit = True
+            else:
+                is_stop_loss_hit = False
+
         # Hard Circuit Breaker: Absolute emergency safety ceiling at -3.5% ROI or -$0.35 USD
         is_hard_circuit_breaker = (
             (not is_spot and (net_pnl_usdt <= -max(0.35, bot_amt * 0.035) or roi_pct <= -3.5)) or

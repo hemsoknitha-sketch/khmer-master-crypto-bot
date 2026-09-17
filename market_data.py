@@ -783,6 +783,101 @@ def detect_cvd_absorption_divergence(df: pd.DataFrame) -> dict:
     except Exception as e:
         return {"divergence": "NONE", "bias": 0.0, "confidence": 0, "description": f"Error: {e}"}
 
+def evaluate_anti_wick_liquidity_sweep(
+    symbol: str, 
+    side: str, 
+    entry_price: float, 
+    mark_price: float, 
+    roi_pct: float, 
+    sl_roi_thresh: float
+) -> dict:
+    """
+    🔍 3. Anti-Wick & Liquidity Sweep Shield:
+    Filters out Market Maker Stop-Hunts and fakeout wicks before triggering Stop Loss:
+    1. Candle Close Invalidation: Poking past stop-loss via a temporary wick is NOT a true breakdown
+       if the 5m candle closes above support with a lower rejection wick (pin-bar hammer).
+    2. CVD Spot Absorption: Checks if Whales are absorbing sell volume (Limit Buy Absorption).
+    3. Returns:
+       - is_genuine_invalidation: bool (True only if structural breakdown confirmed)
+       - is_liquidity_sweep_fakeout: bool (True if smart money is sweeping retail stops)
+       - reason: str
+    """
+    sym = str(symbol).upper().strip()
+    side_str = str(side).upper().strip()
+    is_long = side_str in ["BUY", "LONG", "SPOT"]
+    
+    # If breach is deep past emergency threshold (> 1.5x of SL threshold), immediate hard invalidation
+    if roi_pct <= (sl_roi_thresh * 1.5):
+        return {
+            "is_genuine_invalidation": True,
+            "is_liquidity_sweep_fakeout": False,
+            "absorption_detected": False,
+            "reason": f"Deep structural break (ROI {roi_pct:.1f}% exceeds 1.5x SL threshold)"
+        }
+
+    try:
+        res = fetch_binance_data(sym, interval="5m", limit=15)
+        if res and isinstance(res, tuple) and len(res) >= 1:
+            df = res[0]
+            if df is not None and not df.empty and len(df) >= 3:
+                latest = df.iloc[-1]
+                
+                # Check CVD Absorption
+                cvd_res = detect_cvd_absorption_divergence(df)
+                div_type = cvd_res.get("divergence", "NONE")
+                
+                # 1. CVD Absorption Confirmation
+                if is_long and div_type == "BULLISH_ABSORPTION":
+                    return {
+                        "is_genuine_invalidation": False,
+                        "is_liquidity_sweep_fakeout": True,
+                        "absorption_detected": True,
+                        "reason": "Whale Limit Absorption detected (Bullish CVD Divergence) - Holding position!"
+                    }
+                elif not is_long and div_type == "BEARISH_ABSORPTION":
+                    return {
+                        "is_genuine_invalidation": False,
+                        "is_liquidity_sweep_fakeout": True,
+                        "absorption_detected": True,
+                        "reason": "Whale Limit Absorption detected (Bearish CVD Divergence) - Holding position!"
+                    }
+
+                # 2. Candle Wick vs Body Invalidation Filter (Pin Bar / Hammer Rejection)
+                c_open = float(latest['open'])
+                c_close = float(latest['close'])
+                c_high = float(latest['high'])
+                c_low = float(latest['low'])
+                total_range = c_high - c_low
+                
+                if is_long and total_range > 0:
+                    lower_wick = min(c_open, c_close) - c_low
+                    # If lower wick is >= 40% of candle range and price is holding above low -> Liquidity Sweep Wick
+                    if lower_wick >= (total_range * 0.40) and mark_price > c_low:
+                        return {
+                            "is_genuine_invalidation": False,
+                            "is_liquidity_sweep_fakeout": True,
+                            "absorption_detected": False,
+                            "reason": f"5m Lower Rejection Wick ({lower_wick/total_range*100:.0f}%) confirms Liquidity Sweep - Holding!"
+                        }
+                elif not is_long and total_range > 0:
+                    upper_wick = c_high - max(c_open, c_close)
+                    if upper_wick >= (total_range * 0.40) and mark_price < c_high:
+                        return {
+                            "is_genuine_invalidation": False,
+                            "is_liquidity_sweep_fakeout": True,
+                            "absorption_detected": False,
+                            "reason": f"5m Upper Rejection Wick ({upper_wick/total_range*100:.0f}%) confirms Liquidity Sweep - Holding!"
+                        }
+    except Exception:
+        pass
+
+    return {
+        "is_genuine_invalidation": True,
+        "is_liquidity_sweep_fakeout": False,
+        "absorption_detected": False,
+        "reason": "Structural Invalidation Confirmed"
+    }
+
 def detect_eqh_eql_liquidity(df: pd.DataFrame, tolerance: float = 0.0020) -> dict:
     """
     SMC Engineered Liquidity Pool Detector:

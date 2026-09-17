@@ -602,9 +602,21 @@ async def monitor_macro_auto_trades(app):
                 sl_mult = dna_prof.get("sl_atr_mult", 2.0)
                 curr_atr_pct = float(dna_prof.get("atr_pct", 1.5))
                 macro_sl_roi = -min(2.5, max(1.5, curr_atr_pct * sl_mult * 0.45 * 3.0)) # 3x-5x macro leverage
-                if roi_pct <= macro_sl_roi or effective_pnl <= -max(0.25, amount * 0.025):
-                    is_stop_loss = True
-                    reason_tag = f"MACRO_ASYMMETRIC_STOP_LOSS ({macro_sl_roi:.1f}% ROI / 1R)"
+                raw_macro_sl = (roi_pct <= macro_sl_roi or effective_pnl <= -max(0.25, amount * 0.025))
+                
+                if raw_macro_sl:
+                    # 🔍 3. Anti-Wick & Liquidity Sweep Shield
+                    sweep_eval = market_data.evaluate_anti_wick_liquidity_sweep(
+                        symbol, side, entry_price, mark_price, roi_pct, macro_sl_roi
+                    )
+                    if sweep_eval.get("is_liquidity_sweep_fakeout", False):
+                        is_stop_loss = False
+                        print(f"🛡️ [MACRO ANTI-WICK SHIELD] {symbol}: {sweep_eval.get('reason')} -> Stop Loss suppressed!")
+                    else:
+                        is_stop_loss = True
+                        reason_tag = f"MACRO_ASYMMETRIC_STOP_LOSS ({macro_sl_roi:.1f}% ROI / 1R)"
+                else:
+                    is_stop_loss = False
 
             # 🏆 THE GOLDEN PROFIT RATCHET (Strict Invariant 24 & 5X Asymmetric Standard):
             # Universal Golden 85% Ratchet: Once peak profit reaches >= $0.50 or effective_peak >= 5.0% ROI,
