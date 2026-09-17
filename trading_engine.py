@@ -230,6 +230,20 @@ def get_max_sellable_qty(symbol: str, raw_balance: float) -> float:
         return max_sellable
     return raw_balance
 
+def get_lot_size(symbol: str) -> float:
+    """Returns the LOT_SIZE stepSize for a given Spot or Futures symbol."""
+    if not symbol:
+        return 0.001
+    info = get_futures_symbol_info(symbol) or get_symbol_info(symbol)
+    if info:
+        for f in info.get('filters', []):
+            if f.get('filterType') == 'LOT_SIZE':
+                try:
+                    return float(f.get('stepSize', 0.001))
+                except Exception:
+                    pass
+    return 0.001
+
 def calculate_buy_quantity(api_key: str = "", api_secret: str = "", symbol: str = "", invest_amount: float = 0.0, current_price: float = 0.0) -> float:
     """
     Calculates formatted base asset quantity to buy for a given USDT investment amount.
