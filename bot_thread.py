@@ -4929,6 +4929,24 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_wealth", "btn_wealth_menu", "btn_wealth_refresh"]:
                 context.args = []
                 await wealth_command(update, context)
+            elif data == "btn_wealth_spot_start_50":
+                context.args = ["SPOT", "ON", "50"]
+                await wealth_command(update, context)
+            elif data == "btn_wealth_spot_start_100":
+                context.args = ["SPOT", "ON", "100"]
+                await wealth_command(update, context)
+            elif data == "btn_wealth_spot_stop":
+                context.args = ["SPOT", "OFF"]
+                await wealth_command(update, context)
+            elif data == "btn_wealth_futures_stop":
+                context.args = ["FUTURES", "OFF"]
+                await wealth_command(update, context)
+            elif data == "btn_wealth_all_start":
+                context.args = ["ALL", "ON", "50"]
+                await wealth_command(update, context)
+            elif data == "btn_wealth_all_stop":
+                context.args = ["ALL", "OFF"]
+                await wealth_command(update, context)
             elif data == "btn_wealth_start_30":
                 context.args = ["ON", "30"]
                 await wealth_command(update, context)
@@ -16661,61 +16679,92 @@ class TelegramBotThread(BaseThread):
 
             import perpetual_wealth_engine
             bot_info = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.get_bot_status(chat_id)
-            is_active = (bot_info.get("status") == "ACTIVE")
-            active_badge = "🟢 កំពុងរ៉ាន់ច្បាមចំណេញ ២៤/៧ (ACTIVE)" if is_active else "🔴 បានបិទ (STOPPED)"
-            active_badge_en = "🟢 RUNNING 24/7 (ACTIVE)" if is_active else "🔴 STOPPED"
+            spot_info = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.get_spot_bot_status(chat_id)
+
+            is_fut_active = (bot_info.get("status") == "ACTIVE")
+            is_spot_active = (spot_info.get("status") == "ACTIVE")
+
+            fut_badge = "🟢 កំពុងរ៉ាន់ (ACTIVE)" if is_fut_active else "🔴 បានបិទ (STOPPED)"
+            fut_badge_en = "🟢 RUNNING (ACTIVE)" if is_fut_active else "🔴 STOPPED"
+            spot_badge = "🟢 កំពុងរ៉ាន់ (ACTIVE)" if is_spot_active else "🔴 បានបិទ (STOPPED)"
+            spot_badge_en = "🟢 RUNNING (ACTIVE)" if is_spot_active else "🔴 STOPPED"
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🚀 Start $30 (10x)", callback_data="btn_wealth_start_30"),
-                    InlineKeyboardButton("🚀 Start $50 (10x)", callback_data="btn_wealth_start_50")
+                    InlineKeyboardButton("🟢 Start Spot $50 (1x)", callback_data="btn_wealth_spot_start_50"),
+                    InlineKeyboardButton("💎 Start Spot $100 (1x)", callback_data="btn_wealth_spot_start_100")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Start $100 (10x)", callback_data="btn_wealth_start_100"),
-                    InlineKeyboardButton("💎 Start $200 (15x)", callback_data="btn_wealth_start_200")
+                    InlineKeyboardButton("⚡ Start Futures $30 (10x)", callback_data="btn_wealth_start_30"),
+                    InlineKeyboardButton("⚡ Start Futures $50 (10x)", callback_data="btn_wealth_start_50")
                 ],
                 [
                     InlineKeyboardButton("📊 Real-Time Status", callback_data="btn_wealth_status"),
-                    InlineKeyboardButton("🛑 Stop Engine", callback_data="btn_wealth_stop")
+                    InlineKeyboardButton("🛑 Stop Spot", callback_data="btn_wealth_spot_stop"),
+                    InlineKeyboardButton("🛑 Stop Futures", callback_data="btn_wealth_stop")
+                ],
+                [
+                    InlineKeyboardButton("🚀 Start All ($50)", callback_data="btn_wealth_all_start"),
+                    InlineKeyboardButton("🛑 Stop All", callback_data="btn_wealth_all_stop")
                 ],
                 [
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
 
-            if not args:
-                tot_pnl = bot_info.get("total_realized_pnl", 0.0)
-                win_c = bot_info.get("win_count", 0)
-                loss_c = bot_info.get("loss_count", 0)
-                cycles = bot_info.get("cycles_completed", 0)
-                active_coins = bot_info.get("active_coins", [])
-                coins_str = ", ".join(active_coins) if active_coins else "គ្មាន (កំពុងស្កេនរកកាក់ Golden Sweet-Spot)"
-                coins_str_en = ", ".join(active_coins) if active_coins else "None (Scanning Golden Sweet-Spot)"
+            if not args or (len(args) == 1 and str(args[0]).upper().strip() in ["STATUS", "REPORT"]):
+                # Futures stats
+                fut_pnl = bot_info.get("total_realized_pnl", 0.0)
+                fut_win = bot_info.get("win_count", 0)
+                fut_loss = bot_info.get("loss_count", 0)
+                fut_cycles = bot_info.get("cycles_completed", 0)
+                fut_coins = bot_info.get("active_coins", [])
+                fut_coins_str = ", ".join(fut_coins) if fut_coins else "គ្មាន (ស្កេន Golden Sweet-Spot)"
+                fut_coins_str_en = ", ".join(fut_coins) if fut_coins else "None (Scanning Sweet-Spot)"
+
+                # Spot stats
+                spot_pnl = spot_info.get("total_realized_pnl", 0.0)
+                spot_win = spot_info.get("win_count", 0)
+                spot_loss = spot_info.get("loss_count", 0)
+                spot_cycles = spot_info.get("cycles_completed", 0)
+                spot_coins = spot_info.get("active_coins", [])
+                spot_coins_str = ", ".join(spot_coins) if spot_coins else "គ្មាន (ស្កេន Spot Sweet-Spot)"
+                spot_coins_str_en = ", ".join(spot_coins) if spot_coins else "None (Scanning Spot Sweet-Spot)"
+
+                total_combined_pnl = fut_pnl + spot_pnl
 
                 if user_lang == 'khmer':
                     msg = (
                         "💎 **APEX 24/7 PERPETUAL WEALTH GENERATOR** ⚡\n"
                         "════════════\n"
-                        "🏛️ **ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ កម្រិតស្ថាប័ន**\n\n"
-                        f"📊 **ស្ថានភាពដំណើរការ ៖** `{active_badge}`\n"
-                        f"💰 **ទុនកំណត់ (Capital) ៖** `${bot_info.get('capital', 50.0):.2f} USDT`\n"
-                        f"⚡ **Leverage សុវត្ថិភាព ៖** `{bot_info.get('leverage', 10)}x (ISOLATED Margin)`\n"
-                        f"🎯 **Target TP គោលដៅ ៖** `+{bot_info.get('target_tp', 10.0):.1f}% ROI`\n"
-                        f"🪙 **កាក់កំពុងច្បាមចំណេញ ៖** `{coins_str}`\n"
-                        f"🏆 **ប្រាក់ចំណេញសរុបកើបបាន ៖** `+${tot_pnl:,.2f} USDT`\n"
-                        f"📈 **ស្ថិតិជោគជ័យ ៖** `{win_c} ឈ្នះ | {loss_c} ចាញ់ ({cycles} ជុំ)`\n\n"
-                        "🛡️ **យុទ្ធសាស្ត្រច្បាមចំណេញ ៣ ដំណាក់កាល ៖**\n"
-                        "1️⃣ **Breakeven Armor ៖** ពេល ROI >= +3.0% ចាក់សោ Stop Loss នៅតម្លៃដើម +0.12% ហាមខាត!\n"
-                        "2️⃣ **Micro-Scalp TP1 ៖** ពេល ROI >= +5.0% ច្បាមយកប្រាក់ចំណេញ 50% ភ្លាមៗ!\n"
+                        "🏛️ **ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ (Spot 1x & Futures 10x)**\n\n"
+                        "🟢 **[1] SPOT WEALTH ENGINE (0% Liquidation Risk)**\n"
+                        f"• ស្ថានភាព ៖ `{spot_badge}`\n"
+                        f"• ទុនកំណត់ ៖ `${spot_info.get('capital', 50.0):.2f} USDT` (1x Leverage)\n"
+                        f"• ទុនក្នុង ១ កាក់ ៖ `${spot_info.get('allocation_per_coin', 15.0):.2f} USDT`\n"
+                        f"• កាក់កំពុងច្បាម ៖ `{spot_coins_str}`\n"
+                        f"• ចំណេញសុទ្ធកើបបាន ៖ `+${spot_pnl:,.2f} USDT` ({spot_win} ឈ្នះ | {spot_loss} ចាញ់)\n\n"
+                        "⚡ **[2] FUTURES WEALTH ENGINE (High Velocity 10x)**\n"
+                        f"• ស្ថានភាព ៖ `{fut_badge}`\n"
+                        f"• ទុនកំណត់ ៖ `${bot_info.get('capital', 50.0):.2f} USDT` (10x ISOLATED)\n"
+                        f"• កាក់កំពុងច្បាម ៖ `{fut_coins_str}`\n"
+                        f"• ចំណេញសុទ្ធកើបបាន ៖ `+${fut_pnl:,.2f} USDT` ({fut_win} ឈ្នះ | {fut_loss} ចាញ់)\n\n"
+                        f"🏆 **ប្រាក់ចំណេញសរុបរួម ៖** `+${total_combined_pnl:,.2f} USDT` 💰\n\n"
+                        "🛡️ **យុទ្ធសាស្ត្រកើបចំណេញ ៤ ដំណាក់កាល ៖**\n"
+                        "1️⃣ **Breakeven Armor ៖** ចាក់សោ Stop Loss នៅតម្លៃដើម +0.12%/+0.25% ហាមខាត!\n"
+                        "2️⃣ **Micro-Scalp TP1 ៖** ច្បាមយកប្រាក់ចំណេញ 50% ភ្លាមៗនៅ +5.0% ROI!\n"
                         "3️⃣ **Golden Moonshot Ratchet ៖** Trailing 50% ដែលនៅសល់ចាក់សោ 85% នៃចំណេញកំពូល!\n"
-                        "4️⃣ **24/7 Continuous Rotation ៖** វិលជុំស្វែងរកកាក់ Sweet-Spot ថ្មីៗដោយស្វ័យប្រវត្ត!\n\n"
+                        "4️⃣ **24/7 Continuous Rotation ៖** វិលជុំស្វែងរកកាក់ Breakout ថ្មីៗដោយស្វ័យប្រវត្ត!\n\n"
                         "📋 **1-TAP COMMAND PRESETS ៖**\n"
-                        "👉 **បើកម៉ាស៊ីនទុន $30 ៖** `` `/wealth ON 30` ``\n"
-                        "👉 **បើកម៉ាស៊ីនទុន $50 ៖** `` `/wealth ON 50` ``\n"
-                        "👉 **បើកម៉ាស៊ីនទុន $100 ៖** `` `/wealth ON 100` ``\n"
-                        "👉 **បិទម៉ាស៊ីន និង Market Close ៖** `` `/wealth OFF` ``\n"
+                        "👉 **បើក Spot ($50) ៖** `` `/wealth SPOT ON 50` ``\n"
+                        "👉 **បើក Spot ($100) ៖** `` `/wealth SPOT ON 100` ``\n"
+                        "👉 **បិទ Spot ៖** `` `/wealth SPOT OFF` ``\n"
+                        "👉 **បើក Futures ($50) ៖** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **បិទ Futures ៖** `` `/wealth FUTURES OFF` ``\n"
+                        "👉 **បើកទាំងអស់ ($50) ៖** `` `/wealth ALL ON 50` ``\n"
+                        "👉 **បិទទាំងអស់ ៖** `` `/wealth ALL OFF` ``\n"
                         "════════════\n"
                         "💡 _ចុចប៊ូតុងខាងក្រោម ឬ copy command ដើម្បីដំណើរការភ្លាមៗ!_"
                     )
@@ -16723,24 +16772,32 @@ class TelegramBotThread(BaseThread):
                     msg = (
                         "💎 **APEX 24/7 PERPETUAL WEALTH GENERATOR** ⚡\n"
                         "════════════\n"
-                        "🏛️ **Institutional 24/7 Automated Wealth Extraction Engine**\n\n"
-                        f"📊 **Engine Status:** `{active_badge_en}`\n"
-                        f"💰 **Allocated Capital:** `${bot_info.get('capital', 50.0):.2f} USDT`\n"
-                        f"⚡ **Safety Leverage:** `{bot_info.get('leverage', 10)}x (ISOLATED Margin)`\n"
-                        f"🎯 **Target TP Hurdle:** `+{bot_info.get('target_tp', 10.0):.1f}% ROI`\n"
-                        f"🪙 **Active Wealth Positions:** `{coins_str_en}`\n"
-                        f"🏆 **Total Net Realized PnL:** `+${tot_pnl:,.2f} USDT`\n"
-                        f"📈 **Win/Loss Track Record:** `{win_c} Wins | {loss_c} Losses ({cycles} Cycles)`\n\n"
+                        "🏛️ **Institutional 24/7 Dual-Engine Suite (Spot 1x & Futures 10x)**\n\n"
+                        "🟢 **[1] SPOT WEALTH ENGINE (0.00% Liquidation Risk)**\n"
+                        f"• Status: `{spot_badge_en}`\n"
+                        f"• Capital: `${spot_info.get('capital', 50.0):.2f} USDT` (1x Spot Leverage)\n"
+                        f"• Alloc / Coin: `${spot_info.get('allocation_per_coin', 15.0):.2f} USDT`\n"
+                        f"• Active Coins: `{spot_coins_str_en}`\n"
+                        f"• Net Realized: `+${spot_pnl:,.2f} USDT` ({spot_win} W | {spot_loss} L)\n\n"
+                        "⚡ **[2] FUTURES WEALTH ENGINE (High Velocity 10x)**\n"
+                        f"• Status: `{fut_badge_en}`\n"
+                        f"• Capital: `${bot_info.get('capital', 50.0):.2f} USDT` (10x ISOLATED)\n"
+                        f"• Active Coins: `{fut_coins_str_en}`\n"
+                        f"• Net Realized: `+${fut_pnl:,.2f} USDT` ({fut_win} W | {fut_loss} L)\n\n"
+                        f"🏆 **Total Combined Realized PnL:** `+${total_combined_pnl:,.2f} USDT` 💰\n\n"
                         "🛡️ **3-Tier Symbiotic Extraction Stack:**\n"
-                        "1️⃣ **Breakeven Armor:** At ROI >= +3.0%, locks Stop Loss at Entry + 0.12% fees floor.\n"
-                        "2️⃣ **Micro-Scalp TP1:** At ROI >= +5.0%, harvests 50% cash profit instantly.\n"
+                        "1️⃣ **Breakeven Armor:** Locks Stop Loss at Entry + Fees floor (+0.12%/+0.25%).\n"
+                        "2️⃣ **Micro-Scalp TP1:** Harvests 50% cash profit instantly at +5.0% ROI.\n"
                         "3️⃣ **Golden Moonshot Ratchet:** 50% balance trails price with 85% peak profit locked.\n"
                         "4️⃣ **24/7 Continuous Rotation:** Seamlessly cycles capital into new Sweet-Spot breakouts!\n\n"
                         "📋 **1-TAP COMMAND PRESETS:**\n"
-                        "👉 **Start Engine with $30:** `` `/wealth ON 30` ``\n"
-                        "👉 **Start Engine with $50:** `` `/wealth ON 50` ``\n"
-                        "👉 **Start Engine with $100:** `` `/wealth ON 100` ``\n"
-                        "👉 **Stop Engine & Market Close:** `` `/wealth OFF` ``\n"
+                        "👉 **Start Spot ($50):** `` `/wealth SPOT ON 50` ``\n"
+                        "👉 **Start Spot ($100):** `` `/wealth SPOT ON 100` ``\n"
+                        "👉 **Stop Spot:** `` `/wealth SPOT OFF` ``\n"
+                        "👉 **Start Futures ($50):** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **Stop Futures:** `` `/wealth FUTURES OFF` ``\n"
+                        "👉 **Start All ($50):** `` `/wealth ALL ON 50` ``\n"
+                        "👉 **Stop All:** `` `/wealth ALL OFF` ``\n"
                         "════════════\n"
                         "💡 _Tap the buttons below or copy commands to execute instantly!_"
                     )
@@ -16750,7 +16807,197 @@ class TelegramBotThread(BaseThread):
                 return
 
             subcmd = str(args[0]).upper().strip()
-            if subcmd in ["ON", "START", "RUN"]:
+
+            # --- 1. SPOT SUITE ---
+            if subcmd == "SPOT":
+                action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
+                if action in ["ON", "START", "RUN"]:
+                    cap_arg = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 50.0
+                    pin_arg = str(args[3]).strip() if len(args) > 3 else ""
+                    alloc_arg = max(10.50, round(cap_arg * 0.30, 2))
+
+                    res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_spot_bot(
+                        chat_id=chat_id,
+                        capital=cap_arg,
+                        allocation_per_coin=alloc_arg,
+                        target_tp=6.0,
+                        pin=pin_arg
+                    )
+                    if res.get("status") == "error":
+                        await update.effective_message.reply_text(res.get("message", "❌ Error starting spot bot!"), parse_mode="Markdown")
+                        return
+
+                    succ_msg = (
+                        "🟢 **24/7 SPOT WEALTH GENERATOR ACTIVATED!** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💰 **ទុនកំណត់ (Capital) ៖** `${res['capital']:.2f} USDT`\n"
+                        f"🛡️ **កម្រិតហានិភ័យ ៖** `1x Leverage (0.00% Liquidation Risk)`\n"
+                        f"💵 **សមតុល្យ Spot Available ៖** `${res['available_spot_usdt']:.2f} USDT`\n"
+                        f"🪙 **ទុនក្នុង ១ កាក់ ៖** `${res['allocation_per_coin']:.2f} USDT`\n"
+                        f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💎 _ប្រព័ន្ធកំពុងស្កេនរកកាក់ Spot Golden Sweet-Spot និងចាប់ផ្តើមច្បាមចំណេញ ២៤/៧!_"
+                    ) if user_lang == 'khmer' else (
+                        "🟢 **24/7 SPOT WEALTH GENERATOR ACTIVATED!** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💰 **Allocated Capital:** `${res['capital']:.2f} USDT`\n"
+                        f"🛡️ **Safety Level:** `1x Leverage (0.00% Liquidation Risk)`\n"
+                        f"💵 **Spot Available Balance:** `${res['available_spot_usdt']:.2f} USDT`\n"
+                        f"🪙 **Alloc per Coin:** `${res['allocation_per_coin']:.2f} USDT`\n"
+                        f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💎 _Engine is actively scanning for Spot Sweet-Spot breakouts and harvesting 24/7!_"
+                    )
+                    await update.effective_message.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    self.log_signal.emit(f"🟢 User {chat_id} started 24/7 Spot Wealth Generator with ${cap_arg:.2f} USDT.")
+
+                elif action in ["OFF", "STOP"]:
+                    pin_arg = str(args[2]).strip() if len(args) > 2 else ""
+                    res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.stop_perpetual_wealth_spot_bot(chat_id=chat_id, pin=pin_arg)
+                    if res.get("status") == "error":
+                        await update.effective_message.reply_text(res.get("message", "❌ Error stopping spot bot!"), parse_mode="Markdown")
+                        return
+
+                    stop_msg = (
+                        "🛑 **24/7 SPOT WEALTH GENERATOR STOPPED!** 🔴\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📊 **ស្ថានភាព ៖** `បានបិទដោយជោគជ័យ (STOPPED)`\n"
+                        f"🚪 **ចំនួនកាក់ Spot ត្រូវបានលក់ចេញ ៖** `{res.get('closed_trades', 0)}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _រាល់ការកាន់កាប់ Spot ត្រូវបានប្តូរជា USDT វិញដោយសុវត្ថិភាព។_"
+                    ) if user_lang == 'khmer' else (
+                        "🛑 **24/7 SPOT WEALTH GENERATOR STOPPED!** 🔴\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📊 **Engine Status:** `Successfully Stopped (STOPPED)`\n"
+                        f"🚪 **Spot Positions Liquidated to Cash:** `{res.get('closed_trades', 0)}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _All active spot trades were safely liquidated to USDT._"
+                    )
+                    await update.effective_message.reply_text(stop_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    self.log_signal.emit(f"🛑 User {chat_id} stopped 24/7 Spot Wealth Generator.")
+                else:
+                    await update.effective_message.reply_text("⚠️ Usage: `/wealth SPOT ON 50` or `/wealth SPOT OFF`", parse_mode="Markdown")
+
+            # --- 2. FUTURES SUITE ---
+            elif subcmd == "FUTURES":
+                action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
+                if action in ["ON", "START", "RUN"]:
+                    cap_arg = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 50.0
+                    pin_arg = str(args[3]).strip() if len(args) > 3 else ""
+                    res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_bot(
+                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, pin=pin_arg
+                    )
+                    if res.get("status") == "error":
+                        await update.effective_message.reply_text(res.get("message", "❌ Error starting futures bot!"), parse_mode="Markdown")
+                        return
+
+                    succ_msg = (
+                        "⚡ **24/7 FUTURES WEALTH GENERATOR ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💰 **ទុនកំណត់ (Capital) ៖** `${res['capital']:.2f} USDT`\n"
+                        f"⚡ **Leverage សុវត្ថិភាព ៖** `{res['leverage']}x (ISOLATED Mode)`\n"
+                        f"💵 **សមតុល្យ Futures Available ៖** `${res['available_usdt']:.2f} USDT`\n"
+                        f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💎 _ប្រព័ន្ធកំពុងស្កេនរកកាក់ Golden Sweet-Spot (+3% ទៅ +12%) និងចាប់ផ្តើមច្បាមចំណេញ ២៤/៧!_"
+                    ) if user_lang == 'khmer' else (
+                        "⚡ **24/7 FUTURES WEALTH GENERATOR ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💰 **Allocated Capital:** `${res['capital']:.2f} USDT`\n"
+                        f"⚡ **Safety Leverage:** `{res['leverage']}x (ISOLATED Mode)`\n"
+                        f"💵 **Futures Available Balance:** `${res['available_usdt']:.2f} USDT`\n"
+                        f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💎 _Engine is actively scanning for Golden Sweet-Spot breakouts (+3% to +12%) and harvesting 24/7!_"
+                    )
+                    await update.effective_message.reply_text(succ_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    self.log_signal.emit(f"⚡ User {chat_id} started 24/7 Futures Wealth Generator with ${cap_arg:.2f} USDT.")
+
+                elif action in ["OFF", "STOP"]:
+                    pin_arg = str(args[2]).strip() if len(args) > 2 else ""
+                    res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.stop_perpetual_wealth_bot(chat_id=chat_id, pin=pin_arg)
+                    if res.get("status") == "error":
+                        await update.effective_message.reply_text(res.get("message", "❌ Error stopping futures bot!"), parse_mode="Markdown")
+                        return
+
+                    stop_msg = (
+                        "🛑 **24/7 FUTURES WEALTH GENERATOR STOPPED!** 🔴\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📊 **ស្ថានភាព ៖** `បានបិទដោយជោគជ័យ (STOPPED)`\n"
+                        f"🚪 **ចំនួន Position ត្រូវបានបិទ ៖** `{res.get('closed_positions', 0)}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _រាល់ Position ត្រូវបាន Market Close ដោយសុវត្ថិភាព។_"
+                    ) if user_lang == 'khmer' else (
+                        "🛑 **24/7 FUTURES WEALTH GENERATOR STOPPED!** 🔴\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📊 **Engine Status:** `Successfully Stopped (STOPPED)`\n"
+                        f"🚪 **Positions Closed:** `{res.get('closed_positions', 0)}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _All active positions were safely market closed._"
+                    )
+                    await update.effective_message.reply_text(stop_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    self.log_signal.emit(f"🛑 User {chat_id} stopped 24/7 Futures Wealth Generator.")
+                else:
+                    await update.effective_message.reply_text("⚠️ Usage: `/wealth FUTURES ON 50` or `/wealth FUTURES OFF`", parse_mode="Markdown")
+
+            # --- 3. ALL SUITE (Simultaneous Dual-Engine Execution) ---
+            elif subcmd == "ALL":
+                action = str(args[1]).upper().strip() if len(args) > 1 else "ON"
+                if action in ["ON", "START"]:
+                    cap_arg = float(args[2]) if len(args) > 2 and args[2].replace('.', '', 1).isdigit() else 50.0
+                    pin_arg = str(args[3]).strip() if len(args) > 3 else ""
+                    alloc_spot = max(10.50, round(cap_arg * 0.30, 2))
+
+                    res_fut = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_bot(
+                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, pin=pin_arg
+                    )
+                    res_spot = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_spot_bot(
+                        chat_id=chat_id, capital=cap_arg, allocation_per_coin=alloc_spot, target_tp=6.0, pin=pin_arg
+                    )
+
+                    all_msg = (
+                        "🚀 **24/7 DUAL-ENGINE WEALTH GENERATOR ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🟢 **Spot 1x ៖** `ដំណើរការជោគជ័យ (0% Liquidation Risk)`\n"
+                        "⚡ **Futures 10x ៖** `ដំណើរការជោគជ័យ (ISOLATED Margin)`\n"
+                        f"💰 **ទុនកំណត់រៀងៗខ្លួន ៖** `${cap_arg:.2f} USDT`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💎 _ម៉ាស៊ីនទាំងពីរដំណើរការដំណាលគ្នាដោយបែងចែកកាបូបដាច់ពីគ្នា ១០០%!_"
+                    ) if user_lang == 'khmer' else (
+                        "🚀 **24/7 DUAL-ENGINE WEALTH GENERATOR ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🟢 **Spot 1x:** `Active & Hunting (0% Liquidation Risk)`\n"
+                        "⚡ **Futures 10x:** `Active & Scalping (ISOLATED Margin)`\n"
+                        f"💰 **Allocated per Engine:** `${cap_arg:.2f} USDT`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💎 _Both engines running simultaneously with 100% wallet isolation!_"
+                    )
+                    await update.effective_message.reply_text(all_msg, parse_mode="Markdown", reply_markup=keyboard)
+
+                elif action in ["OFF", "STOP"]:
+                    pin_arg = str(args[2]).strip() if len(args) > 2 else ""
+                    perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.stop_perpetual_wealth_bot(chat_id=chat_id, pin=pin_arg)
+                    perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.stop_perpetual_wealth_spot_bot(chat_id=chat_id, pin=pin_arg)
+
+                    all_stop = (
+                        "🛑 **24/7 DUAL-ENGINE WEALTH GENERATOR STOPPED!** 🔴\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🟢 **Spot Engine ៖** `STOPPED & Market Closed`\n"
+                        "⚡ **Futures Engine ៖** `STOPPED & Market Closed`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _រាល់ Position & Spot Holdings ទាំងអស់ត្រូវបានដកចេញជាសាច់ប្រាក់សុវត្ថិភាព។_"
+                    ) if user_lang == 'khmer' else (
+                        "🛑 **24/7 DUAL-ENGINE WEALTH GENERATOR STOPPED!** 🔴\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🟢 **Spot Engine:** `STOPPED & Market Closed`\n"
+                        "⚡ **Futures Engine:** `STOPPED & Market Closed`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _All positions & spot holdings safely closed to cash balance._"
+                    )
+                    await update.effective_message.reply_text(all_stop, parse_mode="Markdown", reply_markup=keyboard)
+
+            # --- 4. BACKWARDS COMPATIBILITY (Defaults to Futures) ---
+            elif subcmd in ["ON", "START", "RUN"]:
                 cap_arg = float(args[1]) if len(args) > 1 and args[1].replace('.', '', 1).isdigit() else 50.0
                 pin_arg = str(args[2]).strip() if len(args) > 2 else ""
 
@@ -16812,7 +17059,7 @@ class TelegramBotThread(BaseThread):
                 await update.effective_message.reply_text(stop_msg, parse_mode="Markdown", reply_markup=keyboard)
                 self.log_signal.emit(f"🛑 User {chat_id} stopped 24/7 Perpetual Wealth Generator.")
             else:
-                await update.effective_message.reply_text("⚠️ Invalid option! Usage: `/wealth ON 50` or `/wealth OFF`", parse_mode="Markdown")
+                await update.effective_message.reply_text("⚠️ Invalid option! Usage: `/wealth SPOT ON 50` or `/wealth FUTURES ON 50` or `/wealth OFF`", parse_mode="Markdown")
 
         self.app.add_handler(CommandHandler("wealth", wealth_command))
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))

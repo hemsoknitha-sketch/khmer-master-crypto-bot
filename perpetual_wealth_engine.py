@@ -58,6 +58,24 @@ def is_wealth_in_cooldown(symbol: str) -> bool:
     return time.time() < exp
 
 
+# Spot Wealth Cooldown and Execution Locks (Invariant 10 Segregation)
+_active_wealth_spot_exec_keys = set()
+_wealth_spot_symbol_cooldowns = {}
+_last_wealth_spot_scan_time = 0.0
+_WEALTH_SPOT_TECH_CACHE = {}
+
+
+def add_wealth_spot_cooldown(symbol: str, duration_seconds: int = 3600):
+    sym = str(symbol).upper().strip()
+    _wealth_spot_symbol_cooldowns[sym] = time.time() + duration_seconds
+
+
+def is_wealth_spot_in_cooldown(symbol: str) -> bool:
+    sym = str(symbol).upper().strip()
+    exp = _wealth_spot_symbol_cooldowns.get(sym, 0.0)
+    return time.time() < exp
+
+
 async def _async_send_wealth_alert(app, chat_id: int, text: str, alert_name: str = "wealth alert"):
     """Non-blocking background Telegram notification sender with strict network timeout."""
     try:
@@ -773,6 +791,613 @@ class PerpetualWealthGeneratorEngine:
 
                 except Exception as e_user:
                     print(f"⚠️ Notice processing wealth bot user {chat_id}: {e_user}")
+
+        # 3. Autonomous 24/7 Spot Wealth Harvest Cycle (Invariant 10 Segregation)
+        try:
+            await PerpetualWealthGeneratorEngine.execute_spot_harvest_cycle(app)
+        except Exception as e_spot_cycle:
+            print(f"⚠️ Notice in spot wealth harvest cycle: {e_spot_cycle}")
+
+    # ==============================================================================
+    # 💎 SPOT WEALTH GENERATOR SUITE (0% Liquidation Risk & Higher Dollar Capacity)
+    # ==============================================================================
+
+    @staticmethod
+    def scan_spot_sweet_spot_candidates(limit: int = 10) -> list:
+        """
+        Scans Binance Spot for Golden Sweet-Spot Momentum Breakouts.
+        Filters:
+        - 24h Change: +2.5% to +14.0% (Spot is LONG-only)
+        - Rejection of Overextended Pumps: > +18.0% or 15m RSI > 74.0 (Anti-FOMO)
+        - 24h Spot Volume >= $5M USD
+        - 15m & 1h Price > EMA50 (Macro Bull Confluence)
+        """
+        candidates = []
+        try:
+            spot_base = trading_engine.get_working_spot_url()
+            url = f"{spot_base}/api/v3/ticker/24hr"
+            res = trading_engine.HFT_SESSION.get(url, timeout=4)
+            if res.status_code != 200:
+                return []
+            tickers = res.json()
+            if not isinstance(tickers, list):
+                return []
+
+            monitoring_symbols = get_monitoring_symbols_set()
+
+            for t in tickers:
+                symbol = t.get("symbol", "")
+                if not symbol.endswith("USDT"):
+                    continue
+                if symbol in TRADFI_STOCK_SYMBOLS or symbol in monitoring_symbols:
+                    continue
+                if is_wealth_spot_in_cooldown(symbol):
+                    continue
+
+                try:
+                    price_change_pct = float(t.get("priceChangePercent", 0.0))
+                    quote_volume = float(t.get("quoteVolume", 0.0))
+                    last_price = float(t.get("lastPrice", 0.0))
+                except (ValueError, TypeError):
+                    continue
+
+                # Minimum liquidity: $5M 24h quote volume on Spot
+                if quote_volume < 5_000_000.0 or last_price <= 0.0:
+                    continue
+
+                # Golden Sweet Spot for Spot LONG: +2.5% to +14.0%
+                if 2.5 <= price_change_pct <= 14.0:
+                    tech_eval = PerpetualWealthGeneratorEngine.evaluate_spot_symbol_technicals(symbol)
+                    if tech_eval.get("is_valid"):
+                        candidates.append({
+                            "symbol": symbol,
+                            "side": "BUY",
+                            "price_change_pct": price_change_pct,
+                            "last_price": last_price,
+                            "quote_volume": quote_volume,
+                            "rsi_15m": tech_eval.get("rsi_15m", 50.0),
+                            "ema50_15m": tech_eval.get("ema50_15m", last_price),
+                            "ai_score": tech_eval.get("ai_score", 8.5),
+                            "orderbook_ratio": tech_eval.get("orderbook_ratio", 1.25),
+                            "reason": tech_eval.get("reason", "Spot Golden Sweet-Spot Momentum")
+                        })
+
+            candidates.sort(key=lambda x: (x["ai_score"], x["quote_volume"]), reverse=True)
+            return candidates[:limit]
+        except Exception as e:
+            print(f"⚠️ [PERPETUAL WEALTH SPOT SCAN ERROR]: {e}")
+            return []
+
+    @staticmethod
+    def evaluate_spot_symbol_technicals(symbol: str) -> dict:
+        """
+        Evaluates 15m/1h technical health, RSI, EMA50, ADX, and L2 Orderbook for Binance Spot.
+        """
+        global _WEALTH_SPOT_TECH_CACHE
+        cache_key = f"spot_{symbol}"
+        now_ts = time.time()
+        if cache_key in _WEALTH_SPOT_TECH_CACHE:
+            ts, res = _WEALTH_SPOT_TECH_CACHE[cache_key]
+            if now_ts - ts < 30.0:
+                return res
+
+        try:
+            klines = trading_engine.get_klines(symbol, interval="15m", limit=60, is_spot=True)
+            if not klines or len(klines) < 30:
+                return {"is_valid": False, "reason": "Insufficient spot klines"}
+
+            closes = [float(k[4]) for k in klines]
+            current_price = closes[-1]
+
+            # RSI 14
+            gains, losses = [], []
+            for i in range(1, 15):
+                diff = closes[-i] - closes[-i-1]
+                if diff >= 0:
+                    gains.append(diff)
+                    losses.append(0.0)
+                else:
+                    gains.append(0.0)
+                    losses.append(abs(diff))
+            avg_gain = sum(gains) / 14.0 if gains else 0.0
+            avg_loss = sum(losses) / 14.0 if losses else 0.0001
+            rs = avg_gain / avg_loss if avg_loss > 0 else 1.0
+            rsi_15m = 100.0 - (100.0 / (1.0 + rs))
+
+            # EMA 20 & EMA 50
+            k20 = 2.0 / (20 + 1)
+            k50 = 2.0 / (50 + 1)
+            ema20 = closes[0]
+            ema50 = closes[0]
+            for p in closes[1:]:
+                ema20 = (p * k20) + (ema20 * (1 - k20))
+                ema50 = (p * k50) + (ema50 * (1 - k50))
+
+            # ADX(14)
+            highs = [float(k[2]) for k in klines]
+            lows = [float(k[3]) for k in klines]
+            adx_15m = 22.0
+            if len(closes) >= 28:
+                adx_15m, _, _ = market_data.calculate_adx_and_dmi(highs, lows, closes, period=14)
+
+            if adx_15m < 22.0:
+                return {"is_valid": False, "reason": f"Low Trend Strength (15m ADX {adx_15m:.1f} < 22.0)"}
+
+            # Pullback Retracement Guard (Never buy overbought vertical candles, wait for EMA20 retest)
+            is_buy_pullback = (0.990 * ema20 <= current_price <= ema20 * 1.018)
+
+            if rsi_15m > 74.0:
+                return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 74.0 (Anti-FOMO)"}
+            if current_price < (ema50 * 0.994):
+                return {"is_valid": False, "reason": "Price below 15m EMA50"}
+            if not is_buy_pullback:
+                return {"is_valid": False, "reason": "Waiting for healthy pullback retest onto 15m EMA20 support"}
+
+            # Spot L2 Orderbook depth
+            ob_ratio = 1.20
+            try:
+                ob_url = f"{trading_engine.get_working_spot_url()}/api/v3/depth?symbol={symbol}&limit=20"
+                ob_res = trading_engine.HFT_SESSION.get(ob_url, timeout=2)
+                if ob_res.status_code == 200:
+                    ob_data = ob_res.json()
+                    bids = sum(float(b[1]) * float(b[0]) for b in ob_data.get("bids", []))
+                    asks = sum(float(a[1]) * float(a[0]) for a in ob_data.get("asks", []))
+                    if asks > 0:
+                        ob_ratio = bids / asks
+            except Exception:
+                ob_ratio = 1.15
+
+            if ob_ratio < 0.92:
+                return {"is_valid": False, "reason": f"Spot selling pressure (Bid/Ask ratio: {ob_ratio:.2f})"}
+
+            ai_score = 8.5
+            if current_price > ema50 and 45.0 <= rsi_15m <= 65.0:
+                ai_score = 9.3
+
+            res_data = {
+                "is_valid": True,
+                "rsi_15m": rsi_15m,
+                "ema50_15m": ema50,
+                "ema20_15m": ema20,
+                "adx_15m": adx_15m,
+                "orderbook_ratio": ob_ratio,
+                "ai_score": ai_score,
+                "reason": "Spot Sweet-Spot Retest Confluence"
+            }
+            _WEALTH_SPOT_TECH_CACHE[cache_key] = (now_ts, res_data)
+            return res_data
+        except Exception as e:
+            return {"is_valid": False, "reason": f"Error: {e}"}
+
+    @staticmethod
+    def calculate_spot_dna_sizing(total_capital: float, available_usdt: float, user_alloc: float = 15.0) -> dict:
+        """
+        Enforces Invariant 1 (Spot MIN_NOTIONAL $10.50 Hard Floor).
+        Spot 1x leverage with 0% liquidation risk.
+        """
+        total_capital = max(10.50, float(total_capital))
+        available_usdt = max(0.0, float(available_usdt))
+        alloc_per_coin = max(10.50, round(float(user_alloc), 2))
+
+        if available_usdt < alloc_per_coin:
+            if available_usdt >= 10.50:
+                alloc_per_coin = available_usdt
+            else:
+                return {"allocation_per_coin": 0.0, "max_coins": 0, "leverage": 1}
+
+        max_coins = max(1, min(12, int(available_usdt / alloc_per_coin)))
+        return {
+            "allocation_per_coin": alloc_per_coin,
+            "max_coins": max_coins,
+            "leverage": 1
+        }
+
+    @staticmethod
+    def start_perpetual_wealth_spot_bot(chat_id: int, capital: float = 50.0, allocation_per_coin: float = 15.0, target_tp: float = 6.0, pin: str = "") -> dict:
+        """
+        Starts 24/7 Spot Wealth Generator for a user.
+        Validates 2FA PIN, Binance API keys, and Spot USDT balance (Invariant 10).
+        """
+        chat_id = int(chat_id)
+        capital = max(10.50, float(capital))
+        alloc = max(10.50, float(allocation_per_coin))
+
+        # 1. Verify 2FA PIN if set
+        user_pin = db.get_user_pin(chat_id)
+        is_admin = db.is_admin(chat_id) or (int(chat_id) == 859271875)
+        if user_pin and not is_admin:
+            import security
+            if not pin or not security.verify_pin(pin, chat_id, user_pin):
+                return {
+                    "status": "error",
+                    "message": "❌ Security Error: Invalid 2FA PIN! (សូមបញ្ចូលលេខកូដ PIN ត្រឹមត្រូវ: `/wealth SPOT ON <ទុន> <PIN>`)"
+                }
+
+        # 2. Verify Binance API Keys
+        keys = db.get_user_api(chat_id)
+        if not keys or not keys[0] or not keys[1]:
+            return {
+                "status": "error",
+                "message": "❌ Binance API Keys Missing! Please link your Binance API keys first via /add_api."
+            }
+
+        api_key, api_secret = keys[0], keys[1]
+
+        # 3. Verify Spot Balance (Invariant 10: Multi-Wallet Balance Segregation)
+        spot_usdt = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
+        if spot_usdt < 10.50:
+            return {
+                "status": "error",
+                "message": f"⚠️ Insufficient Spot USDT Balance: ${spot_usdt:.2f} USDT (Minimum $10.50 required for Invariant 1)."
+            }
+
+        # 4. Save in DB
+        db.set_perpetual_wealth_spot_bot(
+            chat_id=chat_id,
+            status="ACTIVE",
+            capital=capital,
+            allocation_per_coin=alloc,
+            target_tp=target_tp
+        )
+
+        return {
+            "status": "success",
+            "chat_id": chat_id,
+            "capital": capital,
+            "allocation_per_coin": alloc,
+            "target_tp": target_tp,
+            "available_spot_usdt": spot_usdt
+        }
+
+    @staticmethod
+    def stop_perpetual_wealth_spot_bot(chat_id: int, pin: str = "", sell_open_trades: bool = True) -> dict:
+        """
+        Stops 24/7 Spot Wealth Generator and cleanly sells open spot holdings if requested.
+        """
+        chat_id = int(chat_id)
+        user_pin = db.get_user_pin(chat_id)
+        is_admin = db.is_admin(chat_id) or (int(chat_id) == 859271875)
+        if user_pin and pin and not is_admin:
+            import security
+            if not security.verify_pin(pin, chat_id, user_pin):
+                return {
+                    "status": "error",
+                    "message": "❌ Security Error: Invalid 2FA PIN! (សូមបញ្ចូលលេខកូដ PIN ត្រឹមត្រូវ: `/wealth SPOT OFF <PIN>`)"
+                }
+
+        db.stop_perpetual_wealth_spot_bot(chat_id)
+
+        closed_count = 0
+        if sell_open_trades:
+            keys = db.get_user_api(chat_id)
+            if keys and keys[0] and keys[1]:
+                api_key, api_secret = keys[0], keys[1]
+                active_trades = db.get_active_perpetual_wealth_spot_trades(chat_id)
+                for tr in active_trades:
+                    t_id = tr["id"]
+                    sym = tr["symbol"]
+                    rem_qty = tr["remaining_qty"]
+                    if rem_qty > 0:
+                        try:
+                            trading_engine.place_spot_order(
+                                api_key=api_key,
+                                api_secret=api_secret,
+                                symbol=sym,
+                                side="SELL",
+                                quantity=rem_qty
+                            )
+                            db.close_perpetual_wealth_spot_trade(t_id)
+                            closed_count += 1
+                        except Exception as e:
+                            print(f"⚠️ Notice selling spot trade {sym}: {e}")
+
+        return {
+            "status": "stopped",
+            "chat_id": chat_id,
+            "closed_trades": closed_count
+        }
+
+    @staticmethod
+    def get_spot_bot_status(chat_id: int) -> dict:
+        """Retrieves real-time operational status of Spot Wealth Generator."""
+        chat_id = int(chat_id)
+        bot_data = db.get_perpetual_wealth_spot_bot(chat_id)
+        if not bot_data:
+            return {
+                "status": "STOPPED",
+                "capital": 50.0,
+                "allocation_per_coin": 15.0,
+                "target_tp": 6.0,
+                "total_pnl": 0.0,
+                "win_count": 0,
+                "loss_count": 0,
+                "cycles_completed": 0,
+                "active_coins": []
+            }
+        return bot_data
+
+    @staticmethod
+    async def execute_spot_harvest_cycle(app=None):
+        """
+        Spot 24/7 background harvest cycle called every 8-10 seconds.
+        Performs:
+        1. Multi-Position Spot PnL Monitoring with Breakeven Armor (+2.5%), TP1 (50%), & Moonshot Ratchet (+6.0% to +15.0%).
+        2. Spot Golden Sweet-Spot Breakout Discovery & Dynamic Entry with MIN_NOTIONAL $10.50 (Invariant 1).
+        3. 24/7 Continuous Rotation with 0% Liquidation Risk.
+        """
+        global _last_wealth_spot_scan_time
+        now = time.time()
+
+        active_spot_bots = db.get_active_perpetual_wealth_spot_bots()
+        if not active_spot_bots:
+            return
+
+        # 1. Monitor open Spot positions
+        for bot in active_spot_bots:
+            chat_id = bot.get("chat_id")
+            if not chat_id:
+                continue
+
+            keys = db.get_user_api(chat_id)
+            if not keys or not keys[0] or not keys[1]:
+                continue
+            api_key, api_secret = keys[0], keys[1]
+
+            try:
+                active_trades = db.get_active_perpetual_wealth_spot_trades(chat_id)
+                active_symbols = []
+
+                for tr in active_trades:
+                    t_id = tr["id"]
+                    sym = tr["symbol"]
+                    buy_qty = tr["buy_qty"]
+                    rem_qty = tr["remaining_qty"]
+                    buy_price = tr["buy_price"]
+                    curr_highest = tr["current_highest"]
+                    curr_peak = tr["peak_roi"]
+                    is_tp1_done = bool(tr["tp1_taken"])
+                    is_be_locked = bool(tr["be_locked"])
+
+                    if rem_qty <= 0 or buy_price <= 0:
+                        continue
+
+                    active_symbols.append(sym)
+                    current_price = trading_engine.get_current_price(sym)
+                    if current_price <= 0:
+                        continue
+
+                    roi_pct = ((current_price - buy_price) / buy_price) * 100.0
+
+                    if current_price > curr_highest:
+                        curr_highest = current_price
+                    if roi_pct > curr_peak:
+                        curr_peak = roi_pct
+
+                    # Phase 1: Breakeven Armor at +2.5% ROI (+0.25% fee floor)
+                    if roi_pct >= 2.5 and not is_be_locked:
+                        is_be_locked = True
+                        db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), 1)
+                        print(f"🛡️ [SPOT WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.25% Fees Floor (ROI: +{roi_pct:.2f}%)")
+
+                    # Phase 2: Micro-Scalp TP1 at +5.0% ROI -> Harvest 50% Size
+                    if roi_pct >= 5.0 and not is_tp1_done:
+                        half_qty = rem_qty * 0.5
+                        half_notional = half_qty * current_price
+                        # Invariant 1: Ensure sub-order >= $10.50
+                        if half_notional >= 10.50:
+                            print(f"🎯 [SPOT WEALTH TP1 HARVEST] {sym} reached +{roi_pct:.2f}% ROI! Selling 50% ({half_qty:.4f} units, ${half_notional:.2f} USDT)...")
+                            sell_res = trading_engine.place_spot_order(
+                                api_key=api_key,
+                                api_secret=api_secret,
+                                symbol=sym,
+                                side="SELL",
+                                quantity=half_qty
+                            )
+                            if sell_res and (sell_res.get("status") in ["success", "NEW", "FILLED"] or sell_res.get("orderId")):
+                                rem_qty -= half_qty
+                                is_tp1_done = True
+                                realized_pnl = (current_price - buy_price) * half_qty
+                                db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, 1, int(is_be_locked))
+                                db.update_perpetual_wealth_spot_pnl(chat_id, realized_pnl, is_win=True)
+
+                                if app and hasattr(app, "bot"):
+                                    try:
+                                        user_lang = db.get_user_language(chat_id)
+                                        notif_text = (
+                                            "💎 **[24/7 SPOT WEALTH - TP1 HARVEST]** 🎯\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
+                                            f"📊 **ROI សម្រេចបាន ៖** `+{roi_pct:.2f}%` 🟢\n"
+                                            f"💰 **ប្រាក់ចំណេញច្បាមបាន (50%) ៖** `+${realized_pnl:,.2f} USDT`\n"
+                                            f"🛡️ **Breakeven Armor ៖** `LOCKED (+0.25% Net Floor)`\n"
+                                            f"🚀 **50% Moonshot Ratchet ៖** `ACTIVE (85% Profit Trailing)`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            "💡 _ប្រព័ន្ធកំពុងបន្ត Trailing លើ 50% ដែលនៅសល់ដើម្បីកើប Moonshot!_"
+                                        ) if user_lang == 'khmer' else (
+                                            "💎 **[24/7 SPOT WEALTH - TP1 HARVEST]** 🎯\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
+                                            f"📊 **Target ROI Reached:** `+{roi_pct:.2f}%` 🟢\n"
+                                            f"💰 **Realized Profit (50%):** `+${realized_pnl:,.2f} USDT`\n"
+                                            f"🛡️ **Breakeven Armor:** `LOCKED (+0.25% Net Floor)`\n"
+                                            f"🚀 **50% Moonshot Ratchet:** `ACTIVE (85% Profit Trailing)`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            "💡 _Spot engine is trailing remaining 50% for maximum moonshot!_"
+                                        )
+                                        asyncio.create_task(_async_send_wealth_alert(app, chat_id, notif_text, "Spot TP1 alert"))
+                                    except Exception as notif_err:
+                                        print(f"⚠️ Notice sending Spot TP1 alert: {notif_err}")
+
+                    # Phase 3: Golden 85% Moonshot Ratchet (TP2)
+                    target_bot_tp = float(bot.get("target_tp", 6.0))
+                    if (curr_peak >= 6.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= target_bot_tp:
+                        print(f"🏆 [SPOT WEALTH TP2 MOONSHOT RATCHET] {sym} Peak: +{curr_peak:.2f}%, Current: +{roi_pct:.2f}%. Harvesting remaining cash!")
+                        sell_res = trading_engine.place_spot_order(
+                            api_key=api_key,
+                            api_secret=api_secret,
+                            symbol=sym,
+                            side="SELL",
+                            quantity=rem_qty
+                        )
+                        realized_pnl = (current_price - buy_price) * rem_qty
+                        db.close_perpetual_wealth_spot_trade(t_id)
+                        db.update_perpetual_wealth_spot_pnl(chat_id, realized_pnl, is_win=(roi_pct > 0))
+                        add_wealth_spot_cooldown(sym, duration_seconds=1800)
+
+                        if app and hasattr(app, "bot"):
+                            try:
+                                user_lang = db.get_user_language(chat_id)
+                                harvest_msg = (
+                                    "🏆 **[24/7 SPOT WEALTH - MOONSHOT HARVESTED]** 💰\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
+                                    f"📈 **Peak ROI កំពូល ៖** `+{curr_peak:.2f}%` 🚀\n"
+                                    f"💵 **Exit ROI ចុងក្រោយ ៖** `+{roi_pct:.2f}%` 🟢\n"
+                                    f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${realized_pnl:,.2f} USDT`\n"
+                                    f"🔄 **ស្ថានភាពទុន ៖** `ដកទុន + ចំណេញត្រឡប់មក Spot Wallet`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _ប្រព័ន្ធកំពុងស្វែងរកកាក់ Spot Sweet-Spot បន្ទាប់ដើម្បីច្បាមចំណេញបន្ត!_"
+                                ) if user_lang == 'khmer' else (
+                                    "🏆 **[24/7 SPOT WEALTH - MOONSHOT HARVESTED]** 💰\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
+                                    f"📈 **Peak ROI Achieved:** `+{curr_peak:.2f}%` 🚀\n"
+                                    f"💵 **Harvest Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
+                                    f"🏆 **Net Realized Profit:** `+${realized_pnl:,.2f} USDT`\n"
+                                    f"🔄 **Capital Status:** `Released & Ready in Spot Wallet`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _Hunting next Spot Sweet-Spot breakout immediately!_"
+                                )
+                                asyncio.create_task(_async_send_wealth_alert(app, chat_id, harvest_msg, "Spot TP2 alert"))
+                            except Exception as notif_err:
+                                print(f"⚠️ Notice sending Spot TP2 alert: {notif_err}")
+
+                    # Phase 4: Breakeven Defense Trigger OR Dynamic Stop Loss (-6.0%)
+                    elif (is_be_locked and current_price <= (buy_price * 1.0025)) or roi_pct <= -6.0:
+                        is_be_exit = is_be_locked and roi_pct > -1.0
+                        reason_tag = "BREAKEVEN DEFENSE" if is_be_exit else "DYNAMIC STOP LOSS"
+                        print(f"🛑 [SPOT WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI. Executing Spot protection exit...")
+                        trading_engine.place_spot_order(
+                            api_key=api_key,
+                            api_secret=api_secret,
+                            symbol=sym,
+                            side="SELL",
+                            quantity=rem_qty
+                        )
+                        realized_pnl = (current_price - buy_price) * rem_qty
+                        db.close_perpetual_wealth_spot_trade(t_id)
+                        db.update_perpetual_wealth_spot_pnl(chat_id, realized_pnl, is_win=(realized_pnl > 0))
+                        add_wealth_spot_cooldown(sym, duration_seconds=1800 if is_be_exit else 3600)
+
+                    else:
+                        db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), int(is_be_locked))
+
+                db.update_perpetual_wealth_spot_coins(chat_id, active_symbols)
+            except Exception as e_pos:
+                print(f"⚠️ [SPOT WEALTH MONITOR NOTICE] User {chat_id}: {e_pos}")
+
+        # 2. Spot Candidate Discovery & Entry (every 25s)
+        if now - _last_wealth_spot_scan_time >= 25.0:
+            _last_wealth_spot_scan_time = now
+            candidates = PerpetualWealthGeneratorEngine.scan_spot_sweet_spot_candidates(limit=8)
+            if not candidates:
+                return
+
+            for bot in active_spot_bots:
+                chat_id = bot.get("chat_id")
+                if not chat_id:
+                    continue
+
+                keys = db.get_user_api(chat_id)
+                if not keys or not keys[0] or not keys[1]:
+                    continue
+                api_key, api_secret = keys[0], keys[1]
+
+                try:
+                    spot_bal = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
+                    user_alloc = float(bot.get("allocation_per_coin", 15.0))
+                    bot_cap = float(bot.get("capital", 50.0))
+
+                    sizing = PerpetualWealthGeneratorEngine.calculate_spot_dna_sizing(bot_cap, spot_bal, user_alloc)
+                    alloc_per_coin = sizing["allocation_per_coin"]
+                    max_coins = sizing["max_coins"]
+
+                    active_trades = db.get_active_perpetual_wealth_spot_trades(chat_id)
+                    current_trades_count = len(active_trades)
+                    held_symbols = set([t["symbol"] for t in active_trades])
+
+                    if current_trades_count >= max_coins or spot_bal < alloc_per_coin or alloc_per_coin < 10.50:
+                        continue
+
+                    for cand in candidates:
+                        sym = cand["symbol"]
+                        if sym in held_symbols or is_wealth_spot_in_cooldown(sym):
+                            continue
+
+                        exec_key = f"spot_{chat_id}_{sym}"
+                        if exec_key in _active_wealth_spot_exec_keys:
+                            continue
+                        _active_wealth_spot_exec_keys.add(exec_key)
+
+                        try:
+                            print(f"🚀 [24/7 SPOT WEALTH ENTRY] User {chat_id}: Placing {sym} BUY (${alloc_per_coin:.2f} USDT Spot 1x)...")
+                            order_res = trading_engine.place_spot_order(
+                                api_key=api_key,
+                                api_secret=api_secret,
+                                symbol=sym,
+                                side="BUY",
+                                usdt_amount=alloc_per_coin
+                            )
+
+                            if order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")):
+                                executed_qty = float(order_res.get("executedQty", 0.0))
+                                cummulative_quote = float(order_res.get("cummulativeQuoteQty", 0.0))
+                                buy_price = cummulative_quote / executed_qty if executed_qty > 0 else cand["last_price"]
+                                if executed_qty <= 0:
+                                    executed_qty = alloc_per_coin / buy_price if buy_price > 0 else 0.0
+
+                                db.add_perpetual_wealth_spot_trade(chat_id, sym, executed_qty, buy_price)
+
+                                if app and hasattr(app, "bot"):
+                                    try:
+                                        user_lang = db.get_user_language(chat_id)
+                                        entry_msg = (
+                                            "💎 **[24/7 SPOT WEALTH - POSITION OPENED]** 🟢\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                                            f"🎯 **ប្រព័ន្ធ ៖** `Spot 1x (0% Liquidation Risk)`\n"
+                                            f"💰 **ទុនទិញ (Allocation) ៖** `${alloc_per_coin:.2f} USDT`\n"
+                                            f"📈 **24H Change ៖** `+{cand['price_change_pct']:.2f}%`\n"
+                                            f"🧠 **AI Confluence Score ៖** `{cand['ai_score']:.1f}/10.0`\n"
+                                            f"🛡️ **Breakeven Armor ៖** `ត្រៀម Lock នៅ +2.5% ROI`\n"
+                                            f"🎯 **Target TP1 (50%) ៖** `+5.0% ROI`\n"
+                                            f"🚀 **Target TP2 (Moonshot) ៖** `85% Trailing Lock`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            "💡 _ម៉ាស៊ីន Spot កំពុងដំណើរការដោយសុវត្ថិភាព 0% Liquidation ២៤/៧!_"
+                                        ) if user_lang == 'khmer' else (
+                                            "💎 **[24/7 SPOT WEALTH - POSITION OPENED]** 🟢\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🪙 **Symbol / Pair:** `{sym}`\n"
+                                            f"🎯 **System:** `Spot 1x (0% Liquidation Risk)`\n"
+                                            f"💰 **Allocated Capital:** `${alloc_per_coin:.2f} USDT`\n"
+                                            f"📈 **24H Sweet-Spot Change:** `+{cand['price_change_pct']:.2f}%`\n"
+                                            f"🧠 **AI Confluence Score:** `{cand['ai_score']:.1f}/10.0`\n"
+                                            f"🛡️ **Breakeven Armor:** `Armed for +2.5% ROI Lock`\n"
+                                            f"🎯 **Target TP1 (50%):** `+5.0% ROI`\n"
+                                            f"🚀 **Target TP2 (Moonshot):** `85% Trailing Ratchet`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            "💡 _Autonomous Spot engine is guarding and harvesting profits with 0% liquidation!_"
+                                        )
+                                        asyncio.create_task(_async_send_wealth_alert(app, chat_id, entry_msg, "Spot entry alert"))
+                                    except Exception as alert_err:
+                                        print(f"⚠️ Notice sending spot wealth entry alert: {alert_err}")
+
+                                break
+
+                        finally:
+                            _active_wealth_spot_exec_keys.discard(exec_key)
+                except Exception as e_user:
+                    print(f"⚠️ Notice processing spot wealth bot user {chat_id}: {e_user}")
 
 
 # Singleton Instance
