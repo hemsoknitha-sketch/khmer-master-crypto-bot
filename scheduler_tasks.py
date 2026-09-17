@@ -182,8 +182,11 @@ def get_alert_target_recipients(alert_type: str = "general") -> tuple[list, bool
 async def daily_market_brief(app: Application, ai_engine):
     """Fetches market data and broadcasts a morning summary to all VIP users."""
     print("🌅 Running Daily Market Brief...")
-    vip_users_lang = db.get_vip_users_with_lang()
-    if not vip_users_lang:
+    recipients, is_group_only = get_alert_target_recipients("daily_brief")
+    if not recipients:
+        recipients = db.get_vip_users_with_lang()
+    if not recipients:
+        print("ℹ️ [DAILY BRIEF] No recipients found (no VIP users and no alert_group_id configured).")
         return
         
     # Fetch BTC Data
@@ -210,9 +213,9 @@ async def daily_market_brief(app: Application, ai_engine):
     ml_summary = await asyncio.to_thread(ml_predictor.predict_price, symbol)
     summary += f"\n\n{ml_summary}"
     
-    # Determine which languages are needed by active VIP members
+    # Determine which languages are needed by active recipients
     needed_langs = set()
-    for _, l in vip_users_lang:
+    for _, l in recipients:
         code = str(l or 'khmer').lower().strip()
         if code in ['en', 'english']:
             needed_langs.add('english')
@@ -254,6 +257,13 @@ async def daily_market_brief(app: Application, ai_engine):
                         txt = after[:end_m.start()]
                     else:
                         txt = after
+            # Purge any leaked CJK characters and clean mangled words in Khmer output
+            txt = re.sub(r'[\u4e00-\u9fff]', '', txt)
+            txt = txt.replace("ភស្តុត", "ភស្តុតាង")
+            txt = txt.replace("ភស្តុតាងាង", "ភស្តុតាង")
+            txt = txt.replace("សន្ទស្សរ", "សន្ទស្សន៍")
+            txt = re.sub(r'(\d+)most recent', r'\1', txt)
+            txt = txt.replace("most recent", "ថ្មីៗចុងក្រោយ")
         elif target_clean in ['en', 'english']:
             matches = list(re.finditer(r'(?:\[ENGLISH\]|\*\*\[ENGLISH\]\*\*|(?:\n|^)\s*(?:1[\.\)]\s*)?Section\s*1)', txt, re.IGNORECASE))
             if not matches:
@@ -339,10 +349,14 @@ async def daily_market_brief(app: Application, ai_engine):
             f"ផ្នែកទី ២៖ ភស្តុតាងបរិមាណវិស័យ និងម៉ាក្រូសេដ្ឋកិច្ច (Quantitative and Macro Evidence)\n"
             f"[ វិភាគស៊ីជម្រៅពី RSI, MACD, Funding Rate, Fear & Greed Index និងទិសដៅសន្ទុះទីផ្សារ ]\n\n"
             f"ផ្នែកទី ៣៖ បញ្ជាប្រតិបត្តិការ (The Executive Action Command)\n"
-            f"`/[command] [amount]`\n\n"
+            f"👉 យុទ្ធសាស្ត្រ Futures Hedge ៖\n"
+            f"• `/turbo_hedge ON 50` (ទុន $50 USDT, ISOLATED Margin)\n"
+            f"• `/wealth ON 50` (24/7 Perpetual Wealth Generator)\n"
+            f"👉 យុទ្ធសាស្ត្រ Spot Accumulation (គ្មាន Liquidation) ៖\n"
+            f"• `/smart_trade ON 30` (ទុន Spot $30 USDT)\n\n"
             f"វិធានតឹងរ៉ឹងបំផុត ៖\n"
-            f"- ផ្ញើចេញតែអត្ថបទបទបង្ហាញចុងក្រោយសុទ្ធសាធជាភាសាខ្មែរ។\n"
-            f"- ហាមដាច់ខាតមិនឱ្យបញ្ចេញកំណត់ចំណាំការគិត ការផ្ទៀងផ្ទាត់ ឬការព្រាងទុក (Thinking/Scratchpad/Notes) ឡើយ។"
+            f"- ផ្ញើចេញតែអត្ថបទបទបង្ហាញចុងក្រោយសុទ្ធសាធជាភាសាខ្មែរ (ហាមដាច់ខាតមិនឱ្យលាយអក្សរចិន ឬអង់គ្លេសក្នុងឃ្លាខ្មែរ)។\n"
+            f"- ហាមដាច់ខាតមិនឱ្យបញ្ចេញកំណត់ចំណាំការគិត ឬ placeholder ដូចជា [command] ឬ [amount] ឡើយ។"
         )
         raw_kh = await asyncio.to_thread(ai_engine.generate_response, kh_prompt, "khmer")
         texts['khmer'] = sanitize_brief_text(raw_kh, "khmer")
@@ -390,22 +404,28 @@ async def daily_market_brief(app: Application, ai_engine):
     # Generate Chart
     chart_path = market_data.generate_chart(df, symbol)
     
-    # Send to all VIPs using parallel_broadcast
+    # Send to all recipients (Groups & VIPs) using parallel_broadcast
     def get_market_brief_text(lang):
         code = str(lang or 'khmer').lower().strip()
         if code in ['en', 'english']:
             brief = texts.get('english') or texts.get('khmer', '')
-            header = "🌅 **Daily Market Brief**"
+            header = f"🌅 **KHMER MASTER CRYPTO | DAILY MARKET BRIEF**\n{ui_standards.DIVIDER_HEAVY}"
         elif code in ['zh', 'chinese', 'cn']:
             brief = texts.get('chinese') or texts.get('khmer', '')
-            header = "🌅 **每日市场晨报 (Daily Market Brief)**"
+            header = f"🌅 **KHMER MASTER CRYPTO | 每日机构市场晨报**\n{ui_standards.DIVIDER_HEAVY}"
         else:
             brief = texts.get('khmer') or texts.get('english', '')
-            header = "🌅 **សេចក្តីសង្ខេបទីផ្សារពេលព្រឹក (Daily Market Brief)**"
-            
-        return f"{header}\n\n{brief}"
+            header = f"🌅 **KHMER MASTER CRYPTO | របាយការណ៍ទីផ្សារពេលព្រឹក**\n{ui_standards.DIVIDER_HEAVY}"
 
-    await parallel_broadcast(app, vip_users_lang, get_market_brief_text, photo_path=chart_path)
+        footer = (
+            f"\n\n{ui_standards.DIVIDER_HEAVY}\n"
+            f"_Khmer Master Crypto_\n"
+            f"_APEX SUPER BRAIN AI_\n"
+            f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+        )
+        return f"{header}\n\n{brief}{footer}"
+
+    await parallel_broadcast(app, recipients, get_market_brief_text, photo_path=chart_path)
 
 async def check_price_alerts(app: Application):
     """Checks all active price alerts and notifies users if triggered."""
