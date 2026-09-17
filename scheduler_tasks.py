@@ -6607,12 +6607,12 @@ async def flash_loan_autonomous_engine(app: Application):
                 explorer_link = exec_res.get("explorer_url") or (f"https://arbiscan.io/address/{target_recipient}" if target_recipient.startswith("0x") else "https://arbiscan.io")
 
                 # If transaction reverted (or pre-flight simulation failed), strictly do NOT record phantom/fake profit!
-                # Only notify users if an actual on-chain transaction reverted or verbose alerts are requested.
+                # By default, do NOT spam users with simulation revert notifications; only notify if FLASH_LOAN_NOTIFY_ON_REVERT is explicitly enabled.
                 if not exec_res.get("success"):
                     FLASH_LOAN_USER_LAST_EXEC[chat_id] = now_ts
                     send_shield_alert = (
-                        exec_res.get("mode") not in ("PREFLIGHT_SIMULATION_REVERT_PREVENTED", "EXECUTION_ERROR")
-                        or os.getenv("FLASH_LOAN_NOTIFY_ON_REVERT", "false").lower() in ("true", "1")
+                        os.getenv("FLASH_LOAN_NOTIFY_ON_REVERT", "false").lower() in ("true", "1")
+                        and exec_res.get("mode") not in ("PREFLIGHT_SIMULATION_REVERT_PREVENTED", "EXECUTION_ERROR", "TOKEN_ADDRESS_NOT_FOUND", "GAS_PRICE_CEILING_HALT")
                     )
                     if send_shield_alert:
                         if user_lang == 'km':

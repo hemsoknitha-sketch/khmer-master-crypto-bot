@@ -632,11 +632,11 @@ class FlashLoanMEVEngine:
         Specifically targets weETH, wstETH, ezETH, rETH, and cbETH paired against WETH.
         """
         lst_targets = [
-            {"sym": "WEETHWETH",  "pair": "weETH/WETH",  "token": "weETH",  "borrow_asset": "WETH", "addr": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe", "chain": "ARBITRUM", "hurdle": 0.10, "default_weth": 20.0},
-            {"sym": "WSTETHWETH", "pair": "wstETH/WETH", "token": "wstETH", "borrow_asset": "WETH", "addr": "0x5979D7b546E38E414F7E9822514be443A4800529", "chain": "ARBITRUM", "hurdle": 0.10, "default_weth": 30.0},
-            {"sym": "EZETHWETH",  "pair": "ezETH/WETH",  "token": "ezETH",  "borrow_asset": "WETH", "addr": "0x2416092f143378750bb29b79eD961ab1954E5033", "chain": "ARBITRUM", "hurdle": 0.12, "default_weth": 20.0},
-            {"sym": "RETHWETH",   "pair": "rETH/WETH",   "token": "rETH",   "borrow_asset": "WETH", "addr": "0xEC5dCb5Dbf4B114C9d0F65BcCAb49EC54F6A0867", "chain": "ARBITRUM", "hurdle": 0.12, "default_weth": 15.0},
-            {"sym": "CBETHWETH",  "pair": "cbETH/WETH",  "token": "cbETH",  "borrow_asset": "WETH", "addr": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22", "chain": "BASE",     "hurdle": 0.08, "default_weth": 25.0},
+            {"sym": "WEETHWETH",  "pair": "weETH/WETH",  "token": "weETH",  "borrow_asset": "WETH", "addr": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe", "chain": "ARBITRUM", "hurdle": 0.42, "default_weth": 20.0},
+            {"sym": "WSTETHWETH", "pair": "wstETH/WETH", "token": "wstETH", "borrow_asset": "WETH", "addr": "0x5979D7b546E38E414F7E9822514be443A4800529", "chain": "ARBITRUM", "hurdle": 0.40, "default_weth": 30.0},
+            {"sym": "EZETHWETH",  "pair": "ezETH/WETH",  "token": "ezETH",  "borrow_asset": "WETH", "addr": "0x2416092f143378750bb29b79eD961ab1954E5033", "chain": "ARBITRUM", "hurdle": 0.45, "default_weth": 20.0},
+            {"sym": "RETHWETH",   "pair": "rETH/WETH",   "token": "rETH",   "borrow_asset": "WETH", "addr": "0xEC5dCb5Dbf4B114C9d0F65BcCAb49EC54F6A0867", "chain": "ARBITRUM", "hurdle": 0.45, "default_weth": 15.0},
+            {"sym": "CBETHWETH",  "pair": "cbETH/WETH",  "token": "cbETH",  "borrow_asset": "WETH", "addr": "0x1DEBD73E752bEaF218B81150766a0e9BE7248646", "chain": "ARBITRUM", "hurdle": 0.42, "default_weth": 25.0},
         ]
 
         addrs_str = ",".join([t["addr"] for t in lst_targets])
