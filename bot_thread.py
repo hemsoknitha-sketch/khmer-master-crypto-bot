@@ -16774,6 +16774,7 @@ class TelegramBotThread(BaseThread):
                         "4️⃣ **24/7 Continuous Rotation ៖** វិលជុំស្វែងរកកាក់ Breakout ថ្មីៗដោយស្វ័យប្រវត្ត!\n"
                         "💡 **ព័ត៌មានជំនួយ ៖** បើក 'Use BNB for fees' លើ Binance ដើម្បីចំណេញសេវា 25% & លក់ ១០០% គ្មានសល់កន្ទុយកាក់!\n\n"
                         "📋 **1-TAP COMMAND PRESETS ៖**\n"
+                        "👉 **បើក Spot 1 កាក់ ($22 | $22/កាក់) ៖** `` `/wealth SPOT ON 22` ``\n"
                         "👉 **បើក Spot ($50 | $15/កាក់) ៖** `` `/wealth SPOT ON 50` ``\n"
                         "👉 **បើក Spot ($100 | $25/កាក់) ៖** `` `/wealth SPOT ON 100 25` ``\n"
                         "👉 **បើក Spot ($200 | $50/កាក់) ៖** `` `/wealth SPOT ON 200 50` ``\n"
@@ -16814,6 +16815,7 @@ class TelegramBotThread(BaseThread):
                         "4️⃣ **24/7 Continuous Rotation:** Seamlessly cycles capital into active Sweet-Spot breakouts!\n"
                         "💡 **Pro-Tip:** Enable 'Use BNB for fees' on Binance for 25% discount & 100% clean exit with zero dust!\n\n"
                         "📋 **1-TAP COMMAND PRESETS:**\n"
+                        "👉 **Start Spot 1-Coin ($22 | $22/coin):** `` `/wealth SPOT ON 22` ``\n"
                         "👉 **Start Spot ($50 | $15/coin):** `` `/wealth SPOT ON 50` ``\n"
                         "👉 **Start Spot ($100 | $25/coin):** `` `/wealth SPOT ON 100 25` ``\n"
                         "👉 **Start Spot ($200 | $50/coin):** `` `/wealth SPOT ON 200 50` ``\n"
@@ -16863,7 +16865,10 @@ class TelegramBotThread(BaseThread):
                     if custom_amt > 0.0:
                         alloc = max(10.50, round(custom_amt, 2))
                     else:
-                        alloc = max(10.50, round(cap * 0.30, 2))
+                        if cap < 35.0:
+                            alloc = max(10.50, round(cap, 2))
+                        else:
+                            alloc = max(10.50, round(cap * 0.30, 2))
                     return cap, alloc, pin
                 else:
                     return cap, custom_amt, pin
