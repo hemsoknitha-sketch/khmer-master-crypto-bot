@@ -230,6 +230,33 @@ def get_max_sellable_qty(symbol: str, raw_balance: float) -> float:
         return max_sellable
     return raw_balance
 
+def calculate_buy_quantity(api_key: str = "", api_secret: str = "", symbol: str = "", invest_amount: float = 0.0, current_price: float = 0.0) -> float:
+    """
+    Calculates formatted base asset quantity to buy for a given USDT investment amount.
+    Respects LOT_SIZE stepSize for both Spot and Futures.
+    """
+    if not symbol:
+        return 0.0
+    symbol = str(symbol).upper().strip()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+    if symbol == "DODOUSDT":
+        symbol = "DODOXUSDT"
+
+    if current_price <= 0.0:
+        current_price = get_current_price(symbol)
+    if current_price <= 0.0 or invest_amount <= 0.0:
+        return 0.0
+
+    raw_qty = float(invest_amount) / float(current_price)
+    
+    # Check Futures stepSize first, then Spot stepSize
+    formatted_qty = get_futures_max_sellable_qty(symbol, raw_qty)
+    if formatted_qty <= 0.0:
+        formatted_qty = get_max_sellable_qty(symbol, raw_qty)
+        
+    return formatted_qty
+
 def generate_signature(api_secret: str, query_string: str) -> str:
     """Generates the HMAC SHA256 signature required by Binance."""
     return hmac.new(

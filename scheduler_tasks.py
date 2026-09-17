@@ -4880,9 +4880,9 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             if meta.get("rsi_15m", 50.0) <= 38.0:
                                 print(f"🛡️ [PRE-PUMP SHORT GUARD] Skipped short on {symbol}: 15m RSI <= 38.0!")
                                 continue
-                            order = await asyncio.to_thread(trading_engine.place_futures_short, api_key, api_secret, symbol, qty, effective_leverage)
+                            order = await asyncio.to_thread(trading_engine.place_futures_order, api_key, api_secret, symbol, "SELL", qty, effective_leverage, "SHORT")
                         else:
-                            order = await asyncio.to_thread(trading_engine.place_futures_order, api_key, api_secret, symbol, "BUY", qty, effective_leverage)
+                            order = await asyncio.to_thread(trading_engine.place_futures_order, api_key, api_secret, symbol, "BUY", qty, effective_leverage, "LONG")
 
                         if "error" not in order and "code" not in order and order.get("status") != "error":
                             order_success = True
