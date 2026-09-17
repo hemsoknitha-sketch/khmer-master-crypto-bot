@@ -988,25 +988,28 @@ class PerpetualWealthGeneratorEngine:
             return {"is_valid": False, "reason": f"Error: {e}"}
 
     @staticmethod
-    def calculate_spot_dna_sizing(total_capital: float, available_usdt: float, user_alloc: float = 15.0) -> dict:
+    def calculate_spot_dna_sizing(total_capital: float, available_usdt: float, user_alloc: float = 15.0, realized_pnl: float = 0.0) -> dict:
         """
         Enforces Invariant 1 (Spot MIN_NOTIONAL $10.50 Hard Floor).
         Spot 1x leverage with 0% liquidation risk.
+        Dynamic Auto-Compounding Architecture:
+        - effective_capital = total_capital + max(0.0, realized_pnl)
+        - max_coins = max(1, min(15, int(effective_capital / alloc_per_coin)))
+        Every time cumulative realized profit reaches the cost of 1 coin (+user_alloc),
+        the system automatically unlocks +1 concurrent coin slot 24/7!
         """
         total_capital = max(10.50, float(total_capital))
         available_usdt = max(0.0, float(available_usdt))
         alloc_per_coin = max(10.50, round(float(user_alloc), 2))
+        realized_pnl = max(0.0, float(realized_pnl))
 
-        if available_usdt < alloc_per_coin:
-            if available_usdt >= 10.50:
-                alloc_per_coin = available_usdt
-            else:
-                return {"allocation_per_coin": 0.0, "max_coins": 0, "leverage": 1}
+        effective_capital = total_capital + realized_pnl
+        max_coins = max(1, min(15, int(effective_capital / alloc_per_coin)))
 
-        max_coins = max(1, min(12, int(available_usdt / alloc_per_coin)))
         return {
             "allocation_per_coin": alloc_per_coin,
             "max_coins": max_coins,
+            "effective_capital": effective_capital,
             "leverage": 1
         }
 
@@ -1058,13 +1061,19 @@ class PerpetualWealthGeneratorEngine:
             target_tp=target_tp
         )
 
+        existing_bot = db.get_perpetual_wealth_spot_bot(chat_id)
+        current_pnl = float(existing_bot.get("total_realized_pnl", 0.0)) if existing_bot else 0.0
+        sizing = PerpetualWealthGeneratorEngine.calculate_spot_dna_sizing(capital, spot_usdt, alloc, current_pnl)
+
         return {
             "status": "success",
             "chat_id": chat_id,
             "capital": capital,
             "allocation_per_coin": alloc,
             "target_tp": target_tp,
-            "available_spot_usdt": spot_usdt
+            "available_spot_usdt": spot_usdt,
+            "max_coins": sizing["max_coins"],
+            "effective_capital": sizing["effective_capital"]
         }
 
     @staticmethod
@@ -1323,6 +1332,8 @@ class PerpetualWealthGeneratorEngine:
                         db.close_perpetual_wealth_spot_trade(t_id)
                         db.update_perpetual_wealth_spot_pnl(chat_id, realized_pnl, is_win=(realized_pnl > 0))
                         add_wealth_spot_cooldown(sym, duration_seconds=1800 if (is_be_exit or is_stagnant) else 3600)
+                        if sym in active_symbols:
+                            active_symbols.remove(sym)
 
                         if is_stagnant and app and hasattr(app, "bot"):
                             try:
@@ -1380,8 +1391,9 @@ class PerpetualWealthGeneratorEngine:
                     spot_bal = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
                     user_alloc = float(bot.get("allocation_per_coin", 15.0))
                     bot_cap = float(bot.get("capital", 50.0))
+                    spot_pnl = float(bot.get("total_realized_pnl", 0.0))
 
-                    sizing = PerpetualWealthGeneratorEngine.calculate_spot_dna_sizing(bot_cap, spot_bal, user_alloc)
+                    sizing = PerpetualWealthGeneratorEngine.calculate_spot_dna_sizing(bot_cap, spot_bal, user_alloc, spot_pnl)
                     alloc_per_coin = sizing["allocation_per_coin"]
                     max_coins = sizing["max_coins"]
 
@@ -1420,6 +1432,10 @@ class PerpetualWealthGeneratorEngine:
                                     executed_qty = alloc_per_coin / buy_price if buy_price > 0 else 0.0
 
                                 db.add_perpetual_wealth_spot_trade(chat_id, sym, executed_qty, buy_price)
+                                held_symbols.add(sym)
+                                db.update_perpetual_wealth_spot_coins(chat_id, list(held_symbols))
+                                current_trades_count += 1
+                                spot_bal -= alloc_per_coin
 
                                 if app and hasattr(app, "bot"):
                                     try:
@@ -1457,7 +1473,8 @@ class PerpetualWealthGeneratorEngine:
                                     except Exception as alert_err:
                                         print(f"⚠️ Notice sending spot wealth entry alert: {alert_err}")
 
-                                break
+                                if current_trades_count >= max_coins or spot_bal < alloc_per_coin:
+                                    break
 
                         finally:
                             _active_wealth_spot_exec_keys.discard(exec_key)

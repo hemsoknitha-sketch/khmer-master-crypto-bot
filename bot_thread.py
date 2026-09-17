@@ -16739,6 +16739,14 @@ class TelegramBotThread(BaseThread):
                 fut_margin_str = f"${fut_margin_val:.2f} USDT" if fut_margin_val > 0 else "Auto ($4.00–$5.50 USDT)"
                 fut_margin_str_en = f"${fut_margin_val:.2f} USDT" if fut_margin_val > 0 else "Auto ($4.00–$5.50 USDT)"
 
+                spot_cap = float(spot_info.get("capital", 50.0))
+                spot_alloc = float(spot_info.get("allocation_per_coin", 15.0))
+                spot_sizing = perpetual_wealth_engine.PerpetualWealthGeneratorEngine.calculate_spot_dna_sizing(
+                    spot_cap, 0.0, spot_alloc, spot_pnl
+                )
+                spot_max_coins = spot_sizing["max_coins"]
+                spot_eff_cap = spot_sizing["effective_capital"]
+
                 if user_lang == 'khmer':
                     msg = (
                         "💎 **APEX 24/7 PERPETUAL WEALTH GENERATOR** ⚡\n"
@@ -16746,8 +16754,10 @@ class TelegramBotThread(BaseThread):
                         "🏛️ **ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ (Spot 1x & Futures 10x)**\n\n"
                         "🟢 **[1] SPOT WEALTH ENGINE (0% Liquidation Risk)**\n"
                         f"• ស្ថានភាព ៖ `{spot_badge}`\n"
-                        f"• ទុនកំណត់ ៖ `${spot_info.get('capital', 50.0):.2f} USDT` (1x Leverage)\n"
-                        f"• ទុនក្នុង ១ កាក់ ៖ `${spot_info.get('allocation_per_coin', 15.0):.2f} USDT`\n"
+                        f"• ទុនដើម (Base Capital) ៖ `${spot_cap:.2f} USDT` (1x Leverage)\n"
+                        f"• ទុនបង្វិលសរុប (Effective Capital) ៖ `${spot_eff_cap:.2f} USDT` (+Auto-Compound)\n"
+                        f"• ទុនក្នុង ១ កាក់ ៖ `${spot_alloc:.2f} USDT`\n"
+                        f"• សមត្ថភាពកាន់កាក់ (Capacity) ៖ `{len(spot_coins)}/{spot_max_coins} កាក់ (Auto-Compounding)`\n"
                         f"• កាក់កំពុងច្បាម ៖ `{spot_coins_str}`\n"
                         f"• ចំណេញសុទ្ធកើបបាន ៖ `+${spot_pnl:,.2f} USDT` ({spot_win} ឈ្នះ | {spot_loss} ចាញ់)\n\n"
                         "⚡ **[2] FUTURES WEALTH ENGINE (High Velocity 10x)**\n"
@@ -16784,8 +16794,10 @@ class TelegramBotThread(BaseThread):
                         "🏛️ **Institutional 24/7 Dual-Engine Suite (Spot 1x & Futures 10x)**\n\n"
                         "🟢 **[1] SPOT WEALTH ENGINE (0.00% Liquidation Risk)**\n"
                         f"• Status: `{spot_badge_en}`\n"
-                        f"• Capital: `${spot_info.get('capital', 50.0):.2f} USDT` (1x Spot Leverage)\n"
-                        f"• Alloc / Coin: `${spot_info.get('allocation_per_coin', 15.0):.2f} USDT`\n"
+                        f"• Base Capital: `${spot_cap:.2f} USDT` (1x Spot Leverage)\n"
+                        f"• Effective Capital: `${spot_eff_cap:.2f} USDT` (+Auto-Compound)\n"
+                        f"• Alloc / Coin: `${spot_alloc:.2f} USDT`\n"
+                        f"• Coin Capacity: `{len(spot_coins)}/{spot_max_coins} Coins (Auto-Compounding)`\n"
                         f"• Active Coins: `{spot_coins_str_en}`\n"
                         f"• Net Realized: `+${spot_pnl:,.2f} USDT` ({spot_win} W | {spot_loss} L)\n\n"
                         "⚡ **[2] FUTURES WEALTH ENGINE (High Velocity 10x)**\n"
@@ -16882,6 +16894,7 @@ class TelegramBotThread(BaseThread):
                         f"🛡️ **កម្រិតហានិភ័យ ៖** `1x Leverage (0.00% Liquidation Risk)`\n"
                         f"💵 **សមតុល្យ Spot Available ៖** `${res['available_spot_usdt']:.2f} USDT`\n"
                         f"🪙 **ទុនក្នុង ១ កាក់ ៖** `${res['allocation_per_coin']:.2f} USDT`\n"
+                        f"📈 **សមត្ថភាពកាន់កាក់ (Capacity) ៖** `1/{res.get('max_coins', 3)} កាក់ (Auto-Compounding)`\n"
                         f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "💎 _ប្រព័ន្ធកំពុងស្កេនរកកាក់ Spot Golden Sweet-Spot និងចាប់ផ្តើមច្បាមចំណេញ ២៤/៧!_"
@@ -16892,6 +16905,7 @@ class TelegramBotThread(BaseThread):
                         f"🛡️ **Safety Level:** `1x Leverage (0.00% Liquidation Risk)`\n"
                         f"💵 **Spot Available Balance:** `${res['available_spot_usdt']:.2f} USDT`\n"
                         f"🪙 **Alloc per Coin:** `${res['allocation_per_coin']:.2f} USDT`\n"
+                        f"📈 **Coin Capacity:** `1/{res.get('max_coins', 3)} Coins (Auto-Compounding)`\n"
                         f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "💎 _Engine is actively scanning for Spot Sweet-Spot breakouts and harvesting 24/7!_"
