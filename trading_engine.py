@@ -2690,7 +2690,7 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
     if quantity <= 0:
         return {"status": "error", "error": f"Calculated quantity {quantity} invalid for {symbol}"}
 
-    def _send_hft_order(ord_qty: float, ord_lev: int, pos_side: str = None):
+    def _send_hft_order(ord_qty: float, ord_lev: int, pos_side: str = None, omit_pos_side: bool = False):
         set_futures_leverage(api_key, api_secret, symbol, ord_lev)
         endpoint = "/fapi/v1/order"
         timestamp = int(time.time() * 1000) + TIME_OFFSET
@@ -2702,11 +2702,14 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
             "recvWindow": 60000,
             "timestamp": timestamp
         }
-        eff_pos = pos_side or position_side
-        if not eff_pos and is_hedge_mode(api_key, api_secret):
-            eff_pos = "LONG" if side.upper() == "BUY" else "SHORT"
-        if eff_pos and eff_pos in ["LONG", "SHORT"]:
-            ord_params["positionSide"] = eff_pos
+        if not omit_pos_side:
+            eff_pos = pos_side if pos_side is not None else position_side
+            if not eff_pos and is_hedge_mode(api_key, api_secret):
+                eff_pos = "LONG" if side.upper() == "BUY" else "SHORT"
+            elif eff_pos and not is_hedge_mode(api_key, api_secret):
+                eff_pos = None # Do not inject positionSide on One-Way mode
+            if eff_pos and eff_pos in ["LONG", "SHORT"]:
+                ord_params["positionSide"] = eff_pos
 
         params = urlencode(ord_params)
         sig = generate_signature(api_secret, params)
@@ -2716,10 +2719,19 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
     try:
         res = _send_hft_order(quantity, leverage)
 
-        # Hedge Mode Error -4061 Auto-Recovery
+        # Hedge Mode / One-Way Mode Error -4061 Auto-Recovery
         if "-4061" in res.text:
-            retry_pos = "LONG" if side.upper() == "BUY" else "SHORT"
-            res = _send_hft_order(quantity, leverage, pos_side=retry_pos)
+            if "positionSide" in res.text or position_side:
+                # Account is in One-Way mode: retry without positionSide
+                res = _send_hft_order(quantity, leverage, omit_pos_side=True)
+                if "-4061" in res.text:
+                    retry_pos = "LONG" if side.upper() == "BUY" else "SHORT"
+                    res = _send_hft_order(quantity, leverage, pos_side=retry_pos)
+            else:
+                retry_pos = "LONG" if side.upper() == "BUY" else "SHORT"
+                res = _send_hft_order(quantity, leverage, pos_side=retry_pos)
+                if "-4061" in res.text:
+                    res = _send_hft_order(quantity, leverage, omit_pos_side=True)
         
         if res.status_code == 200:
             data = res.json()

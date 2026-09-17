@@ -689,23 +689,14 @@ class PerpetualWealthGeneratorEngine:
                             print(f"🚀 [24/7 WEALTH GENERATOR ENTRY] User {chat_id}: Placing {sym} {side} (${margin_per_coin:.2f} USDT x{leverage} lev)...")
 
                             # Place order
-                            if side == "BUY":
-                                order_res = trading_engine.place_futures_order(
-                                    api_key=api_key,
-                                    api_secret=api_secret,
-                                    symbol=sym,
-                                    side="BUY",
-                                    quantity=qty,
-                                    position_side="LONG"
-                                )
-                            else:
-                                order_res = trading_engine.place_futures_short(
-                                    api_key=api_key,
-                                    api_secret=api_secret,
-                                    symbol=sym,
-                                    quantity=qty,
-                                    position_side="SHORT"
-                                )
+                            order_res = trading_engine.place_futures_order(
+                                api_key=api_key,
+                                api_secret=api_secret,
+                                symbol=sym,
+                                side=side,
+                                quantity=qty,
+                                leverage=leverage
+                            )
 
                             if order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")):
                                 db.add_active_trade(
