@@ -693,19 +693,19 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [15M/1H TREND LOCK] {symbol}: SELL suppressed because 15m/1h is not in True Downtrend!")
-                elif side == "BUY" and (change_24h >= 20.0 or rsi14 >= 70.0):
+                elif side == "BUY" and (change_24h >= 20.0 or rsi14_15m >= 70.0):
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [STRICT EXCLUSION: ANTI-PEAK BUYING] {symbol}: 24h Change {change_24h:+.1f}% >= +20% or RSI {rsi14:.1f} >= 70 -> Blocked BUY!")
+                    print(f"🛡️ [STRICT EXCLUSION: ANTI-PEAK BUYING] {symbol}: 24h Change {change_24h:+.1f}% >= +20% or RSI {rsi14_15m:.1f} >= 70 -> Blocked BUY!")
                 elif side == "BUY" and not is_spot_mode and price > ema5_1m * 1.0035:
                     # Price extended > 0.35% above 1m EMA5 -> Wait for Pullback Retracement!
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.35% above EMA5 -> Waiting for Pullback!")
-                elif side == "SELL" and (change_24h <= -15.0 or rsi14 <= 38.0):
+                elif side == "SELL" and (change_24h <= -15.0 or rsi14_15m <= 38.0):
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -15% or RSI {rsi14:.1f} <= 38.0 -> Blocked SELL!")
+                    print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -15% or RSI {rsi14_15m:.1f} <= 38.0 -> Blocked SELL!")
                 elif side == "SELL" and not is_spot_mode and price < ema5_1m * 0.9965:
                     # Price extended > 0.35% below 1m EMA5 -> Wait for Bounce Retracement!
                     side = "SKIP"
