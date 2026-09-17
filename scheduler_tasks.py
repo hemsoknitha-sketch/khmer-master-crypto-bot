@@ -5410,6 +5410,7 @@ async def sweep_auto_monitor(app: Application):
         print(f"⚠️ [SWEEP AUTO MONITOR ERROR]: {e}")
 
 _active_funding_positions = {}
+_funding_failed_cooldown = {}
 
 async def funding_harvester_monitor(app: Application):
     """
@@ -5441,6 +5442,10 @@ async def funding_harvester_monitor(app: Application):
                 if chat_id in _active_funding_positions:
                     continue
 
+                # 10-minute cooldown on failed balance/order attempts
+                if time.time() - _funding_failed_cooldown.get(chat_id, 0) < 600:
+                    continue
+
                 keys = db.get_user_api(chat_id)
                 if not keys:
                     continue
@@ -5469,6 +5474,8 @@ async def funding_harvester_monitor(app: Application):
                         await app.bot.send_message(chat_id=chat_id, text=entry_msg, parse_mode="Markdown")
                     except Exception:
                         pass
+                else:
+                    _funding_failed_cooldown[chat_id] = time.time()
 
         # 2. Post-Settlement Exit Window (Within 5 minutes after settlement)
         elif secs_left > 28200:  # right after settlement
@@ -6041,6 +6048,11 @@ async def daily_executive_summary_report(app: Application):
                 await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception as u_err:
                 print(f"⚠️ Error sending daily summary to {chat_id}: {u_err}")
+                if "bot was blocked by the user" in str(u_err).lower() or "user is deactivated" in str(u_err).lower():
+                    try:
+                        db.update_user_vip(chat_id, 0)
+                    except Exception:
+                        pass
     except asyncio.CancelledError:
         pass
     except Exception as e:

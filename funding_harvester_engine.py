@@ -229,6 +229,13 @@ class InstitutionalFundingHarvesterEngine:
             spot_cap = max(10.50, round(capital_usdt * 0.5, 2))
             futures_cap = max(10.50, round(capital_usdt * 0.5, 2))
 
+            # Invariant 10: Multi-Wallet Balance Segregation
+            # Check Spot USDT balance BEFORE attempting spot order
+            spot_bal = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
+            if spot_bal < spot_cap:
+                print(f"⚠️ [FUNDING HARVEST PAIR ABORTED] Insufficient Spot USDT Balance (${spot_bal:.2f} < ${spot_cap:.2f}) for {symbol}. Spot USDT balance required for Delta-Neutral hedge.")
+                return {"status": "error", "message": f"Insufficient Spot USDT Balance (${spot_bal:.2f} < ${spot_cap:.2f})"}
+
             # Set 1x ISOLATED leverage for zero liquidation risk
             trading_engine.set_futures_margin_type(api_key, api_secret, symbol, "ISOLATED")
             trading_engine.set_futures_leverage(api_key, api_secret, symbol, 1)
