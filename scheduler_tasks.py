@@ -6742,6 +6742,19 @@ async def flash_loan_autonomous_engine(app: Application):
         print(f"⚠️ Notice in flash_loan_autonomous_engine: {e}")
 
 
+async def perpetual_wealth_monitor(app: Application):
+    """
+    💎 24/7 Perpetual Wealth Generator Monitor Loop
+    Executes real-time monitoring of open positions, Dual-Harvest TP1/TP2, and continuous sweet-spot rotation.
+    """
+    try:
+        import perpetual_wealth_engine
+        await perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.execute_wealth_harvest_cycle(app)
+    except Exception as e:
+        print(f"⚠️ [PERPETUAL WEALTH MONITOR NOTICE]: {e}")
+
+
+
 
 
 

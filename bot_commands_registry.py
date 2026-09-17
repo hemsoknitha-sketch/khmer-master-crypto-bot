@@ -38,6 +38,7 @@ def get_public_bot_commands():
         BotCommand("spot_harvest", "🏦 Auto Spot Profit Wealth Harvester"),
 
         # --- [3] FUTURES & HEDGE ENGINES (Delta-Neutral & Precision Execution) ---
+        BotCommand("wealth", "💎 24/7 Perpetual Wealth Generator"),
         BotCommand("turbo_hedge", "🛡️ Institutional Dual-Side Delta-Neutral Hedge"),
         BotCommand("smartx", "👑 5-Agent Swarm + 12 Wall Street ML Ensembles"),
         BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),

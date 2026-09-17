@@ -141,6 +141,12 @@ def run_audit():
         else:
             log_pass("Spot Dynamic Fibonacci /infinity_matrix command handler is registered and active!")
 
+        if "wealth" not in cmd_names:
+            failures.append("bot_thread.py missing /wealth command handler!")
+            log_fail("Missing /wealth command handler!")
+        else:
+            log_pass("Flagship /wealth 24/7 Perpetual Wealth Generator command handler is registered and active!")
+
         # Verify all registry commands have handlers in bot_thread.py
         missing_handlers = [c for c in reg_admin if c not in cmd_names]
         if missing_handlers:

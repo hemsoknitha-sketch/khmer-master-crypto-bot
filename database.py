@@ -889,6 +889,26 @@ def init_db():
             exit_reason TEXT
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS perpetual_wealth_bots (
+            chat_id INTEGER PRIMARY KEY,
+            status TEXT DEFAULT 'STOPPED',
+            capital REAL DEFAULT 50.0,
+            leverage INTEGER DEFAULT 10,
+            target_tp REAL DEFAULT 10.0,
+            active_coins TEXT DEFAULT '[]',
+            total_realized_pnl REAL DEFAULT 0.0,
+            win_count INTEGER DEFAULT 0,
+            loss_count INTEGER DEFAULT 0,
+            cycles_completed INTEGER DEFAULT 0,
+            max_drawdown REAL DEFAULT 0.0,
+            peak_pnl REAL DEFAULT 0.0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -5148,5 +5168,233 @@ def get_total_spot_wealth_harvested(chat_id: int) -> dict:
     except Exception as e:
         print(f"⚠️ [DATABASE] Error getting total spot wealth harvested: {e}")
         return {"total_usd": 0.0, "btc_qty": 0.0, "paxg_qty": 0.0, "harvest_count": 0}
+
+
+def set_perpetual_wealth_bot(chat_id: int, status: str = 'ACTIVE', capital: float = 50.0, leverage: int = 10, target_tp: float = 10.0) -> bool:
+    """Inserts or updates perpetual wealth bot state."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS perpetual_wealth_bots (
+            chat_id INTEGER PRIMARY KEY,
+            status TEXT DEFAULT 'STOPPED',
+            capital REAL DEFAULT 50.0,
+            leverage INTEGER DEFAULT 10,
+            target_tp REAL DEFAULT 10.0,
+            active_coins TEXT DEFAULT '[]',
+            total_realized_pnl REAL DEFAULT 0.0,
+            win_count INTEGER DEFAULT 0,
+            loss_count INTEGER DEFAULT 0,
+            cycles_completed INTEGER DEFAULT 0,
+            max_drawdown REAL DEFAULT 0.0,
+            peak_pnl REAL DEFAULT 0.0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )''')
+        cursor.execute('''
+            INSERT INTO perpetual_wealth_bots (chat_id, status, capital, leverage, target_tp, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                status = excluded.status,
+                capital = excluded.capital,
+                leverage = excluded.leverage,
+                target_tp = excluded.target_tp,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (chat_id, status, capital, leverage, target_tp))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in set_perpetual_wealth_bot: {e}")
+        return False
+
+
+def get_perpetual_wealth_bot(chat_id: int) -> dict:
+    """Retrieves perpetual wealth bot configuration and stats for a user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS perpetual_wealth_bots (
+            chat_id INTEGER PRIMARY KEY,
+            status TEXT DEFAULT 'STOPPED',
+            capital REAL DEFAULT 50.0,
+            leverage INTEGER DEFAULT 10,
+            target_tp REAL DEFAULT 10.0,
+            active_coins TEXT DEFAULT '[]',
+            total_realized_pnl REAL DEFAULT 0.0,
+            win_count INTEGER DEFAULT 0,
+            loss_count INTEGER DEFAULT 0,
+            cycles_completed INTEGER DEFAULT 0,
+            max_drawdown REAL DEFAULT 0.0,
+            peak_pnl REAL DEFAULT 0.0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )''')
+        cursor.execute('''
+            SELECT chat_id, status, capital, leverage, target_tp, active_coins,
+                   total_realized_pnl, win_count, loss_count, cycles_completed,
+                   max_drawdown, peak_pnl, created_at, updated_at
+            FROM perpetual_wealth_bots WHERE chat_id = ?
+        ''', (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            import json
+            active_coins = []
+            try:
+                active_coins = json.loads(row[5]) if row[5] else []
+            except Exception:
+                active_coins = []
+            return {
+                "chat_id": row[0],
+                "status": row[1],
+                "capital": row[2],
+                "leverage": row[3],
+                "target_tp": row[4],
+                "active_coins": active_coins,
+                "total_realized_pnl": row[6],
+                "win_count": row[7],
+                "loss_count": row[8],
+                "cycles_completed": row[9],
+                "max_drawdown": row[10],
+                "peak_pnl": row[11],
+                "created_at": row[12],
+                "updated_at": row[13]
+            }
+        return None
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in get_perpetual_wealth_bot: {e}")
+        return None
+
+
+def get_active_perpetual_wealth_bots() -> list:
+    """Retrieves all active perpetual wealth bots."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS perpetual_wealth_bots (
+            chat_id INTEGER PRIMARY KEY,
+            status TEXT DEFAULT 'STOPPED',
+            capital REAL DEFAULT 50.0,
+            leverage INTEGER DEFAULT 10,
+            target_tp REAL DEFAULT 10.0,
+            active_coins TEXT DEFAULT '[]',
+            total_realized_pnl REAL DEFAULT 0.0,
+            win_count INTEGER DEFAULT 0,
+            loss_count INTEGER DEFAULT 0,
+            cycles_completed INTEGER DEFAULT 0,
+            max_drawdown REAL DEFAULT 0.0,
+            peak_pnl REAL DEFAULT 0.0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )''')
+        cursor.execute('''
+            SELECT chat_id, status, capital, leverage, target_tp, active_coins,
+                   total_realized_pnl, win_count, loss_count, cycles_completed,
+                   max_drawdown, peak_pnl
+            FROM perpetual_wealth_bots WHERE status = 'ACTIVE'
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+        bots = []
+        import json
+        for r in rows:
+            coins = []
+            try:
+                coins = json.loads(r[5]) if r[5] else []
+            except Exception:
+                coins = []
+            bots.append({
+                "chat_id": r[0],
+                "status": r[1],
+                "capital": r[2],
+                "leverage": r[3],
+                "target_tp": r[4],
+                "active_coins": coins,
+                "total_realized_pnl": r[6],
+                "win_count": r[7],
+                "loss_count": r[8],
+                "cycles_completed": r[9],
+                "max_drawdown": r[10],
+                "peak_pnl": r[11]
+            })
+        return bots
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in get_active_perpetual_wealth_bots: {e}")
+        return []
+
+
+def update_perpetual_wealth_coins(chat_id: int, coins: list) -> bool:
+    """Updates active coin list for a perpetual wealth bot."""
+    try:
+        import json
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        coins_json = json.dumps(coins)
+        cursor.execute('''
+            UPDATE perpetual_wealth_bots
+            SET active_coins = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+        ''', (coins_json, chat_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in update_perpetual_wealth_coins: {e}")
+        return False
+
+
+def update_perpetual_wealth_pnl(chat_id: int, pnl_delta: float, is_win: bool = True) -> bool:
+    """Updates realized PnL, win/loss count, and cycles completed."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if is_win:
+            cursor.execute('''
+                UPDATE perpetual_wealth_bots
+                SET total_realized_pnl = total_realized_pnl + ?,
+                    win_count = win_count + 1,
+                    cycles_completed = cycles_completed + 1,
+                    peak_pnl = MAX(peak_pnl, total_realized_pnl + ?),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = ?
+            ''', (pnl_delta, pnl_delta, chat_id))
+        else:
+            cursor.execute('''
+                UPDATE perpetual_wealth_bots
+                SET total_realized_pnl = total_realized_pnl + ?,
+                    loss_count = loss_count + 1,
+                    cycles_completed = cycles_completed + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = ?
+            ''', (pnl_delta, chat_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in update_perpetual_wealth_pnl: {e}")
+        return False
+
+
+def stop_perpetual_wealth_bot(chat_id: int) -> bool:
+    """Stops the perpetual wealth bot for a user."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE perpetual_wealth_bots
+            SET status = 'STOPPED', updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+        ''', (chat_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in stop_perpetual_wealth_bot: {e}")
+        return False
+
 
 
