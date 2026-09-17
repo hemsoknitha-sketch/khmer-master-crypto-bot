@@ -878,6 +878,49 @@ def evaluate_anti_wick_liquidity_sweep(
         "reason": "Structural Invalidation Confirmed"
     }
 
+def get_15m_structural_swing_stop(
+    symbol: str, 
+    side: str, 
+    entry_price: float, 
+    current_price: float, 
+    atr_val: float = 0.0
+) -> float:
+    """
+    📈 4. Structural Chandelier Trailing Engine:
+    Finds the latest validated Higher Low (Swing Low) for LONG or Lower High (Swing High) for SHORT on 15m timeframe.
+    - Anchors the trailing stop strictly at the structural swing level (-0.2% buffer).
+    - Prevents premature trailing stops from sitting inside current noise wicks.
+    """
+    sym = str(symbol).upper().strip()
+    is_long = str(side).upper().strip() in ["BUY", "LONG", "SPOT"]
+    
+    try:
+        res = fetch_binance_data(sym, interval="15m", limit=25)
+        if res and isinstance(res, tuple) and len(res) >= 1:
+            df = res[0]
+            if df is not None and not df.empty and len(df) >= 10:
+                lows = df['low'].values
+                highs = df['high'].values
+                
+                if is_long:
+                    # Find lowest low of previous 3-5 completed candles (excluding current active candle)
+                    recent_swing_low = min(lows[-6:-1])
+                    buffer = atr_val * 0.30 if atr_val > 0 else (recent_swing_low * 0.002)
+                    struct_stop = recent_swing_low - buffer
+                    return max(entry_price * 1.0012, struct_stop)
+                else:
+                    recent_swing_high = max(highs[-6:-1])
+                    buffer = atr_val * 0.30 if atr_val > 0 else (recent_swing_high * 0.002)
+                    struct_stop = recent_swing_high + buffer
+                    return min(entry_price * 0.9988, struct_stop)
+    except Exception:
+        pass
+
+    if is_long:
+        return entry_price * 1.0012
+    else:
+        return entry_price * 0.9988
+
 def detect_eqh_eql_liquidity(df: pd.DataFrame, tolerance: float = 0.0020) -> dict:
     """
     SMC Engineered Liquidity Pool Detector:

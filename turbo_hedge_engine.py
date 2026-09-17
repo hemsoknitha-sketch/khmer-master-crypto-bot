@@ -1751,16 +1751,29 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
             # Volatility-Adaptive Chandelier ATR Multiplier: 2.5x for runner wave expansion, 2.0x at peak
             ch_mult = 2.0 if peak_pnl >= 1.50 else 2.5
+            
+            # 📈 4. Structural Swing Stop (15m Higher Lows / Lower Highs):
+            # Anchors trailing stop right below the 15m structural swing low rather than inside current noise
+            swing_stop_p = market_data.get_15m_structural_swing_stop(symbol, current_side, ref_entry, mark_price, curr_atr_val)
+
             if current_side == "BUY":
                 chandelier_stop_p = peak_mark_p - (ch_mult * curr_atr_val)
                 be_fut_stop_p = ref_entry * (1.0 + (min_guaranteed_roi / (100.0 * max(1, active_lev))))
-                effective_fut_stop = max(be_fut_stop_p, chandelier_stop_p)
+                target_trail = max(be_fut_stop_p, chandelier_stop_p)
+                if swing_stop_p > be_fut_stop_p and swing_stop_p < peak_mark_p:
+                    effective_fut_stop = max(be_fut_stop_p, min(target_trail, swing_stop_p))
+                else:
+                    effective_fut_stop = target_trail
                 if mark_price <= effective_fut_stop:
                     is_chandelier_triggered = True
             elif current_side in ["SELL", "SHORT"]:
                 chandelier_stop_p = trough_mark_p + (ch_mult * curr_atr_val)
                 be_fut_stop_p = ref_entry * (1.0 - (min_guaranteed_roi / (100.0 * max(1, active_lev))))
-                effective_fut_stop = min(be_fut_stop_p, chandelier_stop_p)
+                target_trail = min(be_fut_stop_p, chandelier_stop_p)
+                if swing_stop_p < be_fut_stop_p and swing_stop_p > trough_mark_p:
+                    effective_fut_stop = min(be_fut_stop_p, max(target_trail, swing_stop_p))
+                else:
+                    effective_fut_stop = target_trail
                 if mark_price >= effective_fut_stop:
                     is_chandelier_triggered = True
 
