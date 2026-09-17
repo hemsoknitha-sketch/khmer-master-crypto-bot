@@ -2867,9 +2867,11 @@ def set_wave_rider_config(chat_id, enabled: bool):
     conn.close()
 
 # --- Trailing Stop Engine (Active Trades) ---
-def add_active_trade(chat_id, symbol, qty, buy_price, stop_loss_pct):
+def add_active_trade(chat_id, symbol, qty, buy_price=0.0, stop_loss_pct=3.0, *args, **kwargs):
     conn = get_db_connection()
     cursor = conn.cursor()
+    if not buy_price and "entry_price" in kwargs:
+        buy_price = float(kwargs["entry_price"])
     cursor.execute("INSERT INTO active_trades (chat_id, symbol, qty, initial_qty, buy_price, current_highest, stop_loss_pct, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (chat_id, symbol, qty, qty, buy_price, buy_price, stop_loss_pct, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
     trade_id = cursor.lastrowid

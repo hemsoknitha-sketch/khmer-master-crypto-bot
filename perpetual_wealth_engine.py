@@ -702,14 +702,9 @@ class PerpetualWealthGeneratorEngine:
                                 db.add_active_trade(
                                     chat_id=chat_id,
                                     symbol=sym,
-                                    side=side,
-                                    entry_price=last_price,
                                     qty=qty,
-                                    highest_price=last_price,
-                                    trailing_stop_price=last_price * (0.97 if side == "BUY" else 1.03),
-                                    leverage=leverage,
-                                    margin=margin_per_coin,
-                                    mode="PERPETUAL_WEALTH_24_7"
+                                    buy_price=last_price,
+                                    stop_loss_pct=3.0
                                 )
 
                                 # Send Telegram alert
