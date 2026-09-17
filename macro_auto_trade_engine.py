@@ -125,14 +125,28 @@ def is_tradfi_or_delisted(symbol: str) -> bool:
     sym = symbol.upper().strip()
     return (sym in TRADFI_EXCLUSION_SET) or (not sym.endswith("USDT"))
 
+_MACRO_KLINES_CACHE = {}
+
 def fetch_klines_safe(symbol: str, interval: str = "1h", limit: int = 50) -> list:
-    """Fetches Binance Futures klines with fallback to Spot klines."""
+    """Fetches Binance Futures klines with fallback to Spot klines and 25s TTL caching."""
+    global _MACRO_KLINES_CACHE
     symbol = symbol.upper().strip()
+    cache_key = f"{symbol}_{interval}_{limit}"
+    now_ts = time.time()
+
+    if cache_key in _MACRO_KLINES_CACHE:
+        cached_ts, cached_data = _MACRO_KLINES_CACHE[cache_key]
+        if now_ts - cached_ts < 25.0:
+            return cached_data
+
     try:
         url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
         res = requests.get(url, timeout=4)
         if res.status_code == 200:
-            return res.json()
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0:
+                _MACRO_KLINES_CACHE[cache_key] = (now_ts, data)
+                return data
     except Exception:
         pass
 
@@ -140,7 +154,10 @@ def fetch_klines_safe(symbol: str, interval: str = "1h", limit: int = 50) -> lis
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
         res = requests.get(url, timeout=4)
         if res.status_code == 200:
-            return res.json()
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0:
+                _MACRO_KLINES_CACHE[cache_key] = (now_ts, data)
+                return data
     except Exception:
         pass
     return []
@@ -700,8 +717,8 @@ async def run_macro_auto_trade_scanner_cycle(app):
                 print("🌊 [MACRO AUTO-TRADE] Radar Active (0 users currently enrolled in /auto_trade ON. Top HFT /turbo_hedge is handling active positions).")
             return
 
-        # Dynamically fetch top liquid, high-momentum volatile futures candidates
-        dynamic_candidates = await asyncio.to_thread(dynamic_ranking.fetch_top_futures_candidates, 50, 5000000.0)
+        # Dynamically fetch top liquid, high-momentum volatile futures candidates (Streamlined to TOP 15 to avoid rate limits)
+        dynamic_candidates = await asyncio.to_thread(dynamic_ranking.fetch_top_futures_candidates, 15, 5000000.0)
         if not dynamic_candidates:
             dynamic_candidates = FALLBACK_MACRO_SYMBOLS
 

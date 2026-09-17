@@ -2559,17 +2559,16 @@ def set_futures_leverage(api_key: str, api_secret: str, symbol: str, leverage: i
     if not symbol.endswith("USDT"):
         symbol += "USDT"
 
+    cache_key = f"{api_key[-6:]}_{symbol}"
+    if _SET_LEVERAGE_CACHE.get(cache_key) == leverage:
+        return {"symbol": symbol, "leverage": leverage, "status": "cached"}
+
     ensure_oneway_position_mode(api_key, api_secret)
     ensure_single_asset_mode(api_key, api_secret)
     set_futures_margin_type(api_key, api_secret, symbol, "ISOLATED")
 
     max_allowed = get_futures_max_leverage(api_key, api_secret, symbol)
     target_leverage = min(leverage, max_allowed)
-
-    # Super Fast Skip if leverage is already set to target_leverage!
-    cache_key = f"{api_key[-6:]}_{symbol}"
-    if _SET_LEVERAGE_CACHE.get(cache_key) == target_leverage:
-        return {"symbol": symbol, "leverage": target_leverage, "status": "cached"}
 
     fallback_leverages = [target_leverage, 50, 25, 20, 10, 5]
     seen = set()
@@ -2692,7 +2691,8 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
         return {"status": "error", "error": f"Calculated quantity {quantity} invalid for {symbol}"}
 
     def _send_hft_order(ord_qty: float, ord_lev: int, pos_side: str = None, omit_pos_side: bool = False):
-        set_futures_leverage(api_key, api_secret, symbol, ord_lev)
+        if not reduce_only:
+            set_futures_leverage(api_key, api_secret, symbol, ord_lev)
         endpoint = "/fapi/v1/order"
         timestamp = int(time.time() * 1000) + TIME_OFFSET
         ord_params = {
