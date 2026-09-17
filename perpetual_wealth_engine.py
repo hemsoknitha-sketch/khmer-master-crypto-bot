@@ -328,7 +328,7 @@ class PerpetualWealthGeneratorEngine:
 
         # 3. Verify Futures Balance
         fut_bal = trading_engine.get_futures_balance(api_key, api_secret)
-        avail_usdt = fut_bal.get("available_balance", 0.0) if isinstance(fut_bal, dict) else 0.0
+        avail_usdt = float(fut_bal) if isinstance(fut_bal, (int, float)) else (float(fut_bal.get("available_balance", 0.0)) if isinstance(fut_bal, dict) else 0.0)
 
         if avail_usdt < 10.0 and capital > avail_usdt:
             # Check spot balance
@@ -636,7 +636,7 @@ class PerpetualWealthGeneratorEngine:
 
                 try:
                     fut_bal = trading_engine.get_futures_balance(api_key, api_secret)
-                    avail_usdt = float(fut_bal.get("available_balance", 0.0)) if isinstance(fut_bal, dict) else 0.0
+                    avail_usdt = float(fut_bal) if isinstance(fut_bal, (int, float)) else (float(fut_bal.get("available_balance", 0.0)) if isinstance(fut_bal, dict) else 0.0)
                     bot_cap = float(bot.get("capital", 50.0))
 
                     sizing = PerpetualWealthGeneratorEngine.calculate_asset_dna_sizing(bot_cap, avail_usdt)
