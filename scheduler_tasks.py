@@ -958,8 +958,6 @@ async def check_crypto_news(app: Application, ai_engine):
                                                     if entry_price == 0.0:
                                                         entry_price = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
                                                     qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
-                                                    if qty > 0 and entry_price > 0:
-                                                        db.add_active_trade(chat_id, target_sym, qty, entry_price, trailing_pct)
                                                     auto_trade_state = "EXECUTED"
                                                     exec_info = {
                                                         "engine": "/auto_trade (Futures Short)",
@@ -4502,7 +4500,11 @@ async def trailing_stop_engine_job(app: Application):
             # LIQUIDITY GUARD
             base_coin = symbol.replace("USDT", "")
             actual_balance = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, base_coin)
-            safe_qty = min(qty, actual_balance) if actual_balance > 0 else qty
+            if actual_balance <= 0:
+                print(f"🧹 Auto-pruned {symbol} from spot active trades (Spot balance is 0.0 or already sold)")
+                db.remove_active_trade(trade_id, current_price, "ZERO_SPOT_BALANCE_PRUNED")
+                continue
+            safe_qty = min(qty, actual_balance)
 
             # Execute Market Sell (Offloaded to thread)
             res = await asyncio.to_thread(trading_engine.place_market_sell, api_key, api_secret, symbol, safe_qty)
