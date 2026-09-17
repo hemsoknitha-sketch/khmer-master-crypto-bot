@@ -72,6 +72,15 @@ async def _async_send_wealth_alert(app, chat_id: int, text: str, alert_name: str
         print(f"⚠️ Notice sending {alert_name}: {err}")
 
 
+def get_monitoring_symbols_set() -> set:
+    """Retrieves Binance surveillance/monitoring symbols."""
+    try:
+        import turbo_hedge_engine
+        return turbo_hedge_engine.get_binance_monitoring_symbols()
+    except Exception:
+        return set()
+
+
 class PerpetualWealthGeneratorEngine:
     """
     💎 24/7 Perpetual Wealth Generator Engine
