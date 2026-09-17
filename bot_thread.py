@@ -72,6 +72,49 @@ def get_main_bot_loop():
     global MAIN_BOT_LOOP
     return MAIN_BOT_LOOP
 
+def get_persistent_bot_bar_keyboard(chat_id: int = 0) -> ReplyKeyboardMarkup:
+    """
+    Constructs the Institutional Unified Persistent Bottom Keyboard Bar for Telegram.
+    Fuses Telegram Mini App Web GUI Dashboard (web_gui_server.py) and instant 1-tap (<10ms) flagship trading commands.
+    """
+    env_url = os.getenv("TELEGRAM_MINI_APP_URL") or os.getenv("WEB_GUI_URL")
+    if not env_url or "localhost" in env_url or "127.0.0.1" in env_url:
+        for path in ["/tmp/cloudflared_url.txt", "/opt/khmer-master-crypto-bot/.cloudflare_tunnel_url", os.path.expanduser("~/.cloudflare_tunnel_url")]:
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        t_url = f.read().strip()
+                        if t_url.startswith("https://"):
+                            env_url = t_url
+                            break
+                except Exception:
+                    pass
+
+    is_https = bool(env_url and env_url.lower().startswith("https://"))
+    app_url = f"{env_url.rstrip('/')}/?chat_id={chat_id}" if (is_https and chat_id) else (env_url if is_https else "")
+
+    top_row = []
+    if is_https and app_url:
+        top_row.append(KeyboardButton("📱 WebApp Dashboard", web_app=WebAppInfo(url=app_url)))
+    else:
+        top_row.append(KeyboardButton("📱 WebApp Dashboard"))
+    top_row.append(KeyboardButton("🎛️ Master Menu"))
+
+    keyboard = [
+        top_row,
+        [
+            KeyboardButton("🚀 Smart Trade"),
+            KeyboardButton("🛡️ Turbo Hedge"),
+            KeyboardButton("👑 SmartX AI")
+        ],
+        [
+            KeyboardButton("💰 Balance"),
+            KeyboardButton("📊 Portfolio"),
+            KeyboardButton("🛑 Stop ALL")
+        ]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
+
 class TelegramBotThread(BaseThread):
     if not IS_HEADLESS_VPS:
         try:
@@ -2609,6 +2652,18 @@ class TelegramBotThread(BaseThread):
             db.register_user(chat_id, username)
             db.log_user_activity(chat_id, "command_used", "/start")
 
+            # Attach persistent bottom keyboard bar on /start
+            try:
+                persistent_bar = get_persistent_bot_bar_keyboard(chat_id)
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="⚡ **KHMER MASTER CRYPTO | APEX AGI v13.00** 🛡️\n_របារបញ្ជា Bot Bar ត្រូវបានភ្ជាប់ទៅកាន់គណនីរបស់អ្នករួចរាល់ 24/7!_",
+                    parse_mode="Markdown",
+                    reply_markup=persistent_bar
+                )
+            except Exception as e:
+                print(f"Notice sending start persistent bar: {e}")
+
             # Pop up Language Selector Card immediately on /start
             await language_command(update, context)
 
@@ -3982,6 +4037,42 @@ class TelegramBotThread(BaseThread):
             if extracted_addr:
                 context.args = [extracted_tag, extracted_addr] if extracted_tag else [extracted_addr]
                 await set_web3_wallet_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+
+            # ⚡ Instant 1-Tap Persistent Bottom Keyboard Bar Router (<10ms)
+            clean_btn = trimmed_text.strip()
+            if clean_btn in ["🎛️ Master Menu", "Master Menu", "Menu", "មេនុយ", "ម៉ឺនុយ", "Master Control Panel"]:
+                await menu_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["🚀 Smart Trade", "Smart Trade", "SmartTrade", "smart_trade", "smarttrade"]:
+                await smart_trade_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["🛡️ Turbo Hedge", "Turbo Hedge", "TurboHedge", "turbo_hedge", "turbohedge"]:
+                await turbo_hedge_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["👑 SmartX AI", "SmartX AI", "SmartX", "Smart_X", "smartx", "smart_x"]:
+                await smart_x_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["💰 Balance", "Balance", "សមតុល្យ", "លុយ", "balance"]:
+                await balance_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["📊 Portfolio", "Portfolio", "ផលចំណេញ", "Portfolio PnL", "portfolio"]:
+                await portfolio_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["🛑 Stop ALL", "Stop ALL", "Stop All", "បិទទាំងអស់", "stop all", "stop_all"]:
+                context.args = ["ALL"]
+                await stop_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["📱 WebApp Dashboard", "WebApp Dashboard", "Dashboard", "MiniApp", "WebApp", "webapp", "miniapp"]:
+                await webapp_command(update, context)
                 self.active_tasks.discard(chat_id)
                 return
 
@@ -16620,6 +16711,10 @@ class TelegramBotThread(BaseThread):
                 await application.bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())
                 try:
                     await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
+                except Exception: pass
+                try:
+                    from telegram import MenuButtonCommands
+                    await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
                 except Exception: pass
                 print("✅ [TELEGRAM MENU UI] Synchronized v13.00 Public VIP & Super Admin Command Menus!")
             except Exception as e_cmd:
