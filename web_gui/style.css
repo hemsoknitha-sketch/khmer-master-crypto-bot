@@ -1451,3 +1451,98 @@ input:checked + .slider:before {
 .text-neon-red { color: var(--neon-red); }
 .text-cyan { color: var(--neon-cyan); }
 .text-gold { color: var(--khmer-gold-bright); }
+.text-neon-purple { color: var(--neon-purple); }
+
+/* Proprietary IP Shield Grid */
+.ip-shield-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+}
+
+@media (max-width: 360px) {
+    .ip-shield-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.shield-item {
+    background: rgba(4, 12, 26, 0.70);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    transition: all 0.25s ease;
+}
+
+.shield-item:hover {
+    border-color: var(--border-cyan);
+    box-shadow: var(--shadow-glow-cyan);
+}
+
+.shield-item .shield-icon {
+    font-size: 18px;
+    margin-bottom: 2px;
+}
+
+.shield-meta strong {
+    display: block;
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.shield-meta span {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.shield-status {
+    font-size: 10px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+/* Official Institutional Web Footer */
+.institutional-web-footer {
+    text-align: center;
+    padding: 24px 16px 40px 16px;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.institutional-web-footer .footer-divider-line {
+    font-family: var(--font-mono);
+    color: var(--neon-cyan);
+    font-size: 14px;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+}
+
+.institutional-web-footer .footer-disclaimer-khmer {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.institutional-web-footer .footer-disclaimer-sub {
+    color: var(--khmer-gold-quantum);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.institutional-web-footer .footer-copy-tag {
+    color: var(--text-muted);
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+    opacity: 0.7;
+}
