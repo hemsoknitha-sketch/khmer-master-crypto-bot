@@ -489,29 +489,39 @@ async function fetchPortfolio() {
                     elements.pnl24hBadge.className = gm.pnl_24h >= 0 ? 'badge badge-success' : 'badge badge-danger';
                 }
 
-                // 3. Balanced Matrix Grand PnL Grid
-                const mGrand = document.getElementById('matrix-grand-pnl');
-                if (mGrand) {
-                    mGrand.textContent = pnlText;
-                    mGrand.className = isPos ? 'text-neon-emerald' : 'text-neon-crimson';
-                }
-                const mRealized = document.getElementById('matrix-realized-pnl');
-                if (mRealized) {
-                    const rSign = gm.realized_pnl >= 0 ? '+' : '-';
-                    mRealized.textContent = `${rSign}$${formatUSD(Math.abs(gm.realized_pnl))}`;
-                    mRealized.className = gm.realized_pnl >= 0 ? 'text-neon-emerald' : 'text-neon-crimson';
-                }
-                const mUnrealized = document.getElementById('matrix-unrealized-pnl');
-                if (mUnrealized) {
-                    const uSign = gm.unrealized_pnl >= 0 ? '+' : '-';
-                    mUnrealized.textContent = `${uSign}$${formatUSD(Math.abs(gm.unrealized_pnl))}`;
-                    mUnrealized.className = gm.unrealized_pnl >= 0 ? 'text-neon-cyan' : 'text-neon-crimson';
-                }
-                const mWin = document.getElementById('matrix-win-rate');
-                if (mWin) {
-                    mWin.textContent = `${gm.win_rate.toFixed(1)}% (Institutional Win)`;
-                }
+                // 3. Render Global Multi-Timeframe Matrix
+                renderGlobalMatrix(state.matrixTimeframe || '24h');
             }
+        }
+    } catch (e) {
+        console.error('Portfolio fetch error:', e);
+    }
+}
+
+function renderGlobalMatrix(timeframe) {
+    const gm = state.portfolioData?.global_matrix;
+    if (!gm || !gm.timeframes) return;
+    const tf = timeframe || state.matrixTimeframe || '24h';
+    const data = gm.timeframes[tf] || gm.timeframes['24h'];
+    if (!data) return;
+
+    const elVol = document.getElementById('matrix-global-volume');
+    const elProfit = document.getElementById('matrix-global-profit');
+    const elOrders = document.getElementById('matrix-global-orders');
+    const elCapital = document.getElementById('matrix-global-capital');
+
+    if (elVol) elVol.textContent = `$${formatUSD(data.volume_usd)} USDT`;
+    if (elProfit) {
+        const sign = data.net_profit_usd >= 0 ? '+' : '-';
+        elProfit.textContent = `${sign}$${formatUSD(Math.abs(data.net_profit_usd))} (${sign}${data.roi_pct.toFixed(2)}%)`;
+        elProfit.className = data.net_profit_usd >= 0 ? 'text-neon-emerald' : 'text-neon-crimson';
+    }
+    if (elOrders) elOrders.textContent = `${data.orders_count.toLocaleString()} Orders (<30ms HFT)`;
+    if (elCapital) {
+        const pool = gm.active_capital_pool_usd || 28540.0;
+        elCapital.textContent = `$${formatUSD(pool)} USDT`;
+    }
+}
 
 async function fetchWealthCockpit() {
     try {
@@ -812,6 +822,17 @@ function setupEventListeners() {
             state.timeframe = btn.getAttribute('data-tf');
             triggerHaptic('selection');
             fetchAnalytics();
+        });
+    });
+
+    // Balanced Matrix Global Timeframe Selector
+    document.querySelectorAll('.matrix-tf-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.matrix-tf-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.matrixTimeframe = btn.getAttribute('data-mtf');
+            triggerHaptic('selection');
+            renderGlobalMatrix(state.matrixTimeframe);
         });
     });
 

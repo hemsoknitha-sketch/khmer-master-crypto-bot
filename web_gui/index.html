@@ -14,7 +14,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Chart.js via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=2.2.4">
+    <link rel="stylesheet" href="style.css?v=2.2.5">
 </head>
 <body>
     <!-- Background Interactive Neural Network Synapses Canvas -->
@@ -143,16 +143,46 @@
                     </div>
                 </div>
 
-                <!-- Asset Allocation Donut Breakdown -->
+                <!-- Asset Allocation & Global System-Wide Balanced Matrix -->
                 <div class="glass-card allocation-card">
                     <div class="card-header-flex">
                         <div class="card-title-group">
-                            <h3 class="card-title">🍰 ការបែងចែកទុន (Asset Allocation)</h3>
-                            <span class="card-subtitle">Multi-Wallet Dynamic Risk Segregation</span>
+                            <h3 class="card-title">🌐 BALANCED MATRIX &bull; GLOBAL LEDGER</h3>
+                            <span class="card-subtitle">ទំហំប្រតិបត្តិការវិនិយោគ & ផលចំណេញសរុបក្នុងប្រព័ន្ធទាំងមូល (Live 24/7)</span>
                         </div>
-                        <span class="badge badge-cyber">Balanced Matrix &bull; Live 24/7</span>
+                        <span class="badge badge-cyber">All-Node Aggregation</span>
                     </div>
-                    <div class="donut-chart-row">
+
+                    <!-- Timeframe Navigation Tabs for Matrix -->
+                    <div class="matrix-timeframe-bar">
+                        <button class="matrix-tf-btn active" data-mtf="24h">24H Daily</button>
+                        <button class="matrix-tf-btn" data-mtf="monthly">Monthly</button>
+                        <button class="matrix-tf-btn" data-mtf="yearly">Yearly</button>
+                        <button class="matrix-tf-btn" data-mtf="grand_total">🏆 Grand Total</button>
+                    </div>
+
+                    <!-- 4-Grid Dynamic Institutional Metrics Matrix -->
+                    <div class="balanced-matrix-pnl-grid">
+                        <div class="matrix-pnl-item glow-cyan">
+                            <span class="matrix-pnl-label">🌊 ទំហំប្រតិបត្តិការសរុប (Cumulative Turn-Over):</span>
+                            <strong id="matrix-global-volume" class="text-neon-cyan">$0.00 USDT</strong>
+                        </div>
+                        <div class="matrix-pnl-item glow-emerald">
+                            <span class="matrix-pnl-label">💰 ប្រាក់ចំណេញសុទ្ធសរុប (System Net Profit):</span>
+                            <strong id="matrix-global-profit" class="text-neon-emerald">+$0.00 (+0.00%)</strong>
+                        </div>
+                        <div class="matrix-pnl-item">
+                            <span class="matrix-pnl-label">⚡ ចំនួនប្រតិបត្តិការជោគជ័យ (Executed Orders):</span>
+                            <strong id="matrix-global-orders" class="text-neon-purple">0 Orders (&lt;30ms HFT)</strong>
+                        </div>
+                        <div class="matrix-pnl-item">
+                            <span class="matrix-pnl-label">🏦 ទុនកំពុងចរាចរណ៍ជាក់ស្តែង (Live Capital Pool):</span>
+                            <strong id="matrix-global-capital" class="text-neon-gold">$0.00 USDT</strong>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Wallet Risk Segregation Donut Breakdown -->
+                    <div class="donut-chart-row matrix-donut-divider">
                         <div class="donut-container">
                             <canvas id="allocationChart"></canvas>
                         </div>
@@ -161,26 +191,6 @@
                             <div class="legend-item"><span class="legend-color" style="background:#10b981"></span><span>Spot Cash USDT</span><strong id="leg-spot-pct">30%</strong></div>
                             <div class="legend-item"><span class="legend-color" style="background:#f59e0b"></span><span>Spot BTC Accumulator</span><strong id="leg-btc-pct">15%</strong></div>
                             <div class="legend-item"><span class="legend-color" style="background:#eab308"></span><span>Spot PAXG Gold Vault</span><strong id="leg-paxg-pct">10%</strong></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Grand Profit / Loss Live 24/7 Matrix Grid -->
-                    <div class="balanced-matrix-pnl-grid">
-                        <div class="matrix-pnl-item">
-                            <span class="matrix-pnl-label">🏆 Grand Profit / Loss:</span>
-                            <strong id="matrix-grand-pnl" class="text-neon-emerald">+$0.00 (+0.00%)</strong>
-                        </div>
-                        <div class="matrix-pnl-item">
-                            <span class="matrix-pnl-label">💰 Realized Net Profit:</span>
-                            <strong id="matrix-realized-pnl" class="text-neon-emerald">+$0.00</strong>
-                        </div>
-                        <div class="matrix-pnl-item">
-                            <span class="matrix-pnl-label">⚡ Unrealized Running PnL:</span>
-                            <strong id="matrix-unrealized-pnl" class="text-neon-cyan">+$0.00</strong>
-                        </div>
-                        <div class="matrix-pnl-item">
-                            <span class="matrix-pnl-label">🛡️ Multi-Wallet Health:</span>
-                            <strong id="matrix-win-rate" class="text-neon-gold">100% SECURE &bull; ZERO SPILLOVER</strong>
                         </div>
                     </div>
                 </div>
@@ -664,6 +674,6 @@
     <!-- Notification Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.2.4"></script>
+    <script src="app.js?v=2.2.5"></script>
 </body>
 </html>

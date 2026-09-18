@@ -777,24 +777,78 @@ body {
     color: var(--text-primary);
 }
 
+/* Matrix Timeframe Navigation Bar */
+.matrix-timeframe-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 4px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-subtle);
+    margin: 6px 0 14px 0;
+}
+
+.matrix-tf-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 4px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-family: var(--font-display);
+    text-align: center;
+}
+
+.matrix-tf-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.matrix-tf-btn.active {
+    background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(16, 185, 129, 0.25));
+    border: 1px solid var(--border-cyan);
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(0, 242, 254, 0.3);
+}
+
 /* Balanced Matrix PnL Grid */
 .balanced-matrix-pnl-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border-subtle);
+    margin-bottom: 14px;
 }
 
 .matrix-pnl-item {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    padding: 9px 12px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.matrix-pnl-item:hover {
+    transform: translateY(-2px);
+}
+
+.glow-cyan {
+    border-color: rgba(0, 242, 254, 0.35) !important;
+    background: rgba(0, 242, 254, 0.05) !important;
+    box-shadow: 0 0 12px rgba(0, 242, 254, 0.1);
+}
+
+.glow-emerald {
+    border-color: rgba(16, 185, 129, 0.35) !important;
+    background: rgba(16, 185, 129, 0.05) !important;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.1);
 }
 
 .matrix-pnl-label {
@@ -809,6 +863,12 @@ body {
     font-size: 13px;
     font-weight: 700;
     font-family: var(--font-mono);
+}
+
+.matrix-donut-divider {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-subtle);
 }
 
 /* Cards List & Active Position Cards */

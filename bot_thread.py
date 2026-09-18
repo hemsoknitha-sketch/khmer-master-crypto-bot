@@ -91,7 +91,7 @@ def get_persistent_bot_bar_keyboard(chat_id: int = 0) -> ReplyKeyboardMarkup:
                     pass
 
     is_https = bool(env_url and env_url.lower().startswith("https://"))
-    app_url = f"{env_url.rstrip('/')}/?v=2.2.4&chat_id={chat_id}" if (is_https and chat_id) else (f"{env_url.rstrip('/')}/?v=2.2.4" if is_https else "")
+    app_url = f"{env_url.rstrip('/')}/?v=2.2.5&chat_id={chat_id}" if (is_https and chat_id) else (f"{env_url.rstrip('/')}/?v=2.2.5" if is_https else "")
 
     top_row = []
     if is_https and app_url:
@@ -13810,7 +13810,7 @@ class TelegramBotThread(BaseThread):
                 env_url = f"http://localhost:{env_port}"
             
             # Format the personalized URL with version and chat_id
-            app_url = f"{env_url.rstrip('/')}/?v=2.2.4&chat_id={chat_id}"
+            app_url = f"{env_url.rstrip('/')}/?v=2.2.5&chat_id={chat_id}"
             is_https = env_url.lower().startswith("https://")
             
             keyboard_rows = []

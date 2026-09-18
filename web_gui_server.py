@@ -445,6 +445,7 @@ async def handle_api_portfolio(request: web.Request) -> web.Response:
         paxg_pct = round((paxg_val / tot) * 100.0, 1) if tot > 0 else 12.0
 
         grand_metrics = calculate_grand_pnl(chat_id, p_data)
+        global_matrix = db.get_system_global_multi_timeframe_matrix()
 
         response_data = {
             "status": "success",
@@ -457,6 +458,7 @@ async def handle_api_portfolio(request: web.Request) -> web.Response:
                 "paxg_value_usd": round(paxg_val, 2),
                 "btc_value_usd": round(btc_val, 2),
                 "grand_metrics": grand_metrics,
+                "global_matrix": global_matrix,
                 "pnl_24h_pct": grand_metrics["pnl_24h_pct"],
                 "pnl_24h_usd": grand_metrics["pnl_24h"],
                 "allocation": {
@@ -468,6 +470,17 @@ async def handle_api_portfolio(request: web.Request) -> web.Response:
             }
         }
         return web.json_response(response_data)
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+async def handle_api_global_matrix(request: web.Request) -> web.Response:
+    """Returns platform-wide cumulative trading volume and net profit matrix across 24h, monthly, yearly, and grand total."""
+    try:
+        matrix_data = db.get_system_global_multi_timeframe_matrix()
+        resp = web.json_response({"status": "success", "data": matrix_data})
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        return resp
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
@@ -841,6 +854,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/api/analytics", handle_api_analytics)
     app.router.add_get("/api/radar", handle_api_radar)
     app.router.add_get("/api/engine_states", handle_api_engine_states)
+    app.router.add_get("/api/global_matrix", handle_api_global_matrix)
     app.router.add_post("/api/action/harvest", handle_api_harvest_action)
     app.router.add_post("/api/action/engine_toggle", handle_api_engine_toggle)
 
