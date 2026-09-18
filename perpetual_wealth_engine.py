@@ -111,12 +111,14 @@ class PerpetualWealthGeneratorEngine:
     def scan_golden_sweet_spot_candidates(limit: int = 15) -> list:
         """
         Scans Binance USDT-M Futures for Golden Sweet-Spot Momentum Breakouts.
-        Filters:
-        - 24h Change: +3.0% to +14.0% (Golden Sweet Spot)
-        - Rejection of Overextended Pumps: > +20.0% or 15m RSI > 78.0 (Anti-FOMO)
-        - Rejection of Oversold Shorts: 15m RSI <= 38.0 (Invariant 16 Anti-Oversold Short Guard)
+        Strict 8-Pillar Institutional Filters:
+        - 24h Change: +3.0% to +14.0% for LONG, -3.0% to -12.0% for SHORT
+        - RVOL Spike: >= 2.0x (15m Volume Surge over 20-period MA)
+        - Fresh Momentum: 1h Change >= +0.6% / <= -0.6% & 15m Change >= +0.2% / <= -0.2%
+        - Strict ADX & DMI: 15m ADX >= 25.0 & (+DI > -DI for BUY, -DI > +DI for SELL)
+        - Invariant 16 Guard: 15m RSI <= 38.0 strictly blocks SHORT
         - 24h Volume >= $15M USD
-        - 15m & 1h Price > EMA50 (Macro Bull Confluence)
+        - Minimum AI Score Hurdle: >= 8.6/10.0
         """
         candidates = []
         try:
@@ -146,13 +148,12 @@ class PerpetualWealthGeneratorEngine:
                 except (ValueError, TypeError):
                     continue
 
-                # Minimum liquidity: $15M 24h quote volume
+                # Minimum liquidity: $15M 24h quote volume on Futures
                 if quote_volume < 15_000_000.0 or last_price <= 0.0:
                     continue
 
                 # Golden Sweet Spot for LONG: +3.0% to +14.0%
                 if 3.0 <= price_change_pct <= 14.0:
-                    # Validate Technical Confluence
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_symbol_technicals(symbol, target_side="BUY")
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -161,11 +162,15 @@ class PerpetualWealthGeneratorEngine:
                             "price_change_pct": price_change_pct,
                             "last_price": last_price,
                             "quote_volume": quote_volume,
-                            "rsi_15m": tech_eval.get("rsi_15m", 50.0),
+                            "rsi_15m": tech_eval.get("rsi_15m", 58.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
-                            "ai_score": tech_eval.get("ai_score", 8.5),
+                            "rvol": tech_eval.get("rvol", 2.2),
+                            "chg_1h": tech_eval.get("chg_1h", 1.0),
+                            "chg_15m": tech_eval.get("chg_15m", 0.5),
+                            "adx_15m": tech_eval.get("adx_15m", 28.0),
+                            "ai_score": tech_eval.get("ai_score", 9.0),
                             "orderbook_ratio": tech_eval.get("orderbook_ratio", 1.25),
-                            "reason": tech_eval.get("reason", "Golden Sweet Spot Momentum")
+                            "reason": tech_eval.get("reason", "Futures Golden Sweet-Spot Momentum")
                         })
                 # Sweet Spot for SHORT: -3.0% to -12.0% (strictly respecting Invariant 16 RSI > 38.0)
                 elif -12.0 <= price_change_pct <= -3.0:
@@ -177,15 +182,19 @@ class PerpetualWealthGeneratorEngine:
                             "price_change_pct": price_change_pct,
                             "last_price": last_price,
                             "quote_volume": quote_volume,
-                            "rsi_15m": tech_eval.get("rsi_15m", 50.0),
+                            "rsi_15m": tech_eval.get("rsi_15m", 45.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
-                            "ai_score": tech_eval.get("ai_score", 8.5),
-                            "orderbook_ratio": tech_eval.get("orderbook_ratio", 0.85),
-                            "reason": tech_eval.get("reason", "Macro Bear Breakdown")
+                            "rvol": tech_eval.get("rvol", 2.2),
+                            "chg_1h": tech_eval.get("chg_1h", -1.0),
+                            "chg_15m": tech_eval.get("chg_15m", -0.5),
+                            "adx_15m": tech_eval.get("adx_15m", 28.0),
+                            "ai_score": tech_eval.get("ai_score", 9.0),
+                            "orderbook_ratio": tech_eval.get("orderbook_ratio", 0.80),
+                            "reason": tech_eval.get("reason", "Futures Macro Bear Breakdown")
                         })
 
-            # Sort by highest AI score & optimal volume
-            candidates.sort(key=lambda x: (x["ai_score"], x["quote_volume"]), reverse=True)
+            # Sort by highest AI score, highest RVOL volume spike, and highest 1h fresh momentum
+            candidates.sort(key=lambda x: (x["ai_score"], x.get("rvol", 1.0), abs(x.get("chg_1h", 0.0))), reverse=True)
             return candidates[:limit]
         except Exception as e:
             print(f"⚠️ [PERPETUAL WEALTH SCAN ERROR]: {e}")
@@ -194,7 +203,7 @@ class PerpetualWealthGeneratorEngine:
     @staticmethod
     def evaluate_symbol_technicals(symbol: str, target_side: str = "BUY") -> dict:
         """
-        Evaluates 15m/1h technical health, RSI, EMA50, and L2 Orderbook with 30s TTL cache.
+        Evaluates 15m/1h technical health, RVOL Volume Spike, Fresh Momentum, ADX, and L2 Orderbook for Futures.
         Strictly enforces Invariant 16 (Anti-Oversold Short Guard RSI <= 38.0).
         """
         global _WEALTH_TECH_CACHE
@@ -202,23 +211,53 @@ class PerpetualWealthGeneratorEngine:
         now_ts = time.time()
         if cache_key in _WEALTH_TECH_CACHE:
             ts, res = _WEALTH_TECH_CACHE[cache_key]
-            if now_ts - ts < 30.0:
+            if now_ts - ts < 25.0:
                 return res
 
         try:
-            # 1. Fetch 15m Klines
-            k_url = f"{trading_engine.FUTURES_URL}/fapi/v1/klines?symbol={symbol}&interval=15m&limit=60"
-            r = trading_engine.HFT_SESSION.get(k_url, timeout=3)
-            if r.status_code != 200:
-                return {"is_valid": False, "reason": "Failed to fetch klines"}
-            klines = r.json()
-            if len(klines) < 30:
-                return {"is_valid": False, "reason": "Insufficient klines"}
+            # 1. Fetch 15m Klines from Futures
+            klines = trading_engine.get_klines(symbol, interval="15m", limit=60, is_spot=False)
+            if not klines or len(klines) < 30:
+                return {"is_valid": False, "reason": "Insufficient futures klines"}
 
             closes = [float(k[4]) for k in klines]
+            highs = [float(k[2]) for k in klines]
+            lows = [float(k[3]) for k in klines]
+            vols = [float(k[7]) for k in klines]  # Quote USDT volume
             current_price = closes[-1]
 
-            # 2. Calculate RSI 14
+            # 2. Compute RVOL (Relative Volume Spike over 20-period MA)
+            avg_vol_20 = sum(vols[-21:-1]) / 20.0 if len(vols) >= 21 else (sum(vols[:-1]) / max(1, len(vols) - 1))
+            cur_vol = vols[-1]
+            prev_vol = vols[-2] if len(vols) >= 2 else cur_vol
+
+            kline_start_ms = float(klines[-1][0])
+            now_ms = time.time() * 1000.0
+            elapsed_min = max(1.0, min(15.0, (now_ms - kline_start_ms) / 60000.0))
+            projected_cur_vol = cur_vol * (15.0 / elapsed_min)
+            rvol_cur = (projected_cur_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
+            rvol_prev = (prev_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
+            rvol = round(max(rvol_cur, rvol_prev), 2)
+
+            # Strict RVOL Filter: Must show >= 2.0x volume surge
+            if rvol < 2.0:
+                return {"is_valid": False, "reason": f"Insufficient Volume Spike (RVOL {rvol:.2f}x < 2.0x)"}
+
+            # 3. Compute 15m & 1h Fresh Momentum
+            open_15m = float(klines[-1][1])
+            chg_15m = round(((current_price - open_15m) / open_15m) * 100.0, 2)
+            open_1h = float(klines[-4][1]) if len(klines) >= 4 else open_15m
+            chg_1h = round(((current_price - open_1h) / open_1h) * 100.0, 2)
+
+            # Reject exhausted / dying momentum: Requires fresh 1h / 15m directional thrust
+            if target_side == "BUY":
+                if chg_1h < 0.6 and chg_15m < 0.2:
+                    return {"is_valid": False, "reason": f"No Fresh Momentum (1h: {chg_1h:+.2f}%, 15m: {chg_15m:+.2f}%)"}
+            else:  # SELL / SHORT
+                if chg_1h > -0.6 and chg_15m > -0.2:
+                    return {"is_valid": False, "reason": f"No Fresh Bearish Momentum (1h: {chg_1h:+.2f}%, 15m: {chg_15m:+.2f}%)"}
+
+            # 4. Calculate RSI 14
             gains, losses = [], []
             for i in range(1, 15):
                 diff = closes[-i] - closes[-i-1]
@@ -233,56 +272,55 @@ class PerpetualWealthGeneratorEngine:
             rs = avg_gain / avg_loss if avg_loss > 0 else 1.0
             rsi_15m = 100.0 - (100.0 / (1.0 + rs))
 
-            # 3. Calculate EMA 20 & EMA 50
+            # 5. Calculate EMA 9, EMA 20, and EMA 50
+            k9 = 2.0 / (9 + 1)
             k20 = 2.0 / (20 + 1)
             k50 = 2.0 / (50 + 1)
-            ema20 = closes[0]
-            ema50 = closes[0]
+            ema9, ema20, ema50 = closes[0], closes[0], closes[0]
             for p in closes[1:]:
+                ema9 = (p * k9) + (ema9 * (1 - k9))
                 ema20 = (p * k20) + (ema20 * (1 - k20))
                 ema50 = (p * k50) + (ema50 * (1 - k50))
 
-            # 4. Calculate Wilder's ADX(14) - Strict Chop Suppression
-            highs = [float(k[2]) for k in klines]
-            lows = [float(k[3]) for k in klines]
-            adx_15m = 25.0
+            # 6. Calculate Wilder's ADX(14) & DMI - Strict Anti-Chop / Anti-Sideway Guard
+            adx_15m, plus_di, minus_di = 26.0, 25.0, 20.0
             if len(closes) >= 28:
-                adx_15m, _, _ = market_data.calculate_adx_and_dmi(highs, lows, closes, period=14)
+                adx_15m, plus_di, minus_di = market_data.calculate_adx_and_dmi(highs, lows, closes, period=14)
 
             if adx_15m < 25.0:
-                return {
-                    "is_valid": False,
-                    "reason": f"Insufficient Trend Strength (15m ADX {adx_15m:.1f} < 25.0 Chop Guard)"
-                }
+                return {"is_valid": False, "reason": f"Chop Regime Detected (15m ADX {adx_15m:.1f} < 25.0)"}
 
-            # 5. Pullback Retracement Guard (Never buy candle tops, wait for 15m EMA20 test)
-            is_buy_pullback = (0.994 * ema20 <= current_price <= ema20 * 1.008)
-            is_sell_pullback = (ema20 * 0.992 <= current_price <= ema20 * 1.006)
-
-            # 6. Check Invariant 16: Anti-Oversold Short Guard (15m RSI <= 38.0 strictly blocks SHORT)
-            if target_side == "SELL":
+            # 7. Direction-Specific Technical Guards (Invariant 16, RSI boundaries, EMA alignment)
+            if target_side == "BUY":
+                if rsi_15m > 74.0:
+                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 74.0 (Anti-FOMO)"}
+                if rsi_15m < 50.0:
+                    return {"is_valid": False, "reason": f"Bearish / Choppy RSI {rsi_15m:.1f} < 50.0 (No Bull Momentum)"}
+                if current_price < (ema50 * 0.994):
+                    return {"is_valid": False, "reason": "Price below 15m EMA50 (Macro Trend broken)"}
+                if current_price < (0.994 * ema20):
+                    return {"is_valid": False, "reason": "Price below 15m EMA20 (Pullback too deep)"}
+                if plus_di <= minus_di:
+                    return {"is_valid": False, "reason": f"Bearish DMI Dominance (+DI {plus_di:.1f} <= -DI {minus_di:.1f})"}
+            else:  # SELL / SHORT
+                # Invariant 16: Anti-Oversold Short Guard (15m RSI <= 38.0 strictly blocks SHORT)
                 if rsi_15m <= 38.0:
                     return {
                         "is_valid": False,
                         "rsi_15m": rsi_15m,
                         "reason": f"Invariant 16 Triggered: 15m RSI {rsi_15m:.1f} <= 38.0 (Anti-Oversold Short Guard)"
                     }
-                if current_price > ema50:
-                    return {"is_valid": False, "reason": "Price above EMA50 (Counter-trend Short rejected)"}
-                if not is_sell_pullback:
-                    return {"is_valid": False, "reason": "Waiting for bear pullback bounce into 15m EMA20 resistance"}
-
-            # 7. Check BUY guards (Anti-FOMO: reject overbought peak RSI > 78.0)
-            if target_side == "BUY":
-                if rsi_15m > 75.0:
-                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 75.0 (Anti-FOMO)"}
-                if current_price < (ema50 * 0.994):
-                    return {"is_valid": False, "reason": "Price below 15m EMA50 (Trend broken)"}
-                if not is_buy_pullback:
-                    return {"is_valid": False, "reason": "Waiting for healthy pullback retest onto 15m EMA20 support"}
+                if rsi_15m > 55.0:
+                    return {"is_valid": False, "reason": f"Bullish / Overbought RSI {rsi_15m:.1f} > 55.0 (No Bear Momentum)"}
+                if current_price > (ema50 * 1.006):
+                    return {"is_valid": False, "reason": "Price above 15m EMA50 (Macro Bull Trend - Short rejected)"}
+                if current_price > (ema20 * 1.010):
+                    return {"is_valid": False, "reason": "Price above 15m EMA20 (Bounce too high - Short rejected)"}
+                if minus_di <= plus_di:
+                    return {"is_valid": False, "reason": f"Bullish DMI Dominance (-DI {minus_di:.1f} <= +DI {plus_di:.1f})"}
 
             # 8. Orderbook L2 depth check
-            ob_ratio = 1.25
+            ob_ratio = 1.20
             try:
                 ob_url = f"{trading_engine.FUTURES_URL}/fapi/v1/depth?symbol={symbol}&limit=20"
                 ob_res = trading_engine.HFT_SESSION.get(ob_url, timeout=2)
@@ -293,27 +331,99 @@ class PerpetualWealthGeneratorEngine:
                     if asks > 0:
                         ob_ratio = bids / asks
             except Exception:
-                ob_ratio = 1.20
+                ob_ratio = 1.15 if target_side == "BUY" else 0.85
 
-            if target_side == "BUY" and ob_ratio < 0.95:
-                return {"is_valid": False, "reason": f"Orderbook selling pressure (Bid/Ask ratio: {ob_ratio:.2f})"}
+            if target_side == "BUY" and ob_ratio < 1.05:
+                return {"is_valid": False, "reason": f"Orderbook selling pressure (Bid/Ask ratio: {ob_ratio:.2f} < 1.05)"}
+            if target_side == "SELL" and ob_ratio > 0.95:
+                return {"is_valid": False, "reason": f"Orderbook buying support wall (Bid/Ask ratio: {ob_ratio:.2f} > 0.95)"}
 
-            # AI confidence score (8.0 - 9.8)
-            ai_score = 8.5
-            if target_side == "BUY" and current_price > ema50 and 45.0 <= rsi_15m <= 65.0:
-                ai_score = 9.4
-            elif target_side == "SELL" and current_price < ema50 and 40.0 <= rsi_15m <= 55.0:
-                ai_score = 9.1
+            # 9. Dynamic Multi-Factor Confluence AI Scoring
+            ai_score = 7.0
+
+            # RVOL Surge Multiplier
+            if rvol >= 3.0:
+                ai_score += 1.3
+            elif rvol >= 2.2:
+                ai_score += 0.9
+            else:
+                ai_score += 0.4
+
+            # Fresh Momentum Thrust
+            if target_side == "BUY":
+                if chg_1h >= 1.5 and chg_15m >= 0.4:
+                    ai_score += 1.0
+                elif chg_1h >= 0.8:
+                    ai_score += 0.6
+            else:
+                if chg_1h <= -1.5 and chg_15m <= -0.4:
+                    ai_score += 1.0
+                elif chg_1h <= -0.8:
+                    ai_score += 0.6
+
+            # Trend & Directional Strength
+            if target_side == "BUY":
+                if adx_15m >= 30.0 and (plus_di - minus_di) >= 4.0:
+                    ai_score += 0.8
+                elif adx_15m >= 25.0:
+                    ai_score += 0.4
+            else:
+                if adx_15m >= 30.0 and (minus_di - plus_di) >= 4.0:
+                    ai_score += 0.8
+                elif adx_15m >= 25.0:
+                    ai_score += 0.4
+
+            # Active Velocity RSI Zone
+            if target_side == "BUY":
+                if 56.0 <= rsi_15m <= 70.0:
+                    ai_score += 0.8
+                elif 50.0 <= rsi_15m < 56.0:
+                    ai_score += 0.2
+            else:
+                if 40.0 <= rsi_15m <= 50.0:
+                    ai_score += 0.8
+                elif 50.0 < rsi_15m <= 55.0:
+                    ai_score += 0.2
+
+            # Orderbook Cushion
+            if target_side == "BUY":
+                if ob_ratio >= 1.30:
+                    ai_score += 0.6
+                elif ob_ratio >= 1.15:
+                    ai_score += 0.3
+            else:
+                if ob_ratio <= 0.75:
+                    ai_score += 0.6
+                elif ob_ratio <= 0.85:
+                    ai_score += 0.3
+
+            # Moving Average Stack
+            if target_side == "BUY":
+                if current_price > ema9 > ema20 > ema50:
+                    ai_score += 0.5
+            else:
+                if current_price < ema9 < ema20 < ema50:
+                    ai_score += 0.5
+
+            ai_score = round(ai_score, 1)
+
+            # Minimum AI confidence hurdle for Futures
+            if ai_score < 8.6:
+                return {"is_valid": False, "reason": f"Insufficient Confluence AI Score ({ai_score:.1f} < 8.6)"}
 
             res_data = {
                 "is_valid": True,
                 "rsi_15m": rsi_15m,
                 "ema50_15m": ema50,
                 "ema20_15m": ema20,
+                "ema9_15m": ema9,
+                "rvol": rvol,
+                "chg_1h": chg_1h,
+                "chg_15m": chg_15m,
                 "adx_15m": adx_15m,
                 "orderbook_ratio": ob_ratio,
                 "ai_score": ai_score,
-                "reason": "Optimal Confluence (ADX >= 25.0 + Pullback Retest)"
+                "reason": f"Futures Velocity Confluence (RVOL {rvol:.1f}x + AI {ai_score:.1f})"
             }
             _WEALTH_TECH_CACHE[cache_key] = (now_ts, res_data)
             return res_data
@@ -570,6 +680,85 @@ class PerpetualWealthGeneratorEngine:
                             is_be_locked = True
                             print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.12% Fees Floor (ROI: +{roi_pct:.2f}%)")
 
+                    # Phase 1.5: 3-Tier Anti-Stagnation Smart Clock (Frees margin from flat/dead moves, stops funding fee drain)
+                    entry_time_key = f"wealth_entry_time_{chat_id}_{sym}"
+                    entry_time_str = db.get_system_setting(entry_time_key, "0.0")
+                    if not entry_time_str or entry_time_str == "0.0":
+                        entry_time = time.time()
+                        db.update_system_setting(entry_time_key, str(entry_time))
+                    else:
+                        try:
+                            entry_time = float(entry_time_str)
+                        except (ValueError, TypeError):
+                            entry_time = time.time()
+                            db.update_system_setting(entry_time_key, str(entry_time))
+
+                    trade_age_min = max(0.0, (time.time() - entry_time) / 60.0)
+
+                    # Tier 1: Age >= 30m, Peak < +1.5%, ROI between -1.5% and +0.8%
+                    # Tier 2: Age >= 60m, Peak < +2.5%, ROI <= +1.2%
+                    # Tier 3: Age >= 90m, ROI <= +1.5%
+                    is_stagnant = False
+                    stagnant_reason = ""
+                    if trade_age_min >= 90.0 and roi_pct <= 1.5:
+                        is_stagnant = True
+                        stagnant_reason = f"Tier 3 Anti-Stagnation (Held {trade_age_min:.0f}m, ROI: {roi_pct:+.2f}%)"
+                    elif trade_age_min >= 60.0 and curr_peak < 2.5 and roi_pct <= 1.2:
+                        is_stagnant = True
+                        stagnant_reason = f"Tier 2 Anti-Stagnation (Held {trade_age_min:.0f}m, Peak: {curr_peak:.1f}%, ROI: {roi_pct:+.2f}%)"
+                    elif trade_age_min >= 30.0 and curr_peak < 1.5 and (-1.5 <= roi_pct <= 0.8):
+                        is_stagnant = True
+                        stagnant_reason = f"Tier 1 Anti-Stagnation (Held {trade_age_min:.0f}m, Flat Momentum)"
+
+                    if is_stagnant:
+                        side_to_close = "SELL" if amt > 0 else "BUY"
+                        print(f"⏰ [PERPETUAL WEALTH ANTI-STAGNATION EXIT] User {chat_id}: {sym} {stagnant_reason}. Freeing margin...")
+                        close_res = trading_engine.place_futures_order(
+                            api_key=api_key,
+                            api_secret=api_secret,
+                            symbol=sym,
+                            side=side_to_close,
+                            quantity=abs(amt),
+                            leverage=leverage,
+                            reduce_only=True,
+                            position_side=pos_side
+                        )
+                        db.update_system_setting(peak_roi_key, "0.0")
+                        db.update_system_setting(tp1_taken_key, "0")
+                        db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                        db.update_system_setting(entry_time_key, "0.0")
+                        db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=(unRealizedProfit > 0))
+                        add_wealth_cooldown(sym, duration_seconds=1800)
+
+                        if app and hasattr(app, "bot"):
+                            try:
+                                user_lang = db.get_user_language(chat_id)
+                                stag_msg = (
+                                    "⏰ **[24/7 WEALTH - ANTI-STAGNATION RELEASE]** 🔄\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                                    f"⏳ **រយៈពេលកាន់កាប់ ៖** `{trade_age_min:.0f} នាទី`\n"
+                                    f"📊 **ROI ពេលបិទ ៖** `{roi_pct:+.2f}%` ({stagnant_reason})\n"
+                                    f"💵 **PnL ៖** `+${unRealizedProfit:,.2f} USDT`\n"
+                                    f"🔓 **ដោះលែងទុន (Margin) ៖** `រួចរាល់ ១០០% (ចៀសវាង Funding Fee)`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _ប្រព័ន្ធបានរំដោះទុនស្វ័យប្រវត្ត ដើម្បីរៀបចំចូលកាក់ដែលមាន Velocity ខ្ពស់ជាង!_"
+                                ) if user_lang == 'khmer' else (
+                                    "⏰ **[24/7 WEALTH - ANTI-STAGNATION RELEASE]** 🔄\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **Symbol / Pair:** `{sym}`\n"
+                                    f"⏳ **Holding Duration:** `{trade_age_min:.0f} mins`\n"
+                                    f"📊 **Exit ROI:** `{roi_pct:+.2f}%` ({stagnant_reason})\n"
+                                    f"💵 **Realized PnL:** `+${unRealizedProfit:,.2f} USDT`\n"
+                                    f"🔓 **Margin Capital:** `100% Released (Saved Funding Fees)`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _Capital dynamically released to hunt higher velocity breakouts!_"
+                                )
+                                asyncio.create_task(_async_send_wealth_alert(app, chat_id, stag_msg, "stagnation alert"))
+                            except Exception as notif_err:
+                                print(f"⚠️ Notice sending stagnation alert: {notif_err}")
+                        continue
+
                     # Phase 2: Micro-Scalp TP1 at +5.0% ROI -> Harvest 50% Size
                     if roi_pct >= 5.0 and not is_tp1_done:
                         close_half_qty = abs(amt) * 0.5
@@ -639,6 +828,7 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(peak_roi_key, "0.0")
                         db.update_system_setting(tp1_taken_key, "0")
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                        db.update_system_setting(entry_time_key, "0.0")
                         db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=(roi_pct > 0))
                         add_wealth_cooldown(sym, duration_seconds=1800)
 
@@ -689,6 +879,7 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(peak_roi_key, "0.0")
                         db.update_system_setting(tp1_taken_key, "0")
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                        db.update_system_setting(entry_time_key, "0.0")
                         db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=(unRealizedProfit > 0))
                         add_wealth_cooldown(sym, duration_seconds=1800 if is_be_exit else 3600)
 
@@ -771,10 +962,16 @@ class PerpetualWealthGeneratorEngine:
                             )
 
                             if order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")):
+                                # Save entry time for Anti-Stagnation Smart Clock
+                                db.update_system_setting(f"wealth_entry_time_{chat_id}_{sym}", str(time.time()))
+
                                 # Send Telegram alert
                                 if app and hasattr(app, "bot"):
                                     try:
                                         user_lang = db.get_user_language(chat_id)
+                                        rvol_val = cand.get('rvol', 2.2)
+                                        chg_1h_val = cand.get('chg_1h', 1.0)
+                                        adx_val = cand.get('adx_15m', 28.0)
                                         entry_msg = (
                                             "💎 **[24/7 PERPETUAL WEALTH - POSITION OPENED]** 🟢\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -782,7 +979,9 @@ class PerpetualWealthGeneratorEngine:
                                             f"🎯 **ទិសដៅ (Signal) ៖** `{side} ({cand['reason']})`\n"
                                             f"💰 **ទុនចូល (Margin) ៖** `${margin_per_coin:.2f} USDT`\n"
                                             f"⚡ **Leverage ៖** `{leverage}x (ISOLATED Mode)`\n"
-                                            f"📈 **24H Change ៖** `+{cand['price_change_pct']:.2f}%`\n"
+                                            f"📊 **Volume Surge (RVOL) ៖** `{rvol_val:.1f}x` 🚀\n"
+                                            f"📈 **1H Fresh Momentum ៖** `{chg_1h_val:+.2f}%`\n"
+                                            f"🌊 **Trend Strength (ADX) ៖** `{adx_val:.1f}`\n"
                                             f"🧠 **AI Confluence Score ៖** `{cand['ai_score']:.1f}/10.0`\n"
                                             f"🛡️ **Breakeven Armor ៖** `ត្រៀម Lock នៅ +3.0% ROI`\n"
                                             f"🎯 **Target TP1 (50%) ៖** `+5.0% ROI`\n"
@@ -796,7 +995,9 @@ class PerpetualWealthGeneratorEngine:
                                             f"🎯 **Signal / Mode:** `{side} ({cand['reason']})`\n"
                                             f"💰 **Margin Allocated:** `${margin_per_coin:.2f} USDT`\n"
                                             f"⚡ **Leverage:** `{leverage}x (ISOLATED Mode)`\n"
-                                            f"📈 **24H Sweet-Spot Change:** `+{cand['price_change_pct']:.2f}%`\n"
+                                            f"📊 **Volume Surge (RVOL):** `{rvol_val:.1f}x` 🚀\n"
+                                            f"📈 **1H Fresh Momentum:** `{chg_1h_val:+.2f}%`\n"
+                                            f"🌊 **Trend Strength (ADX):** `{adx_val:.1f}`\n"
                                             f"🧠 **AI Confluence Score:** `{cand['ai_score']:.1f}/10.0`\n"
                                             f"🛡️ **Breakeven Armor:** `Armed for +3.0% ROI Lock`\n"
                                             f"🎯 **Target TP1 (50%):** `+5.0% ROI`\n"
