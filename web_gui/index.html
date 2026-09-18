@@ -14,7 +14,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Chart.js via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=2.2.2">
+    <link rel="stylesheet" href="style.css?v=2.2.3">
 </head>
 <body>
     <!-- Background Interactive Neural Network Synapses Canvas -->
@@ -468,11 +468,14 @@
                         <div class="engine-ctrl-header">
                             <div class="engine-badge-icon">💎</div>
                             <div class="engine-ctrl-meta">
-                                <h4>24/7 Perpetual Wealth</h4>
+                                <div class="engine-title-flex">
+                                    <h4>24/7 Perpetual Wealth</h4>
+                                    <span id="badge-wealth" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
                                 <span>Sweet-Spot Multi-Pair Breakout Engine</span>
                             </div>
                             <label class="switch">
-                                <input type="checkbox" id="toggle-wealth" checked data-engine="wealth">
+                                <input type="checkbox" id="toggle-wealth" data-engine="wealth">
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -484,11 +487,14 @@
                         <div class="engine-ctrl-header">
                             <div class="engine-badge-icon">🛡️</div>
                             <div class="engine-ctrl-meta">
-                                <h4>Turbo Hedge HFT</h4>
+                                <div class="engine-title-flex">
+                                    <h4>Turbo Hedge HFT</h4>
+                                    <span id="badge-turbo_hedge" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
                                 <span>Dual-Side Delta-Neutral Hedge</span>
                             </div>
                             <label class="switch">
-                                <input type="checkbox" id="toggle-hedge" checked data-engine="turbo_hedge">
+                                <input type="checkbox" id="toggle-turbo_hedge" data-engine="turbo_hedge">
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -500,11 +506,14 @@
                         <div class="engine-ctrl-header">
                             <div class="engine-badge-icon">🧠</div>
                             <div class="engine-ctrl-meta">
-                                <h4>SmartX Swarm AI</h4>
+                                <div class="engine-title-flex">
+                                    <h4>SmartX Swarm AI</h4>
+                                    <span id="badge-smart_x" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
                                 <span>5-Agent + 12 Wall Street ML Suite</span>
                             </div>
                             <label class="switch">
-                                <input type="checkbox" id="toggle-smartx" checked data-engine="smart_x">
+                                <input type="checkbox" id="toggle-smart_x" data-engine="smart_x">
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -516,11 +525,14 @@
                         <div class="engine-ctrl-header">
                             <div class="engine-badge-icon">❄️</div>
                             <div class="engine-ctrl-meta">
-                                <h4>Compound Grid Spot</h4>
+                                <div class="engine-title-flex">
+                                    <h4>Compound Grid Spot</h4>
+                                    <span id="badge-compound_grid" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
                                 <span>Snowball Multiplier (0% Liquidation)</span>
                             </div>
                             <label class="switch">
-                                <input type="checkbox" id="toggle-grid" checked data-engine="compound_grid">
+                                <input type="checkbox" id="toggle-compound_grid" data-engine="compound_grid">
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -532,15 +544,56 @@
                         <div class="engine-ctrl-header">
                             <div class="engine-badge-icon">♾️</div>
                             <div class="engine-ctrl-meta">
-                                <h4>Infinity Matrix Spot</h4>
+                                <div class="engine-title-flex">
+                                    <h4>Infinity Matrix Spot</h4>
+                                    <span id="badge-infinity_matrix" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
                                 <span>Dynamic Fibonacci Grid</span>
                             </div>
                             <label class="switch">
-                                <input type="checkbox" id="toggle-infinity" checked data-engine="infinity_matrix">
+                                <input type="checkbox" id="toggle-infinity_matrix" data-engine="infinity_matrix">
                                 <span class="slider round"></span>
                             </label>
                         </div>
                         <p class="engine-ctrl-desc">ស្រូបទាញចំណេញតាមសមាមាត្រមាសចក្រវាល Celestial Golden Ratio™ គ្មានហានិភ័យទុន</p>
+                    </div>
+
+                    <!-- Engine 6: Autonomous Scalp Radar -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
+                            <div class="engine-badge-icon">⚡</div>
+                            <div class="engine-ctrl-meta">
+                                <div class="engine-title-flex">
+                                    <h4>Auto Trade Autonomous</h4>
+                                    <span id="badge-auto_trade" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
+                                <span>Kinetic Precision Scalper Engine</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-auto_trade" data-engine="auto_trade">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <p class="engine-ctrl-desc">ម៉ាស៊ីនស្កេនចាប់ចំណេញស្វ័យប្រវត្ត តាមរលកលំហូរទុនធំ (Zero Blind Investing)</p>
+                    </div>
+
+                    <!-- Engine 7: Sovereign Spot Wealth Vault -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
+                            <div class="engine-badge-icon">🏛️</div>
+                            <div class="engine-ctrl-meta">
+                                <div class="engine-title-flex">
+                                    <h4>Sovereign Wealth Vault</h4>
+                                    <span id="badge-spot_vault" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
+                                <span>Gold PAXG & BTC Safe-Haven Accumulator</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-spot_vault" data-engine="spot_vault">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <p class="engine-ctrl-desc">បង្វែរប្រាក់ចំណេញសុទ្ធទៅជាមាស Gold PAXG និង Bitcoin រក្សាទ្រព្យរឹងមាំយូរអង្វែង</p>
                     </div>
                 </div>
             </section>
@@ -587,6 +640,6 @@
     <!-- Notification Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.2.2"></script>
+    <script src="app.js?v=2.2.3"></script>
 </body>
 </html>

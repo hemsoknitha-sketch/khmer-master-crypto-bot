@@ -650,8 +650,35 @@ async function fetchAnalytics() {
 // -----------------------------------------------------------------------------
 // Actions (Engine Toggles, Manual Sweep, Fast Close)
 // -----------------------------------------------------------------------------
+async function fetchEngineStates() {
+    try {
+        const cid = state.chatId || '';
+        const res = await fetch(`/api/engine_states?chat_id=${cid}`);
+        const json = await res.json();
+        if (json.status === 'success' && json.engines) {
+            const eng = json.engines;
+            for (const [name, isActive] of Object.entries(eng)) {
+                const sw = document.getElementById(`toggle-${name}`);
+                if (sw) sw.checked = Boolean(isActive);
+                const badge = document.getElementById(`badge-${name}`);
+                if (badge) {
+                    badge.textContent = isActive ? '🟢 RUNNING 24/7' : '⚪ STANDBY / OFF';
+                    badge.className = isActive ? 'badge badge-success' : 'badge badge-dim';
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Error fetching live engine states:', e);
+    }
+}
+
 async function toggleEngine(engineName, isChecked) {
     triggerHaptic('impact');
+    const badge = document.getElementById(`badge-${engineName}`);
+    if (badge) {
+        badge.textContent = isChecked ? '🟢 RUNNING 24/7' : '⚪ STANDBY / OFF';
+        badge.className = isChecked ? 'badge badge-success' : 'badge badge-dim';
+    }
     try {
         const res = await fetch('/api/action/engine_toggle', {
             method: 'POST',
@@ -660,12 +687,24 @@ async function toggleEngine(engineName, isChecked) {
         });
         const json = await res.json();
         if (json.status === 'success') {
-            showToast(`✅ Engine <strong>${engineName.toUpperCase()}</strong>: ${isChecked ? 'ENABLED 🟢' : 'DISABLED 🔴'}`);
+            showToast(`✅ Engine <strong>${engineName.toUpperCase()}</strong>: ${isChecked ? 'បានបើកដំណើរការ 🟢' : 'បានផ្អាកដំណើរការ (Standby) ⚪'}`);
         } else {
             showToast(`❌ Toggle Failed: ${json.message}`);
+            const sw = document.getElementById(`toggle-${engineName}`);
+            if (sw) sw.checked = !isChecked;
+            if (badge) {
+                badge.textContent = !isChecked ? '🟢 RUNNING 24/7' : '⚪ STANDBY / OFF';
+                badge.className = !isChecked ? 'badge badge-success' : 'badge badge-dim';
+            }
         }
     } catch (e) {
         showToast(`❌ Network Error toggling engine`);
+        const sw = document.getElementById(`toggle-${engineName}`);
+        if (sw) sw.checked = !isChecked;
+        if (badge) {
+            badge.textContent = !isChecked ? '🟢 RUNNING 24/7' : '⚪ STANDBY / OFF';
+            badge.className = !isChecked ? 'badge badge-success' : 'badge badge-dim';
+        }
     }
 }
 
@@ -709,6 +748,9 @@ function setupEventListeners() {
             const targetPane = document.getElementById(targetTabId);
             if (targetPane) targetPane.classList.add('active');
             triggerHaptic('selection');
+            if (targetTabId === 'tab-controls') {
+                fetchEngineStates();
+            }
         });
     });
 
@@ -842,12 +884,14 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchAIBrain();
     fetchHFTMEV();
     fetchAnalytics();
+    fetchEngineStates();
 
     // Passive Fallback Polling every 20s (Stream handles real-time live ticks)
     setInterval(() => {
         if (!state.streamConnected) {
             fetchPortfolio();
             fetchWealthCockpit();
+            fetchEngineStates();
         }
     }, 20000);
 });

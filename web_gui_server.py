@@ -593,33 +593,110 @@ async def handle_api_harvest_action(request: web.Request) -> web.Response:
         })
 
 
+async def handle_api_engine_states(request: web.Request) -> web.Response:
+    """Returns real-time live ON/OFF status of all flagship engines for a specific VIP user."""
+    try:
+        chat_id = _get_chat_id_from_req(request)
+        if not chat_id:
+            chat_id = DEFAULT_VIP_CHAT_ID
+
+        # 1. 24/7 Perpetual Wealth (Futures & Spot)
+        wealth_fut = db.get_perpetual_wealth_bot(chat_id)
+        wealth_spot = db.get_perpetual_wealth_spot_bot(chat_id)
+        is_wealth_active = bool((wealth_fut.get("status") == "ACTIVE") or (wealth_spot.get("status") == "ACTIVE"))
+
+        # 2. Turbo Hedge HFT
+        turbo_bots = db.get_user_turbo_hedge_bots(chat_id)
+        turbo_setting = db.get_system_setting(f"turbo_hedge_{chat_id}_status", "")
+        is_turbo_active = bool(len(turbo_bots) > 0 or turbo_setting == "ACTIVE")
+
+        # 3. SmartX Swarm AI
+        smartx_setting = db.get_system_setting(f"smart_x_{chat_id}_status", "ACTIVE")
+        is_smartx_active = bool(smartx_setting != "STOPPED")
+
+        # 4. Compound Grid Spot
+        grid_bots = db.get_user_compound_grids(chat_id)
+        grid_setting = db.get_system_setting(f"compound_grid_{chat_id}_status", "")
+        is_grid_active = bool(len(grid_bots) > 0 or grid_setting == "ACTIVE")
+
+        # 5. Infinity Matrix Spot
+        inf_bots = db.get_user_infinity_matrix_bots(chat_id)
+        inf_setting = db.get_system_setting(f"infinity_matrix_{chat_id}_status", "")
+        is_inf_active = bool(len(inf_bots) > 0 or inf_setting == "ACTIVE")
+
+        # 6. Auto Trade Autonomous Radar
+        is_autotrade_active = bool(db.is_auto_trade_enabled(chat_id))
+
+        # 7. Sovereign Wealth Vault (Gold PAXG & BTC Accumulator)
+        vault_setting = db.get_system_setting(f"spot_wealth_vault_{chat_id}", "ACTIVE")
+        is_vault_active = bool(vault_setting != "STOPPED")
+
+        resp = web.json_response({
+            "status": "success",
+            "chat_id": chat_id,
+            "engines": {
+                "wealth": is_wealth_active,
+                "turbo_hedge": is_turbo_active,
+                "smart_x": is_smartx_active,
+                "compound_grid": is_grid_active,
+                "infinity_matrix": is_inf_active,
+                "auto_trade": is_autotrade_active,
+                "spot_vault": is_vault_active
+            }
+        })
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        return resp
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
 async def handle_api_engine_toggle(request: web.Request) -> web.Response:
-    """Allows VIP users to toggle engines on/off."""
+    """Allows VIP users to toggle engines on/off with persistent database state."""
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            chat_id = DEFAULT_VIP_CHAT_ID
+
         engine_name = str(data.get("engine", "")).lower()
         enable = bool(data.get("enable", True))
 
         if engine_name in ["wealth", "wealth24_7", "perpetual_wealth"]:
-            if hasattr(db, 'set_wealth_bot_enabled'):
-                db.set_wealth_bot_enabled(chat_id, enable)
+            if enable:
+                db.set_perpetual_wealth_bot(chat_id, status='ACTIVE')
+                db.set_perpetual_wealth_spot_bot(chat_id, status='ACTIVE')
+            else:
+                db.stop_perpetual_wealth_bot(chat_id)
+                db.stop_perpetual_wealth_spot_bot(chat_id)
         elif engine_name in ["turbo_hedge", "hedge"]:
-            if hasattr(db, 'set_turbo_hedge_enabled'):
-                db.set_turbo_hedge_enabled(chat_id, enable)
+            if enable:
+                db.update_system_setting(f"turbo_hedge_{chat_id}_status", "ACTIVE")
+            else:
+                db.stop_all_turbo_hedge_bots(chat_id)
+                db.update_system_setting(f"turbo_hedge_{chat_id}_status", "STOPPED")
         elif engine_name in ["smart_x", "smartx"]:
-            if hasattr(db, 'set_smart_x_enabled'):
-                db.set_smart_x_enabled(chat_id, enable)
+            db.update_system_setting(f"smart_x_{chat_id}_status", "ACTIVE" if enable else "STOPPED")
         elif engine_name in ["compound_grid", "grid"]:
-            if hasattr(db, 'set_compound_grid_enabled'):
-                db.set_compound_grid_enabled(chat_id, enable)
+            if not enable:
+                conn = db.get_db_connection()
+                with conn:
+                    conn.execute("UPDATE compound_grids SET is_active = 0 WHERE chat_id = ?", (chat_id,))
+            db.update_system_setting(f"compound_grid_{chat_id}_status", "ACTIVE" if enable else "STOPPED")
         elif engine_name in ["infinity_matrix", "infinity"]:
-            if hasattr(db, 'set_infinity_matrix_enabled'):
-                db.set_infinity_matrix_enabled(chat_id, enable)
+            if not enable:
+                db.stop_infinity_matrix_bot(chat_id)
+            db.update_system_setting(f"infinity_matrix_{chat_id}_status", "ACTIVE" if enable else "STOPPED")
+        elif engine_name in ["auto_trade", "autotrade"]:
+            db.toggle_auto_trade(chat_id, enable)
+            db.update_system_setting(f"macro_auto_trade_{chat_id}_enabled", "1" if enable else "0")
+        elif engine_name in ["spot_vault", "vault", "gold_vault"]:
+            db.update_system_setting(f"spot_wealth_vault_{chat_id}", "ACTIVE" if enable else "STOPPED")
         else:
             return web.json_response({"status": "error", "message": f"Unknown engine: {engine_name}"}, status=400)
 
-        return web.json_response({"status": "success", "engine": engine_name, "enabled": enable})
+        resp = web.json_response({"status": "success", "engine": engine_name, "enabled": enable, "chat_id": chat_id})
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        return resp
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
@@ -679,6 +756,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/api/hft_mev", handle_api_hft_mev)
     app.router.add_get("/api/analytics", handle_api_analytics)
     app.router.add_get("/api/radar", handle_api_radar)
+    app.router.add_get("/api/engine_states", handle_api_engine_states)
     app.router.add_post("/api/action/harvest", handle_api_harvest_action)
     app.router.add_post("/api/action/engine_toggle", handle_api_engine_toggle)
 

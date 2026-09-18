@@ -635,6 +635,26 @@ body {
     color: var(--neon-purple);
 }
 
+.badge-dim {
+    background: rgba(148, 163, 184, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: var(--text-muted);
+}
+
+.engine-title-flex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.engine-title-flex .badge {
+    font-size: 9px;
+    padding: 2px 7px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
 /* Card Header Flex */
 .card-header-flex {
     display: flex;
