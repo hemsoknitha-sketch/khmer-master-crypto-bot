@@ -502,21 +502,21 @@ async def handle_api_radar(request: web.Request) -> web.Response:
 
 
 async def handle_api_ai_brain(request: web.Request) -> web.Response:
-    """Returns the 33 AI Neural Core status, sentiment gauges, and ADX/RSI metrics."""
+    """Returns the 33 AI Neural Core status, sentiment gauges, and sovereign metrics."""
     try:
         agents = [
-            {"name": "DeepSeek R1 Quantum Reasoning", "tier": "Lead Orchestrator", "confidence": 98.4, "status": "ACTIVE"},
-            {"name": "Llama 3 70B Wall Street Macro", "tier": "Macro Quant", "confidence": 96.2, "status": "ACTIVE"},
-            {"name": "Google Gemini 2.5 Flash HFT", "tier": "Fast Inference", "confidence": 99.1, "status": "ACTIVE"},
-            {"name": "Tokyo MEV Cyclic Pathfinder", "tier": "Arbitrage", "confidence": 99.8, "status": "ACTIVE"},
-            {"name": "CatBoost Microstructure Hunter", "tier": "Pattern Recognition", "confidence": 94.5, "status": "ACTIVE"},
-            {"name": "XGBoost Non-Linear Volatility", "tier": "Risk Shield", "confidence": 95.0, "status": "ACTIVE"},
-            {"name": "Wilder ADX(14) Chop Filter", "tier": "Chop Suppression", "confidence": 97.2, "status": "ACTIVE"},
-            {"name": "RSI Momentum Invariant 16", "tier": "Anti-Oversold Guard", "confidence": 100.0, "status": "LOCKED"},
-            {"name": "Golden 85% Profit Ratchet", "tier": "Profit Lock", "confidence": 99.9, "status": "LOCKED"},
-            {"name": "Dynamic Small Capital Scaler", "tier": "Capital Fortress", "confidence": 100.0, "status": "LOCKED"}
+            {"name": "Apex Omniscient Oracle Core™", "tier": "Multimodal Lead", "confidence": 98.4, "status": "ACTIVE"},
+            {"name": "Macro Sovereign Liquidity Radar™", "tier": "Institutional Macro", "confidence": 96.2, "status": "ACTIVE"},
+            {"name": "Ultra-Fast Inference Engine™", "tier": "Sub-ms Execution", "confidence": 99.1, "status": "ACTIVE"},
+            {"name": "Tachyon Pulse Stabilizer™", "tier": "Market Neutral", "confidence": 99.8, "status": "ACTIVE"},
+            {"name": "Harmonic Microstructure Scanner™", "tier": "Pattern Recognition", "confidence": 94.5, "status": "ACTIVE"},
+            {"name": "Celestial Volatility Deflector™", "tier": "Risk Shield", "confidence": 95.0, "status": "ACTIVE"},
+            {"name": "Kinetic Momentum Gate™", "tier": "Chop Suppression", "confidence": 97.2, "status": "ACTIVE"},
+            {"name": "Singularity Liquidity Armor™", "tier": "Anti-Squeeze Shield", "confidence": 100.0, "status": "LOCKED"},
+            {"name": "Celestial Vault Ratchet™", "tier": "85% Profit Lock", "confidence": 99.9, "status": "LOCKED"},
+            {"name": "Quantum Capital Scaler™", "tier": "Capital Fortress", "confidence": 100.0, "status": "LOCKED"}
         ]
-        return web.json_response({
+        resp = web.json_response({
             "status": "success",
             "data": {
                 "total_agents": 33,
@@ -524,24 +524,26 @@ async def handle_api_ai_brain(request: web.Request) -> web.Response:
                 "confluence_score": 94.8,
                 "market_sentiment": "STRONG BULLISH CONFLUENCE",
                 "adx_15m": 32.4,
-                "adx_status": "TRENDING STRONG (>= 25.0)",
-                "anti_oversold_guard": "ACTIVE",
+                "adx_status": "ALPHA VELOCITY ≥ TIER-1",
+                "anti_oversold_guard": "LOCKED",
                 "top_agents": agents
             }
         })
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        return resp
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
 
 async def handle_api_hft_mev(request: web.Request) -> web.Response:
-    """Returns live Tokyo HFT MEV Flash Loan Arbitrage radar and pathfinder data."""
+    """Returns live Tokyo HFT MEV Flash Loan Arbitrage radar and sovereign pathfinder data."""
     try:
         cycles = [
-            {"path": "Aave V3 → Uniswap V3 → Camelot V2 → SushiSwap", "token": "USDC/USDT", "spread_pct": 0.84, "net_profit_usd": 42.50, "gas_usd": 0.22, "latency_ms": 0.38},
-            {"path": "Aave V3 → Camelot V2 → Uniswap V3 → Balancer", "token": "ETH/USDT", "spread_pct": 0.62, "net_profit_usd": 31.80, "gas_usd": 0.25, "latency_ms": 0.41},
-            {"path": "Aave V3 → SushiSwap → Curve → Uniswap V3", "token": "WBTC/USDT", "spread_pct": 0.76, "net_profit_usd": 58.10, "gas_usd": 0.28, "latency_ms": 0.39}
+            {"path": "Dark Matter Gateway ➔ Node Alpha ➔ Node Beta ➔ Siphon", "token": "USDC/USDT", "spread_pct": 0.84, "net_profit_usd": 42.50, "gas_usd": 0.22, "latency_ms": 0.38},
+            {"path": "Dark Matter Gateway ➔ Node Gamma ➔ Node Delta ➔ Siphon", "token": "ETH/USDT", "spread_pct": 0.62, "net_profit_usd": 31.80, "gas_usd": 0.25, "latency_ms": 0.41},
+            {"path": "Dark Matter Gateway ➔ Node Zeta ➔ Node Theta ➔ Siphon", "token": "WBTC/USDT", "spread_pct": 0.76, "net_profit_usd": 58.10, "gas_usd": 0.28, "latency_ms": 0.39}
         ]
-        return web.json_response({
+        resp = web.json_response({
             "status": "success",
             "data": {
                 "tokyo_rpc_latency_ms": 0.42,
@@ -550,6 +552,8 @@ async def handle_api_hft_mev(request: web.Request) -> web.Response:
                 "active_cycles": cycles
             }
         })
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        return resp
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
@@ -625,13 +629,25 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
 # ==============================================================================
 
 async def handle_index(request: web.Request) -> web.FileResponse:
-    return web.FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    resp = web.FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 async def handle_style(request: web.Request) -> web.FileResponse:
-    return web.FileResponse(os.path.join(STATIC_DIR, "style.css"))
+    resp = web.FileResponse(os.path.join(STATIC_DIR, "style.css"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 async def handle_script(request: web.Request) -> web.FileResponse:
-    return web.FileResponse(os.path.join(STATIC_DIR, "app.js"))
+    resp = web.FileResponse(os.path.join(STATIC_DIR, "app.js"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 # ==============================================================================
