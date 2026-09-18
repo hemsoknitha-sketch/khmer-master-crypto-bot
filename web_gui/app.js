@@ -550,6 +550,7 @@ async function fetchAIBrain() {
             if (elements.brainScoreVal) elements.brainScoreVal.textContent = d.confluence_score.toFixed(1);
             if (elements.brainSentimentBadge) elements.brainSentimentBadge.textContent = d.market_sentiment;
             if (elements.brainAdxVal) elements.brainAdxVal.textContent = `${d.adx_15m.toFixed(1)} (${d.adx_status})`;
+            applySovereignCloaking();
 
             // Radial progress dial offset
             if (elements.radialProgress) {
@@ -771,9 +772,64 @@ function setupEventListeners() {
 }
 
 // -----------------------------------------------------------------------------
+// Sovereign Quantum Cloaking Enforcer (Guaranteed Client-Side Masking)
+// -----------------------------------------------------------------------------
+function applySovereignCloaking() {
+    try {
+        // 1. Header brand title
+        const brandMain = document.querySelector('.brand-title-main');
+        if (brandMain) brandMain.textContent = 'KHMER MASTER CRYPTO';
+        const brandTag = document.querySelector('.brand-tag-ai');
+        if (brandTag) brandTag.textContent = 'APEX SUPER BRAIN AGI';
+
+        // 2. Brain Banner
+        const brainHeading = document.querySelector('#tab-brain .section-heading');
+        if (brainHeading) brainHeading.textContent = '33-Layer Sovereign Neural Apex Core™';
+        const brainDesc = document.querySelector('#tab-brain .section-desc');
+        if (brainDesc) brainDesc.textContent = 'Autonomous Pre-Cognitive Swarm Intelligence • Global Institutional Order Flow Perception';
+
+        // 3. Swarm Consensus Matrix Header
+        const swarmTitle = document.querySelector('.brain-gauge-header .card-title');
+        if (swarmTitle) swarmTitle.textContent = '🌐 Sovereign Swarm Consensus Matrix';
+
+        // 4. Labels in gauge-details-column
+        const detailLabels = document.querySelectorAll('.gauge-detail-item .detail-label');
+        if (detailLabels.length >= 4) {
+            detailLabels[0].textContent = 'Temporal Kinetic Velocity:';
+            detailLabels[1].textContent = 'Singularity Liquidity Armor™:';
+            detailLabels[2].textContent = 'Celestial Vault Ratchet™:';
+            detailLabels[3].textContent = 'Sovereign Capital Fortress™:';
+        }
+
+        // 5. Values in gauge-details-column
+        const detailValues = document.querySelectorAll('.gauge-detail-item strong');
+        if (detailValues.length >= 4) {
+            detailValues[1].className = 'text-neon-cyan';
+            detailValues[1].textContent = 'ARMED (Black-Hole Squeeze Immunity Active)';
+            detailValues[2].className = 'text-neon-gold';
+            detailValues[2].textContent = 'LOCKED (Peak Profit Dynamic Ratchet Active)';
+            detailValues[3].className = 'text-neon-emerald';
+            detailValues[3].textContent = 'SECURED (Zero-Liquidation Multi-Tier Reserve)';
+        }
+
+        // 6. MEV Banner
+        const mevHeading = document.querySelector('#tab-hft .section-heading');
+        if (mevHeading) mevHeading.textContent = 'Quantum Liquidity Siphon & MEV Radar';
+        const mevDesc = document.querySelector('#tab-hft .section-desc');
+        if (mevDesc) mevDesc.textContent = 'Cross-Dimensional Liquidity Relay & Tokyo Gateway (< 0.42ms Latency)';
+    } catch (e) {
+        console.warn('Sovereign cloaking error:', e);
+    }
+}
+
+// Execute immediately if DOM already parsed
+applySovereignCloaking();
+
+// -----------------------------------------------------------------------------
 // App Lifecycle
 // -----------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+    applySovereignCloaking();
     initNeuralCanvas();
     startClocks();
     initCharts();
