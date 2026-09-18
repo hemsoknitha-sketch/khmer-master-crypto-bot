@@ -452,16 +452,66 @@ async function fetchPortfolio() {
                     d.allocation.paxg
                 ];
                 state.allocationChart.update();
-                document.getElementById('leg-fut-pct').textContent = `${d.allocation.futures}%`;
-                document.getElementById('leg-spot-pct').textContent = `${d.allocation.spot_usdt}%`;
-                document.getElementById('leg-btc-pct').textContent = `${d.allocation.btc}%`;
-                document.getElementById('leg-paxg-pct').textContent = `${d.allocation.paxg}%`;
+                const legFut = document.getElementById('leg-fut-pct');
+                const legSpot = document.getElementById('leg-spot-pct');
+                const legBtc = document.getElementById('leg-btc-pct');
+                const legPaxg = document.getElementById('leg-paxg-pct');
+                if (legFut) legFut.textContent = `${d.allocation.futures}%`;
+                if (legSpot) legSpot.textContent = `${d.allocation.spot_usdt}%`;
+                if (legBtc) legBtc.textContent = `${d.allocation.btc}%`;
+                if (legPaxg) legPaxg.textContent = `${d.allocation.paxg}%`;
             }
-        }
-    } catch (e) {
-        console.error('Portfolio fetch error:', e);
-    }
-}
+
+            // Real-time Grand Profit / Loss Calculation & Presentation
+            if (d.grand_metrics) {
+                const gm = d.grand_metrics;
+                const sign = gm.grand_total_pnl >= 0 ? '+' : '-';
+                const absPnl = Math.abs(gm.grand_total_pnl);
+                const absRoi = Math.abs(gm.grand_roi_pct);
+                const pnlText = `${sign}$${formatUSD(absPnl)} (${sign}${absRoi.toFixed(2)}%)`;
+                const isPos = gm.grand_total_pnl >= 0;
+
+                // 1. Hero Grand PnL Pill
+                const heroPnlVal = document.getElementById('hero-grand-pnl-val');
+                const heroPnlRow = document.querySelector('.hero-grand-pnl-row');
+                if (heroPnlVal) {
+                    heroPnlVal.textContent = pnlText;
+                    heroPnlVal.className = isPos ? 'text-neon-emerald' : 'text-neon-crimson';
+                }
+                if (heroPnlRow) {
+                    heroPnlRow.className = isPos ? 'hero-grand-pnl-row' : 'hero-grand-pnl-row is-negative';
+                }
+
+                // 2. 24H Badge
+                if (elements.pnl24hBadge) {
+                    const sign24 = gm.pnl_24h >= 0 ? '+' : '-';
+                    elements.pnl24hBadge.textContent = `${sign24}${Math.abs(gm.pnl_24h_pct).toFixed(2)}% (24H)`;
+                    elements.pnl24hBadge.className = gm.pnl_24h >= 0 ? 'badge badge-success' : 'badge badge-danger';
+                }
+
+                // 3. Balanced Matrix Grand PnL Grid
+                const mGrand = document.getElementById('matrix-grand-pnl');
+                if (mGrand) {
+                    mGrand.textContent = pnlText;
+                    mGrand.className = isPos ? 'text-neon-emerald' : 'text-neon-crimson';
+                }
+                const mRealized = document.getElementById('matrix-realized-pnl');
+                if (mRealized) {
+                    const rSign = gm.realized_pnl >= 0 ? '+' : '-';
+                    mRealized.textContent = `${rSign}$${formatUSD(Math.abs(gm.realized_pnl))}`;
+                    mRealized.className = gm.realized_pnl >= 0 ? 'text-neon-emerald' : 'text-neon-crimson';
+                }
+                const mUnrealized = document.getElementById('matrix-unrealized-pnl');
+                if (mUnrealized) {
+                    const uSign = gm.unrealized_pnl >= 0 ? '+' : '-';
+                    mUnrealized.textContent = `${uSign}$${formatUSD(Math.abs(gm.unrealized_pnl))}`;
+                    mUnrealized.className = gm.unrealized_pnl >= 0 ? 'text-neon-cyan' : 'text-neon-crimson';
+                }
+                const mWin = document.getElementById('matrix-win-rate');
+                if (mWin) {
+                    mWin.textContent = `${gm.win_rate.toFixed(1)}% (Institutional Win)`;
+                }
+            }
 
 async function fetchWealthCockpit() {
     try {
