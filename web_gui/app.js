@@ -521,9 +521,15 @@ function renderGlobalMatrix(timeframe) {
         elProfit.textContent = `${sign}$${formatUSD(Math.abs(data.net_profit_usd))} (${sign}${data.roi_pct.toFixed(2)}%)`;
         elProfit.className = data.net_profit_usd >= 0 ? 'text-neon-emerald' : 'text-neon-crimson';
     }
-    if (elOrders) elOrders.textContent = `${data.orders_count.toLocaleString()} Orders (<30ms HFT)`;
+    if (elOrders) {
+        if (data.orders_count > 0) {
+            elOrders.innerHTML = `${data.orders_count.toLocaleString()} Orders &bull; <span class="text-neon-emerald">${data.win_orders || 0} ដងចំណេញ</span> (<span class="text-neon-cyan">${(data.win_rate_pct || 0).toFixed(1)}% Win Rate</span>)`;
+        } else {
+            elOrders.textContent = `0 Orders (0% Win Rate)`;
+        }
+    }
     if (elCapital) {
-        const pool = gm.active_capital_pool_usd || 28540.0;
+        const pool = (gm.active_capital_pool_usd !== undefined && gm.active_capital_pool_usd !== null) ? gm.active_capital_pool_usd : 0.0;
         elCapital.textContent = `$${formatUSD(pool)} USDT`;
     }
 }

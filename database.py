@@ -4360,6 +4360,7 @@ def get_system_global_multi_timeframe_matrix() -> dict:
         live_vol = 0.0
         live_pnl = 0.0
         live_orders = 0
+        win_orders = 0
 
         # 1. Real closed trades in trade_history (Spot & Futures on Binance)
         try:
@@ -4367,7 +4368,8 @@ def get_system_global_multi_timeframe_matrix() -> dict:
                 cursor.execute("""
                     SELECT COALESCE(SUM(qty * entry_price), 0.0),
                            COALESCE(SUM(pnl), 0.0),
-                           COUNT(*)
+                           COUNT(*),
+                           COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0)
                     FROM trade_history
                     WHERE exit_time >= ?
                 """, (cutoff_str,))
@@ -4375,7 +4377,8 @@ def get_system_global_multi_timeframe_matrix() -> dict:
                 cursor.execute("""
                     SELECT COALESCE(SUM(qty * entry_price), 0.0),
                            COALESCE(SUM(pnl), 0.0),
-                           COUNT(*)
+                           COUNT(*),
+                           COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0)
                     FROM trade_history
                 """)
             row = cursor.fetchone()
@@ -4383,6 +4386,7 @@ def get_system_global_multi_timeframe_matrix() -> dict:
                 live_vol += float(row[0] or 0.0)
                 live_pnl += float(row[1] or 0.0)
                 live_orders += int(row[2] or 0)
+                win_orders += int(row[3] or 0)
         except Exception:
             pass
 
@@ -4390,25 +4394,28 @@ def get_system_global_multi_timeframe_matrix() -> dict:
         try:
             if cutoff_str:
                 cursor.execute("""
-                    SELECT COALESCE(SUM(amount_usd), 0.0),
+                    SELECT COALESCE(SUM(loan_amount), 0.0),
                            COALESCE(SUM(net_profit_usd), 0.0),
-                           COUNT(*)
+                           COUNT(*),
+                           COALESCE(SUM(CASE WHEN net_profit_usd > 0 THEN 1 ELSE 0 END), 0)
                     FROM user_flash_loan_trades
-                    WHERE status = 'COMPLETED' AND created_at >= ?
+                    WHERE (status = 'COMPLETED' OR status = 'LIVE_SETTLED') AND created_at >= ?
                 """, (cutoff_str,))
             else:
                 cursor.execute("""
-                    SELECT COALESCE(SUM(amount_usd), 0.0),
+                    SELECT COALESCE(SUM(loan_amount), 0.0),
                            COALESCE(SUM(net_profit_usd), 0.0),
-                           COUNT(*)
+                           COUNT(*),
+                           COALESCE(SUM(CASE WHEN net_profit_usd > 0 THEN 1 ELSE 0 END), 0)
                     FROM user_flash_loan_trades
-                    WHERE status = 'COMPLETED'
+                    WHERE (status = 'COMPLETED' OR status = 'LIVE_SETTLED')
                 """)
             row = cursor.fetchone()
             if row:
                 live_vol += float(row[0] or 0.0)
                 live_pnl += float(row[1] or 0.0)
                 live_orders += int(row[2] or 0)
+                win_orders += int(row[3] or 0)
         except Exception:
             pass
 
@@ -4417,35 +4424,43 @@ def get_system_global_multi_timeframe_matrix() -> dict:
             if cutoff_str:
                 cursor.execute("""
                     SELECT COALESCE(SUM(total_pnl_usdt), 0.0),
-                           COALESCE(SUM(win_count + loss_count), 0)
+                           COALESCE(SUM(win_count + loss_count), 0),
+                           COALESCE(SUM(win_count), 0)
                     FROM strategy_pnl_attribution
                     WHERE last_updated >= ?
                 """, (cutoff_str,))
             else:
                 cursor.execute("""
                     SELECT COALESCE(SUM(total_pnl_usdt), 0.0),
-                           COALESCE(SUM(win_count + loss_count), 0)
+                           COALESCE(SUM(win_count + loss_count), 0),
+                           COALESCE(SUM(win_count), 0)
                     FROM strategy_pnl_attribution
                 """)
             row = cursor.fetchone()
             if row and live_orders == 0:
                 attr_pnl = float(row[0] or 0.0)
                 attr_orders = int(row[1] or 0)
+                attr_wins = int(row[2] or 0)
                 if attr_orders > 0:
                     live_pnl += attr_pnl
                     live_orders += attr_orders
+                    win_orders += attr_wins
                     live_vol += attr_orders * 15.0  # Conservative estimate based on min notional
         except Exception:
             pass
 
-        # 100% Pure mathematical ROI
+        # 100% Pure mathematical Win Rate and ROI
+        win_rate_pct = round((win_orders / live_orders) * 100.0, 1) if live_orders > 0 else 0.0
         roi_pct = round((live_pnl / max(1.0, live_vol)) * 100.0, 2) if live_vol > 0 else 0.0
 
         result[tf_key] = {
             "volume_usd": round(live_vol, 2),
             "net_profit_usd": round(live_pnl, 2),
             "roi_pct": roi_pct,
-            "orders_count": live_orders
+            "orders_count": live_orders,
+            "win_orders": win_orders,
+            "loss_orders": max(0, live_orders - win_orders),
+            "win_rate_pct": win_rate_pct
         }
 
     # Real Active Capital Pool across all VIP users
