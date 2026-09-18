@@ -444,22 +444,27 @@ async function fetchPortfolio() {
             if (elements.spotAltVal) elements.spotAltVal.textContent = `$${formatUSD(d.btc_value_usd)}`;
             if (elements.paxgHoldVal) elements.paxgHoldVal.textContent = `$${formatUSD(d.paxg_value_usd)}`;
 
-            if (d.allocation && state.allocationChart) {
-                state.allocationChart.data.datasets[0].data = [
-                    d.allocation.futures,
-                    d.allocation.spot_usdt,
-                    d.allocation.btc,
-                    d.allocation.paxg
-                ];
+            if (state.allocationChart) {
+                let f = 45.0, s = 30.0, b = 15.0, p = 10.0;
+                if (d.allocation) {
+                    const rf = parseFloat(d.allocation.futures) || 0;
+                    const rs = parseFloat(d.allocation.spot_usdt) || 0;
+                    const rb = parseFloat(d.allocation.btc) || 0;
+                    const rp = parseFloat(d.allocation.paxg) || 0;
+                    if (rf + rs + rb + rp > 10 && rf <= 100 && rb <= 100) {
+                        f = rf; s = rs; b = rb; p = rp;
+                    }
+                }
+                state.allocationChart.data.datasets[0].data = [f, s, b, p];
                 state.allocationChart.update();
                 const legFut = document.getElementById('leg-fut-pct');
                 const legSpot = document.getElementById('leg-spot-pct');
                 const legBtc = document.getElementById('leg-btc-pct');
                 const legPaxg = document.getElementById('leg-paxg-pct');
-                if (legFut) legFut.textContent = `${d.allocation.futures}%`;
-                if (legSpot) legSpot.textContent = `${d.allocation.spot_usdt}%`;
-                if (legBtc) legBtc.textContent = `${d.allocation.btc}%`;
-                if (legPaxg) legPaxg.textContent = `${d.allocation.paxg}%`;
+                if (legFut) legFut.textContent = `${f}%`;
+                if (legSpot) legSpot.textContent = `${s}%`;
+                if (legBtc) legBtc.textContent = `${b}%`;
+                if (legPaxg) legPaxg.textContent = `${p}%`;
             }
 
             // Real-time Grand Profit / Loss Calculation & Presentation

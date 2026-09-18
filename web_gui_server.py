@@ -439,10 +439,21 @@ async def handle_api_portfolio(request: web.Request) -> web.Response:
         btc_price = _GUI_CACHE["prices"]["BTCUSDT"]
         btc_val = btc_qty * btc_price
 
-        fut_pct = round((fut / tot) * 100.0, 1) if tot > 0 else 40.0
-        spot_pct = round((spot_cash / tot) * 100.0, 1) if tot > 0 else 30.0
-        btc_pct = round((btc_val / tot) * 100.0, 1) if tot > 0 else 18.0
-        paxg_pct = round((paxg_val / tot) * 100.0, 1) if tot > 0 else 12.0
+        # Global Platform Balanced Matrix Allocation
+        # Institutional Standard Target Weights: 45% Futures Margin | 30% Spot Cash | 15% BTC | 10% Gold PAXG
+        # Strictly normalized so sum(pcts) == 100.0%
+        global_tot = fut + spot_cash + btc_val + paxg_val
+        if global_tot > 10.0:
+            fut_pct = round((fut / global_tot) * 100.0, 1)
+            spot_pct = round((spot_cash / global_tot) * 100.0, 1)
+            btc_pct = round((btc_val / global_tot) * 100.0, 1)
+            paxg_pct = round(max(0.0, 100.0 - (fut_pct + spot_pct + btc_pct)), 1)
+        else:
+            # Institutional Canonical Balanced Matrix Baseline
+            fut_pct = 45.0
+            spot_pct = 30.0
+            btc_pct = 15.0
+            paxg_pct = 10.0
 
         grand_metrics = calculate_grand_pnl(chat_id, p_data)
         global_matrix = db.get_system_global_multi_timeframe_matrix()

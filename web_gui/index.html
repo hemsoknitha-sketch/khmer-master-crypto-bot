@@ -14,7 +14,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Chart.js via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=2.2.5">
+    <link rel="stylesheet" href="style.css?v=2.2.6">
 </head>
 <body>
     <!-- Background Interactive Neural Network Synapses Canvas -->
@@ -187,6 +187,9 @@
                             <canvas id="allocationChart"></canvas>
                         </div>
                         <div class="allocation-legend" id="allocation-legend-container">
+                            <div class="matrix-donut-header" style="margin-bottom: 4px;">
+                                <span class="matrix-donut-tag" style="font-size: 10px; font-weight: 700; color: var(--neon-cyan); letter-spacing: 0.5px;">🏛️ សមាមាត្របែងចែកទុនរួមក្នុងប្រព័ន្ធ (PLATFORM ASSET ALLOCATION):</span>
+                            </div>
                             <div class="legend-item"><span class="legend-color" style="background:#00f2fe"></span><span>Futures Margin</span><strong id="leg-fut-pct">45%</strong></div>
                             <div class="legend-item"><span class="legend-color" style="background:#10b981"></span><span>Spot Cash USDT</span><strong id="leg-spot-pct">30%</strong></div>
                             <div class="legend-item"><span class="legend-color" style="background:#f59e0b"></span><span>Spot BTC Accumulator</span><strong id="leg-btc-pct">15%</strong></div>
@@ -674,6 +677,6 @@
     <!-- Notification Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.2.5"></script>
+    <script src="app.js?v=2.2.6"></script>
 </body>
 </html>
