@@ -238,28 +238,32 @@ Any modification that breaks any of the following 28 invariants is considered an
   2. **Cloud AI Hybrid Brain Integration (Hugging Face HF_TOKEN):** The system leverages the Hugging Face Cloud Inference API via dedicated `HF_TOKEN` / `HUGGINGFACE_TOKEN` to execute deep quantitative reasoning models (DeepSeek-R1, Llama-3-70B, Qwen-2.5-72B) in the cloud with zero VPS RAM bloat, keeping local VPS memory usage lean (< 45 MB local ONNX/XGBoost/LSTM runtime).
 
 ### Invariant 28: 24/7 Perpetual Wealth Generator Dual-Engine Architecture & Triple-Phase Safety Covenant Lock
-- **Location:** `perpetual_wealth_engine.py`, `bot_thread.py` (`wealth_command`), `scheduler_tasks.py` (`wealth_generator_daemon_loop`), `database.py`
+- **Location:** `perpetual_wealth_engine.py`, `bot_thread.py` (`wealth_command`), `scheduler_tasks.py` (`perpetual_wealth_monitor`), `database.py`
 - **Rule:** The 24/7 Perpetual Wealth Generator (`/wealth`, `/wealth24/7`) is an institutional-grade, fully autonomous continuous capital accumulation and harvest engine operating in dual-engine mode: **Spot Engine (1x Leverage, 0.00% Liquidation Risk)** and **Futures Engine (10x ISOLATED Margin)** with strict Invariant 10 Multi-Wallet Balance Segregation. It is bound by the following permanent mathematical and risk covenants:
-  1. **Triple-Phase Asymmetric Profit Extraction (យុទ្ធសាស្ត្រច្បាមចំណេញ ៣ ដំណាក់កាល) ៖**
-     - **Phase 1 (Breakeven Armor):** When unrealized profit reaches $+3.0\%$ ROI (Futures) or $+2.5\%$ ROI (Spot), Stop-Loss is unconditionally locked to Entry Price $+ 0.12\%$ (Futures) or $+0.25\%$ (Spot) fee-adjusted net profit floor. Winning trades are strictly prohibited from degrading into losses.
+  1. **Dual Velocity Engine Specification (យន្តការចាប់កាក់ល្បឿនលឿន Spot & Futures) ៖**
+     - **Spot 7-Pillar Velocity Engine:** Scans Binance Spot (+2.0% to +16.0%) with 15m RVOL Volume Surge $\ge 2.0\times$, Fresh Momentum ($1\text{h} \ge +0.6\%$ & $15\text{m} \ge +0.2\%$), Trend Strength ($ADX \ge 26.0$ & $+DI > -DI$), Dynamic AI Confluence Matrix ($\ge 8.6/10.0$), 3-Tier Anti-Stagnation Smart Clock (45m / 75m / 120m), and Micro-Breakeven Armor at $+1.5\%$ ROI (+0.20% fee floor).
+     - **Futures 8-Pillar Dual-Directional Velocity Engine:** Scans Binance USDT-M Futures (+3.0% to +14.0% for LONG, -3.0% to -12.0% for SHORT) with 15m RVOL Volume Surge $\ge 2.0\times$, Dual-Directional Fresh Momentum ($1\text{h} \ge +0.6\%$/$\le -0.6\%$ & $15\text{m} \ge +0.2\%$/$\le -0.2\%$), Strict DMI Dominance ($+DI > -DI$ for LONG, $-DI > +DI$ for SHORT), Invariant 16 Anti-Oversold Short Guard ($RSI \le 38.0$ strictly blocks SHORT), Dynamic AI Confluence Matrix ($\ge 8.6/10.0$), and Futures 3-Tier Anti-Stagnation Smart Clock (30m / 60m / 90m).
+  2. **Triple-Phase Asymmetric Profit Extraction (យុទ្ធសាស្ត្រច្បាមចំណេញ ៣ ដំណាក់កាល) ៖**
+     - **Phase 1 (Breakeven Armor):** When unrealized profit reaches $+3.0\%$ ROI (Futures) or $+1.5\%$ to $+2.5\%$ ROI (Spot), Stop-Loss is unconditionally locked to Entry Price $+ 0.12\%$ (Futures) or $+0.20\%$ (Spot) fee-adjusted net profit floor. Winning trades are strictly prohibited from degrading into losses.
      - **Phase 2 (Micro-Scalp TP1):** When unrealized profit reaches $+4.0\%$ to $+6.0\%$ ROI (target $\ge +5.0\%$), exactly $50\%$ of the open position is liquidated into realized USDT cash immediately (`PARTIAL_TP1_50_PCT`), securing principal gain. On Spot, sub-order size must strictly meet Invariant 1 ($\ge \$10.50$ USDT).
      - **Phase 3 (Golden Moonshot Ratchet):** The remaining $50\%$ position runs as a moonshot runner, dynamically trailing peak profit and permanently locking $85\%$ of the highest reached unrealized profit (`TRAIL_85_PCT_OF_PEAK`), allowing runners to capture $+15\%$ to $+50\%+$ expansions.
-  2. **Spot Engine Mode & 0.00% Liquidation Risk (Invariant 1 & 10) ៖**
+  3. **Spot Engine Mode & 0.00% Liquidation Risk (Invariant 1 & 10) ៖**
      - Spot Wealth Engine operates with 1x leverage and 0% liquidation risk, allowing safe deployment of larger capital ($\$30–\$100+$ per coin) with zero funding fee drag.
      - Strictly enforces Invariant 1: Spot order notional must be at least $\$10.50$ USDT (`quote_order_qty = max(10.50, allocation)`).
      - Strictly isolates Spot USDT (`get_spot_balance`) from Futures USDT (`get_futures_balance`) to eliminate cross-wallet interference.
-  3. **Pullback Retracement & Trend Strength Hurdles (Zero Top Chasing) ៖**
-     - **ADX Trend Strength Hurdle:** Entry strictly requires Wilder's ADX(14) $\ge 25.0$ (Futures) or $\ge 22.0$ (Spot) to eliminate dead sideways chop.
+  4. **Pullback Retracement & Trend Strength Hurdles (Zero Top Chasing) ៖**
+     - **ADX Trend Strength Hurdle:** Entry strictly requires Wilder's ADX(14) $\ge 25.0$ (Futures) or $\ge 26.0$ (Spot) to eliminate dead sideways chop.
      - **EMA20 Pullback Retracement Entry:** Buying green candle exhaustion tops is strictly prohibited; entries require a clean test of the 15m EMA20 dynamic support/resistance band (`0.994 * EMA20 <= price <= 1.008 * EMA20`).
      - **Anti-Oversold Short Guard (Invariant 16):** Short entries or reverse flips into short are 100% blocked if 15m RSI $\le 38.0$. Spot engine is strictly LONG-only.
-  4. **Small Capital Fortress & ISOLATED Margin (Zero Cross-Wallet Contagion) ៖**
+  5. **Small Capital Fortress & ISOLATED Margin (Zero Cross-Wallet Contagion) ៖**
      - Order notional margin is strictly bounded at $\$4.00–\$5.50$ per coin for accounts $< \$100$ on Futures.
      - Maximum futures leverage is clamped to $\le 10\times$ (ISOLATED Margin only, Invariant 3 & 8). Cross-Margin is strictly barred.
-     - Dynamic Stop-Loss breathing cushion is bounded by $1.8\times–2.5\times$ 15m ATR ($-18.0\%$ ROI / $-\$0.60$ USD max dollar risk on Futures, $-6.0\%$ price dip on Spot).
-  5. **Continuous 24/7 Autonomous Symbol Rotation & Reinvestment ៖**
-     - Upon position closure (TP or SL), the capital is automatically recycled back into the available pool to scan the next Golden Sweet-Spot candidate from the top volatile spot/futures universe with zero human intervention required.
-  6. **Persistence & Crash Resilience ៖**
-     - Bot configurations and open spot trades are permanently persisted in SQLite (`perpetual_wealth_bots`, `perpetual_wealth_spot_bots`, `perpetual_wealth_spot_trades`). State persists seamlessly across VPS reboots and systemd restarts.
+     - Dynamic Stop-Loss breathing cushion is bounded by $1.8\times–2.5\times$ 15m ATR ($-18.0\%$ ROI / $-\$0.60$ USD max dollar risk on Futures, $-5.0\%$ to $-6.0\%$ price dip on Spot).
+  6. **Continuous 24/7 Autonomous Symbol Rotation & Anti-Stagnation Reinvestment ៖**
+     - Positions that fail to gain traction within 30–90 minutes are automatically closed by the 3-Tier Anti-Stagnation Smart Clock to eliminate capital lockup and save funding fees.
+     - Upon position closure (TP, SL, or Anti-Stagnation Exit), capital is instantly recycled back into the available pool to scan the next Golden Sweet-Spot candidate from the top volatile spot/futures universe with zero human intervention required.
+  7. **Persistence & Crash Resilience ៖**
+     - Bot configurations and open trades are permanently persisted in SQLite (`perpetual_wealth_bots`, `perpetual_wealth_spot_bots`, `perpetual_wealth_spot_trades`). State persists seamlessly across VPS reboots and systemd restarts.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 21/21].
 
 ---
