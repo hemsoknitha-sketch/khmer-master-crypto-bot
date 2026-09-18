@@ -22,12 +22,57 @@ SEP_LIGHT = DIVIDER_LIGHT
 SEP_DASH = DIVIDER_DASH
 SEP_DOUBLE = DIVIDER_DOUBLE
 
-# Official Institutional Footnote
+# Official Institutional Header & Footer Standards (Zero Line-Wrap Invariant)
+SUPER_ADMIN_ID = 859271875
+
+INSTITUTIONAL_HEADER = (
+    "💎 **KHMER MASTER CRYPTO | APEX SUPER BRAIN AGI** ⚡\n"
+    f"{DIVIDER_DOUBLE}\n"
+)
+
+INSTITUTIONAL_FOOTER = (
+    f"\n{DIVIDER_LIGHT}\n"
+    "💡 នេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម\n"
+    "សូមធ្វើការសម្រេចចិត្តដោយទទួលខុសត្រូវ!"
+)
+
+# Backward-compatible aliases
+HEADER_STANDARD = INSTITUTIONAL_HEADER
+FOOTER_STANDARD = INSTITUTIONAL_FOOTER
+
+# Official Institutional Footnote (Legacy)
 OFFICIAL_FOOTNOTE = (
     "_Khmer Master Crypto_\n"
     "_APEX SUPER BRAIN AI_\n"
     "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
 )
+
+def format_institutional_message(
+    body: str,
+    chat_id: int = 0,
+    is_admin: bool = False,
+    include_header: bool = True,
+    include_footer: bool = True
+) -> str:
+    """
+    Formats institutional responses for VIP Users by applying the official
+    Header and Disclaimer Footer, while guaranteeing unredacted, unconstrained
+    telemetry views for Super Admin ID: 859271875.
+    """
+    clean_body = body.strip()
+    
+    # If explicitly Super Admin and raw debug is requested, return clean body
+    if (chat_id == SUPER_ADMIN_ID or is_admin) and not (include_header or include_footer):
+        return clean_body
+        
+    parts = []
+    if include_header:
+        parts.append(INSTITUTIONAL_HEADER)
+    parts.append(clean_body)
+    if include_footer:
+        parts.append(INSTITUTIONAL_FOOTER)
+        
+    return "".join(parts)
 
 def get_divider(style: str = "heavy") -> str:
     """
