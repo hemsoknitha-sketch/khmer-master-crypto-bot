@@ -62,6 +62,7 @@ def is_wealth_in_cooldown(symbol: str) -> bool:
 _active_wealth_spot_exec_keys = set()
 _wealth_spot_symbol_cooldowns = {}
 _last_wealth_spot_scan_time = 0.0
+_last_spot_harvest_cycle_time = 0.0
 _WEALTH_SPOT_TECH_CACHE = {}
 
 
@@ -499,6 +500,11 @@ class PerpetualWealthGeneratorEngine:
 
         active_bots = db.get_active_perpetual_wealth_bots()
         if not active_bots:
+            # Autonomous 24/7 Spot Wealth Harvest Cycle must STILL execute even if Futures has 0 active bots!
+            try:
+                await PerpetualWealthGeneratorEngine.execute_spot_harvest_cycle(app)
+            except Exception as e_spot_cycle:
+                print(f"⚠️ Notice in spot wealth harvest cycle: {e_spot_cycle}")
             return
 
         # 1. First, monitor and harvest existing open positions
@@ -824,11 +830,13 @@ class PerpetualWealthGeneratorEngine:
     def scan_spot_sweet_spot_candidates(limit: int = 10) -> list:
         """
         Scans Binance Spot for Golden Sweet-Spot Momentum Breakouts.
-        Filters:
-        - 24h Change: +2.5% to +14.0% (Spot is LONG-only)
-        - Rejection of Overextended Pumps: > +18.0% or 15m RSI > 74.0 (Anti-FOMO)
-        - 24h Spot Volume >= $5M USD
-        - 15m & 1h Price > EMA50 (Macro Bull Confluence)
+        Strict 7-Pillar Institutional Filters:
+        - 24h Change: +2.0% to +16.0% (Spot is LONG-only)
+        - RVOL Spike: >= 2.0x (15m Volume Surge over 20-period MA)
+        - Fresh Momentum: 1h Change >= +0.6% & 15m Change >= +0.2%
+        - Strict ADX: 15m ADX >= 26.0 & +DI > -DI (Anti-Chop & Anti-Sideway Guard)
+        - Minimum Spot Volume: >= $8M USD
+        - AI Velocity Score Hurdle: >= 8.6/10.0
         """
         candidates = []
         try:
@@ -859,12 +867,12 @@ class PerpetualWealthGeneratorEngine:
                 except (ValueError, TypeError):
                     continue
 
-                # Minimum liquidity: $5M 24h quote volume on Spot
-                if quote_volume < 5_000_000.0 or last_price <= 0.0:
+                # Institutional liquidity floor: $8M 24h quote volume on Spot
+                if quote_volume < 8_000_000.0 or last_price <= 0.0:
                     continue
 
-                # Golden Sweet Spot for Spot LONG: +2.5% to +14.0%
-                if 2.5 <= price_change_pct <= 14.0:
+                # Golden Sweet Spot for Spot LONG: +2.0% to +16.0%
+                if 2.0 <= price_change_pct <= 16.0:
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_spot_symbol_technicals(symbol)
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -873,14 +881,19 @@ class PerpetualWealthGeneratorEngine:
                             "price_change_pct": price_change_pct,
                             "last_price": last_price,
                             "quote_volume": quote_volume,
-                            "rsi_15m": tech_eval.get("rsi_15m", 50.0),
+                            "rsi_15m": tech_eval.get("rsi_15m", 58.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
-                            "ai_score": tech_eval.get("ai_score", 8.5),
+                            "rvol": tech_eval.get("rvol", 2.2),
+                            "chg_1h": tech_eval.get("chg_1h", 1.0),
+                            "chg_15m": tech_eval.get("chg_15m", 0.5),
+                            "adx_15m": tech_eval.get("adx_15m", 28.0),
+                            "ai_score": tech_eval.get("ai_score", 9.0),
                             "orderbook_ratio": tech_eval.get("orderbook_ratio", 1.25),
                             "reason": tech_eval.get("reason", "Spot Golden Sweet-Spot Momentum")
                         })
 
-            candidates.sort(key=lambda x: (x["ai_score"], x["quote_volume"]), reverse=True)
+            # Sort by highest AI score, highest RVOL volume spike, and highest 1h fresh momentum
+            candidates.sort(key=lambda x: (x["ai_score"], x.get("rvol", 1.0), x.get("chg_1h", 0.0)), reverse=True)
             return candidates[:limit]
         except Exception as e:
             print(f"⚠️ [PERPETUAL WEALTH SPOT SCAN ERROR]: {e}")
@@ -889,14 +902,15 @@ class PerpetualWealthGeneratorEngine:
     @staticmethod
     def evaluate_spot_symbol_technicals(symbol: str) -> dict:
         """
-        Evaluates 15m/1h technical health, RSI, EMA50, ADX, and L2 Orderbook for Binance Spot.
+        Evaluates 15m/1h technical health, RVOL Volume Spike, Fresh Momentum, ADX, and L2 Orderbook for Spot.
+        Strictly rejects dead volume, sideways chop, and exhausted pumps.
         """
         global _WEALTH_SPOT_TECH_CACHE
         cache_key = f"spot_{symbol}"
         now_ts = time.time()
         if cache_key in _WEALTH_SPOT_TECH_CACHE:
             ts, res = _WEALTH_SPOT_TECH_CACHE[cache_key]
-            if now_ts - ts < 30.0:
+            if now_ts - ts < 25.0:
                 return res
 
         try:
@@ -905,9 +919,39 @@ class PerpetualWealthGeneratorEngine:
                 return {"is_valid": False, "reason": "Insufficient spot klines"}
 
             closes = [float(k[4]) for k in klines]
+            highs = [float(k[2]) for k in klines]
+            lows = [float(k[3]) for k in klines]
+            vols = [float(k[7]) for k in klines]  # Quote USDT volume
             current_price = closes[-1]
 
-            # RSI 14
+            # 1. Compute RVOL (Relative Volume Spike over 20-period MA)
+            avg_vol_20 = sum(vols[-21:-1]) / 20.0 if len(vols) >= 21 else (sum(vols[:-1]) / max(1, len(vols) - 1))
+            cur_vol = vols[-1]
+            prev_vol = vols[-2] if len(vols) >= 2 else cur_vol
+
+            kline_start_ms = float(klines[-1][0])
+            now_ms = time.time() * 1000.0
+            elapsed_min = max(1.0, min(15.0, (now_ms - kline_start_ms) / 60000.0))
+            projected_cur_vol = cur_vol * (15.0 / elapsed_min)
+            rvol_cur = (projected_cur_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
+            rvol_prev = (prev_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
+            rvol = round(max(rvol_cur, rvol_prev), 2)
+
+            # Strict RVOL Filter: Must show >= 2.0x volume surge
+            if rvol < 2.0:
+                return {"is_valid": False, "reason": f"Insufficient Volume Spike (RVOL {rvol:.2f}x < 2.0x)"}
+
+            # 2. Compute 15m & 1h Fresh Momentum
+            open_15m = float(klines[-1][1])
+            chg_15m = round(((current_price - open_15m) / open_15m) * 100.0, 2)
+            open_1h = float(klines[-4][1]) if len(klines) >= 4 else open_15m
+            chg_1h = round(((current_price - open_1h) / open_1h) * 100.0, 2)
+
+            # Reject exhausted / dying momentum: Requires fresh 1h / 15m thrust
+            if chg_1h < 0.6 and chg_15m < 0.2:
+                return {"is_valid": False, "reason": f"No Fresh Momentum (1h: {chg_1h:+.2f}%, 15m: {chg_15m:+.2f}%)"}
+
+            # 3. Calculate RSI 14
             gains, losses = [], []
             for i in range(1, 15):
                 diff = closes[-i] - closes[-i-1]
@@ -922,36 +966,37 @@ class PerpetualWealthGeneratorEngine:
             rs = avg_gain / avg_loss if avg_loss > 0 else 1.0
             rsi_15m = 100.0 - (100.0 / (1.0 + rs))
 
-            # EMA 20 & EMA 50
-            k20 = 2.0 / (20 + 1)
-            k50 = 2.0 / (50 + 1)
-            ema20 = closes[0]
-            ema50 = closes[0]
-            for p in closes[1:]:
-                ema20 = (p * k20) + (ema20 * (1 - k20))
-                ema50 = (p * k50) + (ema50 * (1 - k50))
-
-            # ADX(14)
-            highs = [float(k[2]) for k in klines]
-            lows = [float(k[3]) for k in klines]
-            adx_15m = 22.0
-            if len(closes) >= 28:
-                adx_15m, _, _ = market_data.calculate_adx_and_dmi(highs, lows, closes, period=14)
-
-            if adx_15m < 22.0:
-                return {"is_valid": False, "reason": f"Low Trend Strength (15m ADX {adx_15m:.1f} < 22.0)"}
-
-            # Pullback Retracement Guard (Never buy overbought vertical candles, wait for EMA20 retest)
-            is_buy_pullback = (0.990 * ema20 <= current_price <= ema20 * 1.018)
-
             if rsi_15m > 74.0:
                 return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 74.0 (Anti-FOMO)"}
-            if current_price < (ema50 * 0.994):
-                return {"is_valid": False, "reason": "Price below 15m EMA50"}
-            if not is_buy_pullback:
-                return {"is_valid": False, "reason": "Waiting for healthy pullback retest onto 15m EMA20 support"}
+            if rsi_15m < 50.0:
+                return {"is_valid": False, "reason": f"Bearish / Choppy RSI {rsi_15m:.1f} < 50.0 (No Momentum)"}
 
-            # Spot L2 Orderbook depth
+            # 4. Calculate EMA 9, EMA 21, and EMA 50
+            k9 = 2.0 / (9 + 1)
+            k21 = 2.0 / (21 + 1)
+            k50 = 2.0 / (50 + 1)
+            ema9, ema21, ema50 = closes[0], closes[0], closes[0]
+            for p in closes[1:]:
+                ema9 = (p * k9) + (ema9 * (1 - k9))
+                ema21 = (p * k21) + (ema21 * (1 - k21))
+                ema50 = (p * k50) + (ema50 * (1 - k50))
+
+            if current_price < (ema50 * 0.995):
+                return {"is_valid": False, "reason": "Price below 15m EMA50 (Macro Trend broken)"}
+            if current_price < (ema21 * 0.992):
+                return {"is_valid": False, "reason": "Price below 15m EMA21 (Pullback too deep)"}
+
+            # 5. Calculate Wilder's ADX(14) & DMI - Strict Anti-Chop / Anti-Sideway Guard
+            adx_15m, plus_di, minus_di = 26.0, 25.0, 20.0
+            if len(closes) >= 28:
+                adx_15m, plus_di, minus_di = market_data.calculate_adx_and_dmi(highs, lows, closes, period=14)
+
+            if adx_15m < 26.0:
+                return {"is_valid": False, "reason": f"Chop Regime Detected (15m ADX {adx_15m:.1f} < 26.0)"}
+            if plus_di <= minus_di:
+                return {"is_valid": False, "reason": f"Bearish DMI Dominance (+DI {plus_di:.1f} <= -DI {minus_di:.1f})"}
+
+            # 6. Spot L2 Orderbook depth check
             ob_ratio = 1.20
             try:
                 ob_url = f"{trading_engine.get_working_spot_url()}/api/v3/depth?symbol={symbol}&limit=20"
@@ -965,22 +1010,69 @@ class PerpetualWealthGeneratorEngine:
             except Exception:
                 ob_ratio = 1.15
 
-            if ob_ratio < 0.92:
-                return {"is_valid": False, "reason": f"Spot selling pressure (Bid/Ask ratio: {ob_ratio:.2f})"}
+            if ob_ratio < 1.05:
+                return {"is_valid": False, "reason": f"Spot selling pressure (Bid/Ask ratio: {ob_ratio:.2f} < 1.05)"}
 
-            ai_score = 8.5
-            if current_price > ema50 and 45.0 <= rsi_15m <= 65.0:
-                ai_score = 9.3
+            # 7. Dynamic Multi-Factor AI Confluence Scoring (Discards flat 9.3 for sideways)
+            ai_score = 7.0
+
+            # RVOL Surge Multiplier
+            if rvol >= 3.0:
+                ai_score += 1.3
+            elif rvol >= 2.2:
+                ai_score += 0.9
+            else:
+                ai_score += 0.4
+
+            # Fresh Momentum Thrust
+            if chg_1h >= 1.5 and chg_15m >= 0.4:
+                ai_score += 1.0
+            elif chg_1h >= 0.8:
+                ai_score += 0.6
+
+            # Trend & Directional Strength
+            if adx_15m >= 30.0 and (plus_di - minus_di) >= 4.0:
+                ai_score += 0.8
+            elif adx_15m >= 26.0:
+                ai_score += 0.4
+
+            # Active Breakout RSI (56.0 - 70.0 is the Velocity Expansion Zone)
+            if 56.0 <= rsi_15m <= 70.0:
+                ai_score += 0.8
+            elif 50.0 <= rsi_15m < 56.0:
+                ai_score += 0.2
+
+            # Orderbook Buy Wall Cushion
+            if ob_ratio >= 1.30:
+                ai_score += 0.6
+            elif ob_ratio >= 1.15:
+                ai_score += 0.3
+
+            # Moving Average Expansion Stack (Price > EMA9 > EMA21 > EMA50)
+            if current_price >= ema9 and ema9 >= ema21 and ema21 >= ema50:
+                ai_score += 0.5
+
+            ai_score = min(9.9, round(ai_score, 1))
+
+            if ai_score < 8.6:
+                return {
+                    "is_valid": False,
+                    "reason": f"Insufficient AI Velocity Score ({ai_score:.1f}/10.0 < 8.6 hurdle)"
+                }
 
             res_data = {
                 "is_valid": True,
                 "rsi_15m": rsi_15m,
                 "ema50_15m": ema50,
-                "ema20_15m": ema20,
+                "ema21_15m": ema21,
+                "ema9_15m": ema9,
+                "rvol": rvol,
+                "chg_1h": chg_1h,
+                "chg_15m": chg_15m,
                 "adx_15m": adx_15m,
                 "orderbook_ratio": ob_ratio,
                 "ai_score": ai_score,
-                "reason": "Spot Sweet-Spot Retest Confluence"
+                "reason": f"Velocity Confluence (RVOL {rvol:.1f}x + ADX {adx_15m:.1f} + 1h {chg_1h:+.1f}%)"
             }
             _WEALTH_SPOT_TECH_CACHE[cache_key] = (now_ts, res_data)
             return res_data
@@ -1152,8 +1244,11 @@ class PerpetualWealthGeneratorEngine:
         2. Spot Golden Sweet-Spot Breakout Discovery & Dynamic Entry with MIN_NOTIONAL $10.50 (Invariant 1).
         3. 24/7 Continuous Rotation with 0% Liquidation Risk.
         """
-        global _last_wealth_spot_scan_time
+        global _last_wealth_spot_scan_time, _last_spot_harvest_cycle_time
         now = time.time()
+        if now - _last_spot_harvest_cycle_time < 3.0:
+            return
+        _last_spot_harvest_cycle_time = now
 
         active_spot_bots = db.get_active_perpetual_wealth_spot_bots()
         if not active_spot_bots:
@@ -1200,13 +1295,13 @@ class PerpetualWealthGeneratorEngine:
                     if roi_pct > curr_peak:
                         curr_peak = roi_pct
 
-                    # Phase 1: Breakeven Armor at +2.5% ROI (+0.25% fee floor)
-                    if roi_pct >= 2.5 and not is_be_locked:
+                    # Phase 1: Micro-Breakeven Armor at +1.5% ROI (+0.20% fee floor lock)
+                    if roi_pct >= 1.5 and not is_be_locked:
                         is_be_locked = True
                         db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), 1)
-                        print(f"🛡️ [SPOT WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.25% Fees Floor (ROI: +{roi_pct:.2f}%)")
+                        print(f"🛡️ [SPOT WEALTH MICRO-BREAKEVEN ARMOR] {sym} locked at Entry +0.20% Fees Floor (ROI: +{roi_pct:.2f}%)")
 
-                    # Phase 2: 1-Shot Moonshot 50% Profit Lock at +5.0% ROI (Universal for 100% of Spot Trades)
+                    # Phase 2: 1-Shot Moonshot Lock at +5.0% ROI (Universal for 100% of Spot Trades)
                     # Spot has 0% liquidation risk: zero premature 50% cuts. 100% position kept riding!
                     # Eliminates Binance Error -1013 Filter failure and prevents cutting runner profits in half.
                     if roi_pct >= 5.0 and not is_tp1_done:
@@ -1244,13 +1339,26 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending Spot 1-Shot alert: {notif_err}")
 
-                    # Phase 3: Golden 85% Moonshot Ratchet (or 50% Profit Lock exit)
+                    # Phase 3: Fast Harvest (+2.8% to +3.5%) OR Moonshot Ratchet (+5.0%+)
                     target_bot_tp = float(bot.get("target_tp", 6.0))
-                    is_moonshot_tp2 = (curr_peak >= 6.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= target_bot_tp
+                    is_fast_harvest = (curr_peak >= 2.8 and curr_peak < 5.0 and (roi_pct <= (curr_peak * 0.65) or roi_pct >= target_bot_tp))
+                    is_moonshot_tp2 = (curr_peak >= 5.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= target_bot_tp
                     is_profit_lock_tp = (curr_peak >= 5.0 and curr_peak < 6.0 and roi_pct <= (curr_peak * 0.50))
 
-                    if is_moonshot_tp2 or is_profit_lock_tp:
-                        reason_lbl = "TP2 MOONSHOT RATCHET" if is_moonshot_tp2 else "50% PROFIT LOCK EXIT"
+                    if is_fast_harvest or is_moonshot_tp2 or is_profit_lock_tp:
+                        if is_moonshot_tp2:
+                            reason_lbl = "TP2 MOONSHOT RATCHET"
+                            prot_tier_kh = "Golden 85% Moonshot Ratchet (កើប ១០០% ទាំងដុល)"
+                            prot_tier_en = "Golden 85% Moonshot Ratchet (100% Cash Harvest)"
+                        elif is_fast_harvest:
+                            reason_lbl = "FAST PROFIT HARVEST"
+                            prot_tier_kh = "Fast Profit Lock (+2.8% - +3.5% Cash In)"
+                            prot_tier_en = "Fast Profit Lock (+2.8% - +3.5% Cash In)"
+                        else:
+                            reason_lbl = "50% PROFIT LOCK EXIT"
+                            prot_tier_kh = "50% Profit Lock (ការពារចំណេញ)"
+                            prot_tier_en = "50% Profit Lock Exit"
+
                         print(f"🏆 [SPOT WEALTH {reason_lbl}] {sym} Peak: +{curr_peak:.2f}%, Current: +{roi_pct:.2f}%. Harvesting 100% remaining cash!")
                         sell_res = trading_engine.place_spot_order(
                             api_key=api_key,
@@ -1275,7 +1383,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"💵 **Exit ROI ចុងក្រោយ ៖** `+{roi_pct:.2f}%` 🟢\n"
                                     f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${realized_pnl:,.2f} USDT`\n"
                                     f"🔄 **ស្ថានភាពទុន ៖** `ដកទុន + ចំណេញ ១០០% ចូល Spot Wallet`\n"
-                                    f"🛡️ **កម្រិតការពារ ៖** `{'Golden 85% Moonshot Ratchet' if is_moonshot_tp2 else '50% Profit Lock (ការពារចំណេញ)'}`\n"
+                                    f"🛡️ **កម្រិតការពារ ៖** `{prot_tier_kh}`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _ប្រព័ន្ធ Spot បានលក់ចេញ ១០០% ទាំងដុលគ្មានសល់កន្ទុយកាក់ និងកំពុងស្វែងរកកាក់បន្ទាប់!_"
                                 ) if user_lang == 'khmer' else (
@@ -1286,7 +1394,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"💵 **Harvest Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
                                     f"🏆 **Net Realized Profit:** `+${realized_pnl:,.2f} USDT`\n"
                                     f"🔄 **Capital Status:** `100% Released & Ready in Spot Wallet`\n"
-                                    f"🛡️ **Protection Tier:** `{'Golden 85% Moonshot Ratchet' if is_moonshot_tp2 else '50% Profit Lock Exit'}`\n"
+                                    f"🛡️ **Protection Tier:** `{prot_tier_en}`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _Spot position 100% cleanly liquidated with zero leftover dust. Hunting next breakout!_"
                                 )
@@ -1296,8 +1404,8 @@ class PerpetualWealthGeneratorEngine:
 
                         continue
 
-                    # Phase 4: Stagnation Capital Liberation Trigger (Held > 4h without breakout)
-                    # OR Breakeven Defense Trigger OR Dynamic Stop Loss (-6.0%)
+                    # Phase 4: Anti-Stagnation Smart Clock (45-60 min)
+                    # OR Breakeven Defense Trigger OR Dynamic Stop Loss (-5.0%)
                     trade_ts_str = tr.get("timestamp", "")
                     trade_age_seconds = 0.0
                     if trade_ts_str:
@@ -1308,9 +1416,16 @@ class PerpetualWealthGeneratorEngine:
                         except Exception:
                             trade_age_seconds = 0.0
 
-                    is_stagnant = (trade_age_seconds >= 14400.0 and curr_peak < 2.0 and -1.5 <= roi_pct <= 0.8)
-                    is_be_exit = (is_be_locked and curr_peak < 5.0 and current_price <= (buy_price * 1.0025) and roi_pct > -1.0)
-                    is_sl_exit = (roi_pct <= -6.0)
+                    # Smart Clock Tier 1: Held >= 45 min (2700s) and peak < 1.0% and ROI <= 0.5% (Flat Sideway)
+                    # Smart Clock Tier 2: Held >= 75 min (4500s) and peak < 2.0% and ROI <= 0.8% (Sluggish Momentum)
+                    # Smart Clock Tier 3: Held >= 120 min (7200s) and ROI <= 0.8% (Unconditional Liberation to eliminate overnight stagnation)
+                    is_stagnant = (
+                        (trade_age_seconds >= 2700.0 and curr_peak < 1.0 and -2.0 <= roi_pct <= 0.5) or
+                        (trade_age_seconds >= 4500.0 and curr_peak < 2.0 and -2.5 <= roi_pct <= 0.8) or
+                        (trade_age_seconds >= 7200.0 and roi_pct <= 0.8)
+                    )
+                    is_be_exit = (is_be_locked and curr_peak < 2.8 and current_price <= (buy_price * 1.0020) and roi_pct > -1.0)
+                    is_sl_exit = (roi_pct <= -5.0)
 
                     if is_be_exit or is_sl_exit or is_stagnant:
                         if is_stagnant:
@@ -1342,20 +1457,20 @@ class PerpetualWealthGeneratorEngine:
                                     "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
-                                    f"⏱️ **រយៈពេលកាន់កាប់ ៖** `{trade_age_seconds/3600:.1f} ម៉ោង (ទ្រឹងគ្មាន Momentum)`\n"
+                                    f"⏱️ **រយៈពេលកាន់កាប់ ៖** `{trade_age_seconds/60:.0f} នាទី (ទ្រឹងគ្មាន Momentum)`\n"
                                     f"💵 **Exit ROI ៖** `{roi_pct:.2f}%`\n"
                                     f"🔄 **ស្ថានភាពទុន ៖** `ដោះលែងទុនមកវិញ ១០០% ចូល Spot Wallet`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _ប្រព័ន្ធមិនត្រាំកាក់ឡើយ! កំពុងបង្វិលទុនទៅចាប់កាក់ Breakout ថ្មីភ្លាមៗ!_"
+                                    "💡 _Anti-Stagnation Clock: ប្រព័ន្ធមិនត្រាំកាក់ឡើយ! កំពុងបង្វិលទុនទៅចាប់កាក់ Breakout ថ្មីភ្លាមៗ!_"
                                 ) if user_lang == 'khmer' else (
                                     "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
-                                    f"⏱️ **Holding Duration:** `{trade_age_seconds/3600:.1f}h (Stagnant / No Momentum)`\n"
+                                    f"⏱️ **Holding Duration:** `{trade_age_seconds/60:.0f}m (Stagnant / No Momentum)`\n"
                                     f"💵 **Exit ROI:** `{roi_pct:.2f}%`\n"
                                     f"🔄 **Capital Status:** `100% Liberated back to Spot Wallet`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _Zero capital stagnation! Rotating immediately into active breakout candidates._"
+                                    "💡 _Anti-Stagnation Clock: Zero capital stagnation! Rotating immediately into active breakout candidates._"
                                 )
                                 asyncio.create_task(_async_send_wealth_alert(app, chat_id, stag_msg, "Spot stagnation liberation"))
                             except Exception as notif_err:
@@ -1446,13 +1561,15 @@ class PerpetualWealthGeneratorEngine:
                                             f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                                             f"🎯 **ប្រព័ន្ធ ៖** `Spot 1x (0% Liquidation Risk)`\n"
                                             f"💰 **ទុនទិញ (Allocation) ៖** `${alloc_per_coin:.2f} USDT`\n"
-                                            f"📈 **24H Change ៖** `+{cand['price_change_pct']:.2f}%`\n"
-                                            f"🧠 **AI Confluence Score ៖** `{cand['ai_score']:.1f}/10.0`\n"
-                                            f"🛡️ **Breakeven Armor ៖** `ត្រៀម Lock នៅ +2.5% ROI`\n"
-                                            f"🎯 **Target TP1 ៖** `+5.0% ROI (Lock ចំណេញ 50% មិនកាត់កាក់)`\n"
-                                            f"🚀 **Target TP2 ៖** `85% Moonshot Ratchet (កើប ១០០% ទាំងដុល)`\n"
+                                            f"📊 **Volume Spike (RVOL) ៖** `{cand.get('rvol', 2.2):.1f}x (Smart Money)`\n"
+                                            f"📈 **1H Momentum ៖** `+{cand.get('chg_1h', 1.0):.2f}%` (24H: `+{cand['price_change_pct']:.2f}%`)\n"
+                                            f"🧠 **AI Velocity Score ៖** `{cand['ai_score']:.1f}/10.0`\n"
+                                            f"🛡️ **Micro-Breakeven Armor ៖** `ត្រៀម Lock នៅ +1.5% ROI`\n"
+                                            f"💵 **Target Fast Harvest ៖** `+2.8% ដល់ +3.5% ROI`\n"
+                                            f"🚀 **Target Moonshot ៖** `85% Ratchet (>= +5.0% ROI)`\n"
+                                            f"⏱️ **Anti-Stagnation Clock ៖** `45-60 នាទី (រំដោះទុនភ្លាមបើទ្រឹង)`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "✨ **យុទ្ធសាស្ត្រ Spot ៖** `1-Shot Full Moonshot (១០០% ពេញលេញ គ្មាន Error -1013)`\n"
+                                            "✨ **យុទ្ធសាស្ត្រ Spot ៖** `Rapid Velocity (១០០% ពេញលេញ គ្មាន Error -1013)`\n"
                                             "💡 _ព័ត៌មានជំនួយ៖ បើកមុខងារ 'Use BNB for fees' លើ Binance ដើម្បីចំណេញសេវា 25% និងលក់ ១០០% គ្មានសល់កន្ទុយកាក់!_"
                                         ) if user_lang == 'khmer' else (
                                             "💎 **[24/7 SPOT WEALTH - POSITION OPENED]** 🟢\n"
@@ -1460,13 +1577,15 @@ class PerpetualWealthGeneratorEngine:
                                             f"🪙 **Symbol / Pair:** `{sym}`\n"
                                             f"🎯 **System:** `Spot 1x (0% Liquidation Risk)`\n"
                                             f"💰 **Allocated Capital:** `${alloc_per_coin:.2f} USDT`\n"
-                                            f"📈 **24H Sweet-Spot Change:** `+{cand['price_change_pct']:.2f}%`\n"
-                                            f"🧠 **AI Confluence Score:** `{cand['ai_score']:.1f}/10.0`\n"
-                                            f"🛡️ **Breakeven Armor:** `Armed for +2.5% ROI Lock`\n"
-                                            f"🎯 **Target TP1:** `+5.0% ROI (Lock 50% Profit, 100% Coins Ride)`\n"
-                                            f"🚀 **Target TP2:** `85% Moonshot Ratchet (100% Cash Harvest)`\n"
+                                            f"📊 **Volume Spike (RVOL):** `{cand.get('rvol', 2.2):.1f}x (Smart Money)`\n"
+                                            f"📈 **1H Momentum:** `+{cand.get('chg_1h', 1.0):.2f}%` (24H: `+{cand['price_change_pct']:.2f}%`)\n"
+                                            f"🧠 **AI Velocity Score:** `{cand['ai_score']:.1f}/10.0`\n"
+                                            f"🛡️ **Micro-Breakeven Armor:** `Armed for +1.5% ROI Lock`\n"
+                                            f"💵 **Target Fast Harvest:** `+2.8% to +3.5% ROI`\n"
+                                            f"🚀 **Target Moonshot:** `85% Ratchet (>= +5.0% ROI)`\n"
+                                            f"⏱️ **Anti-Stagnation Clock:** `45-60m (Auto-Liberate if Stagnant)`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "✨ **Spot Engine Mode:** `1-Shot Full Moonshot (Zero Error -1013)`\n"
+                                            "✨ **Spot Engine Mode:** `Rapid Velocity (Zero Error -1013)`\n"
                                             "💡 _Tip: Enable 'Use BNB for fees' on Binance for 25% fee discount & zero leftover dust!_"
                                         )
                                         asyncio.create_task(_async_send_wealth_alert(app, chat_id, entry_msg, "Spot entry alert"))

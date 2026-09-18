@@ -6843,10 +6843,12 @@ async def perpetual_wealth_monitor(app: Application):
     """
     💎 24/7 Perpetual Wealth Generator Monitor Loop
     Executes real-time monitoring of open positions, Dual-Harvest TP1/TP2, and continuous sweet-spot rotation.
+    Decoupled execution: Runs both Futures Wealth and Spot Wealth cycles independently.
     """
     try:
         import perpetual_wealth_engine
         await perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.execute_wealth_harvest_cycle(app)
+        await perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.execute_spot_harvest_cycle(app)
     except Exception as e:
         print(f"⚠️ [PERPETUAL WEALTH MONITOR NOTICE]: {e}")
 
