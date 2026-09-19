@@ -3370,6 +3370,30 @@ def update_system_setting(key: str, value: str):
     conn.commit()
     conn.close()
 
+# Canonical alias for compatibility
+set_system_setting = update_system_setting
+
+def get_user_api_credentials(chat_id: int) -> dict:
+    """Returns user's Binance API credentials as a dictionary {'api_key': ..., 'api_secret': ...}."""
+    creds = get_user_api(chat_id)
+    if creds:
+        return {"api_key": creds[0], "api_secret": creds[1]}
+    return {}
+
+def is_wealth_bot_enabled(chat_id: int) -> bool:
+    """Checks if the 24/7 Perpetual Wealth Generator is enabled for a given chat_id."""
+    val = get_system_setting(f"spot_wealth_vault_{chat_id}", "ACTIVE")
+    return str(val).upper() in ("ACTIVE", "1", "TRUE", "ENABLED")
+
+def get_circuit_breaker_status() -> dict:
+    """Returns the current portfolio circuit breaker status."""
+    tripped = get_system_setting("portfolio_circuit_breaker_tripped", "0") == "1"
+    reason = get_system_setting("portfolio_circuit_breaker_reason", "")
+    return {"tripped": tripped, "reason": reason}
+
+# Canonical alias for compatibility
+update_user_vip = set_vip_status
+
 def set_gold_turbo_config(chat_id: int, enabled: bool, amount: float = 15.0):
     enabled_val = 1 if enabled else 0
     update_system_setting(f"gold_turbo_{chat_id}_enabled", str(enabled_val))

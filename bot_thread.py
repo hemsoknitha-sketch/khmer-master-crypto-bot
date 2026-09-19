@@ -1010,7 +1010,7 @@ class TelegramBotThread(BaseThread):
                         turn_on = (update.callback_query.data == "btn_cedefi_auto_on")
                     else:
                         turn_on = True if (len(args) < 3 or args[2].upper() != "OFF") else False
-                    db.set_system_setting(f"flash_loan_cedefi_auto_{chat_id}", "1" if turn_on else "0")
+                    db.update_system_setting(f"flash_loan_cedefi_auto_{chat_id}", "1" if turn_on else "0")
                     status_toast = "✅ CeDeFi Auto: បានបើកដំណើរការ!" if turn_on else "🔴 CeDeFi Auto: បានបិទដំណើរការ!"
                     if update.callback_query:
                         try: await update.callback_query.answer(status_toast)
@@ -1138,7 +1138,7 @@ class TelegramBotThread(BaseThread):
             if args and args[0].upper() == "TRADFI_AUTO_TOGGLE":
                 curr_st = (db.get_system_setting(f"flash_loan_tradfi_auto_{chat_id}", "1") != "0")
                 new_st = "0" if curr_st else "1"
-                db.set_system_setting(f"flash_loan_tradfi_auto_{chat_id}", new_st)
+                db.update_system_setting(f"flash_loan_tradfi_auto_{chat_id}", new_st)
                 toast_txt = "🤖 CeDeFi TradFi 24/7 Auto: បានបើក (ON)" if new_st == "1" else "⚪ CeDeFi TradFi 24/7 Auto: បានបិទ (OFF)"
                 if update.callback_query:
                     try: await update.callback_query.answer(toast_txt)
