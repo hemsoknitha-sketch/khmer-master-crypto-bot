@@ -1003,7 +1003,351 @@ def evaluate_tradfi_signal(epic: str, is_demo: Optional[bool] = None) -> Dict[st
 
 
 # ==============================================================================
-# 4. STANDALONE DEMO TEST HARNESS
+# 4. CAPITAL.COM 24/7 AUTONOMOUS INSTITUTIONAL ENGINE (CAPITAL AUTO)
+# ==============================================================================
+
+class CapitalAutonomousEngine:
+    """
+    Flagship 24/7 Autonomous TradFi Trading Engine on Capital.com.
+    Fuses:
+    1. Google Macro Satellite (google_macro_satellite.py)
+    2. Multi-Timeframe Quant Confluence (1H Trend + 15M Momentum + 5M Pullback)
+    3. Central Bank Gold Radar & Black Swan Guard
+    4. 24/7 Session Awareness (London, NY, Asian/Weekend BTC CFD)
+    5. Breakeven Armor (+1.5% ROI lock) & Golden 80% Trailing Ratchet
+    """
+    def __init__(self):
+        self._peak_upl_cache: Dict[str, float] = {}  # deal_id -> peak_upl
+        self._be_locked_set = set()                   # deal_ids that reached Breakeven Armor
+        self._last_scan_ts: float = 0.0
+        self._scan_interval: float = 25.0             # Scan markets every 25 seconds
+
+    def get_session_priority_assets(self) -> List[str]:
+        """
+        Determines active tradable instruments based on global market hours (UTC+7 Phnom Penh):
+        - London Session (15:00 - 23:00): GOLD (XAU/USD), OIL
+        - Wall Street Session (20:30 - 03:00): SP500, NASDAQ, GOLD
+        - Off-hours / Weekend: BTCUSD (24/7 CFD)
+        """
+        import datetime
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+        weekday = now_dt.weekday()  # Monday = 0, Friday = 4, Saturday = 5, Sunday = 6
+        hour_utc = now_dt.hour
+        
+        # TradFi weekend closure: Friday 21:00 UTC to Sunday 22:00 UTC
+        is_weekend = (weekday == 5) or (weekday == 4 and hour_utc >= 21) or (weekday == 6 and hour_utc < 22)
+        
+        if is_weekend:
+            # 24/7 Crypto CFD active on weekends
+            return ["BTCUSD", "ETHUSD", "SOLUSD"]
+            
+        # On weekdays, prioritize Gold, S&P 500, Crude Oil, then BTC
+        if 8 <= hour_utc < 21:
+            return ["GOLD", "SP500", "OIL", "BTCUSD"]
+        else:
+            return ["GOLD", "BTCUSD", "SP500"]
+
+    def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
+        """
+        Fuses Google Macro Satellite + Technical Indicators + Radar signals:
+        Returns institutional decision with score (0-100) and recommendation.
+        """
+        engine = get_capital_engine()
+        base_quant = engine.evaluate_tradfi_quant_signal(epic)
+        if not base_quant.get("success"):
+            return base_quant
+
+        resolved_epic = base_quant.get("epic", epic)
+        market_status = base_quant.get("market_status", "UNKNOWN")
+        if market_status != "TRADEABLE":
+            return base_quant
+
+        # 1. Google Macro Satellite Integration
+        macro_boost = 0
+        macro_bias = "NEUTRAL"
+        try:
+            import google_macro_satellite
+            macro_data = google_macro_satellite.fetch_google_macro_satellite_data()
+            tradfi_sent = macro_data.get("tradfi_sentiment", "RISK_ON")
+            dxy_sig = macro_data.get("dxy_signal", "BULLISH_LIQUIDITY")
+
+            # Gold benefits from DXY weakness (BULLISH_LIQUIDITY) or RISK_OFF safe haven
+            if resolved_epic == "GOLD":
+                if dxy_sig == "BULLISH_LIQUIDITY":
+                    macro_boost += 15
+                    macro_bias = "BULLISH_MACRO"
+                if tradfi_sent == "RISK_OFF":
+                    macro_boost += 10
+            elif resolved_epic in ["SP500", "US500"]:
+                if tradfi_sent == "RISK_ON":
+                    macro_boost += 15
+                    macro_bias = "BULLISH_MACRO"
+                elif tradfi_sent == "RISK_OFF":
+                    macro_boost -= 20
+                    macro_bias = "BEARISH_MACRO"
+            elif resolved_epic == "BTCUSD":
+                if dxy_sig == "BULLISH_LIQUIDITY" and tradfi_sent == "RISK_ON":
+                    macro_boost += 20
+                    macro_bias = "BULLISH_MACRO"
+        except Exception as e_macro:
+            logger.debug(f"Google Macro Satellite query note: {e_macro}")
+
+        # 2. Central Bank Gold Radar Integration (for Gold)
+        cb_boost = 0
+        if resolved_epic == "GOLD":
+            try:
+                import central_bank_gold_radar
+                cb_radar = central_bank_gold_radar.get_central_bank_gold_radar()
+                if cb_radar.get("regime") == "ACCUMULATION":
+                    cb_boost += 15
+            except Exception:
+                pass
+
+        # 3. Final Score Arbitration
+        raw_conf = base_quant.get("confidence", 50)
+        final_conf = min(98, max(10, raw_conf + macro_boost + cb_boost))
+        base_quant["final_confidence"] = final_conf
+        base_quant["macro_bias"] = macro_bias
+
+        # Adjust signal if macro and technicals align
+        raw_sig = base_quant.get("signal", "HOLD_NEUTRAL")
+        if raw_sig in ["BUY", "STRONG_BUY"] and final_conf >= 75:
+            base_quant["final_action"] = "BUY"
+        elif raw_sig in ["SELL", "STRONG_SELL"] and final_conf >= 75:
+            base_quant["final_action"] = "SELL"
+        else:
+            base_quant["final_action"] = "HOLD"
+
+        return base_quant
+
+    def monitor_and_ratchet_open_positions(self, app=None) -> Dict[str, Any]:
+        """
+        Executes real-time position management on active Capital.com positions:
+        1. Breakeven Armor: At +1.5% ROI, locks Stop-Loss to entry + fees.
+        2. Golden 80% Trailing Ratchet: Ratchets trailing SL protecting 80% of peak profit.
+        """
+        engine = get_capital_engine()
+        positions = engine.get_open_positions()
+        if not positions:
+            return {"active_count": 0, "ratcheted": 0, "closed": 0}
+
+        ratcheted_count = 0
+        closed_count = 0
+
+        for pos_item in positions:
+            pos = pos_item.get("position", {})
+            deal_id = pos.get("dealId")
+            epic = pos.get("epic", "UNKNOWN")
+            direction = pos.get("direction", "BUY").upper()
+            size = float(pos.get("size", 0.0))
+            entry_level = float(pos.get("level", 0.0))
+            upl = float(pos.get("upl", 0.0))
+            sl = float(pos.get("stopLevel", 0.0) or 0.0)
+
+            if not deal_id or entry_level <= 0:
+                continue
+
+            # Calculate ROI estimate (For 20x leverage, 5% margin requirement)
+            estimated_margin = max(1.0, entry_level * size * 0.05)
+            roi_pct = (upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
+
+            # Track peak UPL
+            peak_upl = self._peak_upl_cache.get(deal_id, upl)
+            if upl > peak_upl:
+                peak_upl = upl
+                self._peak_upl_cache[deal_id] = peak_upl
+
+            # A. Breakeven Armor: At +1.5% ROI
+            if roi_pct >= 1.5 and deal_id not in self._be_locked_set:
+                new_sl = round(entry_level * 1.0005, 2) if direction == "BUY" else round(entry_level * 0.9995, 2)
+                upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
+                if upd.get("success"):
+                    self._be_locked_set.add(deal_id)
+                    ratcheted_count += 1
+                    logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} ({direction}) at {new_sl} (+{roi_pct:.1f}% ROI)")
+
+            # B. Golden 80% Trailing Ratchet: When profit exceeds +4.0% ROI
+            elif roi_pct >= 4.0 and peak_upl > 0:
+                target_protected_profit = peak_upl * 0.80
+                if direction == "BUY":
+                    ratchet_price = round(entry_level + (target_protected_profit / size), 2)
+                    if ratchet_price > sl:
+                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
+                        if upd.get("success"):
+                            ratcheted_count += 1
+                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price}")
+                elif direction == "SELL":
+                    ratchet_price = round(entry_level - (target_protected_profit / size), 2)
+                    if sl <= 0 or ratchet_price < sl:
+                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
+                        if upd.get("success"):
+                            ratcheted_count += 1
+                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price}")
+
+        return {
+            "active_count": len(positions),
+            "ratcheted": ratcheted_count,
+            "closed": closed_count
+        }
+
+    async def execute_autonomous_cycle(self, app=None):
+        """
+        Main 24/7 autonomous loop called by scheduler:
+        1. Monitors active positions across all users.
+        2. Discovers new opportunities across priority assets.
+        3. Executes trades for opted-in users within budget & max position limits.
+        """
+        import database as db
+        active_users = db.get_active_capital_auto_users()
+        if not active_users:
+            return
+
+        now = time.time()
+        
+        # Step 1: In-Flight Position Management & Ratchet
+        self.monitor_and_ratchet_open_positions(app=app)
+
+        # Step 2: Rate limit market scans to once every 25 seconds
+        if (now - self._last_scan_ts) < self._scan_interval:
+            return
+        self._last_scan_ts = now
+
+        engine = get_capital_engine()
+        open_positions = engine.get_open_positions()
+        open_epics = {pos.get("position", {}).get("epic", "").upper() for pos in open_positions}
+
+        # Step 3: Scan candidate assets
+        priority_epics = self.get_session_priority_assets()
+        
+        for epic in priority_epics:
+            resolved_epic = EPIC_MAP.get(epic, epic)
+            if resolved_epic in open_epics:
+                continue
+
+            setup = self.evaluate_multi_engine_tradfi_setup(epic)
+            final_action = setup.get("final_action", "HOLD")
+            confidence = setup.get("final_confidence", 0)
+
+            if final_action in ["BUY", "SELL"] and confidence >= 75:
+                logger.info(f"🎯 [CAPITAL AUTO] High-Confidence TradFi Setup detected: {epic} {final_action} ({confidence}% conf)")
+                
+                for user in active_users:
+                    chat_id = user["chat_id"]
+                    budget = user.get("budget", 50.0)
+                    max_pos = user.get("max_positions", 2)
+
+                    if len(open_positions) >= max_pos:
+                        continue
+
+                    # Dynamic size based on user budget and asset DNA
+                    size = None
+                    if resolved_epic == "GOLD":
+                        size = 0.02 if budget < 100 else 0.05
+                    elif resolved_epic in ["US500", "SP500"]:
+                        size = 0.1 if budget < 100 else 0.2
+                    elif resolved_epic == "BTCUSD":
+                        size = 0.001 if budget < 50 else 0.002
+
+                    trade_res = engine.execute_smart_tradfi_order(
+                        epic=resolved_epic,
+                        direction=final_action,
+                        size=size
+                    )
+
+                    if trade_res.get("success"):
+                        deal_ref = trade_res.get("deal_reference", "AUTO")
+                        deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
+                        entry_px = setup.get("ask" if final_action == "BUY" else "bid", 0.0)
+                        sl = trade_res.get("sl", 0.0)
+                        tp = trade_res.get("tp", 0.0)
+                        executed_size = trade_res.get("size", size or 0.01)
+
+                        # Record in database
+                        db.record_capital_auto_trade(
+                            chat_id=chat_id,
+                            deal_id=str(deal_id),
+                            deal_reference=str(deal_ref),
+                            epic=resolved_epic,
+                            direction=final_action,
+                            size=executed_size,
+                            entry_price=entry_px,
+                            sl=sl,
+                            tp=tp
+                        )
+                        db.update_capital_auto_last_trade_time(chat_id, now)
+
+                        # Send Telegram Notification
+                        if app and hasattr(app, "bot"):
+                            try:
+                                user_lang = db.get_user_language(chat_id)
+                                import ui_standards
+                                env_lbl = "DEMO ($10,000)" if engine.is_demo else "LIVE MAINNET"
+                                dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
+                                
+                                if user_lang == 'khmer':
+                                    notif_msg = (
+                                        f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"⚙️ **គណនី ៖** `{env_lbl}`\n"
+                                        f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                        f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
+                                        f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
+                                        f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
+                                        f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
+                                        f"🛑 **Stop-Loss ៖** `${sl:,.2f}`\n"
+                                        f"🎯 **Take-Profit ៖** `${tp:,.2f}`\n"
+                                        f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🛡️ **ក្បួនការពារដើមទុន ៖**\n"
+                                        f"• Breakeven Armor នៅ +1.5% ROI\n"
+                                        f"• The Golden 80% Trailing Ratchet\n"
+                                        f"• Spread Guard & Zero Blind Trading\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"💡 _ម៉ាស៊ីន AI កំពុងតាមដានការពារទុន និងប្រមូលប្រាក់ចំណេញ ២៤/៧!_"
+                                    )
+                                else:
+                                    notif_msg = (
+                                        f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"⚙️ **Account:** `{env_lbl}`\n"
+                                        f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
+                                        f"🎯 **Direction:** `{dir_emoji}`\n"
+                                        f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
+                                        f"📦 **Contract Size:** `{executed_size}`\n"
+                                        f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
+                                        f"🛑 **Stop-Loss:** `${sl:,.2f}`\n"
+                                        f"🎯 **Take-Profit:** `${tp:,.2f}`\n"
+                                        f"🔖 **Deal Reference:** `{deal_ref}`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🛡️ **Institutional Protection:**\n"
+                                        f"• Breakeven Armor at +1.5% ROI\n"
+                                        f"• Golden 80% Trailing Ratchet\n"
+                                        f"• Spread Guard Active\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"💡 _AI Engine actively monitoring and trailing profits 24/7!_"
+                                    )
+                                await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
+                            except Exception as notif_err:
+                                logger.error(f"Failed to send Capital Auto notification: {notif_err}")
+
+                        # Throttle to 1 trade per cycle
+                        break
+
+
+# Singleton Instance
+CAPITAL_AUTO_ENGINE = CapitalAutonomousEngine()
+
+def get_capital_auto_engine() -> CapitalAutonomousEngine:
+    """Returns singleton instance of CapitalAutonomousEngine."""
+    return CAPITAL_AUTO_ENGINE
+
+async def run_capital_auto_cycle(app=None):
+    """Entry point for APScheduler in scheduler_tasks.py."""
+    await CAPITAL_AUTO_ENGINE.execute_autonomous_cycle(app=app)
+
+
+# ==============================================================================
+# 5. STANDALONE DEMO TEST HARNESS
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 70)

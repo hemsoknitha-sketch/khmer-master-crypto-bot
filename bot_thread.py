@@ -5270,6 +5270,42 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_close_all":
                 context.args = ["CLOSEALL"]
                 await capital_command(update, context)
+            elif data == "btn_cap_auto_toggle":
+                curr_state = db.is_capital_auto_enabled(chat_id)
+                new_state = not curr_state
+                cfg = db.get_capital_auto_config(chat_id)
+                db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", 50.0))
+                toast_msg = "✅ Capital Auto: បានបើកដំណើរការ!" if new_state else "🛑 Capital Auto: បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_auto_budget_30":
+                db.set_capital_auto_config(chat_id, enabled=True, budget=30.0)
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $30!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_auto_budget_50":
+                db.set_capital_auto_config(chat_id, enabled=True, budget=50.0)
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $50!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_auto_budget_100":
+                db.set_capital_auto_config(chat_id, enabled=True, budget=100.0)
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $100!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
             elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
                 await turbo_hedge_command(update, context)
             elif data in ["btn_smart_trade", "btn_smart_trade_launch"]:
@@ -17545,13 +17581,37 @@ class TelegramBotThread(BaseThread):
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
             user_lang = db.get_user_language(chat_id)
-            args = context.args if context and context.args else []
+            args = list(context.args) if context and context.args else []
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import capital_engine
             import ui_standards
 
+            # Check if invoked via /capital_auto or /capitalauto directly
+            cmd_text = ""
+            if update.message and update.message.text:
+                cmd_text = update.message.text.split()[0].lower().replace('/', '')
+            if cmd_text in ["capital_auto", "capitalauto"]:
+                if not args:
+                    args = ["AUTO", "STATUS"]
+                elif args[0].upper() not in ["AUTO"]:
+                    args = ["AUTO"] + args
+
+            # Auto config & status
+            is_auto_on = db.is_capital_auto_enabled(chat_id)
+            auto_cfg = db.get_capital_auto_config(chat_id)
+            auto_budget = auto_cfg.get("budget", 50.0)
+            auto_btn_text = f"🤖 Capital Auto: ON 🟢 (${auto_budget:,.0f})" if is_auto_on else "🤖 Capital Auto: OFF ⚪"
+
             keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle")
+                ],
+                [
+                    InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
+                    InlineKeyboardButton("💰 Budget $50", callback_data="btn_cap_auto_budget_50"),
+                    InlineKeyboardButton("💰 Budget $100", callback_data="btn_cap_auto_budget_100")
+                ],
                 [
                     InlineKeyboardButton("🥇 Buy Gold (0.02)", callback_data="btn_cap_buy_gold"),
                     InlineKeyboardButton("🥈 Sell Gold (0.02)", callback_data="btn_cap_sell_gold")
@@ -17574,9 +17634,92 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            # Subcommands: /capital BUY <epic> <size> or /capital SELL <epic> <size>
+            # Subcommands: /capital AUTO ON <budget>, /capital AUTO OFF, /capital BUY <epic> <size>
             if args:
                 action = str(args[0]).upper().strip()
+                if action == "AUTO":
+                    sub_opt = str(args[1]).upper().strip() if len(args) >= 2 else "STATUS"
+                    if sub_opt == "ON":
+                        budget = float(args[2]) if len(args) >= 3 else 50.0
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget)
+                        pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
+                        env_mode = "DEMO ($10,000 Virtual Funds)" if capital_engine.get_capital_engine().is_demo else "LIVE MAINNET"
+
+                        # Rebuild keyboard with updated state
+                        keyboard = InlineKeyboardMarkup([
+                            [
+                                InlineKeyboardButton(f"🤖 Capital Auto: ON 🟢 (${budget:,.0f})", callback_data="btn_cap_auto_toggle")
+                            ],
+                            [
+                                InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
+                                InlineKeyboardButton("💰 Budget $50", callback_data="btn_cap_auto_budget_50"),
+                                InlineKeyboardButton("💰 Budget $100", callback_data="btn_cap_auto_budget_100")
+                            ],
+                            [
+                                InlineKeyboardButton("🥇 Buy Gold (0.02)", callback_data="btn_cap_buy_gold"),
+                                InlineKeyboardButton("🥈 Sell Gold (0.02)", callback_data="btn_cap_sell_gold")
+                            ],
+                            [
+                                InlineKeyboardButton("📈 Buy S&P 500 (0.1)", callback_data="btn_cap_buy_sp500"),
+                                InlineKeyboardButton("📉 Sell S&P 500 (0.1)", callback_data="btn_cap_sell_sp500")
+                            ],
+                            [
+                                InlineKeyboardButton("🪙 Buy BTC CFD", callback_data="btn_cap_buy_btc"),
+                                InlineKeyboardButton("🪙 Sell BTC CFD", callback_data="btn_cap_sell_btc")
+                            ],
+                            [
+                                InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions"),
+                                InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh")
+                            ],
+                            [
+                                InlineKeyboardButton("🛡️ Close All", callback_data="btn_cap_close_all"),
+                                InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                            ]
+                        ])
+
+                        msg = (
+                            f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏦 **គណនី ៖** `{env_mode}`\n"
+                            f"💰 **ទុនកំណត់ក្នុងមួយជុំ ៖** `${budget:,.2f}`\n"
+                            f"🏛️ **ឧបករណ៍វិនិយោគ ៖** `GOLD, S&P 500, OIL, BTC CFD (24/7)`\n"
+                            f"🧠 **AI Intelligence ៖** `Google Macro Satellite + 33 Models`\n"
+                            f"🛡️ **ការការពារដើមទុន ៖** `Breakeven Armor + Golden 80% Ratchet`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"📊 **ប្រវត្តិជួញដូរ ៖** `{pnl_stat['total_trades']} Trades` | Win: `{pnl_stat['win_rate']}%` | PnL: `${pnl_stat['total_pnl']:,.2f}`\n"
+                            f"💡 _ប្រព័ន្ធកំពុងស្កេនចាប់យកឱកាស និងកើបចំណេញ ២៤/៧ ដោយស្វ័យប្រវត្តិ!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏦 **Account:** `{env_mode}`\n"
+                            f"💰 **Budget Per Round:** `${budget:,.2f}`\n"
+                            f"🏛️ **Instruments:** `GOLD, S&P 500, OIL, BTC CFD (24/7)`\n"
+                            f"🧠 **AI Intelligence:** `Google Macro Satellite + 33 Models`\n"
+                            f"🛡️ **Capital Protection:** `Breakeven Armor + Golden 80% Ratchet`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"📊 **Historical:** `{pnl_stat['total_trades']} Trades` | Win: `{pnl_stat['win_rate']}%` | PnL: `${pnl_stat['total_pnl']:,.2f}`\n"
+                            f"💡 _Engine autonomously scanning and harvesting profits 24/7!_"
+                        )
+                        await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                        return
+                    elif sub_opt == "OFF":
+                        db.set_capital_auto_config(chat_id, enabled=False)
+                        msg = (
+                            f"🛑 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: STOPPED** 🔴\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚙️ **ស្ថានភាព ៖** `បានបិទបញ្ចប់ដោយជោគជ័យ (STOPPED)`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _អ្នកអាចបើកឡើងវិញបានគ្រប់ពេលតាមរយៈ `/capital AUTO ON` ឬចុចប៊ូតុងខាងក្រោម!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🛑 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: STOPPED** 🔴\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚙️ **Status:** `Successfully Stopped (STOPPED)`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _You can re-enable anytime via `/capital AUTO ON` or buttons below!_"
+                        )
+                        await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                        return
+
                 if action in ["BUY", "SELL"] and len(args) >= 2:
                     asset = str(args[1]).upper().strip()
                     size = float(args[2]) if len(args) >= 3 else None
@@ -17689,12 +17832,15 @@ class TelegramBotThread(BaseThread):
             pnl_val = data.get("active_pnl", 0.0)
             pnl_badge = f"+${pnl_val:,.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):,.2f}"
 
+            auto_badge = f"🟢 ACTIVE (${auto_budget:,.0f})" if is_auto_on else "⚪ OFF"
+
             if user_lang == 'khmer':
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🏦 **គណនី ៖** `{env_mode}`\n"
                     f"🆔 **Account ID ៖** `{data.get('account_id')}`\n"
+                    f"🤖 **TradFi Auto Engine ៖** `{auto_badge}`\n"
                     f"💰 **សមតុល្យ (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
@@ -17712,6 +17858,8 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard ៖** បដិសេធ Trade ពេល Spread រីកធំ\n"
                     f"• **Asset-DNA Sizing ៖** 1% Risk Clamp គ្មាន Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital AUTO OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
@@ -17722,6 +17870,7 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🏦 **Account:** `{env_mode}`\n"
                     f"🆔 **Account ID:** `{data.get('account_id')}`\n"
+                    f"🤖 **TradFi Auto Engine:** `{auto_badge}`\n"
                     f"💰 **Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
@@ -17739,6 +17888,8 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard:** Rejects orders during wide spreads\n"
                     f"• **Asset-DNA Sizing:** 1% Risk Clamp zero drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital AUTO OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Risk Protection & Wealth Generation 24/7!"
@@ -17749,6 +17900,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capital", capital_command))
         self.app.add_handler(CommandHandler("capital_com", capital_command))
         self.app.add_handler(CommandHandler("capitalcom", capital_command))
+        self.app.add_handler(CommandHandler("capital_auto", capital_command))
+        self.app.add_handler(CommandHandler("capitalauto", capital_command))
         self.app.add_handler(CommandHandler("wealth", wealth_command))
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))
@@ -17862,6 +18015,17 @@ class TelegramBotThread(BaseThread):
             coalesce=True,
             args=[self.app],
             id='perpetual_wealth_monitor'
+        )
+
+        # 1e. 24/7 Capital.com TradFi Autonomous Wealth Harvester Monitor (Every 20 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.capital_auto_monitor,
+            'interval',
+            seconds=20,
+            max_instances=2,
+            coalesce=True,
+            args=[self.app],
+            id='capital_auto_monitor'
         )
 
         # 2. Unified Smart Grid Matrix Monitor (Every 15 seconds)

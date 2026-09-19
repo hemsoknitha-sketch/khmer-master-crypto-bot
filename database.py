@@ -952,6 +952,42 @@ def init_db():
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )
     ''')
+
+    # Capital.com Autonomous TradFi Config
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS capital_auto_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled BOOLEAN NOT NULL DEFAULT 0,
+            budget REAL DEFAULT 50.0,
+            max_positions INTEGER DEFAULT 2,
+            last_trade_time REAL DEFAULT 0.0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )
+    ''')
+
+    # Capital.com Autonomous TradFi Trade History
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS capital_auto_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            deal_id TEXT,
+            deal_reference TEXT,
+            epic TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            size REAL NOT NULL,
+            entry_price REAL NOT NULL,
+            exit_price REAL DEFAULT 0.0,
+            sl REAL DEFAULT 0.0,
+            tp REAL DEFAULT 0.0,
+            pnl REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'OPEN',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            closed_at DATETIME,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -2274,6 +2310,144 @@ def set_auto_trade_config(chat_id: int, enabled: bool, amount: float, trailing_p
                    (enabled, amount, trailing_pct, max_active_trades, chat_id))
     conn.commit()
     conn.close()
+
+# ==============================================================================
+# CAPITAL.COM AUTONOMOUS TRADFI ENGINE CONFIG & TRADE STATE
+# ==============================================================================
+
+def get_capital_auto_config(chat_id: int) -> dict:
+    """Returns the Capital.com Autonomous Trading configuration for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT is_enabled, budget, max_positions, last_trade_time
+            FROM capital_auto_config WHERE chat_id = ?
+        """, (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "enabled": bool(row[0]),
+                "budget": float(row[1] or 50.0),
+                "max_positions": int(row[2] or 2),
+                "last_trade_time": float(row[3] or 0.0)
+            }
+    except Exception:
+        conn.close()
+    return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0}
+
+def is_capital_auto_enabled(chat_id: int) -> bool:
+    """Fast check if a user has enabled Capital.com Autonomous Trading."""
+    cfg = get_capital_auto_config(chat_id)
+    return cfg.get("enabled", False)
+
+def set_capital_auto_config(chat_id: int, enabled: bool, budget: float = 50.0, max_positions: int = 2):
+    """Sets or updates the Capital.com Autonomous Trading config."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            budget = excluded.budget,
+            max_positions = excluded.max_positions,
+            updated_at = excluded.updated_at
+    """, (chat_id, 1 if enabled else 0, float(budget), int(max_positions), now_str))
+    conn.commit()
+    conn.close()
+
+def update_capital_auto_last_trade_time(chat_id: int, last_time: float):
+    """Updates the last trade timestamp for cooldown calculations."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE capital_auto_config SET last_trade_time = ? WHERE chat_id = ?", (last_time, chat_id))
+    conn.commit()
+    conn.close()
+
+def get_active_capital_auto_users() -> list:
+    """Returns a list of all chat_ids that have Capital.com Auto Trade active."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT chat_id, budget, max_positions FROM capital_auto_config WHERE is_enabled = 1")
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"chat_id": r[0], "budget": float(r[1]), "max_positions": int(r[2])} for r in rows]
+    except Exception:
+        conn.close()
+        return []
+
+def record_capital_auto_trade(
+    chat_id: int,
+    deal_id: str,
+    deal_reference: str,
+    epic: str,
+    direction: str,
+    size: float,
+    entry_price: float,
+    sl: float = 0.0,
+    tp: float = 0.0
+) -> int:
+    """Records an executed TradFi trade into capital_auto_trades."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO capital_auto_trades
+        (chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+    """, (chat_id, str(deal_id), str(deal_reference), epic, direction, size, entry_price, sl, tp))
+    trade_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return trade_id
+
+def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float):
+    """Marks a TradFi trade as closed with final exit price and PnL."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        UPDATE capital_auto_trades
+        SET exit_price = ?, pnl = ?, status = 'CLOSED', closed_at = ?
+        WHERE deal_id = ? AND status = 'OPEN'
+    """, (exit_price, pnl, now_str, str(deal_id)))
+    conn.commit()
+    conn.close()
+
+def get_capital_auto_pnl_summary(chat_id: int) -> dict:
+    """Calculates cumulative PnL, win rate, and total trades for TradFi Auto engine."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT COUNT(*),
+                   COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(pnl), 0.0)
+            FROM capital_auto_trades
+            WHERE chat_id = ? AND status = 'CLOSED'
+        """, (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0] > 0:
+            total = row[0]
+            wins = row[1]
+            losses = row[2]
+            tot_pnl = row[3]
+            win_rate = (wins / total * 100.0) if total > 0 else 0.0
+            return {
+                "total_trades": total,
+                "win_count": wins,
+                "loss_count": losses,
+                "total_pnl": tot_pnl,
+                "win_rate": round(win_rate, 1)
+            }
+    except Exception:
+        conn.close()
+    return {"total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0}
 
 def can_user_buy(chat_id: int) -> bool:
     config = get_auto_trade_config(chat_id)

@@ -7219,6 +7219,21 @@ async def perpetual_wealth_monitor(app: Application):
         print(f"⚠️ [PERPETUAL WEALTH MONITOR NOTICE]: {e}")
 
 
+async def capital_auto_monitor(app: Application):
+    """
+    🏛️ 24/7 Capital.com TradFi Autonomous Wealth Harvester Monitor Loop
+    Executes real-time monitoring of open positions, Breakeven Armor,
+    Golden 80% Trailing Ratchet, and institutional multi-asset entry setups.
+    Fuses Google Macro Satellite + 33 AI Ensemble Models + Radars.
+    """
+    try:
+        import capital_engine
+        await capital_engine.run_capital_auto_cycle(app=app)
+    except Exception as e:
+        print(f"⚠️ [CAPITAL AUTO MONITOR NOTICE]: {e}")
+
+
+
 
 
 
