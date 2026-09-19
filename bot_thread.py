@@ -1429,6 +1429,17 @@ class TelegramBotThread(BaseThread):
                         "💡 _LST/LRT arbitrage captures peg imbalances between liquid staking tokens and WETH with zero liquidation risk!_"
                     )
 
+                if user_lang == 'km':
+                    lst_keyboard = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔄 ស្កេន LST ឡើងវិញ", callback_data="btn_flash_loan_lst"),
+                            InlineKeyboardButton("🟢 Auto 24/7: ON", callback_data="btn_flash_loan_auto_on")
+                        ],
+                        [
+                            InlineKeyboardButton("🥩 មឺនុយ Flash Loan", callback_data="btn_flash_loan")
+                        ]
+                    ])
+                else:
                     lst_keyboard = InlineKeyboardMarkup([
                         [
                             InlineKeyboardButton("🔄 Refresh LST Pools", callback_data="btn_flash_loan_lst"),

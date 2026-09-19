@@ -1458,7 +1458,7 @@ class CapitalAutonomousEngine:
                                 f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
                                 f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                                f"🛡️ **ក្បួនការពារ & កើបចំណេញ Asymmetric R:R $\ge 1:6$ ៖**\n"
+                                f"🛡️ **ក្បួនការពារ & កើបចំណេញ Asymmetric R:R ≥ 1:6 ៖**\n"
                                 f"• Tier 1: Breakeven Armor នៅ +1.5% ROI (Risk -> 0.00R)\n"
                                 f"• Tier 2: Capital Fortress Lock (+1.5R) នៅ +3.5% ROI\n"
                                 f"• Tier 3: The Golden 80% Trailing Ratchet\n"
