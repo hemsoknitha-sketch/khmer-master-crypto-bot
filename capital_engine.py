@@ -46,6 +46,12 @@ EPIC_MAP = {
     "NASDAQ": "US100",          # Nasdaq 100 Tech Index
     "DOW": "US30",              # Dow Jones Industrial Average
     "DAX": "GERMANY40",         # German DAX 40
+    # US Mega-Cap Stocks
+    "NVDA": "NVDA",             # Nvidia Corporation
+    "TSLA": "TSLA",             # Tesla Inc
+    "AAPL": "AAPL",             # Apple Inc
+    "MSFT": "MSFT",             # Microsoft Corporation
+    "AMZN": "AMZN",             # Amazon.com Inc
     # Forex
     "EURUSD": "EURUSD",         # Euro / US Dollar
     "GBPUSD": "GBPUSD",         # British Pound / US Dollar
@@ -852,7 +858,10 @@ class CapitalComEngine:
                 tp = round(bid - min_tp_dist, 2)
 
         # 4. Transmit Protected Position
-        max_spreads = {"GOLD": 1.20, "US500": 1.50, "OIL_CRUDE": 0.10, "BTCUSD": 80.0}
+        max_spreads = {
+            "GOLD": 1.20, "US500": 1.50, "US100": 2.00, "OIL_CRUDE": 0.10, "BTCUSD": 80.0,
+            "NVDA": 0.60, "TSLA": 0.60, "AAPL": 0.50, "MSFT": 0.60, "AMZN": 0.60
+        }
         max_spread = max_spreads.get(resolved_epic, 5.0)
 
         res = self.place_position(
@@ -1041,9 +1050,13 @@ class CapitalAutonomousEngine:
             # 24/7 Crypto CFD active on weekends
             return ["BTCUSD", "ETHUSD", "SOLUSD"]
             
-        # On weekdays, prioritize Gold, S&P 500, Crude Oil, then BTC
-        if 8 <= hour_utc < 21:
-            return ["GOLD", "SP500", "OIL", "BTCUSD"]
+        # On weekdays, dynamically adjust priority based on London & Wall Street market hours:
+        # Wall Street Session (13:30 - 21:00 UTC = 20:30 - 04:00 Phnom Penh): S&P 500, Nasdaq, Nvidia, Tesla, Gold, Oil
+        if 13 <= hour_utc < 21:
+            return ["GOLD", "SP500", "NASDAQ", "NVDA", "TSLA", "OIL", "BTCUSD"]
+        # London Session (08:00 - 13:00 UTC = 15:00 - 20:00 Phnom Penh): Gold, Crude Oil, DAX, EURUSD
+        elif 8 <= hour_utc < 13:
+            return ["GOLD", "OIL", "SP500", "DAX", "BTCUSD"]
         else:
             return ["GOLD", "BTCUSD", "SP500"]
 
@@ -1245,6 +1258,10 @@ class CapitalAutonomousEngine:
                         size = 0.02 if budget < 100 else 0.05
                     elif resolved_epic in ["US500", "SP500"]:
                         size = 0.1 if budget < 100 else 0.2
+                    elif resolved_epic in ["US100", "NASDAQ"]:
+                        size = 0.1 if budget < 100 else 0.2
+                    elif resolved_epic in ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
+                        size = 1.0 if budget < 100 else 2.0
                     elif resolved_epic == "BTCUSD":
                         size = 0.001 if budget < 50 else 0.002
 
