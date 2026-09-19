@@ -56,6 +56,7 @@ def get_public_bot_commands():
         BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
         BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Radar"),
         BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
+        BotCommand("macro", "🛰️ Google Macro Satellite & TradFi Confluence"),
         BotCommand("analyze", "🧠 Multi-Agent Deep Market Analysis"),
         BotCommand("predict", "📈 Institutional 24h Trend Forecast"),
         BotCommand("top", "🔥 Top Volatile Gainers & Losers"),

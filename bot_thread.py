@@ -5143,6 +5143,45 @@ class TelegramBotThread(BaseThread):
                 import traceback
                 traceback.print_exc()
 
+        async def macro_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else 0)
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer("🛰️ កំពុងទាញយកទិន្នន័យ Google Macro Satellite...")
+                except Exception:
+                    pass
+
+            import google_macro_satellite
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            report_text = google_macro_satellite.format_google_macro_satellite_report()
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh Satellite", callback_data="btn_macro_refresh"),
+                    InlineKeyboardButton("💎 Wealth Gen", callback_data="btn_wealth_menu")
+                ],
+                [
+                    InlineKeyboardButton("🧠 SmartX AI Swarm", callback_data="btn_report_eng_smart_x_daily"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.edit_message_text(text=report_text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    try:
+                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                        await update.callback_query.edit_message_text(text=clean_txt, reply_markup=keyboard)
+                    except Exception:
+                        await update.effective_message.reply_text(report_text, parse_mode="Markdown", reply_markup=keyboard)
+            else:
+                try:
+                    await update.effective_message.reply_text(report_text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                    await update.effective_message.reply_text(clean_txt, reply_markup=keyboard)
+
         async def master_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             query = update.callback_query
             if not query: return
@@ -5163,6 +5202,8 @@ class TelegramBotThread(BaseThread):
 
             if data == "btn_menu_refresh":
                 await menu_command(update, context)
+            elif data in ["btn_macro_refresh", "btn_macro_satellite", "btn_google_macro", "btn_satellite"]:
+                await macro_command(update, context)
             elif data in ["btn_wealth", "btn_wealth_menu", "btn_wealth_refresh"]:
                 context.args = []
                 await wealth_command(update, context)
@@ -17476,6 +17517,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))
         self.app.add_handler(CommandHandler("perpetual_wealth", wealth_command))
+        self.app.add_handler(CommandHandler("macro", macro_command))
+        self.app.add_handler(CommandHandler("satellite", macro_command))
+        self.app.add_handler(CommandHandler("google_macro", macro_command))
+        self.app.add_handler(CommandHandler("tradfi", macro_command))
         self.app.add_handler(CommandHandler("trailing_stop", trailing_stop_command))
         self.app.add_handler(CommandHandler("trailing_guard", trailing_guard_command))
         self.app.add_handler(CommandHandler("paper_trading", paper_trading_command))

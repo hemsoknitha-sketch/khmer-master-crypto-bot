@@ -718,16 +718,27 @@ class SmartXEngine:
             pboc_status = "ACCUMULATING"
             pboc_action = "BUYING"
 
-        # 8. Query Live Macro Indicators (DXY, Real Yield)
+        # 8. Query Live Macro Indicators (DXY, Real Yield & Google Macro Satellite)
+        sat_score = 75.0
+        sat_regime = "MODERATE_BULLISH"
         try:
-            macro_data = macro_gold_engine.fetch_macro_gold_indicators()
-            dxy_val = macro_data.get("dxy_index", 104.2)
-            real_yield = macro_data.get("real_yield_10y", 1.35)
-            dxy_trend = "DUMPING" if dxy_val < 104.0 else ("PUMPING" if dxy_val > 105.5 else "NEUTRAL")
+            import google_macro_satellite
+            sat_data = google_macro_satellite.get_google_macro_satellite_signal()
+            dxy_val = float(sat_data.get("dxy_index", 100.25))
+            real_yield = float(sat_data.get("real_yield_10y", 1.35))
+            dxy_trend = "DUMPING" if dxy_val < 101.5 else ("PUMPING" if dxy_val > 104.5 else "NEUTRAL")
+            sat_score = float(sat_data.get("composite_macro_score", 75.0))
+            sat_regime = str(sat_data.get("macro_regime", "MODERATE_BULLISH"))
         except Exception:
-            dxy_val = 104.2
-            real_yield = 1.35
-            dxy_trend = "NEUTRAL"
+            try:
+                macro_data = macro_gold_engine.fetch_macro_gold_indicators()
+                dxy_val = macro_data.get("dxy_index", 104.2)
+                real_yield = macro_data.get("real_yield_10y", 1.35)
+                dxy_trend = "DUMPING" if dxy_val < 104.0 else ("PUMPING" if dxy_val > 105.5 else "NEUTRAL")
+            except Exception:
+                dxy_val = 104.2
+                real_yield = 1.35
+                dxy_trend = "NEUTRAL"
 
         # 9. Query PAXG Spot-Futures Basis Spread Arbitrage
         try:
@@ -758,6 +769,10 @@ class SmartXEngine:
                 turbo_win_rate += 12.5
                 turbo_side = "SELL"
                 turbo_reasons.append("📉 Bearish Gold Macro (DXY Strengthening)")
+
+            if sat_regime == "STRONG_MACRO_TAILWIND":
+                turbo_win_rate += 5.0
+                turbo_reasons.append(f"🛰️ Google Satellite Strong Macro Tailwind ({sat_score:.1f}/100 | DXY {dxy_val:.2f})")
 
             if abs(spread_pct) >= 0.05:
                 turbo_win_rate += 7.5

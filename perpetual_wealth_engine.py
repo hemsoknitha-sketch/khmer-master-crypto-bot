@@ -171,6 +171,24 @@ def get_btc_macro_regime() -> dict:
             allow_short = True
             reason = f"BTC Neutral/Chop (${btc_price:,.1f}, RSI {btc_rsi:.1f}) -> Strict AI Confluence Required"
 
+        # Fuse Google Macro Intelligence Satellite Confluence
+        sat_score = 70.0
+        sat_regime = "MODERATE_BULLISH"
+        try:
+            import google_macro_satellite
+            sat_signal = google_macro_satellite.get_google_macro_satellite_signal()
+            sat_score = float(sat_signal.get("composite_macro_score", 70.0))
+            sat_regime = str(sat_signal.get("macro_regime", "MODERATE_BULLISH"))
+
+            if sat_regime == "STRONG_MACRO_TAILWIND" and regime == "NEUTRAL_CHOP" and btc_rsi >= 46.0:
+                allow_long = True
+                reason += f" | 🛰️ Google Satellite Strong Tailwind ({sat_score:.1f}/100) -> Confluence Active"
+            elif sat_regime == "DEFENSIVE_BEARISH_HEADWIND":
+                allow_long = False
+                reason += f" | ⚠️ Google Satellite Bearish Headwind ({sat_score:.1f}/100) -> Longs Blocked"
+        except Exception:
+            pass
+
         res = {
             "regime": regime,
             "allow_long": allow_long,
@@ -178,6 +196,8 @@ def get_btc_macro_regime() -> dict:
             "btc_price": btc_price,
             "btc_ema50": ema50,
             "btc_rsi": btc_rsi,
+            "macro_satellite_score": sat_score,
+            "macro_satellite_regime": sat_regime,
             "reason": reason
         }
         _BTC_MACRO_REGIME_CACHE["regime"] = (now, res)
@@ -543,6 +563,20 @@ class PerpetualWealthGeneratorEngine:
 
             # Blend 33-AI Model Confidence into AI Score
             ai_score = round(min(10.0, ai_score * (ai_conf / 85.0)), 1)
+
+            # Ingest Google Macro Satellite Confluence Boost / Defense
+            try:
+                import google_macro_satellite
+                sat_data = google_macro_satellite.get_google_macro_satellite_signal()
+                sat_regime = sat_data.get("macro_regime", "MODERATE_BULLISH")
+                if target_side == "BUY" and sat_regime == "STRONG_MACRO_TAILWIND":
+                    ai_score = round(min(10.0, ai_score + 0.5), 1)
+                elif target_side == "BUY" and sat_regime == "DEFENSIVE_BEARISH_HEADWIND":
+                    ai_score = max(0.0, ai_score - 1.0)
+                elif target_side == "SELL" and sat_regime == "DEFENSIVE_BEARISH_HEADWIND":
+                    ai_score = round(min(10.0, ai_score + 0.5), 1)
+            except Exception:
+                pass
 
             # Minimum AI confidence hurdle for Futures
             if ai_score < 8.5:
