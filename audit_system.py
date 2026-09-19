@@ -544,11 +544,12 @@ def run_audit():
         has_adx_ema20 = "adx_15m" in pw_code and "0.994 * ema20" in pw_code
         has_command = "wealth_command" in bt_code and "perpetual_wealth_monitor" in st_code
         has_inv28 = "Invariant 28" in agents_code and "Perpetual Wealth Generator" in agents_code
+        has_alpha_swap = "SMART ALPHA ROTATION SWAP" in pw_code and "swappable_trades" in pw_code
 
-        if has_be_armor and has_tp1 and has_ratchet and has_adx_ema20 and has_command and has_inv28:
-            log_pass("24/7 Perpetual Wealth Generator Triple-Phase Extraction & Safety Covenant (Invariant 28) are 100% locked & certified!")
+        if has_be_armor and has_tp1 and has_ratchet and has_adx_ema20 and has_command and has_inv28 and has_alpha_swap:
+            log_pass("24/7 Perpetual Wealth Generator Triple-Phase Extraction, Smart Alpha Swap & Safety Covenant (Invariant 28) are 100% locked & certified!")
         else:
-            failures.append(f"Invariant 28 check failed: be={has_be_armor}, tp1={has_tp1}, ratchet={has_ratchet}, adx_ema20={has_adx_ema20}, cmd={has_command}, inv28={has_inv28}")
+            failures.append(f"Invariant 28 check failed: be={has_be_armor}, tp1={has_tp1}, ratchet={has_ratchet}, adx_ema20={has_adx_ema20}, cmd={has_command}, inv28={has_inv28}, alpha_swap={has_alpha_swap}")
             log_fail("Perpetual Wealth Generator specification or Invariant 28 missing!")
     except Exception as e:
         failures.append(f"Invariant 28 check failed: {e}")

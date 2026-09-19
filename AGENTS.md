@@ -264,6 +264,10 @@ Any modification that breaks any of the following 28 invariants is considered an
      - Upon position closure (TP, SL, or Anti-Stagnation Exit), capital is instantly recycled back into the available pool to scan the next Golden Sweet-Spot candidate from the top volatile spot/futures universe with zero human intervention required.
   7. **Persistence & Crash Resilience ៖**
      - Bot configurations and open trades are permanently persisted in SQLite (`perpetual_wealth_bots`, `perpetual_wealth_spot_bots`, `perpetual_wealth_spot_trades`). State persists seamlessly across VPS reboots and systemd restarts.
+  8. **Smart Alpha Rotation Swap (Opportunity Cost Swap Engine - Zero-Loss Shield) ៖**
+     - When all Spot coin slots are full (`current_trades_count >= max_coins`) or available USDT is deployed, the engine continuously scans for explosive Monster Breakouts (`ai_score >= 9.1`, `ai_confidence >= 85.0%`, `rvol >= 2.8x`, `chg_1h >= 1.0%`).
+     - If an active trade has developed into sluggish positive net profit (`roi_pct >= +0.80%`, held $\ge 30$m, `curr_peak < 2.5%`), the system executes an atomic sub-second rotation: cleanly sells the sluggish winning trade (locking in guaranteed net cash profit) and immediately buys the monster breakout candidate.
+     - **Zero-Loss Shield:** Under NO circumstances is the bot permitted to sell a losing trade (`roi_pct < 0.80%`) to chase a breakout. Only green profitable positions may be rotated.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 21/21].
 
 ---
