@@ -1387,11 +1387,14 @@ class TelegramBotThread(BaseThread):
                     if lst_items:
                         for item in lst_items:
                             status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
+                            sim_badge = item.get("sim_status", "")
+                            sim_line = f"  • ផ្ទៀងផ្ទាត់ On-Chain ៖ `{sim_badge}`\n" if sim_badge else ""
                             lst_msg += (
                                 f"🪙 **{item['pair']} ({item['chain']})** ៖\n"
                                 f"  • ផ្លូវដោះដូរ ៖ `{item['route']}`\n"
                                 f"  • គម្លាតតម្លៃ Gross ៖ `+{item['gross_spread_pct']:.3f}%`\n"
                                 f"  • Net Yield សុទ្ធ ៖ `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                                f"{sim_line}"
                                 f"  • ទំហំកម្ចី Flash Loan ៖ `{item['optimal_weth_loan']:.1f} WETH`\n"
                                 f"  • ប្រាក់ចំណេញសុទ្ធ ៖ `+{item['net_profit_weth']:.4f} WETH (~${item['net_profit_usd']:,.2f} USD)`\n\n"
                             )
@@ -1412,11 +1415,14 @@ class TelegramBotThread(BaseThread):
                     if lst_items:
                         for item in lst_items:
                             status_badge = "🟢 READY" if item["status"] == "PROFITABLE_READY" else "⚪ TIGHT"
+                            sim_badge = item.get("sim_status", "")
+                            sim_line = f"  • On-Chain Sim: `{sim_badge}`\n" if sim_badge else ""
                             lst_msg += (
                                 f"🪙 **{item['pair']} ({item['chain']})**:\n"
                                 f"  • Route: `{item['route']}`\n"
                                 f"  • Gross Spread: `+{item['gross_spread_pct']:.3f}%`\n"
                                 f"  • Net Yield: `+{item['net_yield_pct']:.3f}%` ({status_badge})\n"
+                                f"{sim_line}"
                                 f"  • Flash Loan Loan: `{item['optimal_weth_loan']:.1f} WETH`\n"
                                 f"  • Net Profit: `+{item['net_profit_weth']:.4f} WETH (~${item['net_profit_usd']:,.2f} USD)`\n\n"
                             )

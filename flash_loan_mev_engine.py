@@ -961,16 +961,29 @@ class FlashLoanMEVEngine:
                     except Exception:
                         continue
 
-            if len(matching) < 2:
-                continue
+            # Filter matching venues to only those supported by the Arbitrum Smart Contract
+            # Deployed AaveFlashLoanArbitrage has 2 routers: Uniswap V3 and Camelot V2
+            uni_v = next((v for v in matching if "uni" in v["dex_base"]), None)
+            cam_v = next((v for v in matching if "camelot" in v["dex_base"] and "v3" not in v["dex"].lower()), None)
 
-            matching.sort(key=lambda x: x["price_weth"])
-            buy_venue = matching[0]
-            sell_venue = matching[-1]
-
-            # Ensure buy and sell venues are not on identical router
-            if buy_venue["dex"] == sell_venue["dex"]:
-                continue
+            if uni_v and cam_v:
+                if uni_v["price_weth"] < cam_v["price_weth"]:
+                    buy_venue = uni_v
+                    sell_venue = cam_v
+                    cand_route = 1 # Uni V3 -> Camelot V2
+                else:
+                    buy_venue = cam_v
+                    sell_venue = uni_v
+                    cand_route = 2 # Camelot V2 -> Uni V3
+            else:
+                if len(matching) < 2:
+                    continue
+                matching.sort(key=lambda x: x["price_weth"])
+                buy_venue = matching[0]
+                sell_venue = matching[-1]
+                if buy_venue["dex"] == sell_venue["dex"]:
+                    continue
+                cand_route = 1 if "uni" in buy_venue["dex"].lower() else 2
 
             buy_p = buy_venue["price_weth"]
             sell_p = sell_venue["price_weth"]
@@ -989,7 +1002,41 @@ class FlashLoanMEVEngine:
             net_profit_weth = opt_weth * (net_yield_pct / 100.0)
             net_profit_usd = net_profit_weth * weth_usd
 
-            status = "PROFITABLE_READY" if net_yield_pct > 0.05 else "TIGHT_SPREAD"
+            # Pre-flight On-Chain Simulation Verification (Invariant 16 & 19 Zero-Phantom Guard)
+            # Verify if the candidate opportunity can actually clear loan + premium on Arbitrum One
+            is_verified = False
+            sim_notice = "Market spread tight"
+            if net_yield_pct > 0.05:
+                try:
+                    import keeper_relayer
+                    sim_check = keeper_relayer.keeper_engine.execute_onchain_flash_loan(
+                        borrow_asset="WETH",
+                        amount_usd=opt_usd,
+                        intermediate_token=token_sym,
+                        min_net_profit_usd=net_profit_usd,
+                        user_recipient="",
+                        dex_route=cand_route,
+                        pool_fee=100 if "PEG" in target["pair"] or "ETH" in target["pair"] else 500,
+                        token_out_address=target["addr"],
+                        token_in_address=keeper_relayer.ARBITRUM_TOKENS.get("WETH")
+                    )
+                    if sim_check.get("success") and sim_check.get("mode") not in ("PREFLIGHT_SIMULATION_REVERT_PREVENTED", "TOKEN_ADDRESS_NOT_FOUND"):
+                        is_verified = True
+                        sim_notice = "On-chain simulation verified executable"
+                    else:
+                        sim_notice = sim_check.get("notice") or "Pre-flight simulation reverted: Spread absorbed by slippage / fees"
+                except Exception as ex:
+                    sim_notice = str(ex)
+
+            if not is_verified:
+                status = "TIGHT_SPREAD"
+                net_yield_pct = 0.0
+                net_profit_weth = 0.0
+                net_profit_usd = 0.0
+                sim_badge = "🛡️ REVERT_DEFENDED"
+            else:
+                status = "PROFITABLE_READY"
+                sim_badge = "🟢 ONCHAIN_VERIFIED"
 
             results.append({
                 "pair": target["pair"],
@@ -1012,8 +1059,10 @@ class FlashLoanMEVEngine:
                 "optimal_loan_usd": round(opt_usd, 2),
                 "net_profit_weth": round(net_profit_weth, 4),
                 "net_profit_usd": round(net_profit_usd, 2),
-                "dex_route": 1 if "uni" in buy_venue["dex"].lower() else 2,
-                "status": status
+                "dex_route": cand_route,
+                "status": status,
+                "sim_status": sim_badge,
+                "sim_notice": sim_notice
             })
 
         results.sort(key=lambda x: x["net_profit_usd"], reverse=True)
