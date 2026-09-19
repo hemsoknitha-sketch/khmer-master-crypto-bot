@@ -51,7 +51,6 @@ BINANCE_SPOT_URLS = [u for u in BINANCE_SPOT_URLS if u]
 
 BINANCE_FUTURES_URLS = [
     os.getenv("BINANCE_FUTURES_URL", "").rstrip("/"),
-    "https://fapi-gcp.binance.com",
     "https://fapi.binance.com",
     "https://fapi1.binance.com",
     "https://fapi2.binance.com",
@@ -82,20 +81,20 @@ def get_working_spot_url() -> str:
     return fallback
 
 def get_working_futures_url() -> str:
-    """Smart Fallback: Finds the fastest responsive Binance Futures endpoint (fapi-gcp priority with 60s cache)."""
+    """Smart Fallback: Finds the fastest responsive Binance Futures endpoint (fapi.binance.com priority with 60s cache)."""
     now = time.time()
     if _WORKING_FUTURES_URL_CACHE["url"] and (now - _WORKING_FUTURES_URL_CACHE["ts"] < 60.0):
         return _WORKING_FUTURES_URL_CACHE["url"]
     for url in BINANCE_FUTURES_URLS:
         try:
             res = HFT_SESSION.get(f"{url}/fapi/v1/ping", timeout=2)
-            if res.status_code in [200, 202] or res.status_code < 400:
+            if res.status_code == 200:
                 _WORKING_FUTURES_URL_CACHE["url"] = url
                 _WORKING_FUTURES_URL_CACHE["ts"] = now
                 return url
         except requests.exceptions.RequestException:
             continue
-    fallback = BINANCE_FUTURES_URLS[0] if BINANCE_FUTURES_URLS else "https://fapi-gcp.binance.com"
+    fallback = BINANCE_FUTURES_URLS[0] if BINANCE_FUTURES_URLS else "https://fapi.binance.com"
     _WORKING_FUTURES_URL_CACHE["url"] = fallback
     _WORKING_FUTURES_URL_CACHE["ts"] = now
     return fallback
@@ -361,7 +360,7 @@ def validate_api_keys(api_key: str, api_secret: str) -> tuple[bool, str]:
 
         # Alternative endpoints for GCP and Non-US routing
         spot_endpoints = [BASE_URL, "https://api-gcp.binance.com", "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"]
-        futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi1.binance.com", "https://fapi2.binance.com"]
+        futures_endpoints = [FUTURES_URL, "https://fapi.binance.com", "https://fapi1.binance.com", "https://fapi2.binance.com"]
         
         spot_enabled = False
         futures_enabled = False
@@ -644,7 +643,7 @@ def get_futures_balance_detailed(api_key: str, api_secret: str, asset: str = "US
         signature = generate_signature(api_secret, query_string)
         headers = {"X-MBX-APIKEY": api_key}
         
-        futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
+        futures_endpoints = [FUTURES_URL, "https://fapi.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
         for f_base in futures_endpoints:
             try:
                 url_v2 = f"{f_base}/fapi/v2/balance?{query_string}&signature={signature}"
@@ -1021,7 +1020,7 @@ def transfer_futures_to_spot(api_key: str, api_secret: str, amount: float, asset
 def get_futures_positions(api_key: str, api_secret: str) -> list:
     if PAPER_TRADING:
         return []
-    futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
+    futures_endpoints = [FUTURES_URL, "https://fapi.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
     for f_base in futures_endpoints:
         try:
             endpoint = "/fapi/v2/positionRisk"

@@ -212,12 +212,30 @@ class PerpetualWealthGeneratorEngine:
             allow_long = btc_regime.get("allow_long", True)
             allow_short = btc_regime.get("allow_short", True)
 
-            url = f"{trading_engine.FUTURES_URL}/fapi/v1/ticker/24hr"
-            res = trading_engine.HFT_SESSION.get(url, timeout=4)
-            if res.status_code != 200:
-                return []
-            tickers = res.json()
-            if not isinstance(tickers, list):
+            futures_base = getattr(trading_engine, "FUTURES_URL", "https://fapi.binance.com")
+            endpoints_to_try = [futures_base, "https://fapi.binance.com", "https://fapi1.binance.com", "https://fapi2.binance.com", "https://fapi.binance.info"]
+            seen_ep = set()
+            unique_endpoints = []
+            for ep in endpoints_to_try:
+                ep_clean = ep.rstrip("/")
+                if ep_clean not in seen_ep:
+                    seen_ep.add(ep_clean)
+                    unique_endpoints.append(ep_clean)
+
+            tickers = None
+            for f_base in unique_endpoints:
+                try:
+                    url = f"{f_base}/fapi/v1/ticker/24hr"
+                    res = trading_engine.HFT_SESSION.get(url, timeout=4)
+                    if res.status_code == 200:
+                        data = res.json()
+                        if isinstance(data, list) and len(data) > 0:
+                            tickers = data
+                            break
+                except Exception:
+                    continue
+
+            if not tickers or not isinstance(tickers, list):
                 return []
 
             monitoring_symbols = get_monitoring_symbols_set()

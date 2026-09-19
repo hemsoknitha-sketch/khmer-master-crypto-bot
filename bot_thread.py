@@ -15563,7 +15563,7 @@ class TelegramBotThread(BaseThread):
 
                 # 3. Real Live Measured Binance HFT Gateway & Latency (< 2ms on Tokyo VPS)
                 hft_endpoint = getattr(trading_engine, "BASE_URL", "https://api-gcp.binance.com")
-                futures_endpoint = getattr(trading_engine, "FUTURES_URL", "https://fapi-gcp.binance.com")
+                futures_endpoint = getattr(trading_engine, "FUTURES_URL", "https://fapi.binance.com")
                 hft_host = hft_endpoint.replace("https://", "").replace("http://", "").rstrip("/")
                 futures_host = futures_endpoint.replace("https://", "").replace("http://", "").rstrip("/")
                 time_offset_ms = getattr(trading_engine, "TIME_OFFSET", 0)

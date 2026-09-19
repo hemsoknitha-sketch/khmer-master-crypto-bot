@@ -605,8 +605,8 @@ def get_order_book_depth(symbol: str, limit: int = 100):
 
     # 2. Fallback to Futures (FAPI) Endpoints for perpetual contracts
     futures_urls = [
-        f"https://fapi-gcp.binance.com/fapi/v1/depth?symbol={symbol}&limit={limit}",
         f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit={limit}",
+        f"https://fapi1.binance.com/fapi/v1/depth?symbol={symbol}&limit={limit}",
         f"https://dapi.binance.com/dapi/v1/depth?symbol={symbol}&limit={limit}"
     ]
     for url in futures_urls:
