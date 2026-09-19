@@ -6844,7 +6844,7 @@ async def flash_loan_autonomous_engine(app: Application):
         # 4.1 PILLAR: Scan CeDeFi TradFi Arbitrage (Capital.com CFD vs Crypto/Gold)
         if not profitable_items:
             tradfi_items = await asyncio.to_thread(engine.scan_cedefi_tradfi_arbitrage)
-            profitable_items = [it for it in tradfi_items if (it.get("net_yield_pct", 0.0) >= 0.10 or it.get("price_gap_usd", 0.0) >= 8.0)]
+            profitable_items = [it for it in tradfi_items if it.get("market_status") != "CLOSED" and (it.get("net_yield_pct", 0.0) >= 0.10 or it.get("price_gap_usd", 0.0) >= 8.0)]
 
         # 5. Scan Ultra-Low Fee Pegged Stablecoin Arbitrage (Fee Hurdle ~0.08%)
         if not profitable_items:

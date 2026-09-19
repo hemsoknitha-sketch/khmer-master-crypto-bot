@@ -478,7 +478,14 @@ class FlashLoanMEVEngine:
 
             net_yield_pct = max(0.0, gross_spread_pct - fee_hurdle)
             price_gap_usd = round(abs(cap_mid - crypto_price), 2)
-            status = "⚡ HIGH PROFIT SPREAD" if net_yield_pct >= 0.20 else ("🟢 TRADEABLE" if net_yield_pct > 0.05 else "⚪ TIGHT SPREAD")
+            if market_status == "CLOSED":
+                status = "🔒 MARKET CLOSED (WEEKEND)"
+            elif net_yield_pct >= 0.20:
+                status = "⚡ HIGH PROFIT SPREAD"
+            elif net_yield_pct > 0.05:
+                status = "🟢 TRADEABLE"
+            else:
+                status = "⚪ TIGHT SPREAD"
 
             return {
                 "tradfi_epic": tradfi_epic,
@@ -538,6 +545,12 @@ class FlashLoanMEVEngine:
             return {
                 "success": False,
                 "error": f"No live market data available for {resolved_epic}."
+            }
+
+        if target_item.get("market_status") == "CLOSED":
+            return {
+                "success": False,
+                "error": f"ផ្សារ {target_item['tradfi_name']} នៅលើ Capital.com បច្ចុប្បន្នត្រូវបានបិទ (Market Closed - Weekend)។ ផ្សារ TradFi នឹងបើកឡើងវិញនៅរាត្រីថ្ងៃអាទិត្យ/ព្រឹកថ្ងៃចន្ទ!"
             }
 
         action = target_item["action"]
