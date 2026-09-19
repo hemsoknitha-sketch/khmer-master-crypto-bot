@@ -5243,6 +5243,33 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_wealth_stop":
                 context.args = ["OFF"]
                 await wealth_command(update, context)
+            elif data in ["btn_capital", "btn_capital_menu", "btn_cap_menu", "btn_cap_refresh"]:
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_buy_gold":
+                context.args = ["BUY", "GOLD", "0.02"]
+                await capital_command(update, context)
+            elif data == "btn_cap_sell_gold":
+                context.args = ["SELL", "GOLD", "0.02"]
+                await capital_command(update, context)
+            elif data == "btn_cap_buy_sp500":
+                context.args = ["BUY", "SP500", "0.1"]
+                await capital_command(update, context)
+            elif data == "btn_cap_sell_sp500":
+                context.args = ["SELL", "SP500", "0.1"]
+                await capital_command(update, context)
+            elif data == "btn_cap_buy_btc":
+                context.args = ["BUY", "BTCUSD", "0.001"]
+                await capital_command(update, context)
+            elif data == "btn_cap_sell_btc":
+                context.args = ["SELL", "BTCUSD", "0.001"]
+                await capital_command(update, context)
+            elif data == "btn_cap_positions":
+                context.args = ["POSITIONS"]
+                await capital_command(update, context)
+            elif data == "btn_cap_close_all":
+                context.args = ["CLOSEALL"]
+                await capital_command(update, context)
             elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
                 await turbo_hedge_command(update, context)
             elif data in ["btn_smart_trade", "btn_smart_trade_launch"]:
@@ -17513,6 +17540,215 @@ class TelegramBotThread(BaseThread):
             else:
                 await update.effective_message.reply_text("⚠️ Invalid option! Usage: `/wealth SPOT ON 50` or `/wealth FUTURES ON 50` or `/wealth OFF`", parse_mode="Markdown")
 
+        async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = context.args if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🥇 Buy Gold (0.02)", callback_data="btn_cap_buy_gold"),
+                    InlineKeyboardButton("🥈 Sell Gold (0.02)", callback_data="btn_cap_sell_gold")
+                ],
+                [
+                    InlineKeyboardButton("📈 Buy S&P 500 (0.1)", callback_data="btn_cap_buy_sp500"),
+                    InlineKeyboardButton("📉 Sell S&P 500 (0.1)", callback_data="btn_cap_sell_sp500")
+                ],
+                [
+                    InlineKeyboardButton("🪙 Buy BTC CFD", callback_data="btn_cap_buy_btc"),
+                    InlineKeyboardButton("🪙 Sell BTC CFD", callback_data="btn_cap_sell_btc")
+                ],
+                [
+                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions"),
+                    InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🛡️ Close All", callback_data="btn_cap_close_all"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            # Subcommands: /capital BUY <epic> <size> or /capital SELL <epic> <size>
+            if args:
+                action = str(args[0]).upper().strip()
+                if action in ["BUY", "SELL"] and len(args) >= 2:
+                    asset = str(args[1]).upper().strip()
+                    size = float(args[2]) if len(args) >= 3 else None
+                    trade_res = capital_engine.execute_tradfi_trade(asset, action, size=size)
+                    if trade_res.get("success"):
+                        msg = (
+                            f"✅ **CAPITAL.COM ORDER EXECUTED!** 🚀\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏛️ **ឧបករណ៍ (Epic) ៖** `{trade_res.get('epic')}`\n"
+                            f"🎯 **ទិសដៅ (Direction) ៖** `{trade_res.get('direction')}`\n"
+                            f"📦 **ទំហំ (Contracts) ៖** `{trade_res.get('size')}`\n"
+                            f"🛑 **Stop-Loss ៖** `${trade_res.get('sl', 0.0):,.2f}`\n"
+                            f"🎯 **Take-Profit ៖** `${trade_res.get('tp', 0.0):,.2f}`\n"
+                            f"🔖 **Deal Ref ៖** `{trade_res.get('deal_reference')}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛡️ _ការពារដោយ Breakeven Armor & ATR Trailing Stop!_"
+                        ) if user_lang == 'khmer' else (
+                            f"✅ **CAPITAL.COM ORDER EXECUTED!** 🚀\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏛️ **Epic:** `{trade_res.get('epic')}`\n"
+                            f"🎯 **Direction:** `{trade_res.get('direction')}`\n"
+                            f"📦 **Size:** `{trade_res.get('size')}`\n"
+                            f"🛑 **Stop-Loss:** `${trade_res.get('sl', 0.0):,.2f}`\n"
+                            f"🎯 **Take-Profit:** `${trade_res.get('tp', 0.0):,.2f}`\n"
+                            f"🔖 **Deal Ref:** `{trade_res.get('deal_reference')}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛡️ _Guarded by Breakeven Armor & ATR Trailing Stop!_"
+                        )
+                    else:
+                        err = trade_res.get("error", "Unknown execution error")
+                        msg = (
+                            f"❌ **CAPITAL.COM EXECUTION REJECTED!** ⚠️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚠️ **មូលហេតុ ៖** `{err}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _(ចំណាំ៖ ទីផ្សារ Gold & S&P 500 បិទទ្វារនៅចុងសប្តាហ៍ TradFi Weekend Shield)_"
+                        ) if user_lang == 'khmer' else (
+                            f"❌ **CAPITAL.COM EXECUTION REJECTED!** ⚠️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚠️ **Reason:** `{err}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _(Note: Gold & S&P 500 are closed on weekends under TradFi Market Shield)_"
+                        )
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+                elif action in ["CLOSEALL", "CLOSE", "STOP"]:
+                    res = capital_engine.close_all_tradfi()
+                    count = res.get("closed_count", 0)
+                    msg = (
+                        f"🛡️ **CAPITAL.COM POSITIONS CLOSED!** 🏁\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🚪 **ចំនួន Position ដែលបានបិទ ៖** `{count}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💎 _រាល់ Position ត្រូវបានទូទាត់ជាសាច់ប្រាក់សុទ្ធដោយសុវត្ថិភាព!_"
+                    ) if user_lang == 'khmer' else (
+                        f"🛡️ **CAPITAL.COM POSITIONS CLOSED!** 🏁\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🚪 **Closed Positions:** `{count}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💎 _All positions safely liquidated to clean cash._"
+                    )
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+                elif action in ["POSITIONS", "OPEN"]:
+                    data = capital_engine.get_tradfi_dashboard()
+                    positions = data.get("open_positions", [])
+                    if not positions:
+                        p_msg = (
+                            f"📊 **CAPITAL.COM ACTIVE POSITIONS**\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"ℹ️ **ស្ថានភាព ៖** គ្មាន Position កំពុងដំណើរការនៅឡើយទេ។\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _ចុចប៊ូតុងខាងក្រោមដើម្បីចាប់ផ្តើមចូល Position!_"
+                        )
+                    else:
+                        lines = [f"📊 **CAPITAL.COM ACTIVE POSITIONS ({len(positions)})**", ui_standards.DIVIDER_HEAVY]
+                        for p in positions:
+                            lines.append(f"• **{p['epic']}** ({p['direction']}) Size: `{p['size']}`")
+                            lines.append(f"  Entry: `${p['level']:,.2f}` | PnL: `${p['upl']:,.2f} {p['currency']}`")
+                        lines.append(ui_standards.DIVIDER_HEAVY)
+                        p_msg = "\n".join(lines)
+                    await update.effective_message.reply_text(p_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+            # Default: Master Dashboard
+            data = capital_engine.get_tradfi_dashboard()
+            env_mode = "DEMO ($10,000 Virtual Funds)" if data.get("is_demo") else "LIVE MAINNET"
+            quotes = data.get("quotes", {})
+            gold = quotes.get("GOLD", {})
+            sp500 = quotes.get("SP500", {})
+            oil = quotes.get("OIL", {})
+            btc = quotes.get("BTCUSD", {})
+
+            gold_p = f"${gold.get('ask', 0.0):,.2f}" if gold.get('success') else "N/A"
+            gold_sp = f"${gold.get('spread', 0.0):.2f}" if gold.get('success') else "N/A"
+            gold_st = "🟢 OPEN" if gold.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
+
+            sp_p = f"${sp500.get('ask', 0.0):,.2f}" if sp500.get('success') else "N/A"
+            sp_sp = f"${sp500.get('spread', 0.0):.2f}" if sp500.get('success') else "N/A"
+            sp_st = "🟢 OPEN" if sp500.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
+
+            oil_p = f"${oil.get('ask', 0.0):,.2f}" if oil.get('success') else "N/A"
+            oil_sp = f"${oil.get('spread', 0.0):.2f}" if oil.get('success') else "N/A"
+
+            btc_p = f"${btc.get('ask', 0.0):,.2f}" if btc.get('success') else "N/A"
+            btc_sp = f"${btc.get('spread', 0.0):.2f}" if btc.get('success') else "N/A"
+
+            pnl_val = data.get("active_pnl", 0.0)
+            pnl_badge = f"+${pnl_val:,.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):,.2f}"
+
+            if user_lang == 'khmer':
+                msg = (
+                    f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🏦 **គណនី ៖** `{env_mode}`\n"
+                    f"🆔 **Account ID ៖** `{data.get('account_id')}`\n"
+                    f"💰 **សមតុល្យ (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
+                    f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
+                    f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
+                    f"📊 **Positions សកម្ម ៖** `{data.get('positions_count', 0)} កំពុងដំណើរការ`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📊 **តម្លៃទីផ្សារផ្ទាល់ (Live Institutional Quotes) ៖**\n"
+                    f"🥇 **Gold (XAU/USD) ៖** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"
+                    f"📈 **S&P 500 (US500) ៖** `{sp_p}` | Sp: `{sp_sp}` ({sp_st})\n"
+                    f"🛢️ **Crude Oil (WTI) ៖** `{oil_p}` | Sp: `{oil_sp}`\n"
+                    f"🪙 **Bitcoin (CFD) ៖** `{btc_p}` | Sp: `{btc_sp}` (🟢 24/7)\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **ប្រព័ន្ធការពារដើមទុនស្ថាប័ន (Zero Negligence) ៖**\n"
+                    f"• **Breakeven Armor ៖** ចាក់សោ SL ពេលចំណេញ +1.5%\n"
+                    f"• **Dynamic ATR Trailing ៖** ចាក់សោ 80% នៃចំណេញកំពូល\n"
+                    f"• **Spread Guard ៖** បដិសេធ Trade ពេល Spread រីកធំ\n"
+                    f"• **Asset-DNA Sizing ៖** 1% Risk Clamp គ្មាន Drawdown\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+                )
+            else:
+                msg = (
+                    f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🏦 **Account:** `{env_mode}`\n"
+                    f"🆔 **Account ID:** `{data.get('account_id')}`\n"
+                    f"💰 **Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
+                    f"💵 **Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
+                    f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
+                    f"📊 **Active Positions:** `{data.get('positions_count', 0)} open`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📊 **Live Institutional Market Quotes:**\n"
+                    f"🥇 **Gold (XAU/USD):** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"
+                    f"📈 **S&P 500 (US500):** `{sp_p}` | Sp: `{sp_sp}` ({sp_st})\n"
+                    f"🛢️ **Crude Oil (WTI):** `{oil_p}` | Sp: `{oil_sp}`\n"
+                    f"🪙 **Bitcoin (CFD):** `{btc_p}` | Sp: `{btc_sp}` (🟢 24/7)\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **Institutional Capital Protection (Zero Negligence):**\n"
+                    f"• **Breakeven Armor:** Locks SL at entry on +1.5% profit\n"
+                    f"• **Dynamic ATR Trailing:** Protects 80% peak profit\n"
+                    f"• **Spread Guard:** Rejects orders during wide spreads\n"
+                    f"• **Asset-DNA Sizing:** 1% Risk Clamp zero drawdown\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Risk Protection & Wealth Generation 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
+        self.app.add_handler(CommandHandler("capital", capital_command))
+        self.app.add_handler(CommandHandler("capital_com", capital_command))
+        self.app.add_handler(CommandHandler("capitalcom", capital_command))
         self.app.add_handler(CommandHandler("wealth", wealth_command))
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))

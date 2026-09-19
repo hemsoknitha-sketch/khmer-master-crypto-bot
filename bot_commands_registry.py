@@ -45,6 +45,7 @@ def get_public_bot_commands():
         BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
 
         # --- [4] CEDEFI & ARBITRAGE ENGINES (MEV & High-Yield Harvester) ---
+        BotCommand("capital", "🏛️ Capital.com TradFi (Gold, Oil, S&P 500)"),
         BotCommand("flash_loan", "⚡ Quantum CeDeFi 0-Risk Arbitrage"),
         BotCommand("smart_swap", "⚡ Multi-Chain DEX & AI Gem Sniper"),
         BotCommand("cross_arb", "⚡ High-Speed Cross-Market Arbitrage"),

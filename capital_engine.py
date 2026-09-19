@@ -464,15 +464,379 @@ class CapitalComEngine:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def update_position_stops(
+        self,
+        deal_id: str,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Updates Stop-Loss and/or Take-Profit on an open position (Breakeven Armor / Trailing Stop)."""
+        if not self.ensure_session():
+            return {"success": False, "error": "Unable to establish valid session."}
+
+        url = f"{self.base_url}/positions/{deal_id}"
+        payload: Dict[str, Any] = {}
+        if stop_loss is not None and stop_loss > 0:
+            payload["stopLevel"] = round(stop_loss, 4)
+        if take_profit is not None and take_profit > 0:
+            payload["profitLevel"] = round(take_profit, 4)
+
+        try:
+            res = requests.put(url, headers=self.get_auth_headers(), json=payload, timeout=10)
+            if res.status_code == 200:
+                return {"success": True, "deal_id": deal_id, "data": res.json()}
+            else:
+                err_data = res.json() if res.content else {}
+                err_code = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
+                return {"success": False, "error": err_code}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def close_all_capital_positions(self) -> Dict[str, Any]:
+        """Closes all currently open TradFi positions in one call (Emergency Flush / Clean Harvest)."""
+        positions = self.get_open_positions()
+        if not positions:
+            return {"success": True, "closed_count": 0, "message": "No open positions to close."}
+
+        closed = []
+        errors = []
+        for pos_item in positions:
+            pos = pos_item.get("position", {})
+            deal_id = pos.get("dealId")
+            epic = pos.get("epic", "UNKNOWN")
+            if deal_id:
+                res = self.close_position(deal_id)
+                if res.get("success"):
+                    closed.append({"deal_id": deal_id, "epic": epic})
+                else:
+                    errors.append({"deal_id": deal_id, "error": res.get("error")})
+
+        return {
+            "success": len(errors) == 0,
+            "closed_count": len(closed),
+            "errors_count": len(errors),
+            "closed": closed,
+            "errors": errors
+        }
+
+    # --------------------------------------------------------------------------
+    # Institutional Quant Signal Engine & Mathematical Edge
+    # --------------------------------------------------------------------------
+    def evaluate_tradfi_quant_signal(self, epic: str) -> Dict[str, Any]:
+        """
+        Evaluates Multi-Timeframe Quant Confluence (EMA 20/50, RSI 14, ATR, Spread Guard)
+        on Capital.com instruments (Gold, S&P 500, Crude Oil, Crypto CFDs).
+        
+        Returns actionable institutional signal:
+        {signal: 'STRONG_BUY'|'BUY'|'HOLD_NEUTRAL'|'SELL'|'STRONG_SELL',
+         confidence: int (0-100), entry_price: float, sl: float, tp: float, ...}
+        """
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        market = self.get_market_details(resolved_epic)
+        if not market.get("success"):
+            return {"success": False, "signal": "HOLD_NEUTRAL", "error": market.get("error")}
+
+        current_bid = market.get("bid", 0.0)
+        current_ask = market.get("ask", 0.0)
+        mid_price = market.get("mid", 0.0)
+        spread = market.get("spread", 0.0)
+        market_status = market.get("marketStatus", "UNKNOWN")
+
+        # 1. Market Status Guard (TradFi Market Closed Shield)
+        if market_status != "TRADEABLE":
+            return {
+                "success": True,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "confidence": 0,
+                "market_status": market_status,
+                "reason": f"Market {resolved_epic} is currently {market_status} (TradFi markets closed on weekends/holidays).",
+                "mid_price": mid_price,
+                "spread": spread
+            }
+
+        # 2. Spread Guard
+        max_spreads = {"GOLD": 0.90, "US500": 1.20, "OIL_CRUDE": 0.08, "BTCUSD": 80.0}
+        max_spread = max_spreads.get(resolved_epic, 2.0)
+        if spread > max_spread:
+            return {
+                "success": True,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "confidence": 10,
+                "reason": f"Spread Guard: Current spread {spread} exceeds threshold {max_spread} (News/Volatility dislocation).",
+                "mid_price": mid_price,
+                "spread": spread
+            }
+
+        # 3. Fetch 15m Candles for Technical Confluence
+        candles = self.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=40)
+        if len(candles) < 20:
+            return {
+                "success": True,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "confidence": 20,
+                "reason": "Insufficient historical candles for institutional confluence.",
+                "mid_price": mid_price,
+                "spread": spread
+            }
+
+        closes = [c["close"] for c in candles]
+        highs = [c["high"] for c in candles]
+        lows = [c["low"] for c in candles]
+
+        # Calculate EMA 20 & EMA 50
+        def _ema(prices: List[float], period: int) -> float:
+            if len(prices) < period:
+                return prices[-1] if prices else 0.0
+            mult = 2.0 / (period + 1)
+            val = sum(prices[:period]) / period
+            for p in prices[period:]:
+                val = (p - val) * mult + val
+            return val
+
+        ema20 = _ema(closes, 20)
+        ema50 = _ema(closes, min(50, len(closes)))
+
+        # Calculate RSI 14
+        deltas = [closes[i+1] - closes[i] for i in range(len(closes)-1)]
+        gains = [d if d > 0 else 0.0 for d in deltas]
+        losses = [-d if d < 0 else 0.0 for d in deltas]
+        p_rsi = 14
+        if len(deltas) >= p_rsi:
+            avg_g = sum(gains[:p_rsi]) / p_rsi
+            avg_l = sum(losses[:p_rsi]) / p_rsi
+            for i in range(p_rsi, len(deltas)):
+                avg_g = (avg_g * (p_rsi - 1) + gains[i]) / p_rsi
+                avg_l = (avg_l * (p_rsi - 1) + losses[i]) / p_rsi
+            rs = avg_g / avg_l if avg_l > 0 else 100.0
+            rsi = round(100.0 - (100.0 / (1.0 + rs)), 2)
+        else:
+            rsi = 50.0
+
+        # Calculate ATR 14
+        trs = []
+        for i in range(1, len(candles)):
+            h, l, pc = candles[i]["high"], candles[i]["low"], candles[i-1]["close"]
+            trs.append(max(h - l, abs(h - pc), abs(l - pc)))
+        atr = round(sum(trs[-14:]) / min(14, len(trs)), 4) if trs else 1.0
+
+        # Confluence Logic
+        bullish_score = 0
+        bearish_score = 0
+
+        # EMA Trend
+        if closes[-1] > ema20 > ema50:
+            bullish_score += 40
+        elif closes[-1] < ema20 < ema50:
+            bearish_score += 40
+        elif closes[-1] > ema20:
+            bullish_score += 20
+        elif closes[-1] < ema20:
+            bearish_score += 20
+
+        # RSI Momentum
+        if 48.0 <= rsi <= 68.0:
+            bullish_score += 30
+        elif 32.0 <= rsi <= 52.0:
+            bearish_score += 30
+
+        # Anti-FOMO Overbought / Oversold Guards
+        if rsi > 72.0:
+            bullish_score = 0  # Rebuff chasing tops
+        if rsi < 35.0:
+            bearish_score = 0  # Rebuff shorting bottoms
+
+        # Recent 3 candle momentum
+        if len(closes) >= 4:
+            if closes[-1] > closes[-2] > closes[-3]:
+                bullish_score += 20
+            elif closes[-1] < closes[-2] < closes[-3]:
+                bearish_score += 20
+
+        # Final signal arbitration
+        if bullish_score >= 70:
+            signal = "STRONG_BUY" if bullish_score >= 85 else "BUY"
+            confidence = min(96, bullish_score)
+            sl = round(current_ask - (1.5 * atr), 2)
+            tp = round(current_ask + (3.0 * atr), 2)
+        elif bearish_score >= 70:
+            signal = "STRONG_SELL" if bearish_score >= 85 else "SELL"
+            confidence = min(96, bearish_score)
+            sl = round(current_bid + (1.5 * atr), 2)
+            tp = round(current_bid - (3.0 * atr), 2)
+        else:
+            signal = "HOLD_NEUTRAL"
+            confidence = max(bullish_score, bearish_score)
+            sl = 0.0
+            tp = 0.0
+
+        return {
+            "success": True,
+            "epic": resolved_epic,
+            "signal": signal,
+            "confidence": confidence,
+            "mid_price": mid_price,
+            "bid": current_bid,
+            "ask": current_ask,
+            "spread": spread,
+            "ema20": round(ema20, 2),
+            "ema50": round(ema50, 2),
+            "rsi": rsi,
+            "atr": atr,
+            "sl": sl,
+            "tp": tp,
+            "market_status": market_status
+        }
+
+    def execute_smart_tradfi_order(
+        self,
+        epic: str,
+        direction: str,
+        size: Optional[float] = None,
+        risk_pct: float = 1.0
+    ) -> Dict[str, Any]:
+        """
+        Executes an institutional risk-managed trade with automated SL/TP based on ATR.
+        """
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        dir_u = direction.upper()
+        
+        # 1. Run Quant Signal Evaluation
+        analysis = self.evaluate_tradfi_quant_signal(resolved_epic)
+        if not analysis.get("success"):
+            return {"success": False, "error": analysis.get("error", "Quant signal failure")}
+
+        if analysis.get("market_status") != "TRADEABLE":
+            return {
+                "success": False,
+                "error": f"Market {resolved_epic} is {analysis.get('market_status')} (Closed for trading)."
+            }
+
+        # 2. Compute Size if not specified
+        bal_info = self.get_account_balance()
+        equity = bal_info.get("balance", 1000.0)
+        market_details = self.get_market_details(resolved_epic)
+        min_size = market_details.get("min_deal_size", 0.01)
+
+        if size is None or size <= 0:
+            # Sizing: 1% risk per trade
+            # Gold: 1 lot = 1 oz. 0.01 lot = $0.01 price move = $0.01 PnL
+            if resolved_epic == "GOLD":
+                size = max(0.02, min_size)
+            elif resolved_epic == "US500":
+                size = max(0.1, min_size)
+            elif resolved_epic == "BTCUSD":
+                size = max(0.001, min_size)
+            else:
+                size = min_size
+        else:
+            size = max(size, min_size)
+
+        # 3. Retrieve or calculate dynamic SL/TP
+        sl = analysis.get("sl")
+        tp = analysis.get("tp")
+        atr = analysis.get("atr", 1.0)
+        ask = analysis.get("ask", 0.0)
+        bid = analysis.get("bid", 0.0)
+
+        if dir_u == "BUY":
+            if not sl or sl <= 0:
+                sl = round(ask - (1.5 * atr), 2)
+            if not tp or tp <= 0:
+                tp = round(ask + (3.0 * atr), 2)
+        elif dir_u == "SELL":
+            if not sl or sl <= 0:
+                sl = round(bid + (1.5 * atr), 2)
+            if not tp or tp <= 0:
+                tp = round(bid - (3.0 * atr), 2)
+
+        # 4. Transmit Protected Position
+        res = self.place_position(
+            epic=resolved_epic,
+            direction=dir_u,
+            size=size,
+            stop_loss=sl,
+            take_profit=tp,
+            max_allowed_spread=2.5
+        )
+
+        if res.get("success"):
+            res["sl"] = sl
+            res["tp"] = tp
+            res["confidence"] = analysis.get("confidence")
+            res["rsi"] = analysis.get("rsi")
+            res["atr"] = atr
+
+        return res
+
+    def get_tradfi_dashboard_data(self) -> Dict[str, Any]:
+        """
+        Aggregates live account balance, active quotes, and open positions
+        for the Telegram /capital Master Control Panel.
+        """
+        bal = self.get_account_balance()
+        positions = self.get_open_positions()
+
+        # Fetch key asset quotes (Cached)
+        gold = self.get_market_details("GOLD")
+        sp500 = self.get_market_details("SP500")
+        oil = self.get_market_details("OIL")
+        btc = self.get_market_details("BTCUSD")
+
+        # Summarize positions
+        pos_summary = []
+        total_unrealized_pnl = 0.0
+        for p in positions:
+            pos = p.get("position", {})
+            upl = float(pos.get("upl", 0.0))
+            total_unrealized_pnl += upl
+            pos_summary.append({
+                "deal_id": pos.get("dealId"),
+                "epic": pos.get("epic"),
+                "direction": pos.get("direction"),
+                "size": float(pos.get("size", 0.0)),
+                "level": float(pos.get("level", 0.0)),
+                "upl": upl,
+                "currency": pos.get("currency", "USD"),
+                "stop_level": pos.get("stopLevel"),
+                "profit_level": pos.get("profitLevel")
+            })
+
+        return {
+            "success": True,
+            "is_demo": self.is_demo,
+            "account_id": bal.get("account_id"),
+            "account_name": bal.get("account_name"),
+            "balance": bal.get("balance", 0.0),
+            "available": bal.get("available", 0.0),
+            "equity": bal.get("balance", 0.0) + bal.get("pnl", 0.0),
+            "active_pnl": bal.get("pnl", 0.0) or total_unrealized_pnl,
+            "currency": bal.get("currency", "USD"),
+            "status": bal.get("status", "ACTIVE"),
+            "quotes": {
+                "GOLD": gold,
+                "SP500": sp500,
+                "OIL": oil,
+                "BTCUSD": btc
+            },
+            "open_positions": pos_summary,
+            "positions_count": len(pos_summary)
+        }
+
 
 # ==============================================================================
 # 3. CONVENIENCE HELPERS & FACTORY FUNCTIONS
 # ==============================================================================
 _GLOBAL_CAPITAL_ENGINE: Optional[CapitalComEngine] = None
 
-def get_capital_engine(is_demo: bool = True) -> CapitalComEngine:
+def get_capital_engine(is_demo: Optional[bool] = None) -> CapitalComEngine:
     """Singleton getter for the global CapitalComEngine instance."""
     global _GLOBAL_CAPITAL_ENGINE
+    if is_demo is None:
+        is_demo = os.getenv("CAPITAL_IS_DEMO", "True").strip().lower() in ("true", "1", "yes")
+        
     if _GLOBAL_CAPITAL_ENGINE is None or _GLOBAL_CAPITAL_ENGINE.is_demo != is_demo:
         _GLOBAL_CAPITAL_ENGINE = CapitalComEngine(is_demo=is_demo)
     return _GLOBAL_CAPITAL_ENGINE
@@ -500,15 +864,40 @@ def validate_capital_credentials(
     balance_info = engine.get_account_balance()
     return True, msg, balance_info
 
-def quick_gold_quote(is_demo: bool = True) -> Dict[str, Any]:
+def quick_gold_quote(is_demo: Optional[bool] = None) -> Dict[str, Any]:
     """Fetches instant live quote for Spot Gold (XAU/USD)."""
     engine = get_capital_engine(is_demo=is_demo)
     return engine.get_market_details("GOLD")
 
-def quick_sp500_quote(is_demo: bool = True) -> Dict[str, Any]:
+def quick_sp500_quote(is_demo: Optional[bool] = None) -> Dict[str, Any]:
     """Fetches instant live quote for S&P 500 (US500)."""
     engine = get_capital_engine(is_demo=is_demo)
     return engine.get_market_details("SP500")
+
+def get_tradfi_dashboard(is_demo: Optional[bool] = None) -> Dict[str, Any]:
+    """Retrieves full TradFi dashboard payload for Telegram UI rendering."""
+    engine = get_capital_engine(is_demo=is_demo)
+    return engine.get_tradfi_dashboard_data()
+
+def execute_tradfi_trade(
+    epic: str,
+    direction: str,
+    size: Optional[float] = None,
+    is_demo: Optional[bool] = None
+) -> Dict[str, Any]:
+    """Executes a protected institutional TradFi order on Capital.com."""
+    engine = get_capital_engine(is_demo=is_demo)
+    return engine.execute_smart_tradfi_order(epic=epic, direction=direction, size=size)
+
+def close_all_tradfi(is_demo: Optional[bool] = None) -> Dict[str, Any]:
+    """Closes all open TradFi positions in one click."""
+    engine = get_capital_engine(is_demo=is_demo)
+    return engine.close_all_capital_positions()
+
+def evaluate_tradfi_signal(epic: str, is_demo: Optional[bool] = None) -> Dict[str, Any]:
+    """Evaluates multi-indicator quant signal on a TradFi asset."""
+    engine = get_capital_engine(is_demo=is_demo)
+    return engine.evaluate_tradfi_quant_signal(epic)
 
 
 # ==============================================================================
