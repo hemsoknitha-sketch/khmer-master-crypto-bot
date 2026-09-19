@@ -719,49 +719,138 @@ class CapitalComEngine:
             trs.append(max(h - l, abs(h - pc), abs(l - pc)))
         atr = round(sum(trs[-14:]) / min(14, len(trs)), 4) if trs else 1.0
 
+        # Calculate ADX 14 & Directional Movement (+DI, -DI)
+        adx = 25.0
+        plus_di = 25.0
+        minus_di = 25.0
+        if len(candles) >= 28:
+            tr_list = []
+            dm_plus_list = []
+            dm_minus_list = []
+            for i in range(1, len(candles)):
+                h = candles[i]["high"]
+                l = candles[i]["low"]
+                c_prev = candles[i-1]["close"]
+                h_prev = candles[i-1]["high"]
+                l_prev = candles[i-1]["low"]
+
+                tr = max(h - l, abs(h - c_prev), abs(l - c_prev))
+                up_move = h - h_prev
+                down_move = l_prev - l
+
+                dm_p = up_move if (up_move > down_move and up_move > 0) else 0.0
+                dm_m = down_move if (down_move > up_move and down_move > 0) else 0.0
+
+                tr_list.append(tr)
+                dm_plus_list.append(dm_p)
+                dm_minus_list.append(dm_m)
+
+            p_adx = 14
+            if len(tr_list) >= p_adx:
+                tr14 = sum(tr_list[:p_adx])
+                dmp14 = sum(dm_plus_list[:p_adx])
+                dmm14 = sum(dm_minus_list[:p_adx])
+
+                dx_list = []
+                for i in range(p_adx, len(tr_list)):
+                    tr14 = tr14 - (tr14 / p_adx) + tr_list[i]
+                    dmp14 = dmp14 - (dmp14 / p_adx) + dm_plus_list[i]
+                    dmm14 = dmm14 - (dmm14 / p_adx) + dm_minus_list[i]
+
+                    p_di = (100.0 * dmp14 / tr14) if tr14 > 0 else 0.0
+                    m_di = (100.0 * dmm14 / tr14) if tr14 > 0 else 0.0
+                    di_diff = abs(p_di - m_di)
+                    di_sum = p_di + m_di
+                    dx = (100.0 * di_diff / di_sum) if di_sum > 0 else 0.0
+                    dx_list.append(dx)
+
+                if dx_list:
+                    adx = round(sum(dx_list[-p_adx:]) / min(len(dx_list), p_adx), 2)
+                    plus_di = round(p_di, 2)
+                    minus_di = round(m_di, 2)
+
+        # Calculate Relative Volume (RVOL) and Range Expansion
+        volumes = [float(c.get("volume", 0.0)) for c in candles]
+        valid_vols = [v for v in volumes if v > 0]
+        if len(valid_vols) >= 10:
+            avg_vol = sum(valid_vols[-20:]) / min(len(valid_vols), 20)
+            rvol = round(valid_vols[-1] / avg_vol, 2) if avg_vol > 0 else 1.0
+        else:
+            rvol = 1.0
+
+        candle_ranges = [c["high"] - c["low"] for c in candles]
+        avg_range = sum(candle_ranges[-10:]) / min(len(candle_ranges), 10) if candle_ranges else 1.0
+        current_range = candle_ranges[-1] if candle_ranges else 1.0
+        range_ratio = round(current_range / avg_range, 2) if avg_range > 0 else 1.0
+
         # Confluence Logic
         bullish_score = 0
         bearish_score = 0
 
-        # EMA Trend
+        # 1. EMA Trend (35 pts)
         if closes[-1] > ema20 > ema50:
-            bullish_score += 40
+            bullish_score += 35
         elif closes[-1] < ema20 < ema50:
-            bearish_score += 40
+            bearish_score += 35
         elif closes[-1] > ema20:
             bullish_score += 20
         elif closes[-1] < ema20:
             bearish_score += 20
 
-        # RSI Momentum
-        if 48.0 <= rsi <= 68.0:
-            bullish_score += 30
-        elif 32.0 <= rsi <= 52.0:
-            bearish_score += 30
+        # 2. RSI Momentum Sweet Spot (25 pts)
+        # Pullback sweet spot: 48 - 66 for Bullish (riding uptrend without chasing top)
+        if 48.0 <= rsi <= 66.0:
+            bullish_score += 25
+        # Pullback sweet spot: 34 - 52 for Bearish
+        elif 34.0 <= rsi <= 52.0:
+            bearish_score += 25
 
-        # Anti-FOMO Overbought / Oversold Guards
-        if rsi > 72.0:
-            bullish_score = 0  # Rebuff chasing tops
-        if rsi < 35.0:
-            bearish_score = 0  # Rebuff shorting bottoms
+        # Anti-FOMO Overbought / Oversold Guards (Strict Invariant 16 & Capital Preservation)
+        if rsi > 70.0:
+            bullish_score = 0  # Rebuff buying the absolute top
+        if rsi < 36.0:
+            bearish_score = 0  # Rebuff shorting panic bottom
 
-        # Recent 3 candle momentum
+        # 3. ADX Trend Strength Filter (20 pts)
+        # Low-momentum chop filter: if ADX < 20, market is in sideways consolidation -> penalize
+        if adx >= 24.0:
+            if plus_di > minus_di:
+                bullish_score += 20
+            elif minus_di > plus_di:
+                bearish_score += 20
+        elif adx < 19.0:
+            bullish_score = max(0, bullish_score - 25)
+            bearish_score = max(0, bearish_score - 25)
+
+        # 4. Volume / Range Surge (15 pts)
+        if rvol >= 1.35 or range_ratio >= 1.30:
+            if closes[-1] > closes[-2]:
+                bullish_score += 15
+            elif closes[-1] < closes[-2]:
+                bearish_score += 15
+        elif rvol < 0.60 and range_ratio < 0.60:
+            bullish_score = max(0, bullish_score - 15)
+            bearish_score = max(0, bearish_score - 15)
+
+        # 5. Recent 3 candle momentum (10 pts)
         if len(closes) >= 4:
             if closes[-1] > closes[-2] > closes[-3]:
-                bullish_score += 20
+                bullish_score += 10
             elif closes[-1] < closes[-2] < closes[-3]:
-                bearish_score += 20
+                bearish_score += 10
 
-        # Final signal arbitration with broker distance compliance
-        min_sl_dist = max(1.5 * atr, spread * 2.0, 0.002 * mid_price)
-        min_tp_dist = max(3.0 * atr, spread * 4.0, 0.005 * mid_price)
+        # Asymmetric R:R >= 1:6 Mathematical Ratio Enforcement
+        # Downside Risk (1R): Micro-clamped outside noise band
+        min_sl_dist = max(1.5 * atr, spread * 2.5, 0.0025 * mid_price)
+        # Upside Target (6R): Clamped to >= 6.0x the risk distance
+        min_tp_dist = max(6.0 * min_sl_dist, 6.0 * atr, 0.015 * mid_price)
 
-        if bullish_score >= 70:
+        if bullish_score >= 75:
             signal = "STRONG_BUY" if bullish_score >= 85 else "BUY"
             confidence = min(96, bullish_score)
             sl = round(current_bid - min_sl_dist, 2)
             tp = round(current_ask + min_tp_dist, 2)
-        elif bearish_score >= 70:
+        elif bearish_score >= 75:
             signal = "STRONG_SELL" if bearish_score >= 85 else "SELL"
             confidence = min(96, bearish_score)
             sl = round(current_ask + min_sl_dist, 2)
@@ -785,6 +874,12 @@ class CapitalComEngine:
             "ema50": round(ema50, 2),
             "rsi": rsi,
             "atr": atr,
+            "adx": adx,
+            "plus_di": plus_di,
+            "minus_di": minus_di,
+            "rvol": rvol,
+            "range_ratio": range_ratio,
+            "rr_ratio": 6.0,
             "sl": sl,
             "tp": tp,
             "market_status": market_status
@@ -843,8 +938,9 @@ class CapitalComEngine:
 
         mid_px = (bid + ask) / 2.0 if (bid + ask) > 0 else 1.0
         spread = analysis.get("spread", 0.0)
-        min_sl_dist = max(1.5 * atr, spread * 2.0, 0.002 * mid_px)
-        min_tp_dist = max(3.0 * atr, spread * 4.0, 0.005 * mid_px)
+        # Enforce Asymmetric R:R >= 1:6 Mathematical Ratio
+        min_sl_dist = max(1.5 * atr, spread * 2.5, 0.0025 * mid_px)
+        min_tp_dist = max(6.0 * min_sl_dist, 6.0 * atr, 0.015 * mid_px)
 
         if dir_u == "BUY":
             if not sl or sl <= 0 or sl >= bid:
@@ -1091,13 +1187,17 @@ class CapitalAutonomousEngine:
                     macro_bias = "BULLISH_MACRO"
                 if tradfi_sent == "RISK_OFF":
                     macro_boost += 10
-            elif resolved_epic in ["SP500", "US500"]:
+            elif resolved_epic in ["SP500", "US500", "US100", "NASDAQ", "NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
                 if tradfi_sent == "RISK_ON":
                     macro_boost += 15
                     macro_bias = "BULLISH_MACRO"
                 elif tradfi_sent == "RISK_OFF":
                     macro_boost -= 20
                     macro_bias = "BEARISH_MACRO"
+            elif resolved_epic in ["OIL", "OIL_CRUDE", "OIL_BRENT"]:
+                if tradfi_sent == "RISK_ON":
+                    macro_boost += 10
+                    macro_bias = "BULLISH_MACRO"
             elif resolved_epic == "BTCUSD":
                 if dxy_sig == "BULLISH_LIQUIDITY" and tradfi_sent == "RISK_ON":
                     macro_boost += 20
@@ -1170,17 +1270,28 @@ class CapitalAutonomousEngine:
                 peak_upl = upl
                 self._peak_upl_cache[deal_id] = peak_upl
 
-            # A. Breakeven Armor: At +1.5% ROI
+            # Tier 1. Breakeven Armor: At +1.5% ROI (Locks SL to Entry + Fees, Downside Risk -> 0.00R)
             if roi_pct >= 1.5 and deal_id not in self._be_locked_set:
-                new_sl = round(entry_level * 1.0005, 2) if direction == "BUY" else round(entry_level * 0.9995, 2)
+                new_sl = round(entry_level * 1.0008, 2) if direction == "BUY" else round(entry_level * 0.9992, 2)
                 upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
                 if upd.get("success"):
                     self._be_locked_set.add(deal_id)
                     ratcheted_count += 1
-                    logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} ({direction}) at {new_sl} (+{roi_pct:.1f}% ROI)")
+                    logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} ({direction}) at {new_sl} (+{roi_pct:.1f}% ROI, Risk: 0.00R)")
 
-            # B. Golden 80% Trailing Ratchet: When profit exceeds +4.0% ROI
-            elif roi_pct >= 4.0 and peak_upl > 0:
+            # Tier 2. Capital Fortress Lock: At +3.5% ROI (Secures +1.5R net profit)
+            elif roi_pct >= 3.5 and deal_id not in getattr(self, "_fortress_locked_set", set()):
+                if not hasattr(self, "_fortress_locked_set"):
+                    self._fortress_locked_set = set()
+                secured_sl = round(entry_level * 1.0035, 2) if direction == "BUY" else round(entry_level * 0.9965, 2)
+                upd = engine.update_position_stops(deal_id=deal_id, stop_loss=secured_sl)
+                if upd.get("success"):
+                    self._fortress_locked_set.add(deal_id)
+                    ratcheted_count += 1
+                    logger.info(f"🏰 [CAPITAL FORTRESS] Secured +1.5R for {epic} at {secured_sl} (+{roi_pct:.1f}% ROI)")
+
+            # Tier 3. Golden 80% Trailing Ratchet: When profit exceeds +5.0% ROI (Uncapped upside runner)
+            elif roi_pct >= 5.0 and peak_upl > 0:
                 target_protected_profit = peak_upl * 0.80
                 if direction == "BUY":
                     ratchet_price = round(entry_level + (target_protected_profit / size), 2)
@@ -1188,14 +1299,25 @@ class CapitalAutonomousEngine:
                         upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
                         if upd.get("success"):
                             ratcheted_count += 1
-                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price}")
+                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price} (80% Peak Locked)")
                 elif direction == "SELL":
                     ratchet_price = round(entry_level - (target_protected_profit / size), 2)
                     if sl <= 0 or ratchet_price < sl:
                         upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
                         if upd.get("success"):
                             ratcheted_count += 1
-                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price}")
+                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price} (80% Peak Locked)")
+
+            # Tier 4. Clean Cash Harvest: At +12.0% ROI or 6R Target Reached
+            if roi_pct >= 12.0:
+                logger.info(f"🎯 [MEGA TARGET HARVEST] 6R Target Reached (+{roi_pct:.1f}% ROI)! Executing Clean Cash Harvest for {epic}...")
+                close_res = engine.close_position(deal_id=deal_id)
+                if close_res.get("success"):
+                    closed_count += 1
+                    self._peak_upl_cache.pop(deal_id, None)
+                    self._be_locked_set.discard(deal_id)
+                    if hasattr(self, "_fortress_locked_set"):
+                        self._fortress_locked_set.discard(deal_id)
 
         return {
             "active_count": len(positions),
@@ -1229,9 +1351,10 @@ class CapitalAutonomousEngine:
         open_positions = engine.get_open_positions()
         open_epics = {pos.get("position", {}).get("epic", "").upper() for pos in open_positions}
 
-        # Step 3: Scan candidate assets
+        # Step 3: Scan candidate assets and rank via Institutional Edge Matrix
         priority_epics = self.get_session_priority_assets()
-        
+        candidate_setups = []
+
         for epic in priority_epics:
             resolved_epic = EPIC_MAP.get(epic, epic)
             if resolved_epic in open_epics:
@@ -1241,114 +1364,136 @@ class CapitalAutonomousEngine:
             final_action = setup.get("final_action", "HOLD")
             confidence = setup.get("final_confidence", 0)
 
+            # Strict Invariant: Only setups with confidence >= 75% and actionable signal
             if final_action in ["BUY", "SELL"] and confidence >= 75:
-                logger.info(f"🎯 [CAPITAL AUTO] High-Confidence TradFi Setup detected: {epic} {final_action} ({confidence}% conf)")
-                
-                for user in active_users:
-                    chat_id = user["chat_id"]
-                    budget = user.get("budget", 50.0)
-                    max_pos = user.get("max_positions", 2)
+                adx_val = setup.get("adx", 25.0)
+                rvol_val = setup.get("rvol", 1.0)
+                # Composite Institutional Edge Score: confidence * 1.5 + ADX + RVOL * 10
+                rank_score = (confidence * 1.5) + adx_val + (rvol_val * 10.0)
+                candidate_setups.append((rank_score, epic, resolved_epic, setup))
 
-                    if len(open_positions) >= max_pos:
-                        continue
+        if not candidate_setups:
+            return
 
-                    # Dynamic size based on user budget and asset DNA
-                    size = None
-                    if resolved_epic == "GOLD":
-                        size = 0.02 if budget < 100 else 0.05
-                    elif resolved_epic in ["US500", "SP500"]:
-                        size = 0.1 if budget < 100 else 0.2
-                    elif resolved_epic in ["US100", "NASDAQ"]:
-                        size = 0.1 if budget < 100 else 0.2
-                    elif resolved_epic in ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
-                        size = 1.0 if budget < 100 else 2.0
-                    elif resolved_epic == "BTCUSD":
-                        size = 0.001 if budget < 50 else 0.002
+        # Sort candidate setups descending by institutional rank score (Apex Golden Setup First)
+        candidate_setups.sort(key=lambda x: x[0], reverse=True)
+        best_rank, best_epic, resolved_epic, setup = candidate_setups[0]
+        final_action = setup["final_action"]
+        confidence = setup["final_confidence"]
 
-                    trade_res = engine.execute_smart_tradfi_order(
-                        epic=resolved_epic,
-                        direction=final_action,
-                        size=size
-                    )
+        logger.info(f"👑 [APEX TRADFI SETUP SELECTED] {resolved_epic} {final_action} | Score: {best_rank:.1f} | Conf: {confidence}% | ADX: {setup.get('adx', 0):.1f} | RVOL: {setup.get('rvol', 1.0)}x")
+        
+        for user in active_users:
+            chat_id = user["chat_id"]
+            budget = user.get("budget", 50.0)
+            max_pos = user.get("max_positions", 2)
 
-                    if trade_res.get("success"):
-                        deal_ref = trade_res.get("deal_reference", "AUTO")
-                        deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
-                        entry_px = setup.get("ask" if final_action == "BUY" else "bid", 0.0)
-                        sl = trade_res.get("sl", 0.0)
-                        tp = trade_res.get("tp", 0.0)
-                        executed_size = trade_res.get("size", size or 0.01)
+            if len(open_positions) >= max_pos:
+                continue
 
-                        # Record in database
-                        db.record_capital_auto_trade(
-                            chat_id=chat_id,
-                            deal_id=str(deal_id),
-                            deal_reference=str(deal_ref),
-                            epic=resolved_epic,
-                            direction=final_action,
-                            size=executed_size,
-                            entry_price=entry_px,
-                            sl=sl,
-                            tp=tp
-                        )
-                        db.update_capital_auto_last_trade_time(chat_id, now)
+            # Dynamic size based on user budget and asset DNA
+            size = None
+            if resolved_epic == "GOLD":
+                size = 0.02 if budget < 100 else 0.05
+            elif resolved_epic in ["US500", "SP500"]:
+                size = 0.1 if budget < 100 else 0.2
+            elif resolved_epic in ["US100", "NASDAQ"]:
+                size = 0.1 if budget < 100 else 0.2
+            elif resolved_epic in ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
+                size = 1.0 if budget < 100 else 2.0
+            elif resolved_epic == "BTCUSD":
+                size = 0.001 if budget < 50 else 0.002
 
-                        # Send Telegram Notification
-                        if app and hasattr(app, "bot"):
-                            try:
-                                user_lang = db.get_user_language(chat_id)
-                                import ui_standards
-                                env_lbl = "DEMO ($10,000)" if engine.is_demo else "LIVE MAINNET"
-                                dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
-                                
-                                if user_lang == 'khmer':
-                                    notif_msg = (
-                                        f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
-                                        f"{ui_standards.DIVIDER_HEAVY}\n"
-                                        f"⚙️ **គណនី ៖** `{env_lbl}`\n"
-                                        f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
-                                        f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
-                                        f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
-                                        f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
-                                        f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
-                                        f"🛑 **Stop-Loss ៖** `${sl:,.2f}`\n"
-                                        f"🎯 **Take-Profit ៖** `${tp:,.2f}`\n"
-                                        f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
-                                        f"{ui_standards.DIVIDER_HEAVY}\n"
-                                        f"🛡️ **ក្បួនការពារដើមទុន ៖**\n"
-                                        f"• Breakeven Armor នៅ +1.5% ROI\n"
-                                        f"• The Golden 80% Trailing Ratchet\n"
-                                        f"• Spread Guard & Zero Blind Trading\n"
-                                        f"{ui_standards.DIVIDER_HEAVY}\n"
-                                        f"💡 _ម៉ាស៊ីន AI កំពុងតាមដានការពារទុន និងប្រមូលប្រាក់ចំណេញ ២៤/៧!_"
-                                    )
-                                else:
-                                    notif_msg = (
-                                        f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
-                                        f"{ui_standards.DIVIDER_HEAVY}\n"
-                                        f"⚙️ **Account:** `{env_lbl}`\n"
-                                        f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
-                                        f"🎯 **Direction:** `{dir_emoji}`\n"
-                                        f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
-                                        f"📦 **Contract Size:** `{executed_size}`\n"
-                                        f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
-                                        f"🛑 **Stop-Loss:** `${sl:,.2f}`\n"
-                                        f"🎯 **Take-Profit:** `${tp:,.2f}`\n"
-                                        f"🔖 **Deal Reference:** `{deal_ref}`\n"
-                                        f"{ui_standards.DIVIDER_HEAVY}\n"
-                                        f"🛡️ **Institutional Protection:**\n"
-                                        f"• Breakeven Armor at +1.5% ROI\n"
-                                        f"• Golden 80% Trailing Ratchet\n"
-                                        f"• Spread Guard Active\n"
-                                        f"{ui_standards.DIVIDER_HEAVY}\n"
-                                        f"💡 _AI Engine actively monitoring and trailing profits 24/7!_"
-                                    )
-                                await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
-                            except Exception as notif_err:
-                                logger.error(f"Failed to send Capital Auto notification: {notif_err}")
+            trade_res = engine.execute_smart_tradfi_order(
+                epic=resolved_epic,
+                direction=final_action,
+                size=size
+            )
 
-                        # Throttle to 1 trade per cycle
-                        break
+            if trade_res.get("success"):
+                deal_ref = trade_res.get("deal_reference", "AUTO")
+                deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
+                entry_px = setup.get("ask" if final_action == "BUY" else "bid", 0.0)
+                sl = trade_res.get("sl", 0.0)
+                tp = trade_res.get("tp", 0.0)
+                executed_size = trade_res.get("size", size or 0.01)
+
+                # Record in database
+                db.record_capital_auto_trade(
+                    chat_id=chat_id,
+                    deal_id=str(deal_id),
+                    deal_reference=str(deal_ref),
+                    epic=resolved_epic,
+                    direction=final_action,
+                    size=executed_size,
+                    entry_price=entry_px,
+                    sl=sl,
+                    tp=tp
+                )
+                db.update_capital_auto_last_trade_time(chat_id, now)
+
+                # Send Telegram Notification
+                if app and hasattr(app, "bot"):
+                    try:
+                        user_lang = db.get_user_language(chat_id)
+                        import ui_standards
+                        env_lbl = "DEMO ($10,000)" if engine.is_demo else "LIVE MAINNET"
+                        dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
+                        adx_str = f"{setup.get('adx', 0):.1f}"
+                        rvol_str = f"{setup.get('rvol', 1.0):.1f}x"
+                        
+                        if user_lang == 'khmer':
+                            notif_msg = (
+                                f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"⚙️ **គណនី ៖** `{env_lbl}`\n"
+                                f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
+                                f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
+                                f"📊 **កម្លាំង Trend & Volume ៖** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
+                                f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
+                                f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R) ៖** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **ក្បួនការពារ & កើបចំណេញ Asymmetric R:R $\ge 1:6$ ៖**\n"
+                                f"• Tier 1: Breakeven Armor នៅ +1.5% ROI (Risk -> 0.00R)\n"
+                                f"• Tier 2: Capital Fortress Lock (+1.5R) នៅ +3.5% ROI\n"
+                                f"• Tier 3: The Golden 80% Trailing Ratchet\n"
+                                f"• Tier 4: Mega Target Harvest (6R+) នៅ +12.0% ROI\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរប្រាក់ចំណេញ និងការពារទុន ២៤/៧!_"
+                            )
+                        else:
+                            notif_msg = (
+                                f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"⚙️ **Account:** `{env_lbl}`\n"
+                                f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
+                                f"🎯 **Direction:** `{dir_emoji}`\n"
+                                f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
+                                f"📊 **Trend & Volume:** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
+                                f"📦 **Contract Size:** `{executed_size}`\n"
+                                f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R):** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R):** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference:** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **Asymmetric R:R >= 1:6 Multi-Tier Protection:**\n"
+                                f"• Tier 1: Breakeven Armor at +1.5% ROI (Risk -> 0.00R)\n"
+                                f"• Tier 2: Capital Fortress Lock (+1.5R) at +3.5% ROI\n"
+                                f"• Tier 3: Golden 80% Trailing Ratchet\n"
+                                f"• Tier 4: Mega Target Cash Harvest (6R+) at +12.0% ROI\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _AI Engine actively monitoring and trailing profits 24/7!_"
+                            )
+                        await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
+                    except Exception as notif_err:
+                        logger.error(f"Failed to send Capital Auto notification: {notif_err}")
+
+                # Throttle to 1 trade per cycle
+                break
 
 
 # Singleton Instance
