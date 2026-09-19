@@ -2958,7 +2958,7 @@ def place_spot_order(
             params["timeInForce"] = "GTC"
             buy_qty = get_max_sellable_qty(symbol, (effective_usdt / price) if price > 0 else (effective_usdt / current_p))
             params["quantity"] = f"{buy_qty:.8f}".rstrip('0').rstrip('.')
-            params["price"] = f"{price:.8f}".rstrip('0').rstrip('.')
+            params["price"] = f"{format_price_to_tick_size(symbol, price):.8f}".rstrip('0').rstrip('.')
     else:
         # SELL side
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")

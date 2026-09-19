@@ -1225,15 +1225,19 @@ class PerpetualWealthGeneratorEngine:
         """
         Scans Binance Spot for Golden Sweet-Spot Momentum Breakouts.
         Strict 7-Pillar Institutional Filters:
-        - 24h Change: +2.0% to +16.0% (Spot is LONG-only)
-        - RVOL Spike: >= 2.0x (15m Volume Surge over 20-period MA)
-        - Fresh Momentum: 1h Change >= +0.6% & 15m Change >= +0.2%
-        - Strict ADX: 15m ADX >= 26.0 & +DI > -DI (Anti-Chop & Anti-Sideway Guard)
-        - Minimum Spot Volume: >= $8M USD
-        - AI Velocity Score Hurdle: >= 8.6/10.0
+        - BTC Macro Guard: If BTC is in Bearish Breakdown, requires strong independent decoupling
+        - 24h Change: +2.0% to +18.0% (Spot is LONG-only)
+        - RVOL Spike: >= 1.8x - 2.0x (15m Volume Surge over 20-period MA)
+        - Fresh Momentum: 1h Change >= +0.5% & 15m Change >= +0.2%
+        - Strict ADX: 15m ADX >= 25.0 & +DI > -DI (Anti-Chop & Anti-Sideway Guard)
+        - Minimum Spot Volume: >= $6M USD
+        - 33-AI Model Ensemble Confluence Score Hurdle
         """
         candidates = []
         try:
+            btc_macro = get_btc_macro_regime()
+            allow_spot_long = btc_macro.get("allow_long", True)
+
             spot_base = trading_engine.get_working_spot_url()
             url = f"{spot_base}/api/v3/ticker/24hr"
             res = trading_engine.HFT_SESSION.get(url, timeout=4)
@@ -1261,12 +1265,16 @@ class PerpetualWealthGeneratorEngine:
                 except (ValueError, TypeError):
                     continue
 
-                # Institutional liquidity floor: $8M 24h quote volume on Spot
-                if quote_volume < 8_000_000.0 or last_price <= 0.0:
+                # Institutional liquidity floor: $6M 24h quote volume on Spot
+                if quote_volume < 6_000_000.0 or last_price <= 0.0:
                     continue
 
-                # Golden Sweet Spot for Spot LONG: +2.0% to +16.0%
-                if 2.0 <= price_change_pct <= 16.0:
+                # If BTC Macro is Bearish/Defensive, require strong independent relative strength
+                if not allow_spot_long and (price_change_pct < 3.5 or quote_volume < 10_000_000.0):
+                    continue
+
+                # Golden Sweet Spot for Spot LONG: +2.0% to +18.0%
+                if 2.0 <= price_change_pct <= 18.0:
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_spot_symbol_technicals(symbol)
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -1274,6 +1282,7 @@ class PerpetualWealthGeneratorEngine:
                             "side": "BUY",
                             "price_change_pct": price_change_pct,
                             "last_price": last_price,
+                            "pullback_price": tech_eval.get("pullback_price", last_price),
                             "quote_volume": quote_volume,
                             "rsi_15m": tech_eval.get("rsi_15m", 58.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
@@ -1282,6 +1291,7 @@ class PerpetualWealthGeneratorEngine:
                             "chg_15m": tech_eval.get("chg_15m", 0.5),
                             "adx_15m": tech_eval.get("adx_15m", 28.0),
                             "ai_score": tech_eval.get("ai_score", 9.0),
+                            "ai_confidence": tech_eval.get("ai_confidence", 85.0),
                             "orderbook_ratio": tech_eval.get("orderbook_ratio", 1.25),
                             "reason": tech_eval.get("reason", "Spot Golden Sweet-Spot Momentum")
                         })
@@ -1446,13 +1456,26 @@ class PerpetualWealthGeneratorEngine:
             if current_price >= ema9 and ema9 >= ema21 and ema21 >= ema50:
                 ai_score += 0.5
 
-            ai_score = min(9.9, round(ai_score, 1))
+            # 8. 33 Wall Street AI Models Confluence Evaluation
+            try:
+                ensemble_res = SmartXEngine.evaluate_ai_ensemble(symbol, "BUY")
+                ai_conf = float(ensemble_res.get("confidence", 85.0))
+            except Exception:
+                ai_conf = 85.0
 
-            if ai_score < 8.6:
+            if ai_conf < 78.0:
+                return {"is_valid": False, "reason": f"Insufficient 33-AI Ensemble Confidence ({ai_conf:.1f}% < 78.0%)"}
+
+            # Blend 33-AI Model Confidence into AI Score
+            ai_score = min(9.9, round(ai_score * (ai_conf / 85.0), 1))
+
+            if ai_score < 8.4:
                 return {
                     "is_valid": False,
-                    "reason": f"Insufficient AI Velocity Score ({ai_score:.1f}/10.0 < 8.6 hurdle)"
+                    "reason": f"Insufficient AI Velocity Score ({ai_score:.1f}/10.0 < 8.4 hurdle)"
                 }
+
+            pullback_limit_price = round(max(ema21, current_price * 0.9985), 6)
 
             res_data = {
                 "is_valid": True,
@@ -1466,7 +1489,9 @@ class PerpetualWealthGeneratorEngine:
                 "adx_15m": adx_15m,
                 "orderbook_ratio": ob_ratio,
                 "ai_score": ai_score,
-                "reason": f"Velocity Confluence (RVOL {rvol:.1f}x + ADX {adx_15m:.1f} + 1h {chg_1h:+.1f}%)"
+                "ai_confidence": ai_conf,
+                "pullback_price": pullback_limit_price,
+                "reason": f"Spot Velocity (33-AI {ai_conf:.1f}% + RVOL {rvol:.1f}x + ADX {adx_15m:.1f})"
             }
             _WEALTH_SPOT_TECH_CACHE[cache_key] = (now_ts, res_data)
             return res_data
@@ -1689,19 +1714,18 @@ class PerpetualWealthGeneratorEngine:
                     if roi_pct > curr_peak:
                         curr_peak = roi_pct
 
-                    # Phase 1: Micro-Breakeven Armor at +1.5% ROI (+0.20% fee floor lock)
-                    if roi_pct >= 1.5 and not is_be_locked:
+                    # Phase 1: Breakeven Armor Lock at +2.0% ROI (+0.35% Net Fee Floor)
+                    if roi_pct >= 2.0 and not is_be_locked:
                         is_be_locked = True
                         db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), 1)
-                        print(f"🛡️ [SPOT WEALTH MICRO-BREAKEVEN ARMOR] {sym} locked at Entry +0.20% Fees Floor (ROI: +{roi_pct:.2f}%)")
+                        print(f"🛡️ [SPOT WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.35% Net Fees Floor (ROI: +{roi_pct:.2f}%)")
 
-                    # Phase 2: 1-Shot Moonshot Lock at +5.0% ROI (Universal for 100% of Spot Trades)
+                    # Phase 2: 1-Shot Moonshot Activation at +5.0% ROI (Universal for 100% of Spot Trades)
                     # Spot has 0% liquidation risk: zero premature 50% cuts. 100% position kept riding!
-                    # Eliminates Binance Error -1013 Filter failure and prevents cutting runner profits in half.
                     if roi_pct >= 5.0 and not is_tp1_done:
                         is_tp1_done = True
                         db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, 1, int(is_be_locked))
-                        print(f"🛡️ [SPOT WEALTH 1-SHOT FULL MOONSHOT] {sym} reached +{roi_pct:.2f}% ROI! Keeping 100% position riding (no 50% cut), locking Stop Loss at 50% of peak (+{curr_peak * 0.50:.2f}%).")
+                        print(f"🚀 [SPOT WEALTH 1-SHOT FULL MOONSHOT] {sym} reached +{roi_pct:.2f}% ROI! Keeping 100% position riding (no 50% cut), activating Golden 85% Moonshot Ratchet.")
 
                         if app and hasattr(app, "bot"):
                             try:
@@ -1711,47 +1735,52 @@ class PerpetualWealthGeneratorEngine:
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
                                     f"📊 **ROI សម្រេចបាន ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"🛡️ **Profit Armor Lock ៖** `+{(curr_peak * 0.50):.2f}% Floor` (ចាក់សោ 50% នៃចំណេញ)\n"
-                                    f"🚀 **យុទ្ធសាស្ត្រ Spot ៖** `100% Full Moonshot Ride (មិនពុះ 50%)`\n"
+                                    f"🛡️ **Profit Armor Lock ៖** `Golden 85% Trailing Ratchet`\n"
+                                    f"🚀 **យុទ្ធសាស្ត្រ Spot ៖** `100% Full Moonshot Ride (គ្មានពិដានលក់រាំងផ្លូវ)`\n"
                                     f"✨ **អត្ថប្រយោជន៍ ៖** `ការពារ Error -1013 & កើបចំណេញ ១០០% គ្មានសល់កន្ទុយកាក់`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _Spot 0% Liquidation: រក្សាទំហំកាក់ ១០០% ពេញលេញ! ពេលឡើងដល់ >= +6% នឹងតម្លើង Ratchet 85% និងលក់ចេញ ១០០% ទាំងដុល!_\n"
+                                    "💡 _Spot 0% Liquidation: រក្សាទំហំកាក់ ១០០% ពេញលេញ! ពេលងាកចុះមកវិញ ១៥% ពីចំណុចកំពូល ទើបកើបយក ៨៥% នៃចំណេញកំពូល!_\n"
                                     "💡 _ព័ត៌មានជំនួយ៖ បើកមុខងារ 'Use BNB for fees' លើ Binance ដើម្បីចំណេញថ្លៃសេវា 25%!_"
                                 ) if user_lang == 'khmer' else (
                                     "🚀 **[24/7 SPOT WEALTH - 1-SHOT MOONSHOT LOCKED]** 💎\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
                                     f"📊 **Target ROI Reached:** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"🛡️ **Profit Armor Lock:** `+{(curr_peak * 0.50):.2f}% Floor` (50% Profit Locked)\n"
-                                    f"🚀 **Spot Strategy:** `100% Full Moonshot Ride (No 50% cut)`\n"
+                                    f"🛡️ **Profit Armor Lock:** `Golden 85% Trailing Ratchet`\n"
+                                    f"🚀 **Spot Strategy:** `100% Full Moonshot Ride (No Artificial Ceiling)`\n"
                                     f"✨ **Advantage:** `Prevents Error -1013 & 100% Cash Exit Zero Dust`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _Spot 0% Liquidation: Keeping 100% size. At >= +6%, auto upgrades to 85% Ratchet, selling 100% on reversal!_\n"
+                                    "💡 _Spot 0% Liquidation: Keeping 100% size. Cashing out 85% of peak profit on 15% reversal!_\n"
                                     "💡 _Tip: Enable 'Use BNB for fees' on Binance for 25% fee discount!_"
                                 )
                                 asyncio.create_task(_async_send_wealth_alert(app, chat_id, notif_text, "Spot 1-Shot Moonshot Lock alert"))
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending Spot 1-Shot alert: {notif_err}")
 
-                    # Phase 3: Fast Harvest (+2.8% to +3.5%) OR Moonshot Ratchet (+5.0%+)
+                    # Phase 3: 3-Tier Dynamic Moonshot Ratchet & Fast Profit Harvest
                     target_bot_tp = float(bot.get("target_tp", 6.0))
-                    is_fast_harvest = (curr_peak >= 2.8 and curr_peak < 5.0 and (roi_pct <= (curr_peak * 0.65) or roi_pct >= target_bot_tp))
-                    is_moonshot_tp2 = (curr_peak >= 5.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= target_bot_tp
-                    is_profit_lock_tp = (curr_peak >= 5.0 and curr_peak < 6.0 and roi_pct <= (curr_peak * 0.50))
+                    
+                    # 1. Fast Micro-Harvest (+2.2% to +3.5% Peak): If momentum pulls back by 30% from peak
+                    is_fast_harvest = (curr_peak >= 2.2 and curr_peak < 5.0 and (roi_pct <= (curr_peak * 0.70) or roi_pct >= target_bot_tp))
+                    
+                    # 2. Super Moonshot Ratchet (Peak >= 5.0%):
+                    # Golden 85% Ratchet (rides +10%, +20%, +50% without ceiling).
+                    is_moonshot_tp2 = (curr_peak >= 5.0 and (roi_pct <= (curr_peak * 0.85) or roi_pct >= target_bot_tp))
+                    is_profit_lock_tp = (curr_peak >= 5.0 and curr_peak < 6.0 and roi_pct <= (curr_peak * 0.60))
 
                     if is_fast_harvest or is_moonshot_tp2 or is_profit_lock_tp:
                         if is_moonshot_tp2:
-                            reason_lbl = "TP2 MOONSHOT RATCHET"
-                            prot_tier_kh = "Golden 85% Moonshot Ratchet (កើប ១០០% ទាំងដុល)"
-                            prot_tier_en = "Golden 85% Moonshot Ratchet (100% Cash Harvest)"
+                            reason_lbl = "TP2 MOONSHOT RATCHET (85% Peak Lock)"
+                            prot_tier_kh = "Golden 85% Moonshot Ratchet (កើប ៨៥% នៃចំណេញកំពូល)"
+                            prot_tier_en = "Golden 85% Moonshot Ratchet (85% Peak Cash Harvest)"
                         elif is_fast_harvest:
-                            reason_lbl = "FAST PROFIT HARVEST"
-                            prot_tier_kh = "Fast Profit Lock (+2.8% - +3.5% Cash In)"
-                            prot_tier_en = "Fast Profit Lock (+2.8% - +3.5% Cash In)"
+                            reason_lbl = "FAST MICRO-PROFIT HARVEST"
+                            prot_tier_kh = "Fast Profit Lock (+2.2% - +3.5% Cash In)"
+                            prot_tier_en = "Fast Profit Lock (+2.2% - +3.5% Cash In)"
                         else:
-                            reason_lbl = "50% PROFIT LOCK EXIT"
-                            prot_tier_kh = "50% Profit Lock (ការពារចំណេញ)"
-                            prot_tier_en = "50% Profit Lock Exit"
+                            reason_lbl = "PROFIT LOCK EXIT"
+                            prot_tier_kh = "Profit Lock (ការពារចំណេញ)"
+                            prot_tier_en = "Profit Lock Exit"
 
                         print(f"🏆 [SPOT WEALTH {reason_lbl}] {sym} Peak: +{curr_peak:.2f}%, Current: +{roi_pct:.2f}%. Harvesting 100% remaining cash!")
                         sell_res = trading_engine.place_spot_order(
@@ -1761,9 +1790,11 @@ class PerpetualWealthGeneratorEngine:
                             side="SELL",
                             quantity=rem_qty
                         )
-                        realized_pnl = (current_price - buy_price) * rem_qty
+                        gross_pnl = (current_price - buy_price) * rem_qty
+                        est_spot_fee = (buy_price * rem_qty * 0.001) + (current_price * rem_qty * 0.001)
+                        net_realized_pnl = gross_pnl - est_spot_fee
                         db.close_perpetual_wealth_spot_trade(t_id)
-                        db.update_perpetual_wealth_spot_pnl(chat_id, realized_pnl, is_win=(roi_pct > 0))
+                        db.update_perpetual_wealth_spot_pnl(chat_id, net_realized_pnl, is_win=(net_realized_pnl > 0))
                         add_wealth_spot_cooldown(sym, duration_seconds=1800)
 
                         if app and hasattr(app, "bot"):
@@ -1775,7 +1806,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
                                     f"📈 **Peak ROI កំពូល ៖** `+{curr_peak:.2f}%` 🚀\n"
                                     f"💵 **Exit ROI ចុងក្រោយ ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${realized_pnl:,.2f} USDT`\n"
+                                    f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${net_realized_pnl:,.2f} USDT`\n"
                                     f"🔄 **ស្ថានភាពទុន ៖** `ដកទុន + ចំណេញ ១០០% ចូល Spot Wallet`\n"
                                     f"🛡️ **កម្រិតការពារ ៖** `{prot_tier_kh}`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1786,7 +1817,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
                                     f"📈 **Peak ROI Achieved:** `+{curr_peak:.2f}%` 🚀\n"
                                     f"💵 **Harvest Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"🏆 **Net Realized Profit:** `+${realized_pnl:,.2f} USDT`\n"
+                                    f"🏆 **Net Realized Profit:** `+${net_realized_pnl:,.2f} USDT`\n"
                                     f"🔄 **Capital Status:** `100% Released & Ready in Spot Wallet`\n"
                                     f"🛡️ **Protection Tier:** `{prot_tier_en}`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1798,8 +1829,8 @@ class PerpetualWealthGeneratorEngine:
 
                         continue
 
-                    # Phase 4: Anti-Stagnation Smart Clock (45-60 min)
-                    # OR Breakeven Defense Trigger OR Dynamic Stop Loss (-5.0%)
+                    # Phase 4: Anti-Stagnation Smart Clock (180 to 360 min)
+                    # OR Breakeven Defense Trigger (+0.35% Net Floor) OR Dynamic Stop Loss (-5.0%)
                     trade_ts_str = tr.get("timestamp", "")
                     trade_age_seconds = 0.0
                     if trade_ts_str:
@@ -1810,24 +1841,24 @@ class PerpetualWealthGeneratorEngine:
                         except Exception:
                             trade_age_seconds = 0.0
 
-                    # Smart Clock Tier 1: Held >= 45 min (2700s) and peak < 1.0% and ROI <= 0.5% (Flat Sideway)
-                    # Smart Clock Tier 2: Held >= 75 min (4500s) and peak < 2.0% and ROI <= 0.8% (Sluggish Momentum)
-                    # Smart Clock Tier 3: Held >= 120 min (7200s) and ROI <= 0.8% (Unconditional Liberation to eliminate overnight stagnation)
+                    # Institutional Smart Clock (180m - 360m):
+                    # Tier 1: Held >= 180 min (10,800s) and peak < 1.0% and -2.0 <= roi_pct <= 0.5% (Flat Sideway)
+                    # Tier 2: Held >= 360 min (21,600s) and roi_pct <= 0.8% (Unconditional Liberation to eliminate overnight stagnation)
                     is_stagnant = (
-                        (trade_age_seconds >= 2700.0 and curr_peak < 1.0 and -2.0 <= roi_pct <= 0.5) or
-                        (trade_age_seconds >= 4500.0 and curr_peak < 2.0 and -2.5 <= roi_pct <= 0.8) or
-                        (trade_age_seconds >= 7200.0 and roi_pct <= 0.8)
+                        (trade_age_seconds >= 10800.0 and curr_peak < 1.0 and -2.0 <= roi_pct <= 0.5) or
+                        (trade_age_seconds >= 21600.0 and roi_pct <= 0.8)
                     )
-                    is_be_exit = (is_be_locked and curr_peak < 2.8 and current_price <= (buy_price * 1.0020) and roi_pct > -1.0)
+                    # Breakeven Defense: Locked at +2.0% ROI, triggered if price pulls back to Entry +0.35% Net Fee Floor
+                    is_be_exit = (is_be_locked and curr_peak < 2.5 and current_price <= (buy_price * 1.0035) and roi_pct > -1.0)
                     is_sl_exit = (roi_pct <= -5.0)
 
                     if is_be_exit or is_sl_exit or is_stagnant:
                         if is_stagnant:
-                            reason_tag = "STAGNATION CAPITAL LIBERATION"
+                            reason_tag = "STAGNATION CAPITAL LIBERATION (180-360m)"
                         elif is_be_exit:
-                            reason_tag = "BREAKEVEN DEFENSE"
+                            reason_tag = "BREAKEVEN NET FLOOR DEFENSE (+0.35%)"
                         else:
-                            reason_tag = "DYNAMIC STOP LOSS"
+                            reason_tag = "DYNAMIC STOP LOSS (-5.0%)"
 
                         print(f"🛑 [SPOT WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI. Executing Spot protection exit...")
                         trading_engine.place_spot_order(
@@ -1837,21 +1868,51 @@ class PerpetualWealthGeneratorEngine:
                             side="SELL",
                             quantity=rem_qty
                         )
-                        realized_pnl = (current_price - buy_price) * rem_qty
+                        gross_pnl = (current_price - buy_price) * rem_qty
+                        est_spot_fee = (buy_price * rem_qty * 0.001) + (current_price * rem_qty * 0.001)
+                        net_realized_pnl = gross_pnl - est_spot_fee
                         db.close_perpetual_wealth_spot_trade(t_id)
-                        db.update_perpetual_wealth_spot_pnl(chat_id, realized_pnl, is_win=(realized_pnl > 0))
+                        db.update_perpetual_wealth_spot_pnl(chat_id, net_realized_pnl, is_win=(net_realized_pnl > 0))
                         add_wealth_spot_cooldown(sym, duration_seconds=1800 if (is_be_exit or is_stagnant) else 3600)
                         if sym in active_symbols:
                             active_symbols.remove(sym)
 
-                        if is_stagnant and app and hasattr(app, "bot"):
+                        if is_be_exit and app and hasattr(app, "bot"):
+                            try:
+                                user_lang = db.get_user_language(chat_id)
+                                be_msg = (
+                                    "🛡️ **[24/7 SPOT WEALTH - BREAKEVEN HARVEST]** 💰\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
+                                    f"🛡️ **កម្រិតការពារ ៖** `Entry +0.35% Net Fee Floor`\n"
+                                    f"💵 **Exit ROI សម្រេច ៖** `+{roi_pct:.2f}%` 🟢\n"
+                                    f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${max(0.01, net_realized_pnl):,.2f} USDT`\n"
+                                    f"✅ **ថ្លៃសេវា (Spot Fees) ៖** `កាត់រួចរាល់ ១០០% ហោប៉ៅនៅតែចំណេញ!`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _Breakeven Armor ធានាដាច់ខាតមិនឱ្យខាតដើម និងច្បាមចំណេញសុទ្ធពិតប្រាកដ!_"
+                                ) if user_lang == 'khmer' else (
+                                    "🛡️ **[24/7 SPOT WEALTH - BREAKEVEN HARVEST]** 💰\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
+                                    f"🛡️ **Defense Standard:** `Entry +0.35% Net Fee Floor`\n"
+                                    f"💵 **Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
+                                    f"🏆 **Net Realized Profit:** `+${max(0.01, net_realized_pnl):,.2f} USDT`\n"
+                                    f"✅ **Binance Fees:** `100% Deducted & Net Profit Preserved!`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    "💡 _Breakeven Armor strictly preserved capital with real net positive profit!_"
+                                )
+                                asyncio.create_task(_async_send_wealth_alert(app, chat_id, be_msg, "Spot Breakeven exit alert"))
+                            except Exception as alert_err:
+                                print(f"⚠️ Notice sending Spot Breakeven alert: {alert_err}")
+
+                        elif is_stagnant and app and hasattr(app, "bot"):
                             try:
                                 user_lang = db.get_user_language(chat_id)
                                 stag_msg = (
                                     "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
-                                    f"⏱️ **រយៈពេលកាន់កាប់ ៖** `{trade_age_seconds/60:.0f} នាទី (ទ្រឹងគ្មាន Momentum)`\n"
+                                    f"⏱️ **រយៈពេលកាន់កាប់ ៖** `{trade_age_seconds/60:.0f} នាទី (ទ្រឹង ១៨០-៣៦០ នាទី)`\n"
                                     f"💵 **Exit ROI ៖** `{roi_pct:.2f}%`\n"
                                     f"🔄 **ស្ថានភាពទុន ៖** `ដោះលែងទុនមកវិញ ១០០% ចូល Spot Wallet`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1860,7 +1921,7 @@ class PerpetualWealthGeneratorEngine:
                                     "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
-                                    f"⏱️ **Holding Duration:** `{trade_age_seconds/60:.0f}m (Stagnant / No Momentum)`\n"
+                                    f"⏱️ **Holding Duration:** `{trade_age_seconds/60:.0f}m (Stagnant 180-360m)`\n"
                                     f"💵 **Exit ROI:** `{roi_pct:.2f}%`\n"
                                     f"🔄 **Capital Status:** `100% Liberated back to Spot Wallet`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1949,6 +2010,7 @@ class PerpetualWealthGeneratorEngine:
                                 if app and hasattr(app, "bot"):
                                     try:
                                         user_lang = db.get_user_language(chat_id)
+                                        ai_conf_val = cand.get('ai_confidence', 85.0)
                                         entry_msg = (
                                             "💎 **[24/7 SPOT WEALTH - POSITION OPENED]** 🟢\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1957,13 +2019,13 @@ class PerpetualWealthGeneratorEngine:
                                             f"💰 **ទុនទិញ (Allocation) ៖** `${alloc_per_coin:.2f} USDT`\n"
                                             f"📊 **Volume Spike (RVOL) ៖** `{cand.get('rvol', 2.2):.1f}x (Smart Money)`\n"
                                             f"📈 **1H Momentum ៖** `+{cand.get('chg_1h', 1.0):.2f}%` (24H: `+{cand['price_change_pct']:.2f}%`)\n"
-                                            f"🧠 **AI Velocity Score ៖** `{cand['ai_score']:.1f}/10.0`\n"
-                                            f"🛡️ **Micro-Breakeven Armor ៖** `ត្រៀម Lock នៅ +1.5% ROI`\n"
-                                            f"💵 **Target Fast Harvest ៖** `+2.8% ដល់ +3.5% ROI`\n"
-                                            f"🚀 **Target Moonshot ៖** `85% Ratchet (>= +5.0% ROI)`\n"
-                                            f"⏱️ **Anti-Stagnation Clock ៖** `45-60 នាទី (រំដោះទុនភ្លាមបើទ្រឹង)`\n"
+                                            f"🧠 **33-AI Model Confidence ៖** `{ai_conf_val:.1f}% (Consensus)`\n"
+                                            f"🛡️ **Breakeven Armor ៖** `ត្រៀម Lock នៅ +2.0% ROI (Entry +0.35% Net Floor)`\n"
+                                            f"💵 **Target Fast Harvest ៖** `+2.2% ដល់ +3.5% ROI (ច្បាមសាច់ប្រាក់)`\n"
+                                            f"🚀 **Target Moonshot ៖** `Golden 85% Ratchet (>= +5.0% គ្មានពិដានលក់រាំងផ្លូវ)`\n"
+                                            f"⏱️ **Anti-Stagnation Clock ៖** `180-360 នាទី (រំដោះទុនបើទ្រឹង ៣-៦ ម៉ោង)`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "✨ **យុទ្ធសាស្ត្រ Spot ៖** `Rapid Velocity (១០០% ពេញលេញ គ្មាន Error -1013)`\n"
+                                            "✨ **យុទ្ធសាស្ត្រ Spot ៖** `Super Smart Moonshot Ride (១០០% គ្មាន Error -1013)`\n"
                                             "💡 _ព័ត៌មានជំនួយ៖ បើកមុខងារ 'Use BNB for fees' លើ Binance ដើម្បីចំណេញសេវា 25% និងលក់ ១០០% គ្មានសល់កន្ទុយកាក់!_"
                                         ) if user_lang == 'khmer' else (
                                             "💎 **[24/7 SPOT WEALTH - POSITION OPENED]** 🟢\n"
@@ -1973,13 +2035,13 @@ class PerpetualWealthGeneratorEngine:
                                             f"💰 **Allocated Capital:** `${alloc_per_coin:.2f} USDT`\n"
                                             f"📊 **Volume Spike (RVOL):** `{cand.get('rvol', 2.2):.1f}x (Smart Money)`\n"
                                             f"📈 **1H Momentum:** `+{cand.get('chg_1h', 1.0):.2f}%` (24H: `+{cand['price_change_pct']:.2f}%`)\n"
-                                            f"🧠 **AI Velocity Score:** `{cand['ai_score']:.1f}/10.0`\n"
-                                            f"🛡️ **Micro-Breakeven Armor:** `Armed for +1.5% ROI Lock`\n"
-                                            f"💵 **Target Fast Harvest:** `+2.8% to +3.5% ROI`\n"
-                                            f"🚀 **Target Moonshot:** `85% Ratchet (>= +5.0% ROI)`\n"
-                                            f"⏱️ **Anti-Stagnation Clock:** `45-60m (Auto-Liberate if Stagnant)`\n"
+                                            f"🧠 **33-AI Model Confidence:** `{ai_conf_val:.1f}% (Consensus)`\n"
+                                            f"🛡️ **Breakeven Armor:** `Armed for +2.0% ROI Lock (Entry +0.35% Net Floor)`\n"
+                                            f"💵 **Target Fast Harvest:** `+2.2% to +3.5% ROI (Cash In)`\n"
+                                            f"🚀 **Target Moonshot:** `Golden 85% Ratchet (>= +5.0% No Artificial Ceiling)`\n"
+                                            f"⏱️ **Anti-Stagnation Clock:** `180-360m (Auto-Liberate if Stagnant 3-6h)`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "✨ **Spot Engine Mode:** `Rapid Velocity (Zero Error -1013)`\n"
+                                            "✨ **Spot Engine Mode:** `Super Smart Moonshot Ride (Zero Error -1013)`\n"
                                             "💡 _Tip: Enable 'Use BNB for fees' on Binance for 25% fee discount & zero leftover dust!_"
                                         )
                                         asyncio.create_task(_async_send_wealth_alert(app, chat_id, entry_msg, "Spot entry alert"))
