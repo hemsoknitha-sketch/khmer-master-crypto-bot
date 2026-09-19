@@ -72,6 +72,19 @@ if [ -f "vps_db_backup/.env" ]; then
 fi
 echo "🛡️ [RESTORE] VIP Database and .env restored 100%."
 
+# 4.1 Auto-Inject Capital.com Demo Credentials to .env if Missing
+if [ -f ".env" ]; then
+    if ! grep -q "CAPITAL_API_KEY" .env; then
+        echo "" >> .env
+        echo "# Capital.com TradFi Multi-Asset Brokerage" >> .env
+        echo "CAPITAL_API_KEY=Vm6tyK0cHtqq6fPe" >> .env
+        echo "CAPITAL_IDENTIFIER=hem.sinath@gmail.com" >> .env
+        echo "CAPITAL_PASSWORD=Vipheavy@2297!" >> .env
+        echo "CAPITAL_IS_DEMO=True" >> .env
+        echo "🏛️ [ENV] Added Capital.com default demo credentials to .env."
+    fi
+fi
+
 # 5. Activate Virtual Environment & Sync Dependencies / HF AI Models
 if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate

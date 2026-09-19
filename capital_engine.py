@@ -59,6 +59,11 @@ EPIC_MAP = {
 # Session validity duration in seconds (Capital.com sessions expire after 10 minutes)
 SESSION_EXPIRY_THRESHOLD = 500  # Refresh session after ~8.3 minutes to avoid expiration
 
+# Default Capital.com Institutional Demo Credentials (Zero-Config Fallback)
+DEFAULT_CAPITAL_API_KEY = "Vm6tyK0cHtqq6fPe"
+DEFAULT_CAPITAL_IDENTIFIER = "hem.sinath@gmail.com"
+DEFAULT_CAPITAL_PASSWORD = "Vipheavy@2297!"
+
 
 # ==============================================================================
 # 2. CAPITAL.COM INSTITUTIONAL ENGINE CLASS
@@ -77,9 +82,10 @@ class CapitalComEngine:
         password: Optional[str] = None,
         is_demo: Optional[bool] = None
     ):
-        self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip()
-        self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip()
-        self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip()
+        self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip() or DEFAULT_CAPITAL_API_KEY
+        self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip() or DEFAULT_CAPITAL_IDENTIFIER
+        self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip() or DEFAULT_CAPITAL_PASSWORD
+        self.last_auth_error: str = ""
         
         if is_demo is not None:
             self.is_demo = is_demo
@@ -108,7 +114,10 @@ class CapitalComEngine:
         Captures CST (Client Security Token) and X-SECURITY-TOKEN from response headers.
         """
         if not self.api_key or not self.identifier or not self.password:
-            return False, "Missing Capital.com API Key, Identifier, or API Password."
+            msg = "Missing Capital.com API Key, Identifier, or Password. Please configure .env settings."
+            self.last_auth_error = msg
+            logger.error(msg)
+            return False, msg
 
         url = f"{self.base_url}/session"
         headers = {
@@ -127,6 +136,7 @@ class CapitalComEngine:
                 self.cst_token = res.headers.get("CST")
                 self.security_token = res.headers.get("X-SECURITY-TOKEN")
                 self.session_created_at = time.time()
+                self.last_auth_error = ""
                 
                 body = res.json()
                 self.active_account_id = body.get("currentAccountId")
@@ -140,9 +150,12 @@ class CapitalComEngine:
                 err_msg = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
                 if "error.null.accountId" in err_msg and self.is_demo:
                     err_msg = "error.null.accountId (No active Demo account found on Capital.com profile. Please switch to Demo on Capital.com web platform to activate your $10,000 demo account, or set CAPITAL_IS_DEMO=False for Live)."
+                self.last_auth_error = err_msg
                 logger.error(f"Authentication failed: {err_msg}")
                 return False, f"Auth Error: {err_msg}"
         except Exception as e:
+            err_msg = str(e)
+            self.last_auth_error = err_msg
             logger.error(f"Authentication exception: {e}")
             return False, f"Connection Exception: {e}"
 
@@ -150,12 +163,16 @@ class CapitalComEngine:
         """Verifies session freshness and auto-refreshes if close to 10-minute expiry."""
         now = time.time()
         if not self.cst_token or not self.security_token:
-            success, _ = self.authenticate()
+            success, msg = self.authenticate()
+            if not success:
+                self.last_auth_error = msg
             return success
             
         if (now - self.session_created_at) > SESSION_EXPIRY_THRESHOLD:
             logger.info("Session token near expiry. Performing proactive session refresh...")
-            success, _ = self.authenticate()
+            success, msg = self.authenticate()
+            if not success:
+                self.last_auth_error = msg
             return success
             
         return True
@@ -175,7 +192,8 @@ class CapitalComEngine:
     def get_accounts(self) -> Dict[str, Any]:
         """Fetches full account information, equity, and margin balances."""
         if not self.ensure_session():
-            return {"success": False, "error": "Unable to establish valid session."}
+            err_detail = self.last_auth_error or "Unable to establish valid session."
+            return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
 
         url = f"{self.base_url}/accounts"
         try:
@@ -245,7 +263,8 @@ class CapitalComEngine:
             return cached["data"]
 
         if not self.ensure_session():
-            return {"success": False, "error": "Unable to establish valid session."}
+            err_detail = self.last_auth_error or "Unable to establish valid session."
+            return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
 
         url = f"{self.base_url}/markets/{resolved_epic}"
         try:
@@ -447,7 +466,8 @@ class CapitalComEngine:
     def close_position(self, deal_id: str) -> Dict[str, Any]:
         """Closes an open position by dealId."""
         if not self.ensure_session():
-            return {"success": False, "error": "Unable to establish valid session."}
+            err_detail = self.last_auth_error or "Unable to establish valid session."
+            return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
 
         url = f"{self.base_url}/positions/{deal_id}"
         try:
@@ -472,7 +492,8 @@ class CapitalComEngine:
     ) -> Dict[str, Any]:
         """Updates Stop-Loss and/or Take-Profit on an open position (Breakeven Armor / Trailing Stop)."""
         if not self.ensure_session():
-            return {"success": False, "error": "Unable to establish valid session."}
+            err_detail = self.last_auth_error or "Unable to establish valid session."
+            return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
 
         url = f"{self.base_url}/positions/{deal_id}"
         payload: Dict[str, Any] = {}
@@ -540,7 +561,7 @@ class CapitalComEngine:
         current_ask = market.get("ask", 0.0)
         mid_price = market.get("mid", 0.0)
         spread = market.get("spread", 0.0)
-        market_status = market.get("marketStatus", "UNKNOWN")
+        market_status = market.get("market_status") or market.get("marketStatus", "UNKNOWN")
 
         # 1. Market Status Guard (TradFi Market Closed Shield)
         if market_status != "TRADEABLE":
@@ -753,13 +774,16 @@ class CapitalComEngine:
                 tp = round(bid - (3.0 * atr), 2)
 
         # 4. Transmit Protected Position
+        max_spreads = {"GOLD": 1.20, "US500": 1.50, "OIL_CRUDE": 0.10, "BTCUSD": 80.0}
+        max_spread = max_spreads.get(resolved_epic, 5.0)
+
         res = self.place_position(
             epic=resolved_epic,
             direction=dir_u,
             size=size,
             stop_loss=sl,
             take_profit=tp,
-            max_allowed_spread=2.5
+            max_allowed_spread=max_spread
         )
 
         if res.get("success"):
