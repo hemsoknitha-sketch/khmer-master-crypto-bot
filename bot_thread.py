@@ -3123,15 +3123,19 @@ class TelegramBotThread(BaseThread):
                         timeframe = parts[0] if parts[0] in ["daily", "monthly", "yearly", "lifetime"] else "daily"
                         eng_cand = "_".join(parts[1:]) if len(parts) > 1 else "all"
                         engine_filter = None if eng_cand in ["all", "", "none"] else eng_cand
+                elif suffix in ["8h", "executive", "8hours", "8hour"]:
+                    timeframe = "8h"
                 elif suffix in ["daily", "monthly", "yearly", "lifetime"]:
                     timeframe = suffix
-                elif suffix in ["turbo_hedge", "smart_x", "smart_swap", "smart_trade", "wealth", "grid", "flash_loan"]:
+                elif suffix in ["macro_auto_trade", "turbo_hedge", "smart_x", "smart_swap", "smart_trade", "wealth", "grid", "flash_loan"]:
                     engine_filter = suffix
                 elif suffix in ["all", "all_engines", "all_platforms"]:
                     engine_filter = None
             elif args:
                 arg0 = args[0]
-                if arg0 in ["daily", "24h", "1d", "day"]:
+                if arg0 in ["8h", "8hours", "8hour", "8", "executive"]:
+                    timeframe = "8h"
+                elif arg0 in ["daily", "24h", "1d", "day"]:
                     timeframe = "daily"
                 elif arg0 in ["monthly", "30d", "month", "1m"]:
                     timeframe = "monthly"
@@ -3139,6 +3143,8 @@ class TelegramBotThread(BaseThread):
                     timeframe = "yearly"
                 elif arg0 in ["lifetime", "all", "total", "infinite", "ever"]:
                     timeframe = "lifetime"
+                elif arg0 in ["macro_auto_trade", "macro", "auto_trade", "autotrade", "swing"]:
+                    engine_filter = "macro_auto_trade"
                 elif arg0 in ["wealth", "perpetual_wealth", "pw", "spot_wealth"]:
                     engine_filter = "wealth"
                 elif arg0 in ["turbo_hedge", "turbo", "hedge"]:
@@ -3156,7 +3162,9 @@ class TelegramBotThread(BaseThread):
 
                 if len(args) > 1:
                     arg1 = args[1]
-                    if arg1 in ["daily", "24h", "1d", "day"]:
+                    if arg1 in ["8h", "8hours", "8hour", "8", "executive"]:
+                        timeframe = "8h"
+                    elif arg1 in ["daily", "24h", "1d", "day"]:
                         timeframe = "daily"
                     elif arg1 in ["monthly", "30d", "month", "1m"]:
                         timeframe = "monthly"
@@ -3164,6 +3172,8 @@ class TelegramBotThread(BaseThread):
                         timeframe = "yearly"
                     elif arg1 in ["lifetime", "all", "total", "infinite", "ever"]:
                         timeframe = "lifetime"
+                    elif arg1 in ["macro_auto_trade", "macro", "auto_trade", "autotrade", "swing"]:
+                        engine_filter = "macro_auto_trade"
                     elif arg1 in ["wealth", "perpetual_wealth", "pw", "spot_wealth"]:
                         engine_filter = "wealth"
                     elif arg1 in ["turbo_hedge", "turbo", "hedge"]:
@@ -3181,7 +3191,10 @@ class TelegramBotThread(BaseThread):
 
             try:
                 import scheduler_tasks
-                msg, keyboard = await scheduler_tasks.build_executive_summary_report(chat_id, timeframe=timeframe, engine_filter=engine_filter)
+                if timeframe in ["8h", "8hours", "8hour", "8", "executive"]:
+                    msg, keyboard = await scheduler_tasks.build_vip_8hour_executive_report(chat_id)
+                else:
+                    msg, keyboard = await scheduler_tasks.build_executive_summary_report(chat_id, timeframe=timeframe, engine_filter=engine_filter)
                 if update.callback_query:
                     try:
                         await update.callback_query.edit_message_text(text=msg, parse_mode="Markdown", reply_markup=keyboard)

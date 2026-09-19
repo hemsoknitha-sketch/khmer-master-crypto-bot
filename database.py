@@ -4508,7 +4508,11 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
     from datetime import datetime, timedelta
 
     tf = (timeframe or "daily").lower().strip()
-    if tf in ["daily", "24h", "1d", "day"]:
+    if tf in ["8h", "8hours", "8hour", "8", "executive"]:
+        cutoff_dt = datetime.now() - timedelta(hours=8)
+        tf_label = "8H Executive"
+        growth_label = "8h Growth"
+    elif tf in ["daily", "24h", "1d", "day"]:
         cutoff_dt = datetime.now() - timedelta(hours=24)
         tf_label = "24H Daily"
         growth_label = "24h Growth"
@@ -4533,7 +4537,9 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
 
     # Normalize engine filter if provided
     ef = (engine_filter or "").lower().strip() if engine_filter else None
-    if ef in ["turbo_hedge", "turbo", "hedge"]:
+    if ef in ["macro_auto_trade", "macro", "auto_trade", "autotrade", "swing"]:
+        ef = "macro_auto_trade"
+    elif ef in ["turbo_hedge", "turbo", "hedge"]:
         ef = "turbo_hedge"
     elif ef in ["wealth", "perpetual_wealth", "pw", "spot_wealth"]:
         ef = "wealth"
@@ -4638,7 +4644,9 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
             trade_qty = float(qty or 0.0)
 
             reason_str = str(reason or "").upper()
-            if "WEALTH" in reason_str or "PW_" in reason_str or "PERPETUAL" in reason_str:
+            if "MACRO" in reason_str or "SWING" in reason_str or "WATERFALL" in reason_str or "BREAKOUT" in reason_str:
+                eng_key = "macro_auto_trade"
+            elif "WEALTH" in reason_str or "PW_" in reason_str or "PERPETUAL" in reason_str:
                 eng_key = "wealth"
             elif "TURBO_HEDGE" in reason_str or "HEDGE" in reason_str:
                 eng_key = "turbo_hedge"
