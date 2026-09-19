@@ -39,16 +39,16 @@ def get_public_bot_commands():
 
         # --- [3] FUTURES & HEDGE ENGINES (Delta-Neutral & Precision Execution) ---
         BotCommand("wealth", "💎 24/7 Perpetual Wealth Generator"),
-        BotCommand("turbo_hedge", "🛡️ Institutional Dual-Side Delta-Neutral Hedge"),
-        BotCommand("smartx", "👑 5-Agent Swarm + 12 Wall Street ML Ensembles"),
+        BotCommand("turbo_hedge", "🛡️ Autonomous Dual-Side Hedge Engine"),
+        BotCommand("smartx", "👑 Apex Multi-Layer AI Quant Suite"),
         BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
         BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
 
         # --- [4] CEDEFI & ARBITRAGE ENGINES (MEV & High-Yield Harvester) ---
-        BotCommand("flash_loan", "⚡ Aave V3 Tokyo HFT MEV 0-Risk Arbitrage"),
+        BotCommand("flash_loan", "⚡ Quantum CeDeFi 0-Risk Arbitrage"),
         BotCommand("smart_swap", "⚡ Multi-Chain DEX & AI Gem Sniper"),
-        BotCommand("cross_arb", "⚡ Sub-5ms Cross-Exchange Arbitrage"),
-        BotCommand("funding_harvester", "🌾 Delta-Neutral 30%-120% APY Harvester"),
+        BotCommand("cross_arb", "⚡ High-Speed Cross-Market Arbitrage"),
+        BotCommand("funding_harvester", "🌾 Delta-Neutral High-Yield Harvester"),
         BotCommand("web3_wallet", "💼 Link Web3 Settlement Wallet (MetaMask)"),
 
         # --- [5] MARKET INTELLIGENCE & RADARS (AGI & Multi-Timeframe) ---
@@ -56,8 +56,8 @@ def get_public_bot_commands():
         BotCommand("flash_crash", "🎯 Liquidation Cascade Deep Wick Hunter"),
         BotCommand("pre_pump", "🔥 Pre-Pump Accumulation Radar"),
         BotCommand("news", "📰 3-Paragraph Journalistic Crypto News"),
-        BotCommand("analyze", "🧠 5-Agent AGI Deep Market Analysis"),
-        BotCommand("predict", "📈 Wall Street ML 24h Price Prediction"),
+        BotCommand("analyze", "🧠 Multi-Agent Deep Market Analysis"),
+        BotCommand("predict", "📈 Institutional 24h Trend Forecast"),
         BotCommand("top", "🔥 Top Volatile Gainers & Losers"),
 
         # --- [6] PORTFOLIO, RISK & ACCOUNT SECURITY ---

@@ -16630,7 +16630,7 @@ class TelegramBotThread(BaseThread):
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_health_refresh"),
+                    InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_status_refresh"),
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ],
                 [
