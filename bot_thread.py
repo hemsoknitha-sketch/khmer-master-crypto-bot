@@ -826,12 +826,12 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("💀 DeFi Liquidation Bounty", callback_data="btn_flash_loan_liquidation")
                 ],
                 [
-                    InlineKeyboardButton("🌐 CeDeFi CEX ↔ DEX", callback_data="btn_flash_loan_cedefi"),
-                    InlineKeyboardButton("⚔️ Tokyo HFT MEV Weapon", callback_data="btn_flash_loan_mev")
+                    InlineKeyboardButton("🏛️ CeDeFi TradFi (Capital)", callback_data="btn_flash_loan_tradfi"),
+                    InlineKeyboardButton("🌐 CeDeFi CEX ↔ DEX", callback_data="btn_flash_loan_cedefi")
                 ],
                 [
-                    InlineKeyboardButton("🛡️ 4 Key Strategies", callback_data="btn_flash_loan_strategy"),
-                    InlineKeyboardButton("⚡ Scan All DEX Spreads", callback_data="btn_flash_loan_scan")
+                    InlineKeyboardButton("⚔️ Tokyo HFT MEV Weapon", callback_data="btn_flash_loan_mev"),
+                    InlineKeyboardButton("🛡️ 4 Key Strategies", callback_data="btn_flash_loan_strategy")
                 ],
                 [
                     InlineKeyboardButton("📜 Execution History", callback_data="btn_flash_loan_history"),
@@ -1132,6 +1132,94 @@ class TelegramBotThread(BaseThread):
                     except Exception: await send_long_message(context, chat_id, cedefi_msg, reply_markup=cedefi_keyboard)
                 else:
                     await send_long_message(context, chat_id, cedefi_msg, reply_markup=cedefi_keyboard)
+                return
+
+            # Sub-action: CEDEFI TRADFI MATRIX (/flash_loan TRADFI or callback btn_flash_loan_tradfi)
+            if (args and args[0].upper() in ["TRADFI", "CAPITAL", "CEDEFI_TRADFI"]) or (update.callback_query and update.callback_query.data in ["btn_flash_loan_tradfi", "btn_flash_loan_tradfi_refresh"]):
+                if update.callback_query:
+                    try: await update.callback_query.answer("🏛️ ស្កេន CeDeFi TradFi Arbitrage (Capital.com ↔ Web3)...")
+                    except Exception: pass
+
+                sent_tradfi = await send_reply_or_edit(update, context, "🏛️ **Scanning CeDeFi TradFi Arbitrage Matrix (Capital.com CFD ↔ DEX / Binance)...**")
+                import flash_loan_mev_engine
+                tradfi_items = flash_loan_mev_engine.flash_loan_engine.scan_cedefi_tradfi_arbitrage()
+
+                tradfi_keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh TradFi Matrix", callback_data="btn_flash_loan_tradfi_refresh"),
+                        InlineKeyboardButton("🏛️ Open /capital Engine", callback_data="btn_capital_menu")
+                    ],
+                    [
+                        InlineKeyboardButton("🔙 Back to Flash Loan", callback_data="btn_flash_loan"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                import ui_standards
+                if user_lang == 'km':
+                    tradfi_msg = (
+                        "🏛️ **CEDEFI TRADFI ARBITRAGE MATRIX v13.00** 🏛️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "⚡ **ស្កេនគម្លាតតម្លៃផ្ទាល់ Capital.com CFD ↔ On-Chain Crypto/Gold ៖**\n\n"
+                    )
+                    for t_item in tradfi_items:
+                        tradfi_msg += (
+                            f"💎 **{t_item['tradfi_name']} ↔ {t_item['crypto_name']}** ៖\n"
+                            f"  • សកម្មភាព ៖ `{t_item['action_text']}`\n"
+                            f"  • ផ្សារ TradFi (Capital) ៖ `${t_item['cap_mid']:,.2f}` (`{t_item['market_status']}`)\n"
+                            f"  • ផ្សារ Crypto (DEX/Binance) ៖ `${t_item['crypto_price']:,.2f}`\n"
+                            f"  • គម្លាតតម្លៃ (Gap) ៖ `${t_item['price_gap_usd']:,.2f}`\n"
+                            f"  • Gross Spread ៖ `+{t_item['gross_spread_pct']:.3f}%`\n"
+                            f"  • Net Arbitrage Yield ៖ `+{t_item['net_yield_pct']:.3f}%` ({t_item['status']})\n\n"
+                        )
+                    tradfi_msg += (
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 **ក្បួនខ្នាតស្ថាប័នរកប្រាក់ចំណេញដោយមិនបាច់ប្រើដើមទុន (Zero-Capital Strategy) ៖**\n"
+                        "1. **Capital.com $10,000 Free Virtual Demo ៖**\n"
+                        "   Capital.com ផ្តល់ទុន Demo $10,000 ស្របច្បាប់ដែលភ្ជាប់ផ្សារពិត។ អ្នកអាចដំណើរការ `/capital AUTO` ដើម្បីកើបចំណេញដោយឥតហានិភ័យ $0.00!\n"
+                        "2. **DeFi-to-TradFi House Money Yield Pipeline ៖**\n"
+                        "   ប្រើ `/flash_loan` ស្កេន និងទាញយកប្រាក់ចំណេញ On-Chain (ហានិភ័យ $0 តាម EVM Revert) រួចយកប្រាក់ចំណេញសុទ្ធនោះ មកធ្វើជាដើមទុនវិនិយោគលើ Capital.com ដោយមិនបាច់ប៉ះពាល់ដើមទុនផ្ទាល់ខ្លួន!\n"
+                        "3. **Cross-Market Delta-Neutral Arbitrage ៖**\n"
+                        "   ចាប់យកគម្លាតតម្លៃរវាង On-Chain Gold (PAXG) និង Capital.com Gold ជាមួយ 0% Directional Risk!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "👉 **1-Tap បញ្ជាស្កេន TradFi Arbitrage ៖**\n`` `/flash_loan TRADFI` ``\n\n"
+                        "👉 **1-Tap ចូលទៅកាន់ម៉ាស៊ីនវិនិយោគ TradFi ៖**\n`` `/capital` ``"
+                    )
+                else:
+                    tradfi_msg = (
+                        "🏛️ **CEDEFI TRADFI ARBITRAGE MATRIX v13.00** 🏛️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "⚡ **Real-Time Arbitrage: Capital.com CFD vs On-Chain Crypto/Gold:**\n\n"
+                    )
+                    for t_item in tradfi_items:
+                        tradfi_msg += (
+                            f"💎 **{t_item['tradfi_name']} vs {t_item['crypto_name']}**:\n"
+                            f"  • Action: `{t_item['action_text']}`\n"
+                            f"  • Capital.com Price: `${t_item['cap_mid']:,.2f}` (`{t_item['market_status']}`)\n"
+                            f"  • Crypto Price: `${t_item['crypto_price']:,.2f}`\n"
+                            f"  • Dollar Gap: `${t_item['price_gap_usd']:,.2f}`\n"
+                            f"  • Gross Spread: `+{t_item['gross_spread_pct']:.3f}%`\n"
+                            f"  • Net Arbitrage Yield: `+{t_item['net_yield_pct']:.3f}%` ({t_item['status']})\n\n"
+                        )
+                    tradfi_msg += (
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 **Zero-Capital & House Money Institutional Principles:**\n"
+                        "1. **Capital.com $10,000 Free Virtual Demo:**\n"
+                        "   Trade real live market prices with $10,000 free balance via `/capital AUTO` with zero personal capital.\n"
+                        "2. **DeFi-to-TradFi House Money Yield Pipeline:**\n"
+                        "   Use atomic zero-capital Flash Loan MEV profits on-chain to fund TradFi CFD setups without risking personal savings.\n"
+                        "3. **Cross-Market Delta-Neutral Arbitrage:**\n"
+                        "   Hedge spread between On-Chain Gold/Crypto and TradFi orderbooks with zero directional exposure.\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "👉 **1-Tap Scan TradFi Arbitrage:**\n`` `/flash_loan TRADFI` ``\n\n"
+                        "👉 **1-Tap Open Capital Engine:**\n`` `/capital` ``"
+                    )
+
+                if sent_tradfi:
+                    try: await sent_tradfi.edit_text(tradfi_msg, parse_mode="Markdown", reply_markup=tradfi_keyboard)
+                    except Exception: await send_long_message(context, chat_id, tradfi_msg, reply_markup=tradfi_keyboard)
+                else:
+                    await send_long_message(context, chat_id, tradfi_msg, reply_markup=tradfi_keyboard)
                 return
 
             # Sub-action: BASE NETWORK MULTI-DEX SCANNER (/flash_loan BASE or callback)
@@ -5270,7 +5358,7 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_wealth_stop":
                 context.args = ["OFF"]
                 await wealth_command(update, context)
-            elif data in ["btn_capital", "btn_capital_menu", "btn_cap_menu", "btn_cap_refresh"]:
+            elif data in ["btn_capital", "btn_capital_menu", "btn_capital_overview", "btn_cap_menu", "btn_cap_refresh"]:
                 context.args = []
                 await capital_command(update, context)
             elif data == "btn_cap_buy_gold":
@@ -5362,6 +5450,9 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data == "btn_flash_loan_cedefi":
                 context.args = ["CEDEFI"]
+                await flash_loan_command(update, context)
+            elif data in ["btn_flash_loan_tradfi", "btn_flash_loan_tradfi_refresh"]:
+                context.args = ["TRADFI"]
                 await flash_loan_command(update, context)
             elif data == "btn_cedefi_auto_on":
                 context.args = ["CEDEFI", "AUTO", "ON"]

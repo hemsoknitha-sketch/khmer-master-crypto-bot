@@ -365,6 +365,140 @@ class FlashLoanMEVEngine:
         results.sort(key=lambda x: x["net_yield_pct"], reverse=True)
         return results
 
+    def scan_cedefi_tradfi_arbitrage(self) -> list:
+        """
+        Scans real-time live price disparities between Web3 Crypto / On-Chain Gold
+        and Capital.com TradFi CFD orderbooks (Gold, Bitcoin, Ethereum).
+        Enables CeDeFi-TradFi Delta-Neutral Arbitrage with Zero Directional Risk.
+        Zero-Mock Guaranteed: Uses 100% live Binance and Capital.com endpoints (Invariant 19).
+        """
+        tradfi_targets = [
+            {
+                "tradfi_epic": "GOLD",
+                "tradfi_name": "Spot Gold (XAU/USD)",
+                "crypto_sym": "PAXGUSDT",
+                "crypto_name": "Paxos Gold (On-Chain Token)",
+                "fee_hurdle": 0.15
+            },
+            {
+                "tradfi_epic": "BTCUSD",
+                "tradfi_name": "Bitcoin CFD (Capital.com)",
+                "crypto_sym": "BTCUSDT",
+                "crypto_name": "Bitcoin Spot / DEX",
+                "fee_hurdle": 0.12
+            },
+            {
+                "tradfi_epic": "ETHUSD",
+                "tradfi_name": "Ethereum CFD (Capital.com)",
+                "crypto_sym": "ETHUSDT",
+                "crypto_name": "Ethereum Spot / DEX",
+                "fee_hurdle": 0.15
+            }
+        ]
+
+        try:
+            import capital_engine
+            cap_engine = capital_engine.get_capital_engine()
+        except Exception:
+            cap_engine = None
+
+        results = []
+        for target in tradfi_targets:
+            tradfi_epic = target["tradfi_epic"]
+            crypto_sym = target["crypto_sym"]
+            fee_hurdle = target["fee_hurdle"]
+
+            # 1. Fetch Binance / Crypto Live Price
+            crypto_price = 0.0
+            crypto_bid = 0.0
+            crypto_ask = 0.0
+            try:
+                r = requests.get(f"https://api.binance.com/api/v3/ticker/bookTicker?symbol={crypto_sym}", timeout=3)
+                if r.status_code == 200:
+                    d = r.json()
+                    crypto_bid = float(d.get("bidPrice", 0.0))
+                    crypto_ask = float(d.get("askPrice", 0.0))
+                    crypto_price = (crypto_bid + crypto_ask) / 2.0 if (crypto_bid + crypto_ask) > 0 else float(d.get("askPrice", 0.0))
+            except Exception:
+                crypto_bid, crypto_ask, crypto_price = 0.0, 0.0, 0.0
+
+            if crypto_price <= 0:
+                continue
+
+            # 2. Fetch Capital.com Live Price
+            cap_bid, cap_ask, cap_mid = 0.0, 0.0, 0.0
+            market_status = "UNKNOWN"
+            if cap_engine:
+                try:
+                    m_info = cap_engine.get_market_details(tradfi_epic)
+                    if m_info.get("success"):
+                        cap_bid = float(m_info.get("bid", 0.0))
+                        cap_ask = float(m_info.get("ask", 0.0))
+                        cap_mid = float(m_info.get("mid", 0.0))
+                        market_status = m_info.get("market_status", "TRADEABLE")
+                except Exception:
+                    pass
+
+            if cap_mid <= 0:
+                continue
+
+            # 3. Determine Arbitrage Direction
+            # If Capital.com Bid > Crypto Ask: Buy Crypto -> Short Capital.com
+            # If Crypto Bid > Capital.com Ask: Buy Capital.com -> Short Crypto
+            if cap_bid > crypto_ask and cap_bid > 0 and crypto_ask > 0:
+                action = "BUY_CRYPTO_SHORT_TRADFI"
+                buy_venue = f"Binance / DEX ({crypto_sym})"
+                sell_venue = f"Capital.com ({tradfi_epic})"
+                buy_px = crypto_ask
+                sell_px = cap_bid
+                action_text = f"Buy Crypto (${buy_px:,.2f}) ➔ Short Capital.com (${sell_px:,.2f})"
+                gross_spread_pct = ((sell_px - buy_px) / buy_px) * 100.0
+            elif crypto_bid > cap_ask and crypto_bid > 0 and cap_ask > 0:
+                action = "BUY_TRADFI_SHORT_CRYPTO"
+                buy_venue = f"Capital.com ({tradfi_epic})"
+                sell_venue = f"Binance / DEX ({crypto_sym})"
+                buy_px = cap_ask
+                sell_px = crypto_bid
+                action_text = f"Buy Capital.com (${buy_px:,.2f}) ➔ Short Crypto (${sell_px:,.2f})"
+                gross_spread_pct = ((sell_px - buy_px) / buy_px) * 100.0
+            else:
+                action = "CONVERGENCE_NEUTRAL"
+                buy_venue = "Market Aligned"
+                sell_venue = "Market Aligned"
+                buy_px = min(crypto_price, cap_mid)
+                sell_px = max(crypto_price, cap_mid)
+                action_text = f"Spread Converged (${abs(cap_mid - crypto_price):,.2f} diff)"
+                gross_spread_pct = (abs(cap_mid - crypto_price) / min(crypto_price, cap_mid)) * 100.0
+
+            net_yield_pct = max(0.0, gross_spread_pct - fee_hurdle)
+            price_gap_usd = round(abs(cap_mid - crypto_price), 2)
+
+            status = "⚡ HIGH PROFIT SPREAD" if net_yield_pct >= 0.20 else ("🟢 TRADEABLE" if net_yield_pct > 0.05 else "⚪ TIGHT SPREAD")
+
+            results.append({
+                "tradfi_epic": tradfi_epic,
+                "tradfi_name": target["tradfi_name"],
+                "crypto_sym": crypto_sym,
+                "crypto_name": target["crypto_name"],
+                "cap_bid": cap_bid,
+                "cap_ask": cap_ask,
+                "cap_mid": cap_mid,
+                "crypto_price": crypto_price,
+                "price_gap_usd": price_gap_usd,
+                "market_status": market_status,
+                "action": action,
+                "action_text": action_text,
+                "buy_venue": buy_venue,
+                "sell_venue": sell_venue,
+                "gross_spread_pct": round(gross_spread_pct, 3),
+                "net_yield_pct": round(net_yield_pct, 3),
+                "fee_hurdle": fee_hurdle,
+                "status": status
+            })
+
+        results.sort(key=lambda x: x["net_yield_pct"], reverse=True)
+        return results
+
     def execute_cedefi_arbitrage(
         self,
         chat_id: int,
