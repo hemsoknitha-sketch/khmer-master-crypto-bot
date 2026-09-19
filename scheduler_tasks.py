@@ -6841,6 +6841,11 @@ async def flash_loan_autonomous_engine(app: Application):
             cedefi_items = await asyncio.to_thread(engine.scan_cedefi_arbitrage_matrix)
             profitable_items = [it for it in cedefi_items if it.get("net_yield_pct", 0.0) >= 0.20 and it.get("net_profit_usd", 0.0) > 0.0]
 
+        # 4.1 PILLAR: Scan CeDeFi TradFi Arbitrage (Capital.com CFD vs Crypto/Gold)
+        if not profitable_items:
+            tradfi_items = await asyncio.to_thread(engine.scan_cedefi_tradfi_arbitrage)
+            profitable_items = [it for it in tradfi_items if (it.get("net_yield_pct", 0.0) >= 0.10 or it.get("price_gap_usd", 0.0) >= 8.0)]
+
         # 5. Scan Ultra-Low Fee Pegged Stablecoin Arbitrage (Fee Hurdle ~0.08%)
         if not profitable_items:
             pegged_items = await asyncio.to_thread(engine.scan_pegged_stablecoin_arbitrage)
@@ -6984,6 +6989,56 @@ async def flash_loan_autonomous_engine(app: Application):
                     if app and hasattr(app, "bot"):
                         try:
                             await app.bot.send_message(chat_id=chat_id, text=cedefi_msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
+                continue
+
+            # Check CeDeFi TradFi Arbitrage Execution Branch (Capital.com vs Crypto/Gold)
+            is_tradfi_op = "tradfi_epic" in top_op
+            if is_tradfi_op:
+                tradfi_auto_enabled = (db.get_system_setting(f"flash_loan_tradfi_auto_{chat_id}", "1") != "0")
+                if not tradfi_auto_enabled:
+                    continue
+
+                t_epic = top_op.get("tradfi_epic", "GOLD")
+                exec_res = engine.execute_cedefi_tradfi_arbitrage(chat_id=chat_id, tradfi_epic=t_epic)
+                if exec_res.get("success"):
+                    FLASH_LOAN_USER_LAST_EXEC[chat_id] = now_ts
+                    mode_str = exec_res.get("env_mode", "LIVE MAINNET")
+                    side = exec_res.get("tradfi_direction", "SELL")
+                    deal_id = exec_res.get("tradfi_deal_id", "N/A")
+                    p_gap = exec_res.get("price_gap_usd", 0.0)
+                    yield_pct = exec_res.get("net_yield_pct", 0.0)
+                    est_p = exec_res.get("estimated_profit_usd", 0.0)
+
+                    if user_lang == 'km':
+                        tradfi_notify = (
+                            "🏛️ **[CEDEFI TRADFI ARBITRAGE EXECUTED]** ⚡\n"
+                            "════════════\n\n"
+                            f"⚙️ **ទម្រង់ប្រតិបត្តិការ ៖** `{mode_str}`\n"
+                            f"🪙 **ឧបករណ៍ហិរញ្ញវត្ថុ ៖** `{t_epic} ↔ {top_op.get('crypto_sym')}`\n"
+                            f"📈 **ទិសដៅ TradFi ៖** `{side} ({top_op.get('action_text')})`\n"
+                            f"💵 **គម្លាតតម្លៃ (Gap) ៖** `${p_gap:,.2f}` (`+{yield_pct:.2f}%`)\n"
+                            f"💰 **ប៉ាន់ស្មានប្រាក់ចំណេញ ៖** `+${est_p:.2f} USD`\n"
+                            f"⚡ **Capital.com Deal ID ៖** `{deal_id}`\n\n"
+                            "💡 _ប្រព័ន្ធស្កេន និងចាប់យកគម្លាតតម្លៃ Capital.com ↔ Crypto ដោយស្វ័យប្រវត្តិ ២៤/៧!_"
+                        )
+                    else:
+                        tradfi_notify = (
+                            "🏛️ **[CEDEFI TRADFI ARBITRAGE EXECUTED]** ⚡\n"
+                            "════════════\n\n"
+                            f"⚙️ **Execution Mode:** `{mode_str}`\n"
+                            f"🪙 **Instrument:** `{t_epic} vs {top_op.get('crypto_sym')}`\n"
+                            f"📈 **Strategy:** `{side} ({top_op.get('action_text')})`\n"
+                            f"💵 **Price Disparity:** `${p_gap:,.2f}` (`+{yield_pct:.2f}%`)\n"
+                            f"💰 **Projected Profit:** `+${est_p:.2f} USD`\n"
+                            f"⚡ **Deal ID:** `{deal_id}`\n\n"
+                            "💡 _Autonomous 24/7 Delta-Neutral CeDeFi-TradFi Arbitrage Engine!_"
+                        )
+
+                    if app and hasattr(app, "bot"):
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=tradfi_notify, parse_mode="Markdown")
                         except Exception:
                             pass
                 continue

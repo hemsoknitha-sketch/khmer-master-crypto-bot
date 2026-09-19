@@ -1134,6 +1134,76 @@ class TelegramBotThread(BaseThread):
                     await send_long_message(context, chat_id, cedefi_msg, reply_markup=cedefi_keyboard)
                 return
 
+            # Sub-action: CEDEFI TRADFI AUTO TOGGLE
+            if args and args[0].upper() == "TRADFI_AUTO_TOGGLE":
+                curr_st = (db.get_system_setting(f"flash_loan_tradfi_auto_{chat_id}", "1") != "0")
+                new_st = "0" if curr_st else "1"
+                db.set_system_setting(f"flash_loan_tradfi_auto_{chat_id}", new_st)
+                toast_txt = "🤖 CeDeFi TradFi 24/7 Auto: បានបើក (ON)" if new_st == "1" else "⚪ CeDeFi TradFi 24/7 Auto: បានបិទ (OFF)"
+                if update.callback_query:
+                    try: await update.callback_query.answer(toast_txt)
+                    except Exception: pass
+                args = ["TRADFI"]
+
+            # Sub-action: CEDEFI TRADFI DIRECT EXECUTION
+            if args and args[0].upper() == "TRADFI_EXEC":
+                t_epic = args[1].upper() if len(args) > 1 else "GOLD"
+                if update.callback_query:
+                    try: await update.callback_query.answer(f"⚡ បញ្ជាប្រតិបត្តិការ Arbitrage {t_epic}...")
+                    except Exception: pass
+                import flash_loan_mev_engine
+                res = flash_loan_mev_engine.flash_loan_engine.execute_cedefi_tradfi_arbitrage(chat_id=chat_id, tradfi_epic=t_epic)
+                import ui_standards
+                if res.get("success"):
+                    deal_id = res.get("tradfi_deal_id", "N/A")
+                    side = res.get("tradfi_direction", "SELL")
+                    gap = res.get("price_gap_usd", 0.0)
+                    yield_pct = res.get("net_yield_pct", 0.0)
+                    profit_val = res.get("estimated_profit_usd", 0.0)
+                    env_m = res.get("env_mode", "LIVE")
+
+                    if user_lang == 'km':
+                        exec_msg = (
+                            "🏛️ **[CEDEFI TRADFI ARBITRAGE EXECUTED]** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                            f"⚙️ **ទម្រង់ប្រតិបត្តិការ ៖** `{env_m}`\n"
+                            f"🪙 **ឧបករណ៍ហិរញ្ញវត្ថុ ៖** `{t_epic} ↔ {res.get('crypto_sym')}`\n"
+                            f"📈 **ទិសដៅ TradFi ៖** `{side}` (ទំហំ ៖ `{res.get('deal_size')}` Lot)\n"
+                            f"💵 **គម្លាតតម្លៃ (Price Gap) ៖** `${gap:,.2f}` (`+{yield_pct:.3f}%`)\n"
+                            f"💰 **ប្រាក់ចំណេញប៉ាន់ស្មាន ៖** `+${profit_val:.3f} USD`\n"
+                            f"⚡ **Capital.com Deal ID ៖** `{deal_id}`\n\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            "✅ _ប្រតិបត្តិការចាប់យកផលចំណេញត្រូវបានបញ្ជូនទៅកាន់ Capital.com ដោយជោគជ័យ!_"
+                        )
+                    else:
+                        exec_msg = (
+                            "🏛️ **[CEDEFI TRADFI ARBITRAGE EXECUTED]** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n\n"
+                            f"⚙️ **Execution Mode:** `{env_m}`\n"
+                            f"🪙 **Instrument:** `{t_epic} vs {res.get('crypto_sym')}`\n"
+                            f"📈 **Order Direction:** `{side}` (Size: `{res.get('deal_size')}` Lot)\n"
+                            f"💵 **Price Disparity:** `${gap:,.2f}` (`+{yield_pct:.3f}%`)\n"
+                            f"💰 **Projected Profit:** `+${profit_val:.3f} USD`\n"
+                            f"⚡ **Deal ID:** `{deal_id}`\n\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            "✅ _Arbitrage order successfully placed on Capital.com!_"
+                        )
+                else:
+                    err = res.get("cap_error") or res.get("error", "Failed")
+                    exec_msg = f"❌ **CeDeFi TradFi Arbitrage Notice:** `{err}`"
+
+                exec_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh TradFi Matrix", callback_data="btn_flash_loan_tradfi_refresh"),
+                        InlineKeyboardButton("🏛️ Open /capital", callback_data="btn_capital_menu")
+                    ],
+                    [
+                        InlineKeyboardButton("🔙 Back to Flash Loan", callback_data="btn_flash_loan")
+                    ]
+                ])
+                await send_reply_or_edit(update, context, exec_msg, reply_markup=exec_kb)
+                return
+
             # Sub-action: CEDEFI TRADFI MATRIX (/flash_loan TRADFI or callback btn_flash_loan_tradfi)
             if (args and args[0].upper() in ["TRADFI", "CAPITAL", "CEDEFI_TRADFI"]) or (update.callback_query and update.callback_query.data in ["btn_flash_loan_tradfi", "btn_flash_loan_tradfi_refresh"]):
                 if update.callback_query:
@@ -1144,14 +1214,22 @@ class TelegramBotThread(BaseThread):
                 import flash_loan_mev_engine
                 tradfi_items = flash_loan_mev_engine.flash_loan_engine.scan_cedefi_tradfi_arbitrage()
 
+                is_tradfi_auto = (db.get_system_setting(f"flash_loan_tradfi_auto_{chat_id}", "1") != "0")
+                auto_badge_btn = "🟢 Auto 24/7: ON" if is_tradfi_auto else "⚪ Auto 24/7: OFF"
+                auto_radar_status = "🟢 ACTIVE (ស្កេនស្វ័យប្រវត្តិ ២៤/៧)" if is_tradfi_auto else "⚪ PAUSED"
+
                 tradfi_keyboard = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("🔄 Refresh TradFi Matrix", callback_data="btn_flash_loan_tradfi_refresh"),
-                        InlineKeyboardButton("🏛️ Open /capital Engine", callback_data="btn_capital_menu")
+                        InlineKeyboardButton("⚡ Arbitrage Gold (PAXG)", callback_data="btn_tradfi_exec_gold"),
+                        InlineKeyboardButton("⚡ Arbitrage BTC", callback_data="btn_tradfi_exec_btcusd")
                     ],
                     [
-                        InlineKeyboardButton("🔙 Back to Flash Loan", callback_data="btn_flash_loan"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                        InlineKeyboardButton(auto_badge_btn, callback_data="btn_tradfi_auto_toggle"),
+                        InlineKeyboardButton("🔄 Refresh TradFi Matrix", callback_data="btn_flash_loan_tradfi_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("🏛️ Open /capital Engine", callback_data="btn_capital_menu"),
+                        InlineKeyboardButton("🔙 Back to Flash Loan", callback_data="btn_flash_loan")
                     ]
                 ])
 
@@ -1160,6 +1238,9 @@ class TelegramBotThread(BaseThread):
                     tradfi_msg = (
                         "🏛️ **CEDEFI TRADFI ARBITRAGE MATRIX v13.00** 🏛️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚡ **Tokyo HFT Concurrency ៖** `Sub-Millisecond Parallel Engine`\n"
+                        f"🤖 **24/7 Autonomous Radar ៖** `[ {auto_radar_status} ]`\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
                         "⚡ **ស្កេនគម្លាតតម្លៃផ្ទាល់ Capital.com CFD ↔ On-Chain Crypto/Gold ៖**\n\n"
                     )
                     for t_item in tradfi_items:
@@ -1189,6 +1270,9 @@ class TelegramBotThread(BaseThread):
                     tradfi_msg = (
                         "🏛️ **CEDEFI TRADFI ARBITRAGE MATRIX v13.00** 🏛️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚡ **Tokyo HFT Concurrency:** `Sub-Millisecond Parallel Engine`\n"
+                        f"🤖 **24/7 Autonomous Radar:** `[ {auto_radar_status} ]`\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
                         "⚡ **Real-Time Arbitrage: Capital.com CFD vs On-Chain Crypto/Gold:**\n\n"
                     )
                     for t_item in tradfi_items:
@@ -5453,6 +5537,15 @@ class TelegramBotThread(BaseThread):
                 await flash_loan_command(update, context)
             elif data in ["btn_flash_loan_tradfi", "btn_flash_loan_tradfi_refresh"]:
                 context.args = ["TRADFI"]
+                await flash_loan_command(update, context)
+            elif data == "btn_tradfi_exec_gold":
+                context.args = ["TRADFI_EXEC", "GOLD"]
+                await flash_loan_command(update, context)
+            elif data == "btn_tradfi_exec_btcusd":
+                context.args = ["TRADFI_EXEC", "BTCUSD"]
+                await flash_loan_command(update, context)
+            elif data == "btn_tradfi_auto_toggle":
+                context.args = ["TRADFI_AUTO_TOGGLE"]
                 await flash_loan_command(update, context)
             elif data == "btn_cedefi_auto_on":
                 context.args = ["CEDEFI", "AUTO", "ON"]

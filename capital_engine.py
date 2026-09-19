@@ -11,6 +11,7 @@ Execution Environment: Demo ($10,000 Virtual Funds) & Live Mainnet
 
 import os
 import time
+import threading
 import logging
 import requests
 from typing import Dict, Any, Optional, Tuple, List
@@ -107,6 +108,9 @@ class CapitalComEngine:
         self.active_account_id: Optional[str] = None
         self.account_currency: str = "USD"
         
+        # Thread-safe Session Lock
+        self._session_lock = threading.Lock()
+        
         # In-Memory Cache (Sub-millisecond fast responses)
         self._price_cache: Dict[str, Dict[str, Any]] = {}
         self._cache_ttl = 3.0  # 3 seconds cache for live quotes
@@ -166,22 +170,19 @@ class CapitalComEngine:
             return False, f"Connection Exception: {e}"
 
     def ensure_session(self) -> bool:
-        """Verifies session freshness and auto-refreshes if close to 10-minute expiry."""
+        """Verifies session freshness and auto-refreshes if close to 10-minute expiry (Thread-safe)."""
         now = time.time()
-        if not self.cst_token or not self.security_token:
+        if self.cst_token and self.security_token and (now - self.session_created_at) <= SESSION_EXPIRY_THRESHOLD:
+            return True
+
+        with self._session_lock:
+            now = time.time()
+            if self.cst_token and self.security_token and (now - self.session_created_at) <= SESSION_EXPIRY_THRESHOLD:
+                return True
             success, msg = self.authenticate()
             if not success:
                 self.last_auth_error = msg
             return success
-            
-        if (now - self.session_created_at) > SESSION_EXPIRY_THRESHOLD:
-            logger.info("Session token near expiry. Performing proactive session refresh...")
-            success, msg = self.authenticate()
-            if not success:
-                self.last_auth_error = msg
-            return success
-            
-        return True
 
     def get_auth_headers(self) -> Dict[str, str]:
         """Returns standard headers required for all Capital.com REST requests."""
