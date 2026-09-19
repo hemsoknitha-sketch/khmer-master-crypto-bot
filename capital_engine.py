@@ -14,6 +14,10 @@ import time
 import logging
 import requests
 from typing import Dict, Any, Optional, Tuple, List
+from dotenv import load_dotenv
+
+# Automatically load .env configuration
+load_dotenv()
 
 # Setup Logger
 logger = logging.getLogger("CapitalComEngine")
@@ -71,13 +75,17 @@ class CapitalComEngine:
         api_key: Optional[str] = None,
         identifier: Optional[str] = None,
         password: Optional[str] = None,
-        is_demo: bool = True
+        is_demo: Optional[bool] = None
     ):
-        self.api_key = api_key or os.getenv("CAPITAL_API_KEY", "")
-        self.identifier = identifier or os.getenv("CAPITAL_IDENTIFIER", "")
-        self.password = password or os.getenv("CAPITAL_PASSWORD", "")
-        self.is_demo = is_demo
+        self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip()
+        self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip()
+        self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip()
         
+        if is_demo is not None:
+            self.is_demo = is_demo
+        else:
+            self.is_demo = os.getenv("CAPITAL_IS_DEMO", "True").strip().lower() in ("true", "1", "yes")
+            
         self.base_url = CAPITAL_DEMO_URL if self.is_demo else CAPITAL_LIVE_URL
         
         # Session state
@@ -130,6 +138,8 @@ class CapitalComEngine:
             else:
                 err_data = res.json() if res.content else {}
                 err_msg = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
+                if "error.null.accountId" in err_msg and self.is_demo:
+                    err_msg = "error.null.accountId (No active Demo account found on Capital.com profile. Please switch to Demo on Capital.com web platform to activate your $10,000 demo account, or set CAPITAL_IS_DEMO=False for Live)."
                 logger.error(f"Authentication failed: {err_msg}")
                 return False, f"Auth Error: {err_msg}"
         except Exception as e:
@@ -513,16 +523,19 @@ if __name__ == "__main__":
     ident = os.getenv("CAPITAL_IDENTIFIER", "")
     pwd = os.getenv("CAPITAL_PASSWORD", "")
     
+    is_demo_cfg = os.getenv("CAPITAL_IS_DEMO", "True").strip().lower() in ("true", "1", "yes")
+    target_env = "DEMO ($10,000 Virtual Funds)" if is_demo_cfg else "LIVE MAINNET"
+    
     print("\n[STEP 1] Inspecting Environment Variables...")
     print(f"  • CAPITAL_API_KEY:    {'[SET]' if api_k else '[EMPTY]'}")
     print(f"  • CAPITAL_IDENTIFIER: {'[SET]' if ident else '[EMPTY]'}")
     print(f"  • CAPITAL_PASSWORD:   {'[SET]' if pwd else '[EMPTY]'}")
-    print("  • DEFAULT TARGET:     DEMO ($10,000 Virtual Funds)")
+    print(f"  • TARGET ENVIRONMENT: {target_env}")
     
     if not api_k or not ident or not pwd:
         print("\n[NOTICE] No Capital.com credentials found in .env.")
-        print("To test live execution on Demo Account, obtain free API credentials:")
-        print("  1. Create free Demo account at: https://capital.com/")
+        print("To test live execution, obtain free API credentials:")
+        print("  1. Create account at: https://capital.com/")
         print("  2. Enable 2FA (Google Authenticator)")
         print("  3. Navigate to: Settings > API integrations > Generate Key")
         print("  4. Add to .env:")
@@ -531,23 +544,34 @@ if __name__ == "__main__":
         print("     CAPITAL_PASSWORD=your_api_password")
         print("     CAPITAL_IS_DEMO=True")
         print("\n[TEST] Engine structure, classes, and helper mappings compiled successfully!")
-        print("Ready for automated trading and institutional demo execution.")
+        print("Ready for automated trading and institutional execution.")
     else:
-        print("\n[STEP 2] Authenticating with Capital.com Demo API...")
-        engine = CapitalComEngine(api_key=api_k, identifier=ident, password=pwd, is_demo=True)
+        print(f"\n[STEP 2] Authenticating with Capital.com ({target_env})...")
+        engine = CapitalComEngine(api_key=api_k, identifier=ident, password=pwd, is_demo=is_demo_cfg)
         ok, msg = engine.authenticate()
+        
+        # Smart fallback: If Demo was requested but account only has Live enabled
+        if not ok and is_demo_cfg and "error.null.accountId" in msg:
+            print("\n  [INFO] Capital.com profile has no active Demo sub-account.")
+            print("  [ACTION] Testing connection against Live Mainnet...")
+            engine = CapitalComEngine(api_key=api_k, identifier=ident, password=pwd, is_demo=False)
+            ok, msg = engine.authenticate()
+            
         print(f"  Result: {'SUCCESS' if ok else 'FAILED'} -> {msg}")
         
         if ok:
-            print("\n[STEP 3] Fetching Demo Account Balance...")
+            mode_lbl = "Demo" if engine.is_demo else "Live"
+            print(f"\n[STEP 3] Fetching {mode_lbl} Account Balance...")
             bal = engine.get_account_balance()
-            print(f"  • Account Name: {bal.get('account_name')}")
+            print(f"  • Account ID:   {bal.get('account_id')}")
+            print(f"  • Account Name: {bal.get('account_name') or 'Primary'}")
             print(f"  • Balance:      ${bal.get('balance'):,.2f} {bal.get('currency')}")
             print(f"  • Available:    ${bal.get('available'):,.2f} {bal.get('currency')}")
             print(f"  • Equity:       ${bal.get('balance', 0) + bal.get('pnl', 0):,.2f}")
             print(f"  • Active PnL:   ${bal.get('pnl'):,.2f}")
+            print(f"  • Status:       {bal.get('status')}")
             
-            print("\n[STEP 4] Fetching Live Gold (XAU/USD) & S&P 500 Market Prices...")
+            print("\n[STEP 4] Fetching Live Institutional Market Prices...")
             gold = engine.get_market_details("GOLD")
             if gold.get("success"):
                 print(f"  • GOLD (XAU/USD): Bid ${gold.get('bid'):,.2f} | Ask ${gold.get('ask'):,.2f} | Spread ${gold.get('spread'):.2f}")
@@ -555,5 +579,9 @@ if __name__ == "__main__":
             sp500 = engine.get_market_details("SP500")
             if sp500.get("success"):
                 print(f"  • S&P 500:        Bid ${sp500.get('bid'):,.2f} | Ask ${sp500.get('ask'):,.2f} | Spread ${sp500.get('spread'):.2f}")
+
+            btc = engine.get_market_details("BTCUSD")
+            if btc.get("success"):
+                print(f"  • Bitcoin (CFD):  Bid ${btc.get('bid'):,.2f} | Ask ${btc.get('ask'):,.2f} | Spread ${btc.get('spread'):.2f}")
     
     print("\n" + "=" * 70)
