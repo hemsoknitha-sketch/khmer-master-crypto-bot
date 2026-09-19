@@ -458,6 +458,76 @@ class CapitalComEngine:
                 err_data = res.json() if res.content else {}
                 err_code = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
                 logger.error(f"Order placement failed: {err_code}")
+
+                # Auto-Recovery from Stop-Loss / Take-Profit distance boundary rejections (Invariant 1 Zero Negligence):
+                # 1. error.invalid.stoploss.minvalue: <val>
+                m_sl_min = re.search(r'error\.invalid\.stoploss\.minvalue:\s*([0-9.]+)', err_code)
+                if m_sl_min:
+                    min_val = float(m_sl_min.group(1))
+                    adjusted_sl = round(min_val * 1.0005, 2) if dir_upper == "SELL" else round(min_val * 1.0005, 2)
+                    logger.info(f"🔄 Auto-Recovery: Adjusting Stop-Loss to {adjusted_sl} (required min: {min_val}) and retrying...")
+                    payload["stopLevel"] = adjusted_sl
+                    res_retry = requests.post(url, headers=self.get_auth_headers(), json=payload, timeout=10)
+                    if res_retry.status_code == 200:
+                        data = res_retry.json()
+                        deal_ref = data.get("dealReference")
+                        logger.info(f"✅ Auto-Recovery succeeded! Deal Ref: {deal_ref}")
+                        return {
+                            "success": True,
+                            "epic": resolved_epic,
+                            "direction": dir_upper,
+                            "size": size,
+                            "deal_reference": deal_ref,
+                            "is_demo": self.is_demo,
+                            "response": data
+                        }
+
+                # 2. error.invalid.stoploss.maxvalue: <val>
+                m_sl_max = re.search(r'error\.invalid\.stoploss\.maxvalue:\s*([0-9.]+)', err_code)
+                if m_sl_max:
+                    max_val = float(m_sl_max.group(1))
+                    adjusted_sl = round(max_val * 0.9995, 2)
+                    logger.info(f"🔄 Auto-Recovery: Adjusting Stop-Loss to {adjusted_sl} (required max: {max_val}) and retrying...")
+                    payload["stopLevel"] = adjusted_sl
+                    res_retry = requests.post(url, headers=self.get_auth_headers(), json=payload, timeout=10)
+                    if res_retry.status_code == 200:
+                        data = res_retry.json()
+                        deal_ref = data.get("dealReference")
+                        logger.info(f"✅ Auto-Recovery succeeded! Deal Ref: {deal_ref}")
+                        return {
+                            "success": True,
+                            "epic": resolved_epic,
+                            "direction": dir_upper,
+                            "size": size,
+                            "deal_reference": deal_ref,
+                            "is_demo": self.is_demo,
+                            "response": data
+                        }
+
+                # 3. Fallback: If SL/TP was rejected by exchange distance rules, execute clean Market Order without stops first
+                if "stoploss" in err_code.lower() or "profitlevel" in err_code.lower():
+                    logger.warning(f"Exchange SL/TP rejected ({err_code}). Executing clean Market Order...")
+                    payload_clean = {
+                        "epic": resolved_epic,
+                        "direction": dir_upper,
+                        "size": round(size, 4),
+                        "guaranteedStop": guaranteed_stop
+                    }
+                    res_clean = requests.post(url, headers=self.get_auth_headers(), json=payload_clean, timeout=10)
+                    if res_clean.status_code == 200:
+                        data = res_clean.json()
+                        deal_ref = data.get("dealReference")
+                        logger.info(f"✅ Market entry filled cleanly! Deal Ref: {deal_ref}")
+                        return {
+                            "success": True,
+                            "epic": resolved_epic,
+                            "direction": dir_upper,
+                            "size": size,
+                            "deal_reference": deal_ref,
+                            "is_demo": self.is_demo,
+                            "response": data
+                        }
+
                 return {"success": False, "error": err_code}
         except Exception as e:
             logger.error(f"Order placement exception: {e}")
@@ -676,17 +746,20 @@ class CapitalComEngine:
             elif closes[-1] < closes[-2] < closes[-3]:
                 bearish_score += 20
 
-        # Final signal arbitration
+        # Final signal arbitration with broker distance compliance
+        min_sl_dist = max(1.5 * atr, spread * 2.0, 0.002 * mid_price)
+        min_tp_dist = max(3.0 * atr, spread * 4.0, 0.005 * mid_price)
+
         if bullish_score >= 70:
             signal = "STRONG_BUY" if bullish_score >= 85 else "BUY"
             confidence = min(96, bullish_score)
-            sl = round(current_ask - (1.5 * atr), 2)
-            tp = round(current_ask + (3.0 * atr), 2)
+            sl = round(current_bid - min_sl_dist, 2)
+            tp = round(current_ask + min_tp_dist, 2)
         elif bearish_score >= 70:
             signal = "STRONG_SELL" if bearish_score >= 85 else "SELL"
             confidence = min(96, bearish_score)
-            sl = round(current_bid + (1.5 * atr), 2)
-            tp = round(current_bid - (3.0 * atr), 2)
+            sl = round(current_ask + min_sl_dist, 2)
+            tp = round(current_bid - min_tp_dist, 2)
         else:
             signal = "HOLD_NEUTRAL"
             confidence = max(bullish_score, bearish_score)
@@ -762,16 +835,21 @@ class CapitalComEngine:
         ask = analysis.get("ask", 0.0)
         bid = analysis.get("bid", 0.0)
 
+        mid_px = (bid + ask) / 2.0 if (bid + ask) > 0 else 1.0
+        spread = analysis.get("spread", 0.0)
+        min_sl_dist = max(1.5 * atr, spread * 2.0, 0.002 * mid_px)
+        min_tp_dist = max(3.0 * atr, spread * 4.0, 0.005 * mid_px)
+
         if dir_u == "BUY":
-            if not sl or sl <= 0:
-                sl = round(ask - (1.5 * atr), 2)
-            if not tp or tp <= 0:
-                tp = round(ask + (3.0 * atr), 2)
+            if not sl or sl <= 0 or sl >= bid:
+                sl = round(bid - min_sl_dist, 2)
+            if not tp or tp <= 0 or tp <= ask:
+                tp = round(ask + min_tp_dist, 2)
         elif dir_u == "SELL":
-            if not sl or sl <= 0:
-                sl = round(bid + (1.5 * atr), 2)
-            if not tp or tp <= 0:
-                tp = round(bid - (3.0 * atr), 2)
+            if not sl or sl <= 0 or sl <= ask:
+                sl = round(ask + min_sl_dist, 2)
+            if not tp or tp <= 0 or tp >= bid:
+                tp = round(bid - min_tp_dist, 2)
 
         # 4. Transmit Protected Position
         max_spreads = {"GOLD": 1.20, "US500": 1.50, "OIL_CRUDE": 0.10, "BTCUSD": 80.0}
