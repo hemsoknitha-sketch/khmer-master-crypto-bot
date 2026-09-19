@@ -2963,13 +2963,24 @@ def place_spot_order(
         # SELL side
         base_asset = symbol.replace("USDT", "").replace("DODOX", "DODO")
         actual_free = get_spot_balance(api_key, api_secret, base_asset)
-        if quantity <= 0:
-            raw_qty = actual_free
-        else:
-            raw_qty = min(quantity, actual_free) if actual_free > 0 else quantity
+        if actual_free <= 0.0:
+            # Clear balance cache and re-query once to confirm
+            BALANCE_CACHE.pop(f"{api_key}_{base_asset}", None)
+            actual_free = get_spot_balance(api_key, api_secret, base_asset)
+
+        if actual_free <= 0.0:
+            print(f"🛡️ [SPOT SELL SHIELD] {symbol} Spot Sell skipped: No free {base_asset} balance in Spot wallet (0.00). Position was likely already liquidated.")
+            return {
+                "status": "skipped",
+                "code": -2010,
+                "msg": f"No {base_asset} spot balance available to sell",
+                "error": "Account has insufficient balance for requested action."
+            }
+
+        raw_qty = min(quantity, actual_free) if quantity > 0 else actual_free
 
         if raw_qty <= 0:
-            return {"status": "error", "error": f"No {base_asset} spot balance available to sell"}
+            return {"status": "skipped", "reason": f"No {base_asset} spot balance available to sell", "code": -2010}
 
         formatted_qty = get_max_sellable_qty(symbol, raw_qty)
         if formatted_qty <= 0:
