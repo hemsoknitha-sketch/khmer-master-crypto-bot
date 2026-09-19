@@ -1429,11 +1429,21 @@ class TelegramBotThread(BaseThread):
                         "💡 _LST/LRT arbitrage captures peg imbalances between liquid staking tokens and WETH with zero liquidation risk!_"
                     )
 
+                    lst_keyboard = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔄 Refresh LST Pools", callback_data="btn_flash_loan_lst"),
+                            InlineKeyboardButton("🟢 Auto 24/7: ON", callback_data="btn_flash_loan_auto_on")
+                        ],
+                        [
+                            InlineKeyboardButton("🥩 Flash Loan Menu", callback_data="btn_flash_loan")
+                        ]
+                    ])
+
                 if sent_lst:
-                    try: await sent_lst.edit_text(lst_msg, parse_mode="Markdown", reply_markup=keyboard)
-                    except Exception: await send_long_message(context, chat_id, lst_msg, reply_markup=keyboard)
+                    try: await sent_lst.edit_text(lst_msg, parse_mode="Markdown", reply_markup=lst_keyboard)
+                    except Exception: await send_long_message(context, chat_id, lst_msg, reply_markup=lst_keyboard)
                 else:
-                    await send_long_message(context, chat_id, lst_msg, reply_markup=keyboard)
+                    await send_long_message(context, chat_id, lst_msg, reply_markup=lst_keyboard)
                 return
 
             # Sub-action: PILLAR 2: BALANCER V2 VAULT 0% FEE FLASH LOAN (/flash_loan BALANCER or callback)

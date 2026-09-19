@@ -947,10 +947,14 @@ class FlashLoanMEVEngine:
                     try:
                         nat_price = float(p.get("priceNative", 0.0) or 0.0)
                         liq_usd = float(p.get("liquidity", {}).get("usd", 0.0) or 0.0)
-                        dex_id = p.get("dexId", "dex").capitalize()
+                        dex_raw = p.get("dexId", "dex").capitalize()
+                        labels = p.get("labels", [])
+                        lbl_suffix = f" {labels[0].upper()}" if labels else ""
+                        dex_id = f"{dex_raw}{lbl_suffix}"
                         if nat_price > 0 and liq_usd >= 8000.0:
                             matching.append({
                                 "dex": dex_id,
+                                "dex_base": dex_raw.lower(),
                                 "price_weth": nat_price,
                                 "liquidity_usd": liq_usd
                             })
@@ -963,6 +967,10 @@ class FlashLoanMEVEngine:
             matching.sort(key=lambda x: x["price_weth"])
             buy_venue = matching[0]
             sell_venue = matching[-1]
+
+            # Ensure buy and sell venues are not on identical router
+            if buy_venue["dex"] == sell_venue["dex"]:
+                continue
 
             buy_p = buy_venue["price_weth"]
             sell_p = sell_venue["price_weth"]
@@ -986,6 +994,9 @@ class FlashLoanMEVEngine:
             results.append({
                 "pair": target["pair"],
                 "token": token_sym,
+                "intermediate_token": token_sym,
+                "token_addr": target["addr"],
+                "addr": target["addr"],
                 "chain": target["chain"],
                 "borrow_asset": "WETH",
                 "borrow_source": "Aave V3 WETH Pool ($350M+ Liquidity)",
@@ -998,8 +1009,10 @@ class FlashLoanMEVEngine:
                 "fee_hurdle_pct": hurdle,
                 "net_yield_pct": round(net_yield_pct, 3),
                 "optimal_weth_loan": round(opt_weth, 2),
+                "optimal_loan_usd": round(opt_usd, 2),
                 "net_profit_weth": round(net_profit_weth, 4),
                 "net_profit_usd": round(net_profit_usd, 2),
+                "dex_route": 1 if "uni" in buy_venue["dex"].lower() else 2,
                 "status": status
             })
 
