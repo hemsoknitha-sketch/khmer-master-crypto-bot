@@ -39,9 +39,9 @@ def sync_time():
 
 BINANCE_SPOT_URLS = [
     os.getenv("BINANCE_SPOT_URL", "").rstrip("/"),
+    "https://api-gcp.binance.com",
     "https://api.binance.com",
     "https://api.binance.info",
-    "https://api-gcp.binance.com",
     "https://api1.binance.com",
     "https://api2.binance.com",
     "https://api3.binance.com",
@@ -49,20 +49,60 @@ BINANCE_SPOT_URLS = [
 ]
 BINANCE_SPOT_URLS = [u for u in BINANCE_SPOT_URLS if u]
 
-def get_working_spot_url():
-    """Smart Fallback: Finds a working Binance endpoint to bypass DNS issues."""
+BINANCE_FUTURES_URLS = [
+    os.getenv("BINANCE_FUTURES_URL", "").rstrip("/"),
+    "https://fapi-gcp.binance.com",
+    "https://fapi.binance.com",
+    "https://fapi1.binance.com",
+    "https://fapi2.binance.com",
+    "https://fapi.binance.info"
+]
+BINANCE_FUTURES_URLS = [u for u in BINANCE_FUTURES_URLS if u]
+
+_WORKING_SPOT_URL_CACHE = {"url": None, "ts": 0.0}
+_WORKING_FUTURES_URL_CACHE = {"url": None, "ts": 0.0}
+
+def get_working_spot_url() -> str:
+    """Smart Fallback: Finds the fastest responsive Binance Spot endpoint (api-gcp priority with 60s cache)."""
+    now = time.time()
+    if _WORKING_SPOT_URL_CACHE["url"] and (now - _WORKING_SPOT_URL_CACHE["ts"] < 60.0):
+        return _WORKING_SPOT_URL_CACHE["url"]
     for url in BINANCE_SPOT_URLS:
         try:
-            res = requests.get(f"{url}/api/v3/ping", timeout=3)
-            if res.status_code == 200:
+            res = HFT_SESSION.get(f"{url}/api/v3/ping", timeout=2)
+            if res.status_code in [200, 202] or res.status_code < 400:
+                _WORKING_SPOT_URL_CACHE["url"] = url
+                _WORKING_SPOT_URL_CACHE["ts"] = now
                 return url
         except requests.exceptions.RequestException:
             continue
-    return BINANCE_SPOT_URLS[0]
+    fallback = BINANCE_SPOT_URLS[0] if BINANCE_SPOT_URLS else "https://api-gcp.binance.com"
+    _WORKING_SPOT_URL_CACHE["url"] = fallback
+    _WORKING_SPOT_URL_CACHE["ts"] = now
+    return fallback
+
+def get_working_futures_url() -> str:
+    """Smart Fallback: Finds the fastest responsive Binance Futures endpoint (fapi-gcp priority with 60s cache)."""
+    now = time.time()
+    if _WORKING_FUTURES_URL_CACHE["url"] and (now - _WORKING_FUTURES_URL_CACHE["ts"] < 60.0):
+        return _WORKING_FUTURES_URL_CACHE["url"]
+    for url in BINANCE_FUTURES_URLS:
+        try:
+            res = HFT_SESSION.get(f"{url}/fapi/v1/ping", timeout=2)
+            if res.status_code in [200, 202] or res.status_code < 400:
+                _WORKING_FUTURES_URL_CACHE["url"] = url
+                _WORKING_FUTURES_URL_CACHE["ts"] = now
+                return url
+        except requests.exceptions.RequestException:
+            continue
+    fallback = BINANCE_FUTURES_URLS[0] if BINANCE_FUTURES_URLS else "https://fapi-gcp.binance.com"
+    _WORKING_FUTURES_URL_CACHE["url"] = fallback
+    _WORKING_FUTURES_URL_CACHE["ts"] = now
+    return fallback
 
 BASE_URL = os.getenv("BINANCE_SPOT_URL", get_working_spot_url()).rstrip("/")
+FUTURES_URL = os.getenv("BINANCE_FUTURES_URL", get_working_futures_url()).rstrip("/")
 sync_time()
-FUTURES_URL = os.getenv("BINANCE_FUTURES_URL", "https://fapi.binance.com").rstrip("/")
 import math
 
 SYMBOL_INFO_CACHE = {}
@@ -129,7 +169,7 @@ def get_klines(symbol: str, interval: str = "1m", limit: int = 25, is_spot: bool
 
     if is_spot:
         try:
-            url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+            url = f"{BASE_URL}/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
             res = HFT_SESSION.get(url, timeout=1.5)
             if res.status_code == 200:
                 data = res.json()
@@ -142,7 +182,7 @@ def get_klines(symbol: str, interval: str = "1m", limit: int = 25, is_spot: bool
         return _klines_cache.get(cache_key, [])
 
     try:
-        url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        url = f"{FUTURES_URL}/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
         res = HFT_SESSION.get(url, timeout=1.5)
         if res.status_code == 200:
             data = res.json()
@@ -154,7 +194,7 @@ def get_klines(symbol: str, interval: str = "1m", limit: int = 25, is_spot: bool
         pass
 
     try:
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        url = f"{BASE_URL}/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
         res = HFT_SESSION.get(url, timeout=1.5)
         if res.status_code == 200:
             data = res.json()
@@ -604,7 +644,7 @@ def get_futures_balance_detailed(api_key: str, api_secret: str, asset: str = "US
         signature = generate_signature(api_secret, query_string)
         headers = {"X-MBX-APIKEY": api_key}
         
-        futures_endpoints = [FUTURES_URL, "https://fapi.binance.info", "https://fapi-gcp.binance.com", "https://fapi1.binance.com"]
+        futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
         for f_base in futures_endpoints:
             try:
                 url_v2 = f"{f_base}/fapi/v2/balance?{query_string}&signature={signature}"
@@ -685,7 +725,7 @@ def get_funding_balance(api_key: str, api_secret: str, asset: str = "USDT") -> f
         })
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
-        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.info", "https://api1.binance.com"]
         for s_base in spot_urls:
             try:
                 url = f"{s_base}{endpoint}?{payload}&signature={signature}"
@@ -719,7 +759,7 @@ def get_earn_balance(api_key: str, api_secret: str, asset: str = "USDT") -> floa
         })
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
-        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.info", "https://api1.binance.com"]
         for s_base in spot_urls:
             try:
                 url = f"{s_base}{endpoint}?{payload}&signature={signature}"
@@ -762,7 +802,7 @@ def get_total_earn_exposure(api_key: str, api_secret: str) -> tuple[float, dict]
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
         prices = get_all_prices()
-        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.info", "https://api1.binance.com"]
         for s_base in spot_urls:
             try:
                 url = f"{s_base}{endpoint}?{payload}&signature={signature}"
@@ -815,7 +855,7 @@ def get_auto_invest_plans(api_key: str, api_secret: str) -> list:
         })
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
-        spot_urls = [BASE_URL, "https://api.binance.info", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.info", "https://api1.binance.com"]
         for s_base in spot_urls:
             try:
                 url = f"{s_base}{endpoint}?{payload}&signature={signature}"
@@ -862,7 +902,7 @@ def get_usdt_deposit_address(api_key: str, api_secret: str, network: str = "ARBI
         query_string = urlencode(params)
         signature = generate_signature(api_secret, query_string)
         headers = {"X-MBX-APIKEY": api_key}
-        spot_urls = [BASE_URL, "https://api.binance.com", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.com", "https://api1.binance.com"]
         for s_base in spot_urls:
             try:
                 url = f"{s_base}{endpoint}?{query_string}&signature={signature}"
@@ -913,7 +953,7 @@ def transfer_spot_to_futures(api_key: str, api_secret: str, amount: float, asset
         })
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
-        spot_urls = [BASE_URL, "https://api.binance.com", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.com", "https://api1.binance.com"]
         for s_base in spot_urls:
             try:
                 url = f"{s_base}{endpoint}?{payload}&signature={signature}"
@@ -956,7 +996,7 @@ def transfer_futures_to_spot(api_key: str, api_secret: str, amount: float, asset
         })
         signature = generate_signature(api_secret, payload)
         headers = {"X-MBX-APIKEY": api_key}
-        spot_urls = [BASE_URL, "https://api.binance.com", "https://api-gcp.binance.com", "https://api1.binance.com"]
+        spot_urls = [BASE_URL, "https://api-gcp.binance.com", "https://api.binance.com", "https://api1.binance.com"]
         for s_base in spot_urls:
             try:
                 url = f"{s_base}{endpoint}?{payload}&signature={signature}"
@@ -981,7 +1021,7 @@ def transfer_futures_to_spot(api_key: str, api_secret: str, amount: float, asset
 def get_futures_positions(api_key: str, api_secret: str) -> list:
     if PAPER_TRADING:
         return []
-    futures_endpoints = [FUTURES_URL, "https://fapi.binance.info", "https://fapi-gcp.binance.com", "https://fapi1.binance.com"]
+    futures_endpoints = [FUTURES_URL, "https://fapi-gcp.binance.com", "https://fapi.binance.info", "https://fapi1.binance.com"]
     for f_base in futures_endpoints:
         try:
             endpoint = "/fapi/v2/positionRisk"
@@ -1057,7 +1097,7 @@ def get_current_price(symbol) -> float:
         pass
         
     try:
-        url = f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}"
+        url = f"{FUTURES_URL}/fapi/v1/ticker/price?symbol={symbol}"
         res = HFT_SESSION.get(url, timeout=1.5)
         if res.status_code == 200:
             price = float(res.json().get('price', 0.0))
@@ -1069,7 +1109,7 @@ def get_current_price(symbol) -> float:
         pass
 
     try:
-        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+        url = f"{BASE_URL}/api/v3/ticker/price?symbol={symbol}"
         res = HFT_SESSION.get(url, timeout=1.5)
         if res.status_code == 200:
             price = float(res.json().get('price', 0.0))

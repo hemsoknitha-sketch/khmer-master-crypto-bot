@@ -428,7 +428,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
     price = trading_engine.get_current_price(symbol)
     if price <= 0:
         try:
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+            url = f"{trading_engine.BASE_URL}/api/v3/ticker/price?symbol={symbol}"
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
                 price = float(res.json().get("price", 0))
@@ -517,7 +517,7 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             whale_bid_wall = False
             whale_ask_wall = False
             try:
-                t_url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}" if is_spot_mode else f"https://fapi.binance.com/fapi/v1/ticker/24hr?symbol={symbol}"
+                t_url = f"{trading_engine.BASE_URL}/api/v3/ticker/24hr?symbol={symbol}" if is_spot_mode else f"{trading_engine.FUTURES_URL}/fapi/v1/ticker/24hr?symbol={symbol}"
                 t_res = HFT_SESSION.get(t_url, timeout=2)
                 if t_res.status_code == 200:
                     t_json = t_res.json()
@@ -529,11 +529,11 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                         return {"side": "SKIP", "confidence_pct": 50.0, "reason": "LOW_24H_VOLUME"}
                 
                 if not is_spot_mode:
-                    fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
+                    fr_res = HFT_SESSION.get(f"{trading_engine.FUTURES_URL}/fapi/v1/premiumIndex?symbol={symbol}", timeout=2)
                     if fr_res.status_code == 200:
                         funding_rate = float(fr_res.json().get("lastFundingRate", 0.0))
 
-                depth_url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=20" if is_spot_mode else f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit=20"
+                depth_url = f"{trading_engine.BASE_URL}/api/v3/depth?symbol={symbol}&limit=20" if is_spot_mode else f"{trading_engine.FUTURES_URL}/fapi/v1/depth?symbol={symbol}&limit=20"
                 d_res = HFT_SESSION.get(depth_url, timeout=2)
                 if d_res.status_code == 200:
                     d_data = d_res.json()
@@ -907,7 +907,7 @@ def evaluate_smart_hedge_consensus(symbol: str) -> dict:
     server_time_ms = int(time.time() * 1000)
 
     try:
-        fr_res = HFT_SESSION.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}", timeout=3)
+        fr_res = HFT_SESSION.get(f"{trading_engine.FUTURES_URL}/fapi/v1/premiumIndex?symbol={symbol}", timeout=3)
         if fr_res.status_code == 200:
             fr_data = fr_res.json()
             mark_price = float(fr_data.get("markPrice", 0.0))
@@ -953,7 +953,7 @@ def evaluate_smart_hedge_consensus(symbol: str) -> dict:
     # 4. 24h Price Change & Volatility
     change_24h = 0.0
     try:
-        t_res = HFT_SESSION.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
+        t_res = HFT_SESSION.get(f"{trading_engine.BASE_URL}/api/v3/ticker/24hr?symbol={symbol}", timeout=2)
         if t_res.status_code == 200:
             change_24h = float(t_res.json().get("priceChangePercent", 0.0))
     except Exception:
@@ -1276,7 +1276,7 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
 
         price = trading_engine.get_current_price(symbol)
         if price <= 0:
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+            url = f"{trading_engine.BASE_URL}/api/v3/ticker/price?symbol={symbol}"
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
                 price = float(res.json().get("price", 0))
@@ -2721,7 +2721,7 @@ class MicrostructureOrderbookGuard:
         # 2. Fallback to direct REST depth if ratio is perfectly default 1.0
         if ratio == 1.0:
             try:
-                url = f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit=20"
+                url = f"{trading_engine.BASE_URL}/api/v3/depth?symbol={symbol}&limit=20"
                 r = trading_engine.HFT_SESSION.get(url, timeout=2.5)
                 if r.status_code == 200:
                     d = r.json()

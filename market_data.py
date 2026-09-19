@@ -170,6 +170,7 @@ def fetch_binance_data(symbol: str = "BTCUSDT", interval: str = "1d", limit: int
 
     # Binance provides multiple API endpoints in case of network/DNS issues
     base_urls = [
+        "https://api-gcp.binance.com",
         "https://data-api.binance.vision",
         "https://api.binance.com",
         "https://api1.binance.com",
@@ -424,6 +425,7 @@ def fetch_top_gainers(limit: int = 5, lang: str = 'km'):
     Fetches the top gaining and losing crypto assets in the last 24 hours from Binance (v13.00 Apex Ultra AGI).
     """
     base_urls = [
+        "https://api-gcp.binance.com",
         "https://data-api.binance.vision",
         "https://api.binance.com",
         "https://api1.binance.com",
@@ -583,6 +585,7 @@ def get_order_book_depth(symbol: str, limit: int = 100):
     symbol = str(symbol).upper().strip()
     # 1. Try Spot Endpoints
     spot_urls = [
+        f"https://api-gcp.binance.com/api/v3/depth?symbol={symbol}&limit={limit}",
         f"https://data-api.binance.vision/api/v3/depth?symbol={symbol}&limit={limit}",
         f"https://api.binance.com/api/v3/depth?symbol={symbol}&limit={limit}"
     ]
@@ -602,6 +605,7 @@ def get_order_book_depth(symbol: str, limit: int = 100):
 
     # 2. Fallback to Futures (FAPI) Endpoints for perpetual contracts
     futures_urls = [
+        f"https://fapi-gcp.binance.com/fapi/v1/depth?symbol={symbol}&limit={limit}",
         f"https://fapi.binance.com/fapi/v1/depth?symbol={symbol}&limit={limit}",
         f"https://dapi.binance.com/dapi/v1/depth?symbol={symbol}&limit={limit}"
     ]
@@ -625,6 +629,7 @@ def get_triangular_prices():
     """
     symbols = '["BTCUSDT","ETHBTC","ETHUSDT"]'
     base_urls = [
+        "https://api-gcp.binance.com",
         "https://data-api.binance.vision",
         "https://api.binance.com",
         "https://api1.binance.com",
@@ -1071,6 +1076,7 @@ def fetch_htf_market_structure(symbol: str, ttl_seconds: int = 300) -> dict:
 
     def _fetch_candles(interval: str, limit: int = 30) -> pd.DataFrame:
         endpoints = [
+            f"https://api-gcp.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
             f"https://data-api.binance.vision/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
             f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
             f"https://api.binance.us/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
@@ -1354,6 +1360,7 @@ def extract_10_pillar_feature_vector(symbol: str, interval: str = "15m", limit: 
     symbol = str(symbol).upper().strip()
     try:
         endpoints = [
+            f"https://api-gcp.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
             f"https://data-api.binance.vision/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
             f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}",
             f"https://api.binance.us/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"

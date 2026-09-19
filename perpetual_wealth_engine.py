@@ -305,7 +305,7 @@ class PerpetualWealthGeneratorEngine:
         now_ts = time.time()
         if cache_key in _WEALTH_TECH_CACHE:
             ts, res = _WEALTH_TECH_CACHE[cache_key]
-            if now_ts - ts < 25.0:
+            if now_ts - ts < 8.0:
                 return res
 
         try:
@@ -1048,8 +1048,8 @@ class PerpetualWealthGeneratorEngine:
             except Exception as e_pos:
                 print(f"⚠️ [PERPETUAL WEALTH POS MONITOR NOTICE] User {chat_id}: {e_pos}")
 
-        # 2. Candidate Discovery & Entry Throttle (Run scan every 25 seconds)
-        if now - _last_wealth_scan_time >= 25.0:
+        # 2. Candidate Discovery & Entry Throttle (Run scan every 8 seconds)
+        if now - _last_wealth_scan_time >= 8.0:
             _last_wealth_scan_time = now
             candidates = PerpetualWealthGeneratorEngine.scan_golden_sweet_spot_candidates(limit=10)
             if not candidates:
@@ -1316,7 +1316,7 @@ class PerpetualWealthGeneratorEngine:
         now_ts = time.time()
         if cache_key in _WEALTH_SPOT_TECH_CACHE:
             ts, res = _WEALTH_SPOT_TECH_CACHE[cache_key]
-            if now_ts - ts < 25.0:
+            if now_ts - ts < 8.0:
                 return res
 
         try:
@@ -1942,8 +1942,8 @@ class PerpetualWealthGeneratorEngine:
             except Exception as e_pos:
                 print(f"⚠️ [SPOT WEALTH MONITOR NOTICE] User {chat_id}: {e_pos}")
 
-        # 2. Spot Candidate Discovery & Entry (every 25s)
-        if now - _last_wealth_spot_scan_time >= 25.0:
+        # 2. Spot Candidate Discovery & Entry (every 8s)
+        if now - _last_wealth_spot_scan_time >= 8.0:
             _last_wealth_spot_scan_time = now
             candidates = PerpetualWealthGeneratorEngine.scan_spot_sweet_spot_candidates(limit=8)
             if not candidates:
