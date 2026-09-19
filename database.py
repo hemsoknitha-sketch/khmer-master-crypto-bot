@@ -4535,12 +4535,18 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
     ef = (engine_filter or "").lower().strip() if engine_filter else None
     if ef in ["turbo_hedge", "turbo", "hedge"]:
         ef = "turbo_hedge"
+    elif ef in ["wealth", "perpetual_wealth", "pw", "spot_wealth"]:
+        ef = "wealth"
     elif ef in ["smartx", "smart_x"]:
         ef = "smart_x"
     elif ef in ["smart_trade", "smarttrade", "spot"]:
         ef = "smart_trade"
     elif ef in ["smart_swap", "smartswap", "swap", "dex"]:
         ef = "smart_swap"
+    elif ef in ["grid", "grids", "compound_grid", "infinity_matrix", "compound"]:
+        ef = "grid"
+    elif ef in ["flash_loan", "flash", "arb", "mev", "arbitrage", "funding"]:
+        ef = "flash_loan"
     else:
         ef = None
 
@@ -4555,15 +4561,25 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
 
     engines = {
         "turbo_hedge": {"name": "/turbo_hedge", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
+        "wealth": {"name": "/wealth", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
         "smart_x": {"name": "/smart_x", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
         "smart_trade": {"name": "/smart_trade", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
-        "smart_swap": {"name": "/smart_swap", "pnl": 0.0, "trades": 0, "wins": 0, "active": False}
+        "smart_swap": {"name": "/smart_swap", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
+        "grid": {"name": "/compound_grid", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
+        "flash_loan": {"name": "/flash_loan", "pnl": 0.0, "trades": 0, "wins": 0, "active": False}
     }
 
-    # Check active engines
+    # Check active engines across all trading platforms
     try:
         turbo_bots = get_user_turbo_hedge_bots(chat_id)
         engines["turbo_hedge"]["active"] = bool(turbo_bots)
+    except Exception:
+        pass
+
+    try:
+        wb = get_perpetual_wealth_bot(chat_id)
+        ws = get_perpetual_wealth_spot_bot(chat_id)
+        engines["wealth"]["active"] = bool((wb and wb.get("status") == "ACTIVE") or (ws and ws.get("status") == "ACTIVE"))
     except Exception:
         pass
 
@@ -4573,7 +4589,27 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
         pass
 
     try:
-        engines["smart_trade"]["active"] = bool(is_sweep_auto_enabled(chat_id) or is_funding_harvester_enabled(chat_id))
+        engines["smart_trade"]["active"] = bool(is_auto_trade_enabled(chat_id) or is_sweep_auto_enabled(chat_id))
+    except Exception:
+        pass
+
+    try:
+        swap_setting = (get_system_setting(f"smart_swap_{chat_id}", "0") == "1")
+        engines["smart_swap"]["active"] = bool(swap_setting)
+    except Exception:
+        pass
+
+    try:
+        cg = get_user_compound_grids(chat_id)
+        ig = get_user_infinity_grids(chat_id)
+        engines["grid"]["active"] = bool(cg or ig)
+    except Exception:
+        pass
+
+    try:
+        is_flash_keeper = (get_system_setting(f"flash_loan_keeper_{chat_id}", "0") == "1")
+        is_funding = is_funding_harvester_enabled(chat_id)
+        engines["flash_loan"]["active"] = bool(is_flash_keeper or is_funding)
     except Exception:
         pass
 
@@ -4602,9 +4638,15 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
             trade_qty = float(qty or 0.0)
 
             reason_str = str(reason or "").upper()
-            if "TURBO_HEDGE" in reason_str or "HEDGE" in reason_str:
+            if "WEALTH" in reason_str or "PW_" in reason_str or "PERPETUAL" in reason_str:
+                eng_key = "wealth"
+            elif "TURBO_HEDGE" in reason_str or "HEDGE" in reason_str:
                 eng_key = "turbo_hedge"
-            elif "SMART_X" in reason_str or "AI_" in reason_str:
+            elif "GRID" in reason_str or "COMPOUND" in reason_str or "INFINITY" in reason_str:
+                eng_key = "grid"
+            elif "FLASH" in reason_str or "LOAN" in reason_str or "KEEPER" in reason_str or "FUNDING" in reason_str:
+                eng_key = "flash_loan"
+            elif "SMART_X" in reason_str or "AI_" in reason_str or "XAU" in reason_str or "PAXG" in reason_str:
                 eng_key = "smart_x"
             elif "SWAP" in reason_str or "DEX" in reason_str:
                 eng_key = "smart_swap"
@@ -4716,16 +4758,48 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
                 engines[ek]["pnl"] += pnl_v
                 engines[ek]["trades"] += t_v
                 engines[ek]["wins"] += w_v
+
+        # 4. Check wealth bots table if trade_history was empty or for wealth attribution
+        try:
+            wb = get_perpetual_wealth_bot(chat_id)
+            if wb:
+                wb_pnl = float(wb.get("total_realized_pnl", 0.0) or 0.0)
+                wb_w = int(wb.get("win_count", 0) or 0)
+                wb_l = int(wb.get("loss_count", 0) or 0)
+                wb_t = wb_w + wb_l
+                if wb_t > 0 and (not ef or ef == "wealth"):
+                    if engines["wealth"]["trades"] == 0:
+                        engines["wealth"]["pnl"] += wb_pnl
+                        engines["wealth"]["trades"] += wb_t
+                        engines["wealth"]["wins"] += wb_w
+                        total_pnl += wb_pnl
+                        total_trades += wb_t
+                        wins += wb_w
+            ws = get_perpetual_wealth_spot_bot(chat_id)
+            if ws:
+                ws_pnl = float(ws.get("total_realized_pnl", 0.0) or 0.0)
+                ws_w = int(ws.get("win_count", 0) or 0)
+                ws_l = int(ws.get("loss_count", 0) or 0)
+                ws_t = ws_w + ws_l
+                if ws_t > 0 and (not ef or ef == "wealth"):
+                    if engines["wealth"]["trades"] <= (wb.get("win_count", 0) + wb.get("loss_count", 0) if wb else 0):
+                        engines["wealth"]["pnl"] += ws_pnl
+                        engines["wealth"]["trades"] += ws_t
+                        engines["wealth"]["wins"] += ws_w
+                        total_pnl += ws_pnl
+                        total_trades += ws_t
+                        wins += ws_w
+        except Exception:
+            pass
     except Exception:
         pass
     finally:
         conn.close()
 
     # If local trade_history has no trades, pull actual live trades & income from Binance API
-    # If local trade_history has no trades, pull actual live trades & income from Binance API
     keys = get_user_api(chat_id)
     if total_trades == 0 and keys and keys[0] and keys[1]:
-        if not ef or ef in ["turbo_hedge", "smart_trade", "smart_x"]:
+        if not ef or ef in ["turbo_hedge", "smart_trade", "smart_x", "wealth"]:
             try:
                 import trading_engine
                 b_hours = 24 if tf in ["daily", "24h"] else (720 if tf in ["monthly", "30d"] else 8760)

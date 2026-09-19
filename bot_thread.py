@@ -3086,7 +3086,7 @@ class TelegramBotThread(BaseThread):
 
             if update.callback_query:
                 try:
-                    await update.callback_query.answer()
+                    await update.callback_query.answer("⚡ កំពុងរៀបចំរបាយការណ៍សវនកម្ម...")
                 except Exception:
                     pass
 
@@ -3106,7 +3106,7 @@ class TelegramBotThread(BaseThread):
                 elif suffix.startswith("eng_"):
                     parts = suffix[4:].split("_")
                     if len(parts) >= 2:
-                        if parts[0] in ["turbo", "smart"]:
+                        if parts[0] in ["turbo", "smart", "flash", "compound"]:
                             eng_cand = f"{parts[0]}_{parts[1]}"
                             tf_cand = "_".join(parts[2:]) if len(parts) > 2 else "daily"
                         elif parts[0] == "all":
@@ -3125,9 +3125,9 @@ class TelegramBotThread(BaseThread):
                         engine_filter = None if eng_cand in ["all", "", "none"] else eng_cand
                 elif suffix in ["daily", "monthly", "yearly", "lifetime"]:
                     timeframe = suffix
-                elif suffix in ["turbo_hedge", "smart_x", "smart_swap", "smart_trade"]:
+                elif suffix in ["turbo_hedge", "smart_x", "smart_swap", "smart_trade", "wealth", "grid", "flash_loan"]:
                     engine_filter = suffix
-                elif suffix in ["all", "all_engines"]:
+                elif suffix in ["all", "all_engines", "all_platforms"]:
                     engine_filter = None
             elif args:
                 arg0 = args[0]
@@ -3139,6 +3139,8 @@ class TelegramBotThread(BaseThread):
                     timeframe = "yearly"
                 elif arg0 in ["lifetime", "all", "total", "infinite", "ever"]:
                     timeframe = "lifetime"
+                elif arg0 in ["wealth", "perpetual_wealth", "pw", "spot_wealth"]:
+                    engine_filter = "wealth"
                 elif arg0 in ["turbo_hedge", "turbo", "hedge"]:
                     engine_filter = "turbo_hedge"
                 elif arg0 in ["smartx", "smart_x"]:
@@ -3147,10 +3149,24 @@ class TelegramBotThread(BaseThread):
                     engine_filter = "smart_swap"
                 elif arg0 in ["smart_trade", "smarttrade", "spot"]:
                     engine_filter = "smart_trade"
+                elif arg0 in ["grid", "grids", "compound_grid", "infinity_matrix", "compound"]:
+                    engine_filter = "grid"
+                elif arg0 in ["flash_loan", "flash", "arb", "mev", "arbitrage", "funding"]:
+                    engine_filter = "flash_loan"
 
                 if len(args) > 1:
                     arg1 = args[1]
-                    if arg1 in ["turbo_hedge", "turbo", "hedge"]:
+                    if arg1 in ["daily", "24h", "1d", "day"]:
+                        timeframe = "daily"
+                    elif arg1 in ["monthly", "30d", "month", "1m"]:
+                        timeframe = "monthly"
+                    elif arg1 in ["yearly", "365d", "year", "1y"]:
+                        timeframe = "yearly"
+                    elif arg1 in ["lifetime", "all", "total", "infinite", "ever"]:
+                        timeframe = "lifetime"
+                    elif arg1 in ["wealth", "perpetual_wealth", "pw", "spot_wealth"]:
+                        engine_filter = "wealth"
+                    elif arg1 in ["turbo_hedge", "turbo", "hedge"]:
                         engine_filter = "turbo_hedge"
                     elif arg1 in ["smartx", "smart_x"]:
                         engine_filter = "smart_x"
@@ -3158,6 +3174,10 @@ class TelegramBotThread(BaseThread):
                         engine_filter = "smart_swap"
                     elif arg1 in ["smart_trade", "smarttrade", "spot"]:
                         engine_filter = "smart_trade"
+                    elif arg1 in ["grid", "grids", "compound_grid", "infinity_matrix", "compound"]:
+                        engine_filter = "grid"
+                    elif arg1 in ["flash_loan", "flash", "arb", "mev", "arbitrage", "funding"]:
+                        engine_filter = "flash_loan"
 
             try:
                 import scheduler_tasks
@@ -5455,7 +5475,7 @@ class TelegramBotThread(BaseThread):
                 "btn_executive_report", "btn_report_refresh", "btn_report_daily", 
                 "btn_report_monthly", "btn_report_yearly", "btn_report_lifetime", 
                 "btn_report_turbo_hedge", "btn_report_smart_x", "btn_report_smart_swap", 
-                "btn_report_smart_trade"
+                "btn_report_smart_trade", "btn_report_wealth", "btn_report_grid", "btn_report_flash_loan"
             ] or data.startswith("btn_report_"):
                 await report_command(update, context)
             elif data in ["btn_menu_portfolio", "btn_portfolio"]:

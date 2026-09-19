@@ -5755,6 +5755,17 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     turbo_pnl = engines.get("turbo_hedge", {}).get("pnl", 0.0)
     turbo_res_str = f"${turbo_amt:,.2f} USDT" if turbo_amt > 0 else "$0.00 (Standby)"
 
+    wb = db.get_perpetual_wealth_bot(chat_id) if hasattr(db, 'get_perpetual_wealth_bot') else None
+    ws = db.get_perpetual_wealth_spot_bot(chat_id) if hasattr(db, 'get_perpetual_wealth_spot_bot') else None
+    wb_act = bool(wb and wb.get("status") == "ACTIVE")
+    ws_act = bool(ws and ws.get("status") == "ACTIVE")
+    wealth_act = "ACTIVE" if (wb_act or ws_act) else "STANDBY"
+    wealth_pnl = engines.get("wealth", {}).get("pnl", 0.0)
+    wb_cap = float(wb.get("capital", 0.0) if wb else 0.0)
+    ws_cap = float(ws.get("capital", 0.0) if ws else 0.0)
+    wealth_tot_cap = wb_cap + ws_cap
+    wealth_res_str = f"${wealth_tot_cap:,.2f} USDT" if wealth_tot_cap > 0 else "$0.00 (Standby)"
+
     is_hyper = db.is_hyper_trade_enabled(chat_id)
     is_arb = db.is_auto_arb_enabled(chat_id)
     smartx_act = "ACTIVE" if (is_hyper or is_arb) else "STANDBY"
@@ -5772,21 +5783,97 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     swap_setting = (db.get_system_setting(f"smart_swap_{chat_id}", "0") == "1")
     swap_act = "ACTIVE" if (engines.get("smart_swap", {}).get("active") or swap_setting) else "STANDBY"
 
+    compound_grids = db.get_user_compound_grids(chat_id) if hasattr(db, 'get_user_compound_grids') else []
+    infinity_grids = db.get_user_infinity_grids(chat_id) if hasattr(db, 'get_user_infinity_grids') else []
+    grid_act = "ACTIVE" if (compound_grids or infinity_grids) else "STANDBY"
+    grid_pnl = engines.get("grid", {}).get("pnl", 0.0)
+
     is_flash_keeper = (db.get_system_setting(f"flash_loan_keeper_{chat_id}", "0") == "1")
     flash_act = "ACTIVE" if is_flash_keeper else "STANDBY"
 
     is_funding = db.is_funding_harvester_enabled(chat_id)
     funding_act = "ACTIVE" if is_funding else "STANDBY"
 
-    is_guard = db.is_trailing_guard_enabled(chat_id)
-    guard_act = "ACTIVE" if is_guard else "STANDBY"
+    # Query real live open positions & floating PnL across platforms
+    live_open_positions = []
+    live_floating_pnl = 0.0
+    if has_api:
+        try:
+            fut_positions = await asyncio.to_thread(trading_engine.get_futures_positions, keys[0], keys[1]) or []
+            for p in fut_positions:
+                p_amt = float(p.get("positionAmt", 0.0) or 0.0)
+                if p_amt != 0.0:
+                    p_u = float(p.get("unRealizedProfit", 0.0) or 0.0)
+                    live_floating_pnl += p_u
+                    live_open_positions.append({
+                        "symbol": str(p.get("symbol", "")),
+                        "side": "LONG" if p_amt > 0 else "SHORT",
+                        "pnl": p_u,
+                        "leverage": int(p.get("leverage", 10) or 10),
+                        "venue": "Binance Futures"
+                    })
+        except Exception:
+            pass
 
-    is_pre_pump = db.is_pre_pump_enabled(chat_id)
-    pump_act = "ACTIVE" if is_pre_pump else "STANDBY"
+    try:
+        spot_active = await asyncio.to_thread(db.get_active_trades_by_user, chat_id) or []
+        for st in spot_active:
+            s_sym = st[1]
+            s_qty = float(st[2])
+            s_buy = float(st[3])
+            s_cur = await asyncio.to_thread(trading_engine.get_current_price, s_sym) or s_buy
+            s_pnl, _ = trading_engine.calculate_net_pnl(s_buy, s_cur, s_qty)
+            live_floating_pnl += s_pnl
+            live_open_positions.append({
+                "symbol": s_sym,
+                "side": "BUY (Spot)",
+                "pnl": s_pnl,
+                "leverage": 1,
+                "venue": "Binance Spot"
+            })
+    except Exception:
+        pass
 
     msg_lines = []
 
-    if cur_eng == "turbo_hedge":
+    if cur_eng == "wealth":
+        wb_coins = wb.get("active_coins", []) if wb else []
+        ws_coins = ws.get("active_coins", []) if ws else []
+        wb_pnl = float(wb.get("total_realized_pnl", 0.0) or 0.0) if wb else 0.0
+        ws_pnl = float(ws.get("total_realized_pnl", 0.0) or 0.0) if ws else 0.0
+        w_lev = wb.get("leverage", 10) if wb else 10
+        w_spot_tp = ws.get("target_tp", 6.0) if ws else 6.0
+        w_fut_tp = wb.get("target_tp", 10.0) if wb else 10.0
+
+        msg_lines = [
+            f"👑 *APEX VIP AUDIT — 💎 24/7 PERPETUAL WEALTH*",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ *Mode ៖* `Triple-Phase Wealth Extraction (Spot + Futures)`",
+            sep,
+            f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
+            f"💵 Spot Bal  : `${free_usdt:,.2f}`",
+            f"📈 Futures   : `${futures_margin:,.2f}`",
+            f"💎 Net Total : `${total_equity:,.2f}`"
+        ]
+        if not has_api:
+            msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
+
+        msg_lines.extend([
+            sep,
+            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន WEALTH (SPECS)*",
+            f"├ 💎 ស្ថានភាព     : `[{wealth_act}]`",
+            f"├ 💵 ទុនបម្រុង     : `{wealth_res_str}`",
+            f"├ 🟡 Spot Wealth  : `[{'ACTIVE' if ws_act else 'STANDBY'}]` (${ws_cap:,.1f}) | TP `+{w_spot_tp:.1f}%`",
+            f"├ 🔵 Futures Wealth: `[{'ACTIVE' if wb_act else 'STANDBY'}]` (${wb_cap:,.1f}) | {w_lev}x (ISOLATED)",
+            f"├ 🌾 Breakeven    : `+3.0% -> BE Locked (+0.12% Net)`",
+            f"├ 🔒 Profit Armor : `85% Trailing Profit Ratchet`",
+            f"├ 🪙 Active Spot  : `{len(ws_coins)} Coins (BTC/Gold Accumulation)`",
+            f"├ ⚔️ Active Perp  : `{len(wb_coins)} Pairs (Dual-Side HFT)`",
+            f"└ 🔄 Alpha Swap   : `Smart Rotation Active`",
+            sep,
+            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
+        ])
+    elif cur_eng == "turbo_hedge":
         pairs_cnt = len(turbo_bots) if turbo_bots else 0
         pairs_lbl = f"{pairs_cnt} Pairs" if pairs_cnt > 0 else "Scan Mode"
         wealth_active = (db.get_system_setting(f"turbo_hedge_wealth_{chat_id}_active", "0") == "1")
@@ -5889,16 +5976,16 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ]
-    else:
+    elif cur_eng == "grid":
+        cg_cnt = len(compound_grids)
+        ig_cnt = len(infinity_grids)
         msg_lines = [
-            f"👑 *APEX VIP {tf_label.upper()} AUDIT* 👑",
-            f"⏰ `{now_str} UTC+7`",
-            f"🛡️ *Status ៖* `VIP Clearance Active`",
+            f"👑 *APEX VIP AUDIT — 📊 SPOT SNOWBALL GRIDS*",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ *Mode ៖* `100% Spot Dynamic Grids (0% Liquidation Risk)`",
             sep,
             f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
-            f"💵 Spot      : `${free_usdt:,.2f}`",
-            f"📈 Futures   : `${futures_margin:,.2f}`",
-            f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
+            f"💵 Spot Bal  : `${free_usdt:,.2f}`",
             f"💎 Net Total : `${total_equity:,.2f}`"
         ]
         if not has_api:
@@ -5906,26 +5993,78 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
 
         msg_lines.extend([
             sep,
-            f"⚙️ *ស្ថានភាពកំពូលម៉ាស៊ីន (SUPER SMART ENGINES)*",
-            f"\n🚀 *Turbo Hedge* (`/turbo_hedge`) `[{turbo_act}]`",
-            f"├ 💵 ទុនបម្រុង : `{turbo_res_str}` | Lev: `{turbo_lev}x`" if turbo_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/turbo_hedge ON 50 10 1234` ``",
-            f"\n🧠 *SmartX AI Quant* (`/smartx`) `[{smartx_act}]`",
-            f"├ 💵 ទុនបម្រុង : `{smartx_res_str}` | MoE: `SweetSpot HFT`" if smartx_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smartx ON 50 10 1234` ``",
-            f"\n📊 *24/7 Auto-Trade Radar* (`/auto_trade`) `[{trade_act}]`",
-            f"├ 💵 ទុនបម្រុង : `{trade_res_str}` | Spot Floor: `Min $10.50`" if trade_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/auto_trade ON 30 1234` ``",
-            f"\n⚡ *Aave V3 Flash Loan Keeper* (`/flash_loan_keeper`) `[{flash_act}]`",
-            f"├ 💵 Mode     : `Tokyo Private Mempool (0% Risk)`" if flash_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/flash_loan_keeper AUTO ON 1234` ``",
-            f"\n🌾 *Perpetual Funding Harvester* (`/funding_harvester`) `[{funding_act}]`",
-            f"├ 💵 Yield    : `Delta-Neutral 30%-120% APY`" if funding_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/funding_harvester ON 1234` ``",
-            f"\n🛡️ *Auto-Liquidation & Trailing Guard* (`/trailing_guard`) `[{guard_act}]`",
-            f"├ 💵 Guard    : `Dynamic Peak Lock + Margin Buffer`" if guard_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/trailing_guard ON 1234` ``",
-            f"\n⚡ *Smart Swap DEX MEV* (`/smart_swap`) `[{swap_act}]`",
-            f"├ 💵 DEX      : `Solana / EVM Sub-5ms Arbitrage`" if swap_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smart_swap AUTO 50 1234` ``",
-            f"\n🐋 *Whale Pre-Pump Radar* (`/pre_pump`) `[{pump_act}]`",
-            f"├ 💵 Radar    : `Whale Orderflow Front-Running`" if pump_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/pre_pump ON 50 1234` ``",
+            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន GRID (SPECS)*",
+            f"├ 📊 ស្ថានភាព     : `[{grid_act}]`",
+            f"├ 🔄 Compound Grid: `{cg_cnt} Active Bots (Snowball Reinvest)`",
+            f"├ ♾️ Infinity Grid: `{ig_cnt} Active Bots (Fibonacci Scaling)`",
+            f"├ 🛡️ Liquidation  : `0.00% Zero Risk (Pure Spot)`",
+            f"└ 💎 Harvest Rule : `Clean Cash Partial Layer Take-Profit`",
             sep,
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ])
+    elif cur_eng == "flash_loan":
+        msg_lines = [
+            f"👑 *APEX VIP AUDIT — 🌾 FLASH LOAN & ARBITRAGE*",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ *Mode ៖* `Tokyo HFT MEV Keeper & Funding Arbitrage`",
+            sep,
+            f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
+            f"🌐 Multi-Venue: `Aave V3 Arbitrum / Tokyo Relayer`",
+            f"💎 Net Total : `${total_equity:,.2f}`"
+        ]
+        if not has_api:
+            msg_lines.append("⚠️ មិនទាន់ភ្ជាប់ API (សូមវាយ `/add_api`)")
+
+        msg_lines.extend([
+            sep,
+            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន (SPECS)*",
+            f"├ ⚡ Flash Keeper : `[{flash_act}] (Atomic 0% Capital Loss)`",
+            f"├ 🌾 Funding Harvester: `[{funding_act}] (30%-120% APY)`",
+            f"├ 🏛️ Lending Pool : `Aave V3 Multi-Asset Flash Loan`",
+            f"├ 🛡️ MEV Shield   : `Tokyo Private Mempool Relay`",
+            f"└ 🎯 Execution    : `Sub-Millisecond On-Chain Routing`",
+            sep,
+            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
+        ])
+    else:
+        # MASTER ALL LIVE TRADING PLATFORMS AUDIT
+        float_emoji = "🟢" if live_floating_pnl >= 0 else "🔴"
+        live_pos_text = (
+            f"├ 📊 សរុប Positions : `{len(live_open_positions)} Active Positions`\n"
+            f"└ 💸 Floating PnL   : `{live_floating_pnl:+,.2f} USDT` ({float_emoji} {'កំពុងចំណេញ' if live_floating_pnl >= 0 else 'ហានិភ័យត្រាំ'})"
+            if live_open_positions else
+            "└ 🟢 `100% Cash Harvested — គ្មាន Position ត្រាំឡើយ!`"
+        )
+        msg_lines = [
+            f"👑 *APEX VIP {tf_label.upper()} AUDIT* 👑",
+            f"⏰ `{now_str} UTC+7`",
+            f"🛡️ *Platform Venues ៖* `Binance Spot + Futures + DeFi DEX`",
+            sep,
+            f"💰 *សមតុល្យទុនជាក់ស្តែង (EQUITY)*",
+            f"💵 Spot      : `${free_usdt:,.2f}`",
+            f"📈 Futures   : `${futures_margin:,.2f}`",
+            f"🏦 Free Mgn  : `${avail_margin:,.2f}`",
+            f"💎 Net Total : `${total_equity:,.2f}`",
+            sep,
+            f"⚡ *ស្ថានភាព POSITIONS ផ្ទាល់ (LIVE OPEN)*",
+            live_pos_text,
+            sep,
+            f"⚙️ *ស្ថានភាពគ្រប់ PLATFORMS (24/7 FLEET)*",
+            f"\n💎 *24/7 Perpetual Wealth* (`/wealth`) `[{wealth_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{wealth_res_str}` | Spot + Futures Triple-Phase" if wealth_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/wealth ON 50 1234` ``",
+            f"\n🚀 *Turbo Hedge* (`/turbo_hedge`) `[{turbo_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{turbo_res_str}` | Lev: `{turbo_lev}x (Delta-Neutral)`" if turbo_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/turbo_hedge ON 50 10 1234` ``",
+            f"\n🧠 *SmartX AI Quant* (`/smartx`) `[{smartx_act}]`",
+            f"├ 💵 ទុនបម្រុង : `{smartx_res_str}` | Institutional Gold Quant" if smartx_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smartx ON 50 10 1234` ``",
+            f"\n📊 *Spot Snowball Grids* (`/compound_grid`) `[{grid_act}]`",
+            f"├ 💵 កម្រិត   : `Compounding Dynamic Grids (0% Liquidation)`" if grid_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/compound_grid ON 30 1234` ``",
+            f"\n⚡ *Smart Swap DEX MEV* (`/smart_swap`) `[{swap_act}]`",
+            f"├ 💵 DEX      : `Solana / EVM Sub-5ms Arbitrage`" if swap_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smart_swap AUTO 50 1234` ``",
+            f"\n🌾 *Flash Loan & Funding* (`/flash_loan`) `[{flash_act}]`",
+            f"├ 💵 Yield    : `Delta-Neutral Yield + Tokyo HFT MEV`" if flash_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/flash_loan_keeper AUTO ON 1234` ``",
+            sep,
+            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
+        ]
 
     if not recent_trades:
         msg_lines.append("🟢 `ទុនរៀបរយ - គ្មាន Position ត្រាំ`")
@@ -5965,10 +6104,12 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             if idx < min(3, len(recent_trades)):
                 msg_lines.append(dash_sep)
 
+    wealth_roi = (wealth_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
     turbo_roi = (turbo_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
     smartx_roi = (smartx_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
     trade_roi = (trade_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
     swap_roi = (swap_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+    grid_roi = (grid_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
 
     net_sign = "+" if net_profit >= 0 else ""
     growth_sign = "+" if growth_pct >= 0 else ""
@@ -6004,10 +6145,12 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             line_sep,
             f"💎 *NET PROFIT : {net_sign}${net_profit:,.2f} USDT*",
             f"📈 *{growth_label} : {growth_sign}{growth_pct:.2f}% Net*",
+            f"├ 💎 `/wealth`      : `{wealth_pnl:+,.2f} ({wealth_roi:+.2f}%)`",
             f"├ 🚀 `/turbo_hedge` : `{turbo_pnl:+,.2f} ({turbo_roi:+.2f}%)`",
             f"├ 🧠 `/smart_x`     : `{smartx_pnl:+,.2f} ({smartx_roi:+.2f}%)`",
             f"├ 📊 `/smart_trade` : `{trade_pnl:+,.2f} ({trade_roi:+.2f}%)`",
-            f"└ ⚡ `/smart_swap`  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
+            f"├ ⚡ `/smart_swap`  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
+            f"└ 📊 `/compound_grid`: `{grid_pnl:+,.2f} ({grid_roi:+.2f}%)`",
             sep,
             OFFICIAL_FOOTNOTE
         ])
@@ -6019,11 +6162,13 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     b_yearly = "✅ Yearly" if cur_tf == "yearly" else "📆 Yearly"
     b_lifetime = "✅ Lifetime" if cur_tf == "lifetime" else "♾️ Lifetime"
 
+    b_wealth = "✅ 24/7 Wealth" if cur_eng == "wealth" else "💎 24/7 Wealth"
     b_turbo = "✅ Turbo Hedge" if cur_eng == "turbo_hedge" else "🚀 Turbo Hedge"
     b_smartx = "✅ SmartX" if cur_eng == "smart_x" else "🧠 SmartX"
     b_swap = "✅ Smart Swap" if cur_eng == "smart_swap" else "⚡ Smart Swap"
-    b_trade = "✅ Smart Trade" if cur_eng == "smart_trade" else "📊 Smart Trade"
-    b_all = "✅ All Engines" if cur_eng == "all" else "🌐 All Engines"
+    b_grid = "✅ Spot Grids" if cur_eng == "grid" else "📊 Spot Grids"
+    b_flash = "✅ Flash & Arb" if cur_eng == "flash_loan" else "🌾 Flash & Arb"
+    b_all = "✅ All Platforms" if cur_eng == "all" else "🌐 All Platforms"
 
     keyboard = InlineKeyboardMarkup([
         [
@@ -6035,19 +6180,24 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             InlineKeyboardButton(b_lifetime, callback_data=f"btn_report_tf_lifetime_{cur_eng}")
         ],
         [
-            InlineKeyboardButton(b_turbo, callback_data=f"btn_report_eng_turbo_hedge_{cur_tf}"),
-            InlineKeyboardButton(b_smartx, callback_data=f"btn_report_eng_smart_x_{cur_tf}")
+            InlineKeyboardButton(b_wealth, callback_data=f"btn_report_eng_wealth_{cur_tf}"),
+            InlineKeyboardButton(b_turbo, callback_data=f"btn_report_eng_turbo_hedge_{cur_tf}")
         ],
         [
-            InlineKeyboardButton(b_swap, callback_data=f"btn_report_eng_smart_swap_{cur_tf}"),
-            InlineKeyboardButton(b_trade, callback_data=f"btn_report_eng_smart_trade_{cur_tf}")
+            InlineKeyboardButton(b_smartx, callback_data=f"btn_report_eng_smart_x_{cur_tf}"),
+            InlineKeyboardButton(b_swap, callback_data=f"btn_report_eng_smart_swap_{cur_tf}")
+        ],
+        [
+            InlineKeyboardButton(b_grid, callback_data=f"btn_report_eng_grid_{cur_tf}"),
+            InlineKeyboardButton(b_flash, callback_data=f"btn_report_eng_flash_loan_{cur_tf}")
         ],
         [
             InlineKeyboardButton(b_all, callback_data=f"btn_report_eng_all_{cur_tf}"),
             InlineKeyboardButton("🔄 Refresh", callback_data=f"btn_report_refresh_{cur_tf}_{cur_eng}")
         ],
         [
-            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+            InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh"),
+            InlineKeyboardButton("💼 Portfolio", callback_data="btn_menu_portfolio")
         ]
     ])
 
