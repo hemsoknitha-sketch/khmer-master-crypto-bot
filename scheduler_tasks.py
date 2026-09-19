@@ -7268,8 +7268,15 @@ async def perpetual_wealth_monitor(app: Application):
     """
     try:
         import perpetual_wealth_engine
-        await perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.execute_wealth_harvest_cycle(app)
-        await perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.execute_spot_harvest_cycle(app)
+        try:
+            await perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.execute_wealth_harvest_cycle(app)
+        except Exception as e_fut:
+            print(f"⚠️ [PERPETUAL FUTURES WEALTH MONITOR NOTICE]: {e_fut}")
+
+        try:
+            await perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.execute_spot_harvest_cycle(app)
+        except Exception as e_spot:
+            print(f"⚠️ [PERPETUAL SPOT WEALTH MONITOR NOTICE]: {e_spot}")
     except Exception as e:
         print(f"⚠️ [PERPETUAL WEALTH MONITOR NOTICE]: {e}")
 

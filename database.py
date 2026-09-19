@@ -6262,16 +6262,23 @@ def get_active_perpetual_wealth_spot_trades(chat_id: int = None) -> list:
         return []
 
 
-def update_perpetual_wealth_spot_trade(trade_id: int, remaining_qty: float, current_highest: float, peak_roi: float, tp1_taken: int = 0, be_locked: int = 0) -> bool:
-    """Updates active spot wealth trade tracking state."""
+def update_perpetual_wealth_spot_trade(trade_id: int, remaining_qty: float, current_highest: float, peak_roi: float, tp1_taken: int = 0, be_locked: int = 0, buy_price: float = None) -> bool:
+    """Updates active spot wealth trade tracking state, optionally repairing buy_price if provided."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE perpetual_wealth_spot_trades
-            SET remaining_qty = ?, current_highest = ?, peak_roi = ?, tp1_taken = ?, be_locked = ?
-            WHERE id = ?
-        ''', (remaining_qty, current_highest, peak_roi, tp1_taken, be_locked, trade_id))
+        if buy_price is not None and buy_price > 0.0:
+            cursor.execute('''
+                UPDATE perpetual_wealth_spot_trades
+                SET remaining_qty = ?, current_highest = ?, peak_roi = ?, tp1_taken = ?, be_locked = ?, buy_price = ?
+                WHERE id = ?
+            ''', (remaining_qty, current_highest, peak_roi, tp1_taken, be_locked, buy_price, trade_id))
+        else:
+            cursor.execute('''
+                UPDATE perpetual_wealth_spot_trades
+                SET remaining_qty = ?, current_highest = ?, peak_roi = ?, tp1_taken = ?, be_locked = ?
+                WHERE id = ?
+            ''', (remaining_qty, current_highest, peak_roi, tp1_taken, be_locked, trade_id))
         conn.commit()
         conn.close()
         return True

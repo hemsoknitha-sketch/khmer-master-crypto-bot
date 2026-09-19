@@ -3043,8 +3043,18 @@ def place_spot_order(
         res = HFT_SESSION.post(full_url, headers=headers, timeout=5)
         if res.status_code == 200:
             data = res.json()
-            print(f"🚀 [BINANCE SPOT ORDER SUCCESS (<20ms)] {symbol} {side} ({order_type}) -> OrderId: {data.get('orderId')}")
-            return {"status": "success", "res": data, "orderId": data.get("orderId"), "executedQty": data.get("executedQty", 0.0), "price": current_p}
+            exec_q = float(data.get('executedQty', 0.0) or 0.0)
+            cum_q = float(data.get('cummulativeQuoteQty', 0.0) or 0.0)
+            fill_p = (cum_q / exec_q) if (exec_q > 0 and cum_q > 0) else current_p
+            print(f"🚀 [BINANCE SPOT ORDER SUCCESS (<20ms)] {symbol} {side} ({order_type}) -> OrderId: {data.get('orderId')}, FillPrice: {fill_p:.6f}")
+            return {
+                "status": "success",
+                "res": data,
+                "orderId": data.get("orderId"),
+                "executedQty": exec_q,
+                "cummulativeQuoteQty": cum_q,
+                "price": fill_p
+            }
         else:
             err_text = res.text
             if side == "SELL" and ("-1013" in err_text or "MIN_NOTIONAL" in err_text):

@@ -1753,8 +1753,19 @@ class PerpetualWealthGeneratorEngine:
                     is_tp1_done = bool(tr["tp1_taken"])
                     is_be_locked = bool(tr["be_locked"])
 
-                    if rem_qty <= 0 or buy_price <= 0:
+                    if rem_qty <= 0:
                         continue
+
+                    # Auto-heal: If buy_price is missing or zero, repair immediately so trade is never skipped
+                    if buy_price <= 0:
+                        healed_p = trading_engine.get_current_price(sym)
+                        if healed_p > 0:
+                            buy_price = healed_p
+                            curr_highest = max(curr_highest, healed_p)
+                            db.update_perpetual_wealth_spot_trade(t_id, rem_qty, curr_highest, curr_peak, int(is_tp1_done), int(is_be_locked), buy_price=healed_p)
+                            print(f"🔧 [SPOT WEALTH AUTO-HEAL] Repaired missing buy_price for {sym} (Trade #{t_id}) -> ${buy_price:.6f}")
+                        else:
+                            continue
 
                     active_symbols.append(sym)
                     current_price = trading_engine.get_current_price(sym)
@@ -1811,26 +1822,35 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending Spot 1-Shot alert: {notif_err}")
 
-                    # Phase 3: 3-Tier Dynamic Moonshot Ratchet & Fast Profit Harvest
+                    # Phase 3: 3-Tier Dynamic Moonshot Ratchet & Fast Profit Harvest (Invariant 24)
                     target_bot_tp = float(bot.get("target_tp", 6.0))
                     
-                    # 1. Fast Micro-Harvest (+2.2% to +3.5% Peak): If momentum pulls back by 30% from peak
+                    # 1. Fast Micro-Harvest (+2.2% to +5.0% Peak): If momentum pulls back by 30% from peak
                     is_fast_harvest = (curr_peak >= 2.2 and curr_peak < 5.0 and (roi_pct <= (curr_peak * 0.70) or roi_pct >= target_bot_tp))
                     
-                    # 2. Super Moonshot Ratchet (Peak >= 5.0%):
-                    # Golden 85% Ratchet (rides +10%, +20%, +50% without ceiling).
-                    is_moonshot_tp2 = (curr_peak >= 5.0 and (roi_pct <= (curr_peak * 0.85) or roi_pct >= target_bot_tp))
+                    # 2. Super Moonshot Ratchet (Peak >= 5.0% - Invariant 24 Golden 85% Ratchet):
+                    # - Peak >= 10.0%: lock at 85% of peak (<= peak * 0.85) OR hard safety floor at +6.0% (NEVER allow +10% peak to drop below +6.0%!)
+                    # - Peak >= 7.0%: lock at 85% of peak (<= peak * 0.85) OR hard safety floor at +4.0%
+                    # - Peak >= 5.0%: lock at 82% of peak (<= peak * 0.82) OR hard safety floor at +2.5%
+                    is_moonshot_tp2 = False
+                    if curr_peak >= 10.0:
+                        is_moonshot_tp2 = (roi_pct <= (curr_peak * 0.85) or roi_pct <= 6.0)
+                    elif curr_peak >= 7.0:
+                        is_moonshot_tp2 = (roi_pct <= (curr_peak * 0.85) or roi_pct <= 4.0)
+                    elif curr_peak >= 5.0:
+                        is_moonshot_tp2 = (roi_pct <= (curr_peak * 0.82) or roi_pct <= 2.5)
+
                     is_profit_lock_tp = (curr_peak >= 5.0 and curr_peak < 6.0 and roi_pct <= (curr_peak * 0.60))
 
                     if is_fast_harvest or is_moonshot_tp2 or is_profit_lock_tp:
                         if is_moonshot_tp2:
                             reason_lbl = "TP2 MOONSHOT RATCHET (85% Peak Lock)"
-                            prot_tier_kh = "Golden 85% Moonshot Ratchet (កើប ៨៥% នៃចំណេញកំពូល)"
-                            prot_tier_en = "Golden 85% Moonshot Ratchet (85% Peak Cash Harvest)"
+                            prot_tier_kh = f"Golden 85% Moonshot Ratchet (Peak +{curr_peak:.1f}% -> Exit +{roi_pct:.1f}%)"
+                            prot_tier_en = f"Golden 85% Moonshot Ratchet (Peak +{curr_peak:.1f}% -> Exit +{roi_pct:.1f}%)"
                         elif is_fast_harvest:
                             reason_lbl = "FAST MICRO-PROFIT HARVEST"
-                            prot_tier_kh = "Fast Profit Lock (+2.2% - +3.5% Cash In)"
-                            prot_tier_en = "Fast Profit Lock (+2.2% - +3.5% Cash In)"
+                            prot_tier_kh = "Fast Profit Lock (+2.2% - +5.0% Cash In)"
+                            prot_tier_en = "Fast Profit Lock (+2.2% - +5.0% Cash In)"
                         else:
                             reason_lbl = "PROFIT LOCK EXIT"
                             prot_tier_kh = "Profit Lock (ការពារចំណេញ)"
@@ -1850,6 +1870,8 @@ class PerpetualWealthGeneratorEngine:
                         db.close_perpetual_wealth_spot_trade(t_id)
                         db.update_perpetual_wealth_spot_pnl(chat_id, net_realized_pnl, is_win=(net_realized_pnl > 0))
                         add_wealth_spot_cooldown(sym, duration_seconds=1800)
+                        if sym in active_symbols:
+                            active_symbols.remove(sym)
 
                         if app and hasattr(app, "bot"):
                             try:
@@ -1903,8 +1925,9 @@ class PerpetualWealthGeneratorEngine:
                         (trade_age_seconds >= 21600.0 and roi_pct <= 0.8)
                     )
                     # Breakeven Defense: Locked at +2.0% ROI, triggered if price pulls back to Entry +0.35% Net Fee Floor
-                    is_be_exit = (is_be_locked and curr_peak < 2.5 and current_price <= (buy_price * 1.0035) and roi_pct > -1.0)
-                    is_sl_exit = (roi_pct <= -5.0)
+                    # Invariant 24: Any trade that reached +2.0% is STRICTLY PROHIBITED from closing at a loss!
+                    is_be_exit = (is_be_locked and (current_price <= (buy_price * 1.0035) or roi_pct <= 0.35))
+                    is_sl_exit = (not is_be_locked and roi_pct <= -5.0)
 
                     if is_be_exit or is_sl_exit or is_stagnant:
                         if is_stagnant:
@@ -2053,11 +2076,21 @@ class PerpetualWealthGeneratorEngine:
                                 )
 
                                 if order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")):
-                                    executed_qty = float(order_res.get("executedQty", 0.0))
-                                    cummulative_quote = float(order_res.get("cummulativeQuoteQty", 0.0))
-                                    buy_price = cummulative_quote / executed_qty if executed_qty > 0 else cand["last_price"]
-                                    if executed_qty <= 0:
-                                        executed_qty = alloc_per_coin / buy_price if buy_price > 0 else 0.0
+                                    inner_res = order_res.get("res", {}) if isinstance(order_res.get("res"), dict) else {}
+                                    executed_qty = float(order_res.get("executedQty", 0.0) or inner_res.get("executedQty", 0.0) or 0.0)
+                                    cummulative_quote = float(order_res.get("cummulativeQuoteQty", 0.0) or inner_res.get("cummulativeQuoteQty", 0.0) or 0.0)
+
+                                    if cummulative_quote > 0.0 and executed_qty > 0.0:
+                                        buy_price = cummulative_quote / executed_qty
+                                    elif float(order_res.get("price", 0.0)) > 0.0:
+                                        buy_price = float(order_res.get("price", 0.0))
+                                    else:
+                                        buy_price = float(cand.get("last_price", 0.0))
+
+                                    if buy_price <= 0.0:
+                                        buy_price = trading_engine.get_current_price(sym)
+                                    if executed_qty <= 0.0 and buy_price > 0.0:
+                                        executed_qty = alloc_per_coin / buy_price
 
                                     db.add_perpetual_wealth_spot_trade(chat_id, sym, executed_qty, buy_price)
                                     held_symbols.add(sym)
@@ -2239,11 +2272,21 @@ class PerpetualWealthGeneratorEngine:
                                         )
 
                                         if buy_res and (buy_res.get("status") in ["success", "NEW", "FILLED"] or buy_res.get("orderId")):
-                                            exec_qty = float(buy_res.get("executedQty", 0.0))
-                                            cum_quote = float(buy_res.get("cummulativeQuoteQty", 0.0))
-                                            buy_p = cum_quote / exec_qty if exec_qty > 0 else monster_cand["last_price"]
-                                            if exec_qty <= 0:
-                                                exec_qty = swap_buy_usdt / buy_p if buy_p > 0 else 0.0
+                                            inner_buy = buy_res.get("res", {}) if isinstance(buy_res.get("res"), dict) else {}
+                                            exec_qty = float(buy_res.get("executedQty", 0.0) or inner_buy.get("executedQty", 0.0) or 0.0)
+                                            cum_quote = float(buy_res.get("cummulativeQuoteQty", 0.0) or inner_buy.get("cummulativeQuoteQty", 0.0) or 0.0)
+
+                                            if cum_quote > 0.0 and exec_qty > 0.0:
+                                                buy_p = cum_quote / exec_qty
+                                            elif float(buy_res.get("price", 0.0)) > 0.0:
+                                                buy_p = float(buy_res.get("price", 0.0))
+                                            else:
+                                                buy_p = float(monster_cand.get("last_price", 0.0))
+
+                                            if buy_p <= 0.0:
+                                                buy_p = trading_engine.get_current_price(new_sym)
+                                            if exec_qty <= 0.0 and buy_p > 0.0:
+                                                exec_qty = swap_buy_usdt / buy_p
 
                                             db.add_perpetual_wealth_spot_trade(chat_id, new_sym, exec_qty, buy_p)
                                             held_symbols.add(new_sym)
