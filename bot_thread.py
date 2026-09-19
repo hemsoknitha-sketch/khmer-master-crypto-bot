@@ -108,7 +108,11 @@ def get_persistent_bot_bar_keyboard(chat_id: int = 0) -> ReplyKeyboardMarkup:
             KeyboardButton("👑 SmartX AI")
         ],
         [
-            KeyboardButton("💰 Balance"),
+            KeyboardButton("💎 Wealth 24/7"),
+            KeyboardButton("🏛️ Capital TradFi"),
+            KeyboardButton("💰 Balance")
+        ],
+        [
             KeyboardButton("📊 Portfolio"),
             KeyboardButton("🛑 Stop ALL")
         ]
@@ -2322,6 +2326,8 @@ class TelegramBotThread(BaseThread):
                     "• `/report` - 📊 Multi-Timeframe & Engine VIP Audit Report\n"
                     "• `/stop ALL` - Emergency Stop All Active Trading Engines\n\n"
                     "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
+                    "• `/capital` - 🏛️ Capital.com TradFi Suite (Gold XAU/USD, S&P 500, Oil, BTC CFD)\n"
+                    "• `/wealth` - 💎 24/7 Perpetual Wealth Compounder (100% Capital Preservation)\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Autonomous Trading Engine (Spot/Futures)\n"
                     "• `/smart_swap` - ⚡ Multi-Chain DEX Aggregator & AI Gem Sniper (Solana/BSC/ETH)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage Engine (Binance vs Bybit)\n"
@@ -2353,6 +2359,8 @@ class TelegramBotThread(BaseThread):
                     "• `/report` - 📊 多周期与各引擎 VIP 审计报表\n"
                     "• `/stop ALL` - 紧急一键停止所有运行引擎\n\n"
                     "🚀 **2. 核心自主交易引擎**\n"
+                    "• `/capital` - 🏛️ Capital.com 全球 TradFi (黄金, 标普 500, 原油, 24/7 BTC CFD)\n"
+                    "• `/wealth` - 💎 24/7 永续财富引擎 (100% 保本 0% 爆仓)\n"
                     "• `/turbo_hedge` - 🚀 24/7 HFT 多币/单币高频对冲扫描器 (Spot/Futures)\n"
                     "• `/smart_swap` - ⚡ 跨链 DEX 聚合器与 AI 暴涨代币狙击引擎 (Solana/BSC/ETH)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms 跨交易所套利引擎 (Binance vs Bybit)\n"
@@ -2384,6 +2392,8 @@ class TelegramBotThread(BaseThread):
                     "• `/report` - 📊 របាយការណ៍សវនកម្ម VIP (Daily, Monthly, Engines)\n"
                     "• `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
                     "🚀 **២. FLAGSHIP AUTONOMOUS TRADING ENGINES (ម៉ាស៊ីនវិនិយោគស្វ័យប្រវត្តិ)**\n"
+                    "• `/capital` - 🏛️ Capital.com TradFi Suite (មាស Gold, សន្ទស្សន៍ S&P 500, ប្រេងឆៅ, BTC CFD)\n"
+                    "• `/wealth` - 💎 24/7 Perpetual Wealth (ការពារដើមទុន ១០០% គ្មានហានិភ័យ Liquidation)\n"
                     "• `/turbo_hedge` - 🚀 HFT Multi/Single-Coin Trading Engine (Spot/Futures)\n"
                     "• `/smart_swap` - ⚡ Multi-Chain DEX Aggregator & AI Gem Sniper (Solana/BSC/ETH)\n"
                     "• `/cross_arb` - ⚡ Sub-5ms Cross-Exchange Arbitrage (Binance vs Bybit)\n"
@@ -2433,6 +2443,10 @@ class TelegramBotThread(BaseThread):
                 [
                     InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
                     InlineKeyboardButton("⚡ Smart Swap AI (DEX)", callback_data="btn_smart_swap_menu")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Capital TradFi", callback_data="btn_capital_menu"),
+                    InlineKeyboardButton("💎 24/7 Wealth", callback_data="btn_wealth_status")
                 ],
                 [
                     InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh"),
@@ -2707,11 +2721,14 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("👑 SmartX AI", callback_data="btn_smart_x_turbo")
                 ],
                 [
-                    InlineKeyboardButton("⚡ Flash Loan", callback_data="btn_flash_loan"),
-                    InlineKeyboardButton("🚀 Smart Trade", callback_data="btn_smart_trade")
+                    InlineKeyboardButton("🏛️ Capital TradFi", callback_data="btn_capital_menu"),
+                    InlineKeyboardButton("⚡ Flash Loan", callback_data="btn_flash_loan")
                 ],
                 [
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("🚀 Smart Trade", callback_data="btn_smart_trade"),
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                ],
+                [
                     InlineKeyboardButton("🔑 Setup API", callback_data="btn_menu_api")
                 ]
             ]
@@ -2747,7 +2764,8 @@ class TelegramBotThread(BaseThread):
                     "3. 👑 **SmartX Apex AI Brain**: Institutional multi-layer machine intelligence (Deep-learning market momentum analysis & real-time Smart Money orderflow tracking)\n"
                     "4. ⚡ **Quantum CeDeFi Arbitrage**: Ultra-low-latency market dislocation extraction across major exchanges with zero principal risk\n"
                     "5. ❄️ **Spot Snowball Matrix**: Autonomous asset accumulation strategy (Systematic buy-low sell-high execution with zero liquidation risk)\n"
-                    "6. 🌊 **Macro Trend Radar**: High-conviction macro wave scanner (Detects institutional breakout waves while actively filtering market fakeouts)\n\n"
+                    "6. 🌊 **Macro Trend Radar**: High-conviction macro wave scanner (Detects institutional breakout waves while actively filtering market fakeouts)\n"
+                    "7. 🏛️ **Capital.com TradFi Suite**: Global multi-asset autonomous trading (Gold XAU/USD, S&P 500, Crude Oil, 24/7 Bitcoin CFD) fused with Google Macro Satellite & 80% Trailing Ratchet\n\n"
                     "📋 **1-TAP QUICK COMMANDS (Tap to Copy):**\n"
                     "💎 **Spot Investments (0% Liquidation):**\n"
                     "• Perpetual Wealth ៖ `` `/wealth` ``\n"
@@ -2759,7 +2777,8 @@ class TelegramBotThread(BaseThread):
                     "• SmartX AI Swarm ៖ `` `/smartx` ``\n"
                     "• Micro Scalper ៖ `` `/scalp` ``\n"
                     "• Macro Auto-Trade ៖ `` `/auto_trade` ``\n\n"
-                    "⚡ **CeDeFi & Arbitrage:**\n"
+                    "⚡ **CeDeFi, TradFi & Arbitrage:**\n"
+                    "• Capital.com TradFi ៖ `` `/capital` ``\n"
                     "• Quantum Flash Loan ៖ `` `/flash_loan` ``\n"
                     "• Cross-Chain DEX Swap ៖ `` `/smart_swap` ``\n"
                     "• Funding Harvester ៖ `` `/funding_harvester` ``\n\n"
@@ -2793,7 +2812,8 @@ class TelegramBotThread(BaseThread):
                     "3. 👑 **SmartX 顶级 AI 脑核**: 机构级多层深度神经网络 (全天候深度研判全球市场走势与主力资金 Smart Money 流向)\n"
                     "4. ⚡ **量子 CeDeFi 套利**: 纳秒级跨市场流动性价差收割引擎，本金零风险保障\n"
                     "5. ❄️ **现货滚雪球矩阵**: 全自动资产累积策略 (高抛低吸网格自动化执行，永无爆仓归零风险)\n"
-                    "6. 🌊 **宏观趋势雷达**: 大级别趋势追踪雷达 (精准捕捉主升浪与关键突破，全自动过滤假突破与噪音)\n\n"
+                    "6. 🌊 **宏观趋势雷达**: 大级别趋势追踪雷达 (精准捕捉主升浪与关键突破，全自动过滤假突破与噪音)\n"
+                    "7. 🏛️ **Capital.com 全球 TradFi**: 华尔街级全球多资产自主量化交易 (黄金 XAU/USD, 标普 S&P 500, 原油, 24/7 比特币 CFD)，深度融合 Google 宏观卫星信号与 80% 动态利润棘轮装甲\n\n"
                     "📋 **一键快捷命令（点击复制）：**\n"
                     "💎 **现货投资引擎 (0% 强平风险):**\n"
                     "• 永续财富引擎 ៖ `` `/wealth` ``\n"
@@ -2805,7 +2825,8 @@ class TelegramBotThread(BaseThread):
                     "• SmartX AI 集群 ៖ `` `/smartx` ``\n"
                     "• 微秒级剥头皮 ៖ `` `/scalp` ``\n"
                     "• 宏观自动雷达 ៖ `` `/auto_trade` ``\n\n"
-                    "⚡ **CeDeFi 与链上套利:**\n"
+                    "⚡ **CeDeFi、TradFi 与跨市场套利:**\n"
+                    "• Capital.com TradFi ៖ `` `/capital` ``\n"
                     "• 量子闪电贷套利 ៖ `` `/flash_loan` ``\n"
                     "• 跨链智能兑换 ៖ `` `/smart_swap` ``\n"
                     "• 资金费率收割 ៖ `` `/funding_harvester` ``\n\n"
@@ -2839,7 +2860,8 @@ class TelegramBotThread(BaseThread):
                     "3. 👑 **SmartX Apex AI Brain**: ប្រព័ន្ធខួរក្បាលសិប្បនិម្មិតកម្រិតកំពូល ដំណើរការស្វ័យប្រវត្តិពហុស្រទាប់ (វិភាគស៊ីជម្រៅលើទិន្នន័យទីផ្សារពិភពលោក និងទិសដៅចរន្តសាច់ប្រាក់ Smart Money)\n"
                     "4. ⚡ **Quantum CeDeFi Arbitrage**: ប្រព័ន្ធទាញយកផលចំណេញរវាងផ្សារកណ្តាល និងវិមជ្ឈការក្នុងកម្រិតល្បឿនពន្លឺ ដោយគ្មានហានិភ័យលើប្រាក់ដើមទុនរបស់អ្នកប្រើប្រាស់ឡើយ\n"
                     "5. ❄️ **Spot Snowball Matrix**: យុទ្ធសាស្ត្រសន្សំ និងពង្រីកចំនួនកាក់ដោយស្វ័យប្រវត្តិ (ទិញទាប-លក់ខ្ពស់ជាប្រចាំ គ្មានហានិភ័យបាត់បង់កាក់ ឬ Liquidation សូម្បីតែមួយសេន)\n"
-                    "6. 🌊 **Macro Trend Radar**: ប្រព័ន្ធរ៉ាដាស្កេនចាប់រលកទីផ្សារខ្នាតធំ (ចាប់យកឱកាសទម្លុះទម្លាយធំៗ និងច្រោះរលកបោកបញ្ឆោត Fakeout ដោយស្វ័យប្រវត្តិ)\n\n"
+                    "6. 🌊 **Macro Trend Radar**: ប្រព័ន្ធរ៉ាដាស្កេនចាប់រលកទីផ្សារខ្នាតធំ (ចាប់យកឱកាសទម្លុះទម្លាយធំៗ និងច្រោះរលកបោកបញ្ឆោត Fakeout ដោយស្វ័យប្រវត្តិ)\n"
+                    "7. 🏛️ **Capital.com TradFi Suite**: ប្រព័ន្ធវិនិយោគស្វ័យប្រវត្តិលើទ្រព្យសកម្មសកល (មាស Gold XAU/USD, សន្ទស្សន៍ S&P 500, ប្រេងឆៅ Crude Oil, និង 24/7 Bitcoin CFD) ភ្ជាប់ជាមួយ Google Macro Satellite និង Golden 80% Trailing Ratchet\n\n"
                     "📋 **ពាក្យបញ្ជាផ្លូវកាត់ ១-Tap (ចុចចម្លងភ្លាមៗ):**\n"
                     "💎 **ប្រព័ន្ធវិនិយោគ Spot (សុវត្ថិភាពខ្ពស់ 0% Liquidation):**\n"
                     "• ដំណើរការ Wealth Bot ៖ `` `/wealth` ``\n"
@@ -2851,7 +2873,8 @@ class TelegramBotThread(BaseThread):
                     "• ដំណើរការ SmartX AI ៖ `` `/smartx` ``\n"
                     "• HFT Micro Scalper ៖ `` `/scalp` ``\n"
                     "• Macro Auto-Trade ៖ `` `/auto_trade` ``\n\n"
-                    "⚡ **ប្រព័ន្ធ CeDeFi & Arbitrage:**\n"
+                    "⚡ **ប្រព័ន្ធ CeDeFi, TradFi & Arbitrage:**\n"
+                    "• Capital.com TradFi ៖ `` `/capital` ``\n"
                     "• Quantum Flash Loan ៖ `` `/flash_loan` ``\n"
                     "• Cross-Chain Smart Swap ៖ `` `/smart_swap` ``\n"
                     "• Funding Harvester ៖ `` `/funding_harvester` ``\n\n"
@@ -4208,6 +4231,10 @@ class TelegramBotThread(BaseThread):
                 return
             elif clean_btn in ["💎 24/7 Perpetual Wealth", "💎 Perpetual Wealth", "Perpetual Wealth", "wealth", "wealth24_7", "wealth247", "24/7 Wealth", "Wealth"]:
                 await wealth_command(update, context)
+                self.active_tasks.discard(chat_id)
+                return
+            elif clean_btn in ["🏛️ Capital TradFi", "Capital TradFi", "Capital.com", "capital", "capital_com", "capitalcom", "Capital"]:
+                await capital_command(update, context)
                 self.active_tasks.discard(chat_id)
                 return
 
