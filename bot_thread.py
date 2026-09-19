@@ -2672,7 +2672,7 @@ class TelegramBotThread(BaseThread):
                 except Exception as e:
                     print(f"Notice sending start persistent bar: {e}")
 
-            # 3. Fast Non-blocking System Telemetry & User State
+            # 3. Fast Non-blocking System & User State
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km').lower().strip()
             if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
@@ -2691,14 +2691,8 @@ class TelegramBotThread(BaseThread):
             user_api = db.get_user_api(chat_id) if hasattr(db, 'get_user_api') else None
             has_api = bool(user_api and len(user_api) >= 2 and user_api[0])
 
-            # AI Models count in models/ directory
-            models_dir = os.path.join(os.getcwd(), "models")
-            model_count = len([f for f in os.listdir(models_dir) if f.endswith(('.pkl', '.onnx', '.json', '.pt'))]) if os.path.isdir(models_dir) else 28
-
-            hft_endpoint = getattr(trading_engine, "BASE_URL", "https://api-gcp.binance.com")
-            hft_host = hft_endpoint.replace("https://", "").replace("http://", "").rstrip("/")
-
-            keyboard = InlineKeyboardMarkup([
+            # Construct Interactive Navigation Keyboard (Investment Focus)
+            base_keyboard = [
                 [
                     InlineKeyboardButton("🇰🇭 ភាសាខ្មែរ", callback_data="btn_lang_km"),
                     InlineKeyboardButton("🇬🇧 English", callback_data="btn_lang_en"),
@@ -2710,109 +2704,164 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton("🛡️ Turbo Hedge", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("🩺 VPS Health", callback_data="btn_health_refresh")
+                    InlineKeyboardButton("👑 SmartX AI", callback_data="btn_smart_x_turbo")
+                ],
+                [
+                    InlineKeyboardButton("⚡ Flash Loan", callback_data="btn_flash_loan"),
+                    InlineKeyboardButton("🚀 Smart Trade", callback_data="btn_smart_trade")
                 ],
                 [
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
                     InlineKeyboardButton("🔑 Setup API", callback_data="btn_menu_api")
                 ]
-            ])
+            ]
+
+            # Exclusive Super Admin row appended strictly for Super Admin
+            if is_admin:
+                base_keyboard.append([
+                    InlineKeyboardButton("🩺 VPS Health (Admin)", callback_data="btn_health_refresh"),
+                    InlineKeyboardButton("👑 Admin Panel", callback_data="btn_admin_panel")
+                ])
+
+            keyboard = InlineKeyboardMarkup(base_keyboard)
 
             if user_lang == 'en':
                 user_role_en = "👑 Super Admin Executive" if is_admin else "💎 Registered VIP Trader"
                 mode_badge_en = "🧪 Paper Trading (Simulated Edge)" if is_paper else "🚀 Real Live Trading (Binance HFT)"
-                api_status_en = "🟢 Connected (GCP Peered)" if has_api else "🟡 Standby (Tap Setup API Below)"
+                api_status_en = "🟢 Connected (Ready for Trading)" if has_api else "🟡 Standby (Tap Setup API Below)"
+
+                admin_health_line_en = "\n• Live VPS Diagnostics (Admin) ៖ `` `/health` ``" if is_admin else ""
 
                 welcome_msg = (
                     "🚀 **KHMER MASTER CRYPTO | APEX AGI v13.00** 💎\n"
                     "════════════\n"
-                    f"Welcome **{first_name}**! Welcome to the institutional-grade Wall Street AI Algorithmic Trading Platform running 24/7 on Google Cloud VPS Tokyo!\n\n"
-                    "🖥️ **GOOGLE CLOUD VPS (Tokyo asia-northeast1-a):**\n"
-                    "• **Hardware Profile**: `Google Cloud e2-standard-4 (4 vCPUs | 16 GB RAM)`\n"
-                    f"• **HFT Peering**: `{hft_host}` (`⚡ Sub-2ms Dark Fiber`)\n"
-                    f"• **AI Brain in RAM**: `🟢 {model_count}/28 Models Synced + Gemini 2.5 Flash`\n"
-                    "• **Execution Speed**: `🚀 Sub-20ms Keep-Alive Socket`\n\n"
+                    f"Welcome **{first_name}**! Welcome to the institutional-grade Wall Street AI Algorithmic Trading Platform!\n\n"
                     "🛡️ **ACCOUNT & RISK CONTROLS:**\n"
                     f"• **Account Tier**: `{user_role_en}`\n"
                     f"• **Execution Mode**: `{mode_badge_en}`\n"
                     "• **Margin Guard**: `🛡️ 100% ISOLATED (Zero Contagion Guarantee)`\n"
                     f"• **Binance API**: `{api_status_en}`\n\n"
-                    "💎 **THE 4 INSTITUTIONAL WEALTH ENGINES:**\n"
-                    "1. 💎 **24/7 Perpetual Wealth**: Continuous compounding (Spot 0% liquidation)\n"
-                    "2. 🛡️ **Turbo Hedge Engine**: High-frequency dual-side delta-neutral harvester\n"
-                    "3. 👑 **SmartX AGI Swarm**: 5-Agent Swarm + 12 Wall Street ML Ensembles\n"
-                    "4. ⚡ **CeDeFi Flash Loan**: Aave V3 Tokyo HFT MEV 0-Risk Arbitrage\n\n"
+                    "💎 **INSTITUTIONAL INVESTMENT ENGINES:**\n"
+                    "1. 💎 **24/7 Perpetual Wealth**: Auto-compounding (Spot 0% liquidation, Breakeven Armor +0.35% Net Floor, Golden 85% Ratchet & Smart Alpha Swap)\n"
+                    "2. 🛡️ **Turbo Hedge Engine**: Dual-side Long & Short volatility harvester (Delta-Neutral HFT & Small Capital Fortress)\n"
+                    "3. 👑 **SmartX AGI Swarm**: 5-Agent Swarm + 12 Wall Street ML Ensembles (CatBoost, LightGBM, XGBoost, PatchTST)\n"
+                    "4. ⚡ **CeDeFi Flash Loan**: Aave V3 Tokyo HFT MEV Arbitrage ($0.00 capital loss guarantee via EVM Revert)\n"
+                    "5. ❄️ **Spot Snowball Matrix**: Compound Dynamic Spot Grid (0% liquidation risk)\n"
+                    "6. 🌊 **Macro Auto-Trade Radar**: Institutional breakout & waterfall radar with Anti-Fakeout Confluence\n\n"
                     "📋 **1-TAP QUICK COMMANDS (Tap to Copy):**\n"
-                    "👉 **Master Navigation ៖** `` `/menu` ``\n"
-                    "👉 **Perpetual Wealth ៖** `` `/wealth` ``\n"
-                    "👉 **Turbo Hedge Engine ៖** `` `/turbo_hedge` ``\n"
-                    "👉 **Live VPS Diagnostics ៖** `` `/health` ``\n"
-                    "👉 **Check Wallet Balance ៖** `` `/balance` ``\n\n"
-                    "💡 _Select your preferred language or tap a button below to launch immediately:_"
+                    "💎 **Spot Investments (0% Liquidation):**\n"
+                    "• Perpetual Wealth ៖ `` `/wealth` ``\n"
+                    "• Spot Snowball Grid ៖ `` `/compound_grid` ``\n"
+                    "• Fibonacci Matrix ៖ `` `/infinity_matrix` ``\n"
+                    "• Super Smart Trade ៖ `` `/smart_trade` ``\n\n"
+                    "🛡️ **Futures & Hedge Engines:**\n"
+                    "• Turbo Hedge Engine ៖ `` `/turbo_hedge` ``\n"
+                    "• SmartX AI Swarm ៖ `` `/smartx` ``\n"
+                    "• Micro Scalper ៖ `` `/scalp` ``\n"
+                    "• Macro Auto-Trade ៖ `` `/auto_trade` ``\n\n"
+                    "⚡ **CeDeFi & Arbitrage (Tokyo HFT MEV):**\n"
+                    "• Aave V3 Flash Loan ៖ `` `/flash_loan` ``\n"
+                    "• Cross-Chain DEX Swap ៖ `` `/smart_swap` ``\n"
+                    "• Funding Harvester ៖ `` `/funding_harvester` ``\n\n"
+                    "💼 **Portfolio & Risk Management:**\n"
+                    "• Master Navigation ៖ `` `/menu` ``\n"
+                    "• Wallet Balance ៖ `` `/balance` ``\n"
+                    "• Portfolio & PnL ៖ `` `/portfolio` ``\n"
+                    f"• Emergency Stop ៖ `` `/stop` ``{admin_health_line_en}\n\n"
+                    "════════════\n"
+                    "💡 _Select your preferred language or tap an investment button below to begin:_"
                 )
             elif user_lang == 'zh':
                 user_role_zh = "👑 超级管理员" if is_admin else "💎 注册 VIP 交易员"
                 mode_badge_zh = "🧪 模拟交易 (0风险测试)" if is_paper else "🚀 实盘量化 (币安 HFT 直连)"
-                api_status_zh = "🟢 已连接 (GCP 直连)" if has_api else "🟡 待配置 (点击下方设置 API)"
+                api_status_zh = "🟢 已连接 (准备就绪)" if has_api else "🟡 待配置 (点击下方设置 API)"
+
+                admin_health_line_zh = "\n• 服务器诊断 (管理员) ៖ `` `/health` ``" if is_admin else ""
 
                 welcome_msg = (
                     "🚀 **KHMER MASTER CRYPTO | APEX AGI v13.00** 💎\n"
                     "════════════\n"
-                    f"欢迎 **{first_name}**！欢迎使用在谷歌云东京 VPS 节点 24/7 运行的华尔街级 AI 量化交易系统！\n\n"
-                    "🖥️ **谷歌云 VPS 节点 (东京 asia-northeast1-a):**\n"
-                    "• **硬件规格**: `Google Cloud e2-standard-4 (4 vCPUs | 16 GB RAM)`\n"
-                    f"• **HFT 直连网关**: `{hft_host}` (`⚡ Sub-2ms 暗光纤直连`)\n"
-                    f"• **AI 智能模型群**: `🟢 {model_count}/28 模型内存常驻 + Gemini 2.5 Flash`\n"
-                    "• **执行延迟**: `🚀 Sub-20ms 极速长连接`\n\n"
+                    f"欢迎 **{first_name}**！欢迎使用华尔街级 AI 机构量化交易系统！\n\n"
                     "🛡️ **账户与风控护盾:**\n"
                     f"• **账户级别**: `{user_role_zh}`\n"
                     f"• **交易模式**: `{mode_badge_zh}`\n"
                     "• **保证金模式**: `🛡️ 100% 逐仓隔离 (零穿仓传染风险)`\n"
                     f"• **API 状态**: `{api_status_zh}`\n\n"
-                    "💎 **四大机构级核心交易引擎:**\n"
-                    "1. 💎 **24/7 永续财富引擎**: 现货滚雪球 + 永续复利 (现货 0% 爆仓风险)\n"
-                    "2. 🛡️ **极速双向对冲**: 高频双向 Delta-Neutral 波动率收割引擎\n"
-                    "3. 👑 **SmartX AGI 集群**: 5-Agent 智能集群 + 12 华尔街 ML 模型\n"
-                    "4. ⚡ **CeDeFi 闪电贷套利**: Aave V3 东京 HFT MEV 零本金风险套利\n\n"
+                    "💎 **核心机构级量化交易引擎:**\n"
+                    "1. 💎 **24/7 永续财富引擎**: 现货滚雪球 + 永续复利 (现货 0% 爆仓风险，保本装甲 +0.35% 净利润地板，黄金 85% 移动止盈与 Alpha 轮动)\n"
+                    "2. 🛡️ **极速双向对冲**: 高频双向 Delta-Neutral 波动率收割引擎 (小资金护盾与逐仓风控)\n"
+                    "3. 👑 **SmartX AGI 集群**: 5-Agent 智能集群 + 12 华尔街 ML 模型 (CatBoost, LightGBM, XGBoost, PatchTST)\n"
+                    "4. ⚡ **CeDeFi 闪电贷套利**: Aave V3 东京 HFT MEV 套利 ($0.00 本金风险，EVM 自动回退)\n"
+                    "5. ❄️ **现货滚雪球网格**: 复合动态现货网格 (0% 强平爆仓风险)\n"
+                    "6. 🌊 **宏观自动雷达**: 突破与瀑布行情实时雷达 (防假突破共振过滤)\n\n"
                     "📋 **一键快捷命令（点击复制）：**\n"
-                    "👉 **主控制面板 ៖** `` `/menu` ``\n"
-                    "👉 **永续财富引擎 ៖** `` `/wealth` ``\n"
-                    "👉 **极速对冲引擎 ៖** `` `/turbo_hedge` ``\n"
-                    "👉 **服务器诊断 ៖** `` `/health` ``\n"
-                    "👉 **钱包资产余额 ៖** `` `/balance` ``\n\n"
-                    "💡 _请在下方选择您的语言或点击功能按钮立即开启投资：_"
+                    "💎 **现货投资引擎 (0% 强平风险):**\n"
+                    "• 永续财富引擎 ៖ `` `/wealth` ``\n"
+                    "• 现货滚雪球网格 ៖ `` `/compound_grid` ``\n"
+                    "• 斐波那契无限矩阵 ៖ `` `/infinity_matrix` ``\n"
+                    "• 超级智能交易 ៖ `` `/smart_trade` ``\n\n"
+                    "🛡️ **合约与对冲引擎:**\n"
+                    "• 极速对冲引擎 ៖ `` `/turbo_hedge` ``\n"
+                    "• SmartX AI 集群 ៖ `` `/smartx` ``\n"
+                    "• 微秒级剥头皮 ៖ `` `/scalp` ``\n"
+                    "• 宏观自动雷达 ៖ `` `/auto_trade` ``\n\n"
+                    "⚡ **CeDeFi 与链上套利 (东京 HFT MEV):**\n"
+                    "• Aave V3 闪电贷 ៖ `` `/flash_loan` ``\n"
+                    "• 跨链智能兑换 ៖ `` `/smart_swap` ``\n"
+                    "• 资金费率收割 ៖ `` `/funding_harvester` ``\n\n"
+                    "💼 **资产与风险控制:**\n"
+                    "• 主控制面板 ៖ `` `/menu` ``\n"
+                    "• 钱包资产余额 ៖ `` `/balance` ``\n"
+                    "• 投资组合与盈亏 ៖ `` `/portfolio` ``\n"
+                    f"• 紧急熔断停止 ៖ `` `/stop` ``{admin_health_line_zh}\n\n"
+                    "════════════\n"
+                    "💡 _请在下方选择您的语言或点击功能按钮开启投资：_"
                 )
             else:
                 user_role_km = "👑 Super Admin Executive" if is_admin else "💎 Registered VIP Trader"
                 mode_badge_km = "🧪 Paper Trading (Simulated Edge)" if is_paper else "🚀 Real Live Trading (Binance HFT)"
-                api_status_km = "🟢 ភ្ជាប់រួចរាល់ (GCP Peered)" if has_api else "🟡 Standby (ចុច Setup API ខាងក្រោម)"
+                api_status_km = "🟢 ភ្ជាប់រួចរាល់ (ត្រៀមជួញដូរ)" if has_api else "🟡 Standby (ចុច Setup API ខាងក្រោម)"
+
+                admin_health_line_km = "\n• ឆែកសុខភាព Live VPS (Admin) ៖ `` `/health` ``" if is_admin else ""
 
                 welcome_msg = (
                     "🚀 **KHMER MASTER CRYPTO | APEX AGI v13.00** 💎\n"
                     "════════════\n"
-                    f"សួស្តី **{first_name}**! ស្វាគមន៍មកកាន់ប្រព័ន្ធវិនិយោគស្វ័យប្រវត្តិកម្រិតស្ថាប័ន Wall Street AI Trading Bot ដំណើរការលើ Google Cloud VPS Tokyo 24/7!\n\n"
-                    "🖥️ **GOOGLE CLOUD VPS (Tokyo asia-northeast1-a):**\n"
-                    "• **កម្លាំងម៉ាស៊ីន**: `Google Cloud e2-standard-4 (4 vCPUs | 16 GB RAM)`\n"
-                    f"• **ច្រកតភ្ជាប់ HFT**: `{hft_host}` (`⚡ Sub-2ms Dark Fiber`)\n"
-                    f"• **ខួរក្បាល AI**: `🟢 {model_count}/28 Models Synced + Gemini 2.5 Flash`\n"
-                    "• **ល្បឿនប្រតិបត្តិការ**: `🚀 Sub-20ms Keep-Alive Socket`\n\n"
+                    f"សួស្តី **{first_name}**! ស្វាគមន៍មកកាន់ប្រព័ន្ធវិនិយោគស្វ័យប្រវត្តិកម្រិតស្ថាប័ន Wall Street AI Trading Platform!\n\n"
                     "🛡️ **គណនី & យន្តការសុវត្ថិភាពវិនិយោគ:**\n"
                     f"• **ឋានៈគណនី**: `{user_role_km}`\n"
                     f"• **ទម្រង់ជួញដូរ**: `{mode_badge_km}`\n"
-                    "• **Margin Mode**: `🛡️ 100% ISOLATED (គ្មានហានិភ័យឆ្លងកាបូប)`\n"
+                    "• **Margin Guard**: `🛡️ 100% ISOLATED (គ្មានហានិភ័យឆ្លងកាបូប)`\n"
                     f"• **ស្ថានភាព API**: `{api_status_km}`\n\n"
-                    "💎 **ប្រព័ន្ធយុទ្ធសាស្ត្រជួញដូរស្វ័យប្រវត្តិទាំង ៤ (The 4 Pillars):**\n"
-                    "1. 💎 **24/7 Perpetual Wealth**: រកប្រាក់ចំណេញ 24/7 (Spot 0% Liquidation)\n"
-                    "2. 🛡️ **Turbo Hedge Engine**: ដេញតាមទីផ្សារទ្វេទិស Long & Short ស្វ័យប្រវត្តិ\n"
-                    "3. 👑 **SmartX AGI Swarm**: កងទ័ព AI 5-Agent + 12 Wall Street ML Ensembles\n"
-                    "4. ⚡ **CeDeFi Flash Loan**: Aave V3 Tokyo HFT MEV 0-Risk Arbitrage\n\n"
+                    "💎 **ប្រព័ន្ធយុទ្ធសាស្ត្រវិនិយោគស្វ័យប្រវត្តិកម្រិតស្ថាប័ន:**\n"
+                    "1. 💎 **24/7 Perpetual Wealth**: រកប្រាក់ចំណេញបន្តបន្ទាប់ (Spot 0% Liquidation, Breakeven Armor +0.35% Net Floor, Golden 85% Ratchet & Smart Alpha Swap)\n"
+                    "2. 🛡️ **Turbo Hedge Engine**: ដេញតាមទីផ្សារទ្វេទិស Long & Short ស្វ័យប្រវត្តិ (Delta-Neutral HFT & Small Capital Fortress)\n"
+                    "3. 👑 **SmartX AGI Swarm**: កងទ័ព AI 5-Agent Swarm + 12 Wall Street ML Ensembles (CatBoost, LightGBM, XGBoost, PatchTST)\n"
+                    "4. ⚡ **CeDeFi Flash Loan**: Aave V3 Tokyo HFT MEV 0-Risk Arbitrage ($0.00 Risk via Atomic Revert)\n"
+                    "5. ❄️ **Spot Snowball Matrix**: Compound Dynamic Grid សន្សំកាក់ 0% ហានិភ័យ Liquidation\n"
+                    "6. 🌊 **Macro Auto-Trade Radar**: ស្កេនចាប់រលកធំ Macro Breakout & Waterfall ជាមួយ Anti-Fakeout Confluence\n\n"
                     "📋 **ពាក្យបញ្ជាផ្លូវកាត់ ១-Tap (ចុចចម្លងភ្លាមៗ):**\n"
-                    "👉 **បើកផ្ទាំងបញ្ជាមេ ៖** `` `/menu` ``\n"
-                    "👉 **ដំណើរការ Wealth Bot ៖** `` `/wealth` ``\n"
-                    "👉 **ដំណើរការ Turbo Hedge ៖** `` `/turbo_hedge` ``\n"
-                    "👉 **ឆែកសុខភាព Live VPS ៖** `` `/health` ``\n"
-                    "👉 **ឆែកសមតុល្យកាបូប ៖** `` `/balance` ``\n\n"
-                    "💡 _ជ្រើសរើសភាសា ឬចុចប៊ូតុងខាងក្រោម ដើម្បីចាប់ផ្តើមវិនិយោគភ្លាមៗ ៖_"
+                    "💎 **ប្រព័ន្ធវិនិយោគ Spot (សុវត្ថិភាពខ្ពស់ 0% Liquidation):**\n"
+                    "• ដំណើរការ Wealth Bot ៖ `` `/wealth` ``\n"
+                    "• Spot Snowball Grid ៖ `` `/compound_grid` ``\n"
+                    "• Fibonacci Matrix ៖ `` `/infinity_matrix` ``\n"
+                    "• Super Smart Trade ៖ `` `/smart_trade` ``\n\n"
+                    "🛡️ **ប្រព័ន្ធ Futures & Turbo Hedge (កើបចំណេញរហ័ស):**\n"
+                    "• ដំណើរការ Turbo Hedge ៖ `` `/turbo_hedge` ``\n"
+                    "• ដំណើរការ SmartX AI ៖ `` `/smartx` ``\n"
+                    "• HFT Micro Scalper ៖ `` `/scalp` ``\n"
+                    "• Macro Auto-Trade ៖ `` `/auto_trade` ``\n\n"
+                    "⚡ **ប្រព័ន្ធ CeDeFi & Arbitrage (Tokyo HFT MEV):**\n"
+                    "• Aave V3 Flash Loan ៖ `` `/flash_loan` ``\n"
+                    "• Cross-Chain Smart Swap ៖ `` `/smart_swap` ``\n"
+                    "• Funding Harvester ៖ `` `/funding_harvester` ``\n\n"
+                    "💼 **គ្រប់គ្រងគណនី & ផលប័ត្រ:**\n"
+                    "• បើកផ្ទាំងបញ្ជាមេ ៖ `` `/menu` ``\n"
+                    "• ឆែកសមតុល្យកាបូប ៖ `` `/balance` ``\n"
+                    "• ពិនិត្យផលប័ត្រ & PnL ៖ `` `/portfolio` ``\n"
+                    f"• កុងតាក់សង្គ្រោះបន្ទាន់ ៖ `` `/stop` ``{admin_health_line_km}\n\n"
+                    "════════════\n"
+                    "💡 _ជ្រើសរើសភាសា ឬចុចប៊ូតុងវិនិយោគខាងក្រោម ដើម្បីចាប់ផ្តើមភ្លាមៗ ៖_"
                 )
 
             if update.callback_query:
@@ -5364,6 +5413,13 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_admin_stats_refresh", "btn_admin_stats"]:
                 await admin_stats_command(update, context)
             elif data in ["btn_health_refresh", "btn_health_ping_test"]:
+                is_admin = (chat_id == 859271875) or (db.is_admin(chat_id) if hasattr(db, 'is_admin') else False)
+                if not is_admin:
+                    try:
+                        await update.callback_query.answer("⚠️ មុខងារ /health ត្រូវបានកម្រិតសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
                 try:
                     await update.callback_query.answer("⚡ កំពុងវាស់ស្ទង់ Latency & សុខភាព VPS...")
                 except Exception:
@@ -15389,13 +15445,23 @@ class TelegramBotThread(BaseThread):
                     pass
 
             # Restrict exclusively to Super Admin ID 859271875 or authorized admins
-            if not (chat_id == 859271875 or db.is_admin(chat_id)):
-                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+            is_admin = (chat_id == 859271875) or (db.is_admin(chat_id) if hasattr(db, 'is_admin') else False)
+            if not is_admin:
                 if update.callback_query:
-                    await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                    try:
+                        await update.callback_query.answer("⚠️ មុខងារ /health ត្រូវបានកម្រិតសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
                 else:
-                    await (update.effective_message or update.message).reply_text(err_msg, parse_mode="Markdown")
-                return
+                    access_denied_msg = (
+                        "⛔ **ACCESS DENIED (SUPER ADMIN ONLY)** 🛡️\n"
+                        "════════════\n"
+                        "ពាក្យបញ្ជា `/health` និងការត្រួតពិនិត្យប្រព័ន្ធ VPS ត្រូវបានកម្រិតសិទ្ធិផ្តាច់មុខសម្រាប់តែ **Super Admin** ប៉ុណ្ណោះ!\n\n"
+                        "💡 _សូមប្រើប្រាស់ពាក្យបញ្ជា `/menu`, `/wealth`, ឬ `/portfolio` ដើម្បីពិនិត្យគណនី និងវិនិយោគ។_"
+                    )
+                    await (update.effective_message or update.message).reply_text(access_denied_msg, parse_mode="Markdown")
+                    return
 
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
