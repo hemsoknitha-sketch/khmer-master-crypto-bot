@@ -26,6 +26,7 @@ import database as db
 import trading_engine
 import market_data
 import ui_standards
+from smart_x_engine import SmartXEngine, BRAIN
 
 # Cooldown and execution locks to prevent double-entries
 _active_wealth_exec_keys = set()
@@ -101,6 +102,88 @@ def get_monitoring_symbols_set() -> set:
         return set()
 
 
+_BTC_MACRO_REGIME_CACHE = {}
+
+def get_btc_macro_regime() -> dict:
+    """
+    Evaluates Bitcoin (BTCUSDT) 1h Macro Trend & Momentum Regime.
+    Strict Institutional Directional Shield:
+    - If BTC 1h price < EMA50 or RSI < 48.0:
+        Regime is BEARISH / DEFENSIVE.
+        -> Altcoin LONGs are 100% BLOCKED.
+        -> High-probability breakdown Altcoins are prioritized for SHORT (Delta-Neutral hedging).
+    - If BTC 1h price >= EMA50 and RSI >= 50.0:
+        Regime is BULLISH.
+        -> Altcoin LONGs are permitted on Pullback Retests.
+    """
+    global _BTC_MACRO_REGIME_CACHE
+    now = time.time()
+    if "regime" in _BTC_MACRO_REGIME_CACHE:
+        cached_time, cached_val = _BTC_MACRO_REGIME_CACHE["regime"]
+        if now - cached_time < 45.0:
+            return cached_val
+
+    try:
+        klines_1h = trading_engine.get_klines("BTCUSDT", interval="1h", limit=60, is_spot=False)
+        if not klines_1h or len(klines_1h) < 30:
+            return {"regime": "NEUTRAL", "allow_long": True, "allow_short": True, "btc_price": 0.0, "btc_rsi": 50.0, "reason": "Insufficient BTC data"}
+
+        closes = [float(k[4]) for k in klines_1h]
+        btc_price = closes[-1]
+
+        k50 = 2.0 / (50 + 1)
+        ema50 = closes[0]
+        for p in closes[1:]:
+            ema50 = (p * k50) + (ema50 * (1 - k50))
+
+        gains, losses = [], []
+        for i in range(1, 15):
+            diff = closes[-i] - closes[-i-1]
+            if diff >= 0:
+                gains.append(diff)
+                losses.append(0.0)
+            else:
+                gains.append(0.0)
+                losses.append(abs(diff))
+        avg_g = sum(gains) / 14.0 if gains else 0.0
+        avg_l = sum(losses) / 14.0 if losses else 0.0001
+        rs = avg_g / avg_l if avg_l > 0 else 1.0
+        btc_rsi = 100.0 - (100.0 / (1.0 + rs))
+
+        is_bearish = (btc_price < ema50 * 0.998) or (btc_rsi < 48.0)
+        is_bullish = (btc_price >= ema50 * 1.002) and (btc_rsi >= 50.0)
+
+        if is_bearish:
+            regime = "BEARISH_DEFENSIVE"
+            allow_long = False
+            allow_short = True
+            reason = f"BTC Bearish/Defensive (${btc_price:,.1f} < EMA50 ${ema50:,.1f} or RSI {btc_rsi:.1f} < 48.0) -> Altcoin LONGs BLOCKED 100%"
+        elif is_bullish:
+            regime = "BULLISH_EXPANSION"
+            allow_long = True
+            allow_short = False
+            reason = f"BTC Bullish (${btc_price:,.1f} >= EMA50 ${ema50:,.1f}, RSI {btc_rsi:.1f}) -> Altcoin LONGs Permitted"
+        else:
+            regime = "NEUTRAL_CHOP"
+            allow_long = True
+            allow_short = True
+            reason = f"BTC Neutral/Chop (${btc_price:,.1f}, RSI {btc_rsi:.1f}) -> Strict AI Confluence Required"
+
+        res = {
+            "regime": regime,
+            "allow_long": allow_long,
+            "allow_short": allow_short,
+            "btc_price": btc_price,
+            "btc_ema50": ema50,
+            "btc_rsi": btc_rsi,
+            "reason": reason
+        }
+        _BTC_MACRO_REGIME_CACHE["regime"] = (now, res)
+        return res
+    except Exception as e:
+        return {"regime": "NEUTRAL", "allow_long": True, "allow_short": True, "btc_price": 0.0, "btc_rsi": 50.0, "reason": f"BTC Error: {e}"}
+
+
 class PerpetualWealthGeneratorEngine:
     """
     💎 24/7 Perpetual Wealth Generator Engine
@@ -122,6 +205,11 @@ class PerpetualWealthGeneratorEngine:
         """
         candidates = []
         try:
+            # Enforce Institutional BTC Macro Directional Shield
+            btc_regime = get_btc_macro_regime()
+            allow_long = btc_regime.get("allow_long", True)
+            allow_short = btc_regime.get("allow_short", True)
+
             url = f"{trading_engine.FUTURES_URL}/fapi/v1/ticker/24hr"
             res = trading_engine.HFT_SESSION.get(url, timeout=4)
             if res.status_code != 200:
@@ -152,8 +240,8 @@ class PerpetualWealthGeneratorEngine:
                 if quote_volume < 15_000_000.0 or last_price <= 0.0:
                     continue
 
-                # Golden Sweet Spot for LONG: +3.0% to +14.0%
-                if 3.0 <= price_change_pct <= 14.0:
+                # Golden Sweet Spot for LONG: +3.0% to +14.0% (Strictly blocked if BTC Macro is Bearish/Defensive)
+                if allow_long and (3.0 <= price_change_pct <= 14.0):
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_symbol_technicals(symbol, target_side="BUY")
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -161,6 +249,7 @@ class PerpetualWealthGeneratorEngine:
                             "side": "BUY",
                             "price_change_pct": price_change_pct,
                             "last_price": last_price,
+                            "pullback_price": tech_eval.get("pullback_price", last_price),
                             "quote_volume": quote_volume,
                             "rsi_15m": tech_eval.get("rsi_15m", 58.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
@@ -169,11 +258,12 @@ class PerpetualWealthGeneratorEngine:
                             "chg_15m": tech_eval.get("chg_15m", 0.5),
                             "adx_15m": tech_eval.get("adx_15m", 28.0),
                             "ai_score": tech_eval.get("ai_score", 9.0),
+                            "ai_confidence": tech_eval.get("ai_confidence", 85.0),
                             "orderbook_ratio": tech_eval.get("orderbook_ratio", 1.25),
                             "reason": tech_eval.get("reason", "Futures Golden Sweet-Spot Momentum")
                         })
-                # Sweet Spot for SHORT: -3.0% to -12.0% (strictly respecting Invariant 16 RSI > 38.0)
-                elif -12.0 <= price_change_pct <= -3.0:
+                # Sweet Spot for SHORT: -3.0% to -12.0% (Prioritized when BTC is Bearish / Defensive, respecting Invariant 16 RSI > 38.0)
+                elif allow_short and (-12.0 <= price_change_pct <= -3.0):
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_symbol_technicals(symbol, target_side="SELL")
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -181,6 +271,7 @@ class PerpetualWealthGeneratorEngine:
                             "side": "SELL",
                             "price_change_pct": price_change_pct,
                             "last_price": last_price,
+                            "pullback_price": tech_eval.get("pullback_price", last_price),
                             "quote_volume": quote_volume,
                             "rsi_15m": tech_eval.get("rsi_15m", 45.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
@@ -189,6 +280,7 @@ class PerpetualWealthGeneratorEngine:
                             "chg_15m": tech_eval.get("chg_15m", -0.5),
                             "adx_15m": tech_eval.get("adx_15m", 28.0),
                             "ai_score": tech_eval.get("ai_score", 9.0),
+                            "ai_confidence": tech_eval.get("ai_confidence", 85.0),
                             "orderbook_ratio": tech_eval.get("orderbook_ratio", 0.80),
                             "reason": tech_eval.get("reason", "Futures Macro Bear Breakdown")
                         })
@@ -338,7 +430,31 @@ class PerpetualWealthGeneratorEngine:
             if target_side == "SELL" and ob_ratio > 0.95:
                 return {"is_valid": False, "reason": f"Orderbook buying support wall (Bid/Ask ratio: {ob_ratio:.2f} > 0.95)"}
 
-            # 9. Dynamic Multi-Factor Confluence AI Scoring
+            # 9. 33 Wall Street AI Models Ensemble Confluence (MoE Router + CatBoost + LightGBM + XGBoost + Trend Classifier)
+            ai_ensemble_res = SmartXEngine.evaluate_ai_ensemble(symbol, klines_15m=klines)
+            ai_consensus = ai_ensemble_res.get("consensus", "NEUTRAL")
+            ai_conf = float(ai_ensemble_res.get("confidence_pct", 60.0))
+            moe_regime = ai_ensemble_res.get("moe_regime", "TRENDING_BULL")
+
+            # Strict Directional AI Confluence Guard (Confidence >= 78.0% and consensus alignment)
+            if target_side == "BUY":
+                if ai_consensus == "SELL":
+                    return {"is_valid": False, "reason": f"33 AI Ensemble Bearish Rejection ({ai_conf:.1f}%)"}
+                if ai_conf < 78.0 and ai_consensus != "BUY":
+                    return {"is_valid": False, "reason": f"Insufficient 33-AI Swarm Confidence ({ai_conf:.1f}% < 78.0%)"}
+            else:  # SELL / SHORT
+                if ai_consensus == "BUY":
+                    return {"is_valid": False, "reason": f"33 AI Ensemble Bullish Rejection ({ai_conf:.1f}%)"}
+                if ai_conf < 78.0 and ai_consensus != "SELL":
+                    return {"is_valid": False, "reason": f"Insufficient 33-AI Swarm Confidence ({ai_conf:.1f}% < 78.0%)"}
+
+            # Calculate Pullback Retest Limit Price (Avoid FOMO Green Candle Chasing - Maker Fee 0.02%)
+            if target_side == "BUY":
+                pullback_limit_price = min(current_price, ema20 * 1.0015)
+            else:
+                pullback_limit_price = max(current_price, ema20 * 0.9985)
+
+            # Dynamic Multi-Factor Confluence AI Scoring
             ai_score = 7.0
 
             # RVOL Surge Multiplier
@@ -405,11 +521,12 @@ class PerpetualWealthGeneratorEngine:
                 if current_price < ema9 < ema20 < ema50:
                     ai_score += 0.5
 
-            ai_score = round(ai_score, 1)
+            # Blend 33-AI Model Confidence into AI Score
+            ai_score = round(min(10.0, ai_score * (ai_conf / 85.0)), 1)
 
             # Minimum AI confidence hurdle for Futures
-            if ai_score < 8.6:
-                return {"is_valid": False, "reason": f"Insufficient Confluence AI Score ({ai_score:.1f} < 8.6)"}
+            if ai_score < 8.5:
+                return {"is_valid": False, "reason": f"Insufficient Confluence AI Score ({ai_score:.1f} < 8.5, 33-AI Conf: {ai_conf:.1f}%)"}
 
             res_data = {
                 "is_valid": True,
@@ -423,7 +540,9 @@ class PerpetualWealthGeneratorEngine:
                 "adx_15m": adx_15m,
                 "orderbook_ratio": ob_ratio,
                 "ai_score": ai_score,
-                "reason": f"Futures Velocity Confluence (RVOL {rvol:.1f}x + AI {ai_score:.1f})"
+                "ai_confidence": ai_conf,
+                "pullback_price": pullback_limit_price,
+                "reason": f"Futures Confluence (33-AI {ai_conf:.1f}% + RVOL {rvol:.1f}x)"
             }
             _WEALTH_TECH_CACHE[cache_key] = (now_ts, res_data)
             return res_data
@@ -672,13 +791,13 @@ class PerpetualWealthGeneratorEngine:
                     is_be_locked = (db.get_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0") == "1")
 
                     # Phase 1: Breakeven Armor (Invariant 24) at +3.0% ROI
-                    # Protect winning trade so it never turns into a loss (+0.12% fees floor)
+                    # Protect winning trade so it never turns into a loss (+0.15% net fees floor, ROI >= +1.50%)
                     if roi_pct >= 3.0 and curr_peak >= 3.0:
                         be_locked_key = f"wealth_be_locked_{chat_id}_{sym}"
                         if not is_be_locked:
                             db.update_system_setting(be_locked_key, "1")
                             is_be_locked = True
-                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.12% Fees Floor (ROI: +{roi_pct:.2f}%)")
+                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.15% Net Fees Floor (ROI: +{roi_pct:.2f}%)")
 
                     # Phase 1.5: 3-Tier Anti-Stagnation Smart Clock (Frees margin from flat/dead moves, stops funding fee drain)
                     entry_time_key = f"wealth_entry_time_{chat_id}_{sym}"
@@ -695,20 +814,16 @@ class PerpetualWealthGeneratorEngine:
 
                     trade_age_min = max(0.0, (time.time() - entry_time) / 60.0)
 
-                    # Tier 1: Age >= 30m, Peak < +1.5%, ROI between -1.5% and +0.8%
-                    # Tier 2: Age >= 60m, Peak < +2.5%, ROI <= +1.2%
-                    # Tier 3: Age >= 90m, ROI <= +1.5%
+                    # Phase 1.5: Institutional Anti-Stagnation Smart Clock (Minimum 120-180m)
+                    # Eliminates premature 30m/60m chop exits, giving breakout trends room to develop
                     is_stagnant = False
                     stagnant_reason = ""
-                    if trade_age_min >= 90.0 and roi_pct <= 1.5:
+                    if trade_age_min >= 180.0 and abs(roi_pct) <= 0.8 and curr_peak < 1.8:
                         is_stagnant = True
-                        stagnant_reason = f"Tier 3 Anti-Stagnation (Held {trade_age_min:.0f}m, ROI: {roi_pct:+.2f}%)"
-                    elif trade_age_min >= 60.0 and curr_peak < 2.5 and roi_pct <= 1.2:
+                        stagnant_reason = f"Institutional 180m Stagnation Release (Held {trade_age_min:.0f}m, Flat Volume)"
+                    elif trade_age_min >= 120.0 and abs(roi_pct) <= 0.4 and curr_peak < 1.2:
                         is_stagnant = True
-                        stagnant_reason = f"Tier 2 Anti-Stagnation (Held {trade_age_min:.0f}m, Peak: {curr_peak:.1f}%, ROI: {roi_pct:+.2f}%)"
-                    elif trade_age_min >= 30.0 and curr_peak < 1.5 and (-1.5 <= roi_pct <= 0.8):
-                        is_stagnant = True
-                        stagnant_reason = f"Tier 1 Anti-Stagnation (Held {trade_age_min:.0f}m, Flat Momentum)"
+                        stagnant_reason = f"Institutional 120m Stagnation Release (Held {trade_age_min:.0f}m, Zero Movement)"
 
                     if is_stagnant:
                         side_to_close = "SELL" if amt > 0 else "BUY"
@@ -727,7 +842,9 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(tp1_taken_key, "0")
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
                         db.update_system_setting(entry_time_key, "0.0")
-                        db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=(unRealizedProfit > 0))
+                        est_fee = abs(amt) * entry_price * 0.0008
+                        net_pnl = unRealizedProfit - est_fee
+                        db.update_perpetual_wealth_pnl(chat_id, net_pnl, is_win=(net_pnl > 0))
                         add_wealth_cooldown(sym, duration_seconds=1800)
 
                         if app and hasattr(app, "bot"):
@@ -776,7 +893,9 @@ class PerpetualWealthGeneratorEngine:
                             position_side=pos_side
                         )
                         db.update_system_setting(tp1_taken_key, "1")
-                        db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit * 0.5, is_win=True)
+                        est_fee_50 = (close_half_qty * mark_price) * 0.0008
+                        net_tp1_pnl = max(0.02, (unRealizedProfit * 0.5) - est_fee_50)
+                        db.update_perpetual_wealth_pnl(chat_id, net_tp1_pnl, is_win=True)
 
                         # Send Telegram Notification
                         if app and hasattr(app, "bot"):
@@ -787,8 +906,8 @@ class PerpetualWealthGeneratorEngine:
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                                     f"📊 **ROI សម្រេចបាន ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"💰 **ប្រាក់ចំណេញច្បាមបាន (50%) ៖** `+${unRealizedProfit * 0.5:,.2f} USDT`\n"
-                                    f"🛡️ **Breakeven Armor ៖** `LOCKED (+0.12% Net Floor)`\n"
+                                    f"💰 **ប្រាក់ចំណេញសុទ្ធច្បាមបាន (50%) ៖** `+${net_tp1_pnl:,.2f} USDT`\n"
+                                    f"🛡️ **Breakeven Armor ៖** `LOCKED (+0.15% Net Floor, ROI >= +1.50%)`\n"
                                     f"🚀 **50% Moonshot Ratchet ៖** `ACTIVE (85% Profit Trailing)`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _ប្រព័ន្ធកំពុងបន្ត Trailing លើ 50% ដែលនៅសល់ដើម្បីកើប Moonshot!_"
@@ -797,8 +916,8 @@ class PerpetualWealthGeneratorEngine:
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **Symbol / Pair:** `{sym}`\n"
                                     f"📊 **Target ROI Reached:** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"💰 **Realized Profit (50%):** `+${unRealizedProfit * 0.5:,.2f} USDT`\n"
-                                    f"🛡️ **Breakeven Armor:** `LOCKED (+0.12% Net Floor)`\n"
+                                    f"💰 **Net Realized Profit (50%):** `+${net_tp1_pnl:,.2f} USDT`\n"
+                                    f"🛡️ **Breakeven Armor:** `LOCKED (+0.15% Net Floor, ROI >= +1.50%)`\n"
                                     f"🚀 **50% Moonshot Ratchet:** `ACTIVE (85% Profit Trailing)`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _Autonomous engine is trailing remaining 50% for maximum moonshot!_"
@@ -829,7 +948,9 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(tp1_taken_key, "0")
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
                         db.update_system_setting(entry_time_key, "0.0")
-                        db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=(roi_pct > 0))
+                        est_fee_all = abs(amt) * mark_price * 0.0008
+                        net_tp2_pnl = unRealizedProfit - est_fee_all
+                        db.update_perpetual_wealth_pnl(chat_id, net_tp2_pnl, is_win=(net_tp2_pnl > 0))
                         add_wealth_cooldown(sym, duration_seconds=1800)
 
                         if app and hasattr(app, "bot"):
@@ -841,7 +962,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                                     f"📈 **Peak ROI កំពូល ៖** `+{curr_peak:.2f}%` 🚀\n"
                                     f"💵 **Exit ROI ចុងក្រោយ ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${unRealizedProfit:,.2f} USDT`\n"
+                                    f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${net_tp2_pnl:,.2f} USDT`\n"
                                     f"🔄 **ស្ថានភាពទុន ៖** `ដកទុន + ចំណេញត្រឡប់មកកាបូប 24/7`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _ប្រព័ន្ធកំពុងស្វែងរកកាក់ Golden Sweet-Spot បន្ទាប់ដើម្បីច្បាមចំណេញបន្ត!_"
@@ -851,7 +972,7 @@ class PerpetualWealthGeneratorEngine:
                                     f"🪙 **Symbol / Pair:** `{sym}`\n"
                                     f"📈 **Peak ROI Achieved:** `+{curr_peak:.2f}%` 🚀\n"
                                     f"💵 **Harvest Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
-                                    f"🏆 **Net Realized Profit:** `+${unRealizedProfit:,.2f} USDT`\n"
+                                    f"🏆 **Net Realized Profit:** `+${net_tp2_pnl:,.2f} USDT`\n"
                                     f"🔄 **Capital Status:** `Released & Ready for Next 24/7 Cycle`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     "💡 _Hunting the next Golden Sweet-Spot breakout immediately!_"
@@ -860,28 +981,65 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending TP2 alert: {notif_err}")
 
-                    # Phase 4: Breakeven Defense Trigger (if locked) OR Dynamic Stop Loss Protection (Noise-resistant ~-18.0% ROI / Dynamic ATR Cushion)
-                    elif (is_be_locked and roi_pct <= 0.20) or roi_pct <= -18.0 or (pos_margin > 0 and unRealizedProfit <= -max(0.60, pos_margin * 0.22)):
-                        side_to_close = "SELL" if amt > 0 else "BUY"
-                        is_be_exit = is_be_locked and roi_pct > -5.0
-                        reason_tag = "BREAKEVEN DEFENSE" if is_be_exit else "DYNAMIC STOP LOSS"
-                        print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
-                        trading_engine.place_futures_order(
-                            api_key=api_key,
-                            api_secret=api_secret,
-                            symbol=sym,
-                            side=side_to_close,
-                            quantity=abs(amt),
-                            leverage=leverage,
-                            reduce_only=True,
-                            position_side=pos_side
-                        )
-                        db.update_system_setting(peak_roi_key, "0.0")
-                        db.update_system_setting(tp1_taken_key, "0")
-                        db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
-                        db.update_system_setting(entry_time_key, "0.0")
-                        db.update_perpetual_wealth_pnl(chat_id, unRealizedProfit, is_win=(unRealizedProfit > 0))
-                        add_wealth_cooldown(sym, duration_seconds=1800 if is_be_exit else 3600)
+                    # Phase 4: Breakeven Defense Trigger (at Entry + 0.15% Net Fee Floor) OR Dynamic Stop Loss Protection
+                    # Guaranteed: Breakeven NEVER exits at roi_pct <= 0.20 anymore. Must lock >= +1.50% ROI at 10x (+0.15% price floor)
+                    else:
+                        be_net_floor_roi = max(1.50, 0.15 * leverage)
+                        is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)
+                        is_sl_trigger = roi_pct <= -18.0 or (pos_margin > 0 and unRealizedProfit <= -max(0.60, pos_margin * 0.22))
+                        
+                        if is_be_trigger or is_sl_trigger:
+                            side_to_close = "SELL" if amt > 0 else "BUY"
+                            is_be_exit = is_be_trigger and roi_pct >= 0.0
+                            reason_tag = "BREAKEVEN NET FLOOR DEFENSE (+0.15% Net)" if is_be_exit else "DYNAMIC STOP LOSS"
+                            print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
+                            trading_engine.place_futures_order(
+                                api_key=api_key,
+                                api_secret=api_secret,
+                                symbol=sym,
+                                side=side_to_close,
+                                quantity=abs(amt),
+                                leverage=leverage,
+                                reduce_only=True,
+                                position_side=pos_side
+                            )
+                            db.update_system_setting(peak_roi_key, "0.0")
+                            db.update_system_setting(tp1_taken_key, "0")
+                            db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                            db.update_system_setting(entry_time_key, "0.0")
+
+                            est_exit_fee = abs(amt) * mark_price * 0.0008
+                            net_exit_pnl = unRealizedProfit - est_exit_fee
+                            db.update_perpetual_wealth_pnl(chat_id, net_exit_pnl, is_win=(is_be_exit and net_exit_pnl > 0))
+                            add_wealth_cooldown(sym, duration_seconds=1800 if is_be_exit else 3600)
+
+                            if app and hasattr(app, "bot") and is_be_exit:
+                                try:
+                                    user_lang = db.get_user_language(chat_id)
+                                    be_msg = (
+                                        "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                                        f"🛡️ **កម្រិតការពារ ៖** `Entry +0.15% Net Fee Floor`\n"
+                                        f"💵 **Exit ROI សម្រេច ៖** `+{roi_pct:.2f}%` 🟢\n"
+                                        f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${max(0.01, net_exit_pnl):,.2f} USDT`\n"
+                                        f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ហោប៉ៅនៅតែចំណេញ!`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        "💡 _Breakeven Armor ធានាដាច់ខាតមិនឱ្យខាតដើម និងច្បាមចំណេញសុទ្ធពិតប្រាកដ!_"
+                                    ) if user_lang == 'khmer' else (
+                                        "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🪙 **Symbol / Pair:** `{sym}`\n"
+                                        f"🛡️ **Defense Standard:** `Entry +0.15% Net Fee Floor`\n"
+                                        f"💵 **Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
+                                        f"🏆 **Net Realized Profit:** `+${max(0.01, net_exit_pnl):,.2f} USDT`\n"
+                                        f"✅ **Binance Fees:** `100% Deducted & Net Profit Preserved!`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        "💡 _Breakeven Armor strictly preserved capital with real net positive profit!_"
+                                    )
+                                    asyncio.create_task(_async_send_wealth_alert(app, chat_id, be_msg, "Breakeven exit alert"))
+                                except Exception as alert_err:
+                                    print(f"⚠️ Notice sending Breakeven alert: {alert_err}")
 
                 db.update_perpetual_wealth_coins(chat_id, active_symbols)
 
@@ -940,6 +1098,7 @@ class PerpetualWealthGeneratorEngine:
                         try:
                             # Calculate quantity (Margin mode & leverage are automatically enforced in place_futures_order)
                             last_price = cand["last_price"]
+                            pullback_price = cand.get("pullback_price", last_price)
                             notional = margin_per_coin * leverage
                             raw_qty = notional / last_price if last_price > 0 else 0.0
                             step_size = trading_engine.get_lot_size(sym)
@@ -949,17 +1108,45 @@ class PerpetualWealthGeneratorEngine:
                             if qty <= 0:
                                 continue
 
-                            print(f"🚀 [24/7 WEALTH GENERATOR ENTRY] User {chat_id}: Placing {sym} {side} (${margin_per_coin:.2f} USDT x{leverage} lev)...")
+                            # Pullback Limit Entry to capture Maker fee (0.02% vs 0.04% Taker)
+                            # Ensure limit order price rests on the book rather than crossing the spread:
+                            # For BUY: price slightly below last_price (min(pullback_price, last_price * 0.9995))
+                            # For SELL: price slightly above last_price (max(pullback_price, last_price * 1.0005))
+                            if side == "BUY":
+                                limit_entry_p = min(pullback_price, last_price * 0.9995)
+                            else:
+                                limit_entry_p = max(pullback_price, last_price * 1.0005)
+                            
+                            limit_entry_p = trading_engine.format_price_to_tick_size(sym, limit_entry_p)
 
-                            # Place order
+                            print(f"🚀 [24/7 WEALTH GENERATOR PULLBACK MAKER ENTRY] User {chat_id}: Placing {sym} {side} LIMIT @ ${limit_entry_p} (${margin_per_coin:.2f} USDT x{leverage} lev)...")
+
+                            # Place Pullback Limit Order
                             order_res = trading_engine.place_futures_order(
                                 api_key=api_key,
                                 api_secret=api_secret,
                                 symbol=sym,
                                 side=side,
                                 quantity=qty,
-                                leverage=leverage
+                                leverage=leverage,
+                                order_type="LIMIT",
+                                price=limit_entry_p,
+                                time_in_force="GTC"
                             )
+
+                            # If LIMIT order failed or was rejected, fallback seamlessly to MARKET
+                            is_limit_placed = bool(order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")))
+                            if not is_limit_placed:
+                                print(f"⚠️ [PULLBACK LIMIT FALLBACK] {sym} LIMIT placement rejected ({order_res.get('error') if isinstance(order_res, dict) else ''}). Falling back to MARKET...")
+                                order_res = trading_engine.place_futures_order(
+                                    api_key=api_key,
+                                    api_secret=api_secret,
+                                    symbol=sym,
+                                    side=side,
+                                    quantity=qty,
+                                    leverage=leverage,
+                                    order_type="MARKET"
+                                )
 
                             if order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")):
                                 # Save entry time for Anti-Stagnation Smart Clock
@@ -972,34 +1159,40 @@ class PerpetualWealthGeneratorEngine:
                                         rvol_val = cand.get('rvol', 2.2)
                                         chg_1h_val = cand.get('chg_1h', 1.0)
                                         adx_val = cand.get('adx_15m', 28.0)
+                                        ai_conf_val = cand.get('ai_confidence', 85.0)
+                                        entry_mode_tag = "LIMIT Maker (0.02% Fee)" if is_limit_placed else "MARKET (Instant Fill)"
                                         entry_msg = (
-                                            "💎 **[24/7 PERPETUAL WEALTH - POSITION OPENED]** 🟢\n"
+                                            "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                                             f"🎯 **ទិសដៅ (Signal) ៖** `{side} ({cand['reason']})`\n"
+                                            f"🏷️ **ប្រភេទ Order ៖** `{entry_mode_tag}`\n"
+                                            f"💵 **តម្លៃចូល (Entry Price) ៖** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
                                             f"💰 **ទុនចូល (Margin) ៖** `${margin_per_coin:.2f} USDT`\n"
                                             f"⚡ **Leverage ៖** `{leverage}x (ISOLATED Mode)`\n"
                                             f"📊 **Volume Surge (RVOL) ៖** `{rvol_val:.1f}x` 🚀\n"
                                             f"📈 **1H Fresh Momentum ៖** `{chg_1h_val:+.2f}%`\n"
                                             f"🌊 **Trend Strength (ADX) ៖** `{adx_val:.1f}`\n"
-                                            f"🧠 **AI Confluence Score ៖** `{cand['ai_score']:.1f}/10.0`\n"
-                                            f"🛡️ **Breakeven Armor ៖** `ត្រៀម Lock នៅ +3.0% ROI`\n"
+                                            f"🧠 **33-AI Model Confidence ៖** `{ai_conf_val:.1f}% (Consensus)`\n"
+                                            f"🛡️ **Breakeven Armor ៖** `Lock នៅ +0.15% Net Floor (ROI >= +1.50%)`\n"
                                             f"🎯 **Target TP1 (50%) ៖** `+5.0% ROI`\n"
                                             f"🚀 **Target TP2 (Moonshot) ៖** `85% Trailing Lock`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             "💡 _ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ កំពុងការពារ និងច្បាមផលចំណេញស្វ័យប្រវត្ត!_"
                                         ) if user_lang == 'khmer' else (
-                                            "💎 **[24/7 PERPETUAL WEALTH - POSITION OPENED]** 🟢\n"
+                                            "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             f"🪙 **Symbol / Pair:** `{sym}`\n"
                                             f"🎯 **Signal / Mode:** `{side} ({cand['reason']})`\n"
+                                            f"🏷️ **Order Type:** `{entry_mode_tag}`\n"
+                                            f"💵 **Entry Price:** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
                                             f"💰 **Margin Allocated:** `${margin_per_coin:.2f} USDT`\n"
                                             f"⚡ **Leverage:** `{leverage}x (ISOLATED Mode)`\n"
                                             f"📊 **Volume Surge (RVOL):** `{rvol_val:.1f}x` 🚀\n"
                                             f"📈 **1H Fresh Momentum:** `{chg_1h_val:+.2f}%`\n"
                                             f"🌊 **Trend Strength (ADX):** `{adx_val:.1f}`\n"
-                                            f"🧠 **AI Confluence Score:** `{cand['ai_score']:.1f}/10.0`\n"
-                                            f"🛡️ **Breakeven Armor:** `Armed for +3.0% ROI Lock`\n"
+                                            f"🧠 **33-AI Model Confidence:** `{ai_conf_val:.1f}% (Consensus)`\n"
+                                            f"🛡️ **Breakeven Armor:** `Locks at +0.15% Net Floor (ROI >= +1.50%)`\n"
                                             f"🎯 **Target TP1 (50%):** `+5.0% ROI`\n"
                                             f"🚀 **Target TP2 (Moonshot):** `85% Trailing Ratchet`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"

@@ -244,6 +244,35 @@ def get_lot_size(symbol: str) -> float:
                     pass
     return 0.001
 
+def get_tick_size(symbol: str) -> float:
+    """Returns the PRICE_FILTER tickSize for a given Spot or Futures symbol."""
+    if not symbol:
+        return 0.01
+    info = get_futures_symbol_info(symbol) or get_symbol_info(symbol)
+    if info:
+        for f in info.get('filters', []):
+            if f.get('filterType') == 'PRICE_FILTER':
+                try:
+                    return float(f.get('tickSize', 0.01))
+                except Exception:
+                    pass
+    return 0.01
+
+def format_price_to_tick_size(symbol: str, price: float) -> float:
+    """Rounds price to symbol's PRICE_FILTER tickSize precision."""
+    try:
+        price = float(price)
+        tick_size = get_tick_size(symbol)
+        if tick_size > 0:
+            precision = int(round(-math.log10(tick_size))) if tick_size < 1 else 0
+            if precision > 0:
+                return round(round(price / tick_size) * tick_size, precision)
+            else:
+                return round(round(price / tick_size) * tick_size)
+        return round(price, 4)
+    except Exception:
+        return price
+
 def calculate_buy_quantity(api_key: str = "", api_secret: str = "", symbol: str = "", invest_amount: float = 0.0, current_price: float = 0.0) -> float:
     """
     Calculates formatted base asset quantity to buy for a given USDT investment amount.
@@ -2704,14 +2733,20 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
             set_futures_leverage(api_key, api_secret, symbol, ord_lev)
         endpoint = "/fapi/v1/order"
         timestamp = int(time.time() * 1000) + TIME_OFFSET
+        order_type = str(kwargs.get("order_type", "MARKET")).upper()
         ord_params = {
             "symbol": symbol,
             "side": side.upper(),
-            "type": "MARKET",
+            "type": order_type,
             "quantity": ord_qty,
             "recvWindow": 60000,
             "timestamp": timestamp
         }
+        if order_type == "LIMIT":
+            limit_p = kwargs.get("price")
+            if limit_p is not None:
+                ord_params["price"] = format_price_to_tick_size(symbol, limit_p)
+            ord_params["timeInForce"] = kwargs.get("time_in_force", "GTC")
         if not omit_pos_side:
             eff_pos = pos_side if pos_side is not None else position_side
             if not eff_pos and is_hedge_mode(api_key, api_secret):

@@ -470,7 +470,7 @@ class SmartXEngine:
                 pass
 
         if not klines_15m or len(klines_15m) < 15:
-            return np.array([[50.0, 1.2, 1.0, 0.8, 0.2, 0.0, 1.5, 0.0, 0.0, 1.0]])
+            return np.array([[50.0, 1.2, 1.0, 0.8, 0.2, 0.0, 1.5, 0.0, 0.0, 1.0, 25.0, 0.0]])
 
         closes = [float(k[4]) for k in klines_15m]
         highs = [float(k[2]) for k in klines_15m]
@@ -508,10 +508,18 @@ class SmartXEngine:
         ema_diff = ((closes[-1] - ma30) / max(1e-8, ma30)) * 100.0
         vol_spike = 1.0 if vol_ratio >= 2.0 else 0.0
 
+        adx14 = 25.0
+        if len(closes) >= 28:
+            try:
+                adx14, _, _ = market_data.calculate_adx_and_dmi(highs, lows, closes, period=14)
+            except Exception:
+                adx14 = 25.0
+        imbalance = float(cvd_ratio * 0.8)
+
         return np.array([[
             float(rsi14), float(atr14), float(vol_ratio), float(hl_pct),
             float(co_pct), float(ma_diff), float(bb_width), float(cvd_ratio),
-            float(ema_diff), float(vol_spike)
+            float(ema_diff), float(vol_spike), float(adx14), float(imbalance)
         ]])
 
     @classmethod
