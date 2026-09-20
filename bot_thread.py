@@ -5747,6 +5747,13 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await prop_firm_command(update, context)
+            elif data == "btn_cap_api_vault":
+                try:
+                    await update.callback_query.answer("🔑 បើកផ្ទាំង Capital.com API Vault!")
+                except Exception:
+                    pass
+                context.args = ["API"]
+                await capital_command(update, context)
             elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
                 await turbo_hedge_command(update, context)
             elif data in ["btn_smart_trade", "btn_smart_trade_launch"]:
@@ -18051,7 +18058,11 @@ class TelegramBotThread(BaseThread):
             args = list(context.args) if context and context.args else []
             if args:
                 sub_action = str(args[0]).upper().strip()
-                if sub_action in ["ON", "START", "RUN"]:
+                if sub_action in ["SET_API", "SETAPI", "API_SET", "API", "VAULT", "DELETE_API", "REMOVE_API"]:
+                    context.args = args
+                    await capital_command(update, context)
+                    return
+                elif sub_action in ["ON", "START", "RUN"]:
                     tier_arg = float(args[1]) if len(args) >= 2 else None
                     phase = int(args[2]) if len(args) >= 3 else 1
                     cfg = db.get_prop_firm_config(chat_id)
@@ -18169,7 +18180,7 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(msg_wiz, parse_mode="Markdown", reply_markup=kb_wiz)
                     return
                 elif sub_action in ["CHECK", "TEST", "STATUS", "API"]:
-                    engine = capital_engine.get_capital_engine()
+                    engine = capital_engine.get_user_capital_engine(chat_id)
                     auth_ok, auth_msg = engine.authenticate()
                     bal = engine.get_account_balance()
                     env_lbl = "DEMO ($10,000 Virtual Funds)" if engine.is_demo else "LIVE MAINNET / CHALLENGE"
@@ -18222,10 +18233,13 @@ class TelegramBotThread(BaseThread):
             curr_firm = cap_data.get("firm_name", "FTMO")
 
             toggle_btn_text = "🤖 Prop Auto: ON 🟢" if is_enabled else "🤖 Prop Auto: OFF ⚪"
+            has_vault = db.has_user_capital_credentials(chat_id)
+            vault_btn_text = "🔑 API Vault: 🟢 Connected" if has_vault else "🔑 ភ្ជាប់ API ផ្ទាល់ខ្លួន (Vault)"
             
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(toggle_btn_text, callback_data="btn_cap_prop_toggle")
+                    InlineKeyboardButton(toggle_btn_text, callback_data="btn_cap_prop_toggle"),
+                    InlineKeyboardButton(vault_btn_text, callback_data="btn_cap_api_vault")
                 ],
                 [
                     InlineKeyboardButton("💰 $1k", callback_data="btn_cap_prop_tier_1k"),
@@ -18282,6 +18296,7 @@ class TelegramBotThread(BaseThread):
                     f"🏢 **ស្ថាប័នជ្រើសរើស (Firm) ៖** `{curr_firm}`\n"
                     f"💼 **គណនីប្រឡង (Tier) ៖** `${cap_data['tier']:,.0f} USD` | `{phase_name}`\n"
                     f"🏦 **ឈ្មួញកណ្តាល ៖** `Capital.com ({env_lbl})`\n"
+                    f"🔑 **API Vault ៖** `{'🟢 Connected (Personal Vault Active)' if has_vault else '🟡 Default Pool (Use /capital API to connect)'}`\n"
                     f"🤖 **ម៉ាស៊ីន Prop Auto ៖** `{status_text}`\n"
                     f"💰 **សមតុល្យបច្ចុប្បន្ន (Equity) ៖** `${cap_data['current_equity']:,.2f} USD` ({'+' if cap_data['gain_pct'] >= 0 else ''}{cap_data['gain_pct']:.2f}%)\n"
                     f"🎯 **វឌ្ឍនភាព Target ៖** `{cap_data['progress_bar']}`\n"
@@ -18301,6 +18316,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Weekend Shield ៖** បិទ Trade មុនយប់ថ្ងៃសុក្រម៉ោង 20:00 UTC\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital PROP ON` `` | `` `/capital PROP OFF` ``\n"
+                    f"🔑 **ភ្ជាប់ API ផ្ទាល់ខ្លួន ៖** `` `/capital SET_API <api_key> <identifier> <password>` ``\n"
                     f"🧭 **បើកផែនទី ៤ ដំណាក់កាល ៖** `` `/capital PROP WIZARD` ``\n"
                     f"🔌 **តេស្ត API Connection ៖** `` `/capital PROP CHECK` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -18315,13 +18331,14 @@ class TelegramBotThread(BaseThread):
                     f"🏢 **Selected Firm:** `{curr_firm}`\n"
                     f"💼 **Challenge Tier:** `${cap_data['tier']:,.0f} USD` | `{phase_name}`\n"
                     f"🏦 **Broker Partner:** `Capital.com ({env_lbl})`\n"
+                    f"🔑 **API Vault:** `{'🟢 Connected (Personal Vault Active)' if has_vault else '🟡 Default Pool (Use /capital API to connect)'}`\n"
                     f"🤖 **Prop Auto Engine:** `{status_text}`\n"
                     f"💰 **Current Equity:** `${cap_data['current_equity']:,.2f} USD` ({'+' if cap_data['gain_pct'] >= 0 else ''}{cap_data['gain_pct']:.2f}%)\n"
                     f"🎯 **Profit Target:** `{cap_data['progress_bar']}`\n"
                     f"💵 **Remaining Target:** `+${cap_data['remaining_target_usd']:,.2f}` (Target: `+${cap_data['target_usd']:,.2f}`)\n"
                     f"🛡️ **Daily Drawdown:** `-${cap_data['daily_dd_usd']:,.2f} (-{cap_data['daily_dd_pct']:.2f}% / Max -3.5%)` {cap_data['daily_badge']}\n"
                     f"🏰 **Max Drawdown:** `-${cap_data['max_dd_usd']:,.2f} (-{cap_data['max_dd_pct']:.2f}% / Max -7.0%)` {cap_data['overall_badge']}\n"
-                    f"⚖️ **Fixed Risk per Trade:** `{cap_data['risk_pct']}% (${cap_data['max_risk_usd']:,.2f} Max Risk)`\n"
+                    f"⚖️ **Risk per Trade:** `{cap_data['risk_pct']}% (${cap_data['max_risk_usd']:,.2f} Max Risk)`\n"
                     f"🔖 **Account Status:** `{cap_data['status']}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"{mismatch_warning_en}"
@@ -18334,6 +18351,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Weekend Shield:** Auto-closes positions before Friday 20:00 UTC\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **Presets:** `` `/capital PROP ON` `` | `` `/capital PROP OFF` ``\n"
+                    f"🔑 **Connect Private API:** `` `/capital SET_API <api_key> <identifier> <password>` ``\n"
                     f"🧭 **Open Wizard:** `` `/capital PROP WIZARD` ``\n"
                     f"🔌 **Test Connection:** `` `/capital PROP CHECK` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"

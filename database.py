@@ -968,6 +968,22 @@ def init_db():
         )
     ''')
 
+    # Capital.com & Partner Prop Firm User API Credentials Vault (100% AES-256 Encrypted)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_capital_credentials (
+            chat_id INTEGER PRIMARY KEY,
+            api_key TEXT NOT NULL,
+            identifier TEXT NOT NULL,
+            password TEXT NOT NULL,
+            account_id TEXT DEFAULT '',
+            currency TEXT DEFAULT 'USD',
+            is_demo BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )
+    ''')
+
     # Capital.com Autonomous TradFi Trade History
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS capital_auto_trades (
@@ -2475,6 +2491,160 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
     except Exception:
         conn.close()
     return {"total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0}
+
+# ==============================================================================
+# CAPITAL.COM & PROP FIRM PER-USER API VAULT (AES-256 MILITARY-GRADE ENCRYPTION)
+# ==============================================================================
+
+def set_user_capital_credentials(
+    chat_id: int,
+    api_key: str,
+    identifier: str,
+    password: str,
+    account_id: str = "",
+    currency: str = "USD",
+    is_demo: bool = True
+) -> bool:
+    """
+    Saves or updates user's Capital.com / Prop Firm credentials securely via military-grade AES-256.
+    Every credential field (api_key, identifier, password) is encrypted before persisting to SQLite.
+    """
+    clean_key = str(api_key or "").strip()
+    clean_id = str(identifier or "").strip()
+    clean_pwd = str(password or "").strip()
+    clean_acc = str(account_id or "").strip()
+    clean_curr = str(currency or "USD").strip().upper()
+
+    if not clean_key or not clean_id or not clean_pwd:
+        return False
+
+    enc_key = security.encrypt_data(clean_key)
+    enc_id = security.encrypt_data(clean_id)
+    enc_pwd = security.encrypt_data(clean_pwd)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO user_capital_credentials (
+                chat_id, api_key, identifier, password, account_id, currency, is_demo, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                api_key = excluded.api_key,
+                identifier = excluded.identifier,
+                password = excluded.password,
+                account_id = CASE WHEN excluded.account_id != '' THEN excluded.account_id ELSE user_capital_credentials.account_id END,
+                currency = excluded.currency,
+                is_demo = excluded.is_demo,
+                updated_at = CURRENT_TIMESTAMP
+        """, (chat_id, enc_key, enc_id, enc_pwd, clean_acc, clean_curr, 1 if is_demo else 0))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error saving user_capital_credentials for {chat_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Retrieves and decrypts user's Capital.com / Prop Firm credentials using military-grade AES-256.
+    Returns dict: {'api_key', 'identifier', 'password', 'account_id', 'currency', 'is_demo'}
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT api_key, identifier, password, account_id, currency, is_demo
+            FROM user_capital_credentials WHERE chat_id = ?
+        """, (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return None
+
+        raw_key, raw_id, raw_pwd = str(row[0] or ""), str(row[1] or ""), str(row[2] or "")
+        dec_key = security.decrypt_data(raw_key) if raw_key else ""
+        dec_id = security.decrypt_data(raw_id) if raw_id else ""
+        dec_pwd = security.decrypt_data(raw_pwd) if raw_pwd else ""
+
+        # Fallback if stored unencrypted legacy
+        if not dec_key and raw_key and not raw_key.startswith("gAAAAA"):
+            dec_key = raw_key
+        if not dec_id and raw_id and not raw_id.startswith("gAAAAA"):
+            dec_id = raw_id
+        if not dec_pwd and raw_pwd and not raw_pwd.startswith("gAAAAA"):
+            dec_pwd = raw_pwd
+
+        if not dec_key or not dec_id or not dec_pwd:
+            return None
+
+        return {
+            "api_key": dec_key,
+            "identifier": dec_id,
+            "password": dec_pwd,
+            "account_id": str(row[3] or ""),
+            "currency": str(row[4] or "USD"),
+            "is_demo": bool(row[5])
+        }
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return None
+
+def delete_user_capital_credentials(chat_id: int) -> bool:
+    """Removes user's Capital.com credentials securely from SQLite."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM user_capital_credentials WHERE chat_id = ?", (chat_id,))
+        conn.commit()
+        deleted = cursor.rowcount > 0
+        conn.close()
+        return deleted
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def has_user_capital_credentials(chat_id: int) -> bool:
+    """Checks if a user has custom Capital.com API credentials saved in the vault."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT 1 FROM user_capital_credentials WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return bool(row)
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def get_active_capital_credential_users() -> List[int]:
+    """Returns list of chat_ids that have configured custom Capital.com API credentials."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT chat_id FROM user_capital_credentials")
+        rows = cursor.fetchall()
+        conn.close()
+        return [r[0] for r in rows if r and r[0]]
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
 
 # ==============================================================================
 # PROP FIRM / FUNDED TRADING CHALLENGE ENGINE DATA LAYER

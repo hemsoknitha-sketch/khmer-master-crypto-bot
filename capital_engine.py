@@ -1041,6 +1041,8 @@ class CapitalComEngine:
 # 3. CONVENIENCE HELPERS & FACTORY FUNCTIONS
 # ==============================================================================
 _GLOBAL_CAPITAL_ENGINE: Optional[CapitalComEngine] = None
+_user_engine_pool: Dict[int, CapitalComEngine] = {}
+_pool_lock = threading.Lock()
 
 def get_capital_engine(is_demo: Optional[bool] = None) -> CapitalComEngine:
     """Singleton getter for the global CapitalComEngine instance."""
@@ -1051,6 +1053,39 @@ def get_capital_engine(is_demo: Optional[bool] = None) -> CapitalComEngine:
     if _GLOBAL_CAPITAL_ENGINE is None or _GLOBAL_CAPITAL_ENGINE.is_demo != is_demo:
         _GLOBAL_CAPITAL_ENGINE = CapitalComEngine(is_demo=is_demo)
     return _GLOBAL_CAPITAL_ENGINE
+
+def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> CapitalComEngine:
+    """
+    Per-User Dedicated Vault Engine Factory:
+    Instantiates or retrieves an isolated CapitalComEngine for the specified user chat_id
+    using their AES-256 encrypted credentials from database.py.
+    If user has no custom credentials, falls back gracefully to default institutional instance.
+    """
+    import database as db
+    with _pool_lock:
+        if chat_id in _user_engine_pool:
+            cached_engine = _user_engine_pool[chat_id]
+            if is_demo is None or cached_engine.is_demo == is_demo:
+                return cached_engine
+
+        creds = db.get_user_capital_credentials(chat_id)
+        if creds:
+            user_is_demo = is_demo if is_demo is not None else creds.get("is_demo", True)
+            engine = CapitalComEngine(
+                api_key=creds.get("api_key"),
+                identifier=creds.get("identifier"),
+                password=creds.get("password"),
+                is_demo=user_is_demo
+            )
+            _user_engine_pool[chat_id] = engine
+            return engine
+        else:
+            return get_capital_engine(is_demo=is_demo)
+
+def invalidate_user_capital_engine(chat_id: int):
+    """Evicts user engine from cache upon credential update or deletion."""
+    with _pool_lock:
+        _user_engine_pool.pop(chat_id, None)
 
 def validate_capital_credentials(
     api_key: str,
@@ -1073,7 +1108,19 @@ def validate_capital_credentials(
         return False, msg, {}
 
     balance_info = engine.get_account_balance()
+    accounts_info = engine.get_accounts()
+    acc_list = accounts_info.get("accounts", [])
+    acc_id = ""
+    currency = balance_info.get("currency", "USD")
+    if acc_list:
+        acc_id = acc_list[0].get("accountId", "")
+        currency = acc_list[0].get("currency", currency)
+
+    balance_info["account_id"] = acc_id or balance_info.get("account_id", "")
+    balance_info["currency"] = currency
     return True, msg, balance_info
+
+test_user_capital_credentials = validate_capital_credentials
 
 def quick_gold_quote(is_demo: Optional[bool] = None) -> Dict[str, Any]:
     """Fetches instant live quote for Spot Gold (XAU/USD)."""
@@ -1085,24 +1132,52 @@ def quick_sp500_quote(is_demo: Optional[bool] = None) -> Dict[str, Any]:
     engine = get_capital_engine(is_demo=is_demo)
     return engine.get_market_details("SP500")
 
-def get_tradfi_dashboard(is_demo: Optional[bool] = None) -> Dict[str, Any]:
-    """Retrieves full TradFi dashboard payload for Telegram UI rendering."""
-    engine = get_capital_engine(is_demo=is_demo)
-    return engine.get_tradfi_dashboard_data()
+def get_tradfi_dashboard(chat_id: Optional[int] = None, is_demo: Optional[bool] = None) -> Dict[str, Any]:
+    """Retrieves full TradFi dashboard payload for Telegram UI rendering, using user's dedicated engine if configured."""
+    if chat_id:
+        engine = get_user_capital_engine(chat_id, is_demo=is_demo)
+    else:
+        engine = get_capital_engine(is_demo=is_demo)
+    data = engine.get_tradfi_dashboard_data()
+    if chat_id:
+        import database as db
+        creds = db.get_user_capital_credentials(chat_id)
+        if creds:
+            raw_key = creds.get("api_key", "")
+            raw_id = creds.get("identifier", "")
+            masked_key = f"{raw_key[:4]}••••••••{raw_key[-4:]}" if len(raw_key) >= 8 else "••••••••"
+            if "@" in raw_id:
+                parts = raw_id.split("@")
+                masked_id = f"{parts[0][:1]}••••••@{parts[1]}"
+            else:
+                masked_id = f"{raw_id[:2]}••••••••"
+            data["has_custom_api"] = True
+            data["masked_api_key"] = masked_key
+            data["masked_identifier"] = masked_id
+        else:
+            data["has_custom_api"] = False
+    return data
 
 def execute_tradfi_trade(
     epic: str,
     direction: str,
     size: Optional[float] = None,
+    chat_id: Optional[int] = None,
     is_demo: Optional[bool] = None
 ) -> Dict[str, Any]:
     """Executes a protected institutional TradFi order on Capital.com."""
-    engine = get_capital_engine(is_demo=is_demo)
+    if chat_id:
+        engine = get_user_capital_engine(chat_id, is_demo=is_demo)
+    else:
+        engine = get_capital_engine(is_demo=is_demo)
     return engine.execute_smart_tradfi_order(epic=epic, direction=direction, size=size)
 
-def close_all_tradfi(is_demo: Optional[bool] = None) -> Dict[str, Any]:
+def close_all_tradfi(chat_id: Optional[int] = None, is_demo: Optional[bool] = None) -> Dict[str, Any]:
     """Closes all open TradFi positions in one click."""
-    engine = get_capital_engine(is_demo=is_demo)
+    if chat_id:
+        engine = get_user_capital_engine(chat_id, is_demo=is_demo)
+    else:
+        engine = get_capital_engine(is_demo=is_demo)
     return engine.close_all_capital_positions()
 
 def evaluate_tradfi_signal(epic: str, is_demo: Optional[bool] = None) -> Dict[str, Any]:
@@ -1218,7 +1293,7 @@ class PropFirmRiskManager:
         daily_brake_threshold = max_daily_limit - 0.5  # 3.5%
 
         if daily_loss_pct >= daily_brake_threshold:
-            engine = get_capital_engine()
+            engine = get_user_capital_engine(chat_id)
             engine.close_all_capital_positions()
             db.update_prop_firm_tracking(chat_id, current_equity, status="DAILY_HALTED")
             logger.warning(f"🚨 [PROP FIRM DAILY BRAKE TRIGGERED] Daily Loss: -{daily_loss_pct:.2f}% (Limit: -{max_daily_limit:.1f}%). Trading halted until 00:00 UTC.")
@@ -1241,7 +1316,7 @@ class PropFirmRiskManager:
         overall_brake_threshold = max_overall_limit - 1.0  # 7.0%
 
         if overall_loss_pct >= overall_brake_threshold:
-            engine = get_capital_engine()
+            engine = get_user_capital_engine(chat_id)
             engine.close_all_capital_positions()
             db.update_prop_firm_tracking(chat_id, current_equity, status="BREACHED")
             logger.critical(f"🛑 [PROP FIRM MAX DRAWDOWN BRAKE] Drawdown: -{overall_loss_pct:.2f}%. Trading permanently stopped to preserve account.")
@@ -1257,7 +1332,7 @@ class PropFirmRiskManager:
         if target_pct > 0:
             current_gain_pct = ((current_equity - init_bal) / init_bal) * 100.0 if init_bal > 0 else 0.0
             if current_gain_pct >= target_pct:
-                engine = get_capital_engine()
+                engine = get_user_capital_engine(chat_id)
                 engine.close_all_capital_positions()
                 new_status = "PASSED_PHASE_1" if phase == 1 else "PASSED_PHASE_2"
                 db.update_prop_firm_tracking(chat_id, current_equity, status=new_status)
@@ -1280,7 +1355,7 @@ class PropFirmRiskManager:
             import datetime
             now_dt = datetime.datetime.now(datetime.timezone.utc)
             if now_dt.weekday() == 4 and now_dt.hour >= 19 and now_dt.minute >= 30:
-                engine = get_capital_engine()
+                engine = get_user_capital_engine(chat_id)
                 engine.close_all_capital_positions()
                 return {"eligible": False, "reason": "WEEKEND_HOLDING_GUARD_ACTIVE", "status": status}
 
@@ -1298,7 +1373,7 @@ class PropFirmRiskManager:
         """
         import database as db
         cfg = db.get_prop_firm_config(chat_id)
-        engine = get_capital_engine()
+        engine = get_user_capital_engine(chat_id)
         bal_info = engine.get_account_balance()
         curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
         if curr_equity <= 0:
@@ -1582,16 +1657,11 @@ class CapitalAutonomousEngine:
 
         return base_quant
 
-    def monitor_and_ratchet_open_positions(self, app=None) -> Dict[str, Any]:
-        """
-        Executes real-time position management on active Capital.com positions:
-        1. Breakeven Armor: At +1.5% ROI, locks Stop-Loss to entry + fees.
-        2. Golden 80% Trailing Ratchet: Ratchets trailing SL protecting 80% of peak profit.
-        """
-        engine = get_capital_engine()
+    def _ratchet_engine_positions(self, engine: CapitalComEngine, chat_id: Optional[int] = None) -> Tuple[int, int, int]:
+        """Ratchets open positions on a specific engine instance."""
         positions = engine.get_open_positions()
         if not positions:
-            return {"active_count": 0, "ratcheted": 0, "closed": 0}
+            return 0, 0, 0
 
         ratcheted_count = 0
         closed_count = 0
@@ -1668,23 +1738,62 @@ class CapitalAutonomousEngine:
                     if hasattr(self, "_fortress_locked_set"):
                         self._fortress_locked_set.discard(deal_id)
 
+        return len(positions), ratcheted_count, closed_count
+
+    def monitor_and_ratchet_open_positions(self, app=None) -> Dict[str, Any]:
+        """
+        Executes real-time position management on active Capital.com positions:
+        1. Default Institutional Engine
+        2. Per-User Isolated Vault Engines
+        """
+        import database as db
+        total_active = 0
+        total_ratcheted = 0
+        total_closed = 0
+
+        # Monitor default engine
+        def_engine = get_capital_engine()
+        c_active, c_ratchet, c_close = self._ratchet_engine_positions(def_engine)
+        total_active += c_active
+        total_ratcheted += c_ratchet
+        total_closed += c_close
+
+        # Monitor per-user vaults
+        active_uids = set()
+        for u in db.get_active_capital_auto_users():
+            active_uids.add(u["chat_id"])
+        for pu in db.get_active_prop_firm_users():
+            active_uids.add(pu["chat_id"])
+        for cu in db.get_active_capital_credential_users():
+            active_uids.add(cu)
+
+        for uid in active_uids:
+            if db.has_user_capital_credentials(uid):
+                try:
+                    u_engine = get_user_capital_engine(uid)
+                    u_active, u_ratchet, u_close = self._ratchet_engine_positions(u_engine, chat_id=uid)
+                    total_active += u_active
+                    total_ratcheted += u_ratchet
+                    total_closed += u_close
+                except Exception as e_uratchet:
+                    logger.debug(f"Error ratcheting user {uid} positions: {e_uratchet}")
+
         # Real-time Prop Firm Challenge limits check
         try:
-            import database as db
             active_prop_users = db.get_active_prop_firm_users()
-            if active_prop_users:
-                bal_info = engine.get_account_balance()
+            for pu in active_prop_users:
+                cid = pu["chat_id"]
+                u_engine = get_user_capital_engine(cid)
+                bal_info = u_engine.get_account_balance()
                 curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
-                for pu in active_prop_users:
-                    cid = pu["chat_id"]
-                    self.prop_manager.evaluate_prop_limits_and_milestones(cid, curr_eq, app=app)
+                self.prop_manager.evaluate_prop_limits_and_milestones(cid, curr_eq, app=app)
         except Exception as e_prop_eval:
             logger.debug(f"Prop Firm evaluation note: {e_prop_eval}")
 
         return {
-            "active_count": len(positions),
-            "ratcheted": ratcheted_count,
-            "closed": closed_count
+            "active_count": total_active,
+            "ratcheted": total_ratcheted,
+            "closed": total_closed
         }
 
     async def execute_autonomous_cycle(self, app=None):
@@ -1751,13 +1860,22 @@ class CapitalAutonomousEngine:
 
         logger.info(f"👑 [APEX TRADFI SETUP SELECTED] {resolved_epic} {final_action} | Score: {best_rank:.1f} | Conf: {confidence}% | ADX: {setup.get('adx', 0):.1f} | RVOL: {setup.get('rvol', 1.0)}x")
         
-        # Step 4a: Process Standard Capital Auto Users
+        # Step 4a: Process Standard Capital Auto Users (Per-User Dedicated Vault Engine)
         for user in active_users:
             chat_id = user["chat_id"]
             budget = user.get("budget", 50.0)
             max_pos = user.get("max_positions", 2)
+            user_engine = get_user_capital_engine(chat_id)
+            user_open_positions = user_engine.get_open_positions()
 
-            if len(open_positions) >= max_pos:
+            if len(user_open_positions) >= max_pos:
+                continue
+
+            user_epics = {
+                (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
+                for pos in user_open_positions
+            }
+            if resolved_epic in user_epics:
                 continue
 
             # Dynamic size based on user budget and asset DNA
@@ -1773,7 +1891,7 @@ class CapitalAutonomousEngine:
             elif resolved_epic == "BTCUSD":
                 size = 0.001 if budget < 50 else 0.002
 
-            trade_res = engine.execute_smart_tradfi_order(
+            trade_res = user_engine.execute_smart_tradfi_order(
                 epic=resolved_epic,
                 direction=final_action,
                 size=size
@@ -1806,7 +1924,7 @@ class CapitalAutonomousEngine:
                     try:
                         user_lang = db.get_user_language(chat_id)
                         import ui_standards
-                        env_lbl = "DEMO ($10,000)" if engine.is_demo else "LIVE MAINNET"
+                        env_lbl = "DEMO ($10,000)" if user_engine.is_demo else "LIVE MAINNET"
                         dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
                         adx_str = f"{setup.get('adx', 0):.1f}"
                         rvol_str = f"{setup.get('rvol', 1.0):.1f}x"
@@ -1864,10 +1982,11 @@ class CapitalAutonomousEngine:
                 # Throttle to 1 trade per cycle
                 break
 
-        # Step 4b: Process Active Prop Firm Challenge Users
+        # Step 4b: Process Active Prop Firm Challenge Users (Per-User Dedicated Vault Engine)
         for prop_user in active_prop_users:
             chat_id = prop_user["chat_id"]
-            bal_info = engine.get_account_balance()
+            user_engine = get_user_capital_engine(chat_id)
+            bal_info = user_engine.get_account_balance()
             curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
             if curr_equity <= 0:
                 curr_equity = prop_user.get("initial_balance", 10000.0)
@@ -1878,7 +1997,15 @@ class CapitalAutonomousEngine:
                 continue
 
             max_pos = prop_user.get("max_concurrent_trades", 2)
-            if len(open_positions) >= max_pos:
+            user_open_positions = user_engine.get_open_positions()
+            if len(user_open_positions) >= max_pos:
+                continue
+
+            user_epics = {
+                (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
+                for pos in user_open_positions
+            }
+            if resolved_epic in user_epics:
                 continue
 
             # Calculate dynamic fixed-risk position size
@@ -1893,7 +2020,7 @@ class CapitalAutonomousEngine:
                 epic=resolved_epic
             )
 
-            trade_res = engine.execute_smart_tradfi_order(
+            trade_res = user_engine.execute_smart_tradfi_order(
                 epic=resolved_epic,
                 direction=final_action,
                 size=prop_size
@@ -1923,7 +2050,7 @@ class CapitalAutonomousEngine:
                     try:
                         user_lang = db.get_user_language(chat_id)
                         import ui_standards
-                        env_lbl = "DEMO ($10,000 Virtual)" if engine.is_demo else "PROP LIVE CHALLENGE"
+                        env_lbl = "DEMO ($10,000 Virtual)" if user_engine.is_demo else "PROP LIVE CHALLENGE"
                         dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
                         tier_fmt = f"${prop_user.get('account_tier', 10000.0):,.0f}"
                         phase_lbl = f"Phase {prop_user.get('challenge_phase', 1)}"
