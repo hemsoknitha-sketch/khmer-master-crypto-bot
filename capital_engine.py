@@ -601,7 +601,7 @@ class CapitalComEngine:
         for pos_item in positions:
             pos = pos_item.get("position", {})
             deal_id = pos.get("dealId")
-            epic = pos.get("epic", "UNKNOWN")
+            epic = pos.get("epic") or pos_item.get("market", {}).get("epic", "UNKNOWN")
             if deal_id:
                 res = self.close_position(deal_id)
                 if res.get("success"):
@@ -1596,7 +1596,7 @@ class CapitalAutonomousEngine:
         for pos_item in positions:
             pos = pos_item.get("position", {})
             deal_id = pos.get("dealId")
-            epic = pos.get("epic", "UNKNOWN")
+            epic = pos.get("epic") or pos_item.get("market", {}).get("epic", "UNKNOWN")
             direction = pos.get("direction", "BUY").upper()
             size = float(pos.get("size", 0.0))
             entry_level = float(pos.get("level", 0.0))
@@ -1711,7 +1711,10 @@ class CapitalAutonomousEngine:
 
         engine = get_capital_engine()
         open_positions = engine.get_open_positions()
-        open_epics = {pos.get("position", {}).get("epic", "").upper() for pos in open_positions}
+        open_epics = {
+            (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
+            for pos in open_positions
+        }
 
         # Step 3: Scan candidate assets and rank via Institutional Edge Matrix
         priority_epics = self.get_session_priority_assets()
