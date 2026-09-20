@@ -1021,8 +1021,9 @@ class CapitalComEngine:
             "account_name": bal.get("account_name"),
             "balance": bal.get("balance", 0.0),
             "available": bal.get("available", 0.0),
-            "equity": bal.get("balance", 0.0) + bal.get("pnl", 0.0),
-            "active_pnl": bal.get("pnl", 0.0) or total_unrealized_pnl,
+            "equity": bal.get("balance", 0.0) + total_unrealized_pnl,
+            "active_pnl": total_unrealized_pnl,
+            "realized_pnl": bal.get("pnl", 0.0),
             "currency": bal.get("currency", "USD"),
             "status": bal.get("status", "ACTIVE"),
             "quotes": {
