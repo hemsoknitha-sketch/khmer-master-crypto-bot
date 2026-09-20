@@ -5740,7 +5740,7 @@ class TelegramBotThread(BaseThread):
                 context.args = []
                 await prop_firm_command(update, context)
             elif data == "btn_cap_prop_close_all":
-                capital_engine.close_all_tradfi()
+                await asyncio.to_thread(capital_engine.close_all_tradfi, chat_id)
                 try:
                     await update.callback_query.answer("🛡️ បានបិទ Position ទាំងអស់ដោយសុវត្ថិភាព!")
                 except Exception:
@@ -18269,8 +18269,8 @@ class TelegramBotThread(BaseThread):
                     return
                 elif sub_action in ["CHECK", "TEST", "STATUS", "API"]:
                     engine = capital_engine.get_user_capital_engine(chat_id)
-                    auth_ok, auth_msg = engine.authenticate()
-                    bal = engine.get_account_balance()
+                    auth_ok, auth_msg = await asyncio.to_thread(engine.authenticate)
+                    bal = await asyncio.to_thread(engine.get_account_balance)
                     env_lbl = "DEMO ($10,000 Virtual Funds)" if engine.is_demo else "LIVE MAINNET / CHALLENGE"
                     status_icon = "🟢 CONNECTED & AUTHENTICATED" if auth_ok else "🔴 AUTHENTICATION FAILED"
                     
@@ -18313,7 +18313,7 @@ class TelegramBotThread(BaseThread):
                     return
 
             # Build Dashboard View
-            cap_data = capital_engine.get_prop_firm_dashboard(chat_id)
+            cap_data = await asyncio.to_thread(capital_engine.get_prop_firm_dashboard, chat_id)
             is_enabled = cap_data["is_enabled"]
             status_text = "🟢 ACTIVE" if is_enabled else "⚪ STOPPED"
             env_lbl = "DEMO ($10,000 Virtual)" if cap_data["is_demo"] else "LIVE CHALLENGE"
@@ -18623,7 +18623,7 @@ class TelegramBotThread(BaseThread):
                 if action in ["BUY", "SELL"] and len(args) >= 2:
                     asset = str(args[1]).upper().strip()
                     size = float(args[2]) if len(args) >= 3 else None
-                    trade_res = capital_engine.execute_tradfi_trade(asset, action, size=size)
+                    trade_res = await asyncio.to_thread(capital_engine.execute_tradfi_trade, asset, action, size, chat_id)
                     if trade_res.get("success"):
                         msg = (
                             f"✅ **CAPITAL.COM ORDER EXECUTED!** 🚀\n"
@@ -18667,7 +18667,7 @@ class TelegramBotThread(BaseThread):
                     return
 
                 elif action in ["CLOSEALL", "CLOSE", "STOP"]:
-                    res = capital_engine.close_all_tradfi()
+                    res = await asyncio.to_thread(capital_engine.close_all_tradfi, chat_id)
                     count = res.get("closed_count", 0)
                     msg = (
                         f"🛡️ **CAPITAL.COM POSITIONS CLOSED!** 🏁\n"
@@ -18686,7 +18686,7 @@ class TelegramBotThread(BaseThread):
                     return
 
                 elif action in ["POSITIONS", "OPEN"]:
-                    data = capital_engine.get_tradfi_dashboard()
+                    data = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id)
                     positions = data.get("open_positions", [])
                     if not positions:
                         p_msg = (
@@ -18708,7 +18708,7 @@ class TelegramBotThread(BaseThread):
                     return
 
             # Default: Master Dashboard
-            data = capital_engine.get_tradfi_dashboard()
+            data = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id)
             env_mode = "DEMO ($10,000 Virtual Funds)" if data.get("is_demo") else "LIVE MAINNET"
             quotes = data.get("quotes", {})
             gold = quotes.get("GOLD", {})
@@ -18814,7 +18814,7 @@ class TelegramBotThread(BaseThread):
             import capital_engine
             import ui_standards
 
-            ib_data = capital_engine.get_capital_ib_dashboard(chat_id)
+            ib_data = await asyncio.to_thread(capital_engine.get_capital_ib_dashboard, chat_id)
 
             # Keyboard layout
             keyboard = InlineKeyboardMarkup([
@@ -19469,6 +19469,12 @@ class TelegramBotThread(BaseThread):
                 websocket_engine.start_binance_websocket(self.loop)
             except Exception as e_ws:
                 print(f"⚠️ [BINANCE WEBSOCKET START NOTICE]: {e_ws}")
+
+            try:
+                import capital_engine
+                capital_engine.start_tradfi_price_cache_worker()
+            except Exception as e_cap_worker:
+                print(f"⚠️ [CAPITAL TRADFI PRE-CACHE WORKER NOTICE]: {e_cap_worker}")
 
             while getattr(self, '_is_bot_running', True):
                 try:
