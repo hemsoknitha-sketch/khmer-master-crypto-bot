@@ -19411,6 +19411,12 @@ class TelegramBotThread(BaseThread):
             except Exception as e_web:
                 print(f"⚠️ [WEB GUI SERVER START NOTICE]: {e_web}")
 
+            try:
+                import websocket_engine
+                websocket_engine.start_binance_websocket(self.loop)
+            except Exception as e_ws:
+                print(f"⚠️ [BINANCE WEBSOCKET START NOTICE]: {e_ws}")
+
             while getattr(self, '_is_bot_running', True):
                 try:
                     if self.app and self.app.updater and not getattr(self.app.updater, 'running', False):

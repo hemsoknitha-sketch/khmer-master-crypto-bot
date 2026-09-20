@@ -159,10 +159,15 @@ async def _gui_background_cache_worker():
         try:
             now = time.time()
 
-            # 1. Update BTC and Gold (PAXG) prices every 2.0s
-            if now - _GUI_CACHE["prices"]["timestamp"] >= 2.0:
-                btc_p = await asyncio.to_thread(trading_engine.get_current_price, "BTCUSDT")
-                paxg_p = await asyncio.to_thread(trading_engine.get_current_price, "PAXGUSDT")
+            # 1. Update BTC and Gold (PAXG) prices every 0.5s via sub-0.05ms fast path
+            if now - _GUI_CACHE["prices"]["timestamp"] >= 0.5:
+                import websocket_engine
+                btc_p = websocket_engine.get_fast_price("BTCUSDT")
+                if not btc_p:
+                    btc_p = await asyncio.to_thread(trading_engine.get_current_price, "BTCUSDT")
+                paxg_p = websocket_engine.get_fast_price("PAXGUSDT")
+                if not paxg_p:
+                    paxg_p = await asyncio.to_thread(trading_engine.get_current_price, "PAXGUSDT")
                 _GUI_CACHE["prices"] = {
                     "BTCUSDT": btc_p or _GUI_CACHE["prices"]["BTCUSDT"],
                     "PAXGUSDT": paxg_p or _GUI_CACHE["prices"]["PAXGUSDT"],

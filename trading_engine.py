@@ -1075,16 +1075,15 @@ _price_cache = {}
 _price_cache_time = {}
 
 def get_current_price(symbol) -> float:
-    """Helper to fetch the current price with 2.5s TTL cache and WebSocket fast path."""
+    """Helper to fetch the current price with Sub-0.05ms WebSocket fast path and TTL fallback."""
     if not symbol:
         return 0.0
     if not isinstance(symbol, str):
         symbol = str(symbol)
     symbol = symbol.upper().strip()
     now = time.time()
-    if symbol in _price_cache and (now - _price_cache_time.get(symbol, 0)) < 2.5:
-        return _price_cache[symbol]
 
+    # ⚡ Tier-0: Sub-0.05ms Real-Time In-Memory WebSocket Price
     try:
         import websocket_engine
         fast_price = websocket_engine.get_fast_price(symbol)
@@ -1094,6 +1093,10 @@ def get_current_price(symbol) -> float:
             return fast_price
     except Exception:
         pass
+
+    # Tier-1: 2.5s TTL Local In-Memory Cache
+    if symbol in _price_cache and (now - _price_cache_time.get(symbol, 0)) < 2.5:
+        return _price_cache[symbol]
         
     try:
         url = f"{FUTURES_URL}/fapi/v1/ticker/price?symbol={symbol}"
