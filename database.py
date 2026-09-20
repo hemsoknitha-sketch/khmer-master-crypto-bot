@@ -984,6 +984,44 @@ def init_db():
         )
     ''')
 
+    # Capital.com Introducing Broker (IB) & Spread Rebate Partner Registry
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS capital_ib_partners (
+            chat_id INTEGER PRIMARY KEY,
+            ib_code TEXT NOT NULL,
+            partner_name TEXT DEFAULT '',
+            tier TEXT DEFAULT 'SILVER',
+            rebate_pct REAL DEFAULT 30.0,
+            referred_clients INTEGER DEFAULT 0,
+            total_lots REAL DEFAULT 0.0,
+            total_rebate_usd REAL DEFAULT 0.0,
+            pending_rebate_usd REAL DEFAULT 0.0,
+            paid_rebate_usd REAL DEFAULT 0.0,
+            payout_address TEXT DEFAULT '',
+            payout_method TEXT DEFAULT 'USDT',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )
+    ''')
+
+    # Capital.com Introducing Broker (IB) Daily Spread Rebate Audit Ledger
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS capital_ib_rebate_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            asset TEXT NOT NULL,
+            lots REAL NOT NULL,
+            spread_usd REAL NOT NULL,
+            rebate_usd REAL NOT NULL,
+            client_ref TEXT DEFAULT '',
+            status TEXT DEFAULT 'CREDITED',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )
+    ''')
+
     # Capital.com Autonomous TradFi Trade History
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS capital_auto_trades (
@@ -2645,6 +2683,246 @@ def get_active_capital_credential_users() -> List[int]:
         except Exception:
             pass
         return []
+
+# ==============================================================================
+# CAPITAL.COM INTRODUCING BROKER (IB) & SPREAD REBATE PASSIVE INCOME DATA LAYER
+# ==============================================================================
+
+def get_capital_ib_partner(chat_id: int) -> Dict[str, Any]:
+    """
+    Retrieves the Introducing Broker (IB) partner profile and spread rebate metrics.
+    Automatically initializes profile with default partner code if not existing.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT ib_code, partner_name, tier, rebate_pct, referred_clients,
+                   total_lots, total_rebate_usd, pending_rebate_usd, paid_rebate_usd,
+                   payout_address, payout_method, created_at, updated_at
+            FROM capital_ib_partners WHERE chat_id = ?
+        """, (chat_id,))
+        row = cursor.fetchone()
+        if not row:
+            default_code = f"KM-{chat_id}"
+            cursor.execute("""
+                INSERT OR IGNORE INTO capital_ib_partners (
+                    chat_id, ib_code, tier, rebate_pct, referred_clients,
+                    total_lots, total_rebate_usd, pending_rebate_usd, paid_rebate_usd
+                ) VALUES (?, ?, 'SILVER', 30.0, 0, 0.0, 0.0, 0.0, 0.0)
+            """, (chat_id, default_code))
+            conn.commit()
+            conn.close()
+            return {
+                "chat_id": chat_id,
+                "ib_code": default_code,
+                "partner_name": f"Partner_{chat_id}",
+                "tier": "SILVER",
+                "rebate_pct": 30.0,
+                "referred_clients": 0,
+                "total_lots": 0.0,
+                "total_rebate_usd": 0.0,
+                "pending_rebate_usd": 0.0,
+                "paid_rebate_usd": 0.0,
+                "payout_address": "",
+                "payout_method": "USDT",
+                "created_at": "",
+                "updated_at": ""
+            }
+        conn.close()
+        return {
+            "chat_id": chat_id,
+            "ib_code": str(row[0] or f"KM-{chat_id}"),
+            "partner_name": str(row[1] or f"Partner_{chat_id}"),
+            "tier": str(row[2] or "SILVER").upper(),
+            "rebate_pct": float(row[3] or 30.0),
+            "referred_clients": int(row[4] or 0),
+            "total_lots": float(row[5] or 0.0),
+            "total_rebate_usd": float(row[6] or 0.0),
+            "pending_rebate_usd": float(row[7] or 0.0),
+            "paid_rebate_usd": float(row[8] or 0.0),
+            "payout_address": str(row[9] or ""),
+            "payout_method": str(row[10] or "USDT"),
+            "created_at": str(row[11] or ""),
+            "updated_at": str(row[12] or "")
+        }
+    except Exception as e:
+        print(f"⚠️ Error in get_capital_ib_partner: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return {
+            "chat_id": chat_id,
+            "ib_code": f"KM-{chat_id}",
+            "partner_name": f"Partner_{chat_id}",
+            "tier": "SILVER",
+            "rebate_pct": 30.0,
+            "referred_clients": 0,
+            "total_lots": 0.0,
+            "total_rebate_usd": 0.0,
+            "pending_rebate_usd": 0.0,
+            "paid_rebate_usd": 0.0,
+            "payout_address": "",
+            "payout_method": "USDT"
+        }
+
+def set_capital_ib_partner(
+    chat_id: int,
+    ib_code: str,
+    partner_name: str = "",
+    payout_address: str = "",
+    payout_method: str = "USDT"
+) -> bool:
+    """Updates user's Capital.com Introducing Broker code and payout settings."""
+    clean_code = str(ib_code or "").strip().upper()
+    if not clean_code:
+        return False
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO capital_ib_partners (
+                chat_id, ib_code, partner_name, payout_address, payout_method, updated_at
+            ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                ib_code = excluded.ib_code,
+                partner_name = CASE WHEN excluded.partner_name != '' THEN excluded.partner_name ELSE capital_ib_partners.partner_name END,
+                payout_address = CASE WHEN excluded.payout_address != '' THEN excluded.payout_address ELSE capital_ib_partners.payout_address END,
+                payout_method = CASE WHEN excluded.payout_method != '' THEN excluded.payout_method ELSE capital_ib_partners.payout_method END,
+                updated_at = CURRENT_TIMESTAMP
+        """, (chat_id, clean_code, partner_name, payout_address, payout_method))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error setting capital_ib_partner: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def update_capital_ib_partner_tier(chat_id: int, tier: str, rebate_pct: float) -> bool:
+    """Updates partner tier (SILVER / GOLD / PLATINUM) and rebate percentage."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE capital_ib_partners
+            SET tier = ?, rebate_pct = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+        """, (tier.upper(), float(rebate_pct), chat_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def record_capital_ib_rebate_log(
+    chat_id: int,
+    asset: str,
+    lots: float,
+    spread_usd: float,
+    rebate_usd: float,
+    client_ref: str = "",
+    status: str = "CREDITED"
+) -> bool:
+    """Records a single spread rebate transaction and increments partner totals atomically."""
+    import datetime
+    today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO capital_ib_rebate_logs (
+                chat_id, date, asset, lots, spread_usd, rebate_usd, client_ref, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (chat_id, today_str, asset.upper(), float(lots), float(spread_usd), float(rebate_usd), client_ref, status))
+
+        cursor.execute("""
+            UPDATE capital_ib_partners
+            SET total_lots = total_lots + ?,
+                total_rebate_usd = total_rebate_usd + ?,
+                pending_rebate_usd = pending_rebate_usd + ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+        """, (float(lots), float(rebate_usd), float(rebate_usd), chat_id))
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error in record_capital_ib_rebate_log: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def get_capital_ib_history(chat_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    """Retrieves recent spread rebate payout log entries for a partner."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT date, asset, lots, spread_usd, rebate_usd, client_ref, status, created_at
+            FROM capital_ib_rebate_logs
+            WHERE chat_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+        """, (chat_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        res = []
+        for r in rows:
+            res.append({
+                "date": str(r[0] or ""),
+                "asset": str(r[1] or ""),
+                "lots": float(r[2] or 0.0),
+                "spread_usd": float(r[3] or 0.0),
+                "rebate_usd": float(r[4] or 0.0),
+                "client_ref": str(r[5] or ""),
+                "status": str(r[6] or "CREDITED"),
+                "created_at": str(r[7] or "")
+            })
+        return res
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
+
+def get_all_capital_ib_summary() -> Dict[str, Any]:
+    """Returns platform-wide aggregate Introducing Broker statistics."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT COUNT(*), SUM(referred_clients), SUM(total_lots), SUM(total_rebate_usd)
+            FROM capital_ib_partners
+        """)
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return {"total_partners": 0, "total_clients": 0, "total_lots": 0.0, "total_rebates_usd": 0.0}
+        return {
+            "total_partners": int(row[0] or 0),
+            "total_clients": int(row[1] or 0),
+            "total_lots": float(row[2] or 0.0),
+            "total_rebates_usd": float(row[3] or 0.0)
+        }
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return {"total_partners": 0, "total_clients": 0, "total_lots": 0.0, "total_rebates_usd": 0.0}
 
 # ==============================================================================
 # PROP FIRM / FUNDED TRADING CHALLENGE ENGINE DATA LAYER

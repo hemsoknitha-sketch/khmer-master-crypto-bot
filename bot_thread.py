@@ -5754,6 +5754,41 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["API"]
                 await capital_command(update, context)
+            elif data in ["btn_cap_ib_menu", "btn_cap_ib_refresh", "btn_capital_ib"]:
+                try:
+                    await update.callback_query.answer("🤝 កំពុងបើក IB Partner & Spread Rebate...")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_ib_command(update, context)
+            elif data == "btn_cap_ib_calc":
+                try:
+                    await update.callback_query.answer("🧮 គណនាប្រាក់ចំណូល Spread Rebate!")
+                except Exception:
+                    pass
+                context.args = ["CALC", "10", "2"]
+                await capital_ib_command(update, context)
+            elif data == "btn_cap_ib_set":
+                try:
+                    await update.callback_query.answer("🔗 របៀបកំណត់ Partner Code!")
+                except Exception:
+                    pass
+                context.args = ["GUIDE"]
+                await capital_ib_command(update, context)
+            elif data == "btn_cap_ib_stats":
+                try:
+                    await update.callback_query.answer("📊 តារាងកម្រៃជើងសារ Spread តាមឧបករណ៍!")
+                except Exception:
+                    pass
+                context.args = ["STATS"]
+                await capital_ib_command(update, context)
+            elif data == "btn_cap_ib_guide":
+                try:
+                    await update.callback_query.answer("🧭 មគ្គុទ្ទេសក៍ក្លាយជា Partner!")
+                except Exception:
+                    pass
+                context.args = ["GUIDE"]
+                await capital_ib_command(update, context)
             elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
                 await turbo_hedge_command(update, context)
             elif data in ["btn_smart_trade", "btn_smart_trade_launch"]:
@@ -18385,13 +18420,20 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["prop_firm", "propfirm", "prop"]:
                 await prop_firm_command(update, context)
                 return
+            elif cmd_text in ["capital_ib", "capitalib", "ib", "rebate", "partner"]:
+                await capital_ib_command(update, context)
+                return
 
-            # Subcommands routing: /capital PROP
+            # Subcommands routing: /capital PROP / /capital IB
             if args:
                 action = str(args[0]).upper().strip()
                 if action in ["PROP", "PROPFIRM", "CHALLENGE"]:
                     context.args = args[1:]
                     await prop_firm_command(update, context)
+                    return
+                elif action in ["IB", "REBATE", "PARTNER"]:
+                    context.args = args[1:]
+                    await capital_ib_command(update, context)
                     return
 
             # Auto config & status
@@ -18405,7 +18447,8 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle")
                 ],
                 [
-                    InlineKeyboardButton("🏆 Prop Firm Challenge ($10k-$200k)", callback_data="btn_cap_prop_menu")
+                    InlineKeyboardButton("🏆 Prop Firm ($10k-$200k)", callback_data="btn_cap_prop_menu"),
+                    InlineKeyboardButton("🤝 IB Rebate (30%-50%)", callback_data="btn_cap_ib_menu")
                 ],
                 [
                     InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
@@ -18451,7 +18494,8 @@ class TelegramBotThread(BaseThread):
                                 InlineKeyboardButton(f"🤖 Capital Auto: ON 🟢 (${budget:,.0f})", callback_data="btn_cap_auto_toggle")
                             ],
                             [
-                                InlineKeyboardButton("🏆 Prop Firm Challenge ($10k-$200k)", callback_data="btn_cap_prop_menu")
+                                InlineKeyboardButton("🏆 Prop Firm ($10k-$200k)", callback_data="btn_cap_prop_menu"),
+                                InlineKeyboardButton("🤝 IB Rebate (30%-50%)", callback_data="btn_cap_ib_menu")
                             ],
                             [
                                 InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
@@ -18701,11 +18745,260 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def capital_ib_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🏢 Capital.com Introducing Broker (IB) & Spread Rebate Passive Income Engine.
+            Earns 30% to 50% Volume Rebates on all trading spreads daily.
+            100% Pure Cash Passive Income with Zero Market Risk and Zero Personal Capital.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            ib_data = capital_engine.get_capital_ib_dashboard(chat_id)
+
+            # Keyboard layout
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🧮 Rebate Calculator", callback_data="btn_cap_ib_calc"),
+                    InlineKeyboardButton("🔗 កំណត់ Partner Code", callback_data="btn_cap_ib_set")
+                ],
+                [
+                    InlineKeyboardButton("📊 តារាងកម្រៃជើងសារ", callback_data="btn_cap_ib_stats"),
+                    InlineKeyboardButton("🧭 មគ្គុទ្ទេសក៍ Partner", callback_data="btn_cap_ib_guide")
+                ],
+                [
+                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព", callback_data="btn_cap_ib_refresh"),
+                    InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                ]
+            ])
+
+            # Handling subcommands: /capital IB SET <code>, /capital IB CALC <clients> <lots>, /capital IB GUIDE, /capital IB STATS
+            if args:
+                sub_cmd = str(args[0]).upper().strip()
+                if sub_cmd in ["SET", "CODE", "LINK"] and len(args) >= 2:
+                    new_code = str(args[1]).strip().upper()
+                    db.set_capital_ib_partner(chat_id, ib_code=new_code)
+                    ib_data = capital_engine.get_capital_ib_dashboard(chat_id)
+                    set_msg = (
+                        f"✅ **CAPITAL.COM PARTNER CODE បានកំណត់ជោគជ័យ!** 🔗\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🆔 **Partner Code ៖** `{new_code}`\n"
+                        f"🌐 **Referral Link ៖** `{ib_data['referral_link']}`\n"
+                        f"💼 **កម្រិត Rebate ៖** `{ib_data['tier_badge']}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _អ្នកអាចចែករំលែក Link នេះទៅកាន់សហគមន៍ ឬអ្នកវិនិយោគ ដើម្បីទទួលបានកម្រៃជើងសារ 30%-50% នៃថ្លៃ Spread ជារៀងរាល់ថ្ងៃ!_"
+                    ) if user_lang == 'khmer' else (
+                        f"✅ **CAPITAL.COM PARTNER CODE CONFIGURED!** 🔗\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🆔 **Partner Code:** `{new_code}`\n"
+                        f"🌐 **Referral Link:** `{ib_data['referral_link']}`\n"
+                        f"💼 **Rebate Tier:** `{ib_data['tier_badge']}`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _Share your link with your network to earn 30%-50% daily spread volume rebates!_"
+                    )
+                    await update.effective_message.reply_text(set_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+                elif sub_cmd in ["CALC", "SIM", "PROJECTION"]:
+                    clients_in = int(args[1]) if len(args) >= 2 and args[1].isdigit() else 10
+                    lots_in = float(args[2]) if len(args) >= 3 else 2.0
+                    fcast = capital_engine.calculate_capital_ib_forecast(clients_in, lots_in, custom_pct=ib_data['rebate_pct'])
+                    calc_msg = (
+                        f"🧮 **CAPITAL.COM SPREAD REBATE CALCULATOR** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"👥 **អ្នកវិនិយោគសកម្ម (Active Traders) ៖** `{fcast['active_clients']} នាក់`\n"
+                        f"📦 **ទំហំជួញដូរមធ្យម ៖** `{fcast['lots_per_day_each']:.1f} Lots/ថ្ងៃ/ម្នាក់`\n"
+                        f"📈 **បរិមាណសរុបប្រចាំថ្ងៃ ៖** `{fcast['daily_volume_lots']:.1f} Lots/ថ្ងៃ`\n"
+                        f"💼 **កម្រិត Partner Tier ៖** `{fcast['tier_badge']}`\n"
+                        f"💵 **មធ្យមភាគ Spread ៖** `~${fcast['avg_spread_per_lot']:.2f}/Lot`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💰 **ប្រាក់ចំណូលសុទ្ធប្រចាំថ្ងៃ (Daily Cash) ៖** `+${fcast['daily_cash_rebate']:,.2f} USD`\n"
+                        f"📅 **ប្រាក់ចំណូលប្រចាំសប្តាហ៍ (Weekly Cash) ៖** `+${fcast['weekly_cash_rebate']:,.2f} USD`\n"
+                        f"🏦 **ប្រាក់ចំណូលប្រចាំខែ (Monthly Passive) ៖** `+${fcast['monthly_cash_rebate']:,.2f} USD`\n"
+                        f"👑 **ប្រាក់ចំណូលសរុបប្រចាំឆ្នាំ (Annual Pure Cash) ៖** `+${fcast['annual_cash_rebate']:,.2f} USD`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **គ្មានហានិភ័យទីផ្សារ ១០០% (Zero Market Risk)**\n"
+                        f"💸 **មិនចំណាយដើមទុនផ្ទាល់ខ្លួន (Zero Capital Required)**\n"
+                        f"⚡ _Broker ទូទាត់សាច់ប្រាក់សុទ្ធចូលគណនីជារៀងរាល់ថ្ងៃ!_"
+                    ) if user_lang == 'khmer' else (
+                        f"🧮 **CAPITAL.COM SPREAD REBATE CALCULATOR** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"👥 **Active Traders:** `{fcast['active_clients']} clients`\n"
+                        f"📦 **Average Trading Volume:** `{fcast['lots_per_day_each']:.1f} Lots/day/trader`\n"
+                        f"📈 **Total Daily Volume:** `{fcast['daily_volume_lots']:.1f} Lots/day`\n"
+                        f"💼 **Partner Tier:** `{fcast['tier_badge']}`\n"
+                        f"💵 **Average Retail Spread:** `~${fcast['avg_spread_per_lot']:.2f}/Lot`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💰 **Daily Net Cash Rebate:** `+${fcast['daily_cash_rebate']:,.2f} USD`\n"
+                        f"📅 **Weekly Net Cash Rebate:** `+${fcast['weekly_cash_rebate']:,.2f} USD`\n"
+                        f"🏦 **Monthly Passive Cash:** `+${fcast['monthly_cash_rebate']:,.2f} USD`\n"
+                        f"👑 **Annual Pure Cash Income:** `+${fcast['annual_cash_rebate']:,.2f} USD`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **Zero Market Risk (100% Guaranteed Cash)**\n"
+                        f"💸 **Zero Capital Required (Pure Spread Revenue Share)**\n"
+                        f"⚡ _Paid directly to your account by Capital.com daily!_"
+                    )
+                    await update.effective_message.reply_text(calc_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+                elif sub_cmd in ["STATS", "ASSETS", "SPREAD"]:
+                    benchmarks = capital_engine.CapitalPartnerRebateManager.SPREAD_BENCHMARKS
+                    lines = [
+                        f"📊 **CAPITAL.COM SPREAD REBATE BENCHMARKS**",
+                        ui_standards.DIVIDER_HEAVY,
+                        f"💡 _កម្រៃជើងសារពីការជួញដូរលើគ្រប់ឧបករណ៍ (Per 1.0 Lot) ៖_\n"
+                    ]
+                    for k, v in benchmarks.items():
+                        lines.append(f"• **{v['name']}**")
+                        lines.append(f"  Spread: `~${v['spread_per_lot']:.2f}` | Rebate: `+${v['rebate_30']:.2f} (30%)` ដល់ `+${v['rebate_50']:.2f} (50%)`")
+                    lines.append(f"\n{ui_standards.DIVIDER_HEAVY}")
+                    lines.append(f"👑 **Rebate Tiers (ចំណាត់ថ្នាក់ដៃគូ) ៖**")
+                    lines.append(f"• 🥈 **Silver IB ៖** `30% Spread Rebate` (1-5 Active Clients)")
+                    lines.append(f"• 🥇 **Gold IB ៖** `40% Spread Rebate` (6-19 Clients ឬ 50+ Lots/ខែ)")
+                    lines.append(f"• 👑 **Platinum Master IB ៖** `50% Spread Rebate` (20+ Clients ឬ 200+ Lots/ខែ)")
+                    lines.append(ui_standards.DIVIDER_HEAVY)
+                    stats_msg = "\n".join(lines)
+                    await update.effective_message.reply_text(stats_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+                elif sub_cmd in ["GUIDE", "HELP", "HOWTO"]:
+                    guide_msg = (
+                        f"🧭 **មគ្គុទ្ទេសក៍ក្លាយជា CAPITAL.COM PARTNER (IB)** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"១. **ចុះឈ្មោះគណនី Partner ៖**\n"
+                        f"   • ចូលទៅកាន់គេហទំព័រផ្លូវការ `capital.com/partners`\n"
+                        f"   • ចុះឈ្មោះជា **Introducing Broker (IB)** ដោយឥតគិតថ្លៃ\n\n"
+                        f"២. **យក Partner Code ឬ Referral Link ៖**\n"
+                        f"   • ចូលផ្ទាំង IB Dashboard លើ Capital.com រួចចម្លង Partner Code របស់អ្នក\n\n"
+                        f"៣. **ភ្ជាប់មកកាន់ Bot ដើម្បីដំណើរការស្វ័យប្រវត្តិ ៖**\n"
+                        f"   • វាយបញ្ជា `` `/capital IB SET <កូដរបស់អ្នក>` ``\n"
+                        f"   • ឧទាហរណ៍៖ `` `/capital IB SET KM888` ``\n\n"
+                        f"៤. **ចែករំលែក Bot ទៅកាន់សហគមន៍ ៖**\n"
+                        f"   • ណែនាំអ្នកវិនិយោគឱ្យភ្ជាប់ Bot ជួញដូរ Gold, S&P 500, BTC CFD\n"
+                        f"   • រាល់ពេលដែលពួកគេជួញដូរ ប្រព័ន្ធ Capital.com នឹងទូទាត់ **30% ទៅ 50% នៃថ្លៃ Spread** ចូលកាបូបរបស់អ្នកជារៀងរាល់ថ្ងៃ!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **ចំណូលសុទ្ធ ១០០% គ្មានហានិភ័យ និងមិនត្រូវការដើមទុនផ្ទាល់ខ្លួន!**"
+                    ) if user_lang == 'khmer' else (
+                        f"🧭 **HOW TO BECOME A CAPITAL.COM IB PARTNER** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"1. **Register Partner Account:**\n"
+                        f"   • Visit official portal: `capital.com/partners`\n"
+                        f"   • Sign up as an **Introducing Broker (IB)** for free\n\n"
+                        f"2. **Get Your Partner Code:**\n"
+                        f"   • Locate your IB partner tracking ID in Capital.com portal\n\n"
+                        f"3. **Link to Khmer Master Crypto Bot:**\n"
+                        f"   • Run command `` `/capital IB SET <your_code>` ``\n"
+                        f"   • Example: `` `/capital IB SET KM888` ``\n\n"
+                        f"4. **Share with Community & Investors:**\n"
+                        f"   • Deploy this bot for investors trading Gold, S&P 500, BTC CFD\n"
+                        f"   • Receive **30% to 50% of all spread fees** credited daily directly to your account!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **100% Pure Cash Passive Income. Zero Risk. Zero Capital Required!**"
+                    )
+                    await update.effective_message.reply_text(guide_msg, parse_mode="Markdown", reply_markup=keyboard)
+                    return
+
+            # Default: Master IB Dashboard
+            forecast = capital_engine.calculate_capital_ib_forecast(
+                active_clients=max(1, ib_data['referred_clients']),
+                lots_per_day_each=1.5,
+                custom_rebate_pct=ib_data['rebate_pct']
+            )
+
+            if user_lang == 'khmer':
+                msg = (
+                    f"🏢 **CAPITAL.COM INTRODUCING BROKER (IB) SUITE** 💎\n"
+                    f"**ប្រភពចំណូលសាច់ប្រាក់សុទ្ធ (Spread Rebate Passive Income)**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🤝 **ឈ្មោះដៃគូ (Partner) ៖** `{ib_data['partner_name']}`\n"
+                    f"🆔 **Partner Code ៖** `{ib_data['ib_code']}`\n"
+                    f"🌐 **តំណភ្ជាប់ Referral ៖** `{ib_data['referral_link']}`\n"
+                    f"💼 **កម្រិតដៃគូ (Current Tier) ៖** `{ib_data['tier_badge']}`\n"
+                    f"👥 **អ្នកវិនិយោគសកម្ម (Clients) ៖** `{ib_data['referred_clients']} នាក់`\n"
+                    f"📦 **បរិមាណជួញដូរសរុប (Lots) ៖** `{ib_data['total_lots']:.2f} Lots`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💰 **ចំណូលកម្រៃជើងសារសរុប (Earned) ៖** `+${ib_data['total_rebate_usd']:,.2f} USD`\n"
+                    f"💵 **កំពុងរង់ចាំទូទាត់ (Pending) ៖** `+${ib_data['pending_rebate_usd']:,.2f} USD`\n"
+                    f"💸 **បានទូទាត់រួចរាល់ (Paid Cash) ៖** `+${ib_data['paid_rebate_usd']:,.2f} USD`\n"
+                    f"🏦 **កាបូបទទួលប្រាក់ ៖** `{ib_data['payout_address']}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📈 **ការប៉ាន់ស្មានចំណូល (Passive Run Rate) ៖**\n"
+                    f"• ប្រចាំថ្ងៃ (Daily Rate) ៖ `+${forecast['daily_cash_rebate']:,.2f} USD`\n"
+                    f"• ប្រចាំខែ (Monthly Passive) ៖ `+${forecast['monthly_cash_rebate']:,.2f} USD`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **លក្ខណៈពិសេសកម្រិតស្ថាប័ន (Institutional Advantages) ៖**\n"
+                    f"• **Volume Rebates 30% ទៅ 50% ៖** នៃថ្លៃ Spread ទាំងអស់\n"
+                    f"• **ទូទាត់សាច់ប្រាក់រៀងរាល់ថ្ងៃ ៖** Broker ទូទាត់ចូលដោយស្វ័យប្រវត្តិ\n"
+                    f"• **គ្មានហានិភ័យទីផ្សារ ១០០% ៖** មិនខ្វល់ពីទីផ្សារឡើងឬចុះ\n"
+                    f"• **មិនចំណាយដើមទុន ៖** ចំណូលសាច់ប្រាក់សុទ្ធពីការចែករំលែក Bot\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **គំរូបញ្ជា ៖**\n"
+                    f"• កំណត់កូដ ៖ `` `/capital IB SET KM888` ``\n"
+                    f"• គណនាប្រាក់ចំណូល ៖ `` `/capital IB CALC 10 2` ``\n"
+                    f"• មើលតារាង Spread ៖ `` `/capital IB STATS` ``\n"
+                    f"• មគ្គុទ្ទេសក៍ចុះឈ្មោះ ៖ `` `/capital IB GUIDE` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"ប្រភពចំណូលសកម្ម & អកម្ម គ្មានហានិភ័យ ២៤/៧!"
+                )
+            else:
+                msg = (
+                    f"🏢 **CAPITAL.COM INTRODUCING BROKER (IB) SUITE** 💎\n"
+                    f"**Guaranteed Pure Cash Spread Rebate Passive Income**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🤝 **Partner Name:** `{ib_data['partner_name']}`\n"
+                    f"🆔 **Partner Code:** `{ib_data['ib_code']}`\n"
+                    f"🌐 **Referral Link:** `{ib_data['referral_link']}`\n"
+                    f"💼 **Current Tier:** `{ib_data['tier_badge']}`\n"
+                    f"👥 **Active Clients:** `{ib_data['referred_clients']} traders`\n"
+                    f"📦 **Total Lots Traded:** `{ib_data['total_lots']:.2f} Lots`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💰 **Lifetime Rebates Earned:** `+${ib_data['total_rebate_usd']:,.2f} USD`\n"
+                    f"💵 **Pending Settlement:** `+${ib_data['pending_rebate_usd']:,.2f} USD`\n"
+                    f"💸 **Paid Out Clean Cash:** `+${ib_data['paid_rebate_usd']:,.2f} USD`\n"
+                    f"🏦 **Payout Settlement:** `{ib_data['payout_address']}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📈 **Projected Passive Run Rate:**\n"
+                    f"• Daily Cash Flow: `+${forecast['daily_cash_rebate']:,.2f} USD`\n"
+                    f"• Monthly Passive Cash: `+${forecast['monthly_cash_rebate']:,.2f} USD`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **Institutional Advantages:**\n"
+                    f"• **Volume Rebates 30% to 50%:** Of all trading spreads daily\n"
+                    f"• **Daily Automatic Payouts:** Paid in pure cash by Capital.com\n"
+                    f"• **100% Zero Market Risk:** Immune to market direction\n"
+                    f"• **Zero Capital Required:** Share this institutional bot & earn\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **Commands:**\n"
+                    f"• Set Partner Code: `` `/capital IB SET KM888` ``\n"
+                    f"• Calculator: `` `/capital IB CALC 10 2` ``\n"
+                    f"• Spread Rates: `` `/capital IB STATS` ``\n"
+                    f"• Registration Guide: `` `/capital IB GUIDE` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Risk-Free Passive Wealth Generation 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         self.app.add_handler(CommandHandler("capital", capital_command))
         self.app.add_handler(CommandHandler("capital_com", capital_command))
         self.app.add_handler(CommandHandler("capitalcom", capital_command))
         self.app.add_handler(CommandHandler("capital_auto", capital_command))
         self.app.add_handler(CommandHandler("capitalauto", capital_command))
+        self.app.add_handler(CommandHandler("capital_ib", capital_ib_command))
+        self.app.add_handler(CommandHandler("capitalib", capital_ib_command))
+        self.app.add_handler(CommandHandler("ib", capital_ib_command))
+        self.app.add_handler(CommandHandler("rebate", capital_ib_command))
+        self.app.add_handler(CommandHandler("partner", capital_ib_command))
         self.app.add_handler(CommandHandler("prop_firm", prop_firm_command))
         self.app.add_handler(CommandHandler("propfirm", prop_firm_command))
         self.app.add_handler(CommandHandler("prop", prop_firm_command))
