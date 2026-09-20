@@ -5554,9 +5554,20 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_tier_1k":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=1000.0, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=1000.0, phase=cfg.get("challenge_phase", 1))
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ Tier: $1,000 USD (Micro/Demo)!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
             elif data == "btn_cap_prop_tier_10k":
                 cfg = db.get_prop_firm_config(chat_id)
                 db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=10000.0, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=10000.0, phase=cfg.get("challenge_phase", 1))
                 try:
                     await update.callback_query.answer("💰 បានកំណត់ Tier: $10,000 USD!")
                 except Exception:
@@ -5566,6 +5577,7 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_prop_tier_25k":
                 cfg = db.get_prop_firm_config(chat_id)
                 db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=25000.0, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=25000.0, phase=cfg.get("challenge_phase", 1))
                 try:
                     await update.callback_query.answer("💰 បានកំណត់ Tier: $25,000 USD!")
                 except Exception:
@@ -5575,6 +5587,7 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_prop_tier_50k":
                 cfg = db.get_prop_firm_config(chat_id)
                 db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=50000.0, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=50000.0, phase=cfg.get("challenge_phase", 1))
                 try:
                     await update.callback_query.answer("💰 បានកំណត់ Tier: $50,000 USD!")
                 except Exception:
@@ -5584,6 +5597,7 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_prop_tier_100k":
                 cfg = db.get_prop_firm_config(chat_id)
                 db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=100000.0, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=100000.0, phase=cfg.get("challenge_phase", 1))
                 try:
                     await update.callback_query.answer("💰 បានកំណត់ Tier: $100,000 USD!")
                 except Exception:
@@ -5593,6 +5607,7 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_prop_tier_200k":
                 cfg = db.get_prop_firm_config(chat_id)
                 db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=200000.0, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=200000.0, phase=cfg.get("challenge_phase", 1))
                 try:
                     await update.callback_query.answer("💰 បានកំណត់ Tier: $200,000 USD!")
                 except Exception:
@@ -18037,15 +18052,19 @@ class TelegramBotThread(BaseThread):
             if args:
                 sub_action = str(args[0]).upper().strip()
                 if sub_action in ["ON", "START", "RUN"]:
-                    tier = float(args[1]) if len(args) >= 2 else 10000.0
+                    tier_arg = float(args[1]) if len(args) >= 2 else None
                     phase = int(args[2]) if len(args) >= 3 else 1
+                    cfg = db.get_prop_firm_config(chat_id)
+                    tier = tier_arg if tier_arg is not None else cfg.get("account_tier", 10000.0)
                     db.set_prop_firm_config(chat_id, enabled=True, tier=tier, phase=phase)
+                    db.reset_prop_firm_challenge(chat_id, tier=tier, phase=phase)
                 elif sub_action in ["OFF", "STOP"]:
                     cfg = db.get_prop_firm_config(chat_id)
                     db.set_prop_firm_config(chat_id, enabled=False, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
                 elif sub_action in ["RESET"]:
-                    cfg = db.get_prop_firm_config(chat_id)
-                    db.reset_prop_firm_challenge(chat_id, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
+                    tier_arg = float(args[1]) if len(args) >= 2 else None
+                    phase_arg = int(args[2]) if len(args) >= 3 else None
+                    db.reset_prop_firm_challenge(chat_id, tier=tier_arg, phase=phase_arg)
                 elif sub_action in ["TIER"]:
                     new_tier = float(args[1]) if len(args) >= 2 else 10000.0
                     cfg = db.get_prop_firm_config(chat_id)
@@ -18097,6 +18116,7 @@ class TelegramBotThread(BaseThread):
                     kb_wiz = InlineKeyboardMarkup([
                         [InlineKeyboardButton("🏢 ជំហានទី ១: ជ្រើសរើសស្ថាប័ន (Firm)", callback_data="btn_cap_prop_firm_menu")],
                         [
+                            InlineKeyboardButton("💰 $1k", callback_data="btn_cap_prop_tier_1k"),
                             InlineKeyboardButton("💰 $10k", callback_data="btn_cap_prop_tier_10k"),
                             InlineKeyboardButton("💰 $25k", callback_data="btn_cap_prop_tier_25k"),
                             InlineKeyboardButton("💰 $50k", callback_data="btn_cap_prop_tier_50k"),
@@ -18208,6 +18228,7 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton(toggle_btn_text, callback_data="btn_cap_prop_toggle")
                 ],
                 [
+                    InlineKeyboardButton("💰 $1k", callback_data="btn_cap_prop_tier_1k"),
                     InlineKeyboardButton("💰 $10k", callback_data="btn_cap_prop_tier_10k"),
                     InlineKeyboardButton("💰 $25k", callback_data="btn_cap_prop_tier_25k"),
                     InlineKeyboardButton("💰 $50k", callback_data="btn_cap_prop_tier_50k"),

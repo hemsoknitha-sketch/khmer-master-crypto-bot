@@ -2569,6 +2569,9 @@ def set_prop_firm_config(
             account_tier = excluded.account_tier,
             challenge_phase = excluded.challenge_phase,
             initial_balance = excluded.initial_balance,
+            daily_start_equity = CASE WHEN prop_firm_challenge_config.account_tier != excluded.account_tier THEN excluded.daily_start_equity ELSE prop_firm_challenge_config.daily_start_equity END,
+            high_water_mark = CASE WHEN prop_firm_challenge_config.account_tier != excluded.account_tier THEN excluded.high_water_mark ELSE prop_firm_challenge_config.high_water_mark END,
+            status = CASE WHEN prop_firm_challenge_config.account_tier != excluded.account_tier THEN 'ACTIVE' ELSE prop_firm_challenge_config.status END,
             profit_target_pct = excluded.profit_target_pct,
             risk_per_trade_pct = excluded.risk_per_trade_pct,
             updated_at = excluded.updated_at
@@ -2633,20 +2636,23 @@ def update_prop_firm_tracking(
     conn.commit()
     conn.close()
 
-def reset_prop_firm_challenge(chat_id: int, tier: float = 10000.0, phase: int = 1):
+def reset_prop_firm_challenge(chat_id: int, tier: Optional[float] = None, phase: Optional[int] = None):
     """Resets tracking metrics back to clean initial challenge state."""
     conn = get_db_connection()
     cursor = conn.cursor()
     today_str = datetime.utcnow().strftime("%Y-%m-%d")
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    target_pct = 10.0 if phase == 1 else (5.0 if phase == 2 else 0.0)
+    cfg = get_prop_firm_config(chat_id)
+    target_tier = float(tier) if tier is not None and float(tier) > 0 else float(cfg.get("account_tier", 10000.0))
+    target_phase = int(phase) if phase is not None else int(cfg.get("challenge_phase", 1))
+    target_pct = 10.0 if target_phase == 1 else (5.0 if target_phase == 2 else 0.0)
     cursor.execute("""
         UPDATE prop_firm_challenge_config
         SET account_tier = ?, challenge_phase = ?, initial_balance = ?,
             high_water_mark = ?, daily_start_equity = ?, daily_date = ?,
             profit_target_pct = ?, status = 'ACTIVE', updated_at = ?
         WHERE chat_id = ?
-    """, (tier, phase, tier, tier, tier, today_str, target_pct, now_str, chat_id))
+    """, (target_tier, target_phase, target_tier, target_tier, target_tier, today_str, target_pct, now_str, chat_id))
     conn.commit()
     conn.close()
 
