@@ -1219,6 +1219,12 @@ class PropFirmRiskManager:
             engine.close_all_capital_positions()
             db.update_prop_firm_tracking(chat_id, current_equity, status="DAILY_HALTED")
             logger.warning(f"🚨 [PROP FIRM DAILY BRAKE TRIGGERED] Daily Loss: -{daily_loss_pct:.2f}% (Limit: -{max_daily_limit:.1f}%). Trading halted until 00:00 UTC.")
+            if app and hasattr(app, "bot") and status != "DAILY_HALTED":
+                try:
+                    import asyncio
+                    asyncio.create_task(self._send_prop_milestone_alert(app, chat_id, "DAILY_HALTED", daily_loss_pct, tier, phase))
+                except Exception:
+                    pass
             return {
                 "eligible": False,
                 "reason": "DAILY_DRAWDOWN_LIMIT_REACHED",
@@ -1253,6 +1259,12 @@ class PropFirmRiskManager:
                 new_status = "PASSED_PHASE_1" if phase == 1 else "PASSED_PHASE_2"
                 db.update_prop_firm_tracking(chat_id, current_equity, status=new_status)
                 logger.info(f"🎉 [PROP FIRM CHALLENGE PASSED!] Target +{current_gain_pct:.2f}% reached! Status updated to {new_status}.")
+                if app and hasattr(app, "bot") and status not in ["PASSED_PHASE_1", "PASSED_PHASE_2"]:
+                    try:
+                        import asyncio
+                        asyncio.create_task(self._send_prop_milestone_alert(app, chat_id, new_status, current_gain_pct, tier, phase))
+                    except Exception:
+                        pass
                 return {
                     "eligible": False,
                     "reason": "TARGET_ACHIEVED_CHALLENGE_PASSED",
@@ -1341,6 +1353,102 @@ class PropFirmRiskManager:
             "overall_badge": overall_badge,
             "is_demo": engine.is_demo
         }
+
+    def advance_to_next_phase(self, chat_id: int) -> Dict[str, Any]:
+        """Advances the challenge to the next phase (1 -> 2 -> 3 Funded)."""
+        import database as db
+        cfg = db.get_prop_firm_config(chat_id)
+        curr_phase = cfg.get("challenge_phase", 1)
+        tier = cfg.get("account_tier", 10000.0)
+        next_phase = 2 if curr_phase == 1 else (3 if curr_phase == 2 else 3)
+        db.reset_prop_firm_challenge(chat_id, tier=tier, phase=next_phase)
+        return {"old_phase": curr_phase, "new_phase": next_phase, "tier": tier}
+
+    async def _send_prop_milestone_alert(self, app, chat_id: int, status: str, gain_pct: float, tier: float, phase: int):
+        """Sends rich Telegram alert with interactive progression button upon passing challenge phases."""
+        try:
+            import ui_standards
+            import database as db
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            user_lang = db.get_user_language(chat_id)
+            tier_fmt = f"${tier:,.0f}"
+            if status == "PASSED_PHASE_1":
+                kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 ឈានទៅកាន់ Phase 2 (Target: +5%)", callback_data="btn_cap_prop_advance_phase2")],
+                    [InlineKeyboardButton("🏆 ផ្ទាំងគ្រប់គ្រង Prop Firm", callback_data="btn_cap_prop_menu")]
+                ])
+                if user_lang == 'khmer':
+                    text = (
+                        f"🎉 **[អបអរសាទរ! PASS PROP CHALLENGE PHASE 1]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💼 **គណនីប្រឡង ៖** `{tier_fmt} USD`\n"
+                        f"🎯 **លទ្ធផលសម្រេច ៖** `+{gain_pct:.2f}% (គ្រប់គោលដៅ +10%)`\n"
+                        f"🛡️ **សកម្មភាពការពារ ៖** បានកាត់ផ្តាច់ និងបិទ Position ទាំងអស់ ១០០% ជាសាច់ប្រាក់សុទ្ធ!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ **ជំហានបន្ទាប់ ៖** គណនីបានឆ្លងផុត Phase 1 ជាស្ថាពរ។ សូមចុចប៊ូតុងខាងក្រោមដើម្បីចាប់ផ្តើម Phase 2 (គោលដៅចំណេញត្រឹមតែ +5%)!"
+                    )
+                else:
+                    text = (
+                        f"🎉 **[CONGRATULATIONS! PHASE 1 PASSED!]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💼 **Account Tier:** `{tier_fmt} USD`\n"
+                        f"🎯 **Achievement:** `+{gain_pct:.2f}% (Hit +10% Target)`\n"
+                        f"🛡️ **Protection:** All positions closed 100% to clean cash!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ **Next Step:** Challenge Phase 1 is officially completed. Advance to Phase 2 (only +5% target) below!"
+                    )
+            elif status == "PASSED_PHASE_2":
+                kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("👑 បើកដំណើរការ Funded Mode (80-90% Profit)", callback_data="btn_cap_prop_advance_funded")],
+                    [InlineKeyboardButton("🏆 ផ្ទាំងគ្រប់គ្រង Prop Firm", callback_data="btn_cap_prop_menu")]
+                ])
+                if user_lang == 'khmer':
+                    text = (
+                        f"👑 **[អបអរសាទរ! អ្នកបានក្លាយជា FUNDED TRADER ពេញសិទ្ធិ!]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💼 **គណនីស្ថាប័ន ៖** `{tier_fmt} USD` (Real Funded Account)\n"
+                        f"🎯 **លទ្ធផលសម្រេច ៖** `+{gain_pct:.2f}% (ឆ្លងកាត់ Phase 2 គ្រប់គ្រង +5%)`\n"
+                        f"💵 **ចំណែកប្រាក់ចំណេញ ៖** `80% ទៅ 90% Profit Split`\n"
+                        f"🎁 **ការសងថ្លៃប្រឡង ៖** 100% Refundable ពេលដកប្រាក់លើកដំបូង!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ សូមចុចប៊ូតុងខាងក្រោមដើម្បីបើកដំណើរការ Funded Mode (គ្មាន Target សម្ពាធឡើយ)!"
+                    )
+                else:
+                    text = (
+                        f"👑 **[CONGRATULATIONS! 100% FUNDED TRADER!]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💼 **Funded Account:** `{tier_fmt} USD`\n"
+                        f"🎯 **Achievement:** `+{gain_pct:.2f}% (Phase 2 Target Passed)`\n"
+                        f"💵 **Profit Split:** `80% to 90% to You`\n"
+                        f"🎁 **Refund:** 100% Challenge Fee Refund on first payout!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ Activate Funded Mode below (0% Target Pressure)!"
+                    )
+            elif status == "DAILY_HALTED":
+                kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏆 ផ្ទាំងគ្រប់គ្រង Prop Firm", callback_data="btn_cap_prop_menu")]
+                ])
+                if user_lang == 'khmer':
+                    text = (
+                        f"🚨 **[PROP FIRM DAILY LOSS BRAKE TRIGGERED]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **ការការពារដើមទុន ៖** គម្លាតខាតប្រចាំថ្ងៃប៉ះ `-3.5%`\n"
+                        f"🛑 **ស្ថានភាព ៖** ម៉ាស៊ីនបានបិទរាល់ Position ទាំងអស់ និងផ្អាកជួញដូររហូតដល់ 00:00 UTC\n"
+                        f"💡 **គោលបំណង ៖** ការពារមិនឱ្យខាតដល់កម្រិត -5.0% របស់ស្ថាប័ន ធានាថាមិនអាចធ្លាក់ការប្រឡងឡើយ!"
+                    )
+                else:
+                    text = (
+                        f"🚨 **[PROP FIRM DAILY BRAKE TRIGGERED]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **Capital Armor:** Daily loss reached `-3.5%`\n"
+                        f"🛑 **Status:** All positions closed. Trading halted until 00:00 UTC.\n"
+                        f"💡 **Safeguard:** Preserves the account 1.5% before the broker's -5.0% breach limit!"
+                    )
+            else:
+                return
+            await app.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=kb)
+        except Exception as e:
+            logger.error(f"Error sending prop milestone alert: {e}")
 
 
 # ==============================================================================

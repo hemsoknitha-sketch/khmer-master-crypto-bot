@@ -5590,6 +5590,104 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_tier_200k":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=200000.0, phase=cfg.get("challenge_phase", 1))
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ Tier: $200,000 USD!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_firm_menu":
+                try:
+                    await update.callback_query.answer("🏢 កំពុងបើកបញ្ជីស្ថាប័ន Prop Firm...")
+                except Exception:
+                    pass
+                context.args = ["FIRMS"]
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_set_ftmo":
+                db.set_prop_firm_firm(chat_id, "FTMO")
+                try:
+                    await update.callback_query.answer("🏆 បានជ្រើសរើសស្ថាប័ន: FTMO!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_set_fundingpips":
+                db.set_prop_firm_firm(chat_id, "Funding Pips")
+                try:
+                    await update.callback_query.answer("⚡ បានជ្រើសរើសស្ថាប័ន: Funding Pips!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_set_tft":
+                db.set_prop_firm_firm(chat_id, "The Funded Trader")
+                try:
+                    await update.callback_query.answer("🎯 បានជ្រើសរើសស្ថាប័ន: The Funded Trader!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_set_e8":
+                db.set_prop_firm_firm(chat_id, "E8 Markets")
+                try:
+                    await update.callback_query.answer("🚀 បានជ្រើសរើសស្ថាប័ន: E8 Markets!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_set_capital":
+                db.set_prop_firm_firm(chat_id, "Capital.com Partner")
+                try:
+                    await update.callback_query.answer("🏛️ បានជ្រើសរើសស្ថាប័ន: Capital.com Partner!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_wizard":
+                try:
+                    await update.callback_query.answer("🧭 កំពុងបើកផែនទី ៤ ដំណាក់កាល...")
+                except Exception:
+                    pass
+                context.args = ["WIZARD"]
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_wizard_start_p1":
+                cfg = db.get_prop_firm_config(chat_id)
+                tier = cfg.get("account_tier", 10000.0)
+                db.set_prop_firm_config(chat_id, enabled=True, tier=tier, phase=1)
+                try:
+                    await update.callback_query.answer("🚀 បានចាប់ផ្តើម Phase 1 (Target: 10%)!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_check_conn":
+                try:
+                    await update.callback_query.answer("🔌 កំពុងតេស្ត API Connection & Balance...")
+                except Exception:
+                    pass
+                context.args = ["CHECK"]
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_advance_phase2":
+                manager = capital_engine.PropFirmRiskManager()
+                manager.advance_to_next_phase(chat_id)
+                try:
+                    await update.callback_query.answer("🎯 បានឈានទៅកាន់ Phase 2 ជោគជ័យ! (Target 5%)")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_advance_funded":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=True, tier=cfg.get("account_tier", 10000.0), phase=3)
+                try:
+                    await update.callback_query.answer("👑 បានបើកដំណើរការ FUNDED MODE ជោគជ័យ!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
             elif data == "btn_cap_prop_phase_1":
                 cfg = db.get_prop_firm_config(chat_id)
                 db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=cfg.get("account_tier", 10000.0), phase=1)
@@ -17956,6 +18054,144 @@ class TelegramBotThread(BaseThread):
                     new_phase = int(args[1]) if len(args) >= 2 else 1
                     cfg = db.get_prop_firm_config(chat_id)
                     db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=cfg.get("account_tier", 10000.0), phase=new_phase)
+                elif sub_action in ["FIRM"]:
+                    firm_name = str(args[1]) if len(args) >= 2 else "FTMO"
+                    db.set_prop_firm_firm(chat_id, firm_name)
+                elif sub_action in ["FIRMS", "FIRM_MENU"]:
+                    cfg = db.get_prop_firm_config(chat_id)
+                    curr_firm = cfg.get("firm_name", "FTMO")
+                    kb_firms = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(f"{'✅ ' if curr_firm == 'FTMO' else ''}🏆 FTMO (Global #1)", callback_data="btn_cap_prop_set_ftmo")],
+                        [InlineKeyboardButton(f"{'✅ ' if curr_firm == 'Funding Pips' else ''}⚡ Funding Pips (Fast & Affordable)", callback_data="btn_cap_prop_set_fundingpips")],
+                        [InlineKeyboardButton(f"{'✅ ' if curr_firm == 'The Funded Trader' else ''}🎯 The Funded Trader (TFT)", callback_data="btn_cap_prop_set_tft")],
+                        [InlineKeyboardButton(f"{'✅ ' if curr_firm == 'E8 Markets' else ''}🚀 E8 Markets (Flexible Rules)", callback_data="btn_cap_prop_set_e8")],
+                        [InlineKeyboardButton(f"{'✅ ' if curr_firm == 'Capital.com Partner' else ''}🏛️ Capital.com Partner Account", callback_data="btn_cap_prop_set_capital")],
+                        [InlineKeyboardButton("🔙 ត្រឡប់ទៅ Dashboard", callback_data="btn_cap_prop_menu")]
+                    ])
+                    if user_lang == 'khmer':
+                        msg_firms = (
+                            f"🏢 **ជ្រើសរើសស្ថាប័ន PROP FIRM សម្រាប់ការប្រឡង** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💼 **បច្ចុប្បន្នជ្រើសរើស ៖** `{curr_firm}`\n\n"
+                            f"ស្ថាប័នទាំងអស់ខាងលើ គាំទ្រការជួញដូរឆ្លងកាត់ API និងវេទិកា TradFi (Capital.com / MT4 / MT5 / cTrader)។\n"
+                            f"ប្រព័ន្ធ AI នឹងតម្រឹមច្បាប់ Daily Loss (-3.5%) និង Max Loss (-7.0%) ទៅតាមស្ថាប័នដែលលោកអ្នកជ្រើសរើសដោយស្វ័យប្រវត្តិ!\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👉 សូមចុចជ្រើសរើសស្ថាប័នខាងក្រោម ៖"
+                        )
+                    else:
+                        msg_firms = (
+                            f"🏢 **SELECT YOUR TARGET PROP FIRM** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💼 **Current Selection:** `{curr_firm}`\n\n"
+                            f"All supported firms connect with TradFi API execution.\n"
+                            f"The AI Engine automatically calibrates its risk parameters to the firm's evaluation rules.\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👉 Select your preferred firm below:"
+                        )
+                    await update.effective_message.reply_text(msg_firms, parse_mode="Markdown", reply_markup=kb_firms)
+                    return
+                elif sub_action in ["WIZARD", "STEPS", "HELP"]:
+                    cfg = db.get_prop_firm_config(chat_id)
+                    curr_firm = cfg.get("firm_name", "FTMO")
+                    curr_tier = cfg.get("account_tier", 10000.0)
+                    kb_wiz = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🏢 ជំហានទី ១: ជ្រើសរើសស្ថាប័ន (Firm)", callback_data="btn_cap_prop_firm_menu")],
+                        [
+                            InlineKeyboardButton("💰 $10k", callback_data="btn_cap_prop_tier_10k"),
+                            InlineKeyboardButton("💰 $25k", callback_data="btn_cap_prop_tier_25k"),
+                            InlineKeyboardButton("💰 $50k", callback_data="btn_cap_prop_tier_50k"),
+                            InlineKeyboardButton("💰 $100k", callback_data="btn_cap_prop_tier_100k")
+                        ],
+                        [
+                            InlineKeyboardButton("🚀 ចាប់ផ្តើម Phase 1", callback_data="btn_cap_prop_wizard_start_p1"),
+                            InlineKeyboardButton("🎯 Phase 2 (5%)", callback_data="btn_cap_prop_phase_2"),
+                            InlineKeyboardButton("👑 Funded Mode", callback_data="btn_cap_prop_phase_3")
+                        ],
+                        [InlineKeyboardButton("🔌 Test API & Balance", callback_data="btn_cap_prop_check_conn")],
+                        [InlineKeyboardButton("🔙 ត្រឡប់ទៅ Dashboard", callback_data="btn_cap_prop_menu")]
+                    ])
+                    if user_lang == 'khmer':
+                        msg_wiz = (
+                            f"🧭 **ផែនទី ៤ ដំណាក់កាល ឈានទៅរកគណនី $10k-$200k (ទុនសូន្យរៀល)** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💼 **ស្ថាប័នបច្ចុប្បន្ន ៖** `{curr_firm}` | ទំហំ ៖ `${curr_tier:,.0f} USD`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"1️⃣ **ជំហានទី ១ (រៀបចំគណនី) ៖**\n"
+                            f"• ជ្រើសរើសស្ថាប័ន (Funding Pips, FTMO, TFT, E8, Capital.com)\n"
+                            f"• បញ្ចូល API Credentials ក្នុង `.env` (`CAPITAL_API_KEY`, `CAPITAL_IDENTIFIER`, `CAPITAL_PASSWORD`)\n\n"
+                            f"2️⃣ **ជំហានទី ២ (Phase 1 Target +10%) ៖**\n"
+                            f"• គោលដៅចំណេញ +10% | Max Daily Loss: -3.5% (Safety Buffer 1.5%)\n"
+                            f"• AI ស្កេន Gold, SP500, Oil, BTC CFD | Risk 0.75% / Trade\n"
+                            f"• បញ្ជា ៖ `` `/capital PROP ON {int(curr_tier)} 1` `` ឬចុច [ 🚀 ចាប់ផ្តើម Phase 1 ]\n\n"
+                            f"3️⃣ **ជំហានទី ៣ (Phase 2 Target +5%) ៖**\n"
+                            f"• គោលដៅចំណេញត្រឹមតែ +5% ប៉ុណ្ណោះ ឈ្នះ ២-៣ Trades គឺរួចរាល់\n"
+                            f"• បញ្ជា ៖ `` `/capital PROP ON {int(curr_tier)} 2` `` ឬចុច [ 🎯 Phase 2 ]\n\n"
+                            f"4️⃣ **ជំហានទី ៤ (ទទួលគណនីពិត FUNDED ACCOUNT) ៖**\n"
+                            f"• ទទួលគណនីទុនស្ថាប័នពិតប្រាកដ $10k-$200k (0% Target Pressure)\n"
+                            f"• ចំណែកប្រាក់ចំណេញ 80% ទៅ 90% ជារបស់អ្នក + Refund ថ្លៃប្រឡងវិញ ១០០%!\n"
+                            f"• បញ្ជា ៖ `` `/capital PROP ON {int(curr_tier)} 3` `` ឬចុច [ 👑 Funded Mode ]\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _ជ្រើសរើសជម្រើសខាងក្រោមដើម្បីចាប់ផ្តើម ៖_"
+                        )
+                    else:
+                        msg_wiz = (
+                            f"🧭 **4-STAGE ROADMAP TO $10k-$200k FUNDED ACCOUNT ($0 CAPITAL)** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💼 **Selected Firm:** `{curr_firm}` | **Tier:** `${curr_tier:,.0f} USD`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"1️⃣ **Stage 1 (Setup Account):** Select firm & add API keys to `.env`\n"
+                            f"2️⃣ **Stage 2 (Phase 1: +10% Target):** Risk 0.75% per trade with Breakeven Armor\n"
+                            f"3️⃣ **Stage 3 (Phase 2: +5% Target):** Only +5% needed to complete evaluation\n"
+                            f"4️⃣ **Stage 4 (Funded Account):** Trade real firm capital, 80-90% Profit Split + 100% Fee Refund!\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _Choose an action below to proceed:_"
+                        )
+                    await update.effective_message.reply_text(msg_wiz, parse_mode="Markdown", reply_markup=kb_wiz)
+                    return
+                elif sub_action in ["CHECK", "TEST", "STATUS", "API"]:
+                    engine = capital_engine.get_capital_engine()
+                    auth_ok, auth_msg = engine.authenticate()
+                    bal = engine.get_account_balance()
+                    env_lbl = "DEMO ($10,000 Virtual Funds)" if engine.is_demo else "LIVE MAINNET / CHALLENGE"
+                    status_icon = "🟢 CONNECTED & AUTHENTICATED" if auth_ok else "🔴 AUTHENTICATION FAILED"
+                    
+                    kb_chk = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🚀 បើក Prop Auto ភ្លាម", callback_data="btn_cap_prop_toggle")],
+                        [InlineKeyboardButton("🧭 ផែនទី ៤ ដំណាក់កាល", callback_data="btn_cap_prop_wizard")],
+                        [InlineKeyboardButton("🔙 ត្រឡប់ទៅ Dashboard", callback_data="btn_cap_prop_menu")]
+                    ])
+                    if user_lang == 'khmer':
+                        msg_chk = (
+                            f"🔌 **លទ្ធផលតេស្ត API CONNECTION & សមតុល្យគណនី** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏦 **ឈ្មួញកណ្តាល ៖** `Capital.com ({env_lbl})`\n"
+                            f"📶 **ស្ថានភាព API ៖** `{status_icon}`\n"
+                            f"💬 **សារឆ្លើយតប ៖** `{auth_msg}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💵 **សមតុល្យ (Balance) ៖** `${bal.get('balance', 0.0):,.2f} {bal.get('currency', 'USD')}`\n"
+                            f"💰 **ទុនជាក់ស្តែង (Equity) ៖** `${bal.get('balance', 0.0) + bal.get('pnl', 0.0):,.2f} USD`\n"
+                            f"📦 **ទុនទំនេរ (Available) ៖** `${bal.get('available', 0.0):,.2f} USD`\n"
+                            f"📊 **ចំណេញ/ខាតសកម្ម (PnL) ៖** `${bal.get('pnl', 0.0):,.2f} USD`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **ប្រព័ន្ធត្រៀមខ្លួនរួចរាល់ ១០០% សម្រាប់ដំណាក់កាលទាំង ៤!**' if auth_ok else '⚠️ **សូមពិនិត្យមើល CAPITAL_API_KEY, CAPITAL_IDENTIFIER, CAPITAL_PASSWORD ក្នុង .env!**'}"
+                        )
+                    else:
+                        msg_chk = (
+                            f"🔌 **API CONNECTION & BALANCE TEST REPORT** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏦 **Broker:** `Capital.com ({env_lbl})`\n"
+                            f"📶 **API Status:** `{status_icon}`\n"
+                            f"💬 **Response:** `{auth_msg}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💵 **Balance:** `${bal.get('balance', 0.0):,.2f} {bal.get('currency', 'USD')}`\n"
+                            f"💰 **Equity:** `${bal.get('balance', 0.0) + bal.get('pnl', 0.0):,.2f} USD`\n"
+                            f"📦 **Available:** `${bal.get('available', 0.0):,.2f} USD`\n"
+                            f"📊 **Active PnL:** `${bal.get('pnl', 0.0):,.2f} USD`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **Engine is 100% ready for all 4 phases!**' if auth_ok else '⚠️ **Please verify credentials in .env!**'}"
+                        )
+                    await update.effective_message.reply_text(msg_chk, parse_mode="Markdown", reply_markup=kb_chk)
+                    return
 
             # Build Dashboard View
             cap_data = capital_engine.get_prop_firm_dashboard(chat_id)
@@ -17963,6 +18199,7 @@ class TelegramBotThread(BaseThread):
             status_text = "🟢 ACTIVE" if is_enabled else "⚪ STOPPED"
             env_lbl = "DEMO ($10,000 Virtual)" if cap_data["is_demo"] else "LIVE CHALLENGE"
             phase_name = f"Phase 1 (Target: +10%)" if cap_data["phase"] == 1 else (f"Phase 2 (Target: +5%)" if cap_data["phase"] == 2 else "Funded Account (80-90% Profit)")
+            curr_firm = cap_data.get("firm_name", "FTMO")
 
             toggle_btn_text = "🤖 Prop Auto: ON 🟢" if is_enabled else "🤖 Prop Auto: OFF ⚪"
             
@@ -17974,7 +18211,12 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("💰 $10k", callback_data="btn_cap_prop_tier_10k"),
                     InlineKeyboardButton("💰 $25k", callback_data="btn_cap_prop_tier_25k"),
                     InlineKeyboardButton("💰 $50k", callback_data="btn_cap_prop_tier_50k"),
-                    InlineKeyboardButton("💰 $100k", callback_data="btn_cap_prop_tier_100k")
+                    InlineKeyboardButton("💰 $100k", callback_data="btn_cap_prop_tier_100k"),
+                    InlineKeyboardButton("💰 $200k", callback_data="btn_cap_prop_tier_200k")
+                ],
+                [
+                    InlineKeyboardButton(f"🏢 ស្ថាប័ន ៖ {curr_firm}", callback_data="btn_cap_prop_firm_menu"),
+                    InlineKeyboardButton("🔌 Test API & Balance", callback_data="btn_cap_prop_check_conn")
                 ],
                 [
                     InlineKeyboardButton("🎯 Phase 1 (10%)", callback_data="btn_cap_prop_phase_1"),
@@ -17982,11 +18224,14 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("👑 Funded", callback_data="btn_cap_prop_phase_3")
                 ],
                 [
-                    InlineKeyboardButton("🛡️ Emergency Close All", callback_data="btn_cap_prop_close_all"),
+                    InlineKeyboardButton("🧭 ផែនទី ៤ ដំណាក់កាល (Wizard)", callback_data="btn_cap_prop_wizard"),
                     InlineKeyboardButton("🔄 Reset Tracker", callback_data="btn_cap_prop_reset")
                 ],
                 [
-                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_menu"),
+                    InlineKeyboardButton("🛡️ Emergency Close All", callback_data="btn_cap_prop_close_all"),
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_menu")
+                ],
+                [
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
@@ -17995,6 +18240,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"🏆 **PROP FIRM CHALLENGE & FUNDED EVALUATION** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🏢 **ស្ថាប័នជ្រើសរើស (Firm) ៖** `{curr_firm}`\n"
                     f"💼 **គណនីប្រឡង (Tier) ៖** `${cap_data['tier']:,.0f} USD` | `{phase_name}`\n"
                     f"🏦 **ឈ្មួញកណ្តាល ៖** `Capital.com ({env_lbl})`\n"
                     f"🤖 **ម៉ាស៊ីន Prop Auto ៖** `{status_text}`\n"
@@ -18015,6 +18261,8 @@ class TelegramBotThread(BaseThread):
                     f"• **Weekend Shield ៖** បិទ Trade មុនយប់ថ្ងៃសុក្រម៉ោង 20:00 UTC\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital PROP ON` `` | `` `/capital PROP OFF` ``\n"
+                    f"🧭 **បើកផែនទី ៤ ដំណាក់កាល ៖** `` `/capital PROP WIZARD` ``\n"
+                    f"🔌 **តេស្ត API Connection ៖** `` `/capital PROP CHECK` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -18024,6 +18272,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"🏆 **PROP FIRM CHALLENGE & FUNDED EVALUATION** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🏢 **Selected Firm:** `{curr_firm}`\n"
                     f"💼 **Challenge Tier:** `${cap_data['tier']:,.0f} USD` | `{phase_name}`\n"
                     f"🏦 **Broker Partner:** `Capital.com ({env_lbl})`\n"
                     f"🤖 **Prop Auto Engine:** `{status_text}`\n"
@@ -18044,6 +18293,8 @@ class TelegramBotThread(BaseThread):
                     f"• **Weekend Shield:** Auto-closes positions before Friday 20:00 UTC\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **Presets:** `` `/capital PROP ON` `` | `` `/capital PROP OFF` ``\n"
+                    f"🧭 **Open Wizard:** `` `/capital PROP WIZARD` ``\n"
+                    f"🔌 **Test Connection:** `` `/capital PROP CHECK` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"

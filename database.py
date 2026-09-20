@@ -2504,10 +2504,10 @@ def get_prop_firm_config(chat_id: int) -> dict:
                 "high_water_mark": float(row[5] or 10000.0),
                 "daily_start_equity": float(row[6] or 10000.0),
                 "daily_date": str(row[7] or ""),
-                "max_daily_loss_pct": float(row[8] or 4.0),
-                "max_overall_loss_pct": float(row[9] or 8.0),
-                "profit_target_pct": float(row[10] or 10.0),
-                "risk_per_trade_pct": float(row[11] or 0.75),
+                "max_daily_loss_pct": float(row[8] if row[8] is not None else 4.0),
+                "max_overall_loss_pct": float(row[9] if row[9] is not None else 8.0),
+                "profit_target_pct": float(row[10] if row[10] is not None else 10.0),
+                "risk_per_trade_pct": float(row[11] if row[11] is not None else 0.75),
                 "max_concurrent_trades": int(row[12] or 2),
                 "no_weekend_holding": bool(row[13]),
                 "news_guard_enabled": bool(row[14]),
@@ -2545,7 +2545,7 @@ def set_prop_firm_config(
     tier: float = 10000.0,
     phase: int = 1,
     risk_pct: float = 0.75,
-    firm: str = "FTMO",
+    firm: Optional[str] = None,
     initial_balance: Optional[float] = None
 ):
     """Sets or updates the Prop Firm Challenge parameters."""
@@ -2554,6 +2554,8 @@ def set_prop_firm_config(
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     init_bal = float(initial_balance if initial_balance is not None and initial_balance > 0 else tier)
     target_pct = 10.0 if phase == 1 else (5.0 if phase == 2 else 0.0)
+    cfg = get_prop_firm_config(chat_id)
+    firm_val = str(firm) if firm else cfg.get("firm_name", "FTMO")
     cursor.execute("""
         INSERT INTO prop_firm_challenge_config (
             chat_id, is_enabled, firm_name, account_tier, challenge_phase,
@@ -2571,9 +2573,22 @@ def set_prop_firm_config(
             risk_per_trade_pct = excluded.risk_per_trade_pct,
             updated_at = excluded.updated_at
     """, (
-        chat_id, 1 if enabled else 0, str(firm), float(tier), int(phase),
+        chat_id, 1 if enabled else 0, firm_val, float(tier), int(phase),
         init_bal, init_bal, init_bal, target_pct, float(risk_pct), now_str
     ))
+    conn.commit()
+    conn.close()
+
+def set_prop_firm_firm(chat_id: int, firm_name: str):
+    """Updates the chosen prop firm for the user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        UPDATE prop_firm_challenge_config
+        SET firm_name = ?, updated_at = ?
+        WHERE chat_id = ?
+    """, (firm_name, now_str, chat_id))
     conn.commit()
     conn.close()
 
