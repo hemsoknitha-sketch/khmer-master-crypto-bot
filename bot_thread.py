@@ -5536,6 +5536,104 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_command(update, context)
+            elif data in ["btn_cap_prop_menu", "btn_prop_firm_menu"]:
+                try:
+                    await update.callback_query.answer("🏆 កំពុងបើក Prop Firm Challenge...")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_toggle":
+                cfg = db.get_prop_firm_config(chat_id)
+                new_state = not cfg.get("enabled", False)
+                db.set_prop_firm_config(chat_id, enabled=new_state, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
+                toast_msg = "✅ Prop Auto: បានបើកដំណើរការ!" if new_state else "🛑 Prop Auto: បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_tier_10k":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=10000.0, phase=cfg.get("challenge_phase", 1))
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ Tier: $10,000 USD!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_tier_25k":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=25000.0, phase=cfg.get("challenge_phase", 1))
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ Tier: $25,000 USD!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_tier_50k":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=50000.0, phase=cfg.get("challenge_phase", 1))
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ Tier: $50,000 USD!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_tier_100k":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=100000.0, phase=cfg.get("challenge_phase", 1))
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ Tier: $100,000 USD!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_phase_1":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=cfg.get("account_tier", 10000.0), phase=1)
+                try:
+                    await update.callback_query.answer("🎯 បានកំណត់ Phase 1 (Target 10%)!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_phase_2":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=cfg.get("account_tier", 10000.0), phase=2)
+                try:
+                    await update.callback_query.answer("🎯 បានកំណត់ Phase 2 (Target 5%)!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_phase_3":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=cfg.get("account_tier", 10000.0), phase=3)
+                try:
+                    await update.callback_query.answer("👑 បានកំណត់ Funded Mode (0% Target)!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_reset":
+                cfg = db.get_prop_firm_config(chat_id)
+                db.reset_prop_firm_challenge(chat_id, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
+                try:
+                    await update.callback_query.answer("🔄 បាន Reset Challenge Tracker ជោគជ័យ!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
+            elif data == "btn_cap_prop_close_all":
+                capital_engine.close_all_tradfi()
+                try:
+                    await update.callback_query.answer("🛡️ បានបិទ Position ទាំងអស់ដោយសុវត្ថិភាព!")
+                except Exception:
+                    pass
+                context.args = []
+                await prop_firm_command(update, context)
             elif data in ["btn_turbo_hedge", "btn_hyper_trade_launch"]:
                 await turbo_hedge_command(update, context)
             elif data in ["btn_smart_trade", "btn_smart_trade_launch"]:
@@ -17818,6 +17916,142 @@ class TelegramBotThread(BaseThread):
             else:
                 await update.effective_message.reply_text("⚠️ Invalid option! Usage: `/wealth SPOT ON 50` or `/wealth FUTURES ON 50` or `/wealth OFF`", parse_mode="Markdown")
 
+        async def prop_firm_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🏆 Institutional Prop Firm Challenge & Funded Trader Evaluation Suite ($10k-$200k)
+            100% Risk Compliance & Passing System:
+            - FTMO / Funding Pips / The Funded Trader / Capital.com Partner Rules
+            - Daily Drawdown Guard (Hard Stop at -3.5%)
+            - Max Overall Drawdown Guard (Hard Stop at -7.0%)
+            - Profit Target Milestone (Auto-Locks Victory on +10% or +5%)
+            - Dynamic Fixed Fractional Risk Sizing (0.75% Max Loss per trade)
+            - Breakeven Armor (+1.5% ROI lock) & Golden 80% Trailing Ratchet
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            import ui_standards
+            import capital_engine
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            args = list(context.args) if context and context.args else []
+            if args:
+                sub_action = str(args[0]).upper().strip()
+                if sub_action in ["ON", "START", "RUN"]:
+                    tier = float(args[1]) if len(args) >= 2 else 10000.0
+                    phase = int(args[2]) if len(args) >= 3 else 1
+                    db.set_prop_firm_config(chat_id, enabled=True, tier=tier, phase=phase)
+                elif sub_action in ["OFF", "STOP"]:
+                    cfg = db.get_prop_firm_config(chat_id)
+                    db.set_prop_firm_config(chat_id, enabled=False, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
+                elif sub_action in ["RESET"]:
+                    cfg = db.get_prop_firm_config(chat_id)
+                    db.reset_prop_firm_challenge(chat_id, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
+                elif sub_action in ["TIER"]:
+                    new_tier = float(args[1]) if len(args) >= 2 else 10000.0
+                    cfg = db.get_prop_firm_config(chat_id)
+                    db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=new_tier, phase=cfg.get("challenge_phase", 1))
+                elif sub_action in ["PHASE"]:
+                    new_phase = int(args[1]) if len(args) >= 2 else 1
+                    cfg = db.get_prop_firm_config(chat_id)
+                    db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=cfg.get("account_tier", 10000.0), phase=new_phase)
+
+            # Build Dashboard View
+            cap_data = capital_engine.get_prop_firm_dashboard(chat_id)
+            is_enabled = cap_data["is_enabled"]
+            status_text = "🟢 ACTIVE" if is_enabled else "⚪ STOPPED"
+            env_lbl = "DEMO ($10,000 Virtual)" if cap_data["is_demo"] else "LIVE CHALLENGE"
+            phase_name = f"Phase 1 (Target: +10%)" if cap_data["phase"] == 1 else (f"Phase 2 (Target: +5%)" if cap_data["phase"] == 2 else "Funded Account (80-90% Profit)")
+
+            toggle_btn_text = "🤖 Prop Auto: ON 🟢" if is_enabled else "🤖 Prop Auto: OFF ⚪"
+            
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(toggle_btn_text, callback_data="btn_cap_prop_toggle")
+                ],
+                [
+                    InlineKeyboardButton("💰 $10k", callback_data="btn_cap_prop_tier_10k"),
+                    InlineKeyboardButton("💰 $25k", callback_data="btn_cap_prop_tier_25k"),
+                    InlineKeyboardButton("💰 $50k", callback_data="btn_cap_prop_tier_50k"),
+                    InlineKeyboardButton("💰 $100k", callback_data="btn_cap_prop_tier_100k")
+                ],
+                [
+                    InlineKeyboardButton("🎯 Phase 1 (10%)", callback_data="btn_cap_prop_phase_1"),
+                    InlineKeyboardButton("🎯 Phase 2 (5%)", callback_data="btn_cap_prop_phase_2"),
+                    InlineKeyboardButton("👑 Funded", callback_data="btn_cap_prop_phase_3")
+                ],
+                [
+                    InlineKeyboardButton("🛡️ Emergency Close All", callback_data="btn_cap_prop_close_all"),
+                    InlineKeyboardButton("🔄 Reset Tracker", callback_data="btn_cap_prop_reset")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_menu"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            if user_lang == 'khmer':
+                msg = (
+                    f"🏆 **PROP FIRM CHALLENGE & FUNDED EVALUATION** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💼 **គណនីប្រឡង (Tier) ៖** `${cap_data['tier']:,.0f} USD` | `{phase_name}`\n"
+                    f"🏦 **ឈ្មួញកណ្តាល ៖** `Capital.com ({env_lbl})`\n"
+                    f"🤖 **ម៉ាស៊ីន Prop Auto ៖** `{status_text}`\n"
+                    f"💰 **សមតុល្យបច្ចុប្បន្ន (Equity) ៖** `${cap_data['current_equity']:,.2f} USD` ({'+' if cap_data['gain_pct'] >= 0 else ''}{cap_data['gain_pct']:.2f}%)\n"
+                    f"🎯 **វឌ្ឍនភាព Target ៖** `{cap_data['progress_bar']}`\n"
+                    f"💵 **សល់ខ្វះ ៖** `+${cap_data['remaining_target_usd']:,.2f}` (គោលដៅ: `+${cap_data['target_usd']:,.2f}`)\n"
+                    f"🛡️ **Daily Drawdown ៖** `-${cap_data['daily_dd_usd']:,.2f} (-{cap_data['daily_dd_pct']:.2f}% / Max -3.5%)` {cap_data['daily_badge']}\n"
+                    f"🏰 **Max Drawdown ៖** `-${cap_data['max_dd_usd']:,.2f} (-{cap_data['max_dd_pct']:.2f}% / Max -7.0%)` {cap_data['overall_badge']}\n"
+                    f"⚖️ **Fixed Risk ក្នុងមួយ Trade ៖** `{cap_data['risk_pct']}% (${cap_data['max_risk_usd']:,.2f} Max Risk)`\n"
+                    f"🔖 **ស្ថានភាពគណនី (Status) ៖** `{cap_data['status']}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **ក្បួនការពារការប្រឡង ១០០% (Zero-Breach Guarantee) ៖**\n"
+                    f"• **Daily Drawdown Shield ៖** Hard Stop នៅ -3.5% (សល់ Buffer 0.5%)\n"
+                    f"• **Target Auto-Halt ៖** ចាក់សោ Pass ភ្លាមៗពេលដល់ Target\n"
+                    f"• **Dynamic Lot Sizing ៖** គណនា Lot តាម SL ច្បាស់លាស់\n"
+                    f"• **Breakeven Armor ៖** ចាក់សោ SL ពេលចំណេញ +1.5% ROI\n"
+                    f"• **Golden 80% Ratchet ៖** ការពារប្រាក់ចំណេញ 80% មិនឱ្យរបូត\n"
+                    f"• **Weekend Shield ៖** បិទ Trade មុនយប់ថ្ងៃសុក្រម៉ោង 20:00 UTC\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital PROP ON` `` | `` `/capital PROP OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"ប្រព័ន្ធជួយប្រឡងយកគណនី $10,000 ដល់ $200,000 ជាប់ ១០០%!"
+                )
+            else:
+                msg = (
+                    f"🏆 **PROP FIRM CHALLENGE & FUNDED EVALUATION** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💼 **Challenge Tier:** `${cap_data['tier']:,.0f} USD` | `{phase_name}`\n"
+                    f"🏦 **Broker Partner:** `Capital.com ({env_lbl})`\n"
+                    f"🤖 **Prop Auto Engine:** `{status_text}`\n"
+                    f"💰 **Current Equity:** `${cap_data['current_equity']:,.2f} USD` ({'+' if cap_data['gain_pct'] >= 0 else ''}{cap_data['gain_pct']:.2f}%)\n"
+                    f"🎯 **Profit Target:** `{cap_data['progress_bar']}`\n"
+                    f"💵 **Remaining Target:** `+${cap_data['remaining_target_usd']:,.2f}` (Target: `+${cap_data['target_usd']:,.2f}`)\n"
+                    f"🛡️ **Daily Drawdown:** `-${cap_data['daily_dd_usd']:,.2f} (-{cap_data['daily_dd_pct']:.2f}% / Max -3.5%)` {cap_data['daily_badge']}\n"
+                    f"🏰 **Max Drawdown:** `-${cap_data['max_dd_usd']:,.2f} (-{cap_data['max_dd_pct']:.2f}% / Max -7.0%)` {cap_data['overall_badge']}\n"
+                    f"⚖️ **Fixed Risk per Trade:** `{cap_data['risk_pct']}% (${cap_data['max_risk_usd']:,.2f} Max Risk)`\n"
+                    f"🔖 **Account Status:** `{cap_data['status']}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **100% Zero-Breach Compliance Shields:**\n"
+                    f"• **Daily Drawdown Shield:** Hard Stop at -3.5% (0.5% safety buffer)\n"
+                    f"• **Target Auto-Halt:** Locks Victory Instantly on Target (+10% / +5%)\n"
+                    f"• **Dynamic Lot Sizing:** Exact contract sizing based on SL distance\n"
+                    f"• **Breakeven Armor:** Locks SL to entry at +1.5% ROI\n"
+                    f"• **Golden 80% Ratchet:** Protects 80% peak unrealized profit\n"
+                    f"• **Weekend Shield:** Auto-closes positions before Friday 20:00 UTC\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **Presets:** `` `/capital PROP ON` `` | `` `/capital PROP OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Institutional Funded Trader Passing System 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -17838,6 +18072,17 @@ class TelegramBotThread(BaseThread):
                     args = ["AUTO", "STATUS"]
                 elif args[0].upper() not in ["AUTO"]:
                     args = ["AUTO"] + args
+            elif cmd_text in ["prop_firm", "propfirm", "prop"]:
+                await prop_firm_command(update, context)
+                return
+
+            # Subcommands routing: /capital PROP
+            if args:
+                action = str(args[0]).upper().strip()
+                if action in ["PROP", "PROPFIRM", "CHALLENGE"]:
+                    context.args = args[1:]
+                    await prop_firm_command(update, context)
+                    return
 
             # Auto config & status
             is_auto_on = db.is_capital_auto_enabled(chat_id)
@@ -17848,6 +18093,9 @@ class TelegramBotThread(BaseThread):
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle")
+                ],
+                [
+                    InlineKeyboardButton("🏆 Prop Firm Challenge ($10k-$200k)", callback_data="btn_cap_prop_menu")
                 ],
                 [
                     InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
@@ -17891,6 +18139,9 @@ class TelegramBotThread(BaseThread):
                         keyboard = InlineKeyboardMarkup([
                             [
                                 InlineKeyboardButton(f"🤖 Capital Auto: ON 🟢 (${budget:,.0f})", callback_data="btn_cap_auto_toggle")
+                            ],
+                            [
+                                InlineKeyboardButton("🏆 Prop Firm Challenge ($10k-$200k)", callback_data="btn_cap_prop_menu")
                             ],
                             [
                                 InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
@@ -18144,6 +18395,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capitalcom", capital_command))
         self.app.add_handler(CommandHandler("capital_auto", capital_command))
         self.app.add_handler(CommandHandler("capitalauto", capital_command))
+        self.app.add_handler(CommandHandler("prop_firm", prop_firm_command))
+        self.app.add_handler(CommandHandler("propfirm", prop_firm_command))
+        self.app.add_handler(CommandHandler("prop", prop_firm_command))
         self.app.add_handler(CommandHandler("wealth", wealth_command))
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))

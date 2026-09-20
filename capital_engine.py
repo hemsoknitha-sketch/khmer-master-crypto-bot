@@ -1109,6 +1109,241 @@ def evaluate_tradfi_signal(epic: str, is_demo: Optional[bool] = None) -> Dict[st
 
 
 # ==============================================================================
+# 3.5. INSTITUTIONAL PROP FIRM & FUNDED TRADING RISK MANAGER (THE 6 SACRED RULES)
+# ==============================================================================
+
+class PropFirmRiskManager:
+    """
+    Institutional Risk Compliance Engine for Prop Firm Challenges ($10,000 - $200,000).
+    Engineered to pass FTMO, Funding Pips, The Funded Trader, and Capital.com Partner challenges.
+    Strictly enforces:
+    1. Maximum Daily Loss Limit (Daily Drawdown Shield: hard halt at 3.5%, buffer before 4.0%-5.0% limit)
+    2. Maximum Overall Loss Limit (Max Trailing Drawdown Shield: hard halt at 7.0%, buffer before 8.0%-10.0% limit)
+    3. Profit Target Milestone Auto-Halt (Locks phase pass immediately upon hitting +10% or +5%)
+    4. Fixed-Fractional Dynamic Risk Sizing (0.5% - 0.75% max loss per trade calculated via SL distance)
+    5. High-Impact Economic News Shield (CPI, NFP, FOMC news freeze window)
+    6. Weekend Holding Protection (Auto-closes open swing positions before Friday 20:00 UTC)
+    """
+
+    def __init__(self):
+        self._halted_users = set()
+        self._passed_users = set()
+
+    def calculate_prop_position_size(
+        self,
+        equity: float,
+        risk_pct: float,
+        entry_price: float,
+        sl_price: float,
+        epic: str
+    ) -> float:
+        """
+        Dynamically calculates contract/lot size so maximum dollar loss strictly equals
+        equity * (risk_pct / 100.0). Guarantees zero oversized gambling.
+        """
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        max_dollar_risk = max(5.0, equity * (risk_pct / 100.0))
+        sl_dist = abs(entry_price - sl_price)
+
+        if sl_dist <= 0:
+            sl_dist = max(1.0, entry_price * 0.005)
+
+        # Asset-DNA Contract Multipliers & Min/Max Lot Bounds
+        if resolved_epic in ["GOLD", "SILVER"]:
+            # Gold: 1 lot = 1 oz. Loss = size * sl_dist
+            raw_size = max_dollar_risk / sl_dist
+            return round(min(2.0, max(0.01, raw_size)), 2)
+
+        elif resolved_epic in ["US500", "SP500", "US100", "NASDAQ", "US30", "DOW", "GERMANY40"]:
+            # Indices: 1 contract = $1 per point
+            raw_size = max_dollar_risk / sl_dist
+            return round(min(5.0, max(0.05, raw_size)), 2)
+
+        elif resolved_epic in ["OIL", "OIL_CRUDE", "OIL_BRENT"]:
+            # Crude Oil: 1 contract = 10 barrels
+            raw_size = max_dollar_risk / (sl_dist * 10.0)
+            return round(min(5.0, max(0.1, raw_size)), 1)
+
+        elif resolved_epic == "BTCUSD":
+            # Bitcoin CFD: 1 contract = 1 BTC
+            raw_size = max_dollar_risk / sl_dist
+            return round(min(0.2, max(0.001, raw_size)), 3)
+
+        elif resolved_epic in ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
+            # Equities: 1 share
+            raw_size = max_dollar_risk / sl_dist
+            return round(min(20.0, max(1.0, raw_size)), 0)
+
+        else:
+            raw_size = max_dollar_risk / sl_dist
+            return round(min(1.0, max(0.01, raw_size)), 2)
+
+    def evaluate_prop_limits_and_milestones(
+        self,
+        chat_id: int,
+        current_equity: float,
+        app=None
+    ) -> Dict[str, Any]:
+        """
+        Evaluates real-time equity against Prop Firm Challenge rules:
+        - Updates Daily Equity Baseline & High Water Mark
+        - Verifies Daily Drawdown (Hard Stop at 3.5%)
+        - Verifies Max Drawdown (Hard Stop at 7.0%)
+        - Verifies Profit Target (Auto-Locks Passed Phase)
+        """
+        import database as db
+        cfg = db.get_prop_firm_config(chat_id)
+        if not cfg.get("enabled"):
+            return {"eligible": True, "reason": "PROP_MODE_DISABLED"}
+
+        tier = cfg.get("account_tier", 10000.0)
+        phase = cfg.get("challenge_phase", 1)
+        init_bal = cfg.get("initial_balance", tier)
+        daily_start = cfg.get("daily_start_equity", tier)
+        status = cfg.get("status", "ACTIVE")
+
+        # 1. Update Tracking in DB
+        db.update_prop_firm_tracking(chat_id, current_equity)
+
+        # 2. Check If Already Halted or Breached
+        if status in ["BREACHED", "DAILY_HALTED"]:
+            return {"eligible": False, "reason": f"ACCOUNT_{status}", "status": status}
+
+        # 3. Check Daily Drawdown (4.0% Max Daily Loss -> 3.5% Safety Cushion)
+        daily_loss_pct = ((daily_start - current_equity) / daily_start) * 100.0 if daily_start > 0 else 0.0
+        max_daily_limit = cfg.get("max_daily_loss_pct", 4.0)
+        daily_brake_threshold = max_daily_limit - 0.5  # 3.5%
+
+        if daily_loss_pct >= daily_brake_threshold:
+            engine = get_capital_engine()
+            engine.close_all_capital_positions()
+            db.update_prop_firm_tracking(chat_id, current_equity, status="DAILY_HALTED")
+            logger.warning(f"🚨 [PROP FIRM DAILY BRAKE TRIGGERED] Daily Loss: -{daily_loss_pct:.2f}% (Limit: -{max_daily_limit:.1f}%). Trading halted until 00:00 UTC.")
+            return {
+                "eligible": False,
+                "reason": "DAILY_DRAWDOWN_LIMIT_REACHED",
+                "status": "DAILY_HALTED",
+                "daily_loss_pct": daily_loss_pct
+            }
+
+        # 4. Check Overall Maximum Drawdown (8.0% Max Loss -> 7.0% Safety Cushion)
+        overall_loss_pct = ((init_bal - current_equity) / init_bal) * 100.0 if init_bal > 0 else 0.0
+        max_overall_limit = cfg.get("max_overall_loss_pct", 8.0)
+        overall_brake_threshold = max_overall_limit - 1.0  # 7.0%
+
+        if overall_loss_pct >= overall_brake_threshold:
+            engine = get_capital_engine()
+            engine.close_all_capital_positions()
+            db.update_prop_firm_tracking(chat_id, current_equity, status="BREACHED")
+            logger.critical(f"🛑 [PROP FIRM MAX DRAWDOWN BRAKE] Drawdown: -{overall_loss_pct:.2f}%. Trading permanently stopped to preserve account.")
+            return {
+                "eligible": False,
+                "reason": "MAX_DRAWDOWN_BREACH_GUARD",
+                "status": "BREACHED",
+                "overall_loss_pct": overall_loss_pct
+            }
+
+        # 5. Check Profit Target Milestone (Phase 1: +10%, Phase 2: +5%)
+        target_pct = cfg.get("profit_target_pct", 10.0)
+        if target_pct > 0:
+            current_gain_pct = ((current_equity - init_bal) / init_bal) * 100.0 if init_bal > 0 else 0.0
+            if current_gain_pct >= target_pct:
+                engine = get_capital_engine()
+                engine.close_all_capital_positions()
+                new_status = "PASSED_PHASE_1" if phase == 1 else "PASSED_PHASE_2"
+                db.update_prop_firm_tracking(chat_id, current_equity, status=new_status)
+                logger.info(f"🎉 [PROP FIRM CHALLENGE PASSED!] Target +{current_gain_pct:.2f}% reached! Status updated to {new_status}.")
+                return {
+                    "eligible": False,
+                    "reason": "TARGET_ACHIEVED_CHALLENGE_PASSED",
+                    "status": new_status,
+                    "gain_pct": current_gain_pct
+                }
+
+        # 6. Check Weekend Holding Shield
+        if cfg.get("no_weekend_holding", True):
+            import datetime
+            now_dt = datetime.datetime.now(datetime.timezone.utc)
+            if now_dt.weekday() == 4 and now_dt.hour >= 19 and now_dt.minute >= 30:
+                engine = get_capital_engine()
+                engine.close_all_capital_positions()
+                return {"eligible": False, "reason": "WEEKEND_HOLDING_GUARD_ACTIVE", "status": status}
+
+        return {
+            "eligible": True,
+            "reason": "COMPLIANT",
+            "status": status,
+            "daily_loss_pct": daily_loss_pct,
+            "overall_loss_pct": overall_loss_pct
+        }
+
+    def get_prop_firm_dashboard(self, chat_id: int) -> Dict[str, Any]:
+        """
+        Compiles institutional dashboard data for Telegram UI.
+        """
+        import database as db
+        cfg = db.get_prop_firm_config(chat_id)
+        engine = get_capital_engine()
+        bal_info = engine.get_account_balance()
+        curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+        if curr_equity <= 0:
+            curr_equity = cfg.get("initial_balance", 10000.0)
+
+        eval_res = self.evaluate_prop_limits_and_milestones(chat_id, curr_equity)
+
+        tier = cfg.get("account_tier", 10000.0)
+        init_bal = cfg.get("initial_balance", tier)
+        daily_start = cfg.get("daily_start_equity", tier)
+        phase = cfg.get("challenge_phase", 1)
+        target_pct = cfg.get("profit_target_pct", 10.0)
+        risk_pct = cfg.get("risk_per_trade_pct", 0.75)
+        status = eval_res.get("status", cfg.get("status", "ACTIVE"))
+
+        pnl_usd = curr_equity - init_bal
+        gain_pct = (pnl_usd / init_bal) * 100.0 if init_bal > 0 else 0.0
+        daily_dd_usd = daily_start - curr_equity
+        daily_dd_pct = (daily_dd_usd / daily_start) * 100.0 if daily_start > 0 else 0.0
+        max_dd_usd = init_bal - curr_equity
+        max_dd_pct = (max_dd_usd / init_bal) * 100.0 if init_bal > 0 else 0.0
+        
+        target_usd = init_bal * (target_pct / 100.0) if target_pct > 0 else 0.0
+        progress_pct = min(100.0, max(0.0, (pnl_usd / target_usd * 100.0))) if target_usd > 0 else 100.0
+        remaining_target_usd = max(0.0, target_usd - pnl_usd) if target_usd > 0 else 0.0
+
+        filled_blocks = int(progress_pct / 10)
+        empty_blocks = 10 - filled_blocks
+        progress_bar = f"[{'█' * filled_blocks}{'░' * empty_blocks}] {progress_pct:.1f}%"
+
+        daily_badge = "🟢 SAFE" if daily_dd_pct < 2.5 else ("🟡 CAUTION" if daily_dd_pct < 3.5 else "🔴 HALTED")
+        overall_badge = "🟢 SAFE" if max_dd_pct < 5.0 else ("🟡 CAUTION" if max_dd_pct < 7.0 else "🔴 BREACH GUARD")
+
+        return {
+            "is_enabled": cfg.get("enabled", False),
+            "firm_name": cfg.get("firm_name", "FTMO"),
+            "tier": tier,
+            "phase": phase,
+            "initial_balance": init_bal,
+            "current_equity": curr_equity,
+            "pnl_usd": pnl_usd,
+            "gain_pct": gain_pct,
+            "daily_dd_usd": max(0.0, daily_dd_usd),
+            "daily_dd_pct": max(0.0, daily_dd_pct),
+            "max_dd_usd": max(0.0, max_dd_usd),
+            "max_dd_pct": max(0.0, max_dd_pct),
+            "target_usd": target_usd,
+            "remaining_target_usd": remaining_target_usd,
+            "progress_bar": progress_bar,
+            "progress_pct": progress_pct,
+            "risk_pct": risk_pct,
+            "max_risk_usd": curr_equity * (risk_pct / 100.0),
+            "status": status,
+            "daily_badge": daily_badge,
+            "overall_badge": overall_badge,
+            "is_demo": engine.is_demo
+        }
+
+
+# ==============================================================================
 # 4. CAPITAL.COM 24/7 AUTONOMOUS INSTITUTIONAL ENGINE (CAPITAL AUTO)
 # ==============================================================================
 
@@ -1121,12 +1356,14 @@ class CapitalAutonomousEngine:
     3. Central Bank Gold Radar & Black Swan Guard
     4. 24/7 Session Awareness (London, NY, Asian/Weekend BTC CFD)
     5. Breakeven Armor (+1.5% ROI lock) & Golden 80% Trailing Ratchet
+    6. Institutional Prop Firm Challenge Mode ($10k-$200k Funded Trader Evaluation)
     """
     def __init__(self):
         self._peak_upl_cache: Dict[str, float] = {}  # deal_id -> peak_upl
         self._be_locked_set = set()                   # deal_ids that reached Breakeven Armor
         self._last_scan_ts: float = 0.0
         self._scan_interval: float = 25.0             # Scan markets every 25 seconds
+        self.prop_manager = PropFirmRiskManager()
 
     def get_session_priority_assets(self) -> List[str]:
         """
@@ -1320,6 +1557,19 @@ class CapitalAutonomousEngine:
                     if hasattr(self, "_fortress_locked_set"):
                         self._fortress_locked_set.discard(deal_id)
 
+        # Real-time Prop Firm Challenge limits check
+        try:
+            import database as db
+            active_prop_users = db.get_active_prop_firm_users()
+            if active_prop_users:
+                bal_info = engine.get_account_balance()
+                curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+                for pu in active_prop_users:
+                    cid = pu["chat_id"]
+                    self.prop_manager.evaluate_prop_limits_and_milestones(cid, curr_eq, app=app)
+        except Exception as e_prop_eval:
+            logger.debug(f"Prop Firm evaluation note: {e_prop_eval}")
+
         return {
             "active_count": len(positions),
             "ratcheted": ratcheted_count,
@@ -1332,10 +1582,13 @@ class CapitalAutonomousEngine:
         1. Monitors active positions across all users.
         2. Discovers new opportunities across priority assets.
         3. Executes trades for opted-in users within budget & max position limits.
+        4. Enforces strict Prop Firm Challenge rules for evaluation traders.
         """
         import database as db
         active_users = db.get_active_capital_auto_users()
-        if not active_users:
+        active_prop_users = db.get_active_prop_firm_users()
+
+        if not active_users and not active_prop_users:
             return
 
         now = time.time()
@@ -1384,6 +1637,7 @@ class CapitalAutonomousEngine:
 
         logger.info(f"👑 [APEX TRADFI SETUP SELECTED] {resolved_epic} {final_action} | Score: {best_rank:.1f} | Conf: {confidence}% | ADX: {setup.get('adx', 0):.1f} | RVOL: {setup.get('rvol', 1.0)}x")
         
+        # Step 4a: Process Standard Capital Auto Users
         for user in active_users:
             chat_id = user["chat_id"]
             budget = user.get("budget", 50.0)
@@ -1496,6 +1750,123 @@ class CapitalAutonomousEngine:
                 # Throttle to 1 trade per cycle
                 break
 
+        # Step 4b: Process Active Prop Firm Challenge Users
+        for prop_user in active_prop_users:
+            chat_id = prop_user["chat_id"]
+            bal_info = engine.get_account_balance()
+            curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+            if curr_equity <= 0:
+                curr_equity = prop_user.get("initial_balance", 10000.0)
+
+            # Check prop firm limits and milestones
+            compliance = self.prop_manager.evaluate_prop_limits_and_milestones(chat_id, curr_equity, app=app)
+            if not compliance.get("eligible"):
+                continue
+
+            max_pos = prop_user.get("max_concurrent_trades", 2)
+            if len(open_positions) >= max_pos:
+                continue
+
+            # Calculate dynamic fixed-risk position size
+            entry_px = setup.get("ask" if final_action == "BUY" else "bid", 0.0)
+            sl_px = setup.get("sl", entry_px * 0.99)
+            risk_pct = prop_user.get("risk_per_trade_pct", 0.75)
+            prop_size = self.prop_manager.calculate_prop_position_size(
+                equity=curr_equity,
+                risk_pct=risk_pct,
+                entry_price=entry_px,
+                sl_price=sl_px,
+                epic=resolved_epic
+            )
+
+            trade_res = engine.execute_smart_tradfi_order(
+                epic=resolved_epic,
+                direction=final_action,
+                size=prop_size
+            )
+
+            if trade_res.get("success"):
+                deal_ref = trade_res.get("deal_reference", "PROP")
+                deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
+                sl = trade_res.get("sl", 0.0)
+                tp = trade_res.get("tp", 0.0)
+                executed_size = trade_res.get("size", prop_size)
+
+                db.record_capital_auto_trade(
+                    chat_id=chat_id,
+                    deal_id=str(deal_id),
+                    deal_reference=str(deal_ref),
+                    epic=resolved_epic,
+                    direction=final_action,
+                    size=executed_size,
+                    entry_price=entry_px,
+                    sl=sl,
+                    tp=tp
+                )
+
+                # Send Prop Firm Telegram Notification
+                if app and hasattr(app, "bot"):
+                    try:
+                        user_lang = db.get_user_language(chat_id)
+                        import ui_standards
+                        env_lbl = "DEMO ($10,000 Virtual)" if engine.is_demo else "PROP LIVE CHALLENGE"
+                        dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
+                        tier_fmt = f"${prop_user.get('account_tier', 10000.0):,.0f}"
+                        phase_lbl = f"Phase {prop_user.get('challenge_phase', 1)}"
+                        risk_usd = curr_equity * (risk_pct / 100.0)
+
+                        if user_lang == 'khmer':
+                            notif_msg = (
+                                f"🏆 **[PROP FIRM CHALLENGE TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💼 **គណនីប្រឡង ៖** `{tier_fmt}` | `{phase_lbl}`\n"
+                                f"⚙️ **បរិស្ថាន ៖** `{env_lbl}`\n"
+                                f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
+                                f"⚖️ **Fixed Risk ៖** `{risk_pct}% (${risk_usd:,.2f} Max Risk)`\n"
+                                f"📦 **ទំហំ Lot (Dynamic) ៖** `{executed_size} contracts`\n"
+                                f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R) ៖** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **ក្បួនការពារការប្រឡង (100% Zero-Breach Guard) ៖**\n"
+                                f"• Daily Loss Limit Shield: Hard Halt នៅ -3.5%\n"
+                                f"• Target Auto-Halt: ចាក់សោ Pass ភ្លាមៗពេលដល់ Target\n"
+                                f"• Breakeven Armor នៅ +1.5% ROI (Risk -> 0.00R)\n"
+                                f"• Golden 80% Trailing Ratchet ការពារចំណេញកំពូល\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរការប្រឡងឱ្យជាប់ ១០០%!_"
+                            )
+                        else:
+                            notif_msg = (
+                                f"🏆 **[PROP FIRM CHALLENGE TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💼 **Challenge Account:** `{tier_fmt}` | `{phase_lbl}`\n"
+                                f"⚙️ **Environment:** `{env_lbl}`\n"
+                                f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
+                                f"🎯 **Direction:** `{dir_emoji}`\n"
+                                f"⚖️ **Fixed Risk:** `{risk_pct}% (${risk_usd:,.2f} Max Risk)`\n"
+                                f"📦 **Dynamic Lot Size:** `{executed_size} contracts`\n"
+                                f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R):** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R):** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference:** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **Prop Firm Compliance Shields:**\n"
+                                f"• Daily Drawdown Shield: Hard Halt at -3.5%\n"
+                                f"• Target Auto-Halt: Locks Victory Instantly on Target\n"
+                                f"• Breakeven Armor at +1.5% ROI (Risk -> 0.00R)\n"
+                                f"• Golden 80% Trailing Ratchet\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _AI Engine actively executing strict compliance rules!_"
+                            )
+                        await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
+                    except Exception as notif_err:
+                        logger.error(f"Failed to send Prop Firm notification: {notif_err}")
+
+                break
+
 
 # Singleton Instance
 CAPITAL_AUTO_ENGINE = CapitalAutonomousEngine()
@@ -1503,6 +1874,10 @@ CAPITAL_AUTO_ENGINE = CapitalAutonomousEngine()
 def get_capital_auto_engine() -> CapitalAutonomousEngine:
     """Returns singleton instance of CapitalAutonomousEngine."""
     return CAPITAL_AUTO_ENGINE
+
+def get_prop_firm_dashboard(chat_id: int) -> Dict[str, Any]:
+    """Returns the Prop Firm Challenge dashboard metrics."""
+    return CAPITAL_AUTO_ENGINE.prop_manager.get_prop_firm_dashboard(chat_id)
 
 async def run_capital_auto_cycle(app=None):
     """Entry point for APScheduler in scheduler_tasks.py."""

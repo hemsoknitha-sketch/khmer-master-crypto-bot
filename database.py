@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List, Tuple
 import security
 
 # Absolute path to ensure the DB is created in the Apex_AI_Bot folder
@@ -985,6 +986,32 @@ def init_db():
             status TEXT DEFAULT 'OPEN',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             closed_at DATETIME,
+            FOREIGN KEY (chat_id) REFERENCES users (chat_id)
+        )
+    ''')
+
+    # Prop Firm Challenge Engine Config & Risk Tracker
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS prop_firm_challenge_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled BOOLEAN NOT NULL DEFAULT 0,
+            firm_name TEXT DEFAULT 'FTMO',
+            account_tier REAL DEFAULT 10000.0,
+            challenge_phase INTEGER DEFAULT 1,
+            initial_balance REAL DEFAULT 10000.0,
+            high_water_mark REAL DEFAULT 10000.0,
+            daily_start_equity REAL DEFAULT 10000.0,
+            daily_date TEXT DEFAULT '',
+            max_daily_loss_pct REAL DEFAULT 4.0,
+            max_overall_loss_pct REAL DEFAULT 8.0,
+            profit_target_pct REAL DEFAULT 10.0,
+            risk_per_trade_pct REAL DEFAULT 0.75,
+            max_concurrent_trades INTEGER DEFAULT 2,
+            no_weekend_holding BOOLEAN DEFAULT 1,
+            news_guard_enabled BOOLEAN DEFAULT 1,
+            status TEXT DEFAULT 'ACTIVE',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )
     ''')
@@ -2448,6 +2475,197 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
     except Exception:
         conn.close()
     return {"total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0}
+
+# ==============================================================================
+# PROP FIRM / FUNDED TRADING CHALLENGE ENGINE DATA LAYER
+# ==============================================================================
+
+def get_prop_firm_config(chat_id: int) -> dict:
+    """Returns the Prop Firm Challenge configuration and risk tracking state for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT is_enabled, firm_name, account_tier, challenge_phase, initial_balance,
+                   high_water_mark, daily_start_equity, daily_date, max_daily_loss_pct,
+                   max_overall_loss_pct, profit_target_pct, risk_per_trade_pct,
+                   max_concurrent_trades, no_weekend_holding, news_guard_enabled, status
+            FROM prop_firm_challenge_config WHERE chat_id = ?
+        """, (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "enabled": bool(row[0]),
+                "firm_name": str(row[1] or "FTMO"),
+                "account_tier": float(row[2] or 10000.0),
+                "challenge_phase": int(row[3] or 1),
+                "initial_balance": float(row[4] or 10000.0),
+                "high_water_mark": float(row[5] or 10000.0),
+                "daily_start_equity": float(row[6] or 10000.0),
+                "daily_date": str(row[7] or ""),
+                "max_daily_loss_pct": float(row[8] or 4.0),
+                "max_overall_loss_pct": float(row[9] or 8.0),
+                "profit_target_pct": float(row[10] or 10.0),
+                "risk_per_trade_pct": float(row[11] or 0.75),
+                "max_concurrent_trades": int(row[12] or 2),
+                "no_weekend_holding": bool(row[13]),
+                "news_guard_enabled": bool(row[14]),
+                "status": str(row[15] or "ACTIVE")
+            }
+    except Exception:
+        conn.close()
+    return {
+        "enabled": False,
+        "firm_name": "FTMO",
+        "account_tier": 10000.0,
+        "challenge_phase": 1,
+        "initial_balance": 10000.0,
+        "high_water_mark": 10000.0,
+        "daily_start_equity": 10000.0,
+        "daily_date": "",
+        "max_daily_loss_pct": 4.0,
+        "max_overall_loss_pct": 8.0,
+        "profit_target_pct": 10.0,
+        "risk_per_trade_pct": 0.75,
+        "max_concurrent_trades": 2,
+        "no_weekend_holding": True,
+        "news_guard_enabled": True,
+        "status": "ACTIVE"
+    }
+
+def is_prop_firm_enabled(chat_id: int) -> bool:
+    """Fast check if a user has enabled Prop Firm Challenge Mode."""
+    cfg = get_prop_firm_config(chat_id)
+    return cfg.get("enabled", False)
+
+def set_prop_firm_config(
+    chat_id: int,
+    enabled: bool,
+    tier: float = 10000.0,
+    phase: int = 1,
+    risk_pct: float = 0.75,
+    firm: str = "FTMO",
+    initial_balance: Optional[float] = None
+):
+    """Sets or updates the Prop Firm Challenge parameters."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    init_bal = float(initial_balance if initial_balance is not None and initial_balance > 0 else tier)
+    target_pct = 10.0 if phase == 1 else (5.0 if phase == 2 else 0.0)
+    cursor.execute("""
+        INSERT INTO prop_firm_challenge_config (
+            chat_id, is_enabled, firm_name, account_tier, challenge_phase,
+            initial_balance, high_water_mark, daily_start_equity,
+            profit_target_pct, risk_per_trade_pct, status, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            firm_name = excluded.firm_name,
+            account_tier = excluded.account_tier,
+            challenge_phase = excluded.challenge_phase,
+            initial_balance = excluded.initial_balance,
+            profit_target_pct = excluded.profit_target_pct,
+            risk_per_trade_pct = excluded.risk_per_trade_pct,
+            updated_at = excluded.updated_at
+    """, (
+        chat_id, 1 if enabled else 0, str(firm), float(tier), int(phase),
+        init_bal, init_bal, init_bal, target_pct, float(risk_pct), now_str
+    ))
+    conn.commit()
+    conn.close()
+
+def update_prop_firm_tracking(
+    chat_id: int,
+    current_equity: float,
+    status: Optional[str] = None
+):
+    """Updates high water mark, daily equity baseline (at UTC midnight), and status."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    cfg = get_prop_firm_config(chat_id)
+    stored_date = cfg.get("daily_date", "")
+    hwm = max(cfg.get("high_water_mark", current_equity), current_equity)
+    
+    # Check if UTC calendar day rolled over
+    if stored_date != today_str:
+        daily_start = current_equity
+        # If was daily halted, automatically resume for new trading day
+        new_status = "ACTIVE" if cfg.get("status") == "DAILY_HALTED" else (status or cfg.get("status", "ACTIVE"))
+        cursor.execute("""
+            UPDATE prop_firm_challenge_config
+            SET high_water_mark = ?, daily_start_equity = ?, daily_date = ?, status = ?, updated_at = ?
+            WHERE chat_id = ?
+        """, (hwm, daily_start, today_str, new_status, now_str, chat_id))
+    else:
+        if status:
+            cursor.execute("""
+                UPDATE prop_firm_challenge_config
+                SET high_water_mark = ?, status = ?, updated_at = ?
+                WHERE chat_id = ?
+            """, (hwm, status, now_str, chat_id))
+        else:
+            cursor.execute("""
+                UPDATE prop_firm_challenge_config
+                SET high_water_mark = ?, updated_at = ?
+                WHERE chat_id = ?
+            """, (hwm, now_str, chat_id))
+    conn.commit()
+    conn.close()
+
+def reset_prop_firm_challenge(chat_id: int, tier: float = 10000.0, phase: int = 1):
+    """Resets tracking metrics back to clean initial challenge state."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    target_pct = 10.0 if phase == 1 else (5.0 if phase == 2 else 0.0)
+    cursor.execute("""
+        UPDATE prop_firm_challenge_config
+        SET account_tier = ?, challenge_phase = ?, initial_balance = ?,
+            high_water_mark = ?, daily_start_equity = ?, daily_date = ?,
+            profit_target_pct = ?, status = 'ACTIVE', updated_at = ?
+        WHERE chat_id = ?
+    """, (tier, phase, tier, tier, tier, today_str, target_pct, now_str, chat_id))
+    conn.commit()
+    conn.close()
+
+def get_active_prop_firm_users() -> list:
+    """Returns all users who have Prop Firm Challenge mode active."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT chat_id, account_tier, challenge_phase, initial_balance,
+                   high_water_mark, daily_start_equity, max_daily_loss_pct,
+                   max_overall_loss_pct, profit_target_pct, risk_per_trade_pct,
+                   status
+            FROM prop_firm_challenge_config
+            WHERE is_enabled = 1
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            "chat_id": r[0],
+            "account_tier": float(r[1]),
+            "challenge_phase": int(r[2]),
+            "initial_balance": float(r[3]),
+            "high_water_mark": float(r[4]),
+            "daily_start_equity": float(r[5]),
+            "max_daily_loss_pct": float(r[6]),
+            "max_overall_loss_pct": float(r[7]),
+            "profit_target_pct": float(r[8]),
+            "risk_per_trade_pct": float(r[9]),
+            "status": str(r[10])
+        } for r in rows]
+    except Exception:
+        conn.close()
+        return []
 
 def can_user_buy(chat_id: int) -> bool:
     config = get_auto_trade_config(chat_id)
