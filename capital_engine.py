@@ -998,11 +998,13 @@ class CapitalComEngine:
         total_unrealized_pnl = 0.0
         for p in positions:
             pos = p.get("position", {})
+            market = p.get("market", {})
             upl = float(pos.get("upl", 0.0))
             total_unrealized_pnl += upl
             pos_summary.append({
                 "deal_id": pos.get("dealId"),
-                "epic": pos.get("epic"),
+                "epic": pos.get("epic") or market.get("epic") or market.get("symbol") or market.get("instrumentName", "CFD"),
+                "instrument_name": market.get("instrumentName", "Unknown"),
                 "direction": pos.get("direction"),
                 "size": float(pos.get("size", 0.0)),
                 "level": float(pos.get("level", 0.0)),

@@ -18584,8 +18584,9 @@ class TelegramBotThread(BaseThread):
                     else:
                         lines = [f"📊 **CAPITAL.COM ACTIVE POSITIONS ({len(positions)})**", ui_standards.DIVIDER_HEAVY]
                         for p in positions:
-                            lines.append(f"• **{p['epic']}** ({p['direction']}) Size: `{p['size']}`")
-                            lines.append(f"  Entry: `${p['level']:,.2f}` | PnL: `${p['upl']:,.2f} {p['currency']}`")
+                            epic_name = p.get('epic') or p.get('instrument_name') or 'CFD'
+                            lines.append(f"• **{epic_name}** ({p.get('direction', 'BUY')}) Size: `{p.get('size', 0.0)}`")
+                            lines.append(f"  Entry: `${p.get('level', 0.0):,.2f}` | PnL: `${p.get('upl', 0.0):,.2f} {p.get('currency', 'USD')}`")
                         lines.append(ui_standards.DIVIDER_HEAVY)
                         p_msg = "\n".join(lines)
                     await update.effective_message.reply_text(p_msg, parse_mode="Markdown", reply_markup=keyboard)
