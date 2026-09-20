@@ -18257,6 +18257,24 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
+            mismatch_warning_kh = ""
+            mismatch_warning_en = ""
+            if cap_data['current_equity'] > 0 and cap_data['tier'] > cap_data['current_equity'] * 3.0:
+                mismatch_warning_kh = (
+                    f"⚠️ **ដំណឹងពីទំហំ Tier (Scale Mismatch Alert) ៖**\n"
+                    f"• ទុនក្នុង Capital.com ជាក់ស្តែង ៖ `${cap_data['current_equity']:,.2f} USD`\n"
+                    f"• Challenge Tier កំពុងជ្រើសរើស ៖ `${cap_data['tier']:,.0f} USD`\n"
+                    f"👉 **ដំណោះស្រាយ ៖** សូមចុចប៊ូតុង **[ 💰 $1k ]** ខាងក្រោម ឬវាយ `` `/capital PROP ON 1000 1` `` ដើម្បីដំណើរការប្រក្រតីឡើងវិញ!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                )
+                mismatch_warning_en = (
+                    f"⚠️ **Scale Mismatch Notice:**\n"
+                    f"• Actual Broker Equity: `${cap_data['current_equity']:,.2f} USD`\n"
+                    f"• Challenge Tier Selected: `${cap_data['tier']:,.0f} USD`\n"
+                    f"👉 **Action Required:** Click **[ 💰 $1k ]** below or use `` `/capital PROP ON 1000 1` `` to align with your account balance!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                )
+
             if user_lang == 'khmer':
                 msg = (
                     f"🏆 **PROP FIRM CHALLENGE & FUNDED EVALUATION** ⚡\n"
@@ -18273,6 +18291,7 @@ class TelegramBotThread(BaseThread):
                     f"⚖️ **Fixed Risk ក្នុងមួយ Trade ៖** `{cap_data['risk_pct']}% (${cap_data['max_risk_usd']:,.2f} Max Risk)`\n"
                     f"🔖 **ស្ថានភាពគណនី (Status) ៖** `{cap_data['status']}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"{mismatch_warning_kh}"
                     f"🛡️ **ក្បួនការពារការប្រឡង ១០០% (Zero-Breach Guarantee) ៖**\n"
                     f"• **Daily Drawdown Shield ៖** Hard Stop នៅ -3.5% (សល់ Buffer 0.5%)\n"
                     f"• **Target Auto-Halt ៖** ចាក់សោ Pass ភ្លាមៗពេលដល់ Target\n"
@@ -18305,6 +18324,7 @@ class TelegramBotThread(BaseThread):
                     f"⚖️ **Fixed Risk per Trade:** `{cap_data['risk_pct']}% (${cap_data['max_risk_usd']:,.2f} Max Risk)`\n"
                     f"🔖 **Account Status:** `{cap_data['status']}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"{mismatch_warning_en}"
                     f"🛡️ **100% Zero-Breach Compliance Shields:**\n"
                     f"• **Daily Drawdown Shield:** Hard Stop at -3.5% (0.5% safety buffer)\n"
                     f"• **Target Auto-Halt:** Locks Victory Instantly on Target (+10% / +5%)\n"
