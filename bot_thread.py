@@ -1595,6 +1595,7 @@ class TelegramBotThread(BaseThread):
 
             # Sub-action: PILLAR 2: BALANCER V2 VAULT 0% FEE FLASH LOAN (/flash_loan BALANCER or callback)
             if (args and args[0].upper() in ["BALANCER", "0FEE", "ZERO_FEE"]) or (update.callback_query and update.callback_query.data == "btn_flash_loan_balancer"):
+                sent_bal = await send_reply_or_edit(update, context, "⚖️ **Analyzing Balancer V2 Vault 0.00% Fee Flash Loan Architecture...**")
                 import flash_loan_mev_engine
                 b_info = flash_loan_mev_engine.flash_loan_engine.get_balancer_zero_fee_analysis()
                 c = b_info["comparison"]
@@ -1651,8 +1652,8 @@ class TelegramBotThread(BaseThread):
                         "💡 _Balancer 0% Fee unlocks 10x-15x more profitable arbitrage opportunities per 24 hours!_"
                     )
 
-                if sent_base:
-                    try: await sent_base.edit_text(bal_msg, parse_mode="Markdown", reply_markup=keyboard)
+                if sent_bal:
+                    try: await sent_bal.edit_text(bal_msg, parse_mode="Markdown", reply_markup=keyboard)
                     except Exception: await send_long_message(context, chat_id, bal_msg, reply_markup=keyboard)
                 else:
                     await send_long_message(context, chat_id, bal_msg, reply_markup=keyboard)
