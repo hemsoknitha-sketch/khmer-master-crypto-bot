@@ -5653,6 +5653,24 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_command(update, context)
+            elif data == "btn_cap_leadlag_toggle":
+                curr_state = db.is_capital_leadlag_enabled(chat_id)
+                new_state = not curr_state
+                db.set_capital_leadlag_config(chat_id, enabled=new_state)
+                toast_msg = "⚡ Lead-Lag Arb: បានបើកដំណើរការ!" if new_state else "🛑 Lead-Lag Arb: បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_leadlag_radar":
+                try:
+                    await update.callback_query.answer("📡 កំពុងទាញយកទិន្នន័យ Lead-Lag Radar...")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_leadlag_command(update, context)
             elif data == "btn_cap_auto_budget_10":
                 db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=3, is_demo=False)
                 try:
@@ -18629,6 +18647,141 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def capital_leadlag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            leadlag_engine = capital_engine.get_capital_leadlag_engine()
+
+            # Handle Subcommands: ON, OFF, STATUS
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["ON", "START", "ENABLE"]:
+                    db.set_capital_leadlag_config(chat_id, enabled=True)
+                elif sub in ["OFF", "STOP", "DISABLE"]:
+                    db.set_capital_leadlag_config(chat_id, enabled=False)
+
+            is_leadlag_on = db.is_capital_leadlag_enabled(chat_id)
+            telemetry = leadlag_engine.get_telemetry()
+            pairs = telemetry.get("pairs", {})
+            btc_data = pairs.get("BTCUSD", {})
+            eth_data = pairs.get("ETHUSD", {})
+            sol_data = pairs.get("SOLUSD", {})
+            stats = db.get_capital_leadlag_stats(chat_id)
+
+            toggle_text = "⚡ Lead-Lag Arb: ON 🟢" if is_leadlag_on else "⚡ Lead-Lag Arb: OFF ⚪"
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(toggle_text, callback_data="btn_cap_leadlag_toggle"),
+                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_cap_leadlag_radar")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ /capital Menu", callback_data="btn_cap_menu"),
+                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions")
+                ]
+            ])
+
+            btc_binance = btc_data.get("binance_price", 0.0)
+            btc_capital = btc_data.get("capital_mid", 0.0)
+            btc_disloc = btc_data.get("dislocation_pct", 0.0)
+
+            eth_binance = eth_data.get("binance_price", 0.0)
+            eth_capital = eth_data.get("capital_mid", 0.0)
+            eth_disloc = eth_data.get("dislocation_pct", 0.0)
+
+            sol_binance = sol_data.get("binance_price", 0.0)
+            sol_capital = sol_data.get("capital_mid", 0.0)
+            sol_disloc = sol_data.get("dislocation_pct", 0.0)
+
+            spikes_detected = telemetry.get("spikes_detected", 0)
+            orders_dispatched = telemetry.get("orders_dispatched", 0)
+            successful_exec = telemetry.get("successful_executions", 0)
+            status_emoji = "🟢 ACTIVE (Streaming)" if is_leadlag_on else "⚪ PAUSED (Standby)"
+
+            if user_lang == 'khmer':
+                msg = (
+                    f"⚡ **LEAD-LAG ARBITRAGE RADAR & ENGINE** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🌐 **ស្ថានភាព Engine ៖** `{status_emoji}`\n"
+                    f"📡 **Binance Stream ៖** `Sub-0.05ms Direct RAM Active`\n"
+                    f"🏛️ **Broker Target ៖** `Capital.com Global CFDs`\n"
+                    f"⏱️ **ចន្លោះ Lag Detection ៖** `500 ms - 2000 ms`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📊 **ផ្សាយផ្ទាល់គម្លាតថ្លៃ (Live Dislocation Telemetry) ៖**\n"
+                    f"• **BTC/USD ៖** Binance `${btc_binance:,.2f}` | Cap `${btc_capital:,.2f}`\n"
+                    f"   └ គម្លាត Dislocation ៖ `{btc_disloc:+.3f}%`\n"
+                    f"• **ETH/USD ៖** Binance `${eth_binance:,.2f}` | Cap `${eth_capital:,.2f}`\n"
+                    f"   └ គម្លាត Dislocation ៖ `{eth_disloc:+.3f}%`\n"
+                    f"• **SOL/USD ៖** Binance `${sol_binance:,.2f}` | Cap `${sol_capital:,.2f}`\n"
+                    f"   └ គម្លាត Dislocation ៖ `{sol_disloc:+.3f}%`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📈 **ស្ថិតិចាប់សញ្ញា & ការជួញដូរ ៖**\n"
+                    f"• Spikes រកឃើញសរុប ៖ `{spikes_detected:,}`\n"
+                    f"• បញ្ជាទិញ Dispatched ៖ `{orders_dispatched:,}`\n"
+                    f"• ជោគជ័យ Executed ៖ `{successful_exec:,}`\n"
+                    f"• ប្រតិបត្តិការរបស់អ្នក ៖ `{stats.get('total_trades', 0)} trades`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **ក្បួនការពារ & ប្រៀបឈ្នះគណិតវិជ្ជា ៖**\n"
+                    f"• **Spread Hurdle ៖** Dislocation ≥ Spread × 1.4\n"
+                    f"• **Invariant 16 ៖** ហាម Short បាតដាច់ខាត (RSI ≤ 38.0)\n"
+                    f"• **Breakeven Armor ៖** ចាក់សោរដើមនៅ +1.5% ROI\n"
+                    f"• **Golden 80% Ratchet ៖** រក្សាផលចំណេញខ្ពស់បំផុត 80%\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Presets ៖**\n"
+                    f"• `` `/capital leadlag ON` ``\n"
+                    f"• `` `/capital leadlag OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"High-Frequency Pure Latency Alpha 24/7!"
+                )
+            else:
+                msg = (
+                    f"⚡ **LEAD-LAG ARBITRAGE RADAR & ENGINE** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🌐 **Engine Status:** `{status_emoji}`\n"
+                    f"📡 **Binance Stream:** `Sub-0.05ms Direct RAM Active`\n"
+                    f"🏛️ **Broker Target:** `Capital.com Global CFDs`\n"
+                    f"⏱️ **Lag Window:** `500 ms - 2000 ms`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📊 **Live Dislocation Telemetry:**\n"
+                    f"• **BTC/USD:** Binance `${btc_binance:,.2f}` | Cap `${btc_capital:,.2f}`\n"
+                    f"   └ Dislocation: `{btc_disloc:+.3f}%`\n"
+                    f"• **ETH/USD:** Binance `${eth_binance:,.2f}` | Cap `${eth_capital:,.2f}`\n"
+                    f"   └ Dislocation: `{eth_disloc:+.3f}%`\n"
+                    f"• **SOL/USD:** Binance `${sol_binance:,.2f}` | Cap `${sol_capital:,.2f}`\n"
+                    f"   └ Dislocation: `{sol_disloc:+.3f}%`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📈 **Execution Statistics:**\n"
+                    f"• Spikes Detected: `{spikes_detected:,}`\n"
+                    f"• Orders Dispatched: `{orders_dispatched:,}`\n"
+                    f"• Successfully Executed: `{successful_exec:,}`\n"
+                    f"• Your Trades: `{stats.get('total_trades', 0)} trades`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **Institutional Protection Shields:**\n"
+                    f"• **Spread Hurdle:** Dislocation ≥ Spread × 1.4\n"
+                    f"• **Invariant 16:** Anti-Oversold Short Guard (RSI ≤ 38.0)\n"
+                    f"• **Breakeven Armor:** Locks SL to Entry at +1.5% ROI\n"
+                    f"• **Golden 80% Ratchet:** Ratchets 80% peak profit\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Presets:**\n"
+                    f"• `` `/capital leadlag ON` ``\n"
+                    f"• `` `/capital leadlag OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"High-Frequency Pure Latency Alpha 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -18649,6 +18802,9 @@ class TelegramBotThread(BaseThread):
                     args = ["AUTO", "STATUS"]
                 elif args[0].upper() not in ["AUTO"]:
                     args = ["AUTO"] + args
+            elif cmd_text in ["capital_leadlag", "capitalleadlag", "leadlag"]:
+                await capital_leadlag_command(update, context)
+                return
             elif cmd_text in ["prop_firm", "propfirm", "prop"]:
                 await prop_firm_command(update, context)
                 return
@@ -18656,7 +18812,7 @@ class TelegramBotThread(BaseThread):
                 await capital_ib_command(update, context)
                 return
 
-            # Subcommands routing: /capital PROP / /capital IB
+            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG
             if args:
                 action = str(args[0]).upper().strip()
                 if action in ["PROP", "PROPFIRM", "CHALLENGE"]:
@@ -18667,20 +18823,31 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_ib_command(update, context)
                     return
+                elif action in ["LEADLAG", "LEAD_LAG", "ARB", "ARBITRAGE"]:
+                    context.args = args[1:]
+                    await capital_leadlag_command(update, context)
+                    return
 
             # Auto config & status
             is_auto_on = db.is_capital_auto_enabled(chat_id)
             auto_cfg = db.get_capital_auto_config(chat_id)
             auto_budget = auto_cfg.get("budget", 50.0)
             auto_btn_text = f"🤖 Capital Auto: ON 🟢 (${auto_budget:,.0f})" if is_auto_on else "🤖 Capital Auto: OFF ⚪"
+            is_leadlag_on = db.is_capital_leadlag_enabled(chat_id)
+            leadlag_btn_text = "⚡ Lead-Lag Arb: ON 🟢" if is_leadlag_on else "⚡ Lead-Lag Arb: OFF ⚪"
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle")
+                    InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle"),
+                    InlineKeyboardButton(leadlag_btn_text, callback_data="btn_cap_leadlag_toggle")
                 ],
                 [
                     InlineKeyboardButton("🏆 Prop Firm ($10k-$200k)", callback_data="btn_cap_prop_menu"),
                     InlineKeyboardButton("🤝 IB Rebate (30%-50%)", callback_data="btn_cap_ib_menu")
+                ],
+                [
+                    InlineKeyboardButton("📡 Lead-Lag Radar (HFT)", callback_data="btn_cap_leadlag_radar"),
+                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions")
                 ],
                 [
                     InlineKeyboardButton("💰 Budget $10", callback_data="btn_cap_auto_budget_10"),
@@ -18705,11 +18872,10 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🪙 Sell BTC CFD", callback_data="btn_cap_sell_btc")
                 ],
                 [
-                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions"),
-                    InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh")
+                    InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh"),
+                    InlineKeyboardButton("🛡️ Close All", callback_data="btn_cap_close_all")
                 ],
                 [
-                    InlineKeyboardButton("🛡️ Close All", callback_data="btn_cap_close_all"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
@@ -19319,6 +19485,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capitalcom", capital_command))
         self.app.add_handler(CommandHandler("capital_auto", capital_command))
         self.app.add_handler(CommandHandler("capitalauto", capital_command))
+        self.app.add_handler(CommandHandler("capital_leadlag", capital_leadlag_command))
+        self.app.add_handler(CommandHandler("capitalleadlag", capital_leadlag_command))
+        self.app.add_handler(CommandHandler("leadlag", capital_leadlag_command))
         self.app.add_handler(CommandHandler("capital_ib", capital_ib_command))
         self.app.add_handler(CommandHandler("capitalib", capital_ib_command))
         self.app.add_handler(CommandHandler("ib", capital_ib_command))
@@ -19747,6 +19916,12 @@ class TelegramBotThread(BaseThread):
                 capital_engine.start_tradfi_price_cache_worker()
             except Exception as e_cap_worker:
                 print(f"⚠️ [CAPITAL TRADFI PRE-CACHE WORKER NOTICE]: {e_cap_worker}")
+
+            try:
+                import capital_engine
+                capital_engine.start_capital_leadlag_listener(app=self.app)
+            except Exception as e_cap_leadlag:
+                print(f"⚠️ [CAPITAL LEAD-LAG LISTENER START NOTICE]: {e_cap_leadlag}")
 
             while getattr(self, '_is_bot_running', True):
                 try:

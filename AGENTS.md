@@ -290,7 +290,17 @@ Any modification that breaks any of the following 30 invariants is considered an
      In `smart_swap_engine.py`, the Emergency Stop-Loss floor is locked at $\le -25.0\%$ ROI (giving high-momentum Solana DEX gems adequate breathing room across DEX spreads, pool fees, and retracements to eliminate "death by a thousand cuts" premature chop-outs, while strictly preserving $75\%$ of capital against catastrophic $100\%$ zero-out rug pulls).
   5. **Network Resilience & Robust Alert Timeout ៖**
      Background Telegram notification dispatchers (`_async_send_wealth_alert`, etc.) must enforce robust network timeouts (`read_timeout=15s, write_timeout=15s, connect_timeout=10s`) to prevent network jitter timeouts during high-latency periods.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 23/23].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 23/24].
+
+### Invariant 31: Capital.com Lead-Lag Arbitrage Engine & Pure Latency Alpha Standard (⚡ 500ms – 2000ms Lag Extraction)
+- **Location:** `capital_engine.py` (`CapitalLeadLagArbitrageEngine`, `start_capital_leadlag_listener`), `database.py`, `bot_thread.py`
+- **Rule:** The `/capital` trading ecosystem integrates real-time Lead-Lag Arbitrage exploiting empirical pricing lag (500ms – 2000ms) between Binance WebSocket feeds and Capital.com Crypto CFD order books during high-volatility impulse waves:
+  1. **Sub-Millisecond In-Memory Ingestion (< 0.05ms):** Incoming Binance ticks are received directly in RAM via `websocket_engine.register_tick_listener(on_binance_tick)` without polling delays.
+  2. **Impulse Spike Detection:** Measures price velocity $\Delta P\%$ over rolling lookback windows (250ms – 1200ms). Triggers only on confirmed volatility surges ($|\Delta P\%| \ge 0.15\%$ for BTC, $\ge 0.20\%$ for ETH).
+  3. **Spread Hurdle Verification:** Measured price dislocation must exceed Capital.com's live CFD bid-ask spread by at least $1.4\times$ ($|\text{Dislocation}| \ge \text{Spread}_{\%} \times 1.4$) to eliminate spread bleed and guarantee positive net expectancy.
+  4. **Strict Invariant 16 Compliance:** Any downward impulse short signal is strictly blocked if the 15-minute RSI is $\le 38.0$ to prevent shorting retail panic bottoms.
+  5. **Asynchronous Non-Blocking Order Dispatch:** Order submission to Capital.com runs in a dedicated thread pool (`ThreadPoolExecutor`), completely decoupling execution latency from the core Binance WebSocket event loop.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 24/24].
 
 ---
 

@@ -2561,6 +2561,165 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
     return {"total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0}
 
 # ==============================================================================
+# CAPITAL.COM LEAD-LAG ARBITRAGE PERSISTENCE LAYER
+# ==============================================================================
+
+def get_capital_leadlag_config(chat_id: int) -> dict:
+    """Returns the Capital.com Lead-Lag Arbitrage configuration for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_leadlag_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            min_spike_pct REAL DEFAULT 0.15,
+            max_positions INTEGER DEFAULT 2,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    cursor.execute("""
+        SELECT is_enabled, min_spike_pct, max_positions, is_demo
+        FROM capital_leadlag_config WHERE chat_id = ?
+    """, (chat_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            "enabled": bool(row[0]),
+            "min_spike_pct": float(row[1] or 0.15),
+            "max_positions": int(row[2] or 2),
+            "is_demo": bool(row[3])
+        }
+    return {"enabled": False, "min_spike_pct": 0.15, "max_positions": 2, "is_demo": False}
+
+def is_capital_leadlag_enabled(chat_id: int) -> bool:
+    """Fast check if a user has enabled Capital.com Lead-Lag Arbitrage."""
+    return get_capital_leadlag_config(chat_id).get("enabled", False)
+
+def set_capital_leadlag_config(chat_id: int, enabled: bool, min_spike_pct: float = 0.15, max_positions: int = 2, is_demo: bool = False):
+    """Sets or updates the Capital.com Lead-Lag Arbitrage config."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_leadlag_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            min_spike_pct REAL DEFAULT 0.15,
+            max_positions INTEGER DEFAULT 2,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO capital_leadlag_config (chat_id, is_enabled, min_spike_pct, max_positions, is_demo, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            min_spike_pct = excluded.min_spike_pct,
+            max_positions = excluded.max_positions,
+            is_demo = excluded.is_demo,
+            updated_at = excluded.updated_at
+    """, (chat_id, 1 if enabled else 0, float(min_spike_pct), int(max_positions), 1 if is_demo else 0, now_str))
+    conn.commit()
+    conn.close()
+
+def get_active_capital_leadlag_users() -> list:
+    """Returns a list of all active Capital Lead-Lag users."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_leadlag_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            min_spike_pct REAL DEFAULT 0.15,
+            max_positions INTEGER DEFAULT 2,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    cursor.execute("SELECT chat_id, min_spike_pct, max_positions, is_demo FROM capital_leadlag_config WHERE is_enabled = 1")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"chat_id": r[0], "min_spike_pct": float(r[1]), "max_positions": int(r[2]), "is_demo": bool(r[3])} for r in rows]
+
+def record_capital_leadlag_trade(
+    chat_id: int,
+    epic: str,
+    direction: str,
+    binance_price: float,
+    capital_price: float,
+    dislocation_pct: float,
+    latency_lag_ms: float,
+    deal_id: str = "",
+    status: str = "OPEN"
+) -> int:
+    """Records an executed Lead-Lag Arbitrage trade into capital_leadlag_trades."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_leadlag_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            epic TEXT,
+            direction TEXT,
+            binance_price REAL,
+            capital_price REAL,
+            dislocation_pct REAL,
+            latency_lag_ms REAL,
+            deal_id TEXT,
+            status TEXT,
+            timestamp TEXT
+        )
+    """)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO capital_leadlag_trades
+        (chat_id, epic, direction, binance_price, capital_price, dislocation_pct, latency_lag_ms, deal_id, status, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (chat_id, epic, direction, binance_price, capital_price, dislocation_pct, latency_lag_ms, str(deal_id), status, now_str))
+    trade_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return trade_id
+
+def get_capital_leadlag_stats(chat_id: Optional[int] = None) -> dict:
+    """Returns cumulative statistics for Lead-Lag Arbitrage executions."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_leadlag_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            epic TEXT,
+            direction TEXT,
+            binance_price REAL,
+            capital_price REAL,
+            dislocation_pct REAL,
+            latency_lag_ms REAL,
+            deal_id TEXT,
+            status TEXT,
+            timestamp TEXT
+        )
+    """)
+    if chat_id:
+        cursor.execute("SELECT COUNT(*), AVG(dislocation_pct), AVG(latency_lag_ms) FROM capital_leadlag_trades WHERE chat_id = ?", (chat_id,))
+    else:
+        cursor.execute("SELECT COUNT(*), AVG(dislocation_pct), AVG(latency_lag_ms) FROM capital_leadlag_trades")
+    row = cursor.fetchone()
+    conn.close()
+    total_trades = row[0] if row else 0
+    avg_dislocation = row[1] if row and row[1] is not None else 0.0
+    avg_latency = row[2] if row and row[2] is not None else 0.0
+    return {
+        "total_trades": total_trades,
+        "avg_dislocation_pct": round(avg_dislocation, 3),
+        "avg_latency_ms": round(avg_latency, 1)
+    }
+
+
+# ==============================================================================
 # CAPITAL.COM & PROP FIRM PER-USER API VAULT (AES-256 MILITARY-GRADE ENCRYPTION)
 # ==============================================================================
 
