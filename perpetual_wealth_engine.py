@@ -1291,6 +1291,10 @@ class PerpetualWealthGeneratorEngine:
         try:
             btc_macro = get_btc_macro_regime()
             allow_spot_long = btc_macro.get("allow_long", True)
+            if not allow_spot_long:
+                # Door 1: Institutional BTC Macro Hard Block (0% Buying when BTC is Bearish/Defensive)
+                # Cash is a Position: 100% USDT preserved with sub-millisecond execution (< 0.001ms)
+                return []
 
             spot_base = trading_engine.get_working_spot_url()
             url = f"{spot_base}/api/v3/ticker/24hr"
@@ -1319,16 +1323,12 @@ class PerpetualWealthGeneratorEngine:
                 except (ValueError, TypeError):
                     continue
 
-                # Institutional liquidity floor: $6M 24h quote volume on Spot
-                if quote_volume < 6_000_000.0 or last_price <= 0.0:
+                # Door 2: Institutional liquidity floor ($15M 24h quote volume on Spot, prevents spread & slippage)
+                if quote_volume < 15_000_000.0 or last_price <= 0.0:
                     continue
 
-                # If BTC Macro is Bearish/Defensive, require strong independent relative strength
-                if not allow_spot_long and (price_change_pct < 3.5 or quote_volume < 10_000_000.0):
-                    continue
-
-                # Golden Sweet Spot for Spot LONG: +2.0% to +18.0%
-                if 2.0 <= price_change_pct <= 18.0:
+                # Golden Sweet Spot for Spot LONG: +2.0% to +15.0% (Rejects exhausted pumps > 15%)
+                if 2.0 <= price_change_pct <= 15.0:
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_spot_symbol_technicals(symbol)
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -1383,19 +1383,26 @@ class PerpetualWealthGeneratorEngine:
             current_price = closes[-1]
 
             # 1. Compute RVOL (Relative Volume Spike over 20-period MA)
+            # Door 2: Purge 15x early-minute projection artifact!
+            # Base RVOL on confirmed completed 15m candle (vols[-2]) over prior 20 closed candles
             avg_vol_20 = sum(vols[-21:-1]) / 20.0 if len(vols) >= 21 else (sum(vols[:-1]) / max(1, len(vols) - 1))
+            prev_closed_vol = vols[-2] if len(vols) >= 2 else vols[-1]
             cur_vol = vols[-1]
-            prev_vol = vols[-2] if len(vols) >= 2 else cur_vol
 
+            # Eliminate projection artifact: Base RVOL on genuine closed candle volume.
+            # Current candle is only incorporated if >= 8.0 min have elapsed without reckless 15x multiplier
             kline_start_ms = float(klines[-1][0])
             now_ms = time.time() * 1000.0
-            elapsed_min = max(1.0, min(15.0, (now_ms - kline_start_ms) / 60000.0))
-            projected_cur_vol = cur_vol * (15.0 / elapsed_min)
-            rvol_cur = (projected_cur_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
-            rvol_prev = (prev_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
-            rvol = round(max(rvol_cur, rvol_prev), 2)
+            elapsed_min = max(1.0, (now_ms - kline_start_ms) / 60000.0)
 
-            # Strict RVOL Filter: Must show >= 2.0x volume surge
+            rvol_closed = (prev_closed_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
+            if elapsed_min >= 8.0 and avg_vol_20 > 0:
+                rvol_cur = (cur_vol * (15.0 / elapsed_min)) / avg_vol_20
+                rvol = round(max(rvol_closed, min(rvol_cur, 4.0)), 2)
+            else:
+                rvol = round(rvol_closed, 2)
+
+            # Strict RVOL Filter: Must show >= 2.0x genuine volume surge
             if rvol < 2.0:
                 return {"is_valid": False, "reason": f"Insufficient Volume Spike (RVOL {rvol:.2f}x < 2.0x)"}
 
@@ -1406,8 +1413,8 @@ class PerpetualWealthGeneratorEngine:
             chg_1h = round(((current_price - open_1h) / open_1h) * 100.0, 2)
 
             # Reject exhausted / dying momentum: Requires fresh 1h / 15m thrust
-            if chg_1h < 0.6 and chg_15m < 0.2:
-                return {"is_valid": False, "reason": f"No Fresh Momentum (1h: {chg_1h:+.2f}%, 15m: {chg_15m:+.2f}%)"}
+            if chg_1h < 0.8 or chg_15m < 0.3:
+                return {"is_valid": False, "reason": f"Insufficient Fresh Momentum (1h: {chg_1h:+.2f}%, 15m: {chg_15m:+.2f}%)"}
 
             # 3. Calculate RSI 14
             gains, losses = [], []
@@ -1517,16 +1524,17 @@ class PerpetualWealthGeneratorEngine:
             except Exception:
                 ai_conf = 85.0
 
-            if ai_conf < 78.0:
-                return {"is_valid": False, "reason": f"Insufficient 33-AI Ensemble Confidence ({ai_conf:.1f}% < 78.0%)"}
+            # Door 3: Institutional 33-AI Model Ensemble Hurdle (>= 88.0% Confidence & >= 8.8 AI Score)
+            if ai_conf < 88.0:
+                return {"is_valid": False, "reason": f"Insufficient 33-AI Ensemble Confidence ({ai_conf:.1f}% < 88.0% hurdle)"}
 
             # Blend 33-AI Model Confidence into AI Score
             ai_score = min(9.9, round(ai_score * (ai_conf / 85.0), 1))
 
-            if ai_score < 8.4:
+            if ai_score < 8.8:
                 return {
                     "is_valid": False,
-                    "reason": f"Insufficient AI Velocity Score ({ai_score:.1f}/10.0 < 8.4 hurdle)"
+                    "reason": f"Insufficient AI Velocity Score ({ai_score:.1f}/10.0 < 8.8 hurdle)"
                 }
 
             pullback_limit_price = round(max(ema21, current_price * 0.9985), 6)
@@ -1917,13 +1925,10 @@ class PerpetualWealthGeneratorEngine:
                         except Exception:
                             trade_age_seconds = 0.0
 
-                    # Institutional Smart Clock (180m - 360m):
-                    # Tier 1: Held >= 180 min (10,800s) and peak < 1.0% and -2.0 <= roi_pct <= 0.5% (Flat Sideway)
-                    # Tier 2: Held >= 360 min (21,600s) and roi_pct <= 0.8% (Unconditional Liberation to eliminate overnight stagnation)
-                    is_stagnant = (
-                        (trade_age_seconds >= 10800.0 and curr_peak < 1.0 and -2.0 <= roi_pct <= 0.5) or
-                        (trade_age_seconds >= 21600.0 and roi_pct <= 0.8)
-                    )
+                    # Door 4: Institutional Spot Consolidation Window (Zero Fee Churning):
+                    # Spot 1x has 0% liquidation risk: Never cut at 180m (3h) or 360m (6h) with micro-losses/fees.
+                    # Only liberate capital after 24 hours (86,400s) if completely flat (peak < 1.0% and roi_pct <= 0.5%)
+                    is_stagnant = (trade_age_seconds >= 86400.0 and curr_peak < 1.0 and roi_pct <= 0.5)
                     # Breakeven Defense: Locked at +2.0% ROI, triggered if price pulls back to Entry +0.35% Net Fee Floor
                     # Invariant 24: Any trade that reached +2.0% is STRICTLY PROHIBITED from closing at a loss!
                     is_be_exit = (is_be_locked and (current_price <= (buy_price * 1.0035) or roi_pct <= 0.35))
@@ -1931,7 +1936,7 @@ class PerpetualWealthGeneratorEngine:
 
                     if is_be_exit or is_sl_exit or is_stagnant:
                         if is_stagnant:
-                            reason_tag = "STAGNATION CAPITAL LIBERATION (180-360m)"
+                            reason_tag = "STAGNATION CAPITAL LIBERATION (24H)"
                         elif is_be_exit:
                             reason_tag = "BREAKEVEN NET FLOOR DEFENSE (+0.35%)"
                         else:
@@ -1989,20 +1994,20 @@ class PerpetualWealthGeneratorEngine:
                                     "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}` (Spot 1x)\n"
-                                    f"⏱️ **រយៈពេលកាន់កាប់ ៖** `{trade_age_seconds/60:.0f} នាទី (ទ្រឹង ១៨០-៣៦០ នាទី)`\n"
+                                    f"⏱️ **រយៈពេលកាន់កាប់ ៖** `{trade_age_seconds/3600:.1f} ម៉ោង (ទ្រឹង ២៤ ម៉ោងពេញលេញ)`\n"
                                     f"💵 **Exit ROI ៖** `{roi_pct:.2f}%`\n"
                                     f"🔄 **ស្ថានភាពទុន ៖** `ដោះលែងទុនមកវិញ ១០០% ចូល Spot Wallet`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _Anti-Stagnation Clock: ប្រព័ន្ធមិនត្រាំកាក់ឡើយ! កំពុងបង្វិលទុនទៅចាប់កាក់ Breakout ថ្មីភ្លាមៗ!_"
+                                    "💡 _Anti-Stagnation Clock: ផ្តល់ពេល ២៤ ម៉ោងពេញលេញសម្រាប់ Spot! មិនកាត់លក់ខាតសេវាផ្តេសផ្តាសឡើយ!_"
                                 ) if user_lang == 'khmer' else (
                                     "🔄 **[24/7 SPOT WEALTH - CAPITAL LIBERATED]** ⚡\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **Symbol / Pair:** `{sym}` (Spot 1x)\n"
-                                    f"⏱️ **Holding Duration:** `{trade_age_seconds/60:.0f}m (Stagnant 180-360m)`\n"
+                                    f"⏱️ **Holding Duration:** `{trade_age_seconds/3600:.1f}h (Stagnant 24h Window)`\n"
                                     f"💵 **Exit ROI:** `{roi_pct:.2f}%`\n"
                                     f"🔄 **Capital Status:** `100% Liberated back to Spot Wallet`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _Anti-Stagnation Clock: Zero capital stagnation! Rotating immediately into active breakout candidates._"
+                                    "💡 _Anti-Stagnation Clock: 24h full structural consolidation honored. Zero premature fee churn!_"
                                 )
                                 asyncio.create_task(_async_send_wealth_alert(app, chat_id, stag_msg, "Spot stagnation liberation"))
                             except Exception as notif_err:
@@ -2162,12 +2167,12 @@ class PerpetualWealthGeneratorEngine:
                             c_chg24h = float(cand.get("price_change_pct", 0.0))
 
                             # Strict Institutional Monster Breakout Hurdle:
-                            # 1. AI Score >= 9.1 (Wall Street 33-AI Ensemble Top Tier)
-                            # 2. AI Confidence >= 85.0%
+                            # 1. AI Score >= 9.2 (Wall Street 33-AI Ensemble Top Tier)
+                            # 2. AI Confidence >= 88.0%
                             # 3. RVOL >= 2.8x (Massive Smart Money Volume Spike)
-                            # 4. Fresh 1H Thrust >= +1.0%
-                            # 5. 24H Change <= 16.0% (Not exhausted pump)
-                            if c_score >= 9.1 and c_conf >= 85.0 and c_rvol >= 2.8 and c_chg1h >= 1.0 and c_chg24h <= 16.0:
+                            # 4. Fresh 1H Thrust >= +1.2%
+                            # 5. 24H Change <= 15.0% (Not exhausted pump)
+                            if c_score >= 9.2 and c_conf >= 88.0 and c_rvol >= 2.8 and c_chg1h >= 1.2 and c_chg24h <= 15.0:
                                 monster_cand = cand
                                 break
 
@@ -2200,11 +2205,11 @@ class PerpetualWealthGeneratorEngine:
                                 roi_p = ((cur_p - buy_p) / buy_p) * 100.0
 
                                 # ZERO-LOSS SHIELD & SLUGGISH CHECK:
-                                # - Must be in NET PROFIT: roi_p >= +0.80% (fees ~0.20% 100% covered + profit secured)
+                                # - Door 4: Must be in NET SOLID PROFIT: roi_p >= +2.50% (fees ~0.20% + spread 0.20% 100% covered, netting >= +2.10% genuine profit!)
                                 # - Never sell losing positions (Strict Fiduciary Oath Invariant 1.1)
-                                # - Held >= 30m (1800s) to give it time to run
-                                # - Sluggish: curr_pk < 2.5% and roi_p < 2.5% (not currently rocketing)
-                                if roi_p >= 0.80 and trade_age_seconds >= 1800.0 and curr_pk < 2.5 and roi_p < 2.5:
+                                # - Held >= 60m (3600s) to give it time to run
+                                # - Sluggish: curr_pk < 4.0% and roi_p < 3.5%
+                                if roi_p >= 2.50 and trade_age_seconds >= 3600.0 and curr_pk < 4.0 and roi_p < 3.5:
                                     swappable_trades.append({
                                         "id": t_id,
                                         "symbol": s_sym,
