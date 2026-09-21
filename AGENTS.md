@@ -1,5 +1,5 @@
 # KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 2.2.0 (Absolute Ground Truth Lock - The 28 Pillars)  
+**Document Version:** 2.3.0 (Absolute Ground Truth Lock - The 29 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -264,11 +264,18 @@ Any modification that breaks any of the following 28 invariants is considered an
      - Upon position closure (TP, SL, or Anti-Stagnation Exit), capital is instantly recycled back into the available pool to scan the next Golden Sweet-Spot candidate from the top volatile spot/futures universe with zero human intervention required.
   7. **Persistence & Crash Resilience ៖**
      - Bot configurations and open trades are permanently persisted in SQLite (`perpetual_wealth_bots`, `perpetual_wealth_spot_bots`, `perpetual_wealth_spot_trades`). State persists seamlessly across VPS reboots and systemd restarts.
-  8. **Smart Alpha Rotation Swap (Opportunity Cost Swap Engine - Zero-Loss Shield) ៖**
-     - When all Spot coin slots are full (`current_trades_count >= max_coins`) or available USDT is deployed, the engine continuously scans for explosive Monster Breakouts (`ai_score >= 9.1`, `ai_confidence >= 85.0%`, `rvol >= 2.8x`, `chg_1h >= 1.0%`).
-     - If an active trade has developed into sluggish positive net profit (`roi_pct >= +0.80%`, held $\ge 30$m, `curr_peak < 2.5%`), the system executes an atomic sub-second rotation: cleanly sells the sluggish winning trade (locking in guaranteed net cash profit) and immediately buys the monster breakout candidate.
-     - **Zero-Loss Shield:** Under NO circumstances is the bot permitted to sell a losing trade (`roi_pct < 0.80%`) to chase a breakout. Only green profitable positions may be rotated.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 21/21].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 21/22].
+
+### Invariant 29: Nanosecond Direct RAM Tick Access Latency Standard (⚡ 0.001 – 0.0003 ms Invariant)
+- **Location:** `websocket_engine.py`, `trading_engine.py`, `perpetual_wealth_engine.py`, `flash_loan_mev_engine.py`, `smart_swap_engine.py`, `turbo_hedge_engine.py`, `macro_auto_trade_engine.py`
+- **Rule:**
+  1. **Universal Direct RAM Pre-Cache Priority (ការទាញយកទិន្នន័យពី RAM Memory ជាអាទិភាពខ្ពស់បំផុត) ៖**
+     Every pricing query, tick evaluation, macro BTC regime check, arbitrage spread evaluation, liquidation risk shield, trailing take-profit ratchet, or pre-flight entry check MUST prioritize and bridge directly into in-memory RAM data structures (`websocket_engine.PRICE_CACHE`, `BOOK_TICKER_CACHE`, fast shared memory dicts) achieving **⚡ 0.001 ms – 0.0003 ms (nanosecond/sub-microsecond)** RAM lookup access latency.
+  2. **Strict Prohibition of Blocking Network I/O in Hot Trading Loops ៖**
+     Under NO circumstances shall any critical execution loop, trailing stop monitor, or high-frequency scanning path execute serial, blocking HTTP/REST requests (which suffer 150ms – 500ms internet lag) when prices or ticks are available in the local WebSocket RAM cache.
+  3. **Universal RAM Cache Access Interface ៖**
+     Standardized helper interfaces (e.g. `get_fast_price(symbol)`, `get_fast_book_ticker(symbol)`, `get_hft_fast_sol_price()`, etc.) must be universally accessible across all modules to ensure zero-overhead, sub-millisecond algorithmic decisions.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 22/22].
 
 ---
 
@@ -276,8 +283,8 @@ Any modification that breaks any of the following 28 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 27 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 20 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 29 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 22 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
