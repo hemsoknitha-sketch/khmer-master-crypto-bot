@@ -2956,7 +2956,84 @@ def set_capital_kelly_config(
     conn.commit()
     conn.close()
 
+# ==============================================================================
+# CAPITAL.COM SPREAD DRAG ELIMINATION & ASYMMETRIC 10x HURDLE CONFIG (INVARIANT 34)
+# ==============================================================================
 
+def get_capital_spread_guard_config(chat_id: int) -> dict:
+    """Returns the Spread Drag Elimination & Asymmetric Hurdle configuration."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_spread_guard_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 1,
+            min_target_spread_ratio REAL DEFAULT 10.0,
+            min_rr_ratio REAL DEFAULT 6.0,
+            min_vsqi REAL DEFAULT 3.0,
+            updated_at TEXT
+        )
+    """)
+    conn.commit()
+    cursor.execute("""
+        SELECT is_enabled, min_target_spread_ratio, min_rr_ratio, min_vsqi, updated_at
+        FROM capital_spread_guard_config WHERE chat_id = ?
+    """, (chat_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            "enabled": bool(row[0]),
+            "min_target_spread_ratio": float(row[1]) if row[1] is not None else 10.0,
+            "min_rr_ratio": float(row[2]) if row[2] is not None else 6.0,
+            "min_vsqi": float(row[3]) if row[3] is not None else 3.0,
+            "updated_at": row[4]
+        }
+    return {
+        "enabled": True,
+        "min_target_spread_ratio": 10.0,
+        "min_rr_ratio": 6.0,
+        "min_vsqi": 3.0,
+        "updated_at": None
+    }
+
+def is_capital_spread_guard_enabled(chat_id: int) -> bool:
+    """Fast check if a user has enabled Spread Drag Elimination & 10x Hurdle Guard."""
+    return get_capital_spread_guard_config(chat_id).get("enabled", True)
+
+def set_capital_spread_guard_config(
+    chat_id: int,
+    enabled: bool = True,
+    min_target_spread_ratio: float = 10.0,
+    min_rr_ratio: float = 6.0,
+    min_vsqi: float = 3.0
+):
+    """Sets or updates the Spread Drag Elimination & Asymmetric Hurdle config."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_spread_guard_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 1,
+            min_target_spread_ratio REAL DEFAULT 10.0,
+            min_rr_ratio REAL DEFAULT 6.0,
+            min_vsqi REAL DEFAULT 3.0,
+            updated_at TEXT
+        )
+    """)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO capital_spread_guard_config (chat_id, is_enabled, min_target_spread_ratio, min_rr_ratio, min_vsqi, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            min_target_spread_ratio = excluded.min_target_spread_ratio,
+            min_rr_ratio = excluded.min_rr_ratio,
+            min_vsqi = excluded.min_vsqi,
+            updated_at = excluded.updated_at
+    """, (chat_id, 1 if enabled else 0, float(min_target_spread_ratio), float(min_rr_ratio), float(min_vsqi), now_str))
+    conn.commit()
+    conn.close()
 
 # ==============================================================================
 # CAPITAL.COM & PROP FIRM PER-USER API VAULT (AES-256 MILITARY-GRADE ENCRYPTION)

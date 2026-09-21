@@ -895,22 +895,49 @@ class CapitalComEngine:
             elif closes[-1] < closes[-2] < closes[-3]:
                 bearish_score += 10
 
-        # Asymmetric R:R >= 1:6 Mathematical Ratio Enforcement
-        # Downside Risk (1R): Micro-clamped outside noise band
-        min_sl_dist = max(1.5 * atr, spread * 2.5, 0.0025 * mid_price)
-        # Upside Target (6R): Clamped to >= 6.0x the risk distance
-        min_tp_dist = max(6.0 * min_sl_dist, 6.0 * atr, 0.015 * mid_price)
+        # Invariant 34: Spread Drag Elimination & Asymmetric Minimum 10x Hurdle Protocol
+        spread_mgr = get_capital_spread_drag_manager()
+        is_spread_ok, spread_err = spread_mgr.is_spread_acceptable(resolved_epic, spread, atr=atr)
+        if not is_spread_ok:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "confidence": 0,
+                "reason": spread_err,
+                "mid_price": mid_price,
+                "bid": current_bid,
+                "ask": current_ask,
+                "spread": spread,
+                "atr": atr,
+                "market_status": market_status
+            }
 
+        spread_audit = {}
         if bullish_score >= 75:
             signal = "STRONG_BUY" if bullish_score >= 85 else "BUY"
             confidence = min(96, bullish_score)
-            sl = round(current_bid - min_sl_dist, 2)
-            tp = round(current_ask + min_tp_dist, 2)
+            sl, tp, spread_audit = spread_mgr.enforce_asymmetric_10x_hurdle(
+                epic=resolved_epic,
+                direction="BUY",
+                entry_price=current_ask,
+                spread=spread,
+                atr=atr,
+                min_rr_ratio=6.0,
+                min_target_spread_ratio=10.0
+            )
         elif bearish_score >= 75:
             signal = "STRONG_SELL" if bearish_score >= 85 else "SELL"
             confidence = min(96, bearish_score)
-            sl = round(current_ask + min_sl_dist, 2)
-            tp = round(current_bid - min_tp_dist, 2)
+            sl, tp, spread_audit = spread_mgr.enforce_asymmetric_10x_hurdle(
+                epic=resolved_epic,
+                direction="SELL",
+                entry_price=current_bid,
+                spread=spread,
+                atr=atr,
+                min_rr_ratio=6.0,
+                min_target_spread_ratio=10.0
+            )
         else:
             signal = "HOLD_NEUTRAL"
             confidence = max(bullish_score, bearish_score)
@@ -935,7 +962,11 @@ class CapitalComEngine:
             "minus_di": minus_di,
             "rvol": rvol,
             "range_ratio": range_ratio,
-            "rr_ratio": 6.0,
+            "rr_ratio": spread_audit.get("rr_ratio", 6.0),
+            "hurdle_ratio": spread_audit.get("hurdle_ratio", 10.0),
+            "spread_drag_pct": spread_audit.get("spread_drag_pct", 10.0),
+            "net_profit_share_pct": spread_audit.get("net_profit_share_pct", 90.0),
+            "vsqi": spread_audit.get("vsqi", 10.0),
             "sl": sl,
             "tp": tp,
             "market_status": market_status
@@ -3565,12 +3596,204 @@ class CapitalKellyPositionSizer:
         }
 
 
+# ==============================================================================
+# 3.10. SPREAD DRAG ELIMINATION & ASYMMETRIC 10x HURDLE SUITE (INVARIANT 34)
+# ==============================================================================
+
+class CapitalSpreadDragManager:
+    """
+    🛡️ Institutional Spread Drag Elimination & Asymmetric Minimum Hurdle Protocol.
+    
+    Mathematical Edge:
+    CFD brokers extract revenue via Bid/Ask Spreads. Retail scalping for tight 0.2%-0.5%
+    targets sacrifices 40%-60% of gross edges to spread drag.
+    This manager guarantees:
+      1. Minimum 10.0x Target-to-Spread Hurdle:
+         TP_dist >= 10.0 * Spread -> Clamps Spread Drag <= 10.0%, locking >= 90% Net Profit.
+      2. Asymmetric Risk-to-Reward Ratio:
+         R:R >= 1:6.0 with noise-isolated Stop Loss (SL_dist >= max(1.5*ATR, 2.5*Spread)).
+      3. Volatility-to-Spread Quality Index (VSQI = ATR_14 / Spread >= 3.0):
+         Rejects illiquid, tight volatility holiday sessions where spread eats price action.
+      4. Pre-Execution Spread Blowout Shield:
+         Rejects orders if live spread expands > 30% above historical baseline.
+    """
+
+    BENCHMARK_SPREADS = {
+        "GOLD": 0.60,
+        "NATURALGAS": 0.008,
+        "US500": 0.80,
+        "US100": 1.50,
+        "OIL_CRUDE": 0.04,
+        "BTCUSD": 35.0,
+        "ETHUSD": 2.50,
+        "SOLUSD": 0.20,
+        "META": 0.30,
+        "GOOGL": 0.25,
+        "EURUSD": 0.00012,
+        "GBPUSD": 0.00015
+    }
+
+    def __init__(self):
+        self._stats = {
+            "total_evaluations": 0,
+            "total_passed": 0,
+            "total_rejected_drag": 0,
+            "total_rejected_vsqi": 0,
+            "total_rejected_expansion": 0,
+            "last_evaluation": None
+        }
+
+    def evaluate_spread_drag(
+        self,
+        epic: str,
+        entry_price: float,
+        sl_price: float,
+        tp_price: float,
+        spread: float,
+        atr: float = 0.0,
+        min_target_spread_ratio: float = 10.0,
+        min_rr_ratio: float = 6.0,
+        min_vsqi: float = 3.0
+    ) -> Dict[str, Any]:
+        """
+        Evaluates whether a trade setup satisfies the minimum 10x hurdle and R:R >= 6.0.
+        """
+        self._stats["total_evaluations"] += 1
+
+        sl_dist = abs(entry_price - sl_price) if entry_price > 0 and sl_price > 0 else 0.0
+        tp_dist = abs(tp_price - entry_price) if entry_price > 0 and tp_price > 0 else 0.0
+
+        hurdle_ratio = (tp_dist / spread) if spread > 0 else 999.0
+        spread_drag_pct = (spread / tp_dist * 100.0) if tp_dist > 0 else 100.0
+        net_profit_share_pct = max(0.0, 100.0 - spread_drag_pct)
+        rr_ratio = (tp_dist / sl_dist) if sl_dist > 0 else 0.0
+        vsqi = (atr / spread) if (spread > 0 and atr > 0) else 10.0
+
+        is_hurdle_ok = hurdle_ratio >= min_target_spread_ratio
+        is_rr_ok = rr_ratio >= min_rr_ratio
+        is_vsqi_ok = vsqi >= min_vsqi
+
+        is_acceptable = is_hurdle_ok and is_rr_ok and is_vsqi_ok
+        rejection_reason = None
+
+        if not is_hurdle_ok:
+            self._stats["total_rejected_drag"] += 1
+            rejection_reason = f"Excessive Spread Drag: Target {tp_dist:.2f} is only {hurdle_ratio:.1f}x spread (required >= {min_target_spread_ratio:.1f}x)."
+        elif not is_vsqi_ok:
+            self._stats["total_rejected_vsqi"] += 1
+            rejection_reason = f"Low Volatility-to-Spread Quality Index: VSQI {vsqi:.2f} < {min_vsqi:.1f} (liquidity drought)."
+        elif not is_rr_ok:
+            rejection_reason = f"Insufficient Asymmetry: R:R {rr_ratio:.2f} < {min_rr_ratio:.1f}."
+        else:
+            self._stats["total_passed"] += 1
+
+        result = {
+            "epic": epic,
+            "entry_price": entry_price,
+            "sl_price": sl_price,
+            "tp_price": tp_price,
+            "spread": spread,
+            "atr": atr,
+            "sl_dist": round(sl_dist, 4),
+            "tp_dist": round(tp_dist, 4),
+            "hurdle_ratio": round(hurdle_ratio, 2),
+            "spread_drag_pct": round(spread_drag_pct, 2),
+            "net_profit_share_pct": round(net_profit_share_pct, 2),
+            "rr_ratio": round(rr_ratio, 2),
+            "vsqi": round(vsqi, 2),
+            "is_acceptable": is_acceptable,
+            "rejection_reason": rejection_reason
+        }
+        self._stats["last_evaluation"] = result
+        return result
+
+    def enforce_asymmetric_10x_hurdle(
+        self,
+        epic: str,
+        direction: str,
+        entry_price: float,
+        spread: float,
+        atr: float,
+        min_rr_ratio: float = 6.0,
+        min_target_spread_ratio: float = 10.0
+    ) -> Tuple[float, float, Dict[str, Any]]:
+        """
+        Calculates mathematically optimal SL and TP guaranteeing R:R >= 6.0 and TP >= 10.0x spread.
+        """
+        resolved_epic = epic.upper().replace(".PRO", "").strip()
+        # 1. Downside Risk (1R): Clamped outside market noise
+        min_sl_dist = max(1.5 * atr, spread * 2.5, 0.0025 * entry_price)
+
+        # 2. Upside Target (6R): Clamped to >= 6.0x risk and >= 10.0x spread
+        min_tp_dist = max(min_rr_ratio * min_sl_dist, min_target_spread_ratio * spread, 0.015 * entry_price)
+
+        is_buy = direction.upper() in ["BUY", "STRONG_BUY", "LONG"]
+        if is_buy:
+            sl = round(entry_price - min_sl_dist, 2)
+            tp = round(entry_price + min_tp_dist, 2)
+        else:
+            sl = round(entry_price + min_sl_dist, 2)
+            tp = round(entry_price - min_tp_dist, 2)
+
+        audit = self.evaluate_spread_drag(
+            epic=resolved_epic,
+            entry_price=entry_price,
+            sl_price=sl,
+            tp_price=tp,
+            spread=spread,
+            atr=atr,
+            min_target_spread_ratio=min_target_spread_ratio,
+            min_rr_ratio=min_rr_ratio
+        )
+        return sl, tp, audit
+
+    def is_spread_acceptable(
+        self,
+        epic: str,
+        current_spread: float,
+        atr: float = 0.0,
+        max_expansion_mult: float = 1.30,
+        min_vsqi: float = 3.0
+    ) -> Tuple[bool, str]:
+        """
+        Validates live spread against baseline and checks for liquidity blowout.
+        """
+        resolved_epic = epic.upper().replace(".PRO", "").strip()
+        benchmark = self.BENCHMARK_SPREADS.get(resolved_epic, 1.0)
+
+        # Check spread blowout
+        if current_spread > benchmark * max_expansion_mult:
+            self._stats["total_rejected_expansion"] += 1
+            return False, f"Spread Expansion Rejection: Current {current_spread:.3f} > {benchmark * max_expansion_mult:.3f} (30% blowout above baseline {benchmark:.3f})."
+
+        # Check VSQI
+        if atr > 0 and current_spread > 0:
+            vsqi = atr / current_spread
+            if vsqi < min_vsqi:
+                self._stats["total_rejected_vsqi"] += 1
+                return False, f"VSQI Rejection: {vsqi:.2f} < {min_vsqi:.1f} (market volatility too compressed relative to transaction friction)."
+
+        return True, "SPREAD_PERFECT"
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Returns live Spread Drag Manager telemetry."""
+        return {
+            "total_evaluations": self._stats["total_evaluations"],
+            "total_passed": self._stats["total_passed"],
+            "total_rejected_drag": self._stats["total_rejected_drag"],
+            "total_rejected_vsqi": self._stats["total_rejected_vsqi"],
+            "total_rejected_expansion": self._stats["total_rejected_expansion"],
+            "last_evaluation": self._stats["last_evaluation"]
+        }
+
+
 # Singleton Instances
 CAPITAL_AUTO_ENGINE = CapitalAutonomousEngine()
 CAPITAL_IB_MANAGER = CapitalPartnerRebateManager()
 CAPITAL_LEADLAG_ENGINE = CapitalLeadLagArbitrageEngine()
 CAPITAL_ORB_ENGINE = CapitalOpeningRangeBreakoutEngine()
 CAPITAL_KELLY_SIZER = CapitalKellyPositionSizer()
+CAPITAL_SPREAD_DRAG_MANAGER = CapitalSpreadDragManager()
 
 def get_capital_auto_engine() -> CapitalAutonomousEngine:
     """Returns singleton instance of CapitalAutonomousEngine."""
@@ -3591,6 +3814,10 @@ def get_capital_orb_engine() -> CapitalOpeningRangeBreakoutEngine:
 def get_capital_kelly_sizer() -> CapitalKellyPositionSizer:
     """Returns singleton instance of CapitalKellyPositionSizer."""
     return CAPITAL_KELLY_SIZER
+
+def get_capital_spread_drag_manager() -> CapitalSpreadDragManager:
+    """Returns singleton instance of CapitalSpreadDragManager."""
+    return CAPITAL_SPREAD_DRAG_MANAGER
 
 def start_capital_leadlag_listener(app=None) -> bool:
     """Registers the Lead-Lag Arbitrage tick listener with the Binance WebSocket engine."""

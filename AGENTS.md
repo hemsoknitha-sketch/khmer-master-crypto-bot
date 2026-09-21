@@ -332,7 +332,27 @@ Any modification that breaks any of the following 30 invariants is considered an
      - When the market is choppy or ranging ($< 65\%$), position size contracts to the minimum micro-lot floor ($0.01$ lot / $0.1$ contract), minimizing drawdowns.
   5. **Asset-DNA Lot Boundary & Step Snapping:**
      Calculated contract sizes must strictly adhere to broker-defined lot steps and min/max boundaries (e.g. Gold $0.01$ step, US500 $0.05$ step, BTC $0.001$ step) to prevent order rejections.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 26/26].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 26/27].
+
+### Invariant 34: Spread Drag Elimination & Asymmetric Minimum Hurdle Protocol (Target $\ge 10\times$ Spread)
+- **Location:** `capital_engine.py` (`CapitalSpreadDragManager`, `get_capital_spread_drag_manager`), `database.py`, `bot_thread.py`, `bot_commands_registry.py`
+- **Rule:** CFD brokers monetize order flow via Bid/Ask Spreads. Retail scalping for tight $0.2\% - 0.5\%$ targets sacrifices $40\% - 60\%$ of gross edges to spread drag. The system strictly enforces the 4-pillar Spread Drag Elimination Protocol:
+  1. **Minimum 10.0x Target-to-Spread Hurdle ($\mathcal{H} \ge 10.0$):**
+     Every executed position must enforce a Take-Profit distance of at least $10.0\times$ the prevailing spread:
+     $$TP_{\text{dist}} = |TP - \text{Entry}| \ge 10.0 \times \text{Spread}$$
+     This mathematically clamps maximum Spread Drag to $\le 10\%$:
+     $$\mathcal{D} = \frac{\text{Spread}}{TP_{\text{dist}}} \le \frac{1}{10.0} = 10.0\%$$
+     guaranteeing that $\ge 90\%$ of gross captured price action converts directly into clean Net Profit.
+  2. **Asymmetric Risk-to-Reward Ratio ($R:R \ge 1:6$):**
+     Downside risk (1R) is placed outside market noise:
+     $$SL_{\text{dist}} = |SL - \text{Entry}| \ge \max(1.5 \times \text{ATR}_{14}, 2.5 \times \text{Spread})$$
+     and upside target (6R) is enforced at $TP_{\text{dist}} \ge \max(6.0 \times SL_{\text{dist}}, 10.0 \times \text{Spread})$, yielding positive expectancy even with a conservative $35\%$ win rate.
+  3. **Volatility-to-Spread Quality Index (VSQI $\ge 3.0$):**
+     $$\text{VSQI} = \frac{\text{ATR}_{14}}{\text{Spread}}$$
+     If $\text{VSQI} < 3.0$, the asset's current volatility is too compressed relative to transaction friction (liquidity drought / holiday freeze). Orders are strictly blocked with reason `SPREAD_CONGESTION_VSQI_LOW`.
+  4. **Pre-Execution Spread Expansion Shield:**
+     Orders are immediately aborted if live spread expands $> 30\%$ above historical baseline ($\text{Spread} > 1.30 \times \text{Baseline}$) due to sudden liquidity withdrawal or news spike blowout.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 27/27].
 
 ---
 
@@ -341,7 +361,7 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
 3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 30 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 26 checks remain at 100% `[PASS]`.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 27 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main

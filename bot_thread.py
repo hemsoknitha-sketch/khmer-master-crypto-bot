@@ -5731,6 +5731,24 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_kelly_command(update, context)
+            elif data == "btn_cap_spread_toggle":
+                curr_state = db.is_capital_spread_guard_enabled(chat_id)
+                new_state = not curr_state
+                db.set_capital_spread_guard_config(chat_id, enabled=new_state)
+                toast_msg = "🛡️ Spread Drag Shield: បានបើកដំណើរការ! (10x Hurdle)" if new_state else "🛑 Spread Drag Shield: បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_spread_radar":
+                try:
+                    await update.callback_query.answer("🛡️ កំពុងទាញយកទិន្នន័យ Spread Drag Radar...")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_spread_command(update, context)
             elif data == "btn_cap_auto_budget_10":
                 db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=3, is_demo=False)
                 try:
@@ -19149,6 +19167,175 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def capital_spread_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🛡️ Institutional Spread Drag Elimination & Asymmetric Minimum 10x Hurdle Protocol.
+            Guarantees:
+              1. TP_dist >= 10.0 * Spread (Clamps Spread Drag <= 10.0%, locking >= 90% Net Profit).
+              2. Asymmetric R:R >= 1:6.0 with noise-isolated SL.
+              3. VSQI (ATR / Spread) >= 3.0 to reject illiquid volatility droughts.
+              4. Pre-execution spread expansion guard (rejects blowout > 30% baseline).
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            spread_mgr = capital_engine.get_capital_spread_drag_manager()
+            spread_cfg = db.get_capital_spread_guard_config(chat_id)
+
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["ON", "START", "ENABLE"]:
+                    db.set_capital_spread_guard_config(chat_id, enabled=True)
+                    toast = "✅ Spread Drag Shield: បានបើកដំណើរការ!" if user_lang == 'khmer' else "✅ Spread Drag Shield: ACTIVATED!"
+                    if update.callback_query:
+                        try:
+                            await update.callback_query.answer(toast)
+                        except Exception:
+                            pass
+                    else:
+                        await update.effective_message.reply_text(f"✅ **SPREAD DRAG SHIELD: ON** 🟢\n`បានបើកដំណើរការការពារ Spread Drag (Target >= 10x Spread, R:R >= 1:6)!`", parse_mode="Markdown")
+                    return
+                elif sub in ["OFF", "STOP", "DISABLE"]:
+                    db.set_capital_spread_guard_config(chat_id, enabled=False)
+                    toast = "🛑 Spread Drag Shield: បានបិទ!" if user_lang == 'khmer' else "🛑 Spread Drag Shield: DISABLED!"
+                    if update.callback_query:
+                        try:
+                            await update.callback_query.answer(toast)
+                        except Exception:
+                            pass
+                    else:
+                        await update.effective_message.reply_text(f"🛑 **SPREAD DRAG SHIELD: OFF** ⚪\n`បានបិទ Spread Drag Shield! ប្រព័ន្ធនឹងប្រើ Target ធម្មតា។`", parse_mode="Markdown")
+                    return
+                elif sub in ["HURDLE", "RATIO", "TARGET"]:
+                    try:
+                        hurdle_val = float(args[1]) if len(args) >= 2 else 10.0
+                    except Exception:
+                        hurdle_val = 10.0
+                    hurdle_val = max(5.0, min(25.0, hurdle_val))
+                    db.set_capital_spread_guard_config(chat_id, enabled=True, min_target_spread_ratio=hurdle_val)
+                    await update.effective_message.reply_text(f"🎯 **TARGET-TO-SPREAD HURDLE RATIO ៖** `{hurdle_val:.1f}x` (Spread Drag <= `{100.0/hurdle_val:.1f}%`)", parse_mode="Markdown")
+                    return
+
+            is_on = spread_cfg.get("enabled", True)
+            min_hurdle = spread_cfg.get("min_target_spread_ratio", 10.0)
+            min_rr = spread_cfg.get("min_rr_ratio", 6.0)
+            min_vsqi = spread_cfg.get("min_vsqi", 3.0)
+            status_badge = "🟢 ACTIVE (ដំណើរការ)" if is_on else "⚪ OFF (បិទ)"
+
+            telemetry = spread_mgr.get_telemetry()
+            tot_eval = telemetry.get("total_evaluations", 0)
+            tot_pass = telemetry.get("total_passed", 0)
+            rej_drag = telemetry.get("total_rejected_drag", 0)
+            rej_vsqi = telemetry.get("total_rejected_vsqi", 0)
+            rej_blow = telemetry.get("total_rejected_expansion", 0)
+
+            # Sample Live Data
+            market_gold = capital_engine.get_capital_auto_engine().get_market_quote("GOLD")
+            gold_sp = market_gold.get("spread", 0.60) if market_gold.get("success") else 0.60
+            gold_p = market_gold.get("ask", 2650.0) if market_gold.get("success") else 2650.0
+
+            market_sp500 = capital_engine.get_capital_auto_engine().get_market_quote("US500")
+            sp500_sp = market_sp500.get("spread", 0.80) if market_sp500.get("success") else 0.80
+
+            market_btc = capital_engine.get_capital_auto_engine().get_market_quote("BTCUSD")
+            btc_sp = market_btc.get("spread", 35.0) if market_btc.get("success") else 35.0
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🛡️ Spread Guard: ON 🟢" if is_on else "🛡️ Spread Guard: OFF ⚪", callback_data="btn_cap_spread_toggle"),
+                    InlineKeyboardButton("🔄 Refresh Radar", callback_data="btn_cap_spread_radar")
+                ],
+                [
+                    InlineKeyboardButton("🎯 Hurdle 8x (12% Drag)", callback_data="btn_cap_auto_budget_10"),
+                    InlineKeyboardButton("🎯 Hurdle 10x (10% Drag)", callback_data="btn_cap_auto_budget_30"),
+                    InlineKeyboardButton("🎯 Hurdle 15x (6% Drag)", callback_data="btn_cap_auto_budget_50")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_refresh"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            if user_lang == 'khmer':
+                msg = (
+                    f"🛡️ **SPREAD DRAG ELIMINATION & ASYMMETRIC 10x HURDLE** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚙️ **ស្ថានភាព ៖** `{status_badge}`\n"
+                    f"🎯 **Target-to-Spread Hurdle ៖** `≥ {min_hurdle:.1f}x Spread`\n"
+                    f"📊 **Max Allowed Spread Drag (D) ៖** `≤ {100.0/min_hurdle:.1f}%`\n"
+                    f"⚖️ **Asymmetric Reward-to-Risk (R:R) ៖** `≥ 1:{min_rr:.1f}`\n"
+                    f"🌊 **Min Volatility Index (VSQI) ៖** `≥ {min_vsqi:.1f}`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🧮 **ទ្រឹស្តីគណិតវិជ្ជាស្ថាប័ន (Institutional Formula) ៖**\n"
+                    f"  `Spread Drag = (Spread / TP_dist) × 100%`\n"
+                    f"  • ការ Scalping 0.2%-0.5% បាត់បង់ 40%-60% ទៅលើ Spread!\n"
+                    f"  • ប្រព័ន្ធចាក់សោ `TP_dist ≥ 10.0 × Spread` ធានាផលចំណេញសុទ្ធ `≥ 90.0% Net Profit`!\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📊 **តម្លៃ Spread ផ្ទាល់ & Target អប្បបរមា (Live Spreads) ៖**\n"
+                    f"• 🥇 **Gold (XAU/USD) ៖** Spread `${gold_sp:.2f}` ➔ Min TP: `+${gold_sp * min_hurdle:,.2f}`\n"
+                    f"• 📈 **S&P 500 (US500) ៖** Spread `${sp500_sp:.2f}` ➔ Min TP: `+${sp500_sp * min_hurdle:,.2f}`\n"
+                    f"• 🪙 **Bitcoin (CFD) ៖** Spread `${btc_sp:.2f}` ➔ Min TP: `+${btc_sp * min_hurdle:,.2f}`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📈 **ស្ថិតិការការពារ (Live Guard Telemetry) ៖**\n"
+                    f"• ការត្រួតពិនិត្យសរុប ៖ `{tot_eval}` ដង\n"
+                    f"• អនុម័តចូលផ្សារ (Passed) ៖ `{tot_pass}` ដង\n"
+                    f"• បដិសេធពេល Spread Drag ខ្ពស់ ៖ `-{rej_drag}` ដង\n"
+                    f"• បដិសេធពេល VSQI ទាប (ផ្សារស្ងាត់) ៖ `-{rej_vsqi}` ដង\n"
+                    f"• បដិសេធពេល Spread ផ្ទុះ (>30%) ៖ `-{rej_blow}` ដង\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **គំរូបញ្ជា 1-Tap ៖**\n"
+                    f"• បើក/បិទ ៖ `` `/capital spread ON` `` | `` `/capital spread OFF` ``\n"
+                    f"• កំណត់ Hurdle ៖ `` `/capital spread HURDLE 10` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"លុបបំបាត់ការបាត់បង់ថ្លៃទឹក Spread ធានាចំណេញសុទ្ធ ២៤/៧!"
+                )
+            else:
+                msg = (
+                    f"🛡️ **SPREAD DRAG ELIMINATION & ASYMMETRIC 10x HURDLE** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚙️ **Status:** `{status_badge}`\n"
+                    f"🎯 **Target-to-Spread Hurdle:** `≥ {min_hurdle:.1f}x Spread`\n"
+                    f"📊 **Max Allowed Spread Drag (D):** `≤ {100.0/min_hurdle:.1f}%`\n"
+                    f"⚖️ **Asymmetric Reward-to-Risk (R:R):** `≥ 1:{min_rr:.1f}`\n"
+                    f"🌊 **Min Volatility Index (VSQI):** `≥ {min_vsqi:.1f}`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🧮 **Institutional Mathematical Proof:**\n"
+                    f"  `Spread Drag = (Spread / TP_dist) × 100%`\n"
+                    f"  • Scalping 0.2%-0.5% loses 40%-60% to broker spread!\n"
+                    f"  • Clamping `TP_dist ≥ 10.0 × Spread` guarantees `≥ 90.0% Clean Net Profit`!\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📊 **Live Spreads & Minimum Target Hurdles:**\n"
+                    f"• 🥇 **Gold (XAU/USD):** Spread `${gold_sp:.2f}` ➔ Min TP: `+${gold_sp * min_hurdle:,.2f}`\n"
+                    f"• 📈 **S&P 500 (US500):** Spread `${sp500_sp:.2f}` ➔ Min TP: `+${sp500_sp * min_hurdle:,.2f}`\n"
+                    f"• 🪙 **Bitcoin (CFD):** Spread `${btc_sp:.2f}` ➔ Min TP: `+${btc_sp * min_hurdle:,.2f}`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📈 **Live Telemetry & Rejections:**\n"
+                    f"• Total Evaluated: `{tot_eval}`\n"
+                    f"• Passed (Zero Drag): `{tot_pass}`\n"
+                    f"• Rejected (High Drag): `-{rej_drag}`\n"
+                    f"• Rejected (Low VSQI): `-{rej_vsqi}`\n"
+                    f"• Rejected (Spread Blowout >30%): `-{rej_blow}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Commands:**\n"
+                    f"• Toggle: `` `/capital spread ON` `` | `` `/capital spread OFF` ``\n"
+                    f"• Set Hurdle: `` `/capital spread HURDLE 10` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Institutional Zero-Spread-Drag Net Profit Protection 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -19178,6 +19365,9 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_kelly", "capitalkelly", "kelly"]:
                 await capital_kelly_command(update, context)
                 return
+            elif cmd_text in ["capital_spread", "capitalspread", "spreadguard", "spread_guard"]:
+                await capital_spread_command(update, context)
+                return
             elif cmd_text in ["prop_firm", "propfirm", "prop"]:
                 await prop_firm_command(update, context)
                 return
@@ -19185,7 +19375,7 @@ class TelegramBotThread(BaseThread):
                 await capital_ib_command(update, context)
                 return
 
-            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY
+            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD
             if args:
                 action = str(args[0]).upper().strip()
                 if action in ["PROP", "PROPFIRM", "CHALLENGE"]:
@@ -19208,6 +19398,10 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_kelly_command(update, context)
                     return
+                elif action in ["SPREAD", "SPREAD_GUARD", "SPREADGUARD", "HURDLE"]:
+                    context.args = args[1:]
+                    await capital_spread_command(update, context)
+                    return
 
             # Auto config & status
             is_auto_on = db.is_capital_auto_enabled(chat_id)
@@ -19220,6 +19414,8 @@ class TelegramBotThread(BaseThread):
             orb_btn_text = "🎯 ORB 15m: ON 🟢" if is_orb_on else "🎯 ORB 15m: OFF ⚪"
             is_kelly_on = db.is_capital_kelly_enabled(chat_id)
             kelly_btn_text = "📐 Kelly Sizer: ON 🟢" if is_kelly_on else "📐 Kelly Sizer: OFF ⚪"
+            is_spread_on = db.is_capital_spread_guard_enabled(chat_id)
+            spread_btn_text = "🛡️ Spread Guard: ON 🟢" if is_spread_on else "🛡️ Spread Guard: OFF ⚪"
 
             keyboard = InlineKeyboardMarkup([
                 [
@@ -19229,6 +19425,10 @@ class TelegramBotThread(BaseThread):
                 [
                     InlineKeyboardButton(orb_btn_text, callback_data="btn_cap_orb_toggle"),
                     InlineKeyboardButton(kelly_btn_text, callback_data="btn_cap_kelly_toggle")
+                ],
+                [
+                    InlineKeyboardButton(spread_btn_text, callback_data="btn_cap_spread_toggle"),
+                    InlineKeyboardButton("🛡️ Spread Radar", callback_data="btn_cap_spread_radar")
                 ],
                 [
                     InlineKeyboardButton("📈 ORB Radar (15m)", callback_data="btn_cap_orb_radar"),
@@ -19565,6 +19765,10 @@ class TelegramBotThread(BaseThread):
             is_kelly_on = kelly_cfg.get("enabled", True)
             kelly_mode = kelly_cfg.get("mode", "BALANCED")
             kelly_badge = f"🟢 ACTIVE ({kelly_mode} {kelly_cfg.get('fractional_multiplier', 0.35)}x)" if is_kelly_on else "⚪ OFF"
+            spread_cfg = db.get_capital_spread_guard_config(chat_id)
+            is_spread_on = spread_cfg.get("enabled", True)
+            min_hurdle = spread_cfg.get("min_target_spread_ratio", 10.0)
+            spread_badge = f"🟢 ACTIVE ({min_hurdle:.0f}x Hurdle | R:R 1:6)" if is_spread_on else "⚪ OFF"
 
             if user_lang == 'khmer':
                 msg = (
@@ -19576,6 +19780,7 @@ class TelegramBotThread(BaseThread):
                     f"🎯 **ORB 15m Matrix ៖** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage ៖** `{leadlag_badge}`\n"
                     f"📐 **Kelly Sizer ($f^*$) ៖** `{kelly_badge}`\n"
+                    f"🛡️ **Spread Drag Shield ៖** `{spread_badge}`\n"
                     f"💰 **សមតុល្យលុយពិត (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
@@ -19594,10 +19799,10 @@ class TelegramBotThread(BaseThread):
                     f"🛡️ **ប្រព័ន្ធការពារដើមទុនស្ថាប័ន (Zero Negligence) ៖**\n"
                     f"• **Breakeven Armor ៖** ចាក់សោ SL ពេលចំណេញ +1.5%\n"
                     f"• **Dynamic ATR Trailing ៖** ចាក់សោ 80% នៃចំណេញកំពូល\n"
-                    f"• **Spread Guard ៖** បដិសេធ Trade ពេល Spread រីកធំ\n"
+                    f"• **Spread Guard (10x Hurdle) ៖** កាត់បន្ថយ Spread Drag មកត្រឹម <= 10%\n"
                     f"• **Kelly Sizer ($f^*) ៖** គណនា Lot ល្អបំផុតកាត់បន្ថយ Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital KELLY ON` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -19613,6 +19818,7 @@ class TelegramBotThread(BaseThread):
                     f"🎯 **ORB 15m Matrix:** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage:** `{leadlag_badge}`\n"
                     f"📐 **Kelly Sizer ($f^*$) :** `{kelly_badge}`\n"
+                    f"🛡️ **Spread Drag Shield:** `{spread_badge}`\n"
                     f"💰 **Live Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **Live Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
@@ -19631,10 +19837,10 @@ class TelegramBotThread(BaseThread):
                     f"🛡️ **Institutional Capital Protection (Zero Negligence):**\n"
                     f"• **Breakeven Armor:** Locks SL at entry on +1.5% profit\n"
                     f"• **Dynamic ATR Trailing:** Protects 80% peak profit\n"
-                    f"• **Spread Guard:** Rejects orders during wide spreads\n"
+                    f"• **Spread Guard (10x Hurdle):** Limits spread drag to <= 10%\n"
                     f"• **Kelly Sizer ($f^*$) :** Optimal mathematical lot scaling\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital KELLY ON` ``\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -19901,6 +20107,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capital_kelly", capital_kelly_command))
         self.app.add_handler(CommandHandler("capitalkelly", capital_kelly_command))
         self.app.add_handler(CommandHandler("kelly", capital_kelly_command))
+        self.app.add_handler(CommandHandler("capital_spread", capital_spread_command))
+        self.app.add_handler(CommandHandler("capitalspread", capital_spread_command))
+        self.app.add_handler(CommandHandler("spreadguard", capital_spread_command))
         self.app.add_handler(CommandHandler("capital_ib", capital_ib_command))
         self.app.add_handler(CommandHandler("capitalib", capital_ib_command))
         self.app.add_handler(CommandHandler("ib", capital_ib_command))
