@@ -13484,18 +13484,33 @@ class TelegramBotThread(BaseThread):
                         await msg_target.reply_text("🔒 **កូដ PIN មិនត្រឹមត្រូវ!** សូមបញ្ចូល PIN ៤ខ្ទង់ត្រឹមត្រូវ (ឧទាហរណ៍ ៖ `/smart_swap auto 20 1234` ឬ `/smart_swap auto new 20 1234`)", parse_mode="Markdown")
                     return
 
+                # Seamlessly activate 24/7 Autopilot Loop in Database
+                smart_swap_engine.toggle_smart_swap_autopilot(
+                    chat_id=chat_id,
+                    enable=True,
+                    amount_usd=amount_usd,
+                    max_positions=2,
+                    pin="SKIP",
+                    chain=chain_choice,
+                    mode=swap_mode
+                )
+
                 mode_title = "EARLY BREAKOUT RADAR" if swap_mode == "NEW" else "MOMENTUM GEM SNIPER"
                 mode_desc = "10m-24h Early Gems, LP Locked ≥95%" if swap_mode == "NEW" else "High-Liquidity Breakouts, LP Locked ≥90%"
                 ack_msg = None
                 if msg_target:
                     ack_msg = await msg_target.reply_text(
-                        f"⚡ **[SMART SWAP {mode_title} LAUNCHED]** 🛰️\n"
-                        f"• Mode ៖ `{swap_mode}` ({mode_desc})\n"
-                        f"• Chain ៖ `{chain_choice}`\n"
-                        f"• Capital ៖ `${amount_usd:.2f} USD`\n"
+                        f"⚡ **[SMART SWAP 24/7 AUTOPILOT ACTIVATED]** 🛰️\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n\n"
+                        f"• ស្ថានភាព ២៤/៧ ៖ `🟢 ACTIVE (ដំណើរការ ២៤/៧ ស្វ័យប្រវត្ត)`\n"
+                        f"• ល្បឿនម៉ាស៊ីន ៖ `⚡ < 0.001ms WebSocket RAM Pre-Cache`\n"
+                        f"• ប្រព័ន្ធស្កេន ៖ `{swap_mode}` ({mode_desc})\n"
+                        f"• បណ្តាញ ៖ `{chain_choice} Mainnet`\n"
+                        f"• ទុនវិនិយោគ ៖ `${amount_usd:.2f} USD` (Max 2 Positions)\n"
                         f"• AI Consensus ៖ `32 Wall Street Models Scanning DexScreener & Birdeye...`\n"
                         f"• Honeypot Shield ៖ `Sub-Second Bytecode Verification Active (<15ms)...`\n"
-                        f"• Profit Armor ៖ `Breakeven Armor (+8%) + 3-Stage Profit Harvester`",
+                        f"• Profit Armor ៖ `Breakeven Armor (+12%) + 3-Stage Profit Harvester`\n\n"
+                        f"🎯 **កំពុងស្កេន និងបាញ់កាក់ Gem ទី ១ ភ្លាមៗ...**",
                         parse_mode="Markdown"
                     )
 
@@ -13541,6 +13556,7 @@ class TelegramBotThread(BaseThread):
                                 f"⚡ **KHMER MASTER CRYPTO | SMART SWAP GEM SNIPER SUCCESS** 🚀\n"
                                 f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                                 f"🪙 **កាក់គោលដៅ (Target Gem) ៖** `{gem_name}` ({chain_out})\n"
+                                f"🔄 **ស្ថានភាព ២៤/៧ ៖** `🟢 24/7 AUTOPILOT ACTIVE (ស្កេន & កើបចំណេញជាប់រហូត)`\n"
                                 f"🏷️ **ប្រព័ន្ធស្កេន (Radar Mode) ៖** `{swap_mode}` ({'Early Breakout' if swap_mode == 'NEW' else 'Momentum'})\n"
                                 f"💰 **ទំហំដើមទុនវិនិយោគ ៖** `${amt_u:,.2f} USD`\n"
                                 f"🎯 **ចំនួនកាក់ទទួលបាន ៖** `{t_qty:,.4f} {gem_name}`\n"
@@ -13560,23 +13576,30 @@ class TelegramBotThread(BaseThread):
                             )
                             card_kb = InlineKeyboardMarkup([
                                 [
-                                    InlineKeyboardButton("📊 ពិនិត្យ Status", callback_data="btn_smart_swap_status"),
+                                    InlineKeyboardButton("📊 ពិនិត្យ DEX Portfolio", callback_data="btn_portfolio_smart_swap"),
                                     InlineKeyboardButton("💳 កាបូប Solana", callback_data="btn_smart_swap_wallet")
                                 ],
                                 [
-                                    InlineKeyboardButton("🛑 STOP Swaps (Exit All)", callback_data="btn_smart_swap_stop_all"),
-                                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                                    InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off"),
+                                    InlineKeyboardButton("🛑 STOP ALL (Exit)", callback_data="btn_smart_swap_stop_all")
                                 ]
                             ])
                         else:
-                            card = f"⚠️ **[SMART SWAP SNIPER NOTICE]**\n\n{res.get('msg', res.get('reason', 'Notice'))}"
+                            card = (
+                                f"⚡ **[SMART SWAP 24/7 AUTOPILOT ACTIVE]** 🛰️\n"
+                                f"{ui_standards.DIVIDER_DOUBLE}\n\n"
+                                f"✅ **ស្ថានភាព ២៤/៧ ៖** `🟢 ដំណើរការ ២៤/៧ ស្វ័យប្រវត្ត!` (ទុន: `${amount_usd:.2f}/Trade`)\n\n"
+                                f"{res.get('msg', res.get('reason', 'Notice'))}\n\n"
+                                f"💡 *ប្រព័ន្ធស្វ័យប្រវត្ត ២៤/៧ នឹងបន្តស្កេន និងទិញកាក់ Gem ជូនអ្នករៀងរាល់ ២៥ វិនាទីម្តងដោយស្វ័យប្រវត្តិ!*"
+                            )
                             card_kb = InlineKeyboardMarkup([
                                 [
                                     InlineKeyboardButton("💳 ដាក់ទុន SOL ចូលកាបូប", callback_data="btn_smart_swap_wallet"),
                                     InlineKeyboardButton("🔄 ស្កេនរកកាក់ Gem ថ្មី", callback_data="btn_smart_swap_scan")
                                 ],
                                 [
-                                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                                    InlineKeyboardButton("🛑 បិទ Auto-Pilot", callback_data="btn_smart_swap_autopilot_off"),
+                                    InlineKeyboardButton("📊 ពិនិត្យ DEX Portfolio", callback_data="btn_portfolio_smart_swap")
                                 ]
                             ])
 
