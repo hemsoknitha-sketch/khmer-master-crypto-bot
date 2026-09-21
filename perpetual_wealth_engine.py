@@ -81,15 +81,15 @@ def is_wealth_spot_in_cooldown(symbol: str) -> bool:
 
 
 async def _async_send_wealth_alert(app, chat_id: int, text: str, alert_name: str = "wealth alert"):
-    """Non-blocking background Telegram notification sender with strict network timeout."""
+    """Non-blocking background Telegram notification sender with robust network timeout."""
     try:
         await app.bot.send_message(
             chat_id=chat_id,
             text=text,
             parse_mode="Markdown",
-            read_timeout=5,
-            write_timeout=5,
-            connect_timeout=5
+            read_timeout=15,
+            write_timeout=15,
+            connect_timeout=10
         )
     except Exception as err:
         print(f"⚠️ Notice sending {alert_name}: {err}")
