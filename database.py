@@ -2402,7 +2402,7 @@ def get_capital_auto_config(chat_id: int) -> dict:
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT is_enabled, budget, max_positions, last_trade_time
+            SELECT is_enabled, budget, max_positions, last_trade_time, is_demo
             FROM capital_auto_config WHERE chat_id = ?
         """, (chat_id,))
         row = cursor.fetchone()
@@ -2412,31 +2412,55 @@ def get_capital_auto_config(chat_id: int) -> dict:
                 "enabled": bool(row[0]),
                 "budget": float(row[1] or 50.0),
                 "max_positions": int(row[2] or 2),
-                "last_trade_time": float(row[3] or 0.0)
+                "last_trade_time": float(row[3] or 0.0),
+                "is_demo": bool(row[4]) if len(row) > 4 and row[4] is not None else False
             }
     except Exception:
-        conn.close()
-    return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0}
+        try:
+            cursor.execute("""
+                SELECT is_enabled, budget, max_positions, last_trade_time
+                FROM capital_auto_config WHERE chat_id = ?
+            """, (chat_id,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {
+                    "enabled": bool(row[0]),
+                    "budget": float(row[1] or 50.0),
+                    "max_positions": int(row[2] or 2),
+                    "last_trade_time": float(row[3] or 0.0),
+                    "is_demo": False
+                }
+        except Exception:
+            conn.close()
+    return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0, "is_demo": False}
 
 def is_capital_auto_enabled(chat_id: int) -> bool:
     """Fast check if a user has enabled Capital.com Autonomous Trading."""
     cfg = get_capital_auto_config(chat_id)
     return cfg.get("enabled", False)
 
-def set_capital_auto_config(chat_id: int, enabled: bool, budget: float = 50.0, max_positions: int = 2):
-    """Sets or updates the Capital.com Autonomous Trading config."""
+def set_capital_auto_config(chat_id: int, enabled: bool, budget: float = 50.0, max_positions: int = 2, is_demo: bool = False):
+    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        cursor.execute("ALTER TABLE capital_auto_config ADD COLUMN is_demo BOOLEAN DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass
+
     cursor.execute("""
-        INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(chat_id) DO UPDATE SET
             is_enabled = excluded.is_enabled,
             budget = excluded.budget,
             max_positions = excluded.max_positions,
-            updated_at = excluded.updated_at
-    """, (chat_id, 1 if enabled else 0, float(budget), int(max_positions), now_str))
+            updated_at = excluded.updated_at,
+            is_demo = excluded.is_demo
+    """, (chat_id, 1 if enabled else 0, float(budget), int(max_positions), now_str, 1 if is_demo else 0))
     conn.commit()
     conn.close()
 
@@ -2453,13 +2477,19 @@ def get_active_capital_auto_users() -> list:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT chat_id, budget, max_positions FROM capital_auto_config WHERE is_enabled = 1")
+        cursor.execute("SELECT chat_id, budget, max_positions, is_demo FROM capital_auto_config WHERE is_enabled = 1")
         rows = cursor.fetchall()
         conn.close()
-        return [{"chat_id": r[0], "budget": float(r[1]), "max_positions": int(r[2])} for r in rows]
+        return [{"chat_id": r[0], "budget": float(r[1]), "max_positions": int(r[2]), "is_demo": bool(r[3]) if len(r) > 3 and r[3] is not None else False} for r in rows]
     except Exception:
-        conn.close()
-        return []
+        try:
+            cursor.execute("SELECT chat_id, budget, max_positions FROM capital_auto_config WHERE is_enabled = 1")
+            rows = cursor.fetchall()
+            conn.close()
+            return [{"chat_id": r[0], "budget": float(r[1]), "max_positions": int(r[2]), "is_demo": False} for r in rows]
+        except Exception:
+            conn.close()
+            return []
 
 def record_capital_auto_trade(
     chat_id: int,

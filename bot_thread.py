@@ -5647,6 +5647,14 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_command(update, context)
+            elif data == "btn_cap_auto_budget_10":
+                db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, is_demo=False)
+                try:
+                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $10 (Live Mainnet)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
             elif data == "btn_cap_auto_budget_30":
                 db.set_capital_auto_config(chat_id, enabled=True, budget=30.0)
                 try:
@@ -18669,6 +18677,7 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🤝 IB Rebate (30%-50%)", callback_data="btn_cap_ib_menu")
                 ],
                 [
+                    InlineKeyboardButton("💰 Budget $10", callback_data="btn_cap_auto_budget_10"),
                     InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
                     InlineKeyboardButton("💰 Budget $50", callback_data="btn_cap_auto_budget_50"),
                     InlineKeyboardButton("💰 Budget $100", callback_data="btn_cap_auto_budget_100")
@@ -18700,11 +18709,33 @@ class TelegramBotThread(BaseThread):
                 action = str(args[0]).upper().strip()
                 if action == "AUTO":
                     sub_opt = str(args[1]).upper().strip() if len(args) >= 2 else "STATUS"
-                    if sub_opt == "ON":
-                        budget = float(args[2]) if len(args) >= 3 else 50.0
-                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget)
+                    is_numeric_budget = False
+                    try:
+                        float(sub_opt)
+                        is_numeric_budget = True
+                    except ValueError:
+                        is_numeric_budget = False
+
+                    if sub_opt in ["ON", "LIVE", "START", "RUN"] or is_numeric_budget:
+                        target_is_demo = False
+                        if is_numeric_budget:
+                            budget = float(sub_opt)
+                        elif len(args) >= 3:
+                            try:
+                                budget = float(args[2])
+                            except ValueError:
+                                budget = 10.0
+                        else:
+                            budget = 10.0
+
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, is_demo=target_is_demo)
                         pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
-                        env_mode = "DEMO ($10,000 Virtual Funds)" if capital_engine.get_capital_engine().is_demo else "LIVE MAINNET"
+                        live_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=target_is_demo)
+                        bal_data = await asyncio.to_thread(live_engine.get_account_balance)
+                        live_bal = bal_data.get("balance", 0.0)
+                        live_avail = bal_data.get("available", 0.0)
+                        live_acc_id = bal_data.get("account_id", "")
+                        env_mode = "🟢 LIVE MAINNET (Real Funds)" if not target_is_demo else "🟡 DEMO ($10,000 Virtual)"
 
                         # Rebuild keyboard with updated state
                         keyboard = InlineKeyboardMarkup([
@@ -18716,6 +18747,7 @@ class TelegramBotThread(BaseThread):
                                 InlineKeyboardButton("🤝 IB Rebate (30%-50%)", callback_data="btn_cap_ib_menu")
                             ],
                             [
+                                InlineKeyboardButton("💰 Budget $10", callback_data="btn_cap_auto_budget_10"),
                                 InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
                                 InlineKeyboardButton("💰 Budget $50", callback_data="btn_cap_auto_budget_50"),
                                 InlineKeyboardButton("💰 Budget $100", callback_data="btn_cap_auto_budget_100")
@@ -18746,10 +18778,13 @@ class TelegramBotThread(BaseThread):
                             f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON** 🟢\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"🏦 **គណនី ៖** `{env_mode}`\n"
-                            f"💰 **ទុនកំណត់ក្នុងមួយជុំ ៖** `${budget:,.2f}`\n"
-                            f"🏛️ **ឧបករណ៍វិនិយោគ ៖** `GOLD, S&P 500, OIL, BTC CFD (24/7)`\n"
-                            f"🧠 **AI Intelligence ៖** `Google Macro Satellite + 33 Models`\n"
-                            f"🛡️ **ការការពារដើមទុន ៖** `Breakeven Armor + Golden 80% Ratchet`\n"
+                            f"🆔 **Live Account ID ៖** `{live_acc_id}`\n"
+                            f"💰 **សមតុល្យពិត (Live Balance) ៖** `${live_bal:,.2f} USD` (Available: `${live_avail:,.2f}`)\n"
+                            f"💵 **ទុនកំណត់ក្នុងមួយជុំ ៖** `${budget:,.2f} USD`\n"
+                            f"🏛️ **ឧបករណ៍វិនិយោគ ៖** `GOLD (XAU/USD), S&P 500, OIL, BTC CFD (24/7)`\n"
+                            f"🛡️ **ការបែងចែកដាច់ដោយឡែក (Dual-Engine Isolation) ៖**\n"
+                            f"• `✅ 100% ដាច់ពី Prop Firm Challenge ($10,000 Demo) មិនប៉ះពាល់គ្នាឡើយ!`\n"
+                            f"• `✅ ការពារដោយ Breakeven Armor + Golden 80% Trailing Ratchet`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"📊 **ប្រវត្តិជួញដូរ ៖** `{pnl_stat['total_trades']} Trades` | Win: `{pnl_stat['win_rate']}%` | PnL: `${pnl_stat['total_pnl']:,.2f}`\n"
                             f"💡 _ប្រព័ន្ធកំពុងស្កេនចាប់យកឱកាស និងកើបចំណេញ ២៤/៧ ដោយស្វ័យប្រវត្តិ!_"
@@ -18757,13 +18792,41 @@ class TelegramBotThread(BaseThread):
                             f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON** 🟢\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"🏦 **Account:** `{env_mode}`\n"
-                            f"💰 **Budget Per Round:** `${budget:,.2f}`\n"
+                            f"🆔 **Live Account ID:** `{live_acc_id}`\n"
+                            f"💰 **Live Balance:** `${live_bal:,.2f} USD` (Available: `${live_avail:,.2f}`)\n"
+                            f"💵 **Budget Per Round:** `${budget:,.2f} USD`\n"
                             f"🏛️ **Instruments:** `GOLD, S&P 500, OIL, BTC CFD (24/7)`\n"
-                            f"🧠 **AI Intelligence:** `Google Macro Satellite + 33 Models`\n"
-                            f"🛡️ **Capital Protection:** `Breakeven Armor + Golden 80% Ratchet`\n"
+                            f"🛡️ **Dual-Engine Isolation:**\n"
+                            f"• `✅ 100% Isolated from Prop Firm Challenge ($10,000 Demo)`\n"
+                            f"• `✅ Guarded by Breakeven Armor + Golden 80% Trailing Ratchet`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"📊 **Historical:** `{pnl_stat['total_trades']} Trades` | Win: `{pnl_stat['win_rate']}%` | PnL: `${pnl_stat['total_pnl']:,.2f}`\n"
                             f"💡 _Engine autonomously scanning and harvesting profits 24/7!_"
+                        )
+                        await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                        return
+                    elif sub_opt in ["DEMO", "TEST"]:
+                        target_is_demo = True
+                        budget = float(args[2]) if len(args) >= 3 else 10.0
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, is_demo=target_is_demo)
+                        pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
+                        demo_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+                        bal_data = await asyncio.to_thread(demo_engine.get_account_balance)
+                        demo_bal = bal_data.get("balance", 0.0)
+                        demo_avail = bal_data.get("available", 0.0)
+                        demo_acc_id = bal_data.get("account_id", "")
+                        env_mode = "🟡 DEMO ($10,000 Virtual Funds)"
+
+                        msg = (
+                            f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON (DEMO)** 🟡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏦 **គណនី ៖** `{env_mode}`\n"
+                            f"🆔 **Demo Account ID ៖** `{demo_acc_id}`\n"
+                            f"💰 **សមតុល្យ Demo ៖** `${demo_bal:,.2f} USD` (Available: `${demo_avail:,.2f}`)\n"
+                            f"💵 **ទុនកំណត់ក្នុងមួយជុំ ៖** `${budget:,.2f} USD`\n"
+                            f"🏛️ **ឧបករណ៍វិនិយោគ ៖** `GOLD, S&P 500, OIL, BTC CFD (24/7)`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _ប្រព័ន្ធកំពុងដំណើរការតេស្តសាកល្បង Demo ២៤/៧!_"
                         )
                         await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                         return
@@ -18872,9 +18935,15 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(p_msg, parse_mode="Markdown", reply_markup=keyboard)
                     return
 
-            # Default: Master Dashboard
-            data = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id)
-            env_mode = "DEMO ($10,000 Virtual Funds)" if data.get("is_demo") else "LIVE MAINNET"
+            # Default: Master Dashboard (Queries LIVE Mainnet Account by default)
+            data = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id, False)
+            env_mode = "🟢 LIVE MAINNET (Real Funds)" if not data.get("is_demo") else "🟡 DEMO ($10,000 Virtual Funds)"
+
+            # Prop Firm status check
+            prop_cfg = db.get_prop_firm_config(chat_id)
+            is_prop_active = prop_cfg.get("enabled", False)
+            prop_badge = f"🟡 ACTIVE (${prop_cfg.get('account_tier', 10000.0):,.0f} Phase {prop_cfg.get('challenge_phase', 1)})" if is_prop_active else "⚪ READY"
+
             quotes = data.get("quotes", {})
             gold = quotes.get("GOLD", {})
             sp500 = quotes.get("SP500", {})
@@ -18904,13 +18973,15 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🏦 **គណនី ៖** `{env_mode}`\n"
-                    f"🆔 **Account ID ៖** `{data.get('account_id')}`\n"
+                    f"🏦 **គណនីវិនិយោគ ៖** `{env_mode}`\n"
+                    f"🆔 **Live Account ID ៖** `{data.get('account_id')}`\n"
                     f"🤖 **TradFi Auto Engine ៖** `{auto_badge}`\n"
-                    f"💰 **សមតុល្យ (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
+                    f"💰 **សមតុល្យលុយពិត (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
-                    f"📊 **Positions សកម្ម ៖** `{data.get('positions_count', 0)} កំពុងដំណើរការ`\n"
+                    f"📊 **Live Positions ៖** `{data.get('positions_count', 0)} កំពុងដំណើរការ`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🏆 **Prop Firm Challenge ៖** `{prop_badge} [ដាច់ដោយឡែក 100%]`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"📊 **តម្លៃទីផ្សារផ្ទាល់ (Live Institutional Quotes) ៖**\n"
                     f"🥇 **Gold (XAU/USD) ៖** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"
@@ -18934,13 +19005,15 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🏦 **Account:** `{env_mode}`\n"
-                    f"🆔 **Account ID:** `{data.get('account_id')}`\n"
+                    f"🏦 **Investment Account:** `{env_mode}`\n"
+                    f"🆔 **Live Account ID:** `{data.get('account_id')}`\n"
                     f"🤖 **TradFi Auto Engine:** `{auto_badge}`\n"
-                    f"💰 **Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
-                    f"💵 **Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
+                    f"💰 **Live Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
+                    f"💵 **Live Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
-                    f"📊 **Active Positions:** `{data.get('positions_count', 0)} open`\n"
+                    f"📊 **Live Positions:** `{data.get('positions_count', 0)} open`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🏆 **Prop Firm Challenge:** `{prop_badge} [100% Isolated]`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"📊 **Live Institutional Market Quotes:**\n"
                     f"🥇 **Gold (XAU/USD):** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"

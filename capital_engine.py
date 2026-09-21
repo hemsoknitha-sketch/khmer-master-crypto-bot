@@ -1119,44 +1119,50 @@ class CapitalComEngine:
 # ==============================================================================
 # 3. CONVENIENCE HELPERS & FACTORY FUNCTIONS
 # ==============================================================================
-_GLOBAL_CAPITAL_ENGINE: Optional[CapitalComEngine] = None
-_user_engine_pool: Dict[int, CapitalComEngine] = {}
+_GLOBAL_CAPITAL_LIVE_ENGINE: Optional[CapitalComEngine] = None
+_GLOBAL_CAPITAL_DEMO_ENGINE: Optional[CapitalComEngine] = None
+_user_engine_pool: Dict[str, CapitalComEngine] = {}
 _pool_lock = threading.Lock()
 
 def get_capital_engine(is_demo: Optional[bool] = None) -> CapitalComEngine:
-    """Singleton getter for the global CapitalComEngine instance."""
-    global _GLOBAL_CAPITAL_ENGINE
+    """Singleton getter for the global CapitalComEngine instance (Live or Demo)."""
+    global _GLOBAL_CAPITAL_LIVE_ENGINE, _GLOBAL_CAPITAL_DEMO_ENGINE
     if is_demo is None:
-        is_demo = os.getenv("CAPITAL_IS_DEMO", "True").strip().lower() in ("true", "1", "yes")
-        
-    if _GLOBAL_CAPITAL_ENGINE is None or _GLOBAL_CAPITAL_ENGINE.is_demo != is_demo:
-        _GLOBAL_CAPITAL_ENGINE = CapitalComEngine(is_demo=is_demo)
-    return _GLOBAL_CAPITAL_ENGINE
+        is_demo = False  # Default to LIVE MAINNET for investments
+    if is_demo:
+        if _GLOBAL_CAPITAL_DEMO_ENGINE is None:
+            _GLOBAL_CAPITAL_DEMO_ENGINE = CapitalComEngine(is_demo=True)
+        return _GLOBAL_CAPITAL_DEMO_ENGINE
+    else:
+        if _GLOBAL_CAPITAL_LIVE_ENGINE is None:
+            _GLOBAL_CAPITAL_LIVE_ENGINE = CapitalComEngine(is_demo=False)
+        return _GLOBAL_CAPITAL_LIVE_ENGINE
 
 def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> CapitalComEngine:
     """
     Per-User Dedicated Vault Engine Factory:
     Instantiates or retrieves an isolated CapitalComEngine for the specified user chat_id
-    using their AES-256 encrypted credentials from database.py.
-    If user has no custom credentials, falls back gracefully to default institutional instance.
+    and environment (Live or Demo), ensuring 100% separation between Prop Firm and Auto Trading.
     """
     import database as db
+    if is_demo is None:
+        cfg = db.get_capital_auto_config(chat_id)
+        is_demo = cfg.get("is_demo", False)
+    pool_key = f"{chat_id}_{'demo' if is_demo else 'live'}"
+
     with _pool_lock:
-        if chat_id in _user_engine_pool:
-            cached_engine = _user_engine_pool[chat_id]
-            if is_demo is None or cached_engine.is_demo == is_demo:
-                return cached_engine
+        if pool_key in _user_engine_pool:
+            return _user_engine_pool[pool_key]
 
         creds = db.get_user_capital_credentials(chat_id)
         if creds:
-            user_is_demo = is_demo if is_demo is not None else creds.get("is_demo", True)
             engine = CapitalComEngine(
                 api_key=creds.get("api_key"),
                 identifier=creds.get("identifier"),
                 password=creds.get("password"),
-                is_demo=user_is_demo
+                is_demo=is_demo
             )
-            _user_engine_pool[chat_id] = engine
+            _user_engine_pool[pool_key] = engine
             return engine
         else:
             return get_capital_engine(is_demo=is_demo)
@@ -1164,7 +1170,8 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
 def invalidate_user_capital_engine(chat_id: int):
     """Evicts user engine from cache upon credential update or deletion."""
     with _pool_lock:
-        _user_engine_pool.pop(chat_id, None)
+        _user_engine_pool.pop(f"{chat_id}_live", None)
+        _user_engine_pool.pop(f"{chat_id}_demo", None)
 
 def validate_capital_credentials(
     api_key: str,
@@ -2062,14 +2069,17 @@ class CapitalAutonomousEngine:
         total_ratcheted = 0
         total_closed = 0
 
-        # Monitor default engine
-        def_engine = get_capital_engine()
-        c_active, c_ratchet, c_close = self._ratchet_engine_positions(def_engine)
-        total_active += c_active
-        total_ratcheted += c_ratchet
-        total_closed += c_close
+        # Monitor default engines (Both Live and Demo)
+        for def_engine in [get_capital_engine(is_demo=False), get_capital_engine(is_demo=True)]:
+            try:
+                c_active, c_ratchet, c_close = self._ratchet_engine_positions(def_engine)
+                total_active += c_active
+                total_ratcheted += c_ratchet
+                total_closed += c_close
+            except Exception:
+                pass
 
-        # Monitor per-user vaults
+        # Monitor per-user vaults (Both Live and Demo)
         active_uids = set()
         for u in db.get_active_capital_auto_users():
             active_uids.add(u["chat_id"])
@@ -2079,22 +2089,22 @@ class CapitalAutonomousEngine:
             active_uids.add(cu)
 
         for uid in active_uids:
-            if db.has_user_capital_credentials(uid):
+            for is_d in [False, True]:
                 try:
-                    u_engine = get_user_capital_engine(uid)
+                    u_engine = get_user_capital_engine(uid, is_demo=is_d)
                     u_active, u_ratchet, u_close = self._ratchet_engine_positions(u_engine, chat_id=uid)
                     total_active += u_active
                     total_ratcheted += u_ratchet
                     total_closed += u_close
                 except Exception as e_uratchet:
-                    logger.debug(f"Error ratcheting user {uid} positions: {e_uratchet}")
+                    logger.debug(f"Error ratcheting user {uid} (demo={is_d}) positions: {e_uratchet}")
 
-        # Real-time Prop Firm Challenge limits check
+        # Real-time Prop Firm Challenge limits check (strictly on Demo challenge account)
         try:
             active_prop_users = db.get_active_prop_firm_users()
             for pu in active_prop_users:
                 cid = pu["chat_id"]
-                u_engine = get_user_capital_engine(cid)
+                u_engine = get_user_capital_engine(cid, is_demo=True)
                 bal_info = u_engine.get_account_balance()
                 curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
                 self.prop_manager.evaluate_prop_limits_and_milestones(cid, curr_eq, app=app)
@@ -2110,10 +2120,10 @@ class CapitalAutonomousEngine:
     async def execute_autonomous_cycle(self, app=None):
         """
         Main 24/7 autonomous loop called by scheduler:
-        1. Monitors active positions across all users.
+        1. Monitors active positions across all users (Live and Demo separated).
         2. Discovers new opportunities across priority assets.
-        3. Executes trades for opted-in users within budget & max position limits.
-        4. Enforces strict Prop Firm Challenge rules for evaluation traders.
+        3. Executes trades for Capital Auto users on LIVE MAINNET (or configured mode).
+        4. Enforces strict Prop Firm Challenge rules for evaluation traders on DEMO.
         """
         import database as db
         active_users = db.get_active_capital_auto_users()
@@ -2132,7 +2142,7 @@ class CapitalAutonomousEngine:
             return
         self._last_scan_ts = now
 
-        engine = get_capital_engine()
+        engine = get_capital_engine(is_demo=False)
         open_positions = engine.get_open_positions()
         open_epics = {
             (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
@@ -2171,12 +2181,13 @@ class CapitalAutonomousEngine:
 
         logger.info(f"👑 [APEX TRADFI SETUP SELECTED] {resolved_epic} {final_action} | Score: {best_rank:.1f} | Conf: {confidence}% | ADX: {setup.get('adx', 0):.1f} | RVOL: {setup.get('rvol', 1.0)}x")
         
-        # Step 4a: Process Standard Capital Auto Users (Per-User Dedicated Vault Engine)
+        # Step 4a: Process Standard Capital Auto Users (Per-User Dedicated Vault Engine - LIVE REAL CAPITAL)
         for user in active_users:
             chat_id = user["chat_id"]
             budget = user.get("budget", 50.0)
             max_pos = user.get("max_positions", 2)
-            user_engine = get_user_capital_engine(chat_id)
+            user_is_demo = user.get("is_demo", False)  # 100% Live Mainnet Real Capital
+            user_engine = get_user_capital_engine(chat_id, is_demo=user_is_demo)
             user_open_positions = user_engine.get_open_positions()
 
             if len(user_open_positions) >= max_pos:
@@ -2293,10 +2304,10 @@ class CapitalAutonomousEngine:
                 # Throttle to 1 trade per cycle
                 break
 
-        # Step 4b: Process Active Prop Firm Challenge Users (Per-User Dedicated Vault Engine)
+        # Step 4b: Process Active Prop Firm Challenge Users (Strictly DEMO $10,000 Challenge)
         for prop_user in active_prop_users:
             chat_id = prop_user["chat_id"]
-            user_engine = get_user_capital_engine(chat_id)
+            user_engine = get_user_capital_engine(chat_id, is_demo=True)
             bal_info = user_engine.get_account_balance()
             curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
             if curr_equity <= 0:
