@@ -1036,7 +1036,7 @@ def get_smart_swap_status_overview(chat_id: int) -> dict:
         elif scale_lvl == 2:
             stage_desc = "🌾 TP1 Harvested (50% Moonbag Trailing)"
         else:
-            stage_desc = "Full Entry (Emergency SL: -10%)"
+            stage_desc = "Full Entry (Emergency SL: -25% Rug Shield)"
 
         positions.append({
             "id": pos["id"],
@@ -1115,7 +1115,7 @@ def send_smart_swap_telegram_message(app, chat_id: int, text: str, parse_mode: s
 def monitor_smart_swap_positions(app=None):
     """
     Scans active on-chain Smart Swap positions 24/7 with Super Smart 2-Stage Scale-Out:
-    - Stage 0: Emergency Stop-Loss (<= -10.0% ROI) -> Live on-chain sell back to native coin (preserving 90% capital).
+    - Stage 0: Emergency Stop-Loss (<= -25.0% ROI) -> Live on-chain sell back to native coin (giving gems room to breathe while preserving 75% capital from rug-pulls).
     - Stage 1: Breakeven Armor (>= +12.0% ROI) -> Sets scale_out_level = 1, Stop Loss locked at Entry + 2.0% Net.
       * Breakeven Trigger: If price pulls back <= Entry + 2.0%, sells 100% on-chain to native coin without loss.
     - Stage 2: TP1 50% Bank Cash (>= +30.0% ROI or >= $1.50 Net) -> Sells 50% on-chain to bank 100% initial capital into wallet.
@@ -1151,10 +1151,13 @@ def monitor_smart_swap_positions(app=None):
                 peak_p = curr_p
 
             # ------------------------------------------------------------------
-            # STAGE 0: EMERGENCY STOP LOSS (Cap Loss at -10.0% to preserve capital)
+            # STAGE 0: EMERGENCY STOP LOSS (Dynamic Solana DEX Volatility Buffer)
+            # -25.0% Deep Floor: Gives high-momentum gems room to breathe across DEX spreads & pullbacks,
+            # permanently eliminating "death by a thousand cuts" (-10% chop) while strictly protecting
+            # 75% of capital from catastrophic 100% zero-out rug pulls.
             # ------------------------------------------------------------------
-            if roi_pct <= -10.0:
-                print(f"🚨 [SMART SWAP EMERGENCY SL] {sym}: ROI {roi_pct:.1f}% <= -10.0% -> Executing Market Exit to SOL!")
+            if roi_pct <= -25.0:
+                print(f"🚨 [SMART SWAP EMERGENCY SL] {sym}: ROI {roi_pct:.1f}% <= -25.0% -> Executing Market Exit to SOL!")
                 sell_tx = ""
                 if chain == "SOLANA":
                     try:
@@ -1175,7 +1178,7 @@ def monitor_smart_swap_positions(app=None):
                         f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
                         f"📉 **ROI ៖** `{roi_pct:.1f}%` (PnL: `-${abs(pnl_usd):.2f} USD`)\n"
                         f"⚡ **សកម្មភាព ៖** `លក់ On-Chain ត្រឡប់មកកាន់ Native SOL ភ្លាមៗ`\n"
-                        f"🛡️ **គោលបំណង ៖** `ការពារដើមទុន ៩០% ជៀសវាងការខាតបង់ធ្ងន់ធ្ងរ (-90%)`\n"
+                        f"🛡️ **គោលបំណង ៖** `ការពារដើមទុន ៧៥% ជៀសវាងការខាតបង់ធ្ងន់ធ្ងរដល់ ០$ (Anti-Rug Guard)`\n"
                     )
                     if sell_tx:
                         msg_sl += f"🔗 **Solscan ៖** [ចុចមើល Transaction On-Chain](https://solscan.io/tx/{sell_tx})"
