@@ -5689,6 +5689,48 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_orb_command(update, context)
+            elif data == "btn_cap_kelly_toggle":
+                curr_state = db.is_capital_kelly_enabled(chat_id)
+                new_state = not curr_state
+                db.set_capital_kelly_config(chat_id, enabled=new_state)
+                toast_msg = "📐 Kelly Sizer: បានបើកដំណើរការ!" if new_state else "🛑 Kelly Sizer: បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_kelly_radar":
+                try:
+                    await update.callback_query.answer("🧮 កំពុងទាញយកទិន្នន័យ Kelly Radar...")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_kelly_command(update, context)
+            elif data == "btn_cap_kelly_mode_cons":
+                db.set_capital_kelly_config(chat_id, enabled=True, fractional_multiplier=0.20, max_risk_pct=1.5, mode="CONSERVATIVE")
+                try:
+                    await update.callback_query.answer("🛡️ Kelly Mode: CONSERVATIVE (0.20x, Max 1.5% Risk)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_kelly_command(update, context)
+            elif data == "btn_cap_kelly_mode_bal":
+                db.set_capital_kelly_config(chat_id, enabled=True, fractional_multiplier=0.35, max_risk_pct=2.5, mode="BALANCED")
+                try:
+                    await update.callback_query.answer("⚖️ Kelly Mode: BALANCED (0.35x, Max 2.5% Risk)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_kelly_command(update, context)
+            elif data == "btn_cap_kelly_mode_aggr":
+                db.set_capital_kelly_config(chat_id, enabled=True, fractional_multiplier=0.50, max_risk_pct=3.5, mode="AGGRESSIVE")
+                try:
+                    await update.callback_query.answer("🚀 Kelly Mode: AGGRESSIVE (0.50x, Max 3.5% Risk)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_kelly_command(update, context)
             elif data == "btn_cap_auto_budget_10":
                 db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=3, is_demo=False)
                 try:
@@ -18944,6 +18986,169 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def capital_kelly_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            sizer = capital_engine.get_capital_kelly_sizer()
+            kelly_cfg = db.get_capital_kelly_config(chat_id)
+
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["ON", "START", "ENABLE"]:
+                    db.set_capital_kelly_config(chat_id, enabled=True)
+                    toast = "✅ Fractional Kelly Sizer: បានបើកដំណើរការ!" if user_lang == 'khmer' else "✅ Fractional Kelly Sizer: ACTIVATED!"
+                    if update.callback_query:
+                        try:
+                            await update.callback_query.answer(toast)
+                        except Exception:
+                            pass
+                    else:
+                        await update.effective_message.reply_text(f"✅ **FRACTIONAL KELLY SIZER: ON** 🟢\n`បានបើកដំណើរការគណនាទំហំ Lot ល្អបំផុតតាមគណិតវិជ្ជា Kelly Criterion ($f^*$)!`", parse_mode="Markdown")
+                    return
+                elif sub in ["OFF", "STOP", "DISABLE"]:
+                    db.set_capital_kelly_config(chat_id, enabled=False)
+                    toast = "🛑 Fractional Kelly Sizer: បានបិទ!" if user_lang == 'khmer' else "🛑 Fractional Kelly Sizer: DISABLED!"
+                    if update.callback_query:
+                        try:
+                            await update.callback_query.answer(toast)
+                        except Exception:
+                            pass
+                    else:
+                        await update.effective_message.reply_text(f"🛑 **FRACTIONAL KELLY SIZER: OFF** ⚪\n`បានបិទ Kelly Sizer! ប្រព័ន្ធនឹងប្រើ Fixed Lot Tier ធម្មតា។`", parse_mode="Markdown")
+                    return
+                elif sub in ["MODE", "SET_MODE"]:
+                    mode_val = str(args[1]).upper() if len(args) >= 2 else "BALANCED"
+                    if mode_val in ["CONS", "CONSERVATIVE"]:
+                        db.set_capital_kelly_config(chat_id, enabled=True, fractional_multiplier=0.20, max_risk_pct=1.5, mode="CONSERVATIVE")
+                    elif mode_val in ["AGGR", "AGGRESSIVE"]:
+                        db.set_capital_kelly_config(chat_id, enabled=True, fractional_multiplier=0.50, max_risk_pct=3.5, mode="AGGRESSIVE")
+                    else:
+                        db.set_capital_kelly_config(chat_id, enabled=True, fractional_multiplier=0.35, max_risk_pct=2.5, mode="BALANCED")
+                    kelly_cfg = db.get_capital_kelly_config(chat_id)
+                    await update.effective_message.reply_text(f"⚙️ **KELLY MODE UPDATED ៖** `{kelly_cfg.get('mode')}` (Fraction: `{kelly_cfg.get('fractional_multiplier')}x`, Max Risk: `{kelly_cfg.get('max_risk_pct')}%`)", parse_mode="Markdown")
+                    return
+                elif sub in ["RISK", "MAX_RISK"]:
+                    try:
+                        risk_val = float(args[1]) if len(args) >= 2 else 2.5
+                    except Exception:
+                        risk_val = 2.5
+                    risk_val = max(0.5, min(3.5, risk_val))
+                    db.set_capital_kelly_config(chat_id, enabled=True, max_risk_pct=risk_val)
+                    await update.effective_message.reply_text(f"🛡️ **MAX RISK CEILING UPDATED ៖** `{risk_val}%` per trade!", parse_mode="Markdown")
+                    return
+
+            is_on = kelly_cfg.get("enabled", True)
+            mult = kelly_cfg.get("fractional_multiplier", 0.35)
+            max_r = kelly_cfg.get("max_risk_pct", 2.5)
+            mode = kelly_cfg.get("mode", "BALANCED")
+            status_badge = "🟢 ACTIVE (ដំណើរការ)" if is_on else "⚪ OFF (បិទ)"
+
+            telemetry = sizer.get_telemetry()
+            tot_calc = telemetry.get("total_calculations", 0)
+            high_boosts = telemetry.get("high_confluence_boosts", 0)
+            chop_contracts = telemetry.get("chop_contractions", 0)
+
+            # Sample calculation on Gold
+            sample_gold_high = sizer.compute_kelly_fraction(confidence_score=92.0, entry_price=2650.0, sl_price=2640.0, tp_price=2690.0, fractional_multiplier=mult, max_risk_pct=max_r)
+            sample_gold_chop = sizer.compute_kelly_fraction(confidence_score=55.0, entry_price=2650.0, sl_price=2645.0, tp_price=2655.0, fractional_multiplier=mult, max_risk_pct=max_r)
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📐 Kelly Sizer: ON 🟢" if is_on else "📐 Kelly Sizer: OFF ⚪", callback_data="btn_cap_kelly_toggle"),
+                    InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_kelly_radar")
+                ],
+                [
+                    InlineKeyboardButton("🛡️ Conservative (0.20x)", callback_data="btn_cap_kelly_mode_cons"),
+                    InlineKeyboardButton("⚖️ Balanced (0.35x)", callback_data="btn_cap_kelly_mode_bal"),
+                    InlineKeyboardButton("🚀 Aggressive (0.50x)", callback_data="btn_cap_kelly_mode_aggr")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_refresh"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            if user_lang == 'khmer':
+                msg = (
+                    f"📐 **FRACTIONAL KELLY CRITERION DYNAMIC POSITION SIZER** 🧮\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚙️ **ស្ថានភាព ៖** `{status_badge}`\n"
+                    f"💼 **របៀបគ្រប់គ្រងទុន (Mode) ៖** `{mode}`\n"
+                    f"🔢 **Fractional Multiplier (κ) ៖** `{mult:.2f}x [Quarter/Half-Kelly]`\n"
+                    f"🛡️ **Hard Risk Ceiling (R_max) ៖** `{max_r:.1f}% per trade`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📊 **រូបមន្តគណិតវិជ្ជាស្ថាប័ន (The Kelly Equation) ៖**\n"
+                    f"  `f* = [p(b + 1) - 1] / b`\n"
+                    f"  • `p` ៖ Win-Rate ផ្អែកលើ AI Confluence (Google Macro + ADX)\n"
+                    f"  • `b` ៖ អនុបាតផលចំណេញធៀបការប្រថុយ (Payoff R:R = 2.5 - 6.0)\n"
+                    f"  • `f_risk = min(κ × f*, R_max)`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🧪 **ការក្លែងបន្លំទំហំ Lot ផ្ទាល់ (Live Sizing Simulation) ៖**\n"
+                    f"• 👑 **High AI Confluence (≥90%):**\n"
+                    f"  Win-Rate `p={sample_gold_high['p']*100:.0f}%` | `b={sample_gold_high['b']}` -> Lot `+{sample_gold_high['scale_multiplier']}x` (ទំហំធំ)\n"
+                    f"• 🌊 **Choppy / Ranging Market (<65%):**\n"
+                    f"  Win-Rate `p={sample_gold_chop['p']*100:.0f}%` | `b={sample_gold_chop['b']}` -> Lot `-{sample_gold_chop['scale_multiplier']}x` (Micro-Lot)\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📈 **ស្ថិតិការគណនា (Telemetry Stats) ៖**\n"
+                    f"• ការគណនាសរុប ៖ `{tot_calc}` ដង\n"
+                    f"• ពង្រីក Lot ពេល Confluence ខ្ពស់ ៖ `+{high_boosts}` ដង\n"
+                    f"• បង្រួម Micro-Lot ការពារ Drawdown ៖ `-{chop_contracts}` ដង\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **គំរូបញ្ជា 1-Tap ៖**\n"
+                    f"• បើក/បិទ ៖ `` `/capital kelly ON` `` | `` `/capital kelly OFF` ``\n"
+                    f"• ប្តូរ Mode ៖ `` `/capital kelly MODE BALANCED` ``\n"
+                    f"• កំណត់ Risk ៖ `` `/capital kelly RISK 2.0` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"រូបមន្តគណិតវិជ្ជាបង្កើនផលចំណេញធរណីមាត្រ ២៤/៧!"
+                )
+            else:
+                msg = (
+                    f"📐 **FRACTIONAL KELLY CRITERION DYNAMIC POSITION SIZER** 🧮\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚙️ **Status:** `{status_badge}`\n"
+                    f"💼 **Sizing Mode:** `{mode}`\n"
+                    f"🔢 **Fractional Multiplier (κ):** `{mult:.2f}x [Fractional Kelly]`\n"
+                    f"🛡️ **Hard Risk Ceiling (R_max):** `{max_r:.1f}% per trade`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📊 **Institutional Kelly Formulation:**\n"
+                    f"  `f* = [p(b + 1) - 1] / b`\n"
+                    f"  • `p`: Win probability calibrated from AI Confluence Score\n"
+                    f"  • `b`: Payoff ratio (Reward-to-Risk = 2.5 - 6.0)\n"
+                    f"  • `f_risk = min(κ × f*, R_max)`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🧪 **Live Sizing Simulation:**\n"
+                    f"• 👑 **High AI Confluence (≥90%):**\n"
+                    f"  Win-Rate `p={sample_gold_high['p']*100:.0f}%` | `b={sample_gold_high['b']}` -> Lot `+{sample_gold_high['scale_multiplier']}x` (Boost)\n"
+                    f"• 🌊 **Choppy Market (<65%):**\n"
+                    f"  Win-Rate `p={sample_gold_chop['p']*100:.0f}%` | `b={sample_gold_chop['b']}` -> Lot `-{sample_gold_chop['scale_multiplier']}x` (Micro-Lot)\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📈 **Live Telemetry:**\n"
+                    f"• Total Calculations: `{tot_calc}`\n"
+                    f"• High Confluence Boosts: `+{high_boosts}`\n"
+                    f"• Chop Contractions: `-{chop_contracts}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Commands:**\n"
+                    f"• Toggle: `` `/capital kelly ON` `` | `` `/capital kelly OFF` ``\n"
+                    f"• Sizing Mode: `` `/capital kelly MODE BALANCED` ``\n"
+                    f"• Risk Clamp: `` `/capital kelly RISK 2.0` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Geometric Compounding & Drawdown Minimization 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -18970,6 +19175,9 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_orb", "capitalorb", "orb"]:
                 await capital_orb_command(update, context)
                 return
+            elif cmd_text in ["capital_kelly", "capitalkelly", "kelly"]:
+                await capital_kelly_command(update, context)
+                return
             elif cmd_text in ["prop_firm", "propfirm", "prop"]:
                 await prop_firm_command(update, context)
                 return
@@ -18977,7 +19185,7 @@ class TelegramBotThread(BaseThread):
                 await capital_ib_command(update, context)
                 return
 
-            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB
+            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY
             if args:
                 action = str(args[0]).upper().strip()
                 if action in ["PROP", "PROPFIRM", "CHALLENGE"]:
@@ -18996,6 +19204,10 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_orb_command(update, context)
                     return
+                elif action in ["KELLY", "SIZER", "KELLY_CRITERION"]:
+                    context.args = args[1:]
+                    await capital_kelly_command(update, context)
+                    return
 
             # Auto config & status
             is_auto_on = db.is_capital_auto_enabled(chat_id)
@@ -19006,6 +19218,8 @@ class TelegramBotThread(BaseThread):
             leadlag_btn_text = "⚡ Lead-Lag Arb: ON 🟢" if is_leadlag_on else "⚡ Lead-Lag Arb: OFF ⚪"
             is_orb_on = db.is_capital_orb_enabled(chat_id)
             orb_btn_text = "🎯 ORB 15m: ON 🟢" if is_orb_on else "🎯 ORB 15m: OFF ⚪"
+            is_kelly_on = db.is_capital_kelly_enabled(chat_id)
+            kelly_btn_text = "📐 Kelly Sizer: ON 🟢" if is_kelly_on else "📐 Kelly Sizer: OFF ⚪"
 
             keyboard = InlineKeyboardMarkup([
                 [
@@ -19014,7 +19228,11 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton(orb_btn_text, callback_data="btn_cap_orb_toggle"),
-                    InlineKeyboardButton("📈 ORB Radar (15m)", callback_data="btn_cap_orb_radar")
+                    InlineKeyboardButton(kelly_btn_text, callback_data="btn_cap_kelly_toggle")
+                ],
+                [
+                    InlineKeyboardButton("📈 ORB Radar (15m)", callback_data="btn_cap_orb_radar"),
+                    InlineKeyboardButton("🧮 Kelly Radar", callback_data="btn_cap_kelly_radar")
                 ],
                 [
                     InlineKeyboardButton("🏆 Prop Firm ($10k-$200k)", callback_data="btn_cap_prop_menu"),
@@ -19343,6 +19561,10 @@ class TelegramBotThread(BaseThread):
             orb_badge = "🟢 ACTIVE" if is_orb_on else "⚪ OFF"
             is_leadlag_on = db.is_capital_leadlag_enabled(chat_id)
             leadlag_badge = "🟢 ACTIVE" if is_leadlag_on else "⚪ OFF"
+            kelly_cfg = db.get_capital_kelly_config(chat_id)
+            is_kelly_on = kelly_cfg.get("enabled", True)
+            kelly_mode = kelly_cfg.get("mode", "BALANCED")
+            kelly_badge = f"🟢 ACTIVE ({kelly_mode} {kelly_cfg.get('fractional_multiplier', 0.35)}x)" if is_kelly_on else "⚪ OFF"
 
             if user_lang == 'khmer':
                 msg = (
@@ -19353,6 +19575,7 @@ class TelegramBotThread(BaseThread):
                     f"🤖 **TradFi Auto Engine ៖** `{auto_badge}`\n"
                     f"🎯 **ORB 15m Matrix ៖** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage ៖** `{leadlag_badge}`\n"
+                    f"📐 **Kelly Sizer ($f^*$) ៖** `{kelly_badge}`\n"
                     f"💰 **សមតុល្យលុយពិត (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
@@ -19372,9 +19595,9 @@ class TelegramBotThread(BaseThread):
                     f"• **Breakeven Armor ៖** ចាក់សោ SL ពេលចំណេញ +1.5%\n"
                     f"• **Dynamic ATR Trailing ៖** ចាក់សោ 80% នៃចំណេញកំពូល\n"
                     f"• **Spread Guard ៖** បដិសេធ Trade ពេល Spread រីកធំ\n"
-                    f"• **Asset-DNA Sizing ៖** 1% Risk Clamp គ្មាន Drawdown\n"
+                    f"• **Kelly Sizer ($f^*) ៖** គណនា Lot ល្អបំផុតកាត់បន្ថយ Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital LEADLAG ON` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital KELLY ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -19389,6 +19612,7 @@ class TelegramBotThread(BaseThread):
                     f"🤖 **TradFi Auto Engine:** `{auto_badge}`\n"
                     f"🎯 **ORB 15m Matrix:** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage:** `{leadlag_badge}`\n"
+                    f"📐 **Kelly Sizer ($f^*$) :** `{kelly_badge}`\n"
                     f"💰 **Live Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **Live Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
@@ -19408,9 +19632,9 @@ class TelegramBotThread(BaseThread):
                     f"• **Breakeven Armor:** Locks SL at entry on +1.5% profit\n"
                     f"• **Dynamic ATR Trailing:** Protects 80% peak profit\n"
                     f"• **Spread Guard:** Rejects orders during wide spreads\n"
-                    f"• **Asset-DNA Sizing:** 1% Risk Clamp zero drawdown\n"
+                    f"• **Kelly Sizer ($f^*$) :** Optimal mathematical lot scaling\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital LEADLAG ON` ``\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital KELLY ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -19674,6 +19898,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capital_orb", capital_orb_command))
         self.app.add_handler(CommandHandler("capitalorb", capital_orb_command))
         self.app.add_handler(CommandHandler("orb", capital_orb_command))
+        self.app.add_handler(CommandHandler("capital_kelly", capital_kelly_command))
+        self.app.add_handler(CommandHandler("capitalkelly", capital_kelly_command))
+        self.app.add_handler(CommandHandler("kelly", capital_kelly_command))
         self.app.add_handler(CommandHandler("capital_ib", capital_ib_command))
         self.app.add_handler(CommandHandler("capitalib", capital_ib_command))
         self.app.add_handler(CommandHandler("ib", capital_ib_command))

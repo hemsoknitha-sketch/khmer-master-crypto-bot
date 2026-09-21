@@ -19,6 +19,7 @@ from collections import deque
 from requests.adapters import HTTPAdapter
 from typing import Dict, Any, Optional, Tuple, List
 from dotenv import load_dotenv
+import database as db
 
 # Automatically load .env configuration
 load_dotenv()
@@ -2270,30 +2271,19 @@ class CapitalAutonomousEngine:
             final_action = setup["final_action"]
             confidence = setup["final_confidence"]
 
-            # Dynamic size based on user budget and asset DNA
-            size = None
-            if resolved_epic == "GOLD":
-                size = 0.02 if budget < 100 else 0.05
-            elif resolved_epic in ["NATURALGAS", "GAS"]:
-                size = 10.0 if budget < 50 else 20.0
-            elif resolved_epic == "META":
-                size = 0.02 if budget < 50 else 0.05
-            elif resolved_epic in ["GOOGL", "GOOGLE"]:
-                size = 0.1 if budget < 50 else 0.2
-            elif resolved_epic in ["US500", "SP500"]:
-                size = 0.1 if budget < 100 else 0.2
-            elif resolved_epic in ["US100", "NASDAQ"]:
-                size = 0.1 if budget < 100 else 0.2
-            elif resolved_epic in ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
-                size = 0.1 if budget < 50 else 0.2
-            elif resolved_epic in ["OIL", "OIL_CRUDE"]:
-                size = 0.1 if budget < 50 else 0.2
-            elif resolved_epic == "BTCUSD":
-                size = 0.001 if budget < 50 else 0.002
-            elif resolved_epic == "ETHUSD":
-                size = 0.01 if budget < 50 else 0.02
-            elif resolved_epic == "SOLUSD":
-                size = 0.1 if budget < 50 else 0.2
+            # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
+            entry_p = float(setup.get("ask", 0.0) if final_action == "BUY" else setup.get("bid", 0.0))
+            sl_p = float(setup.get("stop_loss", 0.0))
+            tp_p = float(setup.get("take_profit", 0.0))
+            size = get_capital_kelly_sizer().calculate_lot_size(
+                chat_id=chat_id,
+                epic=resolved_epic,
+                entry_price=entry_p,
+                sl_price=sl_p,
+                tp_price=tp_p,
+                confidence_score=confidence,
+                budget=budget
+            )
 
             trade_res = user_engine.execute_smart_tradfi_order(
                 epic=resolved_epic,
@@ -2736,16 +2726,6 @@ class CapitalLeadLagArbitrageEngine:
                 if len(open_pos) >= user_cfg.get("max_positions", 2):
                     continue
 
-                # Dynamic micro lot size based on asset DNA
-                if epic == "BTCUSD":
-                    size = 0.001 if budget < 100 else 0.002
-                elif epic == "ETHUSD":
-                    size = 0.01 if budget < 100 else 0.02
-                elif epic == "SOLUSD":
-                    size = 0.1 if budget < 100 else 0.2
-                else:
-                    size = 0.01
-
                 # Calculate Dynamic Asymmetric R:R >= 1:6 Stop Loss & Take Profit
                 risk_dist = abs(binance_price - capital_price) * 1.2
                 if risk_dist <= 0:
@@ -2757,6 +2737,17 @@ class CapitalLeadLagArbitrageEngine:
                 else:
                     sl = round(capital_price + risk_dist, 2)
                     tp = round(capital_price - (risk_dist * 6.0), 2)
+
+                # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
+                size = get_capital_kelly_sizer().calculate_lot_size(
+                    chat_id=chat_id,
+                    epic=epic,
+                    entry_price=capital_price,
+                    sl_price=sl,
+                    tp_price=tp,
+                    confidence_score=90.0,
+                    budget=budget
+                )
 
                 order_res = user_engine.place_position(
                     epic=epic,
@@ -3239,21 +3230,17 @@ class CapitalOpeningRangeBreakoutEngine:
                     if len(open_pos) >= user_cfg.get("max_positions", 2):
                         continue
 
-                    # Dynamic contract sizing
-                    if resolved_epic == "GOLD":
-                        size = 0.02 if budget < 100 else 0.05
-                    elif resolved_epic in ["NATURALGAS", "GAS"]:
-                        size = 10.0 if budget < 50 else 20.0
-                    elif resolved_epic in ["US500", "SP500"]:
-                        size = 0.1 if budget < 100 else 0.2
-                    elif resolved_epic in ["US100", "NASDAQ"]:
-                        size = 0.1 if budget < 100 else 0.2
-                    elif resolved_epic in ["OIL", "OIL_CRUDE"]:
-                        size = 0.1 if budget < 50 else 0.2
-                    elif resolved_epic in ["META", "GOOGL", "NVDA", "TSLA"]:
-                        size = 0.05 if budget < 50 else 0.1
-                    else:
-                        size = 0.01
+                    # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
+                    entry_p = ask if direction == "BUY" else bid
+                    size = get_capital_kelly_sizer().calculate_lot_size(
+                        chat_id=chat_id,
+                        epic=resolved_epic,
+                        entry_price=entry_p,
+                        sl_price=sl,
+                        tp_price=tp,
+                        confidence_score=85.0,  # High confidence institutional ORB breakout
+                        budget=budget
+                    )
 
                     trade_res = user_engine.place_position(
                         epic=resolved_epic,
@@ -3381,11 +3368,209 @@ class CapitalOpeningRangeBreakoutEngine:
         }
 
 
+# ==============================================================================
+# FRACTIONAL KELLY CRITERION DYNAMIC POSITION SIZER (INVARIANT 33)
+# ==============================================================================
+
+class CapitalKellyPositionSizer:
+    """
+    Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33).
+    
+    Mathematical Formula:
+        f* = (p * (b + 1) - 1) / b
+        f_risk = min(kappa * f*, max_risk_pct)
+        
+    Where:
+        p: Win probability derived dynamically from AI Confluence Score (Google Macro + Central Bank + Multi-Model AI + ADX)
+        b: Payoff ratio (Reward-to-Risk ratio = TP_dist / SL_dist)
+        kappa: Fractional multiplier (Conservative: 0.20, Balanced: 0.35, Aggressive: 0.50)
+        max_risk_pct: Hard equity risk clamp (e.g. 2.5% default, max 3.5%)
+        
+    Dynamic Scaling Behavior:
+        - High Confluence (>= 90%): Scales lot up to 1.5x - 2.0x base tier
+        - Ranging / Low Confluence (< 70%): Contracts lot to minimum micro-lot floor (0.01 lot / 0.1 contract)
+    """
+
+    # Asset baseline specifications & lot step boundaries
+    ASSET_RULES = {
+        "GOLD": {"base_low": 0.02, "base_high": 0.05, "min_lot": 0.01, "max_lot": 0.25, "lot_step": 0.01, "precision": 2},
+        "NATURALGAS": {"base_low": 10.0, "base_high": 20.0, "min_lot": 1.0, "max_lot": 50.0, "lot_step": 1.0, "precision": 1},
+        "GAS": {"base_low": 10.0, "base_high": 20.0, "min_lot": 1.0, "max_lot": 50.0, "lot_step": 1.0, "precision": 1},
+        "META": {"base_low": 0.02, "base_high": 0.05, "min_lot": 0.01, "max_lot": 0.25, "lot_step": 0.01, "precision": 2},
+        "GOOGL": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "GOOGLE": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "US500": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "SP500": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "US100": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "NASDAQ": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "OIL": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "OIL_CRUDE": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "DAX": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "BTCUSD": {"base_low": 0.001, "base_high": 0.002, "min_lot": 0.001, "max_lot": 0.05, "lot_step": 0.001, "precision": 3},
+        "ETHUSD": {"base_low": 0.01, "base_high": 0.02, "min_lot": 0.01, "max_lot": 0.20, "lot_step": 0.01, "precision": 2},
+        "SOLUSD": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
+        "NVDA": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "TSLA": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "AAPL": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "MSFT": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "AMZN": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+    }
+
+    def __init__(self):
+        self._stats = {
+            "total_calculations": 0,
+            "high_confluence_boosts": 0,
+            "chop_contractions": 0,
+            "last_calculation": None
+        }
+
+    def compute_kelly_fraction(
+        self,
+        confidence_score: float,
+        entry_price: float,
+        sl_price: float,
+        tp_price: float,
+        fractional_multiplier: float = 0.35,
+        max_risk_pct: float = 2.5
+    ) -> Dict[str, Any]:
+        """
+        Calculates mathematical Kelly fraction (f*), allocated risk fraction, and multiplier.
+        """
+        # 1. Calibrate win probability p from AI confidence (50% - 95%)
+        conf = max(40.0, min(98.0, float(confidence_score)))
+        p = conf / 100.0
+
+        # 2. Compute Payoff Ratio b (R:R)
+        risk_dist = abs(entry_price - sl_price) if entry_price and sl_price else 0.0
+        reward_dist = abs(tp_price - entry_price) if entry_price and tp_price else 0.0
+
+        if risk_dist <= 0 or reward_dist <= 0:
+            b = 3.0  # Default institutional 1:3 R:R
+        else:
+            b = max(1.5, min(8.0, reward_dist / risk_dist))
+
+        # 3. Raw Full Kelly: f* = (p * (b + 1) - 1) / b
+        numerator = (p * (b + 1.0)) - 1.0
+        if numerator <= 0:
+            # Negative mathematical expectancy
+            raw_kelly = 0.0
+        else:
+            raw_kelly = numerator / b
+
+        # 4. Institutional Fractional Kelly
+        allocated_fraction = raw_kelly * max(0.10, min(1.0, fractional_multiplier))
+
+        # 5. Hard Risk Clamp
+        max_risk = max(0.01, min(0.035, max_risk_pct / 100.0))
+        final_risk_fraction = min(allocated_fraction, max_risk) if raw_kelly > 0 else 0.005
+
+        # 6. Dynamic Scale Multiplier vs Baseline Risk (0.02)
+        # Scale range: 0.5x (choppy / low conf) to 2.0x (high confluence >= 90%)
+        if conf >= 90.0:
+            scale_multiplier = 1.5 + (0.5 * ((conf - 90.0) / 10.0))  # 1.5x - 2.0x
+        elif conf >= 75.0:
+            scale_multiplier = 1.0 + (0.5 * ((conf - 75.0) / 15.0))  # 1.0x - 1.5x
+        elif conf >= 65.0:
+            scale_multiplier = 0.8 + (0.2 * ((conf - 65.0) / 10.0))  # 0.8x - 1.0x
+        else:
+            scale_multiplier = 0.5  # Micro-lot chop floor
+
+        scale_multiplier = max(0.5, min(2.0, scale_multiplier))
+
+        return {
+            "p": round(p, 4),
+            "b": round(b, 2),
+            "raw_kelly": round(raw_kelly, 4),
+            "allocated_fraction": round(allocated_fraction, 4),
+            "final_risk_fraction": round(final_risk_fraction, 4),
+            "risk_pct": round(final_risk_fraction * 100.0, 2),
+            "scale_multiplier": round(scale_multiplier, 2),
+            "is_positive_expectancy": raw_kelly > 0
+        }
+
+    def calculate_lot_size(
+        self,
+        chat_id: int,
+        epic: str,
+        entry_price: float,
+        sl_price: float,
+        tp_price: float,
+        confidence_score: float,
+        budget: float = 50.0,
+        available_equity: float = 0.0
+    ) -> float:
+        """
+        Computes dynamic lot size via Fractional Kelly Criterion with asset DNA clamping.
+        """
+        self._stats["total_calculations"] += 1
+        clean_epic = epic.upper().strip()
+        rule = self.ASSET_RULES.get(clean_epic, {
+            "base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2
+        })
+
+        # Check user Kelly config
+        kelly_cfg = db.get_capital_kelly_config(chat_id)
+        if not kelly_cfg.get("enabled", True):
+            # Fallback to standard tier if disabled
+            return rule["base_low"] if budget < 100 else rule["base_high"]
+
+        fractional_mult = kelly_cfg.get("fractional_multiplier", 0.35)
+        max_risk = kelly_cfg.get("max_risk_pct", 2.5)
+
+        kelly_res = self.compute_kelly_fraction(
+            confidence_score=confidence_score,
+            entry_price=entry_price,
+            sl_price=sl_price,
+            tp_price=tp_price,
+            fractional_multiplier=fractional_mult,
+            max_risk_pct=max_risk
+        )
+
+        scale_mult = kelly_res["scale_multiplier"]
+        base_lot = rule["base_low"] if budget < 100 else rule["base_high"]
+
+        # Apply dynamic scaling
+        raw_lot = base_lot * scale_mult
+
+        # Clamp strictly between min_lot and max_lot
+        final_lot = max(rule["min_lot"], min(rule["max_lot"], raw_lot))
+
+        # Snap to lot_step
+        step = rule["lot_step"]
+        final_lot = round(round(final_lot / step) * step, rule["precision"])
+
+        if scale_mult >= 1.5:
+            self._stats["high_confluence_boosts"] += 1
+        elif scale_mult <= 0.6:
+            self._stats["chop_contractions"] += 1
+
+        self._stats["last_calculation"] = {
+            "epic": clean_epic,
+            "lot": final_lot,
+            "scale_multiplier": scale_mult,
+            "confidence": confidence_score,
+            "risk_pct": kelly_res["risk_pct"],
+            "mode": kelly_cfg.get("mode", "BALANCED")
+        }
+
+        return final_lot
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Returns live Kelly Sizer telemetry and formula statistics."""
+        return {
+            "total_calculations": self._stats["total_calculations"],
+            "high_confluence_boosts": self._stats["high_confluence_boosts"],
+            "chop_contractions": self._stats["chop_contractions"],
+            "last_calculation": self._stats["last_calculation"]
+        }
+
+
 # Singleton Instances
 CAPITAL_AUTO_ENGINE = CapitalAutonomousEngine()
 CAPITAL_IB_MANAGER = CapitalPartnerRebateManager()
 CAPITAL_LEADLAG_ENGINE = CapitalLeadLagArbitrageEngine()
 CAPITAL_ORB_ENGINE = CapitalOpeningRangeBreakoutEngine()
+CAPITAL_KELLY_SIZER = CapitalKellyPositionSizer()
 
 def get_capital_auto_engine() -> CapitalAutonomousEngine:
     """Returns singleton instance of CapitalAutonomousEngine."""
@@ -3402,6 +3587,10 @@ def get_capital_leadlag_engine() -> CapitalLeadLagArbitrageEngine:
 def get_capital_orb_engine() -> CapitalOpeningRangeBreakoutEngine:
     """Returns singleton instance of CapitalOpeningRangeBreakoutEngine."""
     return CAPITAL_ORB_ENGINE
+
+def get_capital_kelly_sizer() -> CapitalKellyPositionSizer:
+    """Returns singleton instance of CapitalKellyPositionSizer."""
+    return CAPITAL_KELLY_SIZER
 
 def start_capital_leadlag_listener(app=None) -> bool:
     """Registers the Lead-Lag Arbitrage tick listener with the Binance WebSocket engine."""

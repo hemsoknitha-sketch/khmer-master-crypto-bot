@@ -48,6 +48,7 @@ def get_public_bot_commands():
         BotCommand("capital", "🏛️ Capital.com TradFi (Gold, Oil, S&P 500)"),
         BotCommand("capital_ib", "🤝 Capital.com IB Spread Rebates (30%-50%)"),
         BotCommand("capital_orb", "🎯 London & NY Opening Range Breakout"),
+        BotCommand("capital_kelly", "📐 Fractional Kelly Dynamic Position Sizer"),
         BotCommand("flash_loan", "⚡ Quantum CeDeFi 0-Risk Arbitrage"),
         BotCommand("smart_swap", "⚡ Multi-Chain DEX & AI Gem Sniper"),
         BotCommand("cross_arb", "⚡ High-Speed Cross-Market Arbitrage"),

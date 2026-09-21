@@ -2880,6 +2880,82 @@ def get_capital_orb_stats(chat_id: Optional[int] = None) -> dict:
         "instruments_count": row[2] if row else 0
     }
 
+# ==============================================================================
+# FRACTIONAL KELLY CRITERION POSITION SIZER DATA LAYER (INVARIANT 33)
+# ==============================================================================
+
+def get_capital_kelly_config(chat_id: int) -> dict:
+    """Returns Fractional Kelly Criterion Dynamic Position Sizer configuration for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_kelly_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 1,
+            fractional_multiplier REAL DEFAULT 0.35,
+            max_risk_pct REAL DEFAULT 2.5,
+            mode TEXT DEFAULT 'BALANCED',
+            updated_at TEXT
+        )
+    """)
+    cursor.execute("""
+        SELECT is_enabled, fractional_multiplier, max_risk_pct, mode
+        FROM capital_kelly_config WHERE chat_id = ?
+    """, (chat_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            "enabled": bool(row[0]),
+            "fractional_multiplier": float(row[1] if row[1] is not None else 0.35),
+            "max_risk_pct": float(row[2] if row[2] is not None else 2.5),
+            "mode": str(row[3] or "BALANCED").upper()
+        }
+    return {
+        "enabled": True,
+        "fractional_multiplier": 0.35,
+        "max_risk_pct": 2.5,
+        "mode": "BALANCED"
+    }
+
+def is_capital_kelly_enabled(chat_id: int) -> bool:
+    """Fast check if a user has enabled Fractional Kelly Criterion position sizing."""
+    return get_capital_kelly_config(chat_id).get("enabled", True)
+
+def set_capital_kelly_config(
+    chat_id: int,
+    enabled: bool,
+    fractional_multiplier: float = 0.35,
+    max_risk_pct: float = 2.5,
+    mode: str = "BALANCED"
+):
+    """Sets or updates the Fractional Kelly Criterion Dynamic Position Sizer config."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_kelly_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 1,
+            fractional_multiplier REAL DEFAULT 0.35,
+            max_risk_pct REAL DEFAULT 2.5,
+            mode TEXT DEFAULT 'BALANCED',
+            updated_at TEXT
+        )
+    """)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO capital_kelly_config (chat_id, is_enabled, fractional_multiplier, max_risk_pct, mode, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            fractional_multiplier = excluded.fractional_multiplier,
+            max_risk_pct = excluded.max_risk_pct,
+            mode = excluded.mode,
+            updated_at = excluded.updated_at
+    """, (chat_id, 1 if enabled else 0, float(fractional_multiplier), float(max_risk_pct), str(mode).upper(), now_str))
+    conn.commit()
+    conn.close()
+
 
 
 # ==============================================================================

@@ -312,7 +312,27 @@ Any modification that breaks any of the following 30 invariants is considered an
   3. **Strict Invariant 16 Anti-Oversold Short Guard:** Any downward breakdown below $OR_{\text{Low}}$ is strictly blocked if the 15-minute RSI is $\le 38.0$ to eliminate shorting panic sell-offs at the bottom.
   4. **Asymmetric R:R $\ge 1:3$ to $1:6$ with Range Mid Stop:** Stop-Loss is placed at the Range Midpoint ($OR_{\text{Mid}} = \frac{OR_{\text{High}} + OR_{\text{Low}}}{2}$), and positions are protected by Breakeven Armor (+1.5% ROI) and Golden 80% Trailing Ratchet.
   5. **Session Debounce:** Exactly 1 trade per session per symbol is permitted to eliminate chop and whipsaw losses.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 25/25].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 25/26].
+
+### Invariant 33: Fractional Kelly Criterion Dynamic Position Sizer Standard ($f^*$)
+- **Location:** `capital_engine.py` (`CapitalKellyPositionSizer`, `get_capital_kelly_sizer`), `database.py`, `bot_thread.py`, `bot_commands_registry.py`
+- **Rule:** Capital sizing across the `/capital` TradFi engine is strictly governed by the institutional Fractional Kelly Criterion to optimize geometric portfolio growth $\mathbb{E}[\ln(W)]$ while mathematically preventing ruinous drawdowns:
+  1. **The Kelly Equation ($f^*$):**
+     $$f^* = \frac{p(b + 1) - 1}{b} = \frac{p \cdot b - (1 - p)}{b}$$
+     where $p \in [0.50, 0.98]$ is calibrated from the AI Confluence Score (Google Macro + Central Bank + ADX + Volatility) and $b \ge 2.5$ is the payoff ratio (Take Profit / Stop Loss distance).
+  2. **Institutional Fractional Multipliers ($\kappa$):**
+     Full Kelly ($1.0 \times f^*$) is strictly prohibited due to excessive portfolio volatility (~33% drawdown probability). The system strictly enforces **Fractional Kelly**:
+     - Conservative Mode: $\kappa = 0.20$ ($0.20 \times f^*$)
+     - Balanced Mode: $\kappa = 0.35$ ($0.35 \times f^*$)
+     - Aggressive Mode: $\kappa = 0.50$ ($0.50 \times f^*$)
+  3. **Hard Equity Risk Clamp ($R_{\max} \le 3.5\%$):**
+     Total capital at risk per trade is strictly clamped to $\min(\kappa \cdot f^*, R_{\max})$ with a maximum ceiling of $3.5\%$ of account equity/budget, preventing single-trade catastrophic losses.
+  4. **Dynamic Scale Behavior (Confluence Expansion & Choppy Contraction):**
+     - When AI Confluence is overwhelming ($\ge 90\%$), position size dynamically scales up to $1.5\times - 2.0\times$ base tier.
+     - When the market is choppy or ranging ($< 65\%$), position size contracts to the minimum micro-lot floor ($0.01$ lot / $0.1$ contract), minimizing drawdowns.
+  5. **Asset-DNA Lot Boundary & Step Snapping:**
+     Calculated contract sizes must strictly adhere to broker-defined lot steps and min/max boundaries (e.g. Gold $0.01$ step, US500 $0.05$ step, BTC $0.001$ step) to prevent order rejections.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 26/26].
 
 ---
 
@@ -321,7 +341,7 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
 3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 30 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 23 checks remain at 100% `[PASS]`.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 26 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
