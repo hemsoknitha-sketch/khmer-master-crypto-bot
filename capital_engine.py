@@ -2528,9 +2528,20 @@ def get_capital_ib_dashboard(chat_id: int) -> Dict[str, Any]:
     """Returns the Introducing Broker dashboard metrics."""
     return CAPITAL_IB_MANAGER.get_partner_dashboard(chat_id)
 
-def calculate_capital_ib_forecast(active_clients: int, lots_per_day: float = 1.0, custom_pct: Optional[float] = None) -> Dict[str, Any]:
+def calculate_capital_ib_forecast(
+    active_clients: int,
+    lots_per_day: float = 1.0,
+    custom_pct: Optional[float] = None,
+    **kwargs
+) -> Dict[str, Any]:
     """Projects guaranteed risk-free spread rebate cash flow across time horizons."""
-    return CAPITAL_IB_MANAGER.calculate_passive_income_forecast(active_clients, lots_per_day, custom_pct)
+    lots = kwargs.get("lots_per_day_each", lots_per_day)
+    rebate_pct = kwargs.get("custom_rebate_pct", custom_pct)
+    return CAPITAL_IB_MANAGER.calculate_passive_income_forecast(
+        active_clients=active_clients,
+        lots_per_day_each=lots,
+        custom_rebate_pct=rebate_pct
+    )
 
 def get_prop_firm_dashboard(chat_id: int) -> Dict[str, Any]:
     """Returns the Prop Firm Challenge dashboard metrics."""
