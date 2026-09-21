@@ -18217,13 +18217,13 @@ class TelegramBotThread(BaseThread):
                 if action in ["ON", "START", "RUN"]:
                     cap_arg, margin_arg, pin_arg = _parse_wealth_params(args[2:], default_cap=50.0, is_spot=False)
                     res = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_bot(
-                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, margin_per_coin=margin_arg, pin=pin_arg
+                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=35.0, margin_per_coin=margin_arg, pin=pin_arg
                     )
                     if res.get("status") == "error":
                         await update.effective_message.reply_text(res.get("message", "❌ Error starting futures bot!"), parse_mode="Markdown")
                         return
 
-                    m_disp = f"${res['margin_per_coin']:.2f} USDT" if res.get('margin_per_coin', 0.0) > 0 else "Auto ($4.00–$5.50 USDT)"
+                    m_disp = f"${res['margin_per_coin']:.2f} USDT" if res.get('margin_per_coin', 0.0) > 0 else "Auto Dynamic Kelly ($10.00–$20.00 USDT)"
                     succ_msg = (
                         "⚡ **24/7 FUTURES WEALTH GENERATOR ACTIVATED!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -18231,7 +18231,7 @@ class TelegramBotThread(BaseThread):
                         f"⚡ **Leverage សុវត្ថិភាព ៖** `{res['leverage']}x (ISOLATED Mode)`\n"
                         f"🪙 **Margin ក្នុង ១ កាក់ ៖** `{m_disp}`\n"
                         f"💵 **សមតុល្យ Futures Available ៖** `${res['available_usdt']:.2f} USDT`\n"
-                        f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI`\n"
+                        f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI (TP1: +15.0%)`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "💎 _ប្រព័ន្ធកំពុងស្កេនរកកាក់ Golden Sweet-Spot (+3% ទៅ +12%) និងចាប់ផ្តើមច្បាមចំណេញ ២៤/៧!_"
                     ) if user_lang == 'khmer' else (
@@ -18241,7 +18241,7 @@ class TelegramBotThread(BaseThread):
                         f"⚡ **Safety Leverage:** `{res['leverage']}x (ISOLATED Mode)`\n"
                         f"🪙 **Margin per Coin:** `{m_disp}`\n"
                         f"💵 **Futures Available Balance:** `${res['available_usdt']:.2f} USDT`\n"
-                        f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI`\n"
+                        f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI (TP1: +15.0%)`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "💎 _Engine is actively scanning for Golden Sweet-Spot breakouts (+3% to +12%) and harvesting 24/7!_"
                     )
@@ -18284,13 +18284,13 @@ class TelegramBotThread(BaseThread):
                     margin_fut = custom_amt
 
                     res_fut = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_bot(
-                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=10.0, margin_per_coin=margin_fut, pin=pin_arg
+                        chat_id=chat_id, capital=cap_arg, leverage=10, target_tp=35.0, margin_per_coin=margin_fut, pin=pin_arg
                     )
                     res_spot = perpetual_wealth_engine.PERPETUAL_WEALTH_ENGINE.start_perpetual_wealth_spot_bot(
                         chat_id=chat_id, capital=cap_arg, allocation_per_coin=alloc_spot, target_tp=6.0, pin=pin_arg
                     )
 
-                    m_disp = f"${margin_fut:.2f} USDT" if margin_fut > 0 else "Auto ($4–$5.50)"
+                    m_disp = f"${margin_fut:.2f} USDT" if margin_fut > 0 else "Auto Kelly ($10–$20)"
                     all_msg = (
                         "🚀 **24/7 DUAL-ENGINE WEALTH GENERATOR ACTIVATED!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -18340,7 +18340,7 @@ class TelegramBotThread(BaseThread):
                     chat_id=chat_id,
                     capital=cap_arg,
                     leverage=10,
-                    target_tp=10.0,
+                    target_tp=35.0,
                     margin_per_coin=margin_arg,
                     pin=pin_arg
                 )
@@ -18348,7 +18348,7 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(res.get("message", "❌ Error starting bot!"), parse_mode="Markdown")
                     return
 
-                m_disp = f"${res['margin_per_coin']:.2f} USDT" if res.get('margin_per_coin', 0.0) > 0 else "Auto ($4.00–$5.50 USDT)"
+                m_disp = f"${res['margin_per_coin']:.2f} USDT" if res.get('margin_per_coin', 0.0) > 0 else "Auto Dynamic Kelly ($10.00–$20.00 USDT)"
                 succ_msg = (
                     "🚀 **24/7 PERPETUAL WEALTH GENERATOR ACTIVATED!** 🟢\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -18356,7 +18356,7 @@ class TelegramBotThread(BaseThread):
                     f"⚡ **Leverage សុវត្ថិភាព ៖** `{res['leverage']}x (ISOLATED Mode)`\n"
                     f"🪙 **Margin ក្នុង ១ កាក់ ៖** `{m_disp}`\n"
                     f"💵 **សមតុល្យ Futures Available ៖** `${res['available_usdt']:.2f} USDT`\n"
-                    f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI`\n"
+                    f"🎯 **Target TP គោលដៅ ៖** `+{res['target_tp']:.1f}% ROI (TP1: +15.0%)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     "💎 _ប្រព័ន្ធកំពុងស្កេនរកកាក់ Golden Sweet-Spot (+3% ទៅ +12%) និងចាប់ផ្តើមច្បាមចំណេញ ២៤/៧!_"
                 ) if user_lang == 'khmer' else (
@@ -18366,7 +18366,7 @@ class TelegramBotThread(BaseThread):
                     f"⚡ **Safety Leverage:** `{res['leverage']}x (ISOLATED Mode)`\n"
                     f"🪙 **Margin per Coin:** `{m_disp}`\n"
                     f"💵 **Futures Available Balance:** `${res['available_usdt']:.2f} USDT`\n"
-                    f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI`\n"
+                    f"🎯 **Target TP Hurdle:** `+{res['target_tp']:.1f}% ROI (TP1: +15.0%)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     "💎 _Engine is actively scanning for Golden Sweet-Spot breakouts (+3% to +12%) and harvesting 24/7!_"
                 )

@@ -611,38 +611,41 @@ class PerpetualWealthGeneratorEngine:
     @staticmethod
     def calculate_asset_dna_sizing(total_capital: float, available_usdt: float, custom_margin: float = 0.0) -> dict:
         """
-        Applies Invariant 8 (Small Capital Leverage Shield) and Invariant 25 (Dynamic Small Capital Fortress).
-        - Capital < $100 -> leverage clamped to <= 10x.
-        - Risk per trade <= $0.25 on small accounts (or proportional to custom margin).
+        Applies Invariant 8 (Small Capital Leverage Shield), Invariant 25 (Dynamic Small Capital Fortress),
+        and Dynamic Kelly Capital Scaler ($10 - $20 Margin for sufficient capital).
+        - High Liquidity (Available >= $150 or Total >= $150) -> $15.00 - $25.00 Margin per coin, max 6-8 coins.
+        - Medium Capital (Available >= $60 or Total >= $60) -> $10.00 - $15.00 Margin per coin, max 4-5 coins.
+        - Micro Capital (Available < $60 and Total < $60) -> $5.00 - $7.50 Margin per coin, max 2-3 coins (Fortress Shield).
         - If custom_margin > 0.0, user's designated margin per coin is respected within safety boundaries.
-        - Max simultaneous coins: min(12, int(total_capital / margin_per_coin)).
+        - Small accounts < $100 strictly clamp leverage <= 10x (Invariant 8).
         """
         total_capital = max(10.50, float(total_capital))
         available_usdt = max(0.0, float(available_usdt))
         custom_margin = float(custom_margin) if custom_margin else 0.0
 
-        if total_capital < 100.0 or available_usdt < 100.0:
-            leverage = 10  # Invariant 8: Strictly <= 10x for small capital
-            if custom_margin > 0.0:
-                safe_max_margin = max(5.00, available_usdt * 0.40)
-                margin_per_coin = round(max(5.00, min(custom_margin, safe_max_margin)), 2)
-                max_coins = max(1, min(10, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
-                max_risk_usd = round(margin_per_coin * 0.05, 2)
-            else:
-                margin_per_coin = round(min(5.50, max(4.00, available_usdt * 0.12)), 2)
-                max_coins = max(1, min(10, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
-                max_risk_usd = 0.25
+        # Invariant 8: Small capital leverage clamp
+        leverage = 10 if (total_capital < 100.0 or available_usdt < 100.0) else 12
+
+        if custom_margin > 0.0:
+            safe_max_margin = max(5.00, available_usdt * 0.40)
+            margin_per_coin = round(max(5.00, min(custom_margin, safe_max_margin)), 2)
+            max_coins = max(1, min(10, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
+            max_risk_usd = round(margin_per_coin * 0.08, 2)
         else:
-            leverage = 15
-            if custom_margin > 0.0:
-                safe_max_margin = max(10.0, available_usdt * 0.35)
-                margin_per_coin = round(max(5.00, min(custom_margin, safe_max_margin)), 2)
-                max_coins = max(2, min(15, int(total_capital / margin_per_coin) if margin_per_coin > 0 else 5))
-                max_risk_usd = round(margin_per_coin * 0.05, 2)
+            # Dynamic Kelly Capital Scaler
+            effective_cap = max(total_capital, available_usdt)
+            if effective_cap >= 150.0 and available_usdt >= 50.0:
+                margin_per_coin = round(min(25.00, max(15.00, available_usdt * 0.12)), 2)
+                max_coins = max(2, min(8, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 4))
+                max_risk_usd = round(margin_per_coin * 0.08, 2)
+            elif effective_cap >= 60.0 and available_usdt >= 25.0:
+                margin_per_coin = round(min(15.00, max(10.00, available_usdt * 0.18)), 2)
+                max_coins = max(2, min(5, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 3))
+                max_risk_usd = round(margin_per_coin * 0.08, 2)
             else:
-                margin_per_coin = round(min(25.0, max(10.0, total_capital * 0.05)), 2)
-                max_coins = max(2, min(15, int(total_capital / margin_per_coin) if margin_per_coin > 0 else 5))
-                max_risk_usd = round(margin_per_coin * 0.05, 2)
+                margin_per_coin = round(min(7.50, max(5.00, available_usdt * 0.20)), 2)
+                max_coins = max(1, min(3, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
+                max_risk_usd = 0.40
 
         return {
             "leverage": leverage,
@@ -653,7 +656,7 @@ class PerpetualWealthGeneratorEngine:
         }
 
     @staticmethod
-    def start_perpetual_wealth_bot(chat_id: int, capital: float = 50.0, leverage: int = 10, target_tp: float = 10.0, margin_per_coin: float = 0.0, pin: str = "") -> dict:
+    def start_perpetual_wealth_bot(chat_id: int, capital: float = 50.0, leverage: int = 10, target_tp: float = 35.0, margin_per_coin: float = 0.0, pin: str = "") -> dict:
         """
         Starts the 24/7 Perpetual Wealth Generator for a user.
         Validates 2FA PIN, API keys, and initializes database state with custom or auto margin sizing.
@@ -849,14 +852,14 @@ class PerpetualWealthGeneratorEngine:
                     pos_margin = (abs(amt) * entry_price) / max(1, leverage) if entry_price > 0 else 5.0
                     is_be_locked = (db.get_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0") == "1")
 
-                    # Phase 1: Breakeven Armor (Invariant 24) at +3.0% ROI
-                    # Protect winning trade so it never turns into a loss (+0.15% net fees floor, ROI >= +1.50%)
-                    if roi_pct >= 3.0 and curr_peak >= 3.0:
+                    # Phase 1: Breakeven Armor (Invariant 24) at +7.5% ROI (Wide Breathing Room)
+                    # Protect winning trade with generous 5.0% wiggle room so ordinary pullbacks never exit prematurely!
+                    if roi_pct >= 7.5 and curr_peak >= 7.5:
                         be_locked_key = f"wealth_be_locked_{chat_id}_{sym}"
                         if not is_be_locked:
                             db.update_system_setting(be_locked_key, "1")
                             is_be_locked = True
-                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} locked at Entry +0.15% Net Fees Floor (ROI: +{roi_pct:.2f}%)")
+                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} armed at +{roi_pct:.2f}% ROI (Wide Wiggle Room Floor: +2.50% Net ROI)")
 
                     # Phase 1.5: 3-Tier Anti-Stagnation Smart Clock (Frees margin from flat/dead moves, stops funding fee drain)
                     entry_time_key = f"wealth_entry_time_{chat_id}_{sym}"
@@ -935,8 +938,8 @@ class PerpetualWealthGeneratorEngine:
                                 print(f"⚠️ Notice sending stagnation alert: {notif_err}")
                         continue
 
-                    # Phase 2: Micro-Scalp TP1 at +5.0% ROI -> Harvest 50% Size
-                    if roi_pct >= 5.0 and not is_tp1_done:
+                    # Phase 2: Institutional Hurdle TP1 at +15.0% ROI -> Harvest 50% Size
+                    if roi_pct >= 15.0 and not is_tp1_done:
                         close_half_qty = abs(amt) * 0.5
                         side_to_close = "SELL" if amt > 0 else "BUY"
                         print(f"🎯 [PERPETUAL WEALTH TP1 HARVEST] {sym} reached +{roi_pct:.2f}% ROI! Taking 50% Profit ({close_half_qty:.4f} units)...")
@@ -953,7 +956,7 @@ class PerpetualWealthGeneratorEngine:
                         )
                         db.update_system_setting(tp1_taken_key, "1")
                         est_fee_50 = (close_half_qty * mark_price) * 0.0008
-                        net_tp1_pnl = max(0.02, (unRealizedProfit * 0.5) - est_fee_50)
+                        net_tp1_pnl = max(0.15, (unRealizedProfit * 0.5) - est_fee_50)
                         db.update_perpetual_wealth_pnl(chat_id, net_tp1_pnl, is_win=True)
 
                         # Send Telegram Notification
@@ -966,29 +969,29 @@ class PerpetualWealthGeneratorEngine:
                                     f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                                     f"📊 **ROI សម្រេចបាន ៖** `+{roi_pct:.2f}%` 🟢\n"
                                     f"💰 **ប្រាក់ចំណេញសុទ្ធច្បាមបាន (50%) ៖** `+${net_tp1_pnl:,.2f} USDT`\n"
-                                    f"🛡️ **Breakeven Armor ៖** `LOCKED (+0.15% Net Floor, ROI >= +1.50%)`\n"
-                                    f"🚀 **50% Moonshot Ratchet ៖** `ACTIVE (85% Profit Trailing)`\n"
+                                    f"🛡️ **Breakeven Armor ៖** `LOCKED (+4.0% Net Runner Floor)`\n"
+                                    f"🚀 **50% Moonshot Ratchet ៖** `ACTIVE (+35% - +50% Target)`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _ប្រព័ន្ធកំពុងបន្ត Trailing លើ 50% ដែលនៅសល់ដើម្បីកើប Moonshot!_"
+                                    "💡 _ប្រព័ន្ធបានកើបចំណេញសុទ្ធ 50% ទុកក្នុងហោប៉ៅ និងកំពុង Trailing 50% ទៀតដើម្បីចាប់ Moonshot!_"
                                 ) if user_lang == 'khmer' else (
                                     "💎 **[24/7 WEALTH GENERATOR - TP1 HARVEST]** 🎯\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🪙 **Symbol / Pair:** `{sym}`\n"
                                     f"📊 **Target ROI Reached:** `+{roi_pct:.2f}%` 🟢\n"
                                     f"💰 **Net Realized Profit (50%):** `+${net_tp1_pnl:,.2f} USDT`\n"
-                                    f"🛡️ **Breakeven Armor:** `LOCKED (+0.15% Net Floor, ROI >= +1.50%)`\n"
-                                    f"🚀 **50% Moonshot Ratchet:** `ACTIVE (85% Profit Trailing)`\n"
+                                    f"🛡️ **Breakeven Armor:** `LOCKED (+4.0% Net Runner Floor)`\n"
+                                    f"🚀 **50% Moonshot Ratchet:** `ACTIVE (+35% - +50% Target)`\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    "💡 _Autonomous engine is trailing remaining 50% for maximum moonshot!_"
+                                    "💡 _Banked 50% net cash. Autonomous engine is trailing remaining 50% for maximum moonshot!_"
                                 )
                                 asyncio.create_task(_async_send_wealth_alert(app, chat_id, notif_text, "TP1 alert"))
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending TP1 alert: {notif_err}")
 
                     # Phase 3: Golden 85% Moonshot Ratchet (TP2)
-                    # If peak ROI was >= +8.0% and current ROI pulled back by 15% from peak (or hit target TP >= +15%)
-                    target_bot_tp = float(bot.get("target_tp", 10.0))
-                    if (curr_peak >= 8.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= target_bot_tp:
+                    # If peak ROI was >= +25.0% and current ROI pulled back by 15% from peak (or hit target TP >= +35%)
+                    target_bot_tp = float(bot.get("target_tp", 35.0))
+                    if (curr_peak >= 25.0 and roi_pct <= (curr_peak * 0.85)) or roi_pct >= max(35.0, target_bot_tp):
                         side_to_close = "SELL" if amt > 0 else "BUY"
                         print(f"🏆 [PERPETUAL WEALTH TP2 MOONSHOT RATCHET] {sym} Peak: +{curr_peak:.2f}%, Current: +{roi_pct:.2f}%. Harvesting 100% remaining cash!")
                         
@@ -1008,7 +1011,7 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
                         db.update_system_setting(entry_time_key, "0.0")
                         est_fee_all = abs(amt) * mark_price * 0.0008
-                        net_tp2_pnl = unRealizedProfit - est_fee_all
+                        net_tp2_pnl = max(0.50, unRealizedProfit - est_fee_all)
                         db.update_perpetual_wealth_pnl(chat_id, net_tp2_pnl, is_win=(net_tp2_pnl > 0))
                         add_wealth_cooldown(sym, duration_seconds=1800)
 
@@ -1040,17 +1043,21 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending TP2 alert: {notif_err}")
 
-                    # Phase 4: Breakeven Defense Trigger (at Entry + 0.15% Net Fee Floor) OR Dynamic Stop Loss Protection
-                    # Guaranteed: Breakeven NEVER exits at roi_pct <= 0.20 anymore. Must lock >= +1.50% ROI at 10x (+0.15% price floor)
+                    # Phase 4: Breakeven Defense Trigger (Wide Wiggle Room) OR Dynamic Stop Loss Protection
+                    # Generous 5.0% wiggle room: Prevents premature exit on noise retraces, locks +2.5% net (+4.0% on runners)
                     else:
-                        be_net_floor_roi = max(1.50, 0.15 * leverage)
+                        if is_tp1_done:
+                            be_net_floor_roi = max(4.0, 0.40 * leverage)
+                        else:
+                            be_net_floor_roi = max(2.50, 0.25 * leverage)
+                        
                         is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)
                         is_sl_trigger = roi_pct <= -18.0 or (pos_margin > 0 and unRealizedProfit <= -max(0.60, pos_margin * 0.22))
                         
                         if is_be_trigger or is_sl_trigger:
                             side_to_close = "SELL" if amt > 0 else "BUY"
                             is_be_exit = is_be_trigger and roi_pct >= 0.0
-                            reason_tag = "BREAKEVEN NET FLOOR DEFENSE (+0.15% Net)" if is_be_exit else "DYNAMIC STOP LOSS"
+                            reason_tag = f"BREAKEVEN NET FLOOR DEFENSE (+{be_net_floor_roi:.1f}% Net)" if is_be_exit else "DYNAMIC STOP LOSS"
                             print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
                             trading_engine.place_futures_order(
                                 api_key=api_key,
@@ -1079,9 +1086,9 @@ class PerpetualWealthGeneratorEngine:
                                         "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
-                                        f"🛡️ **កម្រិតការពារ ៖** `Entry +0.15% Net Fee Floor`\n"
+                                        f"🛡️ **កម្រិតការពារ ៖** `Entry +{be_net_floor_roi:.1f}% Net Floor (Wiggle Room Protected)`\n"
                                         f"💵 **Exit ROI សម្រេច ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                        f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${max(0.01, net_exit_pnl):,.2f} USDT`\n"
+                                        f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${max(0.10, net_exit_pnl):,.2f} USDT`\n"
                                         f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ហោប៉ៅនៅតែចំណេញ!`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _Breakeven Armor ធានាដាច់ខាតមិនឱ្យខាតដើម និងច្បាមចំណេញសុទ្ធពិតប្រាកដ!_"
@@ -1089,9 +1096,9 @@ class PerpetualWealthGeneratorEngine:
                                         "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         f"🪙 **Symbol / Pair:** `{sym}`\n"
-                                        f"🛡️ **Defense Standard:** `Entry +0.15% Net Fee Floor`\n"
+                                        f"🛡️ **Defense Standard:** `Entry +{be_net_floor_roi:.1f}% Net Floor (Wiggle Room Protected)`\n"
                                         f"💵 **Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
-                                        f"🏆 **Net Realized Profit:** `+${max(0.01, net_exit_pnl):,.2f} USDT`\n"
+                                        f"🏆 **Net Realized Profit:** `+${max(0.10, net_exit_pnl):,.2f} USDT`\n"
                                         f"✅ **Binance Fees:** `100% Deducted & Net Profit Preserved!`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _Breakeven Armor strictly preserved capital with real net positive profit!_"
@@ -1253,9 +1260,9 @@ class PerpetualWealthGeneratorEngine:
                                         f"📈 **1H Fresh Momentum ៖** `{chg_1h_val:+.2f}%`\n"
                                         f"🌊 **Trend Strength (ADX) ៖** `{adx_val:.1f}`\n"
                                         f"🧠 **33-AI Model Confidence ៖** `{ai_conf_val:.1f}% (Consensus)`\n"
-                                        f"🛡️ **Breakeven Armor ៖** `Lock នៅ +0.15% Net Floor (ROI >= +1.50%)`\n"
-                                        f"🎯 **Target TP1 (50%) ៖** `+5.0% ROI`\n"
-                                        f"🚀 **Target TP2 (Moonshot) ៖** `85% Trailing Lock`\n"
+                                        f"🛡️ **Breakeven Armor ៖** `Wiggle Room (Trigger: +7.5%, Floor: +2.5% Net)`\n"
+                                        f"🎯 **Target TP1 (50%) ៖** `+15.0% ROI`\n"
+                                        f"🚀 **Target TP2 (Moonshot) ៖** `+35.0% - +50.0% (Golden 85% Ratchet)`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ កំពុងការពារ និងច្បាមផលចំណេញស្វ័យប្រវត្ត!_"
                                     ) if user_lang == 'khmer' else (
@@ -1271,9 +1278,9 @@ class PerpetualWealthGeneratorEngine:
                                         f"📈 **1H Fresh Momentum:** `{chg_1h_val:+.2f}%`\n"
                                         f"🌊 **Trend Strength (ADX):** `{adx_val:.1f}`\n"
                                         f"🧠 **33-AI Model Confidence:** `{ai_conf_val:.1f}% (Consensus)`\n"
-                                        f"🛡️ **Breakeven Armor:** `Locks at +0.15% Net Floor (ROI >= +1.50%)`\n"
-                                        f"🎯 **Target TP1 (50%):** `+5.0% ROI`\n"
-                                        f"🚀 **Target TP2 (Moonshot):** `85% Trailing Ratchet`\n"
+                                        f"🛡️ **Breakeven Armor:** `Wiggle Room (Trigger: +7.5%, Floor: +2.5% Net)`\n"
+                                        f"🎯 **Target TP1 (50%):** `+15.0% ROI`\n"
+                                        f"🚀 **Target TP2 (Moonshot):** `+35.0% - +50.0% (Golden 85% Ratchet)`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _Autonomous 24/7 wealth engine is guarding and harvesting profits!_"
                                     )
