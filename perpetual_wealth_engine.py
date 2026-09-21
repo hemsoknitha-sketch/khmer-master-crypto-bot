@@ -1133,20 +1133,34 @@ class PerpetualWealthGeneratorEngine:
                     leverage = sizing["leverage"]
                     max_coins = sizing["max_coins"]
 
-                    # Check current open positions count
+                    # Check current open positions count AND open limit orders
                     open_pos = trading_engine.get_open_positions(api_key, api_secret)
-                    current_coins_count = len([p for p in open_pos if abs(float(p.get("positionAmt", 0.0))) > 0.0]) if isinstance(open_pos, list) else 0
-
-                    if current_coins_count >= max_coins or avail_usdt < margin_per_coin:
-                        continue
-
-                    # Select best candidate not already open
                     open_symbols = set([p.get("symbol") for p in open_pos if abs(float(p.get("positionAmt", 0.0))) > 0.0]) if isinstance(open_pos, list) else set()
 
+                    open_orders = trading_engine.get_futures_open_orders(api_key, api_secret)
+                    pending_order_symbols = set(o.get("symbol") for o in open_orders if o.get("symbol")) if isinstance(open_orders, list) else set()
+
+                    # Prune stale unfilled limit orders older than 10 minutes to release locked margin
+                    now_ts = time.time()
+                    if isinstance(open_orders, list):
+                        for o in open_orders:
+                            order_time_ms = float(o.get("time", 0))
+                            if order_time_ms > 0 and (now_ts - (order_time_ms / 1000.0)) > 600:
+                                stale_sym = o.get("symbol")
+                                if stale_sym:
+                                    print(f"🧹 [WEALTH STALE LIMIT PRUNE] Cancelling stale open order for {stale_sym} (sitting > 10m)...")
+                                    trading_engine.cancel_all_futures_open_orders(api_key, api_secret, stale_sym)
+                                    pending_order_symbols.discard(stale_sym)
+
+                    total_active_count = len(open_symbols.union(pending_order_symbols))
+                    if total_active_count >= max_coins or avail_usdt < margin_per_coin:
+                        continue
+
+                    # Select best candidate not already open or pending
                     for cand in candidates:
                         sym = cand["symbol"]
                         side = cand["side"]
-                        if sym in open_symbols or is_wealth_in_cooldown(sym):
+                        if sym in open_symbols or sym in pending_order_symbols or is_wealth_in_cooldown(sym):
                             continue
 
                         exec_key = f"{chat_id}_{sym}"
@@ -1193,75 +1207,71 @@ class PerpetualWealthGeneratorEngine:
                                 time_in_force="GTC"
                             )
 
-                            # If LIMIT order failed or was rejected, fallback seamlessly to MARKET
                             is_limit_placed = bool(order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")))
                             if not is_limit_placed:
-                                print(f"⚠️ [PULLBACK LIMIT FALLBACK] {sym} LIMIT placement rejected ({order_res.get('error') if isinstance(order_res, dict) else ''}). Falling back to MARKET...")
-                                order_res = trading_engine.place_futures_order(
-                                    api_key=api_key,
-                                    api_secret=api_secret,
-                                    symbol=sym,
-                                    side=side,
-                                    quantity=qty,
-                                    leverage=leverage,
-                                    order_type="MARKET"
-                                )
+                                err_msg = str(order_res.get('error') if isinstance(order_res, dict) else '')
+                                print(f"⚠️ [PULLBACK LIMIT NOT PLACED] {sym}: {err_msg}")
+                                add_wealth_cooldown(sym, duration_seconds=300)
+                                continue
 
-                            if order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")):
-                                # Save entry time for Anti-Stagnation Smart Clock
-                                db.update_system_setting(f"wealth_entry_time_{chat_id}_{sym}", str(time.time()))
+                            # Order successfully placed on book: Add 15m cooldown immediately to prevent duplicate orders!
+                            add_wealth_cooldown(sym, duration_seconds=900)
+                            pending_order_symbols.add(sym)
 
-                                # Send Telegram alert
-                                if app and hasattr(app, "bot"):
-                                    try:
-                                        user_lang = db.get_user_language(chat_id)
-                                        rvol_val = cand.get('rvol', 2.2)
-                                        chg_1h_val = cand.get('chg_1h', 1.0)
-                                        adx_val = cand.get('adx_15m', 28.0)
-                                        ai_conf_val = cand.get('ai_confidence', 85.0)
-                                        entry_mode_tag = "LIMIT Maker (0.02% Fee)" if is_limit_placed else "MARKET (Instant Fill)"
-                                        entry_msg = (
-                                            "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
-                                            f"🎯 **ទិសដៅ (Signal) ៖** `{side} ({cand['reason']})`\n"
-                                            f"🏷️ **ប្រភេទ Order ៖** `{entry_mode_tag}`\n"
-                                            f"💵 **តម្លៃចូល (Entry Price) ៖** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
-                                            f"💰 **ទុនចូល (Margin) ៖** `${margin_per_coin:.2f} USDT`\n"
-                                            f"⚡ **Leverage ៖** `{leverage}x (ISOLATED Mode)`\n"
-                                            f"📊 **Volume Surge (RVOL) ៖** `{rvol_val:.1f}x` 🚀\n"
-                                            f"📈 **1H Fresh Momentum ៖** `{chg_1h_val:+.2f}%`\n"
-                                            f"🌊 **Trend Strength (ADX) ៖** `{adx_val:.1f}`\n"
-                                            f"🧠 **33-AI Model Confidence ៖** `{ai_conf_val:.1f}% (Consensus)`\n"
-                                            f"🛡️ **Breakeven Armor ៖** `Lock នៅ +0.15% Net Floor (ROI >= +1.50%)`\n"
-                                            f"🎯 **Target TP1 (50%) ៖** `+5.0% ROI`\n"
-                                            f"🚀 **Target TP2 (Moonshot) ៖** `85% Trailing Lock`\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ កំពុងការពារ និងច្បាមផលចំណេញស្វ័យប្រវត្ត!_"
-                                        ) if user_lang == 'khmer' else (
-                                            "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            f"🪙 **Symbol / Pair:** `{sym}`\n"
-                                            f"🎯 **Signal / Mode:** `{side} ({cand['reason']})`\n"
-                                            f"🏷️ **Order Type:** `{entry_mode_tag}`\n"
-                                            f"💵 **Entry Price:** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
-                                            f"💰 **Margin Allocated:** `${margin_per_coin:.2f} USDT`\n"
-                                            f"⚡ **Leverage:** `{leverage}x (ISOLATED Mode)`\n"
-                                            f"📊 **Volume Surge (RVOL):** `{rvol_val:.1f}x` 🚀\n"
-                                            f"📈 **1H Fresh Momentum:** `{chg_1h_val:+.2f}%`\n"
-                                            f"🌊 **Trend Strength (ADX):** `{adx_val:.1f}`\n"
-                                            f"🧠 **33-AI Model Confidence:** `{ai_conf_val:.1f}% (Consensus)`\n"
-                                            f"🛡️ **Breakeven Armor:** `Locks at +0.15% Net Floor (ROI >= +1.50%)`\n"
-                                            f"🎯 **Target TP1 (50%):** `+5.0% ROI`\n"
-                                            f"🚀 **Target TP2 (Moonshot):** `85% Trailing Ratchet`\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _Autonomous 24/7 wealth engine is guarding and harvesting profits!_"
-                                        )
-                                        asyncio.create_task(_async_send_wealth_alert(app, chat_id, entry_msg, "wealth entry alert"))
-                                    except Exception as alert_err:
-                                        print(f"⚠️ Notice sending wealth entry alert: {alert_err}")
+                            # Save entry time for Anti-Stagnation Smart Clock
+                            db.update_system_setting(f"wealth_entry_time_{chat_id}_{sym}", str(time.time()))
 
-                                break  # Open one position per cycle to space entries smoothly
+                            # Send Telegram alert
+                            if app and hasattr(app, "bot"):
+                                try:
+                                    user_lang = db.get_user_language(chat_id)
+                                    rvol_val = cand.get('rvol', 2.2)
+                                    chg_1h_val = cand.get('chg_1h', 1.0)
+                                    adx_val = cand.get('adx_15m', 28.0)
+                                    ai_conf_val = cand.get('ai_confidence', 85.0)
+                                    entry_mode_tag = "LIMIT Maker (0.02% Fee)" if is_limit_placed else "MARKET (Instant Fill)"
+                                    entry_msg = (
+                                        "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                                        f"🎯 **ទិសដៅ (Signal) ៖** `{side} ({cand['reason']})`\n"
+                                        f"🏷️ **ប្រភេទ Order ៖** `{entry_mode_tag}`\n"
+                                        f"💵 **តម្លៃចូល (Entry Price) ៖** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
+                                        f"💰 **ទុនចូល (Margin) ៖** `${margin_per_coin:.2f} USDT`\n"
+                                        f"⚡ **Leverage ៖** `{leverage}x (ISOLATED Mode)`\n"
+                                        f"📊 **Volume Surge (RVOL) ៖** `{rvol_val:.1f}x` 🚀\n"
+                                        f"📈 **1H Fresh Momentum ៖** `{chg_1h_val:+.2f}%`\n"
+                                        f"🌊 **Trend Strength (ADX) ៖** `{adx_val:.1f}`\n"
+                                        f"🧠 **33-AI Model Confidence ៖** `{ai_conf_val:.1f}% (Consensus)`\n"
+                                        f"🛡️ **Breakeven Armor ៖** `Lock នៅ +0.15% Net Floor (ROI >= +1.50%)`\n"
+                                        f"🎯 **Target TP1 (50%) ៖** `+5.0% ROI`\n"
+                                        f"🚀 **Target TP2 (Moonshot) ៖** `85% Trailing Lock`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        "💡 _ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ កំពុងការពារ និងច្បាមផលចំណេញស្វ័យប្រវត្ត!_"
+                                    ) if user_lang == 'khmer' else (
+                                        "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🪙 **Symbol / Pair:** `{sym}`\n"
+                                        f"🎯 **Signal / Mode:** `{side} ({cand['reason']})`\n"
+                                        f"🏷️ **Order Type:** `{entry_mode_tag}`\n"
+                                        f"💵 **Entry Price:** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
+                                        f"💰 **Margin Allocated:** `${margin_per_coin:.2f} USDT`\n"
+                                        f"⚡ **Leverage:** `{leverage}x (ISOLATED Mode)`\n"
+                                        f"📊 **Volume Surge (RVOL):** `{rvol_val:.1f}x` 🚀\n"
+                                        f"📈 **1H Fresh Momentum:** `{chg_1h_val:+.2f}%`\n"
+                                        f"🌊 **Trend Strength (ADX):** `{adx_val:.1f}`\n"
+                                        f"🧠 **33-AI Model Confidence:** `{ai_conf_val:.1f}% (Consensus)`\n"
+                                        f"🛡️ **Breakeven Armor:** `Locks at +0.15% Net Floor (ROI >= +1.50%)`\n"
+                                        f"🎯 **Target TP1 (50%):** `+5.0% ROI`\n"
+                                        f"🚀 **Target TP2 (Moonshot):** `85% Trailing Ratchet`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        "💡 _Autonomous 24/7 wealth engine is guarding and harvesting profits!_"
+                                    )
+                                    asyncio.create_task(_async_send_wealth_alert(app, chat_id, entry_msg, "wealth entry alert"))
+                                except Exception as alert_err:
+                                    print(f"⚠️ Notice sending wealth entry alert: {alert_err}")
+
+                            break  # Open one position per cycle to space entries smoothly
 
                         finally:
                             _active_wealth_exec_keys.discard(exec_key)

@@ -2706,6 +2706,54 @@ def get_futures_free_margin(api_key: str, api_secret: str) -> float:
         print(f"Error fetching futures free margin: {e}")
     return 0.0
 
+def get_futures_open_orders(api_key: str, api_secret: str, symbol: str = None) -> list:
+    """
+    Fetches all open orders for Binance Futures account (/fapi/v1/openOrders).
+    """
+    if not api_key or not api_secret:
+        return []
+    try:
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = f"timestamp={timestamp}&recvWindow=60000"
+        if symbol:
+            sym_clean = symbol.upper().strip()
+            if not sym_clean.endswith("USDT"):
+                sym_clean += "USDT"
+            params = f"symbol={sym_clean}&{params}"
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        url = f"{FUTURES_URL}/fapi/v1/openOrders?{params}&signature={sig}"
+        res = HFT_SESSION.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, list):
+                return data
+    except Exception as e:
+        print(f"Error fetching futures open orders: {e}")
+    return []
+
+def cancel_all_futures_open_orders(api_key: str, api_secret: str, symbol: str) -> dict:
+    """
+    Cancels all open orders for a specific symbol on Binance Futures (/fapi/v1/allOpenOrders).
+    """
+    if not api_key or not api_secret or not symbol:
+        return {"status": "error", "error": "Missing parameters"}
+    try:
+        sym_clean = symbol.upper().strip()
+        if not sym_clean.endswith("USDT"):
+            sym_clean += "USDT"
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
+        params = f"symbol={sym_clean}&timestamp={timestamp}&recvWindow=60000"
+        sig = generate_signature(api_secret, params)
+        headers = {"X-MBX-APIKEY": api_key}
+        url = f"{FUTURES_URL}/fapi/v1/allOpenOrders?{params}&signature={sig}"
+        res = HFT_SESSION.delete(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            return {"status": "success", "data": res.json()}
+        return {"status": "error", "code": res.status_code, "msg": res.text}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
 def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 10, position_side: str = None, reduce_only: bool = False, **kwargs) -> dict:
     """
     Executes a market order on Binance Futures API (/fapi/v1/order).
