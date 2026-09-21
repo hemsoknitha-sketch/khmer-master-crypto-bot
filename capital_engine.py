@@ -1966,14 +1966,15 @@ class CapitalAutonomousEngine:
             
         # Monday to Friday: 100% Full Priority on Real TradFi Markets (Gold, Gas, Equities, Indices)
         # Wall Street NY Session (13:30 - 21:00 UTC = 20:30 - 04:00 Phnom Penh)
+        # 20x Leverage Priority: US100, US500, GOLD prioritized over 5x stocks
         if 13 <= hour_utc < 21:
-            return ["GOLD", "NATURALGAS", "META", "GOOGL", "NVDA", "TSLA", "US500", "US100", "OIL_CRUDE"]
+            return ["US100", "US500", "GOLD", "NATURALGAS", "OIL_CRUDE", "NVDA", "TSLA", "META", "GOOGL"]
         # London Session (08:00 - 13:30 UTC = 15:00 - 20:30 Phnom Penh)
         elif 8 <= hour_utc < 13:
-            return ["GOLD", "NATURALGAS", "OIL_CRUDE", "GERMANY40", "US500"]
+            return ["US500", "GOLD", "GERMANY40", "OIL_CRUDE", "NATURALGAS"]
         # Asian Session (00:00 - 08:00 UTC = 07:00 - 15:00 Phnom Penh)
         else:
-            return ["GOLD", "NATURALGAS", "OIL_CRUDE", "US500"]
+            return ["US500", "GOLD", "NATURALGAS", "OIL_CRUDE"]
 
     def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
         """
@@ -2061,6 +2062,17 @@ class CapitalAutonomousEngine:
         ratcheted_count = 0
         closed_count = 0
 
+        # Sort positions descending by peak_upl to designate the #1 top performer as the Apex Moonshot Runner
+        sorted_pos = sorted(
+            positions,
+            key=lambda x: self._peak_upl_cache.get(
+                x.get("position", {}).get("dealId", ""),
+                float(x.get("position", {}).get("upl", 0.0))
+            ),
+            reverse=True
+        )
+        runner_deal_id = sorted_pos[0].get("position", {}).get("dealId") if len(positions) >= 3 else None
+
         for pos_item in positions:
             pos = pos_item.get("position", {})
             deal_id = pos.get("dealId")
@@ -2074,8 +2086,12 @@ class CapitalAutonomousEngine:
             if not deal_id or entry_level <= 0:
                 continue
 
-            # Calculate ROI estimate (For 20x leverage, 5% margin requirement)
-            estimated_margin = max(1.0, entry_level * size * 0.05)
+            # Dynamic margin rate based on asset class (20x for indices/gold, 5x for stocks, 2x for crypto)
+            epic_u = epic.upper()
+            is_stock = any(s in epic_u for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+            is_crypto = any(c in epic_u for c in ["BTC", "ETH", "SOL", "XRP"])
+            margin_rate = 0.20 if is_stock else (0.50 if is_crypto else 0.05)
+            estimated_margin = max(1.0, entry_level * size * margin_rate)
             roi_pct = (upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
 
             # Track peak UPL
@@ -2084,47 +2100,57 @@ class CapitalAutonomousEngine:
                 peak_upl = upl
                 self._peak_upl_cache[deal_id] = peak_upl
 
-            # Tier 1. Breakeven Armor: At +1.5% ROI (Locks SL to Entry + Fees, Downside Risk -> 0.00R)
-            if roi_pct >= 1.5 and deal_id not in self._be_locked_set:
-                new_sl = round(entry_level * 1.0008, 2) if direction == "BUY" else round(entry_level * 0.9992, 2)
+            is_runner = (deal_id == runner_deal_id)
+
+            # Tier 1. Breakeven Armor with Wide Wiggle Room: Triggered at +2.5% ROI (Locks SL to Entry +0.15% Net Floor, Downside Risk -> 0.00R)
+            # Breathing room buffer prevents premature exits on ordinary noise retests
+            if roi_pct >= 2.5 and deal_id not in self._be_locked_set:
+                new_sl = round(entry_level * 1.0015, 2) if direction == "BUY" else round(entry_level * 0.9985, 2)
                 upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
                 if upd.get("success"):
                     self._be_locked_set.add(deal_id)
                     ratcheted_count += 1
                     logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} ({direction}) at {new_sl} (+{roi_pct:.1f}% ROI, Risk: 0.00R)")
 
-            # Tier 2. Capital Fortress Lock: At +3.5% ROI (Secures +1.5R net profit)
-            elif roi_pct >= 3.5 and deal_id not in getattr(self, "_fortress_locked_set", set()):
+            # Tier 2. Capital Fortress Lock: At +5.0% ROI (Secures +2.0% Net Profit Floor)
+            elif roi_pct >= 5.0 and deal_id not in getattr(self, "_fortress_locked_set", set()):
                 if not hasattr(self, "_fortress_locked_set"):
                     self._fortress_locked_set = set()
-                secured_sl = round(entry_level * 1.0035, 2) if direction == "BUY" else round(entry_level * 0.9965, 2)
+                secured_sl = round(entry_level * 1.0040, 2) if direction == "BUY" else round(entry_level * 0.9960, 2)
                 upd = engine.update_position_stops(deal_id=deal_id, stop_loss=secured_sl)
                 if upd.get("success"):
                     self._fortress_locked_set.add(deal_id)
                     ratcheted_count += 1
-                    logger.info(f"🏰 [CAPITAL FORTRESS] Secured +1.5R for {epic} at {secured_sl} (+{roi_pct:.1f}% ROI)")
+                    logger.info(f"🏰 [CAPITAL FORTRESS] Secured +2.0% Floor for {epic} at {secured_sl} (+{roi_pct:.1f}% ROI)")
 
-            # Tier 3. Golden 80% Trailing Ratchet: When profit exceeds +5.0% ROI (Uncapped upside runner)
-            elif roi_pct >= 5.0 and peak_upl > 0:
-                target_protected_profit = peak_upl * 0.80
+            # Tier 3. Golden 80%-85% Trailing Ratchet: When profit exceeds +6.0% ROI (Uncapped upside runner)
+            elif roi_pct >= 6.0 and peak_upl > 0:
+                ratchet_pct = 0.85 if is_runner else 0.80
+                target_protected_profit = peak_upl * ratchet_pct
                 if direction == "BUY":
                     ratchet_price = round(entry_level + (target_protected_profit / size), 2)
                     if ratchet_price > sl:
                         upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
                         if upd.get("success"):
                             ratcheted_count += 1
-                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price} (80% Peak Locked)")
+                            tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
+                            logger.info(f"{tag} Ratcheted SL for {epic} to {ratchet_price} ({int(ratchet_pct*100)}% Peak Locked)")
                 elif direction == "SELL":
                     ratchet_price = round(entry_level - (target_protected_profit / size), 2)
                     if sl <= 0 or ratchet_price < sl:
                         upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
                         if upd.get("success"):
                             ratcheted_count += 1
-                            logger.info(f"💎 [GOLDEN RATCHET] Ratcheted SL for {epic} to {ratchet_price} (80% Peak Locked)")
+                            tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
+                            logger.info(f"{tag} Ratcheted SL for {epic} to {ratchet_price} ({int(ratchet_pct*100)}% Peak Locked)")
 
-            # Tier 4. Clean Cash Harvest: At +12.0% ROI or 6R Target Reached
-            if roi_pct >= 12.0:
-                logger.info(f"🎯 [MEGA TARGET HARVEST] 6R Target Reached (+{roi_pct:.1f}% ROI)! Executing Clean Cash Harvest for {epic}...")
+            # Tier 4. Clean Cash Harvest:
+            # - Apex 3rd Runner: Runs uncapped to +30.0% ROI (or until 85% peak ratchet triggers) to capture $4 - $6+ net expansion
+            # - Standard Positions: Clean Cash Harvest at +8.0% to +12.0% ROI (securing $1.80 - $2.50+ net profit)
+            harvest_trigger = (roi_pct >= 30.0) if is_runner else (roi_pct >= 8.0)
+            if harvest_trigger:
+                tag = "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
+                logger.info(f"{tag} Reached +{roi_pct:.1f}% ROI! Executing Cash Harvest for {epic} (UPL: ${upl:+.2f})...")
                 close_res = engine.close_position(deal_id=deal_id)
                 if close_res.get("success"):
                     closed_count += 1
@@ -2243,8 +2269,14 @@ class CapitalAutonomousEngine:
             if final_action in ["BUY", "SELL"] and confidence >= 75:
                 adx_val = setup.get("adx", 25.0)
                 rvol_val = setup.get("rvol", 1.0)
-                # Composite Institutional Edge Score: confidence * 1.5 + ADX + RVOL * 10
-                rank_score = (confidence * 1.5) + adx_val + (rvol_val * 10.0)
+                # 20x Leverage & Liquidity Multiplier (+35 for Indices & Gold, +20 for High-Beta Energy)
+                leverage_boost = 0.0
+                if any(x in resolved_epic.upper() for x in ["US100", "US500", "GOLD", "SP500", "NASDAQ"]):
+                    leverage_boost = 35.0
+                elif any(x in resolved_epic.upper() for x in ["NATURALGAS", "OIL_CRUDE", "GERMANY40"]):
+                    leverage_boost = 20.0
+                # Composite Institutional Edge Score: confidence * 1.5 + ADX + RVOL * 10 + leverage_boost
+                rank_score = (confidence * 1.5) + adx_val + (rvol_val * 10.0) + leverage_boost
                 candidate_setups.append((rank_score, epic, resolved_epic, setup))
 
         if not candidate_setups:
@@ -2940,8 +2972,8 @@ class CapitalOpeningRangeBreakoutEngine:
     7. One-and-Done Session Debounce preventing chop whipsaws.
     """
 
-    LONDON_ASSETS = ["GOLD", "GERMANY40", "OIL_CRUDE", "NATURALGAS", "US500"]
-    NY_ASSETS = ["GOLD", "US500", "US100", "OIL_CRUDE", "NATURALGAS", "META", "GOOGL", "NVDA", "TSLA"]
+    LONDON_ASSETS = ["US500", "GOLD", "GERMANY40", "OIL_CRUDE", "NATURALGAS"]
+    NY_ASSETS = ["US100", "US500", "GOLD", "NATURALGAS", "OIL_CRUDE", "NVDA", "TSLA", "META", "GOOGL"]
 
     def __init__(self):
         self._session_ranges: Dict[str, Dict[str, Any]] = {}   # session_key -> { epic -> range_data }
@@ -3167,7 +3199,18 @@ class CapitalOpeningRangeBreakoutEngine:
 
         engine = get_capital_engine(is_demo=False)
 
-        for epic in assets:
+        # 20x Leverage Priority: Evaluate Indices & Gold first
+        def _orb_asset_priority(ep: str) -> int:
+            ep_u = ep.upper()
+            if any(k in ep_u for k in ["US100", "US500", "GOLD", "SP500", "NASDAQ"]):
+                return 0
+            elif any(k in ep_u for k in ["GERMANY40", "NATURALGAS", "OIL"]):
+                return 1
+            return 2
+
+        sorted_assets = sorted(assets, key=_orb_asset_priority)
+
+        for epic in sorted_assets:
             resolved_epic = EPIC_MAP.get(epic, epic)
             trade_key = f"{session_name}_{date_str}_{resolved_epic}"
 
@@ -3222,17 +3265,22 @@ class CapitalOpeningRangeBreakoutEngine:
             self._session_trades.add(trade_key)
             self._stats["total_breakouts_detected"] += 1
 
-            # Compute Dynamic Stop Loss and Take Profit
+            # Compute Dynamic Stop Loss and Take Profit (Expanded +5.0% to +8.0% Target)
             # SL is set at Range Midpoint (Asymmetric 1R Risk)
-            # TP is set to 3.0x - 6.0x the risk distance
+            # TP is calibrated for +5.0% to +8.0% ROI expansion (4R - 6R)
+            is_index_or_gold = any(x in resolved_epic.upper() for x in ["US100", "US500", "GOLD", "GERMANY40"])
+            min_target_pct = 0.0040 if is_index_or_gold else 0.0150  # +8.0% ROI at 20x (0.40%) or 5x (1.50%)
+
             if direction == "BUY":
                 sl = round(or_mid, 2)
-                risk_dist = abs(ask - sl)
-                tp = round(ask + (risk_dist * 4.0), 2)
+                risk_dist = max(ask * 0.0008, abs(ask - sl))
+                tp_dist = max(risk_dist * 4.0, ask * min_target_pct)
+                tp = round(ask + tp_dist, 2)
             else:
                 sl = round(or_mid, 2)
-                risk_dist = abs(sl - bid)
-                tp = round(bid - (risk_dist * 4.0), 2)
+                risk_dist = max(bid * 0.0008, abs(sl - bid))
+                tp_dist = max(risk_dist * 4.0, bid * min_target_pct)
+                tp = round(bid - tp_dist, 2)
 
             self._stats["last_breakout"] = {
                 "session": session_name,

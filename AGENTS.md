@@ -311,9 +311,11 @@ Any modification that breaks any of the following 30 invariants is considered an
      - **Wall Street New York Open:** 13:30–13:45 UTC (20:30–20:45 Phnom Penh) Range Formation -> 13:45–17:00 UTC (20:45–00:00 Phnom Penh) Breakout Execution.
   2. **Range Sanity Filter:** Breakout execution is strictly bypassed if the 15-minute Opening Range ($OR_{\text{Range}} = OR_{\text{High}} - OR_{\text{Low}}$) is $> 2.5 \times \text{ATR}_{14}$ (exhaustion candle) or $< 0.20 \times \text{ATR}_{14}$ (no institutional participation).
   3. **Strict Invariant 16 Anti-Oversold Short Guard:** Any downward breakdown below $OR_{\text{Low}}$ is strictly blocked if the 15-minute RSI is $\le 38.0$ to eliminate shorting panic sell-offs at the bottom.
-  4. **Asymmetric R:R $\ge 1:3$ to $1:6$ with Range Mid Stop:** Stop-Loss is placed at the Range Midpoint ($OR_{\text{Mid}} = \frac{OR_{\text{High}} + OR_{\text{Low}}}{2}$), and positions are protected by Breakeven Armor (+1.5% ROI) and Golden 80% Trailing Ratchet.
-  5. **Session Debounce:** Exactly 1 trade per session per symbol is permitted to eliminate chop and whipsaw losses.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 25/26].
+  4. **Asymmetric R:R $\ge 1:3$ to $1:6$ with Range Mid Stop & Expanded TP:** Stop-Loss is placed at the Range Midpoint ($OR_{\text{Mid}} = \frac{OR_{\text{High}} + OR_{\text{Low}}}{2}$), and Take-Profit targets are calibrated for **+5.0% to +8.0% ROI** (4R - 6R) on 20x leverage assets ($0.40\%$ price distance for indices/gold, $1.50\%$ for equities).
+  5. **20x Leverage Asset Priority:** To maximize profit velocity and capital efficiency on small accounts ($30 - $100), `US100`, `US500`, and `GOLD` receive an institutional +35.0 score boost to be prioritized into active trade slots before 5x leverage stocks.
+  6. **Breakeven Wiggle Room & 3rd Runner Golden Trailing Ride:** Positions are protected by Breakeven Armor triggered at +2.5% ROI (+0.15% Net Floor) to prevent premature shakeouts. When $\ge 3$ positions are held, the #1 performing position is designated as the **Apex 3rd Runner**, exempted from early close and trailed by the Golden 85% Trailing Ratchet up to **+25.0% to +35.0% ROI** ($4 - $6+ net profit per $10 order).
+  7. **Session Debounce:** Exactly 1 trade per session per symbol is permitted to eliminate chop and whipsaw losses.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 25/27].
 
 ### Invariant 33: Fractional Kelly Criterion Dynamic Position Sizer Standard ($f^*$)
 - **Location:** `capital_engine.py` (`CapitalKellyPositionSizer`, `get_capital_kelly_sizer`), `database.py`, `bot_thread.py`, `bot_commands_registry.py`
