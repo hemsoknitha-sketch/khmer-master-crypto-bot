@@ -5617,6 +5617,12 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_sell_gold":
                 context.args = ["SELL", "GOLD", "0.02"]
                 await capital_command(update, context)
+            elif data == "btn_cap_buy_gas":
+                context.args = ["BUY", "NATGAS", "10.0"]
+                await capital_command(update, context)
+            elif data == "btn_cap_sell_gas":
+                context.args = ["SELL", "NATGAS", "10.0"]
+                await capital_command(update, context)
             elif data == "btn_cap_buy_sp500":
                 context.args = ["BUY", "SP500", "0.1"]
                 await capital_command(update, context)
@@ -18687,6 +18693,10 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🥈 Sell Gold (0.02)", callback_data="btn_cap_sell_gold")
                 ],
                 [
+                    InlineKeyboardButton("🔥 Buy Gas (10)", callback_data="btn_cap_buy_gas"),
+                    InlineKeyboardButton("❄️ Sell Gas (10)", callback_data="btn_cap_sell_gas")
+                ],
+                [
                     InlineKeyboardButton("📈 Buy S&P 500 (0.1)", callback_data="btn_cap_buy_sp500"),
                     InlineKeyboardButton("📉 Sell S&P 500 (0.1)", callback_data="btn_cap_sell_sp500")
                 ],
@@ -18762,6 +18772,10 @@ class TelegramBotThread(BaseThread):
                             [
                                 InlineKeyboardButton("🥇 Buy Gold (0.02)", callback_data="btn_cap_buy_gold"),
                                 InlineKeyboardButton("🥈 Sell Gold (0.02)", callback_data="btn_cap_sell_gold")
+                            ],
+                            [
+                                InlineKeyboardButton("🔥 Buy Gas (10)", callback_data="btn_cap_buy_gas"),
+                                InlineKeyboardButton("❄️ Sell Gas (10)", callback_data="btn_cap_sell_gas")
                             ],
                             [
                                 InlineKeyboardButton("📈 Buy S&P 500 (0.1)", callback_data="btn_cap_buy_sp500"),
@@ -18955,11 +18969,17 @@ class TelegramBotThread(BaseThread):
             gold = quotes.get("GOLD", {})
             sp500 = quotes.get("SP500", {})
             oil = quotes.get("OIL", {})
+            gas = quotes.get("NATGAS", {})
+            meta = quotes.get("META", {})
+            googl = quotes.get("GOOGL", {})
             btc = quotes.get("BTCUSD", {})
 
             gold_p = f"${gold.get('ask', 0.0):,.2f}" if gold.get('success') else "N/A"
             gold_sp = f"${gold.get('spread', 0.0):.2f}" if gold.get('success') else "N/A"
             gold_st = "🟢 OPEN" if gold.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
+
+            gas_p = f"${gas.get('ask', 0.0):.3f}" if gas.get('success') and gas.get('ask') else "N/A"
+            gas_st = "🟢 OPEN" if gas.get('market_status') == 'TRADEABLE' else "🔴 CLOSED"
 
             sp_p = f"${sp500.get('ask', 0.0):,.2f}" if sp500.get('success') else "N/A"
             sp_sp = f"${sp500.get('spread', 0.0):.2f}" if sp500.get('success') else "N/A"
@@ -18967,6 +18987,9 @@ class TelegramBotThread(BaseThread):
 
             oil_p = f"${oil.get('ask', 0.0):,.2f}" if oil.get('success') else "N/A"
             oil_sp = f"${oil.get('spread', 0.0):.2f}" if oil.get('success') else "N/A"
+
+            meta_p = f"${meta.get('ask', 0.0):,.2f}" if meta.get('success') and meta.get('ask') else "CLOSED"
+            googl_p = f"${googl.get('ask', 0.0):,.2f}" if googl.get('success') and googl.get('ask') else "CLOSED"
 
             btc_p = f"${btc.get('ask', 0.0):,.2f}" if btc.get('success') else "N/A"
             btc_sp = f"${btc.get('spread', 0.0):.2f}" if btc.get('success') else "N/A"
@@ -18992,9 +19015,11 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"📊 **តម្លៃទីផ្សារផ្ទាល់ (Live Institutional Quotes) ៖**\n"
                     f"🥇 **Gold (XAU/USD) ៖** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"
+                    f"🔥 **Natural Gas (NATGAS) ៖** `{gas_p}` ({gas_st})\n"
                     f"📈 **S&P 500 (US500) ៖** `{sp_p}` | Sp: `{sp_sp}` ({sp_st})\n"
                     f"🛢️ **Crude Oil (WTI) ៖** `{oil_p}` | Sp: `{oil_sp}`\n"
-                    f"🪙 **Bitcoin (CFD) ៖** `{btc_p}` | Sp: `{btc_sp}` (🟢 24/7)\n"
+                    f"🏢 **Wall St Stocks ៖** Meta: `{meta_p}` | Google: `{googl_p}`\n"
+                    f"🪙 **Crypto (ចុងសប្តាហ៍ 24/7) ៖** BTC: `{btc_p}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🛡️ **ប្រព័ន្ធការពារដើមទុនស្ថាប័ន (Zero Negligence) ៖**\n"
                     f"• **Breakeven Armor ៖** ចាក់សោ SL ពេលចំណេញ +1.5%\n"
@@ -19024,9 +19049,11 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"📊 **Live Institutional Market Quotes:**\n"
                     f"🥇 **Gold (XAU/USD):** `{gold_p}` | Sp: `{gold_sp}` ({gold_st})\n"
+                    f"🔥 **Natural Gas (NATGAS):** `{gas_p}` ({gas_st})\n"
                     f"📈 **S&P 500 (US500):** `{sp_p}` | Sp: `{sp_sp}` ({sp_st})\n"
                     f"🛢️ **Crude Oil (WTI):** `{oil_p}` | Sp: `{oil_sp}`\n"
-                    f"🪙 **Bitcoin (CFD):** `{btc_p}` | Sp: `{btc_sp}` (🟢 24/7)\n"
+                    f"🏢 **Wall St Equities:** Meta: `{meta_p}` | Google: `{googl_p}`\n"
+                    f"🪙 **Crypto (Weekend 24/7):** BTC: `{btc_p}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🛡️ **Institutional Capital Protection (Zero Negligence):**\n"
                     f"• **Breakeven Armor:** Locks SL at entry on +1.5% profit\n"

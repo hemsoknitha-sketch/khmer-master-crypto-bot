@@ -44,12 +44,19 @@ EPIC_MAP = {
     "SILVER": "SILVER",         # Spot Silver / US Dollar (XAG/USD)
     "OIL": "OIL_CRUDE",         # US Crude Oil WTI
     "BRENT": "OIL_BRENT",       # Brent Crude Oil
+    "NATGAS": "NATURALGAS",     # US Natural Gas
+    "NATURALGAS": "NATURALGAS", # US Natural Gas
+    "GAS": "NATURALGAS",        # US Natural Gas
     # Indices
     "SP500": "US500",           # S&P 500 Index
     "NASDAQ": "US100",          # Nasdaq 100 Tech Index
     "DOW": "US30",              # Dow Jones Industrial Average
     "DAX": "GERMANY40",         # German DAX 40
     # US Mega-Cap Stocks
+    "META": "META",             # Meta Platforms Inc
+    "GOOGL": "GOOGL",           # Alphabet Inc (Google) Class A
+    "GOOGLE": "GOOGL",          # Alphabet Inc (Google) Class A
+    "GOOG": "GOOGL",            # Alphabet Inc (Google) Class A
     "NVDA": "NVDA",             # Nvidia Corporation
     "TSLA": "TSLA",             # Tesla Inc
     "AAPL": "AAPL",             # Apple Inc
@@ -967,6 +974,14 @@ class CapitalComEngine:
             # Gold: 1 lot = 1 oz. 0.01 lot = $0.01 price move = $0.01 PnL
             if resolved_epic == "GOLD":
                 size = max(0.02, min_size)
+            elif resolved_epic in ["NATURALGAS", "GAS"]:
+                size = max(10.0, min_size)
+            elif resolved_epic == "META":
+                size = max(0.02, min_size)
+            elif resolved_epic in ["GOOGL", "GOOGLE", "GOOG"]:
+                size = max(0.1, min_size)
+            elif resolved_epic in ["OIL_CRUDE", "OIL"]:
+                size = max(0.1, min_size)
             elif resolved_epic == "US500":
                 size = max(0.1, min_size)
             elif resolved_epic == "BTCUSD":
@@ -1036,12 +1051,15 @@ class CapitalComEngine:
         """
         # ⚡ Pillar 2: 5-Pillar TradFi HFT Concurrency Acceleration
         # Fetch balance, positions, and live quotes in parallel using ThreadPoolExecutor
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=9) as executor:
             f_bal = executor.submit(self.get_account_balance)
             f_pos = executor.submit(self.get_open_positions)
             f_gold = executor.submit(self.get_market_details, "GOLD")
+            f_gas = executor.submit(self.get_market_details, "NATURALGAS")
             f_sp500 = executor.submit(self.get_market_details, "SP500")
             f_oil = executor.submit(self.get_market_details, "OIL")
+            f_meta = executor.submit(self.get_market_details, "META")
+            f_googl = executor.submit(self.get_market_details, "GOOGL")
             f_btc = executor.submit(self.get_market_details, "BTCUSD")
 
             try:
@@ -1062,6 +1080,11 @@ class CapitalComEngine:
                 gold = {"success": False, "error": str(e_g)}
 
             try:
+                gas = f_gas.result(timeout=4.0)
+            except Exception as e_gas:
+                gas = {"success": False, "error": str(e_gas)}
+
+            try:
                 sp500 = f_sp500.result(timeout=4.0)
             except Exception as e_sp:
                 sp500 = {"success": False, "error": str(e_sp)}
@@ -1070,6 +1093,16 @@ class CapitalComEngine:
                 oil = f_oil.result(timeout=4.0)
             except Exception as e_oil:
                 oil = {"success": False, "error": str(e_oil)}
+
+            try:
+                meta = f_meta.result(timeout=4.0)
+            except Exception as e_meta:
+                meta = {"success": False, "error": str(e_meta)}
+
+            try:
+                googl = f_googl.result(timeout=4.0)
+            except Exception as e_googl:
+                googl = {"success": False, "error": str(e_googl)}
 
             try:
                 btc = f_btc.result(timeout=4.0)
@@ -1111,8 +1144,11 @@ class CapitalComEngine:
             "status": bal.get("status", "ACTIVE"),
             "quotes": {
                 "GOLD": gold,
+                "NATGAS": gas,
                 "SP500": sp500,
                 "OIL": oil,
+                "META": meta,
+                "GOOGL": googl,
                 "BTCUSD": btc
             },
             "open_positions": pos_summary,
@@ -1876,32 +1912,35 @@ class CapitalAutonomousEngine:
     def get_session_priority_assets(self) -> List[str]:
         """
         Determines active tradable instruments based on global market hours (UTC+7 Phnom Penh):
-        - London Session (15:00 - 23:00): GOLD (XAU/USD), OIL
-        - Wall Street Session (20:30 - 03:00): SP500, NASDAQ, GOLD
-        - Off-hours / Weekend: BTCUSD (24/7 CFD)
+        - Monday to Friday (ចន្ទ ដល់ សុក្រ): 100% Full Priority on Real TradFi Markets:
+            * Asian / Daytime Session (07:00 - 15:00): GOLD, NATURALGAS, OIL_CRUDE, US500
+            * London Session (15:00 - 20:30): GOLD, NATURALGAS, OIL_CRUDE, GERMANY40, US500
+            * Wall Street NY Session (20:30 - 04:00): GOLD, NATURALGAS, META, GOOGL, NVDA, TSLA, US500, US100, OIL_CRUDE
+        - Saturday & Sunday (សៅរ៍ និង អាទិត្យ 24/7): 100% Dedicated to 24/7 Crypto CFDs:
+            * BTCUSD, ETHUSD, SOLUSD (TradFi markets are closed)
         """
         import datetime
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         weekday = now_dt.weekday()  # Monday = 0, Friday = 4, Saturday = 5, Sunday = 6
         hour_utc = now_dt.hour
         
-        # TradFi weekend closure: Friday 21:00 UTC to Sunday 22:00 UTC
+        # TradFi weekend closure: Friday 21:00 UTC to Sunday 22:00 UTC (Saturday 04:00 to Monday 05:00 Phnom Penh)
         is_weekend = (weekday == 5) or (weekday == 4 and hour_utc >= 21) or (weekday == 6 and hour_utc < 22)
         
         if is_weekend:
-            # 24/7 Crypto CFD active on weekends
+            # 100% Dedicated to 24/7 Crypto CFDs on Weekends (TradFi markets closed)
             return ["BTCUSD", "ETHUSD", "SOLUSD"]
             
-        # On weekdays, dynamically adjust priority based on London & Wall Street market hours:
-        # Wall Street Session (13:30 - 21:00 UTC = 20:30 - 04:00 Phnom Penh): S&P 500, Nasdaq, Nvidia, Tesla, Gold, Oil, Crypto 24/7
+        # Monday to Friday: 100% Full Priority on Real TradFi Markets (Gold, Gas, Equities, Indices)
+        # Wall Street NY Session (13:30 - 21:00 UTC = 20:30 - 04:00 Phnom Penh)
         if 13 <= hour_utc < 21:
-            return ["GOLD", "SP500", "NASDAQ", "NVDA", "TSLA", "OIL", "BTCUSD", "ETHUSD", "SOLUSD"]
-        # London Session (08:00 - 13:00 UTC = 15:00 - 20:00 Phnom Penh): Gold, Crude Oil, DAX, EURUSD, Crypto 24/7
+            return ["GOLD", "NATURALGAS", "META", "GOOGL", "NVDA", "TSLA", "US500", "US100", "OIL_CRUDE"]
+        # London Session (08:00 - 13:30 UTC = 15:00 - 20:30 Phnom Penh)
         elif 8 <= hour_utc < 13:
-            return ["GOLD", "OIL", "SP500", "DAX", "BTCUSD", "ETHUSD", "SOLUSD"]
+            return ["GOLD", "NATURALGAS", "OIL_CRUDE", "GERMANY40", "US500"]
+        # Asian Session (00:00 - 08:00 UTC = 07:00 - 15:00 Phnom Penh)
         else:
-            # Asian Session / Off-hours: Gold, Bitcoin, Ethereum, Solana, S&P 500, Oil
-            return ["GOLD", "BTCUSD", "ETHUSD", "SOLUSD", "OIL", "SP500"]
+            return ["GOLD", "NATURALGAS", "OIL_CRUDE", "US500"]
 
     def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
         """
@@ -2234,12 +2273,20 @@ class CapitalAutonomousEngine:
             size = None
             if resolved_epic == "GOLD":
                 size = 0.02 if budget < 100 else 0.05
+            elif resolved_epic in ["NATURALGAS", "GAS"]:
+                size = 10.0 if budget < 50 else 20.0
+            elif resolved_epic == "META":
+                size = 0.02 if budget < 50 else 0.05
+            elif resolved_epic in ["GOOGL", "GOOGLE"]:
+                size = 0.1 if budget < 50 else 0.2
             elif resolved_epic in ["US500", "SP500"]:
                 size = 0.1 if budget < 100 else 0.2
             elif resolved_epic in ["US100", "NASDAQ"]:
                 size = 0.1 if budget < 100 else 0.2
             elif resolved_epic in ["NVDA", "TSLA", "AAPL", "MSFT", "AMZN"]:
-                size = 1.0 if budget < 100 else 2.0
+                size = 0.1 if budget < 50 else 0.2
+            elif resolved_epic in ["OIL", "OIL_CRUDE"]:
+                size = 0.1 if budget < 50 else 0.2
             elif resolved_epic == "BTCUSD":
                 size = 0.001 if budget < 50 else 0.002
             elif resolved_epic == "ETHUSD":
