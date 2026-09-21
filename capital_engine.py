@@ -971,6 +971,10 @@ class CapitalComEngine:
                 size = max(0.1, min_size)
             elif resolved_epic == "BTCUSD":
                 size = max(0.001, min_size)
+            elif resolved_epic == "ETHUSD":
+                size = max(0.01, min_size)
+            elif resolved_epic == "SOLUSD":
+                size = max(0.1, min_size)
             else:
                 size = min_size
         else:
@@ -1889,14 +1893,15 @@ class CapitalAutonomousEngine:
             return ["BTCUSD", "ETHUSD", "SOLUSD"]
             
         # On weekdays, dynamically adjust priority based on London & Wall Street market hours:
-        # Wall Street Session (13:30 - 21:00 UTC = 20:30 - 04:00 Phnom Penh): S&P 500, Nasdaq, Nvidia, Tesla, Gold, Oil
+        # Wall Street Session (13:30 - 21:00 UTC = 20:30 - 04:00 Phnom Penh): S&P 500, Nasdaq, Nvidia, Tesla, Gold, Oil, Crypto 24/7
         if 13 <= hour_utc < 21:
-            return ["GOLD", "SP500", "NASDAQ", "NVDA", "TSLA", "OIL", "BTCUSD"]
-        # London Session (08:00 - 13:00 UTC = 15:00 - 20:00 Phnom Penh): Gold, Crude Oil, DAX, EURUSD
+            return ["GOLD", "SP500", "NASDAQ", "NVDA", "TSLA", "OIL", "BTCUSD", "ETHUSD", "SOLUSD"]
+        # London Session (08:00 - 13:00 UTC = 15:00 - 20:00 Phnom Penh): Gold, Crude Oil, DAX, EURUSD, Crypto 24/7
         elif 8 <= hour_utc < 13:
-            return ["GOLD", "OIL", "SP500", "DAX", "BTCUSD"]
+            return ["GOLD", "OIL", "SP500", "DAX", "BTCUSD", "ETHUSD", "SOLUSD"]
         else:
-            return ["GOLD", "BTCUSD", "SP500"]
+            # Asian Session / Off-hours: Gold, Bitcoin, Ethereum, Solana, S&P 500, Oil
+            return ["GOLD", "BTCUSD", "ETHUSD", "SOLUSD", "OIL", "SP500"]
 
     def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
         """
@@ -2188,8 +2193,20 @@ class CapitalAutonomousEngine:
             max_pos = user.get("max_positions", 2)
             user_is_demo = user.get("is_demo", False)  # 100% Live Mainnet Real Capital
             user_engine = get_user_capital_engine(chat_id, is_demo=user_is_demo)
-            user_open_positions = user_engine.get_open_positions()
 
+            # Available balance safety verification
+            try:
+                bal_info = user_engine.get_account_balance()
+                user_avail = bal_info.get("available", 0.0)
+            except Exception:
+                user_avail = budget
+
+            # If available cash is below per-trade budget, skip until profits are harvested
+            if user_avail < budget:
+                logger.debug(f"User {chat_id} available cash (${user_avail:,.2f}) < budget (${budget:,.2f}), waiting for capital.")
+                continue
+
+            user_open_positions = user_engine.get_open_positions()
             if len(user_open_positions) >= max_pos:
                 continue
 
@@ -2197,8 +2214,21 @@ class CapitalAutonomousEngine:
                 (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
                 for pos in user_open_positions
             }
-            if resolved_epic in user_epics:
+
+            # Find the best candidate setup that this user DOES NOT currently hold!
+            target_setup_tuple = None
+            for cand in candidate_setups:
+                cand_rank, cand_epic, cand_res_epic, cand_setup = cand
+                if cand_res_epic not in user_epics:
+                    target_setup_tuple = cand
+                    break
+
+            if not target_setup_tuple:
                 continue
+
+            best_rank, best_epic, resolved_epic, setup = target_setup_tuple
+            final_action = setup["final_action"]
+            confidence = setup["final_confidence"]
 
             # Dynamic size based on user budget and asset DNA
             size = None
@@ -2212,6 +2242,10 @@ class CapitalAutonomousEngine:
                 size = 1.0 if budget < 100 else 2.0
             elif resolved_epic == "BTCUSD":
                 size = 0.001 if budget < 50 else 0.002
+            elif resolved_epic == "ETHUSD":
+                size = 0.01 if budget < 50 else 0.02
+            elif resolved_epic == "SOLUSD":
+                size = 0.1 if budget < 50 else 0.2
 
             trade_res = user_engine.execute_smart_tradfi_order(
                 epic=resolved_epic,

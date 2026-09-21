@@ -5648,9 +5648,9 @@ class TelegramBotThread(BaseThread):
                 context.args = []
                 await capital_command(update, context)
             elif data == "btn_cap_auto_budget_10":
-                db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, is_demo=False)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=3, is_demo=False)
                 try:
-                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $10 (Live Mainnet)!")
+                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $10 (Live Mainnet, Max 3 Positions)!")
                 except Exception:
                     pass
                 context.args = []
@@ -18728,7 +18728,14 @@ class TelegramBotThread(BaseThread):
                         else:
                             budget = 10.0
 
-                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, is_demo=target_is_demo)
+                        max_pos = 3 if budget <= 15.0 else 2
+                        if len(args) >= 4:
+                            try:
+                                max_pos = int(args[3])
+                            except ValueError:
+                                pass
+
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
                         pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         live_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=target_is_demo)
                         bal_data = await asyncio.to_thread(live_engine.get_account_balance)
