@@ -1227,22 +1227,26 @@ class PerpetualWealthGeneratorEngine:
                             # Save entry time for Anti-Stagnation Smart Clock
                             db.update_system_setting(f"wealth_entry_time_{chat_id}_{sym}", str(time.time()))
 
-                            # Send Telegram alert
-                            if app and hasattr(app, "bot"):
+                            # Institutional Silence Guard: Limit Maker orders sit on the orderbook awaiting retracement.
+                            # Completely silence resting limit order dispatches to eliminate Telegram spam/false alarms.
+                            # Alerts are strictly reserved for actual position fills (TP1/TP2/Breakeven) or instant MARKET executions.
+                            if is_limit_placed:
+                                print(f"🔕 [PERPETUAL WEALTH SILENT LIMIT ENTRY] User {chat_id}: {sym} {side} LIMIT Maker placed silently on orderbook @ ${limit_entry_p:.4f} (Zero Telegram Alert).")
+                            elif app and hasattr(app, "bot"):
                                 try:
                                     user_lang = db.get_user_language(chat_id)
                                     rvol_val = cand.get('rvol', 2.2)
                                     chg_1h_val = cand.get('chg_1h', 1.0)
                                     adx_val = cand.get('adx_15m', 28.0)
                                     ai_conf_val = cand.get('ai_confidence', 85.0)
-                                    entry_mode_tag = "LIMIT Maker (0.02% Fee)" if is_limit_placed else "MARKET (Instant Fill)"
+                                    entry_mode_tag = "MARKET (Instant Fill)"
                                     entry_msg = (
                                         "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                                         f"🎯 **ទិសដៅ (Signal) ៖** `{side} ({cand['reason']})`\n"
                                         f"🏷️ **ប្រភេទ Order ៖** `{entry_mode_tag}`\n"
-                                        f"💵 **តម្លៃចូល (Entry Price) ៖** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
+                                        f"💵 **តម្លៃចូល (Entry Price) ៖** `${last_price:,.4f}`\n"
                                         f"💰 **ទុនចូល (Margin) ៖** `${margin_per_coin:.2f} USDT`\n"
                                         f"⚡ **Leverage ៖** `{leverage}x (ISOLATED Mode)`\n"
                                         f"📊 **Volume Surge (RVOL) ៖** `{rvol_val:.1f}x` 🚀\n"
@@ -1260,7 +1264,7 @@ class PerpetualWealthGeneratorEngine:
                                         f"🪙 **Symbol / Pair:** `{sym}`\n"
                                         f"🎯 **Signal / Mode:** `{side} ({cand['reason']})`\n"
                                         f"🏷️ **Order Type:** `{entry_mode_tag}`\n"
-                                        f"💵 **Entry Price:** `${limit_entry_p if is_limit_placed else last_price:,.4f}`\n"
+                                        f"💵 **Entry Price:** `${last_price:,.4f}`\n"
                                         f"💰 **Margin Allocated:** `${margin_per_coin:.2f} USDT`\n"
                                         f"⚡ **Leverage:** `{leverage}x (ISOLATED Mode)`\n"
                                         f"📊 **Volume Surge (RVOL):** `{rvol_val:.1f}x` 🚀\n"
