@@ -1460,7 +1460,7 @@ class PropFirmRiskManager:
         daily_brake_threshold = max_daily_limit - 0.5  # 3.5%
 
         if daily_loss_pct >= daily_brake_threshold:
-            engine = get_user_capital_engine(chat_id)
+            engine = get_user_capital_engine(chat_id, is_demo=True)
             engine.close_all_capital_positions()
             db.update_prop_firm_tracking(chat_id, current_equity, status="DAILY_HALTED")
             logger.warning(f"🚨 [PROP FIRM DAILY BRAKE TRIGGERED] Daily Loss: -{daily_loss_pct:.2f}% (Limit: -{max_daily_limit:.1f}%). Trading halted until 00:00 UTC.")
@@ -1483,7 +1483,7 @@ class PropFirmRiskManager:
         overall_brake_threshold = max_overall_limit - 1.0  # 7.0%
 
         if overall_loss_pct >= overall_brake_threshold:
-            engine = get_user_capital_engine(chat_id)
+            engine = get_user_capital_engine(chat_id, is_demo=True)
             engine.close_all_capital_positions()
             db.update_prop_firm_tracking(chat_id, current_equity, status="BREACHED")
             logger.critical(f"🛑 [PROP FIRM MAX DRAWDOWN BRAKE] Drawdown: -{overall_loss_pct:.2f}%. Trading permanently stopped to preserve account.")
@@ -1499,7 +1499,7 @@ class PropFirmRiskManager:
         if target_pct > 0:
             current_gain_pct = ((current_equity - init_bal) / init_bal) * 100.0 if init_bal > 0 else 0.0
             if current_gain_pct >= target_pct:
-                engine = get_user_capital_engine(chat_id)
+                engine = get_user_capital_engine(chat_id, is_demo=True)
                 engine.close_all_capital_positions()
                 new_status = "PASSED_PHASE_1" if phase == 1 else "PASSED_PHASE_2"
                 db.update_prop_firm_tracking(chat_id, current_equity, status=new_status)
@@ -1522,7 +1522,7 @@ class PropFirmRiskManager:
             import datetime
             now_dt = datetime.datetime.now(datetime.timezone.utc)
             if now_dt.weekday() == 4 and now_dt.hour >= 19 and now_dt.minute >= 30:
-                engine = get_user_capital_engine(chat_id)
+                engine = get_user_capital_engine(chat_id, is_demo=True)
                 engine.close_all_capital_positions()
                 return {"eligible": False, "reason": "WEEKEND_HOLDING_GUARD_ACTIVE", "status": status}
 
@@ -1540,7 +1540,7 @@ class PropFirmRiskManager:
         """
         import database as db
         cfg = db.get_prop_firm_config(chat_id)
-        engine = get_user_capital_engine(chat_id)
+        engine = get_user_capital_engine(chat_id, is_demo=True)
         bal_info = engine.get_account_balance()
         curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
         if curr_equity <= 0:
