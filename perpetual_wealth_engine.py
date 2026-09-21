@@ -1124,11 +1124,14 @@ class PerpetualWealthGeneratorEngine:
 
                 try:
                     fut_bal = trading_engine.get_futures_balance(api_key, api_secret)
-                    avail_usdt = float(fut_bal) if isinstance(fut_bal, (int, float)) else (float(fut_bal.get("available_balance", 0.0)) if isinstance(fut_bal, dict) else 0.0)
+                    wallet_usdt = float(fut_bal) if isinstance(fut_bal, (int, float)) else (float(fut_bal.get("available_balance", 0.0)) if isinstance(fut_bal, dict) else 0.0)
+                    free_margin = trading_engine.get_futures_free_margin(api_key, api_secret)
+                    avail_free_usdt = float(free_margin) if free_margin > 0 else 0.0
+
                     bot_cap = float(bot.get("capital", 50.0))
                     custom_margin = float(bot.get("margin_per_coin", 0.0))
 
-                    sizing = PerpetualWealthGeneratorEngine.calculate_asset_dna_sizing(bot_cap, avail_usdt, custom_margin)
+                    sizing = PerpetualWealthGeneratorEngine.calculate_asset_dna_sizing(bot_cap, wallet_usdt, custom_margin)
                     margin_per_coin = sizing["margin_per_coin"]
                     leverage = sizing["leverage"]
                     max_coins = sizing["max_coins"]
@@ -1142,18 +1145,21 @@ class PerpetualWealthGeneratorEngine:
 
                     # Prune stale unfilled limit orders older than 10 minutes to release locked margin
                     now_ts = time.time()
-                    if isinstance(open_orders, list):
+                    if isinstance(open_orders, list) and open_orders:
+                        print(f"📋 [WEALTH OPEN ORDERS] User {chat_id}: Found {len(open_orders)} open order(s): {pending_order_symbols} | Free Margin: ${avail_free_usdt:.2f}")
                         for o in open_orders:
-                            order_time_ms = float(o.get("time", 0))
-                            if order_time_ms > 0 and (now_ts - (order_time_ms / 1000.0)) > 600:
+                            raw_time = float(o.get("time") or o.get("updateTime") or 0)
+                            order_time_sec = (raw_time / 1000.0) if raw_time > 1e11 else raw_time
+                            if order_time_sec > 0 and (now_ts - order_time_sec) > 600:
                                 stale_sym = o.get("symbol")
                                 if stale_sym:
-                                    print(f"🧹 [WEALTH STALE LIMIT PRUNE] Cancelling stale open order for {stale_sym} (sitting > 10m)...")
-                                    trading_engine.cancel_all_futures_open_orders(api_key, api_secret, stale_sym)
+                                    print(f"🧹 [WEALTH STALE LIMIT PRUNE] Cancelling stale open order for {stale_sym} (sitting {(now_ts - order_time_sec)/60:.1f}m > 10m)...")
+                                    cancel_res = trading_engine.cancel_all_futures_open_orders(api_key, api_secret, stale_sym)
+                                    print(f"🧹 [WEALTH STALE LIMIT PRUNE RESULT] {stale_sym}: {cancel_res}")
                                     pending_order_symbols.discard(stale_sym)
 
                     total_active_count = len(open_symbols.union(pending_order_symbols))
-                    if total_active_count >= max_coins or avail_usdt < margin_per_coin:
+                    if total_active_count >= max_coins or avail_free_usdt < margin_per_coin:
                         continue
 
                     # Select best candidate not already open or pending

@@ -2728,6 +2728,8 @@ def get_futures_open_orders(api_key: str, api_secret: str, symbol: str = None) -
             data = res.json()
             if isinstance(data, list):
                 return data
+        else:
+            print(f"⚠️ [GET FUTURES OPEN ORDERS FAILED] Status: {res.status_code}, Msg: {res.text}")
     except Exception as e:
         print(f"Error fetching futures open orders: {e}")
     return []
@@ -2750,8 +2752,10 @@ def cancel_all_futures_open_orders(api_key: str, api_secret: str, symbol: str) -
         res = HFT_SESSION.delete(url, headers=headers, timeout=5)
         if res.status_code == 200:
             return {"status": "success", "data": res.json()}
+        print(f"⚠️ [CANCEL ALL OPEN ORDERS FAILED] {symbol}: {res.status_code} {res.text}")
         return {"status": "error", "code": res.status_code, "msg": res.text}
     except Exception as e:
+        print(f"Error cancelling all futures open orders for {symbol}: {e}")
         return {"status": "error", "error": str(e)}
 
 def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, quantity: float, leverage: int = 10, position_side: str = None, reduce_only: bool = False, **kwargs) -> dict:
