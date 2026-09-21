@@ -5671,6 +5671,24 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_leadlag_command(update, context)
+            elif data == "btn_cap_orb_toggle":
+                curr_state = db.is_capital_orb_enabled(chat_id)
+                new_state = not curr_state
+                db.set_capital_orb_config(chat_id, enabled=new_state)
+                toast_msg = "🎯 ORB 15m: បានបើកដំណើរការ!" if new_state else "🛑 ORB 15m: បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_orb_radar":
+                try:
+                    await update.callback_query.answer("📡 កំពុងទាញយកទិន្នន័យ ORB 15m Matrix...")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_orb_command(update, context)
             elif data == "btn_cap_auto_budget_10":
                 db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=3, is_demo=False)
                 try:
@@ -17399,6 +17417,7 @@ class TelegramBotThread(BaseThread):
             guard_cfg = db.get_trailing_guard_config(chat_id) if hasattr(db, 'get_trailing_guard_config') else {}
             trailing_guard_on = bool(guard_cfg.get("enabled", False)) if isinstance(guard_cfg, dict) else False
 
+
             # Active bots in DB
             grid_bots = db.get_user_grid_bots(chat_id)
             scalp_bots = db.get_user_ai_scalpers(chat_id)
@@ -18782,6 +18801,149 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def capital_orb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            orb_engine = capital_engine.get_capital_orb_engine()
+
+            # Handle Subcommands: ON, OFF, STATUS
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["ON", "START", "ENABLE"]:
+                    db.set_capital_orb_config(chat_id, enabled=True)
+                elif sub in ["OFF", "STOP", "DISABLE"]:
+                    db.set_capital_orb_config(chat_id, enabled=False)
+
+            is_orb_on = db.is_capital_orb_enabled(chat_id)
+            telemetry = orb_engine.get_telemetry()
+            session_info = telemetry.get("session_info", {})
+            current_session = session_info.get("session", "STANDBY")
+            phase = session_info.get("phase", "WAITING")
+            ranges = telemetry.get("ranges", {})
+            stats = db.get_capital_orb_stats(chat_id)
+
+            toggle_text = "🎯 ORB 15m: ON 🟢" if is_orb_on else "🎯 ORB 15m: OFF ⚪"
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(toggle_text, callback_data="btn_cap_orb_toggle"),
+                    InlineKeyboardButton("🔄 Refresh ORB Matrix", callback_data="btn_cap_orb_radar")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ /capital Menu", callback_data="btn_cap_menu"),
+                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions")
+                ]
+            ])
+
+            status_emoji = "🟢 ACTIVE (Auto-Breakout)" if is_orb_on else "⚪ PAUSED (Standby)"
+            if phase == "EXECUTION":
+                phase_badge = "🔥 BREAKOUT EXECUTION ACTIVE"
+            elif phase == "FORMATION":
+                phase_badge = "⏳ FORMING 15m RANGE"
+            else:
+                phase_badge = "💤 WAITING NEXT SESSION"
+
+            range_lines_kh = []
+            range_lines_en = []
+            for ep, r_data in ranges.items():
+                hi = r_data.get("high", 0.0)
+                lo = r_data.get("low", 0.0)
+                mid = r_data.get("mid", 0.0)
+                rng = r_data.get("range", 0.0)
+                status = r_data.get("status", "FORMING")
+                status_lbl = "🟢 BUY BREAKOUT" if status == "BREAKOUT_BUY" else ("🔴 SELL BREAKDOWN" if status == "BREAKOUT_SELL" else "⚪ Inside Range")
+                range_lines_kh.append(f"• **{ep} ៖** H `${hi:,.2f}` | L `${lo:,.2f}` | Mid `${mid:,.2f}`\n   └ ស្ថានភាព ៖ `{status_lbl}` (Range: ${rng:,.2f})")
+                range_lines_en.append(f"• **{ep}:** H `${hi:,.2f}` | L `${lo:,.2f}` | Mid `${mid:,.2f}`\n   └ Status: `{status_lbl}` (Range: ${rng:,.2f})")
+
+            if not range_lines_kh:
+                ranges_str_kh = "• _រង់ចាំម៉ោងបើក London (15:00 PP) ឬ NY (20:30 PP) ដើម្បីគណនា Range..._"
+                ranges_str_en = "• _Waiting for London (15:00 PP) or NY (20:30 PP) Open to compute range..._"
+            else:
+                ranges_str_kh = "\n".join(range_lines_kh[:5])
+                ranges_str_en = "\n".join(range_lines_en[:5])
+
+            total_trades = stats.get("total_trades", 0)
+            wins = stats.get("wins", 0)
+            losses = stats.get("losses", 0)
+            pnl = stats.get("net_pnl", 0.0)
+            pnl_str = f"+${pnl:,.2f}" if pnl >= 0 else f"-${abs(pnl):,.2f}"
+
+            if user_lang == 'khmer':
+                msg = (
+                    f"🎯 **LONDON & NEW YORK ORB 15M MATRIX** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🌐 **ស្ថានភាព Engine ៖** `{status_emoji}`\n"
+                    f"⏰ **Session បច្ចុប្បន្ន ៖** `{current_session} ({phase_badge})`\n"
+                    f"🏛️ **Asset ស្នូល ៖** `Gold, US500, US100, DAX, Oil, Gas`\n"
+                    f"🕒 **កាលវិភាគម៉ោងនៅកម្ពុជា ៖**\n"
+                    f"• London Open ៖ `15:00 - 15:15` (Trade ដល់ `18:30`)\n"
+                    f"• Wall St Open ៖ `20:30 - 20:45` (Trade ដល់ `00:00`)\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📊 **ទិន្នន័យ 15-Minute Opening Ranges ៖**\n"
+                    f"{ranges_str_kh}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📈 **ស្ថិតិប្រតិបត្តិការ ORB ៖**\n"
+                    f"• Trades សរុប ៖ `{total_trades}` | ឈ្នះ ៖ `{wins}` | ចាញ់ ៖ `{losses}`\n"
+                    f"• ចំណេញសុទ្ធ ៖ `{pnl_str} USD`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **ក្បួនការពារ & ប្រៀបឈ្នះគណិតវិជ្ជា ៖**\n"
+                    f"• **Range Sanity Filter ៖** បដិសេធ Range ធំ > 2.5x ATR ឬតូច < 0.20x ATR\n"
+                    f"• **Invariant 16 Guard ៖** ហាម Sell ដាច់ខាតពេល RSI ≤ 38.0\n"
+                    f"• **Asymmetric Edge ៖** R:R 1:3 ដល់ 1:6 (SL នៅ Range Mid)\n"
+                    f"• **Breakeven Armor ៖** ចាក់សោរដើមនៅ +1.5% ROI\n"
+                    f"• **Golden 80% Ratchet ៖** រក្សាផលចំណេញខ្ពស់បំផុត 80%\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Presets ៖**\n"
+                    f"• `` `/capital orb ON` ``\n"
+                    f"• `` `/capital orb OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"London & Wall Street Opening Range Breakout Matrix 24/7!"
+                )
+            else:
+                msg = (
+                    f"🎯 **LONDON & NEW YORK ORB 15M MATRIX** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🌐 **Engine Status:** `{status_emoji}`\n"
+                    f"⏰ **Current Session:** `{current_session} ({phase_badge})`\n"
+                    f"🏛️ **TradFi Assets:** `Gold, US500, US100, DAX, Oil, Gas`\n"
+                    f"🕒 **Session Schedule (Phnom Penh UTC+7):**\n"
+                    f"• London Open: `15:00 - 15:15` (Trade to `18:30`)\n"
+                    f"• Wall St Open: `20:30 - 20:45` (Trade to `00:00`)\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📊 **15-Minute Opening Ranges Telemetry:**\n"
+                    f"{ranges_str_en}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📈 **ORB Execution Statistics:**\n"
+                    f"• Total Trades: `{total_trades}` | Win: `{wins}` | Loss: `{losses}`\n"
+                    f"• Realized PnL: `{pnl_str} USD`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ **Institutional Protection Shields:**\n"
+                    f"• **Range Sanity Filter:** Rejects Range > 2.5x ATR or < 0.20x ATR\n"
+                    f"• **Invariant 16 Guard:** Anti-Oversold Short Guard (RSI ≤ 38.0)\n"
+                    f"• **Asymmetric Edge:** R:R 1:3 to 1:6 (SL placed at Range Mid)\n"
+                    f"• **Breakeven Armor:** Locks SL to Entry at +1.5% ROI\n"
+                    f"• **Golden 80% Ratchet:** Ratchets 80% peak unrealized profit\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Presets:**\n"
+                    f"• `` `/capital orb ON` ``\n"
+                    f"• `` `/capital orb OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"London & Wall Street Opening Range Breakout Matrix 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -18805,6 +18967,9 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_leadlag", "capitalleadlag", "leadlag"]:
                 await capital_leadlag_command(update, context)
                 return
+            elif cmd_text in ["capital_orb", "capitalorb", "orb"]:
+                await capital_orb_command(update, context)
+                return
             elif cmd_text in ["prop_firm", "propfirm", "prop"]:
                 await prop_firm_command(update, context)
                 return
@@ -18812,7 +18977,7 @@ class TelegramBotThread(BaseThread):
                 await capital_ib_command(update, context)
                 return
 
-            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG
+            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB
             if args:
                 action = str(args[0]).upper().strip()
                 if action in ["PROP", "PROPFIRM", "CHALLENGE"]:
@@ -18827,6 +18992,10 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_leadlag_command(update, context)
                     return
+                elif action in ["ORB", "OPENING_RANGE", "BREAKOUT"]:
+                    context.args = args[1:]
+                    await capital_orb_command(update, context)
+                    return
 
             # Auto config & status
             is_auto_on = db.is_capital_auto_enabled(chat_id)
@@ -18835,11 +19004,17 @@ class TelegramBotThread(BaseThread):
             auto_btn_text = f"🤖 Capital Auto: ON 🟢 (${auto_budget:,.0f})" if is_auto_on else "🤖 Capital Auto: OFF ⚪"
             is_leadlag_on = db.is_capital_leadlag_enabled(chat_id)
             leadlag_btn_text = "⚡ Lead-Lag Arb: ON 🟢" if is_leadlag_on else "⚡ Lead-Lag Arb: OFF ⚪"
+            is_orb_on = db.is_capital_orb_enabled(chat_id)
+            orb_btn_text = "🎯 ORB 15m: ON 🟢" if is_orb_on else "🎯 ORB 15m: OFF ⚪"
 
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle"),
                     InlineKeyboardButton(leadlag_btn_text, callback_data="btn_cap_leadlag_toggle")
+                ],
+                [
+                    InlineKeyboardButton(orb_btn_text, callback_data="btn_cap_orb_toggle"),
+                    InlineKeyboardButton("📈 ORB Radar (15m)", callback_data="btn_cap_orb_radar")
                 ],
                 [
                     InlineKeyboardButton("🏆 Prop Firm ($10k-$200k)", callback_data="btn_cap_prop_menu"),
@@ -19164,6 +19339,10 @@ class TelegramBotThread(BaseThread):
             pnl_badge = f"+${pnl_val:,.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):,.2f}"
 
             auto_badge = f"🟢 ACTIVE (${auto_budget:,.0f})" if is_auto_on else "⚪ OFF"
+            is_orb_on = db.is_capital_orb_enabled(chat_id)
+            orb_badge = "🟢 ACTIVE" if is_orb_on else "⚪ OFF"
+            is_leadlag_on = db.is_capital_leadlag_enabled(chat_id)
+            leadlag_badge = "🟢 ACTIVE" if is_leadlag_on else "⚪ OFF"
 
             if user_lang == 'khmer':
                 msg = (
@@ -19172,6 +19351,8 @@ class TelegramBotThread(BaseThread):
                     f"🏦 **គណនីវិនិយោគ ៖** `{env_mode}`\n"
                     f"🆔 **Live Account ID ៖** `{data.get('account_id')}`\n"
                     f"🤖 **TradFi Auto Engine ៖** `{auto_badge}`\n"
+                    f"🎯 **ORB 15m Matrix ៖** `{orb_badge}`\n"
+                    f"⚡ **Lead-Lag Arbitrage ៖** `{leadlag_badge}`\n"
                     f"💰 **សមតុល្យលុយពិត (Balance) ៖** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
@@ -19193,7 +19374,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard ៖** បដិសេធ Trade ពេល Spread រីកធំ\n"
                     f"• **Asset-DNA Sizing ៖** 1% Risk Clamp គ្មាន Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital AUTO OFF` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital LEADLAG ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -19206,6 +19387,8 @@ class TelegramBotThread(BaseThread):
                     f"🏦 **Investment Account:** `{env_mode}`\n"
                     f"🆔 **Live Account ID:** `{data.get('account_id')}`\n"
                     f"🤖 **TradFi Auto Engine:** `{auto_badge}`\n"
+                    f"🎯 **ORB 15m Matrix:** `{orb_badge}`\n"
+                    f"⚡ **Lead-Lag Arbitrage:** `{leadlag_badge}`\n"
                     f"💰 **Live Balance:** `${data.get('balance', 0.0):,.2f} {data.get('currency')}`\n"
                     f"💵 **Live Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
@@ -19227,7 +19410,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard:** Rejects orders during wide spreads\n"
                     f"• **Asset-DNA Sizing:** 1% Risk Clamp zero drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital AUTO OFF` ``\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital ORB ON` `` | `` `/capital LEADLAG ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -19488,6 +19671,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capital_leadlag", capital_leadlag_command))
         self.app.add_handler(CommandHandler("capitalleadlag", capital_leadlag_command))
         self.app.add_handler(CommandHandler("leadlag", capital_leadlag_command))
+        self.app.add_handler(CommandHandler("capital_orb", capital_orb_command))
+        self.app.add_handler(CommandHandler("capitalorb", capital_orb_command))
+        self.app.add_handler(CommandHandler("orb", capital_orb_command))
         self.app.add_handler(CommandHandler("capital_ib", capital_ib_command))
         self.app.add_handler(CommandHandler("capitalib", capital_ib_command))
         self.app.add_handler(CommandHandler("ib", capital_ib_command))

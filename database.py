@@ -2720,6 +2720,169 @@ def get_capital_leadlag_stats(chat_id: Optional[int] = None) -> dict:
 
 
 # ==============================================================================
+# CAPITAL.COM OPENING RANGE BREAKOUT (ORB 15M) PERSISTENCE LAYER
+# ==============================================================================
+
+def get_capital_orb_config(chat_id: int) -> dict:
+    """Returns the Capital.com Opening Range Breakout (ORB 15m) configuration for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_orb_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            session_mode TEXT DEFAULT 'ALL',
+            max_positions INTEGER DEFAULT 2,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    cursor.execute("""
+        SELECT is_enabled, session_mode, max_positions, is_demo
+        FROM capital_orb_config WHERE chat_id = ?
+    """, (chat_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            "enabled": bool(row[0]),
+            "session_mode": str(row[1] or "ALL"),
+            "max_positions": int(row[2] or 2),
+            "is_demo": bool(row[3])
+        }
+    return {"enabled": False, "session_mode": "ALL", "max_positions": 2, "is_demo": False}
+
+def is_capital_orb_enabled(chat_id: int) -> bool:
+    """Fast check if a user has enabled Capital.com ORB 15m."""
+    return get_capital_orb_config(chat_id).get("enabled", False)
+
+def set_capital_orb_config(chat_id: int, enabled: bool, session_mode: str = "ALL", max_positions: int = 2, is_demo: bool = False):
+    """Sets or updates the Capital.com ORB 15m config."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_orb_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            session_mode TEXT DEFAULT 'ALL',
+            max_positions INTEGER DEFAULT 2,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO capital_orb_config (chat_id, is_enabled, session_mode, max_positions, is_demo, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            session_mode = excluded.session_mode,
+            max_positions = excluded.max_positions,
+            is_demo = excluded.is_demo,
+            updated_at = excluded.updated_at
+    """, (chat_id, 1 if enabled else 0, str(session_mode).upper(), int(max_positions), 1 if is_demo else 0, now_str))
+    conn.commit()
+    conn.close()
+
+def get_active_capital_orb_users() -> list:
+    """Returns a list of all active Capital ORB users."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_orb_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            session_mode TEXT DEFAULT 'ALL',
+            max_positions INTEGER DEFAULT 2,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    cursor.execute("SELECT chat_id, session_mode, max_positions, is_demo FROM capital_orb_config WHERE is_enabled = 1")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"chat_id": r[0], "session_mode": str(r[1] or "ALL"), "max_positions": int(r[2]), "is_demo": bool(r[3])} for r in rows]
+
+def record_capital_orb_trade(
+    chat_id: int,
+    session_name: str,
+    epic: str,
+    direction: str,
+    or_high: float,
+    or_low: float,
+    breakout_price: float,
+    sl: float,
+    tp: float,
+    deal_id: str = "",
+    status: str = "OPEN"
+) -> int:
+    """Records an executed ORB 15m trade into capital_orb_trades."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_orb_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            session_name TEXT,
+            epic TEXT,
+            direction TEXT,
+            or_high REAL,
+            or_low REAL,
+            breakout_price REAL,
+            sl REAL,
+            tp REAL,
+            deal_id TEXT,
+            status TEXT,
+            timestamp TEXT
+        )
+    """)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+        INSERT INTO capital_orb_trades
+        (chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, deal_id, status, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, str(deal_id), status, now_str))
+    trade_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return trade_id
+
+def get_capital_orb_stats(chat_id: Optional[int] = None) -> dict:
+    """Returns cumulative statistics for ORB 15m executions."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_orb_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            session_name TEXT,
+            epic TEXT,
+            direction TEXT,
+            or_high REAL,
+            or_low REAL,
+            breakout_price REAL,
+            sl REAL,
+            tp REAL,
+            deal_id TEXT,
+            status TEXT,
+            timestamp TEXT
+        )
+    """)
+    if chat_id:
+        cursor.execute("SELECT COUNT(*), COUNT(DISTINCT session_name), COUNT(DISTINCT epic) FROM capital_orb_trades WHERE chat_id = ?", (chat_id,))
+    else:
+        cursor.execute("SELECT COUNT(*), COUNT(DISTINCT session_name), COUNT(DISTINCT epic) FROM capital_orb_trades")
+    row = cursor.fetchone()
+    conn.close()
+    return {
+        "total_trades": row[0] if row else 0,
+        "sessions_count": row[1] if row else 0,
+        "instruments_count": row[2] if row else 0
+    }
+
+
+
+# ==============================================================================
 # CAPITAL.COM & PROP FIRM PER-USER API VAULT (AES-256 MILITARY-GRADE ENCRYPTION)
 # ==============================================================================
 

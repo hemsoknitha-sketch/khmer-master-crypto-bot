@@ -300,7 +300,19 @@ Any modification that breaks any of the following 30 invariants is considered an
   3. **Spread Hurdle Verification:** Measured price dislocation must exceed Capital.com's live CFD bid-ask spread by at least $1.4\times$ ($|\text{Dislocation}| \ge \text{Spread}_{\%} \times 1.4$) to eliminate spread bleed and guarantee positive net expectancy.
   4. **Strict Invariant 16 Compliance:** Any downward impulse short signal is strictly blocked if the 15-minute RSI is $\le 38.0$ to prevent shorting retail panic bottoms.
   5. **Asynchronous Non-Blocking Order Dispatch:** Order submission to Capital.com runs in a dedicated thread pool (`ThreadPoolExecutor`), completely decoupling execution latency from the core Binance WebSocket event loop.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 24/24].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 24/25].
+
+### Invariant 32: London & New York Opening Range Breakout (ORB 15m) Matrix Standard
+- **Location:** `capital_engine.py` (`CapitalOpeningRangeBreakoutEngine`, `get_capital_orb_engine`), `database.py`, `bot_thread.py`, `scheduler_tasks.py`
+- **Rule:** The `/capital` trading ecosystem integrates an institutional 15-minute Opening Range Breakout (ORB) Matrix capturing liquidity explosions during London Open and Wall Street New York Open sessions across TradFi assets (Gold XAU/USD, S&P 500, Nasdaq, DAX, Crude Oil, Natural Gas):
+  1. **Canonical Session Windows (Phnom Penh UTC+7):**
+     - **London Open:** 08:00–08:15 UTC (15:00–15:15 Phnom Penh) Range Formation -> 08:15–11:30 UTC (15:15–18:30 Phnom Penh) Breakout Execution.
+     - **Wall Street New York Open:** 13:30–13:45 UTC (20:30–20:45 Phnom Penh) Range Formation -> 13:45–17:00 UTC (20:45–00:00 Phnom Penh) Breakout Execution.
+  2. **Range Sanity Filter:** Breakout execution is strictly bypassed if the 15-minute Opening Range ($OR_{\text{Range}} = OR_{\text{High}} - OR_{\text{Low}}$) is $> 2.5 \times \text{ATR}_{14}$ (exhaustion candle) or $< 0.20 \times \text{ATR}_{14}$ (no institutional participation).
+  3. **Strict Invariant 16 Anti-Oversold Short Guard:** Any downward breakdown below $OR_{\text{Low}}$ is strictly blocked if the 15-minute RSI is $\le 38.0$ to eliminate shorting panic sell-offs at the bottom.
+  4. **Asymmetric R:R $\ge 1:3$ to $1:6$ with Range Mid Stop:** Stop-Loss is placed at the Range Midpoint ($OR_{\text{Mid}} = \frac{OR_{\text{High}} + OR_{\text{Low}}}{2}$), and positions are protected by Breakeven Armor (+1.5% ROI) and Golden 80% Trailing Ratchet.
+  5. **Session Debounce:** Exactly 1 trade per session per symbol is permitted to eliminate chop and whipsaw losses.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 25/25].
 
 ---
 
