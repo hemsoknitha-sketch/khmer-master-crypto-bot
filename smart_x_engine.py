@@ -523,7 +523,7 @@ class SmartXEngine:
         ]])
 
     @classmethod
-    def evaluate_ai_ensemble(cls, symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL, feat_vec: np.ndarray = None) -> dict:
+    def evaluate_ai_ensemble(cls, symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL, feat_vec: np.ndarray = None, klines_15m: list = None) -> dict:
         """
         Queries all loaded Wall Street Gradient Boosting models:
         - CatBoost
@@ -534,7 +534,7 @@ class SmartXEngine:
         Returns vote breakdown, consensus direction, and ensemble confidence.
         """
         if feat_vec is None:
-            feat_vec = cls.extract_features(symbol)
+            feat_vec = cls.extract_features(symbol, klines_15m=klines_15m)
 
         votes = []
         model_details = {}

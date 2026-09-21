@@ -262,7 +262,7 @@ class PerpetualWealthGeneratorEngine:
 
             for t in tickers:
                 symbol = t.get("symbol", "")
-                if not symbol.endswith("USDT"):
+                if not symbol.endswith("USDT") or not symbol.isascii():
                     continue
                 if symbol in TRADFI_STOCK_SYMBOLS or symbol in monitoring_symbols:
                     continue
@@ -371,9 +371,9 @@ class PerpetualWealthGeneratorEngine:
             rvol_prev = (prev_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
             rvol = round(max(rvol_cur, rvol_prev), 2)
 
-            # Strict RVOL Filter: Must show >= 2.0x volume surge
-            if rvol < 2.0:
-                return {"is_valid": False, "reason": f"Insufficient Volume Spike (RVOL {rvol:.2f}x < 2.0x)"}
+            # Institutional RVOL Expansion Filter: Must show >= 1.35x volume surge over 20-period 15m MA
+            if rvol < 1.35:
+                return {"is_valid": False, "reason": f"Insufficient Volume Expansion (RVOL {rvol:.2f}x < 1.35x)"}
 
             # 3. Compute 15m & 1h Fresh Momentum
             open_15m = float(klines[-1][1])
@@ -465,10 +465,10 @@ class PerpetualWealthGeneratorEngine:
             except Exception:
                 ob_ratio = 1.15 if target_side == "BUY" else 0.85
 
-            if target_side == "BUY" and ob_ratio < 1.05:
-                return {"is_valid": False, "reason": f"Orderbook selling pressure (Bid/Ask ratio: {ob_ratio:.2f} < 1.05)"}
-            if target_side == "SELL" and ob_ratio > 0.95:
-                return {"is_valid": False, "reason": f"Orderbook buying support wall (Bid/Ask ratio: {ob_ratio:.2f} > 0.95)"}
+            if target_side == "BUY" and ob_ratio < 0.70:
+                return {"is_valid": False, "reason": f"Heavy Orderbook sell wall (Bid/Ask ratio: {ob_ratio:.2f} < 0.70)"}
+            if target_side == "SELL" and ob_ratio > 1.40:
+                return {"is_valid": False, "reason": f"Heavy Orderbook buy wall (Bid/Ask ratio: {ob_ratio:.2f} > 1.40)"}
 
             # 9. 33 Wall Street AI Models Ensemble Confluence (MoE Router + CatBoost + LightGBM + XGBoost + Trend Classifier)
             ai_ensemble_res = SmartXEngine.evaluate_ai_ensemble(symbol, klines_15m=klines)
@@ -476,17 +476,14 @@ class PerpetualWealthGeneratorEngine:
             ai_conf = float(ai_ensemble_res.get("confidence_pct", 60.0))
             moe_regime = ai_ensemble_res.get("moe_regime", "TRENDING_BULL")
 
-            # Strict Directional AI Confluence Guard (Confidence >= 78.0% and consensus alignment)
+            # Strict Directional AI Confluence Guard
+            # Strictly reject counter-trend signals (Never buy into SELL consensus, never short into BUY consensus)
             if target_side == "BUY":
                 if ai_consensus == "SELL":
                     return {"is_valid": False, "reason": f"33 AI Ensemble Bearish Rejection ({ai_conf:.1f}%)"}
-                if ai_conf < 78.0 and ai_consensus != "BUY":
-                    return {"is_valid": False, "reason": f"Insufficient 33-AI Swarm Confidence ({ai_conf:.1f}% < 78.0%)"}
             else:  # SELL / SHORT
                 if ai_consensus == "BUY":
                     return {"is_valid": False, "reason": f"33 AI Ensemble Bullish Rejection ({ai_conf:.1f}%)"}
-                if ai_conf < 78.0 and ai_consensus != "SELL":
-                    return {"is_valid": False, "reason": f"Insufficient 33-AI Swarm Confidence ({ai_conf:.1f}% < 78.0%)"}
 
             # Calculate Pullback Retest Limit Price (Avoid FOMO Green Candle Chasing - Maker Fee 0.02%)
             if target_side == "BUY":
@@ -562,7 +559,11 @@ class PerpetualWealthGeneratorEngine:
                     ai_score += 0.5
 
             # Blend 33-AI Model Confidence into AI Score
-            ai_score = round(min(10.0, ai_score * (ai_conf / 85.0)), 1)
+            # Directional model agreement boosts score, counter-trend already rejected, neutral preserves technical confluence
+            if (target_side == "BUY" and ai_consensus == "BUY") or (target_side == "SELL" and ai_consensus == "SELL"):
+                ai_score = round(min(10.0, ai_score * max(1.0, ai_conf / 80.0)), 1)
+            elif ai_consensus in ["HOLD", "NEUTRAL"]:
+                ai_score = round(min(10.0, ai_score), 1)
 
             # Ingest Google Macro Satellite Confluence Boost / Defense
             try:
@@ -578,9 +579,9 @@ class PerpetualWealthGeneratorEngine:
             except Exception:
                 pass
 
-            # Minimum AI confidence hurdle for Futures
-            if ai_score < 8.5:
-                return {"is_valid": False, "reason": f"Insufficient Confluence AI Score ({ai_score:.1f} < 8.5, 33-AI Conf: {ai_conf:.1f}%)"}
+            # Minimum AI confidence hurdle for Futures (Rigorous institutional hurdle: >= 8.0/10.0)
+            if ai_score < 8.0:
+                return {"is_valid": False, "reason": f"Insufficient Confluence AI Score ({ai_score:.1f} < 8.0, 33-AI Conf: {ai_conf:.1f}%)"}
 
             res_data = {
                 "is_valid": True,
