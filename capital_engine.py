@@ -1003,26 +1003,31 @@ class CapitalComEngine:
         min_size = market_details.get("min_deal_size", 0.01)
 
         if size is None or size <= 0:
-            # Sizing: 1% risk per trade
-            # Gold: 1 lot = 1 oz. 0.01 lot = $0.01 price move = $0.01 PnL
+            # Sizing: Target $10.00 - $15.00 margin per trade (Multiplier 5x-25x over old micro sizes)
             if resolved_epic == "GOLD":
-                size = max(0.02, min_size)
+                size = max(0.07, min_size)
             elif resolved_epic in ["NATURALGAS", "GAS"]:
-                size = max(10.0, min_size)
+                size = max(50.0, min_size)
             elif resolved_epic == "META":
-                size = max(0.02, min_size)
+                size = max(0.08, min_size)
             elif resolved_epic in ["GOOGL", "GOOGLE", "GOOG"]:
-                size = max(0.1, min_size)
+                size = max(0.20, min_size)
             elif resolved_epic in ["OIL_CRUDE", "OIL"]:
-                size = max(0.1, min_size)
-            elif resolved_epic == "US500":
-                size = max(0.1, min_size)
+                size = max(1.5, min_size)
+            elif resolved_epic in ["US500", "SP500"]:
+                size = max(0.05, min_size)
+            elif resolved_epic in ["US100", "NASDAQ"]:
+                size = max(0.05, min_size)
+            elif resolved_epic == "TSLA":
+                size = max(0.15, min_size)
+            elif resolved_epic == "NVDA":
+                size = max(0.25, min_size)
             elif resolved_epic == "BTCUSD":
-                size = max(0.001, min_size)
+                size = max(0.002, min_size)
             elif resolved_epic == "ETHUSD":
-                size = max(0.01, min_size)
+                size = max(0.05, min_size)
             elif resolved_epic == "SOLUSD":
-                size = max(0.1, min_size)
+                size = max(0.2, min_size)
             else:
                 size = min_size
         else:
@@ -3472,27 +3477,27 @@ class CapitalKellyPositionSizer:
 
     # Asset baseline specifications & lot step boundaries
     ASSET_RULES = {
-        "GOLD": {"base_low": 0.02, "base_high": 0.05, "min_lot": 0.01, "max_lot": 0.25, "lot_step": 0.01, "precision": 2},
-        "NATURALGAS": {"base_low": 10.0, "base_high": 20.0, "min_lot": 1.0, "max_lot": 50.0, "lot_step": 1.0, "precision": 1},
-        "GAS": {"base_low": 10.0, "base_high": 20.0, "min_lot": 1.0, "max_lot": 50.0, "lot_step": 1.0, "precision": 1},
-        "META": {"base_low": 0.02, "base_high": 0.05, "min_lot": 0.01, "max_lot": 0.25, "lot_step": 0.01, "precision": 2},
-        "GOOGL": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "GOOGLE": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "US500": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "SP500": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "US100": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "NASDAQ": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "OIL": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "OIL_CRUDE": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "DAX": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "BTCUSD": {"base_low": 0.001, "base_high": 0.002, "min_lot": 0.001, "max_lot": 0.05, "lot_step": 0.001, "precision": 3},
-        "ETHUSD": {"base_low": 0.01, "base_high": 0.02, "min_lot": 0.01, "max_lot": 0.20, "lot_step": 0.01, "precision": 2},
-        "SOLUSD": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
-        "NVDA": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "TSLA": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "AAPL": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "MSFT": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
-        "AMZN": {"base_low": 0.1, "base_high": 0.2, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "GOLD": {"base_low": 0.07, "base_high": 0.15, "min_lot": 0.01, "max_lot": 1.0, "lot_step": 0.01, "precision": 2},
+        "NATURALGAS": {"base_low": 50.0, "base_high": 100.0, "min_lot": 1.0, "max_lot": 500.0, "lot_step": 1.0, "precision": 1},
+        "GAS": {"base_low": 50.0, "base_high": 100.0, "min_lot": 1.0, "max_lot": 500.0, "lot_step": 1.0, "precision": 1},
+        "META": {"base_low": 0.08, "base_high": 0.18, "min_lot": 0.01, "max_lot": 1.0, "lot_step": 0.01, "precision": 2},
+        "GOOGL": {"base_low": 0.20, "base_high": 0.40, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
+        "GOOGLE": {"base_low": 0.20, "base_high": 0.40, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
+        "US500": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "SP500": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "US100": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "NASDAQ": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "OIL": {"base_low": 1.5, "base_high": 3.0, "min_lot": 0.1, "max_lot": 10.0, "lot_step": 0.1, "precision": 1},
+        "OIL_CRUDE": {"base_low": 1.5, "base_high": 3.0, "min_lot": 0.1, "max_lot": 10.0, "lot_step": 0.1, "precision": 1},
+        "DAX": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "BTCUSD": {"base_low": 0.002, "base_high": 0.005, "min_lot": 0.001, "max_lot": 0.10, "lot_step": 0.001, "precision": 3},
+        "ETHUSD": {"base_low": 0.05, "base_high": 0.10, "min_lot": 0.01, "max_lot": 0.50, "lot_step": 0.01, "precision": 2},
+        "SOLUSD": {"base_low": 0.2, "base_high": 0.5, "min_lot": 0.05, "max_lot": 5.0, "lot_step": 0.05, "precision": 2},
+        "NVDA": {"base_low": 0.25, "base_high": 0.60, "min_lot": 0.05, "max_lot": 3.0, "lot_step": 0.05, "precision": 2},
+        "TSLA": {"base_low": 0.15, "base_high": 0.35, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
+        "AAPL": {"base_low": 0.20, "base_high": 0.50, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
+        "MSFT": {"base_low": 0.15, "base_high": 0.35, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
+        "AMZN": {"base_low": 0.20, "base_high": 0.50, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
     }
 
     def __init__(self):
@@ -3606,10 +3611,26 @@ class CapitalKellyPositionSizer:
         )
 
         scale_mult = kelly_res["scale_multiplier"]
-        base_lot = rule["base_low"] if budget < 100 else rule["base_high"]
 
-        # Apply dynamic scaling
-        raw_lot = base_lot * scale_mult
+        # Dynamic Target Margin Sizing: Allocates full $10.00 - $15.00 actual margin per trade
+        is_stock = any(s in clean_epic for s in ["NVDA", "TSLA", "META", "GOOGL", "GOOGLE", "AAPL", "MSFT", "AMZN"])
+        is_crypto = any(c in clean_epic for c in ["BTC", "ETH", "SOL", "XRP"])
+        leverage = 5.0 if is_stock else (2.0 if is_crypto else 20.0)
+
+        # Target margin per position: minimum $10.00, up to $15.00 or 40% of budget
+        target_margin = max(10.00, min(25.0, budget * 0.40)) if budget > 0 else 12.00
+        target_notional = target_margin * leverage
+
+        if entry_price > 0:
+            budget_lot = target_notional / entry_price
+        else:
+            budget_lot = rule["base_low"] if budget < 100 else rule["base_high"]
+
+        # Blend Kelly scale multiplier with budget-based lot (chop contraction to min_lot if scale_mult <= 0.6)
+        if scale_mult <= 0.6:
+            raw_lot = rule["min_lot"]
+        else:
+            raw_lot = budget_lot * scale_mult
 
         # Clamp strictly between min_lot and max_lot
         final_lot = max(rule["min_lot"], min(rule["max_lot"], raw_lot))
