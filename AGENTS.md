@@ -1,5 +1,5 @@
 # KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 2.3.0 (Absolute Ground Truth Lock - The 29 Pillars)  
+**Document Version:** 2.4.0 (Absolute Ground Truth Lock - The 30 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -45,9 +45,9 @@ When a user asks:
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 28 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 30 PILLARS)
 
-Any modification that breaks any of the following 28 invariants is considered an act of technical sabotage:
+Any modification that breaks any of the following 30 invariants is considered an act of technical sabotage:
 
 ### Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
 - **Location:** `trading_engine.py` (`place_spot_order`, `execute_spot_strategy`)
@@ -275,7 +275,22 @@ Any modification that breaks any of the following 28 invariants is considered an
      Under NO circumstances shall any critical execution loop, trailing stop monitor, or high-frequency scanning path execute serial, blocking HTTP/REST requests (which suffer 150ms – 500ms internet lag) when prices or ticks are available in the local WebSocket RAM cache.
   3. **Universal RAM Cache Access Interface ៖**
      Standardized helper interfaces (e.g. `get_fast_price(symbol)`, `get_fast_book_ticker(symbol)`, `get_hft_fast_sol_price()`, etc.) must be universally accessible across all modules to ensure zero-overhead, sub-millisecond algorithmic decisions.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 22/22].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 22/23].
+
+### Invariant 30: Perpetual Wealth Free Margin Gatekeeper, Autonomous Stale Limit Prune & Smart Swap DEX Volatility Buffer Standard
+- **Location:** `perpetual_wealth_engine.py`, `trading_engine.py` (`get_futures_open_orders`, `cancel_all_futures_open_orders`, `get_futures_free_margin`), `smart_swap_engine.py`
+- **Rule:**
+  1. **Exact Free Margin Gatekeeper (ទប់ស្កាត់ Error -2019 ដោយឆែក Free Margin ពិតប្រាកដ) ៖**
+     In `perpetual_wealth_engine.py`, candidate order entry MUST verify `trading_engine.get_futures_free_margin()`. If `avail_free_usdt < margin_per_coin`, candidate dispatch is immediately skipped (`continue`). This permanently blocks premature order dispatch when margin is occupied, eliminating Binance Error `-2019 Margin is insufficient` and spurious order failures.
+  2. **15-Minute Candidate Order Placement Cooldown (ការពារការបញ្ជាទិញស្ទួន) ៖**
+     Immediately upon submitting a limit order for any symbol, `add_wealth_cooldown(sym, duration_seconds=900)` is invoked, barring duplicate order placement on the same symbol for 15 minutes.
+  3. **Autonomous Stale Limit Order Prune (> 10 Minutes) ៖**
+     Unfilled limit orders resting on Binance Futures for $> 10$ minutes are automatically cancelled via `cancel_all_futures_open_orders(api_key, api_secret, stale_sym)` to recover locked margin, ensuring capital remains agile and free of deadlock.
+  4. **Smart Swap On-Chain Dynamic Volatility Buffer ($-25.0\%$ Deep Floor) ៖**
+     In `smart_swap_engine.py`, the Emergency Stop-Loss floor is locked at $\le -25.0\%$ ROI (giving high-momentum Solana DEX gems adequate breathing room across DEX spreads, pool fees, and retracements to eliminate "death by a thousand cuts" premature chop-outs, while strictly preserving $75\%$ of capital against catastrophic $100\%$ zero-out rug pulls).
+  5. **Network Resilience & Robust Alert Timeout ៖**
+     Background Telegram notification dispatchers (`_async_send_wealth_alert`, etc.) must enforce robust network timeouts (`read_timeout=15s, write_timeout=15s, connect_timeout=10s`) to prevent network jitter timeouts during high-latency periods.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 23/23].
 
 ---
 
@@ -283,8 +298,8 @@ Any modification that breaks any of the following 28 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 29 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 22 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 30 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 23 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
