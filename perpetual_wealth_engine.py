@@ -424,10 +424,12 @@ class PerpetualWealthGeneratorEngine:
 
             # 7. Direction-Specific Technical Guards (Invariant 16, RSI boundaries, EMA alignment)
             if target_side == "BUY":
-                if rsi_15m > 74.0:
-                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 74.0 (Anti-FOMO)"}
+                if rsi_15m > 71.0:
+                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 71.0 (Anti-FOMO Top Rejection)"}
                 if rsi_15m < 50.0:
                     return {"is_valid": False, "reason": f"Bearish / Choppy RSI {rsi_15m:.1f} < 50.0 (No Bull Momentum)"}
+                if current_price > (ema20 * 1.030):
+                    return {"is_valid": False, "reason": "Parabolic Overextension (> 3.0% above 15m EMA20) - Anti-Top FOMO Guard"}
                 if current_price < (ema50 * 0.994):
                     return {"is_valid": False, "reason": "Price below 15m EMA50 (Macro Trend broken)"}
                 if current_price < (0.994 * ema20):
@@ -442,8 +444,10 @@ class PerpetualWealthGeneratorEngine:
                         "rsi_15m": rsi_15m,
                         "reason": f"Invariant 16 Triggered: 15m RSI {rsi_15m:.1f} <= 38.0 (Anti-Oversold Short Guard)"
                     }
-                if rsi_15m > 55.0:
-                    return {"is_valid": False, "reason": f"Bullish / Overbought RSI {rsi_15m:.1f} > 55.0 (No Bear Momentum)"}
+                if rsi_15m > 54.0:
+                    return {"is_valid": False, "reason": f"Bullish / Overbought RSI {rsi_15m:.1f} > 54.0 (No Bear Momentum)"}
+                if current_price < (ema20 * 0.970):
+                    return {"is_valid": False, "reason": "Parabolic Waterfall (> 3.0% below 15m EMA20) - Anti-Bottom Short Guard"}
                 if current_price > (ema50 * 1.006):
                     return {"is_valid": False, "reason": "Price above 15m EMA50 (Macro Bull Trend - Short rejected)"}
                 if current_price > (ema20 * 1.010):
