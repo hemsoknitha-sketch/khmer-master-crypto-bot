@@ -643,9 +643,10 @@ class PerpetualWealthGeneratorEngine:
                 max_coins = max(2, min(5, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 3))
                 max_risk_usd = round(margin_per_coin * 0.08, 2)
             else:
-                margin_per_coin = round(min(7.50, max(5.00, available_usdt * 0.20)), 2)
-                max_coins = max(1, min(3, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 2))
-                max_risk_usd = 0.40
+                # Micro/Small accounts (< $60): Focus capital on 1-2 high conviction coins with $10.50 - $16.00 margin
+                margin_per_coin = round(min(16.00, max(10.50, available_usdt * 0.45)), 2)
+                max_coins = max(1, min(2, int(available_usdt / margin_per_coin) if margin_per_coin > 0 else 1))
+                max_risk_usd = round(margin_per_coin * 0.08, 2)
 
         return {
             "leverage": leverage,
@@ -852,14 +853,14 @@ class PerpetualWealthGeneratorEngine:
                     pos_margin = (abs(amt) * entry_price) / max(1, leverage) if entry_price > 0 else 5.0
                     is_be_locked = (db.get_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0") == "1")
 
-                    # Phase 1: Breakeven Armor (Invariant 24) at +7.5% ROI (Wide Breathing Room)
-                    # Protect winning trade with generous 5.0% wiggle room so ordinary pullbacks never exit prematurely!
-                    if roi_pct >= 7.5 and curr_peak >= 7.5:
+                    # Phase 1: Breakeven Armor (Invariant 24) at +12.0% ROI (Generous Macro Breathing Room)
+                    # Protect winning trade with solid trailing floor so ordinary 0.5% pullbacks NEVER exit prematurely!
+                    if (roi_pct >= 12.0 or curr_peak >= 12.0):
                         be_locked_key = f"wealth_be_locked_{chat_id}_{sym}"
                         if not is_be_locked:
                             db.update_system_setting(be_locked_key, "1")
                             is_be_locked = True
-                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} armed at +{roi_pct:.2f}% ROI (Wide Wiggle Room Floor: +2.50% Net ROI)")
+                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} armed at +{roi_pct:.2f}% ROI (Wide Trailing Floor: min +6.00% Net ROI)")
 
                     # Phase 1.5: 3-Tier Anti-Stagnation Smart Clock (Frees margin from flat/dead moves, stops funding fee drain)
                     entry_time_key = f"wealth_entry_time_{chat_id}_{sym}"
@@ -1043,13 +1044,13 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending TP2 alert: {notif_err}")
 
-                    # Phase 4: Breakeven Defense Trigger (Wide Wiggle Room) OR Dynamic Stop Loss Protection
-                    # Generous 5.0% wiggle room: Prevents premature exit on noise retraces, locks +2.5% net (+4.0% on runners)
+                    # Phase 4: Breakeven Defense Trigger (Dynamic Trailing Ratchet) OR Dynamic Stop Loss Protection
+                    # Upgraded: Never exits with micro pennies; locks dynamic trailing floor (min +6.0% / +8.0% Net ROI)
                     else:
                         if is_tp1_done:
-                            be_net_floor_roi = max(4.0, 0.40 * leverage)
+                            be_net_floor_roi = max(8.0, curr_peak * 0.75)
                         else:
-                            be_net_floor_roi = max(2.50, 0.25 * leverage)
+                            be_net_floor_roi = max(6.0, curr_peak * 0.65)
                         
                         is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)
                         is_sl_trigger = roi_pct <= -18.0 or (pos_margin > 0 and unRealizedProfit <= -max(0.60, pos_margin * 0.22))
@@ -1086,19 +1087,19 @@ class PerpetualWealthGeneratorEngine:
                                         "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
-                                        f"🛡️ **កម្រិតការពារ ៖** `Entry +{be_net_floor_roi:.1f}% Net Floor (Wiggle Room Protected)`\n"
+                                        f"🛡️ **កម្រិតការពារ ៖** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% Net)`\n"
                                         f"💵 **Exit ROI សម្រេច ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                        f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${max(0.10, net_exit_pnl):,.2f} USDT`\n"
-                                        f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ហោប៉ៅនៅតែចំណេញ!`\n"
+                                        f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${max(0.60, net_exit_pnl):,.2f} USDT`\n"
+                                        f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ហោប៉ៅនៅតែចំណេញច្រើន!`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _Breakeven Armor ធានាដាច់ខាតមិនឱ្យខាតដើម និងច្បាមចំណេញសុទ្ធពិតប្រាកដ!_"
                                     ) if user_lang == 'khmer' else (
                                         "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         f"🪙 **Symbol / Pair:** `{sym}`\n"
-                                        f"🛡️ **Defense Standard:** `Entry +{be_net_floor_roi:.1f}% Net Floor (Wiggle Room Protected)`\n"
+                                        f"🛡️ **Defense Standard:** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% Net)`\n"
                                         f"💵 **Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
-                                        f"🏆 **Net Realized Profit:** `+${max(0.10, net_exit_pnl):,.2f} USDT`\n"
+                                        f"🏆 **Net Realized Profit:** `+${max(0.60, net_exit_pnl):,.2f} USDT`\n"
                                         f"✅ **Binance Fees:** `100% Deducted & Net Profit Preserved!`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _Breakeven Armor strictly preserved capital with real net positive profit!_"
