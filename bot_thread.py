@@ -13050,37 +13050,43 @@ class TelegramBotThread(BaseThread):
                     ])
 
                     succ_msg = (
-                        f"🥇 **REACHSEY MEAS (GOLD) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"🥇 *REACHSEY MEAS (GOLD) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🏛️ **ឧបករណ៍ TradFi ៖** `XAUUSDT (Perpetual Futures)`\n"
-                        f"💵 **ទុនបែងចែក (Auto Amount) ៖** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
-                        f"📈 **15m Dynamic ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
-                        f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"🏛️ *ឧបករណ៍ TradFi ៖* `XAUUSDT (Perpetual Futures)`\n"
+                        f"💵 *ទុនបែងចែក (Auto Amount) ៖* `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 *15m Dynamic ATR ៖* `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 *15m RSI ៖* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"📋 **ស្ថានភាពបញ្ជាលើ Order Book (Native STOP_MARKET) ៖**\n"
+                        f"📋 *ស្ថានភាពបញ្ជាលើ Order Book (`STOP_MARKET`) ៖*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ **ការការពារទុន ៖** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *ការការពារទុន ៖* `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
                     ) if is_khmer else (
-                        f"🥇 **REACHSEY MEAS (GOLD) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"🥇 *REACHSEY MEAS (GOLD) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🏛️ **Asset:** `XAUUSDT (Perpetual Futures)`\n"
-                        f"💵 **Allocated Capital:** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
-                        f"📈 **15m Dynamic ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
-                        f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"🏛️ *Asset:* `XAUUSDT (Perpetual Futures)`\n"
+                        f"💵 *Allocated Capital:* `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 *15m Dynamic ATR:* `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 *15m RSI:* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"📋 **Active Exchange STOP_MARKET Orders:**\n"
+                        f"📋 *Active Exchange `STOP_MARKET` Orders:*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ **Capital Armor:** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *Capital Armor:* `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _Pre-placed on Binance Futures Order Book for sub-millisecond execution!_"
                     )
-                    await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                    try:
+                        await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                    except Exception:
+                        await msg_target.reply_text(succ_msg, reply_markup=succ_kb)
                     return
                 else:
                     err_msg = exec_res.get("message") or ("\n".join(exec_res.get("errors", [])) if exec_res.get("errors") else "Execution error")
-                    await msg_target.reply_text(f"⚠️ **[REACHSEY MEAS]** {err_msg}", parse_mode="Markdown")
+                    try:
+                        await msg_target.reply_text(f"⚠️ *[REACHSEY MEAS]* {err_msg}", parse_mode="Markdown")
+                    except Exception:
+                        await msg_target.reply_text(f"⚠️ [REACHSEY MEAS] {err_msg}")
                     return
 
             # Render Interactive Dashboard
@@ -13098,27 +13104,27 @@ class TelegramBotThread(BaseThread):
             ])
 
             dash_msg = (
-                f"🥇 **REACHSEY MEAS (GOLD XAUUSDT) SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"🥇 *REACHSEY MEAS (GOLD XAUUSDT) SUPER SMART PENDING STOP MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"📊 **តម្លៃមាសបច្ចុប្បន្ន (Live Gold) ៖** `${lvl.get('current_price'):,.2f} USDT`\n"
-                f"📈 **Dynamic 15m ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (គម្លាត Gap: `1.2x ATR`)\n"
-                f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}`\n"
-                f"🛡️ **ស្ថានភាព Straddle ៖** `{lvl.get('straddle_mode')}`\n"
+                f"📊 *តម្លៃមាសបច្ចុប្បន្ន (Live Gold) ៖* `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 *Dynamic 15m ATR ៖* `${lvl.get('atr_15m'):,.2f} USDT` (គម្លាត Gap: `1.2x ATR`)\n"
+                f"🎯 *15m RSI ៖* `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ *ស្ថានភាព Straddle ៖* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 **កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា ៖**\n"
-                f"🟢 **PENDING BUY-STOP ៖** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"🎯 *កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា ៖*\n"
+                f"🟢 *PENDING BUY-STOP ៖* `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
                 f"   • Stop Loss: `${lvl.get('buy_sl'):,.2f}` | Take Profit: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
-                f"🔴 **PENDING SELL-STOP ៖** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"🔴 *PENDING SELL-STOP ៖* `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
                 f"   • Stop Loss: `${lvl.get('sell_sl'):,.2f}` | Take Profit: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ **សសរស្តម្ភការពារទុនទាំង ៥ (Institutional Standard) ៖**\n"
+                f"🛡️ *សសរស្តម្ភការពារទុនទាំង ៥ (Institutional Standard) ៖*\n"
                 f"• Dynamic ATR Volatility Gap (លុបបំបាត់ Static 450 Points)\n"
-                f"• Sub-Millisecond Native Execution (Binance STOP_MARKET Order Book)\n"
+                f"• Sub-Millisecond Native Execution (Binance `STOP_MARKET` Order Book)\n"
                 f"• Anti-Oversold Shield (RSI <= 38.0 ហាម Sell-Stop លើបាត)\n"
                 f"• Fractional Kelly Sizing (0.35x | គ្មាន Martingale Ruin)\n"
                 f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💡 **គំរូបញ្ជា Auto (1-Tap Copyable) ៖**\n"
+                f"💡 *គំរូបញ្ជា Auto (1-Tap Copyable) ៖*\n"
                 f"• `` `/smartx_reachsey_meas AUTO` `` _(វិនិយោគស្វ័យប្រវត្តិតាមទុន)_\n"
                 f"• `` `/smartx_reachsey_meas 30 10` `` _(ទុន $30 USDT | Leverage 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -13126,27 +13132,27 @@ class TelegramBotThread(BaseThread):
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             ) if is_khmer else (
-                f"🥇 **REACHSEY MEAS (GOLD XAUUSDT) SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"🥇 *REACHSEY MEAS (GOLD XAUUSDT) SUPER SMART PENDING STOP MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"📊 **Live Gold Price:** `${lvl.get('current_price'):,.2f} USDT`\n"
-                f"📈 **Dynamic 15m ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap Multiplier: `1.2x ATR`)\n"
-                f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}`\n"
-                f"🛡️ **Straddle State:** `{lvl.get('straddle_mode')}`\n"
+                f"📊 *Live Gold Price:* `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 *Dynamic 15m ATR:* `${lvl.get('atr_15m'):,.2f} USDT` (Gap Multiplier: `1.2x ATR`)\n"
+                f"🎯 *15m RSI:* `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ *Straddle State:* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 **Calculated Pending Stop Levels:**\n"
-                f"🟢 **PENDING BUY-STOP:** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"🎯 *Calculated Pending Stop Levels:*\n"
+                f"🟢 *PENDING BUY-STOP:* `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
                 f"   • SL: `${lvl.get('buy_sl'):,.2f}` | TP: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
-                f"🔴 **PENDING SELL-STOP:** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"🔴 *PENDING SELL-STOP:* `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
                 f"   • SL: `${lvl.get('sell_sl'):,.2f}` | TP: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ **5 Institutional Pillars:**\n"
+                f"🛡️ *5 Institutional Pillars:*\n"
                 f"• Dynamic ATR Volatility Gap (Zero Static Points)\n"
-                f"• Sub-Millisecond Native Execution (STOP_MARKET Order Book)\n"
+                f"• Sub-Millisecond Native Execution (`STOP_MARKET` Order Book)\n"
                 f"• Anti-Oversold Shield (RSI <= 38.0 Blocks Sell-Stop at Bottom)\n"
                 f"• Fractional Kelly Sizing (0.35x | Zero Martingale Ruin)\n"
                 f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💡 **1-Tap Commands:**\n"
+                f"💡 *1-Tap Commands:*\n"
                 f"• `` `/smartx_reachsey_meas AUTO` `` _(Auto Sizing via Balance)_\n"
                 f"• `` `/smartx_reachsey_meas 30 10` `` _($30 USDT | 10x Leverage)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -13155,7 +13161,10 @@ class TelegramBotThread(BaseThread):
                 f"Risk-Free Passive Wealth Generation 24/7!"
             )
 
-            await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
+            try:
+                await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception:
+                await msg_target.reply_text(dash_msg, reply_markup=keyboard)
 
         async def smartx_reachsey_crypto_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
@@ -13216,37 +13225,43 @@ class TelegramBotThread(BaseThread):
                     ])
 
                     succ_msg = (
-                        f"🪙 **REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"🪙 *REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🪙 **រូបិយប័ណ្ណគ្រីបតូ ៖** `{target_sym}`\n"
-                        f"💵 **ទុនបែងចែក (Auto Amount) ៖** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
-                        f"📈 **15m Dynamic ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
-                        f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"🪙 *រូបិយប័ណ្ណគ្រីបតូ ៖* `{target_sym}`\n"
+                        f"💵 *ទុនបែងចែក (Auto Amount) ៖* `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 *15m Dynamic ATR ៖* `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 *15m RSI ៖* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"📋 **ស្ថានភាពបញ្ជាលើ Order Book (Native STOP_MARKET) ៖**\n"
+                        f"📋 *ស្ថានភាពបញ្ជាលើ Order Book (`STOP_MARKET`) ៖*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ **ការការពារទុន ៖** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *ការការពារទុន ៖* `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
                     ) if is_khmer else (
-                        f"🪙 **REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"🪙 *REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🪙 **Asset:** `{target_sym}`\n"
-                        f"💵 **Allocated Capital:** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
-                        f"📈 **15m Dynamic ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
-                        f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"🪙 *Asset:* `{target_sym}`\n"
+                        f"💵 *Allocated Capital:* `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 *15m Dynamic ATR:* `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 *15m RSI:* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"📋 **Active Exchange STOP_MARKET Orders:**\n"
+                        f"📋 *Active Exchange `STOP_MARKET` Orders:*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ **Capital Armor:** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *Capital Armor:* `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _Pre-placed on Binance Futures Order Book for sub-millisecond execution!_"
                     )
-                    await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                    try:
+                        await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                    except Exception:
+                        await msg_target.reply_text(succ_msg, reply_markup=succ_kb)
                     return
                 else:
                     err_msg = exec_res.get("message") or ("\n".join(exec_res.get("errors", [])) if exec_res.get("errors") else "Execution error")
-                    await msg_target.reply_text(f"⚠️ **[REACHSEY CRYPTO]** {err_msg}", parse_mode="Markdown")
+                    try:
+                        await msg_target.reply_text(f"⚠️ *[REACHSEY CRYPTO]* {err_msg}", parse_mode="Markdown")
+                    except Exception:
+                        await msg_target.reply_text(f"⚠️ [REACHSEY CRYPTO] {err_msg}")
                     return
 
             # Render Dashboard
@@ -13267,28 +13282,28 @@ class TelegramBotThread(BaseThread):
             ])
 
             dash_msg = (
-                f"🪙 **REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"🪙 *REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🪙 **រូបិយប័ណ្ណគំរូ ៖** `BTCUSDT`\n"
-                f"📊 **តម្លៃបច្ចុប្បន្ន (Live BTC) ៖** `${lvl.get('current_price'):,.2f} USDT`\n"
-                f"📈 **Dynamic 15m ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: `1.2x ATR`)\n"
-                f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}`\n"
-                f"🛡️ **ស្ថានភាព Straddle ៖** `{lvl.get('straddle_mode')}`\n"
+                f"🪙 *រូបិយប័ណ្ណគំរូ ៖* `BTCUSDT`\n"
+                f"📊 *តម្លៃបច្ចុប្បន្ន (Live BTC) ៖* `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 *Dynamic 15m ATR ៖* `${lvl.get('atr_15m'):,.2f} USDT` (Gap: `1.2x ATR`)\n"
+                f"🎯 *15m RSI ៖* `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ *ស្ថានភាព Straddle ៖* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 **កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា ៖**\n"
-                f"🟢 **PENDING BUY-STOP ៖** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"🎯 *កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា ៖*\n"
+                f"🟢 *PENDING BUY-STOP ៖* `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
                 f"   • Stop Loss: `${lvl.get('buy_sl'):,.2f}` | Take Profit: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
-                f"🔴 **PENDING SELL-STOP ៖** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"🔴 *PENDING SELL-STOP ៖* `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
                 f"   • Stop Loss: `${lvl.get('sell_sl'):,.2f}` | Take Profit: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ **សសរស្តម្ភការពារទុនទាំង ៥ ៖**\n"
+                f"🛡️ *សសរស្តម្ភការពារទុនទាំង ៥ ៖*\n"
                 f"• Dynamic ATR Volatility Gap (លុបបំបាត់ Static Points)\n"
-                f"• Sub-Millisecond Native Execution (Binance STOP_MARKET Order Book)\n"
+                f"• Sub-Millisecond Native Execution (Binance `STOP_MARKET` Order Book)\n"
                 f"• Anti-Oversold Shield (RSI <= 38.0 ហាម Sell-Stop លើបាត)\n"
                 f"• Fractional Kelly Sizing (0.35x | គ្មាន Martingale Ruin)\n"
                 f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💡 **គំរូបញ្ជា Auto (1-Tap Copyable) ៖**\n"
+                f"💡 *គំរូបញ្ជា Auto (1-Tap Copyable) ៖*\n"
                 f"• `` `/smartx_reachsey_crypto AUTO` `` _(វិនិយោគស្វ័យប្រវត្តលើ BTC)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(វិនិយោគលើ SOL ទុន $25 | 10x)_\n"
                 f"• `` `/smartx_reachsey_crypto ETH 30 10` `` _(វិនិយោគលើ ETH ទុន $30 | 10x)_\n"
@@ -13297,28 +13312,28 @@ class TelegramBotThread(BaseThread):
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             ) if is_khmer else (
-                f"🪙 **REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"🪙 *REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🪙 **Benchmark Asset:** `BTCUSDT`\n"
-                f"📊 **Live BTC Price:** `${lvl.get('current_price'):,.2f} USDT`\n"
-                f"📈 **Dynamic 15m ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: `1.2x ATR`)\n"
-                f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}`\n"
-                f"🛡️ **Straddle State:** `{lvl.get('straddle_mode')}`\n"
+                f"🪙 *Benchmark Asset:* `BTCUSDT`\n"
+                f"📊 *Live BTC Price:* `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 *Dynamic 15m ATR:* `${lvl.get('atr_15m'):,.2f} USDT` (Gap: `1.2x ATR`)\n"
+                f"🎯 *15m RSI:* `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ *Straddle State:* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 **Calculated Pending Stop Levels:**\n"
-                f"🟢 **PENDING BUY-STOP:** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"🎯 *Calculated Pending Stop Levels:*\n"
+                f"🟢 *PENDING BUY-STOP:* `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
                 f"   • SL: `${lvl.get('buy_sl'):,.2f}` | TP: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
-                f"🔴 **PENDING SELL-STOP:** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"🔴 *PENDING SELL-STOP:* `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
                 f"   • SL: `${lvl.get('sell_sl'):,.2f}` | TP: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ **5 Institutional Pillars:**\n"
+                f"🛡️ *5 Institutional Pillars:*\n"
                 f"• Dynamic ATR Volatility Gap (Zero Static Points)\n"
-                f"• Sub-Millisecond Native Execution (STOP_MARKET Order Book)\n"
+                f"• Sub-Millisecond Native Execution (`STOP_MARKET` Order Book)\n"
                 f"• Anti-Oversold Shield (RSI <= 38.0 Blocks Sell-Stop at Bottom)\n"
                 f"• Fractional Kelly Sizing (0.35x | Zero Martingale Ruin)\n"
                 f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💡 **1-Tap Commands:**\n"
+                f"💡 *1-Tap Commands:*\n"
                 f"• `` `/smartx_reachsey_crypto AUTO` `` _(Auto Sizing on BTC)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(Trade SOL $25 | 10x)_\n"
                 f"• `` `/smartx_reachsey_crypto ETH 30 10` `` _(Trade ETH $30 | 10x)_\n"
@@ -13328,7 +13343,10 @@ class TelegramBotThread(BaseThread):
                 f"Risk-Free Passive Wealth Generation 24/7!"
             )
 
-            await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
+            try:
+                await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception:
+                await msg_target.reply_text(dash_msg, reply_markup=keyboard)
 
         async def smart_swap_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
