@@ -1863,7 +1863,24 @@ class CapitalPartnerRebateManager:
             partner["tier"] = tier_code
             partner["rebate_pct"] = live_pct
 
-        referral_link = f"https://capital.com/partner/{ib_code}"
+        # Smart Referral Link Formatting (Handles full URLs, referral codes like 'az48cxia', or custom partner IDs)
+        display_code = ib_code
+        if ib_code.startswith("http://") or ib_code.startswith("https://"):
+            referral_link = ib_code
+            if "c=" in ib_code:
+                try:
+                    import urllib.parse
+                    parsed = urllib.parse.urlparse(ib_code)
+                    qs = urllib.parse.parse_qs(parsed.query)
+                    display_code = qs.get("c", [ib_code])[0]
+                except Exception:
+                    display_code = ib_code
+        elif len(ib_code) == 8 and ib_code.isalnum():
+            # Capital.com refer-a-friend code (e.g. az48cxia)
+            display_code = ib_code
+            referral_link = f"https://capital.com/referafriend?c={ib_code}&pid=referral&src=inviteFriends"
+        else:
+            referral_link = f"https://capital.com/partner/{ib_code}"
 
         # Projected run rate based on current active clients (or minimum 1 client projection)
         forecast = self.calculate_passive_income_forecast(
@@ -1874,7 +1891,7 @@ class CapitalPartnerRebateManager:
 
         return {
             "chat_id": chat_id,
-            "ib_code": ib_code,
+            "ib_code": display_code,
             "partner_name": partner.get("partner_name") or f"Partner_{chat_id}",
             "referral_link": referral_link,
             "tier": partner.get("tier", "SILVER"),

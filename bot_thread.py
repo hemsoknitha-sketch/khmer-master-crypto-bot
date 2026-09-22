@@ -19887,13 +19887,13 @@ class TelegramBotThread(BaseThread):
             if args:
                 sub_cmd = str(args[0]).upper().strip()
                 if sub_cmd in ["SET", "CODE", "LINK"] and len(args) >= 2:
-                    new_code = str(args[1]).strip().upper()
-                    db.set_capital_ib_partner(chat_id, ib_code=new_code)
+                    raw_code = " ".join(args[1:]).strip()
+                    db.set_capital_ib_partner(chat_id, ib_code=raw_code)
                     ib_data = capital_engine.get_capital_ib_dashboard(chat_id)
                     set_msg = (
                         f"✅ **CAPITAL.COM PARTNER CODE បានកំណត់ជោគជ័យ!** 🔗\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🆔 **Partner Code ៖** `{new_code}`\n"
+                        f"🆔 **Partner Code ៖** `{ib_data['ib_code']}`\n"
                         f"🌐 **Referral Link ៖** `{ib_data['referral_link']}`\n"
                         f"💼 **កម្រិត Rebate ៖** `{ib_data['tier_badge']}`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -19901,7 +19901,7 @@ class TelegramBotThread(BaseThread):
                     ) if user_lang == 'khmer' else (
                         f"✅ **CAPITAL.COM PARTNER CODE CONFIGURED!** 🔗\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🆔 **Partner Code:** `{new_code}`\n"
+                        f"🆔 **Partner Code:** `{ib_data['ib_code']}`\n"
                         f"🌐 **Referral Link:** `{ib_data['referral_link']}`\n"
                         f"💼 **Rebate Tier:** `{ib_data['tier_badge']}`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"

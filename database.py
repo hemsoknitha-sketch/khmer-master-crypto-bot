@@ -3280,7 +3280,7 @@ def set_capital_ib_partner(
     payout_method: str = "USDT"
 ) -> bool:
     """Updates user's Capital.com Introducing Broker code and payout settings."""
-    clean_code = str(ib_code or "").strip().upper()
+    clean_code = str(ib_code or "").strip()
     if not clean_code:
         return False
     conn = get_db_connection()
