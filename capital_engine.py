@@ -1952,10 +1952,10 @@ class CapitalAutonomousEngine:
     def get_session_priority_assets(self) -> List[str]:
         """
         Determines active tradable instruments based on global market hours (UTC+7 Phnom Penh):
-        - Monday to Friday (ចន្ទ ដល់ សុក្រ): 100% Full Priority on Real TradFi Markets:
-            * Asian / Daytime Session (07:00 - 15:00): GOLD, NATURALGAS, OIL_CRUDE, US500
-            * London Session (15:00 - 20:30): GOLD, NATURALGAS, OIL_CRUDE, GERMANY40, US500
-            * Wall Street NY Session (20:30 - 04:00): GOLD, NATURALGAS, META, GOOGL, NVDA, TSLA, US500, US100, OIL_CRUDE
+        - Monday to Friday (ចន្ទ ដល់ សុក្រ): 100% Full Priority on Real TradFi Markets (US500, GOLD, NVDA, TSLA prioritized):
+            * Asian / Daytime Session (07:00 - 15:00): US500, GOLD, OIL_CRUDE
+            * London Session (15:00 - 20:30): US500, GOLD, OIL_CRUDE, GERMANY40
+            * Wall Street NY Session (20:30 - 04:00): US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL_CRUDE
         - Saturday & Sunday (សៅរ៍ និង អាទិត្យ 24/7): 100% Dedicated to 24/7 Crypto CFDs:
             * BTCUSD, ETHUSD, SOLUSD (TradFi markets are closed)
         """
