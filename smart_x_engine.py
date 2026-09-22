@@ -1198,10 +1198,67 @@ class ReachseyStraddleEngine:
         recent_high = max(highs[-lookback:])
         recent_low = min(lows[-lookback:])
 
-        # Dynamic Breakout Triggers
-        gap_dist = custom_gap_mult * atr_14
-        buy_stop_trigger = max(recent_high, current_price + gap_dist)
-        sell_stop_trigger = min(recent_low, current_price - gap_dist)
+        # 4. Hawkes Self-Exciting Jump Momentum & Volatility Clustering Engine
+        vol_series = [float(k[5]) for k in klines_15m]
+        mean_vol = float(np.mean(vol_series[-14:])) if len(vol_series) >= 14 else 1.0
+        jump_intensity = 1.0
+        lookback_jumps = min(10, len(closes) - 1)
+        decay_beta = 0.35
+        for k in range(lookback_jumps):
+            idx = -1 - k
+            range_ratio = (highs[idx] - lows[idx]) / max(1e-6, atr_14)
+            vol_ratio = vol_series[idx] / max(1e-6, mean_vol)
+            jump_intensity += (range_ratio * vol_ratio * 0.20) * np.exp(-decay_beta * k)
+        hawkes_score = round(float(jump_intensity), 2)
+        jump_status = "⚡ EXPLOSIVE MOMENTUM" if hawkes_score >= 2.0 else ("🔥 ELEVATED VOLATILITY" if hawkes_score >= 1.5 else "🟢 STABLE CONSOLIDATION")
+
+        # 5. 33 Wall Street AI Models Swarm Confluence Evaluation
+        ai_direction = "NEUTRAL"
+        ai_confidence = 50.0
+        moe_regime = "CONSOLIDATION"
+        ai_votes = "BUY: 0 | SELL: 0"
+        try:
+            ai_eval = SmartXEngine.evaluate_ai_ensemble(sym, klines_15m=klines_15m)
+            ai_direction = ai_eval.get("consensus", "NEUTRAL")
+            ai_confidence = float(ai_eval.get("confidence_pct", 50.0))
+            moe_regime = ai_eval.get("moe_regime", "TRENDING")
+            b_v = ai_eval.get("buy_votes", 0)
+            s_v = ai_eval.get("sell_votes", 0)
+            ai_votes = f"BUY: {b_v} | SELL: {s_v}"
+        except Exception:
+            pass
+
+        # 6. AI Adaptive Elastic Dynamic Gap (0.8x - 1.2x Compression)
+        base_gap = custom_gap_mult
+        gap_mult_buy = base_gap
+        gap_mult_sell = base_gap
+
+        if ai_direction == "BUY" and ai_confidence >= 75.0:
+            # Compress Buy Gap from 1.2x down to 0.80x - 0.85x for rapid explosive entry!
+            compression = min(0.40, (ai_confidence - 50.0) / 100.0)
+            gap_mult_buy = max(0.80, base_gap - compression)
+            # Widen counter sell gap to eliminate whipsaw
+            gap_mult_sell = min(1.50, base_gap + 0.25)
+        elif ai_direction == "SELL" and ai_confidence >= 75.0:
+            # Compress Sell Gap from 1.2x down to 0.80x - 0.85x
+            compression = min(0.40, (ai_confidence - 50.0) / 100.0)
+            gap_mult_sell = max(0.80, base_gap - compression)
+            # Widen counter buy gap
+            gap_mult_buy = min(1.50, base_gap + 0.25)
+
+        # Hawkes Jump Acceleration (tighten by additional 5% if high jump cluster)
+        if hawkes_score >= 2.0:
+            gap_mult_buy = max(0.80, round(gap_mult_buy * 0.95, 2))
+            gap_mult_sell = max(0.80, round(gap_mult_sell * 0.95, 2))
+
+        gap_mult_buy = round(gap_mult_buy, 2)
+        gap_mult_sell = round(gap_mult_sell, 2)
+
+        gap_dist_buy = gap_mult_buy * atr_14
+        gap_dist_sell = gap_mult_sell * atr_14
+
+        buy_stop_trigger = max(recent_high, current_price + gap_dist_buy)
+        sell_stop_trigger = min(recent_low, current_price - gap_dist_sell)
 
         # Asymmetric R:R >= 1:3.0 SL/TP
         buy_sl = buy_stop_trigger - (1.5 * atr_14)
@@ -1218,16 +1275,27 @@ class ReachseyStraddleEngine:
         sell_sl = round(sell_sl, dec)
         sell_tp = round(sell_tp, dec)
 
+        # 7. Fractional Kelly Dynamic Capital Factor (0.35x)
+        p_win = max(0.50, min(0.95, ai_confidence / 100.0))
+        b_ratio = 3.0  # R:R 1:3.0
+        q_loss = 1.0 - p_win
+        kelly_fraction = max(0.10, min(0.35, ((p_win * b_ratio - q_loss) / b_ratio) * 0.35))
+        kelly_fraction = round(kelly_fraction, 3)
+
         # Anti-Oversold & Anti-Overbought Shields (Invariant 16)
         is_sell_blocked = bool(rsi_14 <= 38.0)
         is_buy_blocked = bool(rsi_14 >= 68.0)
 
         if is_sell_blocked and not is_buy_blocked:
-            straddle_mode = "BUY_BREAKOUT_ONLY (Anti-Oversold Guard Active)"
+            straddle_mode = f"BUY_BREAKOUT_ONLY (Anti-Oversold Shield | AI {ai_direction} {ai_confidence:.0f}%)"
         elif is_buy_blocked and not is_sell_blocked:
-            straddle_mode = "SELL_BREAKDOWN_ONLY (Anti-Overbought Guard Active)"
+            straddle_mode = f"SELL_BREAKDOWN_ONLY (Anti-Overbought Shield | AI {ai_direction} {ai_confidence:.0f}%)"
+        elif ai_direction == "BUY" and ai_confidence >= 80.0:
+            straddle_mode = f"AI_ACCELERATED_BUY_STRADDLE ({gap_mult_buy}x Gap | AI {ai_confidence:.0f}%)"
+        elif ai_direction == "SELL" and ai_confidence >= 80.0:
+            straddle_mode = f"AI_ACCELERATED_SELL_STRADDLE ({gap_mult_sell}x Gap | AI {ai_confidence:.0f}%)"
         elif not is_buy_blocked and not is_sell_blocked:
-            straddle_mode = "DUAL_STRADDLE (Bi-Directional Breakout Matrix)"
+            straddle_mode = f"AI_ADAPTIVE_DUAL_STRADDLE (Hawkes {hawkes_score}x | AI {ai_confidence:.0f}%)"
         else:
             straddle_mode = "RANGE_PAUSE (Extreme Volatility)"
 
@@ -1238,7 +1306,18 @@ class ReachseyStraddleEngine:
             "rsi_15m": round(rsi_14, 1),
             "recent_high": round(recent_high, dec),
             "recent_low": round(recent_low, dec),
-            "gap_distance": round(gap_dist, dec),
+            "gap_mult_buy": gap_mult_buy,
+            "gap_mult_sell": gap_mult_sell,
+            "gap_distance_buy": round(gap_dist_buy, dec),
+            "gap_distance_sell": round(gap_dist_sell, dec),
+            "gap_distance": round(gap_dist_buy, dec),
+            "hawkes_score": hawkes_score,
+            "jump_status": jump_status,
+            "ai_direction": ai_direction,
+            "ai_confidence": ai_confidence,
+            "ai_votes": ai_votes,
+            "moe_regime": moe_regime,
+            "kelly_fraction": kelly_fraction,
             "buy_stop_trigger": buy_stop_trigger,
             "sell_stop_trigger": sell_stop_trigger,
             "buy_sl": buy_sl,
