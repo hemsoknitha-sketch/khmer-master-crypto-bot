@@ -1003,33 +1003,32 @@ class CapitalComEngine:
         min_size = market_details.get("min_deal_size", 0.01)
 
         if size is None or size <= 0:
-            is_micro_cap = equity < 100
-            # Sizing: Target $10.00 - $15.00 margin per trade (Multiplier 5x-25x over old micro sizes)
-            # Small Capital Fortress (< $100): Clamps high-beta energy to prevent outsized outlier drawdowns
+            is_micro_cap = equity < 200
+            # Institutional Dollar Risk Normalization: Clamps max 1R risk to ~$1.50 - $3.00 across all assets
             if resolved_epic == "GOLD":
-                size = max(0.05 if is_micro_cap else 0.07, min_size)
+                size = max(0.01 if is_micro_cap else 0.02, min_size)
             elif resolved_epic in ["NATURALGAS", "GAS"]:
-                size = max(15.0 if is_micro_cap else 50.0, min_size)
+                size = max(5.0 if is_micro_cap else 10.0, min_size)
             elif resolved_epic in ["OIL_CRUDE", "OIL"]:
-                size = max(0.5 if is_micro_cap else 1.5, min_size)
+                size = max(0.2 if is_micro_cap else 0.5, min_size)
             elif resolved_epic == "META":
-                size = max(0.08, min_size)
+                size = max(0.05, min_size)
             elif resolved_epic in ["GOOGL", "GOOGLE", "GOOG"]:
-                size = max(0.20, min_size)
+                size = max(0.10, min_size)
             elif resolved_epic in ["US500", "SP500"]:
-                size = max(0.05, min_size)
+                size = max(0.02 if is_micro_cap else 0.05, min_size)
             elif resolved_epic in ["US100", "NASDAQ"]:
-                size = max(0.05, min_size)
+                size = max(0.02 if is_micro_cap else 0.05, min_size)
             elif resolved_epic == "TSLA":
-                size = max(0.15, min_size)
+                size = max(0.05 if is_micro_cap else 0.10, min_size)
             elif resolved_epic == "NVDA":
-                size = max(0.25, min_size)
+                size = max(0.05 if is_micro_cap else 0.10, min_size)
             elif resolved_epic == "BTCUSD":
-                size = max(0.002, min_size)
+                size = max(0.001 if is_micro_cap else 0.002, min_size)
             elif resolved_epic == "ETHUSD":
-                size = max(0.05, min_size)
+                size = max(0.02 if is_micro_cap else 0.05, min_size)
             elif resolved_epic == "SOLUSD":
-                size = max(0.2, min_size)
+                size = max(0.10 if is_micro_cap else 0.20, min_size)
             else:
                 size = min_size
         else:
@@ -1962,6 +1961,7 @@ class CapitalAutonomousEngine:
     def __init__(self):
         self._peak_upl_cache: Dict[str, float] = {}  # deal_id -> peak_upl
         self._be_locked_set = set()                   # deal_ids that reached Breakeven Armor
+        self._asset_cooldowns: Dict[str, float] = {}  # epic -> cooldown_until_ts (Anti-Overtrading Guard)
         self._last_scan_ts: float = 0.0
         self._scan_interval: float = 25.0             # Scan markets every 25 seconds
         self.prop_manager = PropFirmRiskManager()
@@ -2118,6 +2118,13 @@ class CapitalAutonomousEngine:
             estimated_margin = max(1.0, entry_level * size * margin_rate)
             roi_pct = (upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
 
+            # Compute real current market price and spread
+            current_price = entry_level + (upl / size) if direction == "BUY" else entry_level - (upl / size)
+            cached_market = _SHARED_PRICE_CACHE.get(epic_u, {}).get("data", {})
+            spread = cached_market.get("spread", 0.0)
+            if spread <= 0:
+                spread = 0.60 if "GOLD" in epic_u else (0.05 if "OIL" in epic_u else 1.0)
+
             # Track peak UPL
             peak_upl = self._peak_upl_cache.get(deal_id, upl)
             if upl > peak_upl:
@@ -2126,53 +2133,61 @@ class CapitalAutonomousEngine:
 
             is_runner = (deal_id == runner_deal_id)
 
-            # Tier 1. Breakeven Armor with Wide Breathing Room (Invariant 31):
-            # Upgraded from +2.5% to +4.8% ROI (guarantees price moves outside the 0.25%-0.35% broker spread noise & retest band)
-            # Locks SL to Entry +0.25% Net Floor, permanently eliminating downside risk (Risk -> 0.00R) while letting winners run
-            if roi_pct >= 4.8 and deal_id not in self._be_locked_set:
-                new_sl = round(entry_level * 1.0025, 2) if direction == "BUY" else round(entry_level * 0.9975, 2)
-                upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
-                if upd.get("success"):
-                    self._be_locked_set.add(deal_id)
-                    ratcheted_count += 1
-                    logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} ({direction}) at {new_sl} (+{roi_pct:.1f}% ROI, Wide Breathing Room, Risk: 0.00R)")
+            # Tier 1. Mathematical Breakeven Armor with Noise Buffer (Invariant 31):
+            # Triggers strictly at >= +8.0% ROI on margin (~+0.40% price move at 20x leverage).
+            # Guaranteed to place SL strictly below current market price for BUY (and above for SELL)
+            # while locking in Entry + (Spread * 0.5) to secure a net positive return after broker fees.
+            if roi_pct >= 8.0 and deal_id not in self._be_locked_set:
+                if direction == "BUY":
+                    target_be_sl = round(entry_level + max(spread * 0.5, 0.001 * entry_level), 2)
+                    safe_ceiling_sl = round(current_price - (spread * 1.5), 2)
+                    if safe_ceiling_sl > entry_level:
+                        new_sl = min(target_be_sl, safe_ceiling_sl)
+                        if new_sl > sl:
+                            upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
+                            if upd.get("success"):
+                                self._be_locked_set.add(deal_id)
+                                ratcheted_count += 1
+                                logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} (BUY) at {new_sl} (Market: {current_price:.2f}, +{roi_pct:.1f}% ROI, Risk: 0.00R)")
+                elif direction == "SELL":
+                    target_be_sl = round(entry_level - max(spread * 0.5, 0.001 * entry_level), 2)
+                    safe_floor_sl = round(current_price + (spread * 1.5), 2)
+                    if safe_floor_sl < entry_level:
+                        new_sl = max(target_be_sl, safe_floor_sl)
+                        if sl <= 0 or new_sl < sl:
+                            upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
+                            if upd.get("success"):
+                                self._be_locked_set.add(deal_id)
+                                ratcheted_count += 1
+                                logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} (SELL) at {new_sl} (Market: {current_price:.2f}, +{roi_pct:.1f}% ROI, Risk: 0.00R)")
 
-            # Tier 2. Capital Fortress Lock: At +6.8% ROI (Secures +3.0% Net Profit Floor)
-            elif roi_pct >= 6.8 and deal_id not in getattr(self, "_fortress_locked_set", set()):
-                if not hasattr(self, "_fortress_locked_set"):
-                    self._fortress_locked_set = set()
-                secured_sl = round(entry_level * 1.0050, 2) if direction == "BUY" else round(entry_level * 0.9950, 2)
-                upd = engine.update_position_stops(deal_id=deal_id, stop_loss=secured_sl)
-                if upd.get("success"):
-                    self._fortress_locked_set.add(deal_id)
-                    ratcheted_count += 1
-                    logger.info(f"🏰 [CAPITAL FORTRESS] Secured +3.0% Floor for {epic} at {secured_sl} (+{roi_pct:.1f}% ROI)")
-
-            # Tier 3. Golden 80%-85% Trailing Ratchet: When profit exceeds +7.5% ROI (Uncapped upside runner)
-            elif roi_pct >= 7.5 and peak_upl > 0:
+            # Tier 2. The Golden 80%-85% Trailing Ratchet: When profit exceeds >= +14.0% ROI
+            elif roi_pct >= 14.0 and peak_upl > 0:
                 ratchet_pct = 0.85 if is_runner else 0.80
                 target_protected_profit = peak_upl * ratchet_pct
                 if direction == "BUY":
-                    ratchet_price = round(entry_level + (target_protected_profit / size), 2)
-                    if ratchet_price > sl:
-                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
+                    raw_ratchet_price = entry_level + (target_protected_profit / size)
+                    safe_ratchet_price = round(min(raw_ratchet_price, current_price - (spread * 2.0)), 2)
+                    if safe_ratchet_price > sl and safe_ratchet_price > entry_level:
+                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
                         if upd.get("success"):
                             ratcheted_count += 1
                             tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
-                            logger.info(f"{tag} Ratcheted SL for {epic} to {ratchet_price} ({int(ratchet_pct*100)}% Peak Locked)")
+                            logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
                 elif direction == "SELL":
-                    ratchet_price = round(entry_level - (target_protected_profit / size), 2)
-                    if sl <= 0 or ratchet_price < sl:
-                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=ratchet_price)
+                    raw_ratchet_price = entry_level - (target_protected_profit / size)
+                    safe_ratchet_price = round(max(raw_ratchet_price, current_price + (spread * 2.0)), 2)
+                    if (sl <= 0 or safe_ratchet_price < sl) and safe_ratchet_price < entry_level:
+                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
                         if upd.get("success"):
                             ratcheted_count += 1
                             tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
-                            logger.info(f"{tag} Ratcheted SL for {epic} to {ratchet_price} ({int(ratchet_pct*100)}% Peak Locked)")
+                            logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
 
-            # Tier 4. Clean Cash Harvest:
-            # - Apex 3rd Runner: Runs uncapped to +30.0% ROI (or until 85% peak ratchet triggers) to capture $4 - $6+ net expansion
-            # - Standard Positions: Clean Cash Harvest at +10.0% to +14.0% ROI (securing $1.50 - $3.00+ net profit)
-            harvest_trigger = (roi_pct >= 30.0) if is_runner else (roi_pct >= 10.0)
+            # Tier 3. Clean Cash Harvest:
+            # - Apex 3rd Runner: Runs uncapped to +35.0% ROI (or until 85% peak ratchet triggers)
+            # - Standard Positions: Clean Cash Harvest at +18.0% to +24.0% ROI
+            harvest_trigger = (roi_pct >= 35.0) if is_runner else (roi_pct >= 18.0)
             if harvest_trigger:
                 tag = "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
                 logger.info(f"{tag} Reached +{roi_pct:.1f}% ROI! Executing Cash Harvest for {epic} (UPL: ${upl:+.2f})...")
@@ -2181,8 +2196,8 @@ class CapitalAutonomousEngine:
                     closed_count += 1
                     self._peak_upl_cache.pop(deal_id, None)
                     self._be_locked_set.discard(deal_id)
-                    if hasattr(self, "_fortress_locked_set"):
-                        self._fortress_locked_set.discard(deal_id)
+                    # Apply 15-minute anti-overtrading cooldown
+                    self._asset_cooldowns[epic_u] = time.time() + 900.0
 
         return len(positions), ratcheted_count, closed_count
 
@@ -2284,6 +2299,12 @@ class CapitalAutonomousEngine:
         for epic in priority_epics:
             resolved_epic = EPIC_MAP.get(epic, epic)
             if resolved_epic in open_epics:
+                continue
+
+            # Anti-Overtrading Cooldown Shield: Enforce 15-minute rest after closing a position on this asset
+            if self._asset_cooldowns.get(resolved_epic.upper(), 0.0) > now:
+                remain_cd = int(self._asset_cooldowns[resolved_epic.upper()] - now)
+                logger.debug(f"⏳ [COOLDOWN] Asset {resolved_epic} resting for {remain_cd}s (Anti-Chop Guard).")
                 continue
 
             setup = self.evaluate_multi_engine_tradfi_setup(epic)
