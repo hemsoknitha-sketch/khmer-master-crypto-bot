@@ -12560,6 +12560,16 @@ class TelegramBotThread(BaseThread):
 
             action = str(args[0]).upper().strip()
 
+            # Subcommand: REACHSEY MEAS (Gold) & REACHSEY CRYPTO (Multi-Asset)
+            if action in ["REACHSEY", "REACHSEY_MEAS", "REACHSEYMEAS", "MEAS", "GOLD_STRADDLE", "STRADDLE"]:
+                context.args = list(args[1:])
+                await smartx_reachsey_meas_command(update, context)
+                return
+            elif action in ["REACHSEY_CRYPTO", "REACHSEYCRYPTO", "CRYPTO", "CRYPTO_STRADDLE"]:
+                context.args = list(args[1:])
+                await smartx_reachsey_crypto_command(update, context)
+                return
+
             # Subcommand: RADAR (Shanghai Gold Exchange Premium, PBOC, Macro Yields)
             if action in ["RADAR", "SGE", "MACRO"]:
                 xau_p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT") or 4320.0
@@ -13010,7 +13020,9 @@ class TelegramBotThread(BaseThread):
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
             msg_target = update.effective_message or update.message
-            user_lang = db.get_user_language(chat_id)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower()
+            is_khmer = (user_lang in ['km', 'khmer', '0', '1', 'default'])
             args = list(context.args) if context and context.args else []
 
             # Handle Direct Execution Arguments: /smartx_reachsey_meas AUTO | /smartx_reachsey_meas 30 10
@@ -13050,7 +13062,7 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🛡️ **ការការពារទុន ៖** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
-                    ) if user_lang == 'khmer' else (
+                    ) if is_khmer else (
                         f"🥇 **REACHSEY MEAS (GOLD) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🏛️ **Asset:** `XAUUSDT (Perpetual Futures)`\n"
@@ -13113,7 +13125,7 @@ class TelegramBotThread(BaseThread):
                 f"_Khmer Master Crypto_\n"
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
-            ) if user_lang == 'khmer' else (
+            ) if is_khmer else (
                 f"🥇 **REACHSEY MEAS (GOLD XAUUSDT) SUPER SMART PENDING STOP MATRIX** ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"📊 **Live Gold Price:** `${lvl.get('current_price'):,.2f} USDT`\n"
@@ -13159,7 +13171,9 @@ class TelegramBotThread(BaseThread):
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
             msg_target = update.effective_message or update.message
-            user_lang = db.get_user_language(chat_id)
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower()
+            is_khmer = (user_lang in ['km', 'khmer', '0', '1', 'default'])
             args = list(context.args) if context and context.args else []
 
             target_sym = "BTCUSDT"
@@ -13214,7 +13228,7 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🛡️ **ការការពារទុន ៖** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
-                    ) if user_lang == 'khmer' else (
+                    ) if is_khmer else (
                         f"🪙 **REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🪙 **Asset:** `{target_sym}`\n"
@@ -13282,7 +13296,7 @@ class TelegramBotThread(BaseThread):
                 f"_Khmer Master Crypto_\n"
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
-            ) if user_lang == 'khmer' else (
+            ) if is_khmer else (
                 f"🪙 **REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX** ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"🪙 **Benchmark Asset:** `BTCUSDT`\n"
