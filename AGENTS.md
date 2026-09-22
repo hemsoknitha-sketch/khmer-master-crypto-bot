@@ -312,8 +312,8 @@ Any modification that breaks any of the following 30 invariants is considered an
   2. **Range Sanity Filter:** Breakout execution is strictly bypassed if the 15-minute Opening Range ($OR_{\text{Range}} = OR_{\text{High}} - OR_{\text{Low}}$) is $> 2.5 \times \text{ATR}_{14}$ (exhaustion candle) or $< 0.20 \times \text{ATR}_{14}$ (no institutional participation).
   3. **Strict Invariant 16 Anti-Oversold Short Guard:** Any downward breakdown below $OR_{\text{Low}}$ is strictly blocked if the 15-minute RSI is $\le 38.0$ to eliminate shorting panic sell-offs at the bottom.
   4. **Asymmetric R:R $\ge 1:3$ to $1:6$ with Range Mid Stop & Expanded TP:** Stop-Loss is placed at the Range Midpoint ($OR_{\text{Mid}} = \frac{OR_{\text{High}} + OR_{\text{Low}}}{2}$), and Take-Profit targets are calibrated for **+5.0% to +8.0% ROI** (4R - 6R) on 20x leverage assets ($0.40\%$ price distance for indices/gold, $1.50\%$ for equities).
-  5. **20x Leverage Asset Priority:** To maximize profit velocity and capital efficiency on small accounts ($30 - $100), `US100`, `US500`, and `GOLD` receive an institutional +35.0 score boost to be prioritized into active trade slots before 5x leverage stocks.
-  6. **Breakeven Wiggle Room & 3rd Runner Golden Trailing Ride:** Positions are protected by Breakeven Armor triggered at +2.5% ROI (+0.15% Net Floor) to prevent premature shakeouts. When $\ge 3$ positions are held, the #1 performing position is designated as the **Apex 3rd Runner**, exempted from early close and trailed by the Golden 85% Trailing Ratchet up to **+25.0% to +35.0% ROI** ($4 - $6+ net profit per $10 order).
+  5. **20x Leverage Asset Priority:** To maximize profit velocity and capital efficiency on small accounts ($30 - $100), `US100`, `US500`, and `GOLD` receive an institutional +35.0 to +40.0 score boost to be prioritized into active trade slots before 5x leverage stocks.
+  6. **Breakeven Breathing Room & 3rd Runner Golden Trailing Ride:** Positions are protected by Breakeven Armor triggered at **+4.8% ROI** (+0.25% Net Floor, upgraded from +2.5% to clear broker spread noise and normal retests). When $\ge 3$ positions are held, the #1 performing position is designated as the **Apex 3rd Runner**, exempted from early close and trailed by the Golden 85% Trailing Ratchet up to **+25.0% to +35.0% ROI** ($4 - $6+ net profit per $10 order).
   7. **Session Debounce:** Exactly 1 trade per session per symbol is permitted to eliminate chop and whipsaw losses.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 25/27].
 
@@ -335,6 +335,8 @@ Any modification that breaks any of the following 30 invariants is considered an
      - When the market is choppy or ranging ($< 65\%$), position size contracts to the minimum micro-lot floor ($0.01$ lot / $0.1$ contract), minimizing drawdowns.
   5. **Asset-DNA Lot Boundary & Step Snapping:**
      Calculated contract sizes must strictly adhere to broker-defined lot steps and min/max boundaries (e.g. Gold $0.01$ step, US500 $0.05$ step, BTC $0.001$ step) to prevent order rejections.
+  6. **Small Capital Fortress Clamp (< $100 Accounts):**
+     To eliminate outsized outlier losses on micro accounts ($30 - $100), high-beta volatile energy commodities are strictly clamped: `NATURALGAS` $\le 15.0$ contracts and `OIL_CRUDE` $\le 0.5$ barrels, capping 1R downside risk to $\le \$0.30 - \$0.40$ in proportional balance with the portfolio.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 26/27].
 
 ### Invariant 34: Spread Drag Elimination & Asymmetric Minimum Hurdle Protocol (Target $\ge 10\times$ Spread)

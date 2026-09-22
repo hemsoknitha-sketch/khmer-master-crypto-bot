@@ -1003,17 +1003,19 @@ class CapitalComEngine:
         min_size = market_details.get("min_deal_size", 0.01)
 
         if size is None or size <= 0:
+            is_micro_cap = equity < 100
             # Sizing: Target $10.00 - $15.00 margin per trade (Multiplier 5x-25x over old micro sizes)
+            # Small Capital Fortress (< $100): Clamps high-beta energy to prevent outsized outlier drawdowns
             if resolved_epic == "GOLD":
-                size = max(0.07, min_size)
+                size = max(0.05 if is_micro_cap else 0.07, min_size)
             elif resolved_epic in ["NATURALGAS", "GAS"]:
-                size = max(50.0, min_size)
+                size = max(15.0 if is_micro_cap else 50.0, min_size)
+            elif resolved_epic in ["OIL_CRUDE", "OIL"]:
+                size = max(0.5 if is_micro_cap else 1.5, min_size)
             elif resolved_epic == "META":
                 size = max(0.08, min_size)
             elif resolved_epic in ["GOOGL", "GOOGLE", "GOOG"]:
                 size = max(0.20, min_size)
-            elif resolved_epic in ["OIL_CRUDE", "OIL"]:
-                size = max(1.5, min_size)
             elif resolved_epic in ["US500", "SP500"]:
                 size = max(0.05, min_size)
             elif resolved_epic in ["US100", "NASDAQ"]:
@@ -2107,29 +2109,30 @@ class CapitalAutonomousEngine:
 
             is_runner = (deal_id == runner_deal_id)
 
-            # Tier 1. Breakeven Armor with Wide Wiggle Room: Triggered at +2.5% ROI (Locks SL to Entry +0.15% Net Floor, Downside Risk -> 0.00R)
-            # Breathing room buffer prevents premature exits on ordinary noise retests
-            if roi_pct >= 2.5 and deal_id not in self._be_locked_set:
-                new_sl = round(entry_level * 1.0015, 2) if direction == "BUY" else round(entry_level * 0.9985, 2)
+            # Tier 1. Breakeven Armor with Wide Breathing Room (Invariant 31):
+            # Upgraded from +2.5% to +4.8% ROI (guarantees price moves outside the 0.25%-0.35% broker spread noise & retest band)
+            # Locks SL to Entry +0.25% Net Floor, permanently eliminating downside risk (Risk -> 0.00R) while letting winners run
+            if roi_pct >= 4.8 and deal_id not in self._be_locked_set:
+                new_sl = round(entry_level * 1.0025, 2) if direction == "BUY" else round(entry_level * 0.9975, 2)
                 upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
                 if upd.get("success"):
                     self._be_locked_set.add(deal_id)
                     ratcheted_count += 1
-                    logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} ({direction}) at {new_sl} (+{roi_pct:.1f}% ROI, Risk: 0.00R)")
+                    logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} ({direction}) at {new_sl} (+{roi_pct:.1f}% ROI, Wide Breathing Room, Risk: 0.00R)")
 
-            # Tier 2. Capital Fortress Lock: At +5.0% ROI (Secures +2.0% Net Profit Floor)
-            elif roi_pct >= 5.0 and deal_id not in getattr(self, "_fortress_locked_set", set()):
+            # Tier 2. Capital Fortress Lock: At +6.8% ROI (Secures +3.0% Net Profit Floor)
+            elif roi_pct >= 6.8 and deal_id not in getattr(self, "_fortress_locked_set", set()):
                 if not hasattr(self, "_fortress_locked_set"):
                     self._fortress_locked_set = set()
-                secured_sl = round(entry_level * 1.0040, 2) if direction == "BUY" else round(entry_level * 0.9960, 2)
+                secured_sl = round(entry_level * 1.0050, 2) if direction == "BUY" else round(entry_level * 0.9950, 2)
                 upd = engine.update_position_stops(deal_id=deal_id, stop_loss=secured_sl)
                 if upd.get("success"):
                     self._fortress_locked_set.add(deal_id)
                     ratcheted_count += 1
-                    logger.info(f"🏰 [CAPITAL FORTRESS] Secured +2.0% Floor for {epic} at {secured_sl} (+{roi_pct:.1f}% ROI)")
+                    logger.info(f"🏰 [CAPITAL FORTRESS] Secured +3.0% Floor for {epic} at {secured_sl} (+{roi_pct:.1f}% ROI)")
 
-            # Tier 3. Golden 80%-85% Trailing Ratchet: When profit exceeds +6.0% ROI (Uncapped upside runner)
-            elif roi_pct >= 6.0 and peak_upl > 0:
+            # Tier 3. Golden 80%-85% Trailing Ratchet: When profit exceeds +7.5% ROI (Uncapped upside runner)
+            elif roi_pct >= 7.5 and peak_upl > 0:
                 ratchet_pct = 0.85 if is_runner else 0.80
                 target_protected_profit = peak_upl * ratchet_pct
                 if direction == "BUY":
@@ -2151,8 +2154,8 @@ class CapitalAutonomousEngine:
 
             # Tier 4. Clean Cash Harvest:
             # - Apex 3rd Runner: Runs uncapped to +30.0% ROI (or until 85% peak ratchet triggers) to capture $4 - $6+ net expansion
-            # - Standard Positions: Clean Cash Harvest at +8.0% to +12.0% ROI (securing $1.80 - $2.50+ net profit)
-            harvest_trigger = (roi_pct >= 30.0) if is_runner else (roi_pct >= 8.0)
+            # - Standard Positions: Clean Cash Harvest at +10.0% to +14.0% ROI (securing $1.50 - $3.00+ net profit)
+            harvest_trigger = (roi_pct >= 30.0) if is_runner else (roi_pct >= 10.0)
             if harvest_trigger:
                 tag = "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
                 logger.info(f"{tag} Reached +{roi_pct:.1f}% ROI! Executing Cash Harvest for {epic} (UPL: ${upl:+.2f})...")
@@ -2274,12 +2277,14 @@ class CapitalAutonomousEngine:
             if final_action in ["BUY", "SELL"] and confidence >= 75:
                 adx_val = setup.get("adx", 25.0)
                 rvol_val = setup.get("rvol", 1.0)
-                # 20x Leverage & Liquidity Multiplier (+35 for Indices & Gold, +20 for High-Beta Energy)
+                # Institutional Confluence Multiplier (+40 for Indices & High-performing Tech, +30 for Gold, +10 for Energy)
                 leverage_boost = 0.0
-                if any(x in resolved_epic.upper() for x in ["US100", "US500", "GOLD", "SP500", "NASDAQ"]):
-                    leverage_boost = 35.0
+                if any(x in resolved_epic.upper() for x in ["US100", "US500", "SP500", "NASDAQ", "NVDA", "TSLA", "GOOGL"]):
+                    leverage_boost = 40.0
+                elif "GOLD" in resolved_epic.upper():
+                    leverage_boost = 30.0
                 elif any(x in resolved_epic.upper() for x in ["NATURALGAS", "OIL_CRUDE", "GERMANY40"]):
-                    leverage_boost = 20.0
+                    leverage_boost = 10.0
                 # Composite Institutional Edge Score: confidence * 1.5 + ADX + RVOL * 10 + leverage_boost
                 rank_score = (confidence * 1.5) + adx_val + (rvol_val * 10.0) + leverage_boost
                 candidate_setups.append((rank_score, epic, resolved_epic, setup))
@@ -2407,10 +2412,10 @@ class CapitalAutonomousEngine:
                                 f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"🛡️ **ក្បួនការពារ & កើបចំណេញ Asymmetric R:R ≥ 1:6 ៖**\n"
-                                f"• Tier 1: Breakeven Armor នៅ +1.5% ROI (Risk -> 0.00R)\n"
-                                f"• Tier 2: Capital Fortress Lock (+1.5R) នៅ +3.5% ROI\n"
-                                f"• Tier 3: The Golden 80% Trailing Ratchet\n"
-                                f"• Tier 4: Mega Target Harvest (6R+) នៅ +12.0% ROI\n"
+                                f"• Tier 1: Breakeven Armor នៅ +4.8% ROI (Wide Breathing Room, Risk -> 0.00R)\n"
+                                f"• Tier 2: Capital Fortress Lock (+1.5R) នៅ +6.8% ROI\n"
+                                f"• Tier 3: The Golden 80% Trailing Ratchet (≥ +7.5% ROI)\n"
+                                f"• Tier 4: Mega Target Harvest (6R+) នៅ +10.0% - +14.0% ROI\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរប្រាក់ចំណេញ និងការពារទុន ២៤/៧!_"
                             )
@@ -2430,10 +2435,10 @@ class CapitalAutonomousEngine:
                                 f"🔖 **Deal Reference:** `{deal_ref}`\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"🛡️ **Asymmetric R:R >= 1:6 Multi-Tier Protection:**\n"
-                                f"• Tier 1: Breakeven Armor at +1.5% ROI (Risk -> 0.00R)\n"
-                                f"• Tier 2: Capital Fortress Lock (+1.5R) at +3.5% ROI\n"
-                                f"• Tier 3: Golden 80% Trailing Ratchet\n"
-                                f"• Tier 4: Mega Target Cash Harvest (6R+) at +12.0% ROI\n"
+                                f"• Tier 1: Breakeven Armor at +4.8% ROI (Wide Breathing Room, Risk -> 0.00R)\n"
+                                f"• Tier 2: Capital Fortress Lock (+1.5R) at +6.8% ROI\n"
+                                f"• Tier 3: Golden 80% Trailing Ratchet (>= +7.5% ROI)\n"
+                                f"• Tier 4: Mega Target Cash Harvest (6R+) at +10.0% - +14.0% ROI\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"💡 _AI Engine actively monitoring and trailing profits 24/7!_"
                             )
@@ -3634,6 +3639,14 @@ class CapitalKellyPositionSizer:
 
         # Clamp strictly between min_lot and max_lot
         final_lot = max(rule["min_lot"], min(rule["max_lot"], raw_lot))
+
+        # Small Capital Fortress Clamp for Accounts < $100 (Invariant 25 & Invariant 31)
+        # Prevents high-beta energy contracts (NatGas & Crude Oil) from producing outsized outlier losses on micro accounts
+        if budget < 100:
+            if clean_epic in ["NATURALGAS", "GAS"]:
+                final_lot = min(15.0, final_lot)
+            elif clean_epic in ["OIL", "OIL_CRUDE"]:
+                final_lot = min(0.5, final_lot)
 
         # Snap to lot_step
         step = rule["lot_step"]
