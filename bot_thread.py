@@ -5645,6 +5645,15 @@ class TelegramBotThread(BaseThread):
                 curr_state = db.is_capital_auto_enabled(chat_id)
                 new_state = not curr_state
                 cfg = db.get_capital_auto_config(chat_id)
+                is_demo = cfg.get("is_demo", False)
+                if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
+                    try:
+                        await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
+                    except Exception:
+                        pass
+                    gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
+                    await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                    return
                 db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", 50.0))
                 toast_msg = "✅ Capital Auto: បានបើកដំណើរការ!" if new_state else "🛑 Capital Auto: បានបិទ!"
                 try:
@@ -5653,9 +5662,118 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_command(update, context)
+            elif data == "btn_cap_auto_demo":
+                cfg = db.get_capital_auto_config(chat_id)
+                budget = cfg.get("budget", 10.0)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=budget, is_demo=True)
+                try:
+                    await update.callback_query.answer("🟡 បានបើកដំណើរការ Capital Auto លើគណនី DEMO ($10,000)!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["AUTO", "DEMO", str(budget)]
+                await capital_command(update, context)
+            elif data == "btn_cap_req_verify":
+                try:
+                    await update.callback_query.answer("✅ បានផ្ញើសំណើផ្ទៀងផ្ទាត់ទៅកាន់ Super Admin រួចរាល់!", show_alert=True)
+                except Exception:
+                    pass
+                user_creds = db.get_user_capital_credentials(chat_id) or {}
+                acc_id = user_creds.get("account_id", "Not Linked")
+                user_obj = update.effective_user
+                username_str = f"@{user_obj.username}" if user_obj and user_obj.username else f"User_{chat_id}"
+                admin_alert = (
+                    f"🔔 **[CAPITAL.COM LIVE VERIFICATION REQUEST]** 💎\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👤 **អ្នកស្នើសុំ ៖** {username_str} (`{chat_id}`)\n"
+                    f"🆔 **Capital Account ID ៖** `{acc_id}`\n"
+                    f"🌐 **Referral Code ៖** `az48cxia`\n"
+                    f"⏰ **កាលបរិច្ឆេទ ៖** `{time.strftime('%Y-%m-%d %H:%M:%S')}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"សូមពិនិត្យមើលក្នុង Capital.com Partner Portal ហើយចុចអនុម័ត ៖"
+                )
+                admin_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(f"✅ Approve Live Access ({chat_id})", callback_data=f"btn_cap_appr_{chat_id}"),
+                        InlineKeyboardButton(f"❌ Reject ({chat_id})", callback_data=f"btn_cap_rej_{chat_id}")
+                    ]
+                ])
+                try:
+                    await context.bot.send_message(chat_id=859271875, text=admin_alert, parse_mode="Markdown", reply_markup=admin_kb)
+                except Exception as send_err:
+                    logger.warning(f"Could not alert admin of capital verification request: {send_err}")
+                confirm_msg = (
+                    f"📨 **[សំណើផ្ទៀងផ្ទាត់ត្រូវបានផ្ញើជូន SUPER ADMIN]** ✅\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"សំណើផ្ទៀងផ្ទាត់គណនី Live របស់អ្នកត្រូវបានបញ្ជូនទៅកាន់ Super Admin រួចរាល់ហើយ។\n"
+                    f"ប្រព័ន្ធនឹងជូនដំណឹងមកកាន់អ្នកភ្លាមៗនៅពេលដែលគណនីរបស់អ្នកត្រូវបាន Approve!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_(អ្នកអាចបន្តដំណើរការតេស្តសាកល្បងលើ Demo Account $10,000 បានជាធម្មតា)_"
+                ) if user_lang == 'khmer' else (
+                    f"📨 **[VERIFICATION REQUEST SENT TO SUPER ADMIN]** ✅\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"Your Live verification request has been dispatched to Super Admin.\n"
+                    f"You will receive an instant notification once approved!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_(You may continue testing on Demo $10,000 mode in the meantime)_"
+                )
+                await update.effective_message.reply_text(confirm_msg, parse_mode="Markdown")
+            elif data.startswith("btn_cap_appr_"):
+                target_uid = int(data.replace("btn_cap_appr_", "").strip())
+                db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
+                try:
+                    await update.callback_query.answer(f"✅ បានអនុម័តសិទ្ធិ Live Real Capital សម្រាប់ {target_uid}!", show_alert=True)
+                except Exception:
+                    pass
+                await update.effective_message.edit_text(
+                    f"✅ **[CAPITAL.COM LIVE ACCESS APPROVED]**\n"
+                    f"User `{target_uid}` ត្រូវបានអនុម័តឱ្យប្រើប្រាស់ Live Real Capital រួចរាល់ដោយជោគជ័យ!",
+                    parse_mode="Markdown"
+                )
+                try:
+                    target_lang = db.get_user_language(target_uid)
+                    notif = (
+                        f"🎉 **[CAPITAL.COM LIVE VIP ACCESS APPROVED!]** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"គណនី Live Real Capital របស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ និងអនុម័តដោយ Super Admin រួចរាល់ហើយ!\n\n"
+                        f"ឥឡូវនេះអ្នកអាចប្រើប្រាស់មុខងារ `/capital AUTO ON`, ORB Breakout (15m) និង Lead-Lag Arbitrage បានពេញលេញ ២៤/៧!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"👉 វាយបញ្ជា `` `/capital AUTO ON 30` `` ដើម្បីចាប់ផ្តើមកើបចំណេញ!"
+                    ) if target_lang == 'khmer' else (
+                        f"🎉 **[CAPITAL.COM LIVE VIP ACCESS APPROVED!]** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"Your Live Real Capital account has been approved by Super Admin!\n\n"
+                        f"You now have full 24/7 access to `/capital AUTO ON`, ORB Breakout and Lead-Lag Arbitrage!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"👉 Type `` `/capital AUTO ON 30` `` to start harvesting profits!"
+                    )
+                    await context.bot.send_message(chat_id=target_uid, text=notif, parse_mode="Markdown")
+                except Exception as user_notif_err:
+                    logger.warning(f"Could not notify user {target_uid} of capital approval: {user_notif_err}")
+            elif data.startswith("btn_cap_rej_"):
+                target_uid = int(data.replace("btn_cap_rej_", "").strip())
+                db.set_capital_user_referral_status(target_uid, is_verified=False)
+                try:
+                    await update.callback_query.answer(f"❌ បានបដិសេធសិទ្ធិ Live សម្រាប់ {target_uid}", show_alert=True)
+                except Exception:
+                    pass
+                await update.effective_message.edit_text(
+                    f"❌ **[CAPITAL.COM LIVE ACCESS REJECTED]**\n"
+                    f"User `{target_uid}` ត្រូវបានបដិសេធសិទ្ធិ Live Real Capital។",
+                    parse_mode="Markdown"
+                )
             elif data == "btn_cap_leadlag_toggle":
                 curr_state = db.is_capital_leadlag_enabled(chat_id)
                 new_state = not curr_state
+                cfg = db.get_capital_leadlag_config(chat_id)
+                is_demo = cfg.get("is_demo", False)
+                if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
+                    try:
+                        await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
+                    except Exception:
+                        pass
+                    gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
+                    await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                    return
                 db.set_capital_leadlag_config(chat_id, enabled=new_state)
                 toast_msg = "⚡ Lead-Lag Arb: បានបើកដំណើរការ!" if new_state else "🛑 Lead-Lag Arb: បានបិទ!"
                 try:
@@ -5674,6 +5792,16 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_cap_orb_toggle":
                 curr_state = db.is_capital_orb_enabled(chat_id)
                 new_state = not curr_state
+                cfg = db.get_capital_orb_config(chat_id)
+                is_demo = cfg.get("is_demo", False)
+                if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
+                    try:
+                        await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
+                    except Exception:
+                        pass
+                    gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
+                    await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                    return
                 db.set_capital_orb_config(chat_id, enabled=new_state)
                 toast_msg = "🎯 ORB 15m: បានបើកដំណើរការ!" if new_state else "🛑 ORB 15m: បានបិទ!"
                 try:
@@ -19902,6 +20030,104 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        def build_capital_referral_gatekeeper_ui(chat_id: int, user_lang: str = "khmer"):
+            """
+            Capital.com Pro Referral Gatekeeper Lock UI (Invariant 36).
+            Displays interactive registration link and instant verification request options.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import ui_standards
+            pro_url = "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+            partner_code = "az48cxia"
+
+            if user_lang == 'khmer':
+                gate_text = (
+                    f"🔒 **[CAPITAL.COM LIVE VIP ACCESS REQUIRED]** 💎\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚠️ **សេចក្តីជូនដំណឹងសុវត្ថិភាពមូលធន (Capital Protection Lock) ៖**\n"
+                    f"មុខងារជួញដូរសាច់ប្រាក់ពិត **Live Real Capital Trading Mode** ត្រូវបានចាក់សោរសុវត្ថិភាព និងរក្សាសិទ្ធិសម្រាប់តែអ្នកវិនិយោគដែលបានចុះឈ្មោះគណនីក្រោមតំណភ្ជាប់ដៃគូផ្លូវការ (**Official Pro Partner Referral**) ប៉ុណ្ណោះ!\n\n"
+                    f"🌐 **តំណភ្ជាប់ចុះឈ្មោះផ្លូវការ (1-Tap Register) ៖**\n"
+                    f"[{pro_url}]({pro_url})\n\n"
+                    f"🆔 **Partner Referral Code ៖** `{partner_code}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **ដំណាក់កាលអនុវត្ត ៖**\n"
+                    f"1️⃣ ចុះឈ្មោះគណនី Capital.com តាម Link ផ្លូវការខាងលើ\n"
+                    f"2️⃣ ភ្ជាប់ API Key របស់អ្នកតាមរយៈ `` `/capital API ...` ``\n"
+                    f"3️⃣ ចុចប៊ូតុង **[ 🔗 ស្នើសុំផ្ទៀងផ្ទាត់គណនី ]** ខាងក្រោម ដើម្បីទទួលបានការអនុម័តភ្លាមៗ!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_(ចំណាំ៖ គណនី DEMO $10,000 នៅតែអាចសាកល្បងដោយឥតគិតថ្លៃ ១០០% គ្រប់ពេលវេលា)_"
+                )
+            else:
+                gate_text = (
+                    f"🔒 **[CAPITAL.COM LIVE VIP ACCESS REQUIRED]** 💎\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚠️ **Institutional Capital Protection Notice:**\n"
+                    f"Live Real Capital Trading is strictly locked and reserved for traders registered under our official **Pro Partner Referral**!\n\n"
+                    f"🌐 **Official Pro Partner Link (1-Tap Register):**\n"
+                    f"[{pro_url}]({pro_url})\n\n"
+                    f"🆔 **Partner Referral Code:** `{partner_code}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **Next Steps:**\n"
+                    f"1️⃣ Register on Capital.com using the official partner link above\n"
+                    f"2️⃣ Link your API Key via `` `/capital API ...` ``\n"
+                    f"3️⃣ Click **[ 🔗 Request Verification ]** below for instant Super Admin approval!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_(Note: DEMO $10,000 mode is 100% free and open for exploration)_"
+                )
+
+            gate_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🌐 ចុះឈ្មោះគណនីដៃគូ (Official Pro Link)", url=pro_url)],
+                [InlineKeyboardButton("🔗 ស្នើសុំផ្ទៀងផ្ទាត់គណនី (Request Verification)", callback_data="btn_cap_req_verify")],
+                [
+                    InlineKeyboardButton("🟡 សាកល្បង Demo ($10,000)", callback_data="btn_cap_auto_demo"),
+                    InlineKeyboardButton("💬 ជំនួយការ Super Admin", url="https://t.me/hemsoknitha")
+                ],
+                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+            ])
+            return gate_text, gate_kb
+
+        async def admin_capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Admin command to approve/reject/list Capital.com Live users: /admin_capital <approve|reject|list> <chat_id>"""
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id or chat_id != 859271875:
+                return
+            args = list(context.args) if context and context.args else []
+            if not args or args[0].upper() == "LIST":
+                pending = db.get_pending_capital_verification_users()
+                if not pending:
+                    await update.effective_message.reply_text("✅ គ្មានអ្នកប្រើប្រាស់រង់ចាំការផ្ទៀងផ្ទាត់ Capital Live ឡើយ។ (Zero Pending)", parse_mode="Markdown")
+                    return
+                lines = ["📋 **[CAPITAL.COM PENDING LIVE USERS]** 💎\n━━━━━━━━━━━━"]
+                kb_rows = []
+                for p in pending:
+                    lines.append(f"• User `{p['chat_id']}` ({p['username']}) | Acc: `{p['account_id']}`")
+                    kb_rows.append([
+                        InlineKeyboardButton(f"✅ Approve {p['chat_id']}", callback_data=f"btn_cap_appr_{p['chat_id']}"),
+                        InlineKeyboardButton(f"❌ Reject {p['chat_id']}", callback_data=f"btn_cap_rej_{p['chat_id']}")
+                    ])
+                lines.append("━━━━━━━━━━━━\n💡 ចុចប៊ូតុងខាងក្រោមដើម្បីអនុម័តភ្លាមៗ ៖")
+                await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_rows))
+                return
+
+            sub = args[0].upper()
+            if len(args) >= 2 and sub in ["APPROVE", "APP", "VERIFY", "ALLOW"]:
+                target_uid = int(args[1])
+                db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
+                await update.effective_message.reply_text(f"✅ បានអនុម័តសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}` រួចរាល់!", parse_mode="Markdown")
+                try:
+                    await context.bot.send_message(
+                        chat_id=target_uid,
+                        text="🎉 **[CAPITAL.COM LIVE VIP ACCESS APPROVED!]** 🟢\n━━━━━━━━━━━━\nគណនី Live Real Capital របស់អ្នកត្រូវបានអនុម័តដោយ Super Admin រួចរាល់ហើយ!\nអ្នកអាចដំណើរការ `/capital AUTO ON` បានពេញលេញ ២៤/៧!",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+            elif len(args) >= 2 and sub in ["REJECT", "REJ", "BLOCK", "DENY"]:
+                target_uid = int(args[1])
+                db.set_capital_user_referral_status(target_uid, is_verified=False)
+                await update.effective_message.reply_text(f"❌ បានបដិសេធសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}`", parse_mode="Markdown")
+
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -20241,6 +20467,13 @@ class TelegramBotThread(BaseThread):
 
                     if sub_opt in ["ON", "LIVE", "START", "RUN"] or is_numeric_budget:
                         target_is_demo = False
+
+                        # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
+                        if not target_is_demo and not db.is_capital_user_authorized(chat_id):
+                            gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
+                            await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                            return
+
                         if is_numeric_budget:
                             budget = float(sub_opt)
                         elif len(args) >= 3:
@@ -20883,6 +21116,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("trailing_stop", trailing_stop_command))
         self.app.add_handler(CommandHandler("trailing_guard", trailing_guard_command))
         self.app.add_handler(CommandHandler("paper_trading", paper_trading_command))
+        self.app.add_handler(CommandHandler("admin_capital", admin_capital_command))
+        self.app.add_handler(CommandHandler("admincapital", admin_capital_command))
 
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         from telegram.ext import CallbackQueryHandler

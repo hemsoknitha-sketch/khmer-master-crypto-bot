@@ -34,6 +34,12 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 # ==============================================================================
+# CAPITAL.COM PRO REFERRAL & IB GATEKEEPER LOCK (INVARIANT 36)
+# ==============================================================================
+CAPITAL_PRO_REFERRAL_URL = "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
+CAPITAL_PRO_PARTNER_CODE = "az48cxia"
+
+# ==============================================================================
 # 1. CAPITAL.COM REST API ENDPOINTS & CONSTANTS
 # ==============================================================================
 CAPITAL_LIVE_URL = "https://api-capital.backend-capital.com/api/v1"
@@ -982,6 +988,13 @@ class CapitalComEngine:
         """
         Executes an institutional risk-managed trade with automated SL/TP based on ATR.
         """
+        # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
+        if not self.is_demo and not db.is_capital_user_authorized(self._custom_chat_id or 0):
+            return {
+                "success": False,
+                "error": "LOCKED: Live Capital.com trading requires verified registration under official Partner referral code az48cxia."
+            }
+
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
         dir_u = direction.upper()
         
@@ -1875,11 +1888,11 @@ class CapitalPartnerRebateManager:
                 except Exception:
                     display_code = ib_code
         elif len(ib_code) == 8 and ib_code.isalnum():
-            # Capital.com refer-a-friend code (e.g. az48cxia)
+            # Capital.com Pro refer-a-friend code (e.g. az48cxia)
             display_code = ib_code
-            referral_link = f"https://capital.com/referafriend?c={ib_code}&pid=referral&src=inviteFriends"
+            referral_link = f"https://capital.com/referafriend-pro?c={ib_code}&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
         else:
-            referral_link = f"https://capital.com/partner/{ib_code}"
+            referral_link = f"https://capital.com/referafriend-pro?c={ib_code}&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
 
         # Projected run rate based on current active clients (or minimum 1 client projection)
         forecast = self.calculate_passive_income_forecast(
@@ -2348,6 +2361,12 @@ class CapitalAutonomousEngine:
             budget = user.get("budget", 50.0)
             max_pos = user.get("max_positions", 2)
             user_is_demo = user.get("is_demo", False)  # 100% Live Mainnet Real Capital
+
+            # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
+            if not user_is_demo and not db.is_capital_user_authorized(chat_id):
+                logger.warning(f"🔒 [REFERRAL GATEKEEPER] TradFi Auto-Trade blocked for User {chat_id}: Unverified Capital.com referral.")
+                continue
+
             user_engine = get_user_capital_engine(chat_id, is_demo=user_is_demo)
 
             # Available balance safety verification
@@ -2873,6 +2892,11 @@ class CapitalLeadLagArbitrageEngine:
         for chat_id, user_cfg in target_users.items():
             try:
                 is_demo = user_cfg.get("is_demo", False)
+                # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
+                if not is_demo and not db.is_capital_user_authorized(chat_id):
+                    logger.warning(f"🔒 [REFERRAL GATEKEEPER] Lead-Lag trade blocked for User {chat_id}: Unverified Capital.com referral.")
+                    continue
+
                 budget = user_cfg.get("budget", 50.0)
                 user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
 
@@ -3397,6 +3421,11 @@ class CapitalOpeningRangeBreakoutEngine:
             for chat_id, user_cfg in all_target_users.items():
                 try:
                     is_demo = user_cfg.get("is_demo", False)
+                    # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
+                    if not is_demo and not db.is_capital_user_authorized(chat_id):
+                        logger.warning(f"🔒 [REFERRAL GATEKEEPER] ORB breakout trade blocked for User {chat_id}: Unverified Capital.com referral.")
+                        continue
+
                     budget = user_cfg.get("budget", 50.0)
                     user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
 

@@ -97,4 +97,5 @@ def get_admin_bot_commands():
         BotCommand("admin_nuke", "☢️ Emergency Panic Nuke & Shutdown"),
         BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
         BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
+        BotCommand("admin_capital", "🏢 Capital.com Live Verification Approver"),
     ]

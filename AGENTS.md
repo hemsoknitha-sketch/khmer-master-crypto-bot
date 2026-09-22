@@ -374,7 +374,22 @@ Any modification that breaks any of the following 30 invariants is considered an
      - Sizing across assets is calibrated to equalize 1R dollar risk ($1.20 - $2.50 per trade on micro/small capital), clamping Gold (`GOLD`) to $0.01 - 0.02$ lot so that one loss on Gold cannot overwhelm profits from Oil/Indices/Stocks.
   4. **Expulsion of Natural Gas from Automated ORB Breakouts:**
      - Erratic, wide-spread assets like `NATGAS` are 100% expunged from automated ORB breakout execution.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 28/28].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 28/29].
+
+### Invariant 36: Capital.com Pro Referral Gatekeeper & Live Account Verification Standard
+- **Location:** `database.py` (`is_capital_user_authorized`, `set_capital_user_referral_status`, `get_pending_capital_verification_users`), `capital_engine.py` (`CAPITAL_PRO_REFERRAL_URL`, `get_partner_dashboard`, `execute_autonomous_cycle`, `execute_orb_cycle`, `execute_leadlag_cycle`), `bot_thread.py` (`build_capital_referral_gatekeeper_ui`, `admin_capital_command`, `capital_command`, button callback handlers)
+- **Rule:**
+  1. **Demo Mode Freedom ($10,000 Virtual):** Demo mode is 100% open and unrestricted for all users to test, backtest, and explore the bot.
+  2. **Strict Live Mode Gatekeeper:** Live Real Capital Trading (Auto-Trade, ORB Breakout, Lead-Lag Arbitrage, and Manual Trading) is strictly gated. Any unverified Live account attempting to trade is intercepted with the **Referral Gatekeeper UI**.
+  3. **Official Pro Referral URL Lock:** The default partner referral link across the repository is permanently locked to:
+     `https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000` (Partner Code: `az48cxia`).
+  4. **Authorization Protocol:** A user is authorized for Live Real Capital if:
+     - `chat_id == 859271875` (Master Super Admin), or
+     - `is_referral_verified == 1` in `user_capital_credentials`, or
+     - `partner_code` contains `az48cxia` in `capital_user_referrals`, or
+     - `license_expiry == 'Administrator'`.
+  5. **1-Tap Admin Approval Workflow:** Users can submit instant verification requests via Telegram (`btn_cap_req_verify`), generating an interactive approval card for Super Admin with `[ ✅ Approve Live Access ]` and `[ ❌ Reject ]` callbacks.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 29/29].
 
 ---
 
@@ -382,8 +397,8 @@ Any modification that breaks any of the following 30 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 35 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 28 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 36 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 29 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main

@@ -248,6 +248,20 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN dynamic_leverage_enabled BOOLEAN DEFAULT 1")
     except sqlite3.OperationalError:
         pass
+
+    # Capital Referral Gatekeeper Lock migrations
+    try:
+        cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN is_referral_verified BOOLEAN DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN referral_code TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE user_capital_credentials ADD COLUMN verified_at DATETIME")
+    except sqlite3.OperationalError:
+        pass
         
     # Grid trading migrations
     try:
@@ -978,6 +992,9 @@ def init_db():
             account_id TEXT DEFAULT '',
             currency TEXT DEFAULT 'USD',
             is_demo BOOLEAN DEFAULT 1,
+            is_referral_verified BOOLEAN DEFAULT 0,
+            referral_code TEXT DEFAULT '',
+            verified_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
@@ -3058,11 +3075,14 @@ def set_user_capital_credentials(
     password: str,
     account_id: str = "",
     currency: str = "USD",
-    is_demo: bool = True
+    is_demo: bool = True,
+    is_referral_verified: Optional[bool] = None,
+    referral_code: str = ""
 ) -> bool:
     """
     Saves or updates user's Capital.com / Prop Firm credentials securely via military-grade AES-256.
     Every credential field (api_key, identifier, password) is encrypted before persisting to SQLite.
+    Master Admin (chat_id 859271875) is automatically verified for Live Real Capital access.
     """
     clean_key = str(api_key or "").strip()
     clean_id = str(identifier or "").strip()
@@ -3077,22 +3097,50 @@ def set_user_capital_credentials(
     enc_id = security.encrypt_data(clean_id)
     enc_pwd = security.encrypt_data(clean_pwd)
 
+    # Master Admin is automatically verified
+    if chat_id == 859271875:
+        eff_verified = 1
+        eff_code = referral_code or "az48cxia"
+    elif is_referral_verified is not None:
+        eff_verified = 1 if is_referral_verified else 0
+        eff_code = referral_code
+    else:
+        eff_verified = None
+        eff_code = referral_code
+
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            INSERT INTO user_capital_credentials (
-                chat_id, api_key, identifier, password, account_id, currency, is_demo, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(chat_id) DO UPDATE SET
-                api_key = excluded.api_key,
-                identifier = excluded.identifier,
-                password = excluded.password,
-                account_id = CASE WHEN excluded.account_id != '' THEN excluded.account_id ELSE user_capital_credentials.account_id END,
-                currency = excluded.currency,
-                is_demo = excluded.is_demo,
-                updated_at = CURRENT_TIMESTAMP
-        """, (chat_id, enc_key, enc_id, enc_pwd, clean_acc, clean_curr, 1 if is_demo else 0))
+        if eff_verified is not None:
+            cursor.execute("""
+                INSERT INTO user_capital_credentials (
+                    chat_id, api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    api_key = excluded.api_key,
+                    identifier = excluded.identifier,
+                    password = excluded.password,
+                    account_id = CASE WHEN excluded.account_id != '' THEN excluded.account_id ELSE user_capital_credentials.account_id END,
+                    currency = excluded.currency,
+                    is_demo = excluded.is_demo,
+                    is_referral_verified = excluded.is_referral_verified,
+                    referral_code = CASE WHEN excluded.referral_code != '' THEN excluded.referral_code ELSE user_capital_credentials.referral_code END,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (chat_id, enc_key, enc_id, enc_pwd, clean_acc, clean_curr, 1 if is_demo else 0, eff_verified, eff_code))
+        else:
+            cursor.execute("""
+                INSERT INTO user_capital_credentials (
+                    chat_id, api_key, identifier, password, account_id, currency, is_demo, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    api_key = excluded.api_key,
+                    identifier = excluded.identifier,
+                    password = excluded.password,
+                    account_id = CASE WHEN excluded.account_id != '' THEN excluded.account_id ELSE user_capital_credentials.account_id END,
+                    currency = excluded.currency,
+                    is_demo = excluded.is_demo,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (chat_id, enc_key, enc_id, enc_pwd, clean_acc, clean_curr, 1 if is_demo else 0))
         conn.commit()
         conn.close()
         return True
@@ -3107,13 +3155,13 @@ def set_user_capital_credentials(
 def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
     """
     Retrieves and decrypts user's Capital.com / Prop Firm credentials using military-grade AES-256.
-    Returns dict: {'api_key', 'identifier', 'password', 'account_id', 'currency', 'is_demo'}
+    Returns dict: {'api_key', 'identifier', 'password', 'account_id', 'currency', 'is_demo', 'is_referral_verified', 'referral_code'}
     """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT api_key, identifier, password, account_id, currency, is_demo
+            SELECT api_key, identifier, password, account_id, currency, is_demo, is_referral_verified, referral_code
             FROM user_capital_credentials WHERE chat_id = ?
         """, (chat_id,))
         row = cursor.fetchone()
@@ -3137,13 +3185,20 @@ def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
         if not dec_key or not dec_id or not dec_pwd:
             return None
 
+        is_ref_ver = bool(row[6]) if len(row) > 6 and row[6] is not None else False
+        # Master admin override
+        if chat_id == 859271875:
+            is_ref_ver = True
+
         return {
             "api_key": dec_key,
             "identifier": dec_id,
             "password": dec_pwd,
             "account_id": str(row[3] or ""),
             "currency": str(row[4] or "USD"),
-            "is_demo": bool(row[5])
+            "is_demo": bool(row[5]),
+            "is_referral_verified": is_ref_ver,
+            "referral_code": str(row[7] or "") if len(row) > 7 else ""
         }
     except Exception:
         try:
@@ -3151,6 +3206,126 @@ def get_user_capital_credentials(chat_id: int) -> Optional[Dict[str, Any]]:
         except Exception:
             pass
         return None
+
+def is_capital_user_authorized(chat_id: int) -> bool:
+    """
+    Capital.com Pro Referral Gatekeeper Lock (Invariant 36):
+    Checks if a user is authorized to trade Live Mainnet Real Capital on Capital.com.
+    Returns True if:
+    1. chat_id == 859271875 (Master Super Admin)
+    2. User is marked is_referral_verified == 1 in user_capital_credentials
+    3. User is linked in capital_user_referrals with partner_code containing 'az48cxia'
+    4. User license_expiry is 'Administrator'
+    """
+    if chat_id == 859271875:
+        return True
+
+    # Check administrator license
+    try:
+        if is_user_vip(chat_id) and get_user_license(chat_id) == 'Administrator':
+            return True
+    except Exception:
+        pass
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Check user_capital_credentials
+        cursor.execute("SELECT is_referral_verified FROM user_capital_credentials WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        if row and row[0] == 1:
+            conn.close()
+            return True
+
+        # 2. Check capital_user_referrals
+        cursor.execute("SELECT partner_code FROM capital_user_referrals WHERE client_chat_id = ?", (chat_id,))
+        ref_row = cursor.fetchone()
+        if ref_row and "az48cxia" in str(ref_row[0] or "").lower():
+            conn.close()
+            return True
+
+        conn.close()
+        return False
+    except Exception as e:
+        print(f"⚠️ Error checking is_capital_user_authorized for {chat_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def set_capital_user_referral_status(
+    chat_id: int,
+    is_verified: bool,
+    referral_code: str = "az48cxia",
+    notes: str = ""
+) -> bool:
+    """
+    Sets or updates the Capital.com referral verification status for a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE user_capital_credentials
+            SET is_referral_verified = ?, referral_code = ?, verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+        """, (1 if is_verified else 0, referral_code, chat_id))
+
+        # Also ensure link in capital_user_referrals
+        if is_verified:
+            cursor.execute("""
+                INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+                VALUES (?, 859271875, ?)
+                ON CONFLICT(client_chat_id) DO UPDATE SET
+                    partner_chat_id = 859271875,
+                    partner_code = excluded.partner_code
+            """, (chat_id, referral_code))
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error in set_capital_user_referral_status for {chat_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def get_pending_capital_verification_users() -> List[Dict[str, Any]]:
+    """
+    Returns a list of users with Live credentials that are not yet verified.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username
+            FROM user_capital_credentials c
+            LEFT JOIN users u ON c.chat_id = u.chat_id
+            WHERE c.is_demo = 0 AND (c.is_referral_verified = 0 OR c.is_referral_verified IS NULL)
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "chat_id": r[0],
+                "account_id": str(r[1] or ""),
+                "currency": str(r[2] or "USD"),
+                "is_demo": bool(r[3]),
+                "is_referral_verified": bool(r[4]) if r[4] is not None else False,
+                "username": str(r[5] or f"User_{r[0]}")
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"⚠️ Error in get_pending_capital_verification_users: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
 
 def delete_user_capital_credentials(chat_id: int) -> bool:
     """Removes user's Capital.com credentials securely from SQLite."""
@@ -7588,6 +7763,13 @@ def close_perpetual_wealth_spot_trade(trade_id: int) -> bool:
     except Exception as e:
         print(f"⚠️ [DATABASE] Error in close_perpetual_wealth_spot_trade: {e}")
         return False
+
+# Initialize and auto-migrate database schema on startup
+try:
+    init_db()
+except Exception:
+    pass
+
 
 
 
