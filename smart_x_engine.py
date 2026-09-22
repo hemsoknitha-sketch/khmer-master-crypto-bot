@@ -17,6 +17,7 @@ import time
 import math
 import json
 import warnings
+from typing import Union, Dict, Any, Optional, Tuple, List
 from datetime import datetime, timezone
 import numpy as np
 import requests
