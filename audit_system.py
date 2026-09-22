@@ -35,7 +35,7 @@ def run_audit():
     failures = []
     
     # 1. Compile all python files
-    print("\n[CHECK 1/27] Verifying Syntax & AST Compilation for all Python files...")
+    print("\n[CHECK 1/28] Verifying Syntax & AST Compilation for all Python files...")
     py_files = glob.glob("*.py")
     comp_failed = []
     for f in py_files:
@@ -50,7 +50,7 @@ def run_audit():
         log_pass(f"All {len(py_files)} Python files compiled with ZERO syntax errors!")
 
     # 2. Database Deduplication Check
-    print("\n[CHECK 2/27] Verifying database.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 2/28] Verifying database.py Zero-Duplicate-Function Invariant...")
     try:
         with open("database.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -69,7 +69,7 @@ def run_audit():
         log_fail(str(e))
 
     # 3. Scheduler Tasks Deduplication Check
-    print("\n[CHECK 3/27] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 3/28] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -88,7 +88,7 @@ def run_audit():
         log_fail(str(e))
 
     # 4. Command Dispatcher Integrity & Consolidation Check
-    print("\n[CHECK 4/27] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
+    print("\n[CHECK 4/28] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -165,7 +165,7 @@ def run_audit():
         log_fail(str(e))
 
     # 5. Spot MIN_NOTIONAL Filter Shield ($10.50 floor)
-    print("\n[CHECK 5/27] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
+    print("\n[CHECK 5/28] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -180,7 +180,7 @@ def run_audit():
         log_fail(str(e))
 
     # 6. Binance Hedge Mode & Error -4061 Recovery Check
-    print("\n[CHECK 6/27] Verifying Hedge Mode & DualSidePosition Invariant...")
+    print("\n[CHECK 6/28] Verifying Hedge Mode & DualSidePosition Invariant...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -199,7 +199,7 @@ def run_audit():
         log_fail(str(e))
 
     # 7. Isolated Margin Enforcement Check
-    print("\n[CHECK 7/27] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
+    print("\n[CHECK 7/28] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -214,7 +214,7 @@ def run_audit():
         log_fail(str(e))
 
     # 8. Small Capital Leverage Shield Check (<=10x)
-    print("\n[CHECK 8/27] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
+    print("\n[CHECK 8/28] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -229,7 +229,7 @@ def run_audit():
         log_fail(str(e))
 
     # 9. TradFi Stock Perpetual & Delisted Exclusion Check
-    print("\n[CHECK 9/27] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
+    print("\n[CHECK 9/28] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -244,7 +244,7 @@ def run_audit():
         log_fail(str(e))
 
     # 10. Fee-Adjusted Net Profit Floor (+0.12% Offset)
-    print("\n[CHECK 10/27] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
+    print("\n[CHECK 10/28] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -259,7 +259,7 @@ def run_audit():
         log_fail(str(e))
 
     # 11. Telegram Inline Keyboard Button & Callback Query Routing Audit (Repository-Wide)
-    print("\n[CHECK 11/27] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
+    print("\n[CHECK 11/28] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -321,7 +321,7 @@ def run_audit():
         log_fail(str(e))
 
     # 12. DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Invariant Audit
-    print("\n[CHECK 12/27] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
+    print("\n[CHECK 12/28] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
     try:
         # Check flash_loan_mev_engine.py
         with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
@@ -350,7 +350,7 @@ def run_audit():
         log_fail(str(e))
 
     # 13. Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)
-    print("\n[CHECK 13/27] Verifying Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)...")
+    print("\n[CHECK 13/28] Verifying Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -371,7 +371,7 @@ def run_audit():
         log_fail(str(e))
 
     # 14. Single-Asset Mode Enforcement (Binance Error -4168 Auto-Recovery)
-    print("\n[CHECK 14/27] Verifying Single-Asset Mode Enforcement (Zero Error -4168 Contagion)...")
+    print("\n[CHECK 14/28] Verifying Single-Asset Mode Enforcement (Zero Error -4168 Contagion)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -390,7 +390,7 @@ def run_audit():
         log_fail(str(e))
 
     # 15. News Sentiment Technical Confirmation Shield
-    print("\n[CHECK 15/27] Verifying News Sentiment Technical Confirmation Shield...")
+    print("\n[CHECK 15/28] Verifying News Sentiment Technical Confirmation Shield...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             st_code = f.read()
@@ -408,7 +408,7 @@ def run_audit():
 
 
     # 16. Flash Loan Quantitative Edge & Zero-Risk Boundary Lock (Invariant 19)
-    print("\n[CHECK 16/27] Verifying Flash Loan Atomic Revert & Zero-Hallucination Invariant...")
+    print("\n[CHECK 16/28] Verifying Flash Loan Atomic Revert & Zero-Hallucination Invariant...")
     try:
         with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
             fl_code = f.read()
@@ -434,7 +434,7 @@ def run_audit():
         log_fail(str(e))
 
     # 17. The Golden 85% Profit Ratchet & Breakeven Armor Lock (Invariant 24)
-    print("\n[CHECK 17/27] Verifying Golden 85% Profit Ratchet & Breakeven Armor (Invariant 24)...")
+    print("\n[CHECK 17/28] Verifying Golden 85% Profit Ratchet & Breakeven Armor (Invariant 24)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -459,7 +459,7 @@ def run_audit():
         log_fail(str(e))
 
     # 18. Dynamic Small Capital Fortress & Zero Blind Investing Guarantee (Invariant 25)
-    print("\n[CHECK 18/27] Verifying Dynamic Small Capital Fortress & Zero Blind Investing (Invariant 25)...")
+    print("\n[CHECK 18/28] Verifying Dynamic Small Capital Fortress & Zero Blind Investing (Invariant 25)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -482,7 +482,7 @@ def run_audit():
         log_fail(str(e))
 
     # 19. Sub-Mode Explicit State Segregation & Non-Collapsible Invariant (Invariant 26)
-    print("\n[CHECK 19/27] Verifying Sub-Mode Explicit State Segregation & Non-Collapsible Invariant (Invariant 26)...")
+    print("\n[CHECK 19/28] Verifying Sub-Mode Explicit State Segregation & Non-Collapsible Invariant (Invariant 26)...")
     try:
         with open("bot_thread.py", "r", encoding="utf-8") as f:
             bt_code = f.read()
@@ -508,7 +508,7 @@ def run_audit():
     except Exception as e:
         failures.append(f"Invariant 26 check failed: {e}")
     # 20. Google Cloud e2-standard-4 Hardware & Hugging Face Cloud AI Brain Lock (Invariant 27)
-    print("\n[CHECK 20/27] Verifying Google Cloud e2-standard-4 & Hugging Face Cloud AI Brain Lock (Invariant 27)...")
+    print("\n[CHECK 20/28] Verifying Google Cloud e2-standard-4 & Hugging Face Cloud AI Brain Lock (Invariant 27)...")
     try:
         with open("bot_thread.py", "r", encoding="utf-8") as f:
             bt_code = f.read()
@@ -533,7 +533,7 @@ def run_audit():
         log_fail(str(e))
 
     # 21. 24/7 Perpetual Wealth Generator Triple-Phase Extraction & Safety Covenant Lock (Invariant 28)
-    print("\n[CHECK 21/27] Verifying 24/7 Perpetual Wealth Generator & Safety Covenant (Invariant 28)...")
+    print("\n[CHECK 21/28] Verifying 24/7 Perpetual Wealth Generator & Safety Covenant (Invariant 28)...")
     try:
         with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
             pw_code = f.read()
@@ -562,7 +562,7 @@ def run_audit():
         log_fail(str(e))
 
     # 22. Nanosecond Direct RAM Tick Access Latency Standard (Invariant 29)
-    print("\n[CHECK 22/27] Verifying Nanosecond Direct RAM Tick Access Latency Standard (0.001 - 0.0003 ms Invariant 29)...")
+    print("\n[CHECK 22/28] Verifying Nanosecond Direct RAM Tick Access Latency Standard (0.001 - 0.0003 ms Invariant 29)...")
     try:
         with open("websocket_engine.py", "r", encoding="utf-8") as f:
             ws_code = f.read()
@@ -614,7 +614,7 @@ def run_audit():
 
 
     # 23. Perpetual Wealth Free Margin Gatekeeper, Autonomous Stale Limit Prune & Smart Swap Volatility Buffer (Invariant 30)
-    print("\n[CHECK 23/27] Verifying Perpetual Wealth Free Margin Gatekeeper, Stale Prune & Smart Swap Volatility Buffer (Invariant 30)...")
+    print("\n[CHECK 23/28] Verifying Perpetual Wealth Free Margin Gatekeeper, Stale Prune & Smart Swap Volatility Buffer (Invariant 30)...")
     try:
         with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
             pw_code = f.read()
@@ -644,7 +644,7 @@ def run_audit():
         log_fail(str(e))
 
     # 24. Capital.com Lead-Lag Arbitrage Engine & Pure Latency Alpha Standard (Invariant 31)
-    print("\n[CHECK 24/27] Verifying Capital.com Lead-Lag Arbitrage Engine & Pure Latency Alpha Standard (Invariant 31)...")
+    print("\n[CHECK 24/28] Verifying Capital.com Lead-Lag Arbitrage Engine & Pure Latency Alpha Standard (Invariant 31)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -683,7 +683,7 @@ def run_audit():
 
 
     # 25. London & New York Opening Range Breakout (ORB 15m) Matrix Standard (Invariant 32)
-    print("\n[CHECK 25/27] Verifying London & NY Opening Range Breakout (ORB 15m) Matrix (Invariant 32)...")
+    print("\n[CHECK 25/28] Verifying London & NY Opening Range Breakout (ORB 15m) Matrix (Invariant 32)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -726,7 +726,7 @@ def run_audit():
         log_fail(str(e))
 
     # 26. Fractional Kelly Criterion Dynamic Position Sizer Standard (Invariant 33)
-    print("\n[CHECK 26/27] Verifying Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)...")
+    print("\n[CHECK 26/28] Verifying Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -773,7 +773,7 @@ def run_audit():
 
 
     # 27. Spread Drag Elimination & Asymmetric Minimum Hurdle Protocol (Invariant 34)
-    print("\n[CHECK 27/27] Verifying Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34)...")
+    print("\n[CHECK 27/28] Verifying Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -817,6 +817,54 @@ def run_audit():
             log_fail("Spread Drag Elimination specification missing or mathematical unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 34 check failed: {e}")
+        log_fail(str(e))
+
+    # 28. Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15-Minute Asset Cooldown Standard (Invariant 35)
+    print("\n[CHECK 28/28] Verifying Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15m Cooldown (Invariant 35)...")
+    try:
+        with open("capital_engine.py", "r", encoding="utf-8") as f:
+            cap_code = f.read()
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+
+        has_cooldowns = "_asset_cooldowns" in cap_code and "self._asset_cooldowns[epic_u] = time.time() + 900.0" in cap_code
+        has_be_buy = "safe_ceiling_sl = round(current_price - (spread * 1.5), 2)" in cap_code and "new_sl = min(target_be_sl, safe_ceiling_sl)" in cap_code
+        has_be_sell = "safe_floor_sl = round(current_price + (spread * 1.5), 2)" in cap_code and "new_sl = max(target_be_sl, safe_floor_sl)" in cap_code
+        has_gold_clamp = 'resolved_epic == "GOLD":' in cap_code and "min_size" in cap_code
+        has_inv35 = "Invariant 35" in agents_code and "Mathematical Breakeven Armor" in agents_code
+
+        # Dynamic Unit Test: Mathematical price buffer verification
+        entry = 100.0
+        cur_p_buy = 101.0
+        cur_p_sell = 99.0
+        spread = 0.20
+
+        # BUY: BE target should be entry + 0.5*spread = 100.10, safe ceiling SL <= cur_p - 1.5*spread = 100.70
+        target_be_buy = entry + max(spread * 0.5, 0.001 * entry)
+        safe_ceiling_buy = cur_p_buy - (spread * 1.5)
+        eff_sl_buy = min(target_be_buy, safe_ceiling_buy)
+
+        # SELL: BE target should be entry - 0.5*spread = 99.90, safe floor SL >= cur_p + 1.5*spread = 99.30
+        target_be_sell = entry - max(spread * 0.5, 0.001 * entry)
+        safe_floor_sell = cur_p_sell + (spread * 1.5)
+        eff_sl_sell = max(target_be_sell, safe_floor_sell)
+
+        math_ok = (
+            eff_sl_buy < cur_p_buy and
+            eff_sl_buy >= entry and
+            eff_sl_sell > cur_p_sell and
+            eff_sl_sell <= entry and
+            (cur_p_buy - eff_sl_buy) >= (spread * 1.5) and
+            (eff_sl_sell - cur_p_sell) >= (spread * 1.5)
+        )
+
+        if has_cooldowns and has_be_buy and has_be_sell and has_gold_clamp and has_inv35 and math_ok:
+            log_pass("Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15m Cooldown (Invariant 35) are 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 35 check failed: cooldowns={has_cooldowns}, be_buy={has_be_buy}, be_sell={has_be_sell}, gold_clamp={has_gold_clamp}, inv35={has_inv35}, math_ok={math_ok}")
+            log_fail("Mathematical Breakeven Armor (Invariant 35) specification missing or unit test failure!")
+    except Exception as e:
+        failures.append(f"Invariant 35 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

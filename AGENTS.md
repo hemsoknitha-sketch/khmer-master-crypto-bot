@@ -360,7 +360,21 @@ Any modification that breaks any of the following 30 invariants is considered an
      If $\text{VSQI} < 3.0$, the asset's current volatility is too compressed relative to transaction friction (liquidity drought / holiday freeze). Orders are strictly blocked with reason `SPREAD_CONGESTION_VSQI_LOW`.
   4. **Pre-Execution Spread Expansion Shield:**
      Orders are immediately aborted if live spread expands $> 30\%$ above historical baseline ($\text{Spread} > 1.30 \times \text{Baseline}$) due to sudden liquidity withdrawal or news spike blowout.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 27/27].
+### Invariant 35: Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15-Minute Asset Cooldown Standard
+- **Location:** `capital_engine.py` (`_ratchet_engine_positions`, `execute_autonomous_cycle`, `execute_orb_cycle`, `execute_smart_tradfi_order`), `audit_system.py`
+- **Rule:** To eliminate "Death by a Thousand Papercuts", premature stop-outs, and spread bleed on Capital.com CFD positions:
+  1. **Strict Mathematical Price Buffering for Breakeven Armor:**
+     - Breakeven Armor triggers strictly at $\ge +8.0\%$ ROI on margin ($\ge +1.5\text{R}$).
+     - The modified Stop-Loss for BUY positions MUST be strictly $\le \text{current\_market\_price} - (1.5 \times \text{Spread})$, and for SELL positions MUST be $\ge \text{current\_market\_price} + (1.5 \times \text{Spread})$ — NEVER higher than market price for BUY or lower for SELL.
+     - The Stop-Loss locks in at least $\text{Entry} + (0.5 \times \text{Spread})$ for BUY (and $\text{Entry} - 0.5 \times \text{Spread}$ for SELL) to guarantee a genuine net profit after all broker spread costs.
+  2. **15-Minute Anti-Overtrading Asset Cooldown Shield:**
+     - Whenever a position closes (via SL, TP, or Breakeven), a mandatory 15-minute cooldown (`self._asset_cooldowns[epic] = now + 900.0`) is enforced on that asset.
+     - Prevents high-frequency re-entry churn and repeated spread bleed in sideways consolidation.
+  3. **Normalized 1R Dollar Risk Allocation:**
+     - Sizing across assets is calibrated to equalize 1R dollar risk ($1.20 - $2.50 per trade on micro/small capital), clamping Gold (`GOLD`) to $0.01 - 0.02$ lot so that one loss on Gold cannot overwhelm profits from Oil/Indices/Stocks.
+  4. **Expulsion of Natural Gas from Automated ORB Breakouts:**
+     - Erratic, wide-spread assets like `NATGAS` are 100% expunged from automated ORB breakout execution.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 28/28].
 
 ---
 
@@ -368,8 +382,8 @@ Any modification that breaks any of the following 30 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 30 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 27 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 35 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 28 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
