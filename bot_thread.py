@@ -5999,6 +5999,20 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["API"]
                 await capital_command(update, context)
+            elif data == "btn_cap_api_delete":
+                try:
+                    await update.callback_query.answer("🗑️ លុប Capital.com API ចេញពី Vault...")
+                except Exception:
+                    pass
+                context.args = ["API", "DELETE"]
+                await capital_command(update, context)
+            elif data == "btn_cap_api_test":
+                try:
+                    await update.callback_query.answer("🔌 កំពុងធ្វើតេស្ត API Connection...")
+                except Exception:
+                    pass
+                context.args = ["PROP", "TEST"]
+                await prop_firm_command(update, context)
             elif data in ["btn_cap_ib_menu", "btn_cap_ib_refresh", "btn_capital_ib"]:
                 try:
                     await update.callback_query.answer("🤝 កំពុងបើក IB Partner & Spread Rebate...")
@@ -19385,6 +19399,163 @@ class TelegramBotThread(BaseThread):
                 elif action in ["IB", "REBATE", "PARTNER"]:
                     context.args = args[1:]
                     await capital_ib_command(update, context)
+                    return
+                elif action in ["API", "VAULT", "KEY", "KEYS", "CREDENTIALS", "CREDS"]:
+                    sub_args = args[1:]
+                    has_creds = db.has_user_capital_credentials(chat_id)
+                    user_creds = db.get_user_capital_credentials(chat_id) if has_creds else None
+
+                    if sub_args and str(sub_args[0]).upper().strip() in ["DELETE", "REMOVE", "RESET", "CLEAR"]:
+                        db.delete_user_capital_credentials(chat_id)
+                        capital_engine.invalidate_user_capital_engine(chat_id)
+                        del_kb = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("🔑 ភ្ជាប់ API ឡើងវិញ", callback_data="btn_cap_api_vault")],
+                            [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+                        ])
+                        del_msg = (
+                            f"🗑️ **CAPITAL.COM API VAULT ត្រូវបានលុបជោគជ័យ!**\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"ℹ️ _ព័ត៌មានសម្ងាត់ API ទាំងអស់ត្រូវបានលុបចេញពីប្រព័ន្ធដោយសុវត្ថិភាព។ ប្រព័ន្ធនឹងប្រើប្រាស់ Default Global Engine ឡើងវិញ!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🗑️ **CAPITAL.COM API VAULT CLEARED!**\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"ℹ️ _All API credentials safely purged. System reverted to default global pool._"
+                        )
+                        await update.effective_message.reply_text(del_msg, parse_mode="Markdown", reply_markup=del_kb)
+                        return
+
+                    elif len(sub_args) >= 3:
+                        in_key = str(sub_args[0]).strip()
+                        in_id = str(sub_args[1]).strip()
+                        in_pwd = str(sub_args[2]).strip()
+                        in_mode_str = str(sub_args[3]).lower().strip() if len(sub_args) >= 4 else "live"
+                        is_demo_mode = (in_mode_str in ["demo", "virtual", "test", "0", "false"])
+
+                        valid, vmsg, b_info = await asyncio.to_thread(
+                            capital_engine.validate_capital_credentials,
+                            in_key, in_id, in_pwd, is_demo_mode
+                        )
+
+                        if valid:
+                            acc_id = b_info.get("account_id", "")
+                            curr = b_info.get("currency", "USD")
+                            db.set_user_capital_credentials(
+                                chat_id, in_key, in_id, in_pwd,
+                                account_id=acc_id, currency=curr, is_demo=is_demo_mode
+                            )
+                            capital_engine.invalidate_user_capital_engine(chat_id)
+                            bal_val = b_info.get("balance", 0.0)
+                            avail_val = b_info.get("available", 0.0)
+                            mode_lbl = "🟡 DEMO ($10,000 Virtual)" if is_demo_mode else "🟢 LIVE MAINNET (Real Funds)"
+
+                            succ_kb = InlineKeyboardMarkup([
+                                [InlineKeyboardButton("🤖 បើក Capital Auto ភ្លាម", callback_data="btn_cap_auto_toggle")],
+                                [InlineKeyboardButton("🔌 Test Connection", callback_data="btn_cap_api_test")],
+                                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+                            ])
+                            succ_msg = (
+                                f"✅ **CAPITAL.COM API VAULT ភ្ជាប់ជោគជ័យ ១០០%!** 🔐\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏦 **បរិស្ថាន (Mode) ៖** `{mode_lbl}`\n"
+                                f"🆔 **Account ID ៖** `{acc_id}`\n"
+                                f"💵 **សមតុល្យដើមទុន (Balance) ៖** `${bal_val:,.2f} {curr}`\n"
+                                f"📦 **ទុនទំនេរ (Available) ៖** `${avail_val:,.2f} {curr}`\n"
+                                f"🛡️ **ការការពារទិន្នន័យ ៖** `AES-256 Military Encryption`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🚀 _គណនីរបស់អ្នកត្រូវបានភ្ជាប់ដោយជោគជ័យ! ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Auto-Trade ភ្លាមៗ!_"
+                            ) if user_lang == 'khmer' else (
+                                f"✅ **CAPITAL.COM API VAULT CONNECTED!** 🔐\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏦 **Mode:** `{mode_lbl}`\n"
+                                f"🆔 **Account ID:** `{acc_id}`\n"
+                                f"💵 **Balance:** `${bal_val:,.2f} {curr}`\n"
+                                f"📦 **Available:** `${avail_val:,.2f} {curr}`\n"
+                                f"🛡️ **Security:** `AES-256 Military Encryption`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🚀 _Your account is authenticated! Click below to start automated trading!_"
+                            )
+                            await update.effective_message.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                            return
+                        else:
+                            fail_kb = InlineKeyboardMarkup([
+                                [InlineKeyboardButton("🔄 សាកល្បងម្តងទៀត", callback_data="btn_cap_api_vault")],
+                                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+                            ])
+                            fail_msg = (
+                                f"❌ **ការភ្ជាប់ CAPITAL.COM API មិនជោគជ័យ!** ⚠️\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"⚠️ **មូលហេតុ ៖** `{vmsg}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 **ការណែនាំផ្ទៀងផ្ទាត់ ៖**\n"
+                                f"1. ពិនិត្យមើល `API_KEY` ដែលបានបង្កើតលើ Capital.com Web Platform\n"
+                                f"2. ពិនិត្យ `Email/Identifier` និង `Password` ឱ្យបានត្រឹមត្រូវ\n"
+                                f"3. ប្រសិនបើគណនីជា Demo សូមបញ្ជាក់ `demo` នៅចុងបញ្ចប់\n"
+                                f"• គំរូ ៖ `` `/capital API <KEY> <EMAIL> <PASSWORD> live` ``"
+                            ) if user_lang == 'khmer' else (
+                                f"❌ **CAPITAL.COM AUTHENTICATION FAILED!** ⚠️\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"⚠️ **Reason:** `{vmsg}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 **Checklist:**\n"
+                                f"1. Verify API Key generated on Capital.com\n"
+                                f"2. Verify Email/Identifier & Password\n"
+                                f"• Syntax: `` `/capital API <KEY> <EMAIL> <PASSWORD> live` ``"
+                            )
+                            await update.effective_message.reply_text(fail_msg, parse_mode="Markdown", reply_markup=fail_kb)
+                            return
+
+                    # Default: API Vault Dashboard View
+                    status_badge = "🟢 CONNECTED (Personal Vault)" if has_creds else "⚪ NOT CONNECTED (Using Default Pool)"
+                    acc_num = user_creds.get("account_id", "N/A") if user_creds else "Global Master"
+                    mode_txt = "DEMO" if (user_creds and user_creds.get("is_demo")) else "LIVE"
+
+                    v_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔌 Test Connection", callback_data="btn_cap_api_test"),
+                            InlineKeyboardButton("🗑️ លុប API ចេញ", callback_data="btn_cap_api_delete")
+                        ] if has_creds else [
+                            InlineKeyboardButton("📖 របៀបបង្កើត API Key", url="https://capital.com")
+                        ],
+                        [
+                            InlineKeyboardButton("🤖 បើក Capital Auto", callback_data="btn_cap_auto_toggle"),
+                            InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                        ]
+                    ])
+
+                    v_msg = (
+                        f"🔐 **CAPITAL.COM PERSONAL API VAULT** 💎\n"
+                        f"**ប្រព័ន្ធតភ្ជាប់គណនីផ្ទាល់ខ្លួនរបស់អ្នកវិនិយោគ (Client Integration)**\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📶 **ស្ថានភាពតភ្ជាប់ ៖** `{status_badge}`\n"
+                        f"🆔 **Account ID ៖** `{acc_num}` ({mode_txt})\n"
+                        f"🛡️ **កម្រិតសុវត្ថិភាព ៖** `AES-256 Military Grade Encryption`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🧭 **របៀបភ្ជាប់ API របស់អ្នក ៖**\n"
+                        f"1. ចូលទៅកាន់ **Capital.com** -> **Settings** -> **API Integrations**\n"
+                        f"2. ចុច **Generate API Key** (សិទ្ធិ Trade តែប៉ុណ្ណោះ គ្មានសិទ្ធិដកប្រាក់)\n"
+                        f"3. ផ្ញើសារមកកាន់ Bot តាមទម្រង់ ៖\n"
+                        f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
+                        f"• _(សម្រាប់ Demo: ដាក់ពាក្យ `demo` នៅចុងក្រោយ)_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _ទិន្នន័យត្រូវបាន Encrypt ការពារ ១០០% គ្មានអ្នកណាអាចមើលឃើញ Password របស់អ្នកបានឡើយ!_"
+                    ) if user_lang == 'khmer' else (
+                        f"🔐 **CAPITAL.COM PERSONAL API VAULT** 💎\n"
+                        f"**Client Integration & Personal Account Management**\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📶 **Connection Status:** `{status_badge}`\n"
+                        f"🆔 **Account ID:** `{acc_num}` ({mode_txt})\n"
+                        f"🛡️ **Encryption:** `AES-256 Military Grade Encryption`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🧭 **How to connect your account:**\n"
+                        f"1. Go to **Capital.com** -> **Settings** -> **API Integrations**\n"
+                        f"2. Generate your API Key (Trading permissions only, 0% withdrawal risk)\n"
+                        f"3. Send command to Bot:\n"
+                        f"• `` `/capital API <API_KEY> <EMAIL> <PASSWORD> live` ``\n"
+                        f"• _(For Demo: append `demo` at the end)_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _All credentials are fully AES-256 encrypted._"
+                    )
+                    await update.effective_message.reply_text(v_msg, parse_mode="Markdown", reply_markup=v_kb)
                     return
                 elif action in ["LEADLAG", "LEAD_LAG", "ARB", "ARBITRAGE"]:
                     context.args = args[1:]
