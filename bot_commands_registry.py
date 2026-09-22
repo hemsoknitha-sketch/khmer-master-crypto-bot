@@ -41,6 +41,8 @@ def get_public_bot_commands():
         BotCommand("wealth", "💎 24/7 Perpetual Wealth Generator"),
         BotCommand("turbo_hedge", "🛡️ Autonomous Dual-Side Hedge Engine"),
         BotCommand("smartx", "👑 Apex Multi-Layer AI Quant Suite"),
+        BotCommand("smartx_reachsey_meas", "🥇 Reachsey Meas Gold AI Pending Stop"),
+        BotCommand("smartx_reachsey_crypto", "🪙 Reachsey Crypto Multi-Asset Stop"),
         BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
         BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
 

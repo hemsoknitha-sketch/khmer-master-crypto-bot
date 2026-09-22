@@ -6180,6 +6180,9 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_turbo_hedge_circuit_breaker":
                 context.args = ["SHIELD"]
                 await turbo_hedge_command(update, context)
+            elif data in ["btn_smart_x_menu", "btn_smart_x", "btn_smartx"]:
+                context.args = []
+                await smart_x_command(update, context)
             elif data == "btn_smart_x_gold":
                 context.args = ["GOLD", "20", "10", "AUTO"]
                 await smart_x_command(update, context)
@@ -6210,6 +6213,21 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smart_x_stop_all":
                 context.args = ["STOP", "ALL"]
                 await smart_x_command(update, context)
+            elif data in ["btn_smartx_reachsey_meas_menu", "btn_smartx_reachsey_meas_refresh"]:
+                context.args = []
+                await smartx_reachsey_meas_command(update, context)
+            elif data == "btn_smartx_reachsey_meas_auto":
+                context.args = ["AUTO"]
+                await smartx_reachsey_meas_command(update, context)
+            elif data in ["btn_smartx_reachsey_crypto_menu", "btn_smartx_reachsey_crypto_refresh"]:
+                context.args = []
+                await smartx_reachsey_crypto_command(update, context)
+            elif data in ["btn_smartx_reachsey_crypto_auto", "btn_smartx_reachsey_crypto_btc"]:
+                context.args = ["BTC", "AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data == "btn_smartx_reachsey_crypto_sol":
+                context.args = ["SOL", "AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
             elif data in ["btn_smart_swap_menu", "btn_smart_swap"]:
                 context.args = []
                 await smart_swap_command(update, context)
@@ -12409,6 +12427,10 @@ class TelegramBotThread(BaseThread):
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 keyboard = InlineKeyboardMarkup([
                     [
+                        InlineKeyboardButton("🥇 Reachsey Meas (Gold)", callback_data="btn_smartx_reachsey_meas_menu"),
+                        InlineKeyboardButton("🪙 Reachsey Crypto", callback_data="btn_smartx_reachsey_crypto_menu")
+                    ],
+                    [
                         InlineKeyboardButton("🛡️ SONIC Scalp", callback_data="btn_smart_x_gold"),
                         InlineKeyboardButton("🚀 TURBO Sprint", callback_data="btn_smart_x_turbo")
                     ],
@@ -12974,6 +12996,325 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update, user_lang)
                 return
 
+        async def smartx_reachsey_meas_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🥇 Reachsey Meas (Gold XAUUSDT) Super Smart Pending Stop Matrix.
+            Autonomous Breakout Straddle using Dynamic ATR Volatility Gap, Sub-Millisecond Native Execution,
+            Anti-Oversold Shield, Fractional Kelly Sizing, and Breakeven Armor.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import smart_x_engine
+            import ui_standards
+
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            msg_target = update.effective_message or update.message
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            # Handle Direct Execution Arguments: /smartx_reachsey_meas AUTO | /smartx_reachsey_meas 30 10
+            if args:
+                token0 = str(args[0]).upper().strip()
+                amt_param = "AUTO" if token0 in ["AUTO", "ON", "START", "RUN"] else token0
+                lev_param = int(args[1]) if len(args) >= 2 and args[1].isdigit() else 10
+
+                exec_res = await asyncio.to_thread(
+                    smart_x_engine.execute_reachsey_meas,
+                    chat_id, amt_param, lev_param
+                )
+
+                if exec_res.get("status") == "success":
+                    orders = exec_res.get("orders_placed", [])
+                    lvl = exec_res.get("levels", {})
+                    order_lines = []
+                    for o in orders:
+                        order_lines.append(f"• `{o['type']}` : Trigger `${o['trigger_price']:,.2f}` | Qty `{o['qty']}` | SL `${o['sl']:,.2f}` | TP `${o['tp']:,.2f}`")
+
+                    succ_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📊 ពិនិត្យ Positions", callback_data="btn_smart_x_metrics")],
+                        [InlineKeyboardButton("🪙 Reachsey Crypto", callback_data="btn_smartx_reachsey_crypto_menu")],
+                        [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")]
+                    ])
+
+                    succ_msg = (
+                        f"🥇 **REACHSEY MEAS (GOLD) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ **ឧបករណ៍ TradFi ៖** `XAUUSDT (Perpetual Futures)`\n"
+                        f"💵 **ទុនបែងចែក (Auto Amount) ៖** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 **15m Dynamic ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📋 **ស្ថានភាពបញ្ជាលើ Order Book (Native STOP_MARKET) ៖**\n"
+                        + "\n".join(order_lines) + "\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **ការការពារទុន ៖** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
+                    ) if user_lang == 'khmer' else (
+                        f"🥇 **REACHSEY MEAS (GOLD) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ **Asset:** `XAUUSDT (Perpetual Futures)`\n"
+                        f"💵 **Allocated Capital:** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 **15m Dynamic ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📋 **Active Exchange STOP_MARKET Orders:**\n"
+                        + "\n".join(order_lines) + "\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **Capital Armor:** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"⚡ _Pre-placed on Binance Futures Order Book for sub-millisecond execution!_"
+                    )
+                    await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                    return
+                else:
+                    err_msg = exec_res.get("message") or ("\n".join(exec_res.get("errors", [])) if exec_res.get("errors") else "Execution error")
+                    await msg_target.reply_text(f"⚠️ **[REACHSEY MEAS]** {err_msg}", parse_mode="Markdown")
+                    return
+
+            # Render Interactive Dashboard
+            lvl = await asyncio.to_thread(smart_x_engine.ReachseyStraddleEngine.calculate_reachsey_levels, "XAUUSDT")
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🚀 បាញ់ Reachsey Gold (Auto)", callback_data="btn_smartx_reachsey_meas_auto"),
+                    InlineKeyboardButton("🪙 Reachsey Crypto", callback_data="btn_smartx_reachsey_crypto_menu")
+                ],
+                [
+                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាពតម្លៃ", callback_data="btn_smartx_reachsey_meas_refresh"),
+                    InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")
+                ]
+            ])
+
+            dash_msg = (
+                f"🥇 **REACHSEY MEAS (GOLD XAUUSDT) SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"📊 **តម្លៃមាសបច្ចុប្បន្ន (Live Gold) ៖** `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 **Dynamic 15m ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (គម្លាត Gap: `1.2x ATR`)\n"
+                f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ **ស្ថានភាព Straddle ៖** `{lvl.get('straddle_mode')}`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎯 **កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា ៖**\n"
+                f"🟢 **PENDING BUY-STOP ៖** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"   • Stop Loss: `${lvl.get('buy_sl'):,.2f}` | Take Profit: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"🔴 **PENDING SELL-STOP ៖** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"   • Stop Loss: `${lvl.get('sell_sl'):,.2f}` | Take Profit: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🛡️ **សសរស្តម្ភការពារទុនទាំង ៥ (Institutional Standard) ៖**\n"
+                f"• Dynamic ATR Volatility Gap (លុបបំបាត់ Static 450 Points)\n"
+                f"• Sub-Millisecond Native Execution (Binance STOP_MARKET Order Book)\n"
+                f"• Anti-Oversold Shield (RSI <= 38.0 ហាម Sell-Stop លើបាត)\n"
+                f"• Fractional Kelly Sizing (0.35x | គ្មាន Martingale Ruin)\n"
+                f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 **គំរូបញ្ជា Auto (1-Tap Copyable) ៖**\n"
+                f"• `` `/smartx_reachsey_meas AUTO` `` _(វិនិយោគស្វ័យប្រវត្តិតាមទុន)_\n"
+                f"• `` `/smartx_reachsey_meas 30 10` `` _(ទុន $30 USDT | Leverage 10x)_\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"_Khmer Master Crypto_\n"
+                f"_APEX SUPER BRAIN AI_\n"
+                f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+            ) if user_lang == 'khmer' else (
+                f"🥇 **REACHSEY MEAS (GOLD XAUUSDT) SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"📊 **Live Gold Price:** `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 **Dynamic 15m ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap Multiplier: `1.2x ATR`)\n"
+                f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ **Straddle State:** `{lvl.get('straddle_mode')}`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎯 **Calculated Pending Stop Levels:**\n"
+                f"🟢 **PENDING BUY-STOP:** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"   • SL: `${lvl.get('buy_sl'):,.2f}` | TP: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"🔴 **PENDING SELL-STOP:** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"   • SL: `${lvl.get('sell_sl'):,.2f}` | TP: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🛡️ **5 Institutional Pillars:**\n"
+                f"• Dynamic ATR Volatility Gap (Zero Static Points)\n"
+                f"• Sub-Millisecond Native Execution (STOP_MARKET Order Book)\n"
+                f"• Anti-Oversold Shield (RSI <= 38.0 Blocks Sell-Stop at Bottom)\n"
+                f"• Fractional Kelly Sizing (0.35x | Zero Martingale Ruin)\n"
+                f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 **1-Tap Commands:**\n"
+                f"• `` `/smartx_reachsey_meas AUTO` `` _(Auto Sizing via Balance)_\n"
+                f"• `` `/smartx_reachsey_meas 30 10` `` _($30 USDT | 10x Leverage)_\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"_Khmer Master Crypto_\n"
+                f"_APEX SUPER BRAIN AI_\n"
+                f"Risk-Free Passive Wealth Generation 24/7!"
+            )
+
+            await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
+
+        async def smartx_reachsey_crypto_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🪙 Reachsey Crypto (Multi-Asset: BTC/ETH/SOL/XRP/BNB) Super Smart Pending Stop Matrix.
+            Autonomous Multi-Asset Breakout Straddle with Dynamic ATR, Sub-Millisecond Order Book Placement,
+            Anti-Oversold Shield, and Fractional Kelly Sizing.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import smart_x_engine
+            import ui_standards
+
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            msg_target = update.effective_message or update.message
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            target_sym = "BTCUSDT"
+            amt_param = "AUTO"
+            lev_param = 10
+
+            if args:
+                if str(args[0]).upper().strip() in ["BTC", "ETH", "SOL", "XRP", "BNB", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"]:
+                    target_sym = str(args[0]).upper().strip()
+                    if not target_sym.endswith("USDT"): target_sym += "USDT"
+                    if len(args) >= 2:
+                        amt_param = "AUTO" if str(args[1]).upper().strip() in ["AUTO", "ON"] else str(args[1])
+                    if len(args) >= 3 and args[2].isdigit():
+                        lev_param = int(args[2])
+                elif str(args[0]).upper().strip() in ["AUTO", "ON", "START", "RUN"]:
+                    amt_param = "AUTO"
+                    if len(args) >= 2 and args[1].isdigit():
+                        lev_param = int(args[1])
+                elif args[0].isdigit() or "." in args[0]:
+                    amt_param = str(args[0])
+                    if len(args) >= 2 and args[1].isdigit():
+                        lev_param = int(args[1])
+
+                exec_res = await asyncio.to_thread(
+                    smart_x_engine.execute_reachsey_crypto,
+                    chat_id, target_sym, amt_param, lev_param
+                )
+
+                if exec_res.get("status") == "success":
+                    orders = exec_res.get("orders_placed", [])
+                    lvl = exec_res.get("levels", {})
+                    order_lines = []
+                    for o in orders:
+                        order_lines.append(f"• `{o['type']}` : Trigger `${o['trigger_price']:,.2f}` | Qty `{o['qty']}` | SL `${o['sl']:,.2f}` | TP `${o['tp']:,.2f}`")
+
+                    succ_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📊 ពិនិត្យ Positions", callback_data="btn_smart_x_metrics")],
+                        [InlineKeyboardButton("🥇 Reachsey Meas Gold", callback_data="btn_smartx_reachsey_meas_menu")],
+                        [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")]
+                    ])
+
+                    succ_msg = (
+                        f"🪙 **REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🪙 **រូបិយប័ណ្ណគ្រីបតូ ៖** `{target_sym}`\n"
+                        f"💵 **ទុនបែងចែក (Auto Amount) ៖** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 **15m Dynamic ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📋 **ស្ថានភាពបញ្ជាលើ Order Book (Native STOP_MARKET) ៖**\n"
+                        + "\n".join(order_lines) + "\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **ការការពារទុន ៖** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
+                    ) if user_lang == 'khmer' else (
+                        f"🪙 **REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🪙 **Asset:** `{target_sym}`\n"
+                        f"💵 **Allocated Capital:** `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"📈 **15m Dynamic ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: 1.2x)\n"
+                        f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}` ({lvl.get('straddle_mode')})\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📋 **Active Exchange STOP_MARKET Orders:**\n"
+                        + "\n".join(order_lines) + "\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🛡️ **Capital Armor:** `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"⚡ _Pre-placed on Binance Futures Order Book for sub-millisecond execution!_"
+                    )
+                    await msg_target.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                    return
+                else:
+                    err_msg = exec_res.get("message") or ("\n".join(exec_res.get("errors", [])) if exec_res.get("errors") else "Execution error")
+                    await msg_target.reply_text(f"⚠️ **[REACHSEY CRYPTO]** {err_msg}", parse_mode="Markdown")
+                    return
+
+            # Render Dashboard
+            lvl = await asyncio.to_thread(smart_x_engine.ReachseyStraddleEngine.calculate_reachsey_levels, "BTCUSDT")
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🚀 បាញ់ Reachsey BTC (Auto)", callback_data="btn_smartx_reachsey_crypto_btc"),
+                    InlineKeyboardButton("⚡ Reachsey SOL", callback_data="btn_smartx_reachsey_crypto_sol")
+                ],
+                [
+                    InlineKeyboardButton("🥇 Reachsey Meas Gold", callback_data="btn_smartx_reachsey_meas_menu"),
+                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព", callback_data="btn_smartx_reachsey_crypto_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")
+                ]
+            ])
+
+            dash_msg = (
+                f"🪙 **REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🪙 **រូបិយប័ណ្ណគំរូ ៖** `BTCUSDT`\n"
+                f"📊 **តម្លៃបច្ចុប្បន្ន (Live BTC) ៖** `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 **Dynamic 15m ATR ៖** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: `1.2x ATR`)\n"
+                f"🎯 **15m RSI ៖** `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ **ស្ថានភាព Straddle ៖** `{lvl.get('straddle_mode')}`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎯 **កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា ៖**\n"
+                f"🟢 **PENDING BUY-STOP ៖** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"   • Stop Loss: `${lvl.get('buy_sl'):,.2f}` | Take Profit: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"🔴 **PENDING SELL-STOP ៖** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"   • Stop Loss: `${lvl.get('sell_sl'):,.2f}` | Take Profit: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🛡️ **សសរស្តម្ភការពារទុនទាំង ៥ ៖**\n"
+                f"• Dynamic ATR Volatility Gap (លុបបំបាត់ Static Points)\n"
+                f"• Sub-Millisecond Native Execution (Binance STOP_MARKET Order Book)\n"
+                f"• Anti-Oversold Shield (RSI <= 38.0 ហាម Sell-Stop លើបាត)\n"
+                f"• Fractional Kelly Sizing (0.35x | គ្មាន Martingale Ruin)\n"
+                f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 **គំរូបញ្ជា Auto (1-Tap Copyable) ៖**\n"
+                f"• `` `/smartx_reachsey_crypto AUTO` `` _(វិនិយោគស្វ័យប្រវត្តលើ BTC)_\n"
+                f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(វិនិយោគលើ SOL ទុន $25 | 10x)_\n"
+                f"• `` `/smartx_reachsey_crypto ETH 30 10` `` _(វិនិយោគលើ ETH ទុន $30 | 10x)_\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"_Khmer Master Crypto_\n"
+                f"_APEX SUPER BRAIN AI_\n"
+                f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+            ) if user_lang == 'khmer' else (
+                f"🪙 **REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX** ⚡\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🪙 **Benchmark Asset:** `BTCUSDT`\n"
+                f"📊 **Live BTC Price:** `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"📈 **Dynamic 15m ATR:** `${lvl.get('atr_15m'):,.2f} USDT` (Gap: `1.2x ATR`)\n"
+                f"🎯 **15m RSI:** `{lvl.get('rsi_15m')}`\n"
+                f"🛡️ **Straddle State:** `{lvl.get('straddle_mode')}`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎯 **Calculated Pending Stop Levels:**\n"
+                f"🟢 **PENDING BUY-STOP:** `${lvl.get('buy_stop_trigger'):,.2f} USDT`\n"
+                f"   • SL: `${lvl.get('buy_sl'):,.2f}` | TP: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"🔴 **PENDING SELL-STOP:** `${lvl.get('sell_stop_trigger'):,.2f} USDT`\n"
+                f"   • SL: `${lvl.get('sell_sl'):,.2f}` | TP: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🛡️ **5 Institutional Pillars:**\n"
+                f"• Dynamic ATR Volatility Gap (Zero Static Points)\n"
+                f"• Sub-Millisecond Native Execution (STOP_MARKET Order Book)\n"
+                f"• Anti-Oversold Shield (RSI <= 38.0 Blocks Sell-Stop at Bottom)\n"
+                f"• Fractional Kelly Sizing (0.35x | Zero Martingale Ruin)\n"
+                f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 **1-Tap Commands:**\n"
+                f"• `` `/smartx_reachsey_crypto AUTO` `` _(Auto Sizing on BTC)_\n"
+                f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(Trade SOL $25 | 10x)_\n"
+                f"• `` `/smartx_reachsey_crypto ETH 30 10` `` _(Trade ETH $30 | 10x)_\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"_Khmer Master Crypto_\n"
+                f"_APEX SUPER BRAIN AI_\n"
+                f"Risk-Free Passive Wealth Generation 24/7!"
+            )
+
+            await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
 
         async def smart_swap_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -17742,6 +18083,15 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("smarttrade", smart_trade_command))
         self.app.add_handler(CommandHandler("smart_x", smart_x_command))
         self.app.add_handler(CommandHandler("smartx", smart_x_command))
+        self.app.add_handler(CommandHandler("smartx_reachsey_meas", smartx_reachsey_meas_command))
+        self.app.add_handler(CommandHandler("smartxreachseymeas", smartx_reachsey_meas_command))
+        self.app.add_handler(CommandHandler("reachsey_meas", smartx_reachsey_meas_command))
+        self.app.add_handler(CommandHandler("reachseymeas", smartx_reachsey_meas_command))
+        self.app.add_handler(CommandHandler("reachsey", smartx_reachsey_meas_command))
+        self.app.add_handler(CommandHandler("smartx_reachsey_crypto", smartx_reachsey_crypto_command))
+        self.app.add_handler(CommandHandler("smartxreachseycrypto", smartx_reachsey_crypto_command))
+        self.app.add_handler(CommandHandler("reachsey_crypto", smartx_reachsey_crypto_command))
+        self.app.add_handler(CommandHandler("reachseycrypto", smartx_reachsey_crypto_command))
         self.app.add_handler(CommandHandler("smart_swap", smart_swap_command))
         self.app.add_handler(CommandHandler("smartswap", smart_swap_command))
         self.app.add_handler(CommandHandler("scalp", scalp_command))

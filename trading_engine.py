@@ -2839,7 +2839,10 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
             "recvWindow": 60000,
             "timestamp": timestamp
         }
-        if order_type == "LIMIT":
+        if "stop_price" in kwargs or "stopPrice" in kwargs:
+            sp = kwargs.get("stop_price") or kwargs.get("stopPrice")
+            ord_params["stopPrice"] = format_price_to_tick_size(symbol, sp)
+        if order_type in ["LIMIT", "STOP", "TAKE_PROFIT"]:
             limit_p = kwargs.get("price")
             if limit_p is not None:
                 ord_params["price"] = format_price_to_tick_size(symbol, limit_p)
