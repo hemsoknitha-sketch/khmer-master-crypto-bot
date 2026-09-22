@@ -6222,11 +6222,29 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_smartx_reachsey_crypto_menu", "btn_smartx_reachsey_crypto_refresh"]:
                 context.args = []
                 await smartx_reachsey_crypto_command(update, context)
-            elif data in ["btn_smartx_reachsey_crypto_auto", "btn_smartx_reachsey_crypto_btc"]:
+            elif data in ["btn_smartx_reachsey_crypto_auto", "btn_smartx_reachsey_crypto_top"]:
+                context.args = ["AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data == "btn_smartx_reachsey_crypto_btc":
                 context.args = ["BTC", "AUTO"]
                 await smartx_reachsey_crypto_command(update, context)
             elif data == "btn_smartx_reachsey_crypto_sol":
                 context.args = ["SOL", "AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data == "btn_smartx_reachsey_crypto_sui":
+                context.args = ["SUI", "AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data == "btn_smartx_reachsey_crypto_near":
+                context.args = ["NEAR", "AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data == "btn_smartx_reachsey_crypto_doge":
+                context.args = ["DOGE", "AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data == "btn_smartx_reachsey_crypto_xrp":
+                context.args = ["XRP", "AUTO"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data == "btn_smartx_reachsey_crypto_5m":
+                context.args = ["AUTO", "5M"]
                 await smartx_reachsey_crypto_command(update, context)
             elif data in ["btn_smart_swap_menu", "btn_smart_swap"]:
                 context.args = []
@@ -13178,7 +13196,7 @@ class TelegramBotThread(BaseThread):
 
         async def smartx_reachsey_crypto_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
-            🪙 Reachsey Crypto (Multi-Asset: BTC/ETH/SOL/XRP/BNB) Super Smart Pending Stop Matrix.
+            🪙 Reachsey Crypto (Top 15 Multi-Asset & AI Velocity Radar) Super Smart Pending Stop Matrix.
             Autonomous Multi-Asset Breakout Straddle with Dynamic ATR, Sub-Millisecond Order Book Placement,
             Anti-Oversold Shield, and Fractional Kelly Sizing.
             """
@@ -13195,38 +13213,48 @@ class TelegramBotThread(BaseThread):
             is_khmer = (user_lang in ['km', 'khmer', '0', '1', 'default'])
             args = list(context.args) if context and context.args else []
 
-            target_sym = "BTCUSDT"
+            target_sym = "AUTO"
             amt_param = "AUTO"
             lev_param = 10
+            tf_param = "15m"
 
             if args:
-                if str(args[0]).upper().strip() in ["BTC", "ETH", "SOL", "XRP", "BNB", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"]:
-                    target_sym = str(args[0]).upper().strip()
-                    if not target_sym.endswith("USDT"): target_sym += "USDT"
-                    if len(args) >= 2:
-                        amt_param = "AUTO" if str(args[1]).upper().strip() in ["AUTO", "ON"] else str(args[1])
+                for a in args:
+                    if str(a).upper().strip() in ["5M", "5MIN", "MICRO", "FAST"]:
+                        tf_param = "5m"
+                        break
+
+                first_arg = str(args[0]).upper().strip()
+                if first_arg in ["AUTO", "ON", "START", "RUN", "TOP", "BEST", "RADAR", "VELOCITY", "ALL", "SCAN"]:
+                    target_sym = "AUTO"
+                    if len(args) >= 2 and (args[1].isdigit() or "." in args[1]):
+                        amt_param = str(args[1])
                     if len(args) >= 3 and args[2].isdigit():
                         lev_param = int(args[2])
-                elif str(args[0]).upper().strip() in ["AUTO", "ON", "START", "RUN"]:
-                    amt_param = "AUTO"
-                    if len(args) >= 2 and args[1].isdigit():
-                        lev_param = int(args[1])
-                elif args[0].isdigit() or "." in args[0]:
-                    amt_param = str(args[0])
-                    if len(args) >= 2 and args[1].isdigit():
-                        lev_param = int(args[1])
+                elif first_arg in ["5M", "5MIN", "MICRO", "FAST"]:
+                    target_sym = "AUTO"
+                    tf_param = "5m"
+                else:
+                    target_sym = first_arg
+                    if not target_sym.endswith("USDT") and not target_sym.endswith("USD"):
+                        target_sym += "USDT"
+                    if len(args) >= 2:
+                        amt_param = "AUTO" if str(args[1]).upper().strip() in ["AUTO", "ON", "5M", "15M"] else str(args[1])
+                    if len(args) >= 3 and args[2].isdigit():
+                        lev_param = int(args[2])
 
                 exec_res = await asyncio.to_thread(
                     smart_x_engine.execute_reachsey_crypto,
-                    chat_id, target_sym, amt_param, lev_param
+                    chat_id, target_sym, amt_param, lev_param, 1.2, tf_param
                 )
 
                 if exec_res.get("status") == "success":
                     orders = exec_res.get("orders_placed", [])
                     lvl = exec_res.get("levels", {})
+                    actual_sym = exec_res.get("symbol", target_sym)
                     order_lines = []
                     for o in orders:
-                        order_lines.append(f"• `{o['type']}` : Trigger `${o['trigger_price']:,.2f}` | Qty `{o['qty']}` | SL `${o['sl']:,.2f}` | TP `${o['tp']:,.2f}`")
+                        order_lines.append(f"• `{o['type']}` : Trigger `${o['trigger_price']:,.4f}` | Qty `{o['qty']}` | SL `${o['sl']:,.4f}` | TP `${o['tp']:,.4f}`")
 
                     succ_kb = InlineKeyboardMarkup([
                         [InlineKeyboardButton("📊 ពិនិត្យ Positions", callback_data="btn_smart_x_metrics")],
@@ -13234,35 +13262,45 @@ class TelegramBotThread(BaseThread):
                         [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")]
                     ])
 
+                    radar_info = exec_res.get("radar_details", {})
+                    radar_block = (
+                        f"🎯 *AI Radar Scan Pick ៖* `{actual_sym}` (Velocity Score: `{radar_info.get('velocity_score')}`)\n"
+                        f"🏆 *Top 3 Volatility Leaders ៖* `{', '.join(radar_info.get('top_3_leaderboard', []))}`\n"
+                    ) if radar_info else ""
+
                     succ_msg = (
-                        f"🪙 *REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
+                        f"🪙 *REACHSEY CRYPTO ({actual_sym}) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🪙 *រូបិយប័ណ្ណគ្រីបតូ ៖* `{target_sym}`\n"
+                        f"🪙 *រូបិយប័ណ្ណគ្រីបតូ ៖* `{actual_sym}`\n"
+                        f"{radar_block}"
                         f"💵 *ទុនបែងចែក (Auto Kelly) ៖* `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"⏱️ *Timeframe Mode ៖* `{lvl.get('timeframe', tf_param).upper()}`\n"
                         f"🧠 *33 AI Swarm Confluence ៖* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                         f"⚡ *Hawkes Jump Momentum ៖* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
-                        f"📈 *15m Dynamic ATR ៖* `${lvl.get('atr_15m'):,.2f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
-                        f"🎯 *15m RSI ៖* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
+                        f"📈 *Dynamic ATR ៖* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                        f"🎯 *RSI ៖* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"📋 *ស្ថានភាពបញ្ជាលើ Order Book (`STOP_MARKET`) ៖*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ *ការការពារទុន ៖* `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *ការការពារទុន ៖* `Smart OCO Auto-Pruner | Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
                     ) if is_khmer else (
-                        f"🪙 *REACHSEY CRYPTO ({target_sym}) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
+                        f"🪙 *REACHSEY CRYPTO ({actual_sym}) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🪙 *Asset:* `{target_sym}`\n"
+                        f"🪙 *Asset:* `{actual_sym}`\n"
+                        f"{radar_block}"
                         f"💵 *Allocated Capital (Kelly):* `${exec_res.get('allocated_usdt'):,.2f} USDT` ({exec_res.get('leverage')}x ISOLATED)\n"
+                        f"⏱️ *Timeframe Mode:* `{lvl.get('timeframe', tf_param).upper()}`\n"
                         f"🧠 *33 AI Swarm Confluence:* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                         f"⚡ *Hawkes Jump Momentum:* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
-                        f"📈 *15m Dynamic ATR:* `${lvl.get('atr_15m'):,.2f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
-                        f"🎯 *15m RSI:* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
+                        f"📈 *Dynamic ATR:* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                        f"🎯 *RSI:* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"📋 *Active Exchange `STOP_MARKET` Orders:*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ *Capital Armor:* `Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *Capital Armor:* `Smart OCO Auto-Pruner | Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _Pre-placed on Binance Futures Order Book for sub-millisecond execution!_"
                     )
                     try:
@@ -13278,13 +13316,30 @@ class TelegramBotThread(BaseThread):
                         await msg_target.reply_text(f"⚠️ [REACHSEY CRYPTO] {err_msg}")
                     return
 
-            # Render Dashboard
-            lvl = await asyncio.to_thread(smart_x_engine.ReachseyStraddleEngine.calculate_reachsey_levels, "BTCUSDT")
+            # Render Dashboard with Top Velocity Radar Scan
+            scored = await asyncio.to_thread(smart_x_engine.ReachseyStraddleEngine.scan_top_velocity_assets)
+            top_cand = scored[0] if scored else {"symbol": "BTCUSDT", "velocity_score": 1.0, "levels": {}}
+            top_sym = top_cand.get("symbol", "BTCUSDT")
+            lvl = top_cand.get("levels", {})
+            if not lvl:
+                lvl = await asyncio.to_thread(smart_x_engine.ReachseyStraddleEngine.calculate_reachsey_levels, top_sym)
+
+            top_3_str = " | ".join([f"{s['symbol']} (`{s.get('velocity_score')}`)" for s in scored[:3]])
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🚀 បាញ់ Reachsey BTC (Auto)", callback_data="btn_smartx_reachsey_crypto_btc"),
-                    InlineKeyboardButton("⚡ Reachsey SOL", callback_data="btn_smartx_reachsey_crypto_sol")
+                    InlineKeyboardButton("🚀 បាញ់ #1 Top Velocity Radar", callback_data="btn_smartx_reachsey_crypto_top"),
+                    InlineKeyboardButton("⏱️ 5m Micro-Burst Gap", callback_data="btn_smartx_reachsey_crypto_5m")
+                ],
+                [
+                    InlineKeyboardButton("⚡ SOL", callback_data="btn_smartx_reachsey_crypto_sol"),
+                    InlineKeyboardButton("🪙 SUI", callback_data="btn_smartx_reachsey_crypto_sui"),
+                    InlineKeyboardButton("🔷 NEAR", callback_data="btn_smartx_reachsey_crypto_near")
+                ],
+                [
+                    InlineKeyboardButton("🌊 XRP", callback_data="btn_smartx_reachsey_crypto_xrp"),
+                    InlineKeyboardButton("🐕 DOGE", callback_data="btn_smartx_reachsey_crypto_doge"),
+                    InlineKeyboardButton("🪙 BTC", callback_data="btn_smartx_reachsey_crypto_btc")
                 ],
                 [
                     InlineKeyboardButton("🥇 Reachsey Meas Gold", callback_data="btn_smartx_reachsey_meas_menu"),
@@ -13298,32 +13353,33 @@ class TelegramBotThread(BaseThread):
             dash_msg = (
                 f"🪙 *REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🪙 *រូបិយប័ណ្ណគំរូ ៖* `BTCUSDT`\n"
-                f"📊 *តម្លៃបច្ចុប្បន្ន (Live BTC) ៖* `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"🎯 *#1 Top Velocity Asset (AI Radar) ៖* `{top_sym}` (Score: `{top_cand.get('velocity_score')}`)\n"
+                f"🏆 *Top 3 Volatility Leaderboard ៖* {top_3_str}\n"
+                f"📊 *តម្លៃបច្ចុប្បន្ន (Live Price) ៖* `${lvl.get('current_price'):,.4f} USDT`\n"
                 f"🧠 *33 AI Swarm Consensus ៖* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                 f"⚡ *Hawkes Jump Intensity ៖* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
-                f"📈 *Dynamic 15m ATR ៖* `${lvl.get('atr_15m'):,.2f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
-                f"🎯 *15m RSI ៖* `{lvl.get('rsi_15m')}`\n"
+                f"📈 *Dynamic ATR ៖* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                f"🎯 *RSI ៖* `{lvl.get('rsi_15m')}`\n"
                 f"🛡️ *ស្ថានភាព Straddle ៖* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"🎯 *កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា (AI Elastic Gap) ៖*\n"
-                f"🟢 *PENDING BUY-STOP ៖* `${lvl.get('buy_stop_trigger'):,.2f} USDT` (`{lvl.get('gap_mult_buy')}x ATR`)\n"
-                f"   • Stop Loss: `${lvl.get('buy_sl'):,.2f}` | Take Profit: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
-                f"🔴 *PENDING SELL-STOP ៖* `${lvl.get('sell_stop_trigger'):,.2f} USDT` (`{lvl.get('gap_mult_sell')}x ATR`)\n"
-                f"   • Stop Loss: `${lvl.get('sell_sl'):,.2f}` | Take Profit: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"🟢 *PENDING BUY-STOP ៖* `${lvl.get('buy_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_buy')}x ATR`)\n"
+                f"   • Stop Loss: `${lvl.get('buy_sl'):,.4f}` | Take Profit: `${lvl.get('buy_tp'):,.4f}` (R:R 1:3.0)\n"
+                f"🔴 *PENDING SELL-STOP ៖* `${lvl.get('sell_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_sell')}x ATR`)\n"
+                f"   • Stop Loss: `${lvl.get('sell_sl'):,.4f}` | Take Profit: `${lvl.get('sell_tp'):,.4f}` (R:R 1:3.0)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ *សសរស្តម្ភគណិតវិទ្យាការពារទុនទាំង ៥ ៖*\n"
-                f"• AI Adaptive Elastic Dynamic Gap (0.8x-1.2x Compression)\n"
-                f"• Hawkes Self-Exciting Jump Momentum (ទស្សន៍ទាយ Breakout មុន)\n"
-                f"• Sub-Millisecond Native Execution (Binance `STOP_MARKET` Order Book)\n"
-                f"• Anti-Oversold Shield (RSI <= 38.0 ហាម Sell-Stop លើបាត)\n"
-                f"• Fractional Kelly Sizing ({lvl.get('kelly_fraction', 0.25)}x | គ្មាន Martingale Ruin)\n"
-                f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
+                f"🛡️ *សសរស្តម្ភគណិតវិទ្យា & AI ទាំង ៤ (Zero Lingering Standard) ៖*\n"
+                f"• AI Top-1 Velocity Auto-Radar (ស្កេន ១៥ កាក់ស្របគ្នា < 0.1s)\n"
+                f"• 5m/15m Micro-Burst Gap (0.55x-0.70x ATR ផ្ទុះចំណេញក្នុង 5-15 នាទី)\n"
+                f"• Smart OCO Auto-Pruner (លុប Order ច្រាសពេល Fill ភ្លាម)\n"
+                f"• Tiered Multi-TP Runner (TP1 +4.5% ROI Lock / TP2 +15.0% Mega Trend)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💡 *គំរូបញ្ជា Auto (1-Tap Copyable) ៖*\n"
-                f"• `` `/smartx_reachsey_crypto AUTO` `` _(វិនិយោគស្វ័យប្រវត្តលើ BTC & Kelly)_\n"
+                f"• `` `/smartx_reachsey_crypto AUTO` `` _(បាញ់ Top 1 Velocity ស្វ័យប្រវត្តិ)_\n"
+                f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(បាញ់ Top 1 លើ 5M Micro-Burst)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(វិនិយោគលើ SOL ទុន $25 | 10x)_\n"
-                f"• `` `/smartx_reachsey_crypto ETH 30 10` `` _(វិនិយោគលើ ETH ទុន $30 | 10x)_\n"
+                f"• `` `/smartx_reachsey_crypto SUI 20 10` `` _(វិនិយោគលើ SUI ទុន $20 | 10x)_\n"
+                f"• `` `/smartx_reachsey_crypto NEAR 20 10` `` _(វិនិយោគលើ NEAR ទុន $20 | 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
                 f"_APEX SUPER BRAIN AI_\n"
@@ -13331,32 +13387,33 @@ class TelegramBotThread(BaseThread):
             ) if is_khmer else (
                 f"🪙 *REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🪙 *Benchmark Asset:* `BTCUSDT`\n"
-                f"📊 *Live BTC Price:* `${lvl.get('current_price'):,.2f} USDT`\n"
+                f"🎯 *#1 Top Velocity Asset (AI Radar):* `{top_sym}` (Score: `{top_cand.get('velocity_score')}`)\n"
+                f"🏆 *Top 3 Volatility Leaderboard:* {top_3_str}\n"
+                f"📊 *Live Price:* `${lvl.get('current_price'):,.4f} USDT`\n"
                 f"🧠 *33 AI Swarm Consensus:* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                 f"⚡ *Hawkes Jump Intensity:* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
-                f"📈 *Dynamic 15m ATR:* `${lvl.get('atr_15m'):,.2f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
-                f"🎯 *15m RSI:* `{lvl.get('rsi_15m')}`\n"
+                f"📈 *Dynamic ATR:* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                f"🎯 *RSI:* `{lvl.get('rsi_15m')}`\n"
                 f"🛡️ *Straddle State:* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"🎯 *Calculated Pending Stop Levels (AI Elastic Gap):*\n"
-                f"🟢 *PENDING BUY-STOP:* `${lvl.get('buy_stop_trigger'):,.2f} USDT` (`{lvl.get('gap_mult_buy')}x ATR`)\n"
-                f"   • SL: `${lvl.get('buy_sl'):,.2f}` | TP: `${lvl.get('buy_tp'):,.2f}` (R:R 1:3.0)\n"
-                f"🔴 *PENDING SELL-STOP:* `${lvl.get('sell_stop_trigger'):,.2f} USDT` (`{lvl.get('gap_mult_sell')}x ATR`)\n"
-                f"   • SL: `${lvl.get('sell_sl'):,.2f}` | TP: `${lvl.get('sell_tp'):,.2f}` (R:R 1:3.0)\n"
+                f"🟢 *PENDING BUY-STOP:* `${lvl.get('buy_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_buy')}x ATR`)\n"
+                f"   • SL: `${lvl.get('buy_sl'):,.4f}` | TP: `${lvl.get('buy_tp'):,.4f}` (R:R 1:3.0)\n"
+                f"🔴 *PENDING SELL-STOP:* `${lvl.get('sell_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_sell')}x ATR`)\n"
+                f"   • SL: `${lvl.get('sell_sl'):,.4f}` | TP: `${lvl.get('sell_tp'):,.4f}` (R:R 1:3.0)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ *5 Institutional Pillars:*\n"
-                f"• AI Adaptive Elastic Dynamic Gap (0.8x-1.2x Compression)\n"
-                f"• Hawkes Self-Exciting Jump Momentum (Pre-Breakout Predictor)\n"
-                f"• Sub-Millisecond Native Execution (`STOP_MARKET` Order Book)\n"
-                f"• Anti-Oversold Shield (RSI <= 38.0 Blocks Sell-Stop at Bottom)\n"
-                f"• Fractional Kelly Sizing ({lvl.get('kelly_fraction', 0.25)}x | Zero Martingale Ruin)\n"
-                f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
+                f"🛡️ *4 Institutional Pillars (Zero Lingering Standard):*\n"
+                f"• AI Top-1 Velocity Auto-Radar (Parallel Scan 15 Coins < 0.1s)\n"
+                f"• 5m/15m Micro-Burst Gap (0.55x-0.70x ATR for 5-15m Trigger)\n"
+                f"• Smart OCO Auto-Pruner (Cancels opposite leg upon fill)\n"
+                f"• Tiered Multi-TP Runner (TP1 +4.5% ROI Lock / TP2 +15.0% Mega Trend)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💡 *1-Tap Commands:*\n"
-                f"• `` `/smartx_reachsey_crypto AUTO` `` _(Auto Sizing on BTC & Kelly)_\n"
+                f"• `` `/smartx_reachsey_crypto AUTO` `` _(Auto Radar on Top 1 Asset)_\n"
+                f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(Auto Radar on 5M Micro-Burst)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(Trade SOL $25 | 10x)_\n"
-                f"• `` `/smartx_reachsey_crypto ETH 30 10` `` _(Trade ETH $30 | 10x)_\n"
+                f"• `` `/smartx_reachsey_crypto SUI 20 10` `` _(Trade SUI $20 | 10x)_\n"
+                f"• `` `/smartx_reachsey_crypto NEAR 20 10` `` _(Trade NEAR $20 | 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
                 f"_APEX SUPER BRAIN AI_\n"
@@ -13367,6 +13424,7 @@ class TelegramBotThread(BaseThread):
                 await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception:
                 await msg_target.reply_text(dash_msg, reply_markup=keyboard)
+
 
         async def smart_swap_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
