@@ -2825,12 +2825,18 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
     if quantity <= 0:
         return {"status": "error", "error": f"Calculated quantity {quantity} invalid for {symbol}"}
 
-    def _send_hft_order(ord_qty: float, ord_lev: int, pos_side: str = None, omit_pos_side: bool = False):
+    def _send_hft_order(ord_qty: float, ord_lev: int, pos_side: str = None, omit_pos_side: bool = False, use_algo_endpoint: bool = False):
         if not reduce_only:
             set_futures_leverage(api_key, api_secret, symbol, ord_lev)
-        endpoint = "/fapi/v1/order"
-        timestamp = int(time.time() * 1000) + TIME_OFFSET
         order_type = str(kwargs.get("order_type", "MARKET")).upper()
+        is_conditional = order_type in ["STOP_MARKET", "TAKE_PROFIT_MARKET", "STOP", "TAKE_PROFIT", "TRAILING_STOP_MARKET"]
+        
+        if use_algo_endpoint or is_conditional:
+            endpoint = "/fapi/v1/algoOrder"
+        else:
+            endpoint = "/fapi/v1/order"
+
+        timestamp = int(time.time() * 1000) + TIME_OFFSET
         ord_params = {
             "symbol": symbol,
             "side": side.upper(),
@@ -2839,6 +2845,11 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
             "recvWindow": 60000,
             "timestamp": timestamp
         }
+
+        if is_conditional or use_algo_endpoint:
+            ord_params["algoType"] = "CONDITIONAL"
+            ord_params["workingType"] = str(kwargs.get("workingType", "CONTRACT_PRICE")).upper()
+
         if "stop_price" in kwargs or "stopPrice" in kwargs:
             sp = kwargs.get("stop_price") or kwargs.get("stopPrice")
             ord_params["stopPrice"] = format_price_to_tick_size(symbol, sp)
@@ -2867,6 +2878,10 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
     try:
         res = _send_hft_order(quantity, leverage)
 
+        # Algo Order Endpoint Error -4120 Auto-Recovery
+        if "-4120" in res.text:
+            res = _send_hft_order(quantity, leverage, use_algo_endpoint=True)
+
         # Hedge Mode / One-Way Mode Error -4061 Auto-Recovery
         if "-4061" in res.text:
             if "positionSide" in res.text or position_side:
@@ -2883,9 +2898,10 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
         
         if res.status_code == 200:
             data = res.json()
+            order_id = data.get('orderId') or data.get('algoId') or data.get('clientAlgoId')
             order_tag = f" {side} (TP/CLOSE)" if reduce_only else f" {side}"
-            print(f"🚀 [BINANCE FUTURES HFT ORDER SUCCESS (<30ms)] {symbol}{order_tag} Qty: {quantity} Leverage: {leverage}x -> OrderId: {data.get('orderId')}")
-            return {"status": "success", "res": data, "orderId": data.get('orderId')}
+            print(f"🚀 [BINANCE FUTURES HFT ORDER SUCCESS (<30ms)] {symbol}{order_tag} Qty: {quantity} Leverage: {leverage}x -> OrderId/AlgoId: {order_id}")
+            return {"status": "success", "res": data, "orderId": order_id, "algoId": data.get('algoId')}
         
         # Handling Precision/Notional Overflow (-1111, -4164)
         elif "-1111" in res.text or "-4164" in res.text:
