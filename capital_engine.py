@@ -17,6 +17,7 @@ import requests
 import concurrent.futures
 from collections import deque
 from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 from typing import Dict, Any, Optional, Tuple, List
 from dotenv import load_dotenv
 import database as db
@@ -134,7 +135,13 @@ class CapitalComEngine:
 
         # ⚡ Pillar 1: Persistent HFT Session Pool (Zero TLS Handshake Overhead)
         self.session = requests.Session()
-        adapter = HTTPAdapter(pool_connections=25, pool_maxsize=50)
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=0.3,
+            status_forcelist=[429, 500, 502, 503, 504],
+            raise_on_status=False
+        )
+        adapter = HTTPAdapter(pool_connections=25, pool_maxsize=50, max_retries=retry_strategy)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
         
@@ -230,21 +237,36 @@ class CapitalComEngine:
             return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
 
         url = f"{self.base_url}/accounts"
-        try:
-            res = self.session.get(url, headers=self.get_auth_headers(), timeout=10)
-            if res.status_code == 200:
-                data = res.json()
-                accounts = data.get("accounts", [])
-                primary = accounts[0] if accounts else {}
-                self.account_currency = primary.get("currency", "USD")
-                return {
-                    "success": True,
-                    "accounts": accounts,
-                    "primary_account": primary
-                }
-            return {"success": False, "error": f"HTTP {res.status_code}: {res.text}"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        for attempt in range(2):
+            try:
+                res = self.session.get(url, headers=self.get_auth_headers(), timeout=12)
+                if res.status_code == 200:
+                    data = res.json()
+                    accounts = data.get("accounts", [])
+                    primary = accounts[0] if accounts else {}
+                    self.account_currency = primary.get("currency", "USD")
+                    return {
+                        "success": True,
+                        "accounts": accounts,
+                        "primary_account": primary
+                    }
+                elif res.status_code == 401 and attempt == 0:
+                    self.cst_token = None
+                    self.security_token = None
+                    if self.ensure_session():
+                        continue
+                return {"success": False, "error": f"HTTP {res.status_code}: {res.text}"}
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, ConnectionResetError) as ce:
+                if attempt == 0:
+                    time.sleep(0.3)
+                    self.cst_token = None
+                    self.security_token = None
+                    if self.ensure_session():
+                        continue
+                return {"success": False, "error": f"Connection error: {ce}"}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Failed after retry"}
 
     def get_account_balance(self) -> Dict[str, Any]:
         """
@@ -428,20 +450,36 @@ class CapitalComEngine:
     # Trading & Position Management (Demo & Live Protected)
     # --------------------------------------------------------------------------
     def get_open_positions(self) -> List[Dict[str, Any]]:
-        """Retrieves all currently active open positions."""
+        """Retrieves all currently active open positions with automatic connection recovery."""
         if not self.ensure_session():
             return []
 
         url = f"{self.base_url}/positions"
-        try:
-            res = self.session.get(url, headers=self.get_auth_headers(), timeout=10)
-            if res.status_code == 200:
-                data = res.json()
-                return data.get("positions", [])
-            return []
-        except Exception as e:
-            logger.error(f"Error fetching open positions: {e}")
-            return []
+        for attempt in range(2):
+            try:
+                res = self.session.get(url, headers=self.get_auth_headers(), timeout=12)
+                if res.status_code == 200:
+                    data = res.json()
+                    return data.get("positions", [])
+                elif res.status_code == 401 and attempt == 0:
+                    self.cst_token = None
+                    self.security_token = None
+                    if self.ensure_session():
+                        continue
+                return []
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, ConnectionResetError) as ce:
+                if attempt == 0:
+                    time.sleep(0.3)
+                    self.cst_token = None
+                    self.security_token = None
+                    if self.ensure_session():
+                        continue
+                logger.warning(f"Transient connection glitch fetching open positions ({type(ce).__name__}). Retrying on next cycle.")
+                return []
+            except Exception as e:
+                logger.error(f"Error fetching open positions: {e}")
+                return []
+        return []
 
     def place_position(
         self,
