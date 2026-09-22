@@ -6219,6 +6219,9 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_smartx_reachsey_meas_auto":
                 context.args = ["AUTO"]
                 await smartx_reachsey_meas_command(update, context)
+            elif data == "btn_smartx_reachsey_meas_stop":
+                context.args = ["STOP"]
+                await smartx_reachsey_meas_command(update, context)
             elif data in ["btn_smartx_reachsey_crypto_menu", "btn_smartx_reachsey_crypto_refresh"]:
                 context.args = []
                 await smartx_reachsey_crypto_command(update, context)
@@ -6245,6 +6248,9 @@ class TelegramBotThread(BaseThread):
                 await smartx_reachsey_crypto_command(update, context)
             elif data == "btn_smartx_reachsey_crypto_5m":
                 context.args = ["AUTO", "5M"]
+                await smartx_reachsey_crypto_command(update, context)
+            elif data in ["btn_smartx_reachsey_crypto_stop", "btn_smartx_reachsey_crypto_stop_all"]:
+                context.args = ["STOP"]
                 await smartx_reachsey_crypto_command(update, context)
             elif data in ["btn_smart_swap_menu", "btn_smart_swap"]:
                 context.args = []
@@ -13043,9 +13049,41 @@ class TelegramBotThread(BaseThread):
             is_khmer = (user_lang in ['km', 'khmer', '0', '1', 'default'])
             args = list(context.args) if context and context.args else []
 
-            # Handle Direct Execution Arguments: /smartx_reachsey_meas AUTO | /smartx_reachsey_meas 30 10
+            # Handle Direct Execution Arguments: /smartx_reachsey_meas AUTO | /smartx_reachsey_meas STOP | /smartx_reachsey_meas 30 10
             if args:
                 token0 = str(args[0]).upper().strip()
+                if token0 in ["STOP", "CANCEL", "OFF", "CLEAR", "HALT"]:
+                    stop_res = await asyncio.to_thread(smart_x_engine.stop_reachsey_meas, chat_id)
+                    stop_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🚀 បើក Reachsey Gold សារជាថ្មី", callback_data="btn_smartx_reachsey_meas_auto")],
+                        [InlineKeyboardButton("🪙 Reachsey Crypto", callback_data="btn_smartx_reachsey_crypto_menu")],
+                        [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")]
+                    ])
+                    stop_msg = (
+                        f"🛑 *REACHSEY MEAS (GOLD) PENDING STOP MATRIX CANCELLED!* ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ *ស្ថានភាព ៖* បានលុបចោលបញ្ជាស្ទាក់ទាំងអស់លើ `XAUUSDT` ដោយជោគជ័យ!\n"
+                        f"🔒 *Order Book ៖* គ្មាន Pending STOP_MARKET orders សេសសល់ឡើយ។\n"
+                        f"💵 *Margin ៖* Margin ទាំងអស់ត្រូវបានដោះលែងមកវិញ ១០០%។\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"_Khmer Master Crypto_\n"
+                        f"_APEX SUPER BRAIN AI_"
+                    ) if is_khmer else (
+                        f"🛑 *REACHSEY MEAS (GOLD) PENDING STOP MATRIX CANCELLED!* ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ *Status:* Successfully cancelled all pending stop orders on `XAUUSDT`!\n"
+                        f"🔒 *Order Book:* Zero remaining pending STOP_MARKET orders.\n"
+                        f"💵 *Margin:* 100% margin released safely.\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"_Khmer Master Crypto_\n"
+                        f"_APEX SUPER BRAIN AI_"
+                    )
+                    try:
+                        await msg_target.reply_text(stop_msg, parse_mode="Markdown", reply_markup=stop_kb)
+                    except Exception:
+                        await msg_target.reply_text(stop_msg, reply_markup=stop_kb)
+                    return
+
                 amt_param = "AUTO" if token0 in ["AUTO", "ON", "START", "RUN"] else token0
                 lev_param = int(args[1]) if len(args) >= 2 and args[1].isdigit() else 10
 
@@ -13063,6 +13101,7 @@ class TelegramBotThread(BaseThread):
 
                     succ_kb = InlineKeyboardMarkup([
                         [InlineKeyboardButton("📊 ពិនិត្យ Positions", callback_data="btn_smart_x_metrics")],
+                        [InlineKeyboardButton("🛑 លុបចោលស្ទាក់ (Stop)", callback_data="btn_smartx_reachsey_meas_stop")],
                         [InlineKeyboardButton("🪙 Reachsey Crypto", callback_data="btn_smartx_reachsey_crypto_menu")],
                         [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")]
                     ])
@@ -13117,10 +13156,13 @@ class TelegramBotThread(BaseThread):
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🚀 បាញ់ Reachsey Gold (Auto)", callback_data="btn_smartx_reachsey_meas_auto"),
-                    InlineKeyboardButton("🪙 Reachsey Crypto", callback_data="btn_smartx_reachsey_crypto_menu")
+                    InlineKeyboardButton("🛑 លុបចោលស្ទាក់ (Stop)", callback_data="btn_smartx_reachsey_meas_stop")
                 ],
                 [
-                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាពតម្លៃ", callback_data="btn_smartx_reachsey_meas_refresh"),
+                    InlineKeyboardButton("🪙 Reachsey Crypto", callback_data="btn_smartx_reachsey_crypto_menu"),
+                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាពតម្លៃ", callback_data="btn_smartx_reachsey_meas_refresh")
+                ],
+                [
                     InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")
                 ]
             ])
@@ -13149,8 +13191,9 @@ class TelegramBotThread(BaseThread):
                 f"• Fractional Kelly Sizing ({lvl.get('kelly_fraction', 0.25)}x | គ្មាន Martingale Ruin)\n"
                 f"• Golden 85% Profit Ratchet & Breakeven Armor (+4.8% ROI)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💡 *គំរូបញ្ជា Auto (1-Tap Copyable) ៖*\n"
+                f"💡 *គំរូបញ្ជា Auto & Stop (1-Tap Copyable) ៖*\n"
                 f"• `` `/smartx_reachsey_meas AUTO` `` _(វិនិយោគស្វ័យប្រវត្តិតាមទុន & Kelly)_\n"
+                f"• `` `/smartx_reachsey_meas STOP` `` _(លុបចោលបញ្ជាស្ទាក់មាសទាំងអស់)_\n"
                 f"• `` `/smartx_reachsey_meas 30 10` `` _(ទុន $30 USDT | Leverage 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
@@ -13182,6 +13225,7 @@ class TelegramBotThread(BaseThread):
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💡 *1-Tap Commands:*\n"
                 f"• `` `/smartx_reachsey_meas AUTO` `` _(Auto Sizing via Balance & Kelly)_\n"
+                f"• `` `/smartx_reachsey_meas STOP` `` _(Cancel all open Gold stop orders)_\n"
                 f"• `` `/smartx_reachsey_meas 30 10` `` _($30 USDT | 10x Leverage)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
@@ -13193,6 +13237,7 @@ class TelegramBotThread(BaseThread):
                 await msg_target.reply_text(dash_msg, parse_mode="Markdown", reply_markup=keyboard)
             except Exception:
                 await msg_target.reply_text(dash_msg, reply_markup=keyboard)
+
 
         async def smartx_reachsey_crypto_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
@@ -13219,6 +13264,51 @@ class TelegramBotThread(BaseThread):
             tf_param = "15m"
 
             if args:
+                # Check for STOP command
+                is_stop_cmd = False
+                stop_sym = "ALL"
+                for a in args:
+                    tok = str(a).upper().strip()
+                    if tok in ["STOP", "CANCEL", "OFF", "CLEAR", "HALT"]:
+                        is_stop_cmd = True
+                    elif tok not in ["STOP", "CANCEL", "OFF", "CLEAR", "HALT", "ALL"]:
+                        stop_sym = tok
+
+                if is_stop_cmd:
+                    stop_res = await asyncio.to_thread(smart_x_engine.stop_reachsey_crypto, chat_id, stop_sym)
+                    actual_sym = stop_res.get("symbol", stop_sym)
+                    stop_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🚀 បាញ់ #1 Top Velocity Radar", callback_data="btn_smartx_reachsey_crypto_top")],
+                        [InlineKeyboardButton("🥇 Reachsey Meas Gold", callback_data="btn_smartx_reachsey_meas_menu")],
+                        [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")]
+                    ])
+                    target_display = "គ្រីបតូទាំងអស់ (All 15 Universe Assets)" if actual_sym == "ALL_15_ASSETS" else actual_sym
+                    target_display_en = "All 15 Universe Assets" if actual_sym == "ALL_15_ASSETS" else actual_sym
+                    stop_msg = (
+                        f"🛑 *REACHSEY CRYPTO PENDING STOP MATRIX CANCELLED!* ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ *ស្ថានភាព ៖* បានលុបចោលបញ្ជាស្ទាក់ទាំងអស់លើ `{target_display}` ដោយជោគជ័យ!\n"
+                        f"🔒 *Order Book ៖* គ្មាន Pending STOP_MARKET orders សេសសល់ឡើយ។\n"
+                        f"💵 *Margin ៖* Margin ទាំងអស់ត្រូវបានដោះលែងមកវិញ ១០០%។\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"_Khmer Master Crypto_\n"
+                        f"_APEX SUPER BRAIN AI_"
+                    ) if is_khmer else (
+                        f"🛑 *REACHSEY CRYPTO PENDING STOP MATRIX CANCELLED!* ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ *Status:* Successfully cancelled all pending stop orders on `{target_display_en}`!\n"
+                        f"🔒 *Order Book:* Zero remaining pending STOP_MARKET orders.\n"
+                        f"💵 *Margin:* 100% margin released safely.\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"_Khmer Master Crypto_\n"
+                        f"_APEX SUPER BRAIN AI_"
+                    )
+                    try:
+                        await msg_target.reply_text(stop_msg, parse_mode="Markdown", reply_markup=stop_kb)
+                    except Exception:
+                        await msg_target.reply_text(stop_msg, reply_markup=stop_kb)
+                    return
+
                 for a in args:
                     if str(a).upper().strip() in ["5M", "5MIN", "MICRO", "FAST"]:
                         tf_param = "5m"
@@ -13258,6 +13348,7 @@ class TelegramBotThread(BaseThread):
 
                     succ_kb = InlineKeyboardMarkup([
                         [InlineKeyboardButton("📊 ពិនិត្យ Positions", callback_data="btn_smart_x_metrics")],
+                        [InlineKeyboardButton("🛑 លុបចោលស្ទាក់ (Stop)", callback_data="btn_smartx_reachsey_crypto_stop")],
                         [InlineKeyboardButton("🥇 Reachsey Meas Gold", callback_data="btn_smartx_reachsey_meas_menu")],
                         [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")]
                     ])
@@ -13342,10 +13433,11 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🪙 BTC", callback_data="btn_smartx_reachsey_crypto_btc")
                 ],
                 [
-                    InlineKeyboardButton("🥇 Reachsey Meas Gold", callback_data="btn_smartx_reachsey_meas_menu"),
-                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព", callback_data="btn_smartx_reachsey_crypto_refresh")
+                    InlineKeyboardButton("🛑 លុបចោលស្ទាក់ (Stop All)", callback_data="btn_smartx_reachsey_crypto_stop"),
+                    InlineKeyboardButton("🥇 Reachsey Meas Gold", callback_data="btn_smartx_reachsey_meas_menu")
                 ],
                 [
+                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព", callback_data="btn_smartx_reachsey_crypto_refresh"),
                     InlineKeyboardButton("🔙 ត្រឡប់ទៅ /smartx", callback_data="btn_smart_x_menu")
                 ]
             ])
@@ -13362,7 +13454,7 @@ class TelegramBotThread(BaseThread):
                 f"🎯 *RSI ៖* `{lvl.get('rsi_15m')}`\n"
                 f"🛡️ *ស្ថានភាព Straddle ៖* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 *កម្រិតបញ្ជាស្ទាក់ស្វ័យប្រវត្តិកំពុងគណនា (AI Elastic Gap) ៖*\n"
+                f"🎯 *កម្រិតបញ្ជាស្ទាក់ស្វវត្តិកំពុងគណនា (AI Elastic Gap) ៖*\n"
                 f"🟢 *PENDING BUY-STOP ៖* `${lvl.get('buy_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_buy')}x ATR`)\n"
                 f"   • Stop Loss: `${lvl.get('buy_sl'):,.4f}` | Take Profit: `${lvl.get('buy_tp'):,.4f}` (R:R 1:3.0)\n"
                 f"🔴 *PENDING SELL-STOP ៖* `${lvl.get('sell_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_sell')}x ATR`)\n"
@@ -13374,12 +13466,12 @@ class TelegramBotThread(BaseThread):
                 f"• Smart OCO Auto-Pruner (លុប Order ច្រាសពេល Fill ភ្លាម)\n"
                 f"• Tiered Multi-TP Runner (TP1 +4.5% ROI Lock / TP2 +15.0% Mega Trend)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"💡 *គំរូបញ្ជា Auto (1-Tap Copyable) ៖*\n"
+                f"💡 *គំរូបញ្ជា Auto & Stop (1-Tap Copyable) ៖*\n"
                 f"• `` `/smartx_reachsey_crypto AUTO` `` _(បាញ់ Top 1 Velocity ស្វ័យប្រវត្តិ)_\n"
+                f"• `` `/smartx_reachsey_crypto STOP` `` _(លុបចោលបញ្ជាស្ទាក់ទាំងអស់)_\n"
+                f"• `` `/smartx_reachsey_crypto STOP NEAR` `` _(លុបចោលបញ្ជាស្ទាក់លើ NEAR)_\n"
                 f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(បាញ់ Top 1 លើ 5M Micro-Burst)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(វិនិយោគលើ SOL ទុន $25 | 10x)_\n"
-                f"• `` `/smartx_reachsey_crypto SUI 20 10` `` _(វិនិយោគលើ SUI ទុន $20 | 10x)_\n"
-                f"• `` `/smartx_reachsey_crypto NEAR 20 10` `` _(វិនិយោគលើ NEAR ទុន $20 | 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
                 f"_APEX SUPER BRAIN AI_\n"
@@ -13410,10 +13502,10 @@ class TelegramBotThread(BaseThread):
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💡 *1-Tap Commands:*\n"
                 f"• `` `/smartx_reachsey_crypto AUTO` `` _(Auto Radar on Top 1 Asset)_\n"
+                f"• `` `/smartx_reachsey_crypto STOP` `` _(Cancel all open pending orders)_\n"
+                f"• `` `/smartx_reachsey_crypto STOP NEAR` `` _(Cancel open orders on NEAR)_\n"
                 f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(Auto Radar on 5M Micro-Burst)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(Trade SOL $25 | 10x)_\n"
-                f"• `` `/smartx_reachsey_crypto SUI 20 10` `` _(Trade SUI $20 | 10x)_\n"
-                f"• `` `/smartx_reachsey_crypto NEAR 20 10` `` _(Trade NEAR $20 | 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
                 f"_APEX SUPER BRAIN AI_\n"

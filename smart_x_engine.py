@@ -1723,7 +1723,68 @@ def execute_reachsey_crypto(
     }
 
 
+def stop_reachsey_meas(chat_id: int) -> dict:
+    """
+    Cancels all open Reachsey Gold (XAUUSDT) pending stop matrix orders on Binance Futures.
+    """
+    symbol = CANONICAL_FUTURES_GOLD_SYMBOL
+    keys = db.get_user_api(chat_id)
+    if not keys or not keys[0] or not keys[1]:
+        return {
+            "status": "error",
+            "message": "❌ Binance API Keys missing. Please connect via /add_api."
+        }
+    api_key, api_secret = keys[0], keys[1]
+    res = trading_engine.cancel_all_futures_open_orders(api_key, api_secret, symbol)
+    return {
+        "status": "success",
+        "symbol": symbol,
+        "raw_response": res,
+        "message": f"🛑 [REACHSEY MEAS GOLD] Cancelled all pending stop orders for {symbol}."
+    }
+
+
+def stop_reachsey_crypto(chat_id: int, symbol: str = "ALL") -> dict:
+    """
+    Cancels Reachsey Crypto pending stop matrix orders for a specific symbol or across all universe assets.
+    """
+    keys = db.get_user_api(chat_id)
+    if not keys or not keys[0] or not keys[1]:
+        return {
+            "status": "error",
+            "message": "❌ Binance API Keys missing. Please connect via /add_api."
+        }
+    api_key, api_secret = keys[0], keys[1]
+
+    target_sym = str(symbol or "ALL").upper().strip()
+    if target_sym in ["ALL", "TOP", "AUTO", "*", "GLOBAL"]:
+        cancelled_syms = []
+        for sym in ReachseyStraddleEngine.TOP_15_CRYPTO_ASSETS:
+            try:
+                trading_engine.cancel_all_futures_open_orders(api_key, api_secret, sym)
+                cancelled_syms.append(sym)
+            except Exception:
+                pass
+        return {
+            "status": "success",
+            "symbol": "ALL_15_ASSETS",
+            "cancelled_symbols": cancelled_syms,
+            "message": "🛑 [REACHSEY CRYPTO] Cancelled all pending stop orders across all 15 crypto universe assets."
+        }
+    else:
+        if not target_sym.endswith("USDT") and not target_sym.endswith("USD"):
+            target_sym += "USDT"
+        res = trading_engine.cancel_all_futures_open_orders(api_key, api_secret, target_sym)
+        return {
+            "status": "success",
+            "symbol": target_sym,
+            "raw_response": res,
+            "message": f"🛑 [REACHSEY CRYPTO] Cancelled all pending stop orders for {target_sym}."
+        }
+
+
 # Legacy aliases for backwards compatibility
 execute_smart_x_gold_futures = execute_smart_x_futures
 execute_smart_x_gold_spot = execute_smart_x_spot
+
 
