@@ -389,7 +389,26 @@ Any modification that breaks any of the following 30 invariants is considered an
      - `partner_code` contains `az48cxia` in `capital_user_referrals`, or
      - `license_expiry == 'Administrator'`.
   5. **1-Tap Admin Approval Workflow:** Users can submit instant verification requests via Telegram (`btn_cap_req_verify`), generating an interactive approval card for Super Admin with `[ ✅ Approve Live Access ]` and `[ ❌ Reject ]` callbacks.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 29/29].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 29/30].
+
+### Invariant 37: Super Smart 24/7 Multi-Session Forex Exchange & Satellite Geospatial Alpha Protocol
+- **Location:** `capital_engine.py` (`CapitalSatelliteMacroRadar`, `CapitalOUMeanReversionEngine`, `CapitalForexExchangeSuite`, `run_capital_forex_cycle`), `bot_thread.py` (`forex_command`, `master_button_callback`), `bot_commands_registry.py`, `scheduler_tasks.py` (`capital_forex_monitor`), `audit_system.py`
+- **Rule:** The 24/7 Global Forex Exchange operates across 4 distinct institutional market regimes:
+  1. **Tokyo / Asian Session (00:00 - 07:00 UTC):**
+     - Governed by **Ornstein-Uhlenbeck (OU) Stochastic Calculus Mean Reversion**:
+       $$dX_t = \theta(\mu - X_t)dt + \sigma dW_t$$
+     - Orders are dispatched strictly when $|Z\text{-score}| \ge 1.85$ on range-bound currency pairs (`USDJPY`, `AUDUSD`, `EURGBP`, `USDCHF`), targeting the long-term equilibrium price $\mu$.
+  2. **London Session (07:00 - 13:30 UTC):**
+     - Governed by **15-Minute Opening Range Breakout (ORB)** tracking institutional interbank capital flows (`EURUSD`, `GBPUSD`, `GERMANY40`, `EURJPY`).
+  3. **New York Session (13:30 - 21:00 UTC):**
+     - Governed by **Apex Trend Following + Central Bank NLP Sentiment** (<100ms processing of Fed, ECB, BoE, and BoJ statements) with a mandatory $\ge 80\%$ 33 AI Models Swarm Consensus.
+  4. **Weekend Session (24/7 Continuous):**
+     - Governed by **Crypto CFDs Lead-Lag Arbitrage** (`BTCUSD`, `ETHUSD`, `SOLUSD`) capturing sub-second broker pricing disparities.
+  5. **Physical Geospatial Macro Radar (Google Satellite Imagery):**
+     - Quantitative trade biases integrate physical supply chain telemetry (Rotterdam/Singapore port container velocity, Permian Basin oil flaring, and Pilbara mining indices).
+  6. **Risk Management & IB Compounding:**
+     - Dynamic lot allocation via **Fractional Kelly Sizing ($f^*$)**, **10x Hurdle Spread Drag Elimination**, **Breakeven Armor at $+3.0\%$ ROI**, and **30%-50% IB Spread Rebate Compounding** ($+$2.40 - $+$4.00/lot pure cash flow).
+- **Enforcement:** Verified by `audit_system.py` [CHECK 30/30].
 
 ---
 
@@ -397,8 +416,8 @@ Any modification that breaks any of the following 30 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 36 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 29 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 37 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 30 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main

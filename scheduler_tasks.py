@@ -7295,6 +7295,24 @@ async def capital_auto_monitor(app: Application):
         print(f"⚠️ [CAPITAL AUTO MONITOR NOTICE]: {e}")
 
 
+async def capital_forex_monitor(app: Application):
+    """
+    💱 24/7 Global Multi-Session Forex Exchange Monitor Loop (Invariant 37)
+    Executes real-time multi-session cycle:
+    - Tokyo/Asian: Ornstein-Uhlenbeck (OU) Mean Reversion
+    - London: 15m Opening Range Breakout (ORB)
+    - New York: Apex Trend Following & News NLP Momentum
+    - Weekend: 24/7 Crypto Lead-Lag Arbitrage
+    - Compounding IB Spread Rebates ($2.40 - $4.00/lot)
+    """
+    try:
+        import capital_engine
+        await capital_engine.run_capital_forex_cycle(app=app)
+    except Exception as e:
+        print(f"⚠️ [CAPITAL FOREX MONITOR NOTICE]: {e}")
+
+
+
 
 
 

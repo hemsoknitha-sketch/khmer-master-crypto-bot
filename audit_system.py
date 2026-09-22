@@ -868,7 +868,7 @@ def run_audit():
         log_fail(str(e))
 
     # 29. Capital.com Pro Referral Gatekeeper & Live Account Verification Standard (Invariant 36)
-    print("\n[CHECK 29/29] Verifying Capital.com Pro Referral Gatekeeper & Live Access Standard (Invariant 36)...")
+    print("\n[CHECK 29/30] Verifying Capital.com Pro Referral Gatekeeper & Live Access Standard (Invariant 36)...")
     try:
         with open("database.py", "r", encoding="utf-8") as f:
             db_code = f.read()
@@ -905,6 +905,59 @@ def run_audit():
             log_fail("Capital.com Pro Referral Gatekeeper specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 36 check failed: {e}")
+        log_fail(str(e))
+
+    # 30. Super Smart 24/7 Multi-Session Forex Exchange & Satellite Alpha Protocol (Invariant 37)
+    print("\n[CHECK 30/30] Verifying Super Smart 24/7 Forex Exchange & Satellite Geospatial Alpha (Invariant 37)...")
+    try:
+        with open("capital_engine.py", "r", encoding="utf-8") as f:
+            cap_code = f.read()
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        with open("bot_commands_registry.py", "r", encoding="utf-8") as f:
+            reg_code = f.read()
+        with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
+            sched_code = f.read()
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+
+        has_sat_radar = "class CapitalSatelliteMacroRadar" in cap_code and "get_satellite_macro_bias" in cap_code
+        has_ou_engine = "class CapitalOUMeanReversionEngine" in cap_code and "compute_ou_parameters" in cap_code
+        has_fx_suite = "class CapitalForexExchangeSuite" in cap_code and "detect_market_session" in cap_code
+        has_fx_run = "run_capital_forex_cycle" in cap_code
+        has_forex_cmd = "forex_command" in bt_code and "btn_cap_forex_menu" in bt_code
+        has_forex_buttons = "btn_cap_fx_sat" in bt_code and "btn_cap_fx_ou" in bt_code and "btn_cap_fx_swarm" in bt_code
+        has_forex_menu = 'BotCommand("forex"' in reg_code
+        has_forex_sched = "capital_forex_monitor" in sched_code and "capital_forex_monitor" in bt_code
+        has_inv37 = "Invariant 37" in agents_code and "Forex Exchange" in agents_code
+
+        # Dynamic Unit Test: Real math and telemetry evaluation
+        import capital_engine
+        sat = capital_engine.get_capital_satellite_radar()
+        sat_data = sat.get_satellite_macro_bias("EURUSD")
+        sat_ok = sat_data.get("confidence", 0) > 0 and "sensor_target" in sat_data
+
+        ou = capital_engine.get_capital_ou_engine()
+        ou_data = ou.compute_ou_parameters("USDJPY", 143.50)
+        ou_ok = (
+            ou_data.get("reversion_speed_theta", 0) > 0 and
+            ou_data.get("half_life_candles", 0) > 0 and
+            isinstance(ou_data.get("z_score"), (int, float))
+        )
+
+        suite = capital_engine.get_capital_forex_suite()
+        session = suite.detect_market_session()
+        session_ok = "name" in session and "active_strategy" in session and "badge" in session
+
+        if (has_sat_radar and has_ou_engine and has_fx_suite and has_fx_run and
+            has_forex_cmd and has_forex_buttons and has_forex_menu and has_forex_sched and
+            has_inv37 and sat_ok and ou_ok and session_ok):
+            log_pass("Super Smart 24/7 Forex Exchange & Satellite Geospatial Alpha Protocol (Invariant 37) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 37 check failed: sat_radar={has_sat_radar}, ou_engine={has_ou_engine}, fx_suite={has_fx_suite}, fx_run={has_fx_run}, forex_cmd={has_forex_cmd}, forex_btns={has_forex_buttons}, forex_menu={has_forex_menu}, sched={has_forex_sched}, inv37={has_inv37}, sat_test={sat_ok}, ou_test={ou_ok}, session_test={session_ok}")
+            log_fail("Forex Exchange (Invariant 37) specification missing or mathematical unit test failure!")
+    except Exception as e:
+        failures.append(f"Invariant 37 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

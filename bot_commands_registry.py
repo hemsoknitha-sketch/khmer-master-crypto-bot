@@ -48,6 +48,7 @@ def get_public_bot_commands():
 
         # --- [4] CEDEFI & ARBITRAGE ENGINES (MEV & High-Yield Harvester) ---
         BotCommand("capital", "🏛️ Capital.com TradFi (Gold, Oil, S&P 500)"),
+        BotCommand("forex", "💱 24/7 Multi-Session Forex & Satellite Exchange"),
         BotCommand("capital_ib", "🤝 Capital.com IB Spread Rebates (30%-50%)"),
         BotCommand("capital_orb", "🎯 London & NY Opening Range Breakout"),
         BotCommand("capital_kelly", "📐 Fractional Kelly Dynamic Position Sizer"),
