@@ -2416,6 +2416,37 @@ class CapitalAutonomousEngine:
                 )
                 db.update_capital_auto_last_trade_time(chat_id, now)
 
+                # Attribute IB Volume & Spread Rebates to referring partner & master admin
+                try:
+                    partner_id = db.get_user_capital_referrer(chat_id)
+                    benchmarks = CAPITAL_IB_MANAGER.SPREAD_BENCHMARKS.get(resolved_epic, {})
+                    sp_rate = benchmarks.get("spread_per_lot", 25.0)
+                    sp_usd = round(sp_rate * executed_size, 2)
+                    
+                    # Record for direct partner
+                    CAPITAL_IB_MANAGER.record_trade_rebate(
+                        chat_id=partner_id,
+                        asset=resolved_epic,
+                        lots=executed_size,
+                        spread_usd=sp_usd,
+                        client_ref=f"Trader_{chat_id}"
+                    )
+                    
+                    # If sub-partner, record 20% Master Override for Super Admin (859271875)
+                    if partner_id != 859271875:
+                        override_usd = round(sp_usd * 0.20, 2)
+                        db.record_capital_ib_rebate_log(
+                            chat_id=859271875,
+                            asset=resolved_epic,
+                            lots=executed_size,
+                            spread_usd=sp_usd,
+                            rebate_usd=override_usd,
+                            client_ref=f"Override_Partner_{partner_id}",
+                            status="OVERRIDE_CREDITED"
+                        )
+                except Exception as e_reb:
+                    logger.debug(f"IB Rebate attribution notice: {e_reb}")
+
                 # Send Telegram Notification
                 if app and hasattr(app, "bot"):
                     try:

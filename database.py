@@ -1022,6 +1022,18 @@ def init_db():
         )
     ''')
 
+    # Capital.com Introducing Broker (IB) Client-to-Partner Attribution
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS capital_user_referrals (
+            client_chat_id INTEGER PRIMARY KEY,
+            partner_chat_id INTEGER NOT NULL,
+            partner_code TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_chat_id) REFERENCES users (chat_id),
+            FOREIGN KEY (partner_chat_id) REFERENCES users (chat_id)
+        )
+    ''')
+
     # Capital.com Autonomous TradFi Trade History
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS capital_auto_trades (
@@ -3208,6 +3220,22 @@ def get_capital_ib_partner(chat_id: int) -> Dict[str, Any]:
             FROM capital_ib_partners WHERE chat_id = ?
         """, (chat_id,))
         row = cursor.fetchone()
+
+        # Dynamic calculation of active registered clients
+        cursor.execute("SELECT COUNT(DISTINCT chat_id) FROM user_capital_credentials")
+        row_glob = cursor.fetchone()
+        global_tradfi_users = row_glob[0] if row_glob else 0
+
+        cursor.execute("SELECT COUNT(DISTINCT client_chat_id) FROM capital_user_referrals WHERE partner_chat_id = ?", (chat_id,))
+        row_sub = cursor.fetchone()
+        sub_ref_count = row_sub[0] if row_sub else 0
+
+        # Dynamic volume calculation from logs
+        cursor.execute("SELECT COALESCE(SUM(lots), 0.0), COALESCE(SUM(rebate_usd), 0.0) FROM capital_ib_rebate_logs WHERE chat_id = ?", (chat_id,))
+        row_vol = cursor.fetchone()
+        log_lots = float(row_vol[0] or 0.0) if row_vol else 0.0
+        log_rebate = float(row_vol[1] or 0.0) if row_vol else 0.0
+
         if not row:
             default_code = f"KM-{chat_id}"
             cursor.execute("""
@@ -3218,33 +3246,48 @@ def get_capital_ib_partner(chat_id: int) -> Dict[str, Any]:
             """, (chat_id, default_code))
             conn.commit()
             conn.close()
+
+            eff_clients = global_tradfi_users if (chat_id == 859271875) else sub_ref_count
             return {
                 "chat_id": chat_id,
                 "ib_code": default_code,
                 "partner_name": f"Partner_{chat_id}",
                 "tier": "SILVER",
                 "rebate_pct": 30.0,
-                "referred_clients": 0,
-                "total_lots": 0.0,
-                "total_rebate_usd": 0.0,
-                "pending_rebate_usd": 0.0,
+                "referred_clients": eff_clients,
+                "total_lots": log_lots,
+                "total_rebate_usd": log_rebate,
+                "pending_rebate_usd": log_rebate,
                 "paid_rebate_usd": 0.0,
                 "payout_address": "",
                 "payout_method": "USDT",
                 "created_at": "",
                 "updated_at": ""
             }
+
         conn.close()
+        ib_code_val = str(row[0] or f"KM-{chat_id}")
+        stored_clients = int(row[4] or 0)
+        stored_lots = float(row[5] or 0.0)
+        stored_rebate = float(row[6] or 0.0)
+        stored_pending = float(row[7] or 0.0)
+
+        is_master_admin = (chat_id == 859271875 or "az48cxia" in ib_code_val.lower())
+        eff_clients = max(stored_clients, (global_tradfi_users if is_master_admin else sub_ref_count))
+        eff_lots = max(stored_lots, log_lots)
+        eff_rebate = max(stored_rebate, log_rebate)
+        eff_pending = max(stored_pending, log_rebate)
+
         return {
             "chat_id": chat_id,
-            "ib_code": str(row[0] or f"KM-{chat_id}"),
+            "ib_code": ib_code_val,
             "partner_name": str(row[1] or f"Partner_{chat_id}"),
             "tier": str(row[2] or "SILVER").upper(),
             "rebate_pct": float(row[3] or 30.0),
-            "referred_clients": int(row[4] or 0),
-            "total_lots": float(row[5] or 0.0),
-            "total_rebate_usd": float(row[6] or 0.0),
-            "pending_rebate_usd": float(row[7] or 0.0),
+            "referred_clients": eff_clients,
+            "total_lots": eff_lots,
+            "total_rebate_usd": eff_rebate,
+            "pending_rebate_usd": eff_pending,
             "paid_rebate_usd": float(row[8] or 0.0),
             "payout_address": str(row[9] or ""),
             "payout_method": str(row[10] or "USDT"),
@@ -3271,6 +3314,56 @@ def get_capital_ib_partner(chat_id: int) -> Dict[str, Any]:
             "payout_address": "",
             "payout_method": "USDT"
         }
+
+def link_user_capital_referral(client_chat_id: int, partner_chat_id: int, partner_code: str = "") -> bool:
+    """Links a client account to their Introducing Broker (IB) partner."""
+    if not client_chat_id or not partner_chat_id:
+        return False
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO capital_user_referrals (client_chat_id, partner_chat_id, partner_code)
+            VALUES (?, ?, ?)
+            ON CONFLICT(client_chat_id) DO UPDATE SET
+                partner_chat_id = excluded.partner_chat_id,
+                partner_code = excluded.partner_code
+        """, (client_chat_id, partner_chat_id, partner_code))
+        
+        # Increment partner client count
+        cursor.execute("""
+            UPDATE capital_ib_partners
+            SET referred_clients = referred_clients + 1, updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+        """, (partner_chat_id,))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error in link_user_capital_referral: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def get_user_capital_referrer(client_chat_id: int) -> int:
+    """Retrieves the partner chat_id for a client, defaulting to Master Admin (859271875)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT partner_chat_id FROM capital_user_referrals WHERE client_chat_id = ?", (client_chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0]:
+            return int(row[0])
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return 859271875
 
 def set_capital_ib_partner(
     chat_id: int,
