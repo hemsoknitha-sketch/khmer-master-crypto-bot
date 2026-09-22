@@ -3064,8 +3064,8 @@ class CapitalOpeningRangeBreakoutEngine:
     7. One-and-Done Session Debounce preventing chop whipsaws.
     """
 
-    LONDON_ASSETS = ["US500", "GOLD", "GERMANY40", "OIL_CRUDE", "NATURALGAS"]
-    NY_ASSETS = ["US100", "US500", "GOLD", "NATURALGAS", "OIL_CRUDE", "NVDA", "TSLA", "META", "GOOGL"]
+    LONDON_ASSETS = ["US500", "GOLD", "GERMANY40", "OIL_CRUDE"]
+    NY_ASSETS = ["US100", "US500", "GOLD", "OIL_CRUDE", "NVDA", "TSLA", "META", "GOOGL"]
 
     def __init__(self):
         self._session_ranges: Dict[str, Dict[str, Any]] = {}   # session_key -> { epic -> range_data }
@@ -3357,21 +3357,25 @@ class CapitalOpeningRangeBreakoutEngine:
             self._session_trades.add(trade_key)
             self._stats["total_breakouts_detected"] += 1
 
-            # Compute Dynamic Stop Loss and Take Profit (Expanded +5.0% to +8.0% Target)
-            # SL is set at Range Midpoint (Asymmetric 1R Risk)
-            # TP is calibrated for +5.0% to +8.0% ROI expansion (4R - 6R)
+            # Query live spread from cache
+            cached_mkt = _SHARED_PRICE_CACHE.get(resolved_epic.upper(), {}).get("data", {})
+            spread_val = cached_mkt.get("spread", 0.0)
+            if spread_val <= 0:
+                spread_val = 0.60 if "GOLD" in resolved_epic.upper() else (0.05 if "OIL" in resolved_epic.upper() else 1.0)
+
+            # Enforce Invariant 34: Noise-isolated Stop Loss & 10x Hurdle TP
             is_index_or_gold = any(x in resolved_epic.upper() for x in ["US100", "US500", "GOLD", "GERMANY40"])
-            min_target_pct = 0.0040 if is_index_or_gold else 0.0150  # +8.0% ROI at 20x (0.40%) or 5x (1.50%)
+            min_target_pct = 0.0050 if is_index_or_gold else 0.0180  # +10.0% ROI at 20x (0.50%) or 5x (1.80%)
 
             if direction == "BUY":
-                sl = round(or_mid, 2)
-                risk_dist = max(ask * 0.0008, abs(ask - sl))
-                tp_dist = max(risk_dist * 4.0, ask * min_target_pct)
+                min_sl_dist = max(abs(ask - or_mid), spread_val * 2.5, ask * 0.0025, atr * 1.5)
+                sl = round(ask - min_sl_dist, 2)
+                tp_dist = max(min_sl_dist * 4.0, spread_val * 10.0, ask * min_target_pct)
                 tp = round(ask + tp_dist, 2)
             else:
-                sl = round(or_mid, 2)
-                risk_dist = max(bid * 0.0008, abs(sl - bid))
-                tp_dist = max(risk_dist * 4.0, bid * min_target_pct)
+                min_sl_dist = max(abs(or_mid - bid), spread_val * 2.5, bid * 0.0025, atr * 1.5)
+                sl = round(bid + min_sl_dist, 2)
+                tp_dist = max(min_sl_dist * 4.0, spread_val * 10.0, bid * min_target_pct)
                 tp = round(bid - tp_dist, 2)
 
             self._stats["last_breakout"] = {
