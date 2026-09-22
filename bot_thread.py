@@ -19431,6 +19431,37 @@ class TelegramBotThread(BaseThread):
                         in_mode_str = str(sub_args[3]).lower().strip() if len(sub_args) >= 4 else "live"
                         is_demo_mode = (in_mode_str in ["demo", "virtual", "test", "0", "false"])
 
+                        # Check for abstract angle brackets / placeholders
+                        is_placeholder = (
+                            "<" in in_key or ">" in in_key or "API_KEY" in in_key.upper() or
+                            "<" in in_id or ">" in in_id or "EMAIL" in in_id.upper() or
+                            "<" in in_pwd or ">" in in_pwd or "PASSWORD" in in_pwd.upper()
+                        )
+                        if is_placeholder:
+                            ph_kb = InlineKeyboardMarkup([
+                                [InlineKeyboardButton("🔑 របៀបបង្កើត API Key", callback_data="btn_cap_api_vault")],
+                                [InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")]
+                            ])
+                            ph_msg = (
+                                f"⚠️ **សូមបញ្ចូល API KEY, EMAIL និង PASSWORD ពិតប្រាកដរបស់អ្នក!** 🔑\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"ℹ️ _ប្រព័ន្ធរកឃើញថាលោកអ្នកបានវាយពាក្យគំរូ `<...>` ឬមិនទាន់បានជំនួសដោយទិន្នន័យពិតប្រាកដ។_\n\n"
+                                f"👉 **ឧទាហរណ៍ជាក់ស្តែងត្រឹមត្រូវ (កុំដាក់សញ្ញា < >) ៖**\n"
+                                f"• `` `/capital API 9a8b7c6d5e client@gmail.com Pass1234 live` ``\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _ចូលទៅកាន់ Capital.com -> Settings -> API Integrations ដើម្បីបង្កើត API Key ពិតប្រាកដរបស់អ្នក!_"
+                            ) if user_lang == 'khmer' else (
+                                f"⚠️ **PLEASE ENTER YOUR ACTUAL CAPITAL.COM CREDENTIALS!** 🔑\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"ℹ️ _Detected template placeholder `<...>`. Please replace with your actual values._\n\n"
+                                f"👉 **Concrete Example (No angle brackets):**\n"
+                                f"• `` `/capital API 9a8b7c6d5e client@gmail.com Pass1234 live` ``\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _Generate your actual API Key from Capital.com -> Settings -> API Integrations!_"
+                            )
+                            await update.effective_message.reply_text(ph_msg, parse_mode="Markdown", reply_markup=ph_kb)
+                            return
+
                         valid, vmsg, b_info = await asyncio.to_thread(
                             capital_engine.validate_capital_credentials,
                             in_key, in_id, in_pwd, is_demo_mode
