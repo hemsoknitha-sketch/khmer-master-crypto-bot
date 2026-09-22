@@ -2850,9 +2850,13 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
             ord_params["algoType"] = "CONDITIONAL"
             ord_params["workingType"] = str(kwargs.get("workingType", "CONTRACT_PRICE")).upper()
 
-        if "stop_price" in kwargs or "stopPrice" in kwargs:
-            sp = kwargs.get("stop_price") or kwargs.get("stopPrice")
-            ord_params["stopPrice"] = format_price_to_tick_size(symbol, sp)
+        if "stop_price" in kwargs or "stopPrice" in kwargs or "trigger_price" in kwargs or "triggerPrice" in kwargs:
+            sp = kwargs.get("stop_price") or kwargs.get("stopPrice") or kwargs.get("trigger_price") or kwargs.get("triggerPrice")
+            formatted_sp = format_price_to_tick_size(symbol, sp)
+            if is_conditional or use_algo_endpoint:
+                ord_params["triggerPrice"] = formatted_sp
+            else:
+                ord_params["stopPrice"] = formatted_sp
         if order_type in ["LIMIT", "STOP", "TAKE_PROFIT"]:
             limit_p = kwargs.get("price")
             if limit_p is not None:
