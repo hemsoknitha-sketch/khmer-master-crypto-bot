@@ -4829,26 +4829,35 @@ def get_all_strategy_pnls(chat_id: int):
     return res
 
 def get_all_vip_users():
+    """Returns a list of all active VIP users, lifetime holders, and Super Admin."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT chat_id, license_expiry FROM users WHERE license_expiry IS NOT NULL")
+    cursor.execute("SELECT chat_id, license_expiry, is_vip FROM users")
     rows = cursor.fetchall()
     conn.close()
     
-    valid_users = []
+    valid_users = set()
+    valid_users.add(859271875)  # Super Admin always active
+    
     for row in rows:
         chat_id = row[0]
-        expiry = row[1]
-        if expiry == 'Administrator':
-            valid_users.append(chat_id)
-        else:
+        expiry = str(row[1] or '').strip()
+        is_vip = bool(row[2])
+        
+        if chat_id == 859271875:
+            valid_users.add(chat_id)
+            continue
+            
+        if expiry.lower() in ['administrator', 'admin', 'lifetime', 'vip', 'active'] or is_vip:
+            valid_users.add(chat_id)
+        elif expiry:
             try:
                 expiry_date = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S")
                 if datetime.now() <= expiry_date:
-                    valid_users.append(chat_id)
+                    valid_users.add(chat_id)
             except ValueError:
                 pass
-    return valid_users
+    return sorted(list(valid_users))
 
 def get_system_setting(key: str, default: str = None) -> str:
     conn = get_db_connection()

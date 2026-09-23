@@ -841,24 +841,33 @@ class SmartXEngine:
                 "macro_guard": macro
             }
 
+        # --- AUTO MODE: DYNAMIC MOE REGIME ROUTER ---
+        if mode_str in ["AUTO", "AGI"]:
+            # If AI ensemble or macro indicates strong trend, volatility breakout or macro tailwind, route to TURBO Sprint
+            if (ensemble["moe_regime"] in ["TRENDING_BULL", "TRENDING_BEAR"] or 
+                (ensemble["consensus"] in ["BUY", "SELL"] and ensemble["confidence_pct"] >= 75.0) or 
+                sat_regime == "STRONG_MACRO_TAILWIND" or 
+                pboc_action == "BUYING"):
+                return cls.generate_smart_x_signal(symbol, mode="TURBO")
+
         # --- SONIC SCALPER MODE (DEFAULT) ---
         side = "SKIP"
         confidence = 50.0
         reasons = []
 
-        if sweep_data["sweep_signal"] in ["TURTLE_SOUP_BUY", "TRUE_BREAKOUT_BUY"] and ensemble["consensus"] == "BUY":
+        if sweep_data.get("sweep_signal") in ["TURTLE_SOUP_BUY", "TRUE_BREAKOUT_BUY"] and ensemble["consensus"] == "BUY":
             side = "BUY"
             confidence = max(87.5, ensemble["confidence_pct"])
-            reasons.append(f"SONIC {sweep_data['pattern_name']}")
+            reasons.append(f"SONIC {sweep_data.get('pattern_name', 'Turtle Soup')}")
             reasons.append(f"AI Ensemble {ensemble['buy_votes']}/{ensemble['total_votes']} Votes BUY")
             if sge_prem >= 15.0:
                 confidence = min(96.5, confidence + 3.0)
                 reasons.append(f"SGE Premium +${sge_prem:.2f}/oz (PBOC OTC Accumulation)")
 
-        elif sweep_data["sweep_signal"] in ["TURTLE_SOUP_SELL", "TRUE_BREAKOUT_SELL"] and ensemble["consensus"] == "SELL":
+        elif sweep_data.get("sweep_signal") in ["TURTLE_SOUP_SELL", "TRUE_BREAKOUT_SELL"] and ensemble["consensus"] == "SELL":
             side = "SELL"
             confidence = max(86.8, ensemble["confidence_pct"])
-            reasons.append(f"SONIC {sweep_data['pattern_name']}")
+            reasons.append(f"SONIC {sweep_data.get('pattern_name', 'Turtle Soup')}")
             reasons.append(f"AI Ensemble {ensemble['sell_votes']}/{ensemble['total_votes']} Votes SELL")
             if dxy_val > 105.0:
                 confidence = min(95.0, confidence + 2.5)
@@ -869,9 +878,32 @@ class SmartXEngine:
             confidence = 94.0
             reasons.append("🚨 GEOPOLITICAL BLACK SWAN: Immediate Flight-to-Safety into Gold")
 
-        elif session_info.get("is_prime_time") and ensemble["confidence_pct"] >= 88.0:
+        elif ensemble["consensus"] == "BUY" and ensemble["confidence_pct"] >= 75.0:
+            side = "BUY"
+            confidence = max(85.0, ensemble["confidence_pct"])
+            reasons.append(f"🧠 AI Super Brain Consensus ({ensemble['buy_votes']}/{ensemble['total_votes']} BUY)")
+            if sge_prem >= 15.0:
+                confidence = min(96.0, confidence + 3.0)
+                reasons.append(f"SGE Premium +${sge_prem:.2f}/oz")
+            if dxy_trend == "DUMPING":
+                reasons.append(f"DXY Dollar Softening ({dxy_val:.2f})")
+
+        elif ensemble["consensus"] == "SELL" and ensemble["confidence_pct"] >= 75.0:
+            # Anti-Oversold Short Guard (Invariant 16)
+            rsi_val = market_data.get_symbol_rsi(symbol, interval="15m") if hasattr(market_data, 'get_symbol_rsi') else 50.0
+            if rsi_val > 38.0:
+                side = "SELL"
+                confidence = max(85.0, ensemble["confidence_pct"])
+                reasons.append(f"🧠 AI Super Brain Consensus ({ensemble['sell_votes']}/{ensemble['total_votes']} SELL)")
+                if dxy_val > 104.5:
+                    reasons.append(f"DXY Index High ({dxy_val:.2f})")
+            else:
+                side = "SKIP"
+                reasons.append(f"Anti-Oversold Bottom Guard (RSI {rsi_val:.1f} <= 38.0)")
+
+        elif session_info.get("is_prime_time") and ensemble["confidence_pct"] >= 70.0:
             side = ensemble["consensus"]
-            confidence = ensemble["confidence_pct"]
+            confidence = max(80.0, ensemble["confidence_pct"])
             reasons.append(f"Session {session_info['label']} Prime Momentum")
             reasons.append(f"AI Consensus {side} ({confidence}%)")
 
