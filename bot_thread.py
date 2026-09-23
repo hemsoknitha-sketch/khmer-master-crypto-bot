@@ -13574,12 +13574,13 @@ class TelegramBotThread(BaseThread):
                         f"🧠 *33 AI Swarm Confluence ៖* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                         f"⚡ *Hawkes Jump Momentum ៖* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
                         f"📈 *Dynamic ATR ៖* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                        f"⚖️ *Payoff Profile ៖* `Asymmetric {lvl.get('rr_ratio', '1:10.0')} (ចំណេញ ១ ដង ទប់ខាត ១០ ដង)`\n"
                         f"🎯 *RSI ៖* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"📋 *ស្ថានភាពបញ្ជាលើ Order Book (`STOP_MARKET`) ៖*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ *ការការពារទុន ៖* `Smart OCO Auto-Pruner | Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *ការការពារទុន ៖* `Smart OCO Auto-Pruner | Breakeven Armor @ +3.0% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _បញ្ជាត្រូវបានដាក់ផ្ទាល់លើ Binance Futures Order Book រង់ចាំបំបែកតម្លៃ < 0.001 ms!_"
                     ) if is_khmer else (
                         f"🪙 *REACHSEY CRYPTO ({actual_sym}) PENDING STOP MATRIX DEPLOYED!* ⚡\n"
@@ -13591,12 +13592,13 @@ class TelegramBotThread(BaseThread):
                         f"🧠 *33 AI Swarm Confluence:* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                         f"⚡ *Hawkes Jump Momentum:* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
                         f"📈 *Dynamic ATR:* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                        f"⚖️ *Payoff Profile:* `Asymmetric {lvl.get('rr_ratio', '1:10.0')} (1 Win Covers 10 Losses)`\n"
                         f"🎯 *RSI:* `{lvl.get('rsi_15m')}` (`{lvl.get('straddle_mode')}`)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"📋 *Active Exchange `STOP_MARKET` Orders:*\n"
                         + "\n".join(order_lines) + "\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"🛡️ *Capital Armor:* `Smart OCO Auto-Pruner | Breakeven Armor @ +4.8% ROI | Golden 85% Ratchet`\n"
+                        f"🛡️ *Capital Armor:* `Smart OCO Auto-Pruner | Breakeven Armor @ +3.0% ROI | Golden 85% Ratchet`\n"
                         f"⚡ _Pre-placed on Binance Futures Order Book for sub-millisecond execution!_"
                     )
                     try:
@@ -13648,31 +13650,34 @@ class TelegramBotThread(BaseThread):
             ])
 
             dash_msg = (
-                f"🪙 *REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX* ⚡\n"
+                f"🪙 *REACHSEY CRYPTO 500+ UNIVERSE VELOCITY & ASYMMETRIC 1:10 R:R MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 *#1 Top Velocity Asset (AI Radar) ៖* `{top_sym}` (Score: `{top_cand.get('velocity_score')}`)\n"
+                f"🎯 *#1 Top Velocity Asset (500+ Universe Radar) ៖* `{top_sym}` (Score: `{top_cand.get('velocity_score')}`)\n"
                 f"🏆 *Top 3 Volatility Leaderboard ៖* {top_3_str}\n"
                 f"📊 *តម្លៃបច្ចុប្បន្ន (Live Price) ៖* `${lvl.get('current_price'):,.4f} USDT`\n"
                 f"🧠 *33 AI Swarm Consensus ៖* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                 f"⚡ *Hawkes Jump Intensity ៖* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
                 f"📈 *Dynamic ATR ៖* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                f"⚖️ *Payoff Engine ៖* `Asymmetric {lvl.get('rr_ratio', '1:10.0')} (ចំណេញ ១ ដង ទប់ខាត ១០ ដង)`\n"
                 f"🎯 *RSI ៖* `{lvl.get('rsi_15m')}`\n"
                 f"🛡️ *ស្ថានភាព Straddle ៖* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 *កម្រិតបញ្ជាស្ទាក់ស្វវត្តិកំពុងគណនា (AI Elastic Gap) ៖*\n"
+                f"🎯 *កម្រិតបញ្ជាស្ទាក់ស្វវត្តិកំពុងគណនា (AI Elastic Gap & 10R Matrix) ៖*\n"
                 f"🟢 *PENDING BUY-STOP ៖* `${lvl.get('buy_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_buy')}x ATR`)\n"
-                f"   • Stop Loss: `${lvl.get('buy_sl'):,.4f}` | Take Profit: `${lvl.get('buy_tp'):,.4f}` (R:R 1:3.0)\n"
+                f"   • Stop Loss: `${lvl.get('buy_sl'):,.4f}` | Take Profit: `${lvl.get('buy_tp'):,.4f}` (10R Runner)\n"
                 f"🔴 *PENDING SELL-STOP ៖* `${lvl.get('sell_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_sell')}x ATR`)\n"
-                f"   • Stop Loss: `${lvl.get('sell_sl'):,.4f}` | Take Profit: `${lvl.get('sell_tp'):,.4f}` (R:R 1:3.0)\n"
+                f"   • Stop Loss: `${lvl.get('sell_sl'):,.4f}` | Take Profit: `${lvl.get('sell_tp'):,.4f}` (10R Runner)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ *សសរស្តម្ភគណិតវិទ្យា & AI ទាំង ៤ (Zero Lingering Standard) ៖*\n"
-                f"• AI Top-1 Velocity Auto-Radar (ស្កេន ១៥ កាក់ស្របគ្នា < 0.1s)\n"
-                f"• 5m/15m Micro-Burst Gap (0.55x-0.70x ATR ផ្ទុះចំណេញក្នុង 5-15 នាទី)\n"
-                f"• Smart OCO Auto-Pruner (លុប Order ច្រាសពេល Fill ភ្លាម)\n"
-                f"• Tiered Multi-TP Runner (TP1 +4.5% ROI Lock / TP2 +15.0% Mega Trend)\n"
+                f"🛡️ *សសរស្តម្ភគណិតវិទ្យា & AI ទាំង ៦ (The 6 Institutional Pillars) ៖*\n"
+                f"• 500+ Universe Velocity Radar (Hawkes Jump λ(t) + Volatility Clustering < 0.1s)\n"
+                f"• Elastic Dynamic ATR Gap (0.55x-0.80x ATR Compression លើទិសដៅ AI)\n"
+                f"• Asymmetric 1:10 R:R Engine (ចំណេញ ១ ដង ទប់ខាត ១០ ដង ជាមួយ Breakeven Armor)\n"
+                f"• Sub-Millisecond Native Placement (ដាក់លើ Binance Order Book ផ្ទាល់ < 1ms)\n"
+                f"• Anti-Oversold/Overbought Shield (RSI <= 38.0 / >= 68.0 ការពារខាត Invariant 16)\n"
+                f"• Smart OCO Auto-Pruner (លុបចោល Opposite Leg ក្នុង < 30ms ពេល Position Fill)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💡 *គំរូបញ្ជា Auto & Stop (1-Tap Copyable) ៖*\n"
-                f"• `` `/smartx_reachsey_crypto AUTO` `` _(បាញ់ Top 1 Velocity ស្វ័យប្រវត្តិ)_\n"
+                f"• `` `/smartx_reachsey_crypto AUTO` `` _(បាញ់ Top 1 Velocity 500+ Universe)_\n"
                 f"• `` `/smartx_reachsey_crypto STOP` `` _(លុបចោលបញ្ជាស្ទាក់ទាំងអស់)_\n"
                 f"• `` `/smartx_reachsey_crypto STOP NEAR` `` _(លុបចោលបញ្ជាស្ទាក់លើ NEAR)_\n"
                 f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(បាញ់ Top 1 លើ 5M Micro-Burst)_\n"
@@ -13682,31 +13687,34 @@ class TelegramBotThread(BaseThread):
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             ) if is_khmer else (
-                f"🪙 *REACHSEY CRYPTO MULTI-ASSET SUPER SMART PENDING STOP MATRIX* ⚡\n"
+                f"🪙 *REACHSEY CRYPTO 500+ UNIVERSE VELOCITY & ASYMMETRIC 1:10 R:R MATRIX* ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 *#1 Top Velocity Asset (AI Radar):* `{top_sym}` (Score: `{top_cand.get('velocity_score')}`)\n"
+                f"🎯 *#1 Top Velocity Asset (500+ Universe Radar):* `{top_sym}` (Score: `{top_cand.get('velocity_score')}`)\n"
                 f"🏆 *Top 3 Volatility Leaderboard:* {top_3_str}\n"
                 f"📊 *Live Price:* `${lvl.get('current_price'):,.4f} USDT`\n"
                 f"🧠 *33 AI Swarm Consensus:* `{lvl.get('ai_confidence')}%` (`{lvl.get('ai_direction')}` | `{lvl.get('ai_votes')}`)\n"
                 f"⚡ *Hawkes Jump Intensity:* `{lvl.get('hawkes_score')}x` ({lvl.get('jump_status')})\n"
                 f"📈 *Dynamic ATR:* `${lvl.get('atr_15m'):,.4f} USDT` (Elastic Gap: `BUY {lvl.get('gap_mult_buy')}x` | `SELL {lvl.get('gap_mult_sell')}x`)\n"
+                f"⚖️ *Payoff Engine:* `Asymmetric {lvl.get('rr_ratio', '1:10.0')} (1 Win Covers 10 Losses)`\n"
                 f"🎯 *RSI:* `{lvl.get('rsi_15m')}`\n"
                 f"🛡️ *Straddle State:* `{lvl.get('straddle_mode')}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎯 *Calculated Pending Stop Levels (AI Elastic Gap):*\n"
+                f"🎯 *Calculated Pending Stop Levels (AI Elastic Gap & 10R Matrix):*\n"
                 f"🟢 *PENDING BUY-STOP:* `${lvl.get('buy_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_buy')}x ATR`)\n"
-                f"   • SL: `${lvl.get('buy_sl'):,.4f}` | TP: `${lvl.get('buy_tp'):,.4f}` (R:R 1:3.0)\n"
+                f"   • SL: `${lvl.get('buy_sl'):,.4f}` | TP: `${lvl.get('buy_tp'):,.4f}` (10R Runner)\n"
                 f"🔴 *PENDING SELL-STOP:* `${lvl.get('sell_stop_trigger'):,.4f} USDT` (`{lvl.get('gap_mult_sell')}x ATR`)\n"
-                f"   • SL: `${lvl.get('sell_sl'):,.4f}` | TP: `${lvl.get('sell_tp'):,.4f}` (R:R 1:3.0)\n"
+                f"   • SL: `${lvl.get('sell_sl'):,.4f}` | TP: `${lvl.get('sell_tp'):,.4f}` (10R Runner)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🛡️ *4 Institutional Pillars (Zero Lingering Standard):*\n"
-                f"• AI Top-1 Velocity Auto-Radar (Parallel Scan 15 Coins < 0.1s)\n"
-                f"• 5m/15m Micro-Burst Gap (0.55x-0.70x ATR for 5-15m Trigger)\n"
-                f"• Smart OCO Auto-Pruner (Cancels opposite leg upon fill)\n"
-                f"• Tiered Multi-TP Runner (TP1 +4.5% ROI Lock / TP2 +15.0% Mega Trend)\n"
+                f"🛡️ *The 6 Institutional Quantitative Pillars:*\n"
+                f"• 500+ Universe Velocity Radar (Hawkes Jump λ(t) + Volume Clustering in < 0.1s)\n"
+                f"• Elastic Dynamic ATR Gap (0.55x-0.80x ATR Compression on AI Breakout Side)\n"
+                f"• Asymmetric 1:10 R:R Engine (1 Win Covers 10 Losses with Breakeven Armor)\n"
+                f"• Sub-Millisecond Native Placement (Pre-placed on Binance Order Book < 1ms)\n"
+                f"• Anti-Oversold/Overbought Shield (RSI <= 38.0 / >= 68.0 Invariant 16 Guard)\n"
+                f"• Smart OCO Auto-Pruner (Sub-30ms opposing leg cancellation upon position fill)\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"💡 *1-Tap Commands:*\n"
-                f"• `` `/smartx_reachsey_crypto AUTO` `` _(Auto Radar on Top 1 Asset)_\n"
+                f"• `` `/smartx_reachsey_crypto AUTO` `` _(Auto Radar on 500+ Top 1 Asset)_\n"
                 f"• `` `/smartx_reachsey_crypto STOP` `` _(Cancel all open pending orders)_\n"
                 f"• `` `/smartx_reachsey_crypto STOP NEAR` `` _(Cancel open orders on NEAR)_\n"
                 f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(Auto Radar on 5M Micro-Burst)_\n"
@@ -13714,7 +13722,7 @@ class TelegramBotThread(BaseThread):
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
                 f"_APEX SUPER BRAIN AI_\n"
-                f"Risk-Free Passive Wealth Generation 24/7!"
+                f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             )
 
             try:
@@ -21599,6 +21607,17 @@ class TelegramBotThread(BaseThread):
             coalesce=True,
             args=[self.app],
             id='capital_forex_monitor'
+        )
+
+        # 1g. 24/7 Reachsey Crypto 500+ Universe Velocity Radar & Asymmetric 10R Monitor (Every 15 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.reachsey_crypto_monitor,
+            'interval',
+            seconds=15,
+            max_instances=2,
+            coalesce=True,
+            args=[self.app],
+            id='reachsey_crypto_monitor'
         )
 
         # 2. Unified Smart Grid Matrix Monitor (Every 15 seconds)
