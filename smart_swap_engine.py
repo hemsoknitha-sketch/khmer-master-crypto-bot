@@ -649,15 +649,32 @@ def scan_onchain_momentum_gems(chain: str = "SOLANA", limit: int = 8, mode: str 
     # Fallback to institutional liquid tokens ONLY for AUTO mode, NEVER for NEW mode!
     if not candidates and mode_upper != "NEW":
         if chain_upper == "SOLANA":
-            candidates = [
-                {"symbol": "JUP", "address": SOLANA_TOKENS["JUP"], "dex": "Raydium", "price_usd": 0.85, "liquidity_usd": 25000000, "buy_velocity_5m": 2.1, "score": 92.0, "mode": "AUTO", "lp_locked_pct": 100.0},
-                {"symbol": "RAY", "address": SOLANA_TOKENS["RAY"], "dex": "Raydium", "price_usd": 1.75, "liquidity_usd": 18000000, "buy_velocity_5m": 1.9, "score": 88.5, "mode": "AUTO", "lp_locked_pct": 100.0},
-                {"symbol": "BONK", "address": SOLANA_TOKENS["BONK"], "dex": "Raydium", "price_usd": 0.000018, "liquidity_usd": 15000000, "buy_velocity_5m": 2.4, "score": 91.0, "mode": "AUTO", "lp_locked_pct": 100.0},
-                {"symbol": "WIF", "address": SOLANA_TOKENS["WIF"], "dex": "Raydium", "price_usd": 1.90, "liquidity_usd": 30000000, "buy_velocity_5m": 2.8, "score": 94.0, "mode": "AUTO", "lp_locked_pct": 100.0}
+            fallback_defs = [
+                ("JUP", SOLANA_TOKENS.get("JUP", "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"), 25000000, 2.1, 92.0),
+                ("RAY", SOLANA_TOKENS.get("RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"), 18000000, 1.9, 88.5),
+                ("BONK", SOLANA_TOKENS.get("BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"), 15000000, 2.4, 91.0),
+                ("WIF", SOLANA_TOKENS.get("WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"), 30000000, 2.8, 94.0)
             ]
+            candidates = []
+            for f_sym, f_addr, f_liq, f_vel, f_score in fallback_defs:
+                live_p = get_token_price_usd("SOLANA", f_addr)
+                if live_p <= 0:
+                    live_p = 0.30 if f_sym == "JUP" else (1.75 if f_sym == "RAY" else (0.000018 if f_sym == "BONK" else 1.90))
+                candidates.append({
+                    "symbol": f_sym,
+                    "address": f_addr,
+                    "dex": "Raydium",
+                    "price_usd": live_p,
+                    "liquidity_usd": f_liq,
+                    "buy_velocity_5m": f_vel,
+                    "score": f_score,
+                    "mode": "AUTO",
+                    "lp_locked_pct": 100.0
+                })
         else:
+            p_cake = get_token_price_usd("BSC", BSC_TOKENS.get("CAKE", "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82")) or 2.20
             candidates = [
-                {"symbol": "CAKE", "address": BSC_TOKENS["CAKE"], "dex": "PancakeSwap", "price_usd": 2.20, "liquidity_usd": 50000000, "buy_velocity_5m": 2.0, "score": 89.0, "mode": mode_upper, "lp_locked_pct": 100.0}
+                {"symbol": "CAKE", "address": BSC_TOKENS.get("CAKE", "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82"), "dex": "PancakeSwap", "price_usd": p_cake, "liquidity_usd": 50000000, "buy_velocity_5m": 2.0, "score": 89.0, "mode": mode_upper, "lp_locked_pct": 100.0}
             ]
 
     # Sort by AI Score descending
@@ -781,15 +798,11 @@ def execute_smart_swap(chat_id: int, chain: str, from_token: str, to_token: str,
                     simulated_tx = live_res["tx_hash"]
                     solscan_link = live_res["solscan_url"]
                     print(f"🚀 [USER {chat_id} LIVE ON-CHAIN SWAP CONFIRMED] Tx: {simulated_tx} | {solscan_link}")
-                    # Fetch live on-chain balance to guarantee 100% accurate tokens and entry price
-                    try:
-                        time.sleep(1.2)
-                        spl_bal = solana_trading_wallet.get_user_spl_token_balance(chat_id, to_addr)
-                        if spl_bal.get("ui_amount", 0.0) > 0:
-                            out_qty = spl_bal["ui_amount"]
-                            effective_price = amount_usd / max(0.000001, out_qty)
-                    except Exception as e_bal:
-                        print(f"⚠️ [LIVE SPL BAL VERIFICATION ERROR]: {e_bal}")
+                    # Derive incremental tokens received strictly from verified swap transaction (zero wallet balance pollution)
+                    live_out_atomic = int(live_res.get("out_amount", 0) or 0)
+                    if live_out_atomic > 0:
+                        out_qty = float(live_out_atomic) / (10 ** out_decimals)
+                    effective_price = amount_usd / max(0.000001, out_qty)
                 else:
                     live_err = live_res.get("msg", "Jupiter Swap rejected")
                     print(f"⚠️ [USER {chat_id} LIVE SWAP ERROR] {live_err}")
@@ -1142,6 +1155,11 @@ def monitor_smart_swap_positions(app=None):
             if curr_p <= 0 or entry_p <= 0:
                 continue
 
+            # Anti-Glitch Anomaly Guard: Protect against corrupted entry_price (prevent math explosion)
+            expected_entry = (amt_usd / max(0.000001, qty)) if (amt_usd > 0 and qty > 0) else entry_p
+            if entry_p <= 0.000001 or (curr_p / max(0.000001, entry_p) > 20.0 and expected_entry > entry_p * 5.0):
+                entry_p = expected_entry
+
             roi_pct = ((curr_p - entry_p) / entry_p) * 100.0
             pnl_usd = (curr_p - entry_p) * qty
 
@@ -1220,6 +1238,12 @@ def monitor_smart_swap_positions(app=None):
                         sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr)
                         if sell_res.get("status") == "success":
                             sell_tx = sell_res.get("tx_hash", "")
+                            out_lamports = int(sell_res.get("out_amount", 0) or 0)
+                            if out_lamports > 0:
+                                sol_px = get_hft_fast_price_sol() or 145.0
+                                real_received_usd = (out_lamports / 1e9) * sol_px
+                                be_pnl = real_received_usd - amt_usd
+                                be_roi = (be_pnl / max(0.01, amt_usd)) * 100.0
                     except Exception as e_be:
                         print(f"Error in live BE exit for {sym}: {e_be}")
 
@@ -1260,7 +1284,12 @@ def monitor_smart_swap_positions(app=None):
                         sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr, amount_token_raw=sell_atomic)
                         if sell_res.get("status") == "success":
                             sell_tx = sell_res.get("tx_hash", "")
-                            print(f"🚀 [LIVE TP1 SELL CONFIRMED] Tx: {sell_tx}")
+                            # Real on-chain proceeds in SOL converted to USD (zero phantom numbers)
+                            out_lamports = int(sell_res.get("out_amount", 0) or 0)
+                            if out_lamports > 0:
+                                sol_px = get_hft_fast_price_sol() or 145.0
+                                harvested_usd = (out_lamports / 1e9) * sol_px
+                            print(f"🚀 [LIVE TP1 SELL CONFIRMED] Tx: {sell_tx} | Real Harvested: ${harvested_usd:.2f} USD")
                     except Exception as e_tp1:
                         print(f"Error executing live TP1 sell for {sym}: {e_tp1}")
 
@@ -1312,6 +1341,12 @@ def monitor_smart_swap_positions(app=None):
                             sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr)
                             if sell_res.get("status") == "success":
                                 sell_tx = sell_res.get("tx_hash", "")
+                                out_lamports = int(sell_res.get("out_amount", 0) or 0)
+                                if out_lamports > 0:
+                                    sol_px = get_hft_fast_price_sol() or 145.0
+                                    real_received_usd = (out_lamports / 1e9) * sol_px
+                                    final_pnl = real_received_usd - (amt_usd * 0.50)
+                                    roi_pct = (final_pnl / max(0.01, amt_usd * 0.50)) * 100.0
                         except Exception as e_mb:
                             print(f"Error in live moonbag exit for {sym}: {e_mb}")
 
