@@ -34,14 +34,20 @@ else:
 
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ChatMemberHandler
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+import logging
 from ai_engine import AIInvestmentEngine
 import database as db
 import localization as loc
 import security
 import trading_engine
+import turbo_hedge_engine
+import smart_x_engine
+import capital_engine
 import ui_standards
 import spot_profit_harvester
 import web_gui_server
+
+logger = logging.getLogger("KhmerMasterCryptoBot")
 
 def mask_sensitive_data(text: str) -> str:
     """Masks API keys and PINs from user commands before logging."""

@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import asyncio
+import logging
 from telegram.ext import Application
 import database as db
 import market_data
@@ -10,6 +11,12 @@ import xml.etree.ElementTree as ET
 import re
 import localization as loc
 import trading_engine
+import turbo_hedge_engine
+import smart_x_engine
+import capital_engine
+import ui_standards
+
+logger = logging.getLogger("SchedulerTasks")
 
 # Anti-Spam State Machine for Insufficient Balance
 

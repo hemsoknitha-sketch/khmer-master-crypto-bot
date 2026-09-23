@@ -16,11 +16,15 @@ import sys
 import time
 import math
 import json
+import asyncio
+import logging
 import warnings
 from typing import Union, Dict, Any, Optional, Tuple, List
 from datetime import datetime, timezone
 import numpy as np
 import requests
+
+logger = logging.getLogger("SmartXEngine")
 
 # Suppress unpickling and feature name warnings from ML packages
 warnings.filterwarnings("ignore", category=UserWarning)
