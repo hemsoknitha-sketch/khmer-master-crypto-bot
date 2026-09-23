@@ -231,12 +231,17 @@ class PrePumpEngine:
         price_range = max(1e-6, high_price - low_price)
         stoch_k = ((last_price - low_price) / price_range) * 100.0
 
-        # Assess 15m RSI
+        # Assess 15m RSI, ADX(14), and EMA50
         rsi_15m = 50.0
+        adx_15m = 25.0
+        plus_di, minus_di = 25.0, 20.0
+        ema50_15m = last_price
         try:
             r15 = requests.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=28", timeout=3.5)
             if r15.status_code == 200:
                 k_data = r15.json()
+                highs = [float(k[2]) for k in k_data]
+                lows = [float(k[3]) for k in k_data]
                 closes = [float(k[4]) for k in k_data]
                 if len(closes) >= 15:
                     diffs = np.diff(closes)
@@ -246,8 +251,21 @@ class PrePumpEngine:
                     avg_loss = np.mean(losses[-14:])
                     rs = avg_gain / max(1e-6, avg_loss)
                     rsi_15m = 100.0 - (100.0 / (1.0 + rs))
+
+                    # 15m Wilder's ADX(14) Anti-Chop Guard
+                    if len(closes) >= 28:
+                        adx_15m, plus_di, minus_di = md.calculate_adx_and_dmi(highs, lows, closes, period=14)
+
+                    # 15m EMA50 Macro Alignment
+                    k50 = 2.0 / (min(50, len(closes)) + 1)
+                    ema50_15m = closes[0]
+                    for p in closes[1:]:
+                        ema50_15m = (p * k50) + (ema50_15m * (1.0 - k50))
         except Exception:
             rsi_15m = 50.0
+            adx_15m = 25.0
+            plus_di, minus_di = 25.0, 20.0
+            ema50_15m = last_price
 
         # Query 33 Models through SmartXBrain if available
         moe_character = "WHALE_ACCUMULATION"
@@ -346,6 +364,27 @@ class PrePumpEngine:
         dynamic_lev = int(round(5 + kelly_f * 10.0))
         final_lev = min(15, max(3, max(recommended_leverage, dynamic_lev)))
 
+        # Strict Institutional Technical Guard: Reject chop or broken macro trend
+        is_technically_valid = True
+        reject_reason = ""
+
+        # 1. Anti-Chop Guard: Strict 15m ADX >= 25.0
+        if adx_15m < 25.0:
+            is_technically_valid = False
+            reject_reason = f"Chop Regime Detected (15m ADX {adx_15m:.1f} < 25.0)"
+
+        # 2. For BUY: Macro Trend Alignment with EMA50
+        elif side == "BUY":
+            if last_price < (ema50_15m * 0.995) and character != "OVERSOLD_BOUNCE_SETUP":
+                is_technically_valid = False
+                reject_reason = f"Macro Downtrend (Price ${last_price:.4f} < 15m EMA50 ${ema50_15m:.4f})"
+            elif rsi_15m > 72.0:
+                is_technically_valid = False
+                reject_reason = f"Overbought FOMO Top (15m RSI {rsi_15m:.1f} > 72.0)"
+            elif plus_di <= minus_di:
+                is_technically_valid = False
+                reject_reason = f"Bearish DMI Dominance (+DI {plus_di:.1f} <= -DI {minus_di:.1f})"
+
         meta = {
             "symbol": symbol,
             "character": character,
@@ -356,6 +395,12 @@ class PrePumpEngine:
             "satellite_bias": sat_bias,
             "max_hold_minutes": 20,
             "rsi_15m": round(rsi_15m, 1),
+            "adx_15m": round(adx_15m, 1),
+            "ema50_15m": ema50_15m,
+            "plus_di": round(plus_di, 1),
+            "minus_di": round(minus_di, 1),
+            "is_valid": is_technically_valid,
+            "reject_reason": reject_reason,
             "stoch_k": round(stoch_k, 1),
             "asymmetric_rr": "1:10.0",
             "breakeven_armor_roi": 3.0,
@@ -381,6 +426,10 @@ class PrePumpEngine:
 
         # 1. Analyze Coin Character with 33 AI Models
         char_meta = await asyncio.to_thread(self.analyze_character_with_33_models, symbol, current_ticker)
+
+        # Strict Institutional Technical Guard: Reject chop or broken macro trend
+        if not char_meta.get("is_valid", True):
+            return False, 0.0, char_meta
         
         # 2. Check Volume Anomaly (Silent Accumulation)
         is_accumulating = await self.analyze_volume_anomaly(symbol, current_ticker)

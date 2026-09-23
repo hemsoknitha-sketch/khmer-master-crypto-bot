@@ -4943,9 +4943,26 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             if meta.get("rsi_15m", 50.0) <= 38.0:
                                 print(f"🛡️ [PRE-PUMP SHORT GUARD] Skipped short on {symbol}: 15m RSI <= 38.0!")
                                 continue
-                            order = await asyncio.to_thread(trading_engine.place_futures_order, api_key, api_secret, symbol, "SELL", qty, effective_leverage, "SHORT")
+                            pos_side = "SHORT"
+                            limit_entry_p = current_price * 1.0005 # Ask pullback for short maker
                         else:
-                            order = await asyncio.to_thread(trading_engine.place_futures_order, api_key, api_secret, symbol, "BUY", qty, effective_leverage, "LONG")
+                            pos_side = "LONG"
+                            limit_entry_p = current_price * 0.9995 # Bid pullback for long maker
+
+                        # Attempt Pullback LIMIT Maker order (0.02% Maker Fee, 0 Slippage)
+                        order = await asyncio.to_thread(
+                            trading_engine.place_futures_order,
+                            api_key, api_secret, symbol, side, qty, effective_leverage, pos_side,
+                            order_type="LIMIT",
+                            price=limit_entry_p,
+                            time_in_force="GTC"
+                        )
+                        # Precision Fallback to Market Order if LIMIT order is rejected
+                        if "error" in order or "code" in order or order.get("status") == "error":
+                            order = await asyncio.to_thread(
+                                trading_engine.place_futures_order,
+                                api_key, api_secret, symbol, side, qty, effective_leverage, pos_side
+                            )
 
                         if "error" not in order and "code" not in order and order.get("status") != "error":
                             order_success = True
@@ -5066,28 +5083,36 @@ async def pre_pump_positions_monitor(app: Application):
                 close_reason = ""
                 badge_title = "🚀 **[PRE-PUMP & 33 AI MODELS EXIT]** 🎯"
 
-                # 1. Hard Stop-Loss (1.5% Price Dip = 15% ROI at 10x)
-                if roi_pct <= -15.0:
-                    should_close = True
-                    close_reason = "Pre-Pump 1.5% Hard Stop-Loss"
-                    badge_title = "🛑 **[PRE-PUMP STOP-LOSS EXIT]** 🛡️"
+                # Fixed Dollar Risk Parity Calculation (Loss capped at <= $1.20 USD or -6.0% ROI)
+                margin_str = db.get_system_setting(f"pre_pump_margin_{chat_id}_{sym}", "")
+                try:
+                    pos_margin_est = float(margin_str) if margin_str else (abs(amt) * entry_price) / max(1, leverage)
+                except (ValueError, TypeError):
+                    pos_margin_est = (abs(amt) * entry_price) / max(1, leverage)
+                loss_dollar_est = abs(min(0.0, roi_pct) / 100.0) * pos_margin_est
 
-                # 2. Breakeven Armor (lock at +0.12% net floor once peak hits >= 5.0%)
-                elif curr_peak >= 5.0 and roi_pct <= 1.2:
+                # 1. Fixed Dollar Risk Parity Stop-Loss (Max Loss Capped <= $1.20 USD or -6.0% ROI)
+                if roi_pct <= -6.0 or (roi_pct < 0 and loss_dollar_est >= 1.20):
                     should_close = True
-                    close_reason = "Pre-Pump Breakeven Armor (+0.12% Net Floor)"
+                    close_reason = f"Pre-Pump Risk Parity SL (ROI {roi_pct:.1f}%, Capped <= $1.20)"
+                    badge_title = "🛑 **[PRE-PUMP RISK PARITY SL EXIT]** 🛡️"
+
+                # 2. Breathing Breakeven Armor (lock at +3.5% ROI net floor once peak hits >= 10.0%)
+                elif curr_peak >= 10.0 and roi_pct <= 3.5:
+                    should_close = True
+                    close_reason = f"Pre-Pump Breakeven Armor (Peak +{curr_peak:.1f}%, Locked +3.5% ROI)"
                     badge_title = "🛡️ **[PRE-PUMP BREAKEVEN ARMOR EXIT]** 🔒"
 
-                # 3. Golden 85% Ratchet (once peak hits >= 10.0%)
-                elif curr_peak >= 10.0 and roi_pct <= (curr_peak * 0.85):
+                # 3. Golden 85% Ratchet (once peak hits >= 15.0%)
+                elif curr_peak >= 15.0 and roi_pct <= (curr_peak * 0.85):
                     should_close = True
                     close_reason = f"Pre-Pump Golden 85% Ratchet (Peak +{curr_peak:.1f}%)"
                     badge_title = "💰 **[PRE-PUMP 85% PROFIT RATCHET]** 🏆"
 
-                # 4. Take-Profit Target (+25.0% ROI Moonshot)
-                elif roi_pct >= 25.0:
+                # 4. Moonshot Profit Target (+30.0% ROI)
+                elif roi_pct >= 30.0:
                     should_close = True
-                    close_reason = "Pre-Pump Moonshot Target (+25.0% ROI)"
+                    close_reason = "Pre-Pump Moonshot Target (+30.0% ROI)"
                     badge_title = "🎯 **[PRE-PUMP MOONSHOT PROFIT TARGET]** 🚀"
 
                 # 5. Dedicated Anti-Stagnation Release (Held >= 180m with flat volume)
@@ -5115,13 +5140,14 @@ async def pre_pump_positions_monitor(app: Application):
                     db.update_system_setting(f"pre_pump_entry_time_{chat_id}_{sym}", "0.0")
 
                     user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
+                    pnl_sign = "+" if unRealizedProfit >= 0 else ""
                     exit_msg = (
                         f"{badge_title}\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                         f"⏳ **រយៈពេលកាន់កាប់ ៖** `{trade_age_min:.0f} នាទី`\n"
                         f"📊 **ROI ពេលបិទ ៖** `{roi_pct:+.2f}%` ({close_reason})\n"
-                        f"💵 **PnL ជាក់ស្ដែង ៖** `+${unRealizedProfit:,.2f} USDT`\n"
+                        f"💵 **PnL ជាក់ស្ដែង ៖** `{pnl_sign}${unRealizedProfit:,.2f} USDT`\n"
                         f"🔓 **ដោះលែងទុន (Margin) ៖** `រួចរាល់ ១០០%`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
@@ -5131,7 +5157,7 @@ async def pre_pump_positions_monitor(app: Application):
                         f"🪙 **Symbol / Pair:** `{sym}`\n"
                         f"⏳ **Holding Duration:** `{trade_age_min:.0f} mins`\n"
                         f"📊 **Exit ROI:** `{roi_pct:+.2f}%` ({close_reason})\n"
-                        f"💵 **Realized PnL:** `+${unRealizedProfit:,.2f} USDT`\n"
+                        f"💵 **Realized PnL:** `{pnl_sign}${unRealizedProfit:,.2f} USDT`\n"
                         f"🔓 **Margin Capital:** `100% Released`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
