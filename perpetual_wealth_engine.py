@@ -875,6 +875,51 @@ class PerpetualWealthGeneratorEngine:
                     if entry_price <= 0.0:
                         continue
 
+                    # Autonomous Position Fill Detection & Telegram Live Alert
+                    entry_notified_key = f"wealth_entry_notified_{chat_id}_{sym}"
+                    is_entry_notified = (db.get_system_setting(entry_notified_key, "0") == "1")
+                    if not is_entry_notified and app and hasattr(app, "bot"):
+                        db.update_system_setting(entry_notified_key, "1")
+                        try:
+                            user_lang = db.get_user_language(chat_id)
+                            side_label = "BUY / LONG" if amt > 0 else "SELL / SHORT"
+                            fill_pos_margin = (abs(amt) * entry_price) / max(1, leverage)
+                            fill_msg = (
+                                "💎 **[24/7 PERPETUAL WEALTH - POSITION FILLED & LIVE]** 🟢\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                                f"🎯 **ទិសដៅ (Signal) ៖** `{side_label}`\n"
+                                f"🏷️ **ប្រភេទ Order ៖** `LIMIT Maker (Matched 0.02% Fee)`\n"
+                                f"💵 **តម្លៃចូលពិតប្រាកដ (Entry Price) ៖** `${entry_price:,.4f}`\n"
+                                f"💰 **ទុនចូល (Margin) ៖** `${fill_pos_margin:.2f} USDT`\n"
+                                f"⚡ **Leverage ៖** `{leverage}x (ISOLATED Mode)`\n"
+                                f"🛡️ **ពិដានហានិភ័យ (Risk Cap) ៖** `Fixed <= $1.50 USDT (Risk Parity)`\n"
+                                f"🛡️ **Breakeven Armor ៖** `Trigger នៅ +10.0% ROI (ធានា Net >= +$1.00)`\n"
+                                f"🎯 **Target TP1 (50%) ៖** `+15.0% ROI`\n"
+                                f"🚀 **Target TP2 (Moonshot) ៖** `+35.0% - +50.0% (Golden 85% Ratchet)`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                "💡 _Order បាន Match ជោគជ័យលើ Orderbook! ម៉ាស៊ីនកំពុងតាមដានច្បាមចំណេញស្វ័យប្រវត្ត ២៤/៧!_"
+                            ) if user_lang == 'khmer' else (
+                                "💎 **[24/7 PERPETUAL WEALTH - POSITION FILLED & LIVE]** 🟢\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🪙 **Symbol / Pair:** `{sym}`\n"
+                                f"🎯 **Signal / Direction:** `{side_label}`\n"
+                                f"🏷️ **Order Type:** `LIMIT Maker (Matched 0.02% Fee)`\n"
+                                f"💵 **Filled Entry Price:** `${entry_price:,.4f}`\n"
+                                f"💰 **Allocated Margin:** `${fill_pos_margin:.2f} USDT`\n"
+                                f"⚡ **Leverage:** `{leverage}x (ISOLATED Mode)`\n"
+                                f"🛡️ **Risk Ceiling:** `Fixed <= $1.50 USDT (Risk Parity)`\n"
+                                f"🛡️ **Breakeven Armor:** `Trigger at +10.0% ROI (Locks Net >= +$1.00)`\n"
+                                f"🎯 **Target TP1 (50%):** `+15.0% ROI`\n"
+                                f"🚀 **Target TP2 (Moonshot):** `+35.0% - +50.0% (Golden 85% Ratchet)`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                "💡 _Order filled successfully on book! 24/7 autonomous monitoring & harvest active!_"
+                            )
+                            asyncio.create_task(_async_send_wealth_alert(app, chat_id, fill_msg, "wealth fill alert"))
+                        except Exception as e_fill_alert:
+                            print(f"⚠️ Notice sending wealth fill alert: {e_fill_alert}")
+
+
                     # Calculate current ROI %
                     if amt > 0:
                         roi_pct = ((mark_price - entry_price) / entry_price) * 100.0 * leverage
@@ -946,6 +991,7 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(peak_roi_key, "0.0")
                         db.update_system_setting(tp1_taken_key, "0")
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                        db.update_system_setting(f"wealth_entry_notified_{chat_id}_{sym}", "0")
                         db.update_system_setting(entry_time_key, "0.0")
                         est_fee = abs(amt) * entry_price * 0.0008
                         net_pnl = unRealizedProfit - est_fee
@@ -1052,6 +1098,7 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(peak_roi_key, "0.0")
                         db.update_system_setting(tp1_taken_key, "0")
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                        db.update_system_setting(f"wealth_entry_notified_{chat_id}_{sym}", "0")
                         db.update_system_setting(entry_time_key, "0.0")
                         est_fee_all = abs(amt) * mark_price * 0.0008
                         net_tp2_pnl = max(0.50, unRealizedProfit - est_fee_all)
@@ -1129,6 +1176,7 @@ class PerpetualWealthGeneratorEngine:
                             db.update_system_setting(peak_roi_key, "0.0")
                             db.update_system_setting(tp1_taken_key, "0")
                             db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                            db.update_system_setting(f"wealth_entry_notified_{chat_id}_{sym}", "0")
                             db.update_system_setting(entry_time_key, "0.0")
 
                             final_pnl = net_exit_pnl

@@ -19014,6 +19014,60 @@ class TelegramBotThread(BaseThread):
                     )
                     await update.effective_message.reply_text(stop_msg, parse_mode="Markdown", reply_markup=keyboard)
                     self.log_signal.emit(f"🛑 User {chat_id} stopped 24/7 Spot Wealth Generator.")
+                elif action in ["STATUS", "REPORT", "INFO", "CHECK"]:
+                    spot_pnl = spot_info.get("total_realized_pnl", 0.0)
+                    spot_win = spot_info.get("win_count", 0)
+                    spot_loss = spot_info.get("loss_count", 0)
+                    spot_coins = spot_info.get("active_coins", [])
+                    spot_coins_str = ", ".join(spot_coins) if spot_coins else ("គ្មាន (ស្កេន Spot Sweet-Spot)" if user_lang == 'khmer' else "None (Scanning Spot Sweet-Spot)")
+                    spot_cap = float(spot_info.get("capital", 50.0))
+                    spot_alloc = float(spot_info.get("allocation_per_coin", 15.0))
+                    spot_sizing = perpetual_wealth_engine.PerpetualWealthGeneratorEngine.calculate_spot_dna_sizing(
+                        spot_cap, 0.0, spot_alloc, spot_pnl
+                    )
+                    spot_max_coins = spot_sizing["max_coins"]
+                    spot_eff_cap = spot_sizing["effective_capital"]
+
+                    spot_stat_msg = (
+                        "🟢 **APEX 24/7 SPOT WEALTH GENERATOR** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ **ម៉ាស៊ីនច្បាមចំណេញ Spot 1x (0.00% Liquidation Risk)**\n\n"
+                        f"• **ស្ថានភាព ៖** `{spot_badge}`\n"
+                        f"• **ទុនដើម (Base Capital) ៖** `${spot_cap:.2f} USDT` (1x Leverage)\n"
+                        f"• **ទុនបង្វិលសរុប (Effective) ៖** `${spot_eff_cap:.2f} USDT` (+Auto-Compound)\n"
+                        f"• **ទុនក្នុង ១ កាក់ ៖** `${spot_alloc:.2f} USDT`\n"
+                        f"• **សមត្ថភាពកាន់កាក់ (Capacity) ៖** `{len(spot_coins)}/{spot_max_coins} កាក់`\n"
+                        f"• **កាក់កំពុងច្បាម ៖** `{spot_coins_str}`\n"
+                        f"• **ចំណេញសុទ្ធកើបបាន ៖** `+${spot_pnl:,.2f} USDT` ({spot_win} ឈ្នះ | {spot_loss} ចាញ់)\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "📋 **1-TAP COMMAND PRESETS ៖**\n"
+                        "👉 **បើក Spot 1 កាក់ ($22) ៖** `` `/wealth SPOT ON 22` ``\n"
+                        "👉 **បើក Spot ($50 | $15/កាក់) ៖** `` `/wealth SPOT ON 50` ``\n"
+                        "👉 **បើក Spot ($100 | $25/កាក់) ៖** `` `/wealth SPOT ON 100 25` ``\n"
+                        "👉 **បិទ Spot ៖** `` `/wealth SPOT OFF` ``\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _ចុចប៊ូតុងខាងក្រោម ឬ copy command ដើម្បីដំណើរការភ្លាមៗ!_"
+                    ) if user_lang == 'khmer' else (
+                        "🟢 **APEX 24/7 SPOT WEALTH GENERATOR** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ **Autonomous 24/7 Spot 1x Engine (0.00% Liquidation Risk)**\n\n"
+                        f"• **Status:** `{spot_badge_en}`\n"
+                        f"• **Base Capital:** `${spot_cap:.2f} USDT` (1x Spot Leverage)\n"
+                        f"• **Effective Capital:** `${spot_eff_cap:.2f} USDT` (+Auto-Compound)\n"
+                        f"• **Alloc / Coin:** `${spot_alloc:.2f} USDT`\n"
+                        f"• **Coin Capacity:** `{len(spot_coins)}/{spot_max_coins} Coins`\n"
+                        f"• **Active Coins:** `{spot_coins_str}`\n"
+                        f"• **Net Realized:** `+${spot_pnl:,.2f} USDT` ({spot_win} W | {spot_loss} L)\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "📋 **1-TAP COMMAND PRESETS:**\n"
+                        "👉 **Start Spot 1-Coin ($22):** `` `/wealth SPOT ON 22` ``\n"
+                        "👉 **Start Spot ($50 | $15/coin):** `` `/wealth SPOT ON 50` ``\n"
+                        "👉 **Start Spot ($100 | $25/coin):** `` `/wealth SPOT ON 100 25` ``\n"
+                        "👉 **Stop Spot:** `` `/wealth SPOT OFF` ``\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _Tap the buttons below or copy commands to execute!_"
+                    )
+                    await update.effective_message.reply_text(spot_stat_msg, parse_mode="Markdown", reply_markup=keyboard)
                 else:
                     await update.effective_message.reply_text("⚠️ Usage: `/wealth SPOT ON 100 25` or `/wealth SPOT OFF`", parse_mode="Markdown")
 
@@ -19078,6 +19132,60 @@ class TelegramBotThread(BaseThread):
                     )
                     await update.effective_message.reply_text(stop_msg, parse_mode="Markdown", reply_markup=keyboard)
                     self.log_signal.emit(f"🛑 User {chat_id} stopped 24/7 Futures Wealth Generator.")
+                elif action in ["STATUS", "REPORT", "INFO", "CHECK"]:
+                    fut_pnl = bot_info.get("total_realized_pnl", 0.0)
+                    fut_win = bot_info.get("win_count", 0)
+                    fut_loss = bot_info.get("loss_count", 0)
+                    fut_coins = bot_info.get("active_coins", [])
+                    fut_coins_str = ", ".join(fut_coins) if fut_coins else ("គ្មាន (ស្កេន Golden Sweet-Spot +3% ទៅ +14%)" if user_lang == 'khmer' else "None (Scanning Sweet-Spot +3% to +14%)")
+                    fut_margin_val = bot_info.get("margin_per_coin", 0.0) if bot_info else 0.0
+                    fut_margin_str = f"${fut_margin_val:.2f} USDT" if fut_margin_val > 0 else "Auto Dynamic Kelly ($10.00–$16.00 USDT)"
+                    fut_cap = float(bot_info.get('capital', 50.0))
+
+                    fut_stat_msg = (
+                        "⚡ **APEX 24/7 FUTURES WEALTH GENERATOR** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ **ម៉ាស៊ីនច្បាមចំណេញស្វ័យប្រវត្ត Futures 10x ISOLATED Mode**\n\n"
+                        f"• **ស្ថានភាព ៖** `{fut_badge}`\n"
+                        f"• **ទុនកំណត់ (Capital) ៖** `${fut_cap:.2f} USDT` (10x ISOLATED)\n"
+                        f"• **Margin ក្នុង ១ កាក់ ៖** `{fut_margin_str}`\n"
+                        f"• **ពិដានហានិភ័យ (Risk Cap) ៖** `Fixed <= $1.50 USDT (Risk Parity)`\n"
+                        f"• **កាក់កំពុងច្បាម ៖** `{fut_coins_str}`\n"
+                        f"• **ចំណេញសុទ្ធកើបបាន ៖** `+${fut_pnl:,.2f} USDT` ({fut_win} ឈ្នះ | {fut_loss} ចាញ់)\n"
+                        f"• **Breakeven Armor ៖** `Lock នៅ +10.0% ROI (ធានា Net >= +$1.00)`\n"
+                        f"• **Target TP1 / TP2 ៖** `+15.0% (50% Cash) | +35% - +50% (Moonshot)`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "📋 **1-TAP COMMAND PRESETS ៖**\n"
+                        "👉 **បើក Futures ($30) ៖** `` `/wealth FUTURES ON 30` ``\n"
+                        "👉 **បើក Futures ($50) ៖** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **បើក Futures ($100 | $15/កាក់) ៖** `` `/wealth FUTURES ON 100 15` ``\n"
+                        "👉 **បើក Futures ($200 | $25/កាក់) ៖** `` `/wealth FUTURES ON 200 25` ``\n"
+                        "👉 **បិទ Futures ៖** `` `/wealth FUTURES OFF` ``\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _ចុចប៊ូតុងខាងក្រោម ឬ copy command ដើម្បីដំណើរការភ្លាមៗ!_"
+                    ) if user_lang == 'khmer' else (
+                        "⚡ **APEX 24/7 FUTURES WEALTH GENERATOR** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "🏛️ **Autonomous 24/7 Futures 10x ISOLATED Engine**\n\n"
+                        f"• **Status:** `{fut_badge_en}`\n"
+                        f"• **Allocated Capital:** `${fut_cap:.2f} USDT` (10x ISOLATED)\n"
+                        f"• **Margin per Coin:** `{fut_margin_str}`\n"
+                        f"• **Risk Ceiling:** `Fixed <= $1.50 USDT (Risk Parity)`\n"
+                        f"• **Active Coins:** `{fut_coins_str}`\n"
+                        f"• **Net Realized PnL:** `+${fut_pnl:,.2f} USDT` ({fut_win} W | {fut_loss} L)\n"
+                        f"• **Breakeven Armor:** `Locks at +10.0% ROI (Net >= +$1.00)`\n"
+                        f"• **Target TP1 / TP2:** `+15.0% (50% Cash) | +35% - +50% (Moonshot)`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "📋 **1-TAP COMMAND PRESETS:**\n"
+                        "👉 **Start Futures ($30):** `` `/wealth FUTURES ON 30` ``\n"
+                        "👉 **Start Futures ($50):** `` `/wealth FUTURES ON 50` ``\n"
+                        "👉 **Start Futures ($100 | $15/coin):** `` `/wealth FUTURES ON 100 15` ``\n"
+                        "👉 **Start Futures ($200 | $25/coin):** `` `/wealth FUTURES ON 200 25` ``\n"
+                        "👉 **Stop Futures:** `` `/wealth FUTURES OFF` ``\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        "💡 _Tap the buttons below or copy commands to execute!_"
+                    )
+                    await update.effective_message.reply_text(fut_stat_msg, parse_mode="Markdown", reply_markup=keyboard)
                 else:
                     await update.effective_message.reply_text("⚠️ Usage: `/wealth FUTURES ON 100 15` or `/wealth FUTURES OFF`", parse_mode="Markdown")
 
