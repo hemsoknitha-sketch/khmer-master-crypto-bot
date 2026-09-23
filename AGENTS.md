@@ -408,7 +408,28 @@ Any modification that breaks any of the following 30 invariants is considered an
      - Quantitative trade biases integrate physical supply chain telemetry (Rotterdam/Singapore port container velocity, Permian Basin oil flaring, and Pilbara mining indices).
   6. **Risk Management & IB Compounding:**
      - Dynamic lot allocation via **Fractional Kelly Sizing ($f^*$)**, **10x Hurdle Spread Drag Elimination**, **Breakeven Armor at $+3.0\%$ ROI**, and **30%-50% IB Spread Rebate Compounding** ($+$2.40 - $+$4.00/lot pure cash flow).
-- **Enforcement:** Verified by `audit_system.py` [CHECK 30/30].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 30/31].
+
+### Invariant 38: Quantitative Trifecta Autonomous Engine Protocol (/smartx_reachsey_crypto, /pre_pump, /auto_trade)
+- **Location:** `smart_x_engine.py` (`ReachseyStraddleEngine`, `execute_reachsey_crypto`, `stop_reachsey_crypto`), `pre_pump_engine.py` (`PrePumpEngine`, `evaluate_trifecta_signal`, `analyze_character_with_33_models`), `macro_auto_trade_engine.py` (`run_macro_auto_trade_scanner_cycle`, `execute_macro_auto_trade`), `bot_thread.py`, `scheduler_tasks.py` (`reachsey_crypto_monitor`, `pre_pump_sniper_monitor`)
+- **Rule:** The quantitative trifecta engines operate with mathematical edge, strict risk partitioning, and zero technical negligence:
+  1. **Reachsey Crypto Multi-Asset Stop Matrix (`/smartx_reachsey_crypto`):**
+     - Sub-millisecond direct exchange pending stop placement (`STOP_MARKET` on Binance Orderbook).
+     - 500+ Universe RAM Velocity Radar driven by Hawkes Jump Process $\lambda(t)$, Volume Clustering, and Elastic Dynamic ATR Gaps ($0.55\times - 0.80\times$ ATR breakout side / $1.10\times - 1.50\times$ ATR opposite).
+     - Asymmetric $1:10.0$ R:R with Breakeven Armor armed at $+3.0\%$ ROI (+0.12% Net Floor Lock) and Golden 85% Profit Ratchet.
+     - Sub-30ms Smart OCO Auto-Pruner canceling opposing pending legs upon position fill.
+     - Anti-Oversold (15m RSI $\le 38.0$ blocks Sell-Stop) and Anti-Overbought (15m RSI $\ge 68.0$ blocks Buy-Stop) safety shields.
+  2. **Institutional Smart Listing & Pre-Pump Accumulation Engine (`/pre_pump`):**
+     - Real-time L2 orderbook depth scanning for genuine whale accumulation walls ($\ge \$100\text{k}$ BTC/ETH, $\ge \$25\text{k}$ alts) protected by Orderbook Anti-Spoofing.
+     - 33 Wall Street AI Models Swarm (HMM/MoE Gating Router, PINN Jump-Diffusion, XGBoost, LightGBM, CatBoost) with $\ge 85.0\%$ confidence quorum.
+     - Dynamic Fractional Kelly Leverage Sizing ($f^* = \frac{p \cdot b - q}{b}$) clamped to safe $3\times - 12\times$ ISOLATED margin.
+     - Strict 20-minute Hard Time-Stop Guard for zero bag-holding on unconfirmed breakouts.
+  3. **Super Smart Macro Auto-Trade Waterfall Breakdown & Swing Engine (`/auto_trade`):**
+     - Multi-timeframe trend breakdown & breakout detection on 1H/4H + 15m flag retests with 33 AI models consensus.
+     - Ultra-wide liquidation buffer via $3\times - 5\times$ ISOLATED Margin ($\sim 33\%$ safety distance) and Mutual Non-Aggression Shield with `/turbo_hedge`.
+     - Anti-Wick Liquidity Sweep Shield preventing premature stop-out on fakeout spikes.
+     - The Golden 85% Profit Ratchet locking $\ge 85\%$ of peak unrealized profit.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 31/31].
 
 ---
 
@@ -416,8 +437,8 @@ Any modification that breaks any of the following 30 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 37 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 30 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 38 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 31 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
