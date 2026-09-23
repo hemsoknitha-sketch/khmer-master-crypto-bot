@@ -119,12 +119,14 @@ class CapitalComEngine:
         api_key: Optional[str] = None,
         identifier: Optional[str] = None,
         password: Optional[str] = None,
-        is_demo: Optional[bool] = None
+        is_demo: Optional[bool] = None,
+        custom_chat_id: Optional[int] = None
     ):
         self.api_key = (api_key or os.getenv("CAPITAL_API_KEY", "")).strip() or DEFAULT_CAPITAL_API_KEY
         self.identifier = (identifier or os.getenv("CAPITAL_IDENTIFIER", "")).strip() or DEFAULT_CAPITAL_IDENTIFIER
         self.password = (password or os.getenv("CAPITAL_PASSWORD", "")).strip() or DEFAULT_CAPITAL_PASSWORD
         self.last_auth_error: str = ""
+        self._custom_chat_id: Optional[int] = custom_chat_id
         
         if is_demo is not None:
             self.is_demo = is_demo
@@ -1037,7 +1039,8 @@ class CapitalComEngine:
         Executes an institutional risk-managed trade with automated SL/TP based on ATR.
         """
         # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
-        if not self.is_demo and not db.is_capital_user_authorized(self._custom_chat_id or 0):
+        user_cid = getattr(self, "_custom_chat_id", None)
+        if not self.is_demo and user_cid and not db.is_capital_user_authorized(user_cid):
             return {
                 "success": False,
                 "error": "LOCKED: Live Capital.com trading requires verified registration under official Partner referral code az48cxia."
@@ -1305,12 +1308,15 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
                 api_key=creds.get("api_key"),
                 identifier=creds.get("identifier"),
                 password=creds.get("password"),
-                is_demo=is_demo
+                is_demo=is_demo,
+                custom_chat_id=chat_id
             )
             _user_engine_pool[pool_key] = engine
             return engine
         else:
-            return get_capital_engine(is_demo=is_demo)
+            engine = get_capital_engine(is_demo=is_demo)
+            engine._custom_chat_id = chat_id
+            return engine
 
 def invalidate_user_capital_engine(chat_id: int):
     """Evicts user engine from cache upon credential update or deletion."""
