@@ -5713,7 +5713,7 @@ class TelegramBotThread(BaseThread):
                     gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
                     await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                     return
-                db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", 50.0))
+                db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", 50.0), is_demo=is_demo)
                 toast_msg = "✅ Capital Auto: បានបើកដំណើរការ!" if new_state else "🛑 Capital Auto: បានបិទ!"
                 try:
                     await update.callback_query.answer(toast_msg)
@@ -21177,10 +21177,11 @@ class TelegramBotThread(BaseThread):
                 sub = str(args[0]).upper().strip()
                 if sub in ["AUTO", "TOGGLE"]:
                     if len(args) >= 2 and args[1].upper() == "OFF":
-                        db.set_capital_auto_config(chat_id, enabled=False)
+                        db.set_capital_auto_config(chat_id, enabled=False, is_demo=auto_cfg.get("is_demo", True))
                     else:
                         target_budget = float(args[1]) if len(args) >= 2 and args[1].replace('.', '', 1).isdigit() else 50.0
-                        db.set_capital_auto_config(chat_id, enabled=True, budget=target_budget)
+                        target_is_demo = auto_cfg.get("is_demo", not is_auth)
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=target_budget, is_demo=target_is_demo)
                     is_auto_on = db.is_capital_auto_enabled(chat_id)
                 elif sub in ["SAT", "SATELLITE", "RADAR"]:
                     sat_all = sat_radar.get_all_forex_satellite_bias()

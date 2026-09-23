@@ -1255,6 +1255,11 @@ class CapitalComEngine:
             "positions_count": len(pos_summary)
         }
 
+    # Method Aliases for cross-engine compatibility
+    get_market_prices = get_historical_prices
+    place_market_order = place_position
+
+
 
 # ==============================================================================
 # 3. CONVENIENCE HELPERS & FACTORY FUNCTIONS
@@ -4445,9 +4450,26 @@ class CapitalForexExchangeSuite:
                 continue
 
             user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
-            target_assets = session_info["primary_assets"]
+            
+            # Retrieve currently open positions to prevent duplicate entries
+            try:
+                open_pos_list = await asyncio.to_thread(user_engine.get_open_positions)
+                user_open_epics = {
+                    (p.get("market", {}).get("epic") or p.get("position", {}).get("epic", "")).upper()
+                    for p in open_pos_list
+                }
+            except Exception:
+                user_open_epics = set()
+
+            # Prioritize active session pairs, followed by all supported Forex pairs
+            session_pairs = session_info.get("primary_assets", [])
+            target_assets = list(dict.fromkeys(session_pairs + self.FOREX_PAIRS))
 
             for epic in target_assets:
+                clean_epic = epic.upper().replace(".PRO", "").strip()
+                if clean_epic in user_open_epics:
+                    continue
+
                 try:
                     market_info = await asyncio.to_thread(user_engine.get_market_details, epic)
                     if not market_info.get("success") or market_info.get("market_status") != "TRADEABLE":
@@ -4461,7 +4483,7 @@ class CapitalForexExchangeSuite:
                         continue
 
                     sat_data = self.satellite_radar.get_satellite_macro_bias(epic)
-                    candles = await asyncio.to_thread(user_engine.get_market_prices, epic, "MINUTE_15", 20)
+                    candles = await asyncio.to_thread(user_engine.get_historical_prices, epic, "MINUTE_15", 20)
                     ou_setup = self.ou_engine.evaluate_ou_setup(
                         epic=epic,
                         current_price=cur_price,
@@ -4487,7 +4509,7 @@ class CapitalForexExchangeSuite:
                         )
 
                         order_res = await asyncio.to_thread(
-                            user_engine.place_market_order,
+                            user_engine.place_position,
                             epic=epic,
                             direction=action,
                             size=final_lot,
@@ -4497,22 +4519,21 @@ class CapitalForexExchangeSuite:
 
                         if order_res.get("success"):
                             self._stats["total_forex_trades"] += 1
-                            deal_ref = order_res.get("deal_reference", "CONFIRMED")
+                            deal_ref = order_res.get("deal_reference", f"FX_{int(time.time())}")
+                            deal_id = deal_ref
 
                             db.record_capital_auto_trade(
                                 chat_id=chat_id,
+                                deal_id=str(deal_id),
+                                deal_reference=str(deal_ref),
                                 epic=epic,
                                 direction=action,
                                 size=final_lot,
                                 entry_price=cur_price,
-                                sl_price=sl,
-                                tp_price=tp,
-                                deal_reference=deal_ref,
-                                confidence=conf,
-                                pnl_usd=0.0,
-                                status="OPEN",
-                                is_demo=1 if is_demo else 0
+                                sl=sl,
+                                tp=tp
                             )
+                            db.update_capital_auto_last_trade_time(chat_id, time.time())
 
                             if app and hasattr(app, "bot"):
                                 try:

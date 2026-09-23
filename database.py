@@ -2522,23 +2522,38 @@ def get_active_capital_auto_users() -> list:
 
 def record_capital_auto_trade(
     chat_id: int,
-    deal_id: str,
-    deal_reference: str,
-    epic: str,
-    direction: str,
-    size: float,
-    entry_price: float,
+    deal_id: str = "",
+    deal_reference: str = "",
+    epic: str = "",
+    direction: str = "",
+    size: float = 0.0,
+    entry_price: float = 0.0,
     sl: float = 0.0,
-    tp: float = 0.0
+    tp: float = 0.0,
+    **kwargs
 ) -> int:
-    """Records an executed TradFi trade into capital_auto_trades."""
+    """Records an executed TradFi / Forex trade into capital_auto_trades with full alias support."""
+    # Resolve any alias kwargs
+    if not sl and "sl_price" in kwargs:
+        try: sl = float(kwargs["sl_price"])
+        except Exception: pass
+    if not tp and "tp_price" in kwargs:
+        try: tp = float(kwargs["tp_price"])
+        except Exception: pass
+    if not deal_reference and "deal_ref" in kwargs:
+        deal_reference = str(kwargs["deal_ref"])
+    if not deal_id:
+        deal_id = str(deal_reference or kwargs.get("deal_id") or int(time.time()))
+    if not deal_reference:
+        deal_reference = str(deal_id)
+
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO capital_auto_trades
         (chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
-    """, (chat_id, str(deal_id), str(deal_reference), epic, direction, size, entry_price, sl, tp))
+    """, (chat_id, str(deal_id), str(deal_reference), str(epic), str(direction), float(size), float(entry_price), float(sl), float(tp)))
     trade_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -2588,6 +2603,26 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
     except Exception:
         conn.close()
     return {"total_trades": 0, "win_count": 0, "loss_count": 0, "total_pnl": 0.0, "win_rate": 0.0}
+
+def get_capital_auto_trades(chat_id: int, limit: int = 50) -> list:
+    """Returns a list of recent TradFi / Forex auto trades for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, deal_id, deal_reference, epic, direction, size, entry_price, exit_price, sl, tp, pnl, status, created_at, closed_at
+            FROM capital_auto_trades
+            WHERE chat_id = ?
+            ORDER BY id DESC LIMIT ?
+        """, (chat_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        cols = ["id", "deal_id", "deal_reference", "epic", "direction", "size", "entry_price", "exit_price", "sl", "tp", "pnl", "status", "created_at", "closed_at"]
+        return [dict(zip(cols, r)) for r in rows]
+    except Exception:
+        conn.close()
+        return []
+
 
 # ==============================================================================
 # CAPITAL.COM LEAD-LAG ARBITRAGE PERSISTENCE LAYER
