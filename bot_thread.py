@@ -21839,6 +21839,17 @@ class TelegramBotThread(BaseThread):
             id='pre_pump_sniper_monitor'
         )
 
+        # 🐋 Pre-Pump Positions & Exit Lifecycle Monitor (Fast 6s Cadence)
+        self.scheduler.add_job(
+            scheduler_tasks.pre_pump_positions_monitor,
+            'interval',
+            seconds=6,
+            max_instances=3,
+            coalesce=True,
+            args=[self.app],
+            id='pre_pump_positions_monitor'
+        )
+
         # 🌊 Order Book Whale Wall Front-Run Sniper (Optimized 45s Cadence)
         self.scheduler.add_job(
             scheduler_tasks.order_book_sniper,

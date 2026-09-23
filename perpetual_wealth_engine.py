@@ -857,6 +857,14 @@ class PerpetualWealthGeneratorEngine:
                         continue
 
                     sym = pos.get("symbol", "")
+
+                    # Invariant 26: Sub-Mode Explicit State Segregation & Non-Collapsible Invariant
+                    # If position is actively managed by Pre-Pump or Macro Trade engine, skip to eliminate cross-engine collisions!
+                    if db.get_system_setting(f"pre_pump_active_{chat_id}_{sym}", "0") == "1":
+                        continue
+                    if db.get_system_setting(f"macro_trade_{chat_id}_{sym}_peak_roi", None) is not None:
+                        continue
+
                     active_symbols.append(sym)
                     entry_price = float(pos.get("entryPrice", 0.0))
                     mark_price = float(pos.get("markPrice", 0.0))
@@ -1224,7 +1232,12 @@ class PerpetualWealthGeneratorEngine:
 
                     # Check current open positions count AND open limit orders
                     open_pos = trading_engine.get_open_positions(api_key, api_secret)
-                    open_symbols = set([p.get("symbol") for p in open_pos if abs(float(p.get("positionAmt", 0.0))) > 0.0]) if isinstance(open_pos, list) else set()
+                    open_symbols = set([
+                        p.get("symbol") for p in open_pos 
+                        if abs(float(p.get("positionAmt", 0.0))) > 0.0
+                        and db.get_system_setting(f"pre_pump_active_{chat_id}_{p.get('symbol')}", "0") != "1"
+                        and db.get_system_setting(f"macro_trade_{chat_id}_{p.get('symbol')}_peak_roi", None) is None
+                    ]) if isinstance(open_pos, list) else set()
 
                     open_orders = trading_engine.get_futures_open_orders(api_key, api_secret)
                     pending_order_symbols = set(o.get("symbol") for o in open_orders if o.get("symbol")) if isinstance(open_orders, list) else set()

@@ -4894,7 +4894,8 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                     continue
                     
                 already_trading = any((t[1] if isinstance(t, (tuple, list)) else (t.get('symbol') if hasattr(t, 'get') else getattr(t, 'symbol', None))) == symbol for t in active_trades)
-                if already_trading:
+                is_pp_active = (await asyncio.to_thread(db.get_system_setting, f"pre_pump_active_{chat_id}_{symbol}", "0") == "1")
+                if already_trading or is_pp_active:
                     continue
 
                 # Anti-Duplicate Spot Holding Shield: If already holding >= $5 worth on Spot, skip duplicate buys
@@ -4909,8 +4910,14 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                 # Invariant 8: Small capital clamp (< $100 -> max 10x)
                 effective_leverage = min(10, rec_leverage) if invest_amount < 100.0 else rec_leverage
                 
-                # Calculate qty
-                qty = await asyncio.to_thread(trading_engine.calculate_buy_quantity, api_key, api_secret, symbol, invest_amount, current_price)
+                # Calculate qty (Spot vs Futures Notional Distinction)
+                if stage == "SPOT_BUY_SCOUT":
+                    notional_req = max(10.50, invest_amount)
+                    qty = await asyncio.to_thread(trading_engine.calculate_buy_quantity, api_key, api_secret, symbol, notional_req, current_price)
+                else:
+                    futures_notional = max(6.50, invest_amount * effective_leverage)
+                    qty = await asyncio.to_thread(trading_engine.calculate_buy_quantity, api_key, api_secret, symbol, futures_notional, current_price)
+
                 if qty > 0:
                     order_success = False
                     if stage == "SPOT_BUY_SCOUT":
@@ -4926,6 +4933,11 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, buy_price=current_price, stop_loss_pct=1.5)
                     else:
                         # Stage 2: High-Confidence Precision Futures Entry (BUY Long or SELL Short)
+                        fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
+                        if fut_bal < invest_amount:
+                            print(f"🛡️ [PRE-PUMP FUTURES SKIPPED] {symbol}: Available Futures USDT (${fut_bal:.2f}) < Required Margin (${invest_amount:.2f}) for Chat ID {chat_id}.")
+                            continue
+
                         if side == "SELL":
                             # Invariant 16: Anti-Oversold Short Guard
                             if meta.get("rsi_15m", 50.0) <= 38.0:
@@ -4938,11 +4950,24 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                         if "error" not in order and "code" not in order and order.get("status") != "error":
                             order_success = True
                             PRE_PUMP_USER_COOLDOWN_CACHE[(chat_id, symbol)] = now_ts
-                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, buy_price=current_price, stop_loss_pct=1.5)
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_active_{chat_id}_{symbol}", "1")
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_entry_price_{chat_id}_{symbol}", str(current_price))
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_entry_time_{chat_id}_{symbol}", str(now_ts))
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_side_{chat_id}_{symbol}", side)
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_leverage_{chat_id}_{symbol}", str(effective_leverage))
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_margin_{chat_id}_{symbol}", str(invest_amount))
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_qty_{chat_id}_{symbol}", str(qty))
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_peak_roi_{chat_id}_{symbol}", "0.0")
 
                     if order_success:
                         action_badge = "🟢 LONG (BUY)" if side == "BUY" else "🔴 SHORT (SELL)"
                         mode_badge = "🪙 SPOT SCOUT" if stage == "SPOT_BUY_SCOUT" else f"⚡ FUTURES {effective_leverage}x"
+                        user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
+                        if stage == "SPOT_BUY_SCOUT":
+                            capital_line = f"• **ទុនវិនិយោគ ៖** `${invest_amount:,.2f} USDT` (Spot 1x)" if user_lang == "khmer" else f"• **Invest Capital:** `${invest_amount:,.2f} USDT` (Spot 1x)"
+                        else:
+                            notional_val = invest_amount * effective_leverage
+                            capital_line = f"• **ទុនកក់ (Margin) ៖** `${invest_amount:,.2f} USDT` (Notional: `${notional_val:,.2f}` | {effective_leverage}x)" if user_lang == "khmer" else f"• **Allocated Margin:** `${invest_amount:,.2f} USDT` (Notional: `${notional_val:,.2f}` | {effective_leverage}x)"
                         msg = (
                             f"🚀 **PRE-PUMP & 33 AI MODELS EXECUTION** 🔥\n"
                             f"━━━━━━━━━━━━\n"
@@ -4950,7 +4975,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             f"• **យុទ្ធសាស្ត្រ ៖** `{character}`\n"
                             f"• **របៀបជួញដូរ ៖** `{mode_badge}` | `{action_badge}`\n"
                             f"• **AI Confidence ៖** `{conf}%`\n"
-                            f"• **ទុនវិនិយោគ ៖** `${invest_amount:,.2f} USDT`\n"
+                            f"{capital_line}\n"
                             f"• **តម្លៃចូល (Entry) ៖** `${current_price:,.4f}`\n"
                             f"• **Stop-Loss ៖** `1.5%`\n"
                             f"• **Zero Bag-Holding ៖** `HFT Trailing Lock (+0.12% Net Floor)`\n"
@@ -4961,6 +4986,163 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
                         except Exception:
                             pass
+
+
+async def pre_pump_positions_monitor(app: Application):
+    """
+    Continuous Background Monitor for Pre-Pump Futures Positions (Invariant 26 & Invariant 24).
+    Enforces:
+    1. 1.5% Price Hard Stop-Loss (15% ROI at 10x).
+    2. Breakeven Armor & Golden 85% Profit Ratchet.
+    3. Take Profit Moonshot Targets (+25.0% ROI).
+    4. Dedicated Anti-Stagnation Release (if held >= 180m with flat volume).
+    """
+    try:
+        import database as db
+        import trading_engine
+        import ui_standards
+        import time
+
+        pre_pump_users = await asyncio.to_thread(db.get_pre_pump_users)
+        if not pre_pump_users:
+            return
+
+        for chat_id, _ in pre_pump_users:
+            keys = await asyncio.to_thread(db.get_user_api, chat_id)
+            if not keys or not keys[0] or not keys[1]:
+                continue
+            api_key, api_secret = keys[0], keys[1]
+
+            positions = await asyncio.to_thread(trading_engine.get_open_positions, api_key, api_secret)
+            if not isinstance(positions, list):
+                continue
+
+            for pos in positions:
+                amt = float(pos.get("positionAmt", 0.0))
+                if abs(amt) <= 0.0:
+                    continue
+                sym = pos.get("symbol", "")
+
+                # Check if this position was opened by Pre-Pump
+                is_active = (db.get_system_setting(f"pre_pump_active_{chat_id}_{sym}", "0") == "1")
+                if not is_active:
+                    continue
+
+                entry_price = float(pos.get("entryPrice", 0.0))
+                mark_price = float(pos.get("markPrice", 0.0))
+                unRealizedProfit = float(pos.get("unRealizedProfit", 0.0))
+                pos_side = pos.get("positionSide", "LONG" if amt > 0 else "SHORT")
+                leverage = int(pos.get("leverage", 10))
+
+                if entry_price <= 0.0:
+                    continue
+
+                # Calculate current ROI %
+                if amt > 0:
+                    roi_pct = ((mark_price - entry_price) / entry_price) * 100.0 * leverage
+                else:
+                    roi_pct = ((entry_price - mark_price) / entry_price) * 100.0 * leverage
+
+                # Peak ROI tracking
+                peak_key = f"pre_pump_peak_roi_{chat_id}_{sym}"
+                curr_peak_str = db.get_system_setting(peak_key, "0.0")
+                try:
+                    curr_peak = float(curr_peak_str) if curr_peak_str else 0.0
+                except (ValueError, TypeError):
+                    curr_peak = 0.0
+                if roi_pct > curr_peak:
+                    curr_peak = roi_pct
+                    db.update_system_setting(peak_key, str(curr_peak))
+
+                # Entry Time tracking
+                entry_time_str = db.get_system_setting(f"pre_pump_entry_time_{chat_id}_{sym}", "0.0")
+                try:
+                    entry_time = float(entry_time_str) if entry_time_str else time.time()
+                except (ValueError, TypeError):
+                    entry_time = time.time()
+                trade_age_min = max(0.0, (time.time() - entry_time) / 60.0)
+
+                should_close = False
+                close_reason = ""
+                badge_title = "🚀 **[PRE-PUMP & 33 AI MODELS EXIT]** 🎯"
+
+                # 1. Hard Stop-Loss (1.5% Price Dip = 15% ROI at 10x)
+                if roi_pct <= -15.0:
+                    should_close = True
+                    close_reason = "Pre-Pump 1.5% Hard Stop-Loss"
+                    badge_title = "🛑 **[PRE-PUMP STOP-LOSS EXIT]** 🛡️"
+
+                # 2. Breakeven Armor (lock at +0.12% net floor once peak hits >= 5.0%)
+                elif curr_peak >= 5.0 and roi_pct <= 1.2:
+                    should_close = True
+                    close_reason = "Pre-Pump Breakeven Armor (+0.12% Net Floor)"
+                    badge_title = "🛡️ **[PRE-PUMP BREAKEVEN ARMOR EXIT]** 🔒"
+
+                # 3. Golden 85% Ratchet (once peak hits >= 10.0%)
+                elif curr_peak >= 10.0 and roi_pct <= (curr_peak * 0.85):
+                    should_close = True
+                    close_reason = f"Pre-Pump Golden 85% Ratchet (Peak +{curr_peak:.1f}%)"
+                    badge_title = "💰 **[PRE-PUMP 85% PROFIT RATCHET]** 🏆"
+
+                # 4. Take-Profit Target (+25.0% ROI Moonshot)
+                elif roi_pct >= 25.0:
+                    should_close = True
+                    close_reason = "Pre-Pump Moonshot Target (+25.0% ROI)"
+                    badge_title = "🎯 **[PRE-PUMP MOONSHOT PROFIT TARGET]** 🚀"
+
+                # 5. Dedicated Anti-Stagnation Release (Held >= 180m with flat volume)
+                elif trade_age_min >= 180.0 and abs(roi_pct) <= 0.8 and curr_peak < 1.8:
+                    should_close = True
+                    close_reason = f"Pre-Pump Stagnation Release (Held {trade_age_min:.0f}m, Flat Volume)"
+                    badge_title = "⏰ **[PRE-PUMP - ANTI-STAGNATION RELEASE]** 🔄"
+
+                if should_close:
+                    side_to_close = "SELL" if amt > 0 else "BUY"
+                    close_res = await asyncio.to_thread(
+                        trading_engine.place_futures_order,
+                        api_key=api_key,
+                        api_secret=api_secret,
+                        symbol=sym,
+                        side=side_to_close,
+                        quantity=abs(amt),
+                        leverage=leverage,
+                        reduce_only=True,
+                        position_side=pos_side
+                    )
+                    # Clean up DB state
+                    db.update_system_setting(f"pre_pump_active_{chat_id}_{sym}", "0")
+                    db.update_system_setting(peak_key, "0.0")
+                    db.update_system_setting(f"pre_pump_entry_time_{chat_id}_{sym}", "0.0")
+
+                    user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
+                    exit_msg = (
+                        f"{badge_title}\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                        f"⏳ **រយៈពេលកាន់កាប់ ៖** `{trade_age_min:.0f} នាទី`\n"
+                        f"📊 **ROI ពេលបិទ ៖** `{roi_pct:+.2f}%` ({close_reason})\n"
+                        f"💵 **PnL ជាក់ស្ដែង ៖** `+${unRealizedProfit:,.2f} USDT`\n"
+                        f"🔓 **ដោះលែងទុន (Margin) ៖** `រួចរាល់ ១០០%`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                    ) if user_lang == 'khmer' else (
+                        f"{badge_title}\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🪙 **Symbol / Pair:** `{sym}`\n"
+                        f"⏳ **Holding Duration:** `{trade_age_min:.0f} mins`\n"
+                        f"📊 **Exit ROI:** `{roi_pct:+.2f}%` ({close_reason})\n"
+                        f"💵 **Realized PnL:** `+${unRealizedProfit:,.2f} USDT`\n"
+                        f"🔓 **Margin Capital:** `100% Released`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                    )
+                    if app and hasattr(app, "bot"):
+                        try:
+                            await app.bot.send_message(chat_id=chat_id, text=exit_msg, parse_mode="Markdown")
+                        except Exception:
+                            pass
+    except Exception as e:
+        print(f"⚠️ [PRE-PUMP POSITIONS MONITOR ERROR] {e}")
 
 
 async def macro_gold_monitor(app: Application):
