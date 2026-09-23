@@ -902,7 +902,7 @@ class PerpetualWealthGeneratorEngine:
                         if not is_be_locked:
                             db.update_system_setting(be_locked_key, "1")
                             is_be_locked = True
-                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} armed at +{roi_pct:.2f}% ROI (Wide Trailing Floor: min +$1.00 Net)")
+                            print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} armed at +{roi_pct:.2f}% ROI (Dynamic Trailing Floor at 65% of Peak ROI)")
 
                     # Phase 1.5: 3-Tier Anti-Stagnation Smart Clock (Frees margin from flat/dead moves, stops funding fee drain)
                     entry_time_key = f"wealth_entry_time_{chat_id}_{sym}"
@@ -1099,11 +1099,8 @@ class PerpetualWealthGeneratorEngine:
                             be_net_floor_roi = max(6.5, curr_peak * 0.65)
                         
                         # Breakeven trigger: Only fires if Breakeven was armed (peak >= +10.0% ROI)
-                        # and price pulled back to trailing floor, guaranteeing at least +$1.00 Net (or +6.5% Net ROI)
-                        is_be_trigger = is_be_locked and (
-                            (roi_pct <= be_net_floor_roi) or
-                            (net_exit_pnl <= 1.00 and roi_pct > 0.0)
-                        )
+                        # and price subsequently pulled back to or below trailing floor (e.g. <= +6.5% ROI)
+                        is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)
 
                         # Fixed Dollar Risk Parity Stop Loss: Strictly clamped at -$1.50 USDT max loss
                         # Eliminates deep -$2.50 to -$3.62 losses permanently
@@ -1117,7 +1114,7 @@ class PerpetualWealthGeneratorEngine:
                         if is_be_trigger or is_sl_trigger:
                             side_to_close = "SELL" if amt > 0 else "BUY"
                             is_be_exit = is_be_trigger and not is_sl_trigger and (net_exit_pnl > 0.0)
-                            reason_tag = f"BREAKEVEN NET FLOOR DEFENSE (+{be_net_floor_roi:.1f}% ROI / +${max(1.00, net_exit_pnl):.2f} Net)" if is_be_exit else "FIXED DOLLAR RISK PARITY SL ($1.50 Cap)"
+                            reason_tag = f"BREAKEVEN NET FLOOR DEFENSE (+{be_net_floor_roi:.1f}% ROI / +${net_exit_pnl:.2f} Net)" if is_be_exit else "FIXED DOLLAR RISK PARITY SL ($1.50 Cap)"
                             print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
                             trading_engine.place_futures_order(
                                 api_key=api_key,
@@ -1134,7 +1131,7 @@ class PerpetualWealthGeneratorEngine:
                             db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
                             db.update_system_setting(entry_time_key, "0.0")
 
-                            final_pnl = max(1.00, net_exit_pnl) if is_be_exit else net_exit_pnl
+                            final_pnl = net_exit_pnl
                             db.update_perpetual_wealth_pnl(chat_id, final_pnl, is_win=(is_be_exit and final_pnl > 0))
                             add_wealth_cooldown(sym, duration_seconds=1800 if is_be_exit else 3600)
 
@@ -1148,8 +1145,8 @@ class PerpetualWealthGeneratorEngine:
                                             f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
                                             f"🛡️ **កម្រិតការពារ ៖** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% ROI)`\n"
                                             f"💵 **Exit ROI សម្រេច ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                            f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${max(1.00, net_exit_pnl):,.2f} USDT`\n"
-                                            f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ធានាសល់ចំណេញសុទ្ធ >= +$1.00 Net!`\n"
+                                            f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${net_exit_pnl:,.2f} USDT`\n"
+                                            f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ធានាសល់ចំណេញសុទ្ធពិតប្រាកដ!`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             "💡 _Breakeven Armor ធានាដាច់ខាតមិនឱ្យខាតដើម និងច្បាមចំណេញសុទ្ធពិតប្រាកដ!_"
                                         ) if user_lang == 'khmer' else (
@@ -1158,8 +1155,8 @@ class PerpetualWealthGeneratorEngine:
                                             f"🪙 **Symbol / Pair:** `{sym}`\n"
                                             f"🛡️ **Defense Standard:** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% ROI)`\n"
                                             f"💵 **Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
-                                            f"🏆 **Net Realized Profit:** `+${max(1.00, net_exit_pnl):,.2f} USDT`\n"
-                                            f"✅ **Binance Fees:** `100% Deducted & Net Profit Preserved >= +$1.00 Net!`\n"
+                                            f"🏆 **Net Realized Profit:** `+${net_exit_pnl:,.2f} USDT`\n"
+                                            f"✅ **Binance Fees:** `100% Deducted & Real Net Profit Preserved!`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             "💡 _Breakeven Armor strictly preserved capital with real net positive profit!_"
                                         )
