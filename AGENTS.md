@@ -1,5 +1,5 @@
 # KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 2.4.0 (Absolute Ground Truth Lock - The 30 Pillars)  
+**Document Version:** 2.5.0 (Absolute Ground Truth Lock - The 39 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -431,14 +431,42 @@ Any modification that breaks any of the following 30 invariants is considered an
      - The Golden 85% Profit Ratchet locking $\ge 85\%$ of peak unrealized profit.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 31/31].
 
+### Invariant 39: 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity (-$1.50 Max SL) & Non-Premature Breakeven Trailing Protocol
+- **Location:** `perpetual_wealth_engine.py` (`monitor_perpetual_wealth_positions`), `database.py`, `bot_thread.py`, `audit_system.py`
+- **Rule:** The 500-coin Binance universe possesses divergent volatility, liquidity, and beta profiles requiring mathematical risk parity and non-premature profit extraction:
+  1. **500-Coin Volatility DNA Quadrants (ចំណាត់ថ្នាក់ចរិតលក្ខណៈកាក់ទាំង ៥០០) ៖**
+     - **Quadrant 1 (Ultra-Cap Anchors - BTC, ETH, SOL, BNB):** Volatility 1.5%–4.0%, deep orderbooks, lowest slippage. Serves as macroeconomic compass and beta baseline.
+     - **Quadrant 2 (Large-Cap Institutional High-Beta - AVAX, NEAR, LINK, SUI, APT):** Volatility 3.0%–8.0%, liquid derivatives, clean technical swing structures.
+     - **Quadrant 3 (Mid-Cap Momentum Runners - FET, RENDER, INJ, TIA, SEI):** Volatility 5.0%–12.0%, subject to explosive multi-hour trend expansions.
+     - **Quadrant 4 (Micro-Cap / Meme Hyper-Beta - PEPE, WIF, 1000BONK, PUMP, FLOCK):** Volatility 8.0%–25.0%+, subject to aggressive 15m wick noise followed by parabolic surges. Requires wide breathing room to prevent chop stop-outs.
+  2. **Fixed-Dollar Risk Parity Stop-Loss (-$1.50 Hard Cap) (ពិដានកំណត់ទំហំខាតអតិបរមា -$1.50) ៖**
+     - In small capital accounts ($10–$100), deep outlier losses (-$2.50 to -$3.62) previously erased 5 to 10 micro-wins.
+     - The engine strictly enforces a non-negotiable **-$1.50 USD hard dollar ceiling** on loss:
+       `is_sl_trigger = (unRealizedProfit <= -1.50) or (net_exit_pnl <= -1.50) or (roi_pct <= -15.0) or (pos_margin > 0 and unRealizedProfit <= -max(0.60, min(1.50, pos_margin * 0.15)))`
+     - Downside risk per trade ($1R$) is strictly clamped to $\le \$1.50$ USDT on any position, eliminating destructive loss tails.
+  3. **Non-Premature Breakeven Armor & Retracement Trailing Floor (ហាមដាច់ខាតការកាត់ចំណេញខ្ចីមុនពេលកំណត់) ៖**
+     - Breakeven Armor is ONLY armed at $\ge +10.0\%$ ROI (or peak $\ge +10.0\%$), giving trades generous breathing room to absorb natural 0.5%–1.0% pullback fluctuations.
+     - Once armed, it establishes `be_net_floor_roi = max(6.5, curr_peak * 0.65)` (or `max(8.0, curr_peak * 0.75)` after TP1).
+     - The exit trigger MUST strictly check `is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)`.
+     - Inverted dollar thresholds like `(net_exit_pnl <= 1.00 and roi_pct > 0.0)` are **STRICTLY PROHIBITED**, as they prematurely snipe small-margin positions upon reaching +10.15% ROI before they can reach TP1 (+15%) and TP2 (+30%).
+  4. **Asymmetric Risk-to-Reward Ratio ($R:R \ge 1:3$ to $1:10+$) ៖**
+     - $1R$ Downside Risk: strictly capped at $-\$1.50$.
+     - Phase 2 (TP1): $+15.0\%$ ROI (takes 50% partial profit off table, securing net cash).
+     - Phase 3 (TP2): $+30.0\%$ to $+50.0\%+$ ROI (moonshot runner dynamically trailed at 85% of peak ROI).
+     - Mathematical Expectancy ($E[X]$): With Win Rate $p \approx 70\%-73\%$, Average Win $W \approx \$3.00-\$6.00$, and Average Loss $L \le \$1.50$:
+       $$E[X] = (0.70 \times \$3.50) - (0.30 \times \$1.50) = \$2.45 - \$0.45 = +\$2.00 \text{ per trade!}$$
+  5. **Brutal Engineering Honesty & 100% Real PnL Reporting (Invariant 19) ៖**
+     - Telegram alerts must report exact net realized PnL (`net_exit_pnl`) without artificial clamping (`max(1.00, net_exit_pnl)` is permanently purged).
+- **Enforcement:** Verified by `audit_system.py` [CHECK 32/32].
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 38 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 31 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 39 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 32 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
@@ -448,3 +476,4 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
    cd /opt/khmer-master-crypto-bot && bash auto_update_vps.sh
    ```
    *(This directive is permanent, immutable, and must be followed in every future session without prompting).*
+
