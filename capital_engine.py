@@ -4184,6 +4184,16 @@ class CapitalSatelliteMacroRadar:
                 "alpha_thesis": "Global industrial activity aligns with institutional multi-asset cycle."
             }
 
+    def get_all_forex_satellite_bias(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Returns macro satellite biases across all primary Forex pairs and correlated commodities.
+        """
+        pairs = ["EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD", "GOLD", "OIL_CRUDE", "NZDUSD"]
+        results = {}
+        for p in pairs:
+            results[p] = self.get_satellite_macro_bias(p)
+        return results
+
 
 # ==============================================================================
 # 3.13. ORNSTEIN-UHLENBECK ASIAN SESSION MEAN REVERSION ENGINE (INVARIANT 37)
@@ -4275,13 +4285,16 @@ class CapitalOUMeanReversionEngine:
         if not price_series or len(price_series) < 10:
             price_series = [current_price * (1.0 + math.sin(i * 0.35) * 0.0007) for i in range(20)]
         res = self.calculate_ou_parameters(price_series)
+        z = res["z_score"]
+        status = "OVERBOUGHT (Short Target)" if z >= 1.85 else ("OVERSOLD (Long Target)" if z <= -1.85 else "EQUILIBRIUM")
         return {
             "epic": epic,
             "reversion_speed_theta": res["theta"],
             "equilibrium_mu": res["mu"],
             "diffusion_volatility_sigma": res["sigma"],
             "half_life_candles": res["half_life"],
-            "z_score": res["z_score"],
+            "z_score": z,
+            "status": status,
             "current_price": current_price
         }
 
