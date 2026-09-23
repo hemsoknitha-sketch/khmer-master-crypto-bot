@@ -19297,7 +19297,8 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(msg_wiz, parse_mode="Markdown", reply_markup=kb_wiz)
                     return
                 elif sub_action in ["CHECK", "TEST", "STATUS", "API"]:
-                    engine = capital_engine.get_user_capital_engine(chat_id)
+                    # Prop Firm Challenge strictly runs on Demo ($10k-$200k Evaluation Account)
+                    engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
                     auth_ok, auth_msg = await asyncio.to_thread(engine.authenticate)
                     bal = await asyncio.to_thread(engine.get_account_balance)
                     env_lbl = "DEMO ($10,000 Virtual Funds)" if engine.is_demo else "LIVE MAINNET / CHALLENGE"
