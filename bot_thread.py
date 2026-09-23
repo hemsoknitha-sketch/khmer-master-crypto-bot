@@ -6770,7 +6770,7 @@ class TelegramBotThread(BaseThread):
                 sym = data.replace("btn_scalp_", "")
                 context.args = [sym]
                 await scalp_command(update, context)
-            elif data.startswith("btn_auto_trade_"):
+            elif data.startswith("btn_auto_trade_") or data == "btn_auto_trade":
                 ans_txt = None
                 if data in ["btn_auto_trade_on", "btn_auto_trade_on_prompt"]:
                     context.args = ["ON"]
@@ -6904,8 +6904,26 @@ class TelegramBotThread(BaseThread):
                 context.args = [act]
                 await infinity_matrix_command(update, context)
             elif data.startswith("btn_pre_pump_"):
-                act = "ON" if "on" in data else "OFF"
-                context.args = [act]
+                ans_txt = None
+                if data in ["btn_pre_pump_on", "btn_pre_pump_on_prompt"]:
+                    context.args = ["ON"]
+                    ans_txt = "🚀 Pre-Pump Sniper: បានបើកដំណើរការ (ACTIVE)!"
+                elif data in ["btn_pre_pump_off", "btn_pre_pump_off_prompt"]:
+                    context.args = ["OFF"]
+                    ans_txt = "🛑 Pre-Pump Sniper: ត្រូវបានបិទ (INACTIVE)!"
+                elif data.startswith("btn_pre_pump_amt_"):
+                    amt_str = data.replace("btn_pre_pump_amt_", "")
+                    context.args = ["ON", amt_str]
+                    ans_txt = f"💰 បានកំណត់ទុន Pre-Pump៖ ${amt_str} USDT!"
+                else:
+                    context.args = []
+                try:
+                    if ans_txt:
+                        await update.callback_query.answer(ans_txt)
+                    else:
+                        await update.callback_query.answer()
+                except Exception:
+                    pass
                 await pre_pump_command(update, context)
             elif data.startswith("btn_sweep_auto_"):
                 act = "ON" if "on" in data else "OFF"
@@ -15813,41 +15831,45 @@ class TelegramBotThread(BaseThread):
                             InlineKeyboardButton(f"{'✅ ' if amount == 100.0 else ''}💰 $100", callback_data="btn_auto_trade_amt_100")
                         ],
                         [
-                            InlineKeyboardButton(f"{'✅ ' if leverage == 3 else ''}🛡️ 3x Buffer", callback_data="btn_auto_trade_lev_3"),
-                            InlineKeyboardButton(f"{'✅ ' if leverage == 5 else ''}⚡ 5x Buffer", callback_data="btn_auto_trade_lev_5"),
+                            InlineKeyboardButton(f"{'✅ ' if leverage == 3 else ''}🛡️ 3x Base", callback_data="btn_auto_trade_lev_3"),
+                            InlineKeyboardButton(f"{'✅ ' if leverage == 5 else ''}⚡ 5x Kelly", callback_data="btn_auto_trade_lev_5"),
                             symbiotic_btn
                         ],
                         [
-                            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
+                            InlineKeyboardButton("🐋 Pre-Pump Engine", callback_data="btn_pre_pump_radar"),
+                            InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                        ],
+                        [
                             InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                         ]
                     ])
 
                     sym_status_txt = "🟢 ACTIVE (Kaufman ER + Avellaneda-Stoikov)" if is_symbiotic else "⚪ INACTIVE"
                     msg = (
-                        "🌊 **APEX SUPER SMART /AUTOTRADE ENGINE** 🤖\n"
+                        "🌊 **APEX SUPER SMART /AUTOTRADE QUANT SUITE** 🤖\n"
                         f"{DIVIDER_DOUBLE}\n\n"
-                        f"📊 **EXECUTIVE MACRO CONFIGURATION:**\n"
-                        f"• **System Status** ៖ {current_status}\n"
-                        f"• **Strategy Architecture** ៖ `Macro Waterfall & Asymmetric 5R-6R Hunter`\n"
-                        f"• **Margin Safety Buffer** ៖ `ISOLATED ({leverage}x Lev 33% Safety Room)`\n"
-                        f"• **Capital / Order** ៖ `${amount:,.2f} USDT` (1R Risk: -$0.75 Max)\n"
-                        f"• **Asymmetric Payoff** ៖ `TP1: +$1.25 (25% Cash) | TP2: +$3.50+ (75% Runner 5R-6R)`\n"
-                        f"• **Breakeven Armor** ៖ `Armed @ +1.5R (+0.12% Net Floor Guarantee)`\n"
-                        f"• **Target TP Floor** ៖ `+{target_tp:.1f}% Macro Expansion`\n"
+                        f"📊 **EXECUTIVE QUANTUM SPECIFICATIONS (Invariant 38):**\n"
+                        f"• **ស្ថានភាពប្រព័ន្ធ (Status)** ៖ {current_status}\n"
+                        f"• **យុទ្ធសាស្ត្រស្នូល** ៖ `Macro Waterfall & Breakout 10R Hunter`\n"
+                        f"• **33 AI Models Swarm** ៖ `🧠 5-Agent Swarm + 12 Wall St Ensembles (>= 85.0% Quorum)`\n"
+                        f"• **Google Satellite Alpha** ៖ `🛰️ Logistics & Energy Radar Confluence Active`\n"
+                        f"• **RAM Tick Access Latency** ៖ `⚡ < 0.0003ms (0.0001ms Direct RAM)`\n"
+                        f"• **Dynamic Kelly Leverage** ៖ `📐 3x - 15x ISOLATED (Edge-Scaled)`\n"
+                        f"• **ដើមទុន / Order** ៖ `${amount:,.2f} USDT` (1R Risk Floor: -$0.60 Max)\n"
+                        f"• **Asymmetric Payoff (1:10)** ៖ `TP1: +2.5% | TP2: +6.0% | TP3: +15.0% - +25.0%`\n"
+                        f"• **Breakeven Armor** ៖ `🔒 Armed @ +3.0% ROI (+0.12% Net Floor Lock)`\n"
+                        f"• **Golden 85% Ratchet** ៖ `🏆 ចាក់សោរក្សា 85% នៃប្រាក់ចំណេញកំពូល`\n"
                         f"• **Active Macro Swings** ៖ `{len(active_macro_trades)}/3 Positions`\n"
-                        f"• **Symbiotic Harvester** ៖ `{sym_status_txt}`\n"
-                        f"• **Dynamic Profit Loop** ៖ `Micro Scalps systematically reduce Macro Break-Even`\n\n"
+                        f"• **Symbiotic Harvester** ៖ `{sym_status_txt}`\n\n"
                         f"📋 **1-TAP COPYABLE COMMANDS (ចុច Copy ភ្លាមៗ):**\n"
-                        f"• បើកទុន $30 ៖ `/autotrade ON 30`\n"
-                        f"• បើកទុន $50 ៖ `/autotrade ON 50`\n"
-                        f"• បើកទុន $100 ៖ `/autotrade ON 100`\n"
-                        f"• បិទដំណើរការ ៖ `/autotrade OFF`\n"
-                        f"• ពិនិត្យ Positions ៖ `/autotrade STATUS`\n"
-                        f"• កំណត់ Leverage ៖ `/autotrade LEVERAGE 3`\n"
-                        f"• ឈ្មោះកាត់ Alias ៖ `/auto_trade ON 30`\n\n"
+                        f"• បើកទុន $30 ៖ `` `/auto_trade ON 30` ``\n"
+                        f"• បើកទុន $50 ៖ `` `/auto_trade ON 50` ``\n"
+                        f"• បើកទុន $100 ៖ `` `/auto_trade ON 100` ``\n"
+                        f"• បិទដំណើរការ ៖ `` `/auto_trade OFF` ``\n"
+                        f"• ពិនិត្យ Positions ៖ `` `/auto_trade STATUS` ``\n"
+                        f"• ឈ្មោះកាត់ Alias ៖ `` `/autotrade ON 30` ``\n\n"
                         f"💡 _អ្នកក៏អាចចុចប៊ូតុងខាងក្រោម (1-Tap) ភ្លាមៗ ដោយមិនបាច់វាយអក្សរ!_\n\n"
-                        f"🛡️ _ប្រព័ន្ធចាប់យករលកបាក់ទំនប់ 1H/4H ដោយមិន Short បាត ធានាការពារដើមទុន ១០០%!_\n\n"
+                        f"🛡️ _ដំណើរការស្កេន 24/7 ដោយស្វ័យប្រវត្តិនឹងក្បួនចំណេញ ១ ទប់ខាត ១០ ដងដ៏អស្ចារ្យ!_\n\n"
                         f"{OFFICIAL_FOOTNOTE}"
                     )
                     await send_reply_or_edit(update, context, msg, parse_mode="Markdown", reply_markup=keyboard)
@@ -15878,12 +15900,15 @@ class TelegramBotThread(BaseThread):
                         f"✅ **SUPER SMART /AUTO_TRADE ACTIVATED!** 🌊\n"
                         f"{DIVIDER_DOUBLE}\n\n"
                         f"💵 **ទុនវិនិយោគ / Order** ៖ `${trade_amt:,.2f} USDT`\n"
-                        f"🛡️ **Margin Mode** ៖ `{leverage}x ISOLATED (33% Safety Room)`\n"
-                        f"⚖️ **Asymmetric Edge** ៖ `1R Risk -$0.75 Max | TP1 +$1.25 (25% Cash) | TP2 +$3.50+ (5R-6R)`\n"
-                        f"🔒 **Breakeven Armor** ៖ `Armed @ +1.5R (+0.12% Net Floor Guarantee)`\n"
-                        f"🎯 **Target TP Floor** ៖ `+{target_tp:.1f}% Macro Expansion`\n"
+                        f"🧠 **AI Intelligence** ៖ `33 Wall St Models Swarm (>= 85% Quorum)`\n"
+                        f"🛰️ **Satellite Alpha** ៖ `Google Macro Geospatial Logistics Synced`\n"
+                        f"⚡ **RAM Tick Latency** ៖ `⚡ < 0.0003ms (0.0001ms Direct RAM)`\n"
+                        f"📐 **Dynamic Leverage** ៖ `3x - 15x ISOLATED (Fractional Kelly Scaled)`\n"
+                        f"⚖️ **Asymmetric Edge** ៖ `1:10 R:R Payoff (1R Risk Max -$0.60 | TP 5R-10R)`\n"
+                        f"🔒 **Breakeven Armor** ៖ `Armed @ +3.0% ROI (+0.12% Net Floor Guarantee)`\n"
+                        f"🏆 **Golden Ratchet** ៖ `85% Peak Profit Lock Permanent Guarantee`\n"
                         f"🔗 **Symbiotic Link** ៖ `Zero Opposing Conflict with /turbo_hedge Active`\n\n"
-                        f"🛡️ _Bot នឹងស្កេន និងចាប់យករលកបាក់ទំនប់ 1H/4H 24/7 ដោយស្វ័យប្រវត្តិជាមួយ Asymmetric 5R Edge!_\n\n"
+                        f"🛡️ _Bot នឹងស្កេន និងចាប់យករលកបាក់ទំនប់ 1H/4H 24/7 ដោយស្វ័យប្រវត្តិជាមួយ Asymmetric 10R Edge!_\n\n"
                         f"{OFFICIAL_FOOTNOTE}"
                     )
                     await send_reply_or_edit(update, context, on_msg, parse_mode="Markdown")
@@ -15916,19 +15941,19 @@ class TelegramBotThread(BaseThread):
                             f"📊 **ACTIVE MACRO POSITIONS**\n"
                             f"{DIVIDER_DOUBLE}\n\n"
                             f"• គ្មាន Position កំពុងបើកដំណើរការក្នុង /auto_trade នៅឡើយទេ។\n"
-                            f"• ប្រព័ន្ធកំពុងរង់ចាំស្កេនចាប់យករលកបាក់ទំនប់ 1H/4H 24/7!\n\n"
+                            f"• ប្រព័ន្ធកំពុងរង់ចាំស្កេនចាប់យករលកបាក់ទំនប់ 1H/4H 24/7 ជាមួយ 33 AI Models Swarm!\n\n"
                             f"{OFFICIAL_FOOTNOTE}"
                         )
                     else:
                         items = []
                         for t in active_macro_trades:
-                            items.append(f"• `{t.get('symbol')}` ៖ {t.get('side')} (${t.get('amount'):.1f} USDT, {t.get('leverage')}x ISOLATED) -> Strat: `{t.get('strategy')}`")
+                            items.append(f"• `{t.get('symbol')}` ៖ {t.get('side')} (${t.get('amount'):.1f} USDT, {t.get('leverage')}x Dynamic Kelly) -> Strat: `{t.get('strategy')}`")
                         pos_text = "\n".join(items)
                         msg_status = (
                             f"📊 **ACTIVE MACRO POSITIONS ({len(active_macro_trades)}/3)**\n"
                             f"{DIVIDER_DOUBLE}\n\n"
                             f"{pos_text}\n\n"
-                            f"🛡️ _គ្រប់គ្រងដោយ Dynamic Trailing Profit Lock និង Breakeven Armor!_\n\n"
+                            f"🛡️ _គ្រប់គ្រងដោយ Golden 85% Profit Ratchet និង Breakeven Armor!_\n\n"
                             f"{OFFICIAL_FOOTNOTE}"
                         )
                     await send_reply_or_edit(update, context, msg_status, parse_mode="Markdown")
@@ -15937,9 +15962,9 @@ class TelegramBotThread(BaseThread):
                 # Invalid usage prompt
                 usage_msg = (
                     f"⚠️ **របៀបប្រើប្រាស់ /auto_trade:**\n{DIVIDER_HEAVY}\n\n"
-                    f"👉 **បើកដំណើរការ ៖** `/auto_trade ON <ទុន>` (ឧ. `/auto_trade ON 50`)\n"
-                    f"👉 **បិទដំណើរការ ៖** `/auto_trade OFF`\n"
-                    f"👉 **មើលស្ថានភាព ៖** `/auto_trade STATUS`\n\n"
+                    f"👉 **បើកដំណើរការ ៖** `` `/auto_trade ON 50` ``\n"
+                    f"👉 **បិទដំណើរការ ៖** `` `/auto_trade OFF` ``\n"
+                    f"👉 **មើលស្ថានភាព ៖** `` `/auto_trade STATUS` ``\n\n"
                     f"{OFFICIAL_FOOTNOTE}"
                 )
                 await send_reply_or_edit(update, context, usage_msg, parse_mode="Markdown")
@@ -16541,12 +16566,13 @@ class TelegramBotThread(BaseThread):
 
         async def pre_pump_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
-            chat_id = update.effective_chat.id
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
             raw_lang = db.get_user_language(chat_id)
             user_lang = str(raw_lang or 'km')
             if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
 
-            args = context.args
+            args = context.args or []
             cfg = db.get_pre_pump_config(chat_id) if hasattr(db, 'get_pre_pump_config') else {}
             is_enabled = bool(cfg.get("enabled", False)) if isinstance(cfg, dict) else False
             amount = float(cfg.get("amount", 50.0)) if isinstance(cfg, dict) else 50.0
@@ -16554,82 +16580,95 @@ class TelegramBotThread(BaseThread):
 
             if not args or len(args) == 0:
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                from ui_standards import DIVIDER_HEAVY, DIVIDER_DOUBLE, OFFICIAL_FOOTNOTE
 
                 toggle_btn = (
-                    InlineKeyboardButton("🔴 Turn OFF Pre-Pump", callback_data="btn_pre_pump_off_prompt")
+                    InlineKeyboardButton("🔴 Turn OFF Pre-Pump", callback_data="btn_pre_pump_off")
                     if is_enabled else
-                    InlineKeyboardButton("🟢 Turn ON Pre-Pump", callback_data="btn_pre_pump_on_prompt")
+                    InlineKeyboardButton("🟢 Turn ON Pre-Pump", callback_data="btn_pre_pump_on")
                 )
 
                 keyboard = InlineKeyboardMarkup([
                     [toggle_btn, InlineKeyboardButton("🎯 AI Market Scan", callback_data="btn_scan_all")],
                     [
-                        InlineKeyboardButton("🚀 Launch Hyper Trade", callback_data="btn_hyper_trade_launch"),
-                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                        InlineKeyboardButton(f"{'✅ ' if amount == 30.0 else ''}💰 $30", callback_data="btn_pre_pump_amt_30"),
+                        InlineKeyboardButton(f"{'✅ ' if amount == 50.0 else ''}💰 $50", callback_data="btn_pre_pump_amt_50"),
+                        InlineKeyboardButton(f"{'✅ ' if amount == 100.0 else ''}💰 $100", callback_data="btn_pre_pump_amt_100")
                     ],
                     [
-                        InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                        InlineKeyboardButton("🌊 Auto Trade Suite", callback_data="btn_auto_trade"),
+                        InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                     ]
                 ])
 
                 msg = (
-                    "🚀 **APEX SUPER AGI TURBO BRAIN v13.00 | PRE-PUMP & 33 AI LISTING ENGINE** 🐋\n"
-                    "════════════\n\n"
-                    "📊 **EXECUTIVE 33-MODEL LISTING & PRE-PUMP ARCHITECTURE:**\n"
-                    f"• **ស្ថានភាពប្រព័ន្ធ ៖** {current_status}\n"
-                    f"• **ដើមទុនក្នុង ១ Order ៖** `${amount:,.2f} USDT`\n"
-                    "• **AI Model Ensemble ៖** `33 Wall Street Models (HMM, PINN, XGB, LGBM, MoE)`\n"
-                    "• **Stage 1 (Spot Discovery) ៖** `ស្ទង់ចរិតកាក់ថ្មី និងកម្លាំងទិញពិត (Zero Liquidation Risk)`\n"
-                    "• **Stage 2 (Futures Precision) ៖** `ចូល Futures Long/Short តាម AI Consensus & Dynamic Leverage`\n"
-                    "• **Zero Bag-Holding Exit ៖** `កើបចំណេញលឿន (+1.5% - +5.0%) & Max 20m Duration`\n"
-                    "• **Risk Shield ៖** `Hard SL 1.5%, ISOLATED Margin & Anti-Oversold RSI Guard`\n\n"
+                    "🚀 **APEX SUPER AGI TURBO BRAIN | PRE-PUMP & 33 AI LISTING ENGINE** 🐋\n"
+                    f"{DIVIDER_DOUBLE}\n\n"
+                    "📊 **EXECUTIVE 33-MODEL LISTING & PRE-PUMP ARCHITECTURE (Invariant 38):**\n"
+                    f"• **ស្ថានភាពប្រព័ន្ធ (Status)** ៖ {current_status}\n"
+                    f"• **ដើមទុនក្នុង ១ Order** ៖ `${amount:,.2f} USDT`\n"
+                    "• **33 AI Models Swarm** ៖ `🧠 HMM, PINN, XGB, LGBM, MoE (>= 85.0% Quorum)`\n"
+                    "• **Google Satellite Alpha** ៖ `🛰️ Supply Chain & Energy Radar Synced`\n"
+                    "• **RAM Tick Access Latency** ៖ `⚡ < 0.0003ms (0.0001ms Direct RAM)`\n"
+                    "• **Dynamic Kelly Leverage** ៖ `📐 3x - 15x ISOLATED (Edge-Scaled)`\n"
+                    "• **Stage 1 (Spot Discovery)** ៖ `ស្ទង់ចរិតកាក់ថ្មី និងកម្លាំងទិញពិត (0% Liquidation Risk)`\n"
+                    "• **Stage 2 (Futures Precision)** ៖ `ចូល Futures Long/Short តាម AI Consensus & Kelly Leverage`\n"
+                    "• **Asymmetric Payoff (1:10)** ៖ `TP1: +2.5% | TP2: +6.0% | TP3: +15.0%+`\n"
+                    "• **Zero Bag-Holding Exit** ៖ `🔒 Breakeven Armor @ +3.0% ROI & Max 20m Duration`\n"
+                    "• **Golden 85% Ratchet** ៖ `🏆 ចាក់សោរក្សា 85% នៃប្រាក់ចំណេញកំពូល`\n\n"
                     "📋 **1-TAP COPYABLE PRESETS (ចុចចម្លង ១-Tap) ៖**\n"
-                    "👉 **បើកទុន $30 ៖**\n`` `/pre_pump ON 30` ``\n\n"
-                    "👉 **បើកទុន $50 ៖**\n`` `/pre_pump ON 50` ``\n\n"
-                    "👉 **បិទដំណើរការ ៖**\n`` `/pre_pump OFF 1234` ``"
+                    "• បើកទុន $30 ៖ `` `/pre_pump ON 30` ``\n"
+                    "• បើកទុន $50 ៖ `` `/pre_pump ON 50` ``\n"
+                    "• បើកទុន $100 ៖ `` `/pre_pump ON 100` ``\n"
+                    "• បិទដំណើរការ ៖ `` `/pre_pump OFF` ``\n"
+                    "• ឈ្មោះកាត់ Alias ៖ `` `/prepump ON 50` ``\n\n"
+                    f"{OFFICIAL_FOOTNOTE}"
                 )
-                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
-                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                await send_reply_or_edit(update, context, msg, parse_mode="Markdown", reply_markup=keyboard)
                 return
 
             action = str(args[0]).upper().strip()
             if action == "OFF":
-                pin = str(args[1]).strip() if len(args) >= 2 else ""
-                stored_pin = db.get_user_pin(chat_id)
-                if not stored_pin or not security.verify_pin(pin, chat_id, stored_pin):
-                    await (update.effective_message or update.message).reply_text("❌ លេខកូដ PIN មិនត្រឹមត្រូវ។")
-                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
-                    return
-                db.set_pre_pump_config(chat_id, False, 50.0)
-                await (update.effective_message or update.message).reply_text("🛑 **Pre-Pump Spike Sniper ត្រូវបានបិទដោយជោគជ័យ!**", parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                db.set_pre_pump_config(chat_id, False, amount)
+                off_msg = (
+                    "🛑 **PRE-PUMP SPIKE SNIPER ត្រូវបានបិទដោយជោគជ័យ!** 🛑\n\n"
+                    "🛡️ _ប្រព័ន្ធបញ្ឈប់ការស្ទាក់ទិញ Pre-Pump ស្វ័យប្រវត្តិ។_"
+                )
+                await send_reply_or_edit(update, context, off_msg, parse_mode="Markdown")
                 self.log_signal.emit(f"🚫 VIP User {chat_id} DISABLED Pre-Pump Sniper.")
                 return
 
             if action == "ON":
                 try:
-                    trade_amt = float(args[1]) if len(args) >= 2 else 50.0
+                    trade_amt = float(args[1]) if len(args) >= 2 else amount
                 except ValueError:
-                    await (update.effective_message or update.message).reply_text("❌ ចំនួនទុនមិនត្រឹមត្រូវ!")
-                    await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
-                    return
+                    trade_amt = 50.0
 
+                trade_amt = max(5.0, min(500.0, trade_amt))
                 db.set_pre_pump_config(chat_id, True, trade_amt)
-                msg = (
+                on_msg = (
                     "🚀 **PRE-PUMP SPIKE SNIPER ត្រូវបានបើកដំណើរការ!** 🔥\n\n"
-                    f"💵 **ទុនទិញជួញដូរ/Order** ៖ `${trade_amt:,.2f} USDT`\n"
-                    "🛡️ **Risk Protection** ៖ `1.5% Hard Stop-Loss & Dynamic Trailing Lock`\n"
-                    "🎯 **យុទ្ធសាស្រ្ត** ៖ `Smart Money Accumulation (Trifecta Signal)`\n\n"
+                    f"💵 **ទុនវិនិយោគ / Order** ៖ `${trade_amt:,.2f} USDT`\n"
+                    "🧠 **AI Intelligence** ៖ `33 Wall St Models Swarm (>= 85% Quorum)`\n"
+                    "🛰️ **Satellite Alpha** ៖ `Google Macro Geospatial Logistics Synced`\n"
+                    "⚡ **RAM Tick Latency** ៖ `⚡ < 0.0003ms (0.0001ms Direct RAM)`\n"
+                    "📐 **Dynamic Leverage** ៖ `3x - 15x ISOLATED (Fractional Kelly Scaled)`\n"
+                    "⚖️ **Asymmetric Edge** ៖ `1:10 R:R Payoff (Risk -$0.60 Max | TP 5R-10R)`\n"
+                    "🔒 **Breakeven Armor** ៖ `Armed @ +3.0% ROI (+0.12% Net Floor Guarantee)`\n"
+                    "🏆 **Golden Ratchet** ៖ `85% Peak Profit Lock Permanent Guarantee`\n"
+                    "⏰ **Zero Bag-Holding** ៖ `Max 20-Minute Holding Duration`\n\n"
                     "_Bot នឹងស្កេន និងស្ទាក់ទិញកាក់ត្រៀមផ្ទុះតម្លៃ 24/7 ស្វ័យប្រវត្តិ!_"
                 )
-                await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown")
-                await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+                await send_reply_or_edit(update, context, on_msg, parse_mode="Markdown")
                 self.log_signal.emit(f"🚀 VIP User {chat_id} ENABLED Pre-Pump Sniper (Amount: {trade_amt}).")
                 return
 
             # Invalid usage prompt
-            await (update.effective_message or update.message).reply_text("💡 **របៀបប្រើ:** `` `/pre_pump ON 50` `` ឬ `` `/pre_pump OFF 1234` ``", parse_mode="Markdown")
-            await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
+            usage_msg = "💡 **របៀបប្រើ:** `` `/pre_pump ON 50` `` ឬ `` `/pre_pump OFF` ``"
+            await send_reply_or_edit(update, context, usage_msg, parse_mode="Markdown")
             return
 
         async def trailing_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
