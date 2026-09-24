@@ -1,3 +1,4 @@
+from typing import Optional, Dict, Any, List, Tuple, Union
 import asyncio
 from datetime import datetime
 import time
@@ -20365,7 +20366,7 @@ class TelegramBotThread(BaseThread):
             import capital_engine
             import ui_standards
 
-            def _resolve_target(target_input: str) -> Tuple[Optional[int], Optional[Dict[str, Any]]]:
+            def _resolve_target(target_input: str) -> tuple:
                 """Resolves chat_id and user record from chat_id or Capital account_id."""
                 raw = str(target_input or "").strip()
                 # 1. Lookup by Account ID

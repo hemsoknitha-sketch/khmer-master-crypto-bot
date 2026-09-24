@@ -47,6 +47,7 @@ sudo systemctl stop khmer-master-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto.service 2>/dev/null || \
 sudo systemctl stop khmer-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto-bot 2>/dev/null || true
+sudo pkill -9 -f "python.*main.py" 2>/dev/null || true
 
 # 2. Zero-Data-Loss Backup of Database & Environment
 mkdir -p vps_db_backup
