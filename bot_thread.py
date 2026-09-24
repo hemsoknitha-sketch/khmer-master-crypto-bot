@@ -6032,7 +6032,16 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await prop_firm_command(update, context)
-            elif data == "btn_cap_prop_tier_1k":
+            elif data.startswith("btn_cap_prop_tier_"):
+                tier_map = {
+                    "btn_cap_prop_tier_1k": 1000.0,
+                    "btn_cap_prop_tier_10k": 10000.0,
+                    "btn_cap_prop_tier_25k": 25000.0,
+                    "btn_cap_prop_tier_50k": 50000.0,
+                    "btn_cap_prop_tier_100k": 100000.0,
+                    "btn_cap_prop_tier_200k": 200000.0
+                }
+                selected_tier = tier_map.get(data, 10000.0)
                 cfg = db.get_prop_firm_config(chat_id)
                 u_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
                 try:
@@ -6040,61 +6049,11 @@ class TelegramBotThread(BaseThread):
                     curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
                 except Exception:
                     curr_eq = 0.0
-                init_eq = curr_eq if (curr_eq > 0 and 500.0 <= curr_eq <= 3000.0) else 1000.0
-                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=1000.0, phase=cfg.get("challenge_phase", 1))
-                db.reset_prop_firm_challenge(chat_id, tier=1000.0, phase=cfg.get("challenge_phase", 1), initial_equity=init_eq)
+                init_eq = curr_eq if curr_eq > 0 else selected_tier
+                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=selected_tier, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=selected_tier, phase=cfg.get("challenge_phase", 1), initial_equity=init_eq)
                 try:
-                    await update.callback_query.answer("💰 បានកំណត់ Tier: $1,000 USD (Micro/Demo)!")
-                except Exception:
-                    pass
-                context.args = []
-                await prop_firm_command(update, context)
-            elif data == "btn_cap_prop_tier_10k":
-                cfg = db.get_prop_firm_config(chat_id)
-                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=10000.0, phase=cfg.get("challenge_phase", 1))
-                db.reset_prop_firm_challenge(chat_id, tier=10000.0, phase=cfg.get("challenge_phase", 1))
-                try:
-                    await update.callback_query.answer("💰 បានកំណត់ Tier: $10,000 USD!")
-                except Exception:
-                    pass
-                context.args = []
-                await prop_firm_command(update, context)
-            elif data == "btn_cap_prop_tier_25k":
-                cfg = db.get_prop_firm_config(chat_id)
-                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=25000.0, phase=cfg.get("challenge_phase", 1))
-                db.reset_prop_firm_challenge(chat_id, tier=25000.0, phase=cfg.get("challenge_phase", 1))
-                try:
-                    await update.callback_query.answer("💰 បានកំណត់ Tier: $25,000 USD!")
-                except Exception:
-                    pass
-                context.args = []
-                await prop_firm_command(update, context)
-            elif data == "btn_cap_prop_tier_50k":
-                cfg = db.get_prop_firm_config(chat_id)
-                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=50000.0, phase=cfg.get("challenge_phase", 1))
-                db.reset_prop_firm_challenge(chat_id, tier=50000.0, phase=cfg.get("challenge_phase", 1))
-                try:
-                    await update.callback_query.answer("💰 បានកំណត់ Tier: $50,000 USD!")
-                except Exception:
-                    pass
-                context.args = []
-                await prop_firm_command(update, context)
-            elif data == "btn_cap_prop_tier_100k":
-                cfg = db.get_prop_firm_config(chat_id)
-                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=100000.0, phase=cfg.get("challenge_phase", 1))
-                db.reset_prop_firm_challenge(chat_id, tier=100000.0, phase=cfg.get("challenge_phase", 1))
-                try:
-                    await update.callback_query.answer("💰 បានកំណត់ Tier: $100,000 USD!")
-                except Exception:
-                    pass
-                context.args = []
-                await prop_firm_command(update, context)
-            elif data == "btn_cap_prop_tier_200k":
-                cfg = db.get_prop_firm_config(chat_id)
-                db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=200000.0, phase=cfg.get("challenge_phase", 1))
-                db.reset_prop_firm_challenge(chat_id, tier=200000.0, phase=cfg.get("challenge_phase", 1))
-                try:
-                    await update.callback_query.answer("💰 បានកំណត់ Tier: $200,000 USD!")
+                    await update.callback_query.answer(f"💰 បានកំណត់ Tier: ${selected_tier:,.0f} USD!")
                 except Exception:
                     pass
                 context.args = []
@@ -6224,7 +6183,7 @@ class TelegramBotThread(BaseThread):
                     curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
                 except Exception:
                     curr_eq = 0.0
-                init_eq = curr_eq if (curr_eq > 0 and (target_tier / curr_eq <= 3.0 and curr_eq / target_tier <= 3.0)) else None
+                init_eq = curr_eq if curr_eq > 0 else target_tier
                 db.reset_prop_firm_challenge(chat_id, tier=target_tier, phase=cfg.get("challenge_phase", 1), initial_equity=init_eq)
                 try:
                     await update.callback_query.answer("🔄 បាន Reset Challenge Tracker ជោគជ័យ!")
@@ -19406,7 +19365,7 @@ class TelegramBotThread(BaseThread):
                         curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
                     except Exception:
                         curr_eq = 0.0
-                    init_eq = curr_eq if (curr_eq > 0 and (tier / curr_eq <= 3.0 and curr_eq / tier <= 3.0)) else None
+                    init_eq = curr_eq if curr_eq > 0 else tier
                     db.set_prop_firm_config(chat_id, enabled=True, tier=tier, phase=phase)
                     db.reset_prop_firm_challenge(chat_id, tier=tier, phase=phase, initial_equity=init_eq)
                 elif sub_action in ["OFF", "STOP"]:
@@ -19424,12 +19383,20 @@ class TelegramBotThread(BaseThread):
                         curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
                     except Exception:
                         curr_eq = 0.0
-                    init_eq = curr_eq if (curr_eq > 0 and (tier / curr_eq <= 3.0 and curr_eq / tier <= 3.0)) else None
+                    init_eq = curr_eq if curr_eq > 0 else tier
                     db.reset_prop_firm_challenge(chat_id, tier=tier, phase=phase, initial_equity=init_eq)
                 elif sub_action in ["TIER"]:
                     new_tier = float(args[1]) if len(args) >= 2 else 10000.0
                     cfg = db.get_prop_firm_config(chat_id)
+                    u_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+                    try:
+                        bal_info = u_engine.get_account_balance()
+                        curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+                    except Exception:
+                        curr_eq = 0.0
+                    init_eq = curr_eq if curr_eq > 0 else new_tier
                     db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=new_tier, phase=cfg.get("challenge_phase", 1))
+                    db.reset_prop_firm_challenge(chat_id, tier=new_tier, phase=cfg.get("challenge_phase", 1), initial_equity=init_eq)
                 elif sub_action in ["PHASE"]:
                     new_phase = int(args[1]) if len(args) >= 2 else 1
                     cfg = db.get_prop_firm_config(chat_id)
@@ -19626,17 +19593,19 @@ class TelegramBotThread(BaseThread):
             mismatch_warning_en = ""
             if cap_data['current_equity'] > 0 and cap_data['tier'] > cap_data['current_equity'] * 3.0:
                 mismatch_warning_kh = (
-                    f"⚠️ **ដំណឹងពីទំហំ Tier (Scale Mismatch Alert) ៖**\n"
-                    f"• ទុនក្នុង Capital.com ជាក់ស្តែង ៖ `${cap_data['current_equity']:,.2f} USD`\n"
-                    f"• Challenge Tier កំពុងជ្រើសរើស ៖ `${cap_data['tier']:,.0f} USD`\n"
-                    f"👉 **ដំណោះស្រាយ ៖** សូមចុចប៊ូតុង **[ 💰 $1k ]** ខាងក្រោម ឬវាយ `` `/capital PROP ON 1000 1` `` ដើម្បីដំណើរការប្រក្រតីឡើងវិញ!\n"
+                    f"💡 **ដំណឹងតម្រឹមទុន (Adaptive Equity Calibration) ៖**\n"
+                    f"• ទុន Demo ជាក់ស្តែង ៖ `${cap_data['current_equity']:,.2f} USD`\n"
+                    f"• Challenge Tier ៖ `${cap_data['tier']:,.0f} USD` (Phase {cap_data['phase']})\n"
+                    f"✨ ប្រព័ន្ធបានតម្រឹមទុនចាប់ផ្តើមស្មើ `${cap_data['initial_balance']:,.2f}` ដើម្បីឱ្យការប្រឡងដំណើរការ `ACTIVE 🟢` ដោយសុវត្ថិភាព (Drawdown 0.00%)!\n"
+                    f"👉 ប្រសិនបើចង់ប្រឡងពេញលេញ ${cap_data['tier']:,.0f} USD សូមចូលកម្មវិធី Capital.com ហើយ Reset Demo Balance ទៅ ${cap_data['tier']:,.0f}!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                 )
                 mismatch_warning_en = (
-                    f"⚠️ **Scale Mismatch Notice:**\n"
+                    f"💡 **Adaptive Equity Calibration Active:**\n"
                     f"• Actual Broker Equity: `${cap_data['current_equity']:,.2f} USD`\n"
-                    f"• Challenge Tier Selected: `${cap_data['tier']:,.0f} USD`\n"
-                    f"👉 **Action Required:** Click **[ 💰 $1k ]** below or use `` `/capital PROP ON 1000 1` `` to align with your account balance!\n"
+                    f"• Challenge Tier Selected: `${cap_data['tier']:,.0f} USD` (Phase {cap_data['phase']})\n"
+                    f"✨ Starting Baseline is calibrated to `${cap_data['initial_balance']:,.2f}` so evaluation begins at `0.00% Drawdown (🟢 SAFE)`!\n"
+                    f"👉 To trade with full ${cap_data['tier']:,.0f} USD virtual balance, reset your Capital.com demo balance to ${cap_data['tier']:,.0f}!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                 )
 
