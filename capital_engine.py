@@ -2415,21 +2415,13 @@ class CapitalAutonomousEngine:
             return
         self._last_scan_ts = now
 
-        engine = get_capital_engine(is_demo=False)
-        open_positions = engine.get_open_positions()
-        open_epics = {
-            (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
-            for pos in open_positions
-        }
-
         # Step 3: Scan candidate assets and rank via Institutional Edge Matrix
+        # Evaluates all session priority assets; per-user position isolation is handled in execution step
         priority_epics = self.get_session_priority_assets()
         candidate_setups = []
 
         for epic in priority_epics:
             resolved_epic = EPIC_MAP.get(epic, epic)
-            if resolved_epic in open_epics:
-                continue
 
             # Anti-Overtrading Cooldown Shield: Enforce 15-minute rest after closing a position on this asset
             if self._asset_cooldowns.get(resolved_epic.upper(), 0.0) > now:
@@ -2664,8 +2656,8 @@ class CapitalAutonomousEngine:
                     except Exception as notif_err:
                         logger.error(f"Failed to send Capital Auto notification: {notif_err}")
 
-                # Throttle to 1 trade per cycle
-                break
+                # Successfully executed for this user; proceed to next user
+                continue
 
         # Step 4b: Process Active Prop Firm Challenge Users (Strictly DEMO $10,000 Challenge)
         for prop_user in active_prop_users:
