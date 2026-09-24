@@ -77,6 +77,22 @@ JITO_TIP_ACCOUNTS = [
     "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh"
 ]
 
+# ------------------------------------------------------------------------------
+# Anti-Whipsaw Cooldown Cache (Invariant 35 Anti-Overtrading & Zero Re-entry Churn)
+# ------------------------------------------------------------------------------
+_RECENTLY_CLOSED_TOKENS: Dict[Tuple[int, str], float] = {}   # (chat_id, token_address.lower()) -> exit_ts
+_RECENTLY_CLOSED_SYMBOLS: Dict[Tuple[int, str], float] = {}  # (chat_id, token_symbol.upper()) -> exit_ts
+TOKEN_REENTRY_COOLDOWN_SECONDS: float = 1200.0              # 20 Minutes Anti-Whipsaw Cooldown
+
+def register_smart_swap_closed_token(chat_id: int, token_address: str, symbol: str):
+    """Registers an anti-whipsaw cooldown (20 minutes) for a closed token to prevent immediate re-entry churn."""
+    now = time.time()
+    if token_address:
+        _RECENTLY_CLOSED_TOKENS[(chat_id, str(token_address).lower().strip())] = now
+    if symbol:
+        _RECENTLY_CLOSED_SYMBOLS[(chat_id, str(symbol).upper().strip())] = now
+
+
 def resolve_token_address(chain: str, symbol_or_addr: str) -> str:
     """Resolves human-readable symbol or returns the clean token mint/contract address."""
     s = str(symbol_or_addr or "").strip()
@@ -1028,6 +1044,7 @@ def stop_smart_swap(chat_id: int, target: str = "ALL") -> dict:
                 print(f"⚠️ [STOP SWAP LIVE SELL ERROR]: {e}")
 
         db.remove_active_smart_swap(swap_id)
+        register_smart_swap_closed_token(chat_id, addr, sym)
         db.log_smart_swap_history(chat_id, chain, sym, "MANUAL_STOP_EXIT", amt_usd, pnl, roi_pct, sell_tx or f"stop_{swap_id}")
 
         closed_count += 1
@@ -1219,6 +1236,7 @@ def monitor_smart_swap_positions(app=None):
                         print(f"Error in live scalp SL exit for {sym}: {e_sl}")
 
                 db.remove_active_smart_swap(swap_id)
+                register_smart_swap_closed_token(chat_id, addr, sym)
                 db.log_smart_swap_history(chat_id, chain, sym, "SCALP_STOP_LOSS", amt_usd, pnl_usd, roi_pct, sell_tx or f"sl_{swap_id}")
 
                 if app and hasattr(app, "bot"):
@@ -1252,6 +1270,7 @@ def monitor_smart_swap_positions(app=None):
                         print(f"Error in live SL exit for {sym}: {e_sl}")
 
                 db.remove_active_smart_swap(swap_id)
+                register_smart_swap_closed_token(chat_id, addr, sym)
                 db.log_smart_swap_history(chat_id, chain, sym, "EMERGENCY_STOP_LOSS", amt_usd, pnl_usd, roi_pct, sell_tx or f"sl_{swap_id}")
 
                 if app and hasattr(app, "bot"):
@@ -1294,6 +1313,7 @@ def monitor_smart_swap_positions(app=None):
                         print(f"Error in stale exit for {sym}: {e_stale}")
 
                 db.remove_active_smart_swap(swap_id)
+                register_smart_swap_closed_token(chat_id, addr, sym)
                 db.log_smart_swap_history(chat_id, chain, sym, "STALE_MOMENTUM_EXIT", amt_usd, pnl_usd, roi_pct, sell_tx or f"stale_{swap_id}")
                 if app and hasattr(app, "bot"):
                     msg_stale = (
@@ -1352,6 +1372,7 @@ def monitor_smart_swap_positions(app=None):
                         print(f"Error in live BE exit for {sym}: {e_be}")
 
                 db.remove_active_smart_swap(swap_id)
+                register_smart_swap_closed_token(chat_id, addr, sym)
                 db.log_smart_swap_history(chat_id, chain, sym, "BREAKEVEN_ARMOR_EXIT", amt_usd, be_pnl, be_roi, sell_tx or f"be_{swap_id}")
 
                 if app and hasattr(app, "bot"):
@@ -1455,6 +1476,7 @@ def monitor_smart_swap_positions(app=None):
                             print(f"Error in live moonbag exit for {sym}: {e_mb}")
 
                     db.remove_active_smart_swap(swap_id)
+                    register_smart_swap_closed_token(chat_id, addr, sym)
                     db.log_smart_swap_history(chat_id, chain, sym, "GOLDEN_85%_MOONBAG_CLOSE", amt_usd * 0.50, final_pnl, roi_pct, sell_tx or f"final_{swap_id}")
 
                     if app and hasattr(app, "bot"):
@@ -1570,8 +1592,29 @@ def run_smart_swap_autopilot_cycle(app=None):
                     print(f"Error checking wallet for autopilot user {chat_id}: {e}")
                     continue
 
-            # 4. Filter out tokens already held by this user
+            # 4. Filter out tokens already held OR recently closed within 20m cooldown
             owned_tokens = [s.get("token_symbol", "").upper() for s in active_swaps] + [s.get("token_address", "").lower() for s in active_swaps]
+            for (c_id, t_addr), closed_t in list(_RECENTLY_CLOSED_TOKENS.items()):
+                if c_id == chat_id and (now - closed_t) < TOKEN_REENTRY_COOLDOWN_SECONDS:
+                    owned_tokens.append(t_addr)
+            for (c_id, t_sym), closed_t in list(_RECENTLY_CLOSED_SYMBOLS.items()):
+                if c_id == chat_id and (now - closed_t) < TOKEN_REENTRY_COOLDOWN_SECONDS:
+                    owned_tokens.append(t_sym)
+            try:
+                hist_items = db.get_smart_swap_history(chat_id, limit=10) or []
+                for h in hist_items:
+                    c_at_str = h.get("closed_at", "")
+                    if c_at_str:
+                        try:
+                            c_dt = datetime.strptime(str(c_at_str), "%Y-%m-%d %H:%M:%S")
+                            if (datetime.now() - c_dt).total_seconds() < TOKEN_REENTRY_COOLDOWN_SECONDS:
+                                h_sym = h.get("token_symbol", "").upper()
+                                if h_sym:
+                                    owned_tokens.append(h_sym)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
             # 5. Execute Auto Sniper with exclusions and mode
             swap_res = execute_auto_smart_swap_sniper(
@@ -1602,9 +1645,9 @@ def run_smart_swap_autopilot_cycle(app=None):
                         f"💰 **ទុនវិនិយោគ ៖** `${amount_usd:.2f} USD` (Slot: `{len(active_swaps)+1}/{max_pos}`)\n"
                         f"🧠 **AI Momentum Score ៖** `{ai_score}/100` (Buy Velocity: `{buy_vel:.1f}x`)\n"
                         f"🛡️ **MEV Shield ៖** `Jito Private Bundle Confirmed (Anti-Sandwich)`\n"
-                        f"🌾 **យុទ្ធសាស្ត្រកើបចំណេញ (2-Stage Scale-Out) ៖**\n"
-                        f"  • `🛡️ Breakeven Armor ៖ +12% ចាក់សោរចំណេញ +2% Net Floor`\n"
-                        f"  • `🎯 TP1 +25% ៖ លក់ 50% ដកទុនដើម 100% យកប្រាក់សុទ្ធចូលកាបូប`\n"
+                        f"🌾 **យុទ្ធសាស្ត្រកើបចំណេញ (3-Stage Scale-Out) ៖**\n"
+                        f"  • `🛡️ Breakeven Armor ៖ +8% ចាក់សោរចំណេញ +2.5% Net Floor`\n"
+                        f"  • `🎯 TP1 +15% ៖ លក់ 50% ដកទុនដើម 100% យកប្រាក់សុទ្ធចូលកាបូប SOL`\n"
                         f"  • `🚀 Moonbag 50% ៖ Trailing តាម Golden 85% Ratchet ដេញតាមកំពូល`\n"
                         f"⚡ **ដំណើរការ ៖** វិលជុំស្វ័យប្រវត្តិតាមដានទីផ្សារ ២៤/៧ ជាប់រហូត!{link_str}"
                     )

@@ -144,6 +144,8 @@ class CapitalComEngine:
         
         # Thread-safe Session Lock
         self._session_lock = threading.Lock()
+        self._auth_backoff_until: float = 0.0
+        self._auth_error_logged: bool = False
 
         # ⚡ Pillar 1: Persistent HFT Session Pool (Zero TLS Handshake Overhead)
         self.session = requests.Session()
@@ -193,6 +195,8 @@ class CapitalComEngine:
                 self.security_token = res.headers.get("X-SECURITY-TOKEN")
                 self.session_created_at = time.time()
                 self.last_auth_error = ""
+                self._auth_error_logged = False
+                self._auth_backoff_until = 0.0
                 
                 body = res.json()
                 self.active_account_id = body.get("currentAccountId")
@@ -204,15 +208,47 @@ class CapitalComEngine:
             else:
                 err_data = res.json() if res.content else {}
                 err_msg = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
+
+                # Auto-Detection Shield: If Demo was requested but account only has Live sub-accounts
                 if "error.null.accountId" in err_msg and self.is_demo:
+                    logger.info("🔄 [Capital.com] Account has no active Demo sub-account. Testing Live Mainnet auto-fallback...")
+                    try:
+                        live_url = f"{CAPITAL_LIVE_URL}/session"
+                        res_live = self.session.post(live_url, headers=headers, json=payload, timeout=8)
+                        if res_live.status_code == 200:
+                            self.is_demo = False
+                            self.base_url = CAPITAL_LIVE_URL
+                            self.cst_token = res_live.headers.get("CST")
+                            self.security_token = res_live.headers.get("X-SECURITY-TOKEN")
+                            self.session_created_at = time.time()
+                            self.last_auth_error = ""
+                            self._auth_error_logged = False
+                            self._auth_backoff_until = 0.0
+                            body_live = res_live.json()
+                            self.active_account_id = body_live.get("currentAccountId")
+                            msg = f"Session established successfully [LIVE MAINNET (Auto-Detected)]! Account ID: {self.active_account_id}"
+                            logger.info(msg)
+                            return True, msg
+                    except Exception as e_live:
+                        logger.debug(f"Live fallback exception: {e_live}")
+
                     err_msg = "error.null.accountId (No active Demo account found on Capital.com profile. Please switch to Demo on Capital.com web platform to activate your $10,000 demo account, or set CAPITAL_IS_DEMO=False for Live)."
+
                 self.last_auth_error = err_msg
-                logger.error(f"Authentication failed: {err_msg}")
+                self._auth_backoff_until = time.time() + 180.0  # 3-minute backoff to prevent log flooding and scheduler congestion
+                if not self._auth_error_logged:
+                    logger.error(f"Authentication failed: {err_msg}")
+                    self._auth_error_logged = True
+                else:
+                    logger.debug(f"Authentication failed (cooldown active): {err_msg}")
                 return False, f"Auth Error: {err_msg}"
         except Exception as e:
             err_msg = str(e)
             self.last_auth_error = err_msg
-            logger.error(f"Authentication exception: {e}")
+            self._auth_backoff_until = time.time() + 60.0
+            if not self._auth_error_logged:
+                logger.error(f"Authentication exception: {e}")
+                self._auth_error_logged = True
             return False, f"Connection Exception: {e}"
 
     def ensure_session(self) -> bool:
@@ -221,10 +257,15 @@ class CapitalComEngine:
         if self.cst_token and self.security_token and (now - self.session_created_at) <= SESSION_EXPIRY_THRESHOLD:
             return True
 
+        if now < self._auth_backoff_until:
+            return False
+
         with self._session_lock:
             now = time.time()
             if self.cst_token and self.security_token and (now - self.session_created_at) <= SESSION_EXPIRY_THRESHOLD:
                 return True
+            if now < self._auth_backoff_until:
+                return False
             success, msg = self.authenticate()
             if not success:
                 self.last_auth_error = msg
@@ -2301,7 +2342,7 @@ class CapitalAutonomousEngine:
             except Exception:
                 pass
 
-        # Monitor per-user vaults (Both Live and Demo)
+        # Monitor per-user vaults (Targeted to configured user environments)
         active_uids = set()
         for u in db.get_active_capital_auto_users():
             active_uids.add(u["chat_id"])
@@ -2310,8 +2351,18 @@ class CapitalAutonomousEngine:
         for cu in db.get_active_capital_credential_users():
             active_uids.add(cu)
 
+        prop_uid_set = {pu["chat_id"] for pu in db.get_active_prop_firm_users()}
         for uid in active_uids:
-            for is_d in [False, True]:
+            user_envs = []
+            if uid in prop_uid_set:
+                user_envs.append(True)
+            auto_cfg = db.get_capital_auto_config(uid)
+            if auto_cfg:
+                user_envs.append(bool(auto_cfg.get("is_demo", False)))
+            if not user_envs:
+                user_envs = [False]
+
+            for is_d in set(user_envs):
                 try:
                     u_engine = get_user_capital_engine(uid, is_demo=is_d)
                     u_active, u_ratchet, u_close = self._ratchet_engine_positions(u_engine, chat_id=uid)
@@ -4715,10 +4766,6 @@ async def run_capital_auto_cycle(app=None):
         await get_capital_orb_engine().execute_orb_cycle(app=app)
     except Exception as e_orb:
         logger.debug(f"ORB cycle notice: {e_orb}")
-    try:
-        await CAPITAL_FOREX_SUITE.execute_forex_cycle(app=app)
-    except Exception as e_fx:
-        logger.debug(f"Forex cycle notice: {e_fx}")
 
 async def run_capital_forex_cycle(app=None):
     """Dedicated APScheduler cron task for Forex 24/7 Exchange."""

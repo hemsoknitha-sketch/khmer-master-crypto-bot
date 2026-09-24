@@ -21701,11 +21701,11 @@ class TelegramBotThread(BaseThread):
             id='perpetual_wealth_monitor'
         )
 
-        # 1e. 24/7 Capital.com TradFi Autonomous Wealth Harvester Monitor (Every 20 seconds)
+        # 1e. 24/7 Capital.com TradFi Autonomous Wealth Harvester Monitor (Every 30 seconds)
         self.scheduler.add_job(
             scheduler_tasks.capital_auto_monitor,
             'interval',
-            seconds=20,
+            seconds=30,
             max_instances=2,
             coalesce=True,
             args=[self.app],
