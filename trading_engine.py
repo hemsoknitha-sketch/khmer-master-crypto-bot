@@ -1262,6 +1262,25 @@ def place_market_buy(api_key: str, api_secret: str, symbol: str, quote_order_qty
     if db.is_circuit_breaker_active():
         print(f"🛡️ Circuit Breaker Active: Blocked Spot Buy for {symbol} (${quote_order_qty})")
         return {"success": False, "msg": "CIRCUIT_BREAKER_ACTIVE"}
+
+    try:
+        import portfolio_circuit_breaker
+        is_port_cb, cb_msg, _ = portfolio_circuit_breaker.is_portfolio_circuit_breaker_active()
+        if is_port_cb:
+            print(f"🛡️ [PORTFOLIO CIRCUIT BREAKER] Blocked Spot Buy for {symbol}: {cb_msg}")
+            return {"success": False, "error": cb_msg}
+    except Exception:
+        pass
+
+    try:
+        import economic_calendar_guard
+        bo_info = economic_calendar_guard.check_red_folder_blackout()
+        if bo_info.get("is_blackout"):
+            print(f"⏳ [RED FOLDER BLACKOUT] Blocked Spot Buy for {symbol}: {bo_info.get('reason')}")
+            return {"success": False, "error": bo_info.get("reason")}
+    except Exception:
+        pass
+
     if PAPER_TRADING:
         price = get_current_price(symbol)
         qty = round(quote_order_qty / price, 3)
@@ -1707,6 +1726,34 @@ def smart_execute_futures_order(api_key: str, api_secret: str, symbol: str, side
     - is_entry=False: Closing/reducing existing position -> uses emergency_reduce_position (WITH reduceOnly: true).
     """
     if is_entry:
+        try:
+            import portfolio_circuit_breaker
+            is_port_cb, cb_msg, _ = portfolio_circuit_breaker.is_portfolio_circuit_breaker_active()
+            if is_port_cb:
+                print(f"🛡️ [PORTFOLIO CIRCUIT BREAKER] Blocked Futures entry for {symbol}: {cb_msg}")
+                return {"success": False, "error": cb_msg}
+        except Exception:
+            pass
+
+        try:
+            import economic_calendar_guard
+            bo_info = economic_calendar_guard.check_red_folder_blackout()
+            if bo_info.get("is_blackout"):
+                print(f"⏳ [RED FOLDER BLACKOUT] Blocked Futures entry for {symbol}: {bo_info.get('reason')}")
+                return {"success": False, "error": bo_info.get("reason")}
+        except Exception:
+            pass
+
+        # Pillar 3: Binance Futures OI & Funding Rate Squeeze Radar
+        try:
+            import binance_oi_funding_radar
+            is_ok, radar_reason = binance_oi_funding_radar.validate_crypto_trade_against_funding_radar(symbol, side)
+            if not is_ok:
+                print(f"🛡️ [FUNDING RADAR GUARD] Blocked {side} on {symbol}: {radar_reason}")
+                return {"success": False, "error": radar_reason}
+        except Exception:
+            pass
+
         return place_futures_order(api_key, api_secret, symbol, side, qty, leverage)
     else:
         return emergency_reduce_position(api_key, api_secret, symbol, side, qty)

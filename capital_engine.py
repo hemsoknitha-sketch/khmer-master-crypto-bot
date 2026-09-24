@@ -2169,7 +2169,7 @@ class CapitalAutonomousEngine:
         except Exception as e_macro:
             logger.debug(f"Google Macro Satellite query note: {e_macro}")
 
-        # 2. Central Bank Gold Radar Integration (for Gold)
+        # 2. Central Bank Gold Radar & TIPS Real Yield Integration (for Gold)
         cb_boost = 0
         if resolved_epic == "GOLD":
             try:
@@ -2177,6 +2177,19 @@ class CapitalAutonomousEngine:
                 cb_radar = central_bank_gold_radar.get_central_bank_gold_radar()
                 if cb_radar.get("regime") == "ACCUMULATION":
                     cb_boost += 15
+            except Exception:
+                pass
+
+            # Pillar 4: TIPS Real Yield Delta Protocol
+            try:
+                import google_macro_satellite
+                sat_data = google_macro_satellite.fetch_google_macro_satellite_data()
+                ry_bias = sat_data.get("gold_real_yield_bias", "NEUTRAL")
+                if ry_bias == "STRONG_BULLISH":
+                    cb_boost += 20  # +20% boost when Real Yields are falling
+                    logger.info("🥇 [TIPS REAL YIELD ALPHA] Falling Real Yields (+20% Gold BUY Boost active)")
+                elif ry_bias == "BEARISH_DRAG":
+                    cb_boost -= 20  # Penalize Longs when Real Yields are surging
             except Exception:
                 pass
 
@@ -2415,6 +2428,28 @@ class CapitalAutonomousEngine:
             return
         self._last_scan_ts = now
 
+        # Pillar 5: Global Portfolio Drawdown Circuit Breaker Guard (-2.5% Daily Loss Ceiling)
+        try:
+            import portfolio_circuit_breaker
+            await portfolio_circuit_breaker.check_and_enforce_portfolio_circuit_breaker(app=app)
+            is_cb_active, cb_reason, _ = portfolio_circuit_breaker.is_portfolio_circuit_breaker_active()
+            if is_cb_active:
+                logger.warning(f"🛡️ [CIRCUIT BREAKER ACTIVE] {cb_reason}. Skipping new trade entries.")
+                return
+        except Exception as e_cb:
+            logger.debug(f"Circuit breaker check note: {e_cb}")
+
+        # Pillar 1: Red Folder Economic Calendar Blackout Guard (30m Pre / 15m Post CPI/NFP/FOMC)
+        try:
+            import economic_calendar_guard
+            blackout_info = economic_calendar_guard.check_red_folder_blackout()
+            if blackout_info.get("is_blackout"):
+                await economic_calendar_guard.notify_economic_blackout_if_needed(app, blackout_info)
+                logger.warning(f"⏳ [RED FOLDER BLACKOUT] {blackout_info.get('reason')}. Forced Wait Active.")
+                return
+        except Exception as e_ec:
+            logger.debug(f"Economic calendar blackout check note: {e_ec}")
+
         # Step 3: Scan candidate assets and rank via Institutional Edge Matrix
         # Evaluates all session priority assets; per-user position isolation is handled in execution step
         priority_epics = self.get_session_priority_assets()
@@ -2428,6 +2463,16 @@ class CapitalAutonomousEngine:
                 remain_cd = int(self._asset_cooldowns[resolved_epic.upper()] - now)
                 logger.debug(f"⏳ [COOLDOWN] Asset {resolved_epic} resting for {remain_cd}s (Anti-Chop Guard).")
                 continue
+
+            # Pillar 2: Corporate Earnings Blackout Shield (48h Pre-Earnings Anti-Gap Guard)
+            try:
+                import earnings_calendar_filter
+                in_earn_bo, ed_str, rem_h = earnings_calendar_filter.is_asset_in_earnings_blackout(resolved_epic)
+                if in_earn_bo:
+                    logger.debug(f"🛡️ [EARNINGS SHIELD] Skipping {resolved_epic} (Earnings call in {rem_h}h: {ed_str}).")
+                    continue
+            except Exception as e_ef:
+                logger.debug(f"Earnings shield check note: {e_ef}")
 
             setup = self.evaluate_multi_engine_tradfi_setup(epic)
             final_action = setup.get("final_action", "HOLD")
@@ -2536,6 +2581,17 @@ class CapitalAutonomousEngine:
                 budget=budget,
                 available_equity=user_avail
             )
+
+            # Pillar 5: Cross-Asset Correlation Clamping (Beta > 0.85 Contagion Shield)
+            try:
+                import portfolio_circuit_breaker
+                size, corr_msg = portfolio_circuit_breaker.apply_cross_asset_correlation_clamp(
+                    proposed_epic=resolved_epic,
+                    base_size=size,
+                    open_epics=list(user_epics)
+                )
+            except Exception as e_cc:
+                logger.debug(f"Correlation clamping note: {e_cc}")
 
             trade_res = user_engine.execute_smart_tradfi_order(
                 epic=resolved_epic,

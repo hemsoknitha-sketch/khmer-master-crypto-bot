@@ -84,7 +84,8 @@ def fetch_google_macro_satellite_data(force_refresh: bool = False) -> Dict[str, 
         "SP500": "%5EGSPC",
         "NASDAQ": "%5EIXIC",
         "TNX": "%5ETNX",
-        "GOLD": "GC=F"
+        "GOLD": "GC=F",
+        "TIP": "TIP"
     }
 
     for key, sym in tradfi_symbols.items():
@@ -113,11 +114,24 @@ def fetch_google_macro_satellite_data(force_refresh: bool = False) -> Dict[str, 
                     elif key == "GOLD" and price > 0:
                         macro_data["gold_price"] = round(price, 2)
                         macro_data["gold_change_pct"] = chg_pct
+                    elif key == "TIP" and price > 0:
+                        macro_data["tip_price"] = round(price, 2)
+                        macro_data["tip_change_pct"] = chg_pct
         except Exception as err:
             pass
 
-    # Compute Real Yield
+    # Compute Real Yield & Regime Delta (Pillar 4)
     macro_data["real_yield_10y"] = round(macro_data["us10y_yield"] - 2.90, 2)
+    tip_chg = macro_data.get("tip_change_pct", 0.0)
+    if tip_chg > 0.08:
+        macro_data["real_yield_regime"] = "FALLING_REAL_YIELDS"
+        macro_data["gold_real_yield_bias"] = "STRONG_BULLISH"
+    elif tip_chg < -0.18:
+        macro_data["real_yield_regime"] = "RISING_REAL_YIELDS"
+        macro_data["gold_real_yield_bias"] = "BEARISH_DRAG"
+    else:
+        macro_data["real_yield_regime"] = "NEUTRAL"
+        macro_data["gold_real_yield_bias"] = "NEUTRAL"
 
     # DXY Signal Classification
     dxy_val = macro_data["dxy_index"]
