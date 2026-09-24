@@ -5826,6 +5826,45 @@ class TelegramBotThread(BaseThread):
                     f"User `{target_uid}` ត្រូវបានបដិសេធសិទ្ធិ Live Real Capital។",
                     parse_mode="Markdown"
                 )
+            elif data.startswith("btn_cap_admin_on_"):
+                target_uid = int(data.replace("btn_cap_admin_on_", "").strip())
+                db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
+                db.set_capital_auto_config(target_uid, enabled=True, budget=50.0, max_positions=2, is_demo=False)
+                try:
+                    await update.callback_query.answer(f"✅ បានបើក Capital Auto Live ($50) សម្រាប់ {target_uid}!", show_alert=True)
+                except Exception:
+                    pass
+                await update.effective_message.reply_text(
+                    f"🟢 **[CAPITAL.COM LIVE AUTO-TRADE ACTIVATED]**\n"
+                    f"User `{target_uid}` ត្រូវបានបើកដំណើរការ Live Real Capital Auto Trade ($50.00/Trade, Max 2 Positions) ដោយជោគជ័យ!",
+                    parse_mode="Markdown"
+                )
+                try:
+                    user_notif = (
+                        f"🎉 **[CAPITAL.COM LIVE VIP AUTO-TRADE ACTIVATED!]** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"គណនី Live Real Capital របស់អ្នកត្រូវបានបើកដំណើរការដោយ Super Admin រួចរាល់ហើយ!\n\n"
+                        f"💰 **ទុនវិនិយោគ ៖** `$50.00 USD / Trade` (Max 2 Positions)\n"
+                        f"⚙️ **បរិយាកាស ៖** `🟢 LIVE MAINNET (Real Funds)`\n"
+                        f"🛡️ **ការការពារ ៖** `Breakeven Armor & Golden 80% Trailing Ratchet ២៤/៧!`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _អ្នកអាចពិនិត្យ Portfolio តាមរយៈបញ្ជា_ `/capital`"
+                    )
+                    await context.bot.send_message(chat_id=target_uid, text=user_notif, parse_mode="Markdown")
+                except Exception:
+                    pass
+            elif data.startswith("btn_cap_admin_off_"):
+                target_uid = int(data.replace("btn_cap_admin_off_", "").strip())
+                db.set_capital_auto_config(target_uid, enabled=False)
+                try:
+                    await update.callback_query.answer(f"🛑 បានបិទ Capital Auto សម្រាប់ {target_uid}!", show_alert=True)
+                except Exception:
+                    pass
+                await update.effective_message.reply_text(
+                    f"🛑 **[CAPITAL.COM AUTO-TRADE STOPPED]**\n"
+                    f"បានបិទ Capital Auto Trade សម្រាប់ User `{target_uid}` រួចរាល់!",
+                    parse_mode="Markdown"
+                )
             elif data == "btn_cap_leadlag_toggle":
                 curr_state = db.is_capital_leadlag_enabled(chat_id)
                 new_state = not curr_state
@@ -20308,32 +20347,172 @@ class TelegramBotThread(BaseThread):
             return gate_text, gate_kb
 
         async def admin_capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Admin command to approve/reject/list Capital.com Live users: /admin_capital <approve|reject|list> <chat_id>"""
+            """
+            Admin command to manage Capital.com VIP users:
+            - /admin_capital (or /admin_capital list | users): Overview of all registered traders with interactive action buttons
+            - /admin_capital on <chat_id_or_account_id> [budget] [live|demo]: Instantly activates auto trade for user
+            - /admin_capital off <chat_id_or_account_id>: Stops auto trade for user
+            - /admin_capital approve <chat_id_or_account_id>: Approves Live Capital access
+            - /admin_capital reject <chat_id_or_account_id>: Revokes Live Capital access
+            """
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else None
             if not chat_id or chat_id != 859271875:
                 return
             args = list(context.args) if context and context.args else []
-            if not args or args[0].upper() == "LIST":
-                pending = db.get_pending_capital_verification_users()
-                if not pending:
-                    await update.effective_message.reply_text("✅ គ្មានអ្នកប្រើប្រាស់រង់ចាំការផ្ទៀងផ្ទាត់ Capital Live ឡើយ។ (Zero Pending)", parse_mode="Markdown")
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            def _resolve_target(target_input: str) -> Tuple[Optional[int], Optional[Dict[str, Any]]]:
+                """Resolves chat_id and user record from chat_id or Capital account_id."""
+                raw = str(target_input or "").strip()
+                # 1. Lookup by Account ID
+                u_by_acc = db.get_capital_user_by_account_id(raw)
+                if u_by_acc:
+                    return u_by_acc["chat_id"], u_by_acc
+                # 2. Lookup by direct numeric chat_id
+                try:
+                    uid = int(raw)
+                    creds = db.get_user_capital_credentials(uid)
+                    if creds:
+                        return uid, creds
+                    return uid, None
+                except ValueError:
+                    return None, None
+
+            if not args or args[0].upper() in ["LIST", "USERS", "OVERVIEW", "ALL"]:
+                all_users = db.get_all_capital_users_overview()
+                if not all_users:
+                    await update.effective_message.reply_text("ℹ️ មិនទាន់មានអ្នកប្រើប្រាស់ Capital.com ណាមួយនៅក្នុង Database ឡើយ។", parse_mode="Markdown")
                     return
-                lines = ["📋 **[CAPITAL.COM PENDING LIVE USERS]** 💎\n━━━━━━━━━━━━"]
+
+                lines = [
+                    "👑 **[CAPITAL.COM VIP TRADERS DIRECTORY]** 💎",
+                    f"{ui_standards.DIVIDER_HEAVY}"
+                ]
                 kb_rows = []
-                for p in pending:
-                    lines.append(f"• User `{p['chat_id']}` ({p['username']}) | Acc: `{p['account_id']}`")
-                    kb_rows.append([
-                        InlineKeyboardButton(f"✅ Approve {p['chat_id']}", callback_data=f"btn_cap_appr_{p['chat_id']}"),
-                        InlineKeyboardButton(f"❌ Reject {p['chat_id']}", callback_data=f"btn_cap_rej_{p['chat_id']}")
-                    ])
-                lines.append("━━━━━━━━━━━━\n💡 ចុចប៊ូតុងខាងក្រោមដើម្បីអនុម័តភ្លាមៗ ៖")
-                await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_rows))
+                for u in all_users:
+                    u_cid = u["chat_id"]
+                    u_acc = u["account_id"] or "N/A"
+                    u_mode = "DEMO" if u["is_demo"] else "LIVE"
+                    v_badge = "🟢 VERIFIED" if u["is_referral_verified"] else "🟡 UNVERIFIED"
+                    a_badge = f"🟢 ON (${u['auto_budget']:,.0f})" if u["auto_enabled"] else "🛑 OFF"
+                    lines.append(
+                        f"• **User ៖** `{u['username']}` (`{u_cid}`)\n"
+                        f"  🏦 **Account ID ៖** `{u_acc}` ({u_mode})\n"
+                        f"  🛡️ **Status ៖** {v_badge} | **Auto ៖** {a_badge}"
+                    )
+                    btn_row = []
+                    if not u["auto_enabled"]:
+                        btn_row.append(InlineKeyboardButton(f"🟢 ON ({u_cid})", callback_data=f"btn_cap_admin_on_{u_cid}"))
+                    else:
+                        btn_row.append(InlineKeyboardButton(f"🛑 OFF ({u_cid})", callback_data=f"btn_cap_admin_off_{u_cid}"))
+                    if not u["is_referral_verified"]:
+                        btn_row.append(InlineKeyboardButton(f"✅ Approve", callback_data=f"btn_cap_appr_{u_cid}"))
+                    kb_rows.append(btn_row)
+
+                lines.append(f"{ui_standards.DIVIDER_HEAVY}")
+                lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
+                lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade ភ្លាម)")
+                lines.append("• `` `/admin_capital off <Account_ID>` `` (បិទ Auto Trade)")
+                lines.append("• `` `/admin_capital approve <Account_ID>` `` (អនុម័តសិទ្ធិ Live)")
+                await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_rows) if kb_rows else None)
                 return
 
             sub = args[0].upper()
-            if len(args) >= 2 and sub in ["APPROVE", "APP", "VERIFY", "ALLOW"]:
-                target_uid = int(args[1])
+
+            # Command: /admin_capital ON <chat_id_or_acc_id> [budget] [live|demo]
+            if sub in ["ON", "START", "ACTIVATE", "ENABLE"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital on 329979279335052484 50 live` ``", parse_mode="Markdown")
+                    return
+
+                target_uid, u_record = _resolve_target(args[1])
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!", parse_mode="Markdown")
+                    return
+
+                budget = float(args[2]) if len(args) >= 3 and args[2].replace('.', '', 1).isdigit() else 50.0
+                env_str = str(args[3]).lower() if len(args) >= 4 else "live"
+                is_demo = (env_str in ["demo", "virtual", "test", "0", "true"])
+
+                # Auto verify referral
+                db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
+                max_pos = 3 if budget <= 15.0 else 2
+                db.set_capital_auto_config(target_uid, enabled=True, budget=budget, max_positions=max_pos, is_demo=is_demo)
+
+                # Fetch real balance for feedback
+                bal_str = "N/A"
+                acc_id_str = u_record.get("account_id", "") if u_record else str(args[1])
+                try:
+                    u_engine = capital_engine.get_user_capital_engine(target_uid, is_demo=is_demo)
+                    bal_data = await asyncio.to_thread(u_engine.get_account_balance)
+                    bal_val = bal_data.get("balance", 0.0)
+                    acc_id_str = bal_data.get("account_id") or acc_id_str
+                    bal_str = f"${bal_val:,.2f} USD"
+                except Exception as e_b:
+                    bal_str = f"Connected ({e_b})"
+
+                mode_lbl = "🟡 DEMO ($10,000)" if is_demo else "🟢 LIVE MAINNET (Real Funds)"
+                success_msg = (
+                    f"🎉 **[CAPITAL.COM VIP AUTO-TRADE ACTIVATED!]** 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👤 **User ID ៖** `{target_uid}`\n"
+                    f"🏦 **Account ID ៖** `{acc_id_str}`\n"
+                    f"⚙️ **បរិយាកាស ៖** `{mode_lbl}`\n"
+                    f"💰 **ទុនវិនិយោគ ៖** `${budget:,.2f} USD / Trade` (Max: `{max_pos}` កាក់)\n"
+                    f"💵 **សមតុល្យជាក់ស្តែង ៖** `{bal_str}`\n"
+                    f"🛡️ **Referral Status ៖** `100% VERIFIED (az48cxia)`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🚀 _ប្រព័ន្ធ AI ស្វ័យប្រវត្តិកំពុងដំណើរការកើបផលចំណេញ ២៤/៧!_"
+                )
+                await update.effective_message.reply_text(success_msg, parse_mode="Markdown")
+
+                # Notify user
+                try:
+                    user_notif = (
+                        f"🎉 **[CAPITAL.COM LIVE VIP AUTO-TRADE ACTIVATED!]** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"គណនីរបស់អ្នក (`{acc_id_str}`) ត្រូវបាន Super Admin បើកដំណើរការ **Live Real Capital Auto-Trading** ជោគជ័យ!\n\n"
+                        f"💰 **ទុនវិនិយោគ ៖** `${budget:,.2f} USD / Trade`\n"
+                        f"⚙️ **បរិយាកាស ៖** `{mode_lbl}`\n"
+                        f"🛡️ **សុវត្ថិភាព ៖** `Breakeven Armor & Golden 80% Trailing Ratchet សកម្ម ២៤/៧!`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _អ្នកអាចពិនិត្យ Portfolio និងប្រាក់ចំណេញគ្រប់ពេលតាមរយៈបញ្ជា_ `/capital`"
+                    )
+                    await context.bot.send_message(chat_id=target_uid, text=user_notif, parse_mode="Markdown")
+                except Exception as e_nu:
+                    print(f"Failed to notify user {target_uid}: {e_nu}")
+                return
+
+            # Command: /admin_capital OFF <chat_id_or_acc_id>
+            elif sub in ["OFF", "STOP", "DISABLE", "HALT"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital off 329979279335052484` ``", parse_mode="Markdown")
+                    return
+
+                target_uid, _ = _resolve_target(args[1])
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈសម្គាល់ `{args[1]}` ឡើយ!", parse_mode="Markdown")
+                    return
+
+                db.set_capital_auto_config(target_uid, enabled=False)
+                await update.effective_message.reply_text(f"🛑 បានបិទ Capital Auto-Trade សម្រាប់ User `{target_uid}` រួចរាល់!", parse_mode="Markdown")
+                try:
+                    await context.bot.send_message(chat_id=target_uid, text="🛑 Capital Auto-Trade របស់អ្នកត្រូវបានផ្អាកជាបណ្តោះអាសន្នដោយ Super Admin។", parse_mode="Markdown")
+                except Exception:
+                    pass
+                return
+
+            # Command: /admin_capital APPROVE <chat_id_or_acc_id>
+            elif sub in ["APPROVE", "APP", "VERIFY", "ALLOW"]:
+                target_uid, _ = _resolve_target(args[1]) if len(args) >= 2 else (None, None)
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈ `{args[1] if len(args) >= 2 else ''}` ឡើយ!", parse_mode="Markdown")
+                    return
+
                 db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
                 await update.effective_message.reply_text(f"✅ បានអនុម័តសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}` រួចរាល់!", parse_mode="Markdown")
                 try:
@@ -20344,10 +20523,18 @@ class TelegramBotThread(BaseThread):
                     )
                 except Exception:
                     pass
-            elif len(args) >= 2 and sub in ["REJECT", "REJ", "BLOCK", "DENY"]:
-                target_uid = int(args[1])
+                return
+
+            # Command: /admin_capital REJECT <chat_id_or_acc_id>
+            elif sub in ["REJECT", "REJ", "BLOCK", "DENY"]:
+                target_uid, _ = _resolve_target(args[1]) if len(args) >= 2 else (None, None)
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User តាមរយៈ `{args[1] if len(args) >= 2 else ''}` ឡើយ!", parse_mode="Markdown")
+                    return
+
                 db.set_capital_user_referral_status(target_uid, is_verified=False)
                 await update.effective_message.reply_text(f"❌ បានបដិសេធសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}`", parse_mode="Markdown")
+                return
 
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return

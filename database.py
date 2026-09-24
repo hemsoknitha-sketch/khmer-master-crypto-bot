@@ -3362,6 +3362,93 @@ def get_pending_capital_verification_users() -> List[Dict[str, Any]]:
             pass
         return []
 
+def get_capital_user_by_account_id(account_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Finds a user's credential and profile record by Capital.com Account ID.
+    Supports exact matching and substring matching for maximum resilience.
+    """
+    clean_acc = str(account_id or "").strip()
+    if not clean_acc:
+        return None
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username
+            FROM user_capital_credentials c
+            LEFT JOIN users u ON c.chat_id = u.chat_id
+            WHERE c.account_id = ?
+        """, (clean_acc,))
+        r = cursor.fetchone()
+        if not r:
+            cursor.execute("""
+                SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username
+                FROM user_capital_credentials c
+                LEFT JOIN users u ON c.chat_id = u.chat_id
+                WHERE c.account_id LIKE ?
+            """, (f"%{clean_acc}%",))
+            r = cursor.fetchone()
+
+        conn.close()
+        if r:
+            return {
+                "chat_id": r[0],
+                "account_id": str(r[1] or ""),
+                "currency": str(r[2] or "USD"),
+                "is_demo": bool(r[3]),
+                "is_referral_verified": bool(r[4]) if r[4] is not None else False,
+                "username": str(r[5] or f"User_{r[0]}")
+            }
+        return None
+    except Exception as e:
+        print(f"⚠️ Error in get_capital_user_by_account_id: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return None
+
+def get_all_capital_users_overview() -> List[Dict[str, Any]]:
+    """
+    Returns an overview of all users with Capital.com credentials,
+    including their verification status, account ID, and auto-trade configuration.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username,
+                   a.enabled, a.budget, a.max_positions, a.is_demo as auto_is_demo
+            FROM user_capital_credentials c
+            LEFT JOIN users u ON c.chat_id = u.chat_id
+            LEFT JOIN capital_auto_config a ON c.chat_id = a.chat_id
+            ORDER BY c.chat_id ASC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        results = []
+        for r in rows:
+            results.append({
+                "chat_id": r[0],
+                "account_id": str(r[1] or ""),
+                "currency": str(r[2] or "USD"),
+                "is_demo": bool(r[3]),
+                "is_referral_verified": bool(r[4]) if r[4] is not None else False,
+                "username": str(r[5] or f"User_{r[0]}"),
+                "auto_enabled": bool(r[6]) if r[6] is not None else False,
+                "auto_budget": float(r[7]) if r[7] is not None else 50.0,
+                "auto_max_pos": int(r[8]) if r[8] is not None else 2,
+                "auto_is_demo": bool(r[9]) if r[9] is not None else False
+            })
+        return results
+    except Exception as e:
+        print(f"⚠️ Error in get_all_capital_users_overview: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
+
 def delete_user_capital_credentials(chat_id: int) -> bool:
     """Removes user's Capital.com credentials securely from SQLite."""
     conn = get_db_connection()
