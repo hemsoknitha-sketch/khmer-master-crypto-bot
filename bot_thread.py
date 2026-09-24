@@ -6034,8 +6034,15 @@ class TelegramBotThread(BaseThread):
                 await prop_firm_command(update, context)
             elif data == "btn_cap_prop_tier_1k":
                 cfg = db.get_prop_firm_config(chat_id)
+                u_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+                try:
+                    bal_info = u_engine.get_account_balance()
+                    curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+                except Exception:
+                    curr_eq = 0.0
+                init_eq = curr_eq if (curr_eq > 0 and 500.0 <= curr_eq <= 3000.0) else 1000.0
                 db.set_prop_firm_config(chat_id, enabled=cfg.get("enabled", False), tier=1000.0, phase=cfg.get("challenge_phase", 1))
-                db.reset_prop_firm_challenge(chat_id, tier=1000.0, phase=cfg.get("challenge_phase", 1))
+                db.reset_prop_firm_challenge(chat_id, tier=1000.0, phase=cfg.get("challenge_phase", 1), initial_equity=init_eq)
                 try:
                     await update.callback_query.answer("💰 បានកំណត់ Tier: $1,000 USD (Micro/Demo)!")
                 except Exception:
@@ -6210,7 +6217,15 @@ class TelegramBotThread(BaseThread):
                 await prop_firm_command(update, context)
             elif data == "btn_cap_prop_reset":
                 cfg = db.get_prop_firm_config(chat_id)
-                db.reset_prop_firm_challenge(chat_id, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
+                target_tier = cfg.get("account_tier", 10000.0)
+                u_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+                try:
+                    bal_info = u_engine.get_account_balance()
+                    curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+                except Exception:
+                    curr_eq = 0.0
+                init_eq = curr_eq if (curr_eq > 0 and (target_tier / curr_eq <= 3.0 and curr_eq / target_tier <= 3.0)) else None
+                db.reset_prop_firm_challenge(chat_id, tier=target_tier, phase=cfg.get("challenge_phase", 1), initial_equity=init_eq)
                 try:
                     await update.callback_query.answer("🔄 បាន Reset Challenge Tracker ជោគជ័យ!")
                 except Exception:
@@ -19385,15 +19400,32 @@ class TelegramBotThread(BaseThread):
                     phase = int(args[2]) if len(args) >= 3 else 1
                     cfg = db.get_prop_firm_config(chat_id)
                     tier = tier_arg if tier_arg is not None else cfg.get("account_tier", 10000.0)
+                    u_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+                    try:
+                        bal_info = u_engine.get_account_balance()
+                        curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+                    except Exception:
+                        curr_eq = 0.0
+                    init_eq = curr_eq if (curr_eq > 0 and (tier / curr_eq <= 3.0 and curr_eq / tier <= 3.0)) else None
                     db.set_prop_firm_config(chat_id, enabled=True, tier=tier, phase=phase)
-                    db.reset_prop_firm_challenge(chat_id, tier=tier, phase=phase)
+                    db.reset_prop_firm_challenge(chat_id, tier=tier, phase=phase, initial_equity=init_eq)
                 elif sub_action in ["OFF", "STOP"]:
                     cfg = db.get_prop_firm_config(chat_id)
                     db.set_prop_firm_config(chat_id, enabled=False, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))
                 elif sub_action in ["RESET"]:
                     tier_arg = float(args[1]) if len(args) >= 2 else None
                     phase_arg = int(args[2]) if len(args) >= 3 else None
-                    db.reset_prop_firm_challenge(chat_id, tier=tier_arg, phase=phase_arg)
+                    cfg = db.get_prop_firm_config(chat_id)
+                    tier = tier_arg if tier_arg is not None else cfg.get("account_tier", 10000.0)
+                    phase = phase_arg if phase_arg is not None else cfg.get("challenge_phase", 1)
+                    u_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+                    try:
+                        bal_info = u_engine.get_account_balance()
+                        curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+                    except Exception:
+                        curr_eq = 0.0
+                    init_eq = curr_eq if (curr_eq > 0 and (tier / curr_eq <= 3.0 and curr_eq / tier <= 3.0)) else None
+                    db.reset_prop_firm_challenge(chat_id, tier=tier, phase=phase, initial_equity=init_eq)
                 elif sub_action in ["TIER"]:
                     new_tier = float(args[1]) if len(args) >= 2 else 10000.0
                     cfg = db.get_prop_firm_config(chat_id)

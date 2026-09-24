@@ -3979,7 +3979,7 @@ def update_prop_firm_tracking(
     conn.commit()
     conn.close()
 
-def reset_prop_firm_challenge(chat_id: int, tier: Optional[float] = None, phase: Optional[int] = None):
+def reset_prop_firm_challenge(chat_id: int, tier: Optional[float] = None, phase: Optional[int] = None, initial_equity: Optional[float] = None):
     """Resets tracking metrics back to clean initial challenge state."""
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -3989,13 +3989,14 @@ def reset_prop_firm_challenge(chat_id: int, tier: Optional[float] = None, phase:
     target_tier = float(tier) if tier is not None and float(tier) > 0 else float(cfg.get("account_tier", 10000.0))
     target_phase = int(phase) if phase is not None else int(cfg.get("challenge_phase", 1))
     target_pct = 10.0 if target_phase == 1 else (5.0 if target_phase == 2 else 0.0)
+    base_equity = float(initial_equity) if initial_equity is not None and float(initial_equity) > 0 else target_tier
     cursor.execute("""
         UPDATE prop_firm_challenge_config
         SET account_tier = ?, challenge_phase = ?, initial_balance = ?,
             high_water_mark = ?, daily_start_equity = ?, daily_date = ?,
             profit_target_pct = ?, status = 'ACTIVE', updated_at = ?
         WHERE chat_id = ?
-    """, (target_tier, target_phase, target_tier, target_tier, target_tier, today_str, target_pct, now_str, chat_id))
+    """, (target_tier, target_phase, base_equity, base_equity, base_equity, today_str, target_pct, now_str, chat_id))
     conn.commit()
     conn.close()
 
