@@ -3418,7 +3418,7 @@ def get_all_capital_users_overview() -> List[Dict[str, Any]]:
     try:
         cursor.execute("""
             SELECT c.chat_id, c.account_id, c.currency, c.is_demo, c.is_referral_verified, u.username,
-                   a.enabled, a.budget, a.max_positions, a.is_demo as auto_is_demo
+                   a.is_enabled, a.budget, a.max_positions, a.is_demo as auto_is_demo
             FROM user_capital_credentials c
             LEFT JOIN users u ON c.chat_id = u.chat_id
             LEFT JOIN capital_auto_config a ON c.chat_id = a.chat_id
