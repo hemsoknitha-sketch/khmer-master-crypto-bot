@@ -1089,6 +1089,42 @@ class CapitalComEngine:
 
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
         dir_u = direction.upper()
+
+        # Pillar 5: Global Portfolio Drawdown Circuit Breaker Guard (-2.5% Daily Loss Ceiling)
+        try:
+            import portfolio_circuit_breaker
+            is_cb_active, cb_reason, _ = portfolio_circuit_breaker.is_portfolio_circuit_breaker_active()
+            if is_cb_active:
+                return {
+                    "success": False,
+                    "error": f"LOCKED: {cb_reason}"
+                }
+        except Exception:
+            pass
+
+        # Pillar 1: Red Folder Economic Calendar Blackout Guard (30m Pre / 15m Post CPI/NFP/FOMC)
+        try:
+            import economic_calendar_guard
+            blackout_info = economic_calendar_guard.check_red_folder_blackout()
+            if blackout_info.get("is_blackout"):
+                return {
+                    "success": False,
+                    "error": f"LOCKED: Red Folder Economic Release '{blackout_info.get('event_name')}' active ({blackout_info.get('reason')}). Spread blowout shield engaged."
+                }
+        except Exception:
+            pass
+
+        # Pillar 2: Corporate Earnings Blackout Shield (48h Pre-Earnings Anti-Gap Guard)
+        try:
+            import earnings_calendar_filter
+            in_earn_bo, ed_str, rem_h = earnings_calendar_filter.is_asset_in_earnings_blackout(resolved_epic)
+            if in_earn_bo:
+                return {
+                    "success": False,
+                    "error": f"LOCKED: Corporate Earnings Blackout Shield active for {resolved_epic} (Earnings call in {rem_h}h: {ed_str}). Anti-gap protection engaged."
+                }
+        except Exception:
+            pass
         
         # 1. Run Quant Signal Evaluation
         analysis = self.evaluate_tradfi_quant_signal(resolved_epic)

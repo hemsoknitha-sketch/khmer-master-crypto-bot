@@ -21170,6 +21170,37 @@ class TelegramBotThread(BaseThread):
             min_hurdle = spread_cfg.get("min_target_spread_ratio", 10.0)
             spread_badge = f"🟢 ACTIVE ({min_hurdle:.0f}x Hurdle | R:R 1:6)" if is_spread_on else "⚪ OFF"
 
+            # Query 5 Apex Quant Pillars Live Status
+            ec_badge = "NORMAL 🟢"
+            cb_badge = "SAFE 🟢 (-2.5% Cap)"
+            ry_badge = "NEUTRAL ⚪"
+            try:
+                import economic_calendar_guard
+                ec_info = economic_calendar_guard.check_red_folder_blackout()
+                if ec_info.get("is_blackout"):
+                    ec_badge = f"FORCED WAIT ⏳ ({ec_info.get('event_name')})"
+            except Exception:
+                pass
+
+            try:
+                import portfolio_circuit_breaker
+                cb_active, cb_reason, _ = portfolio_circuit_breaker.is_portfolio_circuit_breaker_active()
+                if cb_active:
+                    cb_badge = "TRIPPED 🔴 (Locked 12h)"
+            except Exception:
+                pass
+
+            try:
+                import google_macro_satellite
+                sat_data = google_macro_satellite.fetch_google_macro_satellite_data()
+                ry_bias = sat_data.get("gold_real_yield_bias", "NEUTRAL")
+                if ry_bias == "STRONG_BULLISH":
+                    ry_badge = "+20% Gold BUY Boost 🟢"
+                elif ry_bias == "BEARISH_DRAG":
+                    ry_badge = "-20% Gold Drag 🔴"
+            except Exception:
+                pass
+
             if user_lang == 'khmer':
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
@@ -21195,6 +21226,12 @@ class TelegramBotThread(BaseThread):
                     f"🛢️ **Crude Oil (WTI) ៖** `{oil_p}` | Sp: `{oil_sp}`\n"
                     f"🏢 **Wall St Stocks ៖** Meta: `{meta_p}` | Google: `{googl_p}`\n"
                     f"🪙 **Crypto (ចុងសប្តាហ៍ 24/7) ៖** BTC: `{btc_p}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🏛️ **APEX QUANT 5 PILLARS (Wall Street Guard) ៖**\n"
+                    f"• **Pillar 1 Red Folder ៖** `{ec_badge}` (30m Pre / 15m Post CPI/NFP)\n"
+                    f"• **Pillar 2 Earnings Shield ៖** `ACTIVE 🟢 (48h Pre-Earnings Anti-Gap)`\n"
+                    f"• **Pillar 4 TIPS Real Yield ៖** `{ry_badge}`\n"
+                    f"• **Pillar 5 Portfolio Breaker ៖** `{cb_badge}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🛡️ **ប្រព័ន្ធការពារដើមទុនស្ថាប័ន (Zero Negligence) ៖**\n"
                     f"• **Breakeven Armor ៖** ចាក់សោ SL ពេលចំណេញ +4.8% ROI\n"
@@ -21233,6 +21270,12 @@ class TelegramBotThread(BaseThread):
                     f"🛢️ **Crude Oil (WTI):** `{oil_p}` | Sp: `{oil_sp}`\n"
                     f"🏢 **Wall St Equities:** Meta: `{meta_p}` | Google: `{googl_p}`\n"
                     f"🪙 **Crypto (Weekend 24/7):** BTC: `{btc_p}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🏛️ **APEX QUANT 5 PILLARS (Wall Street Guard):**\n"
+                    f"• **Pillar 1 Red Folder:** `{ec_badge}` (30m Pre / 15m Post CPI/NFP)\n"
+                    f"• **Pillar 2 Earnings Shield:** `ACTIVE 🟢 (48h Pre-Earnings Anti-Gap)`\n"
+                    f"• **Pillar 4 TIPS Real Yield:** `{ry_badge}`\n"
+                    f"• **Pillar 5 Portfolio Breaker:** `{cb_badge}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🛡️ **Institutional Capital Protection (Zero Negligence):**\n"
                     f"• **Breakeven Armor:** Locks SL at entry on +4.8% ROI\n"
