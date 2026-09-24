@@ -17,6 +17,7 @@ import time
 import json
 import requests
 from datetime import datetime
+from typing import Dict, Tuple, List, Optional, Any, Set
 
 # Reconfigure stdout for UTF-8 safety
 if hasattr(sys.stdout, 'reconfigure'):
