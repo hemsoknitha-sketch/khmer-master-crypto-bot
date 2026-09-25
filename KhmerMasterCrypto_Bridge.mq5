@@ -187,8 +187,14 @@ bool ConnectToBridge()
    if(!SocketConnect(g_socket, InpHost, InpPort, InpTimeoutMs))
    {
       g_last_error_code = GetLastError();
-      // Error 5273 = Host unreachable / Firewall blocked, 4014 = Function not allowed
-      PrintFormat("⚠️ [CONNECT FAILED] Unable to connect to %s:%d (Error: %d). Retrying...", InpHost, InpPort, g_last_error_code);
+      if(g_last_error_code == 4014)
+      {
+         PrintFormat("🚨 [PERMISSION ERROR 4014] MT5 blocked connection to %s:%d! Please go to Tools -> Options -> Expert Advisors -> check 'Allow WebRequest for listed URL' and add http://%s", InpHost, InpPort, InpHost);
+      }
+      else
+      {
+         PrintFormat("⚠️ [CONNECT FAILED] Unable to connect to %s:%d (Error: %d). Retrying...", InpHost, InpPort, g_last_error_code);
+      }
       SocketClose(g_socket);
       g_socket = INVALID_HANDLE;
       g_connected = false;
@@ -646,7 +652,9 @@ void UpdateHUD()
    }
    else
    {
-      if(g_last_error_code > 0)
+      if(g_last_error_code == 4014)
+         status_str = "📡 Status: 🔴 DISCONNECTED (Err 4014: Add IP in Tools->Options)";
+      else if(g_last_error_code > 0)
          status_str = StringFormat("📡 Status: 🔴 DISCONNECTED (Err: %d | Retrying...)", g_last_error_code);
       else
          status_str = "📡 Status: 🔴 DISCONNECTED (Auto-reconnecting...)";
