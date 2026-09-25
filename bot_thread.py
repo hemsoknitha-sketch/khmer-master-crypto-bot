@@ -5866,6 +5866,57 @@ class TelegramBotThread(BaseThread):
                     f"បានបិទ Capital Auto Trade សម្រាប់ User `{target_uid}` រួចរាល់!",
                     parse_mode="Markdown"
                 )
+            elif data == "btn_citadel_refresh":
+                import system_security_citadel as sc
+                try:
+                    await update.callback_query.answer("🔄 System Security Citadel Refreshed!")
+                except Exception:
+                    pass
+                card_text = sc.security_citadel.generate_citadel_status_card()
+                kb = [
+                    [
+                        InlineKeyboardButton("🔄 Refresh Citadel", callback_data="btn_citadel_refresh"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ]
+                if chat_id == 859271875:
+                    is_locked = sc.security_citadel.is_locked()
+                    btn_cb_lbl = "🟢 Release Lockdown" if is_locked else "🚨 Trigger Circuit Breaker"
+                    kb.insert(1, [InlineKeyboardButton(btn_cb_lbl, callback_data="btn_citadel_toggle_cb")])
+                try:
+                    await update.effective_message.edit_text(card_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb))
+                except Exception:
+                    await update.effective_message.reply_text(card_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb))
+            elif data == "btn_citadel_toggle_cb":
+                if chat_id != 859271875:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                import system_security_citadel as sc
+                if sc.security_citadel.is_locked():
+                    sc.security_citadel.release_emergency_circuit_breaker(chat_id)
+                else:
+                    sc.security_citadel.trigger_emergency_circuit_breaker(chat_id, "SUPER_ADMIN_INTERACTIVE_BUTTON")
+                try:
+                    await update.callback_query.answer("⚠️ Emergency Circuit Breaker Updated!", show_alert=True)
+                except Exception:
+                    pass
+                card_text = sc.security_citadel.generate_citadel_status_card()
+                kb = [
+                    [
+                        InlineKeyboardButton("🔄 Refresh Citadel", callback_data="btn_citadel_refresh"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ]
+                is_locked = sc.security_citadel.is_locked()
+                btn_cb_lbl = "🟢 Release Lockdown" if is_locked else "🚨 Trigger Circuit Breaker"
+                kb.insert(1, [InlineKeyboardButton(btn_cb_lbl, callback_data="btn_citadel_toggle_cb")])
+                try:
+                    await update.effective_message.edit_text(card_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb))
+                except Exception:
+                    await update.effective_message.reply_text(card_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb))
             elif data == "btn_cap_leadlag_toggle":
                 curr_state = db.is_capital_leadlag_enabled(chat_id)
                 new_state = not curr_state
@@ -20540,6 +20591,37 @@ class TelegramBotThread(BaseThread):
                 await update.effective_message.reply_text(f"❌ បានបដិសេធសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}`", parse_mode="Markdown")
                 return
 
+        async def citadel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🛡️ 5-Layer System Security Citadel & Latency Virtualizer (Invariant 41).
+            Displays live status across Infrastructure, Architectural Invariant Lock,
+            Quantitative Risk Fortress, 33 AI Swarm Latency Virtualizer, and Auto-Healer.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id: return
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import system_security_citadel as sc
+            card_text = sc.security_citadel.generate_citadel_status_card()
+
+            kb = [
+                [
+                    InlineKeyboardButton("🔄 Refresh Citadel", callback_data="btn_citadel_refresh"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ]
+            if chat_id == 859271875:
+                is_locked = sc.security_citadel.is_locked()
+                btn_cb_lbl = "🟢 Release Lockdown" if is_locked else "🚨 Trigger Circuit Breaker"
+                kb.insert(1, [InlineKeyboardButton(btn_cb_lbl, callback_data="btn_citadel_toggle_cb")])
+
+            await update.effective_message.reply_text(
+                card_text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(kb)
+            )
+
         async def capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -21844,6 +21926,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("paper_trading", paper_trading_command))
         self.app.add_handler(CommandHandler("admin_capital", admin_capital_command))
         self.app.add_handler(CommandHandler("admincapital", admin_capital_command))
+        self.app.add_handler(CommandHandler("citadel", citadel_command))
+        self.app.add_handler(CommandHandler("security", citadel_command))
+        self.app.add_handler(CommandHandler("security_citadel", citadel_command))
+        self.app.add_handler(CommandHandler("citadel_status", citadel_command))
 
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         from telegram.ext import CallbackQueryHandler

@@ -79,6 +79,7 @@ def get_public_bot_commands():
         BotCommand("stop", "🛑 Emergency Stop Trading & Market Close"),
         BotCommand("set_pin", "🔒 Configure 2FA Security PIN"),
         BotCommand("reset_pin", "🔒 2FA Security PIN Reset & Recovery"),
+        BotCommand("citadel", "🛡️ 5-Layer Security & Latency Virtualizer"),
     ]
 
 
