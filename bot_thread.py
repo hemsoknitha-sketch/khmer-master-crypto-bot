@@ -14409,7 +14409,7 @@ class TelegramBotThread(BaseThread):
                         f"• ទុនវិនិយោគ ៖ `${amount_usd:.2f} USD` (Max 2 Positions)\n"
                         f"• AI Consensus ៖ `32 Wall Street Models Scanning DexScreener & Birdeye...`\n"
                         f"• Honeypot Shield ៖ `Sub-Second Bytecode Verification Active (<15ms)...`\n"
-                        f"• Profit Armor ៖ `Breakeven Armor (+12%) + 3-Stage Profit Harvester`\n\n"
+                        f"• Profit Armor ៖ `Super Smart Trailing Lock (+18% Floor +5% Net) + 100% Top Exit`\n\n"
                         f"🎯 **កំពុងស្កេន និងបាញ់កាក់ Gem ទី ១ ភ្លាមៗ...**",
                         parse_mode="Markdown"
                     )
@@ -14467,8 +14467,8 @@ class TelegramBotThread(BaseThread):
                                 f"🔒 **Liquidity Lock ៖** `{lp_lock:.1f}% Locked`\n"
                                 f"{exec_line}\n"
                                 f"🛡️ **MEV Protection ៖** `{mev}` (គ្មានការលួច Front-run)\n"
-                                f"🌾 **Breakeven Armor™ ៖** `🟢 ACTIVE (Proprietary Capital Protection)`\n"
-                                f"💰 **Profit Harvester™ ៖** `🟢 ACTIVE (Multi-Stage Moonbag Ratchet)`\n"
+                                f"🌾 **Super Smart Trailing™ ៖** `🟢 ACTIVE (Completely Swap 100% at Top Gainer Trend)`\n"
+                                f"🛡️ **Capital Rescue™ ៖** `🟢 ACTIVE (Dynamic On-Chain Vitality & Rug Defense)`\n"
                                 f"💼 **Settlement Vault ៖** `{recipient_addr[:6]}...{recipient_addr[-4:]}`\n"
                                 f"🔗 **Tx Reference ៖** `{tx_h}`\n"
                                 f"{live_tx_line}\n\n"

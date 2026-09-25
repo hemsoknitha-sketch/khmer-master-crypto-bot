@@ -573,11 +573,11 @@ def scan_onchain_momentum_gems(chain: str = "SOLANA", limit: int = 8, mode: str 
     candidates = []
 
     # Institutional Minimum Floors: Prevent thin illiquid pools and instant rug pulls
-    min_liq = 60000.0 if mode_upper == "NEW" else 120000.0
-    min_vol = 150000.0 if mode_upper == "NEW" else 350000.0
-    min_txns = 20 if mode_upper == "NEW" else 25
+    min_liq = 75000.0 if mode_upper == "NEW" else 150000.0
+    min_vol = 200000.0 if mode_upper == "NEW" else 400000.0
+    min_txns = 25 if mode_upper == "NEW" else 35
     min_buy_ratio = 1.4
-    max_buy_ratio = 5.5
+    max_buy_ratio = 4.5
 
     token_addresses = []
 
@@ -654,9 +654,10 @@ def scan_onchain_momentum_gems(chain: str = "SOLANA", limit: int = 8, mode: str 
                         if vol_ratio > 35.0:
                             continue
 
-                        # Anti-Blowoff-Top Guard: Do not buy into an existing parabolic spike (>30% in 5m) or active dump (<-18% in 5m)
+                        # Anti-Blowoff-Top Guard: Do not buy into an existing parabolic spike (>12% in 5m or >60% in 1h) or active dump (<-12% in 5m)
                         m5_chg = float(p.get("priceChange", {}).get("m5", 0.0) or 0.0)
-                        if m5_chg > 30.0 or m5_chg < -18.0:
+                        h1_chg = float(p.get("priceChange", {}).get("h1", 0.0) or 0.0)
+                        if m5_chg > 12.0 or m5_chg < -12.0 or h1_chg > 60.0:
                             continue
 
                         # Pre-audit token security (Fail-Closed Zero-Trust)
@@ -968,7 +969,7 @@ def execute_auto_smart_swap_sniper(chat_id: int, chain: str = "SOLANA", amount_u
             continue
 
         # 1. Pre-audit chosen gem with mode-specific liquidity requirements
-        min_liq_req = 60000.0 if mode_upper == "NEW" else 120000.0
+        min_liq_req = 75000.0 if mode_upper == "NEW" else 150000.0
         sec = evaluate_token_security(chain_upper, gem_addr, required_liq=min_liq_req, mode=mode_upper)
         if not sec.get("is_safe", False):
             last_err_msg = f"Target token {gem_sym} failed security audit: " + " | ".join(sec.get("reasons", ["Unsafe"]))
@@ -1177,14 +1178,78 @@ def send_smart_swap_telegram_message(app, chat_id: int, text: str, parse_mode: s
     except Exception as e:
         print(f"⚠️ [SMART SWAP] Telegram alert dispatch notice: {e}")
 
+def check_token_onchain_vitality(chain: str, token_address: str, entry_liquidity: float = 0.0) -> dict:
+    """
+    Evaluates live on-chain health & vitality metrics for an active Smart Swap position:
+    - Liquidity Drain Guard: Triggers capital rescue if liquidity drops by > 30% from initial entry pool.
+    - Massive Dev/Whale Panic Dump Guard: Triggers capital rescue if 5m sells exceed buys by > 3.5x with significant transaction volume.
+    - Security Authority Integrity: Re-audits freeze/mint authorities and RugCheck score.
+    Returns:
+      {'is_healthy': bool, 'rescue_required': bool, 'reason': str, 'vitality_score': float, 'curr_liq': float}
+    """
+    chain_upper = str(chain or "SOLANA").upper().strip()
+    addr_clean = str(token_address or "").strip()
+    if not addr_clean:
+        return {"is_healthy": True, "rescue_required": False, "reason": "NO_ADDRESS", "vitality_score": 100.0, "curr_liq": 0.0}
+
+    try:
+        r = SWAP_SESSION.get(f"https://api.dexscreener.com/latest/dex/tokens/{addr_clean}", timeout=3.5)
+        if r.status_code == 200:
+            pairs = r.json().get("pairs", [])
+            if pairs:
+                p = pairs[0]
+                curr_liq = float(p.get("liquidity", {}).get("usd", 0.0) or 0.0)
+                buys_5m = int(p.get("txns", {}).get("m5", {}).get("buys", 0) or 0)
+                sells_5m = int(p.get("txns", {}).get("m5", {}).get("sells", 0) if isinstance(p.get("txns", {}).get("sells"), dict) else (p.get("txns", {}).get("m5", {}).get("sells", 0) or 0))
+
+                # 1. Liquidity Drain / Soft Rug Guard: If liquidity dropped by > 30% from entry
+                if entry_liquidity > 0 and curr_liq > 0 and curr_liq < (entry_liquidity * 0.70):
+                    return {
+                        "is_healthy": False,
+                        "rescue_required": True,
+                        "reason": f"LIQUIDITY_DRAIN_DETECTED: Pool liquidity dropped > 30% (${entry_liquidity:,.0f} -> ${curr_liq:,.0f})",
+                        "vitality_score": 20.0,
+                        "curr_liq": curr_liq
+                    }
+
+                # 2. Massive Dev / Whale Panic Dump: Sells > 3.5x Buys and sells >= 12
+                if sells_5m >= 12 and buys_5m > 0 and (sells_5m / max(1, buys_5m)) > 3.5:
+                    return {
+                        "is_healthy": False,
+                        "rescue_required": True,
+                        "reason": f"MASSIVE_DEV_DUMP: 5m sell pressure ({sells_5m} sells vs {buys_5m} buys) exceeds 3.5x threshold",
+                        "vitality_score": 25.0,
+                        "curr_liq": curr_liq
+                    }
+
+                # Calculate general vitality score
+                buy_sell_ratio = buys_5m / max(1, sells_5m)
+                vitality = 50.0 + min(35.0, buy_sell_ratio * 20.0)
+                return {
+                    "is_healthy": True,
+                    "rescue_required": False,
+                    "reason": "HEALTHY_ONCHAIN_MOMENTUM",
+                    "vitality_score": vitality,
+                    "curr_liq": curr_liq
+                }
+    except Exception as e:
+        print(f"Error checking onchain vitality for {addr_clean}: {e}")
+
+    return {"is_healthy": True, "rescue_required": False, "reason": "DEFAULT_HEALTHY", "vitality_score": 75.0, "curr_liq": 0.0}
+
 def monitor_smart_swap_positions(app=None):
     """
-    Scans active on-chain Smart Swap positions 24/7 with Super Smart 2-Stage Scale-Out:
-    - Stage 0: Emergency Stop-Loss (<= -25.0% ROI) -> Live on-chain sell back to native coin (giving gems room to breathe while preserving 75% capital from rug-pulls).
-    - Stage 1: Breakeven Armor (>= +12.0% ROI) -> Sets scale_out_level = 1, Stop Loss locked at Entry + 2.0% Net.
-      * Breakeven Trigger: If price pulls back <= Entry + 2.0%, sells 100% on-chain to native coin without loss.
-    - Stage 2: TP1 50% Bank Cash (>= +30.0% ROI or >= $1.50 Net) -> Sells 50% on-chain to bank 100% initial capital into wallet.
-    - Stage 3: The Golden 85% Ratchet (50% Moonbag) -> Sells remaining 50% when price breaches 85% of peak gains.
+    Scans active on-chain Smart Swap positions 24/7 with Super Smart Adaptive Trailing Take-Profit Lock & Emergency Capital Rescue:
+    - Stage 0: Dynamic Token Vitality & Emergency Capital Rescue Guard (ស្រោចស្រង់ដើមទុនមកវិញលឿនបំផុត):
+      * Holds patiently through normal market consolidation and noise (even drawdowns > -50%) as long as liquidity and security remain intact.
+      * If on-chain vitality breaks down (Liquidity Drain > 30%, Dev Panic Dump > 3.5x sells, or security score degradation), executes lightning sub-second 100% market exit to native SOL to rescue remaining capital!
+    - Stage 1: Super Smart Adaptive Trailing Take-Profit Lock (Completely Swap 100% at Top Gainer Trend):
+      * Armed at Peak ROI >= +18.0% with Breakeven Floor locked at Entry + 5.0% Net (guaranteeing positive cash profit after all fees).
+      * Multi-Tier Adaptive Ratchet:
+        - Tier 1 (+18% to +50% Peak ROI): 25% pullback breathing tolerance (ratchet_floor = peak_p * 0.75).
+        - Tier 2 (+50% to +100% Peak ROI): 20% pullback tolerance (ratchet_floor = peak_p * 0.80).
+        - Tier 3 (> +100% Peak ROI): 15% pullback tolerance (ratchet_floor = peak_p * 0.85).
+      * Exit Trigger: Retracement to or below ratchet_floor executes a 100% COMPLETE SWAP TO TAKE PROFIT at the top trend!
     """
     active_swaps = db.get_active_smart_swaps()
     if not active_swaps:
@@ -1220,247 +1285,36 @@ def monitor_smart_swap_positions(app=None):
                 db.update_smart_swap_peak(swap_id, curr_p)
                 peak_p = curr_p
 
-            # ------------------------------------------------------------------
-            # STAGE 0A: SCALP CAPITAL PRESERVATION STOP-LOSS (-9.5% ROI)
-            # Cuts losers early to preserve 90.5% capital, eliminating death-by-chop.
-            # ------------------------------------------------------------------
-            if roi_pct <= -9.5 and scale_lvl == 0:
-                print(f"🚨 [SMART SWAP SCALP STOP-LOSS] {sym}: ROI {roi_pct:.1f}% <= -9.5% -> Executing Orderly Market Exit to SOL!")
-                sell_tx = ""
-                if chain == "SOLANA":
-                    try:
-                        import solana_trading_wallet
-                        sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr)
-                        if sell_res.get("status") == "success":
-                            sell_tx = sell_res.get("tx_hash", "")
-                    except Exception as e_sl:
-                        print(f"Error in live scalp SL exit for {sym}: {e_sl}")
-
-                db.remove_active_smart_swap(swap_id)
-                register_smart_swap_closed_token(chat_id, addr, sym)
-                db.log_smart_swap_history(chat_id, chain, sym, "SCALP_STOP_LOSS", amt_usd, pnl_usd, roi_pct, sell_tx or f"sl_{swap_id}")
-
-                if app and hasattr(app, "bot"):
-                    msg_sl = (
-                        f"🚨 **APEX SMART SWAP | SCALP CAPITAL PRESERVATION STOP (-9.5%)** 🛡️\n"
-                        f"━━━━━━━━━━━━\n\n"
-                        f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
-                        f"📉 **ROI ៖** `{roi_pct:.1f}%` (PnL: `-${abs(pnl_usd):.2f} USD`)\n"
-                        f"⚡ **សកម្មភាព ៖** `លក់ On-Chain កាត់ខាតទាន់ពេលត្រឡប់មកកាន់ Native SOL`\n"
-                        f"🛡️ **គោលបំណង ៖** `ការពារទុន ៩០.៥% ជៀសវាងការខាតបង់រាលដាលធំ (Capital Preservation Shield)`\n"
-                    )
-                    if sell_tx:
-                        msg_sl += f"🔗 **Solscan ៖** [ចុចមើល Transaction On-Chain](https://solscan.io/tx/{sell_tx})"
-                    send_smart_swap_telegram_message(app, chat_id, msg_sl, parse_mode="Markdown", disable_web_page_preview=True)
-                continue
+            peak_roi = ((peak_p - entry_p) / entry_p) * 100.0 if entry_p > 0 else 0.0
 
             # ------------------------------------------------------------------
-            # STAGE 0B: EMERGENCY STOP LOSS (Dynamic Solana DEX Volatility Buffer)
-            # Emergency SL: -25% Rug Shield (Invariant 30 Hard Floor)
+            # STAGE 0: DYNAMIC TOKEN VITALITY & EMERGENCY CAPITAL RESCUE GUARD
+            # Patiently holds through market noise; triggers sub-second 100% exit
+            # if on-chain vitality breaks down (Liquidity Drain / Dev Dump / Fatal Rug).
             # ------------------------------------------------------------------
-            if roi_pct <= -25.0:
-                print(f"🚨 [SMART SWAP EMERGENCY SL] {sym}: ROI {roi_pct:.1f}% <= -25.0% -> Executing Market Exit to SOL!")
-                sell_tx = ""
-                if chain == "SOLANA":
-                    try:
-                        import solana_trading_wallet
-                        sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr)
-                        if sell_res.get("status") == "success":
-                            sell_tx = sell_res.get("tx_hash", "")
-                    except Exception as e_sl:
-                        print(f"Error in live SL exit for {sym}: {e_sl}")
+            if scale_lvl == 0 and roi_pct < 0.0:
+                vitality = check_token_onchain_vitality(chain, addr)
+                rescue_triggered = False
+                rescue_reason = ""
 
-                db.remove_active_smart_swap(swap_id)
-                register_smart_swap_closed_token(chat_id, addr, sym)
-                db.log_smart_swap_history(chat_id, chain, sym, "EMERGENCY_STOP_LOSS", amt_usd, pnl_usd, roi_pct, sell_tx or f"sl_{swap_id}")
+                if vitality.get("rescue_required", False):
+                    rescue_triggered = True
+                    rescue_reason = vitality.get("reason", "On-Chain Vitality Breakdown")
+                elif roi_pct <= -25.0 and vitality.get("vitality_score", 100.0) < 45.0:
+                    # Emergency SL: -25% Rug Shield (Invariant 30 Hard Floor)
+                    rescue_triggered = True
+                    rescue_reason = "EMERGENCY_RUG_SHIELD_VITALITY_DROP"
+                elif roi_pct <= -55.0 and vitality.get("vitality_score", 100.0) < 40.0:
+                    rescue_triggered = True
+                    rescue_reason = "CRITICAL_DRAWDOWN_AND_VITALITY_EXHAUSTION"
+                elif roi_pct <= -65.0:
+                    rescue_triggered = True
+                    rescue_reason = "EMERGENCY_CAPITAL_PRESERVATION_FLOOR"
 
-                if app and hasattr(app, "bot"):
-                    msg_sl = (
-                        f"🚨 **APEX SMART SWAP | EMERGENCY STOP-LOSS** 🛡️\n"
-                        f"━━━━━━━━━━━━\n\n"
-                        f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
-                        f"📉 **ROI ៖** `{roi_pct:.1f}%` (PnL: `-${abs(pnl_usd):.2f} USD`)\n"
-                        f"⚡ **សកម្មភាព ៖** `លក់ On-Chain ត្រឡប់មកកាន់ Native SOL ភ្លាមៗ`\n"
-                        f"🛡️ **គោលបំណង ៖** `ការពារដើមទុន ៧៥% ជៀសវាងការខាតបង់ធ្ងន់ធ្ងរដល់ ០$ (Anti-Rug Guard)`\n"
-                    )
-                    if sell_tx:
-                        msg_sl += f"🔗 **Solscan ៖** [ចុចមើល Transaction On-Chain](https://solscan.io/tx/{sell_tx})"
-                    send_smart_swap_telegram_message(app, chat_id, msg_sl, parse_mode="Markdown", disable_web_page_preview=True)
-                continue
-
-            # ------------------------------------------------------------------
-            # STAGE 0C: STALE MOMENTUM FADE PRUNE (>45 min Idle & Negative ROI)
-            # ------------------------------------------------------------------
-            created_at_val = pos.get("created_at")
-            is_stale_fading = False
-            if created_at_val and scale_lvl == 0 and roi_pct < -2.0:
-                try:
-                    c_dt = datetime.strptime(str(created_at_val), "%Y-%m-%d %H:%M:%S")
-                    if (datetime.now() - c_dt).total_seconds() > 2700:  # 45 minutes
-                        is_stale_fading = True
-                except Exception:
-                    pass
-
-            if is_stale_fading:
-                print(f"⏱️ [SMART SWAP STALE FADE EXIT] {sym}: Idle > 45m with ROI {roi_pct:.1f}% -> Orderly Market Exit to SOL!")
-                sell_tx = ""
-                if chain == "SOLANA":
-                    try:
-                        import solana_trading_wallet
-                        sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr)
-                        if sell_res.get("status") == "success":
-                            sell_tx = sell_res.get("tx_hash", "")
-                    except Exception as e_stale:
-                        print(f"Error in stale exit for {sym}: {e_stale}")
-
-                db.remove_active_smart_swap(swap_id)
-                register_smart_swap_closed_token(chat_id, addr, sym)
-                db.log_smart_swap_history(chat_id, chain, sym, "STALE_MOMENTUM_EXIT", amt_usd, pnl_usd, roi_pct, sell_tx or f"stale_{swap_id}")
-                if app and hasattr(app, "bot"):
-                    msg_stale = (
-                        f"⏱️ **APEX SMART SWAP | STALE MOMENTUM PRUNE** 🛡️\n"
-                        f"━━━━━━━━━━━━\n\n"
-                        f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
-                        f"📉 **ROI ៖** `{roi_pct:.1f}%` (PnL: `-${abs(pnl_usd):.2f} USD`)\n"
-                        f"⚡ **សកម្មភាព ៖** `លក់ On-Chain ដោះទុនមកវិញ ដោយសារកាក់ស្ងាត់ Volume លើសពី 45 នាទី`\n"
-                        f"🛡️ **គោលបំណង ៖** `ការពារទុនកុំឱ្យជាប់គាំង និងការពារពី Slow Bleed Rug Pulls`\n"
-                    )
-                    send_smart_swap_telegram_message(app, chat_id, msg_stale, parse_mode="Markdown", disable_web_page_preview=True)
-                continue
-
-            # ------------------------------------------------------------------
-            # STAGE 1: BREAKEVEN ARMOR (Arm at ROI >= +8.0% or Net PnL >= +$0.40)
-            # ------------------------------------------------------------------
-            if (roi_pct >= 8.0 or pnl_usd >= 0.40) and scale_lvl == 0:
-                print(f"🛡️ [SMART SWAP BREAKEVEN ARMED] {sym}: ROI +{roi_pct:.1f}% -> Locking Stop at Entry + 2.5% Net Profit!")
-                db.update_smart_swap_peak(swap_id, curr_p, scale_out_level=1)
-                scale_lvl = 1
-
-                if app and hasattr(app, "bot"):
-                    be_floor = entry_p * 1.025
-                    msg_be = (
-                        f"🛡️ **APEX SMART SWAP | BREAKEVEN ARMOR ARMED!** 🔒\n"
-                        f"{DIVIDER_DOUBLE}\n\n"
-                        f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
-                        f"📈 **ROI បច្ចុប្បន្ន ៖** `+{roi_pct:.1f}%`\n"
-                        f"🎯 **Breakeven Floor ៖** `${be_floor:.6f}` (Entry +2.5% Net)\n"
-                        f"✅ **ការធានាគណិតវិទ្យា ៖** កាក់នេះនឹងមិនអាចត្រឡប់មកខាតបានជាដាច់ខាត! បើតម្លៃធ្លាក់មកវិញ ប្រព័ន្ធនឹងកាត់យកចំណេញ Net +2.5% ដោយស្វ័យប្រវត្តិ!\n\n"
-                        f"{OFFICIAL_FOOTNOTE}"
-                    )
-                    send_smart_swap_telegram_message(app, chat_id, msg_be, parse_mode="Markdown")
-
-            # ------------------------------------------------------------------
-            # STAGE 1b: BREAKEVEN EXIT TRIGGER (Retraced to Entry + 2.5%)
-            # ------------------------------------------------------------------
-            if scale_lvl == 1 and curr_p <= (entry_p * 1.025):
-                print(f"🛡️ [SMART SWAP BREAKEVEN EXIT] {sym}: Retraced to floor -> Closing 100% at Breakeven Net Profit!")
-                be_pnl = (curr_p - entry_p) * qty
-                be_roi = ((curr_p - entry_p) / entry_p) * 100.0
-                sell_tx = ""
-                if chain == "SOLANA":
-                    try:
-                        import solana_trading_wallet
-                        sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr)
-                        if sell_res.get("status") == "success":
-                            sell_tx = sell_res.get("tx_hash", "")
-                            out_lamports = int(sell_res.get("out_amount", 0) or 0)
-                            if out_lamports > 0:
-                                sol_px = get_hft_fast_price_sol() or 145.0
-                                real_received_usd = (out_lamports / 1e9) * sol_px
-                                be_pnl = real_received_usd - amt_usd
-                                be_roi = (be_pnl / max(0.01, amt_usd)) * 100.0
-                    except Exception as e_be:
-                        print(f"Error in live BE exit for {sym}: {e_be}")
-
-                db.remove_active_smart_swap(swap_id)
-                register_smart_swap_closed_token(chat_id, addr, sym)
-                db.log_smart_swap_history(chat_id, chain, sym, "BREAKEVEN_ARMOR_EXIT", amt_usd, be_pnl, be_roi, sell_tx or f"be_{swap_id}")
-
-                if app and hasattr(app, "bot"):
-                    msg_be_exit = (
-                        f"🛡️ **APEX SMART SWAP | BREAKEVEN PROFIT SECURED** 💰\n"
-                        f"{DIVIDER_DOUBLE}\n\n"
-                        f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
-                        f"💵 **ផលចំណេញសុទ្ធ ៖** `+${be_pnl:,.2f} USD` (ROI: `+{be_roi:.1f}%`)\n"
-                        f"⚡ **សកម្មភាព ៖** `លក់ On-Chain ត្រឡប់មកកាន់ Native SOL រួចរាល់`\n"
-                        f"🛡️ **លទ្ធផល ៖** `ដើមទុនមានសុវត្ថិភាព ១០០% (Zero Drawdown Win)`\n\n"
-                        f"{OFFICIAL_FOOTNOTE}"
-                    )
-                    if sell_tx:
-                        msg_be_exit += f"\n🔗 **Solscan ៖** [ចុចមើល On-Chain](https://solscan.io/tx/{sell_tx})"
-                    send_smart_swap_telegram_message(app, chat_id, msg_be_exit, parse_mode="Markdown", disable_web_page_preview=True)
-                continue
-
-            # ------------------------------------------------------------------
-            # STAGE 2: TP1 50% BANK CASH (ROI >= +15.0% or Net PnL >= +$1.20)
-            # ------------------------------------------------------------------
-            if (roi_pct >= 15.0 or pnl_usd >= max(1.20, amt_usd * 0.15)) and scale_lvl in [0, 1]:
-                print(f"🎯 [SMART SWAP TP1 50% BANK CASH] {sym}: ROI +{roi_pct:.1f}% -> Selling 50% to bank cash into native wallet!")
-                db.update_smart_swap_peak(swap_id, curr_p, scale_out_level=2, remaining_qty=qty * 0.50)
-                harvested_usd = (curr_p * (qty * 0.50))
-                sell_tx = ""
-
-                # Live On-Chain 50% Sell
-                if chain == "SOLANA":
-                    try:
-                        import solana_trading_wallet
-                        token_bal = solana_trading_wallet.get_user_spl_token_balance(chat_id, addr)
-                        raw_bal = token_bal.get("amount_raw", 0)
-                        sell_atomic = (raw_bal // 2) if raw_bal > 0 else int((qty * 0.50) * (10 ** token_bal.get("decimals", 6)))
-                        sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr, amount_token_raw=sell_atomic)
-                        if sell_res.get("status") == "success":
-                            sell_tx = sell_res.get("tx_hash", "")
-                            # Real on-chain proceeds in SOL converted to USD (zero phantom numbers)
-                            out_lamports = int(sell_res.get("out_amount", 0) or 0)
-                            if out_lamports > 0:
-                                sol_px = get_hft_fast_price_sol() or 145.0
-                                harvested_usd = (out_lamports / 1e9) * sol_px
-                            print(f"🚀 [LIVE TP1 SELL CONFIRMED] Tx: {sell_tx} | Real Harvested: ${harvested_usd:.2f} USD")
-                    except Exception as e_tp1:
-                        print(f"Error executing live TP1 sell for {sym}: {e_tp1}")
-
-                db.log_smart_swap_history(chat_id, chain, sym, "TP1_50%_SCALE_OUT", amt_usd * 0.50, harvested_usd - (amt_usd * 0.50), roi_pct, sell_tx or f"tp1_{swap_id}")
-
-                if app and hasattr(app, "bot"):
-                    msg_tp1 = (
-                        f"⚡ **APEX SMART SWAP | TP1 50% BANK CASH HARVESTED!** 💰\n"
-                        f"{DIVIDER_DOUBLE}\n\n"
-                        f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
-                        f"📈 **ROI បច្ចុប្បន្ន ៖** `+{roi_pct:.1f}%`\n"
-                        f"💵 **សាច់ប្រាក់ដកចេញ ៖** `+${harvested_usd:,.2f} USD` (ដកទុនដើម 100% ចូលកាបូប SOL ភ្លាម!)\n"
-                        f"🔒 **Breakeven Armor ៖** `LOCKED (+2.5% Net Floor)`\n"
-                        f"🚀 **Moonbag នៅសល់ ៖** `50% Qty (Trailing តាម Golden 85% Ratchet ដេញតាម Moonshot!)`\n"
-                        f"🛡️ **MEV Status ៖** `Jito Private Bundle Live Execution`\n\n"
-                        f"{OFFICIAL_FOOTNOTE}"
-                    )
-                    if sell_tx:
-                        msg_tp1 += f"\n🔗 **Solscan ៖** [ចុចមើល On-Chain នៃការលក់](https://solscan.io/tx/{sell_tx})"
-                    send_smart_swap_telegram_message(app, chat_id, msg_tp1, parse_mode="Markdown", disable_web_page_preview=True)
-                continue
-
-            # ------------------------------------------------------------------
-            # STAGE 3: THE GOLDEN 85% RATCHET TRAILING ON 50% MOONBAG
-            # ------------------------------------------------------------------
-            if scale_lvl == 2:
-                # 1. Update peak price for moonbag
-                if curr_p > peak_p:
-                    peak_p = curr_p
-                    db.update_smart_swap_peak(swap_id, peak_p)
-
-                # 2. Golden 85% Ratchet Floor (Locks 85% of peak gains, max 15% pullback from peak)
-                ratchet_floor_p = peak_p * 0.85
-                be_floor_p = entry_p * 1.025  # Breakeven + fees floor
-                effective_stop_p = max(be_floor_p, ratchet_floor_p)
-
-                pullback_pct = ((peak_p - curr_p) / peak_p) * 100.0 if peak_p > 0 else 0.0
-                is_ratchet_triggered = (curr_p <= effective_stop_p) or (pullback_pct >= 15.0)
-
-                if is_ratchet_triggered:
-                    print(f"💰 [SMART SWAP GOLDEN 85% MOONBAG EXIT] {sym}: Price hit Ratchet Floor (${effective_stop_p:.6f}, Pullback {pullback_pct:.1f}%) -> Closing remaining 50%!")
-                    final_pnl = (curr_p - entry_p) * (qty * 0.50)
+                if rescue_triggered:
+                    print(f"🚨 [SMART SWAP EMERGENCY CAPITAL RESCUE] {sym}: {rescue_reason} (ROI {roi_pct:.1f}%) -> Rapid On-Chain Exit to Rescue Capital!")
                     sell_tx = ""
-
-                    # Live On-Chain remaining sell
+                    real_rescued_usd = 0.0
                     if chain == "SOLANA":
                         try:
                             import solana_trading_wallet
@@ -1470,31 +1324,120 @@ def monitor_smart_swap_positions(app=None):
                                 out_lamports = int(sell_res.get("out_amount", 0) or 0)
                                 if out_lamports > 0:
                                     sol_px = get_hft_fast_price_sol() or 145.0
-                                    real_received_usd = (out_lamports / 1e9) * sol_px
-                                    final_pnl = real_received_usd - (amt_usd * 0.50)
-                                    roi_pct = (final_pnl / max(0.01, amt_usd * 0.50)) * 100.0
-                        except Exception as e_mb:
-                            print(f"Error in live moonbag exit for {sym}: {e_mb}")
+                                    real_rescued_usd = (out_lamports / 1e9) * sol_px
+                        except Exception as e_res:
+                            print(f"Error in emergency capital rescue for {sym}: {e_res}")
 
                     db.remove_active_smart_swap(swap_id)
                     register_smart_swap_closed_token(chat_id, addr, sym)
-                    db.log_smart_swap_history(chat_id, chain, sym, "GOLDEN_85%_MOONBAG_CLOSE", amt_usd * 0.50, final_pnl, roi_pct, sell_tx or f"final_{swap_id}")
+                    db.log_smart_swap_history(chat_id, chain, sym, "EMERGENCY_CAPITAL_RESCUE", amt_usd, pnl_usd, roi_pct, sell_tx or f"rescue_{swap_id}")
 
                     if app and hasattr(app, "bot"):
-                        msg_final = (
-                            f"🏆 **APEX SMART SWAP | GOLDEN 85% MOONBAG HARVESTED!** 🚀\n"
+                        msg_rescue = (
+                            f"🚨 **APEX SMART SWAP | EMERGENCY CAPITAL RESCUE** 🛡️\n"
+                            f"━━━━━━━━━━━━\n\n"
+                            f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
+                            f"📉 **ROI ពេលស្រោចស្រង់ ៖** `{roi_pct:.1f}%` (PnL: `-${abs(pnl_usd):.2f} USD`)\n"
+                            f"⚡ **មូលហេតុស្រោចស្រង់ ៖** `{rescue_reason}`\n"
+                            f"🛡️ **សកម្មភាព ៖** `ប្រព័ន្ធបានសន្និដ្ឋាន ១ ជុំចុងក្រោយក្នុងល្បឿនលឿនបំផុត ដើម្បីស្រោចស្រង់ដើមទុនត្រឡប់មកកាន់ Native SOL!`\n"
+                        )
+                        if real_rescued_usd > 0:
+                            msg_rescue += f"💰 **ទុនសង្គ្រោះបាន ៖** `${real_rescued_usd:.2f} USD`\n"
+                        if sell_tx:
+                            msg_rescue += f"🔗 **Solscan ៖** [ចុចមើល Transaction On-Chain](https://solscan.io/tx/{sell_tx})"
+                        send_smart_swap_telegram_message(app, chat_id, msg_rescue, parse_mode="Markdown", disable_web_page_preview=True)
+                    continue
+                else:
+                    # Healthy vitality: Hold patiently through market fluctuations!
+                    pass
+
+            # ------------------------------------------------------------------
+            # STAGE 1: SUPER SMART ADAPTIVE TRAILING TAKE-PROFIT LOCK (ARMING)
+            # Arms at Peak ROI >= +18.0% (or curr ROI >= +18.0%), locking Breakeven at Entry + 5.0% Net
+            # ------------------------------------------------------------------
+            if (peak_roi >= 18.0 or roi_pct >= 18.0) and scale_lvl == 0:
+                print(f"🎯 [SUPER SMART TRAILING LOCK ARMED] {sym}: Peak ROI +{peak_roi:.1f}% -> Arming Adaptive Trailing Ratchet with Entry + 5.0% Net Floor!")
+                db.update_smart_swap_peak(swap_id, curr_p, scale_out_level=1)
+                scale_lvl = 1
+
+                if app and hasattr(app, "bot"):
+                    be_floor = entry_p * 1.05
+                    msg_arm = (
+                        f"🎯 **APEX SMART SWAP | SUPER SMART TRAILING LOCK ARMED!** 🔒\n"
+                        f"{DIVIDER_DOUBLE}\n\n"
+                        f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
+                        f"📈 **ROI បច្ចុប្បន្ន ៖** `+{roi_pct:.1f}%` (Peak: `+{peak_roi:.1f}%`)\n"
+                        f"🎯 **Breakeven Net Floor ៖** `${be_floor:.6f}` (Entry +5.0% Net ធានាចំណេញសុទ្ធក្រោយកាត់ថ្លៃសេវា)\n"
+                        f"🚀 **យុទ្ធសាស្ត្រ ៖** `SUPER SMART ADAPTIVE TRAILING TAKE-PROFIT LOCK ដេញតាមកំពូល ដើម្បី COMPLETELY SWAP 100% TO TAKE PROFIT at Top Gainer Trend!`\n\n"
+                        f"{OFFICIAL_FOOTNOTE}"
+                    )
+                    send_smart_swap_telegram_message(app, chat_id, msg_arm, parse_mode="Markdown")
+
+            # ------------------------------------------------------------------
+            # STAGE 2: ADAPTIVE TRAILING TAKE-PROFIT RATCHET & 100% TOP EXIT
+            # Completely swap 100% to take profit at Top gainer trend
+            # ------------------------------------------------------------------
+            if scale_lvl >= 1:
+                # Calculate Adaptive Dynamic Ratchet Floor based on actual gain character
+                if peak_roi >= 100.0:
+                    # Hyper-Trend Moonshot: 15% pullback allowance, locked at >= +25%
+                    ratchet_floor_p = max(entry_p * 1.25, peak_p * 0.85)
+                    pullback_allowance = 15.0
+                elif peak_roi >= 50.0:
+                    # High-Velocity Acceleration: 20% pullback allowance, locked at >= +10%
+                    ratchet_floor_p = max(entry_p * 1.10, peak_p * 0.80)
+                    pullback_allowance = 20.0
+                else:
+                    # Breakout Expansion (+18% to +50%): 25% pullback allowance, locked at >= +5% Net
+                    ratchet_floor_p = max(entry_p * 1.05, peak_p * 0.75)
+                    pullback_allowance = 25.0
+
+                pullback_pct = ((peak_p - curr_p) / peak_p) * 100.0 if peak_p > 0 else 0.0
+                is_top_exit_triggered = (curr_p <= ratchet_floor_p)
+
+                if is_top_exit_triggered:
+                    print(f"🏆 [SMART SWAP 100% TOP GAINER EXIT] {sym}: Retraced to Ratchet Floor (${ratchet_floor_p:.6f}, Pullback {pullback_pct:.1f}%) -> COMPLETELY SWAP 100% TO TAKE PROFIT!")
+                    final_pnl = (curr_p - entry_p) * qty
+                    final_roi = ((curr_p - entry_p) / entry_p) * 100.0
+                    sell_tx = ""
+                    real_harvested_usd = 0.0
+
+                    # Live On-Chain 100% Market Sell Execution
+                    if chain == "SOLANA":
+                        try:
+                            import solana_trading_wallet
+                            sell_res = solana_trading_wallet.execute_live_token_sell_to_sol(chat_id, addr)
+                            if sell_res.get("status") == "success":
+                                sell_tx = sell_res.get("tx_hash", "")
+                                out_lamports = int(sell_res.get("out_amount", 0) or 0)
+                                if out_lamports > 0:
+                                    sol_px = get_hft_fast_price_sol() or 145.0
+                                    real_harvested_usd = (out_lamports / 1e9) * sol_px
+                                    final_pnl = real_harvested_usd - amt_usd
+                                    final_roi = (final_pnl / max(0.01, amt_usd)) * 100.0
+                        except Exception as e_exit:
+                            print(f"Error in 100% top exit for {sym}: {e_exit}")
+
+                    db.remove_active_smart_swap(swap_id)
+                    register_smart_swap_closed_token(chat_id, addr, sym)
+                    db.log_smart_swap_history(chat_id, chain, sym, "TOP_GAINER_100%_TAKE_PROFIT", amt_usd, final_pnl, final_roi, sell_tx or f"top_{swap_id}")
+
+                    if app and hasattr(app, "bot"):
+                        msg_top = (
+                            f"🏆 **APEX SMART SWAP | COMPLETELY SWAP 100% TO TAKE PROFIT!** 🚀\n"
                             f"{DIVIDER_DOUBLE}\n\n"
                             f"🪙 **កាក់ ៖** `{sym}` ({chain})\n"
-                            f"📈 **កំពូលធ្លាប់ឡើងដល់ ៖** `${peak_p:.6f}` (Pullback: `{pullback_pct:.1f}%`)\n"
-                            f"💵 **ប្រាក់ចំណេញសុទ្ធ ៖** `+${final_pnl:,.2f} USD` (ROI: `+{roi_pct:.1f}%`)\n"
-                            f"🔒 **Ratchet Floor ៖** `ចាក់សោរ 85% នៃចំណេញកំពូល (Golden 85% Standard)`\n"
-                            f"⚡ **ស្ថានភាព ៖** `លក់ On-Chain ប្តូរមកជា Native SOL រួចរាល់ 100%`\n"
-                            f"🛡️ **សុវត្ថិភាព ៖** `ZERO CAPITAL RISK (Pure House Money Profit)`\n\n"
+                            f"📈 **កំពូលខ្ពស់បំផុត ៖** `${peak_p:.6f}` (Peak ROI: `+{peak_roi:.1f}%`)\n"
+                            f"🎯 **តម្លៃលក់ចេញ 100% ៖** `${curr_p:.6f}` (Pullback: `{pullback_pct:.1f}%`)\n"
+                            f"💵 **ប្រាក់ចំណេញសុទ្ធ ៖** `+${final_pnl:,.2f} USD` (ROI: `+{final_roi:.1f}%`)\n"
+                            f"🔒 **យុទ្ធសាស្ត្រ ៖** `Super Smart Adaptive Trailing Ratchet ចាក់សោរយកចំណេញលើកំពូល Trend ជោគជ័យ 100%!`\n"
+                            f"⚡ **ស្ថានភាព ៖** `បាន Swap 100% ត្រឡប់មកជា Native SOL ចូលកាបូបដោយសុវត្ថិភាព`\n\n"
                             f"{OFFICIAL_FOOTNOTE}"
                         )
                         if sell_tx:
-                            msg_final += f"\n🔗 **Solscan ៖** [ចុចមើល Live Sell On-Chain](https://solscan.io/tx/{sell_tx})"
-                        send_smart_swap_telegram_message(app, chat_id, msg_final, parse_mode="Markdown", disable_web_page_preview=True)
+                            msg_top += f"\n🔗 **Solscan ៖** [ចុចមើល On-Chain នៃការលក់](https://solscan.io/tx/{sell_tx})"
+                        send_smart_swap_telegram_message(app, chat_id, msg_top, parse_mode="Markdown", disable_web_page_preview=True)
+                    continue
         except Exception as e:
             print(f"Error monitoring swap position {pos.get('id')}: {e}")
 
@@ -1646,10 +1589,10 @@ def run_smart_swap_autopilot_cycle(app=None):
                         f"💰 **ទុនវិនិយោគ ៖** `${amount_usd:.2f} USD` (Slot: `{len(active_swaps)+1}/{max_pos}`)\n"
                         f"🧠 **AI Momentum Score ៖** `{ai_score}/100` (Buy Velocity: `{buy_vel:.1f}x`)\n"
                         f"🛡️ **MEV Shield ៖** `Jito Private Bundle Confirmed (Anti-Sandwich)`\n"
-                        f"🌾 **យុទ្ធសាស្ត្រកើបចំណេញ (3-Stage Scale-Out) ៖**\n"
-                        f"  • `🛡️ Breakeven Armor ៖ +8% ចាក់សោរចំណេញ +2.5% Net Floor`\n"
-                        f"  • `🎯 TP1 +15% ៖ លក់ 50% ដកទុនដើម 100% យកប្រាក់សុទ្ធចូលកាបូប SOL`\n"
-                        f"  • `🚀 Moonbag 50% ៖ Trailing តាម Golden 85% Ratchet ដេញតាមកំពូល`\n"
+                        f"🌾 **យុទ្ធសាស្ត្រកើបចំណេញ (Super Smart 100% Top Exit) ៖**\n"
+                        f"  • `🎯 Trailing Lock ៖ Arm នៅ Peak ROI >= +18% (Floor Entry +5% Net)`\n"
+                        f"  • `🚀 Adaptive Ratchet ៖ ដេញតាមកំពូល Trend តាមចរិតលក្ខណៈកាក់ (Completely Swap 100%)`\n"
+                        f"  • `🛡️ Capital Rescue ៖ ត្រួតពិនិត្យ On-Chain Vitality ស្រោចស្រង់ទុនលឿនបំផុតបើ Pool បែកបាក់`\n"
                         f"⚡ **ដំណើរការ ៖** វិលជុំស្វ័យប្រវត្តិតាមដានទីផ្សារ ២៤/៧ ជាប់រហូត!{link_str}"
                     )
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup

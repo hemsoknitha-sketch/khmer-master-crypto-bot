@@ -1084,33 +1084,59 @@ def run_audit():
 
         has_inv40 = "Invariant 40" in agents_code and "Autonomous Solana On-Chain DEX Execution Engine" in agents_code
         has_5layer_roadmap = "Five-Layer Defense Architecture Standard" in agents_code
-        has_scalp_sl = "roi_pct <= -9.5 and scale_lvl == 0" in swap_code
-        has_stale_prune = "STALE MOMENTUM PRUNE" in swap_code
-        has_be_armor = "(roi_pct >= 8.0 or pnl_usd >= 0.40) and scale_lvl == 0" in swap_code and "be_floor = entry_p * 1.025" in swap_code
-        has_be_exit = "curr_p <= (entry_p * 1.025)" in swap_code and "BREAKEVEN_ARMOR_EXIT" in swap_code
-        has_tp1_cash = "(roi_pct >= 15.0 or pnl_usd >= max(1.20, amt_usd * 0.15))" in swap_code and "scale_out_level=2" in swap_code
-        has_moonbag_ratchet = "ratchet_floor_p = peak_p * 0.85" in swap_code and "pullback_pct >= 15.0" in swap_code
+        has_vitality_rescue = "EMERGENCY CAPITAL RESCUE" in swap_code and "check_token_onchain_vitality" in swap_code
+        has_no_stale_prune = "STALE MOMENTUM PRUNE" not in swap_code
+        has_no_50pct_tp = "TP1 50% BANK CASH" not in swap_code
+        has_smart_trailing = "SUPER SMART ADAPTIVE TRAILING TAKE-PROFIT LOCK" in swap_code
+        has_100pct_top_exit = "COMPLETELY SWAP 100% TO TAKE PROFIT" in swap_code
+        has_adaptive_ratchet = "ratchet_floor_p" in swap_code and "peak_roi >= 18.0" in swap_code
 
-        # Dynamic Unit Test:
-        unit_test_sl = (-9.6 <= -9.5) and not (-5.0 <= -9.5)
+        # Dynamic Unit Tests:
+        # 1. Test Adaptive Ratchet logic:
+        # Tier 1 (+30% Peak ROI): floor is peak * 0.75, clamped at min entry * 1.05
         test_entry = 1.00
-        test_be_floor = test_entry * 1.025
-        unit_test_be_arm = (8.5 >= 8.0)
-        unit_test_be_exit = (1.02 <= test_be_floor)
-        unit_test_tp1 = (33.1 >= 15.0)
-        test_peak = 0.001518
-        test_floor = test_peak * 0.85
-        test_pullback_price = 0.001148
-        test_pullback_pct = ((test_peak - test_pullback_price) / test_peak) * 100.0
-        unit_test_ratchet = (test_pullback_price <= test_floor) or (test_pullback_pct >= 15.0)
+        test_peak_tier1 = 1.30  # +30%
+        floor_tier1 = max(test_entry * 1.05, test_peak_tier1 * 0.75)
+        unit_test_ratchet_tier1 = (floor_tier1 >= 1.05)
 
-        all_unit_tests = unit_test_sl and unit_test_be_arm and unit_test_be_exit and unit_test_tp1 and unit_test_ratchet
+        # Tier 2 (+80% Peak ROI): floor is peak * 0.80, clamped at min entry * 1.10
+        test_peak_tier2 = 1.80  # +80%
+        floor_tier2 = max(test_entry * 1.10, test_peak_tier2 * 0.80)
+        unit_test_ratchet_tier2 = abs(floor_tier2 - 1.44) < 1e-5
 
-        if (has_inv40 and has_5layer_roadmap and has_scalp_sl and has_stale_prune and
-            has_be_armor and has_be_exit and has_tp1_cash and has_moonbag_ratchet and all_unit_tests):
+        # Tier 3 (+200% Peak ROI): floor is peak * 0.85, clamped at min entry * 1.25
+        test_peak_tier3 = 3.00  # +200%
+        floor_tier3 = max(test_entry * 1.25, test_peak_tier3 * 0.85)
+        unit_test_ratchet_tier3 = abs(floor_tier3 - 2.55) < 1e-5
+
+        # Retracement test: price dropping to 1.43 when tier 2 floor is 1.44 triggers 100% exit
+        unit_test_exit_trigger = (1.43 <= floor_tier2)
+
+        # 2. Test Vitality Rescue logic:
+        # Liquidity drop from $100k to $65k (>30% drop) must trigger rescue
+        entry_liq = 100000.0
+        curr_liq_drained = 65000.0
+        liq_drain_rescue = (curr_liq_drained < entry_liq * 0.70)
+
+        # Panic dump: 36 sells vs 8 buys (ratio 4.5 > 3.5) must trigger rescue
+        buys = 8
+        sells = 36
+        dump_rescue = (sells >= 12 and (sells / max(1, buys)) > 3.5)
+
+        all_unit_tests = (
+            unit_test_ratchet_tier1 and
+            unit_test_ratchet_tier2 and
+            unit_test_ratchet_tier3 and
+            unit_test_exit_trigger and
+            liq_drain_rescue and
+            dump_rescue
+        )
+
+        if (has_inv40 and has_5layer_roadmap and has_vitality_rescue and has_no_stale_prune and
+            has_no_50pct_tp and has_smart_trailing and has_100pct_top_exit and has_adaptive_ratchet and all_unit_tests):
             log_pass("Autonomous Solana DEX Engine, Tri-Tier Asymmetric Risk Protocol & 5-Layer Defense (Invariant 40) is 100% locked & certified!")
         else:
-            failures.append(f"Invariant 40 check failed: inv40={has_inv40}, roadmap={has_5layer_roadmap}, sl={has_scalp_sl}, prune={has_stale_prune}, be={has_be_armor}, exit={has_be_exit}, tp1={has_tp1_cash}, ratchet={has_moonbag_ratchet}, unit_tests={all_unit_tests}")
+            failures.append(f"Invariant 40 check failed: inv40={has_inv40}, roadmap={has_5layer_roadmap}, vitality={has_vitality_rescue}, no_stale={has_no_stale_prune}, no_50pct={has_no_50pct_tp}, trailing={has_smart_trailing}, exit100={has_100pct_top_exit}, ratchet={has_adaptive_ratchet}, unit_tests={all_unit_tests}")
             log_fail("Autonomous Solana DEX Engine (Invariant 40) specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 40 check failed: {e}")

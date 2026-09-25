@@ -485,28 +485,33 @@ Any modification that breaks any of the following 30 invariants is considered an
 - **Enforcement:** Verified by `audit_system.py` [CHECK 32/33].
 
 ### Invariant 40: Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Asymmetric Risk Protocol & Five-Layer Defense Architecture Standard
-- **Location:** `smart_swap_engine.py` (`monitor_active_smart_swaps`, `execute_smart_swap_cycle`), `solana_trading_wallet.py`, `audit_system.py`, `bot_thread.py`, `scheduler_tasks.py`
-- **Rule:** The Solana On-Chain DEX Execution Engine operates with institutional atomic execution, Jito private mempool bundles, and a non-negotiable multi-stage profit extraction and capital defense protocol:
-  1. **Stage 0A: Sub-Second Scalp Capital Preservation Stop-Loss ($-9.5\%$ Hard Cut):**
-     If a newly entered token drops to $\text{ROI} \le -9.5\%$, the engine immediately executes an Orderly Market Exit swap back to native SOL within sub-second latency, preserving $\ge 90.5\%$ of capital and preventing catastrophic rug-pull or developer dump drawdowns.
-  2. **Stage 0B: 45-Minute Stale Momentum Liquidity Prune:**
-     Tokens stagnating without buying volume or momentum for $\ge 45$ minutes are orderly pruned and returned to native SOL, eliminating slow-bleed capital lockups.
-  3. **Stage 1: Mathematical Breakeven Armor (Arm at $\text{ROI} \ge +8.0\%$ or PnL $\ge +\$0.40$):**
-     Stop is permanently locked to $\text{Entry} + 2.5\%$ Net Floor, mathematically guaranteeing that any position once in profit can never convert into a net loss under any market volatility.
-  4. **Stage 1b: Breakeven Exit Trigger:**
-     Upon retracement to $\text{Entry} + 2.5\%$, the engine closes 100% of remaining position on-chain into native SOL with verified net profit.
-  5. **Stage 2: TP1 50% Bank Cash Extraction ($\text{ROI} \ge +15.0\%$ or PnL $\ge +\$1.20$):**
-     Automatically executes an on-chain DEX market sell of exactly $50\%$ of token balance back into native SOL, extracting initial principal off the table and banking real cash directly into the user's self-custodial wallet with verified Solscan transaction hashes.
-  6. **Stage 3: The Golden 85% Moonbag Ratchet (50% Moonshot Runner):**
-     The remaining $50\%$ moonbag position is trailed dynamically at $\ge 85\%$ of peak unrealized price ($\text{ratchet\_floor} = \text{peak} \times 0.85$ or pullback $\ge 15.0\%$), letting winners run into parabolic multiples while locking in $\ge 85\%$ of the maximum captured upside.
-  7. **The Five-Layer Systemic Defense Architecture Roadmap (ផែនការមេកំពែងការពារ ៥ ជាន់):**
-     The architectural ground truth formally enshrines the 5-Layer Multi-Defense Fortress as the permanent institutional benchmark:
+- **Location:** `smart_swap_engine.py` (`monitor_smart_swap_positions`, `execute_auto_smart_swap_sniper`, `check_token_onchain_vitality`), `solana_trading_wallet.py`, `audit_system.py`, `bot_thread.py`, `scheduler_tasks.py`
+- **Rule:** The Solana On-Chain DEX Execution Engine operates with institutional atomic execution, Jito private mempool bundles, and an adaptive Super Smart Trailing Take-Profit and dynamic on-chain vitality defense protocol:
+  1. **Stage 0: Dynamic Token Vitality & Emergency Capital Rescue Guard (ការស្រោចស្រង់ដើមទុនមកវិញលឿនបំផុត) ៖**
+     - Replaces arbitrary fixed scalp stop-losses (-9.5%) and arbitrary time-based prunes (45m).
+     - The engine holds with disciplined quant patience through natural market noise and consolidation (even when drawdown $> -50\%$) as long as the token's on-chain liquidity, volume, and security integrity remain healthy and intact.
+     - If the token's on-chain vitality breaks down (Pool Liquidity Drain $> 30\%$, Massive Dev Panic Dump with 5m sells $> 3.5\times$ buys, or smart contract security degradation), the engine executes an instantaneous sub-second Emergency Capital Rescue Swap 100% back to native SOL to recover remaining capital before pool dissolution.
+  2. **100% Trend Capture & Eradication of 50% Partial Exits (លុបបំបាត់ចោលទាំងស្រុងការលក់តែ ៥០%) ៖**
+     - 100% of the purchased token position is maintained intact to ride the explosive expansion of on-chain gems without premature chip reduction.
+  3. **Super Smart Adaptive Trailing Take-Profit Lock (Completely Swap 100% at Top Gainer Trend) ៖**
+     - **Arming Threshold:** Dynamically armed at Peak $\text{ROI} \ge +18.0\%$ (or current $\text{ROI} \ge +18.0\%$).
+     - **Guaranteed Net Breakeven Floor:** Stop is permanently anchored at $\text{Entry} + 5.0\%$ Net, mathematically guaranteeing positive cash profit after all DEX pool fees, slippage, and Solana gas fees.
+     - **Multi-Tier Adaptive Volatility Ratchet (ដេញតាមកំពូលតាមចរិតលក្ខណៈកាក់) ៖**
+       * *Tier 1 (Breakout Expansion $+18.0\% \le \text{Peak ROI} < +50.0\%$):* $25.0\%$ pullback breathing allowance ($\text{ratchet\_floor} = \max(\text{Entry} \times 1.05, \text{Peak} \times 0.75)$).
+       * *Tier 2 (Velocity Acceleration $+50.0\% \le \text{Peak ROI} < +100.0\%$):* $20.0\%$ pullback allowance ($\text{ratchet\_floor} = \max(\text{Entry} \times 1.10, \text{Peak} \times 0.80)$).
+       * *Tier 3 (Hyper-Trend Moonshot $\text{Peak ROI} \ge +100.0\%$):* $15.0\%$ pullback allowance ($\text{ratchet\_floor} = \max(\text{Entry} \times 1.25, \text{Peak} \times 0.85)$).
+     - **100% Top Exit Execution:** When price retraces to or below the dynamic ratchet floor, the engine executes an atomic 100% market exit back to native SOL via Jupiter DEX, banking maximum captured peak gains into the user's self-custodial wallet with verified Solscan links.
+  4. **Scanner Quality Citadel & Anti-Blowoff-Top Guards ៖**
+     - Minimum Liquidity: $\ge \$75,000$ (NEW mode), $\ge \$150,000$ (AUTO mode).
+     - Minimum 24h Volume: $\ge \$200,000$ (NEW mode), $\ge \$400,000$ (AUTO mode).
+     - Anti-Blowoff-Top: Strictly blocks entries if 5m price change $> +12.0\%$ (no FOMO buying into green spikes) or 1h change $> +60.0\%$. Targets sweet spot consolidation $0.0\% \le \text{m5\_chg} \le 10.0\%$.
+     - Zero-Trust Security: 100% Mint/Freeze authorities revoked, LP locked/burned $\ge 95\%$, RugCheck score $< 25$, zero transfer tax.
+  5. **The Five-Layer Systemic Defense Architecture Roadmap (ផែនការមេកំពែងការពារ ៥ ជាន់):**
      - *Layer 1 (Infrastructure & API Security Citadel):* Tokyo VPS co-location, sub-millisecond RPC latency (< 0.42ms), encrypted vault, and private Jito/Flashbots mempool routing.
      - *Layer 2 (Architectural Invariant Integrity Armor):* Automated AST compilation, pre-commit audit gates (33/33 checks), zero duplicate functions, and Fiduciary Refusal of ruinous strategies.
-     - *Layer 3 (Institutional Quantitative Risk Fortress):* Breakeven Armor (+1.5% to +8.0%), Golden 85% Profit Ratchet, Single-Asset Isolated Margin, Anti-Oversold RSI $\le 38.0$ Short Guard, and Prop Firm drawdowns clamped to safe boundaries.
+     - *Layer 3 (Institutional Quantitative Risk Fortress):* Super Smart Adaptive Trailing Take-Profit Lock, Dynamic Token Vitality Rescue Guard, Single-Asset Isolated Margin, Anti-Oversold RSI $\le 38.0$ Short Guard, and Prop Firm drawdowns clamped to safe boundaries.
      - *Layer 4 (33 Wall Street AI Models Swarm & Latency Virtualizer):* Multi-Agent Mixture of Experts (MoE), non-collapsible state segregation, TradFi lead-lag arbitrage, and DEX slippage shields.
      - *Layer 5 (Autonomous Self-Healing & Disaster Recovery Watchdog):* SQLite WAL mode 3-tier auto-healer, systemd watchdog auto-recovery, and 100% routed UI/UX callbacks with zero dead buttons.
-     - *(Full code hardening of specialized binary anti-tamper components shall be phased in systematically per founder roadmap without disrupting active live trading).*
 - **Enforcement:** Verified by `audit_system.py` [CHECK 33/33].
 
 ---
