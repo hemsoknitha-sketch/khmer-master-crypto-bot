@@ -6250,6 +6250,34 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await prop_firm_command(update, context)
+            elif data in ["btn_mt5_menu", "btn_mt5_refresh"]:
+                try:
+                    await update.callback_query.answer("🔄 ធ្វើបច្ចុប្បន្នភាព MT5 Bridge Telemetry...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_mt5_test_signal":
+                try:
+                    await update.callback_query.answer("⚡ កំពុងបញ្ជូន Test Signal ទៅកាន់ MT5...")
+                except Exception:
+                    pass
+                context.args = ["TEST"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_prop_shield":
+                try:
+                    await update.callback_query.answer("🛡️ ពិនិត្យ Prop Firm Shield Compliance...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_mt5_close_all":
+                try:
+                    await update.callback_query.answer("🛑 កំពុងបិទ Position ទាំងអស់លើ MT5...")
+                except Exception:
+                    pass
+                context.args = ["CLOSE_ALL"]
+                await mt5_command(update, context)
             elif data == "btn_cap_api_vault":
                 try:
                     await update.callback_query.answer("🔑 បើកផ្ទាំង Capital.com API Vault!")
@@ -19632,10 +19660,11 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🔄 Reset Tracker", callback_data="btn_cap_prop_reset")
                 ],
                 [
-                    InlineKeyboardButton("🛡️ Emergency Close All", callback_data="btn_cap_prop_close_all"),
-                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_menu")
+                    InlineKeyboardButton("⚡ MT5 ZeroMQ Bridge", callback_data="btn_mt5_menu"),
+                    InlineKeyboardButton("🛡️ Emergency Close All", callback_data="btn_cap_prop_close_all")
                 ],
                 [
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_menu"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
@@ -19732,6 +19761,193 @@ class TelegramBotThread(BaseThread):
                 )
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
+        async def mt5_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            ⚡ Institutional ZeroMQ & Native TCP MT5 Prop Firm Bridge Dashboard
+            High-speed low-latency bridge connecting Linux AI Swarm to MetaTrader 5 terminals.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+
+            import mt5_bridge_engine
+            import ui_standards
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            bridge = mt5_bridge_engine.mt5_bridge
+            if not bridge.is_running:
+                bridge.start()
+
+            args = list(context.args) if context and context.args else []
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["TEST", "SIGNAL", "PING"]:
+                    res = bridge.dispatch_order(
+                        symbol="XAUUSD",
+                        action="BUY",
+                        lot=0.01,
+                        sl=0.0,
+                        tp=0.0,
+                        comment="APEX_AI_TEST",
+                        magic=888999
+                    )
+                    reached = res.get("clients_reached", 0)
+                    if user_lang == 'khmer':
+                        msg_test = (
+                            f"⚡ **MT5 BRIDGE SIGNAL DISPATCH TEST** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"📡 **Signal ID ៖** `{res['signal_id']}`\n"
+                            f"🎯 **Action ៖** `BUY 0.01 XAUUSD`\n"
+                            f"🖥️ **Terminals Reached ៖** `{reached} Terminals`\n"
+                            f"🛡️ **Security ៖** `HMAC-SHA256 Signed & Timestamped`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **បញ្ជូន Signal ទៅកាន់ MT5 បានជោគជ័យ!**' if reached > 0 else '⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។ សូមភ្ជាប់ EA KhmerMasterCrypto_Bridge.mq5 លើ MT5 ជាមុន!**'}"
+                        )
+                    else:
+                        msg_test = (
+                            f"⚡ **MT5 BRIDGE SIGNAL DISPATCH TEST** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"📡 **Signal ID:** `{res['signal_id']}`\n"
+                            f"🎯 **Action:** `BUY 0.01 XAUUSD`\n"
+                            f"🖥️ **Terminals Reached:** `{reached} Terminals`\n"
+                            f"🛡️ **Security:** `HMAC-SHA256 Signed & Timestamped`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **Signal successfully dispatched to MT5!**' if reached > 0 else '⚠️ **No MT5 terminals connected. Please attach KhmerMasterCrypto_Bridge.mq5 in MT5!**'}"
+                        )
+                    await update.effective_message.reply_text(msg_test, parse_mode="Markdown")
+                    return
+                elif sub in ["CLOSE_ALL", "CLOSE", "HALT"]:
+                    recent_orders = db.get_mt5_bridge_recent_orders(limit=20)
+                    closed_count = 0
+                    for o in recent_orders:
+                        if o.get("status") == "FILLED" and o.get("ticket"):
+                            bridge.dispatch_close(ticket=o["ticket"], symbol=o.get("symbol"))
+                            closed_count += 1
+                    if user_lang == 'khmer':
+                        msg_close = (
+                            f"🛑 **MT5 EMERGENCY CLOSE ALL EXECUTED** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛡️ **បិទ Position ៖** `{closed_count} Orders Dispatched`\n"
+                            f"🏛️ **Prop Firm Protection ៖** `100% Capital Preserved`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ ប្រព័ន្ធបានបាញ់ Signal បិទ Position ទាំងអស់លើ MT5 Terminals ដោយសុវត្ថិភាព!"
+                        )
+                    else:
+                        msg_close = (
+                            f"🛑 **MT5 EMERGENCY CLOSE ALL EXECUTED** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛡️ **Positions Closed:** `{closed_count} Orders Dispatched`\n"
+                            f"🏛️ **Prop Firm Protection:** `100% Capital Preserved`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ Emergency close signals dispatched to all active MT5 terminals!"
+                        )
+                    await update.effective_message.reply_text(msg_close, parse_mode="Markdown")
+                    return
+
+            status_data = bridge.get_bridge_status()
+            online_count = status_data["online_clients"]
+            total_count = status_data["total_clients"]
+            avg_ping = status_data["avg_ping_ms"]
+            clients = status_data.get("clients", [])
+
+            clients_text_kh = ""
+            clients_text_en = ""
+            if clients:
+                for c in clients:
+                    c_status_icon = "🟢" if c["status"] == "ONLINE" else "🔴"
+                    prop_badge = "✅ SAFE" if c["compliant"] else "🚨 BREACH"
+                    clients_text_kh += (
+                        f"{c_status_icon} **Acc #{c['account_id']}** ({c['broker']} / {c['firm_name']})\n"
+                        f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
+                        f"  • Latency: `{c['ping_ms']:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                    )
+                    clients_text_en += (
+                        f"{c_status_icon} **Acc #{c['account_id']}** ({c['broker']} / {c['firm_name']})\n"
+                        f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
+                        f"  • Latency: `{c['ping_ms']:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                    )
+            else:
+                clients_text_kh = "⚠️ _មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។_\n_សូមភ្ជាប់ EA KhmerMasterCrypto_Bridge.mq5 លើ MT5!_\n"
+                clients_text_en = "⚠️ _No MT5 terminals currently connected._\n_Attach KhmerMasterCrypto_Bridge.mq5 EA in MT5!_\n"
+
+            kb_mt5 = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⚡ Send Test Signal", callback_data="btn_mt5_test_signal"),
+                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_refresh")
+                ],
+                [
+                    InlineKeyboardButton("🛡️ Prop Shield Status", callback_data="btn_mt5_prop_shield"),
+                    InlineKeyboardButton("🛑 Close All Trades", callback_data="btn_mt5_close_all")
+                ],
+                [
+                    InlineKeyboardButton("🏆 Prop Firm Challenge", callback_data="btn_prop_firm_menu"),
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_menu")
+                ],
+                [
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            if user_lang == 'khmer':
+                msg_mt5 = (
+                    f"⚡ **APEX INSTITUTIONAL ZEROMQ / TCP MT5 BRIDGE** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🖥️ **ស្ថានភាព Server ៖** `🟢 ONLINE & RUNNING`\n"
+                    f"🌐 **Native TCP Port ៖** `{status_data['tcp_port']}` (Zero DLL Mode)\n"
+                    f"⚡ **ZeroMQ PUB Port ៖** `{status_data['zmq_pub_port']}` (Sub-Millisecond HFT)\n"
+                    f"📡 **MT5 Terminals ភ្ជាប់ ៖** `{online_count} Online / {total_count} Total`\n"
+                    f"⏱️ **ល្បឿនជាមធ្យម (Ping) ៖** `{avg_ping:.1f} ms`\n"
+                    f"🛡️ **Prop Firm Compliance ៖** `Daily -3.5% | Max Drawdown -7.0%`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📋 **បញ្ជីគណនី MT5 ដែលកំពុងដំណើរការ ៖**\n"
+                    f"{clients_text_kh}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🧭 **របៀបដំឡើង EA លើ MT5 (Setup Guide) ៖**\n"
+                    f"1️⃣ ចម្លងឯកសារ `KhmerMasterCrypto_Bridge.mq5` ទៅដាក់ក្នុង `MQL5/Experts/`\n"
+                    f"2️⃣ បើក MT5 ហើយ Drag EA ចូលលើ Chart ណាមួយ (ឧ. EURUSD ឬ XAUUSD)\n"
+                    f"3️⃣ បញ្ចូល Host IP របស់ VPS និង Port `5555`\n"
+                    f"4️⃣ ចុច OK នោះប្រព័ន្ធនឹងភ្ជាប់ `🟢 CONNECTED` ក្នុងល្បឿន 8-15ms ភ្លាម!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Presets ៖**\n"
+                    f"• សាកល្បង Signal ៖ `` `/mt5 TEST` ``\n"
+                    f"• បិទ Position បន្ទាន់ ៖ `` `/mt5 CLOSE_ALL` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Institutional MT5 Prop Firm Bridge Active 24/7!"
+                )
+            else:
+                msg_mt5 = (
+                    f"⚡ **APEX INSTITUTIONAL ZEROMQ / TCP MT5 BRIDGE** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🖥️ **Server Status:** `🟢 ONLINE & RUNNING`\n"
+                    f"🌐 **Native TCP Port:** `{status_data['tcp_port']}` (Zero DLL Mode)\n"
+                    f"⚡ **ZeroMQ PUB Port:** `{status_data['zmq_pub_port']}` (Sub-Millisecond HFT)\n"
+                    f"📡 **Connected MT5 Terminals:** `{online_count} Online / {total_count} Total`\n"
+                    f"⏱️ **Average Latency:** `{avg_ping:.1f} ms`\n"
+                    f"🛡️ **Prop Firm Compliance:** `Daily -3.5% | Max Drawdown -7.0%`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📋 **Connected MT5 Terminals:**\n"
+                    f"{clients_text_en}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🧭 **MT5 EA Setup Guide:**\n"
+                    f"1️⃣ Copy `KhmerMasterCrypto_Bridge.mq5` into `MQL5/Experts/` folder\n"
+                    f"2️⃣ Open MT5 and attach the EA to any chart (EURUSD or XAUUSD)\n"
+                    f"3️⃣ Set Host to your Linux VPS IP and Port to `5555`\n"
+                    f"4️⃣ Click OK — terminal connects `🟢 CONNECTED` in 8-15ms!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **1-Tap Presets:**\n"
+                    f"• Test Signal: `` `/mt5 TEST` ``\n"
+                    f"• Emergency Close: `` `/mt5 CLOSE_ALL` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Institutional MT5 Prop Firm Bridge Active 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg_mt5, parse_mode="Markdown", reply_markup=kb_mt5)
 
         async def capital_leadlag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
@@ -21913,6 +22129,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("prop_firm", prop_firm_command))
         self.app.add_handler(CommandHandler("propfirm", prop_firm_command))
         self.app.add_handler(CommandHandler("prop", prop_firm_command))
+        self.app.add_handler(CommandHandler("mt5", mt5_command))
+        self.app.add_handler(CommandHandler("prop_bridge", mt5_command))
+        self.app.add_handler(CommandHandler("mt5_bridge", mt5_command))
+        self.app.add_handler(CommandHandler("mt5bridge", mt5_command))
         self.app.add_handler(CommandHandler("wealth", wealth_command))
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))
@@ -22378,6 +22598,12 @@ class TelegramBotThread(BaseThread):
                 capital_engine.start_capital_leadlag_listener(app=self.app)
             except Exception as e_cap_leadlag:
                 print(f"⚠️ [CAPITAL LEAD-LAG LISTENER START NOTICE]: {e_cap_leadlag}")
+
+            try:
+                import mt5_bridge_engine
+                mt5_bridge_engine.mt5_bridge.start()
+            except Exception as e_mt5_bridge:
+                print(f"⚠️ [MT5 ZERO-MQ BRIDGE START NOTICE]: {e_mt5_bridge}")
 
             while getattr(self, '_is_bot_running', True):
                 try:

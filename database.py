@@ -1098,6 +1098,47 @@ def init_db():
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )
     ''')
+
+    # MT5 Institutional ZeroMQ / TCP Bridge Client Registry
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mt5_bridge_clients (
+            account_id TEXT PRIMARY KEY,
+            chat_id INTEGER DEFAULT 0,
+            broker TEXT DEFAULT '',
+            firm_name TEXT DEFAULT '',
+            balance REAL DEFAULT 0.0,
+            equity REAL DEFAULT 0.0,
+            currency TEXT DEFAULT 'USD',
+            ping_ms REAL DEFAULT 0.0,
+            daily_start_equity REAL DEFAULT 0.0,
+            is_prop_compliant BOOLEAN DEFAULT 1,
+            last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'ONLINE'
+        )
+    ''')
+
+    # MT5 Institutional ZeroMQ / TCP Bridge Signal & Execution Ledger
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mt5_bridge_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            signal_id TEXT NOT NULL,
+            account_id TEXT DEFAULT '',
+            ticket INTEGER DEFAULT 0,
+            symbol TEXT NOT NULL,
+            action TEXT NOT NULL,
+            lot REAL NOT NULL,
+            sl REAL DEFAULT 0.0,
+            tp REAL DEFAULT 0.0,
+            open_price REAL DEFAULT 0.0,
+            close_price REAL DEFAULT 0.0,
+            pnl REAL DEFAULT 0.0,
+            magic INTEGER DEFAULT 888999,
+            comment TEXT DEFAULT '',
+            status TEXT DEFAULT 'SENT',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            closed_at DATETIME
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -4031,6 +4072,204 @@ def get_active_prop_firm_users() -> list:
     except Exception:
         conn.close()
         return []
+
+def upsert_mt5_bridge_client(
+    account_id: str,
+    chat_id: int = 0,
+    broker: str = "",
+    firm_name: str = "",
+    balance: float = 0.0,
+    equity: float = 0.0,
+    currency: str = "USD",
+    ping_ms: float = 0.0,
+    daily_start_equity: float = 0.0,
+    is_prop_compliant: bool = True,
+    status: str = "ONLINE"
+) -> bool:
+    """Registers or updates a connected MT5 terminal client session."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        cursor.execute("""
+            INSERT INTO mt5_bridge_clients (
+                account_id, chat_id, broker, firm_name, balance, equity,
+                currency, ping_ms, daily_start_equity, is_prop_compliant,
+                last_heartbeat, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(account_id) DO UPDATE SET
+                chat_id = CASE WHEN excluded.chat_id > 0 THEN excluded.chat_id ELSE mt5_bridge_clients.chat_id END,
+                broker = CASE WHEN excluded.broker != '' THEN excluded.broker ELSE mt5_bridge_clients.broker END,
+                firm_name = CASE WHEN excluded.firm_name != '' THEN excluded.firm_name ELSE mt5_bridge_clients.firm_name END,
+                balance = excluded.balance,
+                equity = excluded.equity,
+                currency = excluded.currency,
+                ping_ms = excluded.ping_ms,
+                daily_start_equity = CASE WHEN excluded.daily_start_equity > 0 THEN excluded.daily_start_equity ELSE mt5_bridge_clients.daily_start_equity END,
+                is_prop_compliant = excluded.is_prop_compliant,
+                last_heartbeat = excluded.last_heartbeat,
+                status = excluded.status
+        """, (
+            str(account_id), int(chat_id), str(broker), str(firm_name),
+            float(balance), float(equity), str(currency), float(ping_ms),
+            float(daily_start_equity), 1 if is_prop_compliant else 0,
+            now_str, str(status)
+        ))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        conn.close()
+        return False
+
+def get_mt5_bridge_clients(chat_id: Optional[int] = None) -> list:
+    """Fetches active MT5 bridge clients."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if chat_id and chat_id > 0:
+            cursor.execute("""
+                SELECT account_id, chat_id, broker, firm_name, balance, equity,
+                       currency, ping_ms, daily_start_equity, is_prop_compliant,
+                       last_heartbeat, status
+                FROM mt5_bridge_clients WHERE chat_id = ?
+                ORDER BY last_heartbeat DESC
+            """, (chat_id,))
+        else:
+            cursor.execute("""
+                SELECT account_id, chat_id, broker, firm_name, balance, equity,
+                       currency, ping_ms, daily_start_equity, is_prop_compliant,
+                       last_heartbeat, status
+                FROM mt5_bridge_clients
+                ORDER BY last_heartbeat DESC
+            """)
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            "account_id": str(r[0]),
+            "chat_id": int(r[1]),
+            "broker": str(r[2]),
+            "firm_name": str(r[3]),
+            "balance": float(r[4]),
+            "equity": float(r[5]),
+            "currency": str(r[6]),
+            "ping_ms": float(r[7]),
+            "daily_start_equity": float(r[8]),
+            "is_prop_compliant": bool(r[9]),
+            "last_heartbeat": str(r[10]),
+            "status": str(r[11])
+        } for r in rows]
+    except Exception:
+        conn.close()
+        return []
+
+def record_mt5_bridge_order(
+    signal_id: str,
+    symbol: str,
+    action: str,
+    lot: float,
+    sl: float = 0.0,
+    tp: float = 0.0,
+    account_id: str = "",
+    ticket: int = 0,
+    open_price: float = 0.0,
+    magic: int = 888999,
+    comment: str = "",
+    status: str = "SENT"
+) -> int:
+    """Logs a newly dispatched or executed MT5 bridge order."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    order_id = 0
+    try:
+        cursor.execute("""
+            INSERT INTO mt5_bridge_orders (
+                signal_id, account_id, ticket, symbol, action, lot, sl, tp,
+                open_price, magic, comment, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(signal_id), str(account_id), int(ticket), str(symbol),
+            str(action).upper(), float(lot), float(sl), float(tp),
+            float(open_price), int(magic), str(comment), str(status), now_str
+        ))
+        conn.commit()
+        order_id = cursor.lastrowid
+    except Exception:
+        pass
+    finally:
+        conn.close()
+    return order_id
+
+def update_mt5_bridge_order_fill(signal_id: str, ticket: int, open_price: float, status: str = "FILLED") -> bool:
+    """Updates order record when MT5 confirms trade entry fill."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE mt5_bridge_orders
+            SET ticket = ?, open_price = ?, status = ?
+            WHERE signal_id = ?
+        """, (int(ticket), float(open_price), str(status), str(signal_id)))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        conn.close()
+        return False
+
+def update_mt5_bridge_order_close(ticket: int, close_price: float, pnl: float, status: str = "CLOSED") -> bool:
+    """Updates order record when MT5 closes a position."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        cursor.execute("""
+            UPDATE mt5_bridge_orders
+            SET close_price = ?, pnl = ?, status = ?, closed_at = ?
+            WHERE ticket = ?
+        """, (float(close_price), float(pnl), str(status), now_str, int(ticket)))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        conn.close()
+        return False
+
+def get_mt5_bridge_recent_orders(limit: int = 10) -> list:
+    """Retrieves recent MT5 bridged orders for UI audit."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, signal_id, account_id, ticket, symbol, action, lot,
+                   sl, tp, open_price, close_price, pnl, status, created_at, closed_at
+            FROM mt5_bridge_orders
+            ORDER BY id DESC LIMIT ?
+        """, (int(limit),))
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            "id": r[0],
+            "signal_id": str(r[1]),
+            "account_id": str(r[2]),
+            "ticket": int(r[3]),
+            "symbol": str(r[4]),
+            "action": str(r[5]),
+            "lot": float(r[6]),
+            "sl": float(r[7]),
+            "tp": float(r[8]),
+            "open_price": float(r[9]),
+            "close_price": float(r[10]),
+            "pnl": float(r[11]),
+            "status": str(r[12]),
+            "created_at": str(r[13]),
+            "closed_at": str(r[14] or "")
+        } for r in rows]
+    except Exception:
+        conn.close()
+        return []
+
 
 def can_user_buy(chat_id: int) -> bool:
     config = get_auto_trade_config(chat_id)
