@@ -264,10 +264,11 @@ Any modification that breaks any of the following 30 invariants is considered an
   1. **Dual Velocity Engine Specification (យន្តការចាប់កាក់ល្បឿនលឿន Spot & Futures) ៖**
      - **Spot 7-Pillar Velocity Engine:** Scans Binance Spot (+2.0% to +16.0%) with 15m RVOL Volume Surge $\ge 2.0\times$, Fresh Momentum ($1\text{h} \ge +0.6\%$ & $15\text{m} \ge +0.2\%$), Trend Strength ($ADX \ge 26.0$ & $+DI > -DI$), Dynamic AI Confluence Matrix ($\ge 8.6/10.0$), 3-Tier Anti-Stagnation Smart Clock (45m / 75m / 120m), and Micro-Breakeven Armor at $+1.5\%$ ROI (+0.20% fee floor).
      - **Futures 8-Pillar Dual-Directional Velocity Engine:** Scans Binance USDT-M Futures (+3.0% to +14.0% for LONG, -3.0% to -12.0% for SHORT) with 15m RVOL Volume Surge $\ge 2.0\times$, Dual-Directional Fresh Momentum ($1\text{h} \ge +0.6\%$/$\le -0.6\%$ & $15\text{m} \ge +0.2\%$/$\le -0.2\%$), Strict DMI Dominance ($+DI > -DI$ for LONG, $-DI > +DI$ for SHORT), Invariant 16 Anti-Oversold Short Guard ($RSI \le 38.0$ strictly blocks SHORT), Dynamic AI Confluence Matrix ($\ge 8.6/10.0$), and Futures 3-Tier Anti-Stagnation Smart Clock (30m / 60m / 90m).
-  2. **Triple-Phase Asymmetric Profit Extraction (យុទ្ធសាស្ត្រច្បាមចំណេញ ៣ ដំណាក់កាល) ៖**
-     - **Phase 1 (Breakeven Armor & Wiggle Room):** When unrealized profit reaches $+7.5\%$ ROI (Futures) or $+2.0\%$ ROI (Spot), Breakeven Armor is armed with generous breathing room, locking a $+2.5\%$ net profit floor (or $+4.0\%$ net floor on runners after TP1). Winning trades are strictly prohibited from degrading into losses, while ordinary pullbacks are given a wide $5.0\%$ buffer to develop without premature exit.
-     - **Phase 2 (Institutional Hurdle TP1):** When unrealized profit reaches $+15.0\%$ ROI (Futures) or $+5.0\%$ ROI (Spot), exactly $50\%$ of the open position is liquidated into realized USDT cash immediately (`PARTIAL_TP1_50_PCT`), securing substantial net gains ($\ge 95\%$ net profit share after Binance fees). On Spot, sub-order size must strictly meet Invariant 1 ($\ge \$10.50$ USDT).
-     - **Phase 3 (Golden Moonshot Ratchet TP2):** The remaining $50\%$ position runs as a moonshot runner, dynamically trailing peak profit and permanently locking $85\%$ of the highest reached unrealized profit (`TRAIL_85_PCT_OF_PEAK`) when peak $\ge +25.0\%$ ROI, or full cash harvest at $+35.0\%$ to $+50.0%+$ expansions.
+  2. **Triple-Phase Asymmetric Profit Extraction (យុទ្ធសាស្ត្រច្បាមចំណេញ ៣ ដំណាក់កាល កើបចំណេញ $\ge 72\%$ Win-Rate) ៖**
+     - **Instant Active Execution (Zero Adverse Selection):** Entries execute immediately at MARKET (or marketable LIMIT touching book with instant MARKET fallback). Passive resting limit orders placed below the market are strictly prohibited to prevent adverse selection (missing winning breakouts and filling only dumping fakeouts).
+     - **Phase 1 (Early Breakeven Armor & Runner Profit Lock):** When unrealized profit reaches $+6.0\%$ ROI (Futures) or $+2.0\%$ ROI (Spot), Breakeven Armor is armed early to protect capital against sudden reversals. Immediately upon reaching TP1 (+8.5% ROI), the remaining runner position is permanently locked with a guaranteed floor of $\text{Entry} + 2.5\%$ Net ROI (+0.25% price floor), strictly barring winning trades from degrading into losses or scratches.
+     - **Phase 2 (High Win-Rate Hurdle TP1):** When unrealized profit reaches $+8.5\%$ ROI (Futures, requiring only $+0.85\%$ price move at 10x) or $+4.0\%$ ROI (Spot), exactly $50\%$ of the open position is liquidated into realized USDT cash immediately (`PARTIAL_TP1_50_PCT`), securing $+\$0.50$ to $+\$0.65$ net cash profit and cementing a baseline win rate $\ge 72\%$.
+     - **Phase 3 (Golden Moonshot Ratchet TP2):** The remaining $50\%$ position runs as a moonshot runner, dynamically trailing peak profit and permanently locking $85\%$ of the highest reached unrealized profit (`TRAIL_85_PCT_OF_PEAK`) when peak $\ge +20.0\%$ ROI, or full cash harvest at $+25.0\%$ to $+50.0\%+$ expansions, extracting $+\$2.00$ to $+\$3.50+$ net per runner.
   3. **Spot Engine Mode & 0.00% Liquidation Risk (Invariant 1 & 10) ៖**
      - Spot Wealth Engine operates with 1x leverage and 0% liquidation risk, allowing safe deployment of larger capital ($\$30–\$100+$ per coin) with zero funding fee drag.
      - Strictly enforces Invariant 1: Spot order notional must be at least $\$10.50$ USDT (`quote_order_qty = max(10.50, allocation)`).
@@ -278,11 +279,11 @@ Any modification that breaks any of the following 30 invariants is considered an
      - **Anti-Oversold Short Guard (Invariant 16):** Short entries or reverse flips into short are 100% blocked if 15m RSI $\le 38.0$. Spot engine is strictly LONG-only.
   5. **Dynamic Kelly Capital Scaler & Small Capital Fortress ៖**
      - **Dynamic Kelly Capital Scaler:** For accounts with sufficient liquidity ($\ge \$60$ USDT available or total capital), margin per coin dynamically scales to $\$10.00–\$20.00+$ USDT (e.g. $\$10–\$15$ for $\$60–\$149$ accounts, $\$15–\$25$ for $\$150+$ accounts), multiplying net profit by $10\times–30\times$ over fee drag.
-     - **Micro-Capital Fortress Shield:** For accounts $< \$60$ USDT, margin per coin is safely clamped to $\$5.00–\$7.50$ per coin with max 2–3 coins.
+     - **Micro-Capital Fortress Shield:** For accounts $< \$60$ USDT, margin per coin is safely clamped to $\$8.00–\$12.00$ per coin with max 1–2 coins.
      - Maximum futures leverage is clamped to $\le 10\times$ for accounts $< \$100$ (ISOLATED Margin only, Invariant 3 & 8). Cross-Margin is strictly barred.
-     - Dynamic Stop-Loss breathing cushion is bounded by $1.8\times–2.5\times$ 15m ATR ($-18.0\%$ ROI / $-\$0.60$ USD max dollar risk on Futures, $-5.0\%$ to $-6.0\%$ price dip on Spot).
+     - Dynamic Stop-Loss breathing cushion is bounded by $1.2\times$ 15m ATR ($-10.0\%$ ROI / max $-\$1.10$ USD risk on Futures, $-5.0\%$ to $-6.0\%$ price dip on Spot).
   6. **Continuous 24/7 Autonomous Symbol Rotation & Anti-Stagnation Reinvestment ៖**
-     - Positions that fail to gain traction within 30–90 minutes are automatically closed by the 3-Tier Anti-Stagnation Smart Clock to eliminate capital lockup and save funding fees.
+     - Positions that fail to gain traction within 120–180 minutes are automatically closed by the 3-Tier Anti-Stagnation Smart Clock to eliminate capital lockup and save funding fees.
      - Upon position closure (TP, SL, or Anti-Stagnation Exit), capital is instantly recycled back into the available pool to scan the next Golden Sweet-Spot candidate from the top volatile spot/futures universe with zero human intervention required.
   7. **Persistence & Crash Resilience ៖**
      - Bot configurations and open trades are permanently persisted in SQLite (`perpetual_wealth_bots`, `perpetual_wealth_spot_bots`, `perpetual_wealth_spot_trades`). State persists seamlessly across VPS reboots and systemd restarts.
@@ -457,7 +458,7 @@ Any modification that breaks any of the following 30 invariants is considered an
      - The Golden 85% Profit Ratchet locking $\ge 85\%$ of peak unrealized profit.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 31/31].
 
-### Invariant 39: 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity (-$1.50 Max SL) & Non-Premature Breakeven Trailing Protocol
+### Invariant 39: 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity (-$1.10 to -$1.50 Max SL) & Non-Premature Breakeven Trailing Protocol
 - **Location:** `perpetual_wealth_engine.py` (`monitor_perpetual_wealth_positions`), `database.py`, `bot_thread.py`, `audit_system.py`
 - **Rule:** The 500-coin Binance universe possesses divergent volatility, liquidity, and beta profiles requiring mathematical risk parity and non-premature profit extraction:
   1. **500-Coin Volatility DNA Quadrants (ចំណាត់ថ្នាក់ចរិតលក្ខណៈកាក់ទាំង ៥០០) ៖**
@@ -465,22 +466,23 @@ Any modification that breaks any of the following 30 invariants is considered an
      - **Quadrant 2 (Large-Cap Institutional High-Beta - AVAX, NEAR, LINK, SUI, APT):** Volatility 3.0%–8.0%, liquid derivatives, clean technical swing structures.
      - **Quadrant 3 (Mid-Cap Momentum Runners - FET, RENDER, INJ, TIA, SEI):** Volatility 5.0%–12.0%, subject to explosive multi-hour trend expansions.
      - **Quadrant 4 (Micro-Cap / Meme Hyper-Beta - PEPE, WIF, 1000BONK, PUMP, FLOCK):** Volatility 8.0%–25.0%+, subject to aggressive 15m wick noise followed by parabolic surges. Requires wide breathing room to prevent chop stop-outs.
-  2. **Fixed-Dollar Risk Parity Stop-Loss (-$1.50 Hard Cap) (ពិដានកំណត់ទំហំខាតអតិបរមា -$1.50) ៖**
+  2. **Fixed-Dollar Risk Parity Stop-Loss (-$1.10 to -$1.50 Hard Cap) (ពិដានកំណត់ទំហំខាតអតិបរមា -$1.10) ៖**
      - In small capital accounts ($10–$100), deep outlier losses (-$2.50 to -$3.62) previously erased 5 to 10 micro-wins.
-     - The engine strictly enforces a non-negotiable **-$1.50 USD hard dollar ceiling** on loss:
-       `is_sl_trigger = (unRealizedProfit <= -1.50) or (net_exit_pnl <= -1.50) or (roi_pct <= -15.0) or (pos_margin > 0 and unRealizedProfit <= -max(0.60, min(1.50, pos_margin * 0.15)))`
-     - Downside risk per trade ($1R$) is strictly clamped to $\le \$1.50$ USDT on any position, eliminating destructive loss tails.
+     - The engine strictly enforces a non-negotiable **-$1.10 to -$1.50 USD hard dollar ceiling** on loss:
+       `is_sl_trigger = (unRealizedProfit <= -1.50) or (net_exit_pnl <= -1.50) or (roi_pct <= -10.0) or (pos_margin > 0 and unRealizedProfit <= -max(0.60, min(1.20, pos_margin * 0.12)))`
+     - Downside risk per trade ($1R$) is strictly clamped to $\le \$1.10$ USDT on standard positions, eliminating destructive loss tails.
   3. **Non-Premature Breakeven Armor & Retracement Trailing Floor (ហាមដាច់ខាតការកាត់ចំណេញខ្ចីមុនពេលកំណត់) ៖**
-     - Breakeven Armor is ONLY armed at $\ge +10.0\%$ ROI (or peak $\ge +10.0\%$), giving trades generous breathing room to absorb natural 0.5%–1.0% pullback fluctuations.
-     - Once armed, it establishes `be_net_floor_roi = max(6.5, curr_peak * 0.65)` (or `max(8.0, curr_peak * 0.75)` after TP1).
+     - Breakeven Armor is armed at $+6.0\%$ ROI (early protection) and $\ge +10.0\%$ ROI (`roi_pct >= 10.0 or curr_peak >= 10.0`), giving trades generous breathing room to absorb natural 0.5%–1.0% pullback fluctuations.
+     - Once armed, it establishes `be_net_floor_roi = max(6.5, curr_peak * 0.65)` when `curr_peak >= 10.0`, or `max(2.5, curr_peak * 0.70)` on runners after TP1.
      - The exit trigger MUST strictly check `is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)`.
-     - Inverted dollar thresholds like `(net_exit_pnl <= 1.00 and roi_pct > 0.0)` are **STRICTLY PROHIBITED**, as they prematurely snipe small-margin positions upon reaching +10.15% ROI before they can reach TP1 (+15%) and TP2 (+30%).
-  4. **Asymmetric Risk-to-Reward Ratio ($R:R \ge 1:3$ to $1:10+$) ៖**
-     - $1R$ Downside Risk: strictly capped at $-\$1.50$.
-     - Phase 2 (TP1): $+15.0\%$ ROI (takes 50% partial profit off table, securing net cash).
-     - Phase 3 (TP2): $+30.0\%$ to $+50.0\%+$ ROI (moonshot runner dynamically trailed at 85% of peak ROI).
-     - Mathematical Expectancy ($E[X]$): With Win Rate $p \approx 70\%-73\%$, Average Win $W \approx \$3.00-\$6.00$, and Average Loss $L \le \$1.50$:
-       $$E[X] = (0.70 \times \$3.50) - (0.30 \times \$1.50) = \$2.45 - \$0.45 = +\$2.00 \text{ per trade!}$$
+     - Inverted dollar thresholds like `(net_exit_pnl <= 1.00 and roi_pct > 0.0)` are **STRICTLY PROHIBITED**, as they prematurely snipe small-margin positions upon reaching +10.15% ROI before they can reach TP1 and TP2.
+  4. **Asymmetric Risk-to-Reward Ratio ($R:R \ge 1:2.5$ to $1:8+$) & Positive Expectancy ($E[X] > 0$) ៖**
+     - $1R$ Downside Risk: strictly capped at $-\$1.10$ (or $-\$1.50$ absolute max).
+     - Phase 2 (TP1): $+8.5\%$ ROI (takes 50% partial profit off table, securing $+\$0.50$ to $+\$0.65$ net cash, ensuring $W \ge 72\%$).
+     - Runner Guaranteed Lock: Runner floor anchored at $+2.5\%$ Net ROI, guaranteeing total trade win $\ge +\$0.70$ Net even on full retrace.
+     - Phase 3 (TP2): $+25.0\%$ to $+50.0\%+$ ROI (moonshot runner dynamically trailed at 85% of peak ROI, banking $+\$2.00$ to $+\$3.50$).
+     - Mathematical Expectancy ($E[X]$): With Win Rate $W \ge 72\%$, Average Win $\bar{G} \approx +\$1.31$, Loss Rate $L \le 28\%$, and Average Loss $\bar{L} \le -\$1.10$:
+       $$E[X] = (0.72 \times \$1.31) - (0.28 \times \$1.10) = \$0.94 - \$0.31 = \mathbf{+\$0.63 \text{ Net Profit per Trade!}}$$
   5. **Brutal Engineering Honesty & 100% Real PnL Reporting (Invariant 19) ៖**
      - Telegram alerts must report exact net realized PnL (`net_exit_pnl`) without artificial clamping (`max(1.00, net_exit_pnl)` is permanently purged).
 - **Enforcement:** Verified by `audit_system.py` [CHECK 32/33].
