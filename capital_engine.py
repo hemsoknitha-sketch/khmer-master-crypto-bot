@@ -2255,8 +2255,16 @@ class CapitalAutonomousEngine:
 
         return base_quant
 
-    def _ratchet_engine_positions(self, engine: CapitalComEngine, chat_id: Optional[int] = None) -> Tuple[int, int, int]:
-        """Ratchets open positions on a specific engine instance."""
+    def _ratchet_engine_positions(self, engine: CapitalComEngine, chat_id: Optional[int] = None, app: Optional[Any] = None) -> Tuple[int, int, int]:
+        """
+        Institutional Multi-Tier Dynamic Position Ratchet & Dual-Layer Harvest Engine:
+        Tier 1: Breakeven Armor (Noise Buffer & 0.00R Risk Lock at +4.8% ROI or +$1.50 profit)
+        Tier 2: Capital Fortress Lock (+1.5R Lock at +6.8% ROI or +$2.50 profit)
+        Tier 3: The Golden 80%-85% Trailing Ratchet (Broker SL trail at >= +7.5% ROI or +$2.50 profit)
+        Tier 4: Mega Target Cash Harvest (100% Market Exit at +14.0% ROI or +$6.00 profit)
+        DUAL-LAYER DEFENSE: Software Autonomous Retracement Exit protects 80%-85% of peak UPL
+        even if broker-side SL is delayed, rejected, or market reverses sharply.
+        """
         positions = engine.get_open_positions()
         if not positions:
             return 0, 0, 0
@@ -2303,19 +2311,173 @@ class CapitalAutonomousEngine:
             if spread <= 0:
                 spread = 0.60 if "GOLD" in epic_u else (0.05 if "OIL" in epic_u else 1.0)
 
-            # Track peak UPL
-            peak_upl = self._peak_upl_cache.get(deal_id, upl)
+            # Persistent Peak UPL tracking with Database Fallback (Survives bot restarts)
+            peak_upl = self._peak_upl_cache.get(deal_id)
+            if peak_upl is None:
+                try:
+                    import database as db
+                    conn = db.get_db_connection()
+                    cur = conn.cursor()
+                    cur.execute("SELECT value FROM system_settings WHERE key = ?", (f"cap_peak_{deal_id}",))
+                    row = cur.fetchone()
+                    conn.close()
+                    if row and row[0]:
+                        peak_upl = float(row[0])
+                except Exception:
+                    pass
+                if peak_upl is None:
+                    peak_upl = upl
+
             if upl > peak_upl:
                 peak_upl = upl
                 self._peak_upl_cache[deal_id] = peak_upl
+                try:
+                    import database as db
+                    conn = db.get_db_connection()
+                    cur = conn.cursor()
+                    cur.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (f"cap_peak_{deal_id}", str(peak_upl)))
+                    conn.commit()
+                    conn.close()
+                except Exception:
+                    pass
+            else:
+                self._peak_upl_cache[deal_id] = peak_upl
 
             is_runner = (deal_id == runner_deal_id)
+            ratchet_pct = 0.85 if is_runner else 0.80
 
-            # Tier 1. Mathematical Breakeven Armor with Noise Buffer (Invariant 31):
-            # Triggers strictly at >= +8.0% ROI on margin (~+0.40% price move at 20x leverage).
+            # =========================================================================
+            # TIER 4: CLEAN CASH TARGET HARVEST (Bank 100% Win at Target)
+            # - Apex 3rd Runner: Runs uncapped to +30.0% ROI or >= +$15.00 UPL
+            # - Standard Positions: Clean Cash Harvest at >= +14.0% ROI or >= +$6.00 UPL
+            # =========================================================================
+            harvest_trigger = (roi_pct >= 30.0 or upl >= 15.0) if is_runner else (roi_pct >= 14.0 or upl >= 6.0)
+            if harvest_trigger:
+                tag = "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
+                logger.info(f"{tag} Reached Target (+{roi_pct:.1f}% ROI / ${upl:+.2f})! Executing Cash Harvest for {epic}...")
+                close_res = engine.close_position(deal_id=deal_id)
+                if close_res.get("success"):
+                    closed_count += 1
+                    self._peak_upl_cache.pop(deal_id, None)
+                    self._be_locked_set.discard(deal_id)
+                    try:
+                        import database as db
+                        conn = db.get_db_connection()
+                        cur = conn.cursor()
+                        cur.execute("DELETE FROM system_settings WHERE key = ?", (f"cap_peak_{deal_id}",))
+                        conn.commit()
+                        conn.close()
+                    except Exception:
+                        pass
+                    # Apply 15-minute anti-overtrading cooldown
+                    self._asset_cooldowns[epic_u] = time.time() + 900.0
+
+                    if chat_id:
+                        try:
+                            import notification_manager, ui_standards
+                            tag_kh = "🚀 Apex 3rd Runner Mega Harvest" if is_runner else "🎯 Clean Cash Target Harvest"
+                            notif_msg = (
+                                f"🏆 **[CAPITAL.COM PROFIT HARVEST]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ **ឧបករណ៍ TradFi ៖** `{epic}`\n"
+                                f"🎯 **ទិសដៅ ៖** `{direction}`\n"
+                                f"📦 **ទំហំ ៖** `{size} contracts`\n"
+                                f"💵 **តម្លៃចូល (Entry) ៖** `${entry_level:,.2f}`\n"
+                                f"📊 **តម្លៃបិទ ៖** `${current_price:,.2f}`\n"
+                                f"💰 **ប្រាក់ចំណេញសុទ្ធ ៖** `+${upl:,.2f} USD` (+{roi_pct:.1f}% ROI)\n"
+                                f"🔝 **ចំណុចកំពូល (Peak UPL) ៖** `+${peak_upl:,.2f} USD`\n"
+                                f"🛡️ **ក្បួនកើបចំណេញ ៖** `{tag_kh}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"✅ _កើបប្រាក់ចំណេញ ១០០% ចូលគណនីជោគជ័យ!_"
+                            )
+                            notification_manager.send_telegram_notification(app, chat_id, notif_msg, category="[CAPITAL HARVEST]")
+                        except Exception as e_notif:
+                            logger.debug(f"Failed to send harvest notification: {e_notif}")
+                    continue
+
+            # =========================================================================
+            # DUAL-LAYER DEFENSE: AUTONOMOUS SOFTWARE RETRACEMENT EXIT GUARD
+            # When position achieved significant profit (Peak >= +$2.50 or Peak ROI >= 6.8%),
+            # if price pulls back to or below 80%-85% of peak, close via software market order!
+            # Never allow a $6.00+ winner to bleed all the way back to $0.00 scratch.
+            # =========================================================================
+            peak_roi = (peak_upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
+            retrace_trigger = (peak_upl >= 2.50 or peak_roi >= 6.8) and (upl <= (peak_upl * ratchet_pct))
+            if retrace_trigger:
+                tag = "💎 [AUTONOMOUS RATCHET HARVEST]"
+                logger.info(f"{tag} Peak was ${peak_upl:.2f}, current UPL ${upl:.2f} reached {int(ratchet_pct*100)}% trailing floor. Executing Market Harvest for {epic}...")
+                close_res = engine.close_position(deal_id=deal_id)
+                if close_res.get("success"):
+                    closed_count += 1
+                    self._peak_upl_cache.pop(deal_id, None)
+                    self._be_locked_set.discard(deal_id)
+                    try:
+                        import database as db
+                        conn = db.get_db_connection()
+                        cur = conn.cursor()
+                        cur.execute("DELETE FROM system_settings WHERE key = ?", (f"cap_peak_{deal_id}",))
+                        conn.commit()
+                        conn.close()
+                    except Exception:
+                        pass
+                    # Apply 15-minute anti-overtrading cooldown
+                    self._asset_cooldowns[epic_u] = time.time() + 900.0
+
+                    if chat_id:
+                        try:
+                            import notification_manager, ui_standards
+                            notif_msg = (
+                                f"💎 **[CAPITAL.COM RATCHET HARVEST]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ **ឧបករណ៍ TradFi ៖** `{epic}`\n"
+                                f"🎯 **ទិសដៅ ៖** `{direction}`\n"
+                                f"📦 **ទំហំ ៖** `{size} contracts`\n"
+                                f"💵 **តម្លៃចូល (Entry) ៖** `${entry_level:,.2f}`\n"
+                                f"📊 **តម្លៃបិទ ៖** `${current_price:,.2f}`\n"
+                                f"💰 **ប្រាក់ចំណេញចាក់សោរ ៖** `+${upl:,.2f} USD` (+{roi_pct:.1f}% ROI)\n"
+                                f"🔝 **ចំណុចកំពូល (Peak UPL) ៖** `+${peak_upl:,.2f} USD`\n"
+                                f"🛡️ **ក្បួនការពារ ៖** `The Golden {int(ratchet_pct*100)}% Trailing Ratchet Exit`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"✅ _ចាក់សោរកើបចំណេញ {int(ratchet_pct*100)}% នៃកំពូល រារាំងការធ្លាក់មកស្មើដើម ១០០%!_"
+                            )
+                            notification_manager.send_telegram_notification(app, chat_id, notif_msg, category="[CAPITAL RATCHET]")
+                        except Exception as e_notif:
+                            logger.debug(f"Failed to send ratchet notification: {e_notif}")
+                    continue
+
+            # =========================================================================
+            # TIER 2 & 3: THE GOLDEN 80%-85% TRAILING RATCHET (Broker Stop-Loss Update)
+            # When profit exceeds >= +7.5% ROI or >= +$2.50 UPL, advance broker Stop-Loss.
+            # =========================================================================
+            ratchet_broker_eligible = (roi_pct >= 7.5 or peak_upl >= 2.50 or upl >= 2.50) and peak_upl > 0
+            if ratchet_broker_eligible:
+                target_protected_profit = peak_upl * ratchet_pct
+                if direction == "BUY":
+                    raw_ratchet_price = entry_level + (target_protected_profit / size)
+                    safe_ratchet_price = round(min(raw_ratchet_price, current_price - (spread * 2.0)), 2)
+                    if safe_ratchet_price > sl and safe_ratchet_price > entry_level:
+                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
+                        if upd.get("success"):
+                            ratcheted_count += 1
+                            tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
+                            logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
+                elif direction == "SELL":
+                    raw_ratchet_price = entry_level - (target_protected_profit / size)
+                    safe_ratchet_price = round(max(raw_ratchet_price, current_price + (spread * 2.0)), 2)
+                    if (sl <= 0 or safe_ratchet_price < sl) and safe_ratchet_price < entry_level:
+                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
+                        if upd.get("success"):
+                            ratcheted_count += 1
+                            tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
+                            logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
+
+            # =========================================================================
+            # TIER 1: MATHEMATICAL BREAKEVEN ARMOR WITH NOISE BUFFER (Invariant 35)
+            # Triggers at >= +4.8% ROI or >= +$1.50 UPL on margin.
             # Guaranteed to place SL strictly below current market price for BUY (and above for SELL)
             # while locking in Entry + (Spread * 0.5) to secure a net positive return after broker fees.
-            if roi_pct >= 8.0 and deal_id not in self._be_locked_set:
+            # =========================================================================
+            if (roi_pct >= 4.8 or upl >= 1.50) and deal_id not in self._be_locked_set:
                 if direction == "BUY":
                     target_be_sl = round(entry_level + max(spread * 0.5, 0.001 * entry_level), 2)
                     safe_ceiling_sl = round(current_price - (spread * 1.5), 2)
@@ -2339,44 +2501,6 @@ class CapitalAutonomousEngine:
                                 ratcheted_count += 1
                                 logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} (SELL) at {new_sl} (Market: {current_price:.2f}, +{roi_pct:.1f}% ROI, Risk: 0.00R)")
 
-            # Tier 2. The Golden 80%-85% Trailing Ratchet: When profit exceeds >= +14.0% ROI
-            elif roi_pct >= 14.0 and peak_upl > 0:
-                ratchet_pct = 0.85 if is_runner else 0.80
-                target_protected_profit = peak_upl * ratchet_pct
-                if direction == "BUY":
-                    raw_ratchet_price = entry_level + (target_protected_profit / size)
-                    safe_ratchet_price = round(min(raw_ratchet_price, current_price - (spread * 2.0)), 2)
-                    if safe_ratchet_price > sl and safe_ratchet_price > entry_level:
-                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
-                        if upd.get("success"):
-                            ratcheted_count += 1
-                            tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
-                            logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
-                elif direction == "SELL":
-                    raw_ratchet_price = entry_level - (target_protected_profit / size)
-                    safe_ratchet_price = round(max(raw_ratchet_price, current_price + (spread * 2.0)), 2)
-                    if (sl <= 0 or safe_ratchet_price < sl) and safe_ratchet_price < entry_level:
-                        upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
-                        if upd.get("success"):
-                            ratcheted_count += 1
-                            tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
-                            logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
-
-            # Tier 3. Clean Cash Harvest:
-            # - Apex 3rd Runner: Runs uncapped to +35.0% ROI (or until 85% peak ratchet triggers)
-            # - Standard Positions: Clean Cash Harvest at +18.0% to +24.0% ROI
-            harvest_trigger = (roi_pct >= 35.0) if is_runner else (roi_pct >= 18.0)
-            if harvest_trigger:
-                tag = "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
-                logger.info(f"{tag} Reached +{roi_pct:.1f}% ROI! Executing Cash Harvest for {epic} (UPL: ${upl:+.2f})...")
-                close_res = engine.close_position(deal_id=deal_id)
-                if close_res.get("success"):
-                    closed_count += 1
-                    self._peak_upl_cache.pop(deal_id, None)
-                    self._be_locked_set.discard(deal_id)
-                    # Apply 15-minute anti-overtrading cooldown
-                    self._asset_cooldowns[epic_u] = time.time() + 900.0
-
         return len(positions), ratcheted_count, closed_count
 
     def monitor_and_ratchet_open_positions(self, app=None) -> Dict[str, Any]:
@@ -2393,7 +2517,7 @@ class CapitalAutonomousEngine:
         # Monitor default engines (Both Live and Demo)
         for def_engine in [get_capital_engine(is_demo=False), get_capital_engine(is_demo=True)]:
             try:
-                c_active, c_ratchet, c_close = self._ratchet_engine_positions(def_engine)
+                c_active, c_ratchet, c_close = self._ratchet_engine_positions(def_engine, app=app)
                 total_active += c_active
                 total_ratcheted += c_ratchet
                 total_closed += c_close
@@ -2430,7 +2554,7 @@ class CapitalAutonomousEngine:
                 u_id, is_d = item
                 try:
                     u_engine = get_user_capital_engine(u_id, is_demo=is_d)
-                    return self._ratchet_engine_positions(u_engine, chat_id=u_id)
+                    return self._ratchet_engine_positions(u_engine, chat_id=u_id, app=app)
                 except Exception as e_uratchet:
                     logger.debug(f"Error ratcheting user {u_id} (demo={is_d}) positions: {e_uratchet}")
                     return 0, 0, 0
