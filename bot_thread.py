@@ -19794,7 +19794,7 @@ class TelegramBotThread(BaseThread):
                         magic=888999
                     )
                     reached = res.get("clients_reached", 0)
-                    if user_lang in ['km', 'khmer']:
+                    if user_lang not in ['en', 'english']:
                         msg_test = (
                             f"⚡ **MT5 BRIDGE SIGNAL DISPATCH TEST** ⚡\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -19803,7 +19803,7 @@ class TelegramBotThread(BaseThread):
                             f"🖥️ **Terminals Reached ៖** `{reached} Terminals`\n"
                             f"🛡️ **Security ៖** `HMAC-SHA256 Signed & Timestamped`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **បញ្ជូន Signal ទៅកាន់ MT5 បានជោគជ័យ!**' if reached > 0 else '⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។ សូមភ្ជាប់ EA KhmerMasterCrypto_Bridge.mq5 លើ MT5 ជាមុន!**'}"
+                            f"{'✅ **បញ្ជូន Signal ទៅកាន់ MT5 បានជោគជ័យ!**' if reached > 0 else '⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។** សូមភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` លើ MT5 ជាមុន!'}"
                         )
                     else:
                         msg_test = (
@@ -19814,9 +19814,12 @@ class TelegramBotThread(BaseThread):
                             f"🖥️ **Terminals Reached:** `{reached} Terminals`\n"
                             f"🛡️ **Security:** `HMAC-SHA256 Signed & Timestamped`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **Signal successfully dispatched to MT5!**' if reached > 0 else '⚠️ **No MT5 terminals connected. Please attach KhmerMasterCrypto_Bridge.mq5 in MT5!**'}"
+                            f"{'✅ **Signal successfully dispatched to MT5!**' if reached > 0 else '⚠️ **No MT5 terminals connected.** Please attach `KhmerMasterCrypto_Bridge.mq5` in MT5!'}"
                         )
-                    await update.effective_message.reply_text(msg_test, parse_mode="Markdown")
+                    try:
+                        await update.effective_message.reply_text(msg_test, parse_mode="Markdown")
+                    except Exception:
+                        await update.effective_message.reply_text(msg_test.replace("*", "").replace("_", ""))
                     return
                 elif sub in ["CLOSE_ALL", "CLOSE", "HALT"]:
                     recent_orders = db.get_mt5_bridge_recent_orders(limit=20)
@@ -19825,7 +19828,7 @@ class TelegramBotThread(BaseThread):
                         if o.get("status") == "FILLED" and o.get("ticket"):
                             bridge.dispatch_close(ticket=o["ticket"], symbol=o.get("symbol"))
                             closed_count += 1
-                    if user_lang in ['km', 'khmer']:
+                    if user_lang not in ['en', 'english']:
                         msg_close = (
                             f"🛑 **MT5 EMERGENCY CLOSE ALL EXECUTED** ⚡\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -19843,7 +19846,10 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"✅ Emergency close signals dispatched to all active MT5 terminals!"
                         )
-                    await update.effective_message.reply_text(msg_close, parse_mode="Markdown")
+                    try:
+                        await update.effective_message.reply_text(msg_close, parse_mode="Markdown")
+                    except Exception:
+                        await update.effective_message.reply_text(msg_close.replace("*", "").replace("_", ""))
                     return
 
             status_data = bridge.get_bridge_status()
@@ -19858,19 +19864,27 @@ class TelegramBotThread(BaseThread):
                 for c in clients:
                     c_status_icon = "🟢" if c["status"] == "ONLINE" else "🔴"
                     prop_badge = "✅ SAFE" if c["compliant"] else "🚨 BREACH"
+                    safe_broker = str(c.get('broker', 'Broker')).replace('_', ' ')
+                    safe_firm = str(c.get('firm_name', 'FTMO')).replace('_', ' ')
                     clients_text_kh += (
-                        f"{c_status_icon} **Acc #{c['account_id']}** ({c['broker']} / {c['firm_name']})\n"
+                        f"{c_status_icon} **Acc #{c['account_id']}** ({safe_broker} / {safe_firm})\n"
                         f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
                         f"  • Latency: `{c['ping_ms']:.1f} ms` | Prop Shield: `{prop_badge}`\n"
                     )
                     clients_text_en += (
-                        f"{c_status_icon} **Acc #{c['account_id']}** ({c['broker']} / {c['firm_name']})\n"
+                        f"{c_status_icon} **Acc #{c['account_id']}** ({safe_broker} / {safe_firm})\n"
                         f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
                         f"  • Latency: `{c['ping_ms']:.1f} ms` | Prop Shield: `{prop_badge}`\n"
                     )
             else:
-                clients_text_kh = "⚠️ _មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។_\n_សូមភ្ជាប់ EA KhmerMasterCrypto_Bridge.mq5 លើ MT5!_\n"
-                clients_text_en = "⚠️ _No MT5 terminals currently connected._\n_Attach KhmerMasterCrypto_Bridge.mq5 EA in MT5!_\n"
+                clients_text_kh = (
+                    "⚠️ _មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។_\n"
+                    "👉 សូមភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` លើ MT5!\n"
+                )
+                clients_text_en = (
+                    "⚠️ _No MT5 terminals currently connected._\n"
+                    "👉 Please attach EA `KhmerMasterCrypto_Bridge.mq5` in MT5!\n"
+                )
 
             kb_mt5 = InlineKeyboardMarkup([
                 [
@@ -19890,7 +19904,7 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            if user_lang in ['km', 'khmer']:
+            if user_lang not in ['en', 'english']:
                 msg_mt5 = (
                     f"⚡ **APEX INSTITUTIONAL ZEROMQ / TCP MT5 BRIDGE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -19907,12 +19921,10 @@ class TelegramBotThread(BaseThread):
                     f"🧭 **របៀបដំឡើង EA លើ MT5 (Setup Guide) ៖**\n"
                     f"1️⃣ ចម្លងឯកសារ `KhmerMasterCrypto_Bridge.mq5` ទៅដាក់ក្នុង `MQL5/Experts/`\n"
                     f"2️⃣ បើក MT5 ហើយ Drag EA ចូលលើ Chart ណាមួយ (ឧ. EURUSD ឬ XAUUSD)\n"
-                    f"3️⃣ បញ្ចូល Host IP របស់ VPS និង Port `5555`\n"
+                    f"3️⃣ ពិនិត្យមើល Host IP របស់ VPS គឺ `34.153.209.188` និង Port `5555`\n"
                     f"4️⃣ ចុច OK នោះប្រព័ន្ធនឹងភ្ជាប់ `🟢 CONNECTED` ក្នុងល្បឿន 8-15ms ភ្លាម!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **1-Tap Presets ៖**\n"
-                    f"• សាកល្បង Signal ៖ `` `/mt5 TEST` ``\n"
-                    f"• បិទ Position បន្ទាន់ ៖ `` `/mt5 CLOSE_ALL` ``\n"
+                    f"💡 **1-Tap Presets ៖** `` `/mt5 TEST` `` | `` `/mt5 CLOSE_ALL` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -19935,19 +19947,21 @@ class TelegramBotThread(BaseThread):
                     f"🧭 **MT5 EA Setup Guide:**\n"
                     f"1️⃣ Copy `KhmerMasterCrypto_Bridge.mq5` into `MQL5/Experts/` folder\n"
                     f"2️⃣ Open MT5 and attach the EA to any chart (EURUSD or XAUUSD)\n"
-                    f"3️⃣ Set Host to your Linux VPS IP and Port to `5555`\n"
+                    f"3️⃣ Verify Host IP is `34.153.209.188` and Port is `5555`\n"
                     f"4️⃣ Click OK — terminal connects `🟢 CONNECTED` in 8-15ms!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **1-Tap Presets:**\n"
-                    f"• Test Signal: `` `/mt5 TEST` ``\n"
-                    f"• Emergency Close: `` `/mt5 CLOSE_ALL` ``\n"
+                    f"💡 **1-Tap Presets:** `` `/mt5 TEST` `` | `` `/mt5 CLOSE_ALL` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Institutional MT5 Prop Firm Bridge Active 24/7!"
                 )
 
-            await update.effective_message.reply_text(msg_mt5, parse_mode="Markdown", reply_markup=kb_mt5)
+            try:
+                await update.effective_message.reply_text(msg_mt5, parse_mode="Markdown", reply_markup=kb_mt5)
+            except Exception as e_send_err:
+                clean_mt5 = msg_mt5.replace("*", "").replace("_", "")
+                await update.effective_message.reply_text(clean_mt5, reply_markup=kb_mt5)
 
         async def capital_leadlag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
