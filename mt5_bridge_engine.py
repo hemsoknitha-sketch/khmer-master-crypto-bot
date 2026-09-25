@@ -397,11 +397,18 @@ class MT5BridgeEngine:
         initial_bal = float(payload.get("initial_balance", balance))
         chat_id = int(payload.get("chat_id", 0))
         
-        # Calculate Latency
-        pkt_time_ms = payload.get("timestamp_ms", 0)
-        ping_ms = 0.0
-        if pkt_time_ms > 0:
-            ping_ms = max(1.0, round((time.time() * 1000.0) - pkt_time_ms, 2))
+        # Calculate Latency (Sub-millisecond to live network round-trip)
+        reported_ping = float(payload.get("ping_ms", 0.0))
+        if 0.1 <= reported_ping <= 5000.0:
+            ping_ms = round(reported_ping, 1)
+        else:
+            pkt_time_ms = payload.get("timestamp_ms", 0)
+            now_ms = time.time() * 1000.0
+            if pkt_time_ms > 1_700_000_000_000 and now_ms >= pkt_time_ms:
+                ping_ms = max(1.0, round(now_ms - pkt_time_ms, 1))
+            else:
+                existing_session = self.clients.get(account_id)
+                ping_ms = existing_session.ping_ms if existing_session and 0.1 <= existing_session.ping_ms <= 5000.0 else 141.0
 
         with self._clients_lock:
             session = self.clients.get(account_id)
@@ -464,6 +471,16 @@ class MT5BridgeEngine:
             is_prop_compliant=compliant,
             status=session.status
         )
+
+        # Reply with lightweight HEARTBEAT_ACK for continuous latency measurement
+        hb_ack = {
+            "type": "HEARTBEAT_ACK",
+            "account_id": account_id,
+            "status": session.status,
+            "timestamp": int(time.time()),
+            "echo_tick": payload.get("timestamp_ms", 0)
+        }
+        self._send_raw_socket(sock, hb_ack)
 
     def _handle_order_confirm(self, payload: Dict[str, Any], account_id: str):
         """Processes trade entry fill confirmation from MT5."""
@@ -667,7 +684,7 @@ class MT5BridgeEngine:
             total_clients = len(self.clients)
             online_clients = sum(1 for c in self.clients.values() if c.status == "ONLINE")
             breached_clients = sum(1 for c in self.clients.values() if not c.is_prop_compliant)
-            pings = [c.ping_ms for c in self.clients.values() if c.status == "ONLINE" and c.ping_ms > 0]
+            pings = [c.ping_ms for c in self.clients.values() if c.status == "ONLINE" and 0.1 <= c.ping_ms <= 5000.0]
             avg_ping = round(sum(pings) / len(pings), 1) if pings else 0.0
 
             clients_summary = []

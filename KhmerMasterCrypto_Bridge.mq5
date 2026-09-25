@@ -262,7 +262,7 @@ void SendHeartbeat()
    ulong now_ms = GetTickCount64();
 
    string json = StringFormat(
-      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"timestamp\":%d,\"timestamp_ms\":%I64u}\n",
+      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"ping_ms\":%.1f,\"timestamp\":%d,\"timestamp_ms\":%I64u}\n",
       (int)m_account.Login(),
       m_account.Company(),
       InpFirmName,
@@ -271,6 +271,7 @@ void SendHeartbeat()
       g_daily_start_equity,
       g_initial_balance,
       InpSecretKey,
+      g_last_ping_ms,
       (int)real_time,
       now_ms
    );
@@ -312,8 +313,9 @@ void ReadSocketData()
    if(readable > 0)
    {
       uchar buffer[];
-      ArrayResize(buffer, 4096);
-      int bytes_read = SocketRead(g_socket, buffer, 4096, 20);
+      int to_read = (int)MathMin(readable, 4096);
+      ArrayResize(buffer, to_read);
+      int bytes_read = SocketRead(g_socket, buffer, to_read, 50);
       if(bytes_read > 0)
       {
          string chunk = CharArrayToString(buffer, 0, bytes_read, CP_UTF8);
@@ -337,8 +339,12 @@ void ReadSocketData()
       }
       else if(bytes_read < 0)
       {
-         Print("🔌 [SOCKET READ] Connection lost. Reconnecting...");
-         DisconnectBridge();
+         int err = GetLastError();
+         if(err != 0 && err != 5273) // 5273 = ERR_NETSOCKET_TIMEOUT
+         {
+            Print("🔌 [SOCKET READ] Connection reset (Err: ", err, "). Reconnecting...");
+            DisconnectBridge();
+         }
       }
    }
 }
@@ -396,9 +402,17 @@ void ExecuteCommand(const string json)
       g_prop_breached = true;
       CloseAllBridgeTrades("PROP_BREACH_HALT");
    }
-   else if(type == "PONG")
+   else if(type == "PONG" || type == "HEARTBEAT_ACK")
    {
-      // Heartbeat roundtrip acknowledged
+      // Calculate live round-trip network ping
+      if(g_last_heartbeat_ms > 0)
+      {
+         ulong roundtrip = GetTickCount64() - g_last_heartbeat_ms;
+         if(roundtrip > 0 && roundtrip < 10000)
+         {
+            g_last_ping_ms = (double)roundtrip;
+         }
+      }
    }
 }
 
@@ -663,7 +677,11 @@ void UpdateHUD()
 
    SetLabelText(HUD_PREFIX + "STATUS", status_str, status_col);
 
-   string eq_str = StringFormat("💰 Equity: $%.2f | Balance: $%.2f", m_account.Equity(), m_account.Balance());
+   string eq_str = "";
+   if(m_account.Login() <= 0)
+      eq_str = "💰 Equity: $0.00 | Balance: $0.00 (⚠️ Please Login to Account)";
+   else
+      eq_str = StringFormat("💰 Equity: $%.2f | Balance: $%.2f (Acc #%d)", m_account.Equity(), m_account.Balance(), (int)m_account.Login());
    SetLabelText(HUD_PREFIX + "EQUITY", eq_str, clrLightGreen);
 
    double daily_dd_pct = (g_daily_start_equity > 0) ? ((m_account.Equity() - g_daily_start_equity) / g_daily_start_equity) * 100.0 : 0.0;

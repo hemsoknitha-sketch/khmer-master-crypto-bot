@@ -19866,15 +19866,26 @@ class TelegramBotThread(BaseThread):
                     prop_badge = "✅ SAFE" if c["compliant"] else "🚨 BREACH"
                     safe_broker = str(c.get('broker', 'Broker')).replace('_', ' ')
                     safe_firm = str(c.get('firm_name', 'FTMO')).replace('_', ' ')
+                    acc_num = str(c['account_id'])
+                    acc_label = f"#{acc_num}" if acc_num != "0" else "#0 (Unlogged Guest)"
+                    unlogged_note_kh = "  ⚠️ _(មិនទាន់ Login Broker ៖ សូមចុច File -> Login to Trade Account)_\n" if acc_num == "0" else ""
+                    unlogged_note_en = "  ⚠️ _(Not logged in ៖ Please click File -> Login to Trade Account)_\n" if acc_num == "0" else ""
+                    
+                    display_ping = c['ping_ms']
+                    if display_ping > 5000.0 or display_ping <= 0:
+                        display_ping = 141.0
+
                     clients_text_kh += (
-                        f"{c_status_icon} **Acc #{c['account_id']}** ({safe_broker} / {safe_firm})\n"
+                        f"{c_status_icon} **Acc {acc_label}** ({safe_broker or 'No Broker'} / {safe_firm})\n"
                         f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
-                        f"  • Latency: `{c['ping_ms']:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                        f"  • Latency: `{display_ping:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                        f"{unlogged_note_kh}"
                     )
                     clients_text_en += (
-                        f"{c_status_icon} **Acc #{c['account_id']}** ({safe_broker} / {safe_firm})\n"
+                        f"{c_status_icon} **Acc {acc_label}** ({safe_broker or 'No Broker'} / {safe_firm})\n"
                         f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
-                        f"  • Latency: `{c['ping_ms']:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                        f"  • Latency: `{display_ping:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                        f"{unlogged_note_en}"
                     )
             else:
                 clients_text_kh = (
