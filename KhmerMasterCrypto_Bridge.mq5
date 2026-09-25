@@ -43,17 +43,18 @@ CPositionInfo  m_position;
 CAccountInfo   m_account;
 CSymbolInfo    m_symbol;
 
-int            g_socket             = INVALID_HANDLE;
-bool           g_connected          = false;
-datetime       g_last_connect_try   = 0;
-datetime       g_last_heartbeat     = 0;
-double         g_daily_start_equity = 0.0;
-double         g_initial_balance    = 0.0;
-int            g_day_of_year        = -1;
-bool           g_prop_breached      = false;
-string         g_rx_buffer          = "";
-ulong          g_orders_executed    = 0;
-double         g_last_ping_ms       = 0.0;
+int            g_socket              = INVALID_HANDLE;
+bool           g_connected           = false;
+ulong          g_last_connect_try_ms = 0;
+ulong          g_last_heartbeat_ms   = 0;
+int            g_last_error_code     = 0;
+double         g_daily_start_equity  = 0.0;
+double         g_initial_balance     = 0.0;
+int            g_day_of_year         = -1;
+bool           g_prop_breached       = false;
+string         g_rx_buffer           = "";
+ulong          g_orders_executed     = 0;
+double         g_last_ping_ms        = 0.0;
 
 #define HUD_PREFIX "KMC_BRIDGE_"
 
@@ -71,7 +72,7 @@ int OnInit()
    g_daily_start_equity = m_account.Equity();
    
    MqlDateTime dt;
-   TimeCurrent(dt);
+   TimeLocal(dt);
    g_day_of_year = dt.day_of_year;
 
    Print("🚀 [KMC BRIDGE] Initializing Apex Institutional MT5 Bridge v13.00...");
@@ -107,11 +108,12 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-   datetime now = TimeCurrent();
+   ulong now_ms = GetTickCount64();
 
-   // 1. Rollover Check for UTC/Broker Daily Equity Baseline
+   // 1. Rollover Check for UTC/Broker Daily Equity Baseline using local clock
+   datetime local_now = TimeLocal();
    MqlDateTime dt;
-   TimeToStruct(now, dt);
+   TimeToStruct(local_now, dt);
    if(dt.day_of_year != g_day_of_year)
    {
       g_day_of_year = dt.day_of_year;
@@ -123,21 +125,21 @@ void OnTimer()
    // 2. Prop Firm Local Hard Circuit Breaker Check
    EvaluateLocalPropCompliance();
 
-   // 3. Connection State Machine & Reconnect
+   // 3. Connection State Machine & Reconnect (Every 3000 ms)
    if(!g_connected)
    {
-      if(now - g_last_connect_try >= 3)
+      if(now_ms - g_last_connect_try_ms >= 3000)
       {
-         g_last_connect_try = now;
+         g_last_connect_try_ms = now_ms;
          ConnectToBridge();
       }
    }
    else
    {
       // 4. Send Periodic Heartbeat (Every 3 seconds)
-      if(now - g_last_heartbeat >= 3)
+      if(now_ms - g_last_heartbeat_ms >= 3000)
       {
-         g_last_heartbeat = now;
+         g_last_heartbeat_ms = now_ms;
          SendHeartbeat();
       }
 
@@ -184,15 +186,16 @@ bool ConnectToBridge()
    uint start_time = GetTickCount();
    if(!SocketConnect(g_socket, InpHost, InpPort, InpTimeoutMs))
    {
-      int err = GetLastError();
-      // Error 5273 = Host unreachable / Firewall blocked
-      PrintFormat("⚠️ [CONNECT FAILED] Unable to connect to %s:%d (Error: %d). Retrying...", InpHost, InpPort, err);
+      g_last_error_code = GetLastError();
+      // Error 5273 = Host unreachable / Firewall blocked, 4014 = Function not allowed
+      PrintFormat("⚠️ [CONNECT FAILED] Unable to connect to %s:%d (Error: %d). Retrying...", InpHost, InpPort, g_last_error_code);
       SocketClose(g_socket);
       g_socket = INVALID_HANDLE;
       g_connected = false;
       return false;
    }
 
+   g_last_error_code = 0;
    g_last_ping_ms = (double)(GetTickCount() - start_time);
    g_connected = true;
    g_rx_buffer = "";
@@ -223,6 +226,9 @@ void SendAuthHandshake()
 {
    if(!g_connected || g_socket == INVALID_HANDLE) return;
 
+   datetime real_time = TimeGMT();
+   if(real_time <= 0) real_time = TimeLocal();
+
    string json = StringFormat(
       "{\"type\":\"AUTH\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"currency\":\"%s\",\"secret_key\":\"%s\",\"timestamp\":%d}\n",
       (int)m_account.Login(),
@@ -232,7 +238,7 @@ void SendAuthHandshake()
       m_account.Equity(),
       m_account.Currency(),
       InpSecretKey,
-      (int)TimeCurrent()
+      (int)real_time
    );
 
    SendRawString(json);
@@ -245,9 +251,12 @@ void SendHeartbeat()
 {
    if(!g_connected || g_socket == INVALID_HANDLE) return;
 
-   ulong now_ms = GetTickCount();
+   datetime real_time = TimeGMT();
+   if(real_time <= 0) real_time = TimeLocal();
+   ulong now_ms = GetTickCount64();
+
    string json = StringFormat(
-      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"timestamp\":%d,\"timestamp_ms\":%d}\n",
+      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"timestamp\":%d,\"timestamp_ms\":%I64u}\n",
       (int)m_account.Login(),
       m_account.Company(),
       InpFirmName,
@@ -256,7 +265,7 @@ void SendHeartbeat()
       g_daily_start_equity,
       g_initial_balance,
       InpSecretKey,
-      (int)TimeCurrent(),
+      (int)real_time,
       now_ms
    );
 
@@ -628,10 +637,21 @@ void CreateHUD()
 
 void UpdateHUD()
 {
-   string status_str = g_connected ? 
-      StringFormat("📡 Status: 🟢 CONNECTED (%.1f ms)", g_last_ping_ms) : 
-      "📡 Status: 🔴 DISCONNECTED (Auto-reconnecting...)";
-   color status_col = g_connected ? clrLime : clrRed;
+   string status_str = "";
+   color status_col = clrRed;
+   if(g_connected)
+   {
+      status_str = StringFormat("📡 Status: 🟢 CONNECTED (%.1f ms)", g_last_ping_ms);
+      status_col = clrLime;
+   }
+   else
+   {
+      if(g_last_error_code > 0)
+         status_str = StringFormat("📡 Status: 🔴 DISCONNECTED (Err: %d | Retrying...)", g_last_error_code);
+      else
+         status_str = "📡 Status: 🔴 DISCONNECTED (Auto-reconnecting...)";
+      status_col = clrRed;
+   }
 
    SetLabelText(HUD_PREFIX + "STATUS", status_str, status_col);
 
