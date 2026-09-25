@@ -19,7 +19,7 @@
 
 //--- INPUT PARAMETERS
 input group "=== 🌐 TOKYO LINUX VPS CONNECTION ==="
-input string   InpHost              = "127.0.0.1";         // Linux VPS IP Address (e.g. 34.85.xxx.xxx)
+input string   InpHost              = "34.153.209.188";    // Linux VPS IP Address (Tokyo GCP)
 input int      InpPort              = 5555;                // TCP Bridge Port (Default: 5555)
 input string   InpSecretKey         = "KhmerMasterCrypto_PropBridge_Fortress_2026"; // Shared Secret Key
 input int      InpTimeoutMs         = 3000;                // Socket Connection Timeout (ms)
