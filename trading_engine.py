@@ -245,9 +245,9 @@ def get_futures_max_sellable_qty(symbol: str, raw_qty: float) -> float:
         import math
         precision = max(0, int(round(-math.log10(step_size))))
         if precision == 0:
-            return float(math.floor(raw_qty))
+            return float(math.floor(round(raw_qty, 8)))
         factor = 10 ** precision
-        max_sellable = math.floor(raw_qty * factor) / factor
+        max_sellable = math.floor(round(raw_qty * factor, 8)) / factor
         return round(max_sellable, precision)
     return round(raw_qty, 3)
 
@@ -264,9 +264,11 @@ def get_max_sellable_qty(symbol: str, raw_balance: float) -> float:
             
     if step_size:
         precision = max(0, int(round(-math.log10(step_size))))
+        if precision == 0:
+            return float(math.floor(round(raw_balance, 8)))
         factor = 10 ** precision
-        max_sellable = math.floor(raw_balance * factor) / factor
-        return max_sellable
+        max_sellable = math.floor(round(raw_balance * factor, 8)) / factor
+        return round(max_sellable, precision)
     return raw_balance
 
 def get_lot_size(symbol: str) -> float:

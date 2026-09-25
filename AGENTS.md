@@ -487,6 +487,14 @@ Any modification that breaks any of the following 30 invariants is considered an
      - Telegram alerts must report exact net realized PnL (`net_exit_pnl`) without artificial clamping (`max(1.00, net_exit_pnl)` is permanently purged).
 - **Enforcement:** Verified by `audit_system.py` [CHECK 32/33].
 
+   6. **IEEE 754 Floating-Point Truncation Elimination & Autonomous Dust Scale-Up Protocol (យន្តការលុបបំបាត់កាក់សល់ & Scale-Up ទុនស្វ័យប្រវត្ត) ៖**
+      - **IEEE 754 Floor Zero-Residual Invariant:** Quantity precision formatting strictly uses `math.floor(round(raw_qty * factor, 8)) / factor` across `trading_engine.py` (`get_futures_max_sellable_qty`, `get_max_sellable_qty`). This eliminates the floating-point truncation artifact (such as $0.57 \times 100 = 56.99999999999999$ flooring to $56$), which previously caused close orders to leave $0.01$ lot size residual dust unclosed on Binance.
+      - **Autonomous Dust Scale-Up / Replenishment on Ultra-High Conviction (\ge 80% - 90%):** If an existing position possesses residual micro-dust (< $2.00 margin, e.g. $0.09 USDT) and the 33-AI Model discovers a fresh high-conviction breakout confluence (\ge 80% - 90%), the engine does NOT skip the coin or let the slot stay stranded. It dynamically calculates the required delta quantity and fires an Instant Market order to scale the margin up to the full target ($5.50 USDT), re-arming TP1 (+8.5%), Breakeven Armor, and TP2 moonshot ratchets.
+      - **Breakeven Defense Scratch Misclassification Elimination:** When Breakeven Armor triggers and the position exits near entry (+0.06% ROI) with a tiny net fee (-$0.04 USDT), the event is strictly classified and reported as a `BREAKEVEN DEFENSE SCRATCH`, permanently prohibiting misleading `RISK PARITY SL` alerts when zero capital loss occurred.
+      - **Autonomous Dust Sweeper:** Unscaled residual micro-dust (< $1.00 margin) held > 2.0 minutes is autonomously swept and closed with `reduce_only=True` to maintain 100% account hygiene.
+
+---
+
 ### Invariant 40: Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Asymmetric Risk Protocol & Five-Layer Defense Architecture Standard
 - **Location:** `smart_swap_engine.py` (`monitor_smart_swap_positions`, `execute_auto_smart_swap_sniper`, `check_token_onchain_vitality`), `solana_trading_wallet.py`, `audit_system.py`, `bot_thread.py`, `scheduler_tasks.py`
 - **Rule:** The Solana On-Chain DEX Execution Engine operates with institutional atomic execution, Jito private mempool bundles, and an adaptive Super Smart Trailing Take-Profit and dynamic on-chain vitality defense protocol:

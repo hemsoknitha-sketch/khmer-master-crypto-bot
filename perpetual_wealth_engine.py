@@ -878,12 +878,13 @@ class PerpetualWealthGeneratorEngine:
                     # Autonomous Position Fill Detection & Telegram Live Alert
                     entry_notified_key = f"wealth_entry_notified_{chat_id}_{sym}"
                     is_entry_notified = (db.get_system_setting(entry_notified_key, "0") == "1")
-                    if not is_entry_notified and app and hasattr(app, "bot"):
+                    fill_pos_margin = (abs(amt) * entry_price) / max(1, leverage)
+                    # Filter: Only broadcast fill alert for active operative positions (>= $1.50 margin), suppressing phantom micro-dust alerts (e.g. $0.09)
+                    if not is_entry_notified and fill_pos_margin >= 1.50 and app and hasattr(app, "bot"):
                         db.update_system_setting(entry_notified_key, "1")
                         try:
                             user_lang = db.get_user_language(chat_id)
                             side_label = "BUY / LONG" if amt > 0 else "SELL / SHORT"
-                            fill_pos_margin = (abs(amt) * entry_price) / max(1, leverage)
                             fill_msg = (
                                 "💎 **[24/7 PERPETUAL WEALTH - POSITION FILLED & LIVE]** 🟢\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -963,6 +964,28 @@ class PerpetualWealthGeneratorEngine:
                             db.update_system_setting(entry_time_key, str(entry_time))
 
                     trade_age_min = max(0.0, (time.time() - entry_time) / 60.0)
+
+                    # Phase 1.4: Autonomous Residual Dust Sweeper
+                    # If position has negligible micro-margin (< $1.00 USDT, like $0.09) and was held >= 2.0 min without scale-up
+                    if pos_margin < 1.00 and trade_age_min >= 2.0:
+                        side_to_close = "SELL" if amt > 0 else "BUY"
+                        print(f"🧹 [PERPETUAL WEALTH DUST SWEEPER] User {chat_id}: Sweeping unclosed residual dust {sym} (Amt: {amt} / Margin: ${pos_margin:.2f})...")
+                        trading_engine.place_futures_order(
+                            api_key=api_key,
+                            api_secret=api_secret,
+                            symbol=sym,
+                            side=side_to_close,
+                            quantity=abs(amt),
+                            leverage=leverage,
+                            reduce_only=True,
+                            position_side=pos_side
+                        )
+                        db.update_system_setting(peak_roi_key, "0.0")
+                        db.update_system_setting(tp1_taken_key, "0")
+                        db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+                        db.update_system_setting(f"wealth_entry_notified_{chat_id}_{sym}", "0")
+                        db.update_system_setting(entry_time_key, "0.0")
+                        continue
 
                     # Phase 1.5: Institutional Anti-Stagnation Smart Clock (Minimum 120-180m)
                     # Eliminates premature 30m/60m chop exits, giving breakout trends room to develop
@@ -1162,8 +1185,11 @@ class PerpetualWealthGeneratorEngine:
                         
                         if is_be_trigger or is_sl_trigger:
                             side_to_close = "SELL" if amt > 0 else "BUY"
-                            is_be_exit = is_be_trigger and not is_sl_trigger and (net_exit_pnl > 0.0)
-                            reason_tag = f"BREAKEVEN NET FLOOR DEFENSE (+{be_net_floor_roi:.1f}% ROI / +${net_exit_pnl:.2f} Net)" if is_be_exit else "FIXED DOLLAR RISK PARITY SL ($1.50 Cap)"
+                            is_be_exit = is_be_trigger and not is_sl_trigger
+                            if is_be_exit:
+                                reason_tag = f"BREAKEVEN NET FLOOR DEFENSE (+{be_net_floor_roi:.1f}% ROI / +${net_exit_pnl:.2f} Net)" if net_exit_pnl > 0.0 else f"BREAKEVEN CAPITAL DEFENSE (+{roi_pct:.2f}% ROI / ${net_exit_pnl:.2f} Net)"
+                            else:
+                                reason_tag = "FIXED DOLLAR RISK PARITY SL ($1.50 Cap)"
                             print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
                             trading_engine.place_futures_order(
                                 api_key=api_key,
@@ -1189,27 +1215,50 @@ class PerpetualWealthGeneratorEngine:
                                 if is_be_exit:
                                     try:
                                         user_lang = db.get_user_language(chat_id)
-                                        be_msg = (
-                                            "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
-                                            f"🛡️ **កម្រិតការពារ ៖** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% ROI)`\n"
-                                            f"💵 **Exit ROI សម្រេច ៖** `+{roi_pct:.2f}%` 🟢\n"
-                                            f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${net_exit_pnl:,.2f} USDT`\n"
-                                            f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ធានាសល់ចំណេញសុទ្ធពិតប្រាកដ!`\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _Breakeven Armor ធានាដាច់ខាតមិនឱ្យខាតដើម និងច្បាមចំណេញសុទ្ធពិតប្រាកដ!_"
-                                        ) if user_lang == 'khmer' else (
-                                            "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            f"🪙 **Symbol / Pair:** `{sym}`\n"
-                                            f"🛡️ **Defense Standard:** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% ROI)`\n"
-                                            f"💵 **Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
-                                            f"🏆 **Net Realized Profit:** `+${net_exit_pnl:,.2f} USDT`\n"
-                                            f"✅ **Binance Fees:** `100% Deducted & Real Net Profit Preserved!`\n"
-                                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _Breakeven Armor strictly preserved capital with real net positive profit!_"
-                                        )
+                                        if net_exit_pnl > 0.0:
+                                            be_msg = (
+                                                "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                                                f"🛡️ **កម្រិតការពារ ៖** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% ROI)`\n"
+                                                f"💵 **Exit ROI សម្រេច ៖** `+{roi_pct:.2f}%` 🟢\n"
+                                                f"🏆 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `+${net_exit_pnl:,.2f} USDT`\n"
+                                                f"✅ **ថ្លៃសេវា (Binance Fees) ៖** `កាត់រួចរាល់ ១០០% ធានាសល់ចំណេញសុទ្ធពិតប្រាកដ!`\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                "💡 _Breakeven Armor ធានាដាច់ខាតមិនឱ្យខាតដើម និងច្បាមចំណេញសុទ្ធពិតប្រាកដ!_"
+                                            ) if user_lang == 'khmer' else (
+                                                "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN HARVEST]** 💰\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🪙 **Symbol / Pair:** `{sym}`\n"
+                                                f"🛡️ **Defense Standard:** `Dynamic Trailing Floor (+{be_net_floor_roi:.1f}% ROI)`\n"
+                                                f"💵 **Exit ROI:** `+{roi_pct:.2f}%` 🟢\n"
+                                                f"🏆 **Net Realized Profit:** `+${net_exit_pnl:,.2f} USDT`\n"
+                                                f"✅ **Binance Fees:** `100% Deducted & Real Net Profit Preserved!`\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                "💡 _Breakeven Armor strictly preserved capital with real net positive profit!_"
+                                            )
+                                        else:
+                                            be_msg = (
+                                                "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN CAPITAL DEFENSE]** 🛡️\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
+                                                f"🛡️ **កម្រិតការពារ ៖** `Dynamic Trailing Breakeven Shield`\n"
+                                                f"💵 **Exit ROI ៖** `{roi_pct:+.2f}%` ⚪\n"
+                                                f"💵 **PnL សុទ្ធ ៖** `-${abs(net_exit_pnl):,.2f} USDT` (ថ្លៃ Fee ជួញដូរ Binance)\n"
+                                                f"🔒 **ការការពារដើមទុន ៖** `កាត់ការពារដើមទាន់ពេល ១០០% មិនឱ្យខាតធ្ងន់!`\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                "💡 _Breakeven Armor បានការពារដើមទុនទាន់ពេលវេលា ចៀសវាងការខាតបង់ធំ!_"
+                                            ) if user_lang == 'khmer' else (
+                                                "🛡️ **[24/7 WEALTH GENERATOR - BREAKEVEN CAPITAL DEFENSE]** 🛡️\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🪙 **Symbol / Pair:** `{sym}`\n"
+                                                f"🛡️ **Defense Standard:** `Dynamic Trailing Breakeven Shield`\n"
+                                                f"💵 **Exit ROI:** `{roi_pct:+.2f}%` ⚪\n"
+                                                f"💵 **Net PnL:** `-${abs(net_exit_pnl):,.2f} USDT` (Round-Trip Fee Offset)\n"
+                                                f"🔒 **Capital Defense:** `Protected 100% principal from deep market reversal!`\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                "💡 _Breakeven Armor preserved capital at scratch level, preventing downside risk!_"
+                                            )
                                         asyncio.create_task(_async_send_wealth_alert(app, chat_id, be_msg, "Breakeven exit alert"))
                                     except Exception as alert_err:
                                         print(f"⚠️ Notice sending Breakeven alert: {alert_err}")
@@ -1279,12 +1328,32 @@ class PerpetualWealthGeneratorEngine:
 
                     # Check current open positions count AND open limit orders
                     open_pos = trading_engine.get_open_positions(api_key, api_secret)
-                    open_symbols = set([
-                        p.get("symbol") for p in open_pos 
-                        if abs(float(p.get("positionAmt", 0.0))) > 0.0
-                        and db.get_system_setting(f"pre_pump_active_{chat_id}_{p.get('symbol')}", "0") != "1"
-                        and db.get_system_setting(f"macro_trade_{chat_id}_{p.get('symbol')}_peak_roi", None) is None
-                    ]) if isinstance(open_pos, list) else set()
+                    open_symbols = set()
+                    dust_positions = {}
+                    if isinstance(open_pos, list):
+                        for p in open_pos:
+                            p_amt = float(p.get("positionAmt", 0.0))
+                            if abs(p_amt) <= 0.0:
+                                continue
+                            p_sym = p.get("symbol")
+                            if db.get_system_setting(f"pre_pump_active_{chat_id}_{p_sym}", "0") == "1":
+                                continue
+                            if db.get_system_setting(f"macro_trade_{chat_id}_{p_sym}_peak_roi", None) is not None:
+                                continue
+                            p_ep = float(p.get("entryPrice") or p.get("markPrice") or 0.0)
+                            p_lev = int(p.get("leverage") or 10)
+                            p_margin = (abs(p_amt) * p_ep) / max(1, p_lev) if p_ep > 0 else 5.0
+                            if p_margin < 2.00:
+                                # Residual dust position (< $2.00 margin, like $0.09)
+                                dust_positions[p_sym] = {
+                                    "amt": p_amt,
+                                    "side": "BUY" if p_amt > 0 else "SELL",
+                                    "margin": p_margin,
+                                    "entry_price": p_ep,
+                                    "leverage": p_lev
+                                }
+                            else:
+                                open_symbols.add(p_sym)
 
                     open_orders = trading_engine.get_futures_open_orders(api_key, api_secret)
                     pending_order_symbols = set(o.get("symbol") for o in open_orders if o.get("symbol")) if isinstance(open_orders, list) else set()
@@ -1339,14 +1408,26 @@ class PerpetualWealthGeneratorEngine:
                             raw_qty = notional / last_price if last_price > 0 else 0.0
                             step_size = trading_engine.get_lot_size(sym)
                             precision = int(round(-math.log10(step_size))) if step_size < 1 else 0
-                            qty = round(math.floor(raw_qty / step_size) * step_size, precision) if step_size > 0 else round(raw_qty, 2)
+                            target_total_qty = round(math.floor(round(raw_qty / step_size, 8)) * step_size, precision) if step_size > 0 else round(raw_qty, 2)
 
-                            if qty <= 0:
+                            # Dynamic Scale-Up / Replenishment of micro-dust position (< $2.00 margin, like $0.09)
+                            existing_dust = dust_positions.get(sym)
+                            is_scaleup = False
+                            if existing_dust and existing_dust.get("side") == side:
+                                dust_amt = abs(existing_dust["amt"])
+                                raw_add_qty = max(0.0, target_total_qty - dust_amt)
+                                qty = round(math.floor(round(raw_add_qty / step_size, 8)) * step_size, precision) if step_size > 0 else round(raw_add_qty, 2)
+                                is_scaleup = True
+                            else:
+                                qty = target_total_qty
+
+                            if qty <= 0 or (qty * last_price) < 5.05:
                                 continue
 
                             # Aggressive Instant Market Execution to capture breakout momentum (Zero Adverse Selection)
                             limit_entry_p = trading_engine.format_price_to_tick_size(sym, last_price)
-                            print(f"🚀 [24/7 WEALTH GENERATOR AGGRESSIVE ENTRY] User {chat_id}: Executing {sym} {side} MARKET @ ${limit_entry_p} (${margin_per_coin:.2f} USDT x{leverage} lev, ATR: {cand_atr:.1f}%)...")
+                            entry_mode_tag = "MARKET (Instant Scale-Up & Re-Arm)" if is_scaleup else "MARKET (Instant Fill)"
+                            print(f"🚀 [24/7 WEALTH GENERATOR AGGRESSIVE ENTRY] User {chat_id}: Executing {sym} {side} {entry_mode_tag} @ ${limit_entry_p} (${margin_per_coin:.2f} USDT x{leverage} lev, ATR: {cand_atr:.1f}%)...")
 
                             # Execute MARKET order for immediate fill
                             order_res = trading_engine.place_futures_order(
@@ -1388,6 +1469,13 @@ class PerpetualWealthGeneratorEngine:
                             # Save entry time for Anti-Stagnation Smart Clock
                             db.update_system_setting(f"wealth_entry_time_{chat_id}_{sym}", str(time.time()))
 
+                            # If scaleup was performed, reset state tracking so the expanded trade has fresh monitoring
+                            if is_scaleup:
+                                db.update_system_setting(f"wealth_entry_notified_{chat_id}_{sym}", "0")
+                                db.update_system_setting(f"wealth_peak_roi_{chat_id}_{sym}", "0.0")
+                                db.update_system_setting(f"wealth_tp1_done_{chat_id}_{sym}", "0")
+                                db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
+
                             # Immediate Telegram Live Alert for successful execution
                             if app and hasattr(app, "bot"):
                                 try:
@@ -1396,7 +1484,6 @@ class PerpetualWealthGeneratorEngine:
                                     chg_1h_val = cand.get('chg_1h', 1.0)
                                     adx_val = cand.get('adx_15m', 28.0)
                                     ai_conf_val = cand.get('ai_confidence', 85.0)
-                                    entry_mode_tag = "MARKET (Instant Fill)"
                                     entry_msg = (
                                         "💎 **[24/7 PERPETUAL WEALTH - ORDER DISPATCHED]** 🟢\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
