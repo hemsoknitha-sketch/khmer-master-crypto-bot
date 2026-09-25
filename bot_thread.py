@@ -19794,7 +19794,7 @@ class TelegramBotThread(BaseThread):
                         magic=888999
                     )
                     reached = res.get("clients_reached", 0)
-                    if user_lang == 'khmer':
+                    if user_lang in ['km', 'khmer']:
                         msg_test = (
                             f"⚡ **MT5 BRIDGE SIGNAL DISPATCH TEST** ⚡\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -19825,7 +19825,7 @@ class TelegramBotThread(BaseThread):
                         if o.get("status") == "FILLED" and o.get("ticket"):
                             bridge.dispatch_close(ticket=o["ticket"], symbol=o.get("symbol"))
                             closed_count += 1
-                    if user_lang == 'khmer':
+                    if user_lang in ['km', 'khmer']:
                         msg_close = (
                             f"🛑 **MT5 EMERGENCY CLOSE ALL EXECUTED** ⚡\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -19890,7 +19890,7 @@ class TelegramBotThread(BaseThread):
                 ]
             ])
 
-            if user_lang == 'khmer':
+            if user_lang in ['km', 'khmer']:
                 msg_mt5 = (
                     f"⚡ **APEX INSTITUTIONAL ZEROMQ / TCP MT5 BRIDGE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
