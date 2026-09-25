@@ -20428,7 +20428,7 @@ class TelegramBotThread(BaseThread):
             # Command: /admin_capital ON <chat_id_or_acc_id> [budget] [live|demo]
             if sub in ["ON", "START", "ACTIVATE", "ENABLE"]:
                 if len(args) < 2:
-                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital on 329979279335052484 50 live` ``", parse_mode="Markdown")
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital on 329979279335052484 50 live 5` ``", parse_mode="Markdown")
                     return
 
                 target_uid, u_record = _resolve_target(args[1])
@@ -20443,6 +20443,8 @@ class TelegramBotThread(BaseThread):
                 # Auto verify referral
                 db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
                 max_pos = 3 if budget <= 15.0 else 2
+                if len(args) >= 5 and args[4].isdigit():
+                    max_pos = int(args[4])
                 db.set_capital_auto_config(target_uid, enabled=True, budget=budget, max_positions=max_pos, is_demo=is_demo)
 
                 # Fetch real balance for feedback
@@ -20888,22 +20890,29 @@ class TelegramBotThread(BaseThread):
                             await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                             return
 
+                        max_pos = 2
                         if is_numeric_budget:
                             budget = float(sub_opt)
+                            max_pos = 3 if budget <= 15.0 else 2
+                            if len(args) >= 3:
+                                try:
+                                    max_pos = int(args[2])
+                                except ValueError:
+                                    pass
                         elif len(args) >= 3:
                             try:
                                 budget = float(args[2])
                             except ValueError:
                                 budget = 10.0
+                            max_pos = 3 if budget <= 15.0 else 2
+                            if len(args) >= 4:
+                                try:
+                                    max_pos = int(args[3])
+                                except ValueError:
+                                    pass
                         else:
                             budget = 10.0
-
-                        max_pos = 3 if budget <= 15.0 else 2
-                        if len(args) >= 4:
-                            try:
-                                max_pos = int(args[3])
-                            except ValueError:
-                                pass
+                            max_pos = 3 if budget <= 15.0 else 2
 
                         db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
                         pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
@@ -20961,7 +20970,7 @@ class TelegramBotThread(BaseThread):
                             f"🏦 **គណនី ៖** `{env_mode}`\n"
                             f"🆔 **Live Account ID ៖** `{live_acc_id}`\n"
                             f"💰 **សមតុល្យពិត (Live Balance) ៖** `${live_bal:,.2f} USD` (Available: `${live_avail:,.2f}`)\n"
-                            f"💵 **ទុនកំណត់ក្នុងមួយជុំ ៖** `${budget:,.2f} USD`\n"
+                            f"💵 **ទុនកំណត់ក្នុងមួយជុំ ៖** `${budget:,.2f} USD` (Max: `{max_pos}` Positions)\n"
                             f"🏛️ **ឧបករណ៍វិនិយោគ ៖** `មាស, ហ្គាស, ហ៊ុន (Meta, Google), S&P500 (ចន្ទ-សុក្រ) | Crypto (ចុងសប្តាហ៍)`\n"
                             f"🛡️ **ការបែងចែកដាច់ដោយឡែក (Dual-Engine Isolation) ៖**\n"
                             f"• `✅ 100% ដាច់ពី Prop Firm Challenge ($10,000 Demo) មិនប៉ះពាល់គ្នាឡើយ!`\n"
@@ -20975,7 +20984,7 @@ class TelegramBotThread(BaseThread):
                             f"🏦 **Account:** `{env_mode}`\n"
                             f"🆔 **Live Account ID:** `{live_acc_id}`\n"
                             f"💰 **Live Balance:** `${live_bal:,.2f} USD` (Available: `${live_avail:,.2f}`)\n"
-                            f"💵 **Budget Per Round:** `${budget:,.2f} USD`\n"
+                            f"💵 **Budget Per Round:** `${budget:,.2f} USD` (Max: `{max_pos}` Positions)\n"
                             f"🏛️ **Instruments:** `GOLD, NATGAS, Equities (META, GOOGL), US500 (Mon-Fri) | Crypto (Weekend)`\n"
                             f"🛡️ **Dual-Engine Isolation:**\n"
                             f"• `✅ 100% Isolated from Prop Firm Challenge ($10,000 Demo)`\n"
@@ -20989,7 +20998,13 @@ class TelegramBotThread(BaseThread):
                     elif sub_opt in ["DEMO", "TEST"]:
                         target_is_demo = True
                         budget = float(args[2]) if len(args) >= 3 else 10.0
-                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, is_demo=target_is_demo)
+                        max_pos = 3 if budget <= 15.0 else 2
+                        if len(args) >= 4:
+                            try:
+                                max_pos = int(args[3])
+                            except ValueError:
+                                pass
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
                         pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         demo_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
                         bal_data = await asyncio.to_thread(demo_engine.get_account_balance)
@@ -21240,7 +21255,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle) ៖** កាត់បន្ថយ Spread Drag មកត្រឹម <= 10%\n"
                     f"• **Kelly Sizer ($f^*) ៖** គណនា Lot ល្អបំផុតកាត់បន្ថយ Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -21284,7 +21299,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle):** Limits spread drag to <= 10%\n"
                     f"• **Kelly Sizer ($f^*$) :** Optimal mathematical lot scaling\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"

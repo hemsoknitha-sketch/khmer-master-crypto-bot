@@ -414,6 +414,7 @@ Any modification that breaks any of the following 30 invariants is considered an
      - `partner_code` contains `az48cxia` in `capital_user_referrals`, or
      - `license_expiry == 'Administrator'`.
   5. **1-Tap Admin Approval Workflow:** Users can submit instant verification requests via Telegram (`btn_cap_req_verify`), generating an interactive approval card for Super Admin with `[ ✅ Approve Live Access ]` and `[ ❌ Reject ]` callbacks.
+   6. **Multi-Asset 5-Position Auto-Trade Standard:** Users and Admins can configure up to 5 concurrent positions across 24/7 priority assets (e.g. /capital AUTO ON 50 5 or /admin_capital on <id> 50 live 5). Daytime Asian and London sessions scan at least 7 liquid 24-hour assets (US500, GOLD, US100, OIL_CRUDE, SILVER, BTCUSD, ETHUSD) while Wall Street NY session activates US Mega-Cap stocks (NVDA, TSLA, AAPL, MSFT, GOOGL, META) guaranteeing up to 5 active positions round-the-clock.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 29/30].
 
 ### Invariant 37: Super Smart 24/7 Multi-Session Forex Exchange & Satellite Geospatial Alpha Protocol

@@ -806,7 +806,16 @@ class CapitalComEngine:
             }
 
         # 2. Spread Guard
-        max_spreads = {"GOLD": 0.90, "US500": 1.20, "OIL_CRUDE": 0.08, "BTCUSD": 80.0}
+        max_spreads = {
+            "GOLD": 0.90,
+            "SILVER": 0.08,
+            "US500": 1.20,
+            "US100": 3.50,
+            "OIL_CRUDE": 0.08,
+            "BTCUSD": 80.0,
+            "ETHUSD": 10.0,
+            "SOLUSD": 1.0
+        }
         max_spread = max_spreads.get(resolved_epic, 2.0)
         if spread > max_spread:
             return {
@@ -2151,10 +2160,10 @@ class CapitalAutonomousEngine:
             return ["US500", "GOLD", "NVDA", "TSLA", "US100", "GOOGL", "META", "OIL_CRUDE"]
         # London Session (08:00 - 13:30 UTC = 15:00 - 20:30 Phnom Penh)
         elif 8 <= hour_utc < 13:
-            return ["US500", "GOLD", "OIL_CRUDE", "GERMANY40"]
+            return ["US500", "GOLD", "US100", "GERMANY40", "OIL_CRUDE", "SILVER", "BTCUSD"]
         # Asian Session (00:00 - 08:00 UTC = 07:00 - 15:00 Phnom Penh)
         else:
-            return ["US500", "GOLD", "OIL_CRUDE"]
+            return ["US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD"]
 
     def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
         """
@@ -2907,6 +2916,8 @@ class CapitalAutonomousEngine:
                     leverage_boost = 50.0
                 elif any(x in resolved_epic.upper() for x in ["US100", "NASDAQ", "GOOGL", "META", "AAPL", "MSFT"]):
                     leverage_boost = 35.0
+                elif any(x in resolved_epic.upper() for x in ["SILVER", "BTCUSD", "ETHUSD"]):
+                    leverage_boost = 25.0
                 elif any(x in resolved_epic.upper() for x in ["OIL_CRUDE", "OIL", "GERMANY40"]):
                     leverage_boost = 10.0
                 elif any(x in resolved_epic.upper() for x in ["NATURALGAS", "GAS"]):
@@ -3904,6 +3915,7 @@ class CapitalKellyPositionSizer:
     # Asset baseline specifications & lot step boundaries
     ASSET_RULES = {
         "GOLD": {"base_low": 0.07, "base_high": 0.15, "min_lot": 0.01, "max_lot": 1.0, "lot_step": 0.01, "precision": 2},
+        "SILVER": {"base_low": 1.0, "base_high": 3.0, "min_lot": 0.5, "max_lot": 20.0, "lot_step": 0.1, "precision": 1},
         "NATURALGAS": {"base_low": 10.0, "base_high": 25.0, "min_lot": 1.0, "max_lot": 100.0, "lot_step": 1.0, "precision": 1},
         "GAS": {"base_low": 10.0, "base_high": 25.0, "min_lot": 1.0, "max_lot": 100.0, "lot_step": 1.0, "precision": 1},
         "META": {"base_low": 0.08, "base_high": 0.18, "min_lot": 0.01, "max_lot": 1.0, "lot_step": 0.01, "precision": 2},
