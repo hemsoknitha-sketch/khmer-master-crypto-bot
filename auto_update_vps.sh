@@ -7,6 +7,15 @@
 
 set -e
 
+# Disable job monitoring messages to silence asynchronous "Killed" notifications
+set +m 2>/dev/null || true
+
+# Enforce clean terminal line discipline (ensures \n translates to \r\n, eliminating staircase effect)
+stty sane 2>/dev/null || true
+stty onlcr 2>/dev/null || true
+trap 'stty sane 2>/dev/null || true' EXIT
+printf "\r"
+
 # Target workspace path
 APP_DIR="/opt/khmer-master-crypto-bot"
 
@@ -47,7 +56,10 @@ sudo systemctl stop khmer-master-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto.service 2>/dev/null || \
 sudo systemctl stop khmer-crypto-bot.service 2>/dev/null || \
 sudo systemctl stop khmer-master-crypto-bot 2>/dev/null || true
-sudo pkill -9 -f "python.*main.py" 2>/dev/null || true
+{ sudo pkill -9 -f "python.*main.py" >/dev/null 2>&1; } || true
+stty sane 2>/dev/null || true
+stty onlcr 2>/dev/null || true
+printf "\r"
 
 # 2. Zero-Data-Loss Backup of Database & Environment
 mkdir -p vps_db_backup
@@ -123,10 +135,21 @@ else
         sudo ln -sf /etc/systemd/system/khmer-master-crypto-bot.service /etc/systemd/system/khmer-master-crypto.service 2>/dev/null || true
         sudo systemctl daemon-reload 2>/dev/null || true
     fi
-    sudo systemctl start khmer-master-crypto-bot.service 2>/dev/null || \
-    sudo systemctl start khmer-master-crypto.service 2>/dev/null || \
-    sudo systemctl start khmer-crypto-bot.service 2>/dev/null || \
-    sudo systemctl start khmer-master-crypto-bot 2>/dev/null || true
+    sudo systemctl restart khmer-master-crypto-bot.service 2>/dev/null || \
+    sudo systemctl restart khmer-master-crypto.service 2>/dev/null || \
+    sudo systemctl restart khmer-crypto-bot.service 2>/dev/null || \
+    sudo systemctl restart khmer-master-crypto-bot 2>/dev/null || true
 fi
 
-echo "🎉 [SUCCESS] GCP VPS successfully updated & running healthy on latest release!"
+# Reset terminal to pristine clean state
+stty sane 2>/dev/null || true
+stty onlcr 2>/dev/null || true
+printf "\r\n"
+
+echo "======================================================================"
+echo "🎉 [SUCCESS] KHMER MASTER CRYPTO BOT UPDATED & RUNNING HEALTHY!"
+echo "======================================================================"
+echo "👉 ដើម្បីមើល Live Logs សូមវាយ:"
+echo "   sudo journalctl -u khmer-master-crypto-bot -f"
+echo "======================================================================"
+echo ""

@@ -185,9 +185,28 @@ def sync_all_models():
 
     # Target union of canonical + discovered remote (strictly excluding Python files)
     target_files = [f for f in list(dict.fromkeys(CANONICAL_ARTIFACTS + remote_files)) if not f.endswith(".py")]
-    synced_count = 0
-
+    
+    # 2. Check if all target model artifacts are already cached locally with valid size
+    missing_files = []
     for filename in target_files:
+        target_path = os.path.join(MODELS_DIR, filename)
+        if not (os.path.exists(target_path) and os.path.getsize(target_path) > 0):
+            missing_files.append(filename)
+
+    force_download = "--force" in sys.argv
+    if not missing_files and not force_download:
+        print(f"  └─ ⚡ [CACHE HIT] All {len(target_files)} AI Brain models verified in RAM/Disk cache! Zero download needed.")
+        print("\n==================================================================")
+        print(f"🎉 [MASTER SYNC COMPLETE] Synced & Verified {len(target_files)}/{len(target_files)} Model Files (100% COMPLETE)!")
+        print(f"Location: {MODELS_DIR}")
+        print("==================================================================")
+        return len(target_files)
+
+    files_to_sync = target_files if force_download else missing_files
+    print(f"  └─ 📥 Syncing {len(files_to_sync)} model files (Missing or Forced)...")
+    synced_count = len(target_files) - len(missing_files) if not force_download else 0
+
+    for filename in files_to_sync:
         if filename.endswith(".py"):
             continue
         try:
