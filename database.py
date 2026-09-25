@@ -4192,30 +4192,86 @@ def log_turbo_hedge_trade_history(chat_id: int, symbol: str, side: str, entry_pr
         print(f"Error in log_turbo_hedge_trade_history: {e}")
 
 def get_recent_harvested_trades(chat_id: int, hours: int = 8) -> list:
-    """Returns list of trades closed in trade_history within the last `hours` hours."""
+    """Returns list of trades closed across ALL engines (Binance, Capital.com, Smart Swap) within the last `hours` hours."""
     trades = []
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         from datetime import datetime, timedelta
         cutoff_time = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute(
-            "SELECT symbol, side, entry_price, exit_price, pnl, pnl_percent, exit_time, qty FROM trade_history WHERE chat_id = ? AND exit_time >= ? ORDER BY id DESC",
-            (chat_id, cutoff_time)
-        )
-        rows = cursor.fetchall()
+
+        # 1. Binance Futures & Spot Trades (trade_history)
+        try:
+            cursor.execute(
+                "SELECT symbol, side, entry_price, exit_price, pnl, pnl_percent, exit_time, qty FROM trade_history WHERE chat_id = ? AND exit_time >= ? ORDER BY id DESC",
+                (chat_id, cutoff_time)
+            )
+            for r in cursor.fetchall():
+                trades.append({
+                    "symbol": r[0],
+                    "side": r[1],
+                    "entry_price": float(r[2] or 0.0),
+                    "exit_price": float(r[3] or 0.0),
+                    "pnl": float(r[4] or 0.0),
+                    "pnl_percent": float(r[5] or 0.0),
+                    "exit_time": str(r[6] or ""),
+                    "qty": float(r[7]) if len(r) > 7 and r[7] is not None else 0.0,
+                    "engine": "Binance"
+                })
+        except Exception as e_bin:
+            print(f"Error querying trade_history for 8h recap: {e_bin}")
+
+        # 2. Capital.com TradFi Closed Trades (capital_auto_trades)
+        try:
+            cursor.execute(
+                "SELECT epic, direction, entry_price, exit_price, pnl, closed_at, size FROM capital_auto_trades WHERE chat_id = ? AND status = 'CLOSED' AND closed_at >= ? ORDER BY id DESC",
+                (chat_id, cutoff_time)
+            )
+            for r in cursor.fetchall():
+                pnl = float(r[4] or 0.0)
+                entry_p = float(r[2] or 0.0)
+                exit_p = float(r[3] or 0.0)
+                size = float(r[6] or 0.0)
+                cost = (entry_p * size) if (entry_p > 0 and size > 0) else 50.0
+                roi = ((pnl / cost) * 100.0) if cost > 0 else 0.0
+                trades.append({
+                    "symbol": str(r[0] or "TRADFI"),
+                    "side": str(r[1] or "BUY"),
+                    "entry_price": entry_p,
+                    "exit_price": exit_p,
+                    "pnl": pnl,
+                    "pnl_percent": roi,
+                    "exit_time": str(r[5] or ""),
+                    "qty": size,
+                    "engine": "Capital.com"
+                })
+        except Exception as e_cap:
+            pass
+
+        # 3. Smart Swap DEX Closed Swaps (smart_swap_trade_history)
+        try:
+            cursor.execute(
+                "SELECT token_symbol, action, amount_usd, pnl_usd, roi_pct, closed_at FROM smart_swap_trade_history WHERE chat_id = ? AND closed_at >= ? ORDER BY id DESC",
+                (chat_id, cutoff_time)
+            )
+            for r in cursor.fetchall():
+                trades.append({
+                    "symbol": str(r[0] or "DEX"),
+                    "side": str(r[1] or "SELL"),
+                    "entry_price": 0.0,
+                    "exit_price": 0.0,
+                    "pnl": float(r[3] or 0.0),
+                    "pnl_percent": float(r[4] or 0.0),
+                    "exit_time": str(r[5] or ""),
+                    "qty": float(r[2] or 0.0),
+                    "engine": "Smart Swap"
+                })
+        except Exception as e_sw:
+            pass
+
         conn.close()
-        for r in rows:
-            trades.append({
-                "symbol": r[0],
-                "side": r[1],
-                "entry_price": r[2],
-                "exit_price": r[3],
-                "pnl": r[4],
-                "pnl_percent": r[5],
-                "exit_time": r[6],
-                "qty": float(r[7]) if len(r) > 7 and r[7] is not None else 0.0
-            })
+        # Sort all trades by exit_time descending
+        trades.sort(key=lambda x: x.get("exit_time", ""), reverse=True)
     except Exception as e:
         print(f"Error in get_recent_harvested_trades: {e}")
     return trades

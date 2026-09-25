@@ -3484,11 +3484,11 @@ class TelegramBotThread(BaseThread):
                             eng_cand = parts[0]
                             tf_cand = "_".join(parts[1:])
                         engine_filter = None if eng_cand in ["all", "", "none"] else eng_cand
-                        timeframe = tf_cand if tf_cand in ["daily", "monthly", "yearly", "lifetime"] else "daily"
+                        timeframe = tf_cand if tf_cand in ["8h", "8hour", "daily", "monthly", "yearly", "lifetime"] else "daily"
                 elif suffix.startswith("refresh_"):
                     parts = suffix[8:].split("_")
                     if parts:
-                        timeframe = parts[0] if parts[0] in ["daily", "monthly", "yearly", "lifetime"] else "daily"
+                        timeframe = parts[0] if parts[0] in ["8h", "8hour", "daily", "monthly", "yearly", "lifetime"] else "daily"
                         eng_cand = "_".join(parts[1:]) if len(parts) > 1 else "all"
                         engine_filter = None if eng_cand in ["all", "", "none"] else eng_cand
                 elif suffix in ["8h", "executive", "8hours", "8hour"]:

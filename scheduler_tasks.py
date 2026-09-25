@@ -6632,8 +6632,10 @@ async def build_vip_8hour_executive_report(chat_id: int):
     7. ⚡ DeFi Flash Loan Tokyo HFT MEV Keeper (/flash_loan)
     8. 🔄 Smart Swap DEX Gem Sniper (/smart_swap)
     9. 🌾 Delta-Neutral Funding Harvester (/funding_harvester)
+    10. 🏛️ Capital.com TradFi Suite (/capital: Gold, Oil, US500, FX, ORB, Lead-Lag)
+    11. 🛡️ System Security Citadel & Latency Sentinel (/citadel)
     
-    Unified Live Portfolio Tracking across both Binance Futures & Spot with real-time floating PnL.
+    Unified Live Portfolio Tracking across Binance Futures, Spot, Capital.com, and Solana DEX.
     Enforces Invariant 13 (12-char mobile dividers) and Invariant 11 (100% active routed buttons).
     """
     from ui_standards import DIVIDER_DOUBLE, DIVIDER_HEAVY, DIVIDER_LIGHT, OFFICIAL_FOOTNOTE
@@ -6647,14 +6649,23 @@ async def build_vip_8hour_executive_report(chat_id: int):
 
     # 1. Multi-Wallet Live Balances
     spot_usdt = 0.0
+    spot_alt_exposure = 0.0
     fut_bal = 0.0
     avail_bal = 0.0
+    fut_floating_pnl = 0.0
+
     if has_api:
         try:
             spot_usdt = await asyncio.to_thread(trading_engine.get_spot_balance, f_keys[0], f_keys[1], "USDT")
             spot_usdt = float(spot_usdt or 0.0)
         except Exception as e:
             print(f"Error fetching spot balance for 8h report: {e}")
+
+        try:
+            spot_alt_val, _ = await asyncio.to_thread(trading_engine.get_total_spot_exposure, f_keys[0], f_keys[1])
+            spot_alt_exposure = float(spot_alt_val or 0.0)
+        except Exception as e:
+            print(f"Error fetching spot alt exposure for 8h report: {e}")
 
         try:
             f_b, _ = await asyncio.to_thread(trading_engine.get_futures_balance_detailed, f_keys[0], f_keys[1], "USDT")
@@ -6672,11 +6683,38 @@ async def build_vip_8hour_executive_report(chat_id: int):
     if fut_bal <= 0 and avail_bal > 0:
         fut_bal = avail_bal
 
+    # Capital.com Live Equity (if connected)
+    cap_equity = 0.0
+    has_capital = db.has_user_capital_credentials(chat_id) if hasattr(db, 'has_user_capital_credentials') else False
+    if has_capital:
+        try:
+            import capital_engine
+            c_client = capital_engine.CapitalTradingClient(chat_id=chat_id)
+            c_info = await asyncio.to_thread(c_client.get_account_balance)
+            if c_info and isinstance(c_info, dict):
+                cap_equity = float(c_info.get("total_equity", 0.0) or c_info.get("balance", 0.0) or 0.0)
+        except Exception as e:
+            print(f"Error fetching Capital.com equity for 8h report: {e}")
+
+    # Solana Web3 Wallet Balance (if configured)
+    sol_usd_val = 0.0
+    sol_amount = 0.0
+    sol_wallet = db.get_user_solana_wallet(chat_id) if hasattr(db, 'get_user_solana_wallet') else None
+    if sol_wallet:
+        try:
+            import solana_trading_wallet as stw
+            sol_data = await asyncio.to_thread(stw.get_solana_balance, sol_wallet.get("public_key"))
+            if sol_data and isinstance(sol_data, dict):
+                sol_amount = float(sol_data.get("sol_balance", 0.0) or 0.0)
+                sol_usd_val = float(sol_data.get("usd_value", 0.0) or 0.0)
+        except Exception as e:
+            print(f"Error fetching Solana wallet balance for 8h report: {e}")
+
     # 2. Gather Status Across ALL Trading Engines
     # Engine 1: Macro Auto-Trade
     macro_cfg = db.get_macro_auto_trade_config(chat_id) if hasattr(db, 'get_macro_auto_trade_config') else {}
     macro_enabled = bool(macro_cfg.get("enabled", False))
-    macro_amt = float(macro_cfg.get("amount", 30.0))
+    macro_amt = float(macro_cfg.get("amount", 25.0))
     macro_lev = int(macro_cfg.get("leverage", 3))
     macro_trades = db.get_user_macro_trades(chat_id) if hasattr(db, 'get_user_macro_trades') else []
     macro_status = f"🟢 `ACTIVE (${macro_amt:,.2f} | {macro_lev}x | {len(macro_trades)}/2 Swings)`" if macro_enabled else "⚪ `STANDBY`"
@@ -6708,8 +6746,17 @@ async def build_vip_8hour_executive_report(chat_id: int):
 
     # Engine 5: Smart Trade Spot Breakout
     is_auto_tr = db.is_auto_trade_enabled(chat_id) if hasattr(db, 'is_auto_trade_enabled') else False
+    is_smart_tr = (db.get_system_setting(f"smart_trade_{chat_id}_status", "0") == "1")
+    auto_cfg = db.get_auto_trade_config(chat_id) if hasattr(db, 'get_auto_trade_config') else {}
+    st_budget = float(auto_cfg.get("amount", 30.0))
     spot_trades_db = db.get_active_trades_by_user(chat_id) if hasattr(db, 'get_active_trades_by_user') else []
-    trade_status = f"🟢 `ACTIVE ({len(spot_trades_db)} Spot Trades)`" if (is_auto_tr or spot_trades_db) else "⚪ `STANDBY`"
+    if is_auto_tr or is_smart_tr or spot_trades_db:
+        if len(spot_trades_db) > 0:
+            trade_status = f"🟢 `ACTIVE (${st_budget:,.2f} | {len(spot_trades_db)} Spot Trades)`"
+        else:
+            trade_status = f"🟢 `ACTIVE (${st_budget:,.2f} | Scanning Breakouts)`"
+    else:
+        trade_status = "⚪ `STANDBY`"
 
     # Engine 6: SmartX AI Swarm
     is_hyper = db.is_hyper_trade_enabled(chat_id) if hasattr(db, 'is_hyper_trade_enabled') else False
@@ -6728,20 +6775,39 @@ async def build_vip_8hour_executive_report(chat_id: int):
     is_funding = db.is_funding_harvester_enabled(chat_id) if hasattr(db, 'is_funding_harvester_enabled') else False
     funding_status = "🟢 `ACTIVE (Delta-Neutral Yield)`" if is_funding else "⚪ `STANDBY`"
 
+    # Engine 10: Capital.com TradFi Suite (Gold, Oil, US500, FX, ORB, Lead-Lag)
+    cap_auto = db.is_capital_auto_enabled(chat_id) if hasattr(db, 'is_capital_auto_enabled') else False
+    cap_ll = db.is_capital_leadlag_enabled(chat_id) if hasattr(db, 'is_capital_leadlag_enabled') else False
+    cap_orb = db.is_capital_orb_enabled(chat_id) if hasattr(db, 'is_capital_orb_enabled') else False
+    cap_fx = db.is_capital_forex_enabled(chat_id) if hasattr(db, 'is_capital_forex_enabled') else False
+    cap_cfg = db.get_capital_auto_config(chat_id) if hasattr(db, 'get_capital_auto_config') else {}
+    cap_budget = float(cap_cfg.get("budget", 50.0))
+    is_cap_active = cap_auto or cap_ll or cap_orb or cap_fx
+    if is_cap_active:
+        cap_modes = []
+        if cap_auto: cap_modes.append("Auto")
+        if cap_ll: cap_modes.append("LeadLag")
+        if cap_orb: cap_modes.append("ORB")
+        if cap_fx: cap_modes.append("Forex")
+        capital_status = f"🟢 `ACTIVE (${cap_budget:,.2f} | {', '.join(cap_modes)})`"
+    else:
+        capital_status = "⚪ `STANDBY`"
+
     # Total Active Engines Count
     active_count = sum([
         macro_enabled,
         bool(turbo_bots),
         bool(wb_act or ws_act),
         bool(tot_grids > 0),
-        bool(is_auto_tr or spot_trades_db),
+        bool(is_auto_tr or is_smart_tr or spot_trades_db),
         bool(is_hyper or is_arb),
         is_flash,
         is_swap,
-        is_funding
+        is_funding,
+        is_cap_active
     ])
 
-    # 3. Query Real Live Open Positions across Binance Futures & Spot
+    # 3. Query Real Live Open Positions across Binance Futures & Spot & TradFi
     all_live_positions = []
     total_floating_pnl = 0.0
 
@@ -6770,6 +6836,7 @@ async def build_vip_8hour_executive_report(chat_id: int):
                         eng_tag = "💎 Wealth Gen"
 
                     total_floating_pnl += p_pnl
+                    fut_floating_pnl += p_pnl
                     all_live_positions.append({
                         "symbol": p_sym,
                         "side": "LONG" if p_amt > 0 else "SHORT",
@@ -6806,7 +6873,37 @@ async def build_vip_8hour_executive_report(chat_id: int):
     except Exception as e:
         print(f"Error querying spot trades for 8h report: {e}")
 
-    total_combined_equity = round(fut_bal + spot_usdt + total_floating_pnl, 2)
+    # Active Smart Swap DEX Positions
+    try:
+        active_swaps = db.get_active_smart_swaps(chat_id) if hasattr(db, 'get_active_smart_swaps') else []
+        for sw in active_swaps:
+            sw_sym = sw.get("token_symbol", "DEX")
+            sw_entry = float(sw.get("entry_price", 0.0) or 0.0)
+            sw_peak = float(sw.get("peak_price", 0.0) or sw_entry)
+            sw_usd = float(sw.get("amount_in_usd", 0.0) or 0.0)
+            sw_roi = (((sw_peak - sw_entry) / sw_entry) * 100.0) if sw_entry > 0 else 0.0
+            sw_pnl = (sw_usd * (sw_roi / 100.0))
+            all_live_positions.append({
+                "symbol": sw_sym,
+                "side": "HOLD (100% Bag)",
+                "venue": "Solana (🔄 Smart Swap)",
+                "entry_price": sw_entry,
+                "current_price": sw_peak,
+                "pnl": sw_pnl,
+                "roi": sw_roi,
+                "margin": sw_usd
+            })
+            total_floating_pnl += sw_pnl
+    except Exception as e:
+        print(f"Error querying active smart swaps for 8h report: {e}")
+
+    # Total Spot Real Asset Value = Free Spot USDT + Active Spot Altcoins Value
+    total_spot_equity = round(spot_usdt + spot_alt_exposure, 2)
+    # Total Futures Real Asset Value = Total Wallet Balance + Floating PnL
+    total_futures_equity = round(fut_bal + fut_floating_pnl, 2)
+    # Total Combined Institutional Equity
+    total_combined_equity = round(total_futures_equity + total_spot_equity + cap_equity + sol_usd_val, 2)
+
     now_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
     # Build Beautiful Super Smart Markdown Report (Invariant 13: 12-char dividers)
@@ -6826,9 +6923,25 @@ async def build_vip_8hour_executive_report(chat_id: int):
         f"• ⚡ **Flash MEV Keeper ៖** {flash_status}\n"
         f"• 🔄 **Smart Swap DEX ៖** {swap_status}\n"
         f"• 🌾 **Funding Harvester ៖** {funding_status}\n"
+    )
+
+    if is_cap_active or has_capital:
+        report_text += f"• 🏛️ **Capital.com TradFi ៖** {capital_status}\n"
+
+    report_text += (
         f"🎮 **ម៉ាស៊ីនសកម្មសរុប ៖** `{active_count} ម៉ាស៊ីនកំពុងតាមប្រមាញ់ & ការពារទុន`\n\n"
         f"{DIVIDER_DOUBLE}\n"
     )
+
+    # 3.1 Smart Capital Allocation Advisory Notice (If Futures active but 0 balance)
+    futures_need_capital = (macro_enabled or bool(turbo_bots) or wb_act)
+    if futures_need_capital and fut_bal < 5.0 and spot_usdt >= 10.0:
+        report_text += (
+            f"⚠️ **ការណែនាំបែងចែកទុន (CAPITAL ADVISORY) ៖**\n"
+            f"• ម៉ាស៊ីន Futures កំពុង ACTIVE ប៉ុន្តែ Futures Wallet មាន `${fut_bal:,.2f} USDT` (Spot មាន `${spot_usdt:,.2f} USDT`)។\n"
+            f"💡 _សូមផ្ទេរទុនពី Spot ➔ Futures តាម Binance App ដើម្បីឱ្យម៉ាស៊ីនអាចចាប់យកឱកាស Trade បាន!_\n\n"
+            f"{DIVIDER_DOUBLE}\n"
+        )
 
     # 4. Position Section
     if not all_live_positions:
@@ -6863,12 +6976,25 @@ async def build_vip_8hour_executive_report(chat_id: int):
         report_text += f"📊 **Floating PnL សរុប ៖** `{total_floating_pnl:+,.2f} USDT` ({flt_emoji})\n\n"
 
     # 5. Live Multi-Wallet Summary
+    spot_disp = f"${spot_usdt:,.2f} USDT"
+    if spot_alt_exposure >= 0.50:
+        spot_disp += f" _(+ Altcoins: `${spot_alt_exposure:,.2f}`)_"
+
     report_text += (
         f"{DIVIDER_DOUBLE}\n"
         f"💰 **សមតុល្យទុនចុងក្រោយ (LIVE EQUITY SUMMARY)**\n"
         f"💵 **Futures Wallet ៖** `${fut_bal:,.2f} USDT`\n"
         f"🏦 **Futures Free Margin ៖** `${avail_bal:,.2f} USDT`\n"
-        f"🪙 **Spot Wallet ៖** `${spot_usdt:,.2f} USDT`\n"
+        f"🪙 **Spot Wallet ៖** `{spot_disp}`\n"
+    )
+
+    if has_capital or cap_equity > 0:
+        report_text += f"🏛️ **Capital.com TradFi ៖** `${cap_equity:,.2f} USD`\n"
+
+    if sol_usd_val > 0:
+        report_text += f"⚡ **Solana Web3 Wallet ៖** `${sol_usd_val:,.2f} USD` _({sol_amount:.3f} SOL)_\n"
+
+    report_text += (
         f"💎 **សរុបទុនរួម (Total Combined Equity) ៖** `${total_combined_equity:,.2f} USDT`\n"
         f"📊 **Active Portfolio ៖** `{len(all_live_positions)} Positions Active`\n\n"
     )
@@ -6890,6 +7016,7 @@ async def build_vip_8hour_executive_report(chat_id: int):
             h_pnl = float(t.get("pnl", 0.0))
             h_roi = float(t.get("pnl_percent", 0.0))
             h_qty = float(t.get("qty", 0.0))
+            h_eng = t.get("engine", "Binance")
 
             if h_qty > 0:
                 trade_notional = (h_entry + h_exit) * h_qty
@@ -6906,7 +7033,7 @@ async def build_vip_8hour_executive_report(chat_id: int):
 
             h_emoji = "🟩" if net_trade_pnl >= 0 else "🟥"
             report_text += (
-                f"**{h_idx}. {h_sym}** ({h_side})\n"
+                f"**{h_idx}. {h_sym}** ({h_side} | {h_eng})\n"
                 f"   💵 **Entry ៖** `${h_entry:,.4f}` ➔ **Harvest ៖** `${h_exit:,.4f}`\n"
                 f"   • Gross ៖ `${h_pnl:+,.2f}` | 💳 Fee ៖ `-${trade_fee:.2f}`\n"
                 f"   {h_emoji} **Net ៖** `${net_trade_pnl:+,.2f} USDT` (`{h_roi:+,.1f}% ROI`)\n\n"
@@ -6942,7 +7069,7 @@ async def build_vip_8hour_executive_report(chat_id: int):
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📊 សវនកម្មពេញលេញ /report", callback_data="btn_report_eng_all_daily"),
-            InlineKeyboardButton("🔄 Refresh សមតុល្យ", callback_data="btn_report_refresh_daily_all")
+            InlineKeyboardButton("🔄 Refresh របាយការណ៍", callback_data="btn_report_refresh_8h_all")
         ],
         [
             InlineKeyboardButton("⚡ Turbo Hedge", callback_data="btn_report_eng_turbo_hedge_daily"),
