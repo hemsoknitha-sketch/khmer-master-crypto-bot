@@ -3,7 +3,7 @@
 # 🚀 KHMER MASTER CRYPTO / APEX AGI ENGINE
 # INSTITUTIONAL 1-CLICK MT5 + XRDP + WINE INSTALLER FOR GOOGLE CLOUD LINUX VPS
 # ==============================================================================
-# Target: Ubuntu 20.04 / 22.04 / 24.04 LTS (x86_64) on GCP e2-standard-4 (Tokyo)
+# Target: Ubuntu 20.04 / 22.04 / 24.04 LTS & Debian 11/12/13 (x86_64) on GCP Tokyo
 # Cost: $0.00 / Month (Zero Windows License Fees, Zero Extra VM Costs)
 # Security: Hardened Polkit, TLS RDP, SSH Tunnel Fortress, Non-Root Isolation
 # ==============================================================================
@@ -61,14 +61,59 @@ if [ "$ARCH" != "x86_64" ]; then
 fi
 
 # ------------------------------------------------------------------------------
+# LOCK-FREE RESILIENT APT HELPER FUNCTIONS
+# ------------------------------------------------------------------------------
+wait_for_dpkg_lock() {
+    local max_wait=120
+    local waited=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+          fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
+          fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
+        echo -e "${YELLOW}⏳ Waiting for background apt/dpkg lock to release... (${waited}s/${max_wait}s)${NC}"
+        sleep 3
+        waited=$((waited + 3))
+        if [ $waited -ge $max_wait ]; then
+            echo -e "${RED}⚠️ Lock held over $max_wait seconds. Safely killing stale background apt processes...${NC}"
+            killall -9 apt-get apt unattended-upgrades dpkg 2>/dev/null || true
+            sleep 2
+            rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock 2>/dev/null || true
+            dpkg --configure -a 2>/dev/null || true
+            break
+        fi
+    done
+}
+
+safe_apt_install() {
+    wait_for_dpkg_lock
+    local retries=5
+    local count=0
+    until DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$@"; do
+        count=$((count + 1))
+        if [ $count -ge $retries ]; then
+            echo -e "${RED}❌ Failed to install $@ after $retries attempts.${NC}"
+            return 1
+        fi
+        echo -e "${YELLOW}⚠️ apt-get busy or interrupted. Retrying ($count/$retries) in 4s...${NC}"
+        sleep 4
+        wait_for_dpkg_lock
+        dpkg --configure -a 2>/dev/null || true
+    done
+}
+
+# Auto-configure any pending dpkg triggers before starting
+wait_for_dpkg_lock
+dpkg --configure -a 2>/dev/null || true
+
+# ------------------------------------------------------------------------------
 # STEP 1: Fast System Update & 32-bit Architecture Enablement
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[1/6] 📦 Enabling 32-bit Multi-Arch & Updating Linux Package Repositories...${NC}"
 dpkg --add-architecture i386 || true
-apt-get update -y -q
+wait_for_dpkg_lock
+apt-get update -y -q || true
 
 echo -e "${CYAN}[2/6] 🖥️ Installing Ultra-Lightweight XFCE4 Desktop (~150MB RAM)...${NC}"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
+safe_apt_install \
     xfce4 \
     xfce4-terminal \
     xfce4-panel \
@@ -112,7 +157,7 @@ chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config"
 # STEP 2: Install & Configure XRDP (Remote Desktop Protocol Server)
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[3/6] 🛡️ Installing & Securing XRDP High-Performance Server...${NC}"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -q xrdp xorgxrdp
+safe_apt_install xrdp xorgxrdp
 
 # Add xrdp user to ssl-cert group to read certificates
 adduser xrdp ssl-cert 2>/dev/null || true
@@ -158,17 +203,21 @@ echo -e "   ${GREEN}✅ XRDP Server is running and listening on port 3389.${NC}"
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[4/6] 🍷 Installing Wine (Windows Emulation Subsystem) & Core Fonts...${NC}"
 
-# Install Wine 64-bit and 32-bit compatibility
-DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
-    wine64 \
-    wine32 \
-    winetricks \
-    zenity \
-    fontconfig
+# Wait for locks and configure
+wait_for_dpkg_lock
+dpkg --configure -a 2>/dev/null || true
 
-# Install Microsoft Core TrueType Fonts for crisp MT5 chart rendering
+# Install Wine with multi-layer compatibility fallback
+if ! command -v wine &>/dev/null; then
+    echo -e "   🍷 Installing Wine packages..."
+    safe_apt_install wine64 wine32:i386 winetricks zenity fontconfig || \
+    safe_apt_install wine64 wine32 winetricks zenity fontconfig || \
+    safe_apt_install wine winetricks zenity fontconfig || true
+fi
+
+# Install fonts for crisp MT5 chart and quote display
 echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections
-DEBIAN_FRONTEND=noninteractive apt-get install -y -q ttf-mscorefonts-installer 2>/dev/null || true
+safe_apt_install ttf-mscorefonts-installer 2>/dev/null || safe_apt_install fonts-wine 2>/dev/null || true
 
 # Refresh font cache
 fc-cache -f -v >/dev/null 2>&1 || true
