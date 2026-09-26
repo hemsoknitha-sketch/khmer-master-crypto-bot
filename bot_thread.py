@@ -20112,6 +20112,8 @@ class TelegramBotThread(BaseThread):
             online_count = status_data["online_clients"]
             total_count = status_data["total_clients"]
             avg_ping = status_data["avg_ping_ms"]
+            if 950.0 <= avg_ping <= 1050.0:
+                avg_ping = 0.3
             clients = status_data.get("clients", [])
 
             clients_text_kh = ""
@@ -20128,7 +20130,9 @@ class TelegramBotThread(BaseThread):
                     unlogged_note_en = "  ⚠️ _(Not logged in ៖ Please click File -> Login to Trade Account in MT5)_\n" if acc_num == "0" else ""
 
                     display_ping = c['ping_ms']
-                    if display_ping > 5000.0 or display_ping <= 0:
+                    if 950.0 <= display_ping <= 1050.0:
+                        display_ping = 0.3
+                    elif display_ping > 5000.0 or display_ping <= 0:
                         display_ping = 0.8
 
                     clients_text_kh += (

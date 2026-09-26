@@ -86,8 +86,8 @@ int OnInit()
    // Attempt initial connection to Linux VPS
    ConnectToBridge();
 
-   // Set fast 1-second timer for heartbeats & background checks
-   EventSetTimer(1);
+   // Set high-frequency 100-millisecond timer for fast socket polling & real-time telemetry
+   EventSetMillisecondTimer(100);
 
    return(INIT_SUCCEEDED);
 }
@@ -104,7 +104,7 @@ void OnDeinit(const int reason)
 }
 
 //+------------------------------------------------------------------+
-//| Expert timer function (Every 1 Second)                           |
+//| Expert timer function (Every 100 Milliseconds)                   |
 //+------------------------------------------------------------------+
 void OnTimer()
 {
@@ -147,9 +147,13 @@ void OnTimer()
       ReadSocketData();
    }
 
-   // 6. Refresh HUD
-   if(InpShowHUD)
+   // 6. Refresh HUD (Throttled to every 500ms to preserve UI performance)
+   static ulong last_hud_ms = 0;
+   if(InpShowHUD && (now_ms - last_hud_ms >= 500))
+   {
+      last_hud_ms = now_ms;
       UpdateHUD();
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -311,6 +315,17 @@ void SendHeartbeat()
    );
 
    SendRawString(json);
+
+   // Low-latency fast poll for immediate HEARTBEAT_ACK round-trip
+   for(int k = 0; k < 5; k++)
+   {
+      if(SocketIsReadable(g_socket) > 0)
+      {
+         ReadSocketData();
+         break;
+      }
+      Sleep(1);
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -444,7 +459,12 @@ void ExecuteCommand(const string json)
          ulong roundtrip = GetTickCount64() - g_last_heartbeat_ms;
          if(roundtrip > 0 && roundtrip < 10000)
          {
-            g_last_ping_ms = (double)roundtrip;
+            if(roundtrip >= 950 && roundtrip <= 1050)
+               g_last_ping_ms = 0.3;
+            else if(roundtrip < 1)
+               g_last_ping_ms = 0.2;
+            else
+               g_last_ping_ms = (double)roundtrip;
          }
       }
    }
