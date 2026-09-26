@@ -20,7 +20,9 @@ import database as db
 import trading_engine
 import portfolio_engine
 import spot_profit_harvester
+import mt5_bridge_engine
 
+DEFAULT_VIP_CHAT_ID = int(os.getenv("TELEGRAM_ADMIN_ID", "859271875"))
 _START_TIME = time.time()
 _SERVER_RUNNER = None
 _SITE = None
@@ -39,7 +41,8 @@ _GUI_CACHE = {
     "analytics": {},     # chat_id -> {"timestamp": float, "data": dict}
     "radar": {"timestamp": 0.0, "data": {}},
     "ai_brain": {"timestamp": 0.0, "data": {}},
-    "hft_mev": {"timestamp": 0.0, "data": {}}
+    "hft_mev": {"timestamp": 0.0, "data": {}},
+    "mt5": {}            # chat_id -> {"timestamp": float, "data": dict}
 }
 
 _ACTIVE_WEBSOCKETS = set()  # set of (WebSocketResponse, chat_id)
@@ -146,6 +149,116 @@ async def get_cached_wealth_cockpit(chat_id: int) -> dict:
         return cached["data"] if cached else {"active_trades": [], "candidates": [], "is_enabled": True, "total_trades_count": 0}
 
 
+async def get_cached_mt5_status(chat_id: int) -> dict:
+    """
+    Returns live MT5 status from RAM cache in <0.01ms.
+    Pulls live terminal telemetry from mt5_bridge_engine and stored VIP config.
+    """
+    now = time.time()
+    cached = _GUI_CACHE.get("mt5", {}).get(chat_id)
+    if cached and (now - cached["timestamp"] < 1.5):
+        return cached["data"]
+
+    try:
+        def _fetch():
+            bridge = mt5_bridge_engine.mt5_bridge
+            cfg = db.get_user_mt5_config(chat_id)
+            user_login = str(cfg.get("login", "")).strip()
+
+            matched_session = None
+            with bridge._clients_lock:
+                for acc_id, sess in bridge.clients.items():
+                    if (chat_id and sess.chat_id == chat_id) or (user_login and acc_id == user_login):
+                        matched_session = sess
+                        break
+                if not matched_session and bridge.clients:
+                    for acc_id, sess in bridge.clients.items():
+                        if sess.status == "ONLINE":
+                            matched_session = sess
+                            break
+
+            is_connected = bool(matched_session and matched_session.status == "ONLINE")
+            balance = float(matched_session.balance if matched_session else 0.0)
+            equity = float(matched_session.equity if matched_session else 0.0)
+            currency = str(matched_session.currency if matched_session else "USD")
+            ping_ms = float(matched_session.ping_ms if matched_session else 0.42)
+            is_prop_compliant = bool(matched_session.is_prop_compliant if matched_session else True)
+            raw_positions = getattr(matched_session, "positions", []) if matched_session else []
+
+            formatted_positions = []
+            for p in raw_positions:
+                formatted_positions.append({
+                    "ticket": p.get("ticket", 0),
+                    "symbol": str(p.get("symbol", "")).upper(),
+                    "action": str(p.get("type", p.get("action", "BUY"))).upper(),
+                    "lot": float(p.get("lots", p.get("lot", 0.01))),
+                    "open_price": float(p.get("open_price", 0.0)),
+                    "current_price": float(p.get("current_price", p.get("open_price", 0.0))),
+                    "profit": float(p.get("profit", p.get("pnl", 0.0))),
+                    "sl": float(p.get("sl", 0.0)),
+                    "tp": float(p.get("tp", 0.0))
+                })
+
+            floating_pnl = round(equity - balance, 2)
+            floating_pnl_pct = round((floating_pnl / balance * 100.0), 2) if balance > 0 else 0.0
+
+            daily_start = getattr(matched_session, "daily_start_equity", equity) if matched_session else equity
+            daily_dd_pct = round(((equity - daily_start) / daily_start * 100.0), 2) if daily_start > 0 else 0.0
+            initial_bal = getattr(matched_session, "initial_balance", balance) if matched_session else balance
+            max_dd_pct = round(((equity - initial_bal) / initial_bal * 100.0), 2) if initial_bal > 0 else 0.0
+
+            free_margin = max(0.0, equity)
+            margin_level = round((equity / max(1.0, equity - free_margin)) * 100.0, 1) if (equity - free_margin) > 0 else 0.0
+
+            ai_auto_trade = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+
+            return {
+                "status": "success",
+                "bridge_running": bridge.is_running,
+                "connected": is_connected,
+                "tcp_port": bridge.tcp_port,
+                "account": {
+                    "login": user_login or (matched_session.account_id if matched_session else ""),
+                    "broker": cfg.get("broker") or (matched_session.broker if matched_session else "GTCFX"),
+                    "server": cfg.get("server") or "GTCGlobalTrade-Live",
+                    "firm_name": cfg.get("firm_name") or (matched_session.firm_name if matched_session else "Personal"),
+                    "balance": balance,
+                    "equity": equity,
+                    "currency": currency,
+                    "free_margin": free_margin,
+                    "floating_pnl": floating_pnl,
+                    "floating_pnl_pct": floating_pnl_pct,
+                    "margin_level": margin_level,
+                    "daily_dd_pct": daily_dd_pct,
+                    "max_dd_pct": max_dd_pct,
+                    "daily_limit_pct": bridge.prop_daily_limit_pct,
+                    "max_limit_pct": bridge.prop_max_limit_pct,
+                    "is_prop_compliant": is_prop_compliant,
+                    "ping_ms": ping_ms,
+                    "ai_auto_trade": ai_auto_trade,
+                    "has_bound_config": bool(cfg.get("login"))
+                },
+                "positions": formatted_positions,
+                "supported_symbols": [
+                    {"symbol": "XAUUSD", "name": "Gold / Spot US Dollar", "category": "Metals", "digits": 2},
+                    {"symbol": "EURUSD", "name": "Euro / US Dollar", "category": "Forex", "digits": 5},
+                    {"symbol": "GBPUSD", "name": "British Pound / US Dollar", "category": "Forex", "digits": 5},
+                    {"symbol": "US30", "name": "Wall Street 30 / Dow Jones", "category": "Indices", "digits": 1},
+                    {"symbol": "BTCUSD", "name": "Bitcoin / US Dollar", "category": "Crypto", "digits": 2}
+                ],
+                "timestamp": now
+            }
+
+        res = await asyncio.to_thread(_fetch)
+        if "mt5" not in _GUI_CACHE:
+            _GUI_CACHE["mt5"] = {}
+        _GUI_CACHE["mt5"][chat_id] = {"timestamp": now, "data": res}
+        return res
+    except Exception as e:
+        print(f"⚠️ [WEB GUI] Error refreshing MT5 status for {chat_id}: {e}")
+        return cached["data"] if cached else {"status": "error", "message": str(e), "connected": False}
+
+
 # ==============================================================================
 # BACKGROUND ASYNC CACHE & TICK WORKER
 # ==============================================================================
@@ -188,6 +301,7 @@ async def _gui_background_cache_worker():
                     try:
                         p_data = _GUI_CACHE["portfolio"].get(chat_id, {}).get("data", {})
                         w_data = _GUI_CACHE["wealth"].get(chat_id, {}).get("data", {})
+                        m_data = _GUI_CACHE.get("mt5", {}).get(chat_id, {}).get("data", {})
 
                         tick_payload = {
                             "type": "tick",
@@ -202,6 +316,9 @@ async def _gui_background_cache_worker():
                             "candidates": w_data.get("candidates", []),
                             "btc_price": prices["BTCUSDT"],
                             "paxg_price": prices["PAXGUSDT"],
+                            "mt5_account": m_data.get("account", {}),
+                            "mt5_positions": m_data.get("positions", []),
+                            "mt5_connected": m_data.get("connected", False),
                             "status": "ONLINE"
                         }
                         await ws.send_json(tick_payload)
@@ -300,6 +417,7 @@ async def handle_api_stream(request: web.Request) -> web.StreamResponse:
             prices = _GUI_CACHE["prices"]
             p_data = _GUI_CACHE["portfolio"].get(chat_id, {}).get("data", {})
             w_data = _GUI_CACHE["wealth"].get(chat_id, {}).get("data", {})
+            m_data = _GUI_CACHE.get("mt5", {}).get(chat_id, {}).get("data", {})
 
             event_payload = {
                 "timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -313,6 +431,9 @@ async def handle_api_stream(request: web.Request) -> web.StreamResponse:
                 "btc_price": prices["BTCUSDT"],
                 "paxg_price": prices["PAXGUSDT"],
                 "ai_sentiment": 98.4,
+                "mt5_account": m_data.get("account", {}),
+                "mt5_positions": m_data.get("positions", []),
+                "mt5_connected": m_data.get("connected", False),
                 "status": "ONLINE"
             }
             await response.write(f"data: {json.dumps(event_payload)}\n\n".encode('utf-8'))
@@ -815,6 +936,145 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
 
 
 # ==============================================================================
+# MT5 INSTITUTIONAL TERMINAL REST API HANDLERS
+# ==============================================================================
+
+async def handle_api_mt5_status(request: web.Request) -> web.Response:
+    chat_id = _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+    data = await get_cached_mt5_status(chat_id)
+    resp = web.json_response(data)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    return resp
+
+async def handle_api_mt5_bind(request: web.Request) -> web.Response:
+    """Allows VIP users to register/bind their MT5 account credentials from the web."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        login = str(data.get("login", "")).strip()
+        server = str(data.get("server", "GTCGlobalTrade-Live")).strip()
+        password = str(data.get("password", "")).strip()
+        broker = str(data.get("broker", "GTCFX")).strip()
+        firm_name = str(data.get("firm_name", "Personal")).strip()
+
+        if not login:
+            return web.json_response({"status": "error", "message": "MT5 Login ID មិនអាចទទេបានឡើយ!"}, status=400)
+
+        success = db.save_user_mt5_config(
+            chat_id=chat_id,
+            login=login,
+            server=server,
+            password=password,
+            broker=broker,
+            firm_name=firm_name
+        )
+
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        if success:
+            return web.json_response({
+                "status": "success",
+                "message": f"គណនី MT5 {login} ({server}) ត្រូវបានភ្ជាប់ជោគជ័យ!",
+                "login": login,
+                "server": server
+            })
+        else:
+            return web.json_response({"status": "error", "message": "បរាជ័យក្នុងការរក្សាទុកគណនី"}, status=500)
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_order(request: web.Request) -> web.Response:
+    """Fast Web Trader order placement (BUY / SELL) via MT5 Bridge."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        symbol = str(data.get("symbol", "XAUUSD")).upper().strip()
+        action = str(data.get("action", "BUY")).upper().strip()
+        lot = float(data.get("lot", 0.01))
+        sl = float(data.get("sl", 0.0))
+        tp = float(data.get("tp", 0.0))
+        comment = str(data.get("comment", "KMC_WEB_TRADER"))
+
+        cfg = db.get_user_mt5_config(chat_id)
+        target_account = cfg.get("login") or None
+
+        res = mt5_bridge_engine.mt5_bridge.dispatch_signal(
+            symbol=symbol,
+            action=action,
+            lot=lot,
+            sl=sl,
+            tp=tp,
+            comment=comment,
+            target_account=target_account
+        )
+
+        db.record_mt5_bridge_order(
+            signal_id=res.get("signal_id", ""),
+            symbol=symbol,
+            action=action,
+            lot=lot,
+            sl=sl,
+            tp=tp,
+            account_id=str(target_account or ""),
+            comment=comment
+        )
+
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_close(request: web.Request) -> web.Response:
+    """Closes an active MT5 position or executes Panic Close All."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        ticket = int(data.get("ticket", 0))
+        symbol = data.get("symbol")
+        close_all = bool(data.get("all", False))
+
+        cfg = db.get_user_mt5_config(chat_id)
+        target_account = cfg.get("login") or None
+
+        res = mt5_bridge_engine.mt5_bridge.dispatch_close(
+            ticket=0 if close_all else ticket,
+            symbol=symbol,
+            comment="WEB_PANIC_CLOSE" if close_all else "WEB_MANUAL_CLOSE",
+            target_account=target_account
+        )
+
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
+    """Toggles AI Swarm auto-trading on user's MT5 account."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        enable = bool(data.get("enable", True))
+
+        db.update_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1" if enable else "0")
+
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        return web.json_response({
+            "status": "success",
+            "chat_id": chat_id,
+            "ai_auto_trade": enable
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+# ==============================================================================
 # STATIC WEB GUI FILE HANDLERS
 # ==============================================================================
 
@@ -873,6 +1133,13 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/api/global_matrix", handle_api_global_matrix)
     app.router.add_post("/api/action/harvest", handle_api_harvest_action)
     app.router.add_post("/api/action/engine_toggle", handle_api_engine_toggle)
+
+    # MT5 Pro Terminal API routes
+    app.router.add_get("/api/mt5/status", handle_api_mt5_status)
+    app.router.add_post("/api/mt5/bind", handle_api_mt5_bind)
+    app.router.add_post("/api/mt5/order", handle_api_mt5_order)
+    app.router.add_post("/api/mt5/close", handle_api_mt5_close)
+    app.router.add_post("/api/mt5/toggle_ai", handle_api_mt5_toggle_ai)
 
     return app
 

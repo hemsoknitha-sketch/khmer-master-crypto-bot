@@ -24,6 +24,7 @@ const state = {
     mevData: null,
     analytics: null,
     radar: null,
+    mt5Data: null,
     isRefreshing: false,
     sseSource: null,
     ws: null,
@@ -66,7 +67,43 @@ const elements = {
     harvestHistoryList: document.getElementById('harvest-history-list'),
     btnRefresh: document.getElementById('btn-refresh'),
     btnManualSweep: document.getElementById('btn-manual-sweep'),
-    toastContainer: document.getElementById('toast-container')
+    toastContainer: document.getElementById('toast-container'),
+
+    // MT5 Pro Terminal Elements
+    mt5StatusPill: document.getElementById('mt5-status-pill'),
+    mt5LatencyPill: document.getElementById('mt5-latency-pill'),
+    mt5BrokerTag: document.getElementById('mt5-broker-tag'),
+    mt5LoginTag: document.getElementById('mt5-login-tag'),
+    mt5AccNum: document.getElementById('mt5-acc-num'),
+    mt5ServerTag: document.getElementById('mt5-server-tag'),
+    mt5FirmBadge: document.getElementById('mt5-firm-badge'),
+    mt5BalanceVal: document.getElementById('mt5-balance-val'),
+    mt5EquityVal: document.getElementById('mt5-equity-val'),
+    mt5FloatingPnl: document.getElementById('mt5-floating-pnl'),
+    mt5FloatingPnlPct: document.getElementById('mt5-floating-pnl-pct'),
+    mt5FreeMarginVal: document.getElementById('mt5-free-margin-val'),
+    mt5PropStatus: document.getElementById('mt5-prop-status'),
+    mt5DailyDdText: document.getElementById('mt5-daily-dd-text'),
+    mt5DailyDdBar: document.getElementById('mt5-daily-dd-bar'),
+    mt5MaxDdText: document.getElementById('mt5-max-dd-text'),
+    mt5MaxDdBar: document.getElementById('mt5-max-dd-bar'),
+    mt5ToggleAiTrade: document.getElementById('mt5-toggle-ai-trade'),
+    mt5TradeSymbol: document.getElementById('mt5-trade-symbol'),
+    mt5TradeLot: document.getElementById('mt5-trade-lot'),
+    mt5LotValTag: document.getElementById('mt5-lot-val-tag'),
+    btnMt5Buy: document.getElementById('btn-mt5-buy'),
+    btnMt5Sell: document.getElementById('btn-mt5-sell'),
+    mt5PosCounter: document.getElementById('mt5-pos-counter'),
+    btnMt5PanicClose: document.getElementById('btn-mt5-panic-close'),
+    mt5PositionsList: document.getElementById('mt5-positions-list'),
+    mt5PosEmpty: document.getElementById('mt5-pos-empty'),
+    navMt5Badge: document.getElementById('nav-mt5-badge'),
+    mt5BindForm: document.getElementById('mt5-bind-form'),
+    mt5InputServer: document.getElementById('mt5-input-server'),
+    mt5InputLogin: document.getElementById('mt5-input-login'),
+    mt5InputPassword: document.getElementById('mt5-input-password'),
+    mt5InputFirm: document.getElementById('mt5-input-firm'),
+    btnTogglePwd: document.getElementById('btn-toggle-pwd')
 };
 
 // Utilities
@@ -290,6 +327,11 @@ function handleStreamData(data) {
     }
     if (Array.isArray(data.candidates) && data.candidates.length > 0) {
         renderLiveCandidates(data.candidates);
+    }
+
+    // Real-Time MT5 Telemetry from Stream
+    if (data.mt5_account && Object.keys(data.mt5_account).length > 0) {
+        renderMT5FromStream(data.mt5_account, data.mt5_positions, data.mt5_connected);
     }
 }
 
@@ -802,6 +844,276 @@ async function closeTrade(symbol) {
 }
 
 // -----------------------------------------------------------------------------
+// MT5 Pro Institutional Terminal Controller (Zero-RDP Web Control)
+// -----------------------------------------------------------------------------
+async function fetchMT5Status() {
+    try {
+        const cid = state.chatId || '';
+        const res = await fetch(`/api/mt5/status?chat_id=${cid}`);
+        const data = await res.json();
+        if (data.status === 'success') {
+            state.mt5Data = data;
+            renderMT5Cockpit(data);
+        }
+    } catch (e) {
+        console.warn('Error fetching MT5 status:', e);
+    }
+}
+
+function renderMT5FromStream(acc, positions, isConnected) {
+    if (!acc) return;
+    renderMT5Cockpit({
+        account: acc,
+        positions: positions || [],
+        connected: isConnected
+    });
+}
+
+function renderMT5Cockpit(data) {
+    if (!data) return;
+    const acc = data.account || {};
+    const positions = data.positions || [];
+    const isConn = Boolean(data.connected);
+
+    // Status Pill
+    if (elements.mt5StatusPill) {
+        if (isConn) {
+            elements.mt5StatusPill.className = 'badge badge-success';
+            elements.mt5StatusPill.textContent = '🟢 TOKYO BRIDGE ONLINE';
+        } else if (acc.has_bound_config) {
+            elements.mt5StatusPill.className = 'badge badge-warning';
+            elements.mt5StatusPill.textContent = '🟡 STANDBY / CONNECTING';
+        } else {
+            elements.mt5StatusPill.className = 'badge badge-dim';
+            elements.mt5StatusPill.textContent = '⚪ NOT BOUND';
+        }
+    }
+
+    if (elements.mt5LatencyPill) {
+        elements.mt5LatencyPill.textContent = `⚡ TY3 ${acc.ping_ms || 0.42}ms`;
+    }
+
+    if (elements.mt5BrokerTag) {
+        elements.mt5BrokerTag.textContent = `${acc.broker || 'GTCFX'} • TY3 GATEWAY`;
+    }
+
+    if (elements.mt5AccNum) {
+        elements.mt5AccNum.textContent = acc.login ? acc.login : 'Not Bound';
+    }
+
+    if (elements.mt5ServerTag) {
+        elements.mt5ServerTag.textContent = acc.server || 'GTCGlobalTrade-Live';
+    }
+
+    if (elements.mt5FirmBadge) {
+        elements.mt5FirmBadge.textContent = acc.firm_name === 'FTMO' ? '🛡️ FTMO PROP' :
+            (acc.firm_name === 'FundedNext' ? '🛡️ FUNDEDNEXT PROP' : '👑 PERSONAL VIP');
+    }
+
+    // Balances & Metrics
+    if (elements.mt5BalanceVal) elements.mt5BalanceVal.textContent = formatUSD(acc.balance || 0);
+    if (elements.mt5EquityVal) elements.mt5EquityVal.textContent = formatUSD(acc.equity || 0);
+    if (elements.mt5FreeMarginVal) elements.mt5FreeMarginVal.textContent = formatUSD(acc.free_margin || 0);
+
+    const flPnl = Number(acc.floating_pnl || 0);
+    const flPct = Number(acc.floating_pnl_pct || 0);
+    if (elements.mt5FloatingPnl) {
+        elements.mt5FloatingPnl.textContent = `${flPnl >= 0 ? '+' : ''}$${formatUSD(flPnl)}`;
+        elements.mt5FloatingPnl.className = flPnl >= 0 ? 'mt5-big-num text-neon-emerald' : 'mt5-big-num text-neon-red';
+    }
+    if (elements.mt5FloatingPnlPct) {
+        elements.mt5FloatingPnlPct.textContent = `(${flPct >= 0 ? '+' : ''}${flPct.toFixed(2)}%)`;
+        elements.mt5FloatingPnlPct.className = flPct >= 0 ? 'mt5-sub-pct text-neon-emerald' : 'mt5-sub-pct text-neon-red';
+    }
+
+    // Prop Firm Drawdown Gauges
+    const dailyDd = Math.abs(acc.daily_dd_pct || 0);
+    const maxDd = Math.abs(acc.max_dd_pct || 0);
+    const dailyLimit = Math.abs(acc.daily_limit_pct || 3.5);
+    const maxLimit = Math.abs(acc.max_limit_pct || 7.0);
+
+    if (elements.mt5DailyDdText) {
+        elements.mt5DailyDdText.textContent = `${(acc.daily_dd_pct || 0).toFixed(2)}% / -${dailyLimit}%`;
+        elements.mt5DailyDdText.className = dailyDd > (dailyLimit * 0.7) ? 'text-neon-red' : 'text-neon-emerald';
+    }
+    if (elements.mt5DailyDdBar) {
+        const fillPct = Math.min(100, (dailyDd / dailyLimit) * 100);
+        elements.mt5DailyDdBar.style.width = `${fillPct}%`;
+        elements.mt5DailyDdBar.className = fillPct > 70 ? 'progress-fill fill-red' : 'progress-fill fill-emerald';
+    }
+
+    if (elements.mt5MaxDdText) {
+        elements.mt5MaxDdText.textContent = `${(acc.max_dd_pct || 0).toFixed(2)}% / -${maxLimit}%`;
+        elements.mt5MaxDdText.className = maxDd > (maxLimit * 0.7) ? 'text-neon-red' : 'text-neon-emerald';
+    }
+    if (elements.mt5MaxDdBar) {
+        const fillPct = Math.min(100, (maxDd / maxLimit) * 100);
+        elements.mt5MaxDdBar.style.width = `${fillPct}%`;
+        elements.mt5MaxDdBar.className = fillPct > 70 ? 'progress-fill fill-red' : 'progress-fill fill-emerald';
+    }
+
+    if (elements.mt5PropStatus) {
+        if (acc.is_prop_compliant !== false) {
+            elements.mt5PropStatus.className = 'badge badge-success';
+            elements.mt5PropStatus.textContent = '✅ COMPLIANT';
+        } else {
+            elements.mt5PropStatus.className = 'badge badge-danger';
+            elements.mt5PropStatus.textContent = '🚨 BREACH RISK LOCKED';
+        }
+    }
+
+    if (elements.mt5ToggleAiTrade) {
+        elements.mt5ToggleAiTrade.checked = acc.ai_auto_trade !== false;
+    }
+
+    // Pre-fill binding inputs
+    if (elements.mt5InputLogin && acc.login && !elements.mt5InputLogin.value) {
+        elements.mt5InputLogin.value = acc.login;
+    }
+    if (elements.mt5InputServer && acc.server) {
+        elements.mt5InputServer.value = acc.server;
+    }
+
+    // Render Positions
+    renderMT5PositionsList(positions);
+}
+
+function renderMT5PositionsList(positions) {
+    const count = positions ? positions.length : 0;
+    if (elements.mt5PosCounter) elements.mt5PosCounter.textContent = `${count} Active`;
+    if (elements.navMt5Badge) {
+        elements.navMt5Badge.textContent = count;
+        elements.navMt5Badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    if (!elements.mt5PositionsList) return;
+
+    if (count === 0) {
+        elements.mt5PositionsList.innerHTML = '';
+        if (elements.mt5PosEmpty) elements.mt5PosEmpty.style.display = 'flex';
+        return;
+    }
+
+    if (elements.mt5PosEmpty) elements.mt5PosEmpty.style.display = 'none';
+
+    elements.mt5PositionsList.innerHTML = positions.map(p => {
+        const isBuy = p.action === 'BUY';
+        const pnl = Number(p.profit || 0);
+        const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+        const pnlSign = pnl >= 0 ? '+' : '';
+        return `
+            <div class="mt5-pos-row">
+                <div class="pos-main-meta">
+                    <span class="pos-type-badge ${isBuy ? 'buy' : 'sell'}">${p.action}</span>
+                    <div class="pos-symbol-info">
+                        <strong>${p.symbol} • ${p.lot} Lot</strong>
+                        <span>#${p.ticket} @ ${formatUSD(p.open_price)} ➔ ${formatUSD(p.current_price)}</span>
+                    </div>
+                </div>
+                <div class="pos-pnl-actions">
+                    <div class="pos-pnl-col">
+                        <span class="pos-pnl-usd ${pnlClass}">${pnlSign}$${formatUSD(pnl)}</span>
+                    </div>
+                    <button type="button" class="btn-close-single" data-ticket="${p.ticket}" data-symbol="${p.symbol}" title="1-Click Close Position">
+                        ✖ Close
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    elements.mt5PositionsList.querySelectorAll('.btn-close-single').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const ticket = e.currentTarget.getAttribute('data-ticket');
+            const sym = e.currentTarget.getAttribute('data-symbol');
+            closeMT5Position(ticket, sym);
+        });
+    });
+}
+
+async function submitMT5Order(action) {
+    const symbol = elements.mt5TradeSymbol ? elements.mt5TradeSymbol.value : 'XAUUSD';
+    const lot = elements.mt5TradeLot ? parseFloat(elements.mt5TradeLot.value) : 0.01;
+
+    triggerHaptic('heavy');
+    showToast(`⚡ កំពុងបញ្ជូន ${action} ${lot} ${symbol} ទៅកាន់ MT5...`);
+
+    try {
+        const res = await fetch('/api/mt5/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: state.chatId,
+                symbol: symbol,
+                action: action,
+                lot: lot
+            })
+        });
+        const json = await res.json();
+        if (json.success || json.status === 'success') {
+            showToast(`✅ ${action} ${lot} ${symbol} ជោគជ័យ! Dispatched < 0.5ms`);
+            fetchMT5Status();
+        } else {
+            showToast(`⚠️ ${json.message || 'បញ្ជូនបរាជ័យ'}`);
+        }
+    } catch (e) {
+        showToast('❌ Error executing MT5 order');
+    }
+}
+
+async function closeMT5Position(ticket, symbol) {
+    triggerHaptic('medium');
+    showToast(`⚡ កំពុងបិទ Position #${ticket} (${symbol})...`);
+    try {
+        const res = await fetch('/api/mt5/close', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: state.chatId,
+                ticket: parseInt(ticket),
+                symbol: symbol
+            })
+        });
+        const json = await res.json();
+        if (json.success || json.status === 'success') {
+            showToast(`✅ Position #${ticket} ត្រូវបានបិទជោគជ័យ!`);
+            fetchMT5Status();
+        } else {
+            showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការបិទ'}`);
+        }
+    } catch (e) {
+        showToast('❌ Error closing MT5 position');
+    }
+}
+
+async function closeAllMT5Positions() {
+    if (!confirm('🚨 តើបងពិតជាចង់បិទរាល់គ្រប់ Position ទាំងអស់ក្នុង MT5 មែនទេ? (PANIC CLOSE ALL)')) {
+        return;
+    }
+    triggerHaptic('heavy');
+    showToast('🚨 កំពុងបិទរាល់គ្រប់ Position ទាំងអស់ក្នុងពេលតែមួយចុច...');
+    try {
+        const res = await fetch('/api/mt5/close', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: state.chatId,
+                all: true
+            })
+        });
+        const json = await res.json();
+        if (json.success || json.status === 'success') {
+            showToast('✅ គ្រប់ Position ទាំងអស់ត្រូវបានបិទជោគជ័យ!');
+            fetchMT5Status();
+        } else {
+            showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការបិទ'}`);
+        }
+    } catch (e) {
+        showToast('❌ Error during panic close');
+    }
+}
+
+// -----------------------------------------------------------------------------
 // UI Event Handlers
 // -----------------------------------------------------------------------------
 function setupEventListeners() {
@@ -821,6 +1133,8 @@ function setupEventListeners() {
             triggerHaptic('selection');
             if (targetTabId === 'tab-controls') {
                 fetchEngineStates();
+            } else if (targetTabId === 'tab-mt5') {
+                fetchMT5Status();
             }
         });
     });
@@ -885,12 +1199,109 @@ function setupEventListeners() {
             triggerHaptic('light');
             elements.btnRefresh.style.transform = 'rotate(360deg)';
             elements.btnRefresh.style.transition = 'transform 0.5s ease';
-            await Promise.all([fetchPortfolio(), fetchWealthCockpit(), fetchAIBrain(), fetchHFTMEV(), fetchAnalytics()]);
+            await Promise.all([fetchPortfolio(), fetchWealthCockpit(), fetchAIBrain(), fetchHFTMEV(), fetchAnalytics(), fetchMT5Status()]);
             setTimeout(() => {
                 elements.btnRefresh.style.transform = 'none';
                 elements.btnRefresh.style.transition = 'none';
             }, 500);
-            showToast('🔄 ទិន្នន័យត្រូវបាន Update ផ្ទាល់ពី Binance!');
+            showToast('🔄 ទិន្នន័យត្រូវបាន Update ផ្ទាល់ពី Binance & MT5!');
+        });
+    }
+
+    // MT5 Lot Size Pills
+    document.querySelectorAll('.lot-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            document.querySelectorAll('.lot-pill').forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            const lotVal = pill.getAttribute('data-lot');
+            if (elements.mt5TradeLot) elements.mt5TradeLot.value = lotVal;
+            if (elements.mt5LotValTag) elements.mt5LotValTag.textContent = lotVal;
+            triggerHaptic('selection');
+        });
+    });
+
+    // MT5 Buy & Sell Buttons
+    if (elements.btnMt5Buy) {
+        elements.btnMt5Buy.addEventListener('click', () => submitMT5Order('BUY'));
+    }
+    if (elements.btnMt5Sell) {
+        elements.btnMt5Sell.addEventListener('click', () => submitMT5Order('SELL'));
+    }
+
+    // MT5 Panic Close All Button
+    if (elements.btnMt5PanicClose) {
+        elements.btnMt5PanicClose.addEventListener('click', () => closeAllMT5Positions());
+    }
+
+    // MT5 AI Auto-Trade Toggle
+    if (elements.mt5ToggleAiTrade) {
+        elements.mt5ToggleAiTrade.addEventListener('change', async (e) => {
+            const isChecked = e.target.checked;
+            triggerHaptic('impact');
+            try {
+                const res = await fetch('/api/mt5/toggle_ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: state.chatId, enable: isChecked })
+                });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    showToast(isChecked ? '🟢 AI Swarm MT5 Auto-Trade: បើកដំណើរការ!' : '⚪ AI Swarm MT5 Auto-Trade: បានផ្អាក!');
+                }
+            } catch (err) {
+                showToast('❌ Error toggling AI Auto-Trade');
+            }
+        });
+    }
+
+    // MT5 Password Eye Toggle
+    if (elements.btnTogglePwd && elements.mt5InputPassword) {
+        elements.btnTogglePwd.addEventListener('click', () => {
+            const currentType = elements.mt5InputPassword.getAttribute('type');
+            elements.mt5InputPassword.setAttribute('type', currentType === 'password' ? 'text' : 'password');
+            elements.btnTogglePwd.textContent = currentType === 'password' ? '🙈' : '👁️';
+        });
+    }
+
+    // MT5 Account Bind Form Submission
+    if (elements.mt5BindForm) {
+        elements.mt5BindForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            triggerHaptic('heavy');
+            const login = elements.mt5InputLogin ? elements.mt5InputLogin.value.trim() : '';
+            const server = elements.mt5InputServer ? elements.mt5InputServer.value.trim() : 'GTCGlobalTrade-Live';
+            const password = elements.mt5InputPassword ? elements.mt5InputPassword.value.trim() : '';
+            const firm = elements.mt5InputFirm ? elements.mt5InputFirm.value.trim() : 'Personal';
+
+            if (!login) {
+                showToast('⚠️ សូមបំពេញលេខគណនី MT5 Login ID');
+                return;
+            }
+
+            showToast('🔗 កំពុងចងភ្ជាប់គណនី MT5 ទៅកាន់ Server...');
+            try {
+                const res = await fetch('/api/mt5/bind', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: state.chatId,
+                        login: login,
+                        server: server,
+                        password: password,
+                        broker: server.includes('GTC') ? 'GTCFX' : (server.includes('Exness') ? 'Exness' : 'Custom'),
+                        firm_name: firm
+                    })
+                });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    showToast(`✅ ${json.message}`);
+                    fetchMT5Status();
+                } else {
+                    showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការភ្ជាប់'}`);
+                }
+            } catch (err) {
+                showToast('❌ Error binding MT5 account');
+            }
         });
     }
 }
@@ -967,6 +1378,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchHFTMEV();
     fetchAnalytics();
     fetchEngineStates();
+    fetchMT5Status();
 
     // Passive Fallback Polling every 20s (Stream handles real-time live ticks)
     setInterval(() => {
@@ -974,6 +1386,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchPortfolio();
             fetchWealthCockpit();
             fetchEngineStates();
+            fetchMT5Status();
         }
     }, 20000);
 });

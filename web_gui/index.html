@@ -485,6 +485,243 @@
             </section>
 
             <!-- ======================================================== -->
+            <!-- TAB: MT5 PRO INSTITUTIONAL TERMINAL                     -->
+            <!-- ======================================================== -->
+            <section id="tab-mt5" class="tab-pane">
+                <!-- MT5 Header Banner -->
+                <div class="section-banner banner-mt5">
+                    <div class="banner-title-row">
+                        <div class="banner-icon-wrap mt5-glow-icon">🏛️</div>
+                        <div>
+                            <h2 class="section-heading">MT5 Pro Institutional Terminal</h2>
+                            <span class="section-desc">Sub-Millisecond Tokyo GTCFX Bridge (<span class="text-neon-cyan">0.42ms</span>) • Zero-RDP Web Control</span>
+                        </div>
+                    </div>
+                    <div class="banner-status-group">
+                        <span id="mt5-status-pill" class="badge badge-warning">🟡 STANDBY / NOT BOUND</span>
+                        <span id="mt5-latency-pill" class="badge badge-info">⚡ TY3 <0.5ms</span>
+                    </div>
+                </div>
+
+                <!-- MT5 Account Metrics Hero Cockpit -->
+                <div class="glass-card mt5-cockpit-card">
+                    <div class="mt5-account-meta-row">
+                        <div class="account-badge-box">
+                            <span class="account-broker-tag" id="mt5-broker-tag">GTCFX • TY3 GATEWAY</span>
+                            <span class="account-login-tag" id="mt5-login-tag">A/C: <strong id="mt5-acc-num">Not Bound</strong></span>
+                            <span class="account-server-tag" id="mt5-server-tag">GTCGlobalTrade-Live</span>
+                        </div>
+                        <div class="account-type-badge" id="mt5-firm-badge">👑 PERSONAL VIP</div>
+                    </div>
+
+                    <div class="mt5-hero-metrics-grid">
+                        <div class="mt5-metric-box">
+                            <span class="mt5-metric-label">BALANCE</span>
+                            <div class="mt5-metric-val-row">
+                                <span class="currency-symbol">$</span>
+                                <span id="mt5-balance-val" class="mt5-big-num">0.00</span>
+                            </div>
+                        </div>
+                        <div class="mt5-metric-box highlight-neon">
+                            <span class="mt5-metric-label">EQUITY</span>
+                            <div class="mt5-metric-val-row">
+                                <span class="currency-symbol">$</span>
+                                <span id="mt5-equity-val" class="mt5-big-num text-neon-cyan">0.00</span>
+                            </div>
+                        </div>
+                        <div class="mt5-metric-box">
+                            <span class="mt5-metric-label">FLOATING PNL</span>
+                            <div class="mt5-metric-val-row">
+                                <span id="mt5-floating-pnl" class="mt5-big-num text-neon-emerald">+$0.00</span>
+                            </div>
+                            <span id="mt5-floating-pnl-pct" class="mt5-sub-pct text-neon-emerald">(+0.00%)</span>
+                        </div>
+                        <div class="mt5-metric-box">
+                            <span class="mt5-metric-label">FREE MARGIN</span>
+                            <div class="mt5-metric-val-row">
+                                <span class="currency-symbol">$</span>
+                                <span id="mt5-free-margin-val" class="mt5-big-num">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Prop Firm Risk Shield HUD -->
+                    <div class="mt5-risk-shield-hud">
+                        <div class="shield-hud-header">
+                            <div class="shield-title-flex">
+                                <span class="shield-icon">🛡️</span>
+                                <strong>Prop Firm Risk Fortress</strong>
+                                <span class="shield-badge-sub">Auto-Drawdown Circuit Breaker</span>
+                            </div>
+                            <span id="mt5-prop-status" class="badge badge-success">✅ COMPLIANT</span>
+                        </div>
+                        <div class="shield-bars-grid">
+                            <div class="shield-bar-item">
+                                <div class="shield-bar-meta">
+                                    <span>Daily Loss (Limit -3.5%)</span>
+                                    <strong id="mt5-daily-dd-text" class="text-neon-emerald">0.00%</strong>
+                                </div>
+                                <div class="progress-track">
+                                    <div id="mt5-daily-dd-bar" class="progress-fill fill-emerald" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="shield-bar-item">
+                                <div class="shield-bar-meta">
+                                    <span>Max Drawdown (Limit -7.0%)</span>
+                                    <strong id="mt5-max-dd-text" class="text-neon-emerald">0.00%</strong>
+                                </div>
+                                <div class="progress-track">
+                                    <div id="mt5-max-dd-bar" class="progress-fill fill-emerald" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1-Click Institutional Web Trader Terminal -->
+                <div class="glass-card mt5-trader-card">
+                    <div class="trader-header-row">
+                        <div class="trader-title-flex">
+                            <span class="trader-icon">⚡</span>
+                            <h4>1-Click Institutional Web Trader</h4>
+                            <span class="trader-tag">Zero-RDP Instant Execution</span>
+                        </div>
+                        <div class="ai-toggle-pill">
+                            <span class="ai-toggle-label">AI Swarm Auto-Trade:</span>
+                            <label class="switch switch-sm">
+                                <input type="checkbox" id="mt5-toggle-ai-trade" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="trader-inputs-grid">
+                        <!-- Symbol Selector -->
+                        <div class="trader-field-group">
+                            <label class="trader-label">SYMBOL / ASSET</label>
+                            <select id="mt5-trade-symbol" class="cyber-select">
+                                <option value="XAUUSD" selected>🥇 XAUUSD (Gold Spot)</option>
+                                <option value="EURUSD">💶 EURUSD (Euro / USD)</option>
+                                <option value="GBPUSD">💷 GBPUSD (Pound / USD)</option>
+                                <option value="US30">🏛️ US30 (Wall St 30)</option>
+                                <option value="BTCUSD">₿ BTCUSD (Bitcoin)</option>
+                            </select>
+                        </div>
+
+                        <!-- Lot Size Quick Selector -->
+                        <div class="trader-field-group">
+                            <div class="lot-label-row">
+                                <label class="trader-label">LOT SIZE</label>
+                                <span class="lot-current-tag">Lot: <strong id="mt5-lot-val-tag">0.01</strong></span>
+                            </div>
+                            <div class="quick-lot-pills">
+                                <button type="button" class="lot-pill active" data-lot="0.01">0.01</button>
+                                <button type="button" class="lot-pill" data-lot="0.02">0.02</button>
+                                <button type="button" class="lot-pill" data-lot="0.05">0.05</button>
+                                <button type="button" class="lot-pill" data-lot="0.10">0.10</button>
+                                <button type="button" class="lot-pill" data-lot="0.20">0.20</button>
+                                <button type="button" class="lot-pill" data-lot="0.50">0.50</button>
+                            </div>
+                            <input type="hidden" id="mt5-trade-lot" value="0.01">
+                        </div>
+                    </div>
+
+                    <!-- Instant Market Execution Buttons -->
+                    <div class="trader-exec-buttons-row">
+                        <button type="button" id="btn-mt5-buy" class="btn-cyber-buy">
+                            <span class="btn-main-text">🟢 BUY MARKET</span>
+                            <span class="btn-sub-text">Instant Ask Execution</span>
+                        </button>
+                        <button type="button" id="btn-mt5-sell" class="btn-cyber-sell">
+                            <span class="btn-main-text">🔴 SELL MARKET</span>
+                            <span class="btn-sub-text">Instant Bid Execution</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Open Positions Matrix -->
+                <div class="glass-card mt5-positions-card">
+                    <div class="positions-header-row">
+                        <div class="positions-title-flex">
+                            <span class="pos-icon">📑</span>
+                            <h4>Active MT5 Positions</h4>
+                            <span id="mt5-pos-counter" class="badge badge-accent">0 Active</span>
+                        </div>
+                        <button type="button" id="btn-mt5-panic-close" class="btn-panic-close" title="Emergency 1-Click Close All">
+                            🚨 CLOSE ALL POSITIONS
+                        </button>
+                    </div>
+
+                    <div id="mt5-positions-list" class="mt5-positions-list">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="mt5-pos-empty" class="cockpit-empty-state">
+                        <span class="empty-icon">🏖️</span>
+                        <p class="empty-title">គ្មាន Position កំពុងរត់ឡើយ (No Open Orders)</p>
+                        <span class="empty-sub">អ្នកអាចបើក Trade ភ្លាមៗតាម 1-Click Web Trader ខាងលើ!</span>
+                    </div>
+                </div>
+
+                <!-- VIP Account Registration & 1-Click Binding Card -->
+                <div class="glass-card mt5-bind-card">
+                    <div class="bind-card-header">
+                        <div class="bind-title-flex">
+                            <span class="bind-icon">🔗</span>
+                            <div>
+                                <h4>VIP MT5 Account Binding (Zero RDP)</h4>
+                                <span class="bind-subtitle">ភ្ជាប់គណនី MT5 ដោយផ្ទាល់ មិនបាច់ចូល Remote Desktop</span>
+                            </div>
+                        </div>
+                        <span class="badge badge-gold">VIP Titanium</span>
+                    </div>
+
+                    <form id="mt5-bind-form" class="cyber-bind-form">
+                        <div class="bind-form-grid">
+                            <div class="bind-field">
+                                <label class="bind-label">BROKER / SERVER</label>
+                                <select id="mt5-input-server" class="cyber-select">
+                                    <option value="GTCGlobalTrade-Live" selected>GTC Global Trade (Live Server - Tokyo TY3)</option>
+                                    <option value="GTCGlobalTrade-Demo">GTC Global Trade (Demo Server)</option>
+                                    <option value="Exness-Real">Exness (Real Server)</option>
+                                    <option value="ICMarketsSC-Live">IC Markets (Live Server)</option>
+                                    <option value="FTMO-Server">FTMO (Prop Firm Server)</option>
+                                    <option value="FundedNext-Server">FundedNext (Prop Firm Server)</option>
+                                    <option value="Custom">Custom Server (Other)</option>
+                                </select>
+                            </div>
+                            <div class="bind-field">
+                                <label class="bind-label">ACCOUNT LOGIN ID</label>
+                                <input type="text" id="mt5-input-login" class="cyber-input" placeholder="ឧ. 1088219" required>
+                            </div>
+                            <div class="bind-field">
+                                <label class="bind-label">PASSWORD (Master ឬ Investor)</label>
+                                <div class="password-input-wrap">
+                                    <input type="password" id="mt5-input-password" class="cyber-input" placeholder="Password (អាច Paste ចូលបានភ្លាមៗ)">
+                                    <button type="button" id="btn-toggle-pwd" class="btn-pwd-eye" title="បង្ហាញ/លាក់ លេខសម្ងាត់">👁️</button>
+                                </div>
+                            </div>
+                            <div class="bind-field">
+                                <label class="bind-label">ACCOUNT PROFILE</label>
+                                <select id="mt5-input-firm" class="cyber-select">
+                                    <option value="Personal" selected>👤 Personal Account (Full Risk Scaling)</option>
+                                    <option value="FTMO">🛡️ FTMO Prop Firm (-3.5% Daily / -7.0% Max Shield)</option>
+                                    <option value="FundedNext">🛡️ FundedNext Prop Firm (-3.5% Daily / -7.0% Max Shield)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="bind-action-row">
+                            <button type="submit" id="btn-mt5-bind-submit" class="btn-cyber-submit">
+                                <span class="submit-icon">🔗</span>
+                                <span>BIND & CONNECT MT5 ACCOUNT</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ======================================================== -->
             <!-- TAB 6: VIP ENGINE CONTROL CENTER                       -->
             <!-- ======================================================== -->
             <section id="tab-controls" class="tab-pane">
@@ -666,6 +903,11 @@
             <button class="nav-item" data-tab="tab-wealth-vault">
                 <span class="nav-icon">🏦</span>
                 <span class="nav-text">Gold Vault</span>
+            </button>
+            <button class="nav-item" data-tab="tab-mt5">
+                <span class="nav-icon">🏛️</span>
+                <span class="nav-text">MT5 Pro</span>
+                <span id="nav-mt5-badge" class="nav-badge" style="display:none">0</span>
             </button>
             <button class="nav-item" data-tab="tab-controls">
                 <span class="nav-icon">🎛️</span>

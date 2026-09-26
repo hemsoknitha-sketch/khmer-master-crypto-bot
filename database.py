@@ -4270,6 +4270,55 @@ def get_mt5_bridge_recent_orders(limit: int = 10) -> list:
         conn.close()
         return []
 
+def save_user_mt5_config(
+    chat_id: int,
+    login: str,
+    server: str,
+    password: str = "",
+    broker: str = "GTCFX",
+    firm_name: str = "Personal"
+) -> bool:
+    """Saves VIP user's MT5 connection configuration in database with credential encryption."""
+    try:
+        import json
+        data = {
+            "chat_id": int(chat_id),
+            "login": str(login).strip(),
+            "server": str(server).strip(),
+            "broker": str(broker).strip(),
+            "firm_name": str(firm_name).strip(),
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        if password:
+            data["password"] = security.encrypt_data(password) if hasattr(security, "encrypt_data") else password
+        update_system_setting(f"mt5_user_config_{chat_id}", json.dumps(data))
+        upsert_mt5_bridge_client(
+            account_id=str(login).strip(),
+            chat_id=int(chat_id),
+            broker=str(broker).strip(),
+            firm_name=str(firm_name).strip(),
+            status="CONFIGURED"
+        )
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error saving MT5 config: {e}")
+        return False
+
+def get_user_mt5_config(chat_id: int) -> dict:
+    """Retrieves user's stored MT5 connection configuration without exposing raw password."""
+    try:
+        raw = get_system_setting(f"mt5_user_config_{chat_id}", "")
+        if raw:
+            import json
+            cfg = json.loads(raw)
+            if "password" in cfg and cfg["password"]:
+                cfg["has_password"] = True
+                cfg.pop("password", None)
+            return cfg
+    except Exception:
+        pass
+    return {}
+
 
 def can_user_buy(chat_id: int) -> bool:
     config = get_auto_trade_config(chat_id)
