@@ -19840,7 +19840,19 @@ class TelegramBotThread(BaseThread):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
             if not chat_id: return
+            user_id = update.effective_user.id if update.effective_user else chat_id
             user_lang = db.get_user_language(chat_id)
+
+            is_admin_user = (user_id == 859271875) or db.is_admin(user_id) or (chat_id == 859271875) or db.is_admin(chat_id)
+            is_vip = is_admin_user or db.is_vip(user_id) or db.is_vip(chat_id)
+            if not is_vip:
+                raw_lang = db.get_user_language(user_id) or db.get_user_language(chat_id)
+                user_lang = str(raw_lang or 'km')
+                if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+                msg = loc.get_text(user_lang, 'access_denied')
+                if update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown")
+                return
 
             import mt5_bridge_engine
             import ui_standards
@@ -19849,6 +19861,11 @@ class TelegramBotThread(BaseThread):
             bridge = mt5_bridge_engine.mt5_bridge
             if not bridge.is_running:
                 bridge.start()
+
+            # Multi-Tenant User Isolation: Resolve bound MT5 account to prevent cross-account collisions
+            cfg = db.get_user_mt5_config(chat_id)
+            user_login = str(cfg.get("login", "")).strip() if cfg else ""
+            target_account = user_login if (not is_admin_user or user_login) else None
 
             args = list(context.args) if context and context.args else []
             if args:
@@ -19896,7 +19913,8 @@ class TelegramBotThread(BaseThread):
                         sl=sl,
                         tp=tp,
                         comment="GTCFX_TOKYO_AI",
-                        magic=888999
+                        magic=888999,
+                        target_account=target_account
                     )
                     reached = res.get("clients_reached", 0)
                     if user_lang not in ['en', 'english']:
@@ -19942,7 +19960,7 @@ class TelegramBotThread(BaseThread):
                     if len(args) >= 2:
                         try:
                             ticket = int(args[1])
-                            res = bridge.dispatch_close(ticket=ticket)
+                            res = bridge.dispatch_close(ticket=ticket, target_account=target_account)
                             reached = res.get("clients_reached", 0)
                             if user_lang not in ['en', 'english']:
                                 msg_c = (
@@ -19972,13 +19990,16 @@ class TelegramBotThread(BaseThread):
 
                 # --- 3. EMERGENCY PANIC CLOSE ALL ---
                 elif sub in ["CLOSE_ALL", "CLOSEALL", "HALT", "PANIC"]:
-                    # Dispatch global emergency close to all active MT5 sockets
-                    bridge.dispatch_close(ticket=0, comment="EMERGENCY_PANIC_ALL")
+                    # Dispatch emergency close to targeted MT5 socket (or all if admin broadcast)
+                    target_for_panic = user_login if (not is_admin_user or user_login) else None
+                    bridge.dispatch_close(ticket=0, comment="EMERGENCY_PANIC_ALL", target_account=target_for_panic)
                     recent_orders = db.get_mt5_bridge_recent_orders(limit=20)
                     closed_count = 0
                     for o in recent_orders:
                         if o.get("status") == "FILLED" and o.get("ticket"):
-                            bridge.dispatch_close(ticket=o["ticket"], symbol=o.get("symbol"))
+                            if target_for_panic and o.get("account_id") and str(o.get("account_id")) != str(target_for_panic):
+                                continue
+                            bridge.dispatch_close(ticket=o["ticket"], symbol=o.get("symbol"), target_account=target_for_panic)
                             closed_count += 1
                     if user_lang not in ['en', 'english']:
                         msg_close = (

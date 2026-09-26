@@ -941,8 +941,18 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
 # MT5 INSTITUTIONAL TERMINAL REST API HANDLERS
 # ==============================================================================
 
+def _is_authorized_vip(chat_id: int) -> bool:
+    if chat_id == DEFAULT_VIP_CHAT_ID:
+        return True
+    return bool(db.is_vip(chat_id) or db.is_admin(chat_id))
+
 async def handle_api_mt5_status(request: web.Request) -> web.Response:
     chat_id = _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+    if not _is_authorized_vip(chat_id):
+        return web.json_response({
+            "status": "error",
+            "message": "⛔ Access Denied: មុខងារ MT5 Pro Terminal នេះត្រូវបានកំណត់សម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ។"
+        }, status=403)
     data = await get_cached_mt5_status(chat_id)
     resp = web.json_response(data)
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -953,6 +963,11 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        if not _is_authorized_vip(chat_id):
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ Access Denied: មិនមានសិទ្ធិចងភ្ជាប់គណនី MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
+            }, status=403)
         login = str(data.get("login", "")).strip()
         server = str(data.get("server", "GTCGlobalSA-Server 2")).strip()
         password = str(data.get("password", "")).strip()
@@ -991,6 +1006,11 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        if not _is_authorized_vip(chat_id):
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ Access Denied: មិនមានសិទ្ធិជួញដូរលើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
+            }, status=403)
         symbol = str(data.get("symbol", "XAUUSD")).upper().strip()
         action = str(data.get("action", "BUY")).upper().strip()
         lot = float(data.get("lot", 0.01))
@@ -1034,6 +1054,11 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        if not _is_authorized_vip(chat_id):
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ Access Denied: មិនមានសិទ្ធិបិទ Position លើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
+            }, status=403)
         ticket = int(data.get("ticket", 0))
         symbol = data.get("symbol")
         close_all = bool(data.get("all", False))
@@ -1060,6 +1085,11 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        if not _is_authorized_vip(chat_id):
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ Access Denied: មិនមានសិទ្ធិកំណត់ AI Trade លើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
+            }, status=403)
         enable = bool(data.get("enable", True))
 
         db.update_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1" if enable else "0")

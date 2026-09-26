@@ -852,6 +852,13 @@ async function fetchMT5Status() {
     try {
         const cid = state.chatId || '';
         const res = await fetch(`/api/mt5/status?chat_id=${cid}`);
+        if (res.status === 403) {
+            if (elements.mt5StatusPill) {
+                elements.mt5StatusPill.className = 'badge badge-danger';
+                elements.mt5StatusPill.textContent = '🔒 VIP EXCLUSIVE';
+            }
+            return;
+        }
         const data = await res.json();
         if (data.status === 'success') {
             state.mt5Data = data;
