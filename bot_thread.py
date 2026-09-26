@@ -20145,12 +20145,12 @@ class TelegramBotThread(BaseThread):
                     )
             else:
                 clients_text_kh = (
-                    "⚠️ _មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។_\n"
-                    "👉 _សូមបើក MT5 លើ VPS រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5`!_\n"
+                    "⚠️ មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។\n"
+                    "👉 សូមបើក MT5 លើ VPS រួចភ្ជាប់ EA `KhmerMasterCryptoBridge.mq5`!"
                 )
                 clients_text_en = (
-                    "⚠️ _No MT5 terminals currently connected._\n"
-                    "👉 _Please launch MT5 on VPS and attach `KhmerMasterCrypto_Bridge.mq5`!_\n"
+                    "⚠️ No MT5 terminals currently connected.\n"
+                    "👉 Please launch MT5 on VPS and attach EA `KhmerMasterCryptoBridge.mq5`!"
                 )
 
             # --- BUILD OPEN POSITIONS TELEMETRY ---
@@ -20198,12 +20198,12 @@ class TelegramBotThread(BaseThread):
                 positions_summary_en = "\n".join(pos_lines_en)
             else:
                 positions_summary_kh = (
-                    "🟢 _គ្មាន Position កំពុងបើកចំហទេ_\n"
-                    "👉 _AI Swarm កំពុង Scan រកឱកាសល្អបំផុតពី GTCFX Tokyo!_"
+                    "🟢 គ្មាន Position កំពុងបើកចំហទេ\n"
+                    "👉 AI Swarm កំពុង Scan រកឱកាសល្អបំផុតពី GTCFX Tokyo!"
                 )
                 positions_summary_en = (
-                    "🟢 _No active open positions currently._\n"
-                    "👉 _AI Swarm scanning for optimal setups on GTCFX Tokyo!_"
+                    "🟢 No active open positions currently.\n"
+                    "👉 AI Swarm scanning for optimal setups on GTCFX Tokyo!"
                 )
 
             # --- INTERACTIVE BUTTON KEYBOARD (SUPER SMART & BEAUTIFUL) ---
@@ -20251,7 +20251,7 @@ class TelegramBotThread(BaseThread):
                     f"• បើក Order មាស ៖ `` `/mt5 BUY XAUUSD 0.01` ``\n"
                     f"• បើក Order រូបិយប័ណ្ណ ៖ `` `/mt5 BUY EURUSD 0.02` ``\n"
                     f"• បិទ Order ជាក់លាក់ ៖ `` `/mt5 CLOSE <ticket>` ``\n"
-                    f"• បិទ Position ទាំងអស់ជាបន្ទាន់ ៖ `` `/mt5 CLOSE_ALL` ``\n"
+                    f"• បិទ Position ទាំងអស់ជាបន្ទាន់ ៖ `` `/mt5 CLOSEALL` ``\n"
                     f"• សាកល្បងល្បឿន Ping ៖ `` `/mt5 TEST` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
@@ -20279,7 +20279,7 @@ class TelegramBotThread(BaseThread):
                     f"• BUY Gold Order: `` `/mt5 BUY XAUUSD 0.01` ``\n"
                     f"• BUY Forex Order: `` `/mt5 BUY EURUSD 0.02` ``\n"
                     f"• Close Specific Order: `` `/mt5 CLOSE <ticket>` ``\n"
-                    f"• Panic Close All: `` `/mt5 CLOSE_ALL` ``\n"
+                    f"• Panic Close All: `` `/mt5 CLOSEALL` ``\n"
                     f"• Test Latency: `` `/mt5 TEST` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
