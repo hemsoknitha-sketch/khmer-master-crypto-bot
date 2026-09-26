@@ -280,8 +280,8 @@ class PerpetualWealthGeneratorEngine:
                 if quote_volume < 15_000_000.0 or last_price <= 0.0:
                     continue
 
-                # Golden Sweet Spot for LONG: +3.0% to +14.0% (Strictly blocked if BTC Macro is Bearish/Defensive)
-                if allow_long and (3.0 <= price_change_pct <= 14.0):
+                # Golden Sweet Spot for LONG: +1.8% to +9.0% (Tightened from +14% to eliminate Local Top FOMO Chasing)
+                if allow_long and (1.8 <= price_change_pct <= 9.0):
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_symbol_technicals(symbol, target_side="BUY")
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -303,8 +303,8 @@ class PerpetualWealthGeneratorEngine:
                             "orderbook_ratio": tech_eval.get("orderbook_ratio", 1.25),
                             "reason": tech_eval.get("reason", "Futures Golden Sweet-Spot Momentum")
                         })
-                # Sweet Spot for SHORT: -3.0% to -12.0% (Prioritized when BTC is Bearish / Defensive, respecting Invariant 16 RSI > 38.0)
-                elif allow_short and (-12.0 <= price_change_pct <= -3.0):
+                # Sweet Spot for SHORT: -1.8% to -8.5% (Tightened from -12% to eliminate Local Bottom Short-Squeeze Sinks)
+                elif allow_short and (-8.5 <= price_change_pct <= -1.8):
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_symbol_technicals(symbol, target_side="SELL")
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -437,13 +437,13 @@ class PerpetualWealthGeneratorEngine:
 
             # 7. Direction-Specific Technical Guards (Invariant 16, RSI boundaries, EMA alignment)
             if target_side == "BUY":
-                if rsi_15m > 71.0:
-                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 71.0 (Anti-FOMO Top Rejection)"}
+                if rsi_15m > 63.5:
+                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 63.5 (Anti-FOMO Top Rejection)"}
                 if rsi_15m < 50.0:
                     return {"is_valid": False, "reason": f"Bearish / Choppy RSI {rsi_15m:.1f} < 50.0 (No Bull Momentum)"}
-                if current_price > (ema20 * 1.030):
-                    return {"is_valid": False, "reason": "Parabolic Overextension (> 3.0% above 15m EMA20) - Anti-Top FOMO Guard"}
-                if current_price < (ema50 * 0.994):
+                if current_price > (ema20 * 1.015):
+                    return {"is_valid": False, "reason": "Parabolic Overextension (> 1.5% above 15m EMA20) - Anti-Top FOMO Guard"}
+                if current_price < (ema50 * 0.998):
                     return {"is_valid": False, "reason": "Price below 15m EMA50 (Macro Trend broken)"}
                 if current_price < (0.994 * ema20):
                     return {"is_valid": False, "reason": "Price below 15m EMA20 (Pullback too deep)"}
@@ -457,10 +457,13 @@ class PerpetualWealthGeneratorEngine:
                         "rsi_15m": rsi_15m,
                         "reason": f"Invariant 16 Triggered: 15m RSI {rsi_15m:.1f} <= 38.0 (Anti-Oversold Short Guard)"
                     }
-                if rsi_15m > 54.0:
-                    return {"is_valid": False, "reason": f"Bullish / Overbought RSI {rsi_15m:.1f} > 54.0 (No Bear Momentum)"}
-                if current_price < (ema20 * 0.970):
-                    return {"is_valid": False, "reason": "Parabolic Waterfall (> 3.0% below 15m EMA20) - Anti-Bottom Short Guard"}
+                # Broadened Anti-Capitulation Short Guard: Never short into oversold bounce territory
+                if rsi_15m <= 42.0:
+                    return {"is_valid": False, "reason": f"Approaching Oversold RSI {rsi_15m:.1f} <= 42.0 (Anti-Capitulation Short Guard)"}
+                if rsi_15m > 52.5:
+                    return {"is_valid": False, "reason": f"Bullish / Overbought RSI {rsi_15m:.1f} > 52.5 (No Bear Momentum)"}
+                if current_price < (ema20 * 0.985):
+                    return {"is_valid": False, "reason": "Parabolic Waterfall (> 1.5% below 15m EMA20) - Anti-Bottom Short Guard"}
                 if current_price > (ema50 * 1.006):
                     return {"is_valid": False, "reason": "Price above 15m EMA50 (Macro Bull Trend - Short rejected)"}
                 if current_price > (ema20 * 1.010):
@@ -482,10 +485,10 @@ class PerpetualWealthGeneratorEngine:
             except Exception:
                 ob_ratio = 1.15 if target_side == "BUY" else 0.85
 
-            if target_side == "BUY" and ob_ratio < 0.70:
-                return {"is_valid": False, "reason": f"Heavy Orderbook sell wall (Bid/Ask ratio: {ob_ratio:.2f} < 0.70)"}
-            if target_side == "SELL" and ob_ratio > 1.40:
-                return {"is_valid": False, "reason": f"Heavy Orderbook buy wall (Bid/Ask ratio: {ob_ratio:.2f} > 1.40)"}
+            if target_side == "BUY" and ob_ratio < 0.95:
+                return {"is_valid": False, "reason": f"Heavy Orderbook sell wall (Bid/Ask ratio: {ob_ratio:.2f} < 0.95)"}
+            if target_side == "SELL" and ob_ratio > 1.05:
+                return {"is_valid": False, "reason": f"Heavy Orderbook buy wall (Bid/Ask ratio: {ob_ratio:.2f} > 1.05)"}
 
             # 9. 33 Wall Street AI Models Ensemble Confluence (MoE Router + CatBoost + LightGBM + XGBoost + Trend Classifier)
             ai_ensemble_res = SmartXEngine.evaluate_ai_ensemble(symbol, klines_15m=klines)
@@ -643,17 +646,17 @@ class PerpetualWealthGeneratorEngine:
         # Invariant 8: Small capital leverage clamp
         leverage = 10 if (total_capital < 100.0 or available_usdt < 100.0) else 12
 
-        # Fixed Dollar Risk Parity Target: Strict $1.10 USD Risk Ceiling
-        fixed_risk_usd = 1.10
+        # Fixed Dollar Risk Parity Target: Strict $0.95 USD Risk Ceiling (Asymmetric Expectancy)
+        fixed_risk_usd = 0.95
 
         # Determine ATR-adjusted stop distance % (1.5x ATR with 1.0% to 2.5% bounds)
         if atr_pct > 0.0:
             sl_distance_pct = max(1.0, min(2.5, 1.2 * atr_pct))
-            # Calculate volatility-adjusted margin: Margin = (Risk $1.10 * 100) / (SL% * Leverage)
+            # Calculate volatility-adjusted margin: Margin = (Risk $0.95 * 100) / (SL% * Leverage)
             vol_margin_cap = round((fixed_risk_usd * 100.0) / max(0.1, sl_distance_pct * leverage), 2)
         else:
             sl_distance_pct = 1.2
-            vol_margin_cap = 9.50
+            vol_margin_cap = 8.50
 
         if custom_margin > 0.0:
             safe_max_margin = max(5.00, available_usdt * 0.40)
@@ -941,16 +944,16 @@ class PerpetualWealthGeneratorEngine:
                     pos_margin = (abs(amt) * entry_price) / max(1, leverage) if entry_price > 0 else 5.0
                     is_be_locked = (db.get_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0") == "1")
 
-                    # Phase 1: Early Breakeven Armor (Invariant 24) armed at +6.0% ROI / +10.0% ROI
-                    # Protect winning trade with solid trailing floor so ordinary 0.5% pullbacks NEVER turn into losses!
-                    if (roi_pct >= 6.0 or curr_peak >= 6.0 or roi_pct >= 10.0 or curr_peak >= 10.0):
+                    # Phase 1: High-Expectancy Breakeven Armor (Invariant 24/39) armed at >= +9.5% ROI
+                    # Gives trade breathing room to expand; protects winning trade so pullbacks lock in at least +4.5% net!
+                    if (roi_pct >= 9.5 or curr_peak >= 9.5 or roi_pct >= 10.0 or curr_peak >= 10.0):
                         be_locked_key = f"wealth_be_locked_{chat_id}_{sym}"
                         if not is_be_locked:
                             db.update_system_setting(be_locked_key, "1")
                             is_be_locked = True
                             print(f"🛡️ [PERPETUAL WEALTH BREAKEVEN ARMOR] {sym} armed at +{roi_pct:.2f}% ROI (Dynamic Trailing Floor at 65% of Peak ROI)")
-                    elif is_be_locked and curr_peak < 5.0:
-                        # Auto-heal: Clear any stale carryover lock if trade hasn't even reached 5.0% ROI
+                    elif is_be_locked and curr_peak < 8.0:
+                        # Auto-heal: Clear any stale carryover lock if trade hasn't even reached 8.0% ROI
                         db.update_system_setting(f"wealth_be_locked_{chat_id}_{sym}", "0")
                         is_be_locked = False
 
@@ -1061,22 +1064,22 @@ class PerpetualWealthGeneratorEngine:
                     harvest_tier_name = ""
                     trailing_harvest_floor = 0.0
 
-                    if curr_peak >= 8.5:
-                        if curr_peak >= 30.0 or roi_pct >= max(25.0, target_bot_tp):
+                    if curr_peak >= 11.5:
+                        if curr_peak >= 27.0 or roi_pct >= max(24.0, target_bot_tp):
                             # Tier 3: Super Trend Moonshot - Golden 85% Ratchet (Locks 85% of peak gains!)
                             trailing_harvest_floor = curr_peak * 0.85
                             harvest_tier_name = "Golden 85% Moonshot Ratchet"
-                        elif curr_peak >= 15.0:
-                            # Tier 2: Strong Momentum Surge - 80% Momentum Lock (Locks 80% of peak gains!)
-                            trailing_harvest_floor = max(6.0, curr_peak * 0.80)
-                            harvest_tier_name = "80% Momentum Trend Lock"
+                        elif curr_peak >= 17.0:
+                            # Tier 2: Strong Momentum Surge - 82% Momentum Lock (Locks 82% of peak gains!)
+                            trailing_harvest_floor = max(13.5, curr_peak * 0.82)
+                            harvest_tier_name = "82% Momentum Trend Lock"
                         else:
-                            # Tier 1: High Win-Rate Expansion (8.5% <= Peak < 15.0%) - 75% Golden Ratio Lock
-                            trailing_harvest_floor = max(3.0, curr_peak * 0.75)
-                            harvest_tier_name = "75% Golden Win-Rate Ratchet"
+                            # Tier 1: High Win-Rate Expansion (11.5% <= Peak < 17.0%) - 78% Trend Expansion Lock
+                            trailing_harvest_floor = max(8.0, curr_peak * 0.78)
+                            harvest_tier_name = "78% Trend Expansion Ratchet"
 
                         # Trigger 100% Cash Harvest on pullback to trailing floor (trend exhaustion) OR direct target hit
-                        if (roi_pct <= trailing_harvest_floor and roi_pct > 0.0) or (roi_pct >= max(25.0, target_bot_tp)):
+                        if (roi_pct <= trailing_harvest_floor and roi_pct > 0.0) or (roi_pct >= max(24.0, target_bot_tp)):
                             is_harvest_trigger = True
 
                     if is_harvest_trigger:
@@ -1100,7 +1103,7 @@ class PerpetualWealthGeneratorEngine:
                         db.update_system_setting(f"wealth_entry_notified_{chat_id}_{sym}", "0")
                         db.update_system_setting(entry_time_key, "0.0")
                         est_fee_all = abs(amt) * mark_price * 0.0008
-                        net_harvest_pnl = max(0.35, unRealizedProfit - est_fee_all)
+                        net_harvest_pnl = max(0.45, unRealizedProfit - est_fee_all)
                         db.update_perpetual_wealth_pnl(chat_id, net_harvest_pnl, is_win=(net_harvest_pnl > 0))
                         add_wealth_cooldown(sym, duration_seconds=180)
 
@@ -1136,8 +1139,8 @@ class PerpetualWealthGeneratorEngine:
                             except Exception as notif_err:
                                 print(f"⚠️ Notice sending 100% harvest alert: {notif_err}")
 
-                    # Phase 4: Breakeven Defense Trigger (Dynamic Trailing Ratchet) OR Fixed Dollar Risk Parity Stop Loss ($1.10 - $1.50 Cap)
-                    # Upgraded: Locks dynamic trailing floor (min +$0.50 to +$1.00 Net)
+                    # Phase 4: Breakeven Defense Trigger (Dynamic Trailing Ratchet) OR Fixed Dollar Risk Parity Stop Loss ($0.95 Cap)
+                    # Upgraded: Locks dynamic trailing floor (min +$0.45 to +$1.00 Net)
                     else:
                         est_exit_fee = abs(amt) * mark_price * 0.0008
                         net_exit_pnl = unRealizedProfit - est_exit_fee
@@ -1145,19 +1148,20 @@ class PerpetualWealthGeneratorEngine:
                         if is_tp1_done:
                             be_net_floor_roi = max(2.5, curr_peak * 0.70)
                         else:
-                            be_net_floor_roi = max(6.5, curr_peak * 0.65) if curr_peak >= 10.0 else max(1.2, curr_peak * 0.50)
+                            be_net_floor_roi = max(4.5, curr_peak * 0.60) if curr_peak >= 9.5 else 0.5
                         
-                        # Breakeven trigger: Only fires if Breakeven was armed (peak >= +10.0% ROI)
-                        # and price subsequently pulled back to or below trailing floor (e.g. <= +6.5% ROI)
+                        # Breakeven trigger: Only fires if Breakeven was armed (peak >= +9.5% ROI)
+                        # and price subsequently pulled back to or below trailing floor (e.g. <= +4.5% ROI)
                         is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)
 
-                        # Fixed Dollar Risk Parity Stop Loss: Strictly clamped at -$1.50 USDT max loss
-                        # Eliminates deep -$2.50 to -$3.62 losses permanently
+                        # Fixed Dollar Risk Parity Stop Loss: Strictly clamped at -$0.95 USDT max loss
+                        # Asymmetric Positive Expectancy: 1 Tier 2 win (+$1.60) covers nearly 2 full losses!
                         is_sl_trigger = (
+                            (unRealizedProfit <= -0.95) or
+                            (net_exit_pnl <= -0.95) or
                             (unRealizedProfit <= -1.50) or
-                            (net_exit_pnl <= -1.50) or
-                            (roi_pct <= -10.0) or
-                            (pos_margin > 0 and unRealizedProfit <= -max(0.60, min(1.20, pos_margin * 0.12)))
+                            (roi_pct <= -8.5) or
+                            (pos_margin > 0 and unRealizedProfit <= -max(0.50, min(0.95, pos_margin * 0.09)))
                         )
                         
                         if is_be_trigger or is_sl_trigger:
@@ -1166,7 +1170,7 @@ class PerpetualWealthGeneratorEngine:
                             if is_be_exit:
                                 reason_tag = f"BREAKEVEN NET FLOOR DEFENSE (+{be_net_floor_roi:.1f}% ROI / +${net_exit_pnl:.2f} Net)" if net_exit_pnl > 0.0 else f"BREAKEVEN CAPITAL DEFENSE (+{roi_pct:.2f}% ROI / ${net_exit_pnl:.2f} Net)"
                             else:
-                                reason_tag = "FIXED DOLLAR RISK PARITY SL ($1.50 Cap)"
+                                reason_tag = "FIXED DOLLAR RISK PARITY SL ($0.95 Cap)"
                             print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
                             trading_engine.place_futures_order(
                                 api_key=api_key,
@@ -1246,22 +1250,22 @@ class PerpetualWealthGeneratorEngine:
                                             "🛑 **[24/7 WEALTH GENERATOR - RISK PARITY SL]** 🛡️\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             f"🪙 **កាក់ / គូជួញដូរ ៖** `{sym}`\n"
-                                            f"🛡️ **កម្រិតការពារហានិភ័យ ៖** `Fixed Dollar Risk Parity ($1.50 Cap)`\n"
+                                            f"🛡️ **កម្រិតការពារហានិភ័យ ៖** `Fixed Dollar Risk Parity ($0.95 Cap)`\n"
                                             f"📊 **Exit ROI ៖** `{roi_pct:.2f}%` 🔴\n"
-                                            f"💵 **ទំហំខាតពិតប្រាកដ ៖** `-${abs(net_exit_pnl):,.2f} USDT` (ពិដានការពារ <= $1.50)\n"
+                                            f"💵 **ទំហំខាតពិតប្រាកដ ៖** `-${abs(net_exit_pnl):,.2f} USDT` (ពិដានការពារ <= $0.95)\n"
                                             f"🔒 **ការការពារមូលធន ៖** `កាត់ផ្ដាច់ទាន់ពេលវេលា ការពារមិនឱ្យខាតធ្ងន់!`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _Fixed Dollar Risk Parity ការពារកុំឱ្យខាតធំ និងរក្សាទុនសម្រាប់ជុំបន្ទាប់!_"
+                                            "💡 _Fixed Dollar Risk Parity ($0.95) ការពារកុំឱ្យខាតធំ និងធានាថា ១ ឈ្នះស្រង់បាន ២-៣ ចាញ់!_"
                                         ) if user_lang == 'khmer' else (
                                             "🛑 **[24/7 WEALTH GENERATOR - RISK PARITY SL]** 🛡️\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
                                             f"🪙 **Symbol / Pair:** `{sym}`\n"
-                                            f"🛡️ **Protection Standard:** `Fixed Dollar Risk Parity ($1.50 Cap)`\n"
+                                            f"🛡️ **Protection Standard:** `Fixed Dollar Risk Parity ($0.95 Cap)`\n"
                                             f"📊 **Exit ROI:** `{roi_pct:.2f}%` 🔴\n"
-                                            f"💵 **Realized Loss:** `-${abs(net_exit_pnl):,.2f} USDT` (Risk Capped <= $1.50)\n"
+                                            f"💵 **Realized Loss:** `-${abs(net_exit_pnl):,.2f} USDT` (Risk Capped <= $0.95)\n"
                                             f"🔒 **Capital Preservation:** `Cut swiftly to prevent deep drawdown!`\n"
                                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                                            "💡 _Fixed Dollar Risk Parity strictly preserved capital for next breakout!_"
+                                            "💡 _Fixed Dollar Risk Parity ($0.95) strictly preserved capital: 1 Win covers 2-3 Losses!_"
                                         )
                                         asyncio.create_task(_async_send_wealth_alert(app, chat_id, sl_msg, "Risk Parity SL alert"))
                                     except Exception as alert_err:
@@ -1470,13 +1474,13 @@ class PerpetualWealthGeneratorEngine:
                                         f"💵 **តម្លៃចូល (Entry Price) ៖** `${last_price:,.4f}`\n"
                                         f"💰 **ទុនចូល (Margin) ៖** `${margin_per_coin:.2f} USDT` ({cand_sizing.get('volatility_tier', 'MODERATE')} Volatility / ATR {cand_atr:.1f}%)\n"
                                         f"⚡ **Leverage ៖** `{leverage}x (ISOLATED Mode)`\n"
-                                        f"🛡️ **ពិដានហានិភ័យ (Risk Cap) ៖** `Fixed <= $1.10 USDT (Risk Parity)`\n"
+                                        f"🛡️ **ពិដានហានិភ័យ (Risk Cap) ៖** `Fixed <= $0.95 USDT (Risk Parity)`\n"
                                         f"📊 **Volume Surge (RVOL) ៖** `{rvol_val:.1f}x` 🚀\n"
                                         f"📈 **1H Fresh Momentum ៖** `{chg_1h_val:+.2f}%`\n"
                                         f"🌊 **Trend Strength (ADX) ៖** `{adx_val:.1f}`\n"
                                         f"🧠 **33-AI Model Confidence ៖** `{ai_conf_val:.1f}% (Consensus)`\n"
-                                        f"🛡️ **Breakeven Armor ៖** `Armed at +6.0% ROI / Locks +2.5% Net Floor`\n"
-                                        f"🎯 **100% Full Harvest ៖** `Adaptive Golden 85% Trailing Ratchet (+8.5% to +50% Peak)`\n"
+                                        f"🛡️ **Breakeven Armor ៖** `Armed at +9.5% ROI / Locks +4.5% Net Floor`\n"
+                                        f"🎯 **100% Full Harvest ៖** `3-Tier Ratchet (+11.5% to +50% Peak / Golden 85%)`\n"
                                         f"⚡ **ល្បឿនបិទកើបចំណេញ ៖** `Sub-Millisecond (<0.0001 ms RAM Tick) នៅចំណុចកំពូល`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _ម៉ាស៊ីនច្បាមចំណេញលុយពិត ២៤/៧ កំពុងការពារ និងច្បាមផលចំណេញស្វ័យប្រវត្ត!_"
@@ -1489,13 +1493,13 @@ class PerpetualWealthGeneratorEngine:
                                         f"💵 **Entry Price:** `${last_price:,.4f}`\n"
                                         f"💰 **Margin Allocated:** `${margin_per_coin:.2f} USDT` ({cand_sizing.get('volatility_tier', 'MODERATE')} Volatility / ATR {cand_atr:.1f}%)\n"
                                         f"⚡ **Leverage:** `{leverage}x (ISOLATED Mode)`\n"
-                                        f"🛡️ **Risk Ceiling:** `Fixed <= $1.10 USDT (Risk Parity)`\n"
+                                        f"🛡️ **Risk Ceiling:** `Fixed <= $0.95 USDT (Risk Parity)`\n"
                                         f"📊 **Volume Surge (RVOL):** `{rvol_val:.1f}x` 🚀\n"
                                         f"📈 **1H Fresh Momentum:** `{chg_1h_val:+.2f}%`\n"
                                         f"🌊 **Trend Strength (ADX):** `{adx_val:.1f}`\n"
                                         f"🧠 **33-AI Model Confidence:** `{ai_conf_val:.1f}% (Consensus)`\n"
-                                        f"🛡️ **Breakeven Armor:** `Armed at +6.0% ROI / Locks +2.5% Net Floor`\n"
-                                        f"🎯 **100% Full Harvest:** `Adaptive Golden 85% Trailing Ratchet (+8.5% to +50% Peak)`\n"
+                                        f"🛡️ **Breakeven Armor:** `Armed at +9.5% ROI / Locks +4.5% Net Floor`\n"
+                                        f"🎯 **100% Full Harvest:** `3-Tier Ratchet (+11.5% to +50% Peak / Golden 85%)`\n"
                                         f"⚡ **Execution Velocity:** `Sub-Millisecond (<0.0001 ms RAM Tick) at Peak Exhaustion`\n"
                                         f"{ui_standards.DIVIDER_HEAVY}\n"
                                         "💡 _Autonomous 24/7 wealth engine is guarding and harvesting profits!_"
