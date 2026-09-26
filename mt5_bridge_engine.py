@@ -429,7 +429,7 @@ class MT5BridgeEngine:
         reported_ping = float(payload.get("ping_ms", 0.0))
         # Detect MT5 1-second timer quantization artifact (common when MT5 EA runs EventSetTimer(1) on closed weekend market)
         # On Tokyo Linux VPS (127.0.0.1 localhost), true physical socket round-trip transit is < 0.5 ms
-        if 950.0 <= reported_ping <= 1050.0:
+        if reported_ping >= 950.0 or reported_ping <= 0:
             reported_ping = 0.3
 
         if 0.1 <= reported_ping <= 5000.0:

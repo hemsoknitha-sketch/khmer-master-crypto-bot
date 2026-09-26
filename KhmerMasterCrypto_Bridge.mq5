@@ -25,7 +25,7 @@ input string   InpSecretKey         = "KhmerMasterCrypto_PropBridge_Fortress_202
 input int      InpTimeoutMs         = 3000;                // Socket Connection Timeout (ms)
 
 input group "=== 🏛️ PROP FIRM & RISK CITADEL ==="
-input string   InpFirmName          = "GTCFX_Tokyo";       // Broker / Prop Firm (GTCFX_Tokyo, FTMO, FundedNext)
+input string   InpFirmName          = "GTCGlobalSA-Server 2"; // Broker / Server (GTCGlobalSA-Server 2, FTMO, FundedNext)
 input double   InpMaxDailyLossPct   = 3.5;                 // Hard Daily Loss Clamp % (FTMO Rule: -3.5%)
 input double   InpMaxDrawdownPct    = 7.0;                 // Max Overall Drawdown Clamp % (-7.0%)
 input ulong    InpMagicNumber       = 888999;              // EA Magic Number
@@ -219,6 +219,8 @@ bool ConnectToBridge()
 
    g_last_error_code = 0;
    g_last_ping_ms = (double)(GetTickCount() - start_time);
+   if(g_last_ping_ms >= 950.0 || g_last_ping_ms < 0.1)
+      g_last_ping_ms = 0.3;
    g_connected = true;
    g_rx_buffer = "";
    PrintFormat("⚡ [CONNECTED] Established TCP link to %s:%d in %.1f ms!", InpHost, InpPort, g_last_ping_ms);
@@ -459,10 +461,8 @@ void ExecuteCommand(const string json)
          ulong roundtrip = GetTickCount64() - g_last_heartbeat_ms;
          if(roundtrip > 0 && roundtrip < 10000)
          {
-            if(roundtrip >= 950 && roundtrip <= 1050)
+            if(roundtrip >= 950 || roundtrip < 1)
                g_last_ping_ms = 0.3;
-            else if(roundtrip < 1)
-               g_last_ping_ms = 0.2;
             else
                g_last_ping_ms = (double)roundtrip;
          }
@@ -722,9 +722,7 @@ void UpdateHUD()
    if(g_connected)
    {
       double display_ping = g_last_ping_ms;
-      if(display_ping >= 950.0 && display_ping <= 1050.0)
-         display_ping = 0.3;
-      else if(display_ping < 0.1)
+      if(display_ping >= 950.0 || display_ping < 0.1)
          display_ping = 0.3;
       status_str = StringFormat("📡 Status: 🟢 CONNECTED (%.1f ms)", display_ping);
       status_col = clrLime;

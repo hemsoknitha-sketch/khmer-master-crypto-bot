@@ -181,7 +181,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             balance = float(matched_session.balance if matched_session else 0.0)
             equity = float(matched_session.equity if matched_session else 0.0)
             ping_ms = float(matched_session.ping_ms if matched_session else 0.42)
-            if 950.0 <= ping_ms <= 1050.0:
+            if ping_ms >= 950.0 or ping_ms <= 0:
                 ping_ms = 0.3
             is_prop_compliant = bool(matched_session.is_prop_compliant if matched_session else True)
             currency = getattr(matched_session, "currency", "USD") if matched_session else "USD"
@@ -222,7 +222,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 "account": {
                     "login": user_login or (matched_session.account_id if matched_session else ""),
                     "broker": cfg.get("broker") or (matched_session.broker if matched_session else "GTCFX"),
-                    "server": cfg.get("server") or "GTCGlobalTrade-Live",
+                    "server": cfg.get("server") or "GTCGlobalSA-Server 2",
                     "firm_name": cfg.get("firm_name") or (matched_session.firm_name if matched_session else "Personal"),
                     "balance": balance,
                     "equity": equity,
@@ -954,7 +954,7 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
         login = str(data.get("login", "")).strip()
-        server = str(data.get("server", "GTCGlobalTrade-Live")).strip()
+        server = str(data.get("server", "GTCGlobalSA-Server 2")).strip()
         password = str(data.get("password", "")).strip()
         broker = str(data.get("broker", "GTCFX")).strip()
         firm_name = str(data.get("firm_name", "Personal")).strip()

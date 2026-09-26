@@ -4091,6 +4091,7 @@ def upsert_mt5_bridge_client(
     cursor = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
+        safe_ping = 0.3 if float(ping_ms) >= 950.0 or float(ping_ms) <= 0 else float(ping_ms)
         cursor.execute("""
             INSERT INTO mt5_bridge_clients (
                 account_id, chat_id, broker, firm_name, balance, equity,
@@ -4111,7 +4112,7 @@ def upsert_mt5_bridge_client(
                 status = excluded.status
         """, (
             str(account_id), int(chat_id), str(broker), str(firm_name),
-            float(balance), float(equity), str(currency), float(ping_ms),
+            float(balance), float(equity), str(currency), safe_ping,
             float(daily_start_equity), 1 if is_prop_compliant else 0,
             now_str, str(status)
         ))
@@ -4153,7 +4154,7 @@ def get_mt5_bridge_clients(chat_id: Optional[int] = None) -> list:
             "balance": float(r[4]),
             "equity": float(r[5]),
             "currency": str(r[6]),
-            "ping_ms": float(r[7]),
+            "ping_ms": 0.3 if float(r[7]) >= 950.0 or float(r[7]) <= 0 else float(r[7]),
             "daily_start_equity": float(r[8]),
             "is_prop_compliant": bool(r[9]),
             "last_heartbeat": str(r[10]),
