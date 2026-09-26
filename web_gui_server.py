@@ -184,6 +184,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             if 950.0 <= ping_ms <= 1050.0:
                 ping_ms = 0.3
             is_prop_compliant = bool(matched_session.is_prop_compliant if matched_session else True)
+            currency = getattr(matched_session, "currency", "USD") if matched_session else "USD"
             raw_positions = getattr(matched_session, "positions", []) if matched_session else []
 
             formatted_positions = []

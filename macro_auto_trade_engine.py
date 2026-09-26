@@ -478,8 +478,9 @@ def scan_macro_breakout_opportunity(symbol: str) -> dict:
     # Check 15m RSI: fresh momentum, not exhausted overbought top (> 68.0)
     klines_15m = fetch_klines_safe(symbol, interval="15m", limit=30)
     rsi_15m = 55.0
-    if klines_15m and len(klines_15m) >= 20:
-        c15 = [float(k[4]) for k in klines_15m]
+    closes_15m = [float(k[4]) for k in klines_15m] if klines_15m else []
+    if closes_15m and len(closes_15m) >= 20:
+        c15 = closes_15m
         g, l = 0.0, 0.0
         for i in range(len(c15) - 14, len(c15)):
             d = c15[i] - c15[i-1]
@@ -492,7 +493,7 @@ def scan_macro_breakout_opportunity(symbol: str) -> dict:
 
     # 🧠 33 AI Models Swarm Consensus Quorum Verification (Invariant 38)
     ai_consensus = evaluate_33_models_macro_consensus(
-        symbol, closes_1h, highs_1h, lows_1h, closes_15m if klines_15m else closes_1h, "BUY"
+        symbol, closes_1h, highs_1h, lows_1h, closes_15m if closes_15m else closes_1h, "BUY"
     )
     if not ai_consensus.get("approved", False):
         return res
