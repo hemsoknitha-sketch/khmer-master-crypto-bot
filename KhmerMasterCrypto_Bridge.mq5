@@ -169,6 +169,18 @@ void OnTick()
 //+------------------------------------------------------------------+
 bool ConnectToBridge()
 {
+   // Guard: If MT5 is not logged into a trading account, do not spam connection attempts
+   if(m_account.Login() <= 0)
+   {
+      static ulong last_unlogged_warn = 0;
+      if(GetTickCount64() - last_unlogged_warn >= 60000)
+      {
+         last_unlogged_warn = GetTickCount64();
+         Print("⚠️ [MT5 BRIDGE] MT5 terminal is not logged into any trading account (Login: 0). Waiting for account login...");
+      }
+      return false;
+   }
+
    if(g_socket != INVALID_HANDLE)
    {
       SocketClose(g_socket);

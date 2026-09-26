@@ -111,6 +111,12 @@ class MT5BridgeEngine:
         self.tcp_thread: Optional[threading.Thread] = None
         self.cleanup_thread: Optional[threading.Thread] = None
         
+        # Rate-Limiting / Anti-Spam Debouncing for Repetitive Connect Loops
+        self._last_connect_log: Dict[str, float] = {}
+        self._last_auth_log: Dict[str, float] = {}
+        self._last_disconnect_log: Dict[str, float] = {}
+        self._last_db_upsert: Dict[str, float] = {}
+        
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
     # =========================================================================
@@ -238,8 +244,13 @@ class MT5BridgeEngine:
                         client_sock.setblocking(False)
                         client_sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                         inputs.append(client_sock)
-                        client_buffers[client_sock] = ""
-                        logger.info(f"🔌 [MT5 BRIDGE] New connection from {client_addr[0]}:{client_addr[1]}")
+                        client_ip = client_addr[0]
+                        now_ts = time.time()
+                        if (now_ts - self._last_connect_log.get(client_ip, 0.0)) >= 60.0:
+                            self._last_connect_log[client_ip] = now_ts
+                            logger.info(f"🔌 [MT5 BRIDGE] New connection from {client_addr[0]}:{client_addr[1]}")
+                        else:
+                            logger.debug(f"🔌 [MT5 BRIDGE] Connection from {client_addr[0]}:{client_addr[1]} (debounced)")
                     else:
                         # Data received from connected MT5 EA
                         try:
@@ -281,8 +292,12 @@ class MT5BridgeEngine:
                 with self._clients_lock:
                     if account_id in self.clients:
                         self.clients[account_id].status = "DISCONNECTED"
-                        self.clients[account_id].socket_conn = None
-                logger.info(f"🔌 [MT5 BRIDGE] Account {account_id} disconnected.")
+                now_ts = time.time()
+                if (now_ts - self._last_disconnect_log.get(account_id, 0.0)) >= 60.0:
+                    self._last_disconnect_log[account_id] = now_ts
+                    logger.info(f"🔌 [MT5 BRIDGE] Account {account_id} disconnected.")
+                else:
+                    logger.debug(f"🔌 [MT5 BRIDGE] Account {account_id} disconnected (debounced)")
             sock.close()
         except Exception:
             pass
@@ -362,20 +377,24 @@ class MT5BridgeEngine:
             if session.initial_balance <= 0:
                 session.initial_balance = balance
 
-        # Upsert in SQLite DB
-        db.upsert_mt5_bridge_client(
-            account_id=account_id,
-            chat_id=chat_id,
-            broker=broker,
-            firm_name=firm_name,
-            balance=balance,
-            equity=equity,
-            currency=currency,
-            ping_ms=0.0,
-            daily_start_equity=equity,
-            is_prop_compliant=True,
-            status="ONLINE"
-        )
+        # Upsert in SQLite DB (Debounced to prevent SQLite WAL thrashing on reconnect loops)
+        now_ts = time.time()
+        last_upsert = self._last_db_upsert.get(account_id, 0.0)
+        if (now_ts - last_upsert) >= 60.0 or balance > 0:
+            self._last_db_upsert[account_id] = now_ts
+            db.upsert_mt5_bridge_client(
+                account_id=account_id,
+                chat_id=chat_id,
+                broker=broker,
+                firm_name=firm_name,
+                balance=balance,
+                equity=equity,
+                currency=currency,
+                ping_ms=0.0,
+                daily_start_equity=equity,
+                is_prop_compliant=True,
+                status="ONLINE"
+            )
 
         ack = {
             "type": "AUTH_SUCCESS",
@@ -385,7 +404,11 @@ class MT5BridgeEngine:
             "message": "Connected to Khmer Master Crypto Tokyo VPS Bridge."
         }
         self._send_raw_socket(sock, ack)
-        logger.info(f"✅ [MT5 AUTH] Account {account_id} ({broker} / {firm_name}) authenticated successfully! Balance: ${balance:,.2f}")
+        if (now_ts - self._last_auth_log.get(account_id, 0.0)) >= 60.0:
+            self._last_auth_log[account_id] = now_ts
+            logger.info(f"✅ [MT5 AUTH] Account {account_id} ({broker} / {firm_name}) authenticated successfully! Balance: ${balance:,.2f}")
+        else:
+            logger.debug(f"✅ [MT5 AUTH] Account {account_id} re-authenticated (debounced)")
 
     def _handle_heartbeat(self, sock: socket.socket, payload: Dict[str, Any], account_id: str):
         """Processes periodic telemetry and runs Wall Street Prop Firm compliance check."""
