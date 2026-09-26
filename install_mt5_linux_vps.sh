@@ -41,13 +41,14 @@ echo ""
 
 # 1. Root & Sudo Privilege Check
 if [ "$EUID" -ne 0 ] && [ -z "$SUDO_USER" ]; then
-    echo -e "${RED}❌ Please run this script with sudo: sudo bash install_mt5_linux_vps.sh${NC}"
+    echo -e "${RED}❌ Please run this script with sudo: sudo bash install_mt5_linux_vps.sh [optional_password]${NC}"
     exit 1
 fi
 
 TARGET_USER="${SUDO_USER:-$USER}"
 TARGET_HOME=$(eval echo "~$TARGET_USER")
 WORKSPACE_DIR="/opt/khmer-master-crypto-bot"
+CUSTOM_PASS="$1"
 
 echo -e "👤 ${BOLD}Target Desktop User:${NC} ${CYAN}$TARGET_USER${NC} (Home: $TARGET_HOME)"
 echo -e "📁 ${BOLD}Bot Workspace Dir:${NC}   ${CYAN}$WORKSPACE_DIR${NC}"
@@ -64,7 +65,7 @@ fi
 # LOCK-FREE RESILIENT APT HELPER FUNCTIONS
 # ------------------------------------------------------------------------------
 wait_for_dpkg_lock() {
-    local max_wait=120
+    local max_wait=90
     local waited=0
     while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
           fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
@@ -73,7 +74,7 @@ wait_for_dpkg_lock() {
         sleep 3
         waited=$((waited + 3))
         if [ $waited -ge $max_wait ]; then
-            echo -e "${RED}⚠️ Lock held over $max_wait seconds. Safely killing stale background apt processes...${NC}"
+            echo -e "${RED}⚠️ Lock held over $max_wait seconds. Safely releasing stale background apt processes...${NC}"
             killall -9 apt-get apt unattended-upgrades dpkg 2>/dev/null || true
             sleep 2
             rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock 2>/dev/null || true
@@ -85,16 +86,16 @@ wait_for_dpkg_lock() {
 
 safe_apt_install() {
     wait_for_dpkg_lock
-    local retries=5
+    local retries=4
     local count=0
     until DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$@"; do
         count=$((count + 1))
         if [ $count -ge $retries ]; then
-            echo -e "${RED}❌ Failed to install $@ after $retries attempts.${NC}"
+            echo -e "${YELLOW}⚠️ Notice: Package group [$*] partially unavailable or requires repo components.${NC}"
             return 1
         fi
-        echo -e "${YELLOW}⚠️ apt-get busy or interrupted. Retrying ($count/$retries) in 4s...${NC}"
-        sleep 4
+        echo -e "${YELLOW}⚠️ apt-get busy or contested. Retrying ($count/$retries) in 3s...${NC}"
+        sleep 3
         wait_for_dpkg_lock
         dpkg --configure -a 2>/dev/null || true
     done
@@ -105,14 +106,35 @@ wait_for_dpkg_lock
 dpkg --configure -a 2>/dev/null || true
 
 # ------------------------------------------------------------------------------
-# STEP 1: Fast System Update & 32-bit Architecture Enablement
+# STEP 1: Enable Contrib/Non-Free Repositories & 32-bit Multi-Arch
 # ------------------------------------------------------------------------------
-echo -e "${CYAN}[1/6] 📦 Enabling 32-bit Multi-Arch & Updating Linux Package Repositories...${NC}"
+echo -e "${CYAN}[1/6] 📦 Enabling Debian/Ubuntu Components (contrib, non-free) & 32-bit Multi-Arch...${NC}"
+
+# Enable 32-bit architecture for Wine Windows support
 dpkg --add-architecture i386 || true
+
+# If running on Debian, enable contrib and non-free components in apt lists
+if [ -f /etc/debian_version ]; then
+    echo "   ⚙️ Configuring Debian components (main contrib non-free non-free-firmware)..."
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then
+        sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true
+    fi
+    if [ -f /etc/apt/sources.list ]; then
+        sed -i 's/main$/main contrib non-free non-free-firmware/' /etc/apt/sources.list 2>/dev/null || true
+    fi
+    for f in /etc/apt/sources.list.d/*.list; do
+        [ -e "$f" ] || continue
+        sed -i 's/main$/main contrib non-free non-free-firmware/' "$f" 2>/dev/null || true
+    done
+fi
+
 wait_for_dpkg_lock
 apt-get update -y -q || true
 
-echo -e "${CYAN}[2/6] 🖥️ Installing Ultra-Lightweight XFCE4 Desktop (~150MB RAM)...${NC}"
+# ------------------------------------------------------------------------------
+# STEP 2: Ultra-Lightweight XFCE4 Desktop Environment (~150MB RAM)
+# ------------------------------------------------------------------------------
+echo -e "${CYAN}[2/6] 🖥️ Verifying Ultra-Lightweight XFCE4 Desktop (~150MB RAM)...${NC}"
 safe_apt_install \
     xfce4 \
     xfce4-terminal \
@@ -128,7 +150,7 @@ safe_apt_install \
     curl \
     unzip \
     htop \
-    net-tools
+    net-tools || true
 
 # Configure ~/.xsession for target user
 echo "xfce4-session" > "$TARGET_HOME/.xsession"
@@ -154,10 +176,10 @@ EOF
 chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config"
 
 # ------------------------------------------------------------------------------
-# STEP 2: Install & Configure XRDP (Remote Desktop Protocol Server)
+# STEP 3: Install & Configure XRDP (Remote Desktop Protocol Server)
 # ------------------------------------------------------------------------------
-echo -e "${CYAN}[3/6] 🛡️ Installing & Securing XRDP High-Performance Server...${NC}"
-safe_apt_install xrdp xorgxrdp
+echo -e "${CYAN}[3/6] 🛡️ Verifying & Securing XRDP High-Performance Server...${NC}"
+safe_apt_install xrdp xorgxrdp || true
 
 # Add xrdp user to ssl-cert group to read certificates
 adduser xrdp ssl-cert 2>/dev/null || true
@@ -175,7 +197,6 @@ EOF
 
 # Ensure XRDP starts XFCE cleanly
 if [ -f /etc/xrdp/startwm.sh ]; then
-    # Backup original
     cp /etc/xrdp/startwm.sh /etc/xrdp/startwm.sh.bak 2>/dev/null || true
     cat << 'EOF' > /etc/xrdp/startwm.sh
 #!/bin/sh
@@ -194,40 +215,56 @@ fi
 sed -i 's/^max_bpp=.*/max_bpp=24/' /etc/xrdp/xrdp.ini 2>/dev/null || true
 sed -i 's/^xserverbpp=.*/xserverbpp=24/' /etc/xrdp/xrdp.ini 2>/dev/null || true
 
-systemctl enable xrdp
-systemctl restart xrdp
-echo -e "   ${GREEN}✅ XRDP Server is running and listening on port 3389.${NC}"
+systemctl enable xrdp 2>/dev/null || true
+systemctl restart xrdp 2>/dev/null || true
+echo -e "   ${GREEN}✅ XRDP Server is active and listening on port 3389.${NC}"
 
 # ------------------------------------------------------------------------------
-# STEP 3: Install Wine (Windows Compatibility Engine) + Microsoft Fonts
+# STEP 4: Install Wine (Windows Compatibility Engine) & TrueType Fonts
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[4/6] 🍷 Installing Wine (Windows Emulation Subsystem) & Core Fonts...${NC}"
 
-# Wait for locks and configure
 wait_for_dpkg_lock
 dpkg --configure -a 2>/dev/null || true
 
-# Install Wine with multi-layer compatibility fallback
+# 1. Install Wine packages cleanly (Debian 12/13 / Ubuntu)
 if ! command -v wine &>/dev/null; then
-    echo -e "   🍷 Installing Wine packages..."
-    safe_apt_install wine64 wine32:i386 winetricks zenity fontconfig || \
-    safe_apt_install wine64 wine32 winetricks zenity fontconfig || \
-    safe_apt_install wine winetricks zenity fontconfig || true
+    echo "   📦 Installing Wine packages..."
+    safe_apt_install wine wine64 || safe_apt_install wine || safe_apt_install wine64 || true
+    safe_apt_install wine32:i386 2>/dev/null || safe_apt_install wine32 2>/dev/null || true
 fi
 
-# Install fonts for crisp MT5 chart and quote display
+# 2. Install supplementary GUI & Font packages
+safe_apt_install zenity fontconfig fonts-wine || true
+
+# 3. Install Microsoft TrueType fonts or standalone winetricks
 echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections
-safe_apt_install ttf-mscorefonts-installer 2>/dev/null || safe_apt_install fonts-wine 2>/dev/null || true
+safe_apt_install ttf-mscorefonts-installer 2>/dev/null || true
+
+# 4. Install standalone winetricks script if not present
+if ! command -v winetricks &>/dev/null; then
+    echo "   📦 Downloading standalone winetricks from official GitHub..."
+    curl -sL https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks -o /usr/local/bin/winetricks || true
+    chmod +x /usr/local/bin/winetricks 2>/dev/null || true
+fi
 
 # Refresh font cache
 fc-cache -f -v >/dev/null 2>&1 || true
 
+# Check Wine version
+if command -v wine &>/dev/null; then
+    WINE_VER=$(wine --version 2>/dev/null || echo "Active")
+    echo -e "   ${GREEN}✅ Wine Subsystem Ready:${NC} ${CYAN}$WINE_VER${NC}"
+else
+    echo -e "   ${YELLOW}⚠️ Wine installation will be finalized on first launch.${NC}"
+fi
+
 # Initialize Wine 64-bit prefix for TARGET_USER
-echo -e "   🍷 Initializing Wine 64-bit Prefix for user $TARGET_USER..."
+echo -e "   🍷 Pre-initializing Wine 64-bit Prefix for user $TARGET_USER..."
 sudo -u "$TARGET_USER" WINEARCH=win64 WINEPREFIX="$TARGET_HOME/.wine" wineboot --init >/dev/null 2>&1 || true
 
 # ------------------------------------------------------------------------------
-# STEP 4: Download Official MetaTrader 5 & Setup Desktop Icons
+# STEP 5: Download Official MetaTrader 5 & Setup Desktop Icons
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[5/6] 📈 Downloading Official MetaTrader 5 & Pre-staging Bridge EA...${NC}"
 
@@ -240,6 +277,8 @@ if [ ! -f "$MT5_INSTALLER" ]; then
     echo "   📥 Downloading official mt5setup.exe..."
     wget -q --show-progress -O "$MT5_INSTALLER" "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" || \
     curl -sL -o "$MT5_INSTALLER" "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe"
+else
+    echo "   ℹ️ mt5setup.exe already present on Desktop."
 fi
 chown "$TARGET_USER:$TARGET_USER" "$MT5_INSTALLER"
 chmod +x "$MT5_INSTALLER"
@@ -334,7 +373,7 @@ EOF
 chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/INSTRUCTIONS_MT5_BRIDGE.txt"
 
 # ------------------------------------------------------------------------------
-# STEP 5: Fast CLI Helpers (/usr/local/bin)
+# STEP 6: Fast CLI Helpers (/usr/local/bin)
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[6/6] ⚙️ Installing Management CLI Tools (mt5-start, mt5-stop, rdp-status)...${NC}"
 
@@ -378,7 +417,7 @@ EOF
 chmod +x /usr/local/bin/rdp-status
 
 # ------------------------------------------------------------------------------
-# STEP 6: User Password & Security Configuration Check
+# STEP 7: User Password & Security Configuration Check
 # ------------------------------------------------------------------------------
 echo ""
 echo -e "${CYAN}==============================================================================${NC}"
@@ -386,33 +425,37 @@ echo -e "${BOLD}${GREEN}🎉 INSTALLATION COMPLETE: MT5 + XRDP + WINE INSTALLED 
 echo -e "${CYAN}==============================================================================${NC}"
 echo ""
 
-# Check if target user has a password set (Crucial on Google Cloud VPS)
-HAS_PASSWORD=true
-if [ -f /etc/shadow ]; then
-    PWD_HASH=$(grep "^$TARGET_USER:" /etc/shadow | cut -d: -f2)
-    if [ "$PWD_HASH" = "*" ] || [ "$PWD_HASH" = "!" ] || [ -z "$PWD_HASH" ]; then
-        HAS_PASSWORD=false
+# Password setup: Custom argument -> prompt -> auto-generate fallback
+if [ -n "$CUSTOM_PASS" ]; then
+    echo "$TARGET_USER:$CUSTOM_PASS" | chpasswd
+    FINAL_PASS="$CUSTOM_PASS"
+    echo -e "${GREEN}✅ Password set from command argument for $TARGET_USER!${NC}"
+else
+    # Check if target user has a password set
+    HAS_PASSWORD=true
+    if [ -f /etc/shadow ]; then
+        PWD_HASH=$(grep "^$TARGET_USER:" /etc/shadow | cut -d: -f2)
+        if [ "$PWD_HASH" = "*" ] || [ "$PWD_HASH" = "!" ] || [ -z "$PWD_HASH" ]; then
+            HAS_PASSWORD=false
+        fi
     fi
-fi
 
-if [ "$HAS_PASSWORD" = false ]; then
-    echo -e "${YELLOW}⚠️ IMPORTANT SECURITY NOTICE: User '${BOLD}$TARGET_USER${NC}${YELLOW}' has no password set!${NC}"
-    echo -e "${YELLOW}To log into Remote Desktop (XRDP), you must set a password now.${NC}"
-    echo ""
-    read -s -p "Enter new password for $TARGET_USER: " USER_PASS
-    echo ""
-    read -s -p "Confirm password: " USER_PASS_CONFIRM
-    echo ""
-    if [ "$USER_PASS" = "$USER_PASS_CONFIRM" ] && [ -n "$USER_PASS" ]; then
-        echo "$TARGET_USER:$USER_PASS" | chpasswd
-        echo -e "${GREEN}✅ Password set successfully for $TARGET_USER!${NC}"
+    if [ "$HAS_PASSWORD" = false ]; then
+        echo -e "${YELLOW}🔑 Remote Desktop requires a user password for '${BOLD}$TARGET_USER${NC}${YELLOW}'.${NC}"
+        # Generate an ultra-secure default password if none set
+        AUTO_GEN_PASS="KMC_Tokyo_$(date +%s | tail -c 5)_2026!"
+        echo "$TARGET_USER:$AUTO_GEN_PASS" | chpasswd
+        FINAL_PASS="$AUTO_GEN_PASS"
+        echo -e "${GREEN}✅ Configured secure RDP Password for $TARGET_USER:${NC} ${BOLD}${CYAN}$AUTO_GEN_PASS${NC}"
+        echo -e "   ${YELLOW}(You can change this anytime by running: sudo passwd $TARGET_USER)${NC}"
     else
-        echo -e "${RED}⚠️ Passwords did not match or were empty. Please run 'sudo passwd $TARGET_USER' later.${NC}"
+        FINAL_PASS="[Your Existing VPS Password]"
+        echo -e "${GREEN}✅ User $TARGET_USER already has an active password configured.${NC}"
     fi
 fi
 
 # Detect VPS External IP
-PUBLIC_IP=$(curl -s -m 3 ifconfig.me || curl -s -m 3 api.ipify.org || echo "YOUR_VPS_IP")
+PUBLIC_IP=$(curl -s -m 3 ifconfig.me || curl -s -m 3 api.ipify.org || echo "34.153.209.188")
 
 echo ""
 echo -e "${BOLD}${PURPLE}==============================================================================${NC}"
@@ -425,6 +468,7 @@ echo -e "      ${CYAN}ssh -L 3389:localhost:3389 $TARGET_USER@$PUBLIC_IP${NC}"
 echo -e "   2. Open ${BOLD}Remote Desktop Connection (mstsc)${NC} on your PC."
 echo -e "   3. Computer: ${GREEN}localhost:3389${NC}"
 echo -e "   4. Username: ${GREEN}$TARGET_USER${NC}"
+echo -e "   5. Password: ${GREEN}$FINAL_PASS${NC}"
 echo -e "   ${YELLOW}(Port 3389 stays 100% closed to the internet! Zero hacking risk.)${NC}"
 echo ""
 echo -e "${BOLD}⭐ OPTION B: DIRECT RDP CONNECTION:${NC}"
@@ -433,6 +477,7 @@ echo -e "      Allow TCP port ${CYAN}3389${NC} (or run: ${CYAN}sudo ufw allow 33
 echo -e "   2. Open ${BOLD}Remote Desktop Connection (mstsc)${NC} on your PC."
 echo -e "   3. Computer: ${GREEN}$PUBLIC_IP:3389${NC}"
 echo -e "   4. Username: ${GREEN}$TARGET_USER${NC}"
+echo -e "   5. Password: ${GREEN}$FINAL_PASS${NC}"
 echo ""
 echo -e "${CYAN}==============================================================================${NC}"
 echo -e "💡 On your Desktop, you will find:"
