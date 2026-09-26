@@ -68,6 +68,7 @@ class MT5ClientSession:
         self.addr = addr
         self.authenticated: bool = False
         self.status: str = "ONLINE"
+        self.positions: List[Dict[str, Any]] = []
 
 class MT5BridgeEngine:
     _instance = None
@@ -310,7 +311,8 @@ class MT5BridgeEngine:
         try:
             payload = json.loads(line)
         except Exception:
-            logger.warning(f"⚠️ [MT5 PACKET] Non-JSON payload received: {line[:50]}")
+            # Drop non-JSON scanner probe packets silently to prevent binary stdout blob in journalctl
+            logger.debug(f"⚠️ [MT5 PACKET] Non-JSON payload dropped ({len(line)} bytes)")
             return
 
         # 1. Security Check
@@ -450,6 +452,10 @@ class MT5BridgeEngine:
                 session.broker = broker
             if firm_name:
                 session.firm_name = firm_name
+            # Record live open positions reported by MT5 terminal
+            positions_data = payload.get("positions", [])
+            if isinstance(positions_data, list):
+                session.positions = positions_data
             if daily_start > 0:
                 session.daily_start_equity = daily_start
             elif session.daily_start_equity <= 0:
@@ -617,12 +623,12 @@ class MT5BridgeEngine:
 
     def dispatch_close(
         self,
-        ticket: int,
+        ticket: int = 0,
         symbol: Optional[str] = None,
         comment: str = "AI_CLOSE",
         target_account: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Dispatches an atomic close signal for an active position."""
+        """Dispatches an atomic close signal for an active position (or 0 for all positions)."""
         payload = {
             "type": "ORDER_CLOSE",
             "ticket": int(ticket),
@@ -723,7 +729,8 @@ class MT5BridgeEngine:
                     "equity": c.equity,
                     "ping_ms": c.ping_ms,
                     "compliant": c.is_prop_compliant,
-                    "status": c.status
+                    "status": c.status,
+                    "positions": getattr(c, "positions", [])
                 })
 
         return {

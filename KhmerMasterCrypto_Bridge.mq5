@@ -19,13 +19,13 @@
 
 //--- INPUT PARAMETERS
 input group "=== 🌐 TOKYO LINUX VPS CONNECTION ==="
-input string   InpHost              = "34.153.209.188";    // Linux VPS IP Address (Tokyo GCP)
+input string   InpHost              = "127.0.0.1";         // Linux VPS IP Address (127.0.0.1 for local VPS or Public IP)
 input int      InpPort              = 5555;                // TCP Bridge Port (Default: 5555)
 input string   InpSecretKey         = "KhmerMasterCrypto_PropBridge_Fortress_2026"; // Shared Secret Key
 input int      InpTimeoutMs         = 3000;                // Socket Connection Timeout (ms)
 
 input group "=== 🏛️ PROP FIRM & RISK CITADEL ==="
-input string   InpFirmName          = "FTMO";              // Prop Firm (FTMO, FundedNext, IC_Markets)
+input string   InpFirmName          = "GTCFX_Tokyo";       // Broker / Prop Firm (GTCFX_Tokyo, FTMO, FundedNext)
 input double   InpMaxDailyLossPct   = 3.5;                 // Hard Daily Loss Clamp % (FTMO Rule: -3.5%)
 input double   InpMaxDrawdownPct    = 7.0;                 // Max Overall Drawdown Clamp % (-7.0%)
 input ulong    InpMagicNumber       = 888999;              // EA Magic Number
@@ -273,8 +273,29 @@ void SendHeartbeat()
    if(real_time <= 0) real_time = TimeLocal();
    ulong now_ms = GetTickCount64();
 
+   // Collect open positions for real-time portfolio telemetry
+   string pos_json = "[";
+   int total_pos = PositionsTotal();
+   int count = 0;
+   for(int i = 0; i < total_pos; i++)
+   {
+      if(m_position.SelectByIndex(i))
+      {
+         if(count > 0) pos_json += ",";
+         string p_type = (m_position.PositionType() == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+         pos_json += StringFormat(
+            "{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":\"%s\",\"lots\":%.2f,\"open_price\":%.5f,\"current_price\":%.5f,\"sl\":%.5f,\"tp\":%.5f,\"profit\":%.2f}",
+            m_position.Ticket(), m_position.Symbol(), p_type, m_position.Volume(),
+            m_position.PriceOpen(), m_position.PriceCurrent(), m_position.StopLoss(),
+            m_position.TakeProfit(), m_position.Profit()
+         );
+         count++;
+      }
+   }
+   pos_json += "]";
+
    string json = StringFormat(
-      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"ping_ms\":%.1f,\"timestamp\":%d,\"timestamp_ms\":%I64u}\n",
+      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"ping_ms\":%.1f,\"timestamp\":%d,\"timestamp_ms\":%I64u,\"positions\":%s}\n",
       (int)m_account.Login(),
       m_account.Company(),
       InpFirmName,
@@ -285,7 +306,8 @@ void SendHeartbeat()
       InpSecretKey,
       g_last_ping_ms,
       (int)real_time,
-      now_ms
+      now_ms,
+      pos_json
    );
 
    SendRawString(json);
@@ -524,6 +546,11 @@ void HandleOrderSend(const string json)
 void HandleOrderClose(const string json)
 {
    ulong ticket = (ulong)StringToInteger(ExtractJsonValue(json, "ticket"));
+   if(ticket == 0 || ticket == 999999999)
+   {
+      CloseAllBridgeTrades("REMOTE_CLOSE_ALL");
+      return;
+   }
    if(ticket > 0 && PositionSelectByTicket(ticket))
    {
       double close_price = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? 
@@ -634,11 +661,12 @@ void EvaluateLocalPropCompliance()
 //+------------------------------------------------------------------+
 void CloseAllBridgeTrades(const string reason)
 {
+   bool close_all_forced = (reason == "REMOTE_CLOSE_ALL" || reason == "PROP_BREACH_HALT" || reason == "EMERGENCY_PANIC_ALL");
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       if(m_position.SelectByIndex(i))
       {
-         if(m_position.Magic() == InpMagicNumber)
+         if(close_all_forced || m_position.Magic() == InpMagicNumber)
          {
             m_trade.PositionClose(m_position.Ticket());
             PrintFormat("🛑 [EMERGENCY CLOSE] Closed position #%d (%s)", m_position.Ticket(), reason);
