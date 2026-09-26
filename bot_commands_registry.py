@@ -101,4 +101,5 @@ def get_admin_bot_commands():
         BotCommand("health", "🩺 Check VPS Hardware & Engine Diagnostics"),
         BotCommand("sync_brain", "📦 Hot-Reload AI Models from Cloud"),
         BotCommand("admin_capital", "🏢 Capital.com Live Verification Approver"),
+        BotCommand("admin_mt5", "🏛️ GTCFX MT5 Live Verification Approver"),
     ]

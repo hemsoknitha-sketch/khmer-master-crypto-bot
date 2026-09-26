@@ -5681,6 +5681,79 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["SELL", "EURUSD", "0.02"]
                 await mt5_command(update, context)
+            elif data == "btn_mt5_req_verify":
+                try:
+                    await update.callback_query.answer("📋 កំពុងផ្ញើសំណើសុំផ្ទៀងផ្ទាត់ MT5 ID...")
+                except Exception:
+                    pass
+                cfg = db.get_user_mt5_config(chat_id)
+                acc = str(cfg.get("login", "")).strip()
+                if acc:
+                    db.register_mt5_referral_request(chat_id, acc, referral_code="130237694", notes="Telegram 1-Tap Request")
+                    try:
+                        admin_msg = (
+                            f"🔔 **[MT5 GTCFX REFERRAL VERIFICATION REQUEST]** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👤 **User Chat ID ៖** `{chat_id}`\n"
+                            f"🎫 **MT5 Account ID ៖** `{acc}`\n"
+                            f"🏛️ **Broker ៖** `GTCFX (Tokyo TY3)`\n"
+                            f"🔑 **Invite Code ៖** `130237694`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👉 **អនុម័ត ៖** `` `/admin_mt5 approve {chat_id}` ``\n"
+                            f"👉 **បដិសេធ ៖** `` `/admin_mt5 reject {chat_id}` ``"
+                        )
+                        await context.bot.send_message(chat_id=859271875, text=admin_msg, parse_mode="Markdown")
+                    except Exception:
+                        pass
+                    await update.effective_message.reply_text(
+                        f"✅ **បានផ្ញើសំណើសុំផ្ទៀងផ្ទាត់គណនី #{acc} ទៅកាន់ Super Admin រួចរាល់!**\n"
+                        f"សូមរង់ចាំការអនុម័តក្នុងពេលឆាប់ៗ។ បន្ទាប់ពីអនុម័តរួច អ្នកអាចជួញដូរលើ MT5 បានភ្លាមៗ!",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await update.effective_message.reply_text(
+                        f"⚠️ **មិនទាន់មានលេខគណនី MT5 នៅឡើយទេ។**\n"
+                        f"សូមចុះឈ្មោះតាម Link ផ្លូវការ: `https://web.mygtc.app/login/register?ref=130237694` (Invite Code: `130237694`)\n"
+                        f"រួចភ្ជាប់គណនីលើ Web GUI ឬផ្ញើលេខ MT5 Account ID មក Admin: @hemsoknitha!",
+                        parse_mode="Markdown"
+                    )
+            elif data == "btn_mt5_check_auth":
+                is_auth_now = db.is_mt5_user_authorized(chat_id)
+                if is_auth_now:
+                    try:
+                        await update.callback_query.answer("🎉 គណនីរបស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់រួចរាល់! កំពុងបើក MT5 Terminal...")
+                    except Exception:
+                        pass
+                    context.args = []
+                    await mt5_command(update, context)
+                else:
+                    try:
+                        await update.callback_query.answer("⏳ គណនីកំពុងរង់ចាំការអនុម័តពី Admin (Invite Code: 130237694)!", show_alert=True)
+                    except Exception:
+                        pass
+            elif data == "btn_admin_mt5_refresh":
+                try:
+                    await update.callback_query.answer("🔄 ធ្វើបច្ចុប្បន្នភាពបញ្ជី MT5 Traders រួចរាល់!")
+                except Exception:
+                    pass
+                context.args = ["LIST"]
+                await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_appr_"):
+                target_cid = int(data.replace("btn_mt5_appr_", ""))
+                try:
+                    await update.callback_query.answer(f"✅ កំពុងអនុម័តសិទ្ធិ MT5 សម្រាប់ {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["APPROVE", str(target_cid)]
+                await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_rej_"):
+                target_cid = int(data.replace("btn_mt5_rej_", ""))
+                try:
+                    await update.callback_query.answer(f"🛑 កំពុងបិទសិទ្ធិ MT5 សម្រាប់ {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["REJECT", str(target_cid)]
+                await admin_mt5_command(update, context)
             elif data in ["btn_prop_firm_menu", "btn_prop_firm"]:
                 try:
                     await update.callback_query.answer("🏆 កំពុងបើកផ្ទាំង Prop Firm Challenge...")
@@ -6348,6 +6421,43 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["CLOSE_ALL"]
                 await mt5_command(update, context)
+            elif data == "btn_mt5_req_verify":
+                try:
+                    await update.callback_query.answer("📋 កំពុងផ្ញើសំណើសុំផ្ទៀងផ្ទាត់ MT5 ID...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_mt5_check_auth":
+                try:
+                    await update.callback_query.answer("🔄 ពិនិត្យសិទ្ធិ MT5...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_admin_mt5_refresh":
+                try:
+                    await update.callback_query.answer("🔄 ធ្វើបច្ចុប្បន្នភាពបញ្ជី MT5...")
+                except Exception:
+                    pass
+                context.args = ["LIST"]
+                await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_appr_"):
+                target_cid = int(data.replace("btn_mt5_appr_", ""))
+                try:
+                    await update.callback_query.answer(f"✅ អនុម័តសិទ្ធិ MT5 {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["APPROVE", str(target_cid)]
+                await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_rej_"):
+                target_cid = int(data.replace("btn_mt5_rej_", ""))
+                try:
+                    await update.callback_query.answer(f"🛑 បិទសិទ្ធិ MT5 {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["REJECT", str(target_cid)]
+                await admin_mt5_command(update, context)
             elif data == "btn_cap_api_vault":
                 try:
                     await update.callback_query.answer("🔑 បើកផ្ទាំង Capital.com API Vault!")
@@ -19830,7 +19940,65 @@ class TelegramBotThread(BaseThread):
                     f"Institutional Funded Trader Passing System 24/7!"
                 )
 
-            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+        def build_mt5_referral_gatekeeper_ui(chat_id: int, user_lang: str = "khmer"):
+            """
+            GTCFX Japan Tokyo MT5 Pro Referral Gatekeeper Lock UI (Invariant 42).
+            Displays interactive registration link, official invite code, and verification request options.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import ui_standards
+            pro_url = "https://web.mygtc.app/login/register?ref=130237694"
+            invite_code = "130237694"
+
+            if user_lang == 'khmer' or user_lang not in ['en', 'english']:
+                gate_text = (
+                    f"🔒 **[GTCFX TOKYO MT5 LIVE VIP ACCESS REQUIRED]** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚠️ **សេចក្តីជូនដំណឹងការពារមូលធន & សិទ្ធិវិនិយោគ MT5 ៖**\n"
+                    f"ប្រព័ន្ធ /mt5 **មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយ** បើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ **Super BOT ADMIN** លើ Broker ដៃគូផ្លូវការ **GTCFX (Equinix Tokyo TY3)**!\n\n"
+                    f"🌐 **តំណភ្ជាប់ចុះឈ្មោះផ្លូវការ (Official Referral URL) ៖**\n"
+                    f"[{pro_url}]({pro_url})\n\n"
+                    f"🔑 **Official Invite Code ៖** `{invite_code}` (ចុចលើវាដើម្បី Copy)\n"
+                    f"🏛️ **Broker Gateway ៖** `GTC Global Trade Capital (Tokyo TY3)`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **ដំណាក់កាលអនុវត្ត (3 ជំហានងាយៗ) ៖**\n"
+                    f"1️⃣ ចុច Link ខាងលើ ឬ Scan QR Code ដើម្បីចុះឈ្មោះគណនី GTCFX\n"
+                    f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code: `{invite_code}`\n"
+                    f"3️⃣ ចុចប៊ូតុង **[ 📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID ]** ខាងក្រោម ដើម្បីទទួលបានការអនុម័តភ្លាមៗ!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_"
+                )
+            else:
+                gate_text = (
+                    f"🔒 **[GTCFX TOKYO MT5 LIVE VIP ACCESS REQUIRED]** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚠️ **Institutional Capital Protection & MT5 Gatekeeper Notice:**\n"
+                    f"The /mt5 system **strictly does NOT permit investing or trading** unless you are properly registered under the **Super BOT ADMIN's Official Referral URL** on **GTCFX (Equinix Tokyo TY3)**!\n\n"
+                    f"🌐 **Official Referral URL (1-Tap Register):**\n"
+                    f"[{pro_url}]({pro_url})\n\n"
+                    f"🔑 **Official Invite Code:** `{invite_code}` (Click to Copy)\n"
+                    f"🏛️ **Broker Gateway:** `GTC Global Trade Capital (Tokyo TY3)`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **3 Simple Steps to Unlock:**\n"
+                    f"1️⃣ Register on GTCFX using the official link or scan QR code\n"
+                    f"2️⃣ Ensure Invite Code is set to `{invite_code}`\n"
+                    f"3️⃣ Click **[ 📋 Request Verification ]** below for instant Super Admin approval!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_"
+                )
+
+            gate_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🌐 ចុះឈ្មោះ GTCFX (Official Link)", url=pro_url)],
+                [InlineKeyboardButton("📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID", callback_data="btn_mt5_req_verify")],
+                [
+                    InlineKeyboardButton("🔄 ពិនិត្យសិទ្ធិឡើងវិញ", callback_data="btn_mt5_check_auth"),
+                    InlineKeyboardButton("💬 ជំនួយការ Super Admin", url="https://t.me/hemsoknitha")
+                ],
+                [InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")]
+            ])
+            return gate_text, gate_kb
 
         async def mt5_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
@@ -19852,6 +20020,35 @@ class TelegramBotThread(BaseThread):
                 msg = loc.get_text(user_lang, 'access_denied')
                 if update.effective_message:
                     await update.effective_message.reply_text(msg, parse_mode="Markdown")
+                return
+
+            # GTCFX Japan Tokyo MT5 Pro Referral Gatekeeper Lock (Invariant 42)
+            is_mt5_auth = is_admin_user or db.is_mt5_user_authorized(chat_id)
+            if not is_mt5_auth:
+                gate_text, gate_kb = build_mt5_referral_gatekeeper_ui(chat_id, user_lang)
+                qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gtc_QRCode.png")
+                if os.path.exists(qr_path):
+                    try:
+                        with open(qr_path, "rb") as f_qr:
+                            if update.callback_query and update.callback_query.message:
+                                await update.callback_query.message.reply_photo(
+                                    photo=f_qr,
+                                    caption=gate_text,
+                                    parse_mode="Markdown",
+                                    reply_markup=gate_kb
+                                )
+                            elif update.effective_message:
+                                await update.effective_message.reply_photo(
+                                    photo=f_qr,
+                                    caption=gate_text,
+                                    parse_mode="Markdown",
+                                    reply_markup=gate_kb
+                                )
+                            return
+                    except Exception:
+                        pass
+                if update.effective_message:
+                    await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                 return
 
             import mt5_bridge_engine
@@ -21174,6 +21371,120 @@ class TelegramBotThread(BaseThread):
 
                 db.set_capital_user_referral_status(target_uid, is_verified=False)
                 await update.effective_message.reply_text(f"❌ បានបដិសេធសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}`", parse_mode="Markdown")
+                return
+
+        async def admin_mt5_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            👑 Super Admin Command to manage GTCFX Tokyo MT5 VIP Users & Referral Gatekeeper:
+            - /admin_mt5 (or /admin_mt5 list): Overview of all registered MT5 accounts with 1-tap Approve/Revoke buttons
+            - /admin_mt5 approve <chat_id>: Grants instant VIP access to /mt5 and Web GUI
+            - /admin_mt5 reject <chat_id>: Revokes access to /mt5 and Web GUI
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            user_id = update.effective_user.id if update.effective_user else chat_id
+            is_admin = (user_id == 859271875) or db.is_admin(user_id) or (chat_id == 859271875) or db.is_admin(chat_id)
+            if not is_admin:
+                return
+
+            args = list(context.args) if context and context.args else []
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import ui_standards
+
+            if not args or args[0].upper() in ["LIST", "USERS", "OVERVIEW", "ALL"]:
+                all_users = db.get_all_mt5_users_overview()
+                if not all_users:
+                    await update.effective_message.reply_text("ℹ️ មិនទាន់មានអ្នកប្រើប្រាស់ MT5 ណាមួយនៅក្នុង Database ឡើយ។", parse_mode="Markdown")
+                    return
+
+                lines = [
+                    "👑 **[GTCFX TOKYO MT5 VIP DIRECTORY]** 🏛️",
+                    f"{ui_standards.DIVIDER_HEAVY}"
+                ]
+                kb_rows = []
+                for u in all_users:
+                    u_cid = u["chat_id"]
+                    u_login = u["login"] or "N/A"
+                    u_srv = u["server"] or "GTC-Live"
+                    u_firm = u["firm_name"] or "GTCFX"
+                    v_badge = "🟢 VERIFIED" if u["is_verified"] else "🟡 UNVERIFIED"
+                    lines.append(
+                        f"• **User ៖** `{u_cid}` | **Firm ៖** `{u_firm}`\n"
+                        f"  🏛️ **Login ៖** `{u_login}` | **Server ៖** `{u_srv}`\n"
+                        f"  🛡️ **Gatekeeper ៖** {v_badge}"
+                    )
+                    btn_row = []
+                    if not u["is_verified"]:
+                        btn_row.append(InlineKeyboardButton(f"✅ អនុម័ត ({u_cid})", callback_data=f"btn_mt5_appr_{u_cid}"))
+                    else:
+                        btn_row.append(InlineKeyboardButton(f"🛑 បិទសិទ្ធិ ({u_cid})", callback_data=f"btn_mt5_rej_{u_cid}"))
+                    kb_rows.append(btn_row)
+
+                kb_rows.append([InlineKeyboardButton("🔄 Refresh List", callback_data="btn_admin_mt5_refresh")])
+                msg_text = "\n".join(lines) + f"\n{ui_standards.DIVIDER_HEAVY}\n_Khmer Master Crypto_\n_APEX SUPER BRAIN AI_"
+                await update.effective_message.reply_text(msg_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_rows))
+                return
+
+            sub = args[0].upper()
+
+            # Command: /admin_mt5 APPROVE <chat_id>
+            if sub in ["APPROVE", "APP", "VERIFY", "ALLOW"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Chat ID: `` `/admin_mt5 approve <chat_id>` ``", parse_mode="Markdown")
+                    return
+                try:
+                    target_cid = int(args[1])
+                except ValueError:
+                    await update.effective_message.reply_text(f"❌ Chat ID `{args[1]}` មិនត្រឹមត្រូវឡើយ!", parse_mode="Markdown")
+                    return
+
+                db.set_mt5_user_referral_status(target_cid, is_verified=True, referral_code="130237694")
+                await update.effective_message.reply_text(f"✅ បានអនុម័តសិទ្ធិ GTCFX MT5 VIP សម្រាប់ User `{target_cid}` រួចរាល់!", parse_mode="Markdown")
+                try:
+                    await context.bot.send_message(
+                        chat_id=target_cid,
+                        text=(
+                            f"🎉 **[GTCFX TOKYO MT5 VIP ACCESS APPROVED!]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"គណនី MT5 របស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ និងអនុម័តដោយ Super Admin រួចរាល់ហើយ!\n"
+                            f"អ្នកអាចដំណើរការ `/mt5` ឬ Web GUI MT5 Pro Terminal បានពេញលេញ ២៤/៧!\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"_Khmer Master Crypto_\n"
+                            f"_APEX SUPER BRAIN AI_"
+                        ),
+                        parse_mode="Markdown"
+                    )
+                except Exception as e_ntf:
+                    print(f"Failed to notify MT5 user {target_cid}: {e_ntf}")
+                return
+
+            # Command: /admin_mt5 REJECT <chat_id>
+            elif sub in ["REJECT", "REJ", "BLOCK", "DENY", "REVOKE"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Chat ID: `` `/admin_mt5 reject <chat_id>` ``", parse_mode="Markdown")
+                    return
+                try:
+                    target_cid = int(args[1])
+                except ValueError:
+                    await update.effective_message.reply_text(f"❌ Chat ID `{args[1]}` មិនត្រឹមត្រូវឡើយ!", parse_mode="Markdown")
+                    return
+
+                db.set_mt5_user_referral_status(target_cid, is_verified=False)
+                await update.effective_message.reply_text(f"🛑 បានបិទសិទ្ធិ MT5 VIP សម្រាប់ User `{target_cid}` រួចរាល់!", parse_mode="Markdown")
+                try:
+                    await context.bot.send_message(
+                        chat_id=target_cid,
+                        text=(
+                            f"⚠️ **[GTCFX TOKYO MT5 ACCESS NOTICE]** 🔒\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"សិទ្ធិចូលដំណើរការ MT5 Terminal របស់អ្នកត្រូវបានផ្អាកជាបណ្តោះអាសន្នដោយ Super Admin។\n"
+                            f"សូមទាក់ទងមកកាន់ Super Admin @hemsoknitha ដើម្បីផ្ទៀងផ្ទាត់ឡើងវិញ។\n"
+                            f"{ui_standards.DIVIDER_HEAVY}"
+                        ),
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
                 return
 
         async def citadel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -22515,6 +22826,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("paper_trading", paper_trading_command))
         self.app.add_handler(CommandHandler("admin_capital", admin_capital_command))
         self.app.add_handler(CommandHandler("admincapital", admin_capital_command))
+        self.app.add_handler(CommandHandler("admin_mt5", admin_mt5_command))
+        self.app.add_handler(CommandHandler("adminmt5", admin_mt5_command))
         self.app.add_handler(CommandHandler("citadel", citadel_command))
         self.app.add_handler(CommandHandler("security", citadel_command))
         self.app.add_handler(CommandHandler("security_citadel", citadel_command))

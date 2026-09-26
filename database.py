@@ -1139,6 +1139,21 @@ def init_db():
             closed_at DATETIME
         )
     ''')
+
+    # MT5 GTCFX Pro Referral & Gatekeeper Registry (Invariant 42)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mt5_user_referrals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER UNIQUE,
+            account_id TEXT DEFAULT '',
+            broker TEXT DEFAULT 'GTCFX',
+            referral_code TEXT DEFAULT '130237694',
+            is_verified BOOLEAN DEFAULT 0,
+            verified_at DATETIME,
+            notes TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -4320,6 +4335,184 @@ def get_user_mt5_config(chat_id: int) -> dict:
         pass
     return {}
 
+# ==============================================================================
+# GTCFX JAPAN TOKYO MT5 PRO REFERRAL GATEKEEPER LOCK (INVARIANT 42)
+# ==============================================================================
+GTC_OFFICIAL_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=130237694"
+GTC_OFFICIAL_INVITE_CODE = "130237694"
+
+def is_mt5_user_authorized(chat_id: int) -> bool:
+    """
+    GTCFX Japan Tokyo MT5 Terminal Pro Referral Gatekeeper Lock (Invariant 42):
+    Under the sacred fiduciary rule of Khmer Master Crypto:
+    ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: 130237694).
+    Returns True if:
+    1. chat_id == 859271875 (Master Super Admin) or is_admin(chat_id)
+    2. User is marked is_verified == 1 in mt5_user_referrals
+    3. User has 'Administrator' license
+    """
+    if chat_id == 859271875:
+        return True
+    try:
+        if is_admin(chat_id):
+            return True
+        if is_user_vip(chat_id) and get_user_license(chat_id) == 'Administrator':
+            return True
+    except Exception:
+        pass
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT is_verified FROM mt5_user_referrals WHERE chat_id = ?", (chat_id,))
+        row = cursor.fetchone()
+        if row and row[0] == 1:
+            conn.close()
+            return True
+        conn.close()
+        return False
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def set_mt5_user_referral_status(
+    chat_id: int,
+    is_verified: bool,
+    account_id: str = "",
+    notes: str = ""
+) -> bool:
+    """
+    Sets or updates the GTCFX MT5 referral verification status for a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO mt5_user_referrals (chat_id, account_id, broker, referral_code, is_verified, verified_at, notes)
+            VALUES (?, ?, 'GTCFX', '130237694', ?, CURRENT_TIMESTAMP, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                account_id = CASE WHEN excluded.account_id != '' THEN excluded.account_id ELSE mt5_user_referrals.account_id END,
+                is_verified = excluded.is_verified,
+                verified_at = CURRENT_TIMESTAMP,
+                notes = excluded.notes
+        """, (chat_id, str(account_id or "").strip(), 1 if is_verified else 0, notes))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error in set_mt5_user_referral_status for {chat_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def register_mt5_referral_request(
+    chat_id: int,
+    account_id: str,
+    referral_code: str = "130237694",
+    notes: str = ""
+) -> bool:
+    """
+    Registers a user's pending MT5 verification request with their MT5 Account ID.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO mt5_user_referrals (chat_id, account_id, broker, referral_code, is_verified, notes)
+            VALUES (?, ?, 'GTCFX', ?, 0, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                account_id = excluded.account_id,
+                referral_code = excluded.referral_code,
+                notes = excluded.notes
+        """, (chat_id, str(account_id or "").strip(), referral_code, notes))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ Error in register_mt5_referral_request for {chat_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False
+
+def get_mt5_referral_record(chat_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Retrieves the GTCFX MT5 referral verification record for a user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT r.chat_id, r.account_id, r.broker, r.referral_code, r.is_verified, r.verified_at, r.notes, r.created_at, u.username
+            FROM mt5_user_referrals r
+            LEFT JOIN users u ON r.chat_id = u.chat_id
+            WHERE r.chat_id = ?
+        """, (chat_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                "chat_id": row[0],
+                "account_id": str(row[1] or ""),
+                "broker": str(row[2] or "GTCFX"),
+                "referral_code": str(row[3] or "130237694"),
+                "is_verified": bool(row[4]),
+                "verified_at": row[5],
+                "notes": str(row[6] or ""),
+                "created_at": row[7],
+                "username": str(row[8] or f"User_{row[0]}")
+            }
+        return None
+    except Exception as e:
+        print(f"⚠️ Error in get_mt5_referral_record: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return None
+
+def get_all_mt5_referral_users() -> List[Dict[str, Any]]:
+    """
+    Returns list of all registered/pending MT5 traders for Admin review.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT r.chat_id, r.account_id, r.broker, r.referral_code, r.is_verified, r.verified_at, r.notes, r.created_at, u.username
+            FROM mt5_user_referrals r
+            LEFT JOIN users u ON r.chat_id = u.chat_id
+            ORDER BY r.created_at DESC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "chat_id": r[0],
+                "account_id": str(r[1] or ""),
+                "broker": str(r[2] or "GTCFX"),
+                "referral_code": str(r[3] or "130237694"),
+                "is_verified": bool(r[4]),
+                "verified_at": r[5],
+                "notes": str(r[6] or ""),
+                "created_at": r[7],
+                "username": str(r[8] or f"User_{r[0]}")
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"⚠️ Error in get_all_mt5_referral_users: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
 
 def can_user_buy(chat_id: int) -> bool:
     config = get_auto_trade_config(chat_id)

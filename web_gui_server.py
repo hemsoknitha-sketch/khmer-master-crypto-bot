@@ -213,12 +213,17 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             margin_level = round((equity / max(1.0, equity - free_margin)) * 100.0, 1) if (equity - free_margin) > 0 else 0.0
 
             ai_auto_trade = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+            is_authorized = db.is_mt5_user_authorized(chat_id)
 
             return {
                 "status": "success",
                 "bridge_running": bridge.is_running,
                 "connected": is_connected,
                 "tcp_port": bridge.tcp_port,
+                "is_authorized": is_authorized,
+                "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
+                "invite_code": "130237694",
+                "qr_code_url": "/gtc_QRCode.png",
                 "account": {
                     "login": user_login or (matched_session.account_id if matched_session else ""),
                     "broker": cfg.get("broker") or (matched_session.broker if matched_session else "GTCFX"),
@@ -238,7 +243,8 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                     "is_prop_compliant": is_prop_compliant,
                     "ping_ms": ping_ms,
                     "ai_auto_trade": ai_auto_trade,
-                    "has_bound_config": bool(cfg.get("login"))
+                    "has_bound_config": bool(cfg.get("login")),
+                    "is_authorized": is_authorized
                 },
                 "positions": formatted_positions,
                 "supported_symbols": [
@@ -986,13 +992,22 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
             firm_name=firm_name
         )
 
+        # Register pending verification in referral registry
+        db.register_mt5_referral_request(chat_id, login, referral_code="130237694", notes="Web GUI Binding")
+        is_auth = db.is_mt5_user_authorized(chat_id)
+
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
             del _GUI_CACHE["mt5"][chat_id]
 
         if success:
+            if is_auth:
+                msg = f"គណនី MT5 #{login} ({server}) ត្រូវបានភ្ជាប់ជោគជ័យ និងមានសិទ្ធិជួញដូរពេញលេញ!"
+            else:
+                msg = f"គណនី MT5 #{login} ត្រូវបានកត់ត្រាទុក! សូមរង់ចាំការអនុម័ត Referral ពី Super Admin (Invite Code: 130237694) ដើម្បីចាប់ផ្តើមជួញដូរ។"
             return web.json_response({
                 "status": "success",
-                "message": f"គណនី MT5 {login} ({server}) ត្រូវបានភ្ជាប់ជោគជ័យ!",
+                "is_authorized": is_auth,
+                "message": msg,
                 "login": login,
                 "server": server
             })
@@ -1011,6 +1026,17 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                 "status": "error",
                 "message": "⛔ Access Denied: មិនមានសិទ្ធិជួញដូរលើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
             }, status=403)
+
+        # GTCFX Pro Referral Gatekeeper Lock (Invariant 42)
+        if not db.is_mt5_user_authorized(chat_id):
+            return web.json_response({
+                "status": "error",
+                "code": "REFERRAL_REQUIRED",
+                "message": "⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: 130237694)!",
+                "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
+                "invite_code": "130237694"
+            }, status=403)
+
         symbol = str(data.get("symbol", "XAUUSD")).upper().strip()
         action = str(data.get("action", "BUY")).upper().strip()
         lot = float(data.get("lot", 0.01))
@@ -1090,6 +1116,17 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
                 "status": "error",
                 "message": "⛔ Access Denied: មិនមានសិទ្ធិកំណត់ AI Trade លើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
             }, status=403)
+
+        # GTCFX Pro Referral Gatekeeper Lock (Invariant 42)
+        if not db.is_mt5_user_authorized(chat_id):
+            return web.json_response({
+                "status": "error",
+                "code": "REFERRAL_REQUIRED",
+                "message": "⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យបើក AI Auto Trade ឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: 130237694)!",
+                "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
+                "invite_code": "130237694"
+            }, status=403)
+
         enable = bool(data.get("enable", True))
 
         db.update_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1" if enable else "0")
@@ -1104,6 +1141,65 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
         })
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
+    """Allows VIP users to submit their MT5 Account ID for GTCFX referral verification."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        account_id = str(data.get("account_id", "")).strip()
+        if not account_id:
+            return web.json_response({"status": "error", "message": "សូមបញ្ចូលលេខ MT5 Account ID!"}, status=400)
+
+        # If admin, auto-verify
+        if chat_id == DEFAULT_VIP_CHAT_ID or db.is_admin(chat_id):
+            db.set_mt5_user_referral_status(chat_id, True, account_id, notes="Admin Auto-Verified")
+            if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+                del _GUI_CACHE["mt5"][chat_id]
+            return web.json_response({
+                "status": "success",
+                "is_authorized": True,
+                "message": f"✅ គណនី #{account_id} ត្រូវបានផ្ទៀងផ្ទាត់អនុម័តដោយជោគជ័យ!"
+            })
+
+        db.register_mt5_referral_request(chat_id, account_id, referral_code="130237694", notes="Web GUI Submit")
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        try:
+            import notification_manager
+            import ui_standards
+            admin_msg = (
+                f"🔔 **[MT5 GTCFX REFERRAL VERIFICATION REQUEST]** ⚡\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👤 **User Chat ID ៖** `{chat_id}`\n"
+                f"🎫 **MT5 Account ID ៖** `{account_id}`\n"
+                f"🏛️ **Broker ៖** `GTCFX (Tokyo TY3)`\n"
+                f"🔑 **Invite Code ៖** `130237694`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👉 **អនុម័ត ៖** `` `/admin_mt5 approve {chat_id}` ``\n"
+                f"👉 **បដិសេធ ៖** `` `/admin_mt5 reject {chat_id}` ``"
+            )
+            asyncio.create_task(notification_manager.broadcast_admin(admin_msg))
+        except Exception:
+            pass
+
+        return web.json_response({
+            "status": "success",
+            "is_authorized": False,
+            "message": f"✅ បានផ្ញើសំណើសុំផ្ទៀងផ្ទាត់គណនី #{account_id} ទៅកាន់ Admin រួចរាល់! សូមរង់ចាំការអនុម័តក្នុងពេលឆាប់ៗ។"
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_gtc_qr(request: web.Request) -> web.FileResponse:
+    """Serves the official GTCFX referral QR Code image."""
+    qr_path = os.path.join(STATIC_DIR, "gtc_QRCode.png")
+    if not os.path.exists(qr_path):
+        qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gtc_QRCode.png")
+    resp = web.FileResponse(qr_path)
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 
 # ==============================================================================
@@ -1145,6 +1241,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/index.html", handle_index)
     app.router.add_get("/style.css", handle_style)
     app.router.add_get("/app.js", handle_script)
+    app.router.add_get("/gtc_QRCode.png", handle_gtc_qr)
 
     # High-Performance WebSocket Route (0.01ms streaming)
     app.router.add_get("/api/ws", handle_api_ws)
@@ -1172,6 +1269,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_post("/api/mt5/order", handle_api_mt5_order)
     app.router.add_post("/api/mt5/close", handle_api_mt5_close)
     app.router.add_post("/api/mt5/toggle_ai", handle_api_mt5_toggle_ai)
+    app.router.add_post("/api/mt5/verify_request", handle_api_mt5_verify_request)
 
     return app
 
