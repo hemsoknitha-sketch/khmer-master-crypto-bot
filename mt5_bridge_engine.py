@@ -244,6 +244,7 @@ class MT5BridgeEngine:
                         client_sock.setblocking(False)
                         client_sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                         inputs.append(client_sock)
+                        client_buffers[client_sock] = ""
                         client_ip = client_addr[0]
                         now_ts = time.time()
                         if (now_ts - self._last_connect_log.get(client_ip, 0.0)) >= 60.0:
@@ -256,6 +257,8 @@ class MT5BridgeEngine:
                         try:
                             data = s.recv(4096)
                             if data:
+                                if s not in client_buffers:
+                                    client_buffers[s] = ""
                                 client_buffers[s] += data.decode("utf-8", errors="ignore")
                                 # Process newline-delimited JSON packets
                                 while "\n" in client_buffers[s]:
