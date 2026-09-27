@@ -86,10 +86,10 @@ chmod 600 "$TARGET_DIR/startup.ini"
 
 mkdir -p "$TARGET_DIR/config"
 cp -f "$TARGET_DIR/startup.ini" "$TARGET_DIR/config/startup.ini"
-chown "$TARGET_USER:$TARGET_USER" "$TARGET_DIR/config/startup.ini"
-chmod 600 "$TARGET_DIR/config/startup.ini"
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_DIR"
+chmod -R 775 "$TARGET_DIR"
 
-echo -e "${GREEN}✅ Successfully written credentials to startup.ini (root & config/)!${NC}"
+echo -e "${GREEN}✅ Successfully written credentials & fixed permissions for user $TARGET_USER!${NC}"
 
 # Auto-detect active X display (XRDP on Ubuntu typically uses :10.0, fallback :0.0)
 DETECTED_DISPLAY="${DISPLAY:-:10.0}"

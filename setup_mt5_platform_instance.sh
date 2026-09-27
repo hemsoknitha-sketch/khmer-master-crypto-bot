@@ -58,8 +58,9 @@ cat << EOF > "$MT5_PLATFORM/startup.ini"
 Login=52135153
 Server=GTCGlobalSA-Server 2
 EOF
-chown "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM/startup.ini"
-echo -e "${GREEN}✅ Configured startup.ini for Platform Account #52135153!${NC}"
+chown -R "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM"
+chmod -R 775 "$MT5_PLATFORM"
+echo -e "${GREEN}✅ Configured startup.ini & fixed permissions for Platform Account #52135153!${NC}"
 
 # 3. Stage KhmerMasterCrypto_Bridge.mq5 into Instance 2 Experts folder
 BRIDGE_SRC="$WORKSPACE_DIR/KhmerMasterCrypto_Bridge.mq5"
