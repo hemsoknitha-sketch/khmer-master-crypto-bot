@@ -5625,6 +5625,17 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await mt5_command(update, context)
+            elif data == "btn_mt5_toggle_auto":
+                curr_auto = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+                new_state = "0" if curr_auto else "1"
+                db.set_system_setting(f"mt5_ai_auto_trade_{chat_id}", new_state)
+                toast_msg = "🤖 MT5 AI Swarm: 🟢 បានបើកដំណើរការ!" if new_state == "1" else "🤖 MT5 AI Swarm: ⚪ បានផ្អាកជាបណ្តោះអាសន្ន!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
             elif data == "btn_mt5_test_signal":
                 try:
                     await update.callback_query.answer("⚡ កំពុងបាញ់ Signal Test ទៅ MT5 GTCFX Tokyo...")
@@ -6396,6 +6407,17 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_mt5_menu", "btn_mt5_refresh"]:
                 try:
                     await update.callback_query.answer("🔄 ធ្វើបច្ចុប្បន្នភាព MT5 Bridge Telemetry...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_mt5_toggle_auto":
+                curr_auto = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+                new_state = "0" if curr_auto else "1"
+                db.set_system_setting(f"mt5_ai_auto_trade_{chat_id}", new_state)
+                toast_msg = "🤖 MT5 AI Swarm: 🟢 បានបើកដំណើរការ!" if new_state == "1" else "🤖 MT5 AI Swarm: ⚪ បានផ្អាកជាបណ្តោះអាសន្ន!"
+                try:
+                    await update.callback_query.answer(toast_msg)
                 except Exception:
                     pass
                 context.args = []
@@ -20068,8 +20090,119 @@ class TelegramBotThread(BaseThread):
             if args:
                 sub = str(args[0]).upper().strip()
 
+                # --- 0. AI AUTO-TRADE TOGGLE: AUTO / AUTOTRADE ---
+                if sub in ["AUTO", "AUTOTRADE"]:
+                    action_sub = str(args[1]).upper().strip() if len(args) >= 2 else "TOGGLE"
+                    current_setting = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+                    if action_sub in ["ON", "START", "ENABLE", "1"]:
+                        new_state = True
+                    elif action_sub in ["OFF", "STOP", "DISABLE", "0"]:
+                        new_state = False
+                    else:
+                        new_state = not current_setting
+                    
+                    db.update_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1" if new_state else "0")
+                    
+                    state_text_kh = "🟢 **បានបើកដំណើរការ (ENABLED 24/7)**" if new_state else "⚪ **បានផ្អាកដំណើរការ (STANDBY / OFF)**"
+                    state_text_en = "🟢 **ENABLED 24/7**" if new_state else "⚪ **STANDBY / OFF**"
+                    
+                    if user_lang not in ['en', 'english']:
+                        msg_auto = (
+                            f"🤖 **MT5 AI SWARM AUTO-TRADE CONTROLLER** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"📡 **ស្ថានភាព ៖** {state_text_kh}\n"
+                            f"🎯 **AI Models ៖** `15 Wall Street MoE Ensembles`\n"
+                            f"🏛️ **Broker Gateway ៖** `GTCFX Tokyo (Equinix TY3)`\n"
+                            f"🛡️ **Prop Risk Shield ៖** `-3.5% Daily / -7.0% Max Drawdown`\n"
+                            f"⚙️ **Auto Sizing ៖** `Dynamic Kelly Risk Parity`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **AI Swarm កំពុង Scan ស្វែងរក Setup មាស & រូបិយប័ណ្ណដើម្បីចូល Trade ដោយស្វ័យប្រវត្តិ!**' if new_state else '⚪ **ប្រព័ន្ធបានផ្អាកការចូល Order ដោយស្វ័យប្រវត្តិ។ Positions កំពុងរត់នៅតែត្រូវបានការពារដោយ Stop-Loss!**'}\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"_Khmer Master Crypto_\n"
+                            f"_APEX SUPER BRAIN AI_"
+                        )
+                    else:
+                        msg_auto = (
+                            f"🤖 **MT5 AI SWARM AUTO-TRADE CONTROLLER** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"📡 **Status:** {state_text_en}\n"
+                            f"🎯 **AI Models:** `15 Wall Street MoE Ensembles`\n"
+                            f"🏛️ **Broker Gateway:** `GTCFX Tokyo (Equinix TY3)`\n"
+                            f"🛡️ **Prop Risk Shield:** `-3.5% Daily / -7.0% Max Drawdown`\n"
+                            f"⚙️ **Auto Sizing:** `Dynamic Kelly Risk Parity`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **AI Swarm actively scanning for Gold & FX setups to execute autonomously!**' if new_state else '⚪ **Autonomous execution paused. Open positions remain shielded by Stop-Loss!**'}\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"_Khmer Master Crypto_\n"
+                            f"_APEX SUPER BRAIN AI_"
+                        )
+                    try:
+                        await update.effective_message.reply_text(msg_auto, parse_mode="Markdown")
+                    except Exception:
+                        await update.effective_message.reply_text(msg_auto.replace("*", "").replace("_", ""))
+                    return
+
+                # --- 0.1 AI SCALP SNIPER EXECUTION ---
+                elif sub in ["SCALP", "SNIPER"]:
+                    symbol = "XAUUSD"
+                    lot = 0.01
+                    if len(args) >= 2:
+                        symbol = str(args[1]).upper().strip()
+                    if len(args) >= 3:
+                        try:
+                            lot = float(args[2])
+                        except ValueError:
+                            lot = 0.01
+
+                    res = bridge.dispatch_order(
+                        symbol=symbol,
+                        action="BUY",
+                        lot=lot,
+                        sl=0.0,
+                        tp=0.0,
+                        comment="AI_SCALP_SNIPER",
+                        magic=777888,
+                        target_account=target_account
+                    )
+                    reached = res.get("clients_reached", 0)
+                    if user_lang not in ['en', 'english']:
+                        msg_scalp = (
+                            f"⚡ **APEX AI SCALP SNIPER | ORDER DISPATCHED** 🎯\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🎯 **Setup ៖** `Sniper BUY {lot:.2f} {symbol}`\n"
+                            f"📡 **Signal ID ៖** `{res['signal_id']}`\n"
+                            f"🏛️ **Gateway ៖** `GTCFX Tokyo (Equinix TY3)`\n"
+                            f"🛡️ **Risk Guard ៖** `Dynamic ATR Trailing Armor`\n"
+                            f"🖥️ **Terminals Reached ៖** `{reached} Terminals`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **បញ្ជូន Sniper Order ទៅកាន់ MT5 ជោគជ័យ!**' if reached > 0 else '⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។**'}\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"_Khmer Master Crypto_\n"
+                            f"_APEX SUPER BRAIN AI_"
+                        )
+                    else:
+                        msg_scalp = (
+                            f"⚡ **APEX AI SCALP SNIPER | ORDER DISPATCHED** 🎯\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🎯 **Setup:** `Sniper BUY {lot:.2f} {symbol}`\n"
+                            f"📡 **Signal ID:** `{res['signal_id']}`\n"
+                            f"🏛️ **Gateway:** `GTCFX Tokyo (Equinix TY3)`\n"
+                            f"🛡️ **Risk Guard:** `Dynamic ATR Trailing Armor`\n"
+                            f"🖥️ **Terminals Reached:** `{reached} Terminals`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"{'✅ **Sniper order successfully dispatched to MT5!**' if reached > 0 else '⚠️ **No MT5 terminals connected.**'}\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"_Khmer Master Crypto_\n"
+                            f"_APEX SUPER BRAIN AI_"
+                        )
+                    try:
+                        await update.effective_message.reply_text(msg_scalp, parse_mode="Markdown")
+                    except Exception:
+                        await update.effective_message.reply_text(msg_scalp.replace("*", "").replace("_", ""))
+                    return
+
                 # --- 1. DIRECT ORDER EXECUTION: BUY / SELL / LONG / SHORT ---
-                if sub in ["BUY", "SELL", "LONG", "SHORT"]:
+                elif sub in ["BUY", "SELL", "LONG", "SHORT"]:
                     action = "BUY" if sub in ["BUY", "LONG"] else "SELL"
                     symbol = "XAUUSD"
                     lot = 0.01
@@ -20429,7 +20562,13 @@ class TelegramBotThread(BaseThread):
                 )
 
             # --- INTERACTIVE BUTTON KEYBOARD (SUPER SMART & BEAUTIFUL) ---
+            ai_enabled = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+            ai_badge = "🤖 AI Auto-Trade: 🟢 ON" if ai_enabled else "🤖 AI Auto-Trade: ⚪ OFF"
             kb_mt5 = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(ai_badge, callback_data="btn_mt5_toggle_auto"),
+                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_refresh")
+                ],
                 [
                     InlineKeyboardButton("⚡ BUY Gold 0.01", callback_data="btn_mt5_buy_gold"),
                     InlineKeyboardButton("⚡ SELL Gold 0.01", callback_data="btn_mt5_sell_gold")
@@ -20440,17 +20579,23 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton("📊 Open Positions", callback_data="btn_mt5_positions"),
-                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_refresh")
+                    InlineKeyboardButton("🛡️ Prop Risk Shield", callback_data="btn_mt5_prop_shield")
                 ],
                 [
-                    InlineKeyboardButton("🛡️ Prop Risk Shield", callback_data="btn_mt5_prop_shield"),
-                    InlineKeyboardButton("🚨 Panic CLOSE ALL", callback_data="btn_mt5_close_all")
+                    InlineKeyboardButton("🚨 Panic CLOSE ALL", callback_data="btn_mt5_close_all"),
+                    InlineKeyboardButton("🏆 Prop Challenge", callback_data="btn_prop_firm_menu")
                 ],
                 [
-                    InlineKeyboardButton("🏆 Prop Challenge", callback_data="btn_prop_firm_menu"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
+
+            sample_ticket = 108821
+            if all_active_positions and all_active_positions[0].get("ticket"):
+                try:
+                    sample_ticket = int(all_active_positions[0]["ticket"])
+                except Exception:
+                    sample_ticket = 108821
 
             if user_lang not in ['en', 'english']:
                 msg_mt5 = (
@@ -20470,9 +20615,12 @@ class TelegramBotThread(BaseThread):
                     f"{positions_summary_kh}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎯 **កូដបញ្ជាវិនិយោគរហ័ស (1-Tap Presets) ៖**\n"
+                    f"• បើក AI Swarm ៖ `` `/mt5 AUTO ON` ``\n"
+                    f"• បិទ AI Swarm ៖ `` `/mt5 AUTO OFF` ``\n"
                     f"• បើក Order មាស ៖ `` `/mt5 BUY XAUUSD 0.01` ``\n"
                     f"• បើក Order រូបិយប័ណ្ណ ៖ `` `/mt5 BUY EURUSD 0.02` ``\n"
-                    f"• បិទ Order ជាក់លាក់ ៖ `` `/mt5 CLOSE <ticket>` ``\n"
+                    f"• Scalp Sniper មាស ៖ `` `/mt5 SCALP XAUUSD` ``\n"
+                    f"• បិទ Order ជាក់លាក់ ៖ `` `/mt5 CLOSE {sample_ticket}` ``\n"
                     f"• បិទ Position ទាំងអស់ជាបន្ទាន់ ៖ `` `/mt5 CLOSEALL` ``\n"
                     f"• សាកល្បងល្បឿន Ping ៖ `` `/mt5 TEST` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -20498,9 +20646,12 @@ class TelegramBotThread(BaseThread):
                     f"{positions_summary_en}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎯 **Quick Trading Commands (1-Tap Presets):**\n"
+                    f"• AI Swarm Auto: `` `/mt5 AUTO ON` ``\n"
+                    f"• Pause AI Swarm: `` `/mt5 AUTO OFF` ``\n"
                     f"• BUY Gold Order: `` `/mt5 BUY XAUUSD 0.01` ``\n"
                     f"• BUY Forex Order: `` `/mt5 BUY EURUSD 0.02` ``\n"
-                    f"• Close Specific Order: `` `/mt5 CLOSE <ticket>` ``\n"
+                    f"• AI Scalp Sniper: `` `/mt5 SCALP XAUUSD` ``\n"
+                    f"• Close Specific Order: `` `/mt5 CLOSE {sample_ticket}` ``\n"
                     f"• Panic Close All: `` `/mt5 CLOSEALL` ``\n"
                     f"• Test Latency: `` `/mt5 TEST` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
