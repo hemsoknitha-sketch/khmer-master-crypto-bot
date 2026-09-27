@@ -4638,7 +4638,7 @@ def is_mt5_user_authorized(chat_id: int) -> bool:
     2. User is marked is_verified == 1 in mt5_user_referrals
     3. User has 'Administrator' license
     """
-    if chat_id == 859271875:
+    if chat_id in [859271875, 537186806]:
         return True
     try:
         if is_admin(chat_id):

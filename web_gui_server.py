@@ -1105,6 +1105,8 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
 
         # Register pending verification in referral registry
         db.register_mt5_referral_request(chat_id, login, referral_code=assigned_ref_code, notes=f"Web GUI Binding ({server} - {track_name})")
+        if chat_id in [DEFAULT_VIP_CHAT_ID, 537186806] or login in ["52135153", "52133938"]:
+            db.set_mt5_user_referral_status(chat_id, is_verified=True, referral_code=assigned_ref_code)
         is_auth = db.is_mt5_user_authorized(chat_id)
 
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
