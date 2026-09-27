@@ -252,17 +252,21 @@ void SendAuthHandshake()
 
    datetime real_time = TimeGMT();
    if(real_time <= 0) real_time = TimeLocal();
+   bool is_trade_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+   string company_name = m_account.Company();
+   if(company_name == "" && is_trade_connected) company_name = m_account.Server();
 
    string json = StringFormat(
-      "{\"type\":\"AUTH\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"currency\":\"%s\",\"secret_key\":\"%s\",\"timestamp\":%d}\n",
+      "{\"type\":\"AUTH\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"currency\":\"%s\",\"secret_key\":\"%s\",\"timestamp\":%d,\"broker_connected\":%s}\n",
       (int)m_account.Login(),
-      m_account.Company(),
+      company_name,
       InpFirmName,
       m_account.Balance(),
       m_account.Equity(),
       m_account.Currency(),
       InpSecretKey,
-      (int)real_time
+      (int)real_time,
+      is_trade_connected ? "true" : "false"
    );
 
    SendRawString(json);
@@ -300,10 +304,14 @@ void SendHeartbeat()
    }
    pos_json += "]";
 
+   bool is_trade_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+   string company_name = m_account.Company();
+   if(company_name == "" && is_trade_connected) company_name = m_account.Server();
+
    string json = StringFormat(
-      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"ping_ms\":%.1f,\"timestamp\":%d,\"timestamp_ms\":%I64u,\"positions\":%s}\n",
+      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"ping_ms\":%.1f,\"timestamp\":%d,\"timestamp_ms\":%I64u,\"broker_connected\":%s,\"positions\":%s}\n",
       (int)m_account.Login(),
-      m_account.Company(),
+      company_name,
       InpFirmName,
       m_account.Balance(),
       m_account.Equity(),
@@ -313,6 +321,7 @@ void SendHeartbeat()
       g_last_ping_ms,
       (int)real_time,
       now_ms,
+      is_trade_connected ? "true" : "false",
       pos_json
    );
 

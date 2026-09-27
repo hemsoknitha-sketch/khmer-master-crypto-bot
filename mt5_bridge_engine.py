@@ -370,17 +370,19 @@ class MT5BridgeEngine:
             pong = {"type": "PONG", "timestamp": int(time.time()), "echo_time": payload.get("timestamp", 0)}
             self._send_raw_socket(sock, pong)
 
-    # =========================================================================
-    # 4. PACKET HANDLERS & PROP FIRM COMPLIANCE FORTRESS
-    # =========================================================================
     def _handle_auth(self, sock: socket.socket, payload: Dict[str, Any], account_id: str):
         """Processes authentication packet from MT5 EA."""
-        broker = str(payload.get("broker", "Generic_MT5"))
+        broker = str(payload.get("broker", "")).strip()
         firm_name = str(payload.get("firm_name", "FTMO"))
         balance = float(payload.get("balance", 0.0))
         equity = float(payload.get("equity", balance))
         currency = str(payload.get("currency", "USD"))
         chat_id = int(payload.get("chat_id", 0))
+        is_broker_connected = payload.get("broker_connected", True)
+        if isinstance(is_broker_connected, str):
+            is_broker_connected = is_broker_connected.lower() == "true"
+        if not broker:
+            is_broker_connected = False
 
         with self._clients_lock:
             session = self.clients.get(account_id)
@@ -396,6 +398,7 @@ class MT5BridgeEngine:
             session.chat_id = chat_id
             session.authenticated = True
             session.status = "ONLINE"
+            session.is_broker_connected = is_broker_connected
             session.last_heartbeat = time.time()
             if session.daily_start_equity <= 0:
                 session.daily_start_equity = equity
@@ -473,6 +476,12 @@ class MT5BridgeEngine:
             session.ping_ms = ping_ms
             session.last_heartbeat = time.time()
             session.status = "ONLINE"
+            is_broker_connected = payload.get("broker_connected", True)
+            if isinstance(is_broker_connected, str):
+                is_broker_connected = is_broker_connected.lower() == "true"
+            if not broker:
+                is_broker_connected = False
+            session.is_broker_connected = is_broker_connected
             if broker:
                 session.broker = broker
             if firm_name:
@@ -755,6 +764,7 @@ class MT5BridgeEngine:
                     "ping_ms": c.ping_ms,
                     "compliant": c.is_prop_compliant,
                     "status": c.status,
+                    "is_broker_connected": getattr(c, "is_broker_connected", True),
                     "positions": getattr(c, "positions", [])
                 })
 
