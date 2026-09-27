@@ -21655,6 +21655,12 @@ class TelegramBotThread(BaseThread):
                     return
 
                 db.set_mt5_user_referral_status(target_cid, is_verified=True, referral_code="130237694")
+                try:
+                    import web_gui_server
+                    if hasattr(web_gui_server, "_GUI_CACHE") and "mt5" in web_gui_server._GUI_CACHE and target_cid in web_gui_server._GUI_CACHE["mt5"]:
+                        del web_gui_server._GUI_CACHE["mt5"][target_cid]
+                except Exception:
+                    pass
                 await update.effective_message.reply_text(f"✅ បានអនុម័តសិទ្ធិ GTCFX MT5 VIP សម្រាប់ User `{target_cid}` រួចរាល់!", parse_mode="Markdown")
                 try:
                     await context.bot.send_message(
@@ -21686,6 +21692,12 @@ class TelegramBotThread(BaseThread):
                     return
 
                 db.set_mt5_user_referral_status(target_cid, is_verified=False)
+                try:
+                    import web_gui_server
+                    if hasattr(web_gui_server, "_GUI_CACHE") and "mt5" in web_gui_server._GUI_CACHE and target_cid in web_gui_server._GUI_CACHE["mt5"]:
+                        del web_gui_server._GUI_CACHE["mt5"][target_cid]
+                except Exception:
+                    pass
                 await update.effective_message.reply_text(f"🛑 បានបិទសិទ្ធិ MT5 VIP សម្រាប់ User `{target_cid}` រួចរាល់!", parse_mode="Markdown")
                 try:
                     await context.bot.send_message(
@@ -21701,6 +21713,84 @@ class TelegramBotThread(BaseThread):
                     )
                 except Exception:
                     pass
+                return
+
+            # Command: /admin_mt5 INSPECT <chat_id>
+            elif sub in ["INSPECT", "INSP", "CHECK", "VIEW"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Chat ID: `` `/admin_mt5 inspect <chat_id>` ``", parse_mode="Markdown")
+                    return
+                try:
+                    target_cid = int(args[1])
+                except ValueError:
+                    await update.effective_message.reply_text(f"❌ Chat ID `{args[1]}` មិនត្រឹមត្រូវឡើយ!", parse_mode="Markdown")
+                    return
+
+                cfg = db.get_user_mt5_config(target_cid)
+                ref_rec = db.get_mt5_referral_record(target_cid)
+                is_auth = db.is_mt5_user_authorized(target_cid)
+                ai_auto = db.get_system_setting(f"mt5_ai_auto_trade_{target_cid}", "0") == "1"
+
+                login_val = cfg.get("login", "N/A") if cfg else (ref_rec.get("account_id", "N/A") if ref_rec else "N/A")
+                srv_val = cfg.get("server", "N/A") if cfg else "N/A"
+                firm_val = cfg.get("firm_name", "GTCFX") if cfg else (ref_rec.get("broker", "GTCFX") if ref_rec else "GTCFX")
+                auth_badge = "🟢 VERIFIED / AUTHORIZED" if is_auth else "🔴 UNVERIFIED / PENDING"
+                ai_badge = "🟢 ACTIVE (ON)" if ai_auto else "⚪ OFF"
+
+                import mt5_bridge_engine
+                session = mt5_bridge_engine.mt5_bridge.get_client_session(target_cid)
+                is_online = bool(session and session.get("is_authenticated"))
+                online_badge = "🟢 ONLINE (Tokyo Bridge)" if is_online else "⚪ STANDBY"
+
+                info_text = (
+                    f"🔍 **[MT5 USER INSPECTION REPORT]** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👤 **User Chat ID ៖** `{target_cid}`\n"
+                    f"🏢 **Broker / Firm ៖** `{firm_val}`\n"
+                    f"🎫 **MT5 Login ID ៖** `{login_val}`\n"
+                    f"🌐 **Server ៖** `{srv_val}`\n"
+                    f"🛡️ **VIP Verification ៖** {auth_badge}\n"
+                    f"⚡ **Tokyo Connection ៖** {online_badge}\n"
+                    f"🤖 **AI Auto-Trade ៖** {ai_badge}\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_"
+                )
+                kb_insp = [
+                    [
+                        InlineKeyboardButton("✅ អនុម័ត", callback_data=f"btn_mt5_appr_{target_cid}"),
+                        InlineKeyboardButton("🛑 បិទសិទ្ធិ", callback_data=f"btn_mt5_rej_{target_cid}")
+                    ],
+                    [
+                        InlineKeyboardButton("🚨 Panic Close All", callback_data=f"btn_mt5_pnc_{target_cid}"),
+                        InlineKeyboardButton("🔄 Refresh List", callback_data="btn_admin_mt5_refresh")
+                    ]
+                ]
+                await update.effective_message.reply_text(info_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_insp))
+                return
+
+            # Command: /admin_mt5 PANIC <chat_id>
+            elif sub in ["PANIC", "CLOSE_ALL", "CLOSEALL"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Chat ID: `` `/admin_mt5 panic <chat_id>` ``", parse_mode="Markdown")
+                    return
+                try:
+                    target_cid = int(args[1])
+                except ValueError:
+                    await update.effective_message.reply_text(f"❌ Chat ID `{args[1]}` មិនត្រឹមត្រូវឡើយ!", parse_mode="Markdown")
+                    return
+
+                import mt5_bridge_engine
+                res = mt5_bridge_engine.mt5_bridge.dispatch_close(client_id=target_cid, ticket=0)
+                await update.effective_message.reply_text(
+                    f"🚨 **[MASTER PANIC CLOSE TRIGGERED]** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"បានបញ្ជាបិទគ្រប់ Position របស់ User `{target_cid}` រួចរាល់!\n"
+                    f"• Status: `{res.get('status', 'sent')}`\n"
+                    f"• Message: `{res.get('message', 'Dispatched to Tokyo Bridge')}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}",
+                    parse_mode="Markdown"
+                )
                 return
 
         async def citadel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

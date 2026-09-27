@@ -4513,7 +4513,10 @@ def set_mt5_user_referral_status(
     chat_id: int,
     is_verified: bool,
     account_id: str = "",
-    notes: str = ""
+    notes: str = "",
+    referral_code: str = "130237694",
+    broker: str = "GTCFX",
+    **kwargs
 ) -> bool:
     """
     Sets or updates the GTCFX MT5 referral verification status for a user.
@@ -4521,15 +4524,19 @@ def set_mt5_user_referral_status(
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        ref_code = str(referral_code or "130237694").strip()
+        brk = str(broker or "GTCFX").strip()
         cursor.execute("""
             INSERT INTO mt5_user_referrals (chat_id, account_id, broker, referral_code, is_verified, verified_at, notes)
-            VALUES (?, ?, 'GTCFX', '130237694', ?, CURRENT_TIMESTAMP, ?)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
             ON CONFLICT(chat_id) DO UPDATE SET
                 account_id = CASE WHEN excluded.account_id != '' THEN excluded.account_id ELSE mt5_user_referrals.account_id END,
+                referral_code = CASE WHEN excluded.referral_code != '' THEN excluded.referral_code ELSE mt5_user_referrals.referral_code END,
+                broker = CASE WHEN excluded.broker != '' THEN excluded.broker ELSE mt5_user_referrals.broker END,
                 is_verified = excluded.is_verified,
                 verified_at = CURRENT_TIMESTAMP,
                 notes = excluded.notes
-        """, (chat_id, str(account_id or "").strip(), 1 if is_verified else 0, notes))
+        """, (chat_id, str(account_id or "").strip(), brk, ref_code, 1 if is_verified else 0, notes))
         conn.commit()
         conn.close()
         return True
@@ -4545,7 +4552,9 @@ def register_mt5_referral_request(
     chat_id: int,
     account_id: str,
     referral_code: str = "130237694",
-    notes: str = ""
+    notes: str = "",
+    broker: str = "GTCFX",
+    **kwargs
 ) -> bool:
     """
     Registers a user's pending MT5 verification request with their MT5 Account ID.
@@ -4555,12 +4564,13 @@ def register_mt5_referral_request(
     try:
         cursor.execute("""
             INSERT INTO mt5_user_referrals (chat_id, account_id, broker, referral_code, is_verified, notes)
-            VALUES (?, ?, 'GTCFX', ?, 0, ?)
+            VALUES (?, ?, ?, ?, 0, ?)
             ON CONFLICT(chat_id) DO UPDATE SET
                 account_id = excluded.account_id,
                 referral_code = excluded.referral_code,
+                broker = excluded.broker,
                 notes = excluded.notes
-        """, (chat_id, str(account_id or "").strip(), referral_code, notes))
+        """, (chat_id, str(account_id or "").strip(), broker or "GTCFX", referral_code or "130237694", notes))
         conn.commit()
         conn.close()
         return True
