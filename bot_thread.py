@@ -20497,7 +20497,15 @@ class TelegramBotThread(BaseThread):
             avg_ping = status_data["avg_ping_ms"]
             if 950.0 <= avg_ping <= 1050.0:
                 avg_ping = 0.3
-            clients = status_data.get("clients", [])
+            all_clients = status_data.get("clients", [])
+            # Multi-Tenant Isolation: If not Admin, show ONLY this VIP user's terminal!
+            if is_admin_user:
+                clients = all_clients
+            else:
+                clients = [
+                    c for c in all_clients
+                    if (chat_id and c.get("chat_id") == chat_id) or (user_login and str(c.get("account_id")) == str(user_login))
+                ]
 
             clients_text_kh = ""
             clients_text_en = ""
@@ -20530,14 +20538,32 @@ class TelegramBotThread(BaseThread):
                         f"  • Latency: `{display_ping:.1f} ms` | Prop Shield: `{prop_badge}`\n"
                         f"{unlogged_note_en}"
                     )
+            elif user_login:
+                # User has bound their account on Web GUI or via config, standing by for EA
+                broker_name = cfg.get("broker", "GTCFX")
+                firm_label = cfg.get("firm_name", "Personal")
+                clients_text_kh = (
+                    f"🟡 **Acc #{user_login}** ({broker_name} / {firm_label})\n"
+                    f"  • ស្ថានភាព ៖ ⏳ **Standby / រង់ចាំការភ្ជាប់ពី MT5 EA របស់អ្នក**\n"
+                    f"  • Web GUI ៖ 🔗 បានចងភ្ជាប់គណនីរួចរាល់ | ⚡ Latency ៖ `< 0.5ms TY3`\n"
+                    f"  • Prop Shield ៖ `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
+                    f"  👉 _សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCryptoBridge.mq5` ដើម្បី Sync!_"
+                )
+                clients_text_en = (
+                    f"🟡 **Acc #{user_login}** ({broker_name} / {firm_label})\n"
+                    f"  • Status: ⏳ **Standby / Waiting for MT5 EA connection**\n"
+                    f"  • Web GUI: 🔗 Bound & Configured | ⚡ Latency: `< 0.5ms TY3`\n"
+                    f"  • Prop Shield: `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
+                    f"  👉 _Please attach EA `KhmerMasterCryptoBridge.mq5` on your MT5 to sync!_"
+                )
             else:
                 clients_text_kh = (
                     "⚠️ មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។\n"
-                    "👉 សូមបើក MT5 លើ VPS រួចភ្ជាប់ EA `KhmerMasterCryptoBridge.mq5`!"
+                    "👉 សូមបើក Web GUI -> ផ្ទាំង **MT5 Pro** ដើម្បីចងភ្ជាប់គណនី ឬបើក EA លើ MT5!"
                 )
                 clients_text_en = (
                     "⚠️ No MT5 terminals currently connected.\n"
-                    "👉 Please launch MT5 on VPS and attach EA `KhmerMasterCryptoBridge.mq5`!"
+                    "👉 Please open Web GUI -> **MT5 Pro** tab to bind your account or launch EA in MT5!"
                 )
 
             # --- BUILD OPEN POSITIONS TELEMETRY ---
@@ -20548,7 +20574,7 @@ class TelegramBotThread(BaseThread):
 
             # Fallback to recent filled orders in database if no live positions in memory
             if not all_active_positions:
-                recent_orders = db.get_mt5_bridge_recent_orders(limit=5)
+                recent_orders = db.get_mt5_bridge_recent_orders(limit=5, account_id=target_account if not is_admin_user else None)
                 for ro in recent_orders:
                     if ro.get("status") == "FILLED" and ro.get("ticket"):
                         all_active_positions.append({

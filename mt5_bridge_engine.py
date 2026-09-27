@@ -228,7 +228,7 @@ class MT5BridgeEngine:
             # Disable Nagle's algorithm for sub-millisecond execution
             self.tcp_server_sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.tcp_server_sock.bind((self.tcp_host, self.tcp_port))
-            self.tcp_server_sock.listen(20)
+            self.tcp_server_sock.listen(1024)
             self.tcp_server_sock.setblocking(False)
             logger.info(f"🌐 [NATIVE TCP BRIDGE] Listening on {self.tcp_host}:{self.tcp_port}")
         except Exception as e:

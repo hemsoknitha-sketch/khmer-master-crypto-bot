@@ -4252,17 +4252,26 @@ def update_mt5_bridge_order_close(ticket: int, close_price: float, pnl: float, s
         conn.close()
         return False
 
-def get_mt5_bridge_recent_orders(limit: int = 10) -> list:
-    """Retrieves recent MT5 bridged orders for UI audit."""
+def get_mt5_bridge_recent_orders(limit: int = 10, account_id: Optional[str] = None) -> list:
+    """Retrieves recent MT5 bridged orders for UI audit, optionally filtered by user account."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT id, signal_id, account_id, ticket, symbol, action, lot,
-                   sl, tp, open_price, close_price, pnl, status, created_at, closed_at
-            FROM mt5_bridge_orders
-            ORDER BY id DESC LIMIT ?
-        """, (int(limit),))
+        if account_id and str(account_id).strip():
+            cursor.execute("""
+                SELECT id, signal_id, account_id, ticket, symbol, action, lot,
+                       sl, tp, open_price, close_price, pnl, status, created_at, closed_at
+                FROM mt5_bridge_orders
+                WHERE account_id = ?
+                ORDER BY id DESC LIMIT ?
+            """, (str(account_id).strip(), int(limit)))
+        else:
+            cursor.execute("""
+                SELECT id, signal_id, account_id, ticket, symbol, action, lot,
+                       sl, tp, open_price, close_price, pnl, status, created_at, closed_at
+                FROM mt5_bridge_orders
+                ORDER BY id DESC LIMIT ?
+            """, (int(limit),))
         rows = cursor.fetchall()
         conn.close()
         return [{
