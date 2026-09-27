@@ -56,6 +56,7 @@ const state = {
     radar: null,
     mt5Data: null,
     mt5ManualRebind: false,
+    mt5ServerUserSelected: false,
     isRefreshing: false,
     sseSource: null,
     ws: null,
@@ -994,7 +995,7 @@ function renderMT5Cockpit(data) {
     }
 
     if (elements.mt5ServerTag) {
-        elements.mt5ServerTag.textContent = acc.server || 'GTCGlobalTrade-Live';
+        elements.mt5ServerTag.textContent = acc.server || 'GTCGlobalSA-Server 2';
     }
 
     if (elements.mt5FirmBadge) {
@@ -1058,11 +1059,11 @@ function renderMT5Cockpit(data) {
         elements.mt5ToggleAiTrade.checked = acc.ai_auto_trade !== false;
     }
 
-    // Pre-fill binding inputs
-    if (elements.mt5InputLogin && acc.login && !elements.mt5InputLogin.value) {
+    // Pre-fill binding inputs (Strict Protection: never override active user selection or focused input)
+    if (elements.mt5InputLogin && acc.login && !elements.mt5InputLogin.value && document.activeElement !== elements.mt5InputLogin) {
         elements.mt5InputLogin.value = acc.login;
     }
-    if (elements.mt5InputServer && acc.server) {
+    if (elements.mt5InputServer && acc.server && !state.mt5ServerUserSelected && document.activeElement !== elements.mt5InputServer) {
         elements.mt5InputServer.value = acc.server;
     }
 
@@ -1543,12 +1544,16 @@ function setupEventListeners() {
         });
     }
 
-    // MT5 Custom Server Toggle
+    // MT5 Custom Server Toggle & User Selection Lock
     if (elements.mt5InputServer) {
         elements.mt5InputServer.addEventListener('change', () => {
+            state.mt5ServerUserSelected = true;
             if (elements.mt5CustomServerWrap) {
                 elements.mt5CustomServerWrap.style.display = elements.mt5InputServer.value === 'Custom' ? 'block' : 'none';
             }
+        });
+        elements.mt5InputServer.addEventListener('focus', () => {
+            state.mt5ServerUserSelected = true;
         });
     }
 
