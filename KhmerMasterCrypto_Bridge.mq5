@@ -79,15 +79,25 @@ int OnInit()
    PrintFormat("🏛️ [PROP SHIELD] Baseline Balance: $%.2f | Daily Equity: $%.2f | Firm: %s", 
                g_initial_balance, g_daily_start_equity, InpFirmName);
 
-   // Create On-Chart HUD
+   // Create On-Chart HUD and perform immediate initial refresh
    if(InpShowHUD)
+   {
       CreateHUD();
+      UpdateHUD();
+   }
 
    // Attempt initial connection to Linux VPS
    ConnectToBridge();
 
-   // Set high-frequency 100-millisecond timer for fast socket polling & real-time telemetry
-   EventSetMillisecondTimer(100);
+   // Set timer with Wine compatibility fallback (200ms -> 1s)
+   if(!EventSetMillisecondTimer(200))
+   {
+      Print("⚠️ [WINE TIMER] EventSetMillisecondTimer failed in Wine, activating EventSetTimer(1)");
+      EventSetTimer(1);
+   }
+
+   if(InpShowHUD)
+      UpdateHUD();
 
    return(INIT_SUCCEEDED);
 }
@@ -728,7 +738,13 @@ void UpdateHUD()
 {
    string status_str = "";
    color status_col = clrRed;
-   if(g_connected)
+
+   if(m_account.Login() <= 0)
+   {
+      status_str = "📡 Status: 🟡 WAITING FOR LOGIN (File -> Login to Trade Account)";
+      status_col = clrYellow;
+   }
+   else if(g_connected)
    {
       double display_ping = g_last_ping_ms;
       if(display_ping >= 950.0 || display_ping < 0.1)
@@ -751,7 +767,7 @@ void UpdateHUD()
 
    string eq_str = "";
    if(m_account.Login() <= 0)
-      eq_str = "💰 Equity: $0.00 | Balance: $0.00 (⚠️ Please Login to Account)";
+      eq_str = "💰 Equity: $0.00 | Balance: $0.00 (⚠️ Please Login: File -> Login)";
    else
       eq_str = StringFormat("💰 Equity: $%.2f | Balance: $%.2f (Acc #%d)", m_account.Equity(), m_account.Balance(), (int)m_account.Login());
    SetLabelText(HUD_PREFIX + "EQUITY", eq_str, clrLightGreen);
@@ -790,5 +806,17 @@ void SetLabelText(string name, string text, color col)
 void RemoveHUD()
 {
    ObjectsDeleteAll(0, HUD_PREFIX);
+}
+
+//+------------------------------------------------------------------+
+//| ChartEvent function (Updates HUD on chart interaction)           |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id,
+                  const long &lparam,
+                  const double &dparam,
+                  const string &sparam)
+{
+   if(InpShowHUD)
+      UpdateHUD();
 }
 //+------------------------------------------------------------------+
