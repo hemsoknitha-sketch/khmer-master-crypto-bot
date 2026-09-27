@@ -51,7 +51,17 @@ else
     echo -e "${GREEN}✅ Platform MT5 directory already exists at: $MT5_PLATFORM${NC}"
 fi
 
-# 2. Stage KhmerMasterCrypto_Bridge.mq5 into Instance 2 Experts folder
+# 2. Reset saved account data for Instance 2 so it does not auto-login to Admin account 52133938
+rm -f "$MT5_PLATFORM/config/accounts.dat"
+cat << EOF > "$MT5_PLATFORM/startup.ini"
+[Common]
+Login=52135153
+Server=GTCGlobalSA-Server 2
+EOF
+chown "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM/startup.ini"
+echo -e "${GREEN}✅ Configured startup.ini for Platform Account #52135153!${NC}"
+
+# 3. Stage KhmerMasterCrypto_Bridge.mq5 into Instance 2 Experts folder
 BRIDGE_SRC="$WORKSPACE_DIR/KhmerMasterCrypto_Bridge.mq5"
 if [ ! -f "$BRIDGE_SRC" ]; then
     BRIDGE_SRC="$(dirname "$0")/KhmerMasterCrypto_Bridge.mq5"
@@ -65,7 +75,7 @@ if [ -f "$BRIDGE_SRC" ]; then
     echo -e "${GREEN}✅ Staged KhmerMasterCrypto_Bridge.mq5 to Platform Experts directory!${NC}"
 fi
 
-# 3. Create Desktop Shortcuts for both instances
+# 4. Create Desktop Shortcuts for both instances (with strict working directory isolation)
 if [ -d "$DESKTOP_DIR" ]; then
     # Shortcut 1: Admin MT5 (52133938)
     cat << EOF > "$DESKTOP_DIR/1_Launch_MT5_Admin.desktop"
@@ -74,7 +84,8 @@ Version=1.0
 Type=Application
 Name=1. Launch MT5 Admin (52133938)
 Comment=Open Super Admin MetaTrader 5 Terminal
-Exec=sh -c 'wine "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe" /portable'
+Path=$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5
+Exec=bash -c 'cd "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5" && wine terminal64.exe /portable'
 Icon=wine
 Terminal=false
 StartupNotify=true
@@ -90,7 +101,8 @@ Version=1.0
 Type=Application
 Name=2. Launch MT5 Platform (52135153)
 Comment=Open Platform Auto-Trade MetaTrader 5 Terminal
-Exec=sh -c 'wine "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform/terminal64.exe" /portable'
+Path=$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform
+Exec=bash -c 'cd "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform" && wine terminal64.exe /portable /config:startup.ini'
 Icon=wine
 Terminal=false
 StartupNotify=true
@@ -98,29 +110,40 @@ Categories=Application;Finance;
 EOF
     chmod +x "$DESKTOP_DIR/2_Launch_MT5_Platform.desktop"
     chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/2_Launch_MT5_Platform.desktop"
-    echo -e "${GREEN}✅ Created Desktop Shortcuts for both MT5 instances!${NC}"
+    echo -e "${GREEN}✅ Created isolated Desktop Shortcuts for both MT5 instances!${NC}"
 fi
 
-# 4. Install Global CLI Commands
+# 5. Install Global CLI Commands
 cat << EOF > /usr/local/bin/mt5-dual-start
 #!/bin/bash
 TARGET_USER="$TARGET_USER"
 TARGET_HOME="$TARGET_HOME"
 echo "🚀 Starting Dual MT5 Terminals in Portable Mode under user \$TARGET_USER..."
 # Launch Instance 1: Admin
-sudo -u "\$TARGET_USER" DISPLAY=:10.0 nohup wine "\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe" /portable >/dev/null 2>&1 &
+sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5' && nohup wine terminal64.exe /portable >/dev/null 2>&1 &"
+sleep 2
 # Launch Instance 2: Platform
-sudo -u "\$TARGET_USER" DISPLAY=:10.0 nohup wine "\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform/terminal64.exe" /portable >/dev/null 2>&1 &
+sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
 echo "✅ Both MT5 Terminals (Admin 52133938 + Platform 52135153) launched in background!"
 EOF
 chmod +x /usr/local/bin/mt5-dual-start
+
+cat << EOF > /usr/local/bin/mt5-admin-start
+#!/bin/bash
+TARGET_USER="$TARGET_USER"
+TARGET_HOME="$TARGET_HOME"
+echo "🚀 Starting Admin MT5 Terminal (52133938)..."
+sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5' && nohup wine terminal64.exe /portable >/dev/null 2>&1 &"
+echo "✅ Admin MT5 Terminal launched in background."
+EOF
+chmod +x /usr/local/bin/mt5-admin-start
 
 cat << EOF > /usr/local/bin/mt5-platform-start
 #!/bin/bash
 TARGET_USER="$TARGET_USER"
 TARGET_HOME="$TARGET_HOME"
 echo "🚀 Starting Platform MT5 Terminal (52135153)..."
-sudo -u "\$TARGET_USER" DISPLAY=:10.0 nohup wine "\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform/terminal64.exe" /portable >/dev/null 2>&1 &
+sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
 echo "✅ Platform MT5 Terminal launched in background."
 EOF
 chmod +x /usr/local/bin/mt5-platform-start
