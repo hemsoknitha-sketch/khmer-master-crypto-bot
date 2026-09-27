@@ -4636,6 +4636,128 @@ def get_all_mt5_referral_users() -> List[Dict[str, Any]]:
             pass
         return []
 
+def get_all_mt5_users_overview() -> List[Dict[str, Any]]:
+    """
+    Returns an aggregated, real-time overview of all registered MT5 VIP users
+    merging mt5_user_referrals, mt5_bridge_clients, and mt5_user_config settings
+    for Super Admin telemetry, verification, and risk management.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    overview_map = {}
+    try:
+        # 1. Fetch from mt5_user_referrals
+        cursor.execute("""
+            SELECT r.chat_id, r.account_id, r.broker, r.referral_code, r.is_verified, r.verified_at, r.notes, r.created_at, u.username
+            FROM mt5_user_referrals r
+            LEFT JOIN users u ON r.chat_id = u.chat_id
+            ORDER BY r.created_at DESC
+        """)
+        for r in cursor.fetchall():
+            cid = int(r[0])
+            overview_map[cid] = {
+                "chat_id": cid,
+                "login": str(r[1] or ""),
+                "account_id": str(r[1] or ""),
+                "broker": str(r[2] or "GTCFX"),
+                "server": "GTCGlobalSA-Server 2",
+                "firm_name": "GTCFX Tokyo",
+                "is_verified": bool(r[4]),
+                "verified_at": str(r[5] or ""),
+                "notes": str(r[6] or ""),
+                "created_at": str(r[7] or ""),
+                "username": str(r[8] or f"User_{cid}"),
+                "balance": 0.0,
+                "equity": 0.0,
+                "status": "UNBOUND"
+            }
+
+        # 2. Enrich from mt5_bridge_clients
+        cursor.execute("""
+            SELECT account_id, chat_id, broker, firm_name, balance, equity, ping_ms, is_prop_compliant, status, last_heartbeat
+            FROM mt5_bridge_clients
+        """)
+        for c in cursor.fetchall():
+            acc_id = str(c[0] or "")
+            cid = int(c[1] or 0)
+            if cid > 0 and cid in overview_map:
+                if acc_id and acc_id != "0":
+                    overview_map[cid]["login"] = acc_id
+                    overview_map[cid]["account_id"] = acc_id
+                if c[2]: overview_map[cid]["broker"] = str(c[2])
+                if c[3]: overview_map[cid]["firm_name"] = str(c[3])
+                overview_map[cid]["balance"] = float(c[4] or 0.0)
+                overview_map[cid]["equity"] = float(c[5] or 0.0)
+                overview_map[cid]["status"] = str(c[8] or "ONLINE")
+            elif cid > 0:
+                overview_map[cid] = {
+                    "chat_id": cid,
+                    "login": acc_id,
+                    "account_id": acc_id,
+                    "broker": str(c[2] or "GTCFX"),
+                    "server": "GTCGlobalSA-Server 2",
+                    "firm_name": str(c[3] or "Personal"),
+                    "is_verified": is_mt5_user_authorized(cid),
+                    "verified_at": "",
+                    "notes": "",
+                    "created_at": str(c[9] or ""),
+                    "username": f"User_{cid}",
+                    "balance": float(c[4] or 0.0),
+                    "equity": float(c[5] or 0.0),
+                    "status": str(c[8] or "ONLINE")
+                }
+
+        # 3. Discover from system_settings where key LIKE 'mt5_user_config_%'
+        cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'mt5_user_config_%'")
+        import json
+        for k, val in cursor.fetchall():
+            try:
+                cid_str = k.replace("mt5_user_config_", "")
+                if cid_str.isdigit():
+                    cid = int(cid_str)
+                    cfg = json.loads(val) if val else {}
+                    if cid not in overview_map:
+                        overview_map[cid] = {
+                            "chat_id": cid,
+                            "login": str(cfg.get("login", "")),
+                            "account_id": str(cfg.get("login", "")),
+                            "broker": str(cfg.get("broker", "GTCFX")),
+                            "server": str(cfg.get("server", "GTCGlobalSA-Server 2")),
+                            "firm_name": str(cfg.get("firm_name", "Personal")),
+                            "is_verified": is_mt5_user_authorized(cid),
+                            "verified_at": "",
+                            "notes": "Web GUI Bound",
+                            "created_at": str(cfg.get("updated_at", "")),
+                            "username": f"User_{cid}",
+                            "balance": 0.0,
+                            "equity": 0.0,
+                            "status": "CONFIGURED"
+                        }
+                    else:
+                        if cfg.get("login"):
+                            overview_map[cid]["login"] = str(cfg["login"])
+                            overview_map[cid]["account_id"] = str(cfg["login"])
+                        if cfg.get("server"):
+                            overview_map[cid]["server"] = str(cfg["server"])
+                        if cfg.get("broker"):
+                            overview_map[cid]["broker"] = str(cfg["broker"])
+                        if cfg.get("firm_name"):
+                            overview_map[cid]["firm_name"] = str(cfg["firm_name"])
+                        if overview_map[cid]["status"] == "UNBOUND":
+                            overview_map[cid]["status"] = "CONFIGURED"
+            except Exception:
+                pass
+
+        conn.close()
+        return list(overview_map.values())
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in get_all_mt5_users_overview: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
+
 def can_user_buy(chat_id: int) -> bool:
     config = get_auto_trade_config(chat_id)
     max_trades = config.get("max_active_trades", 10)

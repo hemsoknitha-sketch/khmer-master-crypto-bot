@@ -1302,6 +1302,87 @@ async def handle_api_mt5_unbind(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+async def handle_api_admin_mt5_list(request: web.Request) -> web.Response:
+    """Admin-only endpoint: Returns all registered MT5 accounts and pending referrals."""
+    try:
+        admin_id = request.query.get("admin_chat_id") or _get_chat_id_from_req(request)
+        try:
+            admin_id = int(admin_id)
+        except (ValueError, TypeError):
+            admin_id = 0
+
+        if not (db.is_admin(admin_id) or admin_id == DEFAULT_VIP_CHAT_ID):
+            return web.json_response({"status": "error", "message": "⛔ Unauthorized: Admin access required"}, status=403)
+
+        records = db.get_all_mt5_referral_requests()
+        all_sessions = mt5_bridge.get_all_active_sessions() if hasattr(mt5_bridge, "get_all_active_sessions") else {}
+
+        items = []
+        for r in records:
+            cid = r.get("chat_id")
+            session = all_sessions.get(cid, {})
+            items.append({
+                "chat_id": cid,
+                "account_id": r.get("account_id"),
+                "broker": r.get("broker", "GTCFX"),
+                "is_verified": bool(r.get("is_verified")),
+                "registered_at": r.get("registered_at"),
+                "is_online": bool(session),
+                "balance": session.get("balance", 0.0),
+                "equity": session.get("equity", 0.0),
+                "positions_count": len(session.get("positions", [])) if isinstance(session.get("positions"), list) else 0
+            })
+
+        return web.json_response({
+            "status": "success",
+            "count": len(items),
+            "users": items
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+async def handle_api_admin_mt5_action(request: web.Request) -> web.Response:
+    """Admin-only endpoint: Approve, Reject, or Panic close MT5 user account."""
+    try:
+        data = await request.json()
+        admin_id = data.get("admin_chat_id") or _get_chat_id_from_req(request)
+        try:
+            admin_id = int(admin_id)
+        except (ValueError, TypeError):
+            admin_id = 0
+
+        if not (db.is_admin(admin_id) or admin_id == DEFAULT_VIP_CHAT_ID):
+            return web.json_response({"status": "error", "message": "⛔ Unauthorized: Admin access required"}, status=403)
+
+        action = str(data.get("action", "")).strip().lower()
+        target_chat_id = int(data.get("target_chat_id", 0))
+        if not target_chat_id:
+            return web.json_response({"status": "error", "message": "Target Chat ID required"}, status=400)
+
+        if action == "approve":
+            db.set_mt5_user_referral_status(target_chat_id, True, notes=f"Approved by Admin #{admin_id} via Web GUI")
+            if "mt5" in _GUI_CACHE and target_chat_id in _GUI_CACHE["mt5"]:
+                del _GUI_CACHE["mt5"][target_chat_id]
+            return web.json_response({"status": "success", "message": f"✅ អនុម័តសិទ្ធិ MT5 សម្រាប់ User {target_chat_id} រួចរាល់!"})
+
+        elif action == "reject":
+            db.set_mt5_user_referral_status(target_chat_id, False, notes=f"Revoked by Admin #{admin_id} via Web GUI")
+            if "mt5" in _GUI_CACHE and target_chat_id in _GUI_CACHE["mt5"]:
+                del _GUI_CACHE["mt5"][target_chat_id]
+            return web.json_response({"status": "success", "message": f"🛑 បានបិទសិទ្ធិ MT5 សម្រាប់ User {target_chat_id} រួចរាល់!"})
+
+        elif action == "panic":
+            res = mt5_bridge.dispatch_close(client_id=target_chat_id, ticket=0)
+            return web.json_response({"status": "success", "message": f"🚨 បញ្ជាបិទ Positions ទាំងអស់របស់ User {target_chat_id} ត្រូវបានបញ្ជូន!", "result": res})
+
+        else:
+            return web.json_response({"status": "error", "message": f"Unknown action: {action}"}, status=400)
+
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
 async def handle_gtc_qr(request: web.Request) -> web.FileResponse:
     """Serves the official GTCFX referral QR Code image."""
     qr_path = os.path.join(STATIC_DIR, "gtc_QRCode.png")
@@ -1381,6 +1462,8 @@ def create_web_gui_app() -> web.Application:
     app.router.add_post("/api/mt5/toggle_ai", handle_api_mt5_toggle_ai)
     app.router.add_post("/api/mt5/verify_request", handle_api_mt5_verify_request)
     app.router.add_post("/api/mt5/unbind", handle_api_mt5_unbind)
+    app.router.add_get("/api/admin/mt5/list", handle_api_admin_mt5_list)
+    app.router.add_post("/api/admin/mt5/action", handle_api_admin_mt5_action)
 
     return app
 

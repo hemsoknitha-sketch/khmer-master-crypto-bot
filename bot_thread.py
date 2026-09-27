@@ -5765,6 +5765,22 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["REJECT", str(target_cid)]
                 await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_insp_"):
+                target_cid = int(data.replace("btn_mt5_insp_", ""))
+                try:
+                    await update.callback_query.answer(f"🔍 កំពុងពិនិត្យ User {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["INSPECT", str(target_cid)]
+                await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_pnc_"):
+                target_cid = int(data.replace("btn_mt5_pnc_", ""))
+                try:
+                    await update.callback_query.answer(f"🚨 កំពុងបិទ Position សម្រាប់ {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["PANIC", str(target_cid)]
+                await admin_mt5_command(update, context)
             elif data in ["btn_prop_firm_menu", "btn_prop_firm"]:
                 try:
                     await update.callback_query.answer("🏆 កំពុងបើកផ្ទាំង Prop Firm Challenge...")
@@ -6479,6 +6495,22 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
                 context.args = ["REJECT", str(target_cid)]
+                await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_insp_"):
+                target_cid = int(data.replace("btn_mt5_insp_", ""))
+                try:
+                    await update.callback_query.answer(f"🔍 កំពុងពិនិត្យ User {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["INSPECT", str(target_cid)]
+                await admin_mt5_command(update, context)
+            elif data.startswith("btn_mt5_pnc_"):
+                target_cid = int(data.replace("btn_mt5_pnc_", ""))
+                try:
+                    await update.callback_query.answer(f"🚨 កំពុងបិទ Position សម្រាប់ {target_cid}...")
+                except Exception:
+                    pass
+                context.args = ["PANIC", str(target_cid)]
                 await admin_mt5_command(update, context)
             elif data == "btn_cap_api_vault":
                 try:
