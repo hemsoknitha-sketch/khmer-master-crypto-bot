@@ -38,7 +38,7 @@ function resolveChatId() {
         if (stored && !isNaN(stored) && parseInt(stored, 10) > 0) {
             return parseInt(stored, 10);
         }
-    } catch (e) {}
+    } catch (e) { }
     return 0;
 }
 
@@ -428,10 +428,10 @@ function renderLiveActiveTrades(trades) {
     elements.wealthTradesList.innerHTML = trades.map(t => {
         const isLong = t.side === 'BUY';
         const roiClass = t.roi_pct >= 0 ? 'text-neon-emerald' : 'text-neon-red';
-        const breakevenBadge = t.breakeven_locked 
+        const breakevenBadge = t.breakeven_locked
             ? `<span class="badge badge-success">🔒 Breakeven Locked (+3.0%)</span>`
             : `<span class="badge badge-accent">🛡️ Trailing Active</span>`;
-        
+
         return `
             <div class="position-card ${isLong ? 'long' : 'short'}">
                 <div class="pos-header-row">
@@ -466,11 +466,11 @@ function renderLiveCandidates(candidates) {
 
 function initRealtimeStream() {
     if (state.ws) {
-        try { state.ws.close(); } catch(e) {}
+        try { state.ws.close(); } catch (e) { }
         state.ws = null;
     }
     if (state.sseSource) {
-        try { state.sseSource.close(); } catch(e) {}
+        try { state.sseSource.close(); } catch (e) { }
         state.sseSource = null;
     }
 
@@ -495,7 +495,7 @@ function initRealtimeStream() {
             try {
                 const data = JSON.parse(event.data);
                 handleStreamData(data);
-            } catch (err) {}
+            } catch (err) { }
         };
 
         ws.onerror = () => {
@@ -518,7 +518,7 @@ function initRealtimeStream() {
 
 function initSSEFallback() {
     if (state.sseSource) {
-        try { state.sseSource.close(); } catch(e) {}
+        try { state.sseSource.close(); } catch (e) { }
     }
     const sseUrl = `/api/stream?chat_id=${state.chatId}`;
     try {
@@ -527,7 +527,7 @@ function initSSEFallback() {
             try {
                 const data = JSON.parse(event.data);
                 handleStreamData(data);
-            } catch (err) {}
+            } catch (err) { }
         };
         state.sseSource.onerror = () => {
             state.sseSource.close();
@@ -674,10 +674,10 @@ async function fetchWealthCockpit() {
                     elements.wealthTradesList.innerHTML = d.active_trades.map(t => {
                         const isLong = t.side === 'BUY';
                         const roiClass = t.roi_pct >= 0 ? 'text-neon-emerald' : 'text-neon-red';
-                        const breakevenBadge = t.breakeven_locked 
+                        const breakevenBadge = t.breakeven_locked
                             ? `<span class="badge badge-success">🔒 Breakeven Locked (+3.0%)</span>`
                             : `<span class="badge badge-accent">🛡️ Trailing Active</span>`;
-                        
+
                         return `
                             <div class="position-card ${isLong ? 'long' : 'short'}">
                                 <div class="pos-header-row">
@@ -794,7 +794,7 @@ async function fetchAnalytics() {
                 if (elements.vaultBtcUsd) elements.vaultBtcUsd.textContent = `≈ $${formatUSD(d.vault.btc_usd)} USD`;
                 if (elements.vaultPaxgQty) elements.vaultPaxgQty.textContent = `${d.vault.paxg_qty.toFixed(4)} PAXG`;
                 if (elements.vaultPaxgUsd) elements.vaultPaxgUsd.textContent = `≈ $${formatUSD(d.vault.paxg_usd)} USD`;
-                
+
                 const pool = Number(d.vault.unharvested_pool || 0);
                 if (elements.sweepPoolText) elements.sweepPoolText.textContent = `$${pool.toFixed(2)} / $10.00 USDT`;
                 if (elements.sweepProgressBar) {
