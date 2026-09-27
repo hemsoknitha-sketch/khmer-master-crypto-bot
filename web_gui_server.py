@@ -314,6 +314,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 },
                 "positions": formatted_positions,
                 "stats": db.get_user_mt5_trade_statistics(chat_id, display_login),
+                "auto_config": db.get_user_mt5_auto_config(chat_id),
                 "supported_symbols": [
                     {"symbol": "XAUUSD", "name": "Gold / Spot US Dollar", "category": "Metals", "digits": 2},
                     {"symbol": "EURUSD", "name": "Euro / US Dollar", "category": "Forex", "digits": 5},
@@ -1341,7 +1342,35 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
             }, status=403)
 
         enable = bool(data.get("enable", True))
+        raw_cap = data.get("capital")
+        raw_assets = data.get("max_assets")
 
+        cfg = db.get_user_mt5_config(chat_id)
+        srv = str(cfg.get("server", "GTCGlobalSA-Server 2")).strip()
+
+        current_auto_cfg = db.get_user_mt5_auto_config(chat_id)
+        capital = float(raw_cap) if raw_cap is not None and str(raw_cap).strip() != "" else float(current_auto_cfg.get("capital", 100.0))
+        max_assets = int(raw_assets) if raw_assets is not None and str(raw_assets).strip() != "" else int(current_auto_cfg.get("max_assets", 5))
+
+        smart_alloc = db.calculate_mt5_smart_allocation(
+            capital=capital,
+            max_assets=max_assets,
+            account_server=srv
+        )
+
+        auto_payload = {
+            "enabled": enable,
+            "capital": capital,
+            "max_assets": max_assets,
+            "capital_per_asset": smart_alloc["capital_per_asset"],
+            "risk_per_trade_usd": smart_alloc["risk_per_trade_usd"],
+            "daily_loss_limit_usd": smart_alloc["daily_loss_limit_usd"],
+            "max_drawdown_limit_usd": smart_alloc["max_drawdown_limit_usd"],
+            "server": srv,
+            "is_cent": smart_alloc["is_cent"],
+            "allocations": smart_alloc["allocations"]
+        }
+        db.save_user_mt5_auto_config(chat_id, auto_payload)
         db.update_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1" if enable else "0")
 
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
@@ -1350,7 +1379,9 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
         return web.json_response({
             "status": "success",
             "chat_id": chat_id,
-            "ai_auto_trade": enable
+            "ai_auto_trade": enable,
+            "auto_config": auto_payload,
+            "message": f"✅ Super Smart MT5 Auto Trade: {'បើកដំណើរការ (ON)' if enable else 'បិទដំណើរការ (OFF)'} | ទុន: ${capital:.2f} ({max_assets} Assets)"
         })
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)

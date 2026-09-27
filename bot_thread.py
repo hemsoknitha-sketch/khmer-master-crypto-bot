@@ -5643,6 +5643,41 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await mt5_command(update, context)
+            elif data == "btn_mt5_auto_100_5":
+                try:
+                    await update.callback_query.answer("🚀 កំពុងកំណត់ MT5 Auto: $100 (5 Assets)...")
+                except Exception:
+                    pass
+                context.args = ["AUTO", "ON", "100", "5"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_auto_50_3":
+                try:
+                    await update.callback_query.answer("🪙 កំពុងកំណត់ MT5 Auto: $50 (3 Assets)...")
+                except Exception:
+                    pass
+                context.args = ["AUTO", "ON", "50", "3"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_auto_200_10":
+                try:
+                    await update.callback_query.answer("💎 កំពុងកំណត់ MT5 Auto: $200 (10 Assets)...")
+                except Exception:
+                    pass
+                context.args = ["AUTO", "ON", "200", "10"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_auto_off":
+                try:
+                    await update.callback_query.answer("🛑 ផ្អាកដំណើរការ MT5 Auto-Trade...")
+                except Exception:
+                    pass
+                context.args = ["AUTO", "OFF"]
+                await mt5_command(update, context)
+            elif data in ["btn_mt5_auto_status", "btn_mt5_auto_refresh"]:
+                try:
+                    await update.callback_query.answer("🔄 ពិនិត្យស្ថានភាព MT5 Super Smart Allocation...")
+                except Exception:
+                    pass
+                context.args = ["AUTO", "STATUS"]
+                await mt5_command(update, context)
             elif data == "btn_mt5_test_signal":
                 try:
                     await update.callback_query.answer("⚡ កំពុងបាញ់ Signal Test ទៅ MT5 GTCFX Tokyo...")
@@ -20151,56 +20186,184 @@ class TelegramBotThread(BaseThread):
             if args:
                 sub = str(args[0]).upper().strip()
 
-                # --- 0. AI AUTO-TRADE TOGGLE: AUTO / AUTOTRADE ---
+                # --- 0. AI AUTO-TRADE CONTROLLER: AUTO / AUTOTRADE ---
                 if sub in ["AUTO", "AUTOTRADE"]:
-                    action_sub = str(args[1]).upper().strip() if len(args) >= 2 else "TOGGLE"
-                    current_setting = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
-                    if action_sub in ["ON", "START", "ENABLE", "1"]:
+                    action_sub = str(args[1]).upper().strip() if len(args) >= 2 else "STATUS"
+                    existing_cfg = db.get_user_mt5_auto_config(chat_id)
+                    current_setting = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1"
+
+                    # Check if action_sub is actually a number (e.g. /mt5 AUTO 100 5)
+                    clean_action_num = action_sub.replace("$", "").replace("USD", "").strip()
+                    if clean_action_num.replace(".", "", 1).isdigit():
                         new_state = True
+                        input_capital = float(clean_action_num)
+                        input_assets = int(args[2]) if len(args) >= 3 and str(args[2]).strip().isdigit() else existing_cfg.get("max_assets", 5)
+                    elif action_sub in ["ON", "START", "ENABLE", "1"]:
+                        new_state = True
+                        input_capital = existing_cfg.get("capital", 100.0)
+                        input_assets = existing_cfg.get("max_assets", 5)
+                        if len(args) >= 3:
+                            cap_arg = str(args[2]).replace("$", "").replace("USD", "").strip()
+                            if cap_arg.replace(".", "", 1).isdigit():
+                                input_capital = float(cap_arg)
+                        if len(args) >= 4:
+                            asset_arg = str(args[3]).strip()
+                            if asset_arg.isdigit():
+                                input_assets = int(asset_arg)
                     elif action_sub in ["OFF", "STOP", "DISABLE", "0"]:
                         new_state = False
+                        input_capital = existing_cfg.get("capital", 100.0)
+                        input_assets = existing_cfg.get("max_assets", 5)
                     else:
-                        new_state = not current_setting
-                    
+                        # STATUS / CONFIG / VIEW
+                        new_state = current_setting
+                        input_capital = existing_cfg.get("capital", 100.0)
+                        input_assets = existing_cfg.get("max_assets", 5)
+
+                    # Get terminal session to read live balance & server
+                    user_server = cfg.get("server", "GTCGlobalSA-Server 2") if cfg else "GTCGlobalSA-Server 2"
+                    live_balance = 0.0
+                    matched_session = None
+                    if user_login and user_login in bridge.clients:
+                        matched_session = bridge.clients[user_login]
+                        live_balance = float(matched_session.balance or 0.0)
+                        if matched_session.firm_name and "Server" in matched_session.firm_name:
+                            user_server = matched_session.firm_name
+
+                    # Run Super Smart Capital Allocation
+                    alloc = db.calculate_mt5_smart_allocation(
+                        capital=input_capital,
+                        max_assets=input_assets,
+                        account_server=user_server,
+                        balance=live_balance
+                    )
+                    alloc["enabled"] = new_state
+                    db.save_user_mt5_auto_config(chat_id, alloc)
                     db.update_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1" if new_state else "0")
-                    
-                    state_text_kh = "🟢 **បានបើកដំណើរការ (ENABLED 24/7)**" if new_state else "⚪ **បានផ្អាកដំណើរការ (STANDBY / OFF)**"
-                    state_text_en = "🟢 **ENABLED 24/7**" if new_state else "⚪ **STANDBY / OFF**"
-                    
+
+                    # Invalidate Web GUI cache
+                    try:
+                        import web_gui_server
+                        if hasattr(web_gui_server, "_GUI_CACHE") and "mt5" in web_gui_server._GUI_CACHE and chat_id in web_gui_server._GUI_CACHE["mt5"]:
+                            del web_gui_server._GUI_CACHE["mt5"][chat_id]
+                    except Exception:
+                        pass
+
+                    state_kh = "🟢 **បានបើកដំណើរការ (ACTIVE 24/7)**" if new_state else "⚪ **បានផ្អាកដំណើរការ (STANDBY / OFF)**"
+                    state_en = "🟢 **ACTIVE 24/7**" if new_state else "⚪ **STANDBY / OFF**"
+
+                    asset_lines_kh = []
+                    asset_lines_en = []
+                    cat_emojis = {"Metals": "🥇", "Forex": "💱", "Indices": "📈", "Crypto": "⚡", "Stocks": "🏛️"}
+                    for i, a in enumerate(alloc["allocations"]):
+                        em = cat_emojis.get(a["category"], "🔹")
+                        if i < 8:
+                            asset_lines_kh.append(
+                                f"  {em} **{a['symbol']}** ({a['name']}) ៖ `${a['capital_allocated']:,.2f}` | `{a['lot_size']:.2f} Lot`"
+                            )
+                            asset_lines_en.append(
+                                f"  {em} **{a['symbol']}** ({a['name']}): `${a['capital_allocated']:,.2f}` | `{a['lot_size']:.2f} Lot`"
+                            )
+                    if len(alloc["allocations"]) > 8:
+                        rem = len(alloc["allocations"]) - 8
+                        asset_lines_kh.append(f"  ... _និង {rem} ទ្រព្យសកម្មផ្សេងទៀត ត្រូវបានបែងចែកស្មើគ្នា_")
+                        asset_lines_en.append(f"  ... _and {rem} other diversified assets equally allocated_")
+
+                    assets_display_kh = "\n".join(asset_lines_kh)
+                    assets_display_en = "\n".join(asset_lines_en)
+
+                    cap_desc_kh = f"`${alloc['capital']:,.2f} USD`"
+                    if alloc["is_cent"]:
+                        cap_desc_kh += f" (`{alloc['capital']*100:,.0f} USC Cents`)"
+
                     if user_lang not in ['en', 'english']:
                         msg_auto = (
-                            f"🤖 **MT5 AI SWARM AUTO-TRADE CONTROLLER** ⚡\n"
+                            f"🤖 **[MT5 SUPER SMART QUANTITATIVE AUTO-TRADE]** 🏛️\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"📡 **ស្ថានភាព ៖** {state_text_kh}\n"
-                            f"🎯 **AI Models ៖** `15 Wall Street MoE Ensembles`\n"
-                            f"🏛️ **Broker Gateway ៖** `GTCFX Tokyo (Equinix TY3)`\n"
-                            f"🛡️ **Prop Risk Shield ៖** `-3.5% Daily / -7.0% Max Drawdown`\n"
-                            f"⚙️ **Auto Sizing ៖** `Dynamic Kelly Risk Parity`\n"
+                            f"📡 **ស្ថានភាព ៖** {state_kh}\n"
+                            f"💰 **ដើមទុនបែងចែក (Total Capital) ៖** {cap_desc_kh}\n"
+                            f"🎯 **ការបែងចែកទ្រព្យ (Diversification) ៖** `{alloc['max_assets']} ទ្រព្យសកម្ម (Assets)`\n"
+                            f"💵 **ទុនក្នុង ១ ទ្រព្យ (Per Asset) ៖** `${alloc['capital_per_asset']:,.2f} USD`\n"
+                            f"⚖️ **ទំហំ Lot បើក (Lot Sizing) ៖** `{alloc['allocations'][0]['lot_size']:.2f} Lot / Asset`\n"
+                            f"🏛️ **Broker / Server ៖** `{alloc['server']}` (`{alloc['account_mode']}`)\n"
+                            f"🛡️ **Margin Safety Shield ៖** `{alloc['margin_safety_ratio']}% Free Margin`\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"🛡️ **ក្បួនការពារដើមទុន (Wall Street Risk Citadel) ៖**\n"
+                            f"• 🚨 **Daily Hard Stop (-3.5%) ៖** `${alloc['daily_loss_limit_usd']:,.2f}`\n"
+                            f"• ⛔ **Max Drawdown Clamp (-7.0%) ៖** `${alloc['max_drawdown_limit_usd']:,.2f}`\n"
+                            f"• 🎯 **Risk-per-Trade (1.5%) ៖** `${alloc['risk_per_trade_usd']:,.2f} / Trade`\n"
+                            f"• 🏹 **Stop-Loss Armor ៖** `Dynamic ATR 30-50 Pips` (TP 1:2+)\n"
+                            f"{ui_standards.DIVIDER_LIGHT}\n"
+                            f"📊 **បញ្ជីទ្រព្យសកម្មដែល AI ជ្រើសរើស (Asset Pool) ៖**\n"
+                            f"{assets_display_kh}\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"⌨️ **បញ្ជា 1-Tap Copyable Presets (ចុចលើវាដើម្បី Copy) ៖**\n"
+                            f"• `` `/mt5 AUTO ON 50 3` `` — ទុន $50 (៣ ទ្រព្យ)\n"
+                            f"• `` `/mt5 AUTO ON 100 5` `` — ទុន $100 (៥ ទ្រព្យ)\n"
+                            f"• `` `/mt5 AUTO ON 200 10` `` — ទុន $200 (១០ ទ្រព្យ)\n"
+                            f"• `` `/mt5 AUTO ON 500 15` `` — ទុន $500 (១៥ ទ្រព្យ)\n"
+                            f"• `` `/mt5 AUTO ON 1000 20` `` — ទុន $1000 (២០ ទ្រព្យ)\n"
+                            f"• `` `/mt5 AUTO OFF` `` — ផ្អាកដំណើរការ\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **AI Swarm កំពុង Scan ស្វែងរក Setup មាស & រូបិយប័ណ្ណដើម្បីចូល Trade ដោយស្វ័យប្រវត្តិ!**' if new_state else '⚪ **ប្រព័ន្ធបានផ្អាកការចូល Order ដោយស្វ័យប្រវត្តិ។ Positions កំពុងរត់នៅតែត្រូវបានការពារដោយ Stop-Loss!**'}\n"
+                            f"{'✅ **AI Swarm កំពុងដំណើរការស្វែងរក Setup លើទ្រព្យសកម្មទាំងនេះ ដើម្បី Execute ដោយស្វ័យប្រវត្តិ!**' if new_state else '⚪ **ប្រព័ន្ធបានផ្អាកការចូល Order ថ្មីដោយស្វ័យប្រវត្តិ។ Positions កំពុងរត់នៅតែត្រូវបានការពារដោយ Stop-Loss!**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"_Khmer Master Crypto_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     else:
                         msg_auto = (
-                            f"🤖 **MT5 AI SWARM AUTO-TRADE CONTROLLER** ⚡\n"
+                            f"🤖 **[MT5 SUPER SMART QUANTITATIVE AUTO-TRADE]** 🏛️\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"📡 **Status:** {state_text_en}\n"
-                            f"🎯 **AI Models:** `15 Wall Street MoE Ensembles`\n"
-                            f"🏛️ **Broker Gateway:** `GTCFX Tokyo (Equinix TY3)`\n"
-                            f"🛡️ **Prop Risk Shield:** `-3.5% Daily / -7.0% Max Drawdown`\n"
-                            f"⚙️ **Auto Sizing:** `Dynamic Kelly Risk Parity`\n"
+                            f"📡 **Status:** {state_en}\n"
+                            f"💰 **Allocated Capital:** `${alloc['capital']:,.2f} USD`\n"
+                            f"🎯 **Diversification:** `{alloc['max_assets']} Assets Pool`\n"
+                            f"💵 **Capital per Asset:** `${alloc['capital_per_asset']:,.2f} USD`\n"
+                            f"⚖️ **Lot Size:** `{alloc['allocations'][0]['lot_size']:.2f} Lot / Asset`\n"
+                            f"🏛️ **Broker / Server:** `{alloc['server']}` (`{alloc['account_mode']}`)\n"
+                            f"🛡️ **Margin Safety Shield:** `{alloc['margin_safety_ratio']}% Free Margin`\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"🛡️ **Capital Protection Citadel:**\n"
+                            f"• 🚨 **Daily Hard Stop (-3.5%):** `${alloc['daily_loss_limit_usd']:,.2f}`\n"
+                            f"• ⛔ **Max Drawdown Clamp (-7.0%):** `${alloc['max_drawdown_limit_usd']:,.2f}`\n"
+                            f"• 🎯 **Risk-per-Trade (1.5%):** `${alloc['risk_per_trade_usd']:,.2f} / Trade`\n"
+                            f"• 🏹 **Stop-Loss Armor:** `Dynamic ATR 30-50 Pips` (TP 1:2+)\n"
+                            f"{ui_standards.DIVIDER_LIGHT}\n"
+                            f"📊 **AI Selected Asset Pool:**\n"
+                            f"{assets_display_en}\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"⌨️ **1-Tap Copyable Presets (Click to Copy):**\n"
+                            f"• `` `/mt5 AUTO ON 50 3` `` — Capital $50 (3 Assets)\n"
+                            f"• `` `/mt5 AUTO ON 100 5` `` — Capital $100 (5 Assets)\n"
+                            f"• `` `/mt5 AUTO ON 200 10` `` — Capital $200 (10 Assets)\n"
+                            f"• `` `/mt5 AUTO ON 500 15` `` — Capital $500 (15 Assets)\n"
+                            f"• `` `/mt5 AUTO ON 1000 20` `` — Capital $1000 (20 Assets)\n"
+                            f"• `` `/mt5 AUTO OFF` `` — Standby / Disable\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **AI Swarm actively scanning for Gold & FX setups to execute autonomously!**' if new_state else '⚪ **Autonomous execution paused. Open positions remain shielded by Stop-Loss!**'}\n"
+                            f"{'✅ **AI Swarm actively scanning these assets to execute trades autonomously!**' if new_state else '⚪ **Autonomous execution paused. Open positions remain shielded by Stop-Loss!**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"_Khmer Master Crypto_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
+
+                    auto_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("💎 $100 (5 Assets)", callback_data="btn_mt5_auto_100_5"),
+                            InlineKeyboardButton("🪙 $50 (3 Assets)", callback_data="btn_mt5_auto_50_3")
+                        ],
+                        [
+                            InlineKeyboardButton("🚀 $200 (10 Assets)", callback_data="btn_mt5_auto_200_10"),
+                            InlineKeyboardButton("🛑 Standby / OFF", callback_data="btn_mt5_auto_off")
+                        ],
+                        [
+                            InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_mt5_auto_refresh"),
+                            InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
+                        ]
+                    ])
+
                     try:
-                        await update.effective_message.reply_text(msg_auto, parse_mode="Markdown")
+                        await update.effective_message.reply_text(msg_auto, parse_mode="Markdown", reply_markup=auto_kb)
                     except Exception:
-                        await update.effective_message.reply_text(msg_auto.replace("*", "").replace("_", ""))
+                        await update.effective_message.reply_text(msg_auto.replace("*", "").replace("_", ""), reply_markup=auto_kb)
                     return
 
                 # --- 0.1 AI SCALP SNIPER EXECUTION ---
