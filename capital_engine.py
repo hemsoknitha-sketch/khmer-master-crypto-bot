@@ -2801,7 +2801,10 @@ class CapitalAutonomousEngine:
                         )
                     await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
                 except Exception as notif_err:
-                    logger.error(f"Failed to send Capital Auto notification: {notif_err}")
+                    if "blocked by the user" in str(notif_err).lower():
+                        logger.warning(f"[Capital.com] User {chat_id} has blocked the bot in Telegram; skipped notification.")
+                    else:
+                        logger.error(f"Failed to send Capital Auto notification: {notif_err}")
             return True
         return False
 

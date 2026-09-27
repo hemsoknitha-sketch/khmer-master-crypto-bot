@@ -434,7 +434,8 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
         }
         await ws.send_json(initial_tick)
     except Exception as e:
-        print(f"⚠️ [WEB GUI WS INIT NOTICE]: {e}")
+        if "closing transport" not in str(e).lower():
+            print(f"⚠️ [WEB GUI WS INIT NOTICE]: {e}")
 
     try:
         async for msg in ws:
