@@ -30,6 +30,12 @@ _CACHE_WORKER_TASK = None
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_gui")
 
+# GTCFX Official Dual-Track Referral Standards (Invariant 42)
+GTC_STD_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+GTC_STD_INVITE_CODE = "LnZZcHxY"
+GTC_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
+GTC_CENT_INVITE_CODE = "PuAfeREN"
+
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
 # ==============================================================================
@@ -167,8 +173,12 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             "is_authorized": False,
             "has_identity": False,
             "chat_id": 0,
-            "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
-            "invite_code": "130237694",
+            "referral_url": GTC_STD_REFERRAL_URL,
+            "invite_code": GTC_STD_INVITE_CODE,
+            "referral_url_std": GTC_STD_REFERRAL_URL,
+            "invite_code_std": GTC_STD_INVITE_CODE,
+            "referral_url_cent": GTC_CENT_REFERRAL_URL,
+            "invite_code_cent": GTC_CENT_INVITE_CODE,
             "qr_code_url": "/gtc_QRCode.png",
             "account": {
                 "login": "",
@@ -273,8 +283,12 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 "is_authorized": is_authorized,
                 "has_identity": True,
                 "chat_id": chat_id,
-                "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
-                "invite_code": "130237694",
+                "referral_url": GTC_STD_REFERRAL_URL,
+                "invite_code": GTC_STD_INVITE_CODE,
+                "referral_url_std": GTC_STD_REFERRAL_URL,
+                "invite_code_std": GTC_STD_INVITE_CODE,
+                "referral_url_cent": GTC_CENT_REFERRAL_URL,
+                "invite_code_cent": GTC_CENT_INVITE_CODE,
                 "qr_code_url": "/gtc_QRCode.png",
                 "account": {
                     "login": display_login,
@@ -1068,8 +1082,14 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
             firm_name=firm_name
         )
 
+        # Determine referral track from server
+        is_cent = "Server 5" in server or "CENT" in server.upper()
+        assigned_ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_INVITE_CODE
+        assigned_ref_url = GTC_CENT_REFERRAL_URL if is_cent else GTC_STD_REFERRAL_URL
+        track_name = "Cent Account (L20 - Server 5)" if is_cent else "Standard Swap-Free (L15 - Server 2)"
+
         # Register pending verification in referral registry
-        db.register_mt5_referral_request(chat_id, login, referral_code="130237694", notes="Web GUI Binding")
+        db.register_mt5_referral_request(chat_id, login, referral_code=assigned_ref_code, notes=f"Web GUI Binding ({server} - {track_name})")
         is_auth = db.is_mt5_user_authorized(chat_id)
 
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
@@ -1086,7 +1106,7 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎫 **MT5 Login ID ៖** `#{login}`\n"
                     f"🏛️ **Broker / Server ៖** `{broker}` (`{server}`)\n"
-                    f"🏷️ **Firm / Profile ៖** `{firm_name}`\n"
+                    f"🏷️ **Firm / Profile ៖** `{firm_name}` ({track_name})\n"
                     f"📡 **ស្ថានភាព Referral ៖** 🟢 **APPROVED / VERIFIED**\n"
                     f"⚡ **Gateway Latency ៖** `Tokyo Equinix TY3 (<0.42ms)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1097,21 +1117,26 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
                 )
                 asyncio.create_task(notification_manager.send_telegram_alert(chat_id, user_msg))
             else:
-                msg = f"គណនី MT5 #{login} ត្រូវបានកត់ត្រាទុក! សូមរង់ចាំការអនុម័ត Referral ពី Super Admin (Invite Code: 130237694) ដើម្បីចាប់ផ្តើមជួញដូរ។"
+                msg = f"គណនី MT5 #{login} ត្រូវបានកត់ត្រាទុក! សូមរង់ចាំការអនុម័ត Referral ពី Super Admin (Invite Code: {assigned_ref_code}) ដើម្បីចាប់ផ្តើមជួញដូរ។"
                 user_msg = (
                     f"🔒 **[GTCFX TOKYO MT5 - សេចក្តីជូនដំណឹងការពារសិទ្ធិ REFERRAL]** 🏛️\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎫 **MT5 Login ID ៖** `#{login}`\n"
                     f"🏛️ **Broker / Server ៖** `{broker}` (`{server}`)\n"
+                    f"🏷️ **ប្រភេទគណនី ៖** `{track_name}`\n"
                     f"📡 **ស្ថានភាព ៖** ⚠️ **មិនទាន់មានក្នុងបញ្ជី Referral របស់ Super BOT ADMIN**\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"⚠️ **មូលហេតុ ៖** គណនី MT5 នេះមិនទាន់បានចុះឈ្មោះក្រោម Referral ផ្លូវការរបស់ Super BOT ADMIN (Invite Code: `130237694`) ឬមិនទាន់ទទួលបានការអនុម័តឡើយ។\n\n"
+                    f"⚠️ **មូលហេតុ ៖** គណនី MT5 នេះមិនទាន់បានចុះឈ្មោះក្រោម Referral ផ្លូវការរបស់ Super BOT ADMIN (Invite Code: `{assigned_ref_code}`) ឬមិនទាន់ទទួលបានការអនុម័តឡើយ។\n\n"
                     f"🌐 **Link ចុះឈ្មោះផ្លូវការ ៖**\n"
-                    f"https://web.mygtc.app/login/register?ref=130237694\n\n"
-                    f"🔑 **Official Invite Code ៖** `130237694`\n"
+                    f"• 💎 **Standard Swap-Free (Server 2) ៖**\n"
+                    f"  {GTC_STD_REFERRAL_URL}\n"
+                    f"  🔑 Invite Code: `{GTC_STD_INVITE_CODE}`\n\n"
+                    f"• 🪙 **Cent Account (Server 5) ៖**\n"
+                    f"  {GTC_CENT_REFERRAL_URL}\n"
+                    f"  🔑 Invite Code: `{GTC_CENT_INVITE_CODE}`\n\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **ដំណាក់កាលដោះស្រាយ ៖**\n"
-                    f"1️⃣ ចុះឈ្មោះគណនី GTCFX ក្រោម Invite Code: `130237694`\n"
+                    f"1️⃣ ចុះឈ្មោះគណនី GTCFX ក្រោម Invite Code: `{assigned_ref_code}`\n"
                     f"2️⃣ ឬទាក់ទង Super Admin @hemsoknitha ដើម្បីអនុម័តសិទ្ធិវិនិយោគ!\n"
                     f"👉 អ្នកក៏អាចប្រើបញ្ជា `` `/mt5` `` លើ Telegram ដើម្បីពិនិត្យសិទ្ធិឡើងវិញបានគ្រប់ពេល។\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1126,8 +1151,8 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
                     f"👤 **User Chat ID ៖** `{chat_id}`\n"
                     f"🎫 **MT5 Account ID ៖** `#{login}`\n"
                     f"🏛️ **Broker/Server ៖** `{broker}` (`{server}`)\n"
-                    f"🏷️ **Firm/Profile ៖** `{firm_name}`\n"
-                    f"🔑 **Invite Code ៖** `130237694`\n"
+                    f"🏷️ **Firm/Profile ៖** `{firm_name}` ({track_name})\n"
+                    f"🔑 **Expected Invite Code ៖** `{assigned_ref_code}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"👉 **អនុម័ត ៖** `` `/admin_mt5 approve {chat_id}` ``\n"
                     f"👉 **បដិសេធ ៖** `` `/admin_mt5 reject {chat_id}` ``"
@@ -1166,8 +1191,10 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"👤 **Chat ID ៖** `{chat_id}`\n"
                 f"⚠️ **សកម្មភាព ៖** បញ្ជា Trade ត្រូវបានច្រានចោលដោយសារគណនីមិនទាន់មាន Referral!\n"
-                f"🔒 **មូលហេតុ ៖** គណនីមិនទាន់បានចុះឈ្មោះតាម Referral របស់ Super BOT ADMIN (Invite Code: `130237694`)។\n\n"
-                f"🌐 **ចុះឈ្មោះផ្លូវការ ៖** https://web.mygtc.app/login/register?ref=130237694\n"
+                f"🔒 **មូលហេតុ ៖** គណនីមិនទាន់បានចុះឈ្មោះតាម Referral របស់ Super BOT ADMIN (Code: `{GTC_STD_INVITE_CODE}` ឬ `{GTC_CENT_INVITE_CODE}`)។\n\n"
+                f"🌐 **ចុះឈ្មោះផ្លូវការ ៖**\n"
+                f"• 💎 **Standard Swap-Free (Server 2) ៖** {GTC_STD_REFERRAL_URL} (`{GTC_STD_INVITE_CODE}`)\n"
+                f"• 🪙 **Cent Account (Server 5) ៖** {GTC_CENT_REFERRAL_URL} (`{GTC_CENT_INVITE_CODE}`)\n\n"
                 f"👉 ប្រើបញ្ជា `` `/mt5` `` លើ Bot ដើម្បីស្នើសុំផ្ទៀងផ្ទាត់ ឬទាក់ទង Super Admin @hemsoknitha\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"_Khmer Master Crypto_\n"
@@ -1178,9 +1205,13 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
             return web.json_response({
                 "status": "error",
                 "code": "REFERRAL_REQUIRED",
-                "message": "⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: 130237694)!",
-                "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
-                "invite_code": "130237694"
+                "message": f"⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: {GTC_STD_INVITE_CODE} ឬ {GTC_CENT_INVITE_CODE})!",
+                "referral_url": GTC_STD_REFERRAL_URL,
+                "invite_code": GTC_STD_INVITE_CODE,
+                "referral_url_std": GTC_STD_REFERRAL_URL,
+                "invite_code_std": GTC_STD_INVITE_CODE,
+                "referral_url_cent": GTC_CENT_REFERRAL_URL,
+                "invite_code_cent": GTC_CENT_INVITE_CODE
             }, status=403)
 
         cfg = db.get_user_mt5_config(chat_id)
@@ -1300,9 +1331,13 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
             return web.json_response({
                 "status": "error",
                 "code": "REFERRAL_REQUIRED",
-                "message": "⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យបើក AI Auto Trade ឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: 130237694)!",
-                "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
-                "invite_code": "130237694"
+                "message": f"⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យបើក AI Auto Trade ឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: {GTC_STD_INVITE_CODE} ឬ {GTC_CENT_INVITE_CODE})!",
+                "referral_url": GTC_STD_REFERRAL_URL,
+                "invite_code": GTC_STD_INVITE_CODE,
+                "referral_url_std": GTC_STD_REFERRAL_URL,
+                "invite_code_std": GTC_STD_INVITE_CODE,
+                "referral_url_cent": GTC_CENT_REFERRAL_URL,
+                "invite_code_cent": GTC_CENT_INVITE_CODE
             }, status=403)
 
         enable = bool(data.get("enable", True))
@@ -1342,7 +1377,14 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
                 "message": f"✅ គណនី #{account_id} ត្រូវបានផ្ទៀងផ្ទាត់អនុម័តដោយជោគជ័យ!"
             })
 
-        db.register_mt5_referral_request(chat_id, account_id, referral_code="130237694", notes="Web GUI Submit")
+        # Check existing config to see if cent account
+        cfg = db.get_user_mt5_config(chat_id)
+        srv = str(cfg.get("server", "")).strip()
+        is_cent = "Server 5" in srv or "CENT" in srv.upper()
+        ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_INVITE_CODE
+        track_name = "Cent (L20)" if is_cent else "Standard (L15)"
+
+        db.register_mt5_referral_request(chat_id, account_id, referral_code=ref_code, notes=f"Web GUI Submit ({track_name})")
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
             del _GUI_CACHE["mt5"][chat_id]
 
@@ -1353,9 +1395,10 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
                 f"🔔 **[MT5 GTCFX REFERRAL VERIFICATION REQUEST]** ⚡\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"👤 **User Chat ID ៖** `{chat_id}`\n"
-                f"🎫 **MT5 Account ID ៖** `{account_id}`\n"
+                f"🎫 **MT5 Account ID ៖** `#{account_id}`\n"
                 f"🏛️ **Broker ៖** `GTCFX (Tokyo TY3)`\n"
-                f"🔑 **Invite Code ៖** `130237694`\n"
+                f"🏷️ **ប្រភេទ ៖** `{track_name}`\n"
+                f"🔑 **Expected Invite Code ៖** `{ref_code}`\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"👉 **អនុម័ត ៖** `` `/admin_mt5 approve {chat_id}` ``\n"
                 f"👉 **បដិសេធ ៖** `` `/admin_mt5 reject {chat_id}` ``"

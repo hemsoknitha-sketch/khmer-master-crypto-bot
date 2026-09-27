@@ -4469,14 +4469,24 @@ def get_user_mt5_trade_statistics(chat_id: int, account_id: str = "") -> dict:
 # ==============================================================================
 # GTCFX JAPAN TOKYO MT5 PRO REFERRAL GATEKEEPER LOCK (INVARIANT 42)
 # ==============================================================================
-GTC_OFFICIAL_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=130237694"
-GTC_OFFICIAL_INVITE_CODE = "130237694"
+# Track 1: Swap-Free Standard L15 (Server 2 - Capital $100+)
+GTC_STD_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+GTC_STD_INVITE_CODE = "LnZZcHxY"
+
+# Track 2: Cent Account L20 (Server 5 - Capital $10 - $100)
+GTC_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
+GTC_CENT_INVITE_CODE = "PuAfeREN"
+
+# Default & Legacy Fallback
+GTC_OFFICIAL_REFERRAL_URL = GTC_STD_REFERRAL_URL
+GTC_OFFICIAL_INVITE_CODE = GTC_STD_INVITE_CODE
+GTC_VALID_INVITE_CODES = {"LnZZcHxY", "PuAfeREN", "130237694"}
 
 def is_mt5_user_authorized(chat_id: int) -> bool:
     """
     GTCFX Japan Tokyo MT5 Terminal Pro Referral Gatekeeper Lock (Invariant 42):
     Under the sacred fiduciary rule of Khmer Master Crypto:
-    ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: 130237694).
+    ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: LnZZcHxY ឬ PuAfeREN).
     Returns True if:
     1. chat_id == 859271875 (Master Super Admin) or is_admin(chat_id)
     2. User is marked is_verified == 1 in mt5_user_referrals
@@ -4514,7 +4524,7 @@ def set_mt5_user_referral_status(
     is_verified: bool,
     account_id: str = "",
     notes: str = "",
-    referral_code: str = "130237694",
+    referral_code: str = GTC_STD_INVITE_CODE,
     broker: str = "GTCFX",
     **kwargs
 ) -> bool:
@@ -4524,7 +4534,7 @@ def set_mt5_user_referral_status(
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        ref_code = str(referral_code or "130237694").strip()
+        ref_code = str(referral_code or GTC_STD_INVITE_CODE).strip()
         brk = str(broker or "GTCFX").strip()
         cursor.execute("""
             INSERT INTO mt5_user_referrals (chat_id, account_id, broker, referral_code, is_verified, verified_at, notes)
@@ -4551,7 +4561,7 @@ def set_mt5_user_referral_status(
 def register_mt5_referral_request(
     chat_id: int,
     account_id: str,
-    referral_code: str = "130237694",
+    referral_code: str = GTC_STD_INVITE_CODE,
     notes: str = "",
     broker: str = "GTCFX",
     **kwargs
@@ -4562,6 +4572,7 @@ def register_mt5_referral_request(
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        ref_code = str(referral_code or GTC_STD_INVITE_CODE).strip()
         cursor.execute("""
             INSERT INTO mt5_user_referrals (chat_id, account_id, broker, referral_code, is_verified, notes)
             VALUES (?, ?, ?, ?, 0, ?)
@@ -4570,7 +4581,7 @@ def register_mt5_referral_request(
                 referral_code = excluded.referral_code,
                 broker = excluded.broker,
                 notes = excluded.notes
-        """, (chat_id, str(account_id or "").strip(), broker or "GTCFX", referral_code or "130237694", notes))
+        """, (chat_id, str(account_id or "").strip(), broker or "GTCFX", ref_code, notes))
         conn.commit()
         conn.close()
         return True

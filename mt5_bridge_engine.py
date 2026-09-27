@@ -35,9 +35,19 @@ import system_security_citadel as sc
 import ui_standards as ui
 import notification_manager
 
-# GTCFX Japan Tokyo MT5 Pro Official Referral Gatekeeper Standard (Invariant 42)
-GTC_OFFICIAL_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=130237694"
-GTC_OFFICIAL_INVITE_CODE = "130237694"
+# GTCFX Japan Tokyo MT5 Pro Official Dual-Track Referral Gatekeeper Standard (Invariant 42)
+# Track 1: Swap-Free Standard L15 (Server 2 - Capital $100+)
+GTC_STD_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+GTC_STD_INVITE_CODE = "LnZZcHxY"
+
+# Track 2: Cent Account L20 (Server 5 - Capital $10 - $100)
+GTC_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
+GTC_CENT_INVITE_CODE = "PuAfeREN"
+
+# Default & Legacy Fallback
+GTC_OFFICIAL_REFERRAL_URL = GTC_STD_REFERRAL_URL
+GTC_OFFICIAL_INVITE_CODE = GTC_STD_INVITE_CODE
+GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "130237694"]
 
 # ZeroMQ high-speed messaging
 try:

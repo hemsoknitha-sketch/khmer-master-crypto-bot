@@ -5706,16 +5706,21 @@ class TelegramBotThread(BaseThread):
                     pass
                 cfg = db.get_user_mt5_config(chat_id)
                 acc = str(cfg.get("login", "")).strip()
+                srv = str(cfg.get("server", "")).strip()
+                is_cent = "Server 5" in srv or "CENT" in srv.upper()
+                ref_code = "PuAfeREN" if is_cent else "LnZZcHxY"
+                track_name = "Cent Account (L20 - Server 5)" if is_cent else "Standard Swap-Free (L15 - Server 2)"
                 if acc:
-                    db.register_mt5_referral_request(chat_id, acc, referral_code="130237694", notes="Telegram 1-Tap Request")
+                    db.register_mt5_referral_request(chat_id, acc, referral_code=ref_code, notes=f"Telegram 1-Tap Request ({track_name})")
                     try:
                         admin_msg = (
                             f"🔔 **[MT5 GTCFX REFERRAL VERIFICATION REQUEST]** ⚡\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"👤 **User Chat ID ៖** `{chat_id}`\n"
-                            f"🎫 **MT5 Account ID ៖** `{acc}`\n"
+                            f"🎫 **MT5 Account ID ៖** `#{acc}`\n"
                             f"🏛️ **Broker ៖** `GTCFX (Tokyo TY3)`\n"
-                            f"🔑 **Invite Code ៖** `130237694`\n"
+                            f"🏷️ **ប្រភេទគណនី ៖** `{track_name}`\n"
+                            f"🔑 **Expected Invite Code ៖** `{ref_code}`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"👉 **អនុម័ត ៖** `` `/admin_mt5 approve {chat_id}` ``\n"
                             f"👉 **បដិសេធ ៖** `` `/admin_mt5 reject {chat_id}` ``"
@@ -5730,8 +5735,12 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     await update.effective_message.reply_text(
-                        f"⚠️ **មិនទាន់មានលេខគណនី MT5 នៅឡើយទេ។**\n"
-                        f"សូមចុះឈ្មោះតាម Link ផ្លូវការ: `https://web.mygtc.app/login/register?ref=130237694` (Invite Code: `130237694`)\n"
+                        f"⚠️ **មិនទាន់មានលេខគណនី MT5 នៅឡើយទេ។**\n\n"
+                        f"សូមចុះឈ្មោះតាមតំណភ្ជាប់ផ្លូវការរបស់ Super Admin ៖\n"
+                        f"• 💎 **Standard Swap-Free (Server 2) ៖**\n"
+                        f"  `https://web.mygtc.app/login/register?ref=LnZZcHxY` (Code: `LnZZcHxY`)\n\n"
+                        f"• 🪙 **Cent Account (Server 5) ៖**\n"
+                        f"  `https://web.mygtc.app/login/register?ref=PuAfeREN` (Code: `PuAfeREN`)\n\n"
                         f"រួចភ្ជាប់គណនីលើ Web GUI ឬផ្ញើលេខ MT5 Account ID មក Admin: @hemsoknitha!",
                         parse_mode="Markdown"
                     )
@@ -5746,7 +5755,7 @@ class TelegramBotThread(BaseThread):
                     await mt5_command(update, context)
                 else:
                     try:
-                        await update.callback_query.answer("⏳ គណនីកំពុងរង់ចាំការអនុម័តពី Admin (Invite Code: 130237694)!", show_alert=True)
+                        await update.callback_query.answer("⏳ គណនីកំពុងរង់ចាំការអនុម័ត Referral ពី Super Admin!", show_alert=True)
                     except Exception:
                         pass
             elif data == "btn_admin_mt5_refresh":
@@ -20008,8 +20017,12 @@ class TelegramBotThread(BaseThread):
             """
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import ui_standards
-            pro_url = "https://web.mygtc.app/login/register?ref=130237694"
-            invite_code = "130237694"
+            pro_url = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+            std_url = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+            std_code = "LnZZcHxY"
+            cent_url = "https://web.mygtc.app/login/register?ref=PuAfeREN"
+            cent_code = "PuAfeREN"
+            invite_code = std_code
 
             if user_lang == 'khmer' or user_lang not in ['en', 'english']:
                 gate_text = (
@@ -20017,14 +20030,17 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"⚠️ **សេចក្តីជូនដំណឹងការពារមូលធន & សិទ្ធិវិនិយោគ MT5 ៖**\n"
                     f"ប្រព័ន្ធ /mt5 **មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយ** បើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ **Super BOT ADMIN** លើ Broker ដៃគូផ្លូវការ **GTCFX (Equinix Tokyo TY3)**!\n\n"
-                    f"🌐 **តំណភ្ជាប់ចុះឈ្មោះផ្លូវការ (Official Referral URL) ៖**\n"
-                    f"[{pro_url}]({pro_url})\n\n"
-                    f"🔑 **Official Invite Code ៖** `{invite_code}` (ចុចលើវាដើម្បី Copy)\n"
+                    f"💎 **1. គណនីស្តង់ដារ Swap-Free (ទុន $100+ ៖ MT5-SF-STD-L15) ៖**\n"
+                    f"• Link: [{std_url}]({std_url})\n"
+                    f"• Invite Code: `{std_code}` (ចុចលើវាដើម្បី Copy)\n\n"
+                    f"🪙 **2. គណនីសេន Cent Account (ទុន $10-$100 ៖ MT5-CENT-L20) ៖**\n"
+                    f"• Link: [{cent_url}]({cent_url})\n"
+                    f"• Invite Code: `{cent_code}` (ចុចលើវាដើម្បី Copy)\n\n"
                     f"🏛️ **Broker Gateway ៖** `GTC Global Trade Capital (Tokyo TY3)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **ដំណាក់កាលអនុវត្ត (3 ជំហានងាយៗ) ៖**\n"
-                    f"1️⃣ ចុច Link ខាងលើ ឬ Scan QR Code ដើម្បីចុះឈ្មោះគណនី GTCFX\n"
-                    f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code: `{invite_code}`\n"
+                    f"1️⃣ ចុច Link ជ្រើសរើសប្រភេទគណនីដែលត្រូវនឹងដើមទុនរបស់អ្នក\n"
+                    f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code (`{std_code}` ឬ `{cent_code}`)\n"
                     f"3️⃣ ចុចប៊ូតុង **[ 📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID ]** ខាងក្រោម ដើម្បីទទួលបានការអនុម័តភ្លាមៗ!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
@@ -20036,14 +20052,17 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"⚠️ **Institutional Capital Protection & MT5 Gatekeeper Notice:**\n"
                     f"The /mt5 system **strictly does NOT permit investing or trading** unless you are properly registered under the **Super BOT ADMIN's Official Referral URL** on **GTCFX (Equinix Tokyo TY3)**!\n\n"
-                    f"🌐 **Official Referral URL (1-Tap Register):**\n"
-                    f"[{pro_url}]({pro_url})\n\n"
-                    f"🔑 **Official Invite Code:** `{invite_code}` (Click to Copy)\n"
+                    f"💎 **1. Standard Swap-Free (Capital $100+ • MT5-SF-STD-L15):**\n"
+                    f"• Link: [{std_url}]({std_url})\n"
+                    f"• Invite Code: `{std_code}` (Click to Copy)\n\n"
+                    f"🪙 **2. Cent Account (Capital $10-$100 • MT5-CENT-L20):**\n"
+                    f"• Link: [{cent_url}]({cent_url})\n"
+                    f"• Invite Code: `{cent_code}` (Click to Copy)\n\n"
                     f"🏛️ **Broker Gateway:** `GTC Global Trade Capital (Tokyo TY3)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **3 Simple Steps to Unlock:**\n"
-                    f"1️⃣ Register on GTCFX using the official link or scan QR code\n"
-                    f"2️⃣ Ensure Invite Code is set to `{invite_code}`\n"
+                    f"1️⃣ Click the link that matches your starting capital\n"
+                    f"2️⃣ Ensure Invite Code is set to `{std_code}` or `{cent_code}`\n"
                     f"3️⃣ Click **[ 📋 Request Verification ]** below for instant Super Admin approval!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
@@ -20051,7 +20070,10 @@ class TelegramBotThread(BaseThread):
                 )
 
             gate_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🌐 ចុះឈ្មោះ GTCFX (Official Link)", url=pro_url)],
+                [
+                    InlineKeyboardButton("💎 Standard (L15)", url=std_url),
+                    InlineKeyboardButton("🪙 Cent (L20)", url=cent_url)
+                ],
                 [InlineKeyboardButton("📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID", callback_data="btn_mt5_req_verify")],
                 [
                     InlineKeyboardButton("🔄 ពិនិត្យសិទ្ធិឡើងវិញ", callback_data="btn_mt5_check_auth"),
@@ -21653,8 +21675,9 @@ class TelegramBotThread(BaseThread):
                 except ValueError:
                     await update.effective_message.reply_text(f"❌ Chat ID `{args[1]}` មិនត្រឹមត្រូវឡើយ!", parse_mode="Markdown")
                     return
-
-                db.set_mt5_user_referral_status(target_cid, is_verified=True, referral_code="130237694")
+                rec = db.get_mt5_referral_record(target_cid)
+                saved_ref = (rec.get("referral_code") if rec else "") or db.GTC_STD_INVITE_CODE
+                db.set_mt5_user_referral_status(target_cid, is_verified=True, referral_code=saved_ref)
                 try:
                     import web_gui_server
                     if hasattr(web_gui_server, "_GUI_CACHE") and "mt5" in web_gui_server._GUI_CACHE and target_cid in web_gui_server._GUI_CACHE["mt5"]:
