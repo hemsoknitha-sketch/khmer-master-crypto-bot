@@ -20751,14 +20751,14 @@ class TelegramBotThread(BaseThread):
                     f"  • ស្ថានភាព ៖ ⏳ **Standby / រង់ចាំការភ្ជាប់ពី MT5 EA របស់អ្នក**\n"
                     f"  • Web GUI ៖ 🔗 បានចងភ្ជាប់គណនីរួចរាល់ | ⚡ Latency ៖ `< 0.5ms TY3`\n"
                     f"  • Prop Shield ៖ `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
-                    f"  👉 _សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCryptoBridge.mq5` ដើម្បី Sync!_"
+                    f"  👉 _សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` ដើម្បី Sync!_"
                 )
                 clients_text_en = (
                     f"🟡 **Acc #{user_login}** ({broker_name} / {firm_label})\n"
                     f"  • Status: ⏳ **Standby / Waiting for MT5 EA connection**\n"
                     f"  • Web GUI: 🔗 Bound & Configured | ⚡ Latency: `< 0.5ms TY3`\n"
                     f"  • Prop Shield: `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
-                    f"  👉 _Please attach EA `KhmerMasterCryptoBridge.mq5` on your MT5 to sync!_"
+                    f"  👉 _Please attach EA `KhmerMasterCrypto_Bridge.mq5` on your MT5 to sync!_"
                 )
             else:
                 clients_text_kh = (

@@ -1111,7 +1111,7 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
                     f"📡 **ស្ថានភាព Referral ៖** 🟢 **APPROVED / VERIFIED**\n"
                     f"⚡ **Gateway Latency ៖** `Tokyo Equinix TY3 (<0.42ms)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"👉 **សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCryptoBridge.mq5` ដើម្បី Sync Live Data & Trade!**\n"
+                    f"👉 **សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` ដើម្បី Sync Live Data & Trade!**\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_"
@@ -1252,7 +1252,7 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                 f"🔍 **មូលហេតុដែលអាចកើតមាន ៖**\n"
                 f"1️⃣ លេខ Account Login ID លើ Web GUI ខុសគ្នាពីលេខ Account លើ MT5 Software\n"
                 f"2️⃣ វាយខុស Password ធ្វើឱ្យ MT5 លើ PC/VPS មិនអាច Login ចូល Broker (Authorization Failed)\n"
-                f"3️⃣ មិនទាន់បានបើកកម្មវិធី MT5 ឬមិនទាន់បាន Attach EA `KhmerMasterCryptoBridge.mq5`\n\n"
+                f"3️⃣ មិនទាន់បានបើកកម្មវិធី MT5 ឬមិនទាន់បាន Attach EA `KhmerMasterCrypto_Bridge.mq5`\n\n"
                 f"👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ជាការស្រេច!"
             )
             asyncio.create_task(notification_manager.send_telegram_alert(chat_id, err_msg))
