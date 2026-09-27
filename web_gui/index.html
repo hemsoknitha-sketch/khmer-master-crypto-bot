@@ -700,8 +700,146 @@
                     </div>
                 </div>
 
+                <!-- VIP MT5 Real-Time Quant Performance Citadel (Live Diagrams & Metrics) -->
+                <div id="mt5-perf-card" class="glass-card mt5-perf-card" style="display: none;">
+                    <div class="perf-card-header">
+                        <div class="perf-title-flex">
+                            <span class="perf-icon">📊</span>
+                            <div>
+                                <h4>VIP Quant Performance & Live Analytics</h4>
+                                <span class="perf-subtitle">ទិន្នន័យវាស់ស្ទង់ Win/Loss និង Profit/Loss ពិតប្រាកដ 100% លើ MT5</span>
+                            </div>
+                        </div>
+                        <div class="perf-actions-flex">
+                            <button type="button" id="btn-toggle-rebind" class="btn-subtle-cyber" title="Manage credentials or change server">
+                                ⚙️ Manage / Re-bind
+                            </button>
+                            <button type="button" id="btn-mt5-disconnect" class="btn-subtle-cyber danger" title="Disconnect MT5 Account">
+                                🚪 Disconnect
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 4-Pillar Performance Cockpit Grid -->
+                    <div class="mt5-perf-cockpit-grid">
+                        <!-- Pillar 1: Dynamic Win/Loss Radial Diagram -->
+                        <div class="perf-gauge-card">
+                            <span class="perf-box-title">WIN / LOSS RATIO</span>
+                            <div class="radial-gauge-wrap">
+                                <svg class="radial-svg" viewBox="0 0 120 120">
+                                    <circle class="radial-bg" cx="60" cy="60" r="48"></circle>
+                                    <circle id="mt5-radial-circle" class="radial-progress" cx="60" cy="60" r="48"
+                                            stroke-dasharray="301.6" stroke-dashoffset="0"></circle>
+                                </svg>
+                                <div class="radial-center-text">
+                                    <span id="mt5-win-rate-val" class="radial-val">0.0%</span>
+                                    <span class="radial-sub">WIN RATE</span>
+                                </div>
+                            </div>
+                            <div class="perf-stats-pills-row">
+                                <span class="stat-pill win">🟢 <strong id="mt5-stat-wins">0</strong> Wins</span>
+                                <span class="stat-pill loss">🔴 <strong id="mt5-stat-losses">0</strong> Losses</span>
+                                <span class="stat-pill total">⚪ <strong id="mt5-stat-total">0</strong> Trades</span>
+                            </div>
+                        </div>
+
+                        <!-- Pillar 2: Realized vs Floating Profit & Loss -->
+                        <div class="perf-metrics-card">
+                            <span class="perf-box-title">PROFIT & LOSS MATRIX</span>
+                            <div class="pnl-breakdown-list">
+                                <div class="pnl-breakdown-row">
+                                    <span class="pnl-label">Net Realized PnL:</span>
+                                    <span id="mt5-stat-realized-pnl" class="pnl-val profit">+$0.00</span>
+                                </div>
+                                <div class="pnl-breakdown-row">
+                                    <span class="pnl-label">Floating Unrealized:</span>
+                                    <span id="mt5-stat-floating-pnl" class="pnl-val neutral">$0.00</span>
+                                </div>
+                                <div class="pnl-breakdown-row highlight">
+                                    <span class="pnl-label">Combined Net PnL:</span>
+                                    <span id="mt5-stat-net-grand-pnl" class="pnl-val highlight-val">+$0.00</span>
+                                </div>
+                                <div class="pnl-breakdown-row">
+                                    <span class="pnl-label">Profit Factor (PF):</span>
+                                    <span id="mt5-stat-profit-factor" class="badge badge-accent">1.00</span>
+                                </div>
+                            </div>
+                            <div class="gross-bar-wrap">
+                                <div class="gross-bar-meta">
+                                    <span>Gross Profit: <strong id="mt5-stat-gross-p">$0.00</strong></span>
+                                    <span>Gross Loss: <strong id="mt5-stat-gross-l">$0.00</strong></span>
+                                </div>
+                                <div class="gross-progress-track">
+                                    <div id="mt5-gross-progress-fill" class="gross-progress-fill" style="width: 50%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pillar 3: Live Dynamic Equity Growth Diagram -->
+                        <div class="perf-chart-card">
+                            <div class="perf-chart-header">
+                                <span class="perf-box-title">EQUITY TRAJECTORY</span>
+                                <span id="mt5-chart-watermark" class="chart-watermark-tag">Peak: $0.00</span>
+                            </div>
+                            <div class="svg-sparkline-wrap">
+                                <svg id="mt5-equity-svg" class="sparkline-svg" viewBox="0 0 280 80" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="eqGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" stop-color="#00f3ff" stop-opacity="0.4"/>
+                                            <stop offset="100%" stop-color="#00f3ff" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path id="mt5-svg-area" d="M 0,80 L 280,80 Z" fill="url(#eqGrad)"></path>
+                                    <path id="mt5-svg-line" d="M 0,40 L 280,40" fill="none" stroke="#00f3ff" stroke-width="2.5" stroke-linecap="round"></path>
+                                </svg>
+                            </div>
+                            <div class="chart-footer-row">
+                                <span>Balance: <strong id="mt5-chart-bal">$0.00</strong></span>
+                                <span>Equity: <strong id="mt5-chart-eq">$0.00</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- Pillar 4: Prop Firm Shield & Best/Worst Metrics -->
+                        <div class="perf-prop-card">
+                            <span class="perf-box-title">PROP DEFENSE & TRADING DNA</span>
+                            <div class="prop-metrics-grid">
+                                <div class="prop-sub-stat">
+                                    <span class="sub-stat-lbl">Total Volume</span>
+                                    <span id="mt5-stat-total-lots" class="sub-stat-val">0.00 Lots</span>
+                                </div>
+                                <div class="prop-sub-stat">
+                                    <span class="sub-stat-lbl">Best Trade</span>
+                                    <span id="mt5-stat-best-trade" class="sub-stat-val text-success">+$0.00</span>
+                                </div>
+                                <div class="prop-sub-stat">
+                                    <span class="sub-stat-lbl">Worst Trade</span>
+                                    <span id="mt5-stat-worst-trade" class="sub-stat-val text-danger">-$0.00</span>
+                                </div>
+                                <div class="prop-sub-stat">
+                                    <span class="sub-stat-lbl">Prop Firm Shield</span>
+                                    <span id="mt5-stat-prop-shield" class="sub-stat-val badge badge-success">🛡️ 100% PASS</span>
+                                </div>
+                            </div>
+                            <div class="audit-note-row">
+                                <span>🔒 គ្មានកំហុសឆ្គងទិន្នន័យ (Audited via SQLite WAL)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Executed/Closed Orders Ledger -->
+                    <div class="mt5-recent-orders-ledger">
+                        <div class="ledger-header-row">
+                            <span class="ledger-title">📋 Recent MT5 Orders & Executions</span>
+                            <span id="mt5-recent-count" class="badge badge-dim">0 Orders</span>
+                        </div>
+                        <div id="mt5-recent-orders-list" class="recent-orders-table-wrap">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- VIP Account Registration & 1-Click Binding Card -->
-                <div class="glass-card mt5-bind-card">
+                <div id="mt5-bind-card" class="glass-card mt5-bind-card">
                     <div class="bind-card-header">
                         <div class="bind-title-flex">
                             <span class="bind-icon">🔗</span>
@@ -710,7 +848,12 @@
                                 <span class="bind-subtitle">ភ្ជាប់គណនី MT5 ដោយផ្ទាល់ មិនបាច់ចូល Remote Desktop</span>
                             </div>
                         </div>
-                        <span class="badge badge-gold">VIP Titanium</span>
+                        <div class="bind-header-actions">
+                            <button type="button" id="btn-close-bind-card" class="btn-subtle-cyber" style="display: none;" title="Hide Form">
+                                ✖ Close
+                            </button>
+                            <span class="badge badge-gold">VIP Titanium</span>
+                        </div>
                     </div>
 
                     <form id="mt5-bind-form" class="cyber-bind-form">

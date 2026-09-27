@@ -55,6 +55,7 @@ const state = {
     analytics: null,
     radar: null,
     mt5Data: null,
+    mt5ManualRebind: false,
     isRefreshing: false,
     sseSource: null,
     ws: null,
@@ -143,7 +144,37 @@ const elements = {
     btnGateConnect: document.getElementById('btn-gate-connect'),
     mt5CurrentUserTag: document.getElementById('mt5-current-user-tag'),
     btnSwitchChatId: document.getElementById('btn-switch-chat-id'),
-    mt5StandbyHelper: document.getElementById('mt5-standby-helper')
+    mt5StandbyHelper: document.getElementById('mt5-standby-helper'),
+
+    // VIP MT5 Performance Citadel & Live Diagram Elements
+    mt5PerfCard: document.getElementById('mt5-perf-card'),
+    mt5BindCard: document.getElementById('mt5-bind-card'),
+    btnToggleRebind: document.getElementById('btn-toggle-rebind'),
+    btnCloseBindCard: document.getElementById('btn-close-bind-card'),
+    btnMT5Disconnect: document.getElementById('btn-mt5-disconnect'),
+    mt5RadialCircle: document.getElementById('mt5-radial-circle'),
+    mt5WinRateVal: document.getElementById('mt5-win-rate-val'),
+    mt5StatWins: document.getElementById('mt5-stat-wins'),
+    mt5StatLosses: document.getElementById('mt5-stat-losses'),
+    mt5StatTotal: document.getElementById('mt5-stat-total'),
+    mt5StatRealizedPnl: document.getElementById('mt5-stat-realized-pnl'),
+    mt5StatFloatingPnl: document.getElementById('mt5-stat-floating-pnl'),
+    mt5StatNetGrandPnl: document.getElementById('mt5-stat-net-grand-pnl'),
+    mt5StatProfitFactor: document.getElementById('mt5-stat-profit-factor'),
+    mt5StatGrossP: document.getElementById('mt5-stat-gross-p'),
+    mt5StatGrossL: document.getElementById('mt5-stat-gross-l'),
+    mt5GrossProgressFill: document.getElementById('mt5-gross-progress-fill'),
+    mt5ChartWatermark: document.getElementById('mt5-chart-watermark'),
+    mt5SvgArea: document.getElementById('mt5-svg-area'),
+    mt5SvgLine: document.getElementById('mt5-svg-line'),
+    mt5ChartBal: document.getElementById('mt5-chart-bal'),
+    mt5ChartEq: document.getElementById('mt5-chart-eq'),
+    mt5StatTotalLots: document.getElementById('mt5-stat-total-lots'),
+    mt5StatBestTrade: document.getElementById('mt5-stat-best-trade'),
+    mt5StatWorstTrade: document.getElementById('mt5-stat-worst-trade'),
+    mt5StatPropShield: document.getElementById('mt5-stat-prop-shield'),
+    mt5RecentCount: document.getElementById('mt5-recent-count'),
+    mt5RecentOrdersList: document.getElementById('mt5-recent-orders-list')
 };
 
 // Utilities
@@ -1035,6 +1066,27 @@ function renderMT5Cockpit(data) {
         elements.mt5InputServer.value = acc.server;
     }
 
+    // Auto-hide Binding Card and Show Quant Performance Citadel upon Bound State
+    const hasBound = Boolean(acc.has_bound_config && acc.login);
+    if (elements.mt5BindCard) {
+        if (hasBound && !state.mt5ManualRebind) {
+            elements.mt5BindCard.style.display = 'none';
+        } else {
+            elements.mt5BindCard.style.display = 'block';
+        }
+    }
+    if (elements.btnCloseBindCard) {
+        elements.btnCloseBindCard.style.display = hasBound ? 'inline-block' : 'none';
+    }
+    if (elements.mt5PerfCard) {
+        elements.mt5PerfCard.style.display = hasBound ? 'block' : 'none';
+    }
+
+    // Render Live Quant Performance Matrix & Diagram
+    if (hasBound && data.stats) {
+        renderMT5PerformanceMatrix(data.stats, acc);
+    }
+
     // Render Positions
     renderMT5PositionsList(positions);
 }
@@ -1090,6 +1142,154 @@ function renderMT5PositionsList(positions) {
             closeMT5Position(ticket, sym);
         });
     });
+}
+
+function renderMT5PerformanceMatrix(stats, acc) {
+    if (!stats) return;
+    const wins = Number(stats.winning_trades || 0);
+    const losses = Number(stats.losing_trades || 0);
+    const total = Number(stats.total_trades || 0);
+    const winRate = Number(stats.win_rate_pct || 0);
+    const realizedPnl = Number(stats.realized_pnl || 0);
+    const floatingPnl = Number(acc.floating_pnl || 0);
+    const netGrandPnl = Math.round((realizedPnl + floatingPnl) * 100) / 100;
+    const pf = Number(stats.profit_factor || 1.0);
+    const grossP = Number(stats.gross_profit || 0);
+    const grossL = Number(stats.gross_loss || 0);
+    const totalLots = Number(stats.total_lots || 0);
+    const bestTrade = Number(stats.best_trade || 0);
+    const worstTrade = Number(stats.worst_trade || 0);
+
+    // 1. Radial Win/Loss Gauge
+    if (elements.mt5WinRateVal) {
+        elements.mt5WinRateVal.textContent = total > 0 ? `${winRate.toFixed(1)}%` : '100%';
+    }
+    if (elements.mt5RadialCircle) {
+        const circum = 301.6;
+        const rate = total > 0 ? winRate : 100;
+        const offset = circum - (circum * (rate / 100));
+        elements.mt5RadialCircle.style.strokeDashoffset = offset;
+        elements.mt5RadialCircle.style.stroke = rate >= 60 ? '#00F0FF' : (rate >= 45 ? '#FFB703' : '#FF5252');
+    }
+    if (elements.mt5StatWins) elements.mt5StatWins.textContent = wins;
+    if (elements.mt5StatLosses) elements.mt5StatLosses.textContent = losses;
+    if (elements.mt5StatTotal) elements.mt5StatTotal.textContent = total;
+
+    // 2. Realized vs Floating PnL Matrix
+    if (elements.mt5StatRealizedPnl) {
+        elements.mt5StatRealizedPnl.textContent = `${realizedPnl >= 0 ? '+' : ''}$${formatUSD(realizedPnl)}`;
+        elements.mt5StatRealizedPnl.className = realizedPnl >= 0 ? 'pnl-val profit' : 'pnl-val loss';
+    }
+    if (elements.mt5StatFloatingPnl) {
+        elements.mt5StatFloatingPnl.textContent = `${floatingPnl >= 0 ? '+' : ''}$${formatUSD(floatingPnl)}`;
+        elements.mt5StatFloatingPnl.className = floatingPnl > 0 ? 'pnl-val profit' : (floatingPnl < 0 ? 'pnl-val loss' : 'pnl-val neutral');
+    }
+    if (elements.mt5StatNetGrandPnl) {
+        elements.mt5StatNetGrandPnl.textContent = `${netGrandPnl >= 0 ? '+' : ''}$${formatUSD(netGrandPnl)}`;
+        elements.mt5StatNetGrandPnl.className = netGrandPnl >= 0 ? 'pnl-val highlight-val text-neon-emerald' : 'pnl-val highlight-val text-neon-red';
+    }
+    if (elements.mt5StatProfitFactor) {
+        elements.mt5StatProfitFactor.textContent = `PF ${pf.toFixed(2)}`;
+        elements.mt5StatProfitFactor.className = pf >= 2.0 ? 'badge badge-success' : (pf >= 1.0 ? 'badge badge-accent' : 'badge badge-danger');
+    }
+    if (elements.mt5StatGrossP) elements.mt5StatGrossP.textContent = `$${formatUSD(grossP)}`;
+    if (elements.mt5StatGrossL) elements.mt5StatGrossL.textContent = `$${formatUSD(grossL)}`;
+    if (elements.mt5GrossProgressFill) {
+        const sumGross = grossP + grossL;
+        const pPct = sumGross > 0 ? (grossP / sumGross) * 100 : 50;
+        elements.mt5GrossProgressFill.style.width = `${pPct}%`;
+    }
+
+    // 3. Dynamic Vector Equity Diagram (Sparkline)
+    const bal = Number(acc.balance || 0);
+    const eq = Number(acc.equity || bal);
+    if (elements.mt5ChartBal) elements.mt5ChartBal.textContent = `$${formatUSD(bal)}`;
+    if (elements.mt5ChartEq) elements.mt5ChartEq.textContent = `$${formatUSD(eq)}`;
+    if (elements.mt5ChartWatermark) {
+        const peak = Math.max(bal, eq);
+        elements.mt5ChartWatermark.textContent = `Peak: $${formatUSD(peak)}`;
+    }
+    if (elements.mt5SvgLine && elements.mt5SvgArea) {
+        const diff = eq - bal;
+        const midY = 40;
+        const deltaY = Math.max(-30, Math.min(30, diff * 1.5));
+        const endY = midY - deltaY;
+        const lineD = `M 0,${midY} Q 70,${midY - deltaY * 0.4} 140,${midY - deltaY * 0.8} T 280,${endY}`;
+        const areaD = `M 0,${midY} Q 70,${midY - deltaY * 0.4} 140,${midY - deltaY * 0.8} T 280,${endY} L 280,80 L 0,80 Z`;
+        elements.mt5SvgLine.setAttribute('d', lineD);
+        elements.mt5SvgArea.setAttribute('d', areaD);
+        elements.mt5SvgLine.setAttribute('stroke', diff >= 0 ? '#00F0FF' : '#FF5252');
+    }
+
+    // 4. Prop Firm & Volume DNA
+    if (elements.mt5StatTotalLots) elements.mt5StatTotalLots.textContent = `${totalLots.toFixed(2)} Lots`;
+    if (elements.mt5StatBestTrade) elements.mt5StatBestTrade.textContent = `+$${formatUSD(bestTrade)}`;
+    if (elements.mt5StatWorstTrade) elements.mt5StatWorstTrade.textContent = `${worstTrade < 0 ? '-' : ''}$${formatUSD(Math.abs(worstTrade))}`;
+    if (elements.mt5StatPropShield) {
+        const isCompliant = acc.is_prop_compliant !== false;
+        elements.mt5StatPropShield.textContent = isCompliant ? '🛡️ 100% PASS' : '🚨 WARNING';
+        elements.mt5StatPropShield.className = isCompliant ? 'sub-stat-val badge badge-success' : 'sub-stat-val badge badge-danger';
+    }
+
+    // 5. Recent Orders Ledger
+    const recent = stats.recent_trades || [];
+    if (elements.mt5RecentCount) elements.mt5RecentCount.textContent = `${recent.length} Orders`;
+    if (elements.mt5RecentOrdersList) {
+        if (recent.length === 0) {
+            elements.mt5RecentOrdersList.innerHTML = `
+                <div class="cockpit-empty-state" style="padding: 16px;">
+                    <span class="empty-icon">🌱</span>
+                    <p class="empty-title" style="font-size: 11px;">មិនទាន់មាន Closed Orders នៅឡើយទេ</p>
+                    <span class="empty-sub" style="font-size: 9.5px;">រាល់ Order ដែលបាន Execute នឹងត្រូវកត់ត្រា និងគណនា PnL ដោយស្វ័យប្រវត្តិ!</span>
+                </div>
+            `;
+        } else {
+            elements.mt5RecentOrdersList.innerHTML = recent.map(o => {
+                const isBuy = o.action === 'BUY';
+                const pnl = Number(o.pnl || 0);
+                const pnlClass = pnl >= 0 ? 'profit text-neon-emerald' : 'loss text-neon-red';
+                const pnlSign = pnl >= 0 ? '+' : '';
+                return `
+                    <div class="recent-order-item">
+                        <div class="recent-order-meta">
+                            <span class="recent-badge ${isBuy ? 'buy' : 'sell'}">${o.action}</span>
+                            <div class="recent-sym-details">
+                                <strong>${o.symbol} • ${o.lot} Lot</strong>
+                                <span>#${o.ticket || o.id} @ ${formatUSD(o.open_price)} ➔ ${formatUSD(o.close_price || o.open_price)}</span>
+                            </div>
+                        </div>
+                        <div class="recent-pnl-time">
+                            <span class="recent-pnl-val ${pnlClass}">${pnlSign}$${formatUSD(pnl)}</span>
+                            <span class="recent-time">${o.closed_at || o.created_at || ''}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+}
+
+async function disconnectMT5Account() {
+    triggerHaptic('heavy');
+    if (!confirm('តើអ្នកពិតជាចង់ផ្តាច់ (Disconnect / Unbind) គណនី MT5 នេះមែនទេ?')) return;
+    showToast('⏳ កំពុងផ្តាច់គណនី MT5...');
+    try {
+        const res = await fetch('/api/mt5/unbind', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: state.chatId })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            showToast(json.message);
+            state.mt5ManualRebind = false;
+            fetchMT5Status();
+        } else {
+            showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការផ្តាច់'}`);
+        }
+    } catch (e) {
+        showToast('❌ Error disconnecting MT5 account');
+    }
 }
 
 async function submitMT5Order(action) {
@@ -1387,6 +1587,7 @@ function setupEventListeners() {
                 const json = await res.json();
                 if (json.status === 'success') {
                     showToast(`✅ ${json.message}`);
+                    state.mt5ManualRebind = false;
                     fetchMT5Status();
                 } else {
                     showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការភ្ជាប់'}`);
@@ -1395,6 +1596,34 @@ function setupEventListeners() {
                 showToast('❌ Error binding MT5 account');
             }
         });
+    }
+
+    // VIP MT5 Re-bind Toggle & Disconnect Buttons
+    if (elements.btnToggleRebind) {
+        elements.btnToggleRebind.addEventListener('click', () => {
+            triggerHaptic('light');
+            state.mt5ManualRebind = !state.mt5ManualRebind;
+            if (elements.mt5BindCard) {
+                elements.mt5BindCard.style.display = state.mt5ManualRebind ? 'block' : 'none';
+                if (state.mt5ManualRebind) {
+                    elements.mt5BindCard.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    }
+
+    if (elements.btnCloseBindCard) {
+        elements.btnCloseBindCard.addEventListener('click', () => {
+            triggerHaptic('light');
+            state.mt5ManualRebind = false;
+            if (elements.mt5BindCard) {
+                elements.mt5BindCard.style.display = 'none';
+            }
+        });
+    }
+
+    if (elements.btnMT5Disconnect) {
+        elements.btnMT5Disconnect.addEventListener('click', () => disconnectMT5Account());
     }
 
     // MT5 VIP Multi-Tenant Identity Gate Connect

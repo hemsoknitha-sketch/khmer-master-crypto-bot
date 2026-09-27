@@ -299,6 +299,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                     "is_authorized": is_authorized
                 },
                 "positions": formatted_positions,
+                "stats": db.get_user_mt5_trade_statistics(chat_id, display_login),
                 "supported_symbols": [
                     {"symbol": "XAUUSD", "name": "Gold / Spot US Dollar", "category": "Metals", "digits": 2},
                     {"symbol": "EURUSD", "name": "Euro / US Dollar", "category": "Forex", "digits": 5},
@@ -1284,6 +1285,23 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+async def handle_api_mt5_unbind(request: web.Request) -> web.Response:
+    """Safely disconnects / unbinds user's MT5 account configuration."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "សូមបញ្ជាក់ Telegram Chat ID!"}, status=400)
+        db.unbind_user_mt5_config(chat_id)
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+        return web.json_response({
+            "status": "success",
+            "message": "✅ បានផ្តាច់គណនី MT5 ដោយជោគជ័យ! អ្នកអាចភ្ជាប់គណនីថ្មីបានគ្រប់ពេល។"
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
 async def handle_gtc_qr(request: web.Request) -> web.FileResponse:
     """Serves the official GTCFX referral QR Code image."""
     qr_path = os.path.join(STATIC_DIR, "gtc_QRCode.png")
@@ -1362,6 +1380,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_post("/api/mt5/close", handle_api_mt5_close)
     app.router.add_post("/api/mt5/toggle_ai", handle_api_mt5_toggle_ai)
     app.router.add_post("/api/mt5/verify_request", handle_api_mt5_verify_request)
+    app.router.add_post("/api/mt5/unbind", handle_api_mt5_unbind)
 
     return app
 

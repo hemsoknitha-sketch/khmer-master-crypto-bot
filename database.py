@@ -4335,6 +4335,128 @@ def get_user_mt5_config(chat_id: int) -> dict:
         pass
     return {}
 
+def unbind_user_mt5_config(chat_id: int) -> bool:
+    """Safely clears bound MT5 configuration for user upon disconnect."""
+    try:
+        update_system_setting(f"mt5_user_config_{chat_id}", "")
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error unbinding MT5 config: {e}")
+        return False
+
+def get_user_mt5_trade_statistics(chat_id: int, account_id: str = "") -> dict:
+    """
+    Computes mathematically rigorous real-time performance metrics for a VIP user's MT5 account:
+    - total_trades, winning_trades, losing_trades
+    - win_rate_pct
+    - realized_pnl, gross_profit, gross_loss, profit_factor
+    - total_lots_traded
+    - recent_trades list
+    """
+    if not account_id and chat_id:
+        cfg = get_user_mt5_config(chat_id)
+        account_id = str(cfg.get("login", "")).strip()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    stats = {
+        "account_id": account_id,
+        "total_trades": 0,
+        "winning_trades": 0,
+        "losing_trades": 0,
+        "break_even_trades": 0,
+        "win_rate_pct": 0.0,
+        "realized_pnl": 0.0,
+        "gross_profit": 0.0,
+        "gross_loss": 0.0,
+        "profit_factor": 1.0,
+        "total_lots": 0.0,
+        "best_trade": 0.0,
+        "worst_trade": 0.0,
+        "recent_trades": []
+    }
+    if not account_id:
+        conn.close()
+        return stats
+
+    try:
+        # 1. Closed trades statistics from mt5_bridge_orders
+        cursor.execute("""
+            SELECT COUNT(*),
+                   SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN pnl = 0 THEN 1 ELSE 0 END),
+                   COALESCE(SUM(pnl), 0.0),
+                   COALESCE(SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END), 0.0),
+                   COALESCE(SUM(CASE WHEN pnl < 0 THEN ABS(pnl) ELSE 0 END), 0.0),
+                   COALESCE(SUM(lot), 0.0),
+                   COALESCE(MAX(pnl), 0.0),
+                   COALESCE(MIN(pnl), 0.0)
+            FROM mt5_bridge_orders
+            WHERE account_id = ? AND status IN ('CLOSED', 'FILLED') AND (pnl != 0.0 OR status = 'CLOSED')
+        """, (str(account_id),))
+        row = cursor.fetchone()
+        if row and row[0] and row[0] > 0:
+            total_closed = int(row[0])
+            wins = int(row[1] or 0)
+            losses = int(row[2] or 0)
+            evens = int(row[3] or 0)
+            tot_pnl = float(row[4] or 0.0)
+            gross_p = float(row[5] or 0.0)
+            gross_l = float(row[6] or 0.0)
+            tot_lots = float(row[7] or 0.0)
+            best_t = float(row[8] or 0.0)
+            worst_t = float(row[9] or 0.0)
+
+            win_rate = round((wins / total_closed * 100.0), 1) if total_closed > 0 else 0.0
+            pf = round(gross_p / gross_l, 2) if gross_l > 0 else (round(gross_p, 2) if gross_p > 0 else 1.0)
+
+            stats.update({
+                "total_trades": total_closed,
+                "winning_trades": wins,
+                "losing_trades": losses,
+                "break_even_trades": evens,
+                "win_rate_pct": win_rate,
+                "realized_pnl": round(tot_pnl, 2),
+                "gross_profit": round(gross_p, 2),
+                "gross_loss": round(gross_l, 2),
+                "profit_factor": pf,
+                "total_lots": round(tot_lots, 2),
+                "best_trade": round(best_t, 2),
+                "worst_trade": round(worst_t, 2)
+            })
+
+        # 2. Recent trades list (up to 8)
+        cursor.execute("""
+            SELECT id, ticket, symbol, action, lot, open_price, close_price, pnl, status, created_at, closed_at
+            FROM mt5_bridge_orders
+            WHERE account_id = ?
+            ORDER BY id DESC LIMIT 8
+        """, (str(account_id),))
+        rows = cursor.fetchall()
+        recent = []
+        for r in rows:
+            recent.append({
+                "id": r[0],
+                "ticket": int(r[1] or 0),
+                "symbol": str(r[2]),
+                "action": str(r[3]),
+                "lot": float(r[4] or 0.0),
+                "open_price": float(r[5] or 0.0),
+                "close_price": float(r[6] or 0.0),
+                "pnl": float(r[7] or 0.0),
+                "status": str(r[8]),
+                "created_at": str(r[9]),
+                "closed_at": str(r[10] or "")
+            })
+        stats["recent_trades"] = recent
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error computing MT5 stats for {account_id}: {e}")
+    finally:
+        conn.close()
+
+    return stats
+
 # ==============================================================================
 # GTCFX JAPAN TOKYO MT5 PRO REFERRAL GATEKEEPER LOCK (INVARIANT 42)
 # ==============================================================================

@@ -2611,3 +2611,438 @@ input:checked + .slider:before {
     font-size: 10.5px;
     color: var(--text-secondary);
 }
+
+/* ==============================================================================
+   VIP MT5 REAL-TIME QUANT PERFORMANCE CITADEL & LIVE DIAGRAMS
+   ============================================================================== */
+.mt5-perf-card {
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    background: linear-gradient(135deg, rgba(6, 18, 42, 0.95) 0%, rgba(2, 11, 30, 0.98) 100%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 240, 255, 0.05);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+    animation: fadeInSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.perf-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.perf-title-flex {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.perf-icon {
+    font-size: 24px;
+    filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.6));
+}
+
+.perf-title-flex h4 {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.perf-subtitle {
+    font-size: 10.5px;
+    color: var(--text-muted);
+}
+
+.perf-actions-flex {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-subtle-cyber {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-subtle-cyber:hover {
+    background: rgba(0, 240, 255, 0.15);
+    border-color: #00F0FF;
+    color: #FFFFFF;
+}
+
+.btn-subtle-cyber.danger:hover {
+    background: rgba(255, 82, 82, 0.2);
+    border-color: #FF5252;
+    color: #FF8A80;
+}
+
+/* 4-Pillar Grid */
+.mt5-perf-cockpit-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+@media (min-width: 680px) {
+    .mt5-perf-cockpit-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1080px) {
+    .mt5-perf-cockpit-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.perf-gauge-card, .perf-metrics-card, .perf-chart-card, .perf-prop-card {
+    background: rgba(2, 10, 25, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.25s ease;
+}
+
+.perf-gauge-card:hover, .perf-metrics-card:hover, .perf-chart-card:hover, .perf-prop-card:hover {
+    border-color: rgba(0, 240, 255, 0.3);
+    box-shadow: 0 4px 18px rgba(0, 240, 255, 0.08);
+}
+
+.perf-box-title {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    margin-bottom: 10px;
+    display: block;
+}
+
+/* Radial Gauge */
+.radial-gauge-wrap {
+    position: relative;
+    width: 110px;
+    height: 110px;
+    margin: 4px auto 10px auto;
+}
+
+.radial-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.radial-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 9;
+}
+
+.radial-progress {
+    fill: none;
+    stroke: #00F0FF;
+    stroke-width: 9;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.4s ease;
+    filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.5));
+}
+
+.radial-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.radial-val {
+    font-size: 16px;
+    font-weight: 800;
+    color: #FFFFFF;
+    font-family: var(--font-mono);
+    line-height: 1.1;
+}
+
+.radial-sub {
+    font-size: 8px;
+    color: var(--neon-cyan);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.perf-stats-pills-row {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    font-family: var(--font-mono);
+}
+
+.stat-pill {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.stat-pill.win strong { color: var(--neon-emerald); }
+.stat-pill.loss strong { color: #FF5252; }
+.stat-pill.total strong { color: var(--neon-cyan); }
+
+/* PnL Matrix */
+.pnl-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.pnl-breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+}
+
+.pnl-breakdown-row.highlight {
+    padding-top: 6px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    font-weight: 800;
+}
+
+.pnl-label {
+    color: var(--text-secondary);
+}
+
+.pnl-val {
+    font-family: var(--font-mono);
+    font-weight: 700;
+}
+
+.pnl-val.profit { color: var(--neon-emerald); }
+.pnl-val.loss { color: #FF5252; }
+.pnl-val.neutral { color: var(--text-muted); }
+.pnl-val.highlight-val { color: var(--neon-cyan); font-size: 13px; }
+
+.gross-bar-wrap {
+    margin-top: auto;
+}
+
+.gross-bar-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    margin-bottom: 4px;
+}
+
+.gross-progress-track {
+    height: 5px;
+    background: rgba(255, 82, 82, 0.4);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.gross-progress-fill {
+    height: 100%;
+    background: var(--neon-emerald);
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+/* Equity Trajectory Chart */
+.perf-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.chart-watermark-tag {
+    font-size: 9.5px;
+    font-family: var(--font-mono);
+    color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.svg-sparkline-wrap {
+    height: 75px;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.sparkline-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.chart-footer-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.chart-footer-row strong {
+    color: #FFFFFF;
+}
+
+/* Prop Defense Card */
+.prop-metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.prop-sub-stat {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 6px 8px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sub-stat-lbl {
+    font-size: 9.5px;
+    color: var(--text-muted);
+}
+
+.sub-stat-val {
+    font-size: 11.5px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: #FFFFFF;
+}
+
+.audit-note-row {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    text-align: center;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Recent Orders Ledger */
+.mt5-recent-orders-ledger {
+    background: rgba(2, 10, 25, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+}
+
+.ledger-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.ledger-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.recent-orders-table-wrap {
+    overflow-x: auto;
+    max-height: 220px;
+}
+
+.recent-order-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 11px;
+}
+
+.recent-order-item:last-child {
+    border-bottom: none;
+}
+
+.recent-order-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.recent-badge {
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+}
+
+.recent-badge.buy { background: rgba(0, 200, 83, 0.2); color: #69F0AE; }
+.recent-badge.sell { background: rgba(213, 0, 0, 0.2); color: #FF5252; }
+
+.recent-sym-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.recent-sym-details strong {
+    color: #FFFFFF;
+    font-family: var(--font-mono);
+}
+
+.recent-sym-details span {
+    font-size: 9.5px;
+    color: var(--text-muted);
+}
+
+.recent-pnl-time {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.recent-pnl-val {
+    font-family: var(--font-mono);
+    font-weight: 800;
+}
+
+.recent-time {
+    font-size: 9px;
+    color: var(--text-muted);
+}
+
+.bind-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
