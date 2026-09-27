@@ -5643,6 +5643,13 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await mt5_command(update, context)
+            elif data == "btn_mt5_auto_100_10":
+                try:
+                    await update.callback_query.answer("🚀 កំពុងកំណត់ MT5 Auto: $100 (10 Assets)...")
+                except Exception:
+                    pass
+                context.args = ["AUTO", "ON", "100", "10"]
+                await mt5_command(update, context)
             elif data == "btn_mt5_auto_100_5":
                 try:
                     await update.callback_query.answer("🚀 កំពុងកំណត់ MT5 Auto: $100 (5 Assets)...")
@@ -20298,8 +20305,9 @@ class TelegramBotThread(BaseThread):
                             f"{assets_display_kh}\n"
                             f"{ui_standards.DIVIDER_DOUBLE}\n"
                             f"⌨️ **បញ្ជា 1-Tap Copyable Presets (ចុចលើវាដើម្បី Copy) ៖**\n"
-                            f"• `` `/mt5 AUTO ON 50 3` `` — ទុន $50 (៣ ទ្រព្យ)\n"
+                            f"• `` `/mt5 AUTO ON 100 10` `` — ទុន $100 (១០ ទ្រព្យ Super Smart)\n"
                             f"• `` `/mt5 AUTO ON 100 5` `` — ទុន $100 (៥ ទ្រព្យ)\n"
+                            f"• `` `/mt5 AUTO ON 50 3` `` — ទុន $50 (៣ ទ្រព្យ)\n"
                             f"• `` `/mt5 AUTO ON 200 10` `` — ទុន $200 (១០ ទ្រព្យ)\n"
                             f"• `` `/mt5 AUTO ON 500 15` `` — ទុន $500 (១៥ ទ្រព្យ)\n"
                             f"• `` `/mt5 AUTO ON 1000 20` `` — ទុន $1000 (២០ ទ្រព្យ)\n"
@@ -20332,8 +20340,9 @@ class TelegramBotThread(BaseThread):
                             f"{assets_display_en}\n"
                             f"{ui_standards.DIVIDER_DOUBLE}\n"
                             f"⌨️ **1-Tap Copyable Presets (Click to Copy):**\n"
-                            f"• `` `/mt5 AUTO ON 50 3` `` — Capital $50 (3 Assets)\n"
+                            f"• `` `/mt5 AUTO ON 100 10` `` — Capital $100 (10 Assets Super Smart)\n"
                             f"• `` `/mt5 AUTO ON 100 5` `` — Capital $100 (5 Assets)\n"
+                            f"• `` `/mt5 AUTO ON 50 3` `` — Capital $50 (3 Assets)\n"
                             f"• `` `/mt5 AUTO ON 200 10` `` — Capital $200 (10 Assets)\n"
                             f"• `` `/mt5 AUTO ON 500 15` `` — Capital $500 (15 Assets)\n"
                             f"• `` `/mt5 AUTO ON 1000 20` `` — Capital $1000 (20 Assets)\n"
@@ -20347,15 +20356,18 @@ class TelegramBotThread(BaseThread):
 
                     auto_kb = InlineKeyboardMarkup([
                         [
-                            InlineKeyboardButton("💎 $100 (5 Assets)", callback_data="btn_mt5_auto_100_5"),
-                            InlineKeyboardButton("🪙 $50 (3 Assets)", callback_data="btn_mt5_auto_50_3")
+                            InlineKeyboardButton("🚀 $100 (10 Assets)", callback_data="btn_mt5_auto_100_10"),
+                            InlineKeyboardButton("💎 $100 (5 Assets)", callback_data="btn_mt5_auto_100_5")
                         ],
                         [
-                            InlineKeyboardButton("🚀 $200 (10 Assets)", callback_data="btn_mt5_auto_200_10"),
-                            InlineKeyboardButton("🛑 Standby / OFF", callback_data="btn_mt5_auto_off")
+                            InlineKeyboardButton("🪙 $50 (3 Assets)", callback_data="btn_mt5_auto_50_3"),
+                            InlineKeyboardButton("💎 $200 (10 Assets)", callback_data="btn_mt5_auto_200_10")
                         ],
                         [
-                            InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_mt5_auto_refresh"),
+                            InlineKeyboardButton("🛑 Standby / OFF", callback_data="btn_mt5_auto_off"),
+                            InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_mt5_auto_refresh")
+                        ],
+                        [
                             InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
                         ]
                     ])
@@ -20865,6 +20877,9 @@ class TelegramBotThread(BaseThread):
                     f"{positions_summary_kh}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎯 **កូដបញ្ជាវិនិយោគរហ័ស (1-Tap Presets) ៖**\n"
+                    f"• Auto Super Smart ($100 / 10 Assets) ៖ `` `/mt5 AUTO ON 100 10` ``\n"
+                    f"• Auto Super Smart ($100 / 5 Assets) ៖ `` `/mt5 AUTO ON 100 5` ``\n"
+                    f"• Auto Super Smart ($50 / 3 Assets) ៖ `` `/mt5 AUTO ON 50 3` ``\n"
                     f"• បើក AI Swarm ៖ `` `/mt5 AUTO ON` ``\n"
                     f"• បិទ AI Swarm ៖ `` `/mt5 AUTO OFF` ``\n"
                     f"• បើក Order មាស ៖ `` `/mt5 BUY XAUUSD 0.01` ``\n"
@@ -20896,6 +20911,9 @@ class TelegramBotThread(BaseThread):
                     f"{positions_summary_en}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎯 **Quick Trading Commands (1-Tap Presets):**\n"
+                    f"• Auto Super Smart ($100 / 10 Assets): `` `/mt5 AUTO ON 100 10` ``\n"
+                    f"• Auto Super Smart ($100 / 5 Assets): `` `/mt5 AUTO ON 100 5` ``\n"
+                    f"• Auto Super Smart ($50 / 3 Assets): `` `/mt5 AUTO ON 50 3` ``\n"
                     f"• AI Swarm Auto: `` `/mt5 AUTO ON` ``\n"
                     f"• Pause AI Swarm: `` `/mt5 AUTO OFF` ``\n"
                     f"• BUY Gold Order: `` `/mt5 BUY XAUUSD 0.01` ``\n"
