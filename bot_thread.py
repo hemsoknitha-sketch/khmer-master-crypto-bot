@@ -74,10 +74,15 @@ def mask_sensitive_data(text: str) -> str:
 
 
 MAIN_BOT_LOOP = None
+MAIN_BOT_APP = None
 
 def get_main_bot_loop():
     global MAIN_BOT_LOOP
     return MAIN_BOT_LOOP
+
+def get_main_bot_app():
+    global MAIN_BOT_APP
+    return MAIN_BOT_APP
 
 def get_persistent_bot_bar_keyboard(chat_id: int = 0) -> ReplyKeyboardMarkup:
     """
@@ -261,6 +266,8 @@ class TelegramBotThread(BaseThread):
             http_version="1.1"
         )
         self.app = ApplicationBuilder().token(self.bot_token).request(t_request).concurrent_updates(128).post_init(post_init).build()
+        global MAIN_BOT_APP
+        MAIN_BOT_APP = self.app
         try:
             self.app.bot_data["loop"] = self.loop
         except Exception:

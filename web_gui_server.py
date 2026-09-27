@@ -1075,10 +1075,64 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
             del _GUI_CACHE["mt5"][chat_id]
 
         if success:
+            import notification_manager
+            import ui_standards
+
             if is_auth:
                 msg = f"គណនី MT5 #{login} ({server}) ត្រូវបានភ្ជាប់ជោគជ័យ និងមានសិទ្ធិជួញដូរពេញលេញ!"
+                user_msg = (
+                    f"✅ **[MT5 PRO WEB TERMINAL - ចងភ្ជាប់គណនីជោគជ័យ]** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🎫 **MT5 Login ID ៖** `#{login}`\n"
+                    f"🏛️ **Broker / Server ៖** `{broker}` (`{server}`)\n"
+                    f"🏷️ **Firm / Profile ៖** `{firm_name}`\n"
+                    f"📡 **ស្ថានភាព Referral ៖** 🟢 **APPROVED / VERIFIED**\n"
+                    f"⚡ **Gateway Latency ៖** `Tokyo Equinix TY3 (<0.42ms)`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👉 **សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCryptoBridge.mq5` ដើម្បី Sync Live Data & Trade!**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_"
+                )
+                asyncio.create_task(notification_manager.send_telegram_alert(chat_id, user_msg))
             else:
                 msg = f"គណនី MT5 #{login} ត្រូវបានកត់ត្រាទុក! សូមរង់ចាំការអនុម័ត Referral ពី Super Admin (Invite Code: 130237694) ដើម្បីចាប់ផ្តើមជួញដូរ។"
+                user_msg = (
+                    f"🔒 **[GTCFX TOKYO MT5 - សេចក្តីជូនដំណឹងការពារសិទ្ធិ REFERRAL]** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🎫 **MT5 Login ID ៖** `#{login}`\n"
+                    f"🏛️ **Broker / Server ៖** `{broker}` (`{server}`)\n"
+                    f"📡 **ស្ថានភាព ៖** ⚠️ **មិនទាន់មានក្នុងបញ្ជី Referral របស់ Super BOT ADMIN**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚠️ **មូលហេតុ ៖** គណនី MT5 នេះមិនទាន់បានចុះឈ្មោះក្រោម Referral ផ្លូវការរបស់ Super BOT ADMIN (Invite Code: `130237694`) ឬមិនទាន់ទទួលបានការអនុម័តឡើយ។\n\n"
+                    f"🌐 **Link ចុះឈ្មោះផ្លូវការ ៖**\n"
+                    f"https://web.mygtc.app/login/register?ref=130237694\n\n"
+                    f"🔑 **Official Invite Code ៖** `130237694`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"💡 **ដំណាក់កាលដោះស្រាយ ៖**\n"
+                    f"1️⃣ ចុះឈ្មោះគណនី GTCFX ក្រោម Invite Code: `130237694`\n"
+                    f"2️⃣ ឬទាក់ទង Super Admin @hemsoknitha ដើម្បីអនុម័តសិទ្ធិវិនិយោគ!\n"
+                    f"👉 អ្នកក៏អាចប្រើបញ្ជា `` `/mt5` `` លើ Telegram ដើម្បីពិនិត្យសិទ្ធិឡើងវិញបានគ្រប់ពេល។\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Khmer Master Crypto_\n"
+                    f"_APEX SUPER BRAIN AI_"
+                )
+                asyncio.create_task(notification_manager.send_telegram_alert(chat_id, user_msg))
+
+                admin_msg = (
+                    f"🔔 **[MT5 GTCFX REFERRAL VERIFICATION REQUIRED]** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👤 **User Chat ID ៖** `{chat_id}`\n"
+                    f"🎫 **MT5 Account ID ៖** `#{login}`\n"
+                    f"🏛️ **Broker/Server ៖** `{broker}` (`{server}`)\n"
+                    f"🏷️ **Firm/Profile ៖** `{firm_name}`\n"
+                    f"🔑 **Invite Code ៖** `130237694`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👉 **អនុម័ត ៖** `` `/admin_mt5 approve {chat_id}` ``\n"
+                    f"👉 **បដិសេធ ៖** `` `/admin_mt5 reject {chat_id}` ``"
+                )
+                asyncio.create_task(notification_manager.broadcast_admin(admin_msg))
+
             return web.json_response({
                 "status": "success",
                 "is_authorized": is_auth,
@@ -1104,6 +1158,22 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
 
         # GTCFX Pro Referral Gatekeeper Lock (Invariant 42)
         if not db.is_mt5_user_authorized(chat_id):
+            import notification_manager
+            import ui_standards
+            warn_msg = (
+                f"⛔ **[MT5 TRADE REJECTED - REFERRAL LOCK]** 🏛️\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👤 **Chat ID ៖** `{chat_id}`\n"
+                f"⚠️ **សកម្មភាព ៖** បញ្ជា Trade ត្រូវបានច្រានចោលដោយសារគណនីមិនទាន់មាន Referral!\n"
+                f"🔒 **មូលហេតុ ៖** គណនីមិនទាន់បានចុះឈ្មោះតាម Referral របស់ Super BOT ADMIN (Invite Code: `130237694`)។\n\n"
+                f"🌐 **ចុះឈ្មោះផ្លូវការ ៖** https://web.mygtc.app/login/register?ref=130237694\n"
+                f"👉 ប្រើបញ្ជា `` `/mt5` `` លើ Bot ដើម្បីស្នើសុំផ្ទៀងផ្ទាត់ ឬទាក់ទង Super Admin @hemsoknitha\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"_Khmer Master Crypto_\n"
+                f"_APEX SUPER BRAIN AI_"
+            )
+            asyncio.create_task(notification_manager.send_telegram_alert(chat_id, warn_msg))
+
             return web.json_response({
                 "status": "error",
                 "code": "REFERRAL_REQUIRED",
@@ -1138,6 +1208,22 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
         )
 
         if res.get("clients_reached", 0) == 0:
+            import notification_manager
+            import ui_standards
+            err_msg = (
+                f"⚠️ **[MT5 TERMINAL NOT CONNECTED / LOGIN MISMATCH]** 🏛️\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎫 **Target Account ID ៖** `#{target_account}`\n"
+                f"📡 **ស្ថានភាព ៖** ❌ **Offline លើ Tokyo VPS Bridge (Port 5555)**\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🔍 **មូលហេតុដែលអាចកើតមាន ៖**\n"
+                f"1️⃣ លេខ Account Login ID លើ Web GUI ខុសគ្នាពីលេខ Account លើ MT5 Software\n"
+                f"2️⃣ វាយខុស Password ធ្វើឱ្យ MT5 លើ PC/VPS មិនអាច Login ចូល Broker (Authorization Failed)\n"
+                f"3️⃣ មិនទាន់បានបើកកម្មវិធី MT5 ឬមិនទាន់បាន Attach EA `KhmerMasterCryptoBridge.mq5`\n\n"
+                f"👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ជាការស្រេច!"
+            )
+            asyncio.create_task(notification_manager.send_telegram_alert(chat_id, err_msg))
+
             return web.json_response({
                 "status": "error",
                 "message": f"⚠️ គណនី MT5 #{target_account} របស់អ្នកមិនទាន់ Online លើ Tokyo VPS Bridge នៅឡើយទេ សូមបើក EA របស់អ្នក!"
