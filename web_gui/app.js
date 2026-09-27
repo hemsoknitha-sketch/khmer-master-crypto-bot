@@ -12,9 +12,39 @@ if (tg) {
     if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
 }
 
+// Helper to parse query parameters
+function getQueryParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+}
+
+// Multi-Tenant Identity Resolver with persistent localStorage support
+function resolveChatId() {
+    try {
+        const urlCid = getQueryParam('chat_id');
+        if (urlCid && String(urlCid).trim().length > 0 && !isNaN(urlCid)) {
+            const parsed = parseInt(urlCid, 10);
+            if (parsed > 0) {
+                localStorage.setItem('kmc_vip_chat_id', parsed);
+                return parsed;
+            }
+        }
+        const tgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        if (tgId && !isNaN(tgId) && parseInt(tgId, 10) > 0) {
+            localStorage.setItem('kmc_vip_chat_id', tgId);
+            return parseInt(tgId, 10);
+        }
+        const stored = localStorage.getItem('kmc_vip_chat_id');
+        if (stored && !isNaN(stored) && parseInt(stored, 10) > 0) {
+            return parseInt(stored, 10);
+        }
+    } catch (e) {}
+    return 0;
+}
+
 // Global Application State
 const state = {
-    chatId: getQueryParam('chat_id') || tg?.initDataUnsafe?.user?.id || 0,
+    chatId: resolveChatId(),
     timeframe: '7D',
     equityChart: null,
     allocationChart: null,
@@ -105,14 +135,18 @@ const elements = {
     mt5InputLogin: document.getElementById('mt5-input-login'),
     mt5InputPassword: document.getElementById('mt5-input-password'),
     mt5InputFirm: document.getElementById('mt5-input-firm'),
-    btnTogglePwd: document.getElementById('btn-toggle-pwd')
+    btnTogglePwd: document.getElementById('btn-toggle-pwd'),
+
+    // MT5 Multi-Tenant Privacy & Identity Gate Elements
+    mt5IdentityGateCard: document.getElementById('mt5-identity-gate-card'),
+    mt5GateInputChatId: document.getElementById('mt5-gate-input-chat-id'),
+    btnGateConnect: document.getElementById('btn-gate-connect'),
+    mt5CurrentUserTag: document.getElementById('mt5-current-user-tag'),
+    btnSwitchChatId: document.getElementById('btn-switch-chat-id'),
+    mt5StandbyHelper: document.getElementById('mt5-standby-helper')
 };
 
 // Utilities
-function getQueryParam(param) {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(param);
-}
 
 function triggerHaptic(type = 'light') {
     if (tg?.HapticFeedback) {
@@ -860,7 +894,7 @@ async function fetchMT5Status() {
             return;
         }
         const data = await res.json();
-        if (data.status === 'success') {
+        if (data.status === 'success' || data.status === 'guest') {
             state.mt5Data = data;
             renderMT5Cockpit(data);
         }
@@ -883,10 +917,26 @@ function renderMT5Cockpit(data) {
     const acc = data.account || {};
     const positions = data.positions || [];
     const isConn = Boolean(data.connected);
+    const isGuest = Boolean(data.status === 'guest' || !state.chatId || state.chatId <= 0);
+
+    // Multi-Tenant Identity Lock Card Visibility
+    if (elements.mt5IdentityGateCard) {
+        elements.mt5IdentityGateCard.style.display = isGuest ? 'block' : 'none';
+    }
+    if (elements.mt5CurrentUserTag) {
+        elements.mt5CurrentUserTag.textContent = state.chatId > 0 ? `👤 VIP: #${state.chatId}` : '👤 Guest';
+    }
+    if (elements.mt5StandbyHelper) {
+        const isStandby = Boolean(acc.has_bound_config && !isConn && !isGuest);
+        elements.mt5StandbyHelper.style.display = isStandby ? 'flex' : 'none';
+    }
 
     // Status Pill
     if (elements.mt5StatusPill) {
-        if (isConn) {
+        if (isGuest) {
+            elements.mt5StatusPill.className = 'badge badge-dim';
+            elements.mt5StatusPill.textContent = '⚪ WAITING FOR VIP LOGIN';
+        } else if (isConn) {
             elements.mt5StatusPill.className = 'badge badge-success';
             elements.mt5StatusPill.textContent = '🟢 TOKYO BRIDGE ONLINE';
         } else if (acc.has_bound_config) {
@@ -1043,6 +1093,15 @@ function renderMT5PositionsList(positions) {
 }
 
 async function submitMT5Order(action) {
+    if (!state.chatId || state.chatId <= 0) {
+        showToast('⚠️ សូមបញ្ជាក់ Telegram Chat ID របស់អ្នកជាមុនសិន!');
+        if (elements.mt5IdentityGateCard) {
+            elements.mt5IdentityGateCard.style.display = 'block';
+            elements.mt5IdentityGateCard.scrollIntoView({ behavior: 'smooth' });
+        }
+        return;
+    }
+
     const symbol = elements.mt5TradeSymbol ? elements.mt5TradeSymbol.value : 'XAUUSD';
     const lot = elements.mt5TradeLot ? parseFloat(elements.mt5TradeLot.value) : 0.01;
 
@@ -1073,6 +1132,11 @@ async function submitMT5Order(action) {
 }
 
 async function closeMT5Position(ticket, symbol) {
+    if (!state.chatId || state.chatId <= 0) {
+        showToast('⚠️ សូមបញ្ជាក់ Telegram Chat ID របស់អ្នកជាមុនសិន!');
+        return;
+    }
+
     triggerHaptic('medium');
     showToast(`⚡ កំពុងបិទ Position #${ticket} (${symbol})...`);
     try {
@@ -1098,6 +1162,11 @@ async function closeMT5Position(ticket, symbol) {
 }
 
 async function closeAllMT5Positions() {
+    if (!state.chatId || state.chatId <= 0) {
+        showToast('⚠️ សូមបញ្ជាក់ Telegram Chat ID របស់អ្នកជាមុនសិន!');
+        return;
+    }
+
     if (!confirm('🚨 តើបងពិតជាចង់បិទរាល់គ្រប់ Position ទាំងអស់ក្នុង MT5 មែនទេ? (PANIC CLOSE ALL)')) {
         return;
     }
@@ -1325,6 +1394,34 @@ function setupEventListeners() {
             } catch (err) {
                 showToast('❌ Error binding MT5 account');
             }
+        });
+    }
+
+    // MT5 VIP Multi-Tenant Identity Gate Connect
+    if (elements.btnGateConnect) {
+        elements.btnGateConnect.addEventListener('click', () => {
+            const inputVal = elements.mt5GateInputChatId ? elements.mt5GateInputChatId.value.trim() : '';
+            if (!inputVal || isNaN(inputVal) || parseInt(inputVal, 10) <= 0) {
+                showToast('⚠️ សូមបញ្ចូល Telegram Chat ID ត្រឹមត្រូវ (ជាលេខ)!');
+                return;
+            }
+            const cid = parseInt(inputVal, 10);
+            state.chatId = cid;
+            localStorage.setItem('kmc_vip_chat_id', cid);
+            showToast(`✅ បានភ្ជាប់ Telegram Chat ID #${cid} ដោយជោគជ័យ!`);
+            fetchMT5Status();
+            fetchPortfolio();
+        });
+    }
+
+    // MT5 VIP Switch Chat ID
+    if (elements.btnSwitchChatId) {
+        elements.btnSwitchChatId.addEventListener('click', () => {
+            localStorage.removeItem('kmc_vip_chat_id');
+            state.chatId = 0;
+            if (elements.mt5GateInputChatId) elements.mt5GateInputChatId.value = '';
+            showToast('🔄 បានចាកចេញពី Session! សូមបញ្ចូល Telegram Chat ID ថ្មី។');
+            fetchMT5Status();
         });
     }
 }

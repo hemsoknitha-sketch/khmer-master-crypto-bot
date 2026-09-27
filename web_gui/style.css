@@ -2452,3 +2452,162 @@ input:checked + .slider:before {
 .btn-cyber-submit:active {
     transform: translateY(1px);
 }
+
+/* ==============================================================================
+   VIP MULTI-TENANT PRIVACY CITADEL & STANDBY HELPER
+   ============================================================================== */
+.mt5-identity-gate-card {
+    background: linear-gradient(135deg, rgba(6, 18, 42, 0.95) 0%, rgba(2, 11, 30, 0.98) 100%);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 240, 255, 0.15), inset 0 0 20px rgba(0, 240, 255, 0.05);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.gate-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.gate-title-flex {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.gate-icon {
+    font-size: 24px;
+    filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.6));
+}
+
+.gate-title-flex h4 {
+    font-size: 15px;
+    font-weight: 800;
+    color: #00F0FF;
+    margin-bottom: 3px;
+    letter-spacing: 0.5px;
+}
+
+.gate-title-flex p {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.gate-form-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.gate-input-group {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.gate-input-icon {
+    position: absolute;
+    left: 12px;
+    font-size: 14px;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.gate-input-group .cyber-input {
+    width: 100%;
+    padding: 10px 14px 10px 38px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #FFFFFF;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+}
+
+.gate-input-group .cyber-input:focus {
+    outline: none;
+    border-color: #00F0FF;
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+}
+
+.gate-tip-row {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.gate-tip-row code {
+    background: rgba(0, 240, 255, 0.1);
+    color: #00F0FF;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.account-identity-tag {
+    background: rgba(0, 240, 255, 0.12);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: #00F0FF;
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.5px;
+}
+
+.btn-switch-id {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-switch-id:hover {
+    background: rgba(0, 240, 255, 0.2);
+    color: #FFFFFF;
+    border-color: #00F0FF;
+}
+
+.mt5-standby-helper {
+    background: rgba(255, 183, 3, 0.1);
+    border: 1px dashed rgba(255, 183, 3, 0.4);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 12px;
+}
+
+.mt5-standby-helper .helper-icon {
+    font-size: 18px;
+}
+
+.mt5-standby-helper .helper-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mt5-standby-helper strong {
+    font-size: 12px;
+    color: #FFB703;
+}
+
+.mt5-standby-helper span {
+    font-size: 10.5px;
+    color: var(--text-secondary);
+}

@@ -153,8 +153,56 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
     """
     Returns live MT5 status from RAM cache in <0.01ms.
     Pulls live terminal telemetry from mt5_bridge_engine and stored VIP config.
+    Strictly isolated per user (Zero cross-tenant data leak).
     """
     now = time.time()
+
+    # Unauthenticated / Guest state: Never access bridge clients or leak admin account data!
+    if chat_id <= 0:
+        return {
+            "status": "guest",
+            "bridge_running": True,
+            "connected": False,
+            "tcp_port": 5555,
+            "is_authorized": False,
+            "has_identity": False,
+            "chat_id": 0,
+            "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
+            "invite_code": "130237694",
+            "qr_code_url": "/gtc_QRCode.png",
+            "account": {
+                "login": "",
+                "broker": "GTCFX",
+                "server": "GTCGlobalSA-Server 2",
+                "firm_name": "Personal",
+                "balance": 0.0,
+                "equity": 0.0,
+                "currency": "USD",
+                "free_margin": 0.0,
+                "floating_pnl": 0.0,
+                "floating_pnl_pct": 0.0,
+                "margin_level": 0.0,
+                "daily_dd_pct": 0.0,
+                "max_dd_pct": 0.0,
+                "daily_limit_pct": -3.5,
+                "max_limit_pct": -7.0,
+                "is_prop_compliant": True,
+                "ping_ms": 0.3,
+                "ai_auto_trade": False,
+                "has_bound_config": False,
+                "is_authorized": False
+            },
+            "positions": [],
+            "supported_symbols": [
+                {"symbol": "XAUUSD", "name": "Gold / Spot US Dollar", "category": "Metals", "digits": 2},
+                {"symbol": "EURUSD", "name": "Euro / US Dollar", "category": "Forex", "digits": 5},
+                {"symbol": "GBPUSD", "name": "British Pound / US Dollar", "category": "Forex", "digits": 5},
+                {"symbol": "US30", "name": "Wall Street 30 / Dow Jones", "category": "Indices", "digits": 1},
+                {"symbol": "BTCUSD", "name": "Bitcoin / US Dollar", "category": "Crypto", "digits": 2}
+            ],
+            "timestamp": now
+        }
+
     cached = _GUI_CACHE.get("mt5", {}).get(chat_id)
     if cached and (now - cached["timestamp"] < 1.5):
         return cached["data"]
@@ -168,19 +216,18 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             matched_session = None
             with bridge._clients_lock:
                 for acc_id, sess in bridge.clients.items():
+                    # Strict Multi-Tenant Isolation: Match ONLY this user's chat_id or bound login!
                     if (chat_id and sess.chat_id == chat_id) or (user_login and acc_id == user_login):
                         matched_session = sess
+                        if not sess.chat_id and chat_id:
+                            sess.chat_id = chat_id
                         break
-                if not matched_session and bridge.clients:
-                    for acc_id, sess in bridge.clients.items():
-                        if sess.status == "ONLINE":
-                            matched_session = sess
-                            break
 
+            # Strict Non-Interference: Zero cross-tenant fallback to Admin or other users!
             is_connected = bool(matched_session and matched_session.status == "ONLINE")
             balance = float(matched_session.balance if matched_session else 0.0)
             equity = float(matched_session.equity if matched_session else 0.0)
-            ping_ms = float(matched_session.ping_ms if matched_session else 0.42)
+            ping_ms = float(matched_session.ping_ms if matched_session else 0.3)
             if ping_ms >= 950.0 or ping_ms <= 0:
                 ping_ms = 0.3
             is_prop_compliant = bool(matched_session.is_prop_compliant if matched_session else True)
@@ -215,17 +262,22 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             ai_auto_trade = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
             is_authorized = db.is_mt5_user_authorized(chat_id)
 
+            # Privacy Shield: Use user's own bound login. If none, do not display other accounts.
+            display_login = user_login if user_login else (matched_session.account_id if matched_session else "")
+
             return {
                 "status": "success",
                 "bridge_running": bridge.is_running,
                 "connected": is_connected,
                 "tcp_port": bridge.tcp_port,
                 "is_authorized": is_authorized,
+                "has_identity": True,
+                "chat_id": chat_id,
                 "referral_url": "https://web.mygtc.app/login/register?ref=130237694",
                 "invite_code": "130237694",
                 "qr_code_url": "/gtc_QRCode.png",
                 "account": {
-                    "login": user_login or (matched_session.account_id if matched_session else ""),
+                    "login": display_login,
                     "broker": cfg.get("broker") or (matched_session.broker if matched_session else "GTCFX"),
                     "server": cfg.get("server") or "GTCGlobalSA-Server 2",
                     "firm_name": cfg.get("firm_name") or (matched_session.firm_name if matched_session else "Personal"),
@@ -243,7 +295,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                     "is_prop_compliant": is_prop_compliant,
                     "ping_ms": ping_ms,
                     "ai_auto_trade": ai_auto_trade,
-                    "has_bound_config": bool(cfg.get("login")),
+                    "has_bound_config": bool(user_login),
                     "is_authorized": is_authorized
                 },
                 "positions": formatted_positions,
@@ -840,7 +892,22 @@ async def handle_api_engine_states(request: web.Request) -> web.Response:
     try:
         chat_id = _get_chat_id_from_req(request)
         if not chat_id:
-            chat_id = DEFAULT_VIP_CHAT_ID
+            # Guest or unauthenticated: Return safe zero/inactive state (Zero Admin Leak)
+            resp = web.json_response({
+                "status": "success",
+                "chat_id": 0,
+                "engines": {
+                    "wealth": False,
+                    "turbo_hedge": False,
+                    "smart_x": False,
+                    "compound_grid": False,
+                    "infinity_matrix": False,
+                    "auto_trade": False,
+                    "spot_vault": False
+                }
+            })
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+            return resp
 
         # 1. 24/7 Perpetual Wealth (Futures & Spot)
         wealth_fut = db.get_perpetual_wealth_bot(chat_id)
@@ -897,8 +964,8 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
-        if not chat_id:
-            chat_id = DEFAULT_VIP_CHAT_ID
+        if not chat_id or not _is_authorized_vip(chat_id):
+            return web.json_response({"status": "error", "message": "Access Denied: Telegram VIP Chat ID required."}, status=403)
 
         engine_name = str(data.get("engine", "")).lower()
         enable = bool(data.get("enable", True))
@@ -948,12 +1015,19 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
 # ==============================================================================
 
 def _is_authorized_vip(chat_id: int) -> bool:
+    if chat_id <= 0:
+        return False
     if chat_id == DEFAULT_VIP_CHAT_ID:
         return True
     return bool(db.is_vip(chat_id) or db.is_admin(chat_id))
 
 async def handle_api_mt5_status(request: web.Request) -> web.Response:
-    chat_id = _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+    chat_id = _get_chat_id_from_req(request)
+    if chat_id <= 0:
+        data = await get_cached_mt5_status(0)
+        resp = web.json_response(data)
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        return resp
     if not _is_authorized_vip(chat_id):
         return web.json_response({
             "status": "error",
@@ -968,8 +1042,8 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
     """Allows VIP users to register/bind their MT5 account credentials from the web."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
-        if not _is_authorized_vip(chat_id):
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
                 "message": "⛔ Access Denied: មិនមានសិទ្ធិចងភ្ជាប់គណនី MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
@@ -1020,8 +1094,8 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
     """Fast Web Trader order placement (BUY / SELL) via MT5 Bridge."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
-        if not _is_authorized_vip(chat_id):
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
                 "message": "⛔ Access Denied: មិនមានសិទ្ធិជួញដូរលើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
@@ -1037,15 +1111,20 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                 "invite_code": "130237694"
             }, status=403)
 
+        cfg = db.get_user_mt5_config(chat_id)
+        target_account = str(cfg.get("login", "")).strip()
+        if not target_account:
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ សូមចងភ្ជាប់គណនី MT5 របស់អ្នកជាមុនសិន មុនពេលបញ្ជា Trade!"
+            }, status=400)
+
         symbol = str(data.get("symbol", "XAUUSD")).upper().strip()
         action = str(data.get("action", "BUY")).upper().strip()
         lot = float(data.get("lot", 0.01))
         sl = float(data.get("sl", 0.0))
         tp = float(data.get("tp", 0.0))
         comment = str(data.get("comment", "KMC_WEB_TRADER"))
-
-        cfg = db.get_user_mt5_config(chat_id)
-        target_account = cfg.get("login") or None
 
         res = mt5_bridge_engine.mt5_bridge.dispatch_signal(
             symbol=symbol,
@@ -1057,6 +1136,12 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
             target_account=target_account
         )
 
+        if res.get("clients_reached", 0) == 0:
+            return web.json_response({
+                "status": "error",
+                "message": f"⚠️ គណនី MT5 #{target_account} របស់អ្នកមិនទាន់ Online លើ Tokyo VPS Bridge នៅឡើយទេ សូមបើក EA របស់អ្នក!"
+            }, status=400)
+
         db.record_mt5_bridge_order(
             signal_id=res.get("signal_id", ""),
             symbol=symbol,
@@ -1064,7 +1149,7 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
             lot=lot,
             sl=sl,
             tp=tp,
-            account_id=str(target_account or ""),
+            account_id=target_account,
             comment=comment
         )
 
@@ -1079,8 +1164,8 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
     """Closes an active MT5 position or executes Panic Close All."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
-        if not _is_authorized_vip(chat_id):
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
                 "message": "⛔ Access Denied: មិនមានសិទ្ធិបិទ Position លើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
@@ -1090,7 +1175,12 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
         close_all = bool(data.get("all", False))
 
         cfg = db.get_user_mt5_config(chat_id)
-        target_account = cfg.get("login") or None
+        target_account = str(cfg.get("login", "")).strip()
+        if not target_account:
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ មិនមានគណនី MT5 ភ្ជាប់ជាមួយគណនីរបស់អ្នកឡើយ!"
+            }, status=400)
 
         res = mt5_bridge_engine.mt5_bridge.dispatch_close(
             ticket=0 if close_all else ticket,
@@ -1110,8 +1200,8 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
     """Toggles AI Swarm auto-trading on user's MT5 account."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
-        if not _is_authorized_vip(chat_id):
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
                 "message": "⛔ Access Denied: មិនមានសិទ្ធិកំណត់ AI Trade លើ MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
@@ -1146,13 +1236,15 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
     """Allows VIP users to submit their MT5 Account ID for GTCFX referral verification."""
     try:
         data = await request.json()
-        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "សូមបញ្ជាក់ Telegram Chat ID!"}, status=400)
         account_id = str(data.get("account_id", "")).strip()
         if not account_id:
             return web.json_response({"status": "error", "message": "សូមបញ្ចូលលេខ MT5 Account ID!"}, status=400)
 
-        # If admin, auto-verify
-        if chat_id == DEFAULT_VIP_CHAT_ID or db.is_admin(chat_id):
+        # If explicitly authenticated as admin, auto-verify
+        if chat_id == DEFAULT_VIP_CHAT_ID and db.is_admin(chat_id):
             db.set_mt5_user_referral_status(chat_id, True, account_id, notes="Admin Auto-Verified")
             if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
                 del _GUI_CACHE["mt5"][chat_id]

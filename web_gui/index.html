@@ -503,6 +503,31 @@
                     </div>
                 </div>
 
+                <!-- VIP Multi-Tenant Identity Lock Card (Zero Cross-Tenant Leak Gate) -->
+                <div class="glass-card mt5-identity-gate-card" id="mt5-identity-gate-card" style="display: none;">
+                    <div class="gate-header-row">
+                        <div class="gate-title-flex">
+                            <span class="gate-icon">🔐</span>
+                            <div>
+                                <h4>VIP Multi-Tenant Identity & Privacy Lock</h4>
+                                <p>ដើម្បីរក្សាសិទ្ធិឯកជនភាព និងសុវត្ថិភាពទិន្នន័យផ្ទាល់ខ្លួន ១០០% (Zero Cross-Tenant Leak) សូមបញ្ជាក់ Telegram Chat ID របស់អ្នក៖</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gate-form-row">
+                        <div class="gate-input-group">
+                            <span class="gate-input-icon">🆔</span>
+                            <input type="text" id="mt5-gate-input-chat-id" class="cyber-input" placeholder="ឧ. 859271875 (Telegram Chat ID)">
+                        </div>
+                        <button type="button" id="btn-gate-connect" class="btn-cyber-primary">
+                            ⚡ ភ្ជាប់គណនី VIP (Connect)
+                        </button>
+                    </div>
+                    <div class="gate-tip-row">
+                        <span>💡 របៀបយក Chat ID: បើក Telegram Bot <strong>@KhmerMasterCrypto_bot</strong> រួចវាយ <code>/id</code> ឬ <code>/myid</code></span>
+                    </div>
+                </div>
+
                 <!-- MT5 Account Metrics Hero Cockpit -->
                 <div class="glass-card mt5-cockpit-card">
                     <div class="mt5-account-meta-row">
@@ -510,8 +535,19 @@
                             <span class="account-broker-tag" id="mt5-broker-tag">GTCFX • TY3 GATEWAY</span>
                             <span class="account-login-tag" id="mt5-login-tag">A/C: <strong id="mt5-acc-num">Not Bound</strong></span>
                             <span class="account-server-tag" id="mt5-server-tag">GTCGlobalTrade-Live</span>
+                            <span class="account-identity-tag" id="mt5-current-user-tag">👤 VIP: #0</span>
+                            <button type="button" class="btn-switch-id" id="btn-switch-chat-id" title="ប្តូរ Telegram Chat ID">🔄 Switch ID</button>
                         </div>
                         <div class="account-type-badge" id="mt5-firm-badge">👑 PERSONAL VIP</div>
+                    </div>
+
+                    <!-- Standby EA Helper Banner -->
+                    <div class="mt5-standby-helper" id="mt5-standby-helper" style="display: none;">
+                        <span class="helper-icon">⏳</span>
+                        <div class="helper-text">
+                            <strong>គណនី MT5 ត្រូវបានកត់ត្រាទុក!</strong>
+                            <span>កំពុងរង់ចាំការភ្ជាប់ពី MT5 EA របស់អ្នកនៅលើ Computer/VPS (Port 5555) ដើម្បីចាប់ផ្តើមជួញដូរ។</span>
+                        </div>
                     </div>
 
                     <div class="mt5-hero-metrics-grid">
