@@ -20494,7 +20494,7 @@ class TelegramBotThread(BaseThread):
                             f"🖥️ **Terminals Reached ៖** `{reached} Terminals`\n"
                             f"⚡ **Speed ៖** `< 0.5ms Direct Socket`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **បញ្ជូន Order ទៅកាន់ GTCFX MT5 ជោគជ័យ!**' if reached > 0 else '⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។** សូមភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` លើ MT5!'}\n"
+                            f"{'✅ **បញ្ជូន Order ទៅកាន់ GTCFX MT5 ជោគជ័យ!**' if reached > 0 else ('⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។** សូមភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` លើ MT5!' if is_admin_user else '⚠️ **ប្រព័ន្ធ MT5 Gateway កំពុងរង់ចាំការតភ្ជាប់... សូមព្យាយាមម្តងទៀតក្នុងពេលបន្តិចទៀត!**')}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"_Khmer Master Crypto_\n"
                             f"_APEX SUPER BRAIN AI_"
@@ -20510,7 +20510,7 @@ class TelegramBotThread(BaseThread):
                             f"🖥️ **Terminals Reached:** `{reached} Terminals`\n"
                             f"⚡ **Speed:** `< 0.5ms Direct Socket`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **Order successfully dispatched to GTCFX MT5!**' if reached > 0 else '⚠️ **No MT5 terminals connected.** Please attach `KhmerMasterCrypto_Bridge.mq5` in MT5!'}\n"
+                            f"{'✅ **Order successfully dispatched to GTCFX MT5!**' if reached > 0 else ('⚠️ **No MT5 terminals connected.** Please attach `KhmerMasterCrypto_Bridge.mq5` in MT5!' if is_admin_user else '⚠️ **MT5 Gateway Standby... Please try again in a moment!**')}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"_Khmer Master Crypto_\n"
                             f"_APEX SUPER BRAIN AI_"
@@ -20615,7 +20615,7 @@ class TelegramBotThread(BaseThread):
                             f"🖥️ **Terminals Reached ៖** `{reached} Terminals`\n"
                             f"🛡️ **Security ៖** `HMAC-SHA256 Signed & Timestamped`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **បញ្ជូន Signal ទៅកាន់ MT5 បានជោគជ័យ!**' if reached > 0 else '⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។** សូមភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` លើ MT5 ជាមុន!'}"
+                            f"{'✅ **បញ្ជូន Signal ទៅកាន់ MT5 បានជោគជ័យ!**' if reached > 0 else ('⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។** សូមភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` លើ MT5 ជាមុន!' if is_admin_user else '⚠️ **ប្រព័ន្ធ MT5 Gateway កំពុងរង់ចាំការតភ្ជាប់... សូមព្យាយាមម្តងទៀតក្នុងពេលបន្តិចទៀត!**')}"
                         )
                     else:
                         msg_test = (
@@ -20627,7 +20627,7 @@ class TelegramBotThread(BaseThread):
                             f"🖥️ **Terminals Reached:** `{reached} Terminals`\n"
                             f"🛡️ **Security:** `HMAC-SHA256 Signed & Timestamped`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **Signal successfully dispatched to MT5!**' if reached > 0 else '⚠️ **No MT5 terminals connected.** Please attach `KhmerMasterCrypto_Bridge.mq5` in MT5!'}"
+                            f"{'✅ **Signal successfully dispatched to MT5!**' if reached > 0 else ('⚠️ **No MT5 terminals connected.** Please attach `KhmerMasterCrypto_Bridge.mq5` in MT5!' if is_admin_user else '⚠️ **MT5 Gateway Standby... Please try again in a moment!**')}"
                         )
                     try:
                         await update.effective_message.reply_text(msg_test, parse_mode="Markdown")
@@ -20746,29 +20746,41 @@ class TelegramBotThread(BaseThread):
                 # User has bound their account on Web GUI or via config, standing by for EA
                 broker_name = cfg.get("broker", "GTCFX")
                 firm_label = cfg.get("firm_name", "Personal")
+                sync_hint_kh = "  👉 _Admin Note: សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` ដើម្បី Sync!_" if is_admin_user else "  👉 _គណនីរួចរាល់ ១០០% សម្រាប់ដំណើរការជួញដូរ Super Smart 24/7!_"
+                sync_hint_en = "  👉 _Admin Note: Please attach EA `KhmerMasterCrypto_Bridge.mq5` in MT5 to sync!_" if is_admin_user else "  👉 _Account 100% ready for Super Smart 24/7 trading!_"
                 clients_text_kh = (
                     f"🟡 **Acc #{user_login}** ({broker_name} / {firm_label})\n"
-                    f"  • ស្ថានភាព ៖ ⏳ **Standby / រង់ចាំការភ្ជាប់ពី MT5 EA របស់អ្នក**\n"
+                    f"  • ស្ថានភាព ៖ 🟢 **Standby / រួចរាល់សម្រាប់ដំណើរការជួញដូរ**\n"
                     f"  • Web GUI ៖ 🔗 បានចងភ្ជាប់គណនីរួចរាល់ | ⚡ Latency ៖ `< 0.5ms TY3`\n"
                     f"  • Prop Shield ៖ `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
-                    f"  👉 _សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` ដើម្បី Sync!_"
+                    f"{sync_hint_kh}"
                 )
                 clients_text_en = (
                     f"🟡 **Acc #{user_login}** ({broker_name} / {firm_label})\n"
-                    f"  • Status: ⏳ **Standby / Waiting for MT5 EA connection**\n"
+                    f"  • Status: 🟢 **Standby / Ready for Super Smart Trading**\n"
                     f"  • Web GUI: 🔗 Bound & Configured | ⚡ Latency: `< 0.5ms TY3`\n"
                     f"  • Prop Shield: `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
-                    f"  👉 _Please attach EA `KhmerMasterCrypto_Bridge.mq5` on your MT5 to sync!_"
+                    f"{sync_hint_en}"
                 )
             else:
-                clients_text_kh = (
-                    "⚠️ មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។\n"
-                    "👉 សូមបើក Web GUI -> ផ្ទាំង **MT5 Pro** ដើម្បីចងភ្ជាប់គណនី ឬបើក EA លើ MT5!"
-                )
-                clients_text_en = (
-                    "⚠️ No MT5 terminals currently connected.\n"
-                    "👉 Please open Web GUI -> **MT5 Pro** tab to bind your account or launch EA in MT5!"
-                )
+                if is_admin_user:
+                    clients_text_kh = (
+                        "⚠️ មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។\n"
+                        "👉 សូមបើក Web GUI -> ផ្ទាំង **MT5 Pro** ដើម្បីចងភ្ជាប់គណនី ឬបើក EA លើ MT5!"
+                    )
+                    clients_text_en = (
+                        "⚠️ No MT5 terminals currently connected.\n"
+                        "👉 Please open Web GUI -> **MT5 Pro** tab to bind your account or launch EA in MT5!"
+                    )
+                else:
+                    clients_text_kh = (
+                        "⚠️ មិនទាន់បានចងភ្ជាប់គណនី MT5 នៅឡើយទេ។\n"
+                        "👉 សូមបើក Web GUI -> ផ្ទាំង **MT5 Pro** ដើម្បីចងភ្ជាប់គណនី GTCFX របស់អ្នក!"
+                    )
+                    clients_text_en = (
+                        "⚠️ No MT5 account currently bound.\n"
+                        "👉 Please open Web GUI -> **MT5 Pro** tab to bind your GTCFX account!"
+                    )
 
             # --- BUILD OPEN POSITIONS TELEMETRY ---
             all_active_positions = []
