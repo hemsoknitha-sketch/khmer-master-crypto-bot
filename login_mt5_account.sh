@@ -14,7 +14,7 @@ set -e
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
-YELLOW='\1;33m'
+YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m'
@@ -86,21 +86,29 @@ chmod 600 "$TARGET_DIR/startup.ini"
 
 echo -e "${GREEN}✅ Successfully written credentials to startup.ini!${NC}"
 
-# 2. Restart target MT5 instance in Wine
-echo -e "${YELLOW}🔄 Restarting target MT5 instance to establish live connection...${NC}"
+# Auto-detect active X display (XRDP on Ubuntu typically uses :10.0, fallback :0.0)
+DETECTED_DISPLAY="${DISPLAY:-:10.0}"
+if [ -e /tmp/.X11-unix/X10 ]; then
+    DETECTED_DISPLAY=":10.0"
+elif [ -e /tmp/.X11-unix/X0 ]; then
+    DETECTED_DISPLAY=":0.0"
+fi
+
+# 2. Restart target MT5 instance in Wine with /config:startup.ini
+echo -e "${YELLOW}🔄 Restarting target MT5 instance to establish live connection (Display $DETECTED_DISPLAY)...${NC}"
 
 if [ "$TARGET_DIR" == "$MT5_PLATFORM" ]; then
     # Kill only Platform instance
     pkill -f "MetaTrader 5_Platform.*terminal64.exe" 2>/dev/null || true
     sleep 2
-    sudo -u "$TARGET_USER" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable >/dev/null 2>&1 &"
-    echo -e "${GREEN}🚀 Platform MT5 instance restarted in Wine!${NC}"
+    sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
+    echo -e "${GREEN}🚀 Platform MT5 instance restarted in Wine with credentials!${NC}"
 else
     # Kill only Admin instance
     pkill -f "MetaTrader 5/terminal64.exe" 2>/dev/null || true
     sleep 2
-    sudo -u "$TARGET_USER" bash -c "cd '$MT5_ADMIN' && nohup wine terminal64.exe /portable >/dev/null 2>&1 &"
-    echo -e "${GREEN}🚀 Admin MT5 instance restarted in Wine!${NC}"
+    sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_ADMIN' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
+    echo -e "${GREEN}🚀 Admin MT5 instance restarted in Wine with credentials!${NC}"
 fi
 
 echo ""
