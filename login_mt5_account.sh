@@ -79,6 +79,7 @@ cat << EOF > "$TARGET_DIR/startup.ini"
 Login=$ACCOUNT_ID
 Password=$PASSWORD
 Server=$SERVER
+KeepPrivate=1
 EOF
 
 chown "$TARGET_USER:$TARGET_USER" "$TARGET_DIR/startup.ini"
