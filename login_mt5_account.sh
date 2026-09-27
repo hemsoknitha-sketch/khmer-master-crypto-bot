@@ -84,7 +84,12 @@ EOF
 chown "$TARGET_USER:$TARGET_USER" "$TARGET_DIR/startup.ini"
 chmod 600 "$TARGET_DIR/startup.ini"
 
-echo -e "${GREEN}✅ Successfully written credentials to startup.ini!${NC}"
+mkdir -p "$TARGET_DIR/config"
+cp -f "$TARGET_DIR/startup.ini" "$TARGET_DIR/config/startup.ini"
+chown "$TARGET_USER:$TARGET_USER" "$TARGET_DIR/config/startup.ini"
+chmod 600 "$TARGET_DIR/config/startup.ini"
+
+echo -e "${GREEN}✅ Successfully written credentials to startup.ini (root & config/)!${NC}"
 
 # Auto-detect active X display (XRDP on Ubuntu typically uses :10.0, fallback :0.0)
 DETECTED_DISPLAY="${DISPLAY:-:10.0}"
@@ -98,14 +103,14 @@ fi
 echo -e "${YELLOW}🔄 Restarting target MT5 instance to establish live connection (Display $DETECTED_DISPLAY)...${NC}"
 
 if [ "$TARGET_DIR" == "$MT5_PLATFORM" ]; then
-    # Kill only Platform instance
-    pkill -f "MetaTrader 5_Platform.*terminal64.exe" 2>/dev/null || true
+    # Force kill lingering Platform instance
+    pkill -9 -f "MetaTrader 5_Platform.*terminal64.exe" 2>/dev/null || true
     sleep 2
     sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
     echo -e "${GREEN}🚀 Platform MT5 instance restarted in Wine with credentials!${NC}"
 else
-    # Kill only Admin instance
-    pkill -f "MetaTrader 5/terminal64.exe" 2>/dev/null || true
+    # Force kill lingering Admin instance
+    pkill -9 -f "MetaTrader 5/terminal64.exe" 2>/dev/null || true
     sleep 2
     sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_ADMIN' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
     echo -e "${GREEN}🚀 Admin MT5 instance restarted in Wine with credentials!${NC}"

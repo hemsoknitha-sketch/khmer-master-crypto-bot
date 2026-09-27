@@ -142,7 +142,9 @@ cat << EOF > /usr/local/bin/mt5-platform-start
 #!/bin/bash
 TARGET_USER="$TARGET_USER"
 TARGET_HOME="$TARGET_HOME"
-echo "🚀 Starting Platform MT5 Terminal (52135153)..."
+echo "🚀 Restarting Platform MT5 Terminal (52135153)..."
+pkill -9 -f "MetaTrader 5_Platform.*terminal64.exe" 2>/dev/null || true
+sleep 2
 sudo -u "\$TARGET_USER" DISPLAY=:10.0 bash -c "cd '\$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
 echo "✅ Platform MT5 Terminal launched in background."
 EOF

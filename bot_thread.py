@@ -20729,6 +20729,7 @@ class TelegramBotThread(BaseThread):
                     safe_broker = str(c.get('broker', 'GTCFX')).replace('_', ' ')
                     safe_firm = str(c.get('firm_name', 'GTCFX_Tokyo')).replace('_', ' ')
                     acc_num = str(c['account_id'])
+                    acc_label = f"#{acc_num}" if acc_num != "0" else "#0 (Unlogged Guest)"
                     is_broker_offline = (acc_num == "0") or (not c.get('broker')) or (c.get('is_broker_connected') is False)
                     if is_broker_offline and c['balance'] == 0.0:
                         unlogged_note_kh = "  ⚠️ _(MT5 លើ VPS មិនទាន់ Login Broker ៖ សូមបើក MT5 វាយ Password ក្នុង File -> Login to Trade Account)_\n"
