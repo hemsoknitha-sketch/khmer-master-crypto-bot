@@ -44,7 +44,6 @@ if [ -f /etc/xrdp/sesman.ini ]; then
     sed -i 's/^KillDisconnected=.*/KillDisconnected=false/' /etc/xrdp/sesman.ini 2>/dev/null || true
     sed -i 's/^DisconnectedTimeLimit=.*/DisconnectedTimeLimit=0/' /etc/xrdp/sesman.ini 2>/dev/null || true
     sed -i 's/^IdleTimeLimit=.*/IdleTimeLimit=0/' /etc/xrdp/sesman.ini 2>/dev/null || true
-    systemctl restart xrdp-sesman xrdp 2>/dev/null || true
     echo -e "   ${GREEN}✅ XRDP is configured to keep all desktop sessions running 24/7!${NC}"
 fi
 
