@@ -5750,8 +5750,8 @@ class TelegramBotThread(BaseThread):
                 acc = str(cfg.get("login", "")).strip()
                 srv = str(cfg.get("server", "")).strip()
                 is_cent = "Server 5" in srv or "CENT" in srv.upper()
-                ref_code = "PuAfeREN" if is_cent else "LnZZcHxY"
-                track_name = "Cent Account (L20 - Server 5)" if is_cent else "Standard Swap-Free (L15 - Server 2)"
+                ref_code = "PuAfeREN" if is_cent else "F8bNxK9L"
+                track_name = "Cent Account (L20 - Server 5)" if is_cent else "Standard Swap-Free (L20 - Server 2)"
                 if acc:
                     db.register_mt5_referral_request(chat_id, acc, referral_code=ref_code, notes=f"Telegram 1-Tap Request ({track_name})")
                     try:
@@ -5779,9 +5779,11 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(
                         f"⚠️ **មិនទាន់មានលេខគណនី MT5 នៅឡើយទេ។**\n\n"
                         f"សូមចុះឈ្មោះតាមតំណភ្ជាប់ផ្លូវការរបស់ Super Admin ៖\n"
-                        f"• 💎 **Standard Swap-Free (Server 2) ៖**\n"
+                        f"• 💎 **Standard Swap-Free (Server 2 - L20 VIP) ៖**\n"
+                        f"  `https://web.mygtc.app/login/register?ref=F8bNxK9L` (Code: `F8bNxK9L`)\n\n"
+                        f"• 💎 **Standard Swap-Free (Server 2 - L15 Pro) ៖**\n"
                         f"  `https://web.mygtc.app/login/register?ref=LnZZcHxY` (Code: `LnZZcHxY`)\n\n"
-                        f"• 🪙 **Cent Account (Server 5) ៖**\n"
+                        f"• 🪙 **Cent Account (Server 5 - L20 Micro) ៖**\n"
                         f"  `https://web.mygtc.app/login/register?ref=PuAfeREN` (Code: `PuAfeREN`)\n\n"
                         f"រួចភ្ជាប់គណនីលើ Web GUI ឬផ្ញើលេខ MT5 Account ID មក Admin: @hemsoknitha!",
                         parse_mode="Markdown"
@@ -20059,12 +20061,12 @@ class TelegramBotThread(BaseThread):
             """
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import ui_standards
-            pro_url = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
-            std_url = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
-            std_code = "LnZZcHxY"
+            std_l20_url = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
+            std_l20_code = "F8bNxK9L"
+            std_l15_url = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+            std_l15_code = "LnZZcHxY"
             cent_url = "https://web.mygtc.app/login/register?ref=PuAfeREN"
             cent_code = "PuAfeREN"
-            invite_code = std_code
 
             if user_lang == 'khmer' or user_lang not in ['en', 'english']:
                 gate_text = (
@@ -20072,17 +20074,20 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"⚠️ **សេចក្តីជូនដំណឹងការពារមូលធន & សិទ្ធិវិនិយោគ MT5 ៖**\n"
                     f"ប្រព័ន្ធ /mt5 **មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយ** បើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ **Super BOT ADMIN** លើ Broker ដៃគូផ្លូវការ **GTCFX (Equinix Tokyo TY3)**!\n\n"
-                    f"💎 **1. គណនីស្តង់ដារ Swap-Free (ទុន $100+ ៖ MT5-SF-STD-L15) ៖**\n"
-                    f"• Link: [{std_url}]({std_url})\n"
-                    f"• Invite Code: `{std_code}` (ចុចលើវាដើម្បី Copy)\n\n"
-                    f"🪙 **2. គណនីសេន Cent Account (ទុន $10-$100 ៖ MT5-CENT-L20) ៖**\n"
+                    f"💎 **1. គណនីស្តង់ដារ Swap-Free L20 (ទុន $100+ ៖ MT5-SF-STD-L20) ៖**\n"
+                    f"• Link: [{std_l20_url}]({std_l20_url})\n"
+                    f"• Invite Code: `{std_l20_code}` (ចុចលើវាដើម្បី Copy)\n\n"
+                    f"💎 **2. គណនីស្តង់ដារ Swap-Free L15 (ទុន $100+ ៖ MT5-SF-STD-L15) ៖**\n"
+                    f"• Link: [{std_l15_url}]({std_l15_url})\n"
+                    f"• Invite Code: `{std_l15_code}` (ចុចលើវាដើម្បី Copy)\n\n"
+                    f"🪙 **3. គណនីសេន Cent Account L20 (ទុន $10-$100 ៖ MT5-CENT-L20) ៖**\n"
                     f"• Link: [{cent_url}]({cent_url})\n"
                     f"• Invite Code: `{cent_code}` (ចុចលើវាដើម្បី Copy)\n\n"
                     f"🏛️ **Broker Gateway ៖** `GTC Global Trade Capital (Tokyo TY3)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **ដំណាក់កាលអនុវត្ត (3 ជំហានងាយៗ) ៖**\n"
                     f"1️⃣ ចុច Link ជ្រើសរើសប្រភេទគណនីដែលត្រូវនឹងដើមទុនរបស់អ្នក\n"
-                    f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code (`{std_code}` ឬ `{cent_code}`)\n"
+                    f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code (`{std_l20_code}`, `{std_l15_code}` ឬ `{cent_code}`)\n"
                     f"3️⃣ ចុចប៊ូតុង **[ 📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID ]** ខាងក្រោម ដើម្បីទទួលបានការអនុម័តភ្លាមៗ!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
@@ -20094,17 +20099,20 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"⚠️ **Institutional Capital Protection & MT5 Gatekeeper Notice:**\n"
                     f"The /mt5 system **strictly does NOT permit investing or trading** unless you are properly registered under the **Super BOT ADMIN's Official Referral URL** on **GTCFX (Equinix Tokyo TY3)**!\n\n"
-                    f"💎 **1. Standard Swap-Free (Capital $100+ • MT5-SF-STD-L15):**\n"
-                    f"• Link: [{std_url}]({std_url})\n"
-                    f"• Invite Code: `{std_code}` (Click to Copy)\n\n"
-                    f"🪙 **2. Cent Account (Capital $10-$100 • MT5-CENT-L20):**\n"
+                    f"💎 **1. Standard Swap-Free L20 (Capital $100+ • MT5-SF-STD-L20):**\n"
+                    f"• Link: [{std_l20_url}]({std_l20_url})\n"
+                    f"• Invite Code: `{std_l20_code}` (Click to Copy)\n\n"
+                    f"💎 **2. Standard Swap-Free L15 (Capital $100+ • MT5-SF-STD-L15):**\n"
+                    f"• Link: [{std_l15_url}]({std_l15_url})\n"
+                    f"• Invite Code: `{std_l15_code}` (Click to Copy)\n\n"
+                    f"🪙 **3. Cent Account L20 (Capital $10-$100 • MT5-CENT-L20):**\n"
                     f"• Link: [{cent_url}]({cent_url})\n"
                     f"• Invite Code: `{cent_code}` (Click to Copy)\n\n"
                     f"🏛️ **Broker Gateway:** `GTC Global Trade Capital (Tokyo TY3)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **3 Simple Steps to Unlock:**\n"
                     f"1️⃣ Click the link that matches your starting capital\n"
-                    f"2️⃣ Ensure Invite Code is set to `{std_code}` or `{cent_code}`\n"
+                    f"2️⃣ Ensure Invite Code is set to `{std_l20_code}`, `{std_l15_code}` or `{cent_code}`\n"
                     f"3️⃣ Click **[ 📋 Request Verification ]** below for instant Super Admin approval!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
@@ -20113,9 +20121,10 @@ class TelegramBotThread(BaseThread):
 
             gate_kb = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("💎 Standard (L15)", url=std_url),
-                    InlineKeyboardButton("🪙 Cent (L20)", url=cent_url)
+                    InlineKeyboardButton("💎 Standard (L20 VIP)", url=std_l20_url),
+                    InlineKeyboardButton("💎 Standard (L15)", url=std_l15_url)
                 ],
+                [InlineKeyboardButton("🪙 Cent Micro (L20)", url=cent_url)],
                 [InlineKeyboardButton("📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID", callback_data="btn_mt5_req_verify")],
                 [
                     InlineKeyboardButton("🔄 ពិនិត្យសិទ្ធិឡើងវិញ", callback_data="btn_mt5_check_auth"),

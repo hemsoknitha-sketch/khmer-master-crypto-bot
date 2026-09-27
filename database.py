@@ -4609,24 +4609,30 @@ def get_user_mt5_trade_statistics(chat_id: int, account_id: str = "") -> dict:
 # ==============================================================================
 # GTCFX JAPAN TOKYO MT5 PRO REFERRAL GATEKEEPER LOCK (INVARIANT 42)
 # ==============================================================================
-# Track 1: Swap-Free Standard L15 (Server 2 - Capital $100+)
-GTC_STD_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
-GTC_STD_INVITE_CODE = "LnZZcHxY"
+# Track 1: Swap-Free Standard L20 VIP Elite (Server 2 - Capital $100+)
+GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
+GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
 
-# Track 2: Cent Account L20 (Server 5 - Capital $10 - $100)
+# Track 2: Swap-Free Standard L15 Pro (Server 2 - Capital $100+)
+GTC_STD_L15_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+GTC_STD_L15_INVITE_CODE = "LnZZcHxY"
+
+# Track 3: Cent Account L20 Micro (Server 5 - Capital $10 - $100)
 GTC_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
 GTC_CENT_INVITE_CODE = "PuAfeREN"
 
 # Default & Legacy Fallback
-GTC_OFFICIAL_REFERRAL_URL = GTC_STD_REFERRAL_URL
-GTC_OFFICIAL_INVITE_CODE = GTC_STD_INVITE_CODE
-GTC_VALID_INVITE_CODES = {"LnZZcHxY", "PuAfeREN", "130237694"}
+GTC_STD_REFERRAL_URL = GTC_STD_L20_REFERRAL_URL
+GTC_STD_INVITE_CODE = GTC_STD_L20_INVITE_CODE
+GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L20_REFERRAL_URL
+GTC_OFFICIAL_INVITE_CODE = GTC_STD_L20_INVITE_CODE
+GTC_VALID_INVITE_CODES = {"F8bNxK9L", "LnZZcHxY", "PuAfeREN", "130237694"}
 
 def is_mt5_user_authorized(chat_id: int) -> bool:
     """
     GTCFX Japan Tokyo MT5 Terminal Pro Referral Gatekeeper Lock (Invariant 42):
     Under the sacred fiduciary rule of Khmer Master Crypto:
-    ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: LnZZcHxY ឬ PuAfeREN).
+    ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: F8bNxK9L, LnZZcHxY ឬ PuAfeREN).
     Returns True if:
     1. chat_id == 859271875 (Master Super Admin) or is_admin(chat_id)
     2. User is marked is_verified == 1 in mt5_user_referrals

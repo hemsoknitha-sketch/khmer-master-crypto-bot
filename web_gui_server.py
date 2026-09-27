@@ -30,11 +30,17 @@ _CACHE_WORKER_TASK = None
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_gui")
 
-# GTCFX Official Dual-Track Referral Standards (Invariant 42)
-GTC_STD_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
-GTC_STD_INVITE_CODE = "LnZZcHxY"
+# GTCFX Official Triple-Track Referral Standards (Invariant 42)
+GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
+GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
+GTC_STD_L15_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
+GTC_STD_L15_INVITE_CODE = "LnZZcHxY"
 GTC_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
 GTC_CENT_INVITE_CODE = "PuAfeREN"
+
+# Default Standard
+GTC_STD_REFERRAL_URL = GTC_STD_L20_REFERRAL_URL
+GTC_STD_INVITE_CODE = GTC_STD_L20_INVITE_CODE
 
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
@@ -177,6 +183,10 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             "invite_code": GTC_STD_INVITE_CODE,
             "referral_url_std": GTC_STD_REFERRAL_URL,
             "invite_code_std": GTC_STD_INVITE_CODE,
+            "referral_url_std_l20": GTC_STD_L20_REFERRAL_URL,
+            "invite_code_std_l20": GTC_STD_L20_INVITE_CODE,
+            "referral_url_std_l15": GTC_STD_L15_REFERRAL_URL,
+            "invite_code_std_l15": GTC_STD_L15_INVITE_CODE,
             "referral_url_cent": GTC_CENT_REFERRAL_URL,
             "invite_code_cent": GTC_CENT_INVITE_CODE,
             "qr_code_url": "/gtc_QRCode.png",
@@ -287,6 +297,10 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 "invite_code": GTC_STD_INVITE_CODE,
                 "referral_url_std": GTC_STD_REFERRAL_URL,
                 "invite_code_std": GTC_STD_INVITE_CODE,
+                "referral_url_std_l20": GTC_STD_L20_REFERRAL_URL,
+                "invite_code_std_l20": GTC_STD_L20_INVITE_CODE,
+                "referral_url_std_l15": GTC_STD_L15_REFERRAL_URL,
+                "invite_code_std_l15": GTC_STD_L15_INVITE_CODE,
                 "referral_url_cent": GTC_CENT_REFERRAL_URL,
                 "invite_code_cent": GTC_CENT_INVITE_CODE,
                 "qr_code_url": "/gtc_QRCode.png",
@@ -1085,9 +1099,9 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
 
         # Determine referral track from server
         is_cent = "Server 5" in server or "CENT" in server.upper()
-        assigned_ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_INVITE_CODE
-        assigned_ref_url = GTC_CENT_REFERRAL_URL if is_cent else GTC_STD_REFERRAL_URL
-        track_name = "Cent Account (L20 - Server 5)" if is_cent else "Standard Swap-Free (L15 - Server 2)"
+        assigned_ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_L20_INVITE_CODE
+        assigned_ref_url = GTC_CENT_REFERRAL_URL if is_cent else GTC_STD_L20_REFERRAL_URL
+        track_name = "Cent Account (L20 - Server 5)" if is_cent else "Standard Swap-Free (L20 - Server 2)"
 
         # Register pending verification in referral registry
         db.register_mt5_referral_request(chat_id, login, referral_code=assigned_ref_code, notes=f"Web GUI Binding ({server} - {track_name})")
@@ -1414,7 +1428,7 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
         srv = str(cfg.get("server", "")).strip()
         is_cent = "Server 5" in srv or "CENT" in srv.upper()
         ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_INVITE_CODE
-        track_name = "Cent (L20)" if is_cent else "Standard (L15)"
+        track_name = "Cent (L20)" if is_cent else "Standard (L20)"
 
         db.register_mt5_referral_request(chat_id, account_id, referral_code=ref_code, notes=f"Web GUI Submit ({track_name})")
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
