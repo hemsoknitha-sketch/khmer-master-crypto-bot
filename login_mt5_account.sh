@@ -27,10 +27,18 @@ ACCOUNT_ID="$1"
 PASSWORD="$2"
 SERVER="${3:-GTCGlobalSA-Server 2}"
 
+# Auto-strip accidental angle brackets <...> if user copied placeholder syntax
+ACCOUNT_ID="${ACCOUNT_ID#<}"
+ACCOUNT_ID="${ACCOUNT_ID%>}"
+PASSWORD="${PASSWORD#<}"
+PASSWORD="${PASSWORD%>}"
+SERVER="${SERVER#<}"
+SERVER="${SERVER%>}"
+
 if [ -z "$ACCOUNT_ID" ] || [ -z "$PASSWORD" ]; then
     echo -e "${RED}❌ Missing required parameters!${NC}"
     echo -e "${YELLOW}Usage:   bash login_mt5_account.sh <ACCOUNT_ID> <PASSWORD> [SERVER]${NC}"
-    echo -e "${YELLOW}Example: bash login_mt5_account.sh 52135153 \"MyPassword123\" \"GTCGlobalSA-Server 2\"${NC}"
+    echo -e "${YELLOW}Example: bash login_mt5_account.sh 52135153 'MyPassword123' 'GTCGlobalSA-Server 2'${NC}"
     exit 1
 fi
 
