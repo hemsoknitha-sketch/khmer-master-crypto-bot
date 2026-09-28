@@ -104,6 +104,16 @@ if [ -f "KhmerMasterCrypto_Bridge.mq5" ]; then
         chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/Desktop/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
     fi
     echo "🏛️ [MT5] Staged updated KhmerMasterCrypto_Bridge.mq5 to all MT5 Experts directories."
+    # Auto-compile KhmerMasterCrypto_Bridge.mq5 into .ex5 if MetaEditor is present
+    for WINE_DIR in "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5" "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"; do
+        if [ -d "$WINE_DIR" ]; then
+            EDITOR_BIN=$(find "$WINE_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
+            if [ -n "$EDITOR_BIN" ]; then
+                echo "⚙️ [MT5] Compiling KhmerMasterCrypto_Bridge.mq5 in $(basename "$WINE_DIR")..."
+                DISPLAY="${DISPLAY:-:10.0}" wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true
+            fi
+        fi
+    done
 fi
 
 # 4.1 Auto-Inject Capital.com Demo Credentials to .env if Missing

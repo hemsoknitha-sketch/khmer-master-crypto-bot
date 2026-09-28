@@ -368,6 +368,14 @@ class MT5QuantumSignalCitadel:
         elif any(fx in raw_clean for fx in ["EUR", "GBP", "JPY", "AUD", "CAD", "CHF"]):
             digits = 3 if "JPY" in raw_clean else 5
             curr_p = current_price
+            if curr_p <= 0:
+                try:
+                    q = mt5_bridge.get_live_symbol_quote(symbol) or mt5_bridge.get_live_symbol_quote(raw_clean)
+                    if q:
+                        curr_p = float(q.get("mid", 0.0) or q.get("ask", 0.0))
+                except Exception:
+                    pass
+
             if "EUR" in raw_clean:
                 curr_p = curr_p if curr_p > 0 else 1.08500
                 sl_dist, tp_dist = 0.0025, 0.0075  # 25 pips SL / 75 pips TP (1:3 R:R)
@@ -375,7 +383,7 @@ class MT5QuantumSignalCitadel:
                 curr_p = curr_p if curr_p > 0 else 1.29500
                 sl_dist, tp_dist = 0.0030, 0.0090  # 30 pips SL / 90 pips TP (1:3 R:R)
             elif "JPY" in raw_clean:
-                curr_p = curr_p if curr_p > 0 else 155.000
+                curr_p = curr_p if curr_p > 0 else 157.000
                 sl_dist, tp_dist = 0.35, 1.05      # 35 pips SL / 105 pips TP (1:3 R:R)
             else:
                 curr_p = curr_p if curr_p > 0 else 1.00000
@@ -525,6 +533,7 @@ class MT5BridgeEngine:
         self._symbol_lockout_until: Dict[str, float] = {}  # {f"{account_id}_{symbol}": timestamp}
         self._signal_to_metadata: Dict[str, Dict[str, Any]] = {}  # {signal_id: metadata}
         self._ticket_metadata: Dict[int, Dict[str, Any]] = {}  # {ticket: {"symbol": str, "account_id": str, "open_price": float, "action": str, "sl": float, "tp": float}}
+        self._live_quotes: Dict[str, Dict[str, Any]] = {}  # {symbol: {"ask": float, "bid": float, "mid": float, "timestamp": float}}
         
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
@@ -916,6 +925,22 @@ class MT5BridgeEngine:
             positions_data = payload.get("positions", [])
             if isinstance(positions_data, list):
                 session.positions = positions_data
+
+            # Record live quote ticks reported by MT5 terminal
+            quotes_data = payload.get("quotes", {})
+            if isinstance(quotes_data, dict):
+                now_tick_ts = time.time()
+                for sym_k, q_v in quotes_data.items():
+                    if isinstance(q_v, dict):
+                        b_ask = float(q_v.get("ask", 0.0) or 0.0)
+                        b_bid = float(q_v.get("bid", 0.0) or 0.0)
+                        if b_ask > 0.0 and b_bid > 0.0:
+                            self._live_quotes[sym_k.upper()] = {
+                                "ask": b_ask,
+                                "bid": b_bid,
+                                "mid": (b_ask + b_bid) / 2.0,
+                                "timestamp": now_tick_ts
+                            }
             if session.daily_start_equity <= 0:
                 session.daily_start_equity = daily_start if daily_start > 0 else equity
             if session.initial_balance <= 0:
@@ -1106,6 +1131,31 @@ class MT5BridgeEngine:
                         self.reset_prop_compliance(account_id)
 
     # =========================================================================
+    # 4.5. LIVE QUOTE & SYMBOL TICK CITADEL
+    # =========================================================================
+    def get_live_symbol_quote(self, symbol: str) -> Optional[Dict[str, float]]:
+        """
+        Returns the most recent sub-millisecond live quote for a symbol reported
+        directly by connected MT5 terminals or shared HFT price caches.
+        """
+        sym_clean = str(symbol).strip().upper().replace("/", "").replace("_I", "").replace(".PRO", "").replace("C", "")
+        with self._clients_lock:
+            q = self._live_quotes.get(sym_clean) or self._live_quotes.get(str(symbol).strip().upper())
+            if q and (time.time() - float(q.get("timestamp", 0.0))) < 300.0:
+                return q
+        # Fallback to shared capital / websocket cache
+        try:
+            import websocket_engine
+            t = websocket_engine.PRICE_CACHE.get(sym_clean) or websocket_engine.PRICE_CACHE.get(sym_clean + "USDT")
+            if t and isinstance(t, dict):
+                p = float(t.get("price", 0.0) or t.get("last_price", 0.0) or 0.0)
+                if p > 0:
+                    return {"ask": p, "bid": p, "mid": p, "timestamp": time.time()}
+        except Exception:
+            pass
+        return None
+
+    # =========================================================================
     # 5. TRADE SIGNAL DISPATCH API (SUB-MILLISECOND EXECUTION)
     # =========================================================================
     def dispatch_order(
@@ -1115,9 +1165,13 @@ class MT5BridgeEngine:
         lot: float,
         sl: float = 0.0,
         tp: float = 0.0,
+        sl_dist: float = 0.0,
+        tp_dist: float = 0.0,
         comment: str = "APEX_AI",
         magic: int = 888999,
-        target_account: Optional[str] = None
+        target_account: Optional[str] = None,
+        client_id: Any = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Dispatches a high-speed trade order signal simultaneously across
@@ -1129,6 +1183,8 @@ class MT5BridgeEngine:
         lot_norm = max(0.01, round(float(lot), 2))
         sl_norm = round(float(sl), 5) if sl > 0 else 0.0
         tp_norm = round(float(tp), 5) if tp > 0 else 0.0
+        sl_dist_norm = round(float(sl_dist), 5) if sl_dist > 0 else 0.0
+        tp_dist_norm = round(float(tp_dist), 5) if tp_dist > 0 else 0.0
 
         # Construct Signed Payload
         payload = {
@@ -1139,6 +1195,8 @@ class MT5BridgeEngine:
             "lot": lot_norm,
             "sl": sl_norm,
             "tp": tp_norm,
+            "sl_dist": sl_dist_norm,
+            "tp_dist": tp_dist_norm,
             "magic": int(magic),
             "comment": str(comment),
             "timestamp": int(time.time()),
@@ -1153,6 +1211,8 @@ class MT5BridgeEngine:
             "lot": lot_norm,
             "sl": sl_norm,
             "tp": tp_norm,
+            "sl_dist": sl_dist_norm,
+            "tp_dist": tp_dist_norm,
             "account_id": target_account or "BROADCAST",
             "timestamp": time.time()
         }
@@ -1759,18 +1819,24 @@ class MT5BridgeEngine:
                         if action == "SKIP" or confidence < 90.0:
                             continue
 
-                        # Calculate Super Smart ATR-Based Server-Side SL & TP
-                        atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(sym_target, action)
+                        # Calculate Super Smart ATR-Based Server-Side SL & TP with Live Quotes & Relative Distances
+                        quote_obj = self.get_live_symbol_quote(sym_target) or self.get_live_symbol_quote(raw_sym)
+                        c_price = float(quote_obj.get("mid", 0.0) if quote_obj else 0.0)
+                        atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(sym_target, action, current_price=c_price)
                         sl_price = float(atr_params.get("sl_price", 0.0))
                         tp_price = float(atr_params.get("tp_price", 0.0))
+                        sl_dist = float(atr_params.get("sl_dist", 0.0))
+                        tp_dist = float(atr_params.get("tp_dist", 0.0))
 
-                        logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {sym_target} (SL: {sl_price}, TP: {tp_price}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
+                        logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {sym_target} (SL: {sl_price}, TP: {tp_price}, Dist: {sl_dist}/{tp_dist}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
                         res = self.dispatch_order(
                             symbol=sym_target,
                             action=action,
                             lot=lot,
                             sl=sl_price,
                             tp=tp_price,
+                            sl_dist=sl_dist,
+                            tp_dist=tp_dist,
                             comment=f"MT5_{signal_reason[:15]}",
                             magic=888999,
                             target_account=acc_id

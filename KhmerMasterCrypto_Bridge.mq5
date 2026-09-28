@@ -325,12 +325,33 @@ void SendHeartbeat()
    }
    pos_json += "]";
 
+   // Collect active live quotes for major tradable symbols
+   string quotes_json = "{";
+   string watched_symbols[] = {"XAUUSD", "GOLD", "EURUSD", "GBPUSD", "USDJPY", "US30", "BTCUSD", "ETHUSD", "AUDUSD"};
+   int q_count = 0;
+   for(int s = 0; s < ArraySize(watched_symbols); s++)
+   {
+      string m_sym = MatchBrokerSymbol(watched_symbols[s]);
+      if(m_sym != "" && SymbolInfoInteger(m_sym, SYMBOL_SELECT))
+      {
+         double b_ask = SymbolInfoDouble(m_sym, SYMBOL_ASK);
+         double b_bid = SymbolInfoDouble(m_sym, SYMBOL_BID);
+         if(b_ask > 0.0 && b_bid > 0.0)
+         {
+            if(q_count > 0) quotes_json += ",";
+            quotes_json += StringFormat("\"%s\":{\"ask\":%.5f,\"bid\":%.5f}", watched_symbols[s], b_ask, b_bid);
+            q_count++;
+         }
+      }
+   }
+   quotes_json += "}";
+
    bool is_trade_connected = (bool)TerminalInfoInteger(TERMINAL_CONNECTED);
    string company_name = m_account.Company();
    if(company_name == "" && is_trade_connected) company_name = m_account.Server();
 
    string json = StringFormat(
-      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"ping_ms\":%.1f,\"timestamp\":%d,\"timestamp_ms\":%I64u,\"broker_connected\":%s,\"positions\":%s}\n",
+      "{\"type\":\"HEARTBEAT\",\"account_id\":\"%d\",\"broker\":\"%s\",\"firm_name\":\"%s\",\"balance\":%.2f,\"equity\":%.2f,\"daily_start_equity\":%.2f,\"initial_balance\":%.2f,\"secret_key\":\"%s\",\"ping_ms\":%.1f,\"timestamp\":%d,\"timestamp_ms\":%I64u,\"broker_connected\":%s,\"positions\":%s,\"quotes\":%s}\n",
       (int)m_account.Login(),
       company_name,
       InpFirmName,
@@ -343,7 +364,8 @@ void SendHeartbeat()
       (int)real_time,
       now_ms,
       is_trade_connected ? "true" : "false",
-      pos_json
+      pos_json,
+      quotes_json
    );
 
    SendRawString(json);
@@ -531,6 +553,8 @@ void HandleOrderSend(const string json)
    double lot_req    = StringToDouble(ExtractJsonValue(json, "lot"));
    double sl_req     = StringToDouble(ExtractJsonValue(json, "sl"));
    double tp_req     = StringToDouble(ExtractJsonValue(json, "tp"));
+   double sl_dist_req = StringToDouble(ExtractJsonValue(json, "sl_dist"));
+   double tp_dist_req = StringToDouble(ExtractJsonValue(json, "tp_dist"));
    ulong  magic_req  = (ulong)StringToInteger(ExtractJsonValue(json, "magic"));
    string comment    = ExtractJsonValue(json, "comment");
 
@@ -561,13 +585,54 @@ void HandleOrderSend(const string json)
    double lot = MathMax(min_lot, MathMin(max_lot, lot_req));
    lot = MathFloor(lot / lot_step) * lot_step;
 
-   // 3. Normalize Digits & Prices
+   // 3. Normalize Digits & Prices with Institutional Dynamic Stop Sanitization
    int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
    double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
    double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   long stops_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
+   long spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD);
 
-   double sl = (sl_req > 0.0) ? NormalizeDouble(sl_req, digits) : 0.0;
-   double tp = (tp_req > 0.0) ? NormalizeDouble(tp_req, digits) : 0.0;
+   // Minimum buffer distance from current price (in quote currency)
+   double min_stop_dist = MathMax((double)stops_level * point, (double)spread * point);
+   if(min_stop_dist < 10.0 * point) min_stop_dist = 10.0 * point;
+
+   double sl = 0.0;
+   double tp = 0.0;
+
+   StringToUpper(action_req);
+   if(action_req == "BUY")
+   {
+      double use_sl_dist = (sl_dist_req > 0.0) ? sl_dist_req : (sl_req > 0.0 ? MathAbs(ask - sl_req) : 0.0);
+      double use_tp_dist = (tp_dist_req > 0.0) ? tp_dist_req : (tp_req > 0.0 ? MathAbs(tp_req - ask) : 0.0);
+
+      if(use_sl_dist > 0.0)
+      {
+         if(use_sl_dist < min_stop_dist) use_sl_dist = min_stop_dist * 2.0;
+         sl = NormalizeDouble(ask - use_sl_dist, digits);
+      }
+      if(use_tp_dist > 0.0)
+      {
+         if(use_tp_dist < min_stop_dist) use_tp_dist = min_stop_dist * 4.0;
+         tp = NormalizeDouble(ask + use_tp_dist, digits);
+      }
+   }
+   else if(action_req == "SELL")
+   {
+      double use_sl_dist = (sl_dist_req > 0.0) ? sl_dist_req : (sl_req > 0.0 ? MathAbs(bid - sl_req) : 0.0);
+      double use_tp_dist = (tp_dist_req > 0.0) ? tp_dist_req : (tp_req > 0.0 ? MathAbs(bid - tp_req) : 0.0);
+
+      if(use_sl_dist > 0.0)
+      {
+         if(use_sl_dist < min_stop_dist) use_sl_dist = min_stop_dist * 2.0;
+         sl = NormalizeDouble(bid + use_sl_dist, digits);
+      }
+      if(use_tp_dist > 0.0)
+      {
+         if(use_tp_dist < min_stop_dist) use_tp_dist = min_stop_dist * 4.0;
+         tp = NormalizeDouble(bid - use_tp_dist, digits);
+      }
+   }
 
    m_trade.SetExpertMagicNumber(magic_req);
    m_trade.SetDeviationInPoints(100); // 100 points slippage tolerance to eliminate requotes on fast markets
@@ -632,6 +697,49 @@ void HandleOrderSend(const string json)
          success = m_trade.Sell(lot, symbol, bid, sl, tp, comment);
       }
       fill_price = bid;
+   }
+
+   // 4. RETCODE 10016 ZERO-STOP SHIELD: Fallback for brokers requiring Market Execution or rejecting initial stops
+   if(!success && m_trade.ResultRetcode() == 10016)
+   {
+      PrintFormat("🛡️ [RETCODE 10016 SHIELD] Broker rejected stops. Retrying Market Order with zero stops for %s...", symbol);
+      m_trade.SetTypeFillingBySymbol(symbol);
+      if(action_req == "BUY")
+      {
+         ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+         success = m_trade.Buy(lot, symbol, ask, 0.0, 0.0, comment);
+         if(!success)
+         {
+            m_trade.SetTypeFilling(ORDER_FILLING_IOC);
+            ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+            success = m_trade.Buy(lot, symbol, ask, 0.0, 0.0, comment);
+         }
+         fill_price = ask;
+      }
+      else if(action_req == "SELL")
+      {
+         bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+         success = m_trade.Sell(lot, symbol, bid, 0.0, 0.0, comment);
+         if(!success)
+         {
+            m_trade.SetTypeFilling(ORDER_FILLING_IOC);
+            bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+            success = m_trade.Sell(lot, symbol, bid, 0.0, 0.0, comment);
+         }
+         fill_price = bid;
+      }
+
+      if(success)
+      {
+         ticket = m_trade.ResultOrder();
+         if(ticket == 0) ticket = m_trade.ResultDeal();
+         PrintFormat("🎯 [ORDER FILLED VIA ZERO-STOP SHIELD] #%d | %s %s %.2f. Modifying position with stops...", ticket, action_req, symbol, lot);
+         if(ticket > 0 && (sl > 0.0 || tp > 0.0))
+         {
+            Sleep(50);
+            m_trade.PositionModify(ticket, sl, tp);
+         }
+      }
    }
 
    if(success)
