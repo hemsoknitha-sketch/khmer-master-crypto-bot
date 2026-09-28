@@ -644,8 +644,8 @@ void HandleOrderSend(const string json)
 
       // Report confirmation back to Linux VPS
       string confirm_json = StringFormat(
-         "{\"type\":\"ORDER_CONFIRM\",\"signal_id\":\"%s\",\"ticket\":%d,\"open_price\":%.5f,\"status\":\"FILLED\",\"secret_key\":\"%s\"}\n",
-         signal_id, ticket, fill_price, InpSecretKey
+         "{\"type\":\"ORDER_CONFIRM\",\"signal_id\":\"%s\",\"ticket\":%d,\"symbol\":\"%s\",\"open_price\":%.5f,\"status\":\"FILLED\",\"secret_key\":\"%s\"}\n",
+         signal_id, ticket, symbol, fill_price, InpSecretKey
       );
       SendRawString(confirm_json);
    }
@@ -677,17 +677,18 @@ void HandleOrderClose(const string json)
    }
    if(ticket > 0 && PositionSelectByTicket(ticket))
    {
+      string pos_sym = PositionGetString(POSITION_SYMBOL);
       double close_price = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? 
-                           SymbolInfoDouble(PositionGetString(POSITION_SYMBOL), SYMBOL_BID) : 
-                           SymbolInfoDouble(PositionGetString(POSITION_SYMBOL), SYMBOL_ASK);
+                           SymbolInfoDouble(pos_sym, SYMBOL_BID) : 
+                           SymbolInfoDouble(pos_sym, SYMBOL_ASK);
       double pnl = PositionGetDouble(POSITION_PROFIT);
 
       if(m_trade.PositionClose(ticket))
       {
-         PrintFormat("💰 [POSITION CLOSED] #%d | Close Price: %.5f | PnL: $%.2f", ticket, close_price, pnl);
+         PrintFormat("💰 [POSITION CLOSED] #%d | %s | Close Price: %.5f | PnL: $%.2f", ticket, pos_sym, close_price, pnl);
          string close_json = StringFormat(
-            "{\"type\":\"ORDER_CLOSED\",\"ticket\":%d,\"close_price\":%.5f,\"pnl\":%.2f,\"status\":\"CLOSED\",\"secret_key\":\"%s\"}\n",
-            ticket, close_price, pnl, InpSecretKey
+            "{\"type\":\"ORDER_CLOSED\",\"ticket\":%d,\"symbol\":\"%s\",\"close_price\":%.5f,\"pnl\":%.2f,\"status\":\"CLOSED\",\"secret_key\":\"%s\"}\n",
+            ticket, pos_sym, close_price, pnl, InpSecretKey
          );
          SendRawString(close_json);
       }

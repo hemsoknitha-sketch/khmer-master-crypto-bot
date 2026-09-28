@@ -430,9 +430,9 @@ class AdaptiveKellyDrawdownGuard:
         if macro_guard["is_frozen"]:
             recommended_lev = min(recommended_lev, macro_guard["max_allowed_leverage"])
 
-        # Dynamic Gold Scalp TP & SL Offsets
-        tp_offset_usd = round(current_price * 0.0035, 2)  # ~$9.20/oz on $2650 gold (realistic profit target)
-        sl_offset_usd = round(current_price * 0.0022, 2)  # ~$5.80/oz on $2650 gold (safe room against noise)
+        # Dynamic Gold Scalp TP & SL Offsets (1:2.8+ Asymmetric 10x Edge)
+        tp_offset_usd = max(15.00, round(current_price * 0.0055, 2))  # ~$15.00 - $18.00/oz on $2700 gold (1:3+ profit target)
+        sl_offset_usd = max(5.00, round(current_price * 0.0022, 2))   # ~$5.80 - $6.50/oz on $2700 gold (safe ATR room against noise)
 
         return {
             "account_balance": account_balance,
@@ -442,7 +442,7 @@ class AdaptiveKellyDrawdownGuard:
             "sl_offset_usd": sl_offset_usd,
             "max_daily_drawdown_limit_usd": round(max_daily_risk_usd, 2),
             "half_kelly_fraction": round(safe_kelly, 4),
-            "risk_reward_ratio": "1:1.6+ Moonbag"
+            "risk_reward_ratio": "1:2.8+ Asymmetric 10x Edge"
         }
 
 

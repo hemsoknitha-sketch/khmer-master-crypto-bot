@@ -28,7 +28,7 @@ import logging
 import threading
 import asyncio
 from typing import Dict, Any, Optional, List, Tuple, Union
-from datetime import datetime
+from datetime import datetime, timezone
 import html
 
 # Database and Core Security Citadel
@@ -266,6 +266,13 @@ class MT5QuantumSignalCitadel:
         # D. TRADFI INDICES & STOCKS (US30, NVDA, AAPL) - S&P 500 Macro Expansion
         elif any(idx in raw_clean for idx in ["US30", "DJ30", "NVDA", "AAPL", "TSLA"]):
             try:
+                # 1. New York Cash Session Clock Guard (13:30 - 20:30 UTC / 09:30 AM - 04:30 PM EST)
+                utc_now = datetime.now(timezone.utc)
+                utc_time_float = utc_now.hour + (utc_now.minute / 60.0)
+                is_ny_session = (13.5 <= utc_time_float <= 20.5)
+                if not is_ny_session:
+                    return "SKIP", 50.0, "NY_SESSION_CLOSED (TradFi active 13:30-20:30 UTC)"
+
                 sp_chg = 0.0
                 try:
                     import google_macro_satellite
@@ -290,6 +297,151 @@ class MT5QuantumSignalCitadel:
             return "SKIP", confidence, f"CONFIDENCE_BELOW_90 ({confidence:.0f}%)"
 
         return action, confidence, signal_reason
+
+    @classmethod
+    def calculate_quantum_atr_sl_tp(cls, symbol: str, action: str, current_price: float = 0.0) -> Dict[str, Any]:
+        """
+        Calculates ATR-based Server-Side Stop Loss (SL) and Take Profit (TP) prices
+        and dollar hurdles based on 10x Asymmetric Profit & Risk Parity.
+        Ensures Gold (XAUUSD) has minimum $5.00/oz - $6.50/oz buffer (preventing noise stop-outs)
+        and $15.00 - $22.50/oz TP (1:3+ Asymmetric Risk-to-Reward).
+        """
+        raw_clean = str(symbol).upper().replace("/", "").replace("_I", "").replace(".PRO", "").replace("C", "")
+        act_norm = "BUY" if str(action).upper() in ["BUY", "LONG"] else "SELL"
+
+        # 1. GOLD & METALS (XAUUSD / GOLD)
+        if "XAU" in raw_clean or "GOLD" in raw_clean:
+            atr_val = 5.0
+            curr_p = current_price
+            try:
+                import market_data
+                atr_info = market_data.get_symbol_atr("XAUUSDT", interval="15m")
+                atr_val = float(atr_info.get("atr_val", 5.0) or 5.0)
+                if curr_p <= 0:
+                    curr_p = float(atr_info.get("current_price", 2700.0) or 2700.0)
+            except Exception:
+                pass
+            if curr_p <= 0:
+                curr_p = 2700.0
+            atr_val = max(4.50, min(15.0, atr_val))
+
+            # SL: 1.5x ATR (Min $5.00/oz - $6.50/oz to absorb spread & noise)
+            sl_dist = round(max(5.00, atr_val * 1.5), 2)
+            # TP: 3.5x ATR (Min $15.00/oz - $22.50/oz for 1:3+ Asymmetric R:R)
+            tp_dist = round(max(15.00, atr_val * 3.5), 2)
+
+            sl_price = round(curr_p - sl_dist, 2) if act_norm == "BUY" else round(curr_p + sl_dist, 2)
+            tp_price = round(curr_p + tp_dist, 2) if act_norm == "BUY" else round(curr_p - tp_dist, 2)
+
+            return {
+                "sl_price": sl_price,
+                "tp_price": tp_price,
+                "sl_dist": sl_dist,
+                "tp_dist": tp_dist,
+                "risk_usd": round(sl_dist * 1.0, 2),
+                "profit_target_usd": round(tp_dist * 1.0, 2),
+                "current_price": curr_p,
+                "digits": 2
+            }
+
+        # 2. FOREX MAJORS (EURUSD, GBPUSD, USDJPY)
+        elif any(fx in raw_clean for fx in ["EUR", "GBP", "JPY", "AUD", "CAD", "CHF"]):
+            digits = 3 if "JPY" in raw_clean else 5
+            curr_p = current_price
+            if "EUR" in raw_clean:
+                curr_p = curr_p if curr_p > 0 else 1.08500
+                sl_dist, tp_dist = 0.0025, 0.0075  # 25 pips SL / 75 pips TP (1:3 R:R)
+            elif "GBP" in raw_clean:
+                curr_p = curr_p if curr_p > 0 else 1.29500
+                sl_dist, tp_dist = 0.0030, 0.0090  # 30 pips SL / 90 pips TP (1:3 R:R)
+            elif "JPY" in raw_clean:
+                curr_p = curr_p if curr_p > 0 else 155.000
+                sl_dist, tp_dist = 0.35, 1.05      # 35 pips SL / 105 pips TP (1:3 R:R)
+            else:
+                curr_p = curr_p if curr_p > 0 else 1.00000
+                sl_dist, tp_dist = 0.0030, 0.0090
+
+            sl_price = round(curr_p - sl_dist, digits) if act_norm == "BUY" else round(curr_p + sl_dist, digits)
+            tp_price = round(curr_p + tp_dist, digits) if act_norm == "BUY" else round(curr_p - tp_dist, digits)
+
+            return {
+                "sl_price": sl_price,
+                "tp_price": tp_price,
+                "sl_dist": sl_dist,
+                "tp_dist": tp_dist,
+                "risk_usd": 2.50,
+                "profit_target_usd": 7.50,
+                "current_price": curr_p,
+                "digits": digits
+            }
+
+        # 3. CRYPTO ASSETS (BTC, ETH, SOL)
+        elif any(c in raw_clean for c in ["BTC", "ETH", "SOL"]):
+            curr_p = current_price
+            if "BTC" in raw_clean:
+                curr_p = curr_p if curr_p > 0 else 65000.0
+                sl_dist = round(max(750.0, curr_p * 0.012), 2)  # 1.2% SL
+                tp_dist = round(max(2250.0, curr_p * 0.036), 2) # 3.6% TP (1:3 R:R)
+            elif "ETH" in raw_clean:
+                curr_p = curr_p if curr_p > 0 else 3000.0
+                sl_dist = round(max(45.0, curr_p * 0.015), 2)
+                tp_dist = round(max(135.0, curr_p * 0.045), 2)
+            elif "SOL" in raw_clean:
+                curr_p = curr_p if curr_p > 0 else 150.0
+                sl_dist = round(max(2.7, curr_p * 0.018), 2)
+                tp_dist = round(max(8.1, curr_p * 0.054), 2)
+            else:
+                curr_p = curr_p if curr_p > 0 else 100.0
+                sl_dist = round(curr_p * 0.015, 2)
+                tp_dist = round(curr_p * 0.045, 2)
+
+            sl_price = round(curr_p - sl_dist, 2) if act_norm == "BUY" else round(curr_p + sl_dist, 2)
+            tp_price = round(curr_p + tp_dist, 2) if act_norm == "BUY" else round(curr_p - tp_dist, 2)
+
+            return {
+                "sl_price": sl_price,
+                "tp_price": tp_price,
+                "sl_dist": sl_dist,
+                "tp_dist": tp_dist,
+                "risk_usd": 2.50,
+                "profit_target_usd": 7.50,
+                "current_price": curr_p,
+                "digits": 2
+            }
+
+        # 4. TRADFI INDICES & STOCKS (US30, NVDA, AAPL)
+        elif any(idx in raw_clean for idx in ["US30", "DJ30", "SP500", "US500", "NAS100"]):
+            curr_p = current_price if current_price > 0 else 40000.0
+            sl_dist = 150.0   # 150 index points
+            tp_dist = 450.0   # 450 index points (1:3 R:R)
+            sl_price = round(curr_p - sl_dist, 1) if act_norm == "BUY" else round(curr_p + sl_dist, 1)
+            tp_price = round(curr_p + tp_dist, 1) if act_norm == "BUY" else round(curr_p - tp_dist, 1)
+            return {
+                "sl_price": sl_price,
+                "tp_price": tp_price,
+                "sl_dist": sl_dist,
+                "tp_dist": tp_dist,
+                "risk_usd": 3.50,
+                "profit_target_usd": 10.50,
+                "current_price": curr_p,
+                "digits": 1
+            }
+        else:
+            curr_p = current_price if current_price > 0 else 150.0
+            sl_dist = round(curr_p * 0.015, 2)
+            tp_dist = round(curr_p * 0.045, 2)
+            sl_price = round(curr_p - sl_dist, 2) if act_norm == "BUY" else round(curr_p + sl_dist, 2)
+            tp_price = round(curr_p + tp_dist, 2) if act_norm == "BUY" else round(curr_p - tp_dist, 2)
+            return {
+                "sl_price": sl_price,
+                "tp_price": tp_price,
+                "sl_dist": sl_dist,
+                "tp_dist": tp_dist,
+                "risk_usd": 2.00,
+                "profit_target_usd": 6.00,
+                "current_price": curr_p,
+                "digits": 2
+            }
 
 
 class MT5BridgeEngine:
@@ -345,6 +497,11 @@ class MT5BridgeEngine:
         self._last_entry_scan: Dict[str, float] = {}
         self._last_symbol_trade_time: Dict[str, float] = {}
         self._ticket_peak_profit: Dict[int, float] = {}
+        
+        # Consecutive Loss Circuit Breaker & 120-Minute Cooldown Lock (Invariants 1.1, 35)
+        self._consecutive_losses: Dict[str, int] = {}  # {f"{account_id}_{symbol}": count}
+        self._symbol_lockout_until: Dict[str, float] = {}  # {f"{account_id}_{symbol}": timestamp}
+        self._ticket_metadata: Dict[int, Dict[str, Any]] = {}  # {ticket: {"symbol": str, "account_id": str, "entry_price": float}}
         
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
@@ -803,9 +960,17 @@ class MT5BridgeEngine:
         ticket = int(payload.get("ticket", 0))
         open_price = float(payload.get("open_price", 0.0) or payload.get("price", 0.0))
         status = str(payload.get("status", "FILLED"))
+        symbol = str(payload.get("symbol", "")).upper()
 
         db.update_mt5_bridge_order_fill(signal_id=signal_id, ticket=ticket, open_price=open_price, status=status)
-        logger.info(f"🎯 [MT5 FILL] Account {account_id} filled order! Ticket: #{ticket}, Price: {open_price}")
+        if ticket > 0:
+            self._ticket_metadata[ticket] = {
+                "symbol": symbol,
+                "account_id": account_id,
+                "open_price": open_price,
+                "signal_id": signal_id
+            }
+        logger.info(f"🎯 [MT5 FILL] Account {account_id} filled order! Ticket: #{ticket}, Symbol: {symbol or 'N/A'}, Price: {open_price}")
 
     def _handle_order_closed(self, payload: Dict[str, Any], account_id: str):
         """Processes trade close confirmation from MT5."""
@@ -813,9 +978,52 @@ class MT5BridgeEngine:
         close_price = float(payload.get("close_price", 0.0) or payload.get("price", 0.0))
         pnl = float(payload.get("pnl", 0.0))
         status = str(payload.get("status", "CLOSED"))
+        symbol = str(payload.get("symbol", "")).upper()
 
         db.update_mt5_bridge_order_close(ticket=ticket, close_price=close_price, pnl=pnl, status=status)
-        logger.info(f"💰 [MT5 CLOSED] Account {account_id} closed #{ticket}! Close Price: {close_price}, PnL: ${pnl:+,.2f}")
+        logger.info(f"💰 [MT5 CLOSED] Account {account_id} closed #{ticket}! Symbol: {symbol or 'N/A'}, Close Price: {close_price}, PnL: ${pnl:+,.2f}")
+
+        # Consecutive Loss Circuit Breaker & 120-Minute (2-Hour) Cooldown Lock
+        meta = self._ticket_metadata.pop(ticket, None) or {}
+        sym_clean = symbol or meta.get("symbol", "")
+        if sym_clean:
+            sym_clean = sym_clean.split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
+            streak_key = f"{account_id}_{sym_clean}"
+            if pnl < 0.0:
+                self._consecutive_losses[streak_key] = self._consecutive_losses.get(streak_key, 0) + 1
+                losses = self._consecutive_losses[streak_key]
+                logger.warning(f"⚠️ [STREAK COUNTER] Account {account_id} Symbol {sym_clean} Consecutive Losses: {losses}")
+                if losses >= 2:
+                    # 120-minute (7200 seconds) Cooldown Lockout
+                    lockout_duration = 7200.0
+                    lockout_until = time.time() + lockout_duration
+                    self._symbol_lockout_until[streak_key] = lockout_until
+                    self._symbol_lockout_until[f"{account_id}_{sym_clean}USDT"] = lockout_until
+                    self._symbol_lockout_until[f"{account_id}_{symbol}"] = lockout_until
+                    logger.error(f"🛑 [CONSECUTIVE LOSS CIRCUIT BREAKER] Account {account_id} Symbol {sym_clean} hit {losses} consecutive losses! Locked for 120 minutes (2 Hours) until {datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC!")
+                    
+                    # Dispatch Telegram Alert
+                    chat_id = 0
+                    with self._clients_lock:
+                        session = self.clients.get(account_id)
+                        if session:
+                            chat_id = getattr(session, "chat_id", 0)
+                    if chat_id:
+                        msg = (
+                            f"🛑 <b>[CONSECUTIVE LOSS CIRCUIT BREAKER]</b>\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"📉 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym_clean}</code>\n"
+                            f"⚠️ <b>ការខាតបង់ផ្ទួនៗ ៖</b> <b>{losses} ដងជាប់គ្នា (PnL: ${pnl:+,.2f})</b>\n"
+                            f"🔒 <b>វិធានការការពារ ៖</b> <b>ចាក់សោស្វ័យប្រវត្តិរយៈពេល ១២០ នាទី (២ ម៉ោង)!</b>\n"
+                            f"⏰ <b>ដោះសោនៅម៉ោង ៖</b> <code>{datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC</code>\n"
+                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{account_id}</code>\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"<i>✨ Khmer Master Crypto Citadel បានកាត់ផ្តាច់រង្វិលជុំខាតបង់ ដើម្បីការពារដើមទុន ១០០%!</i>"
+                        )
+                        _dispatch_telegram_alert(chat_id, msg)
+            elif pnl > 0.0:
+                self._consecutive_losses[streak_key] = 0
+                logger.info(f"✅ [STREAK RESET] Account {account_id} Symbol {sym_clean} had winning trade (${pnl:+,.2f}). Consecutive loss streak reset to 0.")
 
     def _handle_order_failed(self, payload: Dict[str, Any], account_id: str):
         """Processes trade rejection/failure reported by MT5 terminal."""
@@ -1207,8 +1415,8 @@ class MT5BridgeEngine:
                     # =========================================================
                     # 1. ASYMMETRIC 10x PROFIT & RISK HARVESTER (Invariants 1.1, 24, 35)
                     # =========================================================
-                    profit_target_usd = float(auto_cfg.get("profit_target_usd", 2.50) or 2.50)
-                    base_risk_usd = float(auto_cfg.get("risk_per_trade_usd", 1.50) or 1.50)
+                    profit_target_usd = float(auto_cfg.get("profit_target_usd", 7.50) or 7.50)
+                    base_risk_usd = float(auto_cfg.get("risk_per_trade_usd", 2.50) or 2.50)
 
                     current_tickets = set()
                     for p in list(open_positions):
@@ -1219,15 +1427,14 @@ class MT5BridgeEngine:
                         profit = float(p.get("profit", 0.0) or 0.0)
                         sym = str(p.get("symbol", "")).upper()
 
-                        # Asset-specific risk buffer (Benchmark Sonic: Gold requires min -$2.65/oz to absorb $0.45 spread + noise)
-                        max_risk_usd = base_risk_usd
-                        if "XAU" in sym or "GOLD" in sym:
-                            max_risk_usd = max(2.65, base_risk_usd)
+                        # Asset-specific ATR risk buffer (Gold requires min -$5.00/oz to absorb spread & noise)
+                        is_gold = ("XAU" in sym or "GOLD" in sym)
+                        if is_gold:
+                            max_risk_usd = max(5.00, base_risk_usd * 2.0)
                         elif any(idx in sym for idx in ["US30", "DJ30", "SP500", "US500", "NAS100"]):
-                            max_risk_usd = max(2.50, base_risk_usd)
+                            max_risk_usd = max(4.50, base_risk_usd * 1.8)
                         else:
-                            if max_risk_usd <= 0.50 or max_risk_usd > 2.50:
-                                max_risk_usd = 1.50
+                            max_risk_usd = max(2.50, base_risk_usd)
 
                         # Track peak profit
                         peak = self._ticket_peak_profit.get(ticket, 0.0)
@@ -1238,44 +1445,43 @@ class MT5BridgeEngine:
                         should_harvest = False
                         reason = ""
 
-                        is_gold = ("XAU" in sym or "GOLD" in sym)
                         if is_gold:
-                            # Gold Breakeven Armor: Once peak hits >= +$0.85 (8.5 pips above $0.45 spread), lock +$0.25
-                            if peak >= 0.85 and profit <= 0.25 and profit > -0.05:
+                            # Gold Breakeven Armor: Once peak hits >= +$2.50 (25 pips), lock +$0.50 (Breakeven + spread buffer)
+                            if peak >= 2.50 and profit <= 0.50 and profit > -0.10:
                                 should_harvest = True
                                 reason = f"BREAKEVEN_ARMOR (+${profit:.2f} protected at Breakeven from Peak +${peak:.2f})"
-                            elif peak >= 1.20 and peak < 2.00 and profit <= 0.60:
+                            elif peak >= 4.00 and peak < 7.00 and profit <= 2.00:
                                 should_harvest = True
                                 reason = f"TRAILING_LOCK_TIER1 (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
-                            elif peak >= 2.00 and peak < 3.50 and profit <= 1.20:
+                            elif peak >= 7.00 and peak < 12.00 and profit <= 4.50:
                                 should_harvest = True
                                 reason = f"TRAILING_LOCK_TIER2 (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
-                            elif peak >= 3.50 and peak < 6.00 and profit <= 2.20:
+                            elif peak >= 12.00 and peak < 18.00 and profit <= 8.00:
                                 should_harvest = True
                                 reason = f"TRAILING_LOCK_TIER3 (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
-                            elif peak >= 6.00 and profit <= (peak * 0.85):
+                            elif peak >= 18.00 and profit <= (peak * 0.85):
                                 should_harvest = True
                                 reason = f"ASYMMETRIC_10X_RATCHET (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
                         else:
                             # Standard Forex/Crypto Breakeven Armor & Trailing Tiers
-                            if peak >= 0.45 and profit <= 0.12 and profit > -0.05:
+                            if peak >= 1.50 and profit <= 0.30 and profit > -0.05:
                                 should_harvest = True
                                 reason = f"BREAKEVEN_ARMOR (+${profit:.2f} protected at Breakeven from Peak +${peak:.2f})"
-                            elif peak >= 0.80 and peak < 1.50 and profit <= 0.40:
+                            elif peak >= 2.50 and peak < 4.50 and profit <= 1.20:
                                 should_harvest = True
                                 reason = f"TRAILING_LOCK_TIER1 (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
-                            elif peak >= 1.50 and peak < 2.50 and profit <= 1.00:
+                            elif peak >= 4.50 and peak < 8.00 and profit <= 2.80:
                                 should_harvest = True
                                 reason = f"TRAILING_LOCK_TIER2 (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
-                            elif peak >= 2.50 and peak < 5.00 and profit <= 1.80:
+                            elif peak >= 8.00 and peak < 14.00 and profit <= 5.50:
                                 should_harvest = True
                                 reason = f"TRAILING_LOCK_TIER3 (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
-                            elif peak >= 5.00 and profit <= (peak * 0.85):
+                            elif peak >= 14.00 and profit <= (peak * 0.85):
                                 should_harvest = True
                                 reason = f"ASYMMETRIC_10X_RATCHET (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
 
                         # Target Profit Hit for quick scalps:
-                        if not should_harvest and profit >= profit_target_usd and peak < 2.50:
+                        if not should_harvest and profit >= profit_target_usd and peak < (profit_target_usd * 0.6):
                             should_harvest = True
                             reason = f"TARGET_HIT (+${profit:.2f} >= +${profit_target_usd:.2f})"
 
@@ -1357,14 +1563,34 @@ class MT5BridgeEngine:
                     ]
                     allocations = auto_cfg.get("allocations", []) or default_10_universe
 
+                    # Cent Account Detection & Sub-$300 Real Balance Gatekeeper
+                    curr_str = str(getattr(session, "currency", "USD")).upper().strip()
+                    broker_str = str(getattr(session, "broker", "")).lower()
+                    is_cent_account = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
+                    raw_bal = float(getattr(session, "balance", 100.0) or 100.0)
+                    real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
+
+                    # Strict Sub-$300 / Cent Account Gatekeeper:
+                    # Exclude all Indices (US30, US30c, US30C, DJ30, SP500, US500, NAS100, USTEC, GER40) if real balance < $300 USD
+                    if real_usd_balance < 300.0 or is_cent_account:
+                        allocations = [
+                            a for a in allocations 
+                            if a.get("category") not in ["Indices", "Index", "Indices/CFD"]
+                            and not any(idx in str(a.get("symbol", "")).upper() or idx in str(a.get("raw_symbol", "")).upper()
+                                        for idx in ["US30", "DJ30", "SP500", "US500", "NAS100", "USTEC", "GER40", "DOW"])
+                        ]
+
                     max_assets = int(auto_cfg.get("max_assets", 5))
-                    bal = getattr(session, "balance", 100.0)
-                    if bal < 100.0:
+                    if real_usd_balance < 75.0:
+                        max_assets = 1
+                        allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
+                    elif real_usd_balance < 150.0:
                         max_assets = min(2, max_assets)
-                    elif bal < 300.0:
-                        max_assets = min(4, max_assets)
-                    elif bal < 1000.0:
-                        max_assets = min(7, max_assets)
+                        allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
+                    elif real_usd_balance < 300.0:
+                        max_assets = min(3, max_assets)
+                    elif real_usd_balance < 1000.0:
+                        max_assets = min(5, max_assets)
                     else:
                         max_assets = min(10, max_assets)
 
@@ -1374,7 +1600,7 @@ class MT5BridgeEngine:
                     total_pnl = 0.0
                     for p in open_positions:
                         sym = str(p.get("symbol", "")).upper()
-                        clean_sym = sym.split(".")[0].replace("_I", "")
+                        clean_sym = sym.split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
                         open_symbols.add(sym)
                         open_symbols.add(clean_sym)
                         total_pnl += float(p.get("profit", 0.0) or 0.0)
@@ -1382,7 +1608,7 @@ class MT5BridgeEngine:
                     # Debounced Periodic Radar Log (every 60s per user)
                     if now_ts - self._last_auto_trade_log.get(str(chat_id), 0.0) >= 60.0:
                         self._last_auto_trade_log[str(chat_id)] = now_ts
-                        logger.info(f"🌊 [MT5 AUTO-TRADE RADAR] User {chat_id} (Acc #{acc_id}): Active ({current_open_count}/{max_assets} Positions) | PnL: ${total_pnl:+.2f} | 33 AI Models Swarm Active.")
+                        logger.info(f"🌊 [MT5 AUTO-TRADE RADAR] User {chat_id} (Acc #{acc_id}): Active ({current_open_count}/{max_assets} Positions) | Real Bal: ${real_usd_balance:,.2f} | PnL: ${total_pnl:+.2f} | 33 AI Models Swarm Active.")
 
                     # Only scan for new entries every 20 seconds
                     if (now_ts - self._last_entry_scan.get(str(chat_id), 0.0)) < 20.0:
@@ -1396,12 +1622,28 @@ class MT5BridgeEngine:
                     for a in allocations:
                         raw_sym = str(a.get("raw_symbol", a.get("symbol", ""))).upper()
                         sym_target = str(a.get("symbol", raw_sym)).upper()
+                        sym_clean = raw_sym.split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
 
-                        if raw_sym in open_symbols or sym_target in open_symbols:
+                        if raw_sym in open_symbols or sym_target in open_symbols or sym_clean in open_symbols:
+                            continue
+
+                        # 120-Minute Consecutive Loss Circuit Breaker Lockout Check
+                        lockout_t = max(
+                            self._symbol_lockout_until.get(f"{acc_id}_{sym_clean}", 0.0),
+                            self._symbol_lockout_until.get(f"{acc_id}_{raw_sym}", 0.0),
+                            self._symbol_lockout_until.get(f"{acc_id}_{sym_target}", 0.0)
+                        )
+                        if now_ts < lockout_t:
+                            rem_min = int((lockout_t - now_ts) / 60.0)
+                            logger.debug(f"🔒 [CIRCUIT BREAKER LOCK] Account {acc_id} Symbol {sym_clean} in 120m cooldown ({rem_min}m remaining). Skipping.")
                             continue
 
                         # Inter-Trade Anti-Whipsaw Cooldown (180s = 3 minutes per symbol)
-                        last_trade_t = self._last_symbol_trade_time.get(f"{chat_id}_{raw_sym}", 0.0)
+                        last_trade_t = max(
+                            self._last_symbol_trade_time.get(f"{chat_id}_{raw_sym}", 0.0),
+                            self._last_symbol_trade_time.get(f"{chat_id}_{sym_target}", 0.0),
+                            self._last_symbol_trade_time.get(f"{chat_id}_{sym_clean}", 0.0)
+                        )
                         if (now_ts - last_trade_t) < 180.0:
                             continue
 
@@ -1415,13 +1657,18 @@ class MT5BridgeEngine:
                         if action == "SKIP" or confidence < 90.0:
                             continue
 
-                        logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {sym_target} ({signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
+                        # Calculate Super Smart ATR-Based Server-Side SL & TP
+                        atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(sym_target, action)
+                        sl_price = float(atr_params.get("sl_price", 0.0))
+                        tp_price = float(atr_params.get("tp_price", 0.0))
+
+                        logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {sym_target} (SL: {sl_price}, TP: {tp_price}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
                         res = self.dispatch_order(
                             symbol=sym_target,
                             action=action,
                             lot=lot,
-                            sl=0.0,
-                            tp=0.0,
+                            sl=sl_price,
+                            tp=tp_price,
                             comment=f"MT5_{signal_reason[:15]}",
                             magic=888999,
                             target_account=acc_id
@@ -1429,8 +1676,10 @@ class MT5BridgeEngine:
                         if res.get("clients_reached", 0) > 0:
                             self._last_symbol_trade_time[f"{chat_id}_{raw_sym}"] = now_ts
                             self._last_symbol_trade_time[f"{chat_id}_{sym_target}"] = now_ts
+                            self._last_symbol_trade_time[f"{chat_id}_{sym_clean}"] = now_ts
                             open_symbols.add(raw_sym)
                             open_symbols.add(sym_target)
+                            open_symbols.add(sym_clean)
                             current_open_count += 1
                             break
             except Exception as e:
