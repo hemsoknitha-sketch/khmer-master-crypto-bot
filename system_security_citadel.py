@@ -198,8 +198,16 @@ class SecurityCitadelManager:
         daily_change_pct = ((current_equity - daily_start_equity) / daily_start_equity) * 100.0
         max_drawdown_pct = ((current_equity - initial_balance) / initial_balance) * 100.0
 
-        is_daily_breached = (daily_change_pct <= self.PROP_MAX_DAILY_LOSS_PCT)
-        is_max_breached = (max_drawdown_pct <= self.PROP_MAX_TOTAL_LOSS_PCT)
+        daily_limit = self.PROP_MAX_DAILY_LOSS_PCT
+        max_limit = self.PROP_MAX_TOTAL_LOSS_PCT
+        # Small Capital Protection Shield (Invariant 8 & 25): Accounts < $200 receive a dynamic spread buffer
+        # to prevent standard retail broker bid/ask spread drag from triggering false-positive circuit breakers.
+        if initial_balance < 200.0 or daily_start_equity < 200.0:
+            daily_limit = -5.0
+            max_limit = -8.0
+
+        is_daily_breached = (daily_change_pct <= daily_limit)
+        is_max_breached = (max_drawdown_pct <= max_limit)
 
         compliant = not (is_daily_breached or is_max_breached)
 
@@ -208,8 +216,8 @@ class SecurityCitadelManager:
             "current_equity": current_equity,
             "daily_change_pct": round(daily_change_pct, 2),
             "max_drawdown_pct": round(max_drawdown_pct, 2),
-            "daily_limit_pct": self.PROP_MAX_DAILY_LOSS_PCT,
-            "max_limit_pct": self.PROP_MAX_TOTAL_LOSS_PCT,
+            "daily_limit_pct": daily_limit,
+            "max_limit_pct": max_limit,
             "is_daily_breached": is_daily_breached,
             "is_max_breached": is_max_breached,
             "compliant": compliant

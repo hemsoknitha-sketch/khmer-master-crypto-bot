@@ -5699,6 +5699,13 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["PROP"]
                 await mt5_command(update, context)
+            elif data == "btn_mt5_reset_shield":
+                try:
+                    await update.callback_query.answer("🔄 កំពុង Reset & ដោះសោរ Prop Firm Risk Shield...")
+                except Exception:
+                    pass
+                context.args = ["RESET"]
+                await mt5_command(update, context)
             elif data == "btn_mt5_positions":
                 try:
                     await update.callback_query.answer("📊 ពិនិត្យ Positions សកម្មទាំងអស់...")
@@ -6511,6 +6518,13 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
                 context.args = []
+                await mt5_command(update, context)
+            elif data == "btn_mt5_reset_shield":
+                try:
+                    await update.callback_query.answer("🔄 កំពុង Reset & ដោះសោរ Prop Firm Risk Shield...")
+                except Exception:
+                    pass
+                context.args = ["RESET"]
                 await mt5_command(update, context)
             elif data == "btn_mt5_close_all":
                 try:
@@ -20703,6 +20717,45 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(msg_prop.replace("*", "").replace("_", ""))
                     return
 
+                # --- 6. PROP COMPLIANCE RESET / UNLOCK ---
+                elif sub in ["RESET", "UNLOCK", "CLEAR_BREACH"]:
+                    target_to_reset = user_login if (not is_admin_user or user_login) else (args[1] if len(args) >= 2 else None)
+                    success = False
+                    if target_to_reset:
+                        success = bridge.reset_prop_compliance(str(target_to_reset))
+                    else:
+                        status_data = bridge.get_bridge_status()
+                        for c in status_data.get("clients", []):
+                            acc = c.get("account_id")
+                            if acc:
+                                bridge.reset_prop_compliance(str(acc))
+                                success = True
+                    if user_lang not in ['en', 'english']:
+                        msg_reset = (
+                            f"🛡️ **PROP FIRM RISK SHIELD | RESET COMPLIANCE** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🎯 **Target Account ៖** `{target_to_reset or 'All Connected'}`\n"
+                            f"📊 **ស្ថានភាព ៖** `{'✅ UNLOCKED & RESET ជោគជ័យ' if success else '⚠️ រកមិនឃើញ Account ដែលបានភ្ជាប់'}`\n"
+                            f"🔄 **Daily Baseline ៖** `បានកំណត់ឡើងវិញតាម Equity បច្ចុប្បន្ន`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🚀 _ប្រព័ន្ធរួចរាល់សម្រាប់ការវិនិយោគស្វ័យប្រវត្តិបន្តទៀត!_"
+                        )
+                    else:
+                        msg_reset = (
+                            f"🛡️ **PROP FIRM RISK SHIELD | RESET COMPLIANCE** ⚡\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🎯 **Target Account:** `{target_to_reset or 'All Connected'}`\n"
+                            f"📊 **Status:** `{'✅ UNLOCKED & RESET SUCCESS' if success else '⚠️ Connected Account Not Found'}`\n"
+                            f"🔄 **Daily Baseline:** `Reset to Current Equity`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🚀 _System ready to resume auto-trading!_"
+                        )
+                    try:
+                        await update.effective_message.reply_text(msg_reset, parse_mode="Markdown")
+                    except Exception:
+                        await update.effective_message.reply_text(msg_reset.replace("*", "").replace("_", ""))
+                    return
+
             # --- DEFAULT DASHBOARD TELEMETRY ---
             status_data = bridge.get_bridge_status()
             online_count = status_data["online_clients"]
@@ -20867,7 +20920,8 @@ class TelegramBotThread(BaseThread):
                 ],
                 [
                     InlineKeyboardButton("📊 Open Positions", callback_data="btn_mt5_positions"),
-                    InlineKeyboardButton("🛡️ Prop Risk Shield", callback_data="btn_mt5_prop_shield")
+                    InlineKeyboardButton("🛡️ Prop Shield", callback_data="btn_mt5_prop_shield"),
+                    InlineKeyboardButton("🔄 Reset Shield", callback_data="btn_mt5_reset_shield")
                 ],
                 [
                     InlineKeyboardButton("🚨 Panic CLOSE ALL", callback_data="btn_mt5_close_all"),
@@ -20914,6 +20968,7 @@ class TelegramBotThread(BaseThread):
                     f"• បិទ Order ជាក់លាក់ ៖ `` `/mt5 CLOSE {sample_ticket}` ``\n"
                     f"• បិទ Position ទាំងអស់ជាបន្ទាន់ ៖ `` `/mt5 CLOSEALL` ``\n"
                     f"• សាកល្បងល្បឿន Ping ៖ `` `/mt5 TEST` ``\n"
+                    f"• ដោះសោរ Prop Risk Shield ៖ `` `/mt5 RESET` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -20948,6 +21003,7 @@ class TelegramBotThread(BaseThread):
                     f"• Close Specific Order: `` `/mt5 CLOSE {sample_ticket}` ``\n"
                     f"• Panic Close All: `` `/mt5 CLOSEALL` ``\n"
                     f"• Test Latency: `` `/mt5 TEST` ``\n"
+                    f"• Reset Prop Risk Shield: `` `/mt5 RESET` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"

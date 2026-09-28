@@ -472,6 +472,12 @@ void ExecuteCommand(const string json)
       g_prop_breached = true;
       CloseAllBridgeTrades("PROP_BREACH_HALT");
    }
+   else if(type == "PROP_CIRCUIT_BREAKER_RESET")
+   {
+      Print("✅ [PROP RESET] Circuit breaker reset command received from Linux Brain! Resuming trading.");
+      g_prop_breached = false;
+      g_daily_start_equity = m_account.Equity();
+   }
    else if(type == "PONG" || type == "HEARTBEAT_ACK")
    {
       // Calculate live round-trip network ping

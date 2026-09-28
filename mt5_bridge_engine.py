@@ -517,18 +517,25 @@ class MT5BridgeEngine:
             session.is_prop_compliant = compliant
 
             if not compliant:
-                session.status = "LOCKED_PROP_BREACH"
-                logger.error(f"🚨 [PROP BREACH] Account {account_id} breached limit: {details}")
-                # Send Emergency Alert to MT5
-                emergency_msg = {
-                    "type": "PROP_CIRCUIT_BREAKER",
-                    "account_id": account_id,
-                    "action": "HALT_TRADING",
-                    "reason": details.get("action", "PROP_BREACH"),
-                    "details": details,
-                    "timestamp": int(time.time())
-                }
-                self._send_raw_socket(sock, emergency_msg)
+                now_ts = time.time()
+                last_breach_alert = self._last_auth_log.get(f"prop_breach_{account_id}", 0.0)
+                if session.status != "LOCKED_PROP_BREACH" or (now_ts - last_breach_alert >= 60.0):
+                    self._last_auth_log[f"prop_breach_{account_id}"] = now_ts
+                    session.status = "LOCKED_PROP_BREACH"
+                    logger.error(f"🚨 [PROP BREACH] Account {account_id} breached limit: {details}")
+                    # Send Emergency Alert to MT5
+                    emergency_msg = {
+                        "type": "PROP_CIRCUIT_BREAKER",
+                        "account_id": account_id,
+                        "action": "HALT_TRADING",
+                        "reason": details.get("action", "PROP_BREACH"),
+                        "details": details,
+                        "timestamp": int(time.time())
+                    }
+                    self._send_raw_socket(sock, emergency_msg)
+            else:
+                if session.status == "LOCKED_PROP_BREACH":
+                    session.status = "ONLINE"
 
         # Update SQLite DB
         db.upsert_mt5_bridge_client(
@@ -865,6 +872,11 @@ class MT5BridgeEngine:
                         continue
 
                     max_assets = int(auto_cfg.get("max_assets", 5))
+                    # Small Capital Risk Sizing (Invariant 8 & 25):
+                    # For accounts under $200, clamp concurrent positions to max 2
+                    # to keep aggregate spread drag below 0.6% of equity.
+                    if getattr(session, "balance", 100.0) < 200.0:
+                        max_assets = min(2, max_assets)
                     current_open_count = len(open_positions)
 
                     open_symbols = set()
@@ -926,6 +938,28 @@ class MT5BridgeEngine:
                             break
             except Exception as e:
                 logger.error(f"⚠️ [MT5 AUTO-TRADE WORKER ERROR]: {e}")
+
+    def reset_prop_compliance(self, account_id: str) -> bool:
+        """Resets prop compliance baseline for an account."""
+        with self._clients_lock:
+            acc_str = str(account_id)
+            if acc_str in self.clients:
+                session = self.clients[acc_str]
+                session.daily_start_equity = session.equity
+                session.initial_balance = session.balance
+                session.is_prop_compliant = True
+                session.status = "ONLINE"
+                unlock_msg = {
+                    "type": "PROP_CIRCUIT_BREAKER_RESET",
+                    "account_id": acc_str,
+                    "action": "RESUME_TRADING",
+                    "timestamp": int(time.time())
+                }
+                if session.socket_conn:
+                    self._send_raw_socket(session.socket_conn, unlock_msg)
+                logger.info(f"🛡️ [PROP RESET] Compliance reset for account {acc_str}. New Baseline Equity: ${session.equity:,.2f}")
+                return True
+        return False
 
     def get_bridge_status(self) -> Dict[str, Any]:
         """Provides executive telemetry summary for Telegram UI and audits."""
