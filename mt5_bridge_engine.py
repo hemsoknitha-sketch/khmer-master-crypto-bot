@@ -139,6 +139,8 @@ class MT5BridgeEngine:
         self._last_disconnect_log: Dict[str, float] = {}
         self._last_db_upsert: Dict[str, float] = {}
         self._last_auto_trade_log: Dict[str, float] = {}
+        self._last_entry_scan: Dict[str, float] = {}
+        self._ticket_peak_profit: Dict[int, float] = {}
         
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
@@ -853,7 +855,7 @@ class MT5BridgeEngine:
         time.sleep(10.0)  # Initial warmup
         while self.is_running:
             try:
-                time.sleep(20.0)
+                time.sleep(5.0)
                 active_users = db.get_all_active_mt5_auto_users() if hasattr(db, "get_all_active_mt5_auto_users") else []
                 if not active_users:
                     continue
@@ -879,6 +881,65 @@ class MT5BridgeEngine:
                     if not auto_cfg or not auto_cfg.get("enabled", False):
                         continue
 
+                    # =========================================================
+                    # 1. AUTONOMOUS PROFIT HARVESTER & GOLDEN RATCHET (Invariant 24)
+                    # =========================================================
+                    profit_target_usd = float(auto_cfg.get("profit_target_usd", 1.80))
+                    current_tickets = set()
+                    for p in list(open_positions):
+                        ticket = int(p.get("ticket", 0) or 0)
+                        if ticket <= 0:
+                            continue
+                        current_tickets.add(ticket)
+                        profit = float(p.get("profit", 0.0) or 0.0)
+                        sym = str(p.get("symbol", "")).upper()
+
+                        # Track peak profit
+                        peak = self._ticket_peak_profit.get(ticket, 0.0)
+                        if profit > peak:
+                            self._ticket_peak_profit[ticket] = profit
+                            peak = profit
+
+                        should_harvest = False
+                        reason = ""
+                        # A. Target Profit Hit (+1.8% to +2.5% account gain)
+                        if profit >= profit_target_usd:
+                            should_harvest = True
+                            reason = f"TARGET_HIT (+${profit:.2f} >= +${profit_target_usd:.2f})"
+                        # B. Golden 85% Profit Ratchet (Retrace Protection from Peak >= $1.20)
+                        elif peak >= 1.20 and profit <= (peak * 0.80) and profit >= 0.40:
+                            should_harvest = True
+                            reason = f"GOLDEN_RATCHET_LOCK (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
+
+                        if should_harvest:
+                            logger.info(f"💰 [MT5 AUTO PROFIT HARVEST] Ticket #{ticket} ({sym}) | {reason}! Executing 0.5ms market close...")
+                            self.dispatch_close(ticket=ticket, symbol=sym, comment=f"AI_HARVEST_{profit:+.2f}", target_account=acc_id)
+                            self._ticket_peak_profit.pop(ticket, None)
+                            try:
+                                import notification_manager
+                                notification_manager.send_telegram_notification(
+                                    f"💰 <b>[MT5 AUTO PROFIT HARVEST]</b>\n"
+                                    f"━━━━━━━━━━━━\n"
+                                    f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                    f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
+                                    f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>+${profit:,.2f} USD</b>\n"
+                                    f"🛡️ <b>យន្តការ ៖</b> {reason}\n"
+                                    f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
+                                    f"━━━━━━━━━━━━\n"
+                                    f"<i>✨ Apex Super Brain AI បានកើបប្រាក់ចំណេញ និងបិទ Position ដោយស្វ័យប្រវត្តិតាម Tokyo Bridge (<0.5ms)!</i>"
+                                )
+                            except Exception as ex:
+                                logger.warning(f"⚠️ Telegram harvest alert error: {ex}")
+
+                    # Prune stale tickets
+                    for t in list(self._ticket_peak_profit.keys()):
+                        if t not in current_tickets:
+                            self._ticket_peak_profit.pop(t, None)
+
+                    # =========================================================
+                    # 2. POSITION SIZING & DEBOUNCED RADAR SCAN (Every 20s)
+                    # =========================================================
+                    now_ts = time.time()
                     allocations = auto_cfg.get("allocations", [])
                     if not allocations:
                         continue
@@ -901,10 +962,14 @@ class MT5BridgeEngine:
                         total_pnl += float(p.get("profit", 0.0) or 0.0)
 
                     # Debounced Periodic Radar Log (every 60s per user)
-                    now_ts = time.time()
                     if now_ts - self._last_auto_trade_log.get(str(chat_id), 0.0) >= 60.0:
                         self._last_auto_trade_log[str(chat_id)] = now_ts
                         logger.info(f"🌊 [MT5 AUTO-TRADE RADAR] User {chat_id} (Acc #{acc_id}): Active ({current_open_count}/{max_assets} Positions) | PnL: ${total_pnl:+.2f} | 33 AI Models Swarm Active.")
+
+                    # Only scan for new entries every 20 seconds
+                    if (now_ts - self._last_entry_scan.get(str(chat_id), 0.0)) < 20.0:
+                        continue
+                    self._last_entry_scan[str(chat_id)] = now_ts
 
                     if current_open_count >= max_assets:
                         continue
