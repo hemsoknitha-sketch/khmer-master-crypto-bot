@@ -883,9 +883,13 @@ class MT5BridgeEngine:
                         continue
 
                     # =========================================================
-                    # 1. AUTONOMOUS PROFIT HARVESTER & GOLDEN RATCHET (Invariant 24)
+                    # 1. AUTONOMOUS PROFIT & RISK HARVESTER (Invariants 1.1, 24, 35)
                     # =========================================================
-                    profit_target_usd = float(auto_cfg.get("profit_target_usd", 1.80))
+                    profit_target_usd = float(auto_cfg.get("profit_target_usd", 1.80) or 1.80)
+                    max_risk_usd = float(auto_cfg.get("risk_per_trade_usd", 2.00) or 2.00)
+                    if max_risk_usd <= 0.50:
+                        max_risk_usd = 2.00
+
                     current_tickets = set()
                     for p in list(open_positions):
                         ticket = int(p.get("ticket", 0) or 0)
@@ -911,25 +915,45 @@ class MT5BridgeEngine:
                         elif peak >= 1.20 and profit <= (peak * 0.80) and profit >= 0.40:
                             should_harvest = True
                             reason = f"GOLDEN_RATCHET_LOCK (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
+                        # C. Mathematical Hard Stop Loss Guard (Invariant 1.1 & 35)
+                        # Clamps individual trade risk to eliminate runaway drawdowns
+                        elif profit <= -max_risk_usd:
+                            should_harvest = True
+                            reason = f"STOP_LOSS_GUARD (-${abs(profit):.2f} <= -${max_risk_usd:.2f})"
 
                         if should_harvest:
-                            logger.info(f"💰 [MT5 AUTO PROFIT HARVEST] Ticket #{ticket} ({sym}) | {reason}! Executing 0.5ms market close...")
+                            is_loss = (profit < 0.0)
+                            log_icon = "🛑 [MT5 AUTO RISK STOP]" if is_loss else "💰 [MT5 AUTO PROFIT HARVEST]"
+                            logger.info(f"{log_icon} Ticket #{ticket} ({sym}) | {reason}! Executing 0.5ms market close...")
                             self.dispatch_close(ticket=ticket, symbol=sym, comment=f"AI_HARVEST_{profit:+.2f}", target_account=acc_id)
                             self._ticket_peak_profit.pop(ticket, None)
                             try:
                                 import notification_manager
                                 if chat_id:
-                                    msg_harvest = (
-                                        f"💰 <b>[MT5 AUTO PROFIT HARVEST]</b>\n"
-                                        f"━━━━━━━━━━━━\n"
-                                        f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
-                                        f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
-                                        f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>+${profit:,.2f} USD</b>\n"
-                                        f"🛡️ <b>យន្តការ ៖</b> {reason}\n"
-                                        f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
-                                        f"━━━━━━━━━━━━\n"
-                                        f"<i>✨ Apex Super Brain AI បានកើបប្រាក់ចំណេញ និងបិទ Position ដោយស្វ័យប្រវត្តិតាម Tokyo Bridge (&lt;0.5ms)!</i>"
-                                    )
+                                    if is_loss:
+                                        msg_harvest = (
+                                            f"🛡️ <b>[MT5 AUTO RISK STOP-LOSS]</b>\n"
+                                            f"━━━━━━━━━━━━\n"
+                                            f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                            f"📉 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
+                                            f"🔻 <b>កាត់ហានិភ័យស្វ័យប្រវត្តិ ៖</b> <b>-${abs(profit):,.2f} USD</b>\n"
+                                            f"🛡️ <b>យន្តការការពារ ៖</b> {reason}\n"
+                                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
+                                            f"━━━━━━━━━━━━\n"
+                                            f"<i>✨ Apex Super Brain AI បានកាត់ហានិភ័យការពារដើមទុន មិនឱ្យខាតធ្ងន់ធ្ងរឡើយ!</i>"
+                                        )
+                                    else:
+                                        msg_harvest = (
+                                            f"💰 <b>[MT5 AUTO PROFIT HARVEST]</b>\n"
+                                            f"━━━━━━━━━━━━\n"
+                                            f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
+                                            f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>+${profit:,.2f} USD</b>\n"
+                                            f"🛡️ <b>យន្តការ ៖</b> {reason}\n"
+                                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
+                                            f"━━━━━━━━━━━━\n"
+                                            f"<i>✨ Apex Super Brain AI បានកើបប្រាក់ចំណេញ និងបិទ Position ដោយស្វ័យប្រវត្តិតាម Tokyo Bridge (&lt;0.5ms)!</i>"
+                                        )
                                     asyncio.create_task(notification_manager.send_telegram_alert(chat_id, msg_harvest, parse_mode="HTML"))
                             except Exception as ex:
                                 logger.warning(f"⚠️ Telegram harvest alert error: {ex}")
