@@ -26,7 +26,7 @@ import socket
 import select
 import logging
 import threading
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Union
 from datetime import datetime
 
 # Database and Core Security Citadel
@@ -655,14 +655,30 @@ class MT5BridgeEngine:
             "lot": lot_norm
         }
 
+    def dispatch_signal(self, *args, **kwargs) -> Dict[str, Any]:
+        """Dispatches trade signal to MT5 terminals. Canonical alias for dispatch_order."""
+        return self.dispatch_order(*args, **kwargs)
+
     def dispatch_close(
         self,
         ticket: int = 0,
         symbol: Optional[str] = None,
         comment: str = "AI_CLOSE",
-        target_account: Optional[str] = None
+        target_account: Optional[str] = None,
+        client_id: Optional[Union[str, int]] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """Dispatches an atomic close signal for an active position (or 0 for all positions)."""
+        if client_id and not target_account:
+            target_str = str(client_id)
+            with self._clients_lock:
+                for acc_id, session in self.clients.items():
+                    if str(session.chat_id) == target_str:
+                        target_account = acc_id
+                        break
+            if not target_account:
+                target_account = target_str
+
         payload = {
             "type": "ORDER_CLOSE",
             "ticket": int(ticket),
@@ -712,6 +728,64 @@ class MT5BridgeEngine:
                         clients_reached += 1
 
         return {"success": True, "ticket": ticket, "new_sl": new_sl, "new_tp": new_tp, "clients_reached": clients_reached}
+
+    def get_client_session(self, account_or_chat_id: Union[str, int]) -> Optional[Dict[str, Any]]:
+        """Retrieves an active MT5 client session by account ID or chat ID."""
+        acc_str = str(account_or_chat_id)
+        with self._clients_lock:
+            if acc_str in self.clients:
+                s = self.clients[acc_str]
+                return {
+                    "account_id": s.account_id,
+                    "chat_id": s.chat_id,
+                    "broker": s.broker,
+                    "firm_name": s.firm_name,
+                    "balance": s.balance,
+                    "equity": s.equity,
+                    "ping_ms": s.ping_ms,
+                    "compliant": s.is_prop_compliant,
+                    "status": s.status,
+                    "positions": getattr(s, "positions", [])
+                }
+            for s in self.clients.values():
+                if str(s.chat_id) == acc_str:
+                    return {
+                        "account_id": s.account_id,
+                        "chat_id": s.chat_id,
+                        "broker": s.broker,
+                        "firm_name": s.firm_name,
+                        "balance": s.balance,
+                        "equity": s.equity,
+                        "ping_ms": s.ping_ms,
+                        "compliant": s.is_prop_compliant,
+                        "status": s.status,
+                        "positions": getattr(s, "positions", [])
+                    }
+        return None
+
+    def get_all_active_sessions(self) -> Dict[Any, Dict[str, Any]]:
+        """Returns all currently online MT5 client sessions as serialized dicts."""
+        result = {}
+        with self._clients_lock:
+            for acc_id, session in self.clients.items():
+                if session.status == "ONLINE":
+                    data = {
+                        "account_id": acc_id,
+                        "chat_id": session.chat_id,
+                        "broker": session.broker,
+                        "firm_name": session.firm_name,
+                        "balance": session.balance,
+                        "equity": session.equity,
+                        "ping_ms": session.ping_ms,
+                        "compliant": session.is_prop_compliant,
+                        "status": session.status,
+                        "positions": getattr(session, "positions", [])
+                    }
+                    result[acc_id] = data
+                    if session.chat_id:
+                        result[session.chat_id] = data
+                        result[str(session.chat_id)] = data
+        return result
 
     # =========================================================================
     # 6. LOW-LEVEL NETWORK HELPERS & TELEMETRY

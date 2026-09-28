@@ -1247,7 +1247,11 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
         tp = float(data.get("tp", 0.0))
         comment = str(data.get("comment", "KMC_WEB_TRADER"))
 
-        res = mt5_bridge_engine.mt5_bridge.dispatch_signal(
+        dispatch_fn = getattr(mt5_bridge_engine.mt5_bridge, "dispatch_order", None) or getattr(mt5_bridge_engine.mt5_bridge, "dispatch_signal", None)
+        if not dispatch_fn:
+            return web.json_response({"status": "error", "message": "MT5 Bridge dispatch engine is unavailable"}, status=503)
+
+        res = dispatch_fn(
             symbol=symbol,
             action=action,
             lot=lot,
