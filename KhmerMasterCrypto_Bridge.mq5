@@ -86,6 +86,9 @@ int OnInit()
    Print("🚀 [KMC BRIDGE] Initializing Apex Institutional MT5 Bridge v13.00...");
    PrintFormat("🏛️ [PROP SHIELD] Baseline Balance: $%.2f | Daily Equity: $%.2f | Firm: %s", 
                g_initial_balance, g_daily_start_equity, InpFirmName);
+   PrintFormat("📡 [ALGO PERMISSIONS] Terminal Button: %s (Ctrl+E) | EA Properties: %s (F7 -> Common)",
+               TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) ? "GREEN/ON" : "RED/OFF",
+               MQLInfoInteger(MQL_TRADE_ALLOWED) ? "ALLOWED" : "BLOCKED");
 
    // Create On-Chart HUD and perform immediate initial refresh
    if(InpShowHUD)
@@ -570,6 +573,21 @@ void HandleOrderSend(const string json)
 
    // Auto-detect and configure supported filling mode for target symbol
    m_trade.SetTypeFillingBySymbol(symbol);
+
+   // Pre-flight Algo Trading Verification
+   bool term_trade_allowed = (bool)TerminalInfoInteger(TERMINAL_TRADE_ALLOWED);
+   bool ea_trade_allowed = (bool)MQLInfoInteger(MQL_TRADE_ALLOWED);
+   if(!term_trade_allowed || !ea_trade_allowed)
+   {
+      string specific_cause = !term_trade_allowed ? "TERMINAL_ALGO_OFF (Press Ctrl+E on MT5)" : "EA_PROPERTIES_BLOCKED (Press F7 -> Common -> Check Allow Algo Trading)";
+      PrintFormat("❌ [TRADE BLOCKED] %s", specific_cause);
+      string fail_json = StringFormat(
+         "{\"type\":\"ORDER_FAILED\",\"signal_id\":\"%s\",\"retcode\":10027,\"reason\":\"%s\",\"symbol\":\"%s\",\"secret_key\":\"%s\"}\n",
+         signal_id, specific_cause, symbol, InpSecretKey
+      );
+      SendRawString(fail_json);
+      return;
+   }
 
    bool success = false;
    ulong ticket = 0;
