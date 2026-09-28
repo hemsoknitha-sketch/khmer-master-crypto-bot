@@ -91,6 +91,16 @@ fi
 ACTIVE_DISPLAY="${ACTIVE_DISPLAY:-:10.0}"
 echo -e "   ${CYAN}🎯 Targeted Display Screen: ${BOLD}${GREEN}$ACTIVE_DISPLAY${NC}"
 
+# 3.1 Auto-compile latest KhmerMasterCrypto_Bridge.mq5 into .ex5 via MetaEditor
+echo -e "${YELLOW}[3.1/5] ⚙️ Auto-compiling latest KhmerMasterCrypto_Bridge.mq5 into .ex5...${NC}"
+for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
+    if [ -f "$MT5_DIR/metaeditor64.exe" ] && [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" ]; then
+        echo -e "   ${CYAN}⚙️ Compiling in $(basename "$MT5_DIR")...${NC}"
+        sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_DIR' && wine metaeditor64.exe /compile:\"MQL5\\\\Experts\\\\KhmerMasterCrypto_Bridge.mq5\" /log:\"MQL5\\\\Experts\\\\compile.log\"" 2>/dev/null || true
+    fi
+done
+echo -e "   ${GREEN}✅ Compilation completed!${NC}"
+
 # 4. Launch Admin MT5 (#52133938)
 echo -e "${YELLOW}[4/5] 🚀 Launching Instance 1: Admin MT5 (#52133938)...${NC}"
 ADMIN_LOG="$TARGET_HOME/mt5_admin_launch.log"
