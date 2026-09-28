@@ -295,6 +295,8 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             free_margin = max(0.0, equity)
             margin_level = round((equity / max(1.0, equity - free_margin)) * 100.0, 1) if (equity - free_margin) > 0 else 0.0
 
+            ai_auto_trade = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+
             # Privacy Shield: Use user's own bound login. If none, do not display other accounts.
             display_login = user_login if user_login else (matched_session.account_id if matched_session else "")
             is_authorized = db.is_mt5_user_authorized(chat_id, display_login)
