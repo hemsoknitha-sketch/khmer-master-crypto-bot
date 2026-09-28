@@ -1034,6 +1034,18 @@ class MT5BridgeEngine:
             self._last_symbol_trade_time[f"{account_id}_{sym_clean}"] = now_ts
             self._last_symbol_trade_time[f"{account_id}_{symbol}"] = now_ts
 
+            # Also record under chat_id key for multi-index fast lookup
+            user_chat_id = 0
+            with self._clients_lock:
+                session = self.clients.get(account_id)
+                if session:
+                    user_chat_id = getattr(session, "chat_id", 0)
+            if user_chat_id:
+                self._last_symbol_close_time[f"{user_chat_id}_{sym_clean}"] = now_ts
+                self._last_symbol_close_time[f"{user_chat_id}_{symbol}"] = now_ts
+                self._last_symbol_trade_time[f"{user_chat_id}_{sym_clean}"] = now_ts
+                self._last_symbol_trade_time[f"{user_chat_id}_{symbol}"] = now_ts
+
             streak_key = f"{account_id}_{sym_clean}"
             if pnl < 0.0:
                 self._consecutive_losses[streak_key] = self._consecutive_losses.get(streak_key, 0) + 1
