@@ -30,17 +30,25 @@ _CACHE_WORKER_TASK = None
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_gui")
 
-# GTCFX Official Triple-Track Referral Standards (Invariant 42)
-GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
-GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
+# GTCFX Official Referral Standards (Invariant 42)
+# Track 1 (Primary Super Admin): Swap-Free Standard L15 Pro (Server 2 - Capital $100+ • MT5-SF-STD-L15)
 GTC_STD_L15_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
 GTC_STD_L15_INVITE_CODE = "LnZZcHxY"
+
+# Track 2 (Primary Super Admin): Cent Account L20 Micro (Server 5 - Capital $10 - $100 • MT5-CENT-L20)
 GTC_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
 GTC_CENT_INVITE_CODE = "PuAfeREN"
 
-# Default Standard
-GTC_STD_REFERRAL_URL = GTC_STD_L20_REFERRAL_URL
-GTC_STD_INVITE_CODE = GTC_STD_L20_INVITE_CODE
+# Track 3 (Alternative): Swap-Free Standard L20 VIP Elite (Server 2 - Capital $100+ • MT5-SF-STD-L20)
+GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
+GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
+
+# Default & Official Super Admin Fallback
+GTC_STD_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
+GTC_STD_INVITE_CODE = GTC_STD_L15_INVITE_CODE
+GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
+GTC_OFFICIAL_INVITE_CODE = GTC_STD_L15_INVITE_CODE
+GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694"]
 
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
@@ -1117,11 +1125,11 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
             firm_name=firm_name
         )
 
-        # Determine referral track from server
+        # Determine referral track from server (Super Admin Tracks)
         is_cent = "Server 5" in server or "CENT" in server.upper()
-        assigned_ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_L20_INVITE_CODE
-        assigned_ref_url = GTC_CENT_REFERRAL_URL if is_cent else GTC_STD_L20_REFERRAL_URL
-        track_name = "Cent Account (L20 - Server 5)" if is_cent else "Standard Swap-Free (L20 - Server 2)"
+        assigned_ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_L15_INVITE_CODE
+        assigned_ref_url = GTC_CENT_REFERRAL_URL if is_cent else GTC_STD_L15_REFERRAL_URL
+        track_name = "Cent Account (MT5-CENT-L20 - Server 5)" if is_cent else "Standard Swap-Free (MT5-SF-STD-L15 - Server 2)"
 
         # Register pending verification in referral registry
         db.register_mt5_referral_request(chat_id, login, referral_code=assigned_ref_code, notes=f"Web GUI Binding ({server} - {track_name})")
@@ -1494,12 +1502,12 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
                 "message": f"✅ គណនី Super Admin #{account_id} ត្រូវបានផ្ទៀងផ្ទាត់អនុម័តដោយជោគជ័យ!"
             })
 
-        # Check existing config to see if cent account
+        # Check existing config to see if cent account (Super Admin Tracks)
         cfg = db.get_user_mt5_config(chat_id)
         srv = str(cfg.get("server", "")).strip()
         is_cent = "Server 5" in srv or "CENT" in srv.upper()
-        ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_INVITE_CODE
-        track_name = "Cent (L20)" if is_cent else "Standard (L20)"
+        ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_L15_INVITE_CODE
+        track_name = "Cent (MT5-CENT-L20)" if is_cent else "Standard (MT5-SF-STD-L15)"
 
         db.register_mt5_referral_request(chat_id, account_id, referral_code=ref_code, notes=f"Web GUI Submit ({track_name})")
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:

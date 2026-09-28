@@ -74,25 +74,25 @@ def _dispatch_telegram_alert(chat_id: int, message: str, parse_mode: str = "HTML
     except Exception:
         pass
 
-# GTCFX Japan Tokyo MT5 Pro Official Triple-Track Referral Gatekeeper Standard (Invariant 42)
-# Track 1: Swap-Free Standard L20 VIP Elite (Server 2 - Capital $100+)
-GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
-GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
-
-# Track 2: Swap-Free Standard L15 Pro (Server 2 - Capital $100+)
+# GTCFX Japan Tokyo MT5 Pro Official Referral Gatekeeper Standard (Invariant 42)
+# Track 1 (Primary Super Admin): Swap-Free Standard L15 Pro (Server 2 - Capital $100+ • MT5-SF-STD-L15)
 GTC_STD_L15_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
 GTC_STD_L15_INVITE_CODE = "LnZZcHxY"
 
-# Track 3: Cent Account L20 Micro (Server 5 - Capital $10 - $100)
+# Track 2 (Primary Super Admin): Cent Account L20 Micro (Server 5 - Capital $10 - $100 • MT5-CENT-L20)
 GTC_CENT_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=PuAfeREN"
 GTC_CENT_INVITE_CODE = "PuAfeREN"
 
-# Default & Legacy Fallback
-GTC_STD_REFERRAL_URL = GTC_STD_L20_REFERRAL_URL
-GTC_STD_INVITE_CODE = GTC_STD_L20_INVITE_CODE
-GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L20_REFERRAL_URL
-GTC_OFFICIAL_INVITE_CODE = GTC_STD_L20_INVITE_CODE
-GTC_VALID_INVITE_CODES = ["F8bNxK9L", "LnZZcHxY", "PuAfeREN", "130237694"]
+# Track 3 (Alternative): Swap-Free Standard L20 VIP Elite (Server 2 - Capital $100+ • MT5-SF-STD-L20)
+GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
+GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
+
+# Default & Official Super Admin Fallback
+GTC_STD_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
+GTC_STD_INVITE_CODE = GTC_STD_L15_INVITE_CODE
+GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
+GTC_OFFICIAL_INVITE_CODE = GTC_STD_L15_INVITE_CODE
+GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694"]
 
 # ZeroMQ high-speed messaging
 try:
