@@ -976,6 +976,7 @@ def init_db():
             budget REAL DEFAULT 50.0,
             max_positions INTEGER DEFAULT 2,
             last_trade_time REAL DEFAULT 0.0,
+            schedule_mode TEXT DEFAULT 'SCHEDULE_MON_FRI',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
@@ -2487,7 +2488,7 @@ def get_capital_auto_config(chat_id: int) -> dict:
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT is_enabled, budget, max_positions, last_trade_time, is_demo
+            SELECT is_enabled, budget, max_positions, last_trade_time, is_demo, schedule_mode
             FROM capital_auto_config WHERE chat_id = ?
         """, (chat_id,))
         row = cursor.fetchone()
@@ -2498,12 +2499,13 @@ def get_capital_auto_config(chat_id: int) -> dict:
                 "budget": float(row[1] or 50.0),
                 "max_positions": int(row[2] or 2),
                 "last_trade_time": float(row[3] or 0.0),
-                "is_demo": bool(row[4]) if len(row) > 4 and row[4] is not None else False
+                "is_demo": bool(row[4]) if len(row) > 4 and row[4] is not None else False,
+                "schedule_mode": str(row[5]) if len(row) > 5 and row[5] else "SCHEDULE_MON_FRI"
             }
     except Exception:
         try:
             cursor.execute("""
-                SELECT is_enabled, budget, max_positions, last_trade_time
+                SELECT is_enabled, budget, max_positions, last_trade_time, is_demo
                 FROM capital_auto_config WHERE chat_id = ?
             """, (chat_id,))
             row = cursor.fetchone()
@@ -2514,19 +2516,44 @@ def get_capital_auto_config(chat_id: int) -> dict:
                     "budget": float(row[1] or 50.0),
                     "max_positions": int(row[2] or 2),
                     "last_trade_time": float(row[3] or 0.0),
-                    "is_demo": False
+                    "is_demo": bool(row[4]) if len(row) > 4 and row[4] is not None else False,
+                    "schedule_mode": "SCHEDULE_MON_FRI"
                 }
         except Exception:
-            conn.close()
-    return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0, "is_demo": False}
+            try:
+                cursor.execute("""
+                    SELECT is_enabled, budget, max_positions, last_trade_time
+                    FROM capital_auto_config WHERE chat_id = ?
+                """, (chat_id,))
+                row = cursor.fetchone()
+                conn.close()
+                if row:
+                    return {
+                        "enabled": bool(row[0]),
+                        "budget": float(row[1] or 50.0),
+                        "max_positions": int(row[2] or 2),
+                        "last_trade_time": float(row[3] or 0.0),
+                        "is_demo": False,
+                        "schedule_mode": "SCHEDULE_MON_FRI"
+                    }
+            except Exception:
+                conn.close()
+    return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0, "is_demo": False, "schedule_mode": "SCHEDULE_MON_FRI"}
 
 def is_capital_auto_enabled(chat_id: int) -> bool:
     """Fast check if a user has enabled Capital.com Autonomous Trading."""
     cfg = get_capital_auto_config(chat_id)
     return cfg.get("enabled", False)
 
-def set_capital_auto_config(chat_id: int, enabled: bool, budget: float = 50.0, max_positions: int = 2, is_demo: bool = False):
-    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False)."""
+def set_capital_auto_config(
+    chat_id: int,
+    enabled: bool,
+    budget: float = 50.0,
+    max_positions: int = 2,
+    is_demo: bool = False,
+    schedule_mode: str = "SCHEDULE_MON_FRI"
+):
+    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False, Mon-Fri 07:00-23:50 ICT)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2535,19 +2562,42 @@ def set_capital_auto_config(chat_id: int, enabled: bool, budget: float = 50.0, m
         conn.commit()
     except Exception:
         pass
+    try:
+        cursor.execute("ALTER TABLE capital_auto_config ADD COLUMN schedule_mode TEXT DEFAULT 'SCHEDULE_MON_FRI'")
+        conn.commit()
+    except Exception:
+        pass
 
     cursor.execute("""
-        INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(chat_id) DO UPDATE SET
             is_enabled = excluded.is_enabled,
             budget = excluded.budget,
             max_positions = excluded.max_positions,
             updated_at = excluded.updated_at,
-            is_demo = excluded.is_demo
-    """, (chat_id, 1 if enabled else 0, float(budget), int(max_positions), now_str, 1 if is_demo else 0))
+            is_demo = excluded.is_demo,
+            schedule_mode = excluded.schedule_mode
+    """, (chat_id, 1 if enabled else 0, float(budget), int(max_positions), now_str, 1 if is_demo else 0, str(schedule_mode)))
     conn.commit()
     conn.close()
+
+def set_capital_schedule_mode(chat_id: int, schedule_mode: str = "SCHEDULE_MON_FRI"):
+    """Sets schedule mode ('SCHEDULE_MON_FRI' or '24/7') for Capital Auto."""
+    cfg = get_capital_auto_config(chat_id)
+    set_capital_auto_config(
+        chat_id=chat_id,
+        enabled=cfg.get("enabled", False),
+        budget=cfg.get("budget", 50.0),
+        max_positions=cfg.get("max_positions", 2),
+        is_demo=cfg.get("is_demo", False),
+        schedule_mode=schedule_mode
+    )
+
+def get_capital_schedule_mode(chat_id: int) -> str:
+    """Returns the schedule mode ('SCHEDULE_MON_FRI' or '24/7') for a user."""
+    cfg = get_capital_auto_config(chat_id)
+    return cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
 
 def update_capital_auto_last_trade_time(chat_id: int, last_time: float):
     """Updates the last trade timestamp for cooldown calculations."""
@@ -2562,19 +2612,43 @@ def get_active_capital_auto_users() -> list:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT chat_id, budget, max_positions, is_demo FROM capital_auto_config WHERE is_enabled = 1")
+        cursor.execute("SELECT chat_id, budget, max_positions, is_demo, schedule_mode FROM capital_auto_config WHERE is_enabled = 1")
         rows = cursor.fetchall()
         conn.close()
-        return [{"chat_id": r[0], "budget": float(r[1]), "max_positions": int(r[2]), "is_demo": bool(r[3]) if len(r) > 3 and r[3] is not None else False} for r in rows]
+        return [{
+            "chat_id": r[0],
+            "budget": float(r[1]),
+            "max_positions": int(r[2]),
+            "is_demo": bool(r[3]) if len(r) > 3 and r[3] is not None else False,
+            "schedule_mode": str(r[4]) if len(r) > 4 and r[4] else "SCHEDULE_MON_FRI"
+        } for r in rows]
     except Exception:
         try:
-            cursor.execute("SELECT chat_id, budget, max_positions FROM capital_auto_config WHERE is_enabled = 1")
+            cursor.execute("SELECT chat_id, budget, max_positions, is_demo FROM capital_auto_config WHERE is_enabled = 1")
             rows = cursor.fetchall()
             conn.close()
-            return [{"chat_id": r[0], "budget": float(r[1]), "max_positions": int(r[2]), "is_demo": False} for r in rows]
+            return [{
+                "chat_id": r[0],
+                "budget": float(r[1]),
+                "max_positions": int(r[2]),
+                "is_demo": bool(r[3]) if len(r) > 3 and r[3] is not None else False,
+                "schedule_mode": "SCHEDULE_MON_FRI"
+            } for r in rows]
         except Exception:
-            conn.close()
-            return []
+            try:
+                cursor.execute("SELECT chat_id, budget, max_positions FROM capital_auto_config WHERE is_enabled = 1")
+                rows = cursor.fetchall()
+                conn.close()
+                return [{
+                    "chat_id": r[0],
+                    "budget": float(r[1]),
+                    "max_positions": int(r[2]),
+                    "is_demo": False,
+                    "schedule_mode": "SCHEDULE_MON_FRI"
+                } for r in rows]
+            except Exception:
+                conn.close()
+                return []
 
 def record_capital_auto_trade(
     chat_id: int,

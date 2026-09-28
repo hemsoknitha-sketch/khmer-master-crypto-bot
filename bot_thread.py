@@ -5975,6 +5975,22 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["AUTO", "DEMO", str(budget)]
                 await capital_command(update, context)
+            elif data in ["btn_cap_reset_247", "btn_cap_247", "btn_cap_reset"]:
+                db.set_capital_schedule_mode(chat_id, "24/7")
+                try:
+                    await update.callback_query.answer("🔄 Capital Auto: បាន RESET បើកដំណើរការពេញ 24/7 ជាប់រហូត!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["RESET"]
+                await capital_command(update, context)
+            elif data in ["btn_cap_schedule_monfri", "btn_cap_schedule", "btn_cap_mon_fri"]:
+                db.set_capital_schedule_mode(chat_id, "SCHEDULE_MON_FRI")
+                try:
+                    await update.callback_query.answer("⏰ Capital Auto: បានកំណត់កាលវិភាគ ចន្ទ-សុក្រ (07:00-23:50 ICT)!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["SCHEDULE"]
+                await capital_command(update, context)
             elif data == "btn_cap_req_verify":
                 try:
                     await update.callback_query.answer("✅ បានផ្ញើសំណើផ្ទៀងផ្ទាត់ទៅកាន់ Super Admin រួចរាល់!", show_alert=True)
@@ -22364,6 +22380,90 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_spread_command(update, context)
                     return
+                elif action in ["RESET", "247", "24/7", "RESET_SCHEDULE", "SCHEDULE_RESET", "ALWAYS_ON", "CONTINUOUS"]:
+                    db.set_capital_schedule_mode(chat_id, "24/7")
+                    is_auto_on = db.is_capital_auto_enabled(chat_id)
+                    if not is_auto_on:
+                        if not db.is_capital_user_authorized(chat_id):
+                            gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
+                            await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                            return
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=50.0, max_positions=2, is_demo=False, schedule_mode="24/7")
+
+                    succ_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("⏰ កំណត់ម៉ោង ចន្ទ-សុក្រ", callback_data="btn_cap_schedule_monfri"),
+                            InlineKeyboardButton("🤖 Capital Auto", callback_data="btn_cap_auto_toggle")
+                        ],
+                        [
+                            InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                        ]
+                    ])
+                    succ_msg = (
+                        f"🔄 **CAPITAL.COM 24/7 CONTINUOUS MODE ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ **របៀបដំណើរការ (Mode) ៖** `24/7 Continuous Trading (RESET Mode 🟢)`\n"
+                        f"⏰ **កាលវិភាគវិនិយោគ ៖** `បើកដំណើរការពេញ ២៤ម៉ោង/៧ថ្ងៃ រួមទាំងចុងសប្តាហ៍!`\n"
+                        f"🏛️ **ឧបករណ៍វិនិយោគ ៖** `មាស, ហ្គាស, ហ៊ុន, S&P 500 (ចន្ទ-សុក្រ) + Crypto CFD 24/7`\n"
+                        f"🛡️ **ការការពារហានិភ័យ ៖** `Breakeven Armor + Golden 80% ATR Trailing TP`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ _ប្រព័ន្ធត្រូវបាន RESET បើកដំណើរការស្វែងរកឱកាស និងកើបចំណេញ ២៤/៧ ជាបន្តបន្ទាប់!_\n"
+                        f"💡 _ដើម្បីប្តូរត្រឡប់មកកាន់កាលវិភាគ ចន្ទ-សុក្រ (07:00-23:50 ICT) វិញ សូមប្រើបញ្ជា ៖_\n"
+                        f"• `` `/capital SCHEDULE` ``"
+                    ) if user_lang == 'khmer' else (
+                        f"🔄 **CAPITAL.COM 24/7 CONTINUOUS MODE ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ **Operating Mode:** `24/7 Continuous Trading (RESET Mode 🟢)`\n"
+                        f"⏰ **Schedule Window:** `Unrestricted 24/7 Non-Stop (Weekdays + Weekends)`\n"
+                        f"🏛️ **Instruments:** `Gold, Gas, Equities, US500 (Mon-Fri) + Crypto CFDs 24/7`\n"
+                        f"🛡️ **Capital Fortress:** `Breakeven Armor + Golden 80% ATR Trailing TP`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ _System reset to 24/7 continuous autonomous trading!_\n"
+                        f"💡 _To switch back to standard Mon-Fri schedule (07:00-23:50 ICT), send:_\n"
+                        f"• `` `/capital SCHEDULE` ``"
+                    )
+                    await update.effective_message.reply_text(succ_msg, parse_mode="Markdown", reply_markup=succ_kb)
+                    return
+
+                elif action in ["SCHEDULE", "MON_FRI", "MONFRI", "HOURS", "TIME"]:
+                    db.set_capital_schedule_mode(chat_id, "SCHEDULE_MON_FRI")
+                    is_active_sched, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active("SCHEDULE_MON_FRI")
+                    status_icon = "🟢 OPEN (កំពុងជួញដូរ)" if is_active_sched else "⏳ STANDBY (ផ្អាកចូលថ្មី)"
+
+                    sched_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔄 បើក 24/7 Reset Mode", callback_data="btn_cap_reset_247"),
+                            InlineKeyboardButton("🤖 Capital Auto", callback_data="btn_cap_auto_toggle")
+                        ],
+                        [
+                            InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                        ]
+                    ])
+                    sched_msg = (
+                        f"⏰ **CAPITAL.COM MON-FRI SCHEDULE MODE ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📅 **ថ្ងៃប្រតិបត្តិការ ៖** `ថ្ងៃចន្ទ ដល់ ថ្ងៃសុក្រ (Monday - Friday)`\n"
+                        f"⏰ **ម៉ោងដំណើរការ ៖** `07:00 ព្រឹក ដល់ 11:50 យប់ (Cambodia Time UTC+7)`\n"
+                        f"⏳ **ម៉ោង Standby ៖** `11:50 យប់ ដល់ 07:00 ព្រឹក & ចុងសប្តាហ៍ (ផ្អាកចូល Trade ថ្មី)`\n"
+                        f"📶 **ស្ថានភាពបច្ចុប្បន្ន ៖** `{status_icon}` ({sched_dict.get('weekday_kh', '')} {sched_dict.get('now_ict', '')})\n"
+                        f"🛡️ **Position Management ៖** `Breakeven Armor & Trailing TP ការពារ ២៤/៧`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ _ប្រព័ន្ធនឹងស្កេន និងចូល Trade តាមម៉ោងកំណត់ច្បាស់លាស់ ដោយការពារការ Chop ចុងសប្តាហ៍!_\n"
+                        f"💡 _VIP Users អាចចុច `/capital RESET` ដើម្បីបើកការវិនិយោគ ២៤/៧ ពេញម៉ោងគ្រប់ពេល!_"
+                    ) if user_lang == 'khmer' else (
+                        f"⏰ **CAPITAL.COM MON-FRI SCHEDULE MODE ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📅 **Trading Days:** `Monday to Friday`\n"
+                        f"⏰ **Trading Window:** `07:00 AM to 11:50 PM (Cambodia Time UTC+7)`\n"
+                        f"⏳ **Standby Window:** `11:50 PM to 07:00 AM & Weekends (New entries paused)`\n"
+                        f"📶 **Current Status:** `{status_icon}` ({sched_dict.get('weekday', '')} {sched_dict.get('now_ict', '')})\n"
+                        f"🛡️ **Position Guard:** `Breakeven Armor & Trailing TP active 24/7`\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ _System operates strictly within high-liquidity market hours!_\n"
+                        f"💡 _VIP Users may send `/capital RESET` anytime to enable 24/7 continuous trading!_"
+                    )
+                    await update.effective_message.reply_text(sched_msg, parse_mode="Markdown", reply_markup=sched_kb)
+                    return
 
             # Auto config & status
             is_auto_on = db.is_capital_auto_enabled(chat_id)
@@ -22383,6 +22483,10 @@ class TelegramBotThread(BaseThread):
                 [
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle"),
                     InlineKeyboardButton(leadlag_btn_text, callback_data="btn_cap_leadlag_toggle")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Reset / 24/7 Mode", callback_data="btn_cap_reset_247"),
+                    InlineKeyboardButton("⏰ Mon-Fri (7am-11:50pm)", callback_data="btn_cap_schedule_monfri")
                 ],
                 [
                     InlineKeyboardButton(orb_btn_text, callback_data="btn_cap_orb_toggle"),
@@ -22787,6 +22891,19 @@ class TelegramBotThread(BaseThread):
             except Exception:
                 pass
 
+            # Schedule Status Badge
+            sched_mode = auto_cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
+            is_sched_active, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active(sched_mode)
+            if sched_mode == "24/7":
+                sched_badge_kh = "🔄 24/7 Continuous (RESET Mode 🟢)"
+                sched_badge_en = "🔄 24/7 Continuous (RESET Mode 🟢)"
+            elif is_sched_active:
+                sched_badge_kh = f"🟢 OPEN ({sched_dict.get('weekday_kh', 'ចន្ទ-សុក្រ')} 07:00-23:50 ICT)"
+                sched_badge_en = f"🟢 OPEN ({sched_dict.get('weekday', 'Mon-Fri')} 07:00-23:50 ICT)"
+            else:
+                sched_badge_kh = f"⏳ STANDBY ({sched_dict.get('weekday_kh', '')} | ផ្អាកចូលថ្មី | Resumes 07:00 ICT)"
+                sched_badge_en = f"⏳ STANDBY ({sched_dict.get('weekday', '')} | Entries Paused | Resumes 07:00 ICT)"
+
             if user_lang == 'khmer':
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
@@ -22794,6 +22911,7 @@ class TelegramBotThread(BaseThread):
                     f"🏦 **គណនីវិនិយោគ ៖** `{env_mode}`\n"
                     f"🆔 **Live Account ID ៖** `{data.get('account_id')}`\n"
                     f"🤖 **TradFi Auto Engine ៖** `{auto_badge}`\n"
+                    f"⏰ **កាលវិភាគវិនិយោគ ៖** `{sched_badge_kh}`\n"
                     f"🎯 **ORB 15m Matrix ៖** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage ៖** `{leadlag_badge}`\n"
                     f"📐 **Kelly Sizer ($f^*$) ៖** `{kelly_badge}`\n"
@@ -22825,7 +22943,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle) ៖** កាត់បន្ថយ Spread Drag មកត្រឹម <= 10%\n"
                     f"• **Kelly Sizer ($f^*) ៖** គណនា Lot ល្អបំផុតកាត់បន្ថយ Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET` `` | `` `/capital SCHEDULE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -22838,6 +22956,7 @@ class TelegramBotThread(BaseThread):
                     f"🏦 **Investment Account:** `{env_mode}`\n"
                     f"🆔 **Live Account ID:** `{data.get('account_id')}`\n"
                     f"🤖 **TradFi Auto Engine:** `{auto_badge}`\n"
+                    f"⏰ **Trading Schedule:** `{sched_badge_en}`\n"
                     f"🎯 **ORB 15m Matrix:** `{orb_badge}`\n"
                     f"⚡ **Lead-Lag Arbitrage:** `{leadlag_badge}`\n"
                     f"📐 **Kelly Sizer ($f^*$) :** `{kelly_badge}`\n"
@@ -22869,7 +22988,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle):** Limits spread drag to <= 10%\n"
                     f"• **Kelly Sizer ($f^*$) :** Optimal mathematical lot scaling\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital SPREAD ON` `` | `` `/capital KELLY ON` ``\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET` `` | `` `/capital SCHEDULE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
                     f"_APEX SUPER BRAIN AI_\n"

@@ -2603,6 +2603,13 @@ class CapitalAutonomousEngine:
         max_pos = user.get("max_positions", 2)
         user_is_demo = user.get("is_demo", False)  # 100% Live Mainnet Real Capital
 
+        # Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00 - 23:50 ICT vs 24/7 VIP Reset Mode)
+        user_sched_mode = user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
+        is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(user_sched_mode)
+        if not is_sched_active:
+            logger.debug(f"⏳ [CAPITAL SCHEDULE] User {chat_id} trade entry paused: {sched_reason}")
+            return False
+
         # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
         if not user_is_demo and not db.is_capital_user_authorized(chat_id):
             logger.warning(f"🔒 [REFERRAL GATEKEEPER] TradFi Auto-Trade blocked for User {chat_id}: Unverified Capital.com referral.")
@@ -2825,6 +2832,13 @@ class CapitalAutonomousEngine:
         Sub-millisecond concurrent trade dispatcher for Prop Firm Challenge traders.
         """
         chat_id = prop_user["chat_id"]
+        # Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00 - 23:50 ICT vs 24/7 VIP Reset Mode)
+        user_sched_mode = prop_user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
+        is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(user_sched_mode)
+        if not is_sched_active:
+            logger.debug(f"⏳ [CAPITAL SCHEDULE] Prop trader {chat_id} trade entry paused: {sched_reason}")
+            return False
+
         user_engine = get_user_capital_engine(chat_id, is_demo=True)
         try:
             bal_info = await asyncio.to_thread(user_engine.get_account_balance)
@@ -2975,8 +2989,22 @@ class CapitalAutonomousEngine:
 
         now = time.time()
         
-        # Step 1: In-Flight Position Management & Ratchet
+        # Step 1: In-Flight Position Management & Ratchet (ALWAYS RUNS 24/7)
         self.monitor_and_ratchet_open_positions(app=app)
+
+        # Step 1.5: Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00-23:50 ICT or VIP 24/7 Mode)
+        # Verifies if at least one active trader is in an active trading window before doing candidate scans
+        has_eligible_schedule_trader = False
+        for u in (active_users + active_prop_users):
+            u_mode = u.get("schedule_mode") or db.get_capital_schedule_mode(u["chat_id"])
+            is_active_sched, _, _ = is_capital_trading_schedule_active(u_mode)
+            if is_active_sched:
+                has_eligible_schedule_trader = True
+                break
+
+        if not has_eligible_schedule_trader:
+            logger.debug("⏳ [CAPITAL SCHEDULE STANDBY] All traders in Standby mode (Active Mon-Fri 07:00-23:50 ICT). Positions protected 24/7.")
+            return
 
         # Step 2: Rate limit market scans to once every 25 seconds
         if (now - self._last_scan_ts) < self._scan_interval:
@@ -3871,8 +3899,17 @@ class CapitalOpeningRangeBreakoutEngine:
             if u["chat_id"] not in all_target_users:
                 all_target_users[u["chat_id"]] = u
 
-        if not all_target_users:
+        # Cambodia Time Trading Schedule Filter: Only execute ORB for users in active window / 24/7 mode
+        eligible_target_users = {}
+        for uid, u in all_target_users.items():
+            u_mode = u.get("schedule_mode") or db.get_capital_schedule_mode(uid)
+            is_active_sched, _, _ = is_capital_trading_schedule_active(u_mode)
+            if is_active_sched:
+                eligible_target_users[uid] = u
+
+        if not eligible_target_users:
             return
+        all_target_users = eligible_target_users
 
         import datetime
         now_dt = datetime.datetime.now(datetime.timezone.utc)
@@ -5092,6 +5129,61 @@ def calculate_capital_ib_forecast(
 def get_prop_firm_dashboard(chat_id: int) -> Dict[str, Any]:
     """Returns the Prop Firm Challenge dashboard metrics."""
     return CAPITAL_AUTO_ENGINE.prop_manager.get_prop_firm_dashboard(chat_id)
+
+def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI") -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Evaluates whether Capital.com auto trading entries are active based on Cambodia Time (UTC+7 / ICT):
+    - Default Schedule: Monday to Friday from 07:00 AM to 11:50 PM (23:50) Cambodia Time (UTC+7).
+    - Standby Phase: From 23:50 to 07:00 ICT on weekdays, and all day Saturday & Sunday.
+      During Standby, new trade entries are paused while Breakeven Armor, SL & Trailing TP run 24/7.
+    - VIP 24/7 Override: If schedule_mode is '24/7' / 'RESET' / 'ALWAYS_ON', allows continuous trading 24/7.
+    """
+    import datetime
+    
+    mode_str = str(schedule_mode).upper().strip()
+    is_247_mode = mode_str in ["24/7", "247", "RESET", "ALWAYS_ON", "CONTINUOUS", "ALL_TIME"]
+    
+    # Cambodia Time (ICT = UTC+7)
+    ict_tz = datetime.timezone(datetime.timedelta(hours=7))
+    now_ict = datetime.datetime.now(ict_tz)
+    weekday = now_ict.weekday()  # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    time_minutes = now_ict.hour * 60 + now_ict.minute
+    
+    start_minutes = 7 * 60        # 07:00 AM (420 mins)
+    end_minutes = 23 * 60 + 50    # 11:50 PM / 23:50 (1430 mins)
+    
+    is_weekday = weekday in [0, 1, 2, 3, 4]  # Monday (0) to Friday (4)
+    is_time_window = start_minutes <= time_minutes < end_minutes
+    
+    weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    weekday_khmer = ["ចន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍", "អាទិត្យ"]
+    
+    current_day_str = weekday_names[weekday]
+    current_day_kh = weekday_khmer[weekday]
+    current_time_str = now_ict.strftime("%H:%M:%S ICT")
+    
+    info = {
+        "schedule_mode": "24/7" if is_247_mode else "SCHEDULE_MON_FRI",
+        "now_ict": current_time_str,
+        "weekday": current_day_str,
+        "weekday_kh": current_day_kh,
+        "is_weekday": is_weekday,
+        "is_within_time_window": is_time_window,
+        "start_time": "07:00 ICT",
+        "end_time": "23:50 ICT",
+        "is_247_override": is_247_mode
+    }
+    
+    if is_247_mode:
+        return True, "24/7 Continuous Mode Active (VIP Reset)", info
+    
+    if is_weekday and is_time_window:
+        return True, f"Active Window ({current_day_str} {current_time_str} | 07:00-23:50 ICT)", info
+    
+    if not is_weekday:
+        return False, f"Weekend Standby ({current_day_str} {current_time_str} | Active Mon-Fri 07:00-23:50 ICT. Type /capital RESET for 24/7)", info
+    
+    return False, f"Night Standby ({current_time_str} | Resumes 07:00 ICT. Type /capital RESET for 24/7)", info
 
 async def run_capital_auto_cycle(app=None):
     """Entry point for APScheduler in scheduler_tasks.py."""
