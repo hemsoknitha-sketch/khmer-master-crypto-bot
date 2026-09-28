@@ -501,9 +501,15 @@ void ExecuteCommand(const string json)
 void HandleOrderSend(const string json)
 {
    // Prop Firm Shield Pre-Flight Enforcement
+   EvaluateLocalPropCompliance();
    if(g_prop_breached)
    {
+      string signal_id_rej = ExtractJsonValue(json, "signal_id");
+      string symbol_rej = ExtractJsonValue(json, "symbol");
       Print("🛡️ [ORDER BLOCKED] Prop Firm Daily/Max Drawdown Breached! Order rejected.");
+      string reject_msg = StringFormat("{\"type\":\"ORDER_REJECTED\",\"signal_id\":\"%s\",\"symbol\":\"%s\",\"reason\":\"PROP_BREACH_LOCAL\",\"equity\":%.2f,\"timestamp\":%I64u}",
+                                       signal_id_rej, symbol_rej, m_account.Equity(), (ulong)TimeCurrent());
+      SendResponse(reject_msg);
       return;
    }
 
@@ -689,14 +695,33 @@ void EvaluateLocalPropCompliance()
    double daily_dd_pct = ((equity - g_daily_start_equity) / g_daily_start_equity) * 100.0;
    double total_dd_pct = ((equity - g_initial_balance) / g_initial_balance) * 100.0;
 
-   if(daily_dd_pct <= -InpMaxDailyLossPct || total_dd_pct <= -InpMaxDrawdownPct)
+   // Small Capital Protection Shield (Invariant 8 & 25): Accounts < $200 receive dynamic spread buffer
+   double daily_limit = InpMaxDailyLossPct;
+   double max_limit = InpMaxDrawdownPct;
+   if(g_initial_balance < 200.0 || g_daily_start_equity < 200.0)
+   {
+      daily_limit = 5.0;
+      max_limit = 8.0;
+   }
+
+   if(daily_dd_pct <= -daily_limit || total_dd_pct <= -max_limit)
    {
       if(!g_prop_breached)
       {
          g_prop_breached = true;
          PrintFormat("🚨 [LOCAL PROP SHIELD BREACH] Daily DD: %.2f%% (Limit: -%.1f%%) | Total DD: %.2f%%. Halting all EA trading!",
-                     daily_dd_pct, InpMaxDailyLossPct, total_dd_pct);
+                     daily_dd_pct, daily_limit, total_dd_pct);
          CloseAllBridgeTrades("LOCAL_PROP_BREACH_HALT");
+      }
+   }
+   else
+   {
+      // Auto-recover if equity is within safe boundaries
+      if(g_prop_breached)
+      {
+         g_prop_breached = false;
+         PrintFormat("✅ [LOCAL PROP RECOVERY] Equity safe ($%.2f | DD: %.2f%% > -%.1f%%). Resuming trading!",
+                     equity, daily_dd_pct, daily_limit);
       }
    }
 }

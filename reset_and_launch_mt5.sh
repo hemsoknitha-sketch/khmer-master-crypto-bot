@@ -49,6 +49,21 @@ if [ -d "$DESKTOP_DIR" ]; then
 fi
 echo -e "   ${GREEN}✅ Permissions fully restored (Zero EACCES errors)!${NC}"
 
+# 2.1 Sync latest KhmerMasterCrypto_Bridge.mq5 into Experts directories
+WORKSPACE_BRIDGE="/opt/khmer-master-crypto-bot/KhmerMasterCrypto_Bridge.mq5"
+if [ ! -f "$WORKSPACE_BRIDGE" ]; then
+    WORKSPACE_BRIDGE="$(dirname "$0")/KhmerMasterCrypto_Bridge.mq5"
+fi
+if [ -f "$WORKSPACE_BRIDGE" ]; then
+    mkdir -p "$MT5_ADMIN/MQL5/Experts" "$MT5_PLATFORM/MQL5/Experts"
+    cp -f "$WORKSPACE_BRIDGE" "$MT5_ADMIN/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    cp -f "$WORKSPACE_BRIDGE" "$MT5_PLATFORM/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    if [ -d "$DESKTOP_DIR" ]; then
+        cp -f "$WORKSPACE_BRIDGE" "$DESKTOP_DIR/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    fi
+    echo -e "   ${GREEN}✅ Synced latest KhmerMasterCrypto_Bridge.mq5 to all MT5 Experts directories!${NC}"
+fi
+
 # 3. Detect the EXACT display the user is currently viewing
 echo -e "${YELLOW}[3/5] 📺 Detecting active Desktop Display...${NC}"
 ACTIVE_DISPLAY=""
