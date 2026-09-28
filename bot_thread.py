@@ -19768,9 +19768,26 @@ class TelegramBotThread(BaseThread):
                         curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
                     except Exception:
                         curr_eq = 0.0
+                    
+                    # Check MT5 Bridge session equity
+                    try:
+                        import mt5_bridge_engine
+                        s_mt5 = mt5_bridge_engine.mt5_bridge.get_client_session(chat_id)
+                        if s_mt5 and s_mt5.get("equity", 0.0) > 0:
+                            curr_eq = s_mt5["equity"]
+                    except Exception:
+                        pass
+
                     init_eq = curr_eq if curr_eq > 0 else tier
-                    db.set_prop_firm_config(chat_id, enabled=True, tier=tier, phase=phase)
+                    db.set_prop_firm_config(chat_id, enabled=True, tier=tier, phase=phase, initial_balance=init_eq)
                     db.reset_prop_firm_challenge(chat_id, tier=tier, phase=phase, initial_equity=init_eq)
+                    db.set_capital_schedule_mode(chat_id, "VIP_24_7")
+                    db.set_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1")
+                    try:
+                        import mt5_bridge_engine
+                        mt5_bridge_engine.mt5_bridge.reset_prop_compliance(chat_id, init_eq)
+                    except Exception:
+                        pass
                 elif sub_action in ["OFF", "STOP"]:
                     cfg = db.get_prop_firm_config(chat_id)
                     db.set_prop_firm_config(chat_id, enabled=False, tier=cfg.get("account_tier", 10000.0), phase=cfg.get("challenge_phase", 1))

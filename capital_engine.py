@@ -1742,6 +1742,19 @@ class PropFirmRiskManager:
         engine = get_user_capital_engine(chat_id, is_demo=True)
         bal_info = engine.get_account_balance()
         curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+        
+        # Check MT5 Session equity
+        mt5_connected = False
+        try:
+            import mt5_bridge_engine
+            s_mt5 = mt5_bridge_engine.mt5_bridge.get_client_session(chat_id)
+            if s_mt5:
+                mt5_connected = True
+                if s_mt5.get("equity", 0.0) > 0:
+                    curr_equity = s_mt5["equity"]
+        except Exception:
+            pass
+
         if curr_equity <= 0:
             curr_equity = cfg.get("initial_balance", 10000.0)
 
@@ -2882,6 +2895,7 @@ class CapitalAutonomousEngine:
             epic=resolved_epic
         )
 
+        # 1. Attempt Capital.com Demo API execution
         trade_res = await asyncio.to_thread(
             user_engine.execute_smart_tradfi_order,
             epic=resolved_epic,
@@ -2889,13 +2903,72 @@ class CapitalAutonomousEngine:
             size=prop_size
         )
 
-        if trade_res.get("success"):
+        deal_ref = "PROP"
+        deal_id = "AUTO"
+        sl = trade_res.get("sl", sl_px) if trade_res else sl_px
+        tp = trade_res.get("tp", setup.get("tp", 0.0)) if trade_res else setup.get("tp", 0.0)
+        executed_size = trade_res.get("size", prop_size) if trade_res else prop_size
+        is_executed = bool(trade_res.get("success"))
+
+        if is_executed:
             deal_ref = trade_res.get("deal_reference", "PROP")
             deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
-            sl = trade_res.get("sl", 0.0)
-            tp = trade_res.get("tp", 0.0)
-            executed_size = trade_res.get("size", prop_size)
 
+        # 2. Synchronize & Dispatch to MT5 Bridge terminals (FTMO / FundedNext)
+        mt5_dispatched = False
+        try:
+            import mt5_bridge_engine
+            bridge = mt5_bridge_engine.mt5_bridge
+            mt5_session_info = bridge.get_client_session(chat_id)
+            if mt5_session_info:
+                mt5_sym_map = {
+                    "GOLD": "XAUUSD",
+                    "US500": "US500",
+                    "SP500": "US500",
+                    "US100": "USTEC",
+                    "NASDAQ": "USTEC",
+                    "BTCUSD": "BTCUSD",
+                    "ETHUSD": "ETHUSD",
+                    "EURUSD": "EURUSD",
+                    "GBPUSD": "GBPUSD",
+                    "OIL_CRUDE": "USOIL",
+                    "OIL": "USOIL",
+                    "SILVER": "XAGUSD"
+                }
+                mt5_sym = mt5_sym_map.get(resolved_epic.upper(), resolved_epic.upper())
+                sl_dist = abs(entry_px - sl_px) if abs(entry_px - sl_px) > 0 else (entry_px * 0.01)
+                risk_usd = curr_equity * (risk_pct / 100.0)
+                if "XAU" in mt5_sym or "GOLD" in mt5_sym:
+                    calc_lot = risk_usd / (sl_dist * 100.0)
+                elif "BTC" in mt5_sym or "ETH" in mt5_sym:
+                    calc_lot = risk_usd / sl_dist
+                elif any(fx in mt5_sym for fx in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]):
+                    calc_lot = risk_usd / (sl_dist * 100000.0)
+                else:
+                    calc_lot = prop_size
+
+                mt5_lot = max(0.01, min(20.0, round(calc_lot, 2)))
+                tp_val = tp if tp > 0 else (entry_px + (entry_px - sl_px) * 6.0 if final_action == "BUY" else entry_px - (sl_px - entry_px) * 6.0)
+                res_mt5 = bridge.dispatch_order(
+                    symbol=mt5_sym,
+                    action=final_action,
+                    lot=mt5_lot,
+                    sl=sl_px,
+                    tp=tp_val,
+                    comment=f"PROP_{int(prop_user.get('account_tier', 10000))}_P{prop_user.get('challenge_phase', 1)}",
+                    client_id=chat_id
+                )
+                if res_mt5.get("success"):
+                    mt5_dispatched = True
+                    if not is_executed:
+                        is_executed = True
+                        deal_ref = f"MT5_{res_mt5.get('signal_id', 'AUTO')[:8]}"
+                        deal_id = deal_ref
+                        executed_size = mt5_lot
+        except Exception as e_mt5:
+            logger.debug(f"MT5 Prop Dispatch exception: {e_mt5}")
+
+        if is_executed:
             import database as db
             db.record_capital_auto_trade(
                 chat_id=chat_id,
@@ -2914,7 +2987,7 @@ class CapitalAutonomousEngine:
                 try:
                     user_lang = db.get_user_language(chat_id)
                     import ui_standards
-                    env_lbl = "DEMO ($10,000 Virtual)" if user_engine.is_demo else "PROP LIVE CHALLENGE"
+                    env_lbl = "MT5 BRIDGE + CAPITAL" if mt5_dispatched and trade_res.get("success") else ("MT5 TOKYO BRIDGE" if mt5_dispatched else "CAPITAL DEMO")
                     dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
                     tier_fmt = f"${prop_user.get('account_tier', 10000.0):,.0f}"
                     phase_lbl = f"Phase {prop_user.get('challenge_phase', 1)}"
@@ -2925,7 +2998,7 @@ class CapitalAutonomousEngine:
                             f"🏆 **[PROP FIRM CHALLENGE TRADE EXECUTED]** ⚡\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"💼 **គណនីប្រឡង ៖** `{tier_fmt}` | `{phase_lbl}`\n"
-                            f"⚙️ **បរិស្ថាន ៖** `{env_lbl}`\n"
+                            f"⚙️ **បរិស្ថានជួញដូរ ៖** `{env_lbl}`\n"
                             f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
                             f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
                             f"⚖️ **Fixed Risk ៖** `{risk_pct}% (${risk_usd:,.2f} Max Risk)`\n"
@@ -2938,7 +3011,7 @@ class CapitalAutonomousEngine:
                             f"🛡️ **ក្បួនការពារការប្រឡង (100% Zero-Breach Guard) ៖**\n"
                             f"• Daily Loss Limit Shield: Hard Halt នៅ -3.5%\n"
                             f"• Target Auto-Halt: ចាក់សោ Pass ភ្លាមៗពេលដល់ Target\n"
-                            f"• Breakeven Armor នៅ +1.5% ROI (Risk -> 0.00R)\n"
+                            f"• Breakeven Armor នៅ +4.8% ROI (Risk -> 0.00R)\n"
                             f"• Golden 80% Trailing Ratchet ការពារចំណេញកំពូល\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរការប្រឡងឱ្យជាប់ ១០០%!_"
@@ -2961,7 +3034,7 @@ class CapitalAutonomousEngine:
                             f"🛡️ **Prop Firm Compliance Shields:**\n"
                             f"• Daily Drawdown Shield: Hard Halt at -3.5%\n"
                             f"• Target Auto-Halt: Locks Victory Instantly on Target\n"
-                            f"• Breakeven Armor at +1.5% ROI (Risk -> 0.00R)\n"
+                            f"• Breakeven Armor at +4.8% ROI (Risk -> 0.00R)\n"
                             f"• Golden 80% Trailing Ratchet\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"💡 _AI Engine actively executing strict compliance rules!_"
