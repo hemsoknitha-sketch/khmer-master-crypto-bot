@@ -830,62 +830,83 @@ void HandleModifyStops(const string json)
 }
 
 //+------------------------------------------------------------------+
-//| Matches generic symbol name with broker-specific symbol name     |
+//| Verifies if a symbol exists AND is enabled for active trading   |
+//+------------------------------------------------------------------+
+bool IsSymbolTradable(const string sym)
+{
+   if(sym == "" || !SymbolInfoInteger(sym, SYMBOL_EXIST)) return false;
+   long mode = SymbolInfoInteger(sym, SYMBOL_TRADE_MODE);
+   return (mode != SYMBOL_TRADE_MODE_DISABLED);
+}
+
+//+------------------------------------------------------------------+
+//| Matches generic symbol name with broker-specific active symbol   |
 //+------------------------------------------------------------------+
 string MatchBrokerSymbol(const string base_sym)
 {
-   // 1. Direct match with auto-select
-   if(SymbolInfoInteger(base_sym, SYMBOL_EXIST))
+   // 1. Direct match with tradable verification
+   if(IsSymbolTradable(base_sym))
    {
       SymbolSelect(base_sym, true);
       return base_sym;
    }
 
-   // 2. Common broker suffixes & prefixes
+   // 2. Common broker suffixes & prefixes (with tradable priority)
    string variations[];
-   ArrayResize(variations, 10);
-   variations[0] = base_sym + ".pro";
-   variations[1] = base_sym + "m";
-   variations[2] = base_sym + ".m";
-   variations[3] = base_sym + "_i";
-   variations[4] = base_sym + "c";
-   variations[5] = "r" + base_sym;
-   variations[6] = (base_sym == "XAUUSD") ? "GOLD" : "";
-   variations[7] = (base_sym == "GOLD") ? "XAUUSD" : "";
-   variations[8] = (base_sym == "US30") ? "DJ30" : "";
-   variations[9] = (base_sym == "US500") ? "SP500" : "";
+   ArrayResize(variations, 14);
+   variations[0]  = base_sym + ".i";
+   variations[1]  = base_sym + "_i";
+   variations[2]  = base_sym + ".pro";
+   variations[3]  = base_sym + "c";
+   variations[4]  = base_sym + ".c";
+   variations[5]  = base_sym + "m";
+   variations[6]  = base_sym + ".m";
+   variations[7]  = "r" + base_sym;
+   variations[8]  = (base_sym == "XAUUSD") ? "GOLD" : "";
+   variations[9]  = (base_sym == "GOLD") ? "XAUUSD" : "";
+   variations[10] = (base_sym == "XAUUSD") ? "GOLD.i" : "";
+   variations[11] = (base_sym == "XAUUSD") ? "GOLD_i" : "";
+   variations[12] = (base_sym == "US30") ? "DJ30" : "";
+   variations[13] = (base_sym == "US500") ? "SP500" : "";
 
    for(int i = 0; i < ArraySize(variations); i++)
    {
-      if(variations[i] != "" && SymbolInfoInteger(variations[i], SYMBOL_EXIST))
+      if(variations[i] != "" && IsSymbolTradable(variations[i]))
       {
          SymbolSelect(variations[i], true);
          return variations[i];
       }
    }
 
-   // 3. Search selected symbols in Market Watch
+   // 3. Search selected symbols in Market Watch that are tradable
    int total_mw = SymbolsTotal(false);
    for(int i = 0; i < total_mw; i++)
    {
       string s = SymbolName(i, false);
-      if(StringFind(s, base_sym) >= 0)
+      if(StringFind(s, base_sym) >= 0 && IsSymbolTradable(s))
       {
          SymbolSelect(s, true);
          return s;
       }
    }
 
-   // 4. Search entire broker master list (all server symbols)
+   // 4. Search entire broker master list (all server symbols) for tradable variant
    int total_all = SymbolsTotal(true);
    for(int i = 0; i < total_all; i++)
    {
       string s = SymbolName(i, true);
-      if(StringFind(s, base_sym) >= 0)
+      if(StringFind(s, base_sym) >= 0 && IsSymbolTradable(s))
       {
          SymbolSelect(s, true);
          return s;
       }
+   }
+
+   // 5. Ultimate fallback if symbol exists but trade mode is ambiguous
+   if(SymbolInfoInteger(base_sym, SYMBOL_EXIST))
+   {
+      SymbolSelect(base_sym, true);
+      return base_sym;
    }
 
    return "";

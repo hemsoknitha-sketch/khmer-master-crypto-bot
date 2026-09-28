@@ -88,25 +88,12 @@ echo "🛡️ [RESTORE] VIP Database and .env restored 100%."
 # 4.05 Sync updated KhmerMasterCrypto_Bridge.mq5 to Wine MT5 Experts & Desktop
 TARGET_USER="${SUDO_USER:-$USER}"
 TARGET_HOME=$(eval echo "~$TARGET_USER")
-WINE_EXPERTS1="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5/MQL5/Experts"
-WINE_EXPERTS2="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform/MQL5/Experts"
 if [ -f "KhmerMasterCrypto_Bridge.mq5" ]; then
-    if [ -d "$WINE_EXPERTS1" ]; then
-        cp -f KhmerMasterCrypto_Bridge.mq5 "$WINE_EXPERTS1/" 2>/dev/null || true
-        chown -R "$TARGET_USER:$TARGET_USER" "$WINE_EXPERTS1" 2>/dev/null || true
-    fi
-    if [ -d "$WINE_EXPERTS2" ]; then
-        cp -f KhmerMasterCrypto_Bridge.mq5 "$WINE_EXPERTS2/" 2>/dev/null || true
-        chown -R "$TARGET_USER:$TARGET_USER" "$WINE_EXPERTS2" 2>/dev/null || true
-    fi
-    if [ -d "$TARGET_HOME/Desktop" ]; then
-        cp -f KhmerMasterCrypto_Bridge.mq5 "$TARGET_HOME/Desktop/" 2>/dev/null || true
-        chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/Desktop/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
-    fi
-    echo "🏛️ [MT5] Staged updated KhmerMasterCrypto_Bridge.mq5 to all MT5 Experts directories."
-    # Auto-compile KhmerMasterCrypto_Bridge.mq5 into .ex5 if MetaEditor is present
-    for WINE_DIR in "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5" "$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"; do
-        if [ -d "$WINE_DIR" ]; then
+    # Dynamically sync to all active MT5 instances (Admin, Platform, and all VIP client instances)
+    for WINE_DIR in "$TARGET_HOME/.wine/drive_c/Program Files"/MetaTrader\ 5*; do
+        if [ -d "$WINE_DIR/MQL5/Experts" ]; then
+            cp -f KhmerMasterCrypto_Bridge.mq5 "$WINE_DIR/MQL5/Experts/" 2>/dev/null || true
+            chown -R "$TARGET_USER:$TARGET_USER" "$WINE_DIR/MQL5/Experts" 2>/dev/null || true
             EDITOR_BIN=$(find "$WINE_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
             if [ -n "$EDITOR_BIN" ]; then
                 echo "⚙️ [MT5] Compiling KhmerMasterCrypto_Bridge.mq5 in $(basename "$WINE_DIR")..."
@@ -114,6 +101,11 @@ if [ -f "KhmerMasterCrypto_Bridge.mq5" ]; then
             fi
         fi
     done
+    if [ -d "$TARGET_HOME/Desktop" ]; then
+        cp -f KhmerMasterCrypto_Bridge.mq5 "$TARGET_HOME/Desktop/" 2>/dev/null || true
+        chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/Desktop/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    fi
+    echo "🏛️ [MT5] Staged & compiled updated KhmerMasterCrypto_Bridge to all MT5 instances."
 fi
 
 # 4.1 Auto-Inject Capital.com Demo Credentials to .env if Missing
