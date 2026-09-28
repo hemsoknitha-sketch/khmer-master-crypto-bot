@@ -6689,7 +6689,7 @@ async def build_vip_8hour_executive_report(chat_id: int):
     if has_capital:
         try:
             import capital_engine
-            c_client = capital_engine.CapitalTradingClient(chat_id=chat_id)
+            c_client = capital_engine.get_user_capital_engine(chat_id)
             c_info = await asyncio.to_thread(c_client.get_account_balance)
             if c_info and isinstance(c_info, dict):
                 cap_equity = float(c_info.get("total_equity", 0.0) or c_info.get("balance", 0.0) or 0.0)

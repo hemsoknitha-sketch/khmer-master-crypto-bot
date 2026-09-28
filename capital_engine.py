@@ -1404,8 +1404,10 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
             engine._custom_chat_id = chat_id
             return engine
 
+# Canonical Aliases
+CapitalTradingClient = CapitalComEngine
+
 def invalidate_user_capital_engine(chat_id: int):
-    """Evicts user engine from cache upon credential update or deletion."""
     with _pool_lock:
         _user_engine_pool.pop(f"{chat_id}_live", None)
         _user_engine_pool.pop(f"{chat_id}_demo", None)
