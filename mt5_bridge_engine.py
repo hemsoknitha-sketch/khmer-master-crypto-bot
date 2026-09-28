@@ -1870,7 +1870,26 @@ class MT5BridgeEngine:
                             continue
 
                         lot = float(a.get("lot_size", 0.01))
-                        lot = max(0.01, min(1.0, lot))
+                        # Small Balance Lot Clamping (Invariants 1.1 & 33)
+                        if real_usd_balance < 50.0:
+                            lot = 0.01
+                        elif real_usd_balance < 200.0:
+                            lot = min(0.02, lot)
+                        elif real_usd_balance < 500.0:
+                            lot = min(0.05, lot)
+                        elif real_usd_balance < 1000.0:
+                            lot = min(0.10, lot)
+                        else:
+                            lot = max(0.01, min(1.0, lot))
+
+                        # Dynamic Symbol Adaptation for Server 2 Standard vs Server 5 Cent
+                        dispatch_sym = sym_target
+                        sess_srv = str(getattr(session, "server", "") or getattr(session, "firm_name", "")).lower()
+                        if "server 2" in sess_srv or "standard" in sess_srv:
+                            dispatch_sym = sym_clean
+                        elif "server 5" in sess_srv or "cent" in sess_srv:
+                            if not dispatch_sym.endswith(".C") and not dispatch_sym.endswith("c"):
+                                dispatch_sym = f"{sym_clean}.C"
 
                         # Evaluate Quantum Signal via 33 AI Models & Google Macro Satellite
                         action, confidence, signal_reason = MT5QuantumSignalCitadel.evaluate_quantum_signal(raw_sym, sym_target)
@@ -1880,17 +1899,17 @@ class MT5BridgeEngine:
                             continue
 
                         # Calculate Super Smart ATR-Based Server-Side SL & TP with Live Quotes & Relative Distances
-                        quote_obj = self.get_live_symbol_quote(sym_target) or self.get_live_symbol_quote(raw_sym)
+                        quote_obj = self.get_live_symbol_quote(dispatch_sym) or self.get_live_symbol_quote(sym_target) or self.get_live_symbol_quote(raw_sym) or self.get_live_symbol_quote(sym_clean)
                         c_price = float(quote_obj.get("mid", 0.0) if quote_obj else 0.0)
-                        atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(sym_target, action, current_price=c_price)
+                        atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(dispatch_sym, action, current_price=c_price)
                         sl_price = float(atr_params.get("sl_price", 0.0))
                         tp_price = float(atr_params.get("tp_price", 0.0))
                         sl_dist = float(atr_params.get("sl_dist", 0.0))
                         tp_dist = float(atr_params.get("tp_dist", 0.0))
 
-                        logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {sym_target} (SL: {sl_price}, TP: {tp_price}, Dist: {sl_dist}/{tp_dist}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
+                        logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {dispatch_sym} (SL: {sl_price}, TP: {tp_price}, Dist: {sl_dist}/{tp_dist}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
                         res = self.dispatch_order(
-                            symbol=sym_target,
+                            symbol=dispatch_sym,
                             action=action,
                             lot=lot,
                             sl=sl_price,

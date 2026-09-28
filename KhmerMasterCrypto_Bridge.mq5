@@ -643,13 +643,34 @@ void HandleOrderSend(const string json)
    // Pre-flight Algo Trading Verification
    bool term_trade_allowed = (bool)TerminalInfoInteger(TERMINAL_TRADE_ALLOWED);
    bool ea_trade_allowed = (bool)MQLInfoInteger(MQL_TRADE_ALLOWED);
-   if(!term_trade_allowed || !ea_trade_allowed)
+   bool acc_trade_allowed = (bool)AccountInfoInteger(ACCOUNT_TRADE_ALLOWED);
+   bool acc_ea_allowed = (bool)AccountInfoInteger(ACCOUNT_TRADE_EXPERT);
+   if(!term_trade_allowed || !ea_trade_allowed || !acc_trade_allowed || !acc_ea_allowed)
    {
-      string specific_cause = !term_trade_allowed ? "TERMINAL_ALGO_OFF (Press Ctrl+E on MT5)" : "EA_PROPERTIES_BLOCKED (Press F7 -> Common -> Check Allow Algo Trading)";
+      string specific_cause = "TRADE_NOT_ALLOWED";
+      uint err_retcode = 10027;
+      if(!acc_trade_allowed)
+      {
+         specific_cause = "ACCOUNT_TRADE_DISABLED_OR_INVESTOR_PASSWORD";
+         err_retcode = 10017;
+      }
+      else if(!acc_ea_allowed)
+      {
+         specific_cause = "ACCOUNT_EXPERT_DISABLED_BY_BROKER";
+         err_retcode = 10017;
+      }
+      else if(!term_trade_allowed)
+      {
+         specific_cause = "TERMINAL_ALGO_OFF (Press Ctrl+E on MT5)";
+      }
+      else if(!ea_trade_allowed)
+      {
+         specific_cause = "EA_PROPERTIES_BLOCKED (Press F7 -> Common -> Check Allow Algo Trading)";
+      }
       PrintFormat("❌ [TRADE BLOCKED] %s", specific_cause);
       string fail_json = StringFormat(
-         "{\"type\":\"ORDER_FAILED\",\"signal_id\":\"%s\",\"retcode\":10027,\"reason\":\"%s\",\"symbol\":\"%s\",\"secret_key\":\"%s\"}\n",
-         signal_id, specific_cause, symbol, InpSecretKey
+         "{\"type\":\"ORDER_FAILED\",\"signal_id\":\"%s\",\"retcode\":%d,\"reason\":\"%s\",\"symbol\":\"%s\",\"secret_key\":\"%s\"}\n",
+         signal_id, err_retcode, specific_cause, symbol, InpSecretKey
       );
       SendRawString(fail_json);
       return;
@@ -851,23 +872,41 @@ string MatchBrokerSymbol(const string base_sym)
       return base_sym;
    }
 
+   // 1b. Clean Root Symbol match (strip .c, .C, _i, .i, .pro, etc. for cross-account execution)
+   string root_sym = base_sym;
+   StringReplace(root_sym, ".c", "");
+   StringReplace(root_sym, ".C", "");
+   StringReplace(root_sym, "_i", "");
+   StringReplace(root_sym, ".i", "");
+   StringReplace(root_sym, ".pro", "");
+   StringReplace(root_sym, ".m", "");
+   if(root_sym != base_sym && IsSymbolTradable(root_sym))
+   {
+      SymbolSelect(root_sym, true);
+      return root_sym;
+   }
+
    // 2. Common broker suffixes & prefixes (with tradable priority)
    string variations[];
-   ArrayResize(variations, 14);
-   variations[0]  = base_sym + ".i";
-   variations[1]  = base_sym + "_i";
-   variations[2]  = base_sym + ".pro";
-   variations[3]  = base_sym + "c";
-   variations[4]  = base_sym + ".c";
-   variations[5]  = base_sym + "m";
-   variations[6]  = base_sym + ".m";
-   variations[7]  = "r" + base_sym;
-   variations[8]  = (base_sym == "XAUUSD") ? "GOLD" : "";
-   variations[9]  = (base_sym == "GOLD") ? "XAUUSD" : "";
-   variations[10] = (base_sym == "XAUUSD") ? "GOLD.i" : "";
-   variations[11] = (base_sym == "XAUUSD") ? "GOLD_i" : "";
-   variations[12] = (base_sym == "US30") ? "DJ30" : "";
-   variations[13] = (base_sym == "US500") ? "SP500" : "";
+   ArrayResize(variations, 18);
+   variations[0]  = root_sym + ".i";
+   variations[1]  = root_sym + "_i";
+   variations[2]  = root_sym + ".pro";
+   variations[3]  = root_sym + "c";
+   variations[4]  = root_sym + ".c";
+   variations[5]  = root_sym + ".C";
+   variations[6]  = root_sym + "m";
+   variations[7]  = root_sym + ".m";
+   variations[8]  = "r" + root_sym;
+   variations[9]  = (root_sym == "XAUUSD") ? "GOLD" : "";
+   variations[10] = (root_sym == "GOLD") ? "XAUUSD" : "";
+   variations[11] = (root_sym == "XAUUSD") ? "GOLD.i" : "";
+   variations[12] = (root_sym == "XAUUSD") ? "GOLD_i" : "";
+   variations[13] = (root_sym == "XAUUSD") ? "GOLD.c" : "";
+   variations[14] = (root_sym == "XAUUSD") ? "XAUUSD.c" : "";
+   variations[15] = (root_sym == "US30") ? "DJ30" : "";
+   variations[16] = (root_sym == "US500") ? "SP500" : "";
+   variations[17] = (root_sym == "NAS100") ? "USTEC" : "";
 
    for(int i = 0; i < ArraySize(variations); i++)
    {
