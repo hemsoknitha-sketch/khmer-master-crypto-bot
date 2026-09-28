@@ -55,13 +55,16 @@ elif [ "$ACCOUNT_ID" == "52133938" ]; then
     TARGET_DIR="$MT5_ADMIN"
     INSTANCE_NAME="Legacy Admin MT5 (52133938)"
 else
-    # Default to platform if exists, else admin
-    if [ -d "$MT5_PLATFORM" ]; then
-        TARGET_DIR="$MT5_PLATFORM"
-        INSTANCE_NAME="Platform MT5 ($ACCOUNT_ID)"
-    else
-        TARGET_DIR="$MT5_ADMIN"
-        INSTANCE_NAME="Admin MT5 ($ACCOUNT_ID)"
+    # Create isolated dynamic instance directory for this VIP account
+    TARGET_DIR="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_$ACCOUNT_ID"
+    INSTANCE_NAME="VIP Client MT5 ($ACCOUNT_ID)"
+    if [ ! -d "$TARGET_DIR" ]; then
+        echo -e "${YELLOW}📦 Creating isolated directory for Account #$ACCOUNT_ID...${NC}"
+        cp -r "$MT5_ADMIN" "$TARGET_DIR"
+        rm -f "$TARGET_DIR/config/accounts.dat"
+        chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_DIR"
+        chmod -R 775 "$TARGET_DIR"
+        echo -e "${GREEN}✅ Cloned MetaTrader 5 into $TARGET_DIR successfully!${NC}"
     fi
 fi
 
@@ -77,13 +80,19 @@ echo -e "🔑 Account ID:      ${GREEN}$ACCOUNT_ID${NC}"
 echo -e "🌐 Server:          ${GREEN}$SERVER${NC}"
 echo ""
 
-# 1. Write startup.ini with credentials
+# 1. Write startup.ini with credentials & auto-enable algo trading
 cat << EOF > "$TARGET_DIR/startup.ini"
 [Common]
 Login=$ACCOUNT_ID
 Password=$PASSWORD
 Server=$SERVER
 KeepPrivate=1
+
+[Experts]
+AllowDllImport=1
+Enabled=1
+Account=1
+Profile=Default
 EOF
 
 chown "$TARGET_USER:$TARGET_USER" "$TARGET_DIR/startup.ini"
@@ -107,19 +116,11 @@ fi
 # 2. Restart target MT5 instance in Wine with /config:startup.ini
 echo -e "${YELLOW}🔄 Restarting target MT5 instance to establish live connection (Display $DETECTED_DISPLAY)...${NC}"
 
-if [ "$TARGET_DIR" == "$MT5_PLATFORM" ]; then
-    # Force kill lingering Platform instance
-    pkill -9 -f "MetaTrader 5_Platform.*terminal64.exe" 2>/dev/null || true
-    sleep 2
-    sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
-    echo -e "${GREEN}🚀 Platform MT5 instance restarted in Wine with credentials!${NC}"
-else
-    # Force kill lingering Admin instance
-    pkill -9 -f "MetaTrader 5/terminal64.exe" 2>/dev/null || true
-    sleep 2
-    sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_ADMIN' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
-    echo -e "${GREEN}🚀 Admin MT5 instance restarted in Wine with credentials!${NC}"
-fi
+# Safely kill ONLY the instance running in this specific directory
+pkill -9 -f "$TARGET_DIR.*terminal64.exe" 2>/dev/null || true
+sleep 2
+sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$TARGET_DIR' && nohup wine terminal64.exe /portable /config:startup.ini >/dev/null 2>&1 &"
+echo -e "${GREEN}🚀 $INSTANCE_NAME restarted in Wine with credentials!${NC}"
 
 echo ""
 echo -e "${BOLD}${GREEN}==============================================================================${NC}"
