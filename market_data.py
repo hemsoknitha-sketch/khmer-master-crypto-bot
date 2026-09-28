@@ -177,10 +177,22 @@ def fetch_binance_data(symbol: str = "BTCUSDT", interval: str = "1d", limit: int
         "https://api2.binance.com",
         "https://api3.binance.com"
     ]
+
+    is_futures_symbol = symbol in ["XAUUSDT", "PAXGUSDT_PERP"]
+    if is_futures_symbol:
+        urls_to_try = [
+            f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}",
+            f"https://fapi.binance.org/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        ]
+    else:
+        urls_to_try = [
+            f"{base_url}/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}" for base_url in base_urls
+        ] + [
+            f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        ]
     
     last_error = ""
-    for base_url in base_urls:
-        url = f"{base_url}/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+    for url in urls_to_try:
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
@@ -227,8 +239,6 @@ def fetch_binance_data(symbol: str = "BTCUSDT", interval: str = "1d", limit: int
             return df, summary, symbol
             
         except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 400:
-                return None, f"❌ Invalid Coin Symbol: '{symbol}'. Binance does not have this pair. Please provide a valid symbol like BTC or ETH.", symbol
             last_error = str(e)
             continue
         except requests.exceptions.RequestException as e:

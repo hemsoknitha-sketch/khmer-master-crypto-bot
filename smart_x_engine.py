@@ -37,6 +37,7 @@ import macro_gold_engine
 import central_bank_gold_radar
 import paxg_arbitrage_engine
 import black_swan_gold_guard
+import market_data
 
 # Canonical Gold Instruments on Binance (Strict Segregation Standard)
 CANONICAL_FUTURES_GOLD_SYMBOL = "XAUUSDT"  # 100% Dedicated for Binance Futures / Auto / Turbo / Sonic Scalp (40x Deep Liquidity)
@@ -829,6 +830,7 @@ class SmartXEngine:
                 "entry_price": current_price,
                 "tp_price": tp_price,
                 "sl_price": sl_price,
+                "rsi": float(market_data.get_symbol_rsi(symbol, interval="15m")),
                 "strategy": " | ".join(turbo_reasons) if turbo_reasons else "TURBO_MACRO_WAIT",
                 "reason": " | ".join(turbo_reasons) if turbo_reasons else "TURBO_MACRO_WAIT",
                 "sge_premium_usdt": sge_prem,
@@ -927,6 +929,7 @@ class SmartXEngine:
             "current_price": current_price,
             "tp_price": tp_price,
             "sl_price": sl_price,
+            "rsi": float(market_data.get_symbol_rsi(symbol, interval="15m")),
             "strategy": strategy_str,
             "session_window": session_info["label"],
             "is_prime_time": session_info["is_prime_time"],

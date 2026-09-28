@@ -10,6 +10,25 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
+async def _safe_bot_send(bot, chat_id: int, text: str, parse_mode: str = "HTML"):
+    """
+    Safely dispatches bot.send_message with automatic fallback to plain-text on parse errors.
+    Catches all exceptions within the coroutine to eliminate 'Task exception was never retrieved'.
+    """
+    try:
+        await bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
+    except Exception as ex:
+        err_str = str(ex).lower()
+        if "parse entities" in err_str or "can't parse" in err_str or "badrequest" in err_str:
+            try:
+                # Fallback to plain-text so critical alerts are 100% delivered to the user
+                await bot.send_message(chat_id=chat_id, text=text, parse_mode=None)
+                return
+            except Exception as ex2:
+                logger.error(f"Fallback plain-text message failed for {chat_id}: {ex2}")
+        else:
+            logger.error(f"Failed to send telegram message to {chat_id}: {ex}")
+
 async def send_smart_notification(app, chat_id: int, text: str, category: str = "INFO", parse_mode="HTML"):
     """
     Intelligent Notification Throttle.
@@ -36,7 +55,7 @@ async def send_smart_notification(app, chat_id: int, text: str, category: str = 
             try:
                 loop = asyncio.get_running_loop()
                 if loop and loop.is_running():
-                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode))
+                    asyncio.create_task(_safe_bot_send(app.bot, chat_id, text, parse_mode=parse_mode))
                     return
             except RuntimeError:
                 pass
@@ -52,7 +71,7 @@ async def send_smart_notification(app, chat_id: int, text: str, category: str = 
                     pass
 
             if app_loop and app_loop.is_running():
-                asyncio.run_coroutine_threadsafe(app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode), app_loop)
+                asyncio.run_coroutine_threadsafe(_safe_bot_send(app.bot, chat_id, text, parse_mode=parse_mode), app_loop)
     except Exception as e:
         logger.error(f"Failed to send telegram message to {chat_id}: {e}")
 
@@ -72,14 +91,14 @@ async def send_telegram_alert(chat_id: int, text: str, parse_mode: str = "Markdo
             try:
                 loop = asyncio.get_running_loop()
                 if loop and loop.is_running():
-                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode))
+                    asyncio.create_task(_safe_bot_send(app.bot, chat_id, text, parse_mode=parse_mode))
                     return True
             except RuntimeError:
                 pass
 
             app_loop = getattr(bot_thread, "MAIN_BOT_LOOP", None)
             if app_loop and app_loop.is_running():
-                asyncio.run_coroutine_threadsafe(app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode), app_loop)
+                asyncio.run_coroutine_threadsafe(_safe_bot_send(app.bot, chat_id, text, parse_mode=parse_mode), app_loop)
                 return True
     except Exception:
         pass
@@ -100,6 +119,10 @@ async def send_telegram_alert(chat_id: int, text: str, parse_mode: str = "Markdo
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0)) as session:
             async with session.post(url, json=payload) as resp:
+                if resp.status != 200 and "parse" in (await resp.text()).lower():
+                    payload.pop("parse_mode", None)
+                    async with session.post(url, json=payload) as resp2:
+                        return resp2.status == 200
                 return resp.status == 200
     except Exception as e:
         logger.error(f"Failed to send direct REST telegram alert to {chat_id}: {e}")

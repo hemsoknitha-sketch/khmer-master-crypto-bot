@@ -29,12 +29,14 @@ import threading
 import asyncio
 from typing import Dict, Any, Optional, List, Tuple, Union
 from datetime import datetime
+import html
 
 # Database and Core Security Citadel
 import database as db
 import system_security_citadel as sc
 import ui_standards as ui
 import notification_manager
+import market_data
 
 def _dispatch_telegram_alert(chat_id: int, message: str, parse_mode: str = "HTML"):
     """
@@ -58,11 +60,17 @@ def _dispatch_telegram_alert(chat_id: int, message: str, parse_mode: str = "HTML
         import requests
         token = os.getenv("TELEGRAM_BOT_TOKEN")
         if token and token != "your_telegram_bot_token_here":
-            requests.post(
+            resp = requests.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
                 json={"chat_id": chat_id, "text": message, "parse_mode": parse_mode},
                 timeout=3.0
             )
+            if not resp.ok and "parse" in resp.text.lower():
+                requests.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": message},
+                    timeout=3.0
+                )
     except Exception:
         pass
 
@@ -182,17 +190,25 @@ class MT5QuantumSignalCitadel:
                     elif side == "SELL" and dxy_chg >= 0.20:
                         conf = min(95.0, conf + 4.0)
 
+                    # Real-time multi-timeframe RSI analysis for Gold:
+                    rsi_15m = float(market_data.get_symbol_rsi("XAUUSDT", interval="15m"))
+                    rsi_5m = float(market_data.get_symbol_rsi("XAUUSDT", interval="5m"))
+
                     # Citadel Pullback & Invariant 16 Protection:
-                    rsi_val = float(sig.get("rsi", 50.0) or 50.0)
-                    if side == "BUY" and rsi_val >= 68.0:
+                    # 1. Anti-Peak Guard: Do NOT BUY into local overbought peak (15m RSI >= 68.0 or 5m RSI >= 72.0)
+                    if side == "BUY" and (rsi_15m >= 68.0 or rsi_5m >= 72.0):
                         side = "SKIP"
-                    elif side == "SELL" and rsi_val <= 38.0:
+                    # 2. Anti-Falling-Knife Guard: If 15m RSI is in extreme freefall (< 22.0) and 5m is still dumping (< 18.0), wait for stabilization
+                    elif side == "BUY" and (rsi_15m <= 22.0 and rsi_5m <= 18.0):
+                        side = "SKIP"
+                    # 3. Invariant 16 Anti-Oversold Short Guard: Never short into oversold liquidation bottom
+                    elif side == "SELL" and (rsi_15m <= 38.0 or rsi_5m <= 28.0):
                         side = "SKIP"
 
                     if side in ["BUY", "SELL"] and conf >= 90.0:
                         action = side
                         confidence = conf
-                        signal_reason = f"MacroGold_{side}_{conf:.0f}%"
+                        signal_reason = f"MacroGold_{side}_{conf:.0f}%_RSI15m{rsi_15m:.1f}"
             except Exception as ex:
                 logger.warning(f"⚠️ SmartX Gold Citadel error: {ex}")
 
@@ -1276,6 +1292,7 @@ class MT5BridgeEngine:
                             self._ticket_peak_profit.pop(ticket, None)
                             try:
                                 if chat_id:
+                                    clean_reason = html.escape(str(reason))
                                     if is_loss:
                                         msg_harvest = (
                                             f"🛡️ <b>[MT5 AUTO RISK STOP-LOSS]</b>\n"
@@ -1283,7 +1300,7 @@ class MT5BridgeEngine:
                                             f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
                                             f"📉 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
                                             f"🔻 <b>កាត់ហានិភ័យស្វ័យប្រវត្តិ ៖</b> <b>-${abs(profit):,.2f} USD</b>\n"
-                                            f"🛡️ <b>យន្តការការពារ ៖</b> {reason}\n"
+                                            f"🛡️ <b>យន្តការការពារ ៖</b> {clean_reason}\n"
                                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
                                             f"━━━━━━━━━━━━\n"
                                             f"<i>✨ Apex Super Brain AI បានកាត់ហានិភ័យការពារដើមទុន មិនឱ្យខាតធ្ងន់ធ្ងរឡើយ!</i>"
@@ -1295,7 +1312,7 @@ class MT5BridgeEngine:
                                             f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
                                             f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
                                             f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>+${profit:,.2f} USD</b>\n"
-                                            f"🛡️ <b>យន្តការ ៖</b> {reason}\n"
+                                            f"🛡️ <b>យន្តការ ៖</b> {clean_reason}\n"
                                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
                                             f"━━━━━━━━━━━━\n"
                                             f"<i>✨ Apex Super Brain AI បានកើបប្រាក់ចំណេញ និងបិទ Position ដោយស្វ័យប្រវត្តិតាម Tokyo Bridge (&lt;0.5ms)!</i>"
