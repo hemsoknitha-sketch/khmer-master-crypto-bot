@@ -68,11 +68,15 @@ else
     INSTANCE_NAME="VIP Client MT5 ($ACCOUNT_ID)"
     if [ ! -d "$TARGET_DIR" ]; then
         echo -e "${YELLOW}📦 Creating isolated directory for Account #$ACCOUNT_ID...${NC}"
-        cp -r "$MT5_ADMIN" "$TARGET_DIR"
+        SOURCE_DIR="$MT5_PLATFORM"
+        if [ ! -d "$SOURCE_DIR" ]; then
+            SOURCE_DIR="$MT5_ADMIN"
+        fi
+        cp -r "$SOURCE_DIR" "$TARGET_DIR"
         rm -f "$TARGET_DIR/config/accounts.dat"
         chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_DIR"
         chmod -R 775 "$TARGET_DIR"
-        echo -e "${GREEN}✅ Cloned MetaTrader 5 into $TARGET_DIR successfully!${NC}"
+        echo -e "${GREEN}✅ Cloned MetaTrader 5 from $SOURCE_DIR into $TARGET_DIR successfully!${NC}"
     fi
 fi
 
@@ -81,17 +85,22 @@ if [ ! -d "$TARGET_DIR" ]; then
     exit 1
 fi
 
+# Normalize broker server names (GTC Cent is officially "GTCGlobalSA-Server5" without space in MT5)
+CHART_SYMBOL="EURUSD"
+if [[ "$SERVER" =~ [Ss]erver[[:space:]]*5 ]] || [[ "$SERVER" =~ "CENT" ]] || [[ "$SERVER" =~ "Cent" ]]; then
+    SERVER="GTCGlobalSA-Server5"
+    CHART_SYMBOL="EURUSDc"
+elif [[ "$SERVER" =~ [Ss]erver[[:space:]]*2 ]]; then
+    SERVER="GTCGlobalSA-Server 2"
+    CHART_SYMBOL="EURUSD"
+fi
+
 echo -e "👤 Target User:     ${BOLD}${CYAN}$TARGET_USER${NC}"
 echo -e "🎯 Target Instance: ${BOLD}${YELLOW}$INSTANCE_NAME${NC}"
 echo -e "📁 Directory:       ${CYAN}$TARGET_DIR${NC}"
 echo -e "🔑 Account ID:      ${GREEN}$ACCOUNT_ID${NC}"
 echo -e "🌐 Server:          ${GREEN}$SERVER${NC}"
 echo ""
-
-CHART_SYMBOL="EURUSD"
-if [[ "$SERVER" =~ "Server 5" ]] || [[ "$SERVER" =~ "CENT" ]] || [[ "$SERVER" =~ "Cent" ]]; then
-    CHART_SYMBOL="EURUSDc"
-fi
 
 # Auto-detect active X display:
 # Priority 1: Extract working DISPLAY from any active MT5 terminal process
@@ -151,6 +160,11 @@ Password=$PASSWORD
 Server=$SERVER
 KeepPrivate=1
 
+[StartUp]
+Expert=KhmerMasterCrypto_Bridge
+Symbol=$CHART_SYMBOL
+Period=M15
+
 [Experts]
 AllowDllImport=1
 Enabled=1
@@ -197,26 +211,19 @@ echo -e "${YELLOW}🔄 Restarting target MT5 instance to establish live connecti
 
 # Safely kill ONLY the instance running in this specific directory
 pkill -9 -f "$TARGET_DIR.*terminal64.exe" 2>/dev/null || true
+pkill -9 -f "start.exe.*$ACCOUNT_ID" 2>/dev/null || true
 sleep 2
 
 LOG_FILE="$TARGET_DIR/launch.log"
-sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$TARGET_DIR' && nohup wine start /exec terminal64.exe /portable /config:startup.ini > '$LOG_FILE' 2>&1 &"
+sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$TARGET_DIR' && nohup wine terminal64.exe /portable /config:startup.ini > '$LOG_FILE' 2>&1 &"
 
 sleep 4
 if ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep >/dev/null; then
     echo -e "${GREEN}🚀 $INSTANCE_NAME is RUNNING actively in Wine!${NC}"
     ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep
 else
-    # Fallback to direct wine invocation
-    sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$TARGET_DIR' && nohup wine terminal64.exe /portable /config:startup.ini >> '$LOG_FILE' 2>&1 &"
-    sleep 3
-    if ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep >/dev/null; then
-        echo -e "${GREEN}🚀 $INSTANCE_NAME is RUNNING actively in Wine!${NC}"
-        ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep
-    else
-        echo -e "${YELLOW}⚠️ Notice: Terminal process launched. Log output:${NC}"
-        tail -n 15 "$LOG_FILE" 2>/dev/null || true
-    fi
+    echo -e "${YELLOW}⚠️ Notice: Terminal process launched. Log output:${NC}"
+    tail -n 15 "$LOG_FILE" 2>/dev/null || true
 fi
 
 echo ""

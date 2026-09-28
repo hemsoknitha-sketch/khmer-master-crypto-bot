@@ -1169,7 +1169,7 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
         )
 
         # Determine referral track from server (Super Admin Tracks)
-        is_cent = "Server 5" in server or "CENT" in server.upper()
+        is_cent = "Server 5" in server or "Server5" in server or "CENT" in server.upper()
         assigned_ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_L15_INVITE_CODE
         assigned_ref_url = GTC_CENT_REFERRAL_URL if is_cent else GTC_STD_L15_REFERRAL_URL
         track_name = "Cent Account (MT5-CENT-L20 - Server 5)" if is_cent else "Standard Swap-Free (MT5-SF-STD-L15 - Server 2)"
@@ -1573,7 +1573,7 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
         # Check existing config to see if cent account (Super Admin Tracks)
         cfg = db.get_user_mt5_config(chat_id)
         srv = str(cfg.get("server", "")).strip()
-        is_cent = "Server 5" in srv or "CENT" in srv.upper()
+        is_cent = "Server 5" in srv or "Server5" in srv or "CENT" in srv.upper()
         ref_code = GTC_CENT_INVITE_CODE if is_cent else GTC_STD_L15_INVITE_CODE
         track_name = "Cent (MT5-CENT-L20)" if is_cent else "Standard (MT5-SF-STD-L15)"
 
