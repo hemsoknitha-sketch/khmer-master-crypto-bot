@@ -121,7 +121,7 @@ class MT5BridgeEngine:
         
         # Connected Client Registry: {account_id: MT5ClientSession}
         self.clients: Dict[str, MT5ClientSession] = {}
-        self._clients_lock = threading.Lock()
+        self._clients_lock = threading.RLock()
         
         # Sockets
         self.tcp_server_sock: Optional[socket.socket] = None
@@ -845,80 +845,85 @@ class MT5BridgeEngine:
                     if not acc_id:
                         continue
 
+                    session = None
+                    open_positions = []
                     with self._clients_lock:
-                        session = self.clients.get(acc_id)
-                        if not session or session.status != "ONLINE" or not session.is_prop_compliant:
+                        s = self.clients.get(acc_id)
+                        if s and s.status == "ONLINE" and s.is_prop_compliant:
+                            session = s
+                            open_positions = list(getattr(s, "positions", []) or [])
+
+                    if not session:
+                        continue
+
+                    auto_cfg = db.get_user_mt5_auto_config(chat_id)
+                    if not auto_cfg or not auto_cfg.get("enabled", False):
+                        continue
+
+                    allocations = auto_cfg.get("allocations", [])
+                    if not allocations:
+                        continue
+
+                    max_assets = int(auto_cfg.get("max_assets", 5))
+                    current_open_count = len(open_positions)
+
+                    open_symbols = set()
+                    total_pnl = 0.0
+                    for p in open_positions:
+                        sym = str(p.get("symbol", "")).upper()
+                        clean_sym = sym.split(".")[0].replace("_I", "")
+                        open_symbols.add(sym)
+                        open_symbols.add(clean_sym)
+                        total_pnl += float(p.get("profit", 0.0) or 0.0)
+
+                    # Debounced Periodic Radar Log (every 60s per user)
+                    now_ts = time.time()
+                    if now_ts - self._last_auto_trade_log.get(str(chat_id), 0.0) >= 60.0:
+                        self._last_auto_trade_log[str(chat_id)] = now_ts
+                        logger.info(f"🌊 [MT5 AUTO-TRADE RADAR] User {chat_id} (Acc #{acc_id}): Active ({current_open_count}/{max_assets} Positions) | PnL: ${total_pnl:+.2f} | 33 AI Models Swarm Active.")
+
+                    if current_open_count >= max_assets:
+                        continue
+
+                    # Scan and execute unfilled asset allocations
+                    for a in allocations:
+                        raw_sym = str(a.get("raw_symbol", a.get("symbol", ""))).upper()
+                        sym_target = str(a.get("symbol", raw_sym)).upper()
+
+                        if raw_sym in open_symbols or sym_target in open_symbols:
                             continue
 
-                        auto_cfg = db.get_user_mt5_auto_config(chat_id)
-                        if not auto_cfg.get("enabled", False):
-                            continue
+                        lot = float(a.get("lot_size", 0.01))
+                        lot = max(0.01, min(1.0, lot))
 
-                        allocations = auto_cfg.get("allocations", [])
-                        if not allocations:
-                            continue
+                        # Quantitative Trend Assessment
+                        action = "BUY"
+                        try:
+                            import websocket_engine
+                            tick = websocket_engine.PRICE_CACHE.get(raw_sym) or websocket_engine.PRICE_CACHE.get(raw_sym + "USDT")
+                            if tick and isinstance(tick, dict):
+                                chg = float(tick.get("price_change_percent", 0.0) or 0.0)
+                                if chg < -0.8:
+                                    action = "SELL"
+                        except Exception:
+                            pass
 
-                        max_assets = int(auto_cfg.get("max_assets", 5))
-                        open_positions = getattr(session, "positions", []) or []
-                        current_open_count = len(open_positions)
-
-                        open_symbols = set()
-                        total_pnl = 0.0
-                        for p in open_positions:
-                            sym = str(p.get("symbol", "")).upper()
-                            clean_sym = sym.split(".")[0].replace("_I", "")
-                            open_symbols.add(sym)
-                            open_symbols.add(clean_sym)
-                            total_pnl += float(p.get("profit", 0.0) or 0.0)
-
-                        # Debounced Periodic Radar Log (every 60s per user)
-                        now_ts = time.time()
-                        if now_ts - self._last_auto_trade_log.get(str(chat_id), 0.0) >= 60.0:
-                            self._last_auto_trade_log[str(chat_id)] = now_ts
-                            logger.info(f"🌊 [MT5 AUTO-TRADE RADAR] User {chat_id} (Acc #{acc_id}): Active ({current_open_count}/{max_assets} Positions) | PnL: ${total_pnl:+.2f} | 33 AI Models Swarm Active.")
-
-                        if current_open_count >= max_assets:
-                            continue
-
-                        # Scan and execute unfilled asset allocations
-                        for a in allocations:
-                            raw_sym = str(a.get("raw_symbol", a.get("symbol", ""))).upper()
-                            sym_target = str(a.get("symbol", raw_sym)).upper()
-
-                            if raw_sym in open_symbols or sym_target in open_symbols:
-                                continue
-
-                            lot = float(a.get("lot_size", 0.01))
-                            lot = max(0.01, min(1.0, lot))
-
-                            # Quantitative Trend Assessment
-                            action = "BUY"
-                            try:
-                                import websocket_engine
-                                tick = websocket_engine.PRICE_CACHE.get(raw_sym) or websocket_engine.PRICE_CACHE.get(raw_sym + "USDT")
-                                if tick and isinstance(tick, dict):
-                                    chg = float(tick.get("price_change_percent", 0.0) or 0.0)
-                                    if chg < -0.8:
-                                        action = "SELL"
-                            except Exception:
-                                pass
-
-                            logger.info(f"🚀 [MT5 AUTO-TRADE] Autonomous Swarm signal: {action} {lot} {sym_target} for User {chat_id} (Acc #{acc_id})!")
-                            res = self.dispatch_order(
-                                symbol=sym_target,
-                                action=action,
-                                lot=lot,
-                                sl=0.0,
-                                tp=0.0,
-                                comment="MT5_AI_SWARM",
-                                magic=888999,
-                                target_account=acc_id
-                            )
-                            if res.get("clients_reached", 0) > 0:
-                                open_symbols.add(raw_sym)
-                                open_symbols.add(sym_target)
-                                current_open_count += 1
-                                break
+                        logger.info(f"🚀 [MT5 AUTO-TRADE] Autonomous Swarm signal: {action} {lot} {sym_target} for User {chat_id} (Acc #{acc_id})!")
+                        res = self.dispatch_order(
+                            symbol=sym_target,
+                            action=action,
+                            lot=lot,
+                            sl=0.0,
+                            tp=0.0,
+                            comment="MT5_AI_SWARM",
+                            magic=888999,
+                            target_account=acc_id
+                        )
+                        if res.get("clients_reached", 0) > 0:
+                            open_symbols.add(raw_sym)
+                            open_symbols.add(sym_target)
+                            current_open_count += 1
+                            break
             except Exception as e:
                 logger.error(f"⚠️ [MT5 AUTO-TRADE WORKER ERROR]: {e}")
 
