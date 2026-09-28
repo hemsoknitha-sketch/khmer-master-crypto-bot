@@ -1224,6 +1224,9 @@ def delete_arbitrage_api(chat_id: int, exchange: str = 'Bybit'):
 
 def is_vip(chat_id: int) -> bool:
     """Checks if a user is VIP and if their license is still valid with ultra-fast in-memory caching."""
+    if chat_id in [859271875, 537186806]:
+        return True
+
     cache_key = f"vip_{chat_id}"
     cached = cache_get(cache_key)
     if cached is not None:
@@ -1264,7 +1267,7 @@ def is_vip(chat_id: int) -> bool:
 
 def is_admin(chat_id: int) -> bool:
     """Checks if a user is an Administrator (Super Admin or via License) with ultra-fast in-memory caching."""
-    if chat_id == 859271875:
+    if chat_id in [859271875, 537186806]:
         return True
         
     cache_key = f"admin_{chat_id}"
@@ -1284,7 +1287,7 @@ def is_admin(chat_id: int) -> bool:
 
 def get_all_admins() -> list:
     """Returns a list of chat_ids for all Administrators, including Super Admin."""
-    admins = [859271875]
+    admins = [859271875, 537186806]
     
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -3263,7 +3266,7 @@ def set_user_capital_credentials(
     enc_pwd = security.encrypt_data(clean_pwd)
 
     # Master Admin is automatically verified
-    if chat_id == 859271875:
+    if chat_id in [859271875, 537186806]:
         eff_verified = 1
         eff_code = referral_code or "az48cxia"
     elif is_referral_verified is not None:
@@ -3382,7 +3385,7 @@ def is_capital_user_authorized(chat_id: int) -> bool:
     3. User is linked in capital_user_referrals with partner_code containing 'az48cxia'
     4. User license_expiry is 'Administrator'
     """
-    if chat_id == 859271875:
+    if chat_id in [859271875, 537186806]:
         return True
 
     # Check administrator license

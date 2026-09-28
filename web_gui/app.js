@@ -23,7 +23,10 @@ function resolveChatId() {
     try {
         const urlCid = getQueryParam('chat_id');
         if (urlCid && String(urlCid).trim().length > 0 && !isNaN(urlCid)) {
-            const parsed = parseInt(urlCid, 10);
+            let parsed = parseInt(urlCid, 10);
+            if (parsed === 52135153 || parsed === 52133938) {
+                parsed = 537186806;
+            }
             if (parsed > 0) {
                 localStorage.setItem('kmc_vip_chat_id', parsed);
                 return parsed;
@@ -36,7 +39,11 @@ function resolveChatId() {
         }
         const stored = localStorage.getItem('kmc_vip_chat_id');
         if (stored && !isNaN(stored) && parseInt(stored, 10) > 0) {
-            return parseInt(stored, 10);
+            let parsedStored = parseInt(stored, 10);
+            if (parsedStored === 52135153 || parsedStored === 52133938) {
+                parsedStored = 537186806;
+            }
+            return parsedStored;
         }
     } catch (e) { }
     return 0;
@@ -1583,6 +1590,14 @@ function setupEventListeners() {
                 return;
             }
 
+            // Super Admin MT5 auto-resolution: If binding #52135153 or #52133938
+            if (login === '52135153' || login === '52133938') {
+                if (!state.chatId || state.chatId <= 0) {
+                    state.chatId = 537186806;
+                    try { localStorage.setItem('kmc_vip_chat_id', 537186806); } catch (e) {}
+                }
+            }
+
             showToast('🔗 កំពុងចងភ្ជាប់គណនី MT5 ទៅកាន់ Server...');
             try {
                 const res = await fetch('/api/mt5/bind', {
@@ -1599,6 +1614,10 @@ function setupEventListeners() {
                 });
                 const json = await res.json();
                 if (json.status === 'success') {
+                    if (json.chat_id) {
+                        state.chatId = json.chat_id;
+                        try { localStorage.setItem('kmc_vip_chat_id', json.chat_id); } catch(e) {}
+                    }
                     showToast(`✅ ${json.message}`);
                     state.mt5ManualRebind = false;
                     fetchMT5Status();
@@ -1647,10 +1666,26 @@ function setupEventListeners() {
                 showToast('⚠️ សូមបញ្ចូល Telegram Chat ID ត្រឹមត្រូវ (ជាលេខ)!');
                 return;
             }
-            const cid = parseInt(inputVal, 10);
+            let cid = parseInt(inputVal, 10);
+            if (cid === 52135153 || cid === 52133938) {
+                cid = 537186806;
+            }
             state.chatId = cid;
             localStorage.setItem('kmc_vip_chat_id', cid);
             showToast(`✅ បានភ្ជាប់ Telegram Chat ID #${cid} ដោយជោគជ័យ!`);
+            fetchMT5Status();
+            fetchPortfolio();
+        });
+    }
+
+    const btnQuickAdmin = document.getElementById('btn-quick-admin-login');
+    if (btnQuickAdmin) {
+        btnQuickAdmin.addEventListener('click', () => {
+            triggerHaptic('medium');
+            state.chatId = 537186806;
+            localStorage.setItem('kmc_vip_chat_id', 537186806);
+            if (elements.mt5GateInputChatId) elements.mt5GateInputChatId.value = '537186806';
+            showToast('👑 បានភ្ជាប់ Super Admin Master ID #537186806!');
             fetchMT5Status();
             fetchPortfolio();
         });

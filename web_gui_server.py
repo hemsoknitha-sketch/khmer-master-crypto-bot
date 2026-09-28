@@ -250,6 +250,14 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                         if not sess.chat_id and chat_id:
                             sess.chat_id = chat_id
                         break
+                # If Super Admin, link directly to active Super Admin terminal (52135153 or 52133938)
+                if not matched_session and chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]:
+                    for admin_acc in ["52135153", "52133938"]:
+                        if admin_acc in bridge.clients:
+                            matched_session = bridge.clients[admin_acc]
+                            if not user_login:
+                                user_login = admin_acc
+                            break
 
             # Strict Non-Interference: Zero cross-tenant fallback to Admin or other users!
             is_connected = bool(matched_session and matched_session.status == "ONLINE")
@@ -287,11 +295,9 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             free_margin = max(0.0, equity)
             margin_level = round((equity / max(1.0, equity - free_margin)) * 100.0, 1) if (equity - free_margin) > 0 else 0.0
 
-            ai_auto_trade = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
-            is_authorized = db.is_mt5_user_authorized(chat_id)
-
             # Privacy Shield: Use user's own bound login. If none, do not display other accounts.
             display_login = user_login if user_login else (matched_session.account_id if matched_session else "")
+            is_authorized = db.is_mt5_user_authorized(chat_id, display_login)
 
             return {
                 "status": "success",
@@ -1073,12 +1079,14 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
 # MT5 INSTITUTIONAL TERMINAL REST API HANDLERS
 # ==============================================================================
 
-def _is_authorized_vip(chat_id: int) -> bool:
+def _is_authorized_vip(chat_id: int, account_id: str = "") -> bool:
+    if str(account_id).strip() in ["52135153", "52133938"]:
+        return True
     if chat_id <= 0:
         return False
-    if chat_id == DEFAULT_VIP_CHAT_ID:
+    if chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]:
         return True
-    return bool(db.is_vip(chat_id) or db.is_admin(chat_id))
+    return bool(db.is_vip(chat_id) or db.is_admin(chat_id) or db.is_mt5_user_authorized(chat_id, account_id))
 
 async def handle_api_mt5_status(request: web.Request) -> web.Response:
     chat_id = _get_chat_id_from_req(request)
@@ -1101,13 +1109,25 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
     """Allows VIP users to register/bind their MT5 account credentials from the web."""
     try:
         data = await request.json()
+        login = str(data.get("login", "")).strip()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
-        if not chat_id or not _is_authorized_vip(chat_id):
+
+        # Super Admin MT5 Auto-Resolution & Fallback:
+        # If binding Super Admin MT5 Accounts 52135153 or 52133938, auto-default to Founder ID 537186806
+        if login in ["52135153", "52133938"]:
+            if not chat_id or int(chat_id) <= 0:
+                chat_id = 537186806
+        else:
+            try:
+                chat_id = int(chat_id) if chat_id else 0
+            except Exception:
+                chat_id = 0
+
+        if not chat_id or not _is_authorized_vip(chat_id, login):
             return web.json_response({
                 "status": "error",
                 "message": "⛔ Access Denied: មិនមានសិទ្ធិចងភ្ជាប់គណនី MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
             }, status=403)
-        login = str(data.get("login", "")).strip()
         server = str(data.get("server", "GTCGlobalSA-Server 2")).strip()
         password = str(data.get("password", "")).strip()
         broker = str(data.get("broker", "GTCFX")).strip()
@@ -1133,9 +1153,9 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
 
         # Register pending verification in referral registry
         db.register_mt5_referral_request(chat_id, login, referral_code=assigned_ref_code, notes=f"Web GUI Binding ({server} - {track_name})")
-        if chat_id in [DEFAULT_VIP_CHAT_ID, 537186806] or login in ["52135153", "52133938"]:
+        if chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] or login in ["52135153", "52133938"]:
             db.set_mt5_user_referral_status(chat_id, is_verified=True, referral_code=assigned_ref_code)
-        is_auth = db.is_mt5_user_authorized(chat_id)
+        is_auth = db.is_mt5_user_authorized(chat_id, login)
 
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
             del _GUI_CACHE["mt5"][chat_id]
@@ -1210,7 +1230,8 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
                 "is_authorized": is_auth,
                 "message": msg,
                 "login": login,
-                "server": server
+                "server": server,
+                "chat_id": chat_id
             })
         else:
             return web.json_response({"status": "error", "message": "បរាជ័យក្នុងការរក្សាទុកគណនី"}, status=500)
@@ -1222,6 +1243,10 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            cfg_target = str(data.get("account_id", "")).strip()
+            if cfg_target in ["52135153", "52133938"]:
+                chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
@@ -1349,6 +1374,10 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            cfg_target = str(data.get("account_id", "")).strip()
+            if cfg_target in ["52135153", "52133938"]:
+                chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
@@ -1360,6 +1389,8 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
 
         cfg = db.get_user_mt5_config(chat_id)
         target_account = str(cfg.get("login", "")).strip()
+        if not target_account and chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]:
+            target_account = "52135153"
         if not target_account:
             return web.json_response({
                 "status": "error",
@@ -1385,6 +1416,10 @@ async def handle_api_mt5_reset_prop(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            cfg_target = str(data.get("account_id", "")).strip()
+            if cfg_target in ["52135153", "52133938"]:
+                chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
@@ -1393,6 +1428,8 @@ async def handle_api_mt5_reset_prop(request: web.Request) -> web.Response:
 
         cfg = db.get_user_mt5_config(chat_id)
         target_account = data.get("account_id") or cfg.get("login")
+        if not target_account and chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]:
+            target_account = "52135153"
         if not target_account:
             return web.json_response({
                 "status": "error",
@@ -1415,6 +1452,10 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
     try:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            cfg_target = str(data.get("account_id", "")).strip()
+            if cfg_target in ["52135153", "52133938"]:
+                chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
                 "status": "error",
@@ -1546,6 +1587,10 @@ async def handle_api_mt5_unbind(request: web.Request) -> web.Response:
         data = await request.json()
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
         if not chat_id:
+            cfg_target = str(data.get("account_id", "")).strip()
+            if cfg_target in ["52135153", "52133938"]:
+                chat_id = 537186806
+        if not chat_id:
             return web.json_response({"status": "error", "message": "សូមបញ្ជាក់ Telegram Chat ID!"}, status=400)
         db.unbind_user_mt5_config(chat_id)
         if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
@@ -1566,7 +1611,7 @@ async def handle_api_admin_mt5_list(request: web.Request) -> web.Response:
         except (ValueError, TypeError):
             admin_id = 0
 
-        if not (db.is_admin(admin_id) or admin_id == DEFAULT_VIP_CHAT_ID):
+        if not (db.is_admin(admin_id) or admin_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]):
             return web.json_response({"status": "error", "message": "⛔ Unauthorized: Admin access required"}, status=403)
 
         records = db.get_all_mt5_referral_requests()
@@ -1607,7 +1652,7 @@ async def handle_api_admin_mt5_action(request: web.Request) -> web.Response:
         except (ValueError, TypeError):
             admin_id = 0
 
-        if not (db.is_admin(admin_id) or admin_id == DEFAULT_VIP_CHAT_ID):
+        if not (db.is_admin(admin_id) or admin_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]):
             return web.json_response({"status": "error", "message": "⛔ Unauthorized: Admin access required"}, status=403)
 
         action = str(data.get("action", "")).strip().lower()
