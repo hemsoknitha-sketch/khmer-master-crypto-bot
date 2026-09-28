@@ -1284,24 +1284,39 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
         if res.get("clients_reached", 0) == 0:
             import notification_manager
             import ui_standards
-            err_msg = (
-                f"⚠️ **[MT5 TERMINAL NOT CONNECTED / LOGIN MISMATCH]** 🏛️\n"
-                f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🎫 **Target Account ID ៖** `#{target_account}`\n"
-                f"📡 **ស្ថានភាព ៖** ❌ **Offline លើ Tokyo VPS Bridge (Port 5555)**\n"
-                f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"🔍 **មូលហេតុដែលអាចកើតមាន ៖**\n"
-                f"1️⃣ លេខ Account Login ID លើ Web GUI ខុសគ្នាពីលេខ Account លើ MT5 Software\n"
-                f"2️⃣ វាយខុស Password ធ្វើឱ្យ MT5 លើ PC/VPS មិនអាច Login ចូល Broker (Authorization Failed)\n"
-                f"3️⃣ មិនទាន់បានបើកកម្មវិធី MT5 ឬមិនទាន់បាន Attach EA `KhmerMasterCrypto_Bridge.mq5`\n\n"
-                f"👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ជាការស្រេច!"
-            )
-            asyncio.create_task(notification_manager.send_telegram_alert(chat_id, err_msg))
-
-            return web.json_response({
-                "status": "error",
-                "message": f"⚠️ គណនី MT5 #{target_account} របស់អ្នកមិនទាន់ Online លើ Tokyo VPS Bridge នៅឡើយទេ សូមបើក EA របស់អ្នក!"
-            }, status=400)
+            if res.get("skipped_prop"):
+                err_msg = (
+                    f"🚨 **[MT5 ORDER BLOCKED: PROP FIRM CIRCUIT BREAKER]** 🛡️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🎫 **Target Account ID ៖** `#{target_account}`\n"
+                    f"🛡️ **ស្ថានភាព ៖** ⚠️ **ជាប់សោ Prop Shield (Drawdown Limit Hit)**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🔍 **មូលហេតុ ៖** គណនីបានប៉ះនឹង Drawdown Limit ពីមុន ដូច្នេះប្រព័ន្ធបញ្ឈប់ការបើក Order ថ្មីដើម្បីការពារទុន!\n\n"
+                    f"👉 **ដំណោះស្រាយ ៖** សូមចូល Telegram រួចវាយបញ្ជា `/mt5 RESET` ដើម្បី Reset Baseline និងដោះសោ Trade បន្ត!"
+                )
+                asyncio.create_task(notification_manager.send_telegram_alert(chat_id, err_msg))
+                return web.json_response({
+                    "status": "error",
+                    "message": f"🚨 គណនី #{target_account} កំពុងជាប់សោ Prop Shield! សូមវាយបញ្ជា /mt5 RESET ក្នុង Telegram ដើម្បីដោះសោ!"
+                }, status=400)
+            else:
+                err_msg = (
+                    f"⚠️ **[MT5 TERMINAL NOT CONNECTED / LOGIN MISMATCH]** 🏛️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🎫 **Target Account ID ៖** `#{target_account}`\n"
+                    f"📡 **ស្ថានភាព ៖** ❌ **Offline លើ Tokyo VPS Bridge (Port 5555)**\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🔍 **មូលហេតុដែលអាចកើតមាន ៖**\n"
+                    f"1️⃣ លេខ Account Login ID លើ Web GUI ខុសគ្នាពីលេខ Account លើ MT5 Software\n"
+                    f"2️⃣ វាយខុស Password ធ្វើឱ្យ MT5 លើ PC/VPS មិនអាច Login ចូល Broker (Authorization Failed)\n"
+                    f"3️⃣ មិនទាន់បានបើកកម្មវិធី MT5 ឬមិនទាន់បាន Attach EA `KhmerMasterCrypto_Bridge.mq5`\n\n"
+                    f"👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ឬ run: `bash reset_and_launch_mt5.sh`!"
+                )
+                asyncio.create_task(notification_manager.send_telegram_alert(chat_id, err_msg))
+                return web.json_response({
+                    "status": "error",
+                    "message": f"⚠️ គណនី MT5 #{target_account} របស់អ្នកមិនទាន់ Online លើ Tokyo VPS Bridge នៅឡើយទេ សូមបើក EA របស់អ្នក!"
+                }, status=400)
 
         db.record_mt5_bridge_order(
             signal_id=res.get("signal_id", ""),

@@ -652,12 +652,16 @@ class MT5BridgeEngine:
         )
 
         clients_reached = 0
+        target_found = False
+        skipped_prop = False
         with self._clients_lock:
             for acc_id, session in self.clients.items():
                 if target_account and acc_id != target_account:
                     continue
+                target_found = True
                 # Prop Firm Compliance Guard: Never route to breached account
                 if not session.is_prop_compliant:
+                    skipped_prop = True
                     logger.warning(f"🛡️ [DISPATCH GUARD] Skipped account {acc_id} due to Prop Firm Breach status.")
                     continue
                 if session.socket_conn:
@@ -675,9 +679,11 @@ class MT5BridgeEngine:
 
         logger.info(f"⚡ [MT5 DISPATCH] Signal {signal_id} ({act_norm} {lot_norm} {sym_norm} SL:{sl_norm} TP:{tp_norm}) dispatched to {clients_reached} terminals!")
         return {
-            "success": True,
+            "success": clients_reached > 0,
             "signal_id": signal_id,
             "clients_reached": clients_reached,
+            "target_found": target_found,
+            "skipped_prop": skipped_prop,
             "symbol": sym_norm,
             "action": act_norm,
             "lot": lot_norm
