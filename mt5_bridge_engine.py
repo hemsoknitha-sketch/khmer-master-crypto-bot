@@ -1235,18 +1235,47 @@ class MT5BridgeEngine:
         target_found = False
         skipped_prop = False
         with self._clients_lock:
-            for acc_id, session in self.clients.items():
-                if target_account and acc_id != target_account:
-                    continue
+            # 1. Direct targeted account
+            if target_account and target_account in self.clients:
                 target_found = True
-                # Prop Firm Compliance Guard: Never route to breached account
+                session = self.clients[target_account]
                 if not session.is_prop_compliant:
                     skipped_prop = True
-                    logger.warning(f"🛡️ [DISPATCH GUARD] Skipped account {acc_id} due to Prop Firm Breach status.")
-                    continue
-                if session.socket_conn:
+                    logger.warning(f"🛡️ [DISPATCH GUARD] Skipped account {target_account} due to Prop Firm Breach status.")
+                elif session.socket_conn:
                     if self._send_raw_socket(session.socket_conn, payload):
                         clients_reached += 1
+            # 2. Master Signal Bridge / Cloud Copy-Trade Fallback for VIP accounts
+            elif target_account:
+                for master_acc in ["52135153", "55688250", "52133938"]:
+                    if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
+                        target_found = True
+                        m_sess = self.clients[master_acc]
+                        if not m_sess.is_prop_compliant:
+                            skipped_prop = True
+                        elif m_sess.socket_conn:
+                            if self._send_raw_socket(m_sess.socket_conn, payload):
+                                clients_reached += 1
+                        break
+                if not target_found:
+                    for any_acc, any_sess in self.clients.items():
+                        if any_sess.status == "ONLINE" and any_sess.socket_conn:
+                            target_found = True
+                            if not any_sess.is_prop_compliant:
+                                skipped_prop = True
+                            elif self._send_raw_socket(any_sess.socket_conn, payload):
+                                clients_reached += 1
+                            break
+            # 3. Broadcast mode (target_account is None or empty)
+            else:
+                for acc_id, session in self.clients.items():
+                    target_found = True
+                    if not session.is_prop_compliant:
+                        skipped_prop = True
+                        continue
+                    if session.socket_conn:
+                        if self._send_raw_socket(session.socket_conn, payload):
+                            clients_reached += 1
 
         # Also broadcast via ZeroMQ PUB if available
         if self.zmq_pub_sock and ZMQ_AVAILABLE:
@@ -1305,11 +1334,27 @@ class MT5BridgeEngine:
 
         clients_reached = 0
         with self._clients_lock:
-            for acc_id, session in self.clients.items():
-                if target_account and acc_id != target_account:
-                    continue
-                if session.socket_conn:
-                    if self._send_raw_socket(session.socket_conn, payload):
+            if target_account and target_account in self.clients:
+                session = self.clients[target_account]
+                if session.socket_conn and self._send_raw_socket(session.socket_conn, payload):
+                    clients_reached += 1
+            elif target_account:
+                # Master Signal Bridge / Cloud Copy-Trade Fallback
+                for master_acc in ["52135153", "55688250", "52133938"]:
+                    if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
+                        m_sess = self.clients[master_acc]
+                        if m_sess.socket_conn and self._send_raw_socket(m_sess.socket_conn, payload):
+                            clients_reached += 1
+                        break
+                if clients_reached == 0:
+                    for any_acc, any_sess in self.clients.items():
+                        if any_sess.status == "ONLINE" and any_sess.socket_conn:
+                            if self._send_raw_socket(any_sess.socket_conn, payload):
+                                clients_reached += 1
+                                break
+            else:
+                for acc_id, session in self.clients.items():
+                    if session.socket_conn and self._send_raw_socket(session.socket_conn, payload):
                         clients_reached += 1
 
         logger.info(f"🛑 [MT5 CLOSE DISPATCH] Close signal (Ticket: #{ticket}, Symbol: {symbol or 'ALL'}, Comment: {comment}) dispatched to {clients_reached} terminals!")
@@ -1533,6 +1578,21 @@ class MT5BridgeEngine:
                         if s and s.status == "ONLINE":
                             session = s
                             open_positions = list(getattr(s, "positions", []) or [])
+                        else:
+                            # Master Signal Bridge / Cloud Copy-Trade Fallback
+                            for master_acc in ["52135153", "55688250", "52133938"]:
+                                if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
+                                    session = self.clients[master_acc]
+                                    acc_id = master_acc
+                                    open_positions = list(getattr(session, "positions", []) or [])
+                                    break
+                            if not session:
+                                for any_acc, any_sess in self.clients.items():
+                                    if any_sess.status == "ONLINE":
+                                        session = any_sess
+                                        acc_id = any_acc
+                                        open_positions = list(getattr(session, "positions", []) or [])
+                                        break
 
                     if not session:
                         continue

@@ -262,6 +262,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                     cfg = db.get_user_mt5_config(chat_id)
 
             matched_session = None
+            is_master_bridge = False
             with bridge._clients_lock:
                 for acc_id, sess in bridge.clients.items():
                     # Strict Multi-Tenant Isolation: Match ONLY this user's chat_id or bound login!
@@ -287,10 +288,35 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                                     user_login = any_acc
                                 break
 
-            # Strict Non-Interference: Zero cross-tenant fallback to Admin or other users!
+                # Master Signal Bridge / Cloud Copy-Trade Mode (Option 2) for VIP Users
+                # If VIP user doesn't run an isolated MT5 software on PC/VPS,
+                # but is an authorized VIP or has bound an MT5 account, link to active Master Terminal!
+                if not matched_session and chat_id > 0:
+                    is_auth_vip = _is_authorized_vip(chat_id, user_login) or db.is_mt5_user_authorized(chat_id, user_login)
+                    if is_auth_vip and (user_login or db.is_vip(chat_id)):
+                        for master_acc in ["52135153", "55688250", "52133938"]:
+                            if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
+                                matched_session = bridge.clients[master_acc]
+                                is_master_bridge = True
+                                break
+                        if not matched_session and bridge.clients:
+                            for any_acc, any_sess in bridge.clients.items():
+                                if any_sess.status == "ONLINE":
+                                    matched_session = any_sess
+                                    is_master_bridge = True
+                                    break
+
             is_connected = bool(matched_session and matched_session.status == "ONLINE")
-            balance = float(matched_session.balance if matched_session else 0.0)
-            equity = float(matched_session.equity if matched_session else 0.0)
+            auto_cfg = db.get_user_mt5_auto_config(chat_id)
+            if is_master_bridge:
+                user_cap = float(auto_cfg.get("capital", 0.0) or 0.0)
+                balance = user_cap if user_cap > 0 else float(matched_session.balance if matched_session else 100.0)
+                master_pnl = float(getattr(matched_session, "floating_pnl", 0.0) if matched_session else 0.0)
+                equity = balance + master_pnl
+            else:
+                balance = float(matched_session.balance if matched_session else 0.0)
+                equity = float(matched_session.equity if matched_session else 0.0)
+
             ping_ms = float(matched_session.ping_ms if matched_session else 0.3)
             if ping_ms >= 950.0 or ping_ms <= 0:
                 ping_ms = 0.3
@@ -370,7 +396,9 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                     "ping_ms": ping_ms,
                     "ai_auto_trade": ai_auto_trade,
                     "has_bound_config": bool(user_login),
-                    "is_authorized": is_authorized
+                    "is_authorized": is_authorized,
+                    "is_master_bridge": is_master_bridge,
+                    "status_label": "ONLINE (Connected via Master Super Brain AI) ⚡" if is_master_bridge else ("TOKYO BRIDGE ONLINE" if is_connected else "STANDBY / CONNECTING")
                 },
                 "positions": formatted_positions,
                 "stats": db.get_user_mt5_trade_statistics(chat_id, display_login),

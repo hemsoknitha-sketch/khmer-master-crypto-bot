@@ -145,6 +145,7 @@ const elements = {
     mt5InputPassword: document.getElementById('mt5-input-password'),
     mt5InputFirm: document.getElementById('mt5-input-firm'),
     btnTogglePwd: document.getElementById('btn-toggle-pwd'),
+    mt5MasterBridgeBanner: document.getElementById('mt5-master-bridge-banner'),
 
     // MT5 Multi-Tenant Privacy & Identity Gate Elements
     mt5IdentityGateCard: document.getElementById('mt5-identity-gate-card'),
@@ -977,6 +978,9 @@ function renderMT5Cockpit(data) {
         const isStandby = Boolean(acc.has_bound_config && !isConn && !isGuest);
         elements.mt5StandbyHelper.style.display = isStandby ? 'flex' : 'none';
     }
+    if (elements.mt5MasterBridgeBanner) {
+        elements.mt5MasterBridgeBanner.style.display = (acc.is_master_bridge && isConn) ? 'flex' : 'none';
+    }
 
     // Status Pill
     if (elements.mt5StatusPill) {
@@ -985,7 +989,11 @@ function renderMT5Cockpit(data) {
             elements.mt5StatusPill.textContent = '⚪ WAITING FOR VIP LOGIN';
         } else if (isConn) {
             elements.mt5StatusPill.className = 'badge badge-success';
-            elements.mt5StatusPill.textContent = '🟢 TOKYO BRIDGE ONLINE';
+            if (acc.is_master_bridge || acc.status_label) {
+                elements.mt5StatusPill.textContent = acc.status_label || '🟢 ONLINE (Connected via Master Super Brain AI) ⚡';
+            } else {
+                elements.mt5StatusPill.textContent = '🟢 TOKYO BRIDGE ONLINE';
+            }
         } else if (acc.has_bound_config) {
             elements.mt5StatusPill.className = 'badge badge-warning';
             elements.mt5StatusPill.textContent = '🟡 STANDBY / CONNECTING';
@@ -1002,11 +1010,15 @@ function renderMT5Cockpit(data) {
     }
 
     if (elements.mt5BrokerTag) {
-        elements.mt5BrokerTag.textContent = `${acc.broker || 'GTCFX'} • TY3 GATEWAY`;
+        if (acc.is_master_bridge) {
+            elements.mt5BrokerTag.textContent = `${acc.broker || 'GTCFX'} • MASTER CLOUD COPY-TRADE ⚡`;
+        } else {
+            elements.mt5BrokerTag.textContent = `${acc.broker || 'GTCFX'} • TY3 GATEWAY`;
+        }
     }
 
     if (elements.mt5AccNum) {
-        elements.mt5AccNum.textContent = acc.login ? acc.login : 'Not Bound';
+        elements.mt5AccNum.textContent = acc.login ? (acc.is_master_bridge ? `${acc.login} (Cloud Copy)` : acc.login) : 'Not Bound';
     }
 
     if (elements.mt5ServerTag) {
