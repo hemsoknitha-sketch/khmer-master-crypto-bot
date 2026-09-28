@@ -131,4 +131,7 @@ async def broadcast_admin(text: str, parse_mode: str = "Markdown") -> int:
             pass
     return sent
 
+# Backward-compatibility alias
+send_telegram_notification = send_telegram_alert
+
 

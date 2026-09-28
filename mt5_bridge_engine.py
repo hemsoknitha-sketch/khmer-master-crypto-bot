@@ -918,17 +918,19 @@ class MT5BridgeEngine:
                             self._ticket_peak_profit.pop(ticket, None)
                             try:
                                 import notification_manager
-                                notification_manager.send_telegram_notification(
-                                    f"💰 <b>[MT5 AUTO PROFIT HARVEST]</b>\n"
-                                    f"━━━━━━━━━━━━\n"
-                                    f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
-                                    f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
-                                    f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>+${profit:,.2f} USD</b>\n"
-                                    f"🛡️ <b>យន្តការ ៖</b> {reason}\n"
-                                    f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
-                                    f"━━━━━━━━━━━━\n"
-                                    f"<i>✨ Apex Super Brain AI បានកើបប្រាក់ចំណេញ និងបិទ Position ដោយស្វ័យប្រវត្តិតាម Tokyo Bridge (<0.5ms)!</i>"
-                                )
+                                if chat_id:
+                                    msg_harvest = (
+                                        f"💰 <b>[MT5 AUTO PROFIT HARVEST]</b>\n"
+                                        f"━━━━━━━━━━━━\n"
+                                        f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                        f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
+                                        f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>+${profit:,.2f} USD</b>\n"
+                                        f"🛡️ <b>យន្តការ ៖</b> {reason}\n"
+                                        f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
+                                        f"━━━━━━━━━━━━\n"
+                                        f"<i>✨ Apex Super Brain AI បានកើបប្រាក់ចំណេញ និងបិទ Position ដោយស្វ័យប្រវត្តិតាម Tokyo Bridge (&lt;0.5ms)!</i>"
+                                    )
+                                    asyncio.create_task(notification_manager.send_telegram_alert(chat_id, msg_harvest, parse_mode="HTML"))
                             except Exception as ex:
                                 logger.warning(f"⚠️ Telegram harvest alert error: {ex}")
 
