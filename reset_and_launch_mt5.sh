@@ -4,8 +4,8 @@
 # MT5 DUAL INSTANCE MASTER RESTORER & PERSISTENCE ENGINE
 # ==============================================================================
 # Restores & Launches:
-# 1. Admin Master MT5 (#52133938)
-# 2. Platform Auto-Trade MT5 (#52135153)
+# 1. Super Admin Master MT5 (#52135153)
+# 2. Platform / Secondary MT5 (#52135153)
 # ==============================================================================
 
 set -e
@@ -18,8 +18,8 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${CYAN}==============================================================================${NC}"
-echo -e "${BOLD}${GREEN}   🏛️ KHMER MASTER CRYPTO — MT5 DUAL INSTANCE MASTER RESTORER 🏛️${NC}"
-echo -e "${YELLOW}   Unlocks & Restores: Admin (#52133938) & Platform (#52135153)${NC}"
+echo -e "${BOLD}${GREEN}   🏛️ KHMER MASTER CRYPTO — SUPER ADMIN MT5 MASTER RESTORER 🏛️${NC}"
+echo -e "${YELLOW}   Unlocks & Restores: Super Admin MT5 (#52135153)${NC}"
 echo -e "${CYAN}==============================================================================${NC}"
 
 TARGET_USER="${SUDO_USER:-$USER}"
@@ -119,7 +119,7 @@ for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
 done
 echo -e "   ${GREEN}✅ Compilation check completed!${NC}"
 
-# 4. Configure startup.ini to enforce automated Algo Trading (Retcode 10027 Shield)
+# 4. Configure startup.ini for Super Admin MT5 (52135153) (Retcode 10027 Shield)
 cat << 'EOF' > "$MT5_PLATFORM/startup.ini"
 [Common]
 Login=52135153
@@ -135,7 +135,7 @@ chown "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM/startup.ini"
 
 cat << 'EOF' > "$MT5_ADMIN/startup.ini"
 [Common]
-Login=52133938
+Login=52135153
 Server=GTCGlobalSA-Server 2
 
 [Experts]
@@ -146,57 +146,46 @@ Profile=Default
 EOF
 chown "$TARGET_USER:$TARGET_USER" "$MT5_ADMIN/startup.ini"
 
-# Launch Admin MT5 (#52133938)
-echo -e "${YELLOW}[4/5] 🚀 Launching Instance 1: Admin MT5 (#52133938)...${NC}"
-ADMIN_LOG="$TARGET_HOME/mt5_admin_launch.log"
-sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_ADMIN' && nohup wine terminal64.exe /portable /config:startup.ini > '$ADMIN_LOG' 2>&1 &"
-sleep 2
-
-# Launch Platform MT5 (#52135153)
-echo -e "${YELLOW}[5/5] 🚀 Launching Instance 2: Platform MT5 (#52135153)...${NC}"
+# Launch Super Admin MT5 (#52135153)
+echo -e "${YELLOW}[4/5] 🚀 Launching Primary Super Admin MT5 (#52135153)...${NC}"
 PLATFORM_LOG="$TARGET_HOME/mt5_platform_launch.log"
 sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini > '$PLATFORM_LOG' 2>&1 &"
 sleep 3
 
 # 6. Create 1-Click Desktop Launcher script directly on user's Desktop
 if [ -d "$DESKTOP_DIR" ]; then
-    cat << 'EOF' > "$DESKTOP_DIR/START_ALL_MT5.sh"
+    cat << 'EOF' > "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
 #!/bin/bash
 pkill -9 -f "terminal64.exe" 2>/dev/null || true
 pkill -9 -f "wineserver" 2>/dev/null || true
 sleep 1
 TARGET_HOME="$HOME"
-MT5_ADMIN="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5"
 MT5_PLATFORM="$TARGET_HOME/.wine/drive_c/Program Files/MetaTrader 5_Platform"
 CURRENT_DISP="${DISPLAY:-:10.0}"
 
-# Start Admin MT5
-cd "$MT5_ADMIN" && nohup wine terminal64.exe /portable > "$TARGET_HOME/mt5_admin_launch.log" 2>&1 &
-sleep 2
-
-# Start Platform MT5
+# Start Super Admin MT5 (52135153)
 cd "$MT5_PLATFORM" && nohup wine terminal64.exe /portable /config:startup.ini > "$TARGET_HOME/mt5_platform_launch.log" 2>&1 &
 
-notify-send "Khmer Master Crypto" "Both MT5 instances launched successfully!" 2>/dev/null || true
+notify-send "Khmer Master Crypto" "Super Admin MT5 (52135153) launched successfully!" 2>/dev/null || true
 EOF
-    chmod +x "$DESKTOP_DIR/START_ALL_MT5.sh"
-    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/START_ALL_MT5.sh"
+    chmod +x "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
+    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
 
     # Create .desktop file for 1-click execution
-    cat << EOF > "$DESKTOP_DIR/0_START_ALL_MT5.desktop"
+    cat << EOF > "$DESKTOP_DIR/0_START_SUPER_ADMIN_MT5.desktop"
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=▶️ START ALL MT5 (Admin + Platform)
-Comment=Launch both MetaTrader 5 terminals side by side
-Exec=bash "$DESKTOP_DIR/START_ALL_MT5.sh"
+Name=▶️ START SUPER ADMIN MT5 (52135153)
+Comment=Launch Super Admin MetaTrader 5 Terminal 24/7
+Exec=bash "$DESKTOP_DIR/START_SUPER_ADMIN_MT5.sh"
 Icon=wine
 Terminal=false
 StartupNotify=true
 Categories=Application;Finance;
 EOF
-    chmod +x "$DESKTOP_DIR/0_START_ALL_MT5.desktop"
-    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/0_START_ALL_MT5.desktop"
+    chmod +x "$DESKTOP_DIR/0_START_SUPER_ADMIN_MT5.desktop"
+    chown "$TARGET_USER:$TARGET_USER" "$DESKTOP_DIR/0_START_SUPER_ADMIN_MT5.desktop"
 fi
 
 echo ""

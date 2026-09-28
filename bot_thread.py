@@ -20823,7 +20823,9 @@ class TelegramBotThread(BaseThread):
                     safe_broker = str(c.get('broker', 'GTCFX')).replace('_', ' ')
                     safe_firm = str(c.get('firm_name', 'GTCFX_Tokyo')).replace('_', ' ')
                     acc_num = str(c['account_id'])
-                    acc_label = f"#{acc_num}" if acc_num != "0" else "#0 (Unlogged Guest)"
+                    is_admin_acc = acc_num in ["52135153", "52133938"]
+                    admin_tag = " 👑 SUPER ADMIN" if is_admin_acc else ""
+                    acc_label = f"#{acc_num}{admin_tag}" if acc_num != "0" else "#0 (Unlogged Guest)"
                     is_broker_offline = (acc_num == "0") or (not c.get('broker')) or (c.get('is_broker_connected') is False)
                     if is_broker_offline and c['balance'] == 0.0:
                         unlogged_note_kh = "  ⚠️ _(MT5 លើ VPS មិនទាន់ Login Broker ៖ សូមបើក MT5 វាយ Password ក្នុង File -> Login to Trade Account)_\n"
@@ -20856,15 +20858,17 @@ class TelegramBotThread(BaseThread):
                 firm_label = cfg.get("firm_name", "Personal")
                 sync_hint_kh = "  👉 _Admin Note: សូមបើក MT5 លើ PC/VPS រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` ដើម្បី Sync!_" if is_admin_user else "  👉 _គណនីរួចរាល់ ១០០% សម្រាប់ដំណើរការជួញដូរ Super Smart 24/7!_"
                 sync_hint_en = "  👉 _Admin Note: Please attach EA `KhmerMasterCrypto_Bridge.mq5` in MT5 to sync!_" if is_admin_user else "  👉 _Account 100% ready for Super Smart 24/7 trading!_"
+                is_admin_acc = str(user_login) in ["52135153", "52133938"]
+                admin_tag = " 👑 SUPER ADMIN" if is_admin_acc else ""
                 clients_text_kh = (
-                    f"🟡 **Acc #{user_login}** ({broker_name} / {firm_label})\n"
+                    f"🟡 **Acc #{user_login}{admin_tag}** ({broker_name} / {firm_label})\n"
                     f"  • ស្ថានភាព ៖ 🟢 **Standby / រួចរាល់សម្រាប់ដំណើរការជួញដូរ**\n"
                     f"  • Web GUI ៖ 🔗 បានចងភ្ជាប់គណនីរួចរាល់ | ⚡ Latency ៖ `< 0.5ms TY3`\n"
                     f"  • Prop Shield ៖ `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
                     f"{sync_hint_kh}"
                 )
                 clients_text_en = (
-                    f"🟡 **Acc #{user_login}** ({broker_name} / {firm_label})\n"
+                    f"🟡 **Acc #{user_login}{admin_tag}** ({broker_name} / {firm_label})\n"
                     f"  • Status: 🟢 **Standby / Ready for Super Smart Trading**\n"
                     f"  • Web GUI: 🔗 Bound & Configured | ⚡ Latency: `< 0.5ms TY3`\n"
                     f"  • Prop Shield: `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"

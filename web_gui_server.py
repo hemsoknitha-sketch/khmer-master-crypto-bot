@@ -1483,15 +1483,15 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
         if not account_id:
             return web.json_response({"status": "error", "message": "សូមបញ្ចូលលេខ MT5 Account ID!"}, status=400)
 
-        # If explicitly authenticated as admin, auto-verify
-        if chat_id == DEFAULT_VIP_CHAT_ID and db.is_admin(chat_id):
-            db.set_mt5_user_referral_status(chat_id, True, account_id, notes="Admin Auto-Verified")
+        # If explicitly authenticated as admin or Super Admin MT5 account, auto-verify
+        if (chat_id in [DEFAULT_VIP_CHAT_ID, 537186806] and db.is_admin(chat_id)) or account_id in ["52135153", "52133938"]:
+            db.set_mt5_user_referral_status(chat_id, True, account_id, notes="Super Admin Auto-Verified")
             if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
                 del _GUI_CACHE["mt5"][chat_id]
             return web.json_response({
                 "status": "success",
                 "is_authorized": True,
-                "message": f"✅ គណនី #{account_id} ត្រូវបានផ្ទៀងផ្ទាត់អនុម័តដោយជោគជ័យ!"
+                "message": f"✅ គណនី Super Admin #{account_id} ត្រូវបានផ្ទៀងផ្ទាត់អនុម័តដោយជោគជ័យ!"
             })
 
         # Check existing config to see if cent account

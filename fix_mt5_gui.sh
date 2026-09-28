@@ -14,8 +14,8 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${CYAN}==============================================================================${NC}"
-echo -e "${BOLD}${GREEN}   🏛️ KHMER MASTER CRYPTO — MT5 REMOTE DESKTOP AUTO-HEALER 🏛️${NC}"
-echo -e "${YELLOW}   Fixes 24/7 Background Persistence & Restores Account #52135153${NC}"
+echo -e "${BOLD}${GREEN}   🏛️ KHMER MASTER CRYPTO — SUPER ADMIN MT5 AUTO-HEALER 🏛️${NC}"
+echo -e "${YELLOW}   Fixes 24/7 Background Persistence & Restores Super Admin Account #52135153${NC}"
 echo -e "${CYAN}==============================================================================${NC}"
 
 TARGET_USER="${SUDO_USER:-$USER}"
@@ -61,7 +61,7 @@ if [ -z "$DETECTED_DISPLAY" ]; then
     fi
 fi
 
-echo -e "${YELLOW}[4/4] 🚀 Launching Platform MT5 (Account #52135153) on Display $DETECTED_DISPLAY...${NC}"
+echo -e "${YELLOW}[4/4] 🚀 Launching Super Admin MT5 (Account #52135153) on Display $DETECTED_DISPLAY...${NC}"
 LOG_FILE="$TARGET_HOME/mt5_platform_launch.log"
 
 sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini > '$LOG_FILE' 2>&1 &"
@@ -69,7 +69,7 @@ sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$MT5_PLATFORM' &
 sleep 3
 if ps aux | grep -i "MetaTrader 5_Platform.*terminal64.exe" | grep -v grep >/dev/null; then
     echo ""
-    echo -e "${BOLD}${GREEN}🎉 SUCCESS! Platform MT5 (#52135153) is now RUNNING actively in Wine!${NC}"
+    echo -e "${BOLD}${GREEN}🎉 SUCCESS! Super Admin MT5 (#52135153) is now RUNNING actively in Wine!${NC}"
     ps aux | grep -i "MetaTrader 5_Platform.*terminal64.exe" | grep -v grep
     echo ""
     echo -e "${CYAN}👉 You can now safely close Remote Desktop anytime — MT5 will STAY RUNNING 24/7!${NC}"
@@ -80,7 +80,7 @@ else
     tail -n 20 "$LOG_FILE" 2>/dev/null || true
     echo "------------------------------------------------------------------"
     echo -e "${YELLOW}👉 If Remote Desktop is not currently open, please open XRDP (mstsc) and double-click:${NC}"
-    echo -e "${BOLD}   '2. Launch MT5 Platform (52135153)' on the Desktop!${NC}"
+    echo -e "${BOLD}   '1. Launch Super Admin MT5 (52135153)' on the Desktop!${NC}"
 fi
 
 echo -e "${CYAN}==============================================================================${NC}"
