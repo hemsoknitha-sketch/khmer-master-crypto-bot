@@ -4431,6 +4431,8 @@ def calculate_mt5_smart_allocation(
     selected_assets = master_universe[:n_assets]
     capital_per_asset = round(cap / n_assets, 2)
     risk_per_trade_usd = round(cap * 0.015, 2)
+    if not is_cent and cap < 150.0:
+        risk_per_trade_usd = max(2.50, risk_per_trade_usd)
     daily_loss_limit_usd = round(cap * 0.035, 2)
     max_drawdown_limit_usd = round(cap * 0.070, 2)
 

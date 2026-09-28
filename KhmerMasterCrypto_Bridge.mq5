@@ -519,8 +519,8 @@ void HandleOrderSend(const string json)
       string signal_id_rej = ExtractJsonValue(json, "signal_id");
       string symbol_rej = ExtractJsonValue(json, "symbol");
       Print("🛡️ [ORDER BLOCKED] Prop Firm Daily/Max Drawdown Breached! Order rejected.");
-      string reject_msg = StringFormat("{\"type\":\"ORDER_REJECTED\",\"signal_id\":\"%s\",\"symbol\":\"%s\",\"reason\":\"PROP_BREACH_LOCAL\",\"equity\":%.2f,\"timestamp\":%I64u}\n",
-                                       signal_id_rej, symbol_rej, m_account.Equity(), (ulong)TimeCurrent());
+      string reject_msg = StringFormat("{\"type\":\"ORDER_REJECTED\",\"signal_id\":\"%s\",\"symbol\":\"%s\",\"reason\":\"PROP_BREACH_LOCAL\",\"equity\":%.2f,\"secret_key\":\"%s\",\"timestamp\":%I64u}\n",
+                                       signal_id_rej, symbol_rej, m_account.Equity(), InpSecretKey, (ulong)TimeCurrent());
       SendRawString(reject_msg);
       return;
    }
@@ -798,8 +798,8 @@ void EvaluateLocalPropCompliance()
    double max_limit = InpMaxDrawdownPct;
    if(g_initial_balance < 200.0 || g_daily_start_equity < 200.0)
    {
-      daily_limit = 8.0;
-      max_limit = 15.0;
+      daily_limit = 12.0;
+      max_limit = 25.0;
    }
 
    if(daily_dd_pct <= -daily_limit || total_dd_pct <= -max_limit)
