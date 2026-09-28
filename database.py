@@ -4493,6 +4493,23 @@ def get_user_mt5_auto_config(chat_id: int) -> dict:
         "max_drawdown_limit_usd": 7.00
     }
 
+def get_all_active_mt5_auto_users() -> list:
+    """Returns list of chat_ids that have MT5 AI Auto-Trade active."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'mt5_ai_auto_trade_%' AND value = '1'")
+    rows = cursor.fetchall()
+    conn.close()
+    users = []
+    for r in rows:
+        parts = r[0].split("_")
+        if len(parts) >= 5:
+            try:
+                users.append(int(parts[4]))
+            except Exception:
+                pass
+    return users
+
 def get_user_mt5_trade_statistics(chat_id: int, account_id: str = "") -> dict:
     """
     Computes mathematically rigorous real-time performance metrics for a VIP user's MT5 account:

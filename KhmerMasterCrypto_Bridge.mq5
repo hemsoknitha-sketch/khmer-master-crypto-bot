@@ -707,8 +707,22 @@ void CloseAllBridgeTrades(const string reason)
       {
          if(close_all_forced || m_position.Magic() == InpMagicNumber)
          {
-            m_trade.PositionClose(m_position.Ticket());
-            PrintFormat("🛑 [EMERGENCY CLOSE] Closed position #%d (%s)", m_position.Ticket(), reason);
+            ulong ticket = m_position.Ticket();
+            string sym = m_position.Symbol();
+            double close_price = (m_position.PositionType() == POSITION_TYPE_BUY) ? 
+                                 SymbolInfoDouble(sym, SYMBOL_BID) : 
+                                 SymbolInfoDouble(sym, SYMBOL_ASK);
+            double pnl = m_position.Profit();
+
+            if(m_trade.PositionClose(ticket))
+            {
+               PrintFormat("🛑 [EMERGENCY CLOSE] Closed position #%d (%s) | Close Price: %.5f | PnL: $%.2f", ticket, reason, close_price, pnl);
+               string close_json = StringFormat(
+                  "{\"type\":\"ORDER_CLOSED\",\"ticket\":%d,\"close_price\":%.5f,\"pnl\":%.2f,\"status\":\"CLOSED\",\"secret_key\":\"%s\"}\n",
+                  ticket, close_price, pnl, InpSecretKey
+               );
+               SendRawString(close_json);
+            }
          }
       }
    }
