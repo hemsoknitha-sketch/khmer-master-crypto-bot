@@ -4745,6 +4745,7 @@ GTC_STD_INVITE_CODE = GTC_STD_L15_INVITE_CODE
 GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
 GTC_OFFICIAL_INVITE_CODE = GTC_STD_L15_INVITE_CODE
 GTC_VALID_INVITE_CODES = {"LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"}
+SUPER_ADMIN_MT5_ACCOUNTS = {"55688250", "52135153", "52133938"}
 
 def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     """
@@ -4755,13 +4756,13 @@ def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     1. chat_id == 859271875 (Master Super Admin) or is_admin(chat_id)
     2. User is marked is_verified == 1 in mt5_user_referrals
     3. User has 'Administrator' license
-    4. Account ID is Super Admin MT5 (52135153 or 52133938)
+    4. Account ID is Super Admin MT5 (55688250, 52135153, or 52133938)
     """
-    if chat_id in [859271875, 537186806] or str(account_id).strip() in ["52135153", "52133938"]:
+    if chat_id in [859271875, 537186806] or str(account_id).strip() in SUPER_ADMIN_MT5_ACCOUNTS:
         return True
     try:
         cfg = get_user_mt5_config(chat_id)
-        if str(cfg.get("login", "")).strip() in ["52135153", "52133938"]:
+        if str(cfg.get("login", "")).strip() in SUPER_ADMIN_MT5_ACCOUNTS:
             return True
     except Exception:
         pass

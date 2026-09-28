@@ -53,6 +53,7 @@ GTC_STD_INVITE_CODE = GTC_PRO_INVITE_CODE
 GTC_OFFICIAL_REFERRAL_URL = GTC_PRO_REFERRAL_URL
 GTC_OFFICIAL_INVITE_CODE = GTC_PRO_INVITE_CODE
 GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"]
+SUPER_ADMIN_MT5_ACCOUNTS = {"55688250", "52135153", "52133938"}
 
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
@@ -269,14 +270,22 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                         if not sess.chat_id and chat_id:
                             sess.chat_id = chat_id
                         break
-                # If Super Admin, link directly to active Super Admin terminal (52135153 or 52133938)
-                if not matched_session and chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875]:
-                    for admin_acc in ["52135153", "52133938"]:
+                # If Super Admin or local portal, link directly to active Super Admin terminal (55688250, 52135153 or 52133938)
+                if not matched_session and (chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] or chat_id <= 0):
+                    for admin_acc in ["55688250", "52135153", "52133938"]:
                         if admin_acc in bridge.clients:
                             matched_session = bridge.clients[admin_acc]
                             if not user_login:
                                 user_login = admin_acc
                             break
+                    # If still not matched, link to ANY online terminal session for Super Admin portal
+                    if not matched_session and bridge.clients:
+                        for any_acc, any_sess in bridge.clients.items():
+                            if any_sess.status == "ONLINE":
+                                matched_session = any_sess
+                                if not user_login:
+                                    user_login = any_acc
+                                break
 
             # Strict Non-Interference: Zero cross-tenant fallback to Admin or other users!
             is_connected = bool(matched_session and matched_session.status == "ONLINE")
@@ -1103,7 +1112,7 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
 # ==============================================================================
 
 def _is_authorized_vip(chat_id: int, account_id: str = "") -> bool:
-    if str(account_id).strip() in ["52135153", "52133938"]:
+    if str(account_id).strip() in SUPER_ADMIN_MT5_ACCOUNTS:
         return True
     if chat_id <= 0:
         return False
@@ -1136,8 +1145,8 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
 
         # Super Admin MT5 Auto-Resolution & Fallback:
-        # If binding Super Admin MT5 Accounts 52135153 or 52133938, auto-default to Founder ID 537186806
-        if login in ["52135153", "52133938"]:
+        # If binding Super Admin MT5 Accounts (55688250, 52135153 or 52133938), auto-default to Founder ID 537186806
+        if login in SUPER_ADMIN_MT5_ACCOUNTS:
             if not chat_id or int(chat_id) <= 0:
                 chat_id = 537186806
         else:
@@ -1176,7 +1185,7 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
 
         # Register pending verification in referral registry
         db.register_mt5_referral_request(chat_id, login, referral_code=assigned_ref_code, notes=f"Web GUI Binding ({server} - {track_name})")
-        if chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] or login in ["52135153", "52133938"]:
+        if chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] or login in SUPER_ADMIN_MT5_ACCOUNTS:
             db.set_mt5_user_referral_status(chat_id, is_verified=True, referral_code=assigned_ref_code)
         is_auth = db.is_mt5_user_authorized(chat_id, login)
 
@@ -1268,7 +1277,7 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
         if not chat_id:
             cfg_target = str(data.get("account_id", "")).strip()
-            if cfg_target in ["52135153", "52133938"]:
+            if cfg_target in SUPER_ADMIN_MT5_ACCOUNTS:
                 chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
@@ -1401,7 +1410,7 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
         if not chat_id:
             cfg_target = str(data.get("account_id", "")).strip()
-            if cfg_target in ["52135153", "52133938"]:
+            if cfg_target in SUPER_ADMIN_MT5_ACCOUNTS:
                 chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
@@ -1443,7 +1452,7 @@ async def handle_api_mt5_reset_prop(request: web.Request) -> web.Response:
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
         if not chat_id:
             cfg_target = str(data.get("account_id", "")).strip()
-            if cfg_target in ["52135153", "52133938"]:
+            if cfg_target in SUPER_ADMIN_MT5_ACCOUNTS:
                 chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
@@ -1479,7 +1488,7 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
         if not chat_id:
             cfg_target = str(data.get("account_id", "")).strip()
-            if cfg_target in ["52135153", "52133938"]:
+            if cfg_target in SUPER_ADMIN_MT5_ACCOUNTS:
                 chat_id = 537186806
         if not chat_id or not _is_authorized_vip(chat_id):
             return web.json_response({
@@ -1560,7 +1569,7 @@ async def handle_api_mt5_verify_request(request: web.Request) -> web.Response:
             return web.json_response({"status": "error", "message": "សូមបញ្ចូលលេខ MT5 Account ID!"}, status=400)
 
         # If explicitly authenticated as admin or Super Admin MT5 account, auto-verify
-        if (chat_id in [DEFAULT_VIP_CHAT_ID, 537186806] and db.is_admin(chat_id)) or account_id in ["52135153", "52133938"]:
+        if (chat_id in [DEFAULT_VIP_CHAT_ID, 537186806] and db.is_admin(chat_id)) or account_id in SUPER_ADMIN_MT5_ACCOUNTS:
             db.set_mt5_user_referral_status(chat_id, True, account_id, notes="Super Admin Auto-Verified")
             if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
                 del _GUI_CACHE["mt5"][chat_id]
@@ -1615,7 +1624,7 @@ async def handle_api_mt5_unbind(request: web.Request) -> web.Response:
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
         if not chat_id:
             cfg_target = str(data.get("account_id", "")).strip()
-            if cfg_target in ["52135153", "52133938"]:
+            if cfg_target in SUPER_ADMIN_MT5_ACCOUNTS:
                 chat_id = 537186806
         if not chat_id:
             return web.json_response({"status": "error", "message": "សូមបញ្ជាក់ Telegram Chat ID!"}, status=400)
