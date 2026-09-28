@@ -5786,6 +5786,8 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(
                         f"⚠️ **មិនទាន់មានលេខគណនី MT5 នៅឡើយទេ។**\n\n"
                         f"សូមចុះឈ្មោះតាមតំណភ្ជាប់ផ្លូវការរបស់ Super Admin ៖\n"
+                        f"• 💎 **Super Admin Master Pro (MT5-SF-STD-PRO) ៖**\n"
+                        f"  `https://web.mygtc.app/login/register?ref=qAiGKeEm` (Code: `qAiGKeEm`)\n\n"
                         f"• 💎 **Super Admin Standard Swap-Free (Server 2 - MT5-SF-STD-L15) ៖**\n"
                         f"  `https://web.mygtc.app/login/register?ref=LnZZcHxY` (Code: `LnZZcHxY`)\n\n"
                         f"• 🪙 **Super Admin Cent Account (Server 5 - MT5-CENT-L20) ៖**\n"
@@ -20116,6 +20118,8 @@ class TelegramBotThread(BaseThread):
             """
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import ui_standards
+            std_pro_url = "https://web.mygtc.app/login/register?ref=qAiGKeEm"
+            std_pro_code = "qAiGKeEm"
             std_l20_url = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
             std_l20_code = "F8bNxK9L"
             std_l15_url = "https://web.mygtc.app/login/register?ref=LnZZcHxY"
@@ -20129,20 +20133,23 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"⚠️ **សេចក្តីជូនដំណឹងការពារមូលធន & សិទ្ធិវិនិយោគ MT5 ៖**\n"
                     f"ប្រព័ន្ធ /mt5 **មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយ** បើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ **Super BOT ADMIN** លើ Broker ដៃគូផ្លូវការ **GTCFX (Equinix Tokyo TY3)**!\n\n"
-                    f"💎 **1. គណនីស្តង់ដារ Super Admin Swap-Free L15 (ទុន $100+ ៖ MT5-SF-STD-L15) ៖**\n"
+                    f"💎 **1. គណនី Super Admin Master Pro (ទុន $100+ ៖ MT5-SF-STD-PRO) ៖**\n"
+                    f"• Link: [{std_pro_url}]({std_pro_url})\n"
+                    f"• Invite Code: `{std_pro_code}` (ចុចលើវាដើម្បី Copy)\n\n"
+                    f"💎 **2. គណនីស្តង់ដារ Super Admin Swap-Free L15 (ទុន $100+ ៖ MT5-SF-STD-L15) ៖**\n"
                     f"• Link: [{std_l15_url}]({std_l15_url})\n"
                     f"• Invite Code: `{std_l15_code}` (ចុចលើវាដើម្បី Copy)\n\n"
-                    f"🪙 **2. គណនីសេន Super Admin Cent Account L20 (ទុន $10-$100 ៖ MT5-CENT-L20) ៖**\n"
+                    f"🪙 **3. គណនីសេន Super Admin Cent Account L20 (ទុន $10-$100 ៖ MT5-CENT-L20) ៖**\n"
                     f"• Link: [{cent_url}]({cent_url})\n"
                     f"• Invite Code: `{cent_code}` (ចុចលើវាដើម្បី Copy)\n\n"
-                    f"💎 **3. គណនីស្តង់ដារ Alternative Swap-Free L20 (ទុន $100+ ៖ MT5-SF-STD-L20) ៖**\n"
+                    f"💎 **4. គណនីស្តង់ដារ Alternative Swap-Free L20 (ទុន $100+ ៖ MT5-SF-STD-L20) ៖**\n"
                     f"• Link: [{std_l20_url}]({std_l20_url})\n"
                     f"• Invite Code: `{std_l20_code}` (ចុចលើវាដើម្បី Copy)\n\n"
                     f"🏛️ **Broker Gateway ៖** `GTC Global Trade Capital (Tokyo TY3)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **ដំណាក់កាលអនុវត្ត (3 ជំហានងាយៗ) ៖**\n"
                     f"1️⃣ ចុច Link ជ្រើសរើសប្រភេទគណនីដែលត្រូវនឹងដើមទុនរបស់អ្នក\n"
-                    f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code (`{std_l15_code}`, `{cent_code}` ឬ `{std_l20_code}`)\n"
+                    f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code (`{std_pro_code}`, `{std_l15_code}`, `{cent_code}` ឬ `{std_l20_code}`)\n"
                     f"3️⃣ ចុចប៊ូតុង **[ 📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID ]** ខាងក្រោម ដើម្បីទទួលបានការអនុម័តភ្លាមៗ!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
@@ -20154,20 +20161,23 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"⚠️ **Institutional Capital Protection & MT5 Gatekeeper Notice:**\n"
                     f"The /mt5 system **strictly does NOT permit investing or trading** unless you are properly registered under the **Super BOT ADMIN's Official Referral URL** on **GTCFX (Equinix Tokyo TY3)**!\n\n"
-                    f"💎 **1. Super Admin Standard Swap-Free L15 (Capital $100+ • MT5-SF-STD-L15):**\n"
+                    f"💎 **1. Super Admin Master Pro (Capital $100+ • MT5-SF-STD-PRO):**\n"
+                    f"• Link: [{std_pro_url}]({std_pro_url})\n"
+                    f"• Invite Code: `{std_pro_code}` (Click to Copy)\n\n"
+                    f"💎 **2. Super Admin Standard Swap-Free L15 (Capital $100+ • MT5-SF-STD-L15):**\n"
                     f"• Link: [{std_l15_url}]({std_l15_url})\n"
                     f"• Invite Code: `{std_l15_code}` (Click to Copy)\n\n"
-                    f"🪙 **2. Super Admin Cent Account L20 (Capital $10-$100 • MT5-CENT-L20):**\n"
+                    f"🪙 **3. Super Admin Cent Account L20 (Capital $10-$100 • MT5-CENT-L20):**\n"
                     f"• Link: [{cent_url}]({cent_url})\n"
                     f"• Invite Code: `{cent_code}` (Click to Copy)\n\n"
-                    f"💎 **3. Alternative Standard Swap-Free L20 (Capital $100+ • MT5-SF-STD-L20):**\n"
+                    f"💎 **4. Alternative Standard Swap-Free L20 (Capital $100+ • MT5-SF-STD-L20):**\n"
                     f"• Link: [{std_l20_url}]({std_l20_url})\n"
                     f"• Invite Code: `{std_l20_code}` (Click to Copy)\n\n"
                     f"🏛️ **Broker Gateway:** `GTC Global Trade Capital (Tokyo TY3)`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **3 Simple Steps to Unlock:**\n"
                     f"1️⃣ Click the link that matches your starting capital\n"
-                    f"2️⃣ Ensure Invite Code is set to `{std_l15_code}`, `{cent_code}` or `{std_l20_code}`\n"
+                    f"2️⃣ Ensure Invite Code is set to `{std_pro_code}`, `{std_l15_code}`, `{cent_code}` or `{std_l20_code}`\n"
                     f"3️⃣ Click **[ 📋 Request Verification ]** below for instant Super Admin approval!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Khmer Master Crypto_\n"
@@ -20176,10 +20186,13 @@ class TelegramBotThread(BaseThread):
 
             gate_kb = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("💎 Standard (L15 Pro)", url=std_l15_url),
-                    InlineKeyboardButton("🪙 Cent Micro (L20)", url=cent_url)
+                    InlineKeyboardButton("💎 Master Pro", url=std_pro_url),
+                    InlineKeyboardButton("💎 Standard (L15)", url=std_l15_url)
                 ],
-                [InlineKeyboardButton("💎 Alternative Standard (L20 VIP)", url=std_l20_url)],
+                [
+                    InlineKeyboardButton("🪙 Cent Micro (L20)", url=cent_url),
+                    InlineKeyboardButton("💎 Alt VIP (L20)", url=std_l20_url)
+                ],
                 [InlineKeyboardButton("📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID", callback_data="btn_mt5_req_verify")],
                 [
                     InlineKeyboardButton("🔄 ពិនិត្យសិទ្ធិឡើងវិញ", callback_data="btn_mt5_check_auth"),

@@ -43,12 +43,16 @@ GTC_CENT_INVITE_CODE = "PuAfeREN"
 GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
 GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
 
+# Track 4 (Super Admin Master Pro): Swap-Free Standard L15 Pro (Server 2 - Capital $100+ • MT5-SF-STD-PRO)
+GTC_PRO_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=qAiGKeEm"
+GTC_PRO_INVITE_CODE = "qAiGKeEm"
+
 # Default & Official Super Admin Fallback
-GTC_STD_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
-GTC_STD_INVITE_CODE = GTC_STD_L15_INVITE_CODE
-GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
-GTC_OFFICIAL_INVITE_CODE = GTC_STD_L15_INVITE_CODE
-GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694"]
+GTC_STD_REFERRAL_URL = GTC_PRO_REFERRAL_URL
+GTC_STD_INVITE_CODE = GTC_PRO_INVITE_CODE
+GTC_OFFICIAL_REFERRAL_URL = GTC_PRO_REFERRAL_URL
+GTC_OFFICIAL_INVITE_CODE = GTC_PRO_INVITE_CODE
+GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"]
 
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
@@ -189,6 +193,8 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             "chat_id": 0,
             "referral_url": GTC_STD_REFERRAL_URL,
             "invite_code": GTC_STD_INVITE_CODE,
+            "referral_url_pro": GTC_PRO_REFERRAL_URL,
+            "invite_code_pro": GTC_PRO_INVITE_CODE,
             "referral_url_std": GTC_STD_REFERRAL_URL,
             "invite_code_std": GTC_STD_INVITE_CODE,
             "referral_url_std_l20": GTC_STD_L20_REFERRAL_URL,
@@ -311,6 +317,8 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 "chat_id": chat_id,
                 "referral_url": GTC_STD_REFERRAL_URL,
                 "invite_code": GTC_STD_INVITE_CODE,
+                "referral_url_pro": GTC_PRO_REFERRAL_URL,
+                "invite_code_pro": GTC_PRO_INVITE_CODE,
                 "referral_url_std": GTC_STD_REFERRAL_URL,
                 "invite_code_std": GTC_STD_INVITE_CODE,
                 "referral_url_std_l20": GTC_STD_L20_REFERRAL_URL,
@@ -1278,9 +1286,11 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
             return web.json_response({
                 "status": "error",
                 "code": "REFERRAL_REQUIRED",
-                "message": f"⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: {GTC_STD_INVITE_CODE} ឬ {GTC_CENT_INVITE_CODE})!",
-                "referral_url": GTC_STD_REFERRAL_URL,
-                "invite_code": GTC_STD_INVITE_CODE,
+                "message": f"⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យចូលវិនិយោគឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: {GTC_PRO_INVITE_CODE}, {GTC_STD_L15_INVITE_CODE} ឬ {GTC_CENT_INVITE_CODE})!",
+                "referral_url": GTC_PRO_REFERRAL_URL,
+                "invite_code": GTC_PRO_INVITE_CODE,
+                "referral_url_pro": GTC_PRO_REFERRAL_URL,
+                "invite_code_pro": GTC_PRO_INVITE_CODE,
                 "referral_url_std": GTC_STD_REFERRAL_URL,
                 "invite_code_std": GTC_STD_INVITE_CODE,
                 "referral_url_cent": GTC_CENT_REFERRAL_URL,
@@ -1469,9 +1479,11 @@ async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
             return web.json_response({
                 "status": "error",
                 "code": "REFERRAL_REQUIRED",
-                "message": f"⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យបើក AI Auto Trade ឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: {GTC_STD_INVITE_CODE} ឬ {GTC_CENT_INVITE_CODE})!",
-                "referral_url": GTC_STD_REFERRAL_URL,
-                "invite_code": GTC_STD_INVITE_CODE,
+                "message": f"⛔ ប្រព័ន្ធ /mt5 មិនអនុញ្ញាតិឱ្យបើក AI Auto Trade ឡើយបើមិនបានចុះឈ្មោះត្រឹមត្រូវតាម Referral URL របស់ Super BOT ADMIN (Invite Code: {GTC_PRO_INVITE_CODE}, {GTC_STD_L15_INVITE_CODE} ឬ {GTC_CENT_INVITE_CODE})!",
+                "referral_url": GTC_PRO_REFERRAL_URL,
+                "invite_code": GTC_PRO_INVITE_CODE,
+                "referral_url_pro": GTC_PRO_REFERRAL_URL,
+                "invite_code_pro": GTC_PRO_INVITE_CODE,
                 "referral_url_std": GTC_STD_REFERRAL_URL,
                 "invite_code_std": GTC_STD_INVITE_CODE,
                 "referral_url_cent": GTC_CENT_REFERRAL_URL,

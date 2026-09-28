@@ -4735,12 +4735,16 @@ GTC_CENT_INVITE_CODE = "PuAfeREN"
 GTC_STD_L20_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=F8bNxK9L"
 GTC_STD_L20_INVITE_CODE = "F8bNxK9L"
 
+# Track 4 (Super Admin Master Pro): Swap-Free Standard L15 Pro (Server 2 - Capital $100+ • MT5-SF-STD-PRO)
+GTC_PRO_REFERRAL_URL = "https://web.mygtc.app/login/register?ref=qAiGKeEm"
+GTC_PRO_INVITE_CODE = "qAiGKeEm"
+
 # Official Super Admin Referrals (Primary Defaults)
 GTC_STD_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
 GTC_STD_INVITE_CODE = GTC_STD_L15_INVITE_CODE
 GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
 GTC_OFFICIAL_INVITE_CODE = GTC_STD_L15_INVITE_CODE
-GTC_VALID_INVITE_CODES = {"LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694"}
+GTC_VALID_INVITE_CODES = {"LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"}
 
 def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     """
