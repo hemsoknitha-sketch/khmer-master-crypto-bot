@@ -485,7 +485,8 @@ class MT5BridgeEngine:
             session.equity = equity
             session.ping_ms = ping_ms
             session.last_heartbeat = time.time()
-            session.status = "ONLINE"
+            if session.status != "LOCKED_PROP_BREACH":
+                session.status = "ONLINE"
             is_broker_connected = payload.get("broker_connected", True)
             if isinstance(is_broker_connected, str):
                 is_broker_connected = is_broker_connected.lower() == "true"

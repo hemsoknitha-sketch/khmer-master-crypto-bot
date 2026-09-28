@@ -1357,6 +1357,36 @@ async def handle_api_mt5_close(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+async def handle_api_mt5_reset_prop(request: web.Request) -> web.Response:
+    """Resets Wall Street Prop Firm risk compliance baseline for an account."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id or not _is_authorized_vip(chat_id):
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ Access Denied: សម្រាប់តែសមាជិក VIP។"
+            }, status=403)
+
+        cfg = db.get_user_mt5_config(chat_id)
+        target_account = data.get("account_id") or cfg.get("login")
+        if not target_account:
+            return web.json_response({
+                "status": "error",
+                "message": "⛔ មិនមានគណនី MT5 ភ្ជាប់ជាមួយគណនីរបស់អ្នកឡើយ!"
+            }, status=400)
+
+        success = mt5_bridge_engine.mt5_bridge.reset_prop_compliance(str(target_account))
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        return web.json_response({
+            "status": "success" if success else "error",
+            "message": "✅ បានកំណត់ Baseline សុវត្ថិភាពឡើងវិញជោគជ័យ!" if success else "⚠️ មិនអាចកំណត់ឡើងវិញបានទេ"
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
 async def handle_api_mt5_toggle_ai(request: web.Request) -> web.Response:
     """Toggles AI Swarm auto-trading on user's MT5 account."""
     try:
@@ -1661,6 +1691,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_post("/api/mt5/bind", handle_api_mt5_bind)
     app.router.add_post("/api/mt5/order", handle_api_mt5_order)
     app.router.add_post("/api/mt5/close", handle_api_mt5_close)
+    app.router.add_post("/api/mt5/reset_prop", handle_api_mt5_reset_prop)
     app.router.add_post("/api/mt5/toggle_ai", handle_api_mt5_toggle_ai)
     app.router.add_post("/api/mt5/verify_request", handle_api_mt5_verify_request)
     app.router.add_post("/api/mt5/unbind", handle_api_mt5_unbind)
