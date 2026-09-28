@@ -20101,6 +20101,14 @@ class TelegramBotThread(BaseThread):
                     f"Institutional Funded Trader Passing System 24/7!"
                 )
 
+            if update.callback_query and update.callback_query.message:
+                try:
+                    await update.callback_query.message.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+            elif update.effective_message:
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         def build_mt5_referral_gatekeeper_ui(chat_id: int, user_lang: str = "khmer"):
             """
             GTCFX Japan Tokyo MT5 Pro Referral Gatekeeper Lock UI (Invariant 42).

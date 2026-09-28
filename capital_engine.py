@@ -1739,33 +1739,39 @@ class PropFirmRiskManager:
         """
         import database as db
         cfg = db.get_prop_firm_config(chat_id)
+        tier = float(cfg.get("account_tier", 10000.0))
+        init_bal = float(cfg.get("initial_balance", tier))
+        daily_start = float(cfg.get("daily_start_equity", tier))
+        phase = int(cfg.get("challenge_phase", 1))
+        target_pct = float(cfg.get("profit_target_pct", 10.0))
+        risk_pct = float(cfg.get("risk_per_trade_pct", 0.75))
+
         engine = get_user_capital_engine(chat_id, is_demo=True)
         bal_info = engine.get_account_balance()
-        curr_equity = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+        c_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
         
         # Check MT5 Session equity
         mt5_connected = False
+        curr_equity = init_bal
         try:
             import mt5_bridge_engine
             s_mt5 = mt5_bridge_engine.mt5_bridge.get_client_session(chat_id)
-            if s_mt5:
+            if s_mt5 and s_mt5.get("equity", 0.0) > 0:
+                curr_equity = float(s_mt5["equity"])
                 mt5_connected = True
-                if s_mt5.get("equity", 0.0) > 0:
-                    curr_equity = s_mt5["equity"]
         except Exception:
             pass
 
+        if not mt5_connected:
+            if bal_info.get("balance", 0.0) > 0 and (abs(c_eq - init_bal) / max(init_bal, 1.0) < 0.5):
+                curr_equity = c_eq
+            else:
+                curr_equity = init_bal
+
         if curr_equity <= 0:
-            curr_equity = cfg.get("initial_balance", 10000.0)
+            curr_equity = init_bal
 
         eval_res = self.evaluate_prop_limits_and_milestones(chat_id, curr_equity)
-
-        tier = cfg.get("account_tier", 10000.0)
-        init_bal = cfg.get("initial_balance", tier)
-        daily_start = cfg.get("daily_start_equity", tier)
-        phase = cfg.get("challenge_phase", 1)
-        target_pct = cfg.get("profit_target_pct", 10.0)
-        risk_pct = cfg.get("risk_per_trade_pct", 0.75)
         status = eval_res.get("status", cfg.get("status", "ACTIVE"))
 
         pnl_usd = curr_equity - init_bal
@@ -2581,15 +2587,34 @@ class CapitalAutonomousEngine:
                     total_ratcheted += u_ratchet
                     total_closed += u_close
 
-        # Real-time Prop Firm Challenge limits check (strictly on Demo challenge account)
+        # Real-time Prop Firm Challenge limits check (strictly on Demo / MT5 challenge account)
         try:
             active_prop_users = db.get_active_prop_firm_users()
             for pu in active_prop_users:
                 cid = pu["chat_id"]
-                u_engine = get_user_capital_engine(cid, is_demo=True)
-                bal_info = u_engine.get_account_balance()
-                curr_eq = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
-                self.prop_manager.evaluate_prop_limits_and_milestones(cid, curr_eq, app=app)
+                tier_u = float(pu.get("account_tier", 10000.0))
+                init_bal_u = float(pu.get("initial_balance", tier_u))
+                u_curr_eq = init_bal_u
+                mt5_found = False
+                try:
+                    import mt5_bridge_engine
+                    s_mt5_u = mt5_bridge_engine.mt5_bridge.get_client_session(cid)
+                    if s_mt5_u and s_mt5_u.get("equity", 0.0) > 0:
+                        u_curr_eq = float(s_mt5_u["equity"])
+                        mt5_found = True
+                except Exception:
+                    pass
+
+                if not mt5_found:
+                    u_engine = get_user_capital_engine(cid, is_demo=True)
+                    bal_info = u_engine.get_account_balance()
+                    c_eq_u = bal_info.get("balance", 0.0) + bal_info.get("pnl", 0.0)
+                    if bal_info.get("balance", 0.0) > 0 and (abs(c_eq_u - init_bal_u) / max(init_bal_u, 1.0) < 0.5):
+                        u_curr_eq = c_eq_u
+                    else:
+                        u_curr_eq = init_bal_u
+
+                self.prop_manager.evaluate_prop_limits_and_milestones(cid, u_curr_eq, app=app)
         except Exception as e_prop_eval:
             logger.debug(f"Prop Firm evaluation note: {e_prop_eval}")
 
