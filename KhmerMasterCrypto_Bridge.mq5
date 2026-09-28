@@ -29,7 +29,7 @@ input string   InpFirmName          = "GTCGlobalSA-Server 2"; // Broker / Server
 input double   InpMaxDailyLossPct   = 3.5;                 // Hard Daily Loss Clamp % (FTMO Rule: -3.5%)
 input double   InpMaxDrawdownPct    = 7.0;                 // Max Overall Drawdown Clamp % (-7.0%)
 input ulong    InpMagicNumber       = 888999;              // EA Magic Number
-input ulong    InpMaxSlippage       = 20;                  // Max Slippage in Points
+input ulong    InpMaxSlippage       = 100;                 // Max Slippage in Points (100 = 10 pips / $1.00 Gold)
 input string   InpOrderComment      = "APEX_AI_BRIDGE";    // Order Comment Tag
 
 input group "=== 📊 ON-CHART HEADS-UP DISPLAY (HUD) ==="
@@ -553,6 +553,18 @@ void HandleOrderSend(const string json)
    double tp = (tp_req > 0.0) ? NormalizeDouble(tp_req, digits) : 0.0;
 
    m_trade.SetExpertMagicNumber(magic_req);
+   m_trade.SetDeviationInPoints(100); // 100 points slippage tolerance to eliminate requotes on fast markets
+
+   // Auto-detect and configure supported filling mode for target symbol
+   uint filling = (uint)SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
+   ENUM_ORDER_TYPE_FILLING preferred_filling = ORDER_FILLING_IOC;
+   if((filling & SYMBOL_FILLING_IOC) != 0)
+      preferred_filling = ORDER_FILLING_IOC;
+   else if((filling & SYMBOL_FILLING_FOK) != 0)
+      preferred_filling = ORDER_FILLING_FOK;
+   else if((filling & SYMBOL_FILLING_RETURN) != 0)
+      preferred_filling = ORDER_FILLING_RETURN;
+   m_trade.SetTypeFilling(preferred_filling);
 
    bool success = false;
    ulong ticket = 0;
@@ -561,12 +573,40 @@ void HandleOrderSend(const string json)
    StringToUpper(action_req);
    if(action_req == "BUY")
    {
+      ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
       success = m_trade.Buy(lot, symbol, ask, sl, tp, comment);
+      if(!success)
+      {
+         // Retry with IOC
+         m_trade.SetTypeFilling(ORDER_FILLING_IOC);
+         ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+         success = m_trade.Buy(lot, symbol, ask, sl, tp, comment);
+      }
+      if(!success)
+      {
+         // Retry with RETURN
+         m_trade.SetTypeFilling(ORDER_FILLING_RETURN);
+         ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+         success = m_trade.Buy(lot, symbol, ask, sl, tp, comment);
+      }
       fill_price = ask;
    }
    else if(action_req == "SELL")
    {
+      bid = SymbolInfoDouble(symbol, SYMBOL_BID);
       success = m_trade.Sell(lot, symbol, bid, sl, tp, comment);
+      if(!success)
+      {
+         m_trade.SetTypeFilling(ORDER_FILLING_IOC);
+         bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+         success = m_trade.Sell(lot, symbol, bid, sl, tp, comment);
+      }
+      if(!success)
+      {
+         m_trade.SetTypeFilling(ORDER_FILLING_RETURN);
+         bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+         success = m_trade.Sell(lot, symbol, bid, sl, tp, comment);
+      }
       fill_price = bid;
    }
 
@@ -587,7 +627,16 @@ void HandleOrderSend(const string json)
    }
    else
    {
-      PrintFormat("❌ [ORDER FAILED] Error: %d (%s)", m_trade.ResultRetcode(), m_trade.ResultRetcodeDescription());
+      uint retcode = m_trade.ResultRetcode();
+      string ret_desc = m_trade.ResultRetcodeDescription();
+      PrintFormat("❌ [ORDER FAILED] Symbol: %s | Retcode: %d (%s)", symbol, retcode, ret_desc);
+
+      // Report failure back to Linux VPS
+      string fail_json = StringFormat(
+         "{\"type\":\"ORDER_FAILED\",\"signal_id\":\"%s\",\"retcode\":%d,\"reason\":\"%s\",\"symbol\":\"%s\",\"secret_key\":\"%s\"}\n",
+         signal_id, retcode, ret_desc, symbol, InpSecretKey
+      );
+      SendRawString(fail_json);
    }
 }
 

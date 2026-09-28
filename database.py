@@ -4234,6 +4234,23 @@ def update_mt5_bridge_order_fill(signal_id: str, ticket: int, open_price: float,
         conn.close()
         return False
 
+def update_mt5_bridge_order_status(signal_id: str, status: str) -> bool:
+    """Updates order record status (e.g. REJECTED, FAILED)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE mt5_bridge_orders
+            SET status = ?
+            WHERE signal_id = ?
+        """, (str(status), str(signal_id)))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        conn.close()
+        return False
+
 def update_mt5_bridge_order_close(ticket: int, close_price: float, pnl: float, status: str = "CLOSED") -> bool:
     """Updates order record when MT5 closes a position."""
     conn = get_db_connection()
@@ -4592,11 +4609,11 @@ def get_user_mt5_trade_statistics(chat_id: int, account_id: str = "") -> dict:
                 "worst_trade": round(worst_t, 2)
             })
 
-        # 2. Recent trades list (up to 8)
+        # 2. Recent trades list (up to 8 - only genuine filled/closed executions)
         cursor.execute("""
             SELECT id, ticket, symbol, action, lot, open_price, close_price, pnl, status, created_at, closed_at
             FROM mt5_bridge_orders
-            WHERE account_id = ?
+            WHERE account_id = ? AND status IN ('FILLED', 'CLOSED')
             ORDER BY id DESC LIMIT 8
         """, (str(account_id),))
         rows = cursor.fetchall()

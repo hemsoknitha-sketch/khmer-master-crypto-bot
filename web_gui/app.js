@@ -399,7 +399,7 @@ function handleStreamData(data) {
 
     // Real-Time MT5 Telemetry from Stream
     if (data.mt5_account && Object.keys(data.mt5_account).length > 0) {
-        renderMT5FromStream(data.mt5_account, data.mt5_positions, data.mt5_connected);
+        renderMT5FromStream(data.mt5_account, data.mt5_positions, data.mt5_connected, data.mt5_stats);
     }
 }
 
@@ -935,12 +935,20 @@ async function fetchMT5Status() {
     }
 }
 
-function renderMT5FromStream(acc, positions, isConnected) {
+function renderMT5FromStream(acc, positions, isConnected, stats) {
     if (!acc) return;
+    const finalStats = stats || state.mt5Data?.stats;
+    if (state.mt5Data) {
+        state.mt5Data.account = acc;
+        state.mt5Data.positions = positions || [];
+        state.mt5Data.connected = isConnected;
+        if (stats) state.mt5Data.stats = stats;
+    }
     renderMT5Cockpit({
         account: acc,
         positions: positions || [],
-        connected: isConnected
+        connected: isConnected,
+        stats: finalStats
     });
 }
 
@@ -1733,6 +1741,14 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchAnalytics();
     fetchEngineStates();
     fetchMT5Status();
+
+    // Fast Active Poller for MT5 Tab (Real-Time 2.0s refresh of telemetry & recent orders)
+    setInterval(() => {
+        const mt5Pane = document.getElementById('tab-mt5');
+        if (mt5Pane && mt5Pane.classList.contains('active')) {
+            fetchMT5Status();
+        }
+    }, 2000);
 
     // Passive Fallback Polling every 20s (Stream handles real-time live ticks)
     setInterval(() => {

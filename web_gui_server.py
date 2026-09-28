@@ -358,6 +358,7 @@ async def _gui_background_cache_worker():
     Guarantees sub-millisecond execution with zero blocking of the asyncio loop.
     """
     global _GUI_CACHE, _ACTIVE_WEBSOCKETS
+    last_mt5_cache_time = 0.0
     while True:
         try:
             now = time.time()
@@ -376,6 +377,18 @@ async def _gui_background_cache_worker():
                     "PAXGUSDT": paxg_p or _GUI_CACHE["prices"]["PAXGUSDT"],
                     "timestamp": now
                 }
+
+            # 1b. Periodically refresh MT5 telemetry in RAM Cache every 1.5s for connected users
+            if now - last_mt5_cache_time >= 1.5:
+                last_mt5_cache_time = now
+                active_cids = {cid for _, cid in _ACTIVE_WEBSOCKETS if cid}
+                if DEFAULT_VIP_CHAT_ID:
+                    active_cids.add(DEFAULT_VIP_CHAT_ID)
+                for cid in active_cids:
+                    try:
+                        await get_cached_mt5_status(cid)
+                    except Exception:
+                        pass
 
             # 2. Broadcast live tick to active WebSockets
             if _ACTIVE_WEBSOCKETS:
@@ -409,6 +422,7 @@ async def _gui_background_cache_worker():
                             "mt5_account": m_data.get("account", {}),
                             "mt5_positions": m_data.get("positions", []),
                             "mt5_connected": m_data.get("connected", False),
+                            "mt5_stats": m_data.get("stats", {}),
                             "status": "ONLINE"
                         }
                         await ws.send_json(tick_payload)
@@ -445,6 +459,7 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
     try:
         p_data = await get_cached_portfolio_data(chat_id)
         w_data = await get_cached_wealth_cockpit(chat_id)
+        m_data = await get_cached_mt5_status(chat_id)
         prices = _GUI_CACHE["prices"]
         initial_tick = {
             "type": "init",
@@ -459,6 +474,10 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
             "candidates": w_data.get("candidates", []),
             "btc_price": prices["BTCUSDT"],
             "paxg_price": prices["PAXGUSDT"],
+            "mt5_account": m_data.get("account", {}),
+            "mt5_positions": m_data.get("positions", []),
+            "mt5_connected": m_data.get("connected", False),
+            "mt5_stats": m_data.get("stats", {}),
             "status": "ONLINE"
         }
         await ws.send_json(initial_tick)
@@ -525,6 +544,7 @@ async def handle_api_stream(request: web.Request) -> web.StreamResponse:
                 "mt5_account": m_data.get("account", {}),
                 "mt5_positions": m_data.get("positions", []),
                 "mt5_connected": m_data.get("connected", False),
+                "mt5_stats": m_data.get("stats", {}),
                 "status": "ONLINE"
             }
             await response.write(f"data: {json.dumps(event_payload)}\n\n".encode('utf-8'))

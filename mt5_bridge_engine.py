@@ -372,6 +372,8 @@ class MT5BridgeEngine:
             self._handle_order_confirm(payload, account_id)
         elif msg_type == "ORDER_CLOSED":
             self._handle_order_closed(payload, account_id)
+        elif msg_type in ["ORDER_FAILED", "ORDER_REJECTED"]:
+            self._handle_order_failed(payload, account_id)
         elif msg_type == "PING":
             pong = {"type": "PONG", "timestamp": int(time.time()), "echo_time": payload.get("timestamp", 0)}
             self._send_raw_socket(sock, pong)
@@ -580,6 +582,16 @@ class MT5BridgeEngine:
 
         db.update_mt5_bridge_order_close(ticket=ticket, close_price=close_price, pnl=pnl, status=status)
         logger.info(f"💰 [MT5 CLOSED] Account {account_id} closed #{ticket}! Close Price: {close_price}, PnL: ${pnl:+,.2f}")
+
+    def _handle_order_failed(self, payload: Dict[str, Any], account_id: str):
+        """Processes trade rejection/failure reported by MT5 terminal."""
+        signal_id = str(payload.get("signal_id", ""))
+        retcode = payload.get("retcode", 0)
+        reason = str(payload.get("reason", "BROKER_REJECTED"))
+        symbol = str(payload.get("symbol", ""))
+
+        db.update_mt5_bridge_order_status(signal_id=signal_id, status=f"REJECTED_{retcode}")
+        logger.warning(f"❌ [MT5 REJECTED] Account {account_id} | Signal: {signal_id} | Symbol: {symbol} | Retcode: {retcode} ({reason})")
 
     # =========================================================================
     # 5. TRADE SIGNAL DISPATCH API (SUB-MILLISECOND EXECUTION)
