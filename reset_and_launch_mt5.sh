@@ -119,13 +119,40 @@ for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
 done
 echo -e "   ${GREEN}✅ Compilation check completed!${NC}"
 
-# 4. Launch Admin MT5 (#52133938)
+# 4. Configure startup.ini to enforce automated Algo Trading (Retcode 10027 Shield)
+cat << 'EOF' > "$MT5_PLATFORM/startup.ini"
+[Common]
+Login=52135153
+Server=GTCGlobalSA-Server 2
+
+[Experts]
+AllowDllImport=1
+Enabled=1
+Account=1
+Profile=Default
+EOF
+chown "$TARGET_USER:$TARGET_USER" "$MT5_PLATFORM/startup.ini"
+
+cat << 'EOF' > "$MT5_ADMIN/startup.ini"
+[Common]
+Login=52133938
+Server=GTCGlobalSA-Server 2
+
+[Experts]
+AllowDllImport=1
+Enabled=1
+Account=1
+Profile=Default
+EOF
+chown "$TARGET_USER:$TARGET_USER" "$MT5_ADMIN/startup.ini"
+
+# Launch Admin MT5 (#52133938)
 echo -e "${YELLOW}[4/5] 🚀 Launching Instance 1: Admin MT5 (#52133938)...${NC}"
 ADMIN_LOG="$TARGET_HOME/mt5_admin_launch.log"
-sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_ADMIN' && nohup wine terminal64.exe /portable > '$ADMIN_LOG' 2>&1 &"
+sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_ADMIN' && nohup wine terminal64.exe /portable /config:startup.ini > '$ADMIN_LOG' 2>&1 &"
 sleep 2
 
-# 5. Launch Platform MT5 (#52135153)
+# Launch Platform MT5 (#52135153)
 echo -e "${YELLOW}[5/5] 🚀 Launching Instance 2: Platform MT5 (#52135153)...${NC}"
 PLATFORM_LOG="$TARGET_HOME/mt5_platform_launch.log"
 sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_PLATFORM' && nohup wine terminal64.exe /portable /config:startup.ini > '$PLATFORM_LOG' 2>&1 &"
