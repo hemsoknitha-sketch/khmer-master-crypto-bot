@@ -515,9 +515,9 @@ void HandleOrderSend(const string json)
       string signal_id_rej = ExtractJsonValue(json, "signal_id");
       string symbol_rej = ExtractJsonValue(json, "symbol");
       Print("🛡️ [ORDER BLOCKED] Prop Firm Daily/Max Drawdown Breached! Order rejected.");
-      string reject_msg = StringFormat("{\"type\":\"ORDER_REJECTED\",\"signal_id\":\"%s\",\"symbol\":\"%s\",\"reason\":\"PROP_BREACH_LOCAL\",\"equity\":%.2f,\"timestamp\":%I64u}",
+      string reject_msg = StringFormat("{\"type\":\"ORDER_REJECTED\",\"signal_id\":\"%s\",\"symbol\":\"%s\",\"reason\":\"PROP_BREACH_LOCAL\",\"equity\":%.2f,\"timestamp\":%I64u}\n",
                                        signal_id_rej, symbol_rej, m_account.Equity(), (ulong)TimeCurrent());
-      SendResponse(reject_msg);
+      SendRawString(reject_msg);
       return;
    }
 
@@ -569,15 +569,7 @@ void HandleOrderSend(const string json)
    m_trade.SetDeviationInPoints(100); // 100 points slippage tolerance to eliminate requotes on fast markets
 
    // Auto-detect and configure supported filling mode for target symbol
-   uint filling = (uint)SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
-   ENUM_ORDER_TYPE_FILLING preferred_filling = ORDER_FILLING_IOC;
-   if((filling & SYMBOL_FILLING_IOC) != 0)
-      preferred_filling = ORDER_FILLING_IOC;
-   else if((filling & SYMBOL_FILLING_FOK) != 0)
-      preferred_filling = ORDER_FILLING_FOK;
-   else if((filling & SYMBOL_FILLING_RETURN) != 0)
-      preferred_filling = ORDER_FILLING_RETURN;
-   m_trade.SetTypeFilling(preferred_filling);
+   m_trade.SetTypeFillingBySymbol(symbol);
 
    bool success = false;
    ulong ticket = 0;

@@ -100,9 +100,17 @@ for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
         if [ -n "$EDITOR_BIN" ] && [ -f "$MQ5_FILE" ]; then
             echo -e "   ${CYAN}⚙️ Found compiler: $(basename "$EDITOR_BIN") in $(basename "$MT5_DIR")...${NC}"
             cd "$MT5_DIR" && DISPLAY="$ACTIVE_DISPLAY" wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true
-            sleep 1
+            for i in $(seq 1 5); do
+                if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
+                    break
+                fi
+                sleep 1
+            done
             if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
                 echo -e "   ${GREEN}🎯 SUCCESS: KhmerMasterCrypto_Bridge.ex5 compiled in $(basename "$MT5_DIR")!${NC}"
+            else
+                echo -e "   ${YELLOW}⚠️ Check compile.log in $(basename "$MT5_DIR")/MQL5/Experts/compile.log${NC}"
+                cat "$MT5_DIR/MQL5/Experts/compile.log" 2>/dev/null || true
             fi
         else
             echo -e "   ${YELLOW}ℹ️ Compiler: ${EDITOR_BIN:-Not Found} | MQ5: $MQ5_FILE${NC}"
