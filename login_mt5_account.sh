@@ -93,12 +93,27 @@ if [[ "$SERVER" =~ "Server 5" ]] || [[ "$SERVER" =~ "CENT" ]] || [[ "$SERVER" =~
     CHART_SYMBOL="EURUSDc"
 fi
 
-# Auto-detect active X display (XRDP on Ubuntu typically uses :10.0, fallback :0.0)
-DETECTED_DISPLAY="${DISPLAY:-:10.0}"
-if [ -e /tmp/.X11-unix/X10 ]; then
-    DETECTED_DISPLAY=":10.0"
-elif [ -e /tmp/.X11-unix/X0 ]; then
-    DETECTED_DISPLAY=":0.0"
+# Auto-detect active X display:
+# Priority 1: Extract working DISPLAY from any active MT5 terminal process
+DETECTED_DISPLAY=""
+RUNNING_PID=$(pgrep -f "terminal64.exe" 2>/dev/null | head -n 1 || true)
+if [ -n "$RUNNING_PID" ] && [ -r "/proc/$RUNNING_PID/environ" ]; then
+    FOUND_DISPLAY=$(strings "/proc/$RUNNING_PID/environ" 2>/dev/null | grep '^DISPLAY=' | head -n 1 | cut -d= -f2 || true)
+    if [ -n "$FOUND_DISPLAY" ]; then
+        DETECTED_DISPLAY="$FOUND_DISPLAY"
+        echo -e "📡 Cloned active Display from running MT5 (PID $RUNNING_PID): ${GREEN}$DETECTED_DISPLAY${NC}"
+    fi
+fi
+
+if [ -z "$DETECTED_DISPLAY" ]; then
+    DETECTED_DISPLAY="${DISPLAY:-:10.0}"
+    if [ -e /tmp/.X11-unix/X10 ]; then
+        DETECTED_DISPLAY=":10.0"
+    elif [ -e /tmp/.X11-unix/X11 ]; then
+        DETECTED_DISPLAY=":11.0"
+    elif [ -e /tmp/.X11-unix/X0 ]; then
+        DETECTED_DISPLAY=":0.0"
+    fi
 fi
 
 # Stage and sync EA into target Experts directory
@@ -185,15 +200,23 @@ pkill -9 -f "$TARGET_DIR.*terminal64.exe" 2>/dev/null || true
 sleep 2
 
 LOG_FILE="$TARGET_DIR/launch.log"
-sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$TARGET_DIR' && nohup wine terminal64.exe /portable /config:startup.ini > '$LOG_FILE' 2>&1 &"
+sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$TARGET_DIR' && nohup wine start /exec terminal64.exe /portable /config:startup.ini > '$LOG_FILE' 2>&1 &"
 
-sleep 3
+sleep 4
 if ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep >/dev/null; then
     echo -e "${GREEN}🚀 $INSTANCE_NAME is RUNNING actively in Wine!${NC}"
     ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep
 else
-    echo -e "${YELLOW}⚠️ Notice: Terminal process launched. Log output:${NC}"
-    tail -n 15 "$LOG_FILE" 2>/dev/null || true
+    # Fallback to direct wine invocation
+    sudo -u "$TARGET_USER" DISPLAY="$DETECTED_DISPLAY" bash -c "cd '$TARGET_DIR' && nohup wine terminal64.exe /portable /config:startup.ini >> '$LOG_FILE' 2>&1 &"
+    sleep 3
+    if ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep >/dev/null; then
+        echo -e "${GREEN}🚀 $INSTANCE_NAME is RUNNING actively in Wine!${NC}"
+        ps aux | grep -i "$TARGET_DIR.*terminal64.exe" | grep -v grep
+    else
+        echo -e "${YELLOW}⚠️ Notice: Terminal process launched. Log output:${NC}"
+        tail -n 15 "$LOG_FILE" 2>/dev/null || true
+    fi
 fi
 
 echo ""
