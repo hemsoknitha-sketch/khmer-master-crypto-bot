@@ -488,6 +488,7 @@ void ExecuteCommand(const string json)
       Print("✅ [PROP RESET] Circuit breaker reset command received from Linux Brain! Resuming trading.");
       g_prop_breached = false;
       g_daily_start_equity = m_account.Equity();
+      g_initial_balance = m_account.Balance();
    }
    else if(type == "PONG" || type == "HEARTBEAT_ACK")
    {
@@ -797,8 +798,8 @@ void EvaluateLocalPropCompliance()
    double max_limit = InpMaxDrawdownPct;
    if(g_initial_balance < 200.0 || g_daily_start_equity < 200.0)
    {
-      daily_limit = 5.0;
-      max_limit = 8.0;
+      daily_limit = 8.0;
+      max_limit = 15.0;
    }
 
    if(daily_dd_pct <= -daily_limit || total_dd_pct <= -max_limit)

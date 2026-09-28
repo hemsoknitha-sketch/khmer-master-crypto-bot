@@ -1023,19 +1023,23 @@ class MT5BridgeEngine:
             acc_str = str(account_id)
             if acc_str in self.clients:
                 session = self.clients[acc_str]
-                session.daily_start_equity = session.equity
-                session.initial_balance = session.balance
+                base_eq = session.equity if session.equity > 0 else session.balance
+                session.daily_start_equity = base_eq
+                session.initial_balance = base_eq
                 session.is_prop_compliant = True
                 session.status = "ONLINE"
+                self._last_auth_log.pop(f"prop_breach_{acc_str}", None)
                 unlock_msg = {
                     "type": "PROP_CIRCUIT_BREAKER_RESET",
                     "account_id": acc_str,
                     "action": "RESUME_TRADING",
+                    "new_daily_equity": round(base_eq, 2),
+                    "new_initial_balance": round(base_eq, 2),
                     "timestamp": int(time.time())
                 }
                 if session.socket_conn:
                     self._send_raw_socket(session.socket_conn, unlock_msg)
-                logger.info(f"🛡️ [PROP RESET] Compliance reset for account {acc_str}. New Baseline Equity: ${session.equity:,.2f}")
+                logger.info(f"🛡️ [PROP RESET] Compliance reset for account {acc_str}. New Baseline Equity & Balance: ${base_eq:,.2f}")
                 return True
         return False
 

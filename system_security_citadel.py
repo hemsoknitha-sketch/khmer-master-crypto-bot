@@ -203,8 +203,8 @@ class SecurityCitadelManager:
         # Small Capital Protection Shield (Invariant 8 & 25): Accounts < $200 receive a dynamic spread buffer
         # to prevent standard retail broker bid/ask spread drag from triggering false-positive circuit breakers.
         if initial_balance < 200.0 or daily_start_equity < 200.0:
-            daily_limit = -5.0
-            max_limit = -8.0
+            daily_limit = -8.0
+            max_limit = -15.0
 
         is_daily_breached = (daily_change_pct <= daily_limit)
         is_max_breached = (max_drawdown_pct <= max_limit)
