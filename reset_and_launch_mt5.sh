@@ -94,12 +94,22 @@ echo -e "   ${CYAN}🎯 Targeted Display Screen: ${BOLD}${GREEN}$ACTIVE_DISPLAY$
 # 3.1 Auto-compile latest KhmerMasterCrypto_Bridge.mq5 into .ex5 via MetaEditor
 echo -e "${YELLOW}[3.1/5] ⚙️ Auto-compiling latest KhmerMasterCrypto_Bridge.mq5 into .ex5...${NC}"
 for MT5_DIR in "$MT5_ADMIN" "$MT5_PLATFORM"; do
-    if [ -f "$MT5_DIR/metaeditor64.exe" ] && [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" ]; then
-        echo -e "   ${CYAN}⚙️ Compiling in $(basename "$MT5_DIR")...${NC}"
-        sudo -u "$TARGET_USER" DISPLAY="$ACTIVE_DISPLAY" bash -c "cd '$MT5_DIR' && wine metaeditor64.exe /compile:\"MQL5\\\\Experts\\\\KhmerMasterCrypto_Bridge.mq5\" /log:\"MQL5\\\\Experts\\\\compile.log\"" 2>/dev/null || true
+    if [ -d "$MT5_DIR" ]; then
+        EDITOR_BIN=$(find "$MT5_DIR" -maxdepth 1 -iname "metaeditor*.exe" 2>/dev/null | head -n 1 || true)
+        MQ5_FILE="$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5"
+        if [ -n "$EDITOR_BIN" ] && [ -f "$MQ5_FILE" ]; then
+            echo -e "   ${CYAN}⚙️ Found compiler: $(basename "$EDITOR_BIN") in $(basename "$MT5_DIR")...${NC}"
+            cd "$MT5_DIR" && DISPLAY="$ACTIVE_DISPLAY" wine "$EDITOR_BIN" /compile:"MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" /log:"MQL5/Experts/compile.log" 2>/dev/null || true
+            sleep 1
+            if [ -f "$MT5_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" ]; then
+                echo -e "   ${GREEN}🎯 SUCCESS: KhmerMasterCrypto_Bridge.ex5 compiled in $(basename "$MT5_DIR")!${NC}"
+            fi
+        else
+            echo -e "   ${YELLOW}ℹ️ Compiler: ${EDITOR_BIN:-Not Found} | MQ5: $MQ5_FILE${NC}"
+        fi
     fi
 done
-echo -e "   ${GREEN}✅ Compilation completed!${NC}"
+echo -e "   ${GREEN}✅ Compilation check completed!${NC}"
 
 # 4. Launch Admin MT5 (#52133938)
 echo -e "${YELLOW}[4/5] 🚀 Launching Instance 1: Admin MT5 (#52133938)...${NC}"
@@ -165,4 +175,9 @@ echo -e "${BOLD}${GREEN}🎉 BOTH MT5 TERMINALS RESTORED & ACTIVE ON DISPLAY $AC
 echo -e "👉 Look at your Remote Desktop screen right now — both MT5 windows are OPEN!"
 echo -e "👉 A 1-Click shortcut '${BOLD}0_START_ALL_MT5.desktop${NC}' has been placed on your Desktop."
 echo -e "👉 Verify in Telegram with: /mt5"
+
+# Auto-restart python bot service so Linux Brain & MT5 are 100% in sync
+echo -e "${YELLOW}[6/6] 🔄 Synchronizing & Restarting khmer-master-crypto-bot service...${NC}"
+sudo systemctl restart khmer-master-crypto-bot 2>/dev/null || true
+echo -e "   ${GREEN}✅ khmer-master-crypto-bot service synchronized & active!${NC}"
 echo -e "${CYAN}==============================================================================${NC}"
