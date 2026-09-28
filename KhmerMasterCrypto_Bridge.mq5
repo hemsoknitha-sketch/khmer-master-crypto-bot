@@ -68,6 +68,14 @@ int OnInit()
    m_trade.SetDeviationInPoints(InpMaxSlippage);
    m_trade.SetTypeFillingBySymbol(_Symbol);
 
+   // Pre-select major tradable symbols into Market Watch for active tick subscriptions
+   string pre_symbols[] = {"XAUUSD", "GOLD", "EURUSD", "GBPUSD", "USDJPY", "US30", "BTCUSD"};
+   for(int i = 0; i < ArraySize(pre_symbols); i++)
+   {
+      if(SymbolInfoInteger(pre_symbols[i], SYMBOL_EXIST))
+         SymbolSelect(pre_symbols[i], true);
+   }
+
    g_initial_balance = m_account.Balance();
    g_daily_start_equity = m_account.Equity();
    
@@ -530,6 +538,11 @@ void HandleOrderSend(const string json)
    if(symbol == "")
    {
       PrintFormat("❌ [SYMBOL ERROR] Symbol '%s' not supported by broker!", symbol_req);
+      string fail_json = StringFormat(
+         "{\"type\":\"ORDER_FAILED\",\"signal_id\":\"%s\",\"retcode\":10006,\"reason\":\"SYMBOL_NOT_FOUND\",\"symbol\":\"%s\",\"secret_key\":\"%s\"}\n",
+         signal_id, symbol_req, InpSecretKey
+      );
+      SendRawString(fail_json);
       return;
    }
 
@@ -701,12 +714,16 @@ void HandleModifyStops(const string json)
 //+------------------------------------------------------------------+
 string MatchBrokerSymbol(const string base_sym)
 {
-   if(SymbolInfoDouble(base_sym, SYMBOL_BID) > 0)
+   // 1. Direct match with auto-select
+   if(SymbolInfoInteger(base_sym, SYMBOL_EXIST))
+   {
+      SymbolSelect(base_sym, true);
       return base_sym;
+   }
 
-   // Common aliases
+   // 2. Common broker suffixes & prefixes
    string variations[];
-   ArrayResize(variations, 7);
+   ArrayResize(variations, 10);
    variations[0] = base_sym + ".pro";
    variations[1] = base_sym + "m";
    variations[2] = base_sym + ".m";
@@ -714,20 +731,41 @@ string MatchBrokerSymbol(const string base_sym)
    variations[4] = base_sym + "c";
    variations[5] = "r" + base_sym;
    variations[6] = (base_sym == "XAUUSD") ? "GOLD" : "";
+   variations[7] = (base_sym == "GOLD") ? "XAUUSD" : "";
+   variations[8] = (base_sym == "US30") ? "DJ30" : "";
+   variations[9] = (base_sym == "US500") ? "SP500" : "";
 
    for(int i = 0; i < ArraySize(variations); i++)
    {
-      if(variations[i] != "" && SymbolInfoDouble(variations[i], SYMBOL_BID) > 0)
+      if(variations[i] != "" && SymbolInfoInteger(variations[i], SYMBOL_EXIST))
+      {
+         SymbolSelect(variations[i], true);
          return variations[i];
+      }
    }
 
-   // Search symbol list in Market Watch
-   int total = SymbolsTotal(false);
-   for(int i = 0; i < total; i++)
+   // 3. Search selected symbols in Market Watch
+   int total_mw = SymbolsTotal(false);
+   for(int i = 0; i < total_mw; i++)
    {
       string s = SymbolName(i, false);
       if(StringFind(s, base_sym) >= 0)
+      {
+         SymbolSelect(s, true);
          return s;
+      }
+   }
+
+   // 4. Search entire broker master list (all server symbols)
+   int total_all = SymbolsTotal(true);
+   for(int i = 0; i < total_all; i++)
+   {
+      string s = SymbolName(i, true);
+      if(StringFind(s, base_sym) >= 0)
+      {
+         SymbolSelect(s, true);
+         return s;
+      }
    }
 
    return "";
