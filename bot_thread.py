@@ -21996,16 +21996,27 @@ class TelegramBotThread(BaseThread):
                 except ValueError:
                     await update.effective_message.reply_text(f"❌ Chat ID `{args[1]}` មិនត្រឹមត្រូវឡើយ!", parse_mode="Markdown")
                     return
+                target_acc = str(args[2]).strip() if len(args) >= 3 else ""
                 rec = db.get_mt5_referral_record(target_cid)
                 saved_ref = (rec.get("referral_code") if rec else "") or db.GTC_STD_INVITE_CODE
-                db.set_mt5_user_referral_status(target_cid, is_verified=True, referral_code=saved_ref)
+                if not target_acc and rec:
+                    target_acc = str(rec.get("account_id", "")).strip()
+
+                db.set_mt5_user_referral_status(target_cid, is_verified=True, account_id=target_acc, referral_code=saved_ref)
+                if target_acc:
+                    is_cent = (saved_ref == db.GTC_CENT_INVITE_CODE) or ("CENT" in str(rec.get("notes", "") if rec else "").upper())
+                    srv = "GTCGlobalSA-Server 5" if is_cent else "GTCGlobalSA-Server 2"
+                    firm = "Personal (Cent Account)" if is_cent else "Personal"
+                    db.save_user_mt5_config(target_cid, target_acc, srv, broker="GTCFX", firm_name=firm)
+
                 try:
                     import web_gui_server
                     if hasattr(web_gui_server, "_GUI_CACHE") and "mt5" in web_gui_server._GUI_CACHE and target_cid in web_gui_server._GUI_CACHE["mt5"]:
                         del web_gui_server._GUI_CACHE["mt5"][target_cid]
                 except Exception:
                     pass
-                await update.effective_message.reply_text(f"✅ បានអនុម័តសិទ្ធិ GTCFX MT5 VIP សម្រាប់ User `{target_cid}` រួចរាល់!", parse_mode="Markdown")
+                acc_info = f" (គណនី #{target_acc})" if target_acc else ""
+                await update.effective_message.reply_text(f"✅ បានអនុម័តសិទ្ធិ GTCFX MT5 VIP សម្រាប់ User `{target_cid}`{acc_info} រួចរាល់!", parse_mode="Markdown")
                 try:
                     await context.bot.send_message(
                         chat_id=target_cid,

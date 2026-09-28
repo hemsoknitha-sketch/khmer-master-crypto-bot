@@ -247,6 +247,19 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
             cfg = db.get_user_mt5_config(chat_id)
             user_login = str(cfg.get("login", "")).strip()
 
+            # Auto-resolve verified referral account if not yet manually bound
+            if not user_login and chat_id > 0:
+                ref_rec = db.get_mt5_referral_record(chat_id)
+                if ref_rec and ref_rec.get("account_id") and ref_rec.get("is_verified"):
+                    user_login = str(ref_rec.get("account_id")).strip()
+                    brk = ref_rec.get("broker") or "GTCFX"
+                    ref_code = str(ref_rec.get("referral_code", "")).strip()
+                    is_cent = (ref_code == db.GTC_CENT_INVITE_CODE) or ("CENT" in str(ref_rec.get("notes", "")).upper())
+                    srv = "GTCGlobalSA-Server 5" if is_cent else "GTCGlobalSA-Server 2"
+                    firm = "Personal (Cent Account)" if is_cent else "Personal"
+                    db.save_user_mt5_config(chat_id, user_login, srv, broker=brk, firm_name=firm)
+                    cfg = db.get_user_mt5_config(chat_id)
+
             matched_session = None
             with bridge._clients_lock:
                 for acc_id, sess in bridge.clients.items():
