@@ -618,11 +618,10 @@ class MT5BridgeEngine:
             session.authenticated = True
             session.status = "ONLINE"
             session.is_broker_connected = is_broker_connected
-            session.last_heartbeat = time.time()
-            if session.daily_start_equity <= 0:
-                session.daily_start_equity = equity
-            if session.initial_balance <= 0:
-                session.initial_balance = balance
+            base_eq = equity if equity > 0 else balance
+            session.daily_start_equity = base_eq
+            session.initial_balance = base_eq
+            session.is_prop_compliant = True
 
         # Upsert in SQLite DB (Debounced to prevent SQLite WAL thrashing on reconnect loops)
         now_ts = time.time()
@@ -651,6 +650,17 @@ class MT5BridgeEngine:
             "message": "Connected to Khmer Master Crypto Tokyo VPS Bridge."
         }
         self._send_raw_socket(sock, ack)
+
+        # Proactively calibrate baseline and unblock circuit breaker on MT5 EA
+        unlock_msg = {
+            "type": "PROP_CIRCUIT_BREAKER_RESET",
+            "account_id": account_id,
+            "action": "RESUME_TRADING",
+            "new_daily_equity": round(base_eq, 2),
+            "new_initial_balance": round(base_eq, 2),
+            "timestamp": int(time.time())
+        }
+        self._send_raw_socket(sock, unlock_msg)
         if (now_ts - self._last_auth_log.get(account_id, 0.0)) >= 60.0:
             self._last_auth_log[account_id] = now_ts
             logger.info(f"✅ [MT5 AUTH] Account {account_id} ({broker} / {firm_name}) authenticated successfully! Balance: ${balance:,.2f}")
@@ -710,14 +720,10 @@ class MT5BridgeEngine:
             positions_data = payload.get("positions", [])
             if isinstance(positions_data, list):
                 session.positions = positions_data
-            if daily_start > 0:
-                session.daily_start_equity = daily_start
-            elif session.daily_start_equity <= 0:
-                session.daily_start_equity = equity
-            if initial_bal > 0:
-                session.initial_balance = initial_bal
-            elif session.initial_balance <= 0:
-                session.initial_balance = balance
+            if session.daily_start_equity <= 0:
+                session.daily_start_equity = daily_start if daily_start > 0 else equity
+            if session.initial_balance <= 0:
+                session.initial_balance = initial_bal if initial_bal > 0 else balance
 
             # =================================================================
             # WALL STREET PROP FIRM COMPLIANCE CITADEL (FTMO -3.5% / -7.0%)
@@ -805,14 +811,17 @@ class MT5BridgeEngine:
         db.update_mt5_bridge_order_status(signal_id=signal_id, status=f"REJECTED_{retcode}")
         logger.warning(f"❌ [MT5 REJECTED] Account {account_id} | Signal: {signal_id} | Symbol: {symbol} | Retcode: {retcode} ({reason})")
 
-        # Auto-Healer: If rejection is due to local EA prop breach, start cooling off
+        # Auto-Healer: If rejection is due to local EA prop breach, calibrate baseline & resume immediately
         if "PROP_BREACH" in reason or "PROP_BREACH_LOCAL" in reason:
             with self._clients_lock:
                 session = self.clients.get(account_id)
                 if session:
-                    session.is_prop_compliant = False
-                    session.breach_timestamp = time.time()
-                    logger.warning(f"🛡️ [PROP REJECTION DETECTED] Account {account_id} in local prop breach mode. Auto-Healer cooling off active.")
+                    now = time.time()
+                    last_auto_reset = getattr(session, "last_auto_reset", 0.0)
+                    if (now - last_auto_reset) >= 15.0:
+                        session.last_auto_reset = now
+                        logger.info(f"🛡️ [AUTO-HEALER TRIGGERED] Account {account_id} reported {reason}. Auto-resetting circuit breaker to current equity ${session.equity:,.2f}!")
+                        self.reset_prop_compliance(account_id)
 
     # =========================================================================
     # 5. TRADE SIGNAL DISPATCH API (SUB-MILLISECOND EXECUTION)
