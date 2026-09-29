@@ -15,17 +15,24 @@ async def _safe_bot_send(bot, chat_id: int, text: str, parse_mode: str = "HTML")
     Safely dispatches bot.send_message with automatic fallback to plain-text on parse errors.
     Catches all exceptions within the coroutine to eliminate 'Task exception was never retrieved'.
     """
+    import re
+    # Intelligent parse_mode auto-detection
+    has_html_tags = bool(re.search(r'<\/?(?:b|strong|i|em|code|pre|a|u|s|strike|tg-spoiler)\b', text, re.IGNORECASE))
+    if has_html_tags:
+        parse_mode = "HTML"
+
     try:
         await bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
     except Exception as ex:
         err_str = str(ex).lower()
         if "parse entities" in err_str or "can't parse" in err_str or "badrequest" in err_str:
             try:
-                # Fallback to plain-text so critical alerts are 100% delivered to the user
-                await bot.send_message(chat_id=chat_id, text=text, parse_mode=None)
+                # Cleanly strip HTML tags before fallback so raw tags are never shown to user
+                clean_text = re.sub(r'<[^>]+>', '', text)
+                await bot.send_message(chat_id=chat_id, text=clean_text, parse_mode=None)
                 return
             except Exception as ex2:
-                logger.error(f"Fallback plain-text message failed for {chat_id}: {ex2}")
+                logger.error(f"Fallback clean-text message failed for {chat_id}: {ex2}")
         else:
             logger.error(f"Failed to send telegram message to {chat_id}: {ex}")
 
@@ -75,13 +82,19 @@ async def send_smart_notification(app, chat_id: int, text: str, category: str = 
     except Exception as e:
         logger.error(f"Failed to send telegram message to {chat_id}: {e}")
 
-async def send_telegram_alert(chat_id: int, text: str, parse_mode: str = "Markdown") -> bool:
+async def send_telegram_alert(chat_id: int, text: str, parse_mode: str = "HTML") -> bool:
     """
     Universal non-blocking Telegram alert dispatcher for any component (Web GUI, MT5 Bridge, Watchdogs).
     Attempts active in-process bot application first, then falls back to direct async REST HTTP request.
     """
     if not chat_id:
         return False
+
+    import re
+    # Intelligent parse_mode auto-detection
+    has_html_tags = bool(re.search(r'<\/?(?:b|strong|i|em|code|pre|a|u|s|strike|tg-spoiler)\b', text, re.IGNORECASE))
+    if has_html_tags:
+        parse_mode = "HTML"
 
     # 1. Try active in-process Telegram Application
     try:
@@ -120,6 +133,8 @@ async def send_telegram_alert(chat_id: int, text: str, parse_mode: str = "Markdo
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0)) as session:
             async with session.post(url, json=payload) as resp:
                 if resp.status != 200 and "parse" in (await resp.text()).lower():
+                    # Cleanly strip HTML tags so raw tags are never shown to user
+                    payload["text"] = re.sub(r'<[^>]+>', '', text)
                     payload.pop("parse_mode", None)
                     async with session.post(url, json=payload) as resp2:
                         return resp2.status == 200
@@ -128,7 +143,7 @@ async def send_telegram_alert(chat_id: int, text: str, parse_mode: str = "Markdo
         logger.error(f"Failed to send direct REST telegram alert to {chat_id}: {e}")
         return False
 
-async def broadcast_admin(text: str, parse_mode: str = "Markdown") -> int:
+async def broadcast_admin(text: str, parse_mode: str = "HTML") -> int:
     """
     Broadcasts message to Master Admin (859271875) and all registered system admins.
     """

@@ -5404,9 +5404,20 @@ def record_virtual_trade_pnl(ticket: int, symbol: str, total_pnl: float, close_p
                 if loop and loop.is_running():
                     import asyncio
                     asyncio.run_coroutine_threadsafe(
-                        notification_manager.send_telegram_alert(cid, msg_pnl),
+                        notification_manager.send_telegram_alert(cid, msg_pnl, parse_mode="HTML"),
                         loop
                     )
+                else:
+                    # Direct REST fallback for non-async / background threads
+                    import os
+                    import requests
+                    token = os.getenv("TELEGRAM_BOT_TOKEN")
+                    if token and token != "your_telegram_bot_token_here":
+                        requests.post(
+                            f"https://api.telegram.org/bot{token}/sendMessage",
+                            json={"chat_id": cid, "text": msg_pnl, "parse_mode": "HTML"},
+                            timeout=3.0
+                        )
             except Exception:
                 pass
 
