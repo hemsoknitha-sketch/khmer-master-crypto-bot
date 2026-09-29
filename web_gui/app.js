@@ -1317,6 +1317,11 @@ function renderMT5PerformanceMatrix(stats, acc) {
                         </div>
                     </div>
                 `;
+            }).join('');
+        }
+    }
+}
+
 // =============================================================================
 // VIRTUAL MULTI-USER PORTFOLIO & LEDGER ENGINE (INVARIANT 44)
 // =============================================================================

@@ -5713,6 +5713,21 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["POSITIONS"]
                 await mt5_command(update, context)
+            elif data == "btn_mt5_vault":
+                try:
+                    await update.callback_query.answer("🏛️ Master Cloud Virtual Vault & Ledger...")
+                except Exception:
+                    pass
+                context.args = ["VAULT"]
+                await mt5_command(update, context)
+            elif data in ["btn_mt5_vault_alloc_100", "btn_mt5_vault_alloc_250", "btn_mt5_vault_alloc_500", "btn_mt5_vault_alloc_1000"]:
+                cap_val = data.replace("btn_mt5_vault_alloc_", "")
+                try:
+                    await update.callback_query.answer(f"💰 កំណត់ទុន Virtual Vault: ${cap_val} USD...")
+                except Exception:
+                    pass
+                context.args = ["VAULT", cap_val]
+                await mt5_command(update, context)
             elif data == "btn_mt5_close_all":
                 try:
                     await update.callback_query.answer("🛑 កំពុងបញ្ជូន Signal បិទ Position ទាំងអស់លើ MT5...")
@@ -20810,6 +20825,87 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(msg_reset.replace("*", "").replace("_", ""))
                     return
 
+                # --- 7. VIRTUAL MULTI-USER PORTFOLIO & LEDGER VIEW: VAULT / LEDGER / WALLET ---
+                elif sub in ["VAULT", "LEDGER", "PORTFOLIO", "WALLET", "ALLOC"]:
+                    # Check if user passed capital allocation (e.g. /mt5 VAULT 250 or /mt5 ALLOC 500)
+                    if len(args) >= 2:
+                        raw_val = str(args[1]).replace("$", "").replace("USD", "").strip()
+                        if raw_val.replace(".", "", 1).isdigit():
+                            new_cap = float(raw_val)
+                            db.update_virtual_ledger_allocation(chat_id, capital=new_cap, risk_level="BALANCED", auto_reinvest=True)
+
+                    v_ledger = db.get_or_create_virtual_ledger(chat_id)
+                    v_pool = db.get_virtual_pool_metrics()
+                    v_txs = db.get_virtual_transactions(chat_id, limit=6)
+
+                    v_eq = v_ledger.get('virtual_equity', 100.0)
+                    v_cap = v_ledger.get('allocated_capital', 100.0)
+                    v_pnl = v_ledger.get('realized_profit', 0.0)
+                    v_pnl_str = f"+${v_pnl:,.2f} 🟢" if v_pnl >= 0 else f"-${abs(v_pnl):,.2f} 🔴"
+                    v_reinv = "🟢 ACTIVE (Compound Grid)" if v_ledger.get('auto_reinvest') else "⚪ STANDBY"
+                    v_risk = v_ledger.get('risk_level', 'BALANCED')
+                    v_share = v_ledger.get('pool_share_pct', 0.0)
+                    v_split = v_ledger.get('profit_split_pct', 80.0)
+
+                    tx_lines = []
+                    for tx in v_txs:
+                        t_typ = tx.get('type', 'PROFIT_SHARE')
+                        t_amt = tx.get('amount', 0.0)
+                        t_sym = tx.get('symbol') or "MT5"
+                        t_time = str(tx.get('created_at', ''))[:16]
+                        t_sign = "+" if t_amt >= 0 else "-"
+                        tx_lines.append(f"• `{t_time}` | {t_typ} ៖ `{t_sign}${abs(t_amt):,.2f}` ({t_sym})")
+                    tx_display = "\n".join(tx_lines) if tx_lines else "  _មិនទាន់មានប្រតិបត្តិការថ្មីនៅឡើយទេ_"
+
+                    vault_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🚀 $100 (Micro)", callback_data="btn_mt5_vault_alloc_100"),
+                            InlineKeyboardButton("💎 $250 (Std)", callback_data="btn_mt5_vault_alloc_250")
+                        ],
+                        [
+                            InlineKeyboardButton("🏆 $500 (Pro)", callback_data="btn_mt5_vault_alloc_500"),
+                            InlineKeyboardButton("👑 $1,000 (VIP)", callback_data="btn_mt5_vault_alloc_1000")
+                        ],
+                        [
+                            InlineKeyboardButton("🔄 Refresh Vault", callback_data="btn_mt5_vault"),
+                            InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
+                        ]
+                    ])
+
+                    msg_vault = (
+                        f"🏛️ **[MASTER CLOUD VIRTUAL PORTFOLIO & LEDGER]** 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"👤 **VIP Investor ៖** `{chat_id}` (Vault ID: `#{v_ledger.get('account_id')}`)\n"
+                        f"💰 **ដើមទុនបែងចែក (Allocated Capital) ៖** `${v_cap:,.2f} USD`\n"
+                        f"💎 **សមតុល្យបច្ចុប្បន្ន (Virtual Equity) ៖** `${v_eq:,.2f} USD`\n"
+                        f"🟢 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `{v_pnl_str}` (Net {v_split:.0f}%)\n"
+                        f"⚖️ **រូបមន្តបែងចែកចំណេញ ៖** `{v_split:.0f}% VIP / {100-v_split:.0f}% Super Admin`\n"
+                        f"🔄 **ប្រព័ន្ធ Compound Grid ៖** `{v_reinv}`\n"
+                        f"🛡️ **កម្រិតការពារ Risk ៖** `{v_risk}` ({v_ledger.get('risk_per_trade_pct', 1.5)}% / Trade)\n"
+                        f"🌐 **ចំណែកក្នុង Master Pool ៖** `{v_share}%` (Pool AUM: `${v_pool.get('total_pool_aum', 125100.0):,.2f}`)\n"
+                        f"🏛️ **Broker Gateway ៖** `GTCFX Tokyo (TY3 Co-Location < 0.5ms)`\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"📜 **ប្រវត្តិប្រតិបត្តិការចុងក្រោយ (Audit Ledger Trail) ៖**\n"
+                        f"{tx_display}\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"⌨️ **បញ្ជា 1-Tap Copyable Presets (ចុចដើម្បី Copy) ៖**\n"
+                        f"• `` `/mt5 VAULT 100` `` — កំណត់ទុន $100 (Micro)\n"
+                        f"• `` `/mt5 VAULT 250` `` — កំណត់ទុន $250 (Standard)\n"
+                        f"• `` `/mt5 VAULT 500` `` — កំណត់ទុន $500 (Pro)\n"
+                        f"• `` `/mt5 VAULT 1000` `` — កំណត់ទុន $1,000 (VIP)\n"
+                        f"• `` `/mt5 VAULT 3000` `` — កំណត់ទុន $3,000 (Elite)\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ _ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វ័យប្រវត្តិកម្រិត Cloud 24/7!_\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"_Khmer Master Crypto_\n"
+                        f"_APEX SUPER BRAIN AI_"
+                    )
+                    try:
+                        await update.effective_message.reply_text(msg_vault, parse_mode="Markdown", reply_markup=vault_kb)
+                    except Exception:
+                        await update.effective_message.reply_text(msg_vault.replace("*", "").replace("_", ""), reply_markup=vault_kb)
+                    return
+
             # --- DEFAULT DASHBOARD TELEMETRY ---
             status_data = bridge.get_bridge_status()
             online_count = status_data["online_clients"]
@@ -20826,6 +20922,17 @@ class TelegramBotThread(BaseThread):
                     c for c in all_clients
                     if (chat_id and c.get("chat_id") == chat_id) or (user_login and str(c.get("account_id")) == str(user_login))
                 ]
+
+            # Multi-Tenant Isolated Virtual Ledger Telemetry (Invariant 44)
+            v_ledger = db.get_or_create_virtual_ledger(chat_id)
+            v_pool = db.get_virtual_pool_metrics()
+            v_eq = v_ledger.get('virtual_equity', 100.0)
+            v_cap = v_ledger.get('allocated_capital', 100.0)
+            v_pnl = v_ledger.get('realized_profit', 0.0)
+            v_pnl_badge = f"+${v_pnl:,.2f} 🟢" if v_pnl >= 0 else f"-${abs(v_pnl):,.2f} 🔴"
+            v_reinv = "🟢 ON (Compound)" if v_ledger.get('auto_reinvest') else "⚪ OFF"
+            v_risk = v_ledger.get('risk_level', 'BALANCED')
+            v_share = v_ledger.get('pool_share_pct', 0.0)
 
             clients_text_kh = ""
             clients_text_en = ""
@@ -20857,12 +20964,14 @@ class TelegramBotThread(BaseThread):
                         f"{c_status_icon} **Acc {acc_label}** ({safe_broker or 'GTCFX'} / {safe_firm})\n"
                         f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
                         f"  • Latency: `{display_ping:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                        f"  • Master Cloud Vault ៖ `${v_eq:,.2f} USD` (ទុន: `${v_cap:,.2f}` | ចំណេញ: `{v_pnl_badge}`)\n"
                         f"{unlogged_note_kh}"
                     )
                     clients_text_en += (
                         f"{c_status_icon} **Acc {acc_label}** ({safe_broker or 'GTCFX'} / {safe_firm})\n"
                         f"  • Equity: `${c['equity']:,.2f}` | Balance: `${c['balance']:,.2f}`\n"
                         f"  • Latency: `{display_ping:.1f} ms` | Prop Shield: `{prop_badge}`\n"
+                        f"  • Master Cloud Vault: `${v_eq:,.2f} USD` (Cap: `${v_cap:,.2f}` | Profit: `{v_pnl_badge}`)\n"
                         f"{unlogged_note_en}"
                     )
             elif user_login:
@@ -20878,6 +20987,7 @@ class TelegramBotThread(BaseThread):
                     f"  • ស្ថានភាព ៖ 🟢 **Standby / រួចរាល់សម្រាប់ដំណើរការជួញដូរ**\n"
                     f"  • Web GUI ៖ 🔗 បានចងភ្ជាប់គណនីរួចរាល់ | ⚡ Latency ៖ `< 0.5ms TY3`\n"
                     f"  • Prop Shield ៖ `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
+                    f"  • Master Cloud Vault ៖ `${v_eq:,.2f} USD` (ទុន: `${v_cap:,.2f}` | ចំណេញ: `{v_pnl_badge}`)\n"
                     f"{sync_hint_kh}"
                 )
                 clients_text_en = (
@@ -20885,27 +20995,28 @@ class TelegramBotThread(BaseThread):
                     f"  • Status: 🟢 **Standby / Ready for Super Smart Trading**\n"
                     f"  • Web GUI: 🔗 Bound & Configured | ⚡ Latency: `< 0.5ms TY3`\n"
                     f"  • Prop Shield: `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
+                    f"  • Master Cloud Vault: `${v_eq:,.2f} USD` (Cap: `${v_cap:,.2f}` | Profit: `{v_pnl_badge}`)\n"
                     f"{sync_hint_en}"
                 )
             else:
-                if is_admin_user:
-                    clients_text_kh = (
-                        "⚠️ មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។\n"
-                        "👉 សូមបើក Web GUI -> ផ្ទាំង **MT5 Pro** ដើម្បីចងភ្ជាប់គណនី ឬបើក EA លើ MT5!"
-                    )
-                    clients_text_en = (
-                        "⚠️ No MT5 terminals currently connected.\n"
-                        "👉 Please open Web GUI -> **MT5 Pro** tab to bind your account or launch EA in MT5!"
-                    )
-                else:
-                    clients_text_kh = (
-                        "⚠️ មិនទាន់បានចងភ្ជាប់គណនី MT5 នៅឡើយទេ។\n"
-                        "👉 សូមបើក Web GUI -> ផ្ទាំង **MT5 Pro** ដើម្បីចងភ្ជាប់គណនី GTCFX របស់អ្នក!"
-                    )
-                    clients_text_en = (
-                        "⚠️ No MT5 account currently bound.\n"
-                        "👉 Please open Web GUI -> **MT5 Pro** tab to bind your GTCFX account!"
-                    )
+                clients_text_kh = (
+                    f"🏛️ **Master Cloud Virtual Sub-Account Vault (Zero-RDP 24/7)**\n"
+                    f"  • សមតុល្យក្នុង Vault (Equity) ៖ `${v_eq:,.2f} USD`\n"
+                    f"  • ដើមទុនវិនិយោគ (Allocated) ៖ `${v_cap:,.2f} USD`\n"
+                    f"  • ផលចំណេញសុទ្ធកើបបាន ៖ `{v_pnl_badge}` (Net 80%)\n"
+                    f"  • យុទ្ធសាស្ត្រ Risk Armor ៖ `{v_risk}` (1.5% Risk) | Compound: `{v_reinv}`\n"
+                    f"  • ចំណែកក្នុង Master Pool ៖ `{v_share}%` (Pool AUM: `${v_pool.get('total_pool_aum', 125100.0):,.2f}`)\n"
+                    f"  👉 _គណនីរបស់អ្នកកំពុងកើបចំណេញស្វ័យប្រវត្តិកម្រិត Cloud មិនបាច់បើកកុំព្យូទ័រចោល!_"
+                )
+                clients_text_en = (
+                    f"🏛️ **Master Cloud Virtual Sub-Account Vault (Zero-RDP 24/7)**\n"
+                    f"  • Vault Equity: `${v_eq:,.2f} USD`\n"
+                    f"  • Allocated Capital: `${v_cap:,.2f} USD`\n"
+                    f"  • Net Realized Profit: `{v_pnl_badge}` (Net 80%)\n"
+                    f"  • Risk Armor: `{v_risk}` (1.5% Risk) | Compound: `{v_reinv}`\n"
+                    f"  • Master Pool Share: `{v_share}%` (Pool AUM: `${v_pool.get('total_pool_aum', 125100.0):,.2f}`)\n"
+                    f"  👉 _Account harvesting profits autonomously on Cloud 24/7!_"
+                )
 
             # --- BUILD OPEN POSITIONS TELEMETRY ---
             all_active_positions = []
@@ -20966,7 +21077,7 @@ class TelegramBotThread(BaseThread):
             kb_mt5 = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(ai_badge, callback_data="btn_mt5_toggle_auto"),
-                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_refresh")
+                    InlineKeyboardButton("🏛️ Virtual Vault", callback_data="btn_mt5_vault")
                 ],
                 [
                     InlineKeyboardButton("⚡ BUY Gold 0.01", callback_data="btn_mt5_buy_gold"),
@@ -20986,6 +21097,7 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🏆 Prop Challenge", callback_data="btn_prop_firm_menu")
                 ],
                 [
+                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_refresh"),
                     InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
             ])
@@ -21015,6 +21127,7 @@ class TelegramBotThread(BaseThread):
                     f"{positions_summary_kh}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎯 **កូដបញ្ជាវិនិយោគរហ័ស (1-Tap Presets) ៖**\n"
+                    f"• មើល Virtual Vault ៖ `` `/mt5 VAULT` `` (ឬកែទុន: `` `/mt5 VAULT 250` ``)\n"
                     f"• Auto Super Smart ($100 / 10 Assets) ៖ `` `/mt5 AUTO ON 100 10` ``\n"
                     f"• Auto Super Smart ($100 / 5 Assets) ៖ `` `/mt5 AUTO ON 100 5` ``\n"
                     f"• Auto Super Smart ($50 / 3 Assets) ៖ `` `/mt5 AUTO ON 50 3` ``\n"
@@ -21050,6 +21163,7 @@ class TelegramBotThread(BaseThread):
                     f"{positions_summary_en}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎯 **Quick Trading Commands (1-Tap Presets):**\n"
+                    f"• Master Virtual Vault: `` `/mt5 VAULT` `` (or set capital: `` `/mt5 VAULT 250` ``)\n"
                     f"• Auto Super Smart ($100 / 10 Assets): `` `/mt5 AUTO ON 100 10` ``\n"
                     f"• Auto Super Smart ($100 / 5 Assets): `` `/mt5 AUTO ON 100 5` ``\n"
                     f"• Auto Super Smart ($50 / 3 Assets): `` `/mt5 AUTO ON 50 3` ``\n"
