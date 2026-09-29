@@ -1139,6 +1139,13 @@ class MT5BridgeEngine:
             self._last_auth_log[rej_key] = now_ts
             admin_chat_id = 537186806
             if retcode == 10017:
+                self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 1800.0
+                curr_bal = 0.0
+                with self._clients_lock:
+                    s_cli = self.clients.get(account_id)
+                    if s_cli:
+                        curr_bal = float(getattr(s_cli, "balance", 0.0) or 0.0)
+                bal_str = f"${curr_bal:,.2f}" if curr_bal > 0 else "ក្រោម $5.00"
                 help_text = (
                     "⚠️ <b>[MT5 ORDER REJECTED: RETCODE 10017 - TRADE DISABLED]</b>\n"
                     "━━━━━━━━━━━━\n"
@@ -1148,11 +1155,12 @@ class MT5BridgeEngine:
                     "━━━━━━━━━━━━\n"
                     "👉 <b>ដំណោះស្រាយ ៖</b>\n"
                     "1. <b>Investor Password ៖</b> គណនីបាន Login ដោយពាក្យសម្ងាត់មើល (Read-only)។ សូម Login ឡើងវិញក្នុង MT5 ដោយប្រើ <b>Master/Trader Password</b>។\n"
-                    "2. <b>ទុនតិចពេក (Insufficient Margin) ៖</b> បើទុនសល់តិច ($3.93) មិនគ្រប់ Margin បើក 0.01 Lot ឡើយ។ សូម Top-up បន្ថែម $10–$50។\n"
+                    f"2. <b>ទុនតិចពេក (Insufficient Margin) ៖</b> បើទុនសល់តិច ({bal_str}) មិនគ្រប់ Margin បើក 0.01 Lot ឡើយ។ សូម Top-up បន្ថែម $10–$50។\n"
                     "3. <b>Algo Trading ៖</b> ត្រូវចុចបើកប៊ូតុង Algo Trading (ពណ៌បៃតង) លើ MT5។"
                 )
                 _dispatch_telegram_alert(admin_chat_id, help_text)
             elif retcode == 10019:
+                self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 900.0
                 help_text = (
                     "⚠️ <b>[MT5 ORDER REJECTED: RETCODE 10019 - NO MONEY]</b>\n"
                     "━━━━━━━━━━━━\n"
@@ -1637,20 +1645,25 @@ class MT5BridgeEngine:
                     super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
                     is_real_admin = (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
                     if not is_real_admin and acc_id in super_admins:
+                        db.unbind_user_mt5_config(chat_id)
                         now_t = time.time()
-                        if (now_t - self._last_admin_hijack_warn.get(chat_id, 0.0)) > 1800.0:
+                        if (now_t - self._last_admin_hijack_warn.get(chat_id, 0.0)) > 86400.0:
                             self._last_admin_hijack_warn[chat_id] = now_t
                             msg_hijack = (
                                 f"⚠️ <b>[MT5 ACCESS CONTROL NOTICE]</b>\n"
                                 f"━━━━━━━━━━━━\n"
                                 f"🏛️ <b>គណនី #{acc_id} គឺជាគណនី Super Admin!</b>\n"
-                                f"👉 សូមភ្ជាប់គណនី MT5 ផ្ទាល់ខ្លួនរបស់អ្នក (Model 2) ដោយវាយ ៖\n"
-                                f"<code>/mt5 BIND &lt;លេខគណនីផ្ទាល់ខ្លួន&gt;</code>\n"
+                                f"👉 ប្រព័ន្ធបានផ្តាច់គណនី Admin នេះចេញដោយស្វ័យប្រវត្តិ។\n"
+                                f"សូមជ្រើសរើសជម្រើសវិនិយោគរបស់អ្នក ៖\n"
+                                f"1️⃣ <b>Cloud Virtual Vault (មិនបាច់មាន MT5 ខ្លួនឯង) ៖</b>\n"
+                                f"   វាយ <code>/mt5 VAULT 100</code> ដើម្បីទទួលផលចំណេញស្វ័យប្រវត្តិ ២៤/៧!\n"
+                                f"2️⃣ <b>ភ្ជាប់គណនី MT5 ផ្ទាល់ខ្លួន (Model 2) ៖</b>\n"
+                                f"   វាយ <code>/mt5 BIND &lt;លេខគណនីផ្ទាល់ខ្លួន&gt;</code>\n"
                                 f"━━━━━━━━━━━━\n"
                                 f"<i>✨ Khmer Master Crypto Citadel ការពារសុវត្ថិភាពមូលធន ១០០%!</i>"
                             )
                             _dispatch_telegram_alert(chat_id, msg_hijack)
-                            logger.warning(f"🛡️ [SECURITY CITADEL] Blocked non-admin user {chat_id} from auto-trading on Super Admin MT5 #{acc_id}!")
+                            logger.warning(f"🛡️ [SECURITY CITADEL] Auto-unbound Super Admin MT5 #{acc_id} from non-admin user {chat_id}!")
                         continue
 
                     session = None
@@ -1881,6 +1894,15 @@ class MT5BridgeEngine:
                     is_cent_account = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
                     raw_bal = float(getattr(session, "balance", 100.0) or 100.0)
                     real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
+
+                    # Strict Sub-$5.00 Minimum Capital Gatekeeper (Standard Account):
+                    # 0.01 lot of Gold requires >$5.32 margin. Trading with < $5.00 causes broker Retcode 10017/10019 rejection.
+                    if not is_cent_account and real_usd_balance < 5.0:
+                        min_log_k = f"low_cap_{acc_id}"
+                        if (now_ts - self._last_auth_log.get(min_log_k, 0.0)) >= 900.0:
+                            self._last_auth_log[min_log_k] = now_ts
+                            logger.warning(f"⚠️ [LOW CAPITAL GUARD] Account #{acc_id} has ${real_usd_balance:.2f} USD (< $5.00 minimum required for margin). Pausing auto-trade until deposit.")
+                        continue
 
                     # Strict Sub-$300 / Cent Account Gatekeeper:
                     # Exclude all Indices (US30, US30c, US30C, DJ30, SP500, US500, NAS100, USTEC, GER40) if real balance < $300 USD
