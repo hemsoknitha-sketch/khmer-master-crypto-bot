@@ -1029,7 +1029,7 @@ class MT5BridgeEngine:
                 "signal_id": signal_id,
                 "fill_time": time.time()
             }
-        logger.info(f"🎯 [MT5 FILL] Account {account_id} filled order! Ticket: #{ticket}, Symbol: {symbol or 'N/A'}, Price: {open_price}")
+        logger.info(f"🎯 [MT5 ORDER FILLED] Account {account_id} filled order! Ticket: #{ticket}, Symbol: {symbol or 'N/A'}, Price: {open_price}")
 
     def _handle_order_closed(self, payload: Dict[str, Any], account_id: str):
         """Processes trade close confirmation from MT5."""
@@ -1047,7 +1047,7 @@ class MT5BridgeEngine:
         self._ticket_peak_profit.pop(ticket, None)
 
         db.update_mt5_bridge_order_close(ticket=ticket, close_price=close_price, pnl=pnl, status=status)
-        logger.info(f"💰 [MT5 CLOSED] Account {account_id} closed #{ticket}! Symbol: {symbol or 'N/A'}, Close Price: {close_price}, PnL: ${pnl:+,.2f}")
+        logger.info(f"💰 [MT5 ORDER CLOSED] Account {account_id} closed #{ticket}! Symbol: {symbol or 'N/A'}, Close Price: {close_price}, PnL: ${pnl:+,.2f}")
 
         # Post-Trade Anti-Whipsaw Cooldown: Mandatory 15-Minute (900s) cooldown after close
         now_ts = time.time()
@@ -1116,7 +1116,39 @@ class MT5BridgeEngine:
         symbol = str(payload.get("symbol", ""))
 
         db.update_mt5_bridge_order_status(signal_id=signal_id, status=f"REJECTED_{retcode}")
-        logger.warning(f"❌ [MT5 REJECTED] Account {account_id} | Signal: {signal_id} | Symbol: {symbol} | Retcode: {retcode} ({reason})")
+        logger.warning(f"❌ [MT5 ORDER REJECTED] Account {account_id} | Signal: {signal_id} | Symbol: {symbol} | Retcode: {retcode} ({reason})")
+
+        # Proactive Admin Telegram Alert on Rejection (Debounced 10 mins per retcode)
+        now_ts = time.time()
+        rej_key = f"rej_{account_id}_{retcode}"
+        if (now_ts - self._last_auth_log.get(rej_key, 0.0)) >= 600.0:
+            self._last_auth_log[rej_key] = now_ts
+            admin_chat_id = 537186806
+            if retcode == 10017:
+                help_text = (
+                    "⚠️ <b>[MT5 ORDER REJECTED: RETCODE 10017 - TRADE DISABLED]</b>\n"
+                    "━━━━━━━━━━━━\n"
+                    f"🏛️ <b>គណនី MT5 ៖</b> <code>#{account_id}</code>\n"
+                    f"📉 <b>ទ្រព្យសកម្ម ៖</b> <code>{symbol}</code>\n"
+                    f"⛔ <b>មូលហេតុ ៖</b> Broker បដិសេធការ Trade (Trade Disabled)!\n"
+                    "━━━━━━━━━━━━\n"
+                    "👉 <b>ដំណោះស្រាយ ៖</b>\n"
+                    "1. <b>Investor Password ៖</b> គណនីបាន Login ដោយពាក្យសម្ងាត់មើល (Read-only)។ សូម Login ឡើងវិញក្នុង MT5 ដោយប្រើ <b>Master/Trader Password</b>។\n"
+                    "2. <b>ទុនតិចពេក (Insufficient Margin) ៖</b> បើទុនសល់តិច ($3.93) មិនគ្រប់ Margin បើក 0.01 Lot ឡើយ។ សូម Top-up បន្ថែម $10–$50។\n"
+                    "3. <b>Algo Trading ៖</b> ត្រូវចុចបើកប៊ូតុង Algo Trading (ពណ៌បៃតង) លើ MT5។"
+                )
+                _dispatch_telegram_alert(admin_chat_id, help_text)
+            elif retcode == 10019:
+                help_text = (
+                    "⚠️ <b>[MT5 ORDER REJECTED: RETCODE 10019 - NO MONEY]</b>\n"
+                    "━━━━━━━━━━━━\n"
+                    f"🏛️ <b>គណនី MT5 ៖</b> <code>#{account_id}</code>\n"
+                    f"📉 <b>ទ្រព្យសកម្ម ៖</b> <code>{symbol}</code>\n"
+                    "⛔ <b>មូលហេតុ ៖</b> ទុនមិនគ្រប់ Margin (Insufficient Margin)!\n"
+                    "━━━━━━━━━━━━\n"
+                    "👉 សូមបញ្ចូលទុនបន្ថែម (Top-up) ទៅក្នុងគណនី MT5 ដើម្បីបន្តដំណើរការ Trade!"
+                )
+                _dispatch_telegram_alert(admin_chat_id, help_text)
 
         # Auto-Healer: If rejection is due to local EA prop breach, calibrate baseline & resume immediately
         if "PROP_BREACH" in reason or "PROP_BREACH_LOCAL" in reason:
