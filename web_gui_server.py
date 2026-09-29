@@ -1436,6 +1436,18 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                     "message": f"🚨 គណនី #{target_account} កំពុងជាប់សោ Prop Shield! សូមវាយបញ្ជា /mt5 RESET ក្នុង Telegram ដើម្បីដោះសោ!"
                 }, status=400)
             else:
+                is_admin_acc = str(target_account) in ["52135153", "52133938"]
+                if is_admin_acc:
+                    solve_hint = "👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ឬ run លើ VPS ៖ `` `bash reset_and_launch_mt5.sh` ``!"
+                else:
+                    solve_hint = (
+                        f"👉 **ដំណោះស្រាយ (ជ្រើសរើស ១ ក្នុងចំណោម ៣) ៖**\n"
+                        f"• **Auto-Launch លើ VPS ៖** ចូល Web MT5 PRO -> ចុច `⚙️ MT5 Connect & Bind` រួចវាយ Password ដើម្បី Auto-Launch ឬ run លើ VPS ៖\n"
+                        f"  `` `bash login_mt5_account.sh {target_account} <password> \"GTCGlobalSA-Server 5\"` ``\n"
+                        f"• **បើកលើ PC ៖** បើក MT5 លើ PC របស់អ្នក រួចភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5`\n"
+                        f"• **វិនិយោគតាម Cloud Vault ៖** បញ្ជា Trade ស្វ័យប្រវត្តិតាម Master AI តាមរយៈ `` `/mt5 VAULT` ``"
+                    )
+
                 err_msg = (
                     f"⚠️ **[MT5 TERMINAL NOT CONNECTED / LOGIN MISMATCH]** 🏛️\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -1443,15 +1455,15 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                     f"📡 **ស្ថានភាព ៖** ❌ **Offline លើ Tokyo VPS Bridge (Port 5555)**\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🔍 **មូលហេតុដែលអាចកើតមាន ៖**\n"
-                    f"1️⃣ លេខ Account Login ID លើ Web GUI ខុសគ្នាពីលេខ Account លើ MT5 Software\n"
-                    f"2️⃣ វាយខុស Password ធ្វើឱ្យ MT5 លើ PC/VPS មិនអាច Login ចូល Broker (Authorization Failed)\n"
-                    f"3️⃣ មិនទាន់បានបើកកម្មវិធី MT5 ឬមិនទាន់បាន Attach EA `KhmerMasterCrypto_Bridge.mq5`\n\n"
-                    f"👉 **ដំណោះស្រាយ ៖** សូមពិនិត្យលេខ Account/Password លើ MT5 ឱ្យបានត្រឹមត្រូវ រួចបើក EA ឬ run: `bash reset_and_launch_mt5.sh`!"
+                    f"1️⃣ កម្មវិធី MT5 របស់គណនី #{target_account} មិនទាន់បានបើកដំណើរការលើ VPS ឬ PC\n"
+                    f"2️⃣ មិនទាន់បានវាយ Password ក្នុង Web GUI ដើម្បីឱ្យ VPS Auto-Launch កម្មវិធី MT5\n"
+                    f"3️⃣ បើក MT5 លើ PC ផ្ទាល់ខ្លួន តែមិនទាន់បាន Attach EA `KhmerMasterCrypto_Bridge.mq5`\n\n"
+                    f"{solve_hint}"
                 )
                 asyncio.create_task(notification_manager.send_telegram_alert(chat_id, err_msg))
                 return web.json_response({
                     "status": "error",
-                    "message": f"⚠️ គណនី MT5 #{target_account} របស់អ្នកមិនទាន់ Online លើ Tokyo VPS Bridge នៅឡើយទេ សូមបើក EA របស់អ្នក!"
+                    "message": f"⚠️ គណនី MT5 #{target_account} របស់អ្នកមិនទាន់ Online លើ Tokyo VPS Bridge នៅឡើយទេ សូមវាយ Password ក្នុង Web GUI ដើម្បី Auto-Launch ឬបើក EA!"
                 }, status=400)
 
         db.record_mt5_bridge_order(
