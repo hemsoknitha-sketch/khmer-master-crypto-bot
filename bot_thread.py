@@ -5728,6 +5728,20 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["VAULT", cap_val]
                 await mt5_command(update, context)
+            elif data == "btn_mt5_download_ea":
+                try:
+                    await update.callback_query.answer("📥 កំពុងរៀបចំផ្ញើឯកសារ EA Bridge (.mq5)...")
+                except Exception:
+                    pass
+                context.args = ["EA"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_bind_guide":
+                try:
+                    await update.callback_query.answer("🔗 របៀបភ្ជាប់គណនី MT5 ផ្ទាល់ខ្លួន...")
+                except Exception:
+                    pass
+                context.args = ["BIND"]
+                await mt5_command(update, context)
             elif data == "btn_mt5_close_all":
                 try:
                     await update.callback_query.answer("🛑 កំពុងបញ្ជូន Signal បិទ Position ទាំងអស់លើ MT5...")
@@ -20906,6 +20920,102 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(msg_vault.replace("*", "").replace("_", ""), reply_markup=vault_kb)
                     return
 
+                # --- 8. DIRECT PERSONAL MT5 BIND / CONNECT (Model 2) ---
+                elif sub in ["BIND", "CONNECT"]:
+                    if len(args) >= 2:
+                        acc_id = str(args[1]).strip()
+                        srv = str(args[2]).strip() if len(args) >= 3 else "GTCGlobalSA-Server 2"
+                        brk = str(args[3]).strip() if len(args) >= 4 else "GTCFX"
+                        db.save_user_mt5_config(chat_id=chat_id, login=acc_id, server=srv, broker=brk, firm_name="Personal")
+                        if not is_mt5_auth:
+                            db.set_mt5_user_referral_status(chat_id, True, acc_id, notes="Personal MT5 Direct Bind")
+                        msg_bind = (
+                            f"🔗 <b>[MT5 PERSONAL ACCOUNT BOUND]</b> 🏛️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code>\n"
+                            f"🎫 <b>MT5 Account ID ៖</b> <code>#{acc_id}</code>\n"
+                            f"🏛️ <b>Broker / Server ៖</b> <code>{srv}</code> ({brk})\n"
+                            f"📡 <b>ស្ថានភាព ៖</b> <b>✅ ភ្ជាប់ជោគជ័យ! រួចរាល់សម្រាប់ជួញដូរទុនផ្ទាល់ខ្លួន</b>\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"👉 <b>ជំហានបន្ទាប់ដើម្បីចាប់ផ្តើម ៖</b>\n"
+                            f"1️⃣ ទាញយក EA Bridge តាមបញ្ជា <code>/mt5 EA</code> ឬចុចប៊ូតុងខាងក្រោម\n"
+                            f"2️⃣ ដាក់ក្នុង MT5 លើ PC/VPS ➔ បើកប៊ូតុង Algo Trading (ពណ៌បៃតង)\n"
+                            f"3️⃣ បើក AI Auto-Trade ៖ <code>/mt5 AUTO ON 100 5</code>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✨ <i>ដើមទុនក្នុងគណនីផ្ទាល់ខ្លួនរបស់អ្នក ស្ថិតក្រោមការគ្រប់គ្រងរបស់អ្នក ១០០%!</i>"
+                        )
+                        bind_kb = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("📥 ទាញយក EA Bridge (.mq5)", callback_data="btn_mt5_download_ea")],
+                            [InlineKeyboardButton("🤖 បើក Auto-Trade 24/7", callback_data="btn_mt5_auto_100_5")],
+                            [InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")]
+                        ])
+                        await update.effective_message.reply_text(msg_bind, parse_mode="HTML", reply_markup=bind_kb)
+                        return
+                    else:
+                        msg_help = (
+                            f"ℹ️ <b>របៀប Bind គណនី MT5 ផ្ទាល់ខ្លួន (Model 2) ៖</b>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"វាយបញ្ជា ៖ <code>/mt5 BIND &lt;Account_ID&gt; [Server] [Broker]</code>\n"
+                            f"{ui_standards.DIVIDER_LIGHT}\n"
+                            f"⌨️ <b>1-Tap Copyable Presets (ចុចដើម្បីចម្លង) ៖</b>\n"
+                            f"• <code>/mt5 BIND 52135153 GTCGlobalSA-Server 2 GTCFX</code>\n"
+                            f"• <code>/mt5 BIND 66778899 Exness-Real7 Exness</code>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👉 <i>ក្រោយ Bind រួច AI នឹងបញ្ជាទិញចូល MT5 ផ្ទាល់ខ្លួនរបស់អ្នកដោយស្វ័យប្រវត្តិ!</i>"
+                        )
+                        await update.effective_message.reply_text(msg_help, parse_mode="HTML")
+                        return
+
+                # --- 8.1 UNBIND / DISCONNECT ---
+                elif sub in ["UNBIND", "DISCONNECT"]:
+                    db.unbind_user_mt5_config(chat_id)
+                    await update.effective_message.reply_text("✅ <b>បានផ្តាច់គណនី MT5 ផ្ទាល់ខ្លួនដោយជោគជ័យ!</b>", parse_mode="HTML")
+                    return
+
+                # --- 9. DOWNLOAD EA BRIDGE FILE & SETUP GUIDE ---
+                elif sub in ["EA", "DOWNLOAD", "DOWNLOAD_EA"]:
+                    ea_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "KhmerMasterCrypto_Bridge.mq5")
+                    if not os.path.exists(ea_path):
+                        ea_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "KhmerMasterCrypto_Bridge.mq5")
+
+                    vps_ip = os.getenv("MT5_PUBLIC_IP", "34.153.209.188")
+                    guide_text = (
+                        f"📥 <b>[KHMER MASTER CRYPTO - MT5 BRIDGE EA V13.0]</b> 🚀\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ <b>សម្រាប់ដោតលើ MT5 ផ្ទាល់ខ្លួន (PC / Laptop / VPS)</b>\n"
+                        f"⚡ <b>Zero DLL Direct Socket (&lt; 0.5ms HFT Bridge)</b>\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"⚙️ <b>ការកំណត់ក្នុង EA Settings (Inputs) ៖</b>\n"
+                        f"• <code>InpHost</code> ៖ <code>{vps_ip}</code> (Cloud Swarm IP)\n"
+                        f"• <code>InpPort</code> ៖ <code>5555</code> (TCP Bridge Port)\n"
+                        f"• <code>InpSecretKey</code> ៖ <code>KhmerMasterCrypto_PropBridge_Fortress_2026</code>\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"📖 <b>ការណែនាំដំឡើងជា ៤ ជំហានងាយៗ ៖</b>\n"
+                        f"1️⃣ ចម្លងឯកសារ <code>.mq5</code> នេះ ទៅដាក់ក្នុង Folder ៖\n"
+                        f"   <code>File</code> ➔ <code>Open Data Folder</code> ➔ <code>MQL5</code> ➔ <code>Experts</code>\n"
+                        f"2️⃣ ក្នុង MT5 Navigator ចុចកណ្ដុរស្ដាំលើ Experts ជ្រើសរើស <b>Refresh</b>\n"
+                        f"3️⃣ ទាញ EA ដាក់លើក្រាហ្វិកមាស (<code>XAUUSD</code>) ឬរូបិយប័ណ្ណណាមួយ\n"
+                        f"4️⃣ ចុចបើកប៊ូតុង <b>Algo Trading</b> (ពណ៌បៃតង) លើរបារខាងលើ MT5!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ <i>ពេលភ្ជាប់ជោគជ័យ HUD Dashboard ពណ៌ខៀវ Neon នឹងលោតលើក្រាហ្វិក MT5 ភ្លាម!</i>"
+                    )
+                    ea_kb = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔗 ភ្ជាប់គណនីផ្ទាល់ខ្លួន (Bind)", callback_data="btn_mt5_bind_guide")],
+                        [InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")]
+                    ])
+                    if os.path.exists(ea_path):
+                        with open(ea_path, "rb") as doc_file:
+                            await update.effective_message.reply_document(
+                                document=doc_file,
+                                filename="KhmerMasterCrypto_Bridge.mq5",
+                                caption=guide_text,
+                                parse_mode="HTML",
+                                reply_markup=ea_kb
+                            )
+                    else:
+                        await update.effective_message.reply_text(guide_text, parse_mode="HTML", reply_markup=ea_kb)
+                    return
+
             # --- DEFAULT DASHBOARD TELEMETRY ---
             status_data = bridge.get_bridge_status()
             online_count = status_data["online_clients"]
@@ -21080,6 +21190,10 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🏛️ Virtual Vault", callback_data="btn_mt5_vault")
                 ],
                 [
+                    InlineKeyboardButton("📥 ទាញយក EA Bridge (.mq5)", callback_data="btn_mt5_download_ea"),
+                    InlineKeyboardButton("🔗 ភ្ជាប់គណនីផ្ទាល់ខ្លួន (Bind)", callback_data="btn_mt5_bind_guide")
+                ],
+                [
                     InlineKeyboardButton("⚡ BUY Gold 0.01", callback_data="btn_mt5_buy_gold"),
                     InlineKeyboardButton("⚡ SELL Gold 0.01", callback_data="btn_mt5_sell_gold")
                 ],
@@ -21127,6 +21241,8 @@ class TelegramBotThread(BaseThread):
                     f"{positions_summary_kh}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🎯 **កូដបញ្ជាវិនិយោគរហ័ស (1-Tap Presets) ៖**\n"
+                    f"• ភ្ជាប់គណនីផ្ទាល់ខ្លួន ៖ `` `/mt5 BIND 52135153` ``\n"
+                    f"• ទាញយក EA Bridge ៖ `` `/mt5 EA` ``\n"
                     f"• មើល Virtual Vault ៖ `` `/mt5 VAULT` `` (ឬកែទុន: `` `/mt5 VAULT 250` ``)\n"
                     f"• Auto Super Smart ($100 / 10 Assets) ៖ `` `/mt5 AUTO ON 100 10` ``\n"
                     f"• Auto Super Smart ($100 / 5 Assets) ៖ `` `/mt5 AUTO ON 100 5` ``\n"
