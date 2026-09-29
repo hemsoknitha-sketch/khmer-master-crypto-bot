@@ -4785,6 +4785,16 @@ GTC_STD_INVITE_CODE = GTC_STD_L15_INVITE_CODE
 GTC_OFFICIAL_REFERRAL_URL = GTC_STD_L15_REFERRAL_URL
 GTC_OFFICIAL_INVITE_CODE = GTC_STD_L15_INVITE_CODE
 GTC_VALID_INVITE_CODES = {"LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"}
+
+# Architectural Role Specialization:
+# 1. Trading Master Controller: Executes Super Brain AI trades & signals (MT5's Super ADMIN)
+MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52135153"
+
+# 2. Treasury & Rebate Collector: Real Super Account receiving 20% Cloud Maintenance Fee & 100% full referral rebates (Wallet: 130237694)
+MT5_TREASURY_REBATE_ACCOUNT = "52133938"
+MT5_TREASURY_WALLET_ID = "130237694"
+
+# Set of all Super Admin tier accounts (authorized for elevated access & zero lockouts)
 SUPER_ADMIN_MT5_ACCOUNTS = {"55688250", "52135153", "52133938"}
 
 def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
@@ -5144,6 +5154,44 @@ def _ensure_virtual_ledger_schema(cursor):
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mt5_treasury_vault (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id TEXT UNIQUE,
+            wallet_id TEXT,
+            account_name TEXT,
+            maintenance_fee_pct REAL DEFAULT 20.0,
+            total_maintenance_fee_usd REAL DEFAULT 0.0,
+            total_rebate_usd REAL DEFAULT 0.0,
+            total_balance_usd REAL DEFAULT 0.0,
+            withdrawn_usd REAL DEFAULT 0.0,
+            is_active BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mt5_treasury_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id TEXT,
+            wallet_id TEXT,
+            tx_type TEXT,
+            amount REAL,
+            balance_before REAL,
+            balance_after REAL,
+            source_type TEXT DEFAULT 'VIRTUAL_VAULT',
+            source_ref TEXT DEFAULT '',
+            ticket INTEGER DEFAULT 0,
+            symbol TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # Pre-seed Real Super Treasury Account 52133938 (Wallet: 130237694)
+    cursor.execute('''
+        INSERT OR IGNORE INTO mt5_treasury_vault (account_id, wallet_id, account_name, maintenance_fee_pct, total_maintenance_fee_usd, total_rebate_usd, total_balance_usd, is_active)
+        VALUES ('52133938', '130237694', 'Real Super Treasury & Rebate Collector', 20.0, 0.0, 0.0, 0.0, 1)
+    ''')
 
 def get_or_create_virtual_ledger(chat_id: int, initial_capital: float = 100.0, account_id: str = "") -> dict:
     """
@@ -5427,13 +5475,212 @@ def record_virtual_trade_pnl(ticket: int, symbol: str, total_pnl: float, close_p
             except Exception:
                 pass
 
+    # Atomically credit 20% Cloud Maintenance & AI Swarm Fee to Real Super Account 52133938 (Wallet: 130237694)
+    if admin_fees_total > 0:
+        try:
+            cursor.execute("SELECT total_balance_usd, total_maintenance_fee_usd FROM mt5_treasury_vault WHERE account_id = ?", (MT5_TREASURY_REBATE_ACCOUNT,))
+            t_row = cursor.fetchone()
+            t_bal_before = float(t_row[0] or 0.0) if t_row else 0.0
+            t_maint_before = float(t_row[1] or 0.0) if t_row else 0.0
+            t_bal_after = round(t_bal_before + admin_fees_total, 2)
+            t_maint_after = round(t_maint_before + admin_fees_total, 2)
+
+            cursor.execute('''
+                UPDATE mt5_treasury_vault
+                SET total_balance_usd = ?, total_maintenance_fee_usd = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE account_id = ?
+            ''', (t_bal_after, t_maint_after, MT5_TREASURY_REBATE_ACCOUNT))
+
+            cursor.execute('''
+                INSERT INTO mt5_treasury_transactions (account_id, wallet_id, tx_type, amount, balance_before, balance_after, source_type, source_ref, ticket, symbol, description)
+                VALUES (?, ?, 'MAINTENANCE_FEE', ?, ?, ?, 'VIRTUAL_VAULT', ?, ?, ?, ?)
+            ''', (MT5_TREASURY_REBATE_ACCOUNT, MT5_TREASURY_WALLET_ID, admin_fees_total, t_bal_before, t_bal_after, f"Distributed to {distributed_count} VIP Investors", ticket, symbol, f"20% Cloud Maintenance & AI Swarm Fee from Trade #{ticket} ({symbol})"))
+
+            # Dispatch Real-Time Treasury Harvest Alert to Super Admin
+            msg_treasury = (
+                f"🏛️ <b>[SUPER SMART TREASURY FEE HARVEST]</b> 💎\n"
+                f"━━━━━━━━━━━━\n"
+                f"🏦 <b>Real Super Account ៖</b> <code>{MT5_TREASURY_REBATE_ACCOUNT}</code>\n"
+                f"💳 <b>Treasury Wallet ID ៖</b> <code>{MT5_TREASURY_WALLET_ID}</code>\n"
+                f"🟢 <b>កម្រៃថែទាំ Cloud ២០% ៖</b> <b>+${admin_fees_total:,.2f} USD</b>\n"
+                f"📈 <b>ប្រភពជួញដូរ ៖</b> <code>{symbol}</code> (Ticket #{ticket})\n"
+                f"👥 <b>VIP Investors ទទួលបានផល ៖</b> <b>{distributed_count} នាក់</b>\n"
+                f"💰 <b>សមតុល្យ Treasury សរុប ៖</b> <b>${t_bal_after:,.2f} USD</b>\n"
+                f"⚙️ <b>Super ADMIN MT5 (Trading Master) ៖</b> <code>{MT5_SUPER_ADMIN_TRADING_ACCOUNT}</code>\n"
+                f"━━━━━━━━━━━━\n"
+                f"<i>✨ កម្រៃថែទាំប្រព័ន្ធ Cloud និងសេវាកម្ម AI Swarm ត្រូវបានផ្ទេរចូល Treasury Vault ដោយជោគជ័យ!</i>"
+            )
+            admin_cid = 859271875
+            import notification_manager
+            import bot_thread
+            loop = getattr(bot_thread, "MAIN_BOT_LOOP", None)
+            if loop and loop.is_running():
+                import asyncio
+                asyncio.run_coroutine_threadsafe(
+                    notification_manager.send_telegram_alert(admin_cid, msg_treasury, parse_mode="HTML"),
+                    loop
+                )
+            else:
+                import os
+                import requests
+                token = os.getenv("TELEGRAM_BOT_TOKEN")
+                if token and token != "your_telegram_bot_token_here":
+                    requests.post(
+                        f"https://api.telegram.org/bot{token}/sendMessage",
+                        json={"chat_id": admin_cid, "text": msg_treasury, "parse_mode": "HTML"},
+                        timeout=3.0
+                    )
+        except Exception:
+            pass
+
     conn.commit()
     conn.close()
     return {
         "success": True,
         "investors_count": distributed_count,
         "total_distributed_usd": total_distributed,
-        "admin_fees_total_usd": admin_fees_total
+        "admin_fees_total_usd": admin_fees_total,
+        "treasury_account_id": MT5_TREASURY_REBATE_ACCOUNT,
+        "treasury_wallet_id": MT5_TREASURY_WALLET_ID
+    }
+
+def record_treasury_maintenance_fee(amount_usd: float, ticket: int = 0, symbol: str = "", source_ref: str = "") -> dict:
+    """
+    Credits 20% Cloud Maintenance & AI Swarm Performance Fee to Real Super Account 52133938 (Wallet: 130237694).
+    """
+    if amount_usd <= 0:
+        return {"success": False, "reason": "Amount must be positive"}
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+
+    cursor.execute("SELECT total_balance_usd, total_maintenance_fee_usd FROM mt5_treasury_vault WHERE account_id = ?", (MT5_TREASURY_REBATE_ACCOUNT,))
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute('''
+            INSERT INTO mt5_treasury_vault (account_id, wallet_id, account_name, maintenance_fee_pct, total_maintenance_fee_usd, total_rebate_usd, total_balance_usd)
+            VALUES (?, ?, 'Real Super Treasury & Rebate Collector', 20.0, 0.0, 0.0, 0.0)
+        ''', (MT5_TREASURY_REBATE_ACCOUNT, MT5_TREASURY_WALLET_ID))
+        bal_before = 0.0
+        maint_before = 0.0
+    else:
+        bal_before = float(row[0] or 0.0)
+        maint_before = float(row[1] or 0.0)
+
+    bal_after = round(bal_before + amount_usd, 2)
+    maint_after = round(maint_before + amount_usd, 2)
+
+    cursor.execute('''
+        UPDATE mt5_treasury_vault
+        SET total_balance_usd = ?, total_maintenance_fee_usd = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE account_id = ?
+    ''', (bal_after, maint_after, MT5_TREASURY_REBATE_ACCOUNT))
+
+    cursor.execute('''
+        INSERT INTO mt5_treasury_transactions (account_id, wallet_id, tx_type, amount, balance_before, balance_after, source_type, source_ref, ticket, symbol, description)
+        VALUES (?, ?, 'MAINTENANCE_FEE', ?, ?, ?, 'VIRTUAL_VAULT', ?, ?, ?, ?)
+    ''', (MT5_TREASURY_REBATE_ACCOUNT, MT5_TREASURY_WALLET_ID, amount_usd, bal_before, bal_after, source_ref, ticket, symbol, f"20% Cloud Maintenance & AI Swarm Fee from Trade #{ticket} ({symbol})"))
+
+    conn.commit()
+    conn.close()
+    return {"success": True, "account_id": MT5_TREASURY_REBATE_ACCOUNT, "wallet_id": MT5_TREASURY_WALLET_ID, "amount": amount_usd, "new_balance": bal_after}
+
+def record_treasury_referral_rebate(amount_usd: float, source_account: str = "", lots: float = 0.0, symbol: str = "", description: str = "") -> dict:
+    """
+    Credits 100% of Referral Rebates across linked accounts to Real Super Account 52133938 (Wallet: 130237694).
+    """
+    if amount_usd <= 0:
+        return {"success": False, "reason": "Amount must be positive"}
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+
+    cursor.execute("SELECT total_balance_usd, total_rebate_usd FROM mt5_treasury_vault WHERE account_id = ?", (MT5_TREASURY_REBATE_ACCOUNT,))
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute('''
+            INSERT INTO mt5_treasury_vault (account_id, wallet_id, account_name, maintenance_fee_pct, total_maintenance_fee_usd, total_rebate_usd, total_balance_usd)
+            VALUES (?, ?, 'Real Super Treasury & Rebate Collector', 20.0, 0.0, 0.0, 0.0)
+        ''', (MT5_TREASURY_REBATE_ACCOUNT, MT5_TREASURY_WALLET_ID))
+        bal_before = 0.0
+        rebate_before = 0.0
+    else:
+        bal_before = float(row[0] or 0.0)
+        rebate_before = float(row[1] or 0.0)
+
+    bal_after = round(bal_before + amount_usd, 2)
+    rebate_after = round(rebate_before + amount_usd, 2)
+
+    cursor.execute('''
+        UPDATE mt5_treasury_vault
+        SET total_balance_usd = ?, total_rebate_usd = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE account_id = ?
+    ''', (bal_after, rebate_after, MT5_TREASURY_REBATE_ACCOUNT))
+
+    cursor.execute('''
+        INSERT INTO mt5_treasury_transactions (account_id, wallet_id, tx_type, amount, balance_before, balance_after, source_type, source_ref, ticket, symbol, description)
+        VALUES (?, ?, 'REFERRAL_REBATE', ?, ?, ?, 'MT5_REFERRAL', ?, 0, ?, ?)
+    ''', (MT5_TREASURY_REBATE_ACCOUNT, MT5_TREASURY_WALLET_ID, amount_usd, bal_before, bal_after, source_account, symbol, description or f"IB Spread Rebate from Account #{source_account} ({lots} lots {symbol})"))
+
+    conn.commit()
+    conn.close()
+    return {"success": True, "account_id": MT5_TREASURY_REBATE_ACCOUNT, "wallet_id": MT5_TREASURY_WALLET_ID, "amount": amount_usd, "new_balance": bal_after}
+
+def get_treasury_vault_metrics() -> dict:
+    """Returns complete real-time treasury metrics for Account 52133938 / Wallet 130237694."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_virtual_ledger_schema(cursor)
+    cursor.execute("SELECT account_id, wallet_id, account_name, maintenance_fee_pct, total_maintenance_fee_usd, total_rebate_usd, total_balance_usd, withdrawn_usd, updated_at FROM mt5_treasury_vault WHERE account_id = ?", (MT5_TREASURY_REBATE_ACCOUNT,))
+    row = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT tx_type, amount, balance_before, balance_after, source_type, source_ref, symbol, description, created_at
+        FROM mt5_treasury_transactions
+        ORDER BY id DESC LIMIT 8
+    """)
+    tx_rows = cursor.fetchall()
+    conn.close()
+
+    txs = []
+    for r in tx_rows:
+        txs.append({
+            "type": r[0],
+            "amount": float(r[1] or 0.0),
+            "balance_before": float(r[2] or 0.0),
+            "balance_after": float(r[3] or 0.0),
+            "source_type": r[4],
+            "source_ref": r[5],
+            "symbol": r[6],
+            "description": r[7],
+            "created_at": str(r[8] or "")
+        })
+
+    if not row:
+        return {
+            "account_id": MT5_TREASURY_REBATE_ACCOUNT,
+            "wallet_id": MT5_TREASURY_WALLET_ID,
+            "account_name": "Real Super Treasury & Rebate Collector",
+            "maintenance_fee_pct": 20.0,
+            "total_maintenance_fee_usd": 0.0,
+            "total_rebate_usd": 0.0,
+            "total_balance_usd": 0.0,
+            "withdrawn_usd": 0.0,
+            "super_admin_trading_account": MT5_SUPER_ADMIN_TRADING_ACCOUNT,
+            "recent_transactions": txs
+        }
+
+    return {
+        "account_id": row[0],
+        "wallet_id": row[1],
+        "account_name": row[2],
+        "maintenance_fee_pct": float(row[3] or 20.0),
+        "total_maintenance_fee_usd": float(row[4] or 0.0),
+        "total_rebate_usd": float(row[5] or 0.0),
+        "total_balance_usd": float(row[6] or 0.0),
+        "withdrawn_usd": float(row[7] or 0.0),
+        "super_admin_trading_account": MT5_SUPER_ADMIN_TRADING_ACCOUNT,
+        "recent_transactions": txs
     }
 
 def get_virtual_transactions(chat_id: int, limit: int = 15) -> list:

@@ -1052,14 +1052,31 @@ class MT5BridgeEngine:
         db.update_mt5_bridge_order_close(ticket=ticket, close_price=close_price, pnl=pnl, status=status)
         logger.info(f"💰 [MT5 ORDER CLOSED] Account {account_id} closed #{ticket}! Symbol: {symbol or 'N/A'}, Close Price: {close_price}, PnL: ${pnl:+,.2f}")
 
-        # Real-time Virtual Multi-User Ledger Profit Harvester & Distribution (Invariant 44)
+        # Real-time Virtual Multi-User Ledger Profit Harvester & Treasury Inflow Engine (Invariant 44)
         try:
             super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
             if account_id in super_admins or not account_id:
                 sym_rec = str(symbol or meta.get("symbol", "")).split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
                 dist_res = db.record_virtual_trade_pnl(ticket=ticket, symbol=sym_rec or "TRADE", total_pnl=pnl, close_price=close_price)
                 if dist_res.get("investors_count", 0) > 0:
-                    logger.info(f"🏛️ [VIRTUAL LEDGER] Distributed {pnl:+,.2f} USD across {dist_res['investors_count']} VIP investors (Net: ${dist_res.get('total_distributed_usd', 0.0):+,.2f}, Admin Fee: ${dist_res.get('admin_fees_total_usd', 0.0):,.2f})")
+                    t_acc = dist_res.get("treasury_account_id", getattr(db, "MT5_TREASURY_REBATE_ACCOUNT", "52133938"))
+                    t_wal = dist_res.get("treasury_wallet_id", getattr(db, "MT5_TREASURY_WALLET_ID", "130237694"))
+                    logger.info(f"🏛️ [VIRTUAL LEDGER & TREASURY] Distributed {pnl:+,.2f} USD across {dist_res['investors_count']} VIP investors (Net: ${dist_res.get('total_distributed_usd', 0.0):+,.2f}, 20% Fee to Treasury #{t_acc} Wallet #{t_wal}: ${dist_res.get('admin_fees_total_usd', 0.0):,.2f})")
+            else:
+                # Connected Client / Referral MT5 Account: Credit IB Spread Rebate directly into Treasury Account 52133938 (Wallet: 130237694)
+                vol = float(payload.get("volume", 0.0) or payload.get("lots", 0.0) or meta.get("volume", 0.01) or 0.01)
+                rebate_rate = 3.0  # $3.00 USD / standard lot on GTCFX
+                rebate_earned = round(max(0.01, vol * rebate_rate), 2)
+                t_acc = getattr(db, "MT5_TREASURY_REBATE_ACCOUNT", "52133938")
+                t_wal = getattr(db, "MT5_TREASURY_WALLET_ID", "130237694")
+                db.record_treasury_referral_rebate(
+                    amount_usd=rebate_earned,
+                    source_account=str(account_id),
+                    lots=vol,
+                    symbol=symbol,
+                    description=f"Referral IB Rebate from Client #{account_id} ({vol} lots {symbol})"
+                )
+                logger.info(f"🎁 [TREASURY REBATE] Credited ${rebate_earned:,.2f} USD referral rebate to Treasury #{t_acc} (Wallet: {t_wal}) from Client #{account_id}")
         except Exception as e_dist:
             logger.warning(f"⚠️ [VIRTUAL LEDGER DISTRIBUTION NOTICE]: {e_dist}")
 

@@ -5720,6 +5720,13 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["VAULT"]
                 await mt5_command(update, context)
+            elif data == "btn_mt5_treasury":
+                try:
+                    await update.callback_query.answer("🏛️ Master Treasury & Rebate Vault (52133938)...")
+                except Exception:
+                    pass
+                context.args = ["TREASURY"]
+                await mt5_command(update, context)
             elif data in ["btn_mt5_vault_alloc_100", "btn_mt5_vault_alloc_250", "btn_mt5_vault_alloc_500", "btn_mt5_vault_alloc_1000"]:
                 cap_val = data.replace("btn_mt5_vault_alloc_", "")
                 try:
@@ -20884,6 +20891,9 @@ class TelegramBotThread(BaseThread):
                         ],
                         [
                             InlineKeyboardButton("🔄 Refresh Vault", callback_data="btn_mt5_vault"),
+                            InlineKeyboardButton("🏛️ Treasury & Rebate", callback_data="btn_mt5_treasury")
+                        ],
+                        [
                             InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
                         ]
                     ])
@@ -20911,7 +20921,7 @@ class TelegramBotThread(BaseThread):
                         f"• <code>/mt5 VAULT 1000</code> — កំណត់ទុន $1,000 (VIP)\n"
                         f"• <code>/mt5 VAULT 3000</code> — កំណត់ទុន $3,000 (Elite)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"✨ <i>ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វ័យប្រវត្តិកម្រិត Cloud 24/7!</i>\n"
+                        f"✨ <i>ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វវត្តិកម្រិត Cloud 24/7!</i>\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"<i>Khmer Master Crypto</i>\n"
                         f"<i>APEX SUPER BRAIN AI</i>"
@@ -20921,6 +20931,72 @@ class TelegramBotThread(BaseThread):
                     except Exception:
                         clean_text = msg_vault.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "")
                         await update.effective_message.reply_text(clean_text, reply_markup=vault_kb)
+                    return
+
+                # --- 7.1 SUPER SMART TREASURY & REBATE VAULT (Account 52133938 / Wallet 130237694) ---
+                elif sub in ["TREASURY", "REBATE", "FEES", "MAINTENANCE", "ADMIN_VAULT"]:
+                    t_metrics = db.get_treasury_vault_metrics()
+                    t_acc = t_metrics.get("account_id", "52133938")
+                    t_wal = t_metrics.get("wallet_id", "130237694")
+                    t_maint = t_metrics.get("total_maintenance_fee_usd", 0.0)
+                    t_rebate = t_metrics.get("total_rebate_usd", 0.0)
+                    t_bal = t_metrics.get("total_balance_usd", 0.0)
+                    t_trading_admin = t_metrics.get("super_admin_trading_account", "52135153")
+                    t_txs = t_metrics.get("recent_transactions", [])
+
+                    t_tx_lines = []
+                    for tx in t_txs:
+                        tx_t = tx.get("type", "FEE")
+                        tx_a = tx.get("amount", 0.0)
+                        tx_s = tx.get("symbol", "MT5")
+                        tx_time = str(tx.get("created_at", ""))[:16]
+                        t_time_clean = tx_time if tx_time.strip() else "Recent"
+                        badge = "🟢 <b>20% FEE</b>" if tx_t == "MAINTENANCE_FEE" else "🎁 <b>REBATE</b>"
+                        t_tx_lines.append(f"• <code>{t_time_clean}</code> | {badge} ៖ <b>+${tx_a:,.2f}</b> (<code>{tx_s}</code>)")
+                    t_tx_display = "\n".join(t_tx_lines) if t_tx_lines else "  <i>មិនទាន់មានប្រតិបត្តិការថ្មីនៅឡើយទេ</i>"
+
+                    treasury_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔄 Refresh Treasury", callback_data="btn_mt5_treasury"),
+                            InlineKeyboardButton("💎 Virtual Vault", callback_data="btn_mt5_vault")
+                        ],
+                        [
+                            InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
+                        ]
+                    ])
+
+                    msg_treasury = (
+                        f"🏛️ <b>[SUPER SMART MASTER TREASURY & REBATE VAULT]</b> 💎\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏦 <b>Real Super Account ៖</b> <code>{t_acc}</code>\n"
+                        f"💳 <b>Treasury Wallet ID ៖</b> <code>{t_wal}</code>\n"
+                        f"🏛️ <b>តួនាទីគណនី ៖</b> <code>គណនីទទួល Rebate &amp; ២០% កម្រៃថែទាំប្រព័ន្ធ</code>\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"💵 <b>កម្រៃថែទាំ Cloud &amp; AI Swarm (២០%) ៖</b> <b>+${t_maint:,.2f} USD</b>\n"
+                        f"🎁 <b>សរុប Rebate ពី Referrals ទាំងអស់ ៖</b> <b>+${t_rebate:,.2f} USD</b>\n"
+                        f"💰 <b>សមតុល្យ Treasury សរុបបច្ចុប្បន្ន ៖</b> <b>${t_bal:,.2f} USD</b>\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"⚙️ <b>MT5 Super ADMIN Trading Master ៖</b> <code>{t_trading_admin}</code>\n"
+                        f"<i>(គណនីគ្រប់គ្រងប្រព័ន្ធជួញដូរ Super ADMIN MT5 ផ្ទាល់លើ Broker)</i>\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"📜 <b>ប្រវត្តិចំណូល Treasury ចុងក្រោយ (Audit Trail) ៖</b>\n"
+                        f"{t_tx_display}\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"⌨️ <b>បញ្ជា 1-Tap Copyable Presets (ចុចដើម្បី Copy) ៖</b>\n"
+                        f"• <code>/mt5 TREASURY</code> — មើលរបាយការណ៍ Treasury &amp; Rebates\n"
+                        f"• <code>/mt5 VAULT</code> — មើល Virtual Multi-User Vault\n"
+                        f"• <code>/mt5</code> — ផ្ទាំងគ្រប់គ្រង MT5 Dashboard\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✨ <i>ប្រព័ន្ធបែងចែកចំណូល និងកម្រៃថែទាំដំណើរការស្វ័យប្រវត្តិកម្រិតស្ថាប័ន ២៤/៧!</i>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"<i>Khmer Master Crypto</i>\n"
+                        f"<i>APEX SUPER BRAIN AI</i>"
+                    )
+                    try:
+                        await update.effective_message.reply_text(msg_treasury, parse_mode="HTML", reply_markup=treasury_kb)
+                    except Exception:
+                        clean_t = msg_treasury.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "").replace("&amp;", "&")
+                        await update.effective_message.reply_text(clean_t, reply_markup=treasury_kb)
                     return
 
                 # --- 8. DIRECT PERSONAL MT5 BIND / CONNECT (Model 2) ---

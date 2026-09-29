@@ -53,6 +53,11 @@ GTC_STD_INVITE_CODE = GTC_PRO_INVITE_CODE
 GTC_OFFICIAL_REFERRAL_URL = GTC_PRO_REFERRAL_URL
 GTC_OFFICIAL_INVITE_CODE = GTC_PRO_INVITE_CODE
 GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiGKeEm"]
+
+# MT5 Architectural Specialization:
+MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52135153"  # MT5's Super ADMIN (Trading Master)
+MT5_TREASURY_REBATE_ACCOUNT = "52133938"     # Real Super Treasury & Rebate Collector
+MT5_TREASURY_WALLET_ID = "130237694"          # Treasury Wallet ID
 SUPER_ADMIN_MT5_ACCOUNTS = {"55688250", "52135153", "52133938"}
 
 # ==============================================================================
@@ -271,9 +276,9 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                         if not sess.chat_id and chat_id:
                             sess.chat_id = chat_id
                         break
-                # If Super Admin or local portal, link directly to active Super Admin terminal (55688250, 52135153 or 52133938)
+                # If Super Admin or local portal, link directly to active Super Admin terminal (52135153 Trading Master, 55688250 or 52133938 Treasury)
                 if not matched_session and (chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] or chat_id <= 0):
-                    for admin_acc in ["55688250", "52135153", "52133938"]:
+                    for admin_acc in [MT5_SUPER_ADMIN_TRADING_ACCOUNT, "55688250", MT5_TREASURY_REBATE_ACCOUNT]:
                         if admin_acc in bridge.clients:
                             matched_session = bridge.clients[admin_acc]
                             if not user_login:
@@ -294,7 +299,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 if not matched_session and chat_id > 0:
                     is_auth_vip = _is_authorized_vip(chat_id, user_login) or db.is_mt5_user_authorized(chat_id, user_login)
                     if is_auth_vip and (user_login or db.is_vip(chat_id)):
-                        for master_acc in ["55688250", "52135153", "52133938"]:
+                        for master_acc in [MT5_SUPER_ADMIN_TRADING_ACCOUNT, "55688250", MT5_TREASURY_REBATE_ACCOUNT]:
                             if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
                                 matched_session = bridge.clients[master_acc]
                                 is_master_bridge = True
@@ -1765,6 +1770,14 @@ async def handle_api_mt5_pool_overview(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+async def handle_api_mt5_treasury(request: web.Request) -> web.Response:
+    """Returns complete Real Super Treasury & Rebate metrics for Account 52133938 / Wallet 130237694."""
+    try:
+        metrics = db.get_treasury_vault_metrics()
+        return web.json_response({"status": "success", "treasury": metrics})
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
 async def handle_api_admin_mt5_list(request: web.Request) -> web.Response:
     """Admin-only endpoint: Returns all registered MT5 accounts and pending referrals."""
     try:
@@ -1935,6 +1948,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_post("/api/mt5/ledger/withdraw", handle_api_mt5_ledger_withdraw)
     app.router.add_get("/api/mt5/ledger/transactions", handle_api_mt5_ledger_transactions)
     app.router.add_get("/api/mt5/pool/overview", handle_api_mt5_pool_overview)
+    app.router.add_get("/api/mt5/treasury", handle_api_mt5_treasury)
 
     return app
 
