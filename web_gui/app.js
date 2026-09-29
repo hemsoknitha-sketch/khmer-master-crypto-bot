@@ -155,6 +155,26 @@ const elements = {
     btnSwitchChatId: document.getElementById('btn-switch-chat-id'),
     mt5StandbyHelper: document.getElementById('mt5-standby-helper'),
 
+    // MT5 Virtual Multi-User Ledger Elements (Invariant 44)
+    vledgerAllocatedVal: document.getElementById('vledger-allocated-val'),
+    vledgerEquityVal: document.getElementById('vledger-equity-val'),
+    vledgerRealizedPnl: document.getElementById('vledger-realized-pnl'),
+    vledgerPoolShareText: document.getElementById('vledger-pool-share-text'),
+    vledgerInputCapital: document.getElementById('vledger-input-capital'),
+    vledgerSelectRisk: document.getElementById('vledger-select-risk'),
+    vledgerToggleReinvest: document.getElementById('vledger-toggle-reinvest'),
+    btnVledgerSaveAlloc: document.getElementById('btn-vledger-save-alloc'),
+    btnVledgerQuickDeposit: document.getElementById('btn-vledger-quick-deposit'),
+    btnVledgerQuickWithdraw: document.getElementById('btn-vledger-quick-withdraw'),
+    vpoolAumVal: document.getElementById('vpool-aum-val'),
+    vpoolInvestorsVal: document.getElementById('vpool-investors-val'),
+    vledgerTxCount: document.getElementById('vledger-tx-count'),
+    vledgerTransactionsBody: document.getElementById('vledger-transactions-body'),
+    btnModeVirtualVault: document.getElementById('btn-mode-virtual-vault'),
+    btnModeDirectTerminal: document.getElementById('btn-mode-direct-terminal'),
+    mt5VirtualLedgerCard: document.getElementById('mt5-virtual-ledger-card'),
+    mt5TraderCard: document.getElementById('mt5-trader-card'),
+
     // VIP MT5 Performance Citadel & Live Diagram Elements
     mt5PerfCard: document.getElementById('mt5-perf-card'),
     mt5BindCard: document.getElementById('mt5-bind-card'),
@@ -1115,6 +1135,11 @@ function renderMT5Cockpit(data) {
         renderMT5PerformanceMatrix(data.stats, acc);
     }
 
+    // Render Virtual Multi-User Ledger Citadel (Invariant 44)
+    if (data.virtual_ledger) {
+        renderMT5VirtualLedger(data.virtual_ledger, data.pool_metrics, data.virtual_transactions);
+    }
+
     // Render Positions
     renderMT5PositionsList(positions);
 }
@@ -1292,8 +1317,186 @@ function renderMT5PerformanceMatrix(stats, acc) {
                         </div>
                     </div>
                 `;
+// =============================================================================
+// VIRTUAL MULTI-USER PORTFOLIO & LEDGER ENGINE (INVARIANT 44)
+// =============================================================================
+function renderMT5VirtualLedger(ledger, pool, transactions) {
+    if (!ledger) return;
+
+    if (elements.vledgerAllocatedVal) elements.vledgerAllocatedVal.textContent = formatUSD(ledger.allocated_capital || 0);
+    if (elements.vledgerEquityVal) elements.vledgerEquityVal.textContent = formatUSD(ledger.virtual_equity || ledger.current_balance || 0);
+
+    const pnl = Number(ledger.realized_profit || 0);
+    if (elements.vledgerRealizedPnl) {
+        elements.vledgerRealizedPnl.textContent = `${pnl >= 0 ? '+' : ''}$${formatUSD(pnl)}`;
+        elements.vledgerRealizedPnl.className = pnl >= 0 ? 'vstat-big-val text-neon-emerald' : 'vstat-big-val text-neon-red';
+    }
+
+    if (elements.vledgerPoolShareText) {
+        elements.vledgerPoolShareText.textContent = `ចំណែក Pool: ${(ledger.pool_share_pct || 0).toFixed(2)}%`;
+    }
+
+    // Input values (prevent overriding active user input)
+    if (elements.vledgerInputCapital && document.activeElement !== elements.vledgerInputCapital) {
+        elements.vledgerInputCapital.value = ledger.allocated_capital || 100;
+    }
+    if (elements.vledgerSelectRisk && document.activeElement !== elements.vledgerSelectRisk) {
+        elements.vledgerSelectRisk.value = ledger.risk_level || 'BALANCED';
+    }
+    if (elements.vledgerToggleReinvest) {
+        elements.vledgerToggleReinvest.checked = ledger.auto_reinvest !== false;
+    }
+
+    // Presets active highlight
+    const curCap = Number(ledger.allocated_capital || 100);
+    document.querySelectorAll('.vcap-preset-btn').forEach(btn => {
+        const amt = Number(btn.getAttribute('data-amount') || 0);
+        btn.classList.toggle('active', amt === curCap);
+    });
+
+    // Pool Telemetry
+    if (pool) {
+        if (elements.vpoolAumVal) elements.vpoolAumVal.textContent = `$${formatUSD(pool.total_aum || 125100)}`;
+        if (elements.vpoolInvestorsVal) elements.vpoolInvestorsVal.textContent = `${pool.user_investors_count || 1} VIPs`;
+    }
+
+    // Transactions Table
+    const txs = transactions || [];
+    if (elements.vledgerTxCount) elements.vledgerTxCount.textContent = `${txs.length} Events`;
+    if (elements.vledgerTransactionsBody) {
+        if (txs.length === 0) {
+            elements.vledgerTransactionsBody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #94a3b8; padding: 18px;">
+                        គ្មានប្រតិបត្តិការកន្លងមកទេ (No Transactions Yet)
+                    </td>
+                </tr>
+            `;
+        } else {
+            elements.vledgerTransactionsBody.innerHTML = txs.map(t => {
+                let badgeClass = 'profit';
+                let typeLabel = 'PROFIT';
+                if (t.type === 'DEPOSIT') { badgeClass = 'deposit'; typeLabel = 'DEPOSIT'; }
+                else if (t.type === 'WITHDRAW') { badgeClass = 'withdraw'; typeLabel = 'WITHDRAW'; }
+                else if (t.type === 'CAPITAL_ALLOCATE' || t.type === 'INITIAL_ALLOCATION') { badgeClass = 'allocate'; typeLabel = 'ALLOCATE'; }
+
+                const isPos = t.amount >= 0;
+                const amtSign = isPos ? '+' : '';
+                const amtColor = isPos ? 'text-neon-emerald' : 'text-neon-red';
+
+                return `
+                    <tr>
+                        <td style="color: #94a3b8; font-size: 10px;">${t.timestamp || 'N/A'}</td>
+                        <td><span class="badge-vtx ${badgeClass}">${typeLabel}</span></td>
+                        <td><strong>${t.symbol ? `${t.symbol} #${t.ticket}` : 'VAULT'}</strong></td>
+                        <td class="${amtColor}"><strong>${amtSign}$${formatUSD(t.amount)}</strong></td>
+                        <td style="color: #FFD54F;">$${formatUSD(t.balance_after)}</td>
+                        <td style="color: #CBD5E1; font-size: 10.5px;">${t.description || ''}</td>
+                    </tr>
+                `;
             }).join('');
         }
+    }
+}
+
+async function saveVirtualLedgerAllocation() {
+    triggerHaptic('heavy');
+    const cap = parseFloat(elements.vledgerInputCapital ? elements.vledgerInputCapital.value : 100);
+    const risk = elements.vledgerSelectRisk ? elements.vledgerSelectRisk.value : 'BALANCED';
+    const reinvest = elements.vledgerToggleReinvest ? elements.vledgerToggleReinvest.checked : true;
+
+    if (isNaN(cap) || cap < 10) {
+        showToast('⚠️ ទុនវិនិយោគអប្បបរមាគឺ $10.00 USD!');
+        return;
+    }
+
+    showToast('⏳ កំពុងកត់ត្រាការបែងចែកទុន Master Cloud...');
+    try {
+        const res = await fetch('/api/mt5/ledger/allocate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: state.chatId,
+                capital: cap,
+                risk_level: risk,
+                auto_reinvest: reinvest
+            })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            showToast(json.message);
+            fetchMT5Status();
+        } else {
+            showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការកំណត់ទុន'}`);
+        }
+    } catch (e) {
+        showToast('❌ Error updating Virtual Ledger allocation');
+    }
+}
+
+async function depositVirtualVault() {
+    triggerHaptic('impact');
+    const raw = prompt('បញ្ចូលចំនួនទឹកប្រាក់ដែលត្រូវបញ្ចូលក្នុង Virtual Vault ($ USD):', '100');
+    if (!raw) return;
+    const amount = parseFloat(raw);
+    if (isNaN(amount) || amount <= 0) {
+        showToast('⚠️ សូមបញ្ចូលចំនួនទឹកប្រាក់ដែលត្រឹមត្រូវ!');
+        return;
+    }
+
+    showToast('⏳ កំពុងដំណើរការបញ្ចូលទឹកប្រាក់...');
+    try {
+        const res = await fetch('/api/mt5/ledger/deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: state.chatId,
+                amount: amount,
+                notes: 'Web GUI VIP Deposit'
+            })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            showToast(json.message);
+            fetchMT5Status();
+        } else {
+            showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការបញ្ចូលទឹកប្រាក់'}`);
+        }
+    } catch (e) {
+        showToast('❌ Error depositing into Virtual Vault');
+    }
+}
+
+async function withdrawVirtualVault() {
+    triggerHaptic('impact');
+    const raw = prompt('បញ្ចូលចំនួនទឹកប្រាក់ដែលត្រូវដកចេញពី Virtual Vault ($ USD):', '50');
+    if (!raw) return;
+    const amount = parseFloat(raw);
+    if (isNaN(amount) || amount <= 0) {
+        showToast('⚠️ សូមបញ្ចូលចំនួនទឹកប្រាក់ដែលត្រឹមត្រូវ!');
+        return;
+    }
+
+    showToast('⏳ កំពុងដំណើរការដកប្រាក់...');
+    try {
+        const res = await fetch('/api/mt5/ledger/withdraw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: state.chatId,
+                amount: amount,
+                notes: 'Web GUI VIP Withdrawal'
+            })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            showToast(json.message);
+            fetchMT5Status();
+        } else {
+            showToast(`⚠️ ${json.message || 'បរាជ័យក្នុងការដកប្រាក់'}`);
+        }
+    } catch (e) {
+        showToast('❌ Error withdrawing from Virtual Vault');
     }
 }
 
@@ -1560,6 +1763,46 @@ function setupEventListeners() {
                 showToast('❌ Error toggling AI Auto-Trade');
             }
         });
+    }
+
+    // MT5 Virtual Ledger Mode Switchers (Invariant 44)
+    if (elements.btnModeVirtualVault) {
+        elements.btnModeVirtualVault.addEventListener('click', () => {
+            if (elements.btnModeVirtualVault) elements.btnModeVirtualVault.classList.add('active');
+            if (elements.btnModeDirectTerminal) elements.btnModeDirectTerminal.classList.remove('active');
+            if (elements.mt5VirtualLedgerCard) elements.mt5VirtualLedgerCard.scrollIntoView({ behavior: 'smooth' });
+            triggerHaptic('selection');
+        });
+    }
+    if (elements.btnModeDirectTerminal) {
+        elements.btnModeDirectTerminal.addEventListener('click', () => {
+            if (elements.btnModeDirectTerminal) elements.btnModeDirectTerminal.classList.add('active');
+            if (elements.btnModeVirtualVault) elements.btnModeVirtualVault.classList.remove('active');
+            if (elements.mt5TraderCard) elements.mt5TraderCard.scrollIntoView({ behavior: 'smooth' });
+            triggerHaptic('selection');
+        });
+    }
+
+    // Virtual Capital Preset Buttons
+    document.querySelectorAll('.vcap-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.vcap-preset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const amt = btn.getAttribute('data-amount');
+            if (elements.vledgerInputCapital) elements.vledgerInputCapital.value = amt;
+            triggerHaptic('selection');
+        });
+    });
+
+    // Virtual Ledger Action Buttons
+    if (elements.btnVledgerSaveAlloc) {
+        elements.btnVledgerSaveAlloc.addEventListener('click', () => saveVirtualLedgerAllocation());
+    }
+    if (elements.btnVledgerQuickDeposit) {
+        elements.btnVledgerQuickDeposit.addEventListener('click', () => depositVirtualVault());
+    }
+    if (elements.btnVledgerQuickWithdraw) {
+        elements.btnVledgerQuickWithdraw.addEventListener('click', () => withdrawVirtualVault());
     }
 
     // MT5 Password Eye Toggle

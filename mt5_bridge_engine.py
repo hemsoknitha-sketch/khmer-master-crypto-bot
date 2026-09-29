@@ -1049,6 +1049,17 @@ class MT5BridgeEngine:
         db.update_mt5_bridge_order_close(ticket=ticket, close_price=close_price, pnl=pnl, status=status)
         logger.info(f"💰 [MT5 ORDER CLOSED] Account {account_id} closed #{ticket}! Symbol: {symbol or 'N/A'}, Close Price: {close_price}, PnL: ${pnl:+,.2f}")
 
+        # Real-time Virtual Multi-User Ledger Profit Harvester & Distribution (Invariant 44)
+        try:
+            super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
+            if account_id in super_admins or not account_id:
+                sym_rec = str(symbol or meta.get("symbol", "")).split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
+                dist_res = db.record_virtual_trade_pnl(ticket=ticket, symbol=sym_rec or "TRADE", total_pnl=pnl, close_price=close_price)
+                if dist_res.get("investors_count", 0) > 0:
+                    logger.info(f"🏛️ [VIRTUAL LEDGER] Distributed {pnl:+,.2f} USD across {dist_res['investors_count']} VIP investors (Net: ${dist_res.get('total_distributed_usd', 0.0):+,.2f}, Admin Fee: ${dist_res.get('admin_fees_total_usd', 0.0):,.2f})")
+        except Exception as e_dist:
+            logger.warning(f"⚠️ [VIRTUAL LEDGER DISTRIBUTION NOTICE]: {e_dist}")
+
         # Post-Trade Anti-Whipsaw Cooldown: Mandatory 15-Minute (900s) cooldown after close
         now_ts = time.time()
         sym_clean = symbol or meta.get("symbol", "")

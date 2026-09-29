@@ -403,6 +403,9 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 "positions": formatted_positions,
                 "stats": db.get_user_mt5_trade_statistics(chat_id, display_login),
                 "auto_config": db.get_user_mt5_auto_config(chat_id),
+                "virtual_ledger": db.get_or_create_virtual_ledger(chat_id),
+                "pool_metrics": db.get_virtual_pool_metrics(),
+                "virtual_transactions": db.get_virtual_transactions(chat_id, limit=10),
                 "supported_symbols": [
                     {"symbol": "XAUUSD", "name": "Gold / Spot US Dollar", "category": "Metals", "digits": 2},
                     {"symbol": "EURUSD", "name": "Euro / US Dollar", "category": "Forex", "digits": 5},
@@ -1666,6 +1669,105 @@ async def handle_api_mt5_unbind(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+# ==============================================================================
+# MT5 VIRTUAL MULTI-USER PORTFOLIO & LEDGER ENDPOINTS (INVARIANT 44)
+# ==============================================================================
+
+async def handle_api_mt5_ledger_allocate(request: web.Request) -> web.Response:
+    """Updates user's allocated virtual capital and risk profile."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "សូមបញ្ជាក់ Telegram Chat ID!"}, status=400)
+        capital = float(data.get("capital", 100.0))
+        risk_level = str(data.get("risk_level", "BALANCED"))
+        auto_reinvest = bool(data.get("auto_reinvest", True))
+
+        updated_ledger = db.update_virtual_ledger_allocation(
+            chat_id=chat_id,
+            capital=capital,
+            risk_level=risk_level,
+            auto_reinvest=auto_reinvest
+        )
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        return web.json_response({
+            "status": "success",
+            "message": f"✅ បានកំណត់ទុនវិនិយោគ ${capital:,.2f} ({risk_level}) ក្នុង Master Cloud Virtual Portfolio ដោយជោគជ័យ!",
+            "virtual_ledger": updated_ledger
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_ledger_deposit(request: web.Request) -> web.Response:
+    """Processes virtual deposit / capital top-up into user's ledger."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "សូមបញ្ជាក់ Telegram Chat ID!"}, status=400)
+        amount = float(data.get("amount", 0.0))
+        notes = str(data.get("notes", "Web GUI Deposit"))
+        res = db.deposit_virtual_ledger(chat_id, amount, notes)
+        if not res.get("success"):
+            return web.json_response({"status": "error", "message": res.get("error", "Deposit failed")}, status=400)
+
+        ledger = db.get_or_create_virtual_ledger(chat_id)
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        return web.json_response({
+            "status": "success",
+            "message": f"✅ បានបញ្ចូលទឹកប្រាក់ ${amount:,.2f} ទៅក្នុង Virtual Vault ដោយជោគជ័យ!",
+            "virtual_ledger": ledger
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_ledger_withdraw(request: web.Request) -> web.Response:
+    """Processes profit or capital withdrawal from user's virtual ledger."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            return web.json_response({"status": "error", "message": "សូមបញ្ជាក់ Telegram Chat ID!"}, status=400)
+        amount = float(data.get("amount", 0.0))
+        notes = str(data.get("notes", "Web GUI Withdrawal"))
+        res = db.withdraw_virtual_ledger(chat_id, amount, notes)
+        if not res.get("success"):
+            return web.json_response({"status": "error", "message": res.get("error", "Withdrawal failed")}, status=400)
+
+        ledger = db.get_or_create_virtual_ledger(chat_id)
+        if "mt5" in _GUI_CACHE and chat_id in _GUI_CACHE["mt5"]:
+            del _GUI_CACHE["mt5"][chat_id]
+
+        return web.json_response({
+            "status": "success",
+            "message": f"✅ បានដកប្រាក់ ${amount:,.2f} ចេញពី Virtual Vault ដោយជោគជ័យ!",
+            "virtual_ledger": ledger
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_ledger_transactions(request: web.Request) -> web.Response:
+    """Retrieves immutable audit trail of virtual transactions."""
+    try:
+        chat_id = _get_chat_id_from_req(request)
+        txs = db.get_virtual_transactions(chat_id, limit=30)
+        return web.json_response({"status": "success", "transactions": txs})
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+async def handle_api_mt5_pool_overview(request: web.Request) -> web.Response:
+    """Returns aggregated Master Liquidity Pool metrics."""
+    try:
+        metrics = db.get_virtual_pool_metrics()
+        return web.json_response({"status": "success", "pool": metrics})
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
 async def handle_api_admin_mt5_list(request: web.Request) -> web.Response:
     """Admin-only endpoint: Returns all registered MT5 accounts and pending referrals."""
     try:
@@ -1829,6 +1931,13 @@ def create_web_gui_app() -> web.Application:
     app.router.add_post("/api/mt5/unbind", handle_api_mt5_unbind)
     app.router.add_get("/api/admin/mt5/list", handle_api_admin_mt5_list)
     app.router.add_post("/api/admin/mt5/action", handle_api_admin_mt5_action)
+
+    # MT5 Virtual Multi-User Portfolio & Ledger routes (Invariant 44)
+    app.router.add_post("/api/mt5/ledger/allocate", handle_api_mt5_ledger_allocate)
+    app.router.add_post("/api/mt5/ledger/deposit", handle_api_mt5_ledger_deposit)
+    app.router.add_post("/api/mt5/ledger/withdraw", handle_api_mt5_ledger_withdraw)
+    app.router.add_get("/api/mt5/ledger/transactions", handle_api_mt5_ledger_transactions)
+    app.router.add_get("/api/mt5/pool/overview", handle_api_mt5_pool_overview)
 
     return app
 

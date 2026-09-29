@@ -667,8 +667,190 @@
                     </div>
                 </div>
 
+                <!-- ======================================================== -->
+                <!-- VIRTUAL MULTI-USER PORTFOLIO & LEDGER CITADEL (INVARIANT 44) -->
+                <!-- ======================================================== -->
+                <div class="glass-card mt5-virtual-ledger-card" id="mt5-virtual-ledger-card">
+                    <div class="vledger-header-row">
+                        <div class="vledger-title-flex">
+                            <div class="vledger-glow-icon">🏛️</div>
+                            <div>
+                                <h3 class="vledger-heading">Master Cloud Virtual Portfolio &amp; Ledger</h3>
+                                <span class="vledger-sub">Zero-RDP Automated Capital Multiplexer • 100% Isolated Sub-Account Vault</span>
+                            </div>
+                        </div>
+                        <div class="vledger-mode-tabs">
+                            <button type="button" class="vledger-mode-pill active" id="btn-mode-virtual-vault">
+                                🏛️ Cloud Virtual Vault
+                            </button>
+                            <button type="button" class="vledger-mode-pill" id="btn-mode-direct-terminal">
+                                ⚡ Direct Terminal
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Virtual Sub-Account Vault Cockpit -->
+                    <div class="vledger-cockpit-grid">
+                        <div class="vledger-stat-card highlight-gold">
+                            <div class="vstat-label-row">
+                                <span class="vstat-label">ALLOCATED CAPITAL</span>
+                                <span class="vstat-badge gold">VAULT ACTIVE</span>
+                            </div>
+                            <div class="vstat-val-row">
+                                <span class="vstat-currency">$</span>
+                                <span id="vledger-allocated-val" class="vstat-big-val text-neon-gold">100.00</span>
+                            </div>
+                            <span class="vstat-sub-text">ទុនជួញដូរក្នុង Master Pool</span>
+                        </div>
+
+                        <div class="vledger-stat-card highlight-cyan">
+                            <div class="vstat-label-row">
+                                <span class="vstat-label">VIRTUAL EQUITY</span>
+                                <span class="vstat-badge cyan">LIVE 60FPS</span>
+                            </div>
+                            <div class="vstat-val-row">
+                                <span class="vstat-currency">$</span>
+                                <span id="vledger-equity-val" class="vstat-big-val text-neon-cyan">100.00</span>
+                            </div>
+                            <span class="vstat-sub-text" id="vledger-pool-share-text">ចំណែក Pool: 0.08%</span>
+                        </div>
+
+                        <div class="vledger-stat-card highlight-emerald">
+                            <div class="vstat-label-row">
+                                <span class="vstat-label">TOTAL PROFIT EARNED</span>
+                                <span class="vstat-badge emerald">NET 80%</span>
+                            </div>
+                            <div class="vstat-val-row">
+                                <span id="vledger-realized-pnl" class="vstat-big-val text-neon-emerald">+$0.00</span>
+                            </div>
+                            <span class="vstat-sub-text">ប្រាក់ចំណេញសុទ្ធកើបបាន</span>
+                        </div>
+
+                        <div class="vledger-stat-card">
+                            <div class="vstat-label-row">
+                                <span class="vstat-label">PROFIT SHARING RATIO</span>
+                                <span class="vstat-badge">FIDUCIARY</span>
+                            </div>
+                            <div class="vstat-val-row">
+                                <span class="vstat-big-val text-neon-purple">80 / 20</span>
+                            </div>
+                            <span class="vstat-sub-text">80% វិនិយោគិន / 20% Super Admin</span>
+                        </div>
+                    </div>
+
+                    <!-- 1-Tap Capital Allocator & Risk Armor Control -->
+                    <div class="vledger-controls-box">
+                        <div class="vctrl-row-title">
+                            <strong>⚙️ 1-Tap Capital Allocator &amp; Dynamic Risk Armor</strong>
+                            <span>ជ្រើសរើសទំហំទុន និងកម្រិតការពារហានិភ័យដើម្បីឱ្យ Master AI ជួញដូរស្វ័យប្រវត្តិ៖</span>
+                        </div>
+
+                        <!-- Capital Presets -->
+                        <div class="vledger-presets-grid">
+                            <button type="button" class="vcap-preset-btn active" data-amount="100">$100 (Micro)</button>
+                            <button type="button" class="vcap-preset-btn" data-amount="250">$250 (Standard)</button>
+                            <button type="button" class="vcap-preset-btn" data-amount="500">$500 (Pro)</button>
+                            <button type="button" class="vcap-preset-btn" data-amount="1000">$1,000 (VIP)</button>
+                            <button type="button" class="vcap-preset-btn" data-amount="3000">$3,000 (Elite)</button>
+                            <button type="button" class="vcap-preset-btn" data-amount="5000">$5,000 (Titanium)</button>
+                        </div>
+
+                        <div class="vledger-inputs-flex">
+                            <div class="vinput-group">
+                                <label class="vinput-label">CUSTOM CAPITAL ($ USD)</label>
+                                <div class="vinput-wrap">
+                                    <span class="vinput-icon">$</span>
+                                    <input type="number" id="vledger-input-capital" class="cyber-input" value="100" min="10" max="100000" step="10">
+                                </div>
+                            </div>
+
+                            <div class="vinput-group">
+                                <label class="vinput-label">RISK STRATEGY ARMOR</label>
+                                <select id="vledger-select-risk" class="cyber-select">
+                                    <option value="CONSERVATIVE">🛡️ Conservative (1.0% Risk / High Defense)</option>
+                                    <option value="BALANCED" selected>⚖️ Balanced (1.5% Risk / Wall St Standard)</option>
+                                    <option value="AGGRESSIVE">🚀 Alpha Growth (2.5% Risk / Max Harvesting)</option>
+                                </select>
+                            </div>
+
+                            <div class="vinput-group checkbox-group">
+                                <label class="vinput-label">AUTO-REINVEST (COMPOUND)</label>
+                                <div class="reinvest-toggle-box">
+                                    <label class="switch switch-sm">
+                                        <input type="checkbox" id="vledger-toggle-reinvest" checked>
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span class="toggle-text">បើកដំណើរការ Compound Grid</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="vledger-actions-row">
+                            <button type="button" id="btn-vledger-save-alloc" class="btn-cyber-primary">
+                                💾 រក្សាទុកការកំណត់ទុន (Update Allocation)
+                            </button>
+                            <button type="button" id="btn-vledger-quick-deposit" class="btn-subtle-cyber">
+                                ➕ បញ្ចូលទឹកប្រាក់បន្ថែម (Deposit)
+                            </button>
+                            <button type="button" id="btn-vledger-quick-withdraw" class="btn-subtle-cyber">
+                                💸 ដកប្រាក់ចំណេញ (Withdraw)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Master Liquidity Pool Telemetry (Institutional Wall Street Overview) -->
+                    <div class="vledger-pool-telemetry">
+                        <div class="telemetry-item">
+                            <span class="t-label">MASTER POOL AUM</span>
+                            <strong id="vpool-aum-val" class="t-val text-neon-cyan">$125,100.00</strong>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="t-label">ACTIVE VIP INVESTORS</span>
+                            <strong id="vpool-investors-val" class="t-val text-neon-emerald">1 VIP</strong>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="t-label">QUANTUM WIN-RATE</span>
+                            <strong class="t-val text-neon-gold">95.2%</strong>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="t-label">DATACENTER / SPEED</span>
+                            <strong class="t-val text-neon-cyan">Tokyo TY3 (0.38ms)</strong>
+                        </div>
+                    </div>
+
+                    <!-- Immutable Profit Distribution Audit Ledger -->
+                    <div class="vledger-audit-box">
+                        <div class="audit-box-header">
+                            <span class="audit-title">📜 Immutable Profit Distribution Ledger (Audit Trail)</span>
+                            <span id="vledger-tx-count" class="badge badge-accent">Live Sync</span>
+                        </div>
+                        <div class="vledger-table-wrap">
+                            <table class="vledger-table">
+                                <thead>
+                                    <tr>
+                                        <th>TIMESTAMP</th>
+                                        <th>EVENT TYPE</th>
+                                        <th>ASSET / TICKET</th>
+                                        <th>AMOUNT</th>
+                                        <th>RUNNING BALANCE</th>
+                                        <th>DETAILS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vledger-transactions-body">
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: #94a3b8; padding: 18px;">
+                                            កំពុងទាញយកប្រវត្តិកើបចំណេញ...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 1-Click Institutional Web Trader Terminal -->
-                <div class="glass-card mt5-trader-card">
+                <div class="glass-card mt5-trader-card" id="mt5-trader-card">
                     <div class="trader-header-row">
                         <div class="trader-title-flex">
                             <span class="trader-icon">⚡</span>

@@ -3046,3 +3046,385 @@ input:checked + .slider:before {
     align-items: center;
     gap: 8px;
 }
+
+/* ==============================================================================
+   VIRTUAL MULTI-USER PORTFOLIO & LEDGER CITADEL (INVARIANT 44)
+   ============================================================================== */
+.mt5-virtual-ledger-card {
+    background: linear-gradient(135deg, rgba(8, 24, 52, 0.92) 0%, rgba(3, 14, 38, 0.96) 100%);
+    border: 1px solid rgba(0, 242, 254, 0.35);
+    box-shadow: 0 10px 36px rgba(0, 242, 254, 0.12), inset 0 0 25px rgba(0, 242, 254, 0.04);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.vledger-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 16px;
+}
+
+.vledger-title-flex {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.vledger-glow-icon {
+    font-size: 32px;
+    filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.6));
+}
+
+.vledger-heading {
+    font-size: 17px;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: 0.5px;
+    margin: 0 0 4px 0;
+}
+
+.vledger-sub {
+    font-size: 11.5px;
+    color: #94A3B8;
+}
+
+.vledger-mode-tabs {
+    display: flex;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 4px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vledger-mode-pill {
+    background: transparent;
+    border: none;
+    color: #94A3B8;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vledger-mode-pill.active {
+    background: linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%);
+    color: #020B1E;
+    box-shadow: 0 2px 12px rgba(0, 242, 254, 0.4);
+}
+
+.vledger-cockpit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+}
+
+.vledger-stat-card {
+    background: rgba(13, 27, 62, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.vledger-stat-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0, 242, 254, 0.3);
+}
+
+.vledger-stat-card.highlight-gold {
+    border-left: 3px solid #FFD54F;
+}
+
+.vledger-stat-card.highlight-cyan {
+    border-left: 3px solid #00F2FE;
+}
+
+.vledger-stat-card.highlight-emerald {
+    border-left: 3px solid #00E676;
+}
+
+.vstat-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vstat-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: #94A3B8;
+}
+
+.vstat-badge {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #CBD5E1;
+}
+
+.vstat-badge.gold {
+    background: rgba(255, 213, 79, 0.15);
+    color: #FFD54F;
+    border: 1px solid rgba(255, 213, 79, 0.3);
+}
+
+.vstat-badge.cyan {
+    background: rgba(0, 242, 254, 0.15);
+    color: #00F2FE;
+    border: 1px solid rgba(0, 242, 254, 0.3);
+}
+
+.vstat-badge.emerald {
+    background: rgba(0, 230, 118, 0.15);
+    color: #00E676;
+    border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.vstat-val-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.vstat-currency {
+    font-size: 14px;
+    font-weight: 700;
+    color: #64748B;
+}
+
+.vstat-big-val {
+    font-size: 22px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+}
+
+.text-neon-gold { color: #FFD54F; text-shadow: 0 0 10px rgba(255, 213, 79, 0.4); }
+.text-neon-cyan { color: #00F2FE; text-shadow: 0 0 10px rgba(0, 242, 254, 0.4); }
+.text-neon-emerald { color: #00E676; text-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
+.text-neon-purple { color: #D8B4FE; text-shadow: 0 0 10px rgba(216, 180, 254, 0.4); }
+
+.vstat-sub-text {
+    font-size: 10.5px;
+    color: #64748B;
+}
+
+.vledger-controls-box {
+    background: rgba(4, 15, 40, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.vctrl-row-title strong {
+    display: block;
+    font-size: 13.5px;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+}
+
+.vctrl-row-title span {
+    font-size: 11px;
+    color: #94A3B8;
+}
+
+.vledger-presets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
+}
+
+.vcap-preset-btn {
+    background: rgba(13, 27, 62, 0.8);
+    border: 1px solid rgba(0, 242, 254, 0.2);
+    border-radius: var(--radius-sm);
+    color: #E2E8F0;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vcap-preset-btn:hover {
+    border-color: #00F2FE;
+    background: rgba(0, 242, 254, 0.15);
+    transform: translateY(-1px);
+}
+
+.vcap-preset-btn.active {
+    background: linear-gradient(135deg, rgba(0, 242, 254, 0.25) 0%, rgba(79, 172, 254, 0.25) 100%);
+    border: 1px solid #00F2FE;
+    color: #00F2FE;
+    box-shadow: 0 0 12px rgba(0, 242, 254, 0.35);
+}
+
+.vledger-inputs-flex {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    align-items: flex-end;
+}
+
+.vinput-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vinput-label {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #94A3B8;
+    letter-spacing: 0.5px;
+}
+
+.vinput-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.vinput-icon {
+    position: absolute;
+    left: 12px;
+    color: #64748B;
+    font-weight: 700;
+}
+
+.vinput-wrap input {
+    padding-left: 28px !important;
+}
+
+.reinvest-toggle-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 38px;
+}
+
+.reinvest-toggle-box .toggle-text {
+    font-size: 11.5px;
+    color: #E2E8F0;
+    font-weight: 600;
+}
+
+.vledger-actions-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.vledger-pool-telemetry {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+}
+
+.telemetry-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.telemetry-item .t-label {
+    font-size: 9.5px;
+    font-weight: 800;
+    color: #64748B;
+    letter-spacing: 0.5px;
+}
+
+.telemetry-item .t-val {
+    font-size: 13.5px;
+    font-family: var(--font-mono);
+}
+
+.vledger-audit-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.audit-box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.audit-title {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: #CBD5E1;
+    letter-spacing: 0.5px;
+}
+
+.vledger-table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vledger-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.vledger-table th {
+    background: rgba(13, 27, 62, 0.9);
+    color: #94A3B8;
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 800;
+    font-size: 9.5px;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vledger-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: #E2E8F0;
+    font-family: var(--font-mono);
+}
+
+.vledger-table tr:hover td {
+    background: rgba(0, 242, 254, 0.04);
+}
+
+.badge-vtx {
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.badge-vtx.profit { background: rgba(0, 230, 118, 0.2); color: #00E676; }
+.badge-vtx.deposit { background: rgba(0, 242, 254, 0.2); color: #00F2FE; }
+.badge-vtx.withdraw { background: rgba(255, 82, 82, 0.2); color: #FF5252; }
+.badge-vtx.allocate { background: rgba(255, 213, 79, 0.2); color: #FFD54F; }
+
