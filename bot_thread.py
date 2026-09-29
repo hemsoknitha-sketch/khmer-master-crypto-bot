@@ -21190,9 +21190,27 @@ class TelegramBotThread(BaseThread):
                 sync_hint_en = "  👉 _Admin Note: Please attach EA `KhmerMasterCrypto_Bridge.mq5` in MT5 to sync!_" if is_admin_user else "  👉 _Account 100% ready for Super Smart 24/7 trading!_"
                 is_admin_acc = str(user_login) in ["52135153", "52133938"]
                 admin_tag = " 👑 SUPER ADMIN" if is_admin_acc else ""
+                # Query saved balance telemetry from Bridge Database
+                db_client_list = db.get_mt5_bridge_clients(chat_id)
+                db_bal = 0.0
+                db_eq = 0.0
+                if db_client_list:
+                    for dbc in db_client_list:
+                        if str(dbc.get("account_id")) == str(user_login):
+                            db_bal = float(dbc.get("balance", 0.0))
+                            db_eq = float(dbc.get("equity", 0.0))
+                            break
+                    if db_bal == 0.0 and db_client_list[0].get("balance"):
+                        db_bal = float(db_client_list[0].get("balance", 0.0))
+                        db_eq = float(db_client_list[0].get("equity", 0.0))
+
+                bal_line_kh = f"  • GTCFX Balance ៖ `${db_bal:,.2f}` | Equity: `${db_eq:,.2f}`\n" if db_bal > 0 else "  • GTCFX Balance ៖ ⏳ _កំពុងរង់ចាំ Sync ទិន្នន័យផ្ទាល់ពី Broker (សូមវាយ Password ក្នុង Web GUI ដើម្បី Login)_\n"
+                bal_line_en = f"  • GTCFX Balance: `${db_bal:,.2f}` | Equity: `${db_eq:,.2f}`\n" if db_bal > 0 else "  • GTCFX Balance: ⏳ _Awaiting live broker sync (enter password in Web GUI to login)_\n"
+
                 clients_text_kh = (
                     f"🟡 **Acc #{user_login}{admin_tag}** ({broker_name} / {firm_label})\n"
                     f"  • ស្ថានភាព ៖ 🟢 **Standby / រួចរាល់សម្រាប់ដំណើរការជួញដូរ**\n"
+                    f"{bal_line_kh}"
                     f"  • Web GUI ៖ 🔗 បានចងភ្ជាប់គណនីរួចរាល់ | ⚡ Latency ៖ `< 0.5ms TY3`\n"
                     f"  • Prop Shield ៖ `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
                     f"  • Master Cloud Vault ៖ `${v_eq:,.2f} USD` (ទុន: `${v_cap:,.2f}` | ចំណេញ: `{v_pnl_badge}`)\n"
@@ -21201,6 +21219,7 @@ class TelegramBotThread(BaseThread):
                 clients_text_en = (
                     f"🟡 **Acc #{user_login}{admin_tag}** ({broker_name} / {firm_label})\n"
                     f"  • Status: 🟢 **Standby / Ready for Super Smart Trading**\n"
+                    f"{bal_line_en}"
                     f"  • Web GUI: 🔗 Bound & Configured | ⚡ Latency: `< 0.5ms TY3`\n"
                     f"  • Prop Shield: `✅ SAFE` | 🛡️ Daily DD: `-3.5%` Max DD: `-7.0%`\n"
                     f"  • Master Cloud Vault: `${v_eq:,.2f} USD` (Cap: `${v_cap:,.2f}` | Profit: `{v_pnl_badge}`)\n"
