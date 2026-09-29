@@ -1153,17 +1153,7 @@ def _is_authorized_vip(chat_id: int, account_id: str = "") -> bool:
 
 async def handle_api_mt5_status(request: web.Request) -> web.Response:
     chat_id = _get_chat_id_from_req(request)
-    if chat_id <= 0:
-        data = await get_cached_mt5_status(0)
-        resp = web.json_response(data)
-        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-        return resp
-    if not _is_authorized_vip(chat_id):
-        return web.json_response({
-            "status": "error",
-            "message": "⛔ Access Denied: មុខងារ MT5 Pro Terminal នេះត្រូវបានកំណត់សម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ។"
-        }, status=403)
-    data = await get_cached_mt5_status(chat_id)
+    data = await get_cached_mt5_status(chat_id if chat_id > 0 else 0)
     resp = web.json_response(data)
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     return resp
@@ -1172,6 +1162,7 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
     """Allows VIP users to register/bind their MT5 account credentials from the web."""
     try:
         import re
+        data = await request.json()
         raw_login = str(data.get("login", "")).strip()
         clean_login = re.sub(r'[^0-9]', '', raw_login)
         login = clean_login if clean_login else raw_login
@@ -1192,11 +1183,11 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
             except Exception:
                 chat_id = 0
 
-        if not chat_id or not _is_authorized_vip(chat_id, login):
+        if not chat_id or chat_id <= 0:
             return web.json_response({
                 "status": "error",
-                "message": "⛔ Access Denied: មិនមានសិទ្ធិចងភ្ជាប់គណនី MT5 ទេ (សម្រាប់តែសមាជិក VIP)។"
-            }, status=403)
+                "message": "⛔ សូមបញ្ជាក់ Telegram Chat ID របស់អ្នកដើម្បីចងភ្ជាប់គណនី MT5!"
+            }, status=400)
         server = str(data.get("server", "GTCGlobalSA-Server 2")).strip()
         password = str(data.get("password", "")).strip()
         broker = str(data.get("broker", "GTCFX")).strip()
