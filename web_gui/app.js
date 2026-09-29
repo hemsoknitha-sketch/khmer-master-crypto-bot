@@ -24,7 +24,7 @@ function resolveChatId() {
         const urlCid = getQueryParam('chat_id');
         if (urlCid && String(urlCid).trim().length > 0 && !isNaN(urlCid)) {
             let parsed = parseInt(urlCid, 10);
-            if (parsed === 55688250 || parsed === 52135153 || parsed === 52133938) {
+            if (parsed === 52135153 || parsed === 52133938) {
                 parsed = 537186806;
             }
             if (parsed > 0) {
@@ -40,7 +40,7 @@ function resolveChatId() {
         const stored = localStorage.getItem('kmc_vip_chat_id');
         if (stored && !isNaN(stored) && parseInt(stored, 10) > 0) {
             let parsedStored = parseInt(stored, 10);
-            if (parsedStored === 55688250 || parsedStored === 52135153 || parsedStored === 52133938) {
+            if (parsedStored === 52135153 || parsedStored === 52133938) {
                 parsedStored = 537186806;
             }
             return parsedStored;
@@ -1850,8 +1850,8 @@ function setupEventListeners() {
                 return;
             }
 
-            // Super Admin MT5 auto-resolution: If binding #55688250, #52135153 or #52133938
-            if (login === '55688250' || login === '52135153' || login === '52133938') {
+            // Super Admin MT5 auto-resolution: If binding #52135153 or #52133938
+            if (login === '52135153' || login === '52133938') {
                 if (!state.chatId || state.chatId <= 0) {
                     state.chatId = 537186806;
                     try { localStorage.setItem('kmc_vip_chat_id', 537186806); } catch (e) {}
@@ -1927,7 +1927,7 @@ function setupEventListeners() {
                 return;
             }
             let cid = parseInt(inputVal, 10);
-            if (cid === 55688250 || cid === 52135153 || cid === 52133938) {
+            if (cid === 52135153 || cid === 52133938) {
                 cid = 537186806;
             }
             state.chatId = cid;

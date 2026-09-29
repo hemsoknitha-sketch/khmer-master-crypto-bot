@@ -21007,7 +21007,7 @@ class TelegramBotThread(BaseThread):
                         clean_digits = re.sub(r'[^0-9]', '', raw_acc)
                         acc_id = clean_digits if clean_digits else raw_acc
 
-                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
+                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
                         if not is_admin_user and acc_id in super_admins:
                             msg_admin_err = (
                                 f"⚠️ <b>[MT5 ACCESS CONTROL NOTICE]</b>\n"

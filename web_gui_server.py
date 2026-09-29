@@ -58,7 +58,7 @@ GTC_VALID_INVITE_CODES = ["LnZZcHxY", "PuAfeREN", "F8bNxK9L", "130237694", "qAiG
 MT5_SUPER_ADMIN_TRADING_ACCOUNT = "52135153"  # MT5's Super ADMIN (Trading Master)
 MT5_TREASURY_REBATE_ACCOUNT = "52133938"     # Real Super Treasury & Rebate Collector
 MT5_TREASURY_WALLET_ID = "130237694"          # Treasury Wallet ID
-SUPER_ADMIN_MT5_ACCOUNTS = {"55688250", "52135153", "52133938"}
+SUPER_ADMIN_MT5_ACCOUNTS = {MT5_SUPER_ADMIN_TRADING_ACCOUNT, MT5_TREASURY_REBATE_ACCOUNT}
 
 # ==============================================================================
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
@@ -276,9 +276,9 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                         if not sess.chat_id and chat_id:
                             sess.chat_id = chat_id
                         break
-                # If Super Admin or local portal, link directly to active Super Admin terminal (52135153 Trading Master, 55688250 or 52133938 Treasury)
+                # If Super Admin or local portal, link directly to active Super Admin terminal (52135153 Trading Master or 52133938 Treasury)
                 if not matched_session and (chat_id in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] or chat_id <= 0):
-                    for admin_acc in [MT5_SUPER_ADMIN_TRADING_ACCOUNT, "55688250", MT5_TREASURY_REBATE_ACCOUNT]:
+                    for admin_acc in [MT5_SUPER_ADMIN_TRADING_ACCOUNT, MT5_TREASURY_REBATE_ACCOUNT]:
                         if admin_acc in bridge.clients:
                             matched_session = bridge.clients[admin_acc]
                             if not user_login:
@@ -299,7 +299,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 if not matched_session and chat_id > 0:
                     is_auth_vip = _is_authorized_vip(chat_id, user_login) or db.is_mt5_user_authorized(chat_id, user_login)
                     if is_auth_vip and (user_login or db.is_vip(chat_id)):
-                        for master_acc in [MT5_SUPER_ADMIN_TRADING_ACCOUNT, "55688250", MT5_TREASURY_REBATE_ACCOUNT]:
+                        for master_acc in [MT5_SUPER_ADMIN_TRADING_ACCOUNT, MT5_TREASURY_REBATE_ACCOUNT]:
                             if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
                                 matched_session = bridge.clients[master_acc]
                                 is_master_bridge = True
@@ -319,8 +319,29 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 master_pnl = float(getattr(matched_session, "floating_pnl", 0.0) if matched_session else 0.0)
                 equity = balance + master_pnl
             else:
-                balance = float(matched_session.balance if matched_session else 0.0)
-                equity = float(matched_session.equity if matched_session else 0.0)
+                if matched_session:
+                    balance = float(matched_session.balance)
+                    equity = float(matched_session.equity)
+                else:
+                    # Enforce Real VIP Account Balance from SQLite Ledger & Bridge DB
+                    saved_clients = db.get_mt5_bridge_clients(chat_id)
+                    matched_db = None
+                    if saved_clients:
+                        for sc in saved_clients:
+                            if str(sc.get("account_id")) == user_login or (not user_login and sc.get("balance", 0.0) > 0):
+                                matched_db = sc
+                                break
+                        if not matched_db and saved_clients:
+                            matched_db = saved_clients[0]
+                    if matched_db and float(matched_db.get("balance", 0.0)) > 0:
+                        balance = float(matched_db.get("balance", 0.0))
+                        equity = float(matched_db.get("equity", balance))
+                        currency = str(matched_db.get("currency", currency))
+                    else:
+                        # Fallback to Virtual Multi-User Vault Ledger
+                        v_ledger = db.get_or_create_virtual_ledger(chat_id)
+                        balance = float(v_ledger.get("current_balance", 0.0) or 0.0)
+                        equity = float(v_ledger.get("virtual_equity", balance) or balance)
 
             ping_ms = float(matched_session.ping_ms if matched_session else 0.3)
             if ping_ms >= 950.0 or ping_ms <= 0:
@@ -1226,6 +1247,21 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
             del _GUI_CACHE["mt5"][chat_id]
 
         if success:
+            # Autonomous Zero-Touch MT5 Instance Launcher on VPS:
+            if password and sys.platform.startswith("linux"):
+                try:
+                    import subprocess
+                    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "login_mt5_account.sh")
+                    if os.path.exists(script_path):
+                        subprocess.Popen(
+                            ["bash", script_path, str(login), str(password), str(server)],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            close_fds=True
+                        )
+                except Exception as e_launch:
+                    print(f"⚠️ [AUTO MT5 LAUNCH NOTICE]: {e_launch}")
+
             import notification_manager
             import ui_standards
 

@@ -4795,7 +4795,7 @@ MT5_TREASURY_REBATE_ACCOUNT = "52133938"
 MT5_TREASURY_WALLET_ID = "130237694"
 
 # Set of all Super Admin tier accounts (authorized for elevated access & zero lockouts)
-SUPER_ADMIN_MT5_ACCOUNTS = {"55688250", "52135153", "52133938"}
+SUPER_ADMIN_MT5_ACCOUNTS = {"52135153", "52133938"}
 
 def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     """
@@ -4806,7 +4806,7 @@ def is_mt5_user_authorized(chat_id: int, account_id: str = "") -> bool:
     1. chat_id == 859271875 (Master Super Admin) or is_admin(chat_id)
     2. User is marked is_verified == 1 in mt5_user_referrals
     3. User has 'Administrator' license
-    4. Account ID is Super Admin MT5 (55688250, 52135153, or 52133938)
+    4. Account ID is Super Admin MT5 (52135153 or 52133938)
     """
     if chat_id in [859271875, 537186806] or str(account_id).strip() in SUPER_ADMIN_MT5_ACCOUNTS:
         return True
