@@ -134,13 +134,18 @@ fi
 
 mkdir -p "$TARGET_DIR/MQL5/Experts"
 if [ -f "$BRIDGE_SRC" ]; then
-    cp -f "$BRIDGE_SRC" "$TARGET_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5"
+    if [ "$(realpath "$BRIDGE_SRC" 2>/dev/null || echo "$BRIDGE_SRC")" != "$(realpath "$TARGET_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || echo "")" ]; then
+        cp -f "$BRIDGE_SRC" "$TARGET_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.mq5" 2>/dev/null || true
+    fi
 fi
 
 # Copy pre-compiled .ex5 from existing instances if available
 for CANDIDATE in "$MT5_PLATFORM/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5" "$MT5_ADMIN/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5"; do
+    DEST_EX5="$TARGET_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5"
     if [ -f "$CANDIDATE" ]; then
-        cp -f "$CANDIDATE" "$TARGET_DIR/MQL5/Experts/KhmerMasterCrypto_Bridge.ex5"
+        if [ "$(realpath "$CANDIDATE" 2>/dev/null || echo "$CANDIDATE")" != "$(realpath "$DEST_EX5" 2>/dev/null || echo "")" ]; then
+            cp -f "$CANDIDATE" "$DEST_EX5" 2>/dev/null || true
+        fi
         break
     fi
 done
