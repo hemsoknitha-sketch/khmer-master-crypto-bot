@@ -1279,25 +1279,29 @@ class MT5BridgeEngine:
                         clients_reached += 1
             # 2. Master Signal Bridge / Cloud Copy-Trade Fallback for VIP accounts
             elif target_account:
-                for master_acc in ["52135153", "55688250", "52133938"]:
-                    if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
-                        target_found = True
-                        m_sess = self.clients[master_acc]
-                        if not m_sess.is_prop_compliant:
-                            skipped_prop = True
-                        elif m_sess.socket_conn:
-                            if self._send_raw_socket(m_sess.socket_conn, payload):
-                                clients_reached += 1
-                        break
-                if not target_found:
-                    for any_acc, any_sess in self.clients.items():
-                        if any_sess.status == "ONLINE" and any_sess.socket_conn:
+                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
+                if target_account in super_admins:
+                    for master_acc in ["55688250", "52135153", "52133938"]:
+                        if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
                             target_found = True
-                            if not any_sess.is_prop_compliant:
+                            m_sess = self.clients[master_acc]
+                            if not m_sess.is_prop_compliant:
                                 skipped_prop = True
-                            elif self._send_raw_socket(any_sess.socket_conn, payload):
-                                clients_reached += 1
+                            elif m_sess.socket_conn:
+                                if self._send_raw_socket(m_sess.socket_conn, payload):
+                                    clients_reached += 1
                             break
+                    if not target_found:
+                        for any_acc, any_sess in self.clients.items():
+                            if any_sess.status == "ONLINE" and any_sess.socket_conn:
+                                target_found = True
+                                if not any_sess.is_prop_compliant:
+                                    skipped_prop = True
+                                elif self._send_raw_socket(any_sess.socket_conn, payload):
+                                    clients_reached += 1
+                                break
+                else:
+                    logger.warning(f"⚠️ [DISPATCH GUARD] Target account {target_account} is offline and not a super admin terminal. Skipping dispatch to protect admin capital.")
             # 3. Broadcast mode (target_account is None or empty)
             else:
                 for acc_id, session in self.clients.items():
@@ -1372,18 +1376,20 @@ class MT5BridgeEngine:
                     clients_reached += 1
             elif target_account:
                 # Master Signal Bridge / Cloud Copy-Trade Fallback
-                for master_acc in ["52135153", "55688250", "52133938"]:
-                    if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
-                        m_sess = self.clients[master_acc]
-                        if m_sess.socket_conn and self._send_raw_socket(m_sess.socket_conn, payload):
-                            clients_reached += 1
-                        break
-                if clients_reached == 0:
-                    for any_acc, any_sess in self.clients.items():
-                        if any_sess.status == "ONLINE" and any_sess.socket_conn:
-                            if self._send_raw_socket(any_sess.socket_conn, payload):
+                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
+                if target_account in super_admins:
+                    for master_acc in ["55688250", "52135153", "52133938"]:
+                        if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
+                            m_sess = self.clients[master_acc]
+                            if m_sess.socket_conn and self._send_raw_socket(m_sess.socket_conn, payload):
                                 clients_reached += 1
-                                break
+                            break
+                    if clients_reached == 0:
+                        for any_acc, any_sess in self.clients.items():
+                            if any_sess.status == "ONLINE" and any_sess.socket_conn:
+                                if self._send_raw_socket(any_sess.socket_conn, payload):
+                                    clients_reached += 1
+                                    break
             else:
                 for acc_id, session in self.clients.items():
                     if session.socket_conn and self._send_raw_socket(session.socket_conn, payload):
@@ -1607,12 +1613,13 @@ class MT5BridgeEngine:
                     open_positions = []
                     with self._clients_lock:
                         s = self.clients.get(acc_id)
+                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
                         if s and s.status == "ONLINE":
                             session = s
                             open_positions = list(getattr(s, "positions", []) or [])
-                        else:
-                            # Master Signal Bridge / Cloud Copy-Trade Fallback
-                            for master_acc in ["52135153", "55688250", "52133938"]:
+                        elif chat_id in [537186806, 859271875] or acc_id in super_admins:
+                            # Master Signal Bridge / Cloud Copy-Trade Fallback for Admin
+                            for master_acc in ["55688250", "52135153", "52133938"]:
                                 if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
                                     session = self.clients[master_acc]
                                     acc_id = master_acc
@@ -1625,6 +1632,27 @@ class MT5BridgeEngine:
                                         acc_id = any_acc
                                         open_positions = list(getattr(session, "positions", []) or [])
                                         break
+                        else:
+                            # Dedicated VIP account is OFFLINE - Do NOT hijack Admin account!
+                            now_t = time.time()
+                            if not hasattr(self, "_last_offline_warn"):
+                                self._last_offline_warn = {}
+                            last_warn = self._last_offline_warn.get(chat_id, 0.0)
+                            if (now_t - last_warn) > 1800.0:
+                                self._last_offline_warn[chat_id] = now_t
+                                msg_off = (
+                                    f"⚠️ <b>[MT5 TERMINAL OFFLINE - មិនទាន់ភ្ជាប់]</b>\n"
+                                    f"━━━━━━━━━━━━\n"
+                                    f"🏛️ <b>គណនី MT5 ៖</b> <code>#{acc_id}</code>\n"
+                                    f"📡 <b>ស្ថានភាព ៖</b> <code>OFFLINE (រង់ចាំការភ្ជាប់ពី MT5)</code>\n"
+                                    f"━━━━━━━━━━━━\n"
+                                    f"👉 <b>ដំណោះស្រាយដើម្បីជួញដូរទុនផ្ទាល់ខ្លួន ៖</b>\n"
+                                    f"1. <b>បើកលើ VPS ៖</b> វាយបញ្ជា <code>bash login_mt5_account.sh {acc_id} &lt;password&gt;</code>\n"
+                                    f"2. <b>បើកលើ PC ៖</b> ចូល MT5 លើកុំព្យូទ័រ ដាក់ EA KhmerMasterCrypto_Bridge.mq5 និងបើក Algo Trading (ពណ៌បៃតង)។"
+                                )
+                                _dispatch_telegram_alert(chat_id, msg_off)
+                                logger.warning(f"⚠️ [MT5 VIP OFFLINE] User {chat_id} account #{acc_id} terminal is not running. Skipped auto-trade to prevent hijacking Admin account!")
+                            continue
 
                     if not session:
                         continue

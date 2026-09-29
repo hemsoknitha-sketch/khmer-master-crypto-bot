@@ -294,7 +294,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                 if not matched_session and chat_id > 0:
                     is_auth_vip = _is_authorized_vip(chat_id, user_login) or db.is_mt5_user_authorized(chat_id, user_login)
                     if is_auth_vip and (user_login or db.is_vip(chat_id)):
-                        for master_acc in ["52135153", "55688250", "52133938"]:
+                        for master_acc in ["55688250", "52135153", "52133938"]:
                             if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
                                 matched_session = bridge.clients[master_acc]
                                 is_master_bridge = True
