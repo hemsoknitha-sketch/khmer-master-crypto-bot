@@ -2015,6 +2015,15 @@ class MT5BridgeEngine:
                 session.is_prop_compliant = True
                 session.status = "ONLINE"
                 self._last_auth_log.pop(f"prop_breach_{acc_str}", None)
+
+                # Reset consecutive loss streaks & symbol lockout timers
+                keys_to_clear = [k for k in self._consecutive_losses if str(k).startswith(acc_str)]
+                for k in keys_to_clear:
+                    self._consecutive_losses[k] = 0
+                lockout_keys = [k for k in self._symbol_lockout_until if str(k).startswith(acc_str)]
+                for k in lockout_keys:
+                    self._symbol_lockout_until.pop(k, None)
+
                 unlock_msg = {
                     "type": "PROP_CIRCUIT_BREAKER_RESET",
                     "account_id": acc_str,

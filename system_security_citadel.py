@@ -209,6 +209,13 @@ class SecurityCitadelManager:
         is_daily_breached = (daily_change_pct <= daily_limit)
         is_max_breached = (max_drawdown_pct <= max_limit)
 
+        # Micro Capital Spread Drag Buffer: On sub-$50 micro accounts, retail broker bid/ask spread
+        # ($0.30-$1.50 per trade) represents 5-15% nominal drawdown on 2-3 trades.
+        # Require at least $3.50 nominal dollar loss before triggering daily percentage breach.
+        nominal_daily_loss = daily_start_equity - current_equity
+        if (daily_start_equity < 50.0 or initial_balance < 50.0) and nominal_daily_loss < 3.50:
+            is_daily_breached = False
+
         compliant = not (is_daily_breached or is_max_breached)
 
         details = {
