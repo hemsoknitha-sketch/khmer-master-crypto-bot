@@ -1629,11 +1629,13 @@ class MT5BridgeEngine:
         while self.is_running:
             try:
                 time.sleep(5.0)
+                now_ts = time.time()
                 active_users = db.get_all_active_mt5_auto_users() if hasattr(db, "get_all_active_mt5_auto_users") else []
                 if not active_users:
                     continue
 
                 for chat_id in active_users:
+                    now_ts = time.time()
                     cfg = db.get_user_mt5_config(chat_id)
                     raw_acc = str(cfg.get("login", "")).strip()
                     import re
@@ -1648,9 +1650,8 @@ class MT5BridgeEngine:
                     is_real_admin = (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
                     if not is_real_admin and acc_id in super_admins:
                         db.unbind_user_mt5_config(chat_id)
-                        now_t = time.time()
-                        if (now_t - self._last_admin_hijack_warn.get(chat_id, 0.0)) > 86400.0:
-                            self._last_admin_hijack_warn[chat_id] = now_t
+                        if (now_ts - self._last_admin_hijack_warn.get(chat_id, 0.0)) > 86400.0:
+                            self._last_admin_hijack_warn[chat_id] = now_ts
                             msg_hijack = (
                                 f"⚠️ <b>[MT5 ACCESS CONTROL NOTICE]</b>\n"
                                 f"━━━━━━━━━━━━\n"
@@ -1666,6 +1667,8 @@ class MT5BridgeEngine:
                             )
                             _dispatch_telegram_alert(chat_id, msg_hijack)
                             logger.warning(f"🛡️ [SECURITY CITADEL] Auto-unbound Super Admin MT5 #{acc_id} from non-admin user {chat_id}!")
+                        continue
+
                     # Account-Level Trade Disabled Cooldown (Retcode 10017)
                     disabled_until = self._account_trade_disabled_until.get(str(acc_id), 0.0)
                     if now_ts < disabled_until:
