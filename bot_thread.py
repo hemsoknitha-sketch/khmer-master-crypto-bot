@@ -20866,10 +20866,12 @@ class TelegramBotThread(BaseThread):
                         t_typ = tx.get('type', 'PROFIT_SHARE')
                         t_amt = tx.get('amount', 0.0)
                         t_sym = tx.get('symbol') or "MT5"
-                        t_time = str(tx.get('created_at', ''))[:16]
+                        raw_time = str(tx.get('created_at', ''))[:16]
+                        t_time = raw_time if raw_time.strip() else "Recent"
                         t_sign = "+" if t_amt >= 0 else "-"
-                        tx_lines.append(f"• `{t_time}` | {t_typ} ៖ `{t_sign}${abs(t_amt):,.2f}` ({t_sym})")
-                    tx_display = "\n".join(tx_lines) if tx_lines else "  _មិនទាន់មានប្រតិបត្តិការថ្មីនៅឡើយទេ_"
+                        typ_badge = "🟢 <b>PROFIT</b>" if t_amt >= 0 else "🔴 <b>RISK_ADJ</b>"
+                        tx_lines.append(f"• <code>{t_time}</code> | {typ_badge} ៖ <b>{t_sign}${abs(t_amt):,.2f}</b> (<code>{t_sym}</code>)")
+                    tx_display = "\n".join(tx_lines) if tx_lines else "  <i>មិនទាន់មានប្រតិបត្តិការថ្មីនៅឡើយទេ</i>"
 
                     vault_kb = InlineKeyboardMarkup([
                         [
@@ -20887,37 +20889,38 @@ class TelegramBotThread(BaseThread):
                     ])
 
                     msg_vault = (
-                        f"🏛️ **[MASTER CLOUD VIRTUAL PORTFOLIO & LEDGER]** 💎\n"
+                        f"🏛️ <b>[MASTER CLOUD VIRTUAL PORTFOLIO & LEDGER]</b> 💎\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"👤 **VIP Investor ៖** `{chat_id}` (Vault ID: `#{v_ledger.get('account_id')}`)\n"
-                        f"💰 **ដើមទុនបែងចែក (Allocated Capital) ៖** `${v_cap:,.2f} USD`\n"
-                        f"💎 **សមតុល្យបច្ចុប្បន្ន (Virtual Equity) ៖** `${v_eq:,.2f} USD`\n"
-                        f"🟢 **ប្រាក់ចំណេញសុទ្ធកើបបាន ៖** `{v_pnl_str}` (Net {v_split:.0f}%)\n"
-                        f"⚖️ **រូបមន្តបែងចែកចំណេញ ៖** `{v_split:.0f}% VIP / {100-v_split:.0f}% Super Admin`\n"
-                        f"🔄 **ប្រព័ន្ធ Compound Grid ៖** `{v_reinv}`\n"
-                        f"🛡️ **កម្រិតការពារ Risk ៖** `{v_risk}` ({v_ledger.get('risk_per_trade_pct', 1.5)}% / Trade)\n"
-                        f"🌐 **ចំណែកក្នុង Master Pool ៖** `{v_share}%` (Pool AUM: `${v_pool.get('total_pool_aum', 125100.0):,.2f}`)\n"
-                        f"🏛️ **Broker Gateway ៖** `GTCFX Tokyo (TY3 Co-Location < 0.5ms)`\n"
+                        f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code> (Vault ID: <code>#{v_ledger.get('account_id')}</code>)\n"
+                        f"💰 <b>ដើមទុនបែងចែក (Allocated Capital) ៖</b> <b>${v_cap:,.2f} USD</b>\n"
+                        f"💎 <b>សមតុល្យបច្ចុប្បន្ន (Virtual Equity) ៖</b> <b>${v_eq:,.2f} USD</b>\n"
+                        f"🟢 <b>ប្រាក់ចំណេញសុទ្ធកើបបាន ៖</b> <b>{v_pnl_str}</b> (Net {v_split:.0f}%)\n"
+                        f"⚖️ <b>រូបមន្តបែងចែកចំណេញ ៖</b> <code>{v_split:.0f}% VIP / {100-v_split:.0f}% Super Admin</code>\n"
+                        f"🔄 <b>ប្រព័ន្ធ Compound Grid ៖</b> <b>{v_reinv}</b>\n"
+                        f"🛡️ <b>កម្រិតការពារ Risk ៖</b> <code>{v_risk}</code> ({v_ledger.get('risk_per_trade_pct', 1.5)}% / Trade)\n"
+                        f"🌐 <b>ចំណែកក្នុង Master Pool ៖</b> <b>{v_share}%</b> (Pool AUM: ${v_pool.get('total_pool_aum', 125100.0):,.2f})\n"
+                        f"🏛️ <b>Broker Gateway ៖</b> <code>GTCFX Tokyo (TY3 Co-Location &lt; 0.5ms)</code>\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
-                        f"📜 **ប្រវត្តិប្រតិបត្តិការចុងក្រោយ (Audit Ledger Trail) ៖**\n"
+                        f"📜 <b>ប្រវត្តិប្រតិបត្តិការចុងក្រោយ (Audit Ledger Trail) ៖</b>\n"
                         f"{tx_display}\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
-                        f"⌨️ **បញ្ជា 1-Tap Copyable Presets (ចុចដើម្បី Copy) ៖**\n"
-                        f"• `` `/mt5 VAULT 100` `` — កំណត់ទុន $100 (Micro)\n"
-                        f"• `` `/mt5 VAULT 250` `` — កំណត់ទុន $250 (Standard)\n"
-                        f"• `` `/mt5 VAULT 500` `` — កំណត់ទុន $500 (Pro)\n"
-                        f"• `` `/mt5 VAULT 1000` `` — កំណត់ទុន $1,000 (VIP)\n"
-                        f"• `` `/mt5 VAULT 3000` `` — កំណត់ទុន $3,000 (Elite)\n"
+                        f"⌨️ <b>បញ្ជា 1-Tap Copyable Presets (ចុចដើម្បី Copy) ៖</b>\n"
+                        f"• <code>/mt5 VAULT 100</code> — កំណត់ទុន $100 (Micro)\n"
+                        f"• <code>/mt5 VAULT 250</code> — កំណត់ទុន $250 (Standard)\n"
+                        f"• <code>/mt5 VAULT 500</code> — កំណត់ទុន $500 (Pro)\n"
+                        f"• <code>/mt5 VAULT 1000</code> — កំណត់ទុន $1,000 (VIP)\n"
+                        f"• <code>/mt5 VAULT 3000</code> — កំណត់ទុន $3,000 (Elite)\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"✨ _ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វ័យប្រវត្តិកម្រិត Cloud 24/7!_\n"
+                        f"✨ <i>ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វ័យប្រវត្តិកម្រិត Cloud 24/7!</i>\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
-                        f"_APEX SUPER BRAIN AI_"
+                        f"<i>Khmer Master Crypto</i>\n"
+                        f"<i>APEX SUPER BRAIN AI</i>"
                     )
                     try:
-                        await update.effective_message.reply_text(msg_vault, parse_mode="Markdown", reply_markup=vault_kb)
+                        await update.effective_message.reply_text(msg_vault, parse_mode="HTML", reply_markup=vault_kb)
                     except Exception:
-                        await update.effective_message.reply_text(msg_vault.replace("*", "").replace("_", ""), reply_markup=vault_kb)
+                        clean_text = msg_vault.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "")
+                        await update.effective_message.reply_text(clean_text, reply_markup=vault_kb)
                     return
 
                 # --- 8. DIRECT PERSONAL MT5 BIND / CONNECT (Model 2) ---

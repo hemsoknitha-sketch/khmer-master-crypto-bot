@@ -5379,10 +5379,11 @@ def record_virtual_trade_pnl(ticket: int, symbol: str, total_pnl: float, close_p
             WHERE chat_id = ?
         """, (new_bal, new_bal, new_cap, user_net_pnl, cid))
 
+        tx_type_val = 'PROFIT_SHARE' if user_net_pnl >= 0 else 'LOSS_SHARE'
         cursor.execute("""
             INSERT INTO mt5_virtual_transactions (chat_id, tx_type, amount, balance_before, balance_after, ticket, symbol, description)
-            VALUES (?, 'PROFIT_SHARE', ?, ?, ?, ?, ?, ?)
-        """, (cid, user_net_pnl, old_bal, new_bal, ticket, symbol, f"Trade #{ticket} ({symbol}) Profit Share (Net: {user_net_pnl:+,.2f} USD)"))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (cid, tx_type_val, user_net_pnl, old_bal, new_bal, ticket, symbol, f"Trade #{ticket} ({symbol}) {'Profit Share' if user_net_pnl >= 0 else 'Risk Adjustment'} (Net: {user_net_pnl:+,.2f} USD)"))
 
         distributed_count += 1
         total_distributed += user_net_pnl
@@ -5391,15 +5392,17 @@ def record_virtual_trade_pnl(ticket: int, symbol: str, total_pnl: float, close_p
         if abs(user_net_pnl) >= 0.05 and cid > 0:
             try:
                 sign_emoji = "🟢" if user_net_pnl >= 0 else "🔴"
+                header_title = "🎉 <b>[MT5 CLOUD VIRTUAL PROFIT HARVEST]</b> 🏛️" if user_net_pnl >= 0 else "🛡️ <b>[MT5 CLOUD VIRTUAL RISK ADJUSTMENT]</b> 🏛️"
+                pnl_label = "ប្រាក់ចំណេញសុទ្ធ ៖" if user_net_pnl >= 0 else "ការប្រែប្រួលសមតុល្យ ៖"
                 msg_pnl = (
-                    f"🎉 <b>[MT5 CLOUD VIRTUAL PROFIT HARVEST]</b> 🏛️\n"
+                    f"{header_title}\n"
                     f"━━━━━━━━━━━━\n"
                     f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{symbol}</code> (Ticket #{ticket})\n"
-                    f"{sign_emoji} <b>ប្រាក់ចំណេញសុទ្ធ ៖</b> <b>{user_net_pnl:+,.2f} USD</b>\n"
+                    f"{sign_emoji} <b>{pnl_label}</b> <b>{user_net_pnl:+,.2f} USD</b>\n"
                     f"💰 <b>សមតុល្យក្នុង Vault ៖</b> <b>${new_bal:,.2f} USD</b>\n"
                     f"🏛️ <b>ប្រព័ន្ធ ៖</b> Master Super Brain AI Cloud Copy\n"
                     f"━━━━━━━━━━━━\n"
-                    f"<i>✨ ដើមទុនរបស់អ្នកទទួលបានផលចំណេញស្វ័យប្រវត្តិកម្រិត Cloud 24/7!</i>"
+                    f"<i>✨ ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វ័យប្រវត្តិកម្រិត Cloud 24/7!</i>"
                 )
                 import notification_manager
                 import bot_thread
