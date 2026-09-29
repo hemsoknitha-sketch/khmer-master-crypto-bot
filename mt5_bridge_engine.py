@@ -531,6 +531,7 @@ class MT5BridgeEngine:
         # Consecutive Loss Circuit Breaker & 120-Minute Cooldown Lock (Invariants 1.1, 35)
         self._consecutive_losses: Dict[str, int] = {}  # {f"{account_id}_{symbol}": count}
         self._symbol_lockout_until: Dict[str, float] = {}  # {f"{account_id}_{symbol}": timestamp}
+        self._account_trade_disabled_until: Dict[str, float] = {}  # {account_id: timestamp}
         self._signal_to_metadata: Dict[str, Dict[str, Any]] = {}  # {signal_id: metadata}
         self._ticket_metadata: Dict[int, Dict[str, Any]] = {}  # {ticket: {"symbol": str, "account_id": str, "open_price": float, "action": str, "sl": float, "tp": float}}
         self._live_quotes: Dict[str, Dict[str, Any]] = {}  # {symbol: {"ask": float, "bid": float, "mid": float, "timestamp": float}}
@@ -1139,7 +1140,8 @@ class MT5BridgeEngine:
             self._last_auth_log[rej_key] = now_ts
             admin_chat_id = 537186806
             if retcode == 10017:
-                self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 1800.0
+                self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 3600.0
+                self._account_trade_disabled_until[str(account_id)] = now_ts + 1800.0
                 curr_bal = 0.0
                 with self._clients_lock:
                     s_cli = self.clients.get(account_id)
@@ -1664,6 +1666,11 @@ class MT5BridgeEngine:
                             )
                             _dispatch_telegram_alert(chat_id, msg_hijack)
                             logger.warning(f"🛡️ [SECURITY CITADEL] Auto-unbound Super Admin MT5 #{acc_id} from non-admin user {chat_id}!")
+                    # Account-Level Trade Disabled Cooldown (Retcode 10017)
+                    disabled_until = self._account_trade_disabled_until.get(str(acc_id), 0.0)
+                    if now_ts < disabled_until:
+                        rem_m = int((disabled_until - now_ts) / 60.0)
+                        logger.debug(f"⏳ [ACCOUNT DISABLED COOLDOWN] Account #{acc_id} resting for {rem_m}m due to Retcode 10017.")
                         continue
 
                     session = None
@@ -1917,7 +1924,13 @@ class MT5BridgeEngine:
                     max_assets = int(auto_cfg.get("max_assets", 5))
                     if real_usd_balance < 75.0:
                         max_assets = 1
-                        allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
+                        # Sub-$25 Gold Margin Shield (Standard USD Account):
+                        # 0.01 lot Gold ($4,170/oz) requires $8.34 - $20.85 margin.
+                        # Exclude Gold on sub-$25 standard accounts to prevent Retcode 10017 / 10019 rejections.
+                        if not is_cent_account and real_usd_balance < 25.0:
+                            allocations = [a for a in allocations if a.get("category") == "Forex"]
+                        else:
+                            allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
                     elif real_usd_balance < 150.0:
                         max_assets = min(2, max_assets)
                         allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
