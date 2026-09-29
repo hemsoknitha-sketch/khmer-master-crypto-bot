@@ -1171,13 +1171,19 @@ async def handle_api_mt5_status(request: web.Request) -> web.Response:
 async def handle_api_mt5_bind(request: web.Request) -> web.Response:
     """Allows VIP users to register/bind their MT5 account credentials from the web."""
     try:
-        data = await request.json()
-        login = str(data.get("login", "")).strip()
+        import re
+        raw_login = str(data.get("login", "")).strip()
+        clean_login = re.sub(r'[^0-9]', '', raw_login)
+        login = clean_login if clean_login else raw_login
         chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
 
-        # Super Admin MT5 Auto-Resolution & Fallback:
-        # If binding Super Admin MT5 Accounts (55688250, 52135153 or 52133938), auto-default to Founder ID 537186806
+        # Super Admin MT5 Isolation & Quarantine:
         if login in SUPER_ADMIN_MT5_ACCOUNTS:
+            if chat_id and int(chat_id) not in [DEFAULT_VIP_CHAT_ID, 537186806, 859271875] and not db.is_admin(int(chat_id)):
+                return web.json_response({
+                    "status": "error",
+                    "message": f"⚠️ លេខគណនី #{login} គឺជាគណនី Super Admin! សូមបញ្ចូលលេខគណនី MT5 ផ្ទាល់ខ្លួនរបស់អ្នក (ឧ. 66778899) ដើម្បីវិនិយោគទុនផ្ទាល់ខ្លួន ឬប្រើប្រាស់ Master Cloud Virtual Vault (/mt5 VAULT 100)។"
+                }, status=400)
             if not chat_id or int(chat_id) <= 0:
                 chat_id = 537186806
         else:

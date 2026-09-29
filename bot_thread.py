@@ -20923,7 +20923,26 @@ class TelegramBotThread(BaseThread):
                 # --- 8. DIRECT PERSONAL MT5 BIND / CONNECT (Model 2) ---
                 elif sub in ["BIND", "CONNECT"]:
                     if len(args) >= 2:
-                        acc_id = str(args[1]).strip()
+                        import re
+                        raw_acc = str(args[1]).strip()
+                        clean_digits = re.sub(r'[^0-9]', '', raw_acc)
+                        acc_id = clean_digits if clean_digits else raw_acc
+
+                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
+                        if not is_admin_user and acc_id in super_admins:
+                            msg_admin_err = (
+                                f"⚠️ <b>[MT5 ACCESS CONTROL NOTICE]</b>\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ <b>លេខគណនី #{acc_id} គឺជាគណនី Super Admin!</b>\n"
+                                f"👉 ដើម្បីសុវត្ថិភាពមូលធន សូមបញ្ចូលលេខគណនី MT5 ផ្ទាល់ខ្លួនរបស់អ្នក (ឧទាហរណ៍ ៖ <code>66778899</code>) ដែលអ្នកបានចុះឈ្មោះនៅ Broker (GTCFX / Exness / IC Markets)។\n"
+                                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                                f"💡 <i>ប្រសិនបើអ្នកមិនទាន់មានគណនី MT5 ផ្ទាល់ខ្លួនទេ អ្នកអាចចូលរួមវិនិយោគតាមរយៈ Master Cloud Virtual Vault ដោយវាយ ៖</i>\n"
+                                f"<code>/mt5 VAULT 100</code> (ទទួលផលចំណេញស្វ័យប្រវត្តិ ២៤/៧!)\n"
+                                f"{ui_standards.DIVIDER_HEAVY}"
+                            )
+                            await update.effective_message.reply_text(msg_admin_err, parse_mode="HTML")
+                            return
+
                         srv = str(args[2]).strip() if len(args) >= 3 else "GTCGlobalSA-Server 2"
                         brk = str(args[3]).strip() if len(args) >= 4 else "GTCFX"
                         db.save_user_mt5_config(chat_id=chat_id, login=acc_id, server=srv, broker=brk, firm_name="Personal")
@@ -20958,8 +20977,8 @@ class TelegramBotThread(BaseThread):
                             f"វាយបញ្ជា ៖ <code>/mt5 BIND &lt;Account_ID&gt; [Server] [Broker]</code>\n"
                             f"{ui_standards.DIVIDER_LIGHT}\n"
                             f"⌨️ <b>1-Tap Copyable Presets (ចុចដើម្បីចម្លង) ៖</b>\n"
-                            f"• <code>/mt5 BIND 52135153 GTCGlobalSA-Server 2 GTCFX</code>\n"
-                            f"• <code>/mt5 BIND 66778899 Exness-Real7 Exness</code>\n"
+                            f"• <code>/mt5 BIND 66778899 GTCGlobalSA-Server 2 GTCFX</code>\n"
+                            f"• <code>/mt5 BIND 88991122 Exness-Real7 Exness</code>\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"👉 <i>ក្រោយ Bind រួច AI នឹងបញ្ជាទិញចូល MT5 ផ្ទាល់ខ្លួនរបស់អ្នកដោយស្វ័យប្រវត្តិ!</i>"
                         )
