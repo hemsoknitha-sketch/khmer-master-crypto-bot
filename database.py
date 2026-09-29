@@ -4545,7 +4545,30 @@ def calculate_mt5_smart_allocation(
         {"symbol": "META", "name": "Meta CFD", "category": "Stocks", "weight": 0.002, "adr_pips": 40},
     ]
 
-    selected_assets = master_universe[:n_assets]
+    cent_universe = [
+        {"symbol": "XAUUSD", "name": "Gold / USD", "category": "Metals", "weight": 0.20, "adr_pips": 250},
+        {"symbol": "EURUSD", "name": "Euro / USD", "category": "Forex", "weight": 0.10, "adr_pips": 65},
+        {"symbol": "GBPUSD", "name": "GBP / USD", "category": "Forex", "weight": 0.10, "adr_pips": 85},
+        {"symbol": "USDJPY", "name": "USD / JPY", "category": "Forex", "weight": 0.08, "adr_pips": 90},
+        {"symbol": "AUDUSD", "name": "AUD / USD", "category": "Forex", "weight": 0.06, "adr_pips": 55},
+        {"symbol": "USDCAD", "name": "USD / CAD", "category": "Forex", "weight": 0.06, "adr_pips": 60},
+        {"symbol": "USDCHF", "name": "USD / CHF", "category": "Forex", "weight": 0.05, "adr_pips": 50},
+        {"symbol": "NZDUSD", "name": "NZD / USD", "category": "Forex", "weight": 0.05, "adr_pips": 50},
+        {"symbol": "EURJPY", "name": "EUR / JPY", "category": "Forex", "weight": 0.05, "adr_pips": 95},
+        {"symbol": "GBPJPY", "name": "GBP / JPY", "category": "Forex", "weight": 0.05, "adr_pips": 120},
+        {"symbol": "AUDJPY", "name": "AUD / JPY", "category": "Forex", "weight": 0.04, "adr_pips": 75},
+        {"symbol": "CADJPY", "name": "CAD / JPY", "category": "Forex", "weight": 0.03, "adr_pips": 70},
+        {"symbol": "EURGBP", "name": "EUR / GBP", "category": "Forex", "weight": 0.03, "adr_pips": 40},
+        {"symbol": "EURAUD", "name": "EUR / AUD", "category": "Forex", "weight": 0.02, "adr_pips": 90},
+        {"symbol": "GBPAUD", "name": "GBP / AUD", "category": "Forex", "weight": 0.02, "adr_pips": 110},
+        {"symbol": "EURCAD", "name": "EUR / CAD", "category": "Forex", "weight": 0.02, "adr_pips": 80},
+        {"symbol": "GBPCAD", "name": "GBP / CAD", "category": "Forex", "weight": 0.02, "adr_pips": 100},
+        {"symbol": "NZDJPY", "name": "NZD / JPY", "category": "Forex", "weight": 0.02, "adr_pips": 70},
+        {"symbol": "AUDNZD", "name": "AUD / NZD", "category": "Forex", "weight": 0.01, "adr_pips": 45},
+        {"symbol": "XAGUSD", "name": "Silver / USD", "category": "Metals", "weight": 0.01, "adr_pips": 150},
+    ]
+
+    selected_assets = cent_universe[:n_assets] if is_cent else master_universe[:n_assets]
     capital_per_asset = round(cap / n_assets, 2)
     risk_per_trade_usd = round(cap * 0.015, 2)
     if not is_cent and cap < 150.0:

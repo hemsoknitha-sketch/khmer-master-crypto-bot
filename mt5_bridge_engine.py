@@ -254,7 +254,8 @@ class MT5QuantumSignalCitadel:
                 pass
 
         # C. FOREX MAJORS (EURUSD, GBPUSD, USDJPY) - DXY Inversion + Session Flow
-        elif any(fx in raw_clean for fx in ["EUR", "GBP", "JPY", "AUD", "CAD", "CHF"]):
+        # C. FOREX MAJORS & CROSSES (EUR, GBP, JPY, AUD, CAD, CHF, NZD) - DXY Inversion + Session Flow
+        elif any(fx in raw_clean for fx in ["EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"]):
             try:
                 import websocket_engine
                 tick = websocket_engine.PRICE_CACHE.get(raw_clean) or websocket_engine.PRICE_CACHE.get(raw_clean + "USDT")
@@ -280,9 +281,28 @@ class MT5QuantumSignalCitadel:
                         action = "SELL"
                         confidence = 91.0
                         signal_reason = f"USDJPY_Dollar_Drop_{dxy_chg:+.2f}%"
+                elif "AUD" in raw_clean or "NZD" in raw_clean:
+                    # Commodity & Risk-On Currencies
+                    if dxy_chg <= -0.12 and (chg >= 0.08 or tradfi_sentiment == "RISK_ON"):
+                        action = "BUY"
+                        confidence = 92.0
+                        signal_reason = f"RiskOn_CommodityFX_Pump_{dxy_chg:+.2f}%"
+                    elif dxy_chg >= 0.20 and (chg <= -0.08 or tradfi_sentiment == "RISK_OFF"):
+                        action = "SELL"
+                        confidence = 91.0
+                        signal_reason = f"RiskOff_CommodityFX_Dump_{dxy_chg:+.2f}%"
+                elif "CAD" in raw_clean or "CHF" in raw_clean:
+                    # USD-Base Pairs (USDCAD, USDCHF)
+                    if dxy_chg >= 0.15 and (chg >= 0.05 or macro_score >= 68.0):
+                        action = "BUY"
+                        confidence = 91.5
+                        signal_reason = f"DXY_Surge_USDX_Pump_{dxy_chg:+.2f}%"
+                    elif dxy_chg <= -0.15 and chg <= -0.05:
+                        action = "SELL"
+                        confidence = 91.0
+                        signal_reason = f"DXY_Drop_USDX_Dump_{dxy_chg:+.2f}%"
             except Exception:
                 pass
-
         # D. TRADFI INDICES & STOCKS (US30, NVDA, AAPL) - S&P 500 Macro Expansion
         elif any(idx in raw_clean for idx in ["US30", "DJ30", "NVDA", "AAPL", "TSLA"]):
             try:
@@ -1900,7 +1920,7 @@ class MT5BridgeEngine:
                         else:
                             continue
 
-                    # Dynamic 10-Asset Universe
+                    # Dynamic 10-Asset Universe & 20-Asset Cent Universe
                     default_10_universe = [
                         {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.01, "category": "Metals"},
                         {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.01, "category": "Forex"},
@@ -1913,7 +1933,29 @@ class MT5BridgeEngine:
                         {"symbol": "NVDA", "raw_symbol": "NVDA", "lot_size": 0.01, "category": "Stocks"},
                         {"symbol": "AAPL", "raw_symbol": "AAPL", "lot_size": 0.01, "category": "Stocks"},
                     ]
-                    allocations = auto_cfg.get("allocations", []) or default_10_universe
+
+                    default_cent_20_universe = [
+                        {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.01, "category": "Metals"},
+                        {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "AUDUSD", "raw_symbol": "AUDUSD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "USDCAD", "raw_symbol": "USDCAD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "USDCHF", "raw_symbol": "USDCHF", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "NZDUSD", "raw_symbol": "NZDUSD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "EURJPY", "raw_symbol": "EURJPY", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "GBPJPY", "raw_symbol": "GBPJPY", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "AUDJPY", "raw_symbol": "AUDJPY", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "CADJPY", "raw_symbol": "CADJPY", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "EURGBP", "raw_symbol": "EURGBP", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "EURAUD", "raw_symbol": "EURAUD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "GBPAUD", "raw_symbol": "GBPAUD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "EURCAD", "raw_symbol": "EURCAD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "GBPCAD", "raw_symbol": "GBPCAD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "NZDJPY", "raw_symbol": "NZDJPY", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "AUDNZD", "raw_symbol": "AUDNZD", "lot_size": 0.01, "category": "Forex"},
+                        {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.01, "category": "Metals"},
+                    ]
 
                     # Cent Account Detection & Sub-$300 Real Balance Gatekeeper
                     curr_str = str(getattr(session, "currency", "USD")).upper().strip()
@@ -1921,6 +1963,10 @@ class MT5BridgeEngine:
                     is_cent_account = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
                     raw_bal = float(getattr(session, "balance", 100.0) or 100.0)
                     real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
+
+                    allocations = auto_cfg.get("allocations", []) or (default_cent_20_universe if is_cent_account else default_10_universe)
+                    if is_cent_account and len(allocations) < 15:
+                        allocations = default_cent_20_universe
 
                     # Strict Sub-$5.00 Minimum Capital Gatekeeper (Standard Account):
                     # 0.01 lot of Gold requires >$5.32 margin. Trading with < $5.00 causes broker Retcode 10017/10019 rejection.
@@ -1938,29 +1984,40 @@ class MT5BridgeEngine:
                             a for a in allocations 
                             if a.get("category") not in ["Indices", "Index", "Indices/CFD"]
                             and not any(idx in str(a.get("symbol", "")).upper() or idx in str(a.get("raw_symbol", "")).upper()
-                                        for idx in ["US30", "DJ30", "SP500", "US500", "NAS100", "USTEC", "GER40", "DOW"])
+                                         for idx in ["US30", "DJ30", "SP500", "US500", "NAS100", "USTEC", "GER40", "DOW"])
                         ]
 
                     max_assets = int(auto_cfg.get("max_assets", 5))
-                    if real_usd_balance < 75.0:
-                        max_assets = 1
-                        # Sub-$25 Gold Margin Shield (Standard USD Account):
-                        # 0.01 lot Gold ($4,170/oz) requires $8.34 - $20.85 margin.
-                        # Exclude Gold on sub-$25 standard accounts to prevent Retcode 10017 / 10019 rejections.
-                        if not is_cent_account and real_usd_balance < 25.0:
-                            allocations = [a for a in allocations if a.get("category") == "Forex"]
-                        else:
+                    if not is_cent_account:
+                        if real_usd_balance < 75.0:
+                            max_assets = 1
+                            # Sub-$25 Gold Margin Shield (Standard USD Account):
+                            if real_usd_balance < 25.0:
+                                allocations = [a for a in allocations if a.get("category") == "Forex"]
+                            else:
+                                allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
+                        elif real_usd_balance < 150.0:
+                            max_assets = min(2, max_assets)
                             allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
-                    elif real_usd_balance < 150.0:
-                        max_assets = min(2, max_assets)
-                        allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
-                    elif real_usd_balance < 300.0:
-                        max_assets = min(3, max_assets)
-                    elif real_usd_balance < 1000.0:
-                        max_assets = min(5, max_assets)
+                        elif real_usd_balance < 300.0:
+                            max_assets = min(3, max_assets)
+                        elif real_usd_balance < 1000.0:
+                            max_assets = min(5, max_assets)
+                        else:
+                            max_assets = min(10, max_assets)
                     else:
-                        max_assets = min(10, max_assets)
-
+                        # Cent Account Multi-Asset Scaling (GTCFX Server 5 - USC ¢):
+                        # raw_bal is denominated in USC (e.g. $29.13 = 2,913.00 USC).
+                        # 0.01 lot Cent uses only ~2.00 USC margin on Forex pairs and ~5.30 USC on Gold.
+                        if raw_bal < 300.0:  # < $3.00 USD
+                            max_assets = min(2, max_assets)
+                        elif raw_bal < 1000.0:  # < $10.00 USD
+                            max_assets = min(5, max_assets)
+                        elif raw_bal < 2000.0:  # < $20.00 USD
+                            max_assets = min(10, max_assets)
+                        else:  # >= $20.00 USD (>= 2,000 USC)
+                            max_assets = min(20, max_assets)
+                        allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
                     current_open_count = len(open_positions)
 
                     open_symbols = set()
@@ -2072,9 +2129,12 @@ class MT5BridgeEngine:
                             break
 
                         # Small Balance Max Concurrent Positions Guard:
-                        # If real balance < $25.00, NEVER hold more than 1 position at a time to prevent margin exhaustion!
-                        if real_usd_balance < 25.0 and current_open_count >= 1:
+                        # If real balance < $25.00 on Standard Account, NEVER hold more than 1 position at a time to prevent margin exhaustion!
+                        if not is_cent_account and real_usd_balance < 25.0 and current_open_count >= 1:
                             logger.debug(f"🛡️ [MARGIN SAFETY GUARD] Account {acc_id} has ${real_usd_balance:.2f} balance and already {current_open_count} open position. Skipping new entry.")
+                            break
+                        elif is_cent_account and raw_bal < 300.0 and current_open_count >= 2:
+                            logger.debug(f"🛡️ [MARGIN SAFETY GUARD] Cent Account {acc_id} has {raw_bal:.0f} USC balance and already {current_open_count} open positions. Skipping new entry.")
                             break
 
                         logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {dispatch_sym} (SL: {sl_price}, TP: {tp_price}, Dist: {sl_dist}/{tp_dist}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
