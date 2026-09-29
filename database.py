@@ -4437,9 +4437,12 @@ def save_user_mt5_config(
     """Saves VIP user's MT5 connection configuration in database with credential encryption."""
     try:
         import json
+        import re
+        clean_login = re.sub(r'[^0-9]', '', str(login))
+        clean_login = clean_login if clean_login else str(login).strip()
         data = {
             "chat_id": int(chat_id),
-            "login": str(login).strip(),
+            "login": clean_login,
             "server": str(server).strip(),
             "broker": str(broker).strip(),
             "firm_name": str(firm_name).strip(),
@@ -4449,7 +4452,7 @@ def save_user_mt5_config(
             data["password"] = security.encrypt_data(password) if hasattr(security, "encrypt_data") else password
         update_system_setting(f"mt5_user_config_{chat_id}", json.dumps(data))
         upsert_mt5_bridge_client(
-            account_id=str(login).strip(),
+            account_id=clean_login,
             chat_id=int(chat_id),
             broker=str(broker).strip(),
             firm_name=str(firm_name).strip(),

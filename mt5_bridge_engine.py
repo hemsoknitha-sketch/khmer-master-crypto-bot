@@ -534,6 +534,8 @@ class MT5BridgeEngine:
         self._signal_to_metadata: Dict[str, Dict[str, Any]] = {}  # {signal_id: metadata}
         self._ticket_metadata: Dict[int, Dict[str, Any]] = {}  # {ticket: {"symbol": str, "account_id": str, "open_price": float, "action": str, "sl": float, "tp": float}}
         self._live_quotes: Dict[str, Dict[str, Any]] = {}  # {symbol: {"ask": float, "bid": float, "mid": float, "timestamp": float}}
+        self._last_account_dispatch_time: Dict[str, float] = {}  # {account_id: timestamp}
+        self._last_admin_hijack_warn: Dict[int, float] = {}  # {chat_id: timestamp}
         
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
@@ -1088,13 +1090,14 @@ class MT5BridgeEngine:
                 losses = self._consecutive_losses[streak_key]
                 logger.warning(f"⚠️ [STREAK COUNTER] Account {account_id} Symbol {sym_clean} Consecutive Losses: {losses}")
                 if losses >= 2:
-                    # 120-minute (7200 seconds) Cooldown Lockout
-                    lockout_duration = 7200.0
+                    is_micro_loss = (abs(pnl) < 1.50)
+                    lockout_duration = 300.0 if is_micro_loss else 7200.0
                     lockout_until = now_ts + lockout_duration
                     self._symbol_lockout_until[streak_key] = lockout_until
                     self._symbol_lockout_until[f"{account_id}_{sym_clean}USDT"] = lockout_until
                     self._symbol_lockout_until[f"{account_id}_{symbol}"] = lockout_until
-                    logger.error(f"🛑 [CONSECUTIVE LOSS CIRCUIT BREAKER] Account {account_id} Symbol {sym_clean} hit {losses} consecutive losses! Locked for 120 minutes (2 Hours) until {datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC!")
+                    lock_label = "៥ នាទី (Anti-Noise Cooldown)" if is_micro_loss else "១២០ នាទី (២ ម៉ោង)"
+                    logger.error(f"🛑 [CONSECUTIVE LOSS CIRCUIT BREAKER] Account {account_id} Symbol {sym_clean} hit {losses} consecutive losses! Locked for {lock_label} until {datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC!")
                     
                     # Dispatch Telegram Alert
                     chat_id = 0
@@ -1108,7 +1111,7 @@ class MT5BridgeEngine:
                             f"━━━━━━━━━━━━\n"
                             f"📉 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym_clean}</code>\n"
                             f"⚠️ <b>ការខាតបង់ផ្ទួនៗ ៖</b> <b>{losses} ដងជាប់គ្នា (PnL: ${pnl:+,.2f})</b>\n"
-                            f"🔒 <b>វិធានការការពារ ៖</b> <b>ចាក់សោស្វ័យប្រវត្តិរយៈពេល ១២០ នាទី (២ ម៉ោង)!</b>\n"
+                            f"🔒 <b>វិធានការការពារ ៖</b> <b>ចាក់សោស្វ័យប្រវត្តិរយៈពេល {lock_label}!</b>\n"
                             f"⏰ <b>ដោះសោនៅម៉ោង ៖</b> <code>{datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC</code>\n"
                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{account_id}</code>\n"
                             f"━━━━━━━━━━━━\n"
@@ -1569,6 +1572,12 @@ class MT5BridgeEngine:
                                 except Exception:
                                     pass
 
+                # 1.1 Autonomous Auto-Healer for Symbol Lockout (Anti-Permanent Lockout)
+                expired_locks = [k for k, exp in list(self._symbol_lockout_until.items()) if now >= exp]
+                for k in expired_locks:
+                    self._symbol_lockout_until.pop(k, None)
+                    logger.info(f"🛡️ [WATCHDOG HEALER] Symbol lockout expired for {k}. Trading unlocked.")
+
                 # 2. Check TCP Socket Port 5555 Health
                 if not self.tcp_server_sock or getattr(self.tcp_server_sock, "fileno", lambda: -1)() == -1:
                     logger.warning("🚨 [WATCHDOG CITADEL] TCP Socket on 5555 is dead! Resurrecting TCP listener...")
@@ -1616,20 +1625,43 @@ class MT5BridgeEngine:
 
                 for chat_id in active_users:
                     cfg = db.get_user_mt5_config(chat_id)
-                    acc_id = str(cfg.get("login", "")).strip()
+                    raw_acc = str(cfg.get("login", "")).strip()
+                    import re
+                    clean_digits = re.sub(r'[^0-9]', '', raw_acc)
+                    acc_id = clean_digits if clean_digits else raw_acc
                     if not acc_id:
+                        continue
+
+                    # Strict Admin Account Access Control (Invariants 1.1, 10, 44):
+                    # Super Admin MT5 accounts belong EXCLUSIVELY to authorized Admins!
+                    super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
+                    is_real_admin = (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
+                    if not is_real_admin and acc_id in super_admins:
+                        now_t = time.time()
+                        if (now_t - self._last_admin_hijack_warn.get(chat_id, 0.0)) > 1800.0:
+                            self._last_admin_hijack_warn[chat_id] = now_t
+                            msg_hijack = (
+                                f"⚠️ <b>[MT5 ACCESS CONTROL NOTICE]</b>\n"
+                                f"━━━━━━━━━━━━\n"
+                                f"🏛️ <b>គណនី #{acc_id} គឺជាគណនី Super Admin!</b>\n"
+                                f"👉 សូមភ្ជាប់គណនី MT5 ផ្ទាល់ខ្លួនរបស់អ្នក (Model 2) ដោយវាយ ៖\n"
+                                f"<code>/mt5 BIND &lt;លេខគណនីផ្ទាល់ខ្លួន&gt;</code>\n"
+                                f"━━━━━━━━━━━━\n"
+                                f"<i>✨ Khmer Master Crypto Citadel ការពារសុវត្ថិភាពមូលធន ១០០%!</i>"
+                            )
+                            _dispatch_telegram_alert(chat_id, msg_hijack)
+                            logger.warning(f"🛡️ [SECURITY CITADEL] Blocked non-admin user {chat_id} from auto-trading on Super Admin MT5 #{acc_id}!")
                         continue
 
                     session = None
                     open_positions = []
                     with self._clients_lock:
                         s = self.clients.get(acc_id)
-                        super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"55688250", "52135153", "52133938"})
                         if s and s.status == "ONLINE":
                             session = s
                             open_positions = list(getattr(s, "positions", []) or [])
-                        elif chat_id in [537186806, 859271875] or acc_id in super_admins:
-                            # Master Signal Bridge / Cloud Copy-Trade Fallback for Admin
+                        elif is_real_admin:
+                            # Master Signal Bridge / Cloud Copy-Trade Fallback ONLY for true Admin
                             for master_acc in ["55688250", "52135153", "52133938"]:
                                 if master_acc in self.clients and self.clients[master_acc].status == "ONLINE":
                                     session = self.clients[master_acc]
@@ -1978,6 +2010,18 @@ class MT5BridgeEngine:
                         sl_dist = float(atr_params.get("sl_dist", 0.0))
                         tp_dist = float(atr_params.get("tp_dist", 0.0))
 
+                        # Pending dispatch debounce per account (Zero double-dispatch race condition)
+                        last_dispatch = self._last_account_dispatch_time.get(acc_id, 0.0)
+                        if (now_ts - last_dispatch) < 15.0:
+                            logger.debug(f"⏳ [DISPATCH DEBOUNCE] Account {acc_id} has recent order in flight ({now_ts - last_dispatch:.1f}s ago). Waiting for fill.")
+                            break
+
+                        # Small Balance Max Concurrent Positions Guard:
+                        # If real balance < $25.00, NEVER hold more than 1 position at a time to prevent margin exhaustion!
+                        if real_usd_balance < 25.0 and current_open_count >= 1:
+                            logger.debug(f"🛡️ [MARGIN SAFETY GUARD] Account {acc_id} has ${real_usd_balance:.2f} balance and already {current_open_count} open position. Skipping new entry.")
+                            break
+
                         logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {dispatch_sym} (SL: {sl_price}, TP: {tp_price}, Dist: {sl_dist}/{tp_dist}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
                         res = self.dispatch_order(
                             symbol=dispatch_sym,
@@ -1991,6 +2035,7 @@ class MT5BridgeEngine:
                             magic=888999,
                             target_account=acc_id
                         )
+                        self._last_account_dispatch_time[acc_id] = now_ts
                         if res.get("clients_reached", 0) > 0:
                             self._last_symbol_trade_time[f"{chat_id}_{raw_sym}"] = now_ts
                             self._last_symbol_trade_time[f"{chat_id}_{sym_target}"] = now_ts
