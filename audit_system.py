@@ -35,7 +35,7 @@ def run_audit():
     failures = []
     
     # 1. Compile all python files
-    print("\n[CHECK 1/34] Verifying Syntax & AST Compilation for all Python files...")
+    print("\n[CHECK 1/35] Verifying Syntax & AST Compilation for all Python files...")
     py_files = glob.glob("*.py")
     comp_failed = []
     for f in py_files:
@@ -50,7 +50,7 @@ def run_audit():
         log_pass(f"All {len(py_files)} Python files compiled with ZERO syntax errors!")
 
     # 2. Database Deduplication Check
-    print("\n[CHECK 2/34] Verifying database.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 2/35] Verifying database.py Zero-Duplicate-Function Invariant...")
     try:
         with open("database.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -69,7 +69,7 @@ def run_audit():
         log_fail(str(e))
 
     # 3. Scheduler Tasks Deduplication Check
-    print("\n[CHECK 3/34] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
+    print("\n[CHECK 3/35] Verifying scheduler_tasks.py Zero-Duplicate-Function Invariant...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             tree = ast.parse(f.read())
@@ -88,7 +88,7 @@ def run_audit():
         log_fail(str(e))
 
     # 4. Command Dispatcher Integrity & Consolidation Check
-    print("\n[CHECK 4/34] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
+    print("\n[CHECK 4/35] Verifying Telegram Dispatcher Command Registry in bot_thread.py...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -165,7 +165,7 @@ def run_audit():
         log_fail(str(e))
 
     # 5. Spot MIN_NOTIONAL Filter Shield ($10.50 floor)
-    print("\n[CHECK 5/34] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
+    print("\n[CHECK 5/35] Verifying Spot MIN_NOTIONAL Guard in trading_engine.py...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -180,7 +180,7 @@ def run_audit():
         log_fail(str(e))
 
     # 6. Binance Hedge Mode & Error -4061 Recovery Check
-    print("\n[CHECK 6/34] Verifying Hedge Mode & DualSidePosition Invariant...")
+    print("\n[CHECK 6/35] Verifying Hedge Mode & DualSidePosition Invariant...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -199,7 +199,7 @@ def run_audit():
         log_fail(str(e))
 
     # 7. Isolated Margin Enforcement Check
-    print("\n[CHECK 7/34] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
+    print("\n[CHECK 7/35] Verifying ISOLATED Margin Enforcement (Zero Cross-Wallet Spillover)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -214,7 +214,7 @@ def run_audit():
         log_fail(str(e))
 
     # 8. Small Capital Leverage Shield Check (<=10x)
-    print("\n[CHECK 8/34] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
+    print("\n[CHECK 8/35] Verifying Small Capital Leverage Clamp in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -229,7 +229,7 @@ def run_audit():
         log_fail(str(e))
 
     # 9. TradFi Stock Perpetual & Delisted Exclusion Check
-    print("\n[CHECK 9/34] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
+    print("\n[CHECK 9/35] Verifying TradFi & Delisting Shield (Zero Error -4411 / -4140)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -244,7 +244,7 @@ def run_audit():
         log_fail(str(e))
 
     # 10. Fee-Adjusted Net Profit Floor (+0.12% Offset)
-    print("\n[CHECK 10/34] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
+    print("\n[CHECK 10/35] Verifying Net Profit Floor Offset in turbo_hedge_engine.py...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -259,7 +259,7 @@ def run_audit():
         log_fail(str(e))
 
     # 11. Telegram Inline Keyboard Button & Callback Query Routing Audit (Repository-Wide)
-    print("\n[CHECK 11/34] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
+    print("\n[CHECK 11/35] Verifying 100% Inline Button & Callback Query Routing Repository-Wide...")
     try:
         import re
         with open("bot_thread.py", "r", encoding="utf-8") as f:
@@ -321,7 +321,7 @@ def run_audit():
         log_fail(str(e))
 
     # 12. DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Invariant Audit
-    print("\n[CHECK 12/34] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
+    print("\n[CHECK 12/35] Verifying DeFi Flash Loan & Tokyo HFT MEV Weapon Stack Integrity...")
     try:
         # Check flash_loan_mev_engine.py
         with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
@@ -350,7 +350,7 @@ def run_audit():
         log_fail(str(e))
 
     # 13. Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)
-    print("\n[CHECK 13/34] Verifying Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)...")
+    print("\n[CHECK 13/35] Verifying Anti-Oversold Short Guard (RSI <= 38.0 Bottom Rejection)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -371,7 +371,7 @@ def run_audit():
         log_fail(str(e))
 
     # 14. Single-Asset Mode Enforcement (Binance Error -4168 Auto-Recovery)
-    print("\n[CHECK 14/34] Verifying Single-Asset Mode Enforcement (Zero Error -4168 Contagion)...")
+    print("\n[CHECK 14/35] Verifying Single-Asset Mode Enforcement (Zero Error -4168 Contagion)...")
     try:
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             tr_code = f.read()
@@ -390,7 +390,7 @@ def run_audit():
         log_fail(str(e))
 
     # 15. News Sentiment Technical Confirmation Shield
-    print("\n[CHECK 15/34] Verifying News Sentiment Technical Confirmation Shield...")
+    print("\n[CHECK 15/35] Verifying News Sentiment Technical Confirmation Shield...")
     try:
         with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
             st_code = f.read()
@@ -408,7 +408,7 @@ def run_audit():
 
 
     # 16. Flash Loan Quantitative Edge & Zero-Risk Boundary Lock (Invariant 19)
-    print("\n[CHECK 16/34] Verifying Flash Loan Atomic Revert & Zero-Hallucination Invariant...")
+    print("\n[CHECK 16/35] Verifying Flash Loan Atomic Revert & Zero-Hallucination Invariant...")
     try:
         with open("flash_loan_mev_engine.py", "r", encoding="utf-8") as f:
             fl_code = f.read()
@@ -434,7 +434,7 @@ def run_audit():
         log_fail(str(e))
 
     # 17. The Golden 85% Profit Ratchet & Breakeven Armor Lock (Invariant 24)
-    print("\n[CHECK 17/34] Verifying Golden 85% Profit Ratchet & Breakeven Armor (Invariant 24)...")
+    print("\n[CHECK 17/35] Verifying Golden 85% Profit Ratchet & Breakeven Armor (Invariant 24)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -459,7 +459,7 @@ def run_audit():
         log_fail(str(e))
 
     # 18. Dynamic Small Capital Fortress & Zero Blind Investing Guarantee (Invariant 25)
-    print("\n[CHECK 18/34] Verifying Dynamic Small Capital Fortress & Zero Blind Investing (Invariant 25)...")
+    print("\n[CHECK 18/35] Verifying Dynamic Small Capital Fortress & Zero Blind Investing (Invariant 25)...")
     try:
         with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
             th_code = f.read()
@@ -482,7 +482,7 @@ def run_audit():
         log_fail(str(e))
 
     # 19. Sub-Mode Explicit State Segregation & Non-Collapsible Invariant (Invariant 26)
-    print("\n[CHECK 19/34] Verifying Sub-Mode Explicit State Segregation & Non-Collapsible Invariant (Invariant 26)...")
+    print("\n[CHECK 19/35] Verifying Sub-Mode Explicit State Segregation & Non-Collapsible Invariant (Invariant 26)...")
     try:
         with open("bot_thread.py", "r", encoding="utf-8") as f:
             bt_code = f.read()
@@ -508,7 +508,7 @@ def run_audit():
     except Exception as e:
         failures.append(f"Invariant 26 check failed: {e}")
     # 20. Google Cloud e2-standard-4 Hardware & Hugging Face Cloud AI Brain Lock (Invariant 27)
-    print("\n[CHECK 20/34] Verifying Google Cloud e2-standard-4 & Hugging Face Cloud AI Brain Lock (Invariant 27)...")
+    print("\n[CHECK 20/35] Verifying Google Cloud e2-standard-4 & Hugging Face Cloud AI Brain Lock (Invariant 27)...")
     try:
         with open("bot_thread.py", "r", encoding="utf-8") as f:
             bt_code = f.read()
@@ -533,7 +533,7 @@ def run_audit():
         log_fail(str(e))
 
     # 21. 24/7 Perpetual Wealth Generator Triple-Phase Extraction & Safety Covenant Lock (Invariant 28)
-    print("\n[CHECK 21/34] Verifying 24/7 Perpetual Wealth Generator & Safety Covenant (Invariant 28)...")
+    print("\n[CHECK 21/35] Verifying 24/7 Perpetual Wealth Generator & Safety Covenant (Invariant 28)...")
     try:
         with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
             pw_code = f.read()
@@ -562,7 +562,7 @@ def run_audit():
         log_fail(str(e))
 
     # 22. Nanosecond Direct RAM Tick Access Latency Standard (Invariant 29)
-    print("\n[CHECK 22/34] Verifying Nanosecond Direct RAM Tick Access Latency Standard (0.001 - 0.0003 ms Invariant 29)...")
+    print("\n[CHECK 22/35] Verifying Nanosecond Direct RAM Tick Access Latency Standard (0.001 - 0.0003 ms Invariant 29)...")
     try:
         with open("websocket_engine.py", "r", encoding="utf-8") as f:
             ws_code = f.read()
@@ -614,7 +614,7 @@ def run_audit():
 
 
     # 23. Perpetual Wealth Free Margin Gatekeeper, Autonomous Stale Limit Prune & Smart Swap Volatility Buffer (Invariant 30)
-    print("\n[CHECK 23/34] Verifying Perpetual Wealth Free Margin Gatekeeper, Stale Prune & Smart Swap Volatility Buffer (Invariant 30)...")
+    print("\n[CHECK 23/35] Verifying Perpetual Wealth Free Margin Gatekeeper, Stale Prune & Smart Swap Volatility Buffer (Invariant 30)...")
     try:
         with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
             pw_code = f.read()
@@ -644,7 +644,7 @@ def run_audit():
         log_fail(str(e))
 
     # 24. Capital.com Lead-Lag Arbitrage Engine & Pure Latency Alpha Standard (Invariant 31)
-    print("\n[CHECK 24/34] Verifying Capital.com Lead-Lag Arbitrage Engine & Pure Latency Alpha Standard (Invariant 31)...")
+    print("\n[CHECK 24/35] Verifying Capital.com Lead-Lag Arbitrage Engine & Pure Latency Alpha Standard (Invariant 31)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -683,7 +683,7 @@ def run_audit():
 
 
     # 25. London & New York Opening Range Breakout (ORB 15m) Matrix Standard (Invariant 32)
-    print("\n[CHECK 25/34] Verifying London & NY Opening Range Breakout (ORB 15m) Matrix (Invariant 32)...")
+    print("\n[CHECK 25/35] Verifying London & NY Opening Range Breakout (ORB 15m) Matrix (Invariant 32)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -726,7 +726,7 @@ def run_audit():
         log_fail(str(e))
 
     # 26. Fractional Kelly Criterion Dynamic Position Sizer Standard (Invariant 33)
-    print("\n[CHECK 26/34] Verifying Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)...")
+    print("\n[CHECK 26/35] Verifying Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -773,7 +773,7 @@ def run_audit():
 
 
     # 27. Spread Drag Elimination & Asymmetric Minimum Hurdle Protocol (Invariant 34)
-    print("\n[CHECK 27/34] Verifying Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34)...")
+    print("\n[CHECK 27/35] Verifying Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -820,7 +820,7 @@ def run_audit():
         log_fail(str(e))
 
     # 28. Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15-Minute Asset Cooldown Standard (Invariant 35)
-    print("\n[CHECK 28/34] Verifying Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15m Cooldown (Invariant 35)...")
+    print("\n[CHECK 28/35] Verifying Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15m Cooldown (Invariant 35)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -868,7 +868,7 @@ def run_audit():
         log_fail(str(e))
 
     # 29. Capital.com Pro Referral Gatekeeper & Live Account Verification Standard (Invariant 36)
-    print("\n[CHECK 29/34] Verifying Capital.com Pro Referral Gatekeeper & Live Access Standard (Invariant 36)...")
+    print("\n[CHECK 29/35] Verifying Capital.com Pro Referral Gatekeeper & Live Access Standard (Invariant 36)...")
     try:
         with open("database.py", "r", encoding="utf-8") as f:
             db_code = f.read()
@@ -908,7 +908,7 @@ def run_audit():
         log_fail(str(e))
 
     # 30. Super Smart 24/7 Multi-Session Forex Exchange & Satellite Alpha Protocol (Invariant 37)
-    print("\n[CHECK 30/34] Verifying Super Smart 24/7 Forex Exchange & Satellite Geospatial Alpha (Invariant 37)...")
+    print("\n[CHECK 30/35] Verifying Super Smart 24/7 Forex Exchange & Satellite Geospatial Alpha (Invariant 37)...")
     try:
         with open("capital_engine.py", "r", encoding="utf-8") as f:
             cap_code = f.read()
@@ -962,7 +962,7 @@ def run_audit():
 
 
     # 31. Quantitative Trifecta Autonomous Engine Protocol (Invariant 38)
-    print("\n[CHECK 31/34] Verifying Quantitative Trifecta Autonomous Engine Protocol (Invariant 38)...")
+    print("\n[CHECK 31/35] Verifying Quantitative Trifecta Autonomous Engine Protocol (Invariant 38)...")
     try:
         with open("smart_x_engine.py", "r", encoding="utf-8") as f:
             sx_code = f.read()
@@ -1031,7 +1031,7 @@ def run_audit():
         log_fail(str(e))
 
     # 32. 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity & Non-Premature Breakeven Protocol (Invariant 39)
-    print("\n[CHECK 32/34] Verifying 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity & Non-Premature Breakeven Protocol (Invariant 39)...")
+    print("\n[CHECK 32/35] Verifying 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity & Non-Premature Breakeven Protocol (Invariant 39)...")
     try:
         with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
             pw_code = f.read()
@@ -1075,7 +1075,7 @@ def run_audit():
 
 
     # 33. Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Risk Protocol & 5-Layer Defense (Invariant 40)
-    print("\n[CHECK 33/34] Verifying Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Risk Protocol & 5-Layer Defense (Invariant 40)...")
+    print("\n[CHECK 33/35] Verifying Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Risk Protocol & 5-Layer Defense (Invariant 40)...")
     try:
         with open("smart_swap_engine.py", "r", encoding="utf-8") as f:
             swap_code = f.read()
@@ -1144,7 +1144,7 @@ def run_audit():
 
 
     # 34. Institutional Five-Layer Security Citadel, Latency Virtualizer & Prop Firm Compliance (Invariant 41)
-    print("\n[CHECK 34/34] Verifying Institutional Five-Layer Security Citadel, Latency Virtualizer & Prop Firm Compliance (Invariant 41)...")
+    print("\n[CHECK 34/35] Verifying Institutional Five-Layer Security Citadel, Latency Virtualizer & Prop Firm Compliance (Invariant 41)...")
     try:
         import system_security_citadel as sc
         with open("AGENTS.md", "r", encoding="utf-8") as f:
@@ -1215,6 +1215,94 @@ def run_audit():
             log_fail("Five-Layer Security Citadel (Invariant 41) specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 41 check failed: {e}")
+    # 35. Super Smart Sky Net Omni-Swarm Quorum & Zero-Conflict Cross-Engine Guard (Invariant 42)
+    print("\n[CHECK 35/35] Verifying Super Smart Sky Net Omni-Swarm Quorum & Zero-Conflict Cross-Engine Guard (Invariant 42)...")
+    try:
+        import sky_net_orchestrator as sno
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
+            pw_code = f.read()
+        with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
+            th_code = f.read()
+        with open("macro_auto_trade_engine.py", "r", encoding="utf-8") as f:
+            mat_code = f.read()
+        with open("scheduler_tasks.py", "r", encoding="utf-8") as f:
+            sched_code = f.read()
+        with open("smart_x_engine.py", "r", encoding="utf-8") as f:
+            sx_code = f.read()
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        with open("bot_commands_registry.py", "r", encoding="utf-8") as f:
+            reg_code = f.read()
+
+        has_inv42 = "Invariant 42" in agents_code and "Super Smart Sky Net Omni-Swarm" in agents_code
+        has_sno_file = os.path.exists("sky_net_orchestrator.py")
+        has_wealth_hook = "sky_net_orchestrator.validate_cross_engine_entry" in pw_code
+        has_turbo_hook = "sky_net_orchestrator.validate_cross_engine_entry" in th_code
+        has_macro_hook = "sky_net_orchestrator.validate_cross_engine_entry" in mat_code
+        has_prep_hook = "sky_net_orchestrator.validate_cross_engine_entry" in sched_code
+        has_smartx_hook = "sky_net_orchestrator.validate_cross_engine_entry" in sx_code
+        has_skynet_cmd = "skynet_command" in bt_code and 'CommandHandler("skynet"' in bt_code
+        has_skynet_reg = '"skynet"' in reg_code
+
+        # Unit Test 1: Invariant 16 Anti-Oversold Short Guard in Sky Net (RSI <= 38.0 must block SHORT)
+        block_short_ok, block_short_reason, _ = sno.validate_cross_engine_entry(
+            chat_id=999999,
+            symbol="BTCUSDT",
+            proposed_side="SHORT",
+            requesting_engine="wealth",
+            rsi_15m=32.0
+        )
+        unit_test_short_guard = (not block_short_ok and "ANTI_OVERSOLD_SHORT_GUARD" in block_short_reason)
+
+        # Unit Test 2: Normal Valid Entry Allowed
+        valid_entry_ok, _, _ = sno.validate_cross_engine_entry(
+            chat_id=999999,
+            symbol="BTCUSDT",
+            proposed_side="LONG",
+            requesting_engine="wealth",
+            rsi_15m=50.0
+        )
+        unit_test_valid_entry = valid_entry_ok
+
+        # Unit Test 3: Sky Net Confluence Evaluation produces valid score & confidence
+        conf_res = sno.evaluate_sky_net_swarm_confluence(chat_id=999999, symbol="BTCUSDT")
+        unit_test_confluence = (
+            "confluence_score" in conf_res and
+            "conviction_level" in conf_res and
+            "direction" in conf_res and
+            conf_res.get("confluence_score", 0) >= 0
+        )
+
+        # Unit Test 4: Network status returns all 5 flagship engines
+        net_status = sno.get_sky_net_network_status(chat_id=999999)
+        engines_dict = net_status.get("engines", {})
+        unit_test_engines = (
+            "wealth" in engines_dict and
+            "turbo_hedge" in engines_dict and
+            "smartx" in engines_dict and
+            "auto_trade" in engines_dict and
+            "pre_pump" in engines_dict and
+            net_status.get("zero_conflict_guard") == "ACTIVE"
+        )
+
+        all_skynet_unit_tests = (
+            unit_test_short_guard and
+            unit_test_valid_entry and
+            unit_test_confluence and
+            unit_test_engines
+        )
+
+        if (has_inv42 and has_sno_file and has_wealth_hook and has_turbo_hook and
+            has_macro_hook and has_prep_hook and has_smartx_hook and
+            has_skynet_cmd and has_skynet_reg and all_skynet_unit_tests):
+            log_pass("Super Smart Sky Net Omni-Swarm Quorum & Zero-Conflict Cross-Engine Guard (Invariant 42) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 42 check failed: inv42={has_inv42}, sno={has_sno_file}, wealth={has_wealth_hook}, turbo={has_turbo_hook}, macro={has_macro_hook}, prep={has_prep_hook}, smartx={has_smartx_hook}, cmd={has_skynet_cmd}, reg={has_skynet_reg}, unit_tests={all_skynet_unit_tests}")
+            log_fail("Sky Net Omni-Swarm (Invariant 42) specification missing or unit test failure!")
+    except Exception as e:
+        failures.append(f"Invariant 42 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

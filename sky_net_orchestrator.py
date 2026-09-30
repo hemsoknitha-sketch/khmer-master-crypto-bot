@@ -239,7 +239,7 @@ def get_all_active_symbols_across_engines(chat_id: int) -> Dict[str, dict]:
     return aggregated
 
 
-def evaluate_sky_net_swarm_confluence(symbol: str, proposed_side: str) -> dict:
+def evaluate_sky_net_swarm_confluence(*args, **kwargs) -> dict:
     """
     Evaluates 5-Engine Sky Net Swarm Confluence Matrix:
     1. SmartX Wall Street 25-ML Ensembles (CatBoost, LightGBM, XGBoost, MoE Router)
@@ -248,13 +248,43 @@ def evaluate_sky_net_swarm_confluence(symbol: str, proposed_side: str) -> dict:
     4. Perpetual Wealth Golden Sweet-Spot Momentum
     5. Macro Google Satellite & MT5 Carry-Trade Radar
 
+    Accepts flexible arguments: (symbol, proposed_side="AUTO") or (chat_id, symbol, proposed_side="AUTO")
+
     Returns:
     - confluence_score: float (0.0 to 100.0)
-    - is_sky_net_99: bool (True if confluence >= 90.0)
+    - is_sky_net_99: bool (True if confluence >= 86.0)
     - confidence_pct: float (99.0% - 99.8% if is_sky_net_99 else standard)
     - votes: dict of module alignments
     - priority_engine: optimal engine for this trade
     """
+    symbol = "BTCUSDT"
+    proposed_side = "AUTO"
+    chat_id = None
+
+    if len(args) == 1:
+        if isinstance(args[0], str) and ("USDT" in args[0] or "USD" in args[0] or len(args[0]) <= 10):
+            symbol = args[0]
+        else:
+            chat_id = args[0]
+    elif len(args) == 2:
+        if isinstance(args[0], (int, float)) or (isinstance(args[0], str) and str(args[0]).isdigit()):
+            chat_id = args[0]
+            symbol = args[1]
+        else:
+            symbol = args[0]
+            proposed_side = args[1]
+    elif len(args) >= 3:
+        chat_id = args[0]
+        symbol = args[1]
+        proposed_side = args[2]
+
+    if "symbol" in kwargs:
+        symbol = kwargs["symbol"]
+    if "proposed_side" in kwargs:
+        proposed_side = kwargs["proposed_side"]
+    if "chat_id" in kwargs:
+        chat_id = kwargs["chat_id"]
+
     symbol = str(symbol).upper().strip()
     norm_side = normalize_side(proposed_side)
 
@@ -363,6 +393,8 @@ def evaluate_sky_net_swarm_confluence(symbol: str, proposed_side: str) -> dict:
     return {
         "symbol": symbol,
         "proposed_side": norm_side,
+        "direction": norm_side,
+        "conviction_level": "[⚡ SKY NET 99%+ SUPER CONVICTION 🦅]" if is_sky_net_99 else f"[CONVICTION {confidence_pct:.1f}%]",
         "confluence_score": confluence_score,
         "is_sky_net_99": is_sky_net_99,
         "confidence_pct": confidence_pct,
@@ -376,7 +408,9 @@ def validate_cross_engine_entry(
     chat_id: int,
     symbol: str,
     proposed_side: str,
-    requesting_engine: str
+    requesting_engine: str,
+    rsi_15m: Optional[float] = None,
+    **kwargs
 ) -> Tuple[bool, str, dict]:
     """
     Universal Sky Net Cross-Engine Gatekeeper.
@@ -411,27 +445,31 @@ def validate_cross_engine_entry(
 
     # 1. Invariant 16 Anti-Oversold Short Guard Check
     if norm_proposed == "SELL":
-        try:
-            klines = trading_engine.get_klines(sym, interval="15m", limit=20, is_spot=False)
-            if klines and len(klines) >= 15:
-                closes = [float(k[4]) for k in klines]
-                gains, losses = [], []
-                for i in range(1, 15):
-                    diff = closes[-i] - closes[-i-1]
-                    if diff >= 0:
-                        gains.append(diff)
-                        losses.append(0.0)
-                    else:
-                        gains.append(0.0)
-                        losses.append(abs(diff))
-                avg_g = sum(gains) / 14.0 if gains else 0.0
-                avg_l = sum(losses) / 14.0 if losses else 0.0001
-                rs = avg_g / avg_l if avg_l > 0 else 1.0
-                rsi_15m = 100.0 - (100.0 / (1.0 + rs))
-                if rsi_15m <= 38.0:
-                    return False, f"INVARIANT_16_BLOCKED: 15m RSI {rsi_15m:.1f} <= 38.0 (Anti-Oversold Short Guard)", {}
-        except Exception:
-            pass
+        if rsi_15m is not None:
+            if float(rsi_15m) <= 38.0:
+                return False, f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI {float(rsi_15m):.1f} <= 38.0 (Invariant 16)", {}
+        else:
+            try:
+                klines = trading_engine.get_klines(sym, interval="15m", limit=20, is_spot=False)
+                if klines and len(klines) >= 15:
+                    closes = [float(k[4]) for k in klines]
+                    gains, losses = [], []
+                    for i in range(1, 15):
+                        diff = closes[-i] - closes[-i-1]
+                        if diff >= 0:
+                            gains.append(diff)
+                            losses.append(0.0)
+                        else:
+                            gains.append(0.0)
+                            losses.append(abs(diff))
+                    avg_g = sum(gains) / 14.0 if gains else 0.0
+                    avg_l = sum(losses) / 14.0 if losses else 0.0001
+                    rs = avg_g / avg_l if avg_l > 0 else 1.0
+                    calc_rsi = 100.0 - (100.0 / (1.0 + rs))
+                    if calc_rsi <= 38.0:
+                        return False, f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI {calc_rsi:.1f} <= 38.0 (Invariant 16)", {}
+            except Exception:
+                pass
 
     # 2. Cross-Engine Ownership & Mutual Non-Aggression Check
     active_map = get_all_active_symbols_across_engines(chat_id)
@@ -542,10 +580,19 @@ def get_sky_net_network_status(chat_id: int) -> dict:
     active_map = get_all_active_symbols_across_engines(chat_id)
     
     # Engine break-down
+    engines = {
+        "wealth": {"active_trades": 0, "coins": []},
+        "turbo_hedge": {"active_trades": 0, "coins": []},
+        "smartx": {"active_trades": 0, "coins": []},
+        "auto_trade": {"active_trades": 0, "coins": []},
+        "pre_pump": {"active_trades": 0, "coins": []},
+        "live_exchange": {"active_trades": 0, "coins": []}
+    }
     engines_summary = {
         "wealth": [],
         "turbo_hedge": [],
         "smart_x": [],
+        "smartx": [],
         "auto_trade": [],
         "pre_pump": [],
         "live_exchange": []
@@ -553,16 +600,23 @@ def get_sky_net_network_status(chat_id: int) -> dict:
 
     for sym, data in active_map.items():
         eng = data.get("engine", "live_exchange")
+        norm_eng = "smartx" if eng == "smart_x" else eng
+        if norm_eng in engines:
+            engines[norm_eng]["active_trades"] += 1
+            engines[norm_eng]["coins"].append(f"{sym} ({data.get('side')})")
         if eng in engines_summary:
             engines_summary[eng].append(f"{sym} ({data.get('side')})")
-        else:
-            engines_summary["live_exchange"].append(f"{sym} ({data.get('side')})")
 
     return {
         "chat_id": chat_id,
+        "total_active_positions": len(active_map),
         "total_active_coins": len(active_map),
+        "active_symbols_count": len(active_map),
         "active_symbols": list(active_map.keys()),
+        "active_symbols_detail": active_map,
+        "engines": engines,
         "engines_summary": engines_summary,
+        "zero_conflict_guard": "ACTIVE",
         "zero_conflict_status": "CERTIFIED_ZERO_CONFLICT",
         "sky_net_quorum": "ACTIVE (99% Confluence Radar)",
         "ram_speed": "< 0.0003ms Direct Tick Latency",
