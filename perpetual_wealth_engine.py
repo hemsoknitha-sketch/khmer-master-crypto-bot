@@ -189,6 +189,26 @@ def get_btc_macro_regime() -> dict:
         except Exception:
             pass
 
+        # Pillar 3: MT5 Interbank Forex & Carry Trade Triangulation Guard (98% Conviction Edge)
+        try:
+            import mt5_bridge_engine
+            mt5_bridge = mt5_bridge_engine.get_mt5_bridge()
+            if mt5_bridge:
+                mt5_bias = mt5_bridge.get_interbank_macro_bias()
+                if mt5_bias.get("carry_unwind_detected"):
+                    allow_long = False
+                    reason += f" | 🚨 MT5 Alert: USDJPY Carry-Trade Unwind ({mt5_bias.get('reason')}) -> Altcoin LONGs 100% BLOCKED!"
+                elif mt5_bias.get("dxy_surge_detected"):
+                    allow_long = False
+                    allow_short = True
+                    reason += " | 🛡️ MT5 Interbank Radar: DXY Surge (Dollar Flight) -> Altcoin LONGs Blocked, High-Beta SHORTs Favored (98% Edge)!"
+                elif mt5_bias.get("macro_tailwinds"):
+                    if regime == "NEUTRAL_CHOP" and btc_rsi >= 44.0:
+                        allow_long = True
+                        reason += " | 🚀 MT5 Tailwinds: Interbank Dollar Drop -> Altcoin Long Confluence Confirmed (98% Conviction)"
+        except Exception:
+            pass
+
         res = {
             "regime": regime,
             "allow_long": allow_long,

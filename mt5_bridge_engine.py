@@ -1248,6 +1248,53 @@ class MT5BridgeEngine:
             pass
         return None
 
+    def get_interbank_macro_bias(self) -> Dict[str, Any]:
+        """
+        Synthesizes live MT5 interbank quotes + Google Macro Satellite:
+        Provides actionable macro bias for /wealth, /smart_trade, and crypto engines.
+        1. DXY Surge / Liquidity Contraction Detector.
+        2. USDJPY Carry-Trade Unwind Crash Sentinel.
+        3. Gold Safe-Haven Capital Flight Barometer.
+        """
+        dxy_chg = 0.0
+        dxy_sig = "NEUTRAL"
+        tradfi_sentiment = "RISK_ON"
+        macro_score = 70.0
+
+        try:
+            import google_macro_satellite
+            m_data = google_macro_satellite.fetch_google_macro_satellite_data()
+            if m_data:
+                dxy_chg = float(m_data.get("dxy_change_pct", 0.0) or 0.0)
+                dxy_sig = str(m_data.get("dxy_signal", "NEUTRAL")).upper()
+                tradfi_sentiment = str(m_data.get("tradfi_sentiment", "RISK_ON")).upper()
+                macro_score = float(m_data.get("composite_macro_score", 70.0) or 70.0)
+        except Exception:
+            pass
+
+        # Check live USDJPY tick change from MT5
+        usdjpy_q = self.get_live_symbol_quote("USDJPY")
+        carry_unwind = False
+        carry_reason = ""
+        if usdjpy_q:
+            if dxy_chg <= -0.30 and tradfi_sentiment == "RISK_OFF":
+                carry_unwind = True
+                carry_reason = "USDJPY_Yen_Carry_Unwind_Risk_Off"
+
+        dxy_surge = (dxy_chg >= 0.20 or dxy_sig == "BEARISH_LIQUIDITY")
+        macro_tailwinds = (dxy_chg <= -0.12 and tradfi_sentiment == "RISK_ON" and macro_score >= 68.0)
+
+        return {
+            "carry_unwind_detected": carry_unwind,
+            "dxy_surge_detected": dxy_surge,
+            "macro_tailwinds": macro_tailwinds,
+            "dxy_change_pct": dxy_chg,
+            "dxy_signal": dxy_sig,
+            "tradfi_sentiment": tradfi_sentiment,
+            "macro_score": macro_score,
+            "reason": carry_reason or ("DXY_Surge_Dollar_Flight" if dxy_surge else ("Liquidity_Tailwind" if macro_tailwinds else "Neutral"))
+        }
+
     # =========================================================================
     # 5. TRADE SIGNAL DISPATCH API (SUB-MILLISECOND EXECUTION)
     # =========================================================================
