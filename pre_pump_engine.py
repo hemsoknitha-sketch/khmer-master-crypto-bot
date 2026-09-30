@@ -326,28 +326,42 @@ class PrePumpEngine:
             character = "OVERSOLD_BOUNCE_SETUP"
             stage = "SPOT_BUY_SCOUT" if is_new_listing_window else "FUTURES_PRECISION"
             side = "BUY"
-            confidence_pct = 85.0
+            confidence_pct = 88.0
+            if adx_15m >= 28.0 and buy_votes >= 2:
+                confidence_pct = 95.5
             recommended_leverage = 10
-        elif price_change_pct >= 15.0 and stoch_k >= 85.0 and rsi_15m >= 78.0:
+        elif price_change_pct >= 15.0 and stoch_k >= 85.0 and rsi_15m >= 76.0:
             # Overextended Blow-Off Exhaustion Top -> High-confidence Short Scalp
             character = "EXHAUSTION_TOP"
             stage = "FUTURES_PRECISION"
             side = "SELL"
-            confidence_pct = 88.5
+            base_conf = 89.0
+            if minus_di > plus_di and adx_15m >= 28.0:
+                base_conf += 6.5  # Reaches 95.5% Apex Tier!
+            confidence_pct = min(98.0, base_conf)
             recommended_leverage = 10
         elif is_new_listing_window and price_change_pct <= 5.0:
             # Initial Listing Price Discovery -> Micro Spot Scout
             character = "NEW_LISTING_SPOT_SCOUT"
             stage = "SPOT_BUY_SCOUT"
             side = "BUY"
-            confidence_pct = 90.0
+            confidence_pct = 92.0
+            if buy_votes >= 2:
+                confidence_pct = 96.0
             recommended_leverage = 1  # 1x Spot
         elif buy_votes >= sell_votes:
             # Bullish Momentum Ignition
             character = "MOMENTUM_IGNITION"
             stage = "FUTURES_PRECISION"
             side = "BUY"
-            confidence_pct = 82.0 + (buy_votes / total_votes) * 12.0
+            vote_ratio = buy_votes / total_votes
+            base_conf = 84.0 + (vote_ratio * 11.0)
+            # Apex 95%+ Ultra-Confluence Booster: Multi-Timeframe ADX >= 28, +DI > -DI, Price > EMA50
+            if adx_15m >= 28.0 and plus_di > minus_di + 4.0 and last_price >= ema50_15m * 1.002:
+                base_conf += 4.0
+            if sat_bias == "BULLISH":
+                base_conf += 2.0
+            confidence_pct = min(98.5, base_conf)
             recommended_leverage = 12 if confidence_pct >= 90.0 else 10
         else:
             character = "STANDBY_OBSERVATION"
@@ -442,9 +456,11 @@ class PrePumpEngine:
 
         current_price = float(current_ticker.get("lastPrice", 0.0))
 
-        # Trifecta Trigger Consensus: Either traditional 3-way trifecta OR AI High-Confidence Ignition (>= 85%)
+        # 🎯 Apex 95%+ Ultra-Precision Trigger Consensus:
+        # Traditional 3-way trifecta OR AI Apex High-Confidence Ignition (>= 95.0% or >= 88.0% with strong walls/accumulation)
+        conf = char_meta.get("confidence_pct", 0.0)
         is_trifecta = is_accumulating and has_walls and is_squeezing
-        is_ai_strike = char_meta.get("confidence_pct", 0.0) >= 85.0 and (has_walls or is_accumulating)
+        is_ai_strike = (conf >= 95.0 and (has_walls or is_accumulating)) or (conf >= 88.0 and has_walls and is_accumulating)
 
         if is_trifecta or is_ai_strike:
             char_meta["entry_price"] = current_price
