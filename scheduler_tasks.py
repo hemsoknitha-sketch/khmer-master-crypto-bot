@@ -5019,7 +5019,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                                 import mt5_bridge_engine
                                 mt5_lot = round(min(1.0, max(0.01, (invest_amount * effective_leverage) / 50000.0)), 2)
                                 mt5_action = "BUY" if side == "BUY" else "SELL"
-                                mt5_sym = symbol.replace("USDT", "USD") if not symbol.endswith("USDT") else symbol
+                                mt5_sym = "XAUUSD" if "XAU" in symbol else (symbol.replace("USDT", "USD") if symbol.endswith("USDT") else symbol)
                                 mt5_bridge_engine.mt5_bridge.dispatch_order(
                                     symbol=mt5_sym,
                                     action=mt5_action,

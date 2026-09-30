@@ -1519,13 +1519,13 @@ class PerpetualWealthGeneratorEngine:
                             # MT5 Prop Firm Bridge Dual-Dispatch Synchronization (Apex 98%+ Conviction Execution)
                             try:
                                 import mt5_bridge_engine
-                                mt5_sym = "XAUUSD" if "XAU" in sym else sym.replace("USDT", "")
+                                mt5_sym = "XAUUSD" if "XAU" in sym else (sym.replace("USDT", "USD") if sym.endswith("USDT") else sym)
                                 lot_size = round(max(0.01, (margin_per_coin * leverage) / max(1.0, last_price * 1000.0)), 2)
                                 mt5_action = "BUY" if side.upper() == "BUY" else "SELL"
                                 mt5_bridge_engine.mt5_bridge.dispatch_order(
                                     symbol=mt5_sym,
                                     action=mt5_action,
-                                    volume=lot_size,
+                                    lot=lot_size,
                                     comment=f"Wealth_{side}_{sym}",
                                     client_id=str(chat_id)
                                 )
@@ -2478,12 +2478,12 @@ class PerpetualWealthGeneratorEngine:
                                     # MT5 Prop Firm Bridge Dual-Dispatch Synchronization for Spot
                                     try:
                                         import mt5_bridge_engine
-                                        mt5_sym = sym.replace("USDT", "")
+                                        mt5_sym = "XAUUSD" if "XAU" in sym else (sym.replace("USDT", "USD") if sym.endswith("USDT") else sym)
                                         spot_lot = round(max(0.01, alloc_per_coin / max(1.0, buy_price * 1000.0)), 2)
                                         mt5_bridge_engine.mt5_bridge.dispatch_order(
                                             symbol=mt5_sym,
                                             action="BUY",
-                                            volume=spot_lot,
+                                            lot=spot_lot,
                                             comment=f"SpotWealth_{sym}",
                                             client_id=str(chat_id)
                                         )

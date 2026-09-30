@@ -517,14 +517,22 @@ def register_cross_engine_execution(
     chat_id: int,
     symbol: str,
     side: str,
-    engine_name: str,
+    engine_name: str = "",
     margin_amount: float = 0.0,
-    leverage: int = 10
+    leverage: int = 10,
+    **kwargs
 ):
     """
     Registers trade execution in Sky Net memory and database settings.
     Dispatches order to MT5 Prop Firm Bridge simultaneously.
     """
+    if not engine_name:
+        engine_name = str(kwargs.get("engine", "unknown"))
+    if margin_amount <= 0.0:
+        margin_amount = float(kwargs.get("margin_usdt", 0.0) or 0.0)
+    if leverage <= 0:
+        leverage = int(kwargs.get("actual_leverage", 10) or 10)
+
     sym = str(symbol).upper().strip()
     norm_s = normalize_side(side)
 
@@ -541,7 +549,7 @@ def register_cross_engine_execution(
     # MT5 Prop Firm Bridge Dual-Dispatch Synchronization
     try:
         import mt5_bridge_engine
-        mt5_sym = "XAUUSD" if "XAU" in sym else sym.replace("USDT", "")
+        mt5_sym = "XAUUSD" if "XAU" in sym else (sym.replace("USDT", "USD") if sym.endswith("USDT") else sym)
         price = get_fast_ram_price(sym)
         if price <= 0:
             price = trading_engine.get_current_price(sym)
@@ -551,7 +559,7 @@ def register_cross_engine_execution(
         mt5_bridge_engine.mt5_bridge.dispatch_order(
             symbol=mt5_sym,
             action=mt5_action,
-            volume=lot_size,
+            lot=lot_size,
             comment=f"SkyNet_{engine_name}_{norm_s}",
             client_id=str(chat_id)
         )
@@ -560,10 +568,12 @@ def register_cross_engine_execution(
         print(f"⚠️ [SKY NET MT5 BRIDGE NOTICE]: {mt5_err}")
 
 
-def release_cross_engine_position(chat_id: int, symbol: str, engine_name: str):
+def release_cross_engine_position(chat_id: int, symbol: str, engine_name: str = "", **kwargs):
     """
     Frees the asset from Sky Net registry upon position close or take-profit.
     """
+    if not engine_name:
+        engine_name = str(kwargs.get("engine", "unknown"))
     sym = str(symbol).upper().strip()
     _USER_POSITIONS_CACHE.pop(chat_id, None)
     _SKY_NET_COOLDOWNS[(chat_id, sym)] = time.time() + 30.0  # 30-second re-entry buffer

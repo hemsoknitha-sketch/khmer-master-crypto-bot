@@ -131,6 +131,83 @@ class MT5ClientSession:
         self.breach_timestamp: float = 0.0
 
 
+# =========================================================================
+# CANONICAL MT5 SYMBOL NORMALIZER & BROKER ADAPTER (ZERO RETCODE 10006)
+# =========================================================================
+MT5_SUPPORTED_CRYPTO = {"BTC", "ETH", "SOL", "XRP", "LTC", "DOGE", "BNB", "ADA"}
+MT5_FOREX_CURRENCIES = {"USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "CNH", "SGD", "HKD", "SEK", "NOK", "TRY", "ZAR", "MXN"}
+MT5_METALS = {"XAU", "GOLD", "XAG", "SILVER", "XPT", "XPD"}
+MT5_INDICES_STOCKS = {
+    "US30", "US100", "US500", "NAS100", "SP500", "DJ30", "GER40", "DE40", "UK100", "JP225", "HK50",
+    "NVDA", "TSLA", "AAPL", "MSFT", "AMZN", "GOOGL", "META"
+}
+
+
+def normalize_mt5_symbol(symbol: str) -> str:
+    """
+    Cleans broker-specific suffixes (.c, .C, _i, _I, .pro, .PRO, .m, .M, or trailing c/C/m on 7-char forex)
+    while strictly preserving currency letters (e.g., USDCAD stays USDCAD, USDCHF stays USDCHF).
+    """
+    if not symbol:
+        return ""
+    s = str(symbol).strip().upper().replace("/", "")
+    # Remove dot extension if present (e.g., EURUSD.C -> EURUSD, XAUUSD.PRO -> XAUUSD)
+    if "." in s:
+        s = s.split(".")[0]
+    # Remove underscore suffixes (e.g., EURUSD_I -> EURUSD)
+    if s.endswith(("_I", "_PRO", "_M", "_C")):
+        s = s.rsplit("_", 1)[0]
+    # Handle single-letter broker suffix without dot (e.g., EURUSDC, XAUUSDC, GBPUSDM)
+    # Standard Forex pairs are 6 characters (e.g. USDCAD, USDCHF). If 7 chars and ends with C or M or I:
+    if len(s) == 7 and s.endswith(("C", "M", "I")):
+        s = s[:-1]
+    return s
+
+
+def is_mt5_supported_symbol(symbol: str) -> Tuple[bool, str]:
+    """
+    Checks if a symbol is supported on MT5 Prop Firm / Forex terminals.
+    Returns (is_supported, canonical_mt5_symbol).
+    Filters out Binance-exclusive altcoins (e.g. ASTER, 0G, MEW, RAVE, CELO, NMR) that do not exist on MT5.
+    """
+    if not symbol:
+        return False, ""
+    s = normalize_mt5_symbol(symbol)
+
+    # 1. Metals
+    if any(s.startswith(m) for m in ["XAU", "GOLD", "XAG"]):
+        if "XAU" in s or "GOLD" in s:
+            return True, "XAUUSD"
+        if "XAG" in s:
+            return True, "XAGUSD"
+        return True, s
+
+    # 2. Indices & Stocks
+    if s in MT5_INDICES_STOCKS:
+        return True, s
+
+    # 3. Crypto Assets
+    if s.endswith("USDT") or s.endswith("USD"):
+        base = s.replace("USDT", "").replace("USD", "")
+        if base in MT5_SUPPORTED_CRYPTO:
+            return True, f"{base}USD"
+        if s.endswith("USDT"):
+            return False, s
+
+    # 4. Forex Pairs (6 chars: 3 char base + 3 char quote)
+    if len(s) == 6:
+        base = s[:3]
+        quote = s[3:]
+        if base in MT5_FOREX_CURRENCIES and quote in MT5_FOREX_CURRENCIES:
+            return True, s
+
+    # 5. Crypto without USDT suffix (e.g. BTC, ETH)
+    if s in MT5_SUPPORTED_CRYPTO:
+        return True, f"{s}USD"
+
+    return False, s
+
+
 class MT5QuantumSignalCitadel:
     """
     🏛️ MT5 Quantum 95% Win-Rate Institutional Signal & Confluence Engine.
@@ -144,7 +221,7 @@ class MT5QuantumSignalCitadel:
 
     @classmethod
     def evaluate_quantum_signal(cls, raw_sym: str, sym_target: str) -> Tuple[str, float, str]:
-        raw_clean = str(raw_sym).upper().replace("/", "").replace("_I", "").replace(".PRO", "")
+        raw_clean = normalize_mt5_symbol(raw_sym)
 
         # 0. High-Impact Economic Blackout & Interbank Rollover Spread Freeze Guard
         try:
@@ -346,7 +423,7 @@ class MT5QuantumSignalCitadel:
         Ensures Gold (XAUUSD) has minimum $5.00/oz - $6.50/oz buffer (preventing noise stop-outs)
         and $15.00 - $22.50/oz TP (1:3+ Asymmetric Risk-to-Reward).
         """
-        raw_clean = str(symbol).upper().replace("/", "").replace("_I", "").replace(".PRO", "").replace("C", "")
+        raw_clean = normalize_mt5_symbol(symbol)
         act_norm = "BUY" if str(action).upper() in ["BUY", "LONG"] else "SELL"
 
         # 1. GOLD & METALS (XAUUSD / GOLD)
@@ -1076,7 +1153,7 @@ class MT5BridgeEngine:
         try:
             super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
             if account_id in super_admins or not account_id:
-                sym_rec = str(symbol or meta.get("symbol", "")).split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
+                sym_rec = normalize_mt5_symbol(symbol or meta.get("symbol", ""))
                 dist_res = db.record_virtual_trade_pnl(ticket=ticket, symbol=sym_rec or "TRADE", total_pnl=pnl, close_price=close_price)
                 if dist_res.get("investors_count", 0) > 0:
                     t_acc = dist_res.get("treasury_account_id", getattr(db, "MT5_TREASURY_REBATE_ACCOUNT", "52133938"))
@@ -1104,7 +1181,7 @@ class MT5BridgeEngine:
         now_ts = time.time()
         sym_clean = symbol or meta.get("symbol", "")
         if sym_clean:
-            sym_clean = sym_clean.split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
+            sym_clean = normalize_mt5_symbol(sym_clean)
             self._last_symbol_close_time[f"{account_id}_{sym_clean}"] = now_ts
             self._last_symbol_close_time[f"{account_id}_{symbol}"] = now_ts
             self._last_symbol_trade_time[f"{account_id}_{sym_clean}"] = now_ts
@@ -1231,7 +1308,7 @@ class MT5BridgeEngine:
         Returns the most recent sub-millisecond live quote for a symbol reported
         directly by connected MT5 terminals or shared HFT price caches.
         """
-        sym_clean = str(symbol).strip().upper().replace("/", "").replace("_I", "").replace(".PRO", "").replace("C", "")
+        sym_clean = normalize_mt5_symbol(symbol)
         with self._clients_lock:
             q = self._live_quotes.get(sym_clean) or self._live_quotes.get(str(symbol).strip().upper())
             if q and (time.time() - float(q.get("timestamp", 0.0))) < 300.0:
@@ -1298,11 +1375,54 @@ class MT5BridgeEngine:
     # =========================================================================
     # 5. TRADE SIGNAL DISPATCH API (SUB-MILLISECOND EXECUTION)
     # =========================================================================
+    def adapt_symbol_for_session(self, symbol: str, session: MT5ClientSession) -> str:
+        """
+        Dynamically adapts standard symbol (e.g., XAUUSD, USDCAD) for the target session's
+        account type:
+        - Server 5 / Cent Account (USC): appends broker suffix (.C for GTCFX, c for Exness)
+        - Server 2 / Standard Account (USD): strips suffixes to ensure clean symbol (e.g. XAUUSD, USDCAD)
+        """
+        clean = normalize_mt5_symbol(symbol)
+        if not clean:
+            return symbol
+
+        if clean.endswith("USDT"):
+            base = clean[:-4]
+            if base in ["XAU", "GOLD"]:
+                clean = "XAUUSD"
+            elif base in MT5_SUPPORTED_CRYPTO:
+                clean = f"{base}USD"
+
+        curr_str = str(getattr(session, "currency", "USD")).upper().strip()
+        broker_str = str(getattr(session, "broker", "")).lower()
+        server_str = str(getattr(session, "server", "") or getattr(session, "firm_name", "")).lower()
+
+        is_cent = (
+            curr_str in ["USC", "CENT", "EUAC", "GBPC"]
+            or "cent" in broker_str
+            or "micro" in broker_str
+            or "server 5" in server_str
+            or "cent" in server_str
+        )
+
+        if is_cent:
+            if "exness" in broker_str:
+                return f"{clean}c"
+            return f"{clean}.C"
+        return clean
+
+    def _send_session_order(self, session: MT5ClientSession, base_payload: dict, sym_clean: str) -> bool:
+        sess_sym = self.adapt_symbol_for_session(sym_clean, session)
+        p = dict(base_payload)
+        p["symbol"] = sess_sym
+        p["signature"] = self.generate_signature(p)
+        return self._send_raw_socket(session.socket_conn, p)
+
     def dispatch_order(
         self,
         symbol: str,
         action: str,
-        lot: float,
+        lot: float = 0.01,
         sl: float = 0.0,
         tp: float = 0.0,
         sl_dist: float = 0.0,
@@ -1317,14 +1437,63 @@ class MT5BridgeEngine:
         Dispatches a high-speed trade order signal simultaneously across
         all connected MT5 terminals (or a targeted account).
         """
+        # Flexible volume / lot keyword fallback
+        if "volume" in kwargs:
+            try:
+                lot = float(kwargs["volume"])
+            except Exception:
+                pass
+        elif "lot_size" in kwargs:
+            try:
+                lot = float(kwargs["lot_size"])
+            except Exception:
+                pass
+        elif "lots" in kwargs:
+            try:
+                lot = float(kwargs["lots"])
+            except Exception:
+                pass
+
         signal_id = f"SIG-{int(time.time()*1000)}-{uuid.uuid4().hex[:6]}"
-        sym_norm = str(symbol).strip().upper()
         act_norm = "BUY" if str(action).strip().upper() in ["BUY", "LONG"] else "SELL"
         lot_norm = max(0.01, round(float(lot), 2))
         sl_norm = round(float(sl), 5) if sl > 0 else 0.0
         tp_norm = round(float(tp), 5) if tp > 0 else 0.0
         sl_dist_norm = round(float(sl_dist), 5) if sl_dist > 0 else 0.0
         tp_dist_norm = round(float(tp_dist), 5) if tp_dist > 0 else 0.0
+
+        # MT5 Symbol Validation & Altcoin Shield (Zero Retcode 10006 SYMBOL_NOT_FOUND)
+        is_supp, canon_sym = is_mt5_supported_symbol(symbol)
+        if not is_supp:
+            logger.info(f"ℹ️ [MT5 SYMBOL SHIELD] Symbol '{symbol}' is a crypto altcoin not supported on MT5 Prop Firm/Forex terminals. Gracefully skipped MT5 dispatch.")
+            return {
+                "success": False,
+                "status": "skipped_unsupported_symbol",
+                "symbol": symbol,
+                "reason": "MT5_ALTCOIN_NOT_SUPPORTED",
+                "clients_reached": 0
+            }
+        sym_norm = canon_sym
+
+        # Resolve target account from client_id (Telegram chat_id) if not directly provided
+        if not target_account and client_id:
+            c_id_int = 0
+            try:
+                c_id_int = int(client_id)
+            except Exception:
+                pass
+            with self._clients_lock:
+                for a_id, sess in self.clients.items():
+                    if getattr(sess, "chat_id", 0) and getattr(sess, "chat_id", 0) == c_id_int:
+                        target_account = a_id
+                        break
+            if not target_account:
+                try:
+                    db_acc = db.get_system_setting(f"mt5_account_id_{client_id}", "")
+                    if db_acc and db_acc in self.clients:
+                        target_account = db_acc
+                except Exception:
+                    pass
 
         # Small Capital Suicide Lot Clamp (Invariants 1.1, 8, 33)
         # Prevents dangerous over-leveraging where manual Web or Telegram orders request 1.0+ lot on a sub-$50 account
@@ -1344,7 +1513,7 @@ class MT5BridgeEngine:
                 )
                 lot_norm = clamped_lot
 
-        # Construct Signed Payload
+        # Construct Base Signed Payload
         payload = {
             "type": "ORDER_SEND",
             "signal_id": signal_id,
@@ -1401,7 +1570,7 @@ class MT5BridgeEngine:
                     skipped_prop = True
                     logger.warning(f"🛡️ [DISPATCH GUARD] Skipped account {target_account} due to Prop Firm Breach status.")
                 elif session.socket_conn:
-                    if self._send_raw_socket(session.socket_conn, payload):
+                    if self._send_session_order(session, payload, sym_norm):
                         clients_reached += 1
             # 2. Master Signal Bridge / Cloud Copy-Trade Fallback for VIP accounts
             elif target_account:
@@ -1414,7 +1583,7 @@ class MT5BridgeEngine:
                             if not m_sess.is_prop_compliant:
                                 skipped_prop = True
                             elif m_sess.socket_conn:
-                                if self._send_raw_socket(m_sess.socket_conn, payload):
+                                if self._send_session_order(m_sess, payload, sym_norm):
                                     clients_reached += 1
                             break
                     if not target_found:
@@ -1423,21 +1592,23 @@ class MT5BridgeEngine:
                                 target_found = True
                                 if not any_sess.is_prop_compliant:
                                     skipped_prop = True
-                                elif self._send_raw_socket(any_sess.socket_conn, payload):
+                                elif self._send_session_order(any_sess, payload, sym_norm):
                                     clients_reached += 1
                                 break
                 else:
                     logger.warning(f"⚠️ [DISPATCH GUARD] Target account {target_account} is offline and not a super admin terminal. Skipping dispatch to protect admin capital.")
-            # 3. Broadcast mode (target_account is None or empty)
-            else:
+            # 3. Broadcast mode (explicit BROADCAST or scheduler global signals without specific client_id)
+            elif not client_id or target_account == "BROADCAST":
                 for acc_id, session in self.clients.items():
                     target_found = True
                     if not session.is_prop_compliant:
                         skipped_prop = True
                         continue
                     if session.socket_conn:
-                        if self._send_raw_socket(session.socket_conn, payload):
+                        if self._send_session_order(session, payload, sym_norm):
                             clients_reached += 1
+            else:
+                logger.debug(f"ℹ️ [MT5 DISPATCH] Chat {client_id} has no connected MT5 terminal. Skipping MT5 dispatch.")
 
         # Also broadcast via ZeroMQ PUB if available
         if self.zmq_pub_sock and ZMQ_AVAILABLE:
@@ -2089,7 +2260,7 @@ class MT5BridgeEngine:
                     total_pnl = 0.0
                     for p in open_positions:
                         sym = str(p.get("symbol", "")).upper()
-                        clean_sym = sym.split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
+                        clean_sym = normalize_mt5_symbol(sym)
                         open_symbols.add(sym)
                         open_symbols.add(clean_sym)
                         total_pnl += float(p.get("profit", 0.0) or 0.0)
@@ -2111,7 +2282,7 @@ class MT5BridgeEngine:
                     for a in allocations:
                         raw_sym = str(a.get("raw_symbol", a.get("symbol", ""))).upper()
                         sym_target = str(a.get("symbol", raw_sym)).upper()
-                        sym_clean = raw_sym.split(".")[0].replace("_I", "").replace("c", "").replace("C", "")
+                        sym_clean = normalize_mt5_symbol(raw_sym)
 
                         if raw_sym in open_symbols or sym_target in open_symbols or sym_clean in open_symbols:
                             continue
@@ -2163,13 +2334,7 @@ class MT5BridgeEngine:
                             lot = max(0.01, min(1.0, lot))
 
                         # Dynamic Symbol Adaptation for Server 2 Standard vs Server 5 Cent
-                        dispatch_sym = sym_target
-                        sess_srv = str(getattr(session, "server", "") or getattr(session, "firm_name", "")).lower()
-                        if "server 2" in sess_srv or "standard" in sess_srv:
-                            dispatch_sym = sym_clean
-                        elif "server 5" in sess_srv or "cent" in sess_srv:
-                            if not dispatch_sym.endswith(".C") and not dispatch_sym.endswith("c"):
-                                dispatch_sym = f"{sym_clean}.C"
+                        dispatch_sym = self.adapt_symbol_for_session(sym_clean, session)
 
                         # Evaluate Quantum Signal via 33 AI Models & Google Macro Satellite
                         action, confidence, signal_reason = MT5QuantumSignalCitadel.evaluate_quantum_signal(raw_sym, sym_target)

@@ -1122,7 +1122,7 @@ def execute_smart_x_futures(
                     mt5_bridge_engine.mt5_bridge.dispatch_order(
                         symbol=mt5_sym,
                         action=mt5_action,
-                        volume=lot_size,
+                        lot=lot_size,
                         comment=f"SmartX_{mode_str}_Gold",
                         client_id=str(chat_id)
                     )
@@ -1718,7 +1718,7 @@ def execute_reachsey_meas(
             mt5_bridge_engine.mt5_bridge.dispatch_order(
                 symbol="XAUUSD",
                 action=mt5_act,
-                volume=lot_size,
+                lot=lot_size,
                 comment="Reachsey_Meas_Gold",
                 client_id=str(chat_id)
             )
