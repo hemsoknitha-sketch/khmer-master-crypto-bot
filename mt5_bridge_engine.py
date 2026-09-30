@@ -1279,6 +1279,24 @@ class MT5BridgeEngine:
         sl_dist_norm = round(float(sl_dist), 5) if sl_dist > 0 else 0.0
         tp_dist_norm = round(float(tp_dist), 5) if tp_dist > 0 else 0.0
 
+        # Small Capital Suicide Lot Clamp (Invariants 1.1, 8, 33)
+        # Prevents dangerous over-leveraging where manual Web or Telegram orders request 1.0+ lot on a sub-$50 account
+        if target_account and target_account in self.clients:
+            sess_obj = self.clients[target_account]
+            curr_str = str(getattr(sess_obj, "currency", "USD")).upper().strip()
+            broker_str = str(getattr(sess_obj, "broker", "")).lower()
+            is_cent = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
+            raw_b = float(getattr(sess_obj, "balance", 100.0) or 100.0)
+            real_b = (raw_b / 100.0) if is_cent else raw_b
+
+            if real_b < 50.0 and lot_norm > 0.05:
+                clamped_lot = 0.05 if is_cent else 0.01
+                logger.warning(
+                    f"🛡️ [SMALL CAPITAL SHIELD] Clamped suicide lot {lot_norm} -> {clamped_lot} "
+                    f"for Account #{target_account} (Real Balance: ${real_b:.2f} USD). Capital Preserved!"
+                )
+                lot_norm = clamped_lot
+
         # Construct Signed Payload
         payload = {
             "type": "ORDER_SEND",

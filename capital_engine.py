@@ -3163,6 +3163,11 @@ class CapitalAutonomousEngine:
             if final_action in ["BUY", "SELL"] and confidence >= 75:
                 adx_val = setup.get("adx", 25.0)
                 rvol_val = setup.get("rvol", 1.0)
+
+                # Institutional Volume Filter (Invariant 43): Discard ghost volume setups (RVOL < 0.35x) to eliminate spread drag
+                if rvol_val < 0.35:
+                    logger.debug(f"🛡️ [LOW RVOL FILTER] Discarding {resolved_epic} setup (RVOL: {rvol_val:.2f}x < 0.35x minimum liquidity threshold).")
+                    continue
                 # Institutional Confluence Multiplier:
                 # Top priority (+50) on 100% Win Rate & Ultra-Low Spread Assets: US500 (S&P 500), GOLD, NVDA, TSLA
                 # Secondary (+35) for other Tech/Indices; Modest (+10) for Oil/DAX; Disfavored (-10) for Gas
