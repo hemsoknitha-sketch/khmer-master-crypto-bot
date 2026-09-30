@@ -1724,7 +1724,7 @@ function setupEventListeners() {
         });
     }
 
-    // MT5 Lot Size Pills
+    // MT5 Lot Size Pills & Custom Lot Input
     document.querySelectorAll('.lot-pill').forEach(pill => {
         pill.addEventListener('click', () => {
             document.querySelectorAll('.lot-pill').forEach(p => p.classList.remove('active'));
@@ -1735,6 +1735,21 @@ function setupEventListeners() {
             triggerHaptic('selection');
         });
     });
+
+    if (elements.mt5TradeLot) {
+        elements.mt5TradeLot.addEventListener('input', (e) => {
+            const rawVal = parseFloat(e.target.value) || 0.01;
+            const formatted = rawVal.toFixed(2);
+            if (elements.mt5LotValTag) elements.mt5LotValTag.textContent = formatted;
+            document.querySelectorAll('.lot-pill').forEach(p => {
+                if (parseFloat(p.getAttribute('data-lot')) === parseFloat(formatted)) {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
+                }
+            });
+        });
+    }
 
     // MT5 Buy & Sell Buttons
     if (elements.btnMt5Buy) {

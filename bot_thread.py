@@ -20334,6 +20334,8 @@ class TelegramBotThread(BaseThread):
                         new_state = False
                         input_capital = existing_cfg.get("capital", 100.0)
                         input_assets = existing_cfg.get("max_assets", 5)
+                        if len(args) >= 3 and str(args[2]).upper().strip() in ["CLOSE", "ALL", "CLOSE_ALL", "CLOSEALL", "PANIC", "HALT"]:
+                            bridge.dispatch_close(ticket=0, comment="AUTO_OFF_PANIC_ALL", target_account=target_account)
                     else:
                         # STATUS / CONFIG / VIEW
                         new_state = current_setting
@@ -20424,9 +20426,11 @@ class TelegramBotThread(BaseThread):
                             f"• `` `/mt5 AUTO ON 200 10` `` — ទុន $200 (១០ ទ្រព្យ)\n"
                             f"• `` `/mt5 AUTO ON 500 15` `` — ទុន $500 (១៥ ទ្រព្យ)\n"
                             f"• `` `/mt5 AUTO ON 1000 20` `` — ទុន $1000 (២០ ទ្រព្យ)\n"
-                            f"• `` `/mt5 AUTO OFF` `` — ផ្អាកដំណើរការ\n"
+                            f"• `` `/mt5 AUTO OFF` `` — ផ្អាកការបើក Order ថ្មី\n"
+                            f"• `` `/mt5 AUTO OFF CLOSE` `` — ផ្អាក និងបិទ Position ទាំងអស់ភ្លាមៗ\n"
+                            f"• `` `/mt5 CLOSE_ALL` `` — បិទ Position ទាំងអស់ (Panic Close All)\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **AI Swarm កំពុងដំណើរការស្វែងរក Setup លើទ្រព្យសកម្មទាំងនេះ ដើម្បី Execute ដោយស្វ័យប្រវត្តិ!**' if new_state else '⚪ **ប្រព័ន្ធបានផ្អាកការចូល Order ថ្មីដោយស្វ័យប្រវត្តិ។ Positions កំពុងរត់នៅតែត្រូវបានការពារដោយ Stop-Loss!**'}\n"
+                            f"{'✅ **AI Swarm កំពុងដំណើរការស្វែងរក Setup លើទ្រព្យសកម្មទាំងនេះ ដើម្បី Execute ដោយស្វ័យប្រវត្តិ!**' if new_state else '⚪ **ប្រព័ន្ធបានផ្អាកការចូល Order ថ្មីដោយស្វ័យប្រវត្តិ។ Positions កំពុងរត់នៅតែត្រូវបានការពារដោយ Stop-Loss! (ចុចប៊ូតុងខាងក្រោមបើចង់បិទទាំងអស់ភ្លាមៗ)**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"_Khmer Master Crypto_\n"
                             f"_APEX SUPER BRAIN AI_"
@@ -20460,14 +20464,16 @@ class TelegramBotThread(BaseThread):
                             f"• `` `/mt5 AUTO ON 500 15` `` — Capital $500 (15 Assets)\n"
                             f"• `` `/mt5 AUTO ON 1000 20` `` — Capital $1000 (20 Assets)\n"
                             f"• `` `/mt5 AUTO OFF` `` — Standby / Disable\n"
+                            f"• `` `/mt5 AUTO OFF CLOSE` `` — Standby and Close All Positions\n"
+                            f"• `` `/mt5 CLOSE_ALL` `` — Emergency Panic Close All\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"{'✅ **AI Swarm actively scanning these assets to execute trades autonomously!**' if new_state else '⚪ **Autonomous execution paused. Open positions remain shielded by Stop-Loss!**'}\n"
+                            f"{'✅ **AI Swarm actively scanning these assets to execute trades autonomously!**' if new_state else '⚪ **Autonomous execution paused. Open positions remain shielded by Stop-Loss! (Use button below to close all immediately)**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"_Khmer Master Crypto_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
 
-                    auto_kb = InlineKeyboardMarkup([
+                    auto_rows = [
                         [
                             InlineKeyboardButton("🚀 $100 (10 Assets)", callback_data="btn_mt5_auto_100_10"),
                             InlineKeyboardButton("💎 $100 (5 Assets)", callback_data="btn_mt5_auto_100_5")
@@ -20475,15 +20481,22 @@ class TelegramBotThread(BaseThread):
                         [
                             InlineKeyboardButton("🪙 $50 (3 Assets)", callback_data="btn_mt5_auto_50_3"),
                             InlineKeyboardButton("💎 $200 (10 Assets)", callback_data="btn_mt5_auto_200_10")
-                        ],
-                        [
+                        ]
+                    ]
+                    if not new_state:
+                        auto_rows.append([
+                            InlineKeyboardButton("🚨 បិទ Position ទាំងអស់ (Close All)", callback_data="btn_mt5_close_all"),
+                            InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_mt5_auto_refresh")
+                        ])
+                    else:
+                        auto_rows.append([
                             InlineKeyboardButton("🛑 Standby / OFF", callback_data="btn_mt5_auto_off"),
                             InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_mt5_auto_refresh")
-                        ],
-                        [
-                            InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
-                        ]
+                        ])
+                    auto_rows.append([
+                        InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
                     ])
+                    auto_kb = InlineKeyboardMarkup(auto_rows)
 
                     try:
                         await update.effective_message.reply_text(msg_auto, parse_mode="Markdown", reply_markup=auto_kb)

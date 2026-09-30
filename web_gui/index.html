@@ -882,18 +882,25 @@
                         <!-- Lot Size Quick Selector -->
                         <div class="trader-field-group">
                             <div class="lot-label-row">
-                                <label class="trader-label">LOT SIZE</label>
-                                <span class="lot-current-tag">Lot: <strong id="mt5-lot-val-tag">0.01</strong></span>
+                                <label class="trader-label">LOT SIZE SELECTION</label>
+                                <span class="lot-current-tag">Selected: <strong id="mt5-lot-val-tag">0.01</strong> Lot</span>
                             </div>
                             <div class="quick-lot-pills">
                                 <button type="button" class="lot-pill active" data-lot="0.01">0.01</button>
-                                <button type="button" class="lot-pill" data-lot="0.02">0.02</button>
                                 <button type="button" class="lot-pill" data-lot="0.05">0.05</button>
                                 <button type="button" class="lot-pill" data-lot="0.10">0.10</button>
                                 <button type="button" class="lot-pill" data-lot="0.20">0.20</button>
                                 <button type="button" class="lot-pill" data-lot="0.50">0.50</button>
+                                <button type="button" class="lot-pill" data-lot="1.00">1.00</button>
+                                <button type="button" class="lot-pill" data-lot="2.00">2.00</button>
+                                <button type="button" class="lot-pill" data-lot="3.00">3.00</button>
+                                <button type="button" class="lot-pill" data-lot="5.00">5.00</button>
                             </div>
-                            <input type="hidden" id="mt5-trade-lot" value="0.01">
+                            <div class="custom-lot-input-wrap">
+                                <span class="custom-lot-label">✍️ Custom Lot:</span>
+                                <input type="number" id="mt5-trade-lot" class="trader-lot-input" value="0.01" step="0.01" min="0.01" max="100.0" placeholder="1.00">
+                                <span class="lot-unit-tag">LOTS</span>
+                            </div>
                         </div>
                     </div>
 
