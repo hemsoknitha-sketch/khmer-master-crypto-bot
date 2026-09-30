@@ -5313,11 +5313,13 @@ async def gold_turbo_monitor(app: Application):
                     print(f"🧠 [AGI AUTO -> TURBO] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
                     if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
                         try:
-                            p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                            p = await asyncio.to_thread(smart_x_engine.get_fast_ram_price, "XAUUSDT")
+                            conf_val = float(turbo_res.get('confidence_pct', 0.0))
+                            conf_badge = " [APEX 98%+ CONVICTION]" if conf_val >= 98.0 else ""
                             notif = (
-                                "👑 *[SMARTX AGI AUTO -> TURBO SPRINT]* 🚀\n"
+                                f"👑 *[SMARTX AGI AUTO -> TURBO SPRINT]{conf_badge}* 🚀\n"
                                 "━━━━━━━━━━━━\n"
-                                f"• Direction  : `{side} ({turbo_res.get('confidence_pct')}% Conf)`\n"
+                                f"• Direction  : `{side} ({conf_val}% Conf)`\n"
                                 "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                                 f"• Entry Price: `${p:,.2f}`\n"
                                 f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
@@ -5343,11 +5345,13 @@ async def gold_turbo_monitor(app: Application):
                     print(f"🧠 [AGI AUTO -> SONIC] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
                     if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
                         try:
-                            p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                            p = await asyncio.to_thread(smart_x_engine.get_fast_ram_price, "XAUUSDT")
+                            conf_val = float(sonic_res.get('confidence_pct', 0.0))
+                            conf_badge = " [APEX 98%+ CONVICTION]" if conf_val >= 98.0 else ""
                             notif = (
-                                "👑 *[SMARTX AGI AUTO -> SONIC SCALP]* 🎯\n"
+                                f"👑 *[SMARTX AGI AUTO -> SONIC SCALP]{conf_badge}* 🎯\n"
                                 "━━━━━━━━━━━━\n"
-                                f"• Direction  : `{side} ({sonic_res.get('confidence_pct')}% Conf)`\n"
+                                f"• Direction  : `{side} ({conf_val}% Conf)`\n"
                                 "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                                 f"• Entry Price: `${p:,.2f}`\n"
                                 f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
@@ -5373,11 +5377,13 @@ async def gold_turbo_monitor(app: Application):
                 print(f"🥇 [SUPER SMART GOLD TURBO] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
                 if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
                     try:
-                        p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                        p = await asyncio.to_thread(smart_x_engine.get_fast_ram_price, "XAUUSDT")
+                        conf_val = float(turbo_res.get('confidence_pct', 0.0))
+                        conf_badge = " [APEX 98%+ CONVICTION]" if conf_val >= 98.0 else ""
                         notif = (
-                            "👑 *[SMARTX GOLD TURBO ENTRY]* 🎯\n"
+                            f"👑 *[SMARTX GOLD TURBO ENTRY]{conf_badge}* 🎯\n"
                             "━━━━━━━━━━━━\n"
-                            f"• Direction  : `{side} ({turbo_res.get('confidence_pct')}% Conf)`\n"
+                            f"• Direction  : `{side} ({conf_val}% Conf)`\n"
                             "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                             f"• Entry Price: `${p:,.2f}`\n"
                             f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"
@@ -5402,11 +5408,13 @@ async def gold_turbo_monitor(app: Application):
                 print(f"👑 [SUPER SMART GOLD SONIC] Chat: {chat_id} | Side: {side} | Lev: {lev}x | Res: {exec_res.get('status')}")
                 if isinstance(exec_res, dict) and (exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId")):
                     try:
-                        p = await asyncio.to_thread(trading_engine.get_current_price, "XAUUSDT")
+                        p = await asyncio.to_thread(smart_x_engine.get_fast_ram_price, "XAUUSDT")
+                        conf_val = float(sonic_res.get('confidence_pct', 0.0))
+                        conf_badge = " [APEX 98%+ CONVICTION]" if conf_val >= 98.0 else ""
                         notif = (
-                            "👑 *[SMARTX GOLD SONIC ENTRY]* 🎯\n"
+                            f"👑 *[SMARTX GOLD SONIC ENTRY]{conf_badge}* 🎯\n"
                             "━━━━━━━━━━━━\n"
-                            f"• Direction  : `{side} ({sonic_res.get('confidence_pct')}% Conf)`\n"
+                            f"• Direction  : `{side} ({conf_val}% Conf)`\n"
                             "• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                             f"• Entry Price: `${p:,.2f}`\n"
                             f"• Capital    : `${amount:.2f} USDT` ({lev}x ISOLATED)\n"

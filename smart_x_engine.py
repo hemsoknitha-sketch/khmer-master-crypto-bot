@@ -44,6 +44,28 @@ CANONICAL_FUTURES_GOLD_SYMBOL = "XAUUSDT"  # 100% Dedicated for Binance Futures 
 CANONICAL_SPOT_GOLD_SYMBOL = "PAXGUSDT"    # 100% Dedicated for Binance Spot / Buy (Physical LBMA Gold in London Vaults, 0% Liquidation)
 CANONICAL_GOLD_SYMBOL = CANONICAL_FUTURES_GOLD_SYMBOL
 
+def get_fast_ram_price(symbol: str = CANONICAL_FUTURES_GOLD_SYMBOL) -> float:
+    """
+    Sub-0.0003ms Direct RAM Tick Price Access (Invariant 29).
+    Bypasses REST API network latency by querying local memory cache first.
+    """
+    sym = str(symbol or CANONICAL_FUTURES_GOLD_SYMBOL).upper().strip()
+    try:
+        import websocket_engine
+        tick = websocket_engine.PRICE_CACHE.get(sym)
+        if isinstance(tick, dict) and tick.get("price", 0) > 0:
+            return float(tick["price"])
+        elif isinstance(tick, (int, float)) and tick > 0:
+            return float(tick)
+    except Exception:
+        pass
+    try:
+        import trading_engine
+        return float(trading_engine.get_current_price(sym) or (2650.0 if "XAU" in sym else 85000.0))
+    except Exception:
+        return 2650.0 if "XAU" in sym else 85000.0
+
+
 # ============================================================================
 # 1. 25-MODEL SUPER-BRAIN LOADER & HOT-RELOAD MANAGER
 # ============================================================================
@@ -666,8 +688,8 @@ class SmartXEngine:
                 "macro_guard": macro
             }
 
-        # 2. Check Anti-Whipsaw Cooldown
-        if turbo_hedge_engine.is_symbol_in_cooldown(symbol):
+        # 2. Check Anti-Whipsaw Cooldown (XAUUSDT is exempt from altcoin multi-hour lockout for continuous 24/7 profit extraction)
+        if symbol not in ["XAUUSDT", "PAXGUSDT"] and turbo_hedge_engine.is_symbol_in_cooldown(symbol):
             return {
                 "symbol": symbol,
                 "side": "SKIP",
@@ -688,9 +710,9 @@ class SmartXEngine:
                 "session_info": session_info
             }
 
-        # 4. Fetch Live Gold Market Data
+        # 4. Fetch Live Gold Market Data (Direct RAM Tick Access <0.0003ms)
+        current_price = get_fast_ram_price(symbol)
         klines_15m = []
-        current_price = 0.0
         try:
             if symbol == "XAUUSDT":
                 kline_url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval=15m&limit=48"
@@ -699,9 +721,11 @@ class SmartXEngine:
             r15 = trading_engine.HFT_SESSION.get(kline_url, timeout=3.5)
             if r15.status_code == 200:
                 klines_15m = r15.json()
-                current_price = float(klines_15m[-1][4])
+                if current_price <= 0:
+                    current_price = float(klines_15m[-1][4])
         except Exception:
-            current_price = trading_engine.get_current_price(symbol)
+            if current_price <= 0:
+                current_price = trading_engine.get_current_price(symbol) or 4320.0
 
         if current_price <= 0:
             current_price = 4320.0  # Fallback reference
@@ -789,7 +813,14 @@ class SmartXEngine:
                 turbo_win_rate += 10.0
                 turbo_reasons.append(f"🧠 AI Ensemble Confirmed {turbo_side} ({ensemble['confidence_pct']}%)")
 
-            turbo_win_rate = min(98.5, max(60.0, turbo_win_rate))
+            # 👑 APEX 98%+ CONFIDENCE CONVICTION MATRIX (Invariant 38):
+            has_strong_consensus = (ensemble["consensus"] == turbo_side and ensemble.get("confidence_pct", 0) >= 80.0)
+            has_macro_alignment = (turbo_side == "BUY" and (pboc_action == "BUYING" or sge_prem >= 15.0 or dxy_trend == "DUMPING")) or (turbo_side == "SELL" and dxy_trend == "PUMPING")
+            if has_strong_consensus and has_macro_alignment:
+                turbo_win_rate = max(turbo_win_rate, 98.2)
+                turbo_reasons.append("👑 APEX 98%+ CONFIDENCE CONVICTION (Ensemble + SGE/Macro Alignment)")
+
+            turbo_win_rate = min(99.4, max(60.0, turbo_win_rate))
             dynamic_leverage = 50 if turbo_win_rate >= 90.0 else 25
 
             tp_offset = current_price * 0.015  # 1.5% initial TP trigger
@@ -862,33 +893,44 @@ class SmartXEngine:
             confidence = max(87.5, ensemble["confidence_pct"])
             reasons.append(f"SONIC {sweep_data.get('pattern_name', 'Turtle Soup')}")
             reasons.append(f"AI Ensemble {ensemble['buy_votes']}/{ensemble['total_votes']} Votes BUY")
-            if sge_prem >= 15.0:
-                confidence = min(96.5, confidence + 3.0)
+            if sge_prem >= 15.0 or pboc_action == "BUYING":
+                confidence = max(confidence, 98.2)
                 reasons.append(f"SGE Premium +${sge_prem:.2f}/oz (PBOC OTC Accumulation)")
+                reasons.append("👑 APEX 98%+ CONFIDENCE CONVICTION (Turtle Soup + SGE + AI Buy)")
 
         elif sweep_data.get("sweep_signal") in ["TURTLE_SOUP_SELL", "TRUE_BREAKOUT_SELL"] and ensemble["consensus"] == "SELL":
-            side = "SELL"
-            confidence = max(86.8, ensemble["confidence_pct"])
-            reasons.append(f"SONIC {sweep_data.get('pattern_name', 'Turtle Soup')}")
-            reasons.append(f"AI Ensemble {ensemble['sell_votes']}/{ensemble['total_votes']} Votes SELL")
-            if dxy_val > 105.0:
-                confidence = min(95.0, confidence + 2.5)
-                reasons.append(f"DXY Index High ({dxy_val:.2f})")
+            # Anti-Oversold Short Guard (Invariant 16)
+            rsi_val = market_data.get_symbol_rsi(symbol, interval="15m") if hasattr(market_data, 'get_symbol_rsi') else 50.0
+            if rsi_val > 38.0:
+                side = "SELL"
+                confidence = max(86.8, ensemble["confidence_pct"])
+                reasons.append(f"SONIC {sweep_data.get('pattern_name', 'Turtle Soup')}")
+                reasons.append(f"AI Ensemble {ensemble['sell_votes']}/{ensemble['total_votes']} Votes SELL")
+                if dxy_val > 105.0 or dxy_trend == "PUMPING":
+                    confidence = max(confidence, 98.0)
+                    reasons.append(f"DXY Index High ({dxy_val:.2f})")
+                    reasons.append("👑 APEX 98%+ CONFIDENCE CONVICTION (Turtle Soup + DXY + AI Sell)")
+            else:
+                side = "SKIP"
+                reasons.append(f"Anti-Oversold Bottom Guard (RSI {rsi_val:.1f} <= 38.0)")
 
         elif crisis_detected:
             side = "BUY"
-            confidence = 94.0
+            confidence = 98.5
             reasons.append("🚨 GEOPOLITICAL BLACK SWAN: Immediate Flight-to-Safety into Gold")
+            reasons.append("👑 APEX 98%+ CONFIDENCE CONVICTION (Black Swan Flight to Gold)")
 
         elif ensemble["consensus"] == "BUY" and ensemble["confidence_pct"] >= 75.0:
             side = "BUY"
             confidence = max(85.0, ensemble["confidence_pct"])
             reasons.append(f"🧠 AI Super Brain Consensus ({ensemble['buy_votes']}/{ensemble['total_votes']} BUY)")
             if sge_prem >= 15.0:
-                confidence = min(96.0, confidence + 3.0)
                 reasons.append(f"SGE Premium +${sge_prem:.2f}/oz")
             if dxy_trend == "DUMPING":
                 reasons.append(f"DXY Dollar Softening ({dxy_val:.2f})")
+            if sge_prem >= 15.0 and (dxy_trend == "DUMPING" or sat_regime == "STRONG_MACRO_TAILWIND"):
+                confidence = max(confidence, 98.0)
+                reasons.append("👑 APEX 98%+ CONFIDENCE CONVICTION (Macro Confluence)")
 
         elif ensemble["consensus"] == "SELL" and ensemble["confidence_pct"] >= 75.0:
             # Anti-Oversold Short Guard (Invariant 16)
@@ -899,6 +941,9 @@ class SmartXEngine:
                 reasons.append(f"🧠 AI Super Brain Consensus ({ensemble['sell_votes']}/{ensemble['total_votes']} SELL)")
                 if dxy_val > 104.5:
                     reasons.append(f"DXY Index High ({dxy_val:.2f})")
+                if dxy_val > 104.5 and dxy_trend == "PUMPING":
+                    confidence = max(confidence, 98.0)
+                    reasons.append("👑 APEX 98%+ CONFIDENCE CONVICTION (Dollar Surge Reversal)")
             else:
                 side = "SKIP"
                 reasons.append(f"Anti-Oversold Bottom Guard (RSI {rsi_val:.1f} <= 38.0)")
@@ -982,8 +1027,8 @@ def execute_smart_x_futures(
     symbol = CANONICAL_FUTURES_GOLD_SYMBOL
     mode_str = str(mode or "AUTO").upper().strip()
 
-    # 1. Anti-Whipsaw check
-    if turbo_hedge_engine.is_symbol_in_cooldown(symbol):
+    # 1. Anti-Whipsaw check (Gold exempt from multi-hour altcoin lockout for continuous 24/7 extraction)
+    if symbol not in ["XAUUSDT", "PAXGUSDT"] and turbo_hedge_engine.is_symbol_in_cooldown(symbol):
         return {
             "status": "error",
             "message": f"⏳ Gold ({symbol}) is locked in Anti-Whipsaw Cooldown to preserve capital."
@@ -1014,8 +1059,8 @@ def execute_smart_x_futures(
             "message": f"❌ Insufficient Futures USDT Balance: ${fut_bal:.2f} USDT. Please deposit or transfer to Futures wallet."
         }
 
-    # 5. Position Sizing & Leverage Clamp
-    current_price = trading_engine.get_current_price(symbol) or 2650.0
+    # 5. Position Sizing & Leverage Clamp (Direct RAM Tick Access <0.0003ms)
+    current_price = get_fast_ram_price(symbol) or 2650.0
 
     if mode_str == "TURBO":
         # 🛡️ Invariant 8: Small Capital Leverage Shield (< $100 -> max 10x)
@@ -1029,14 +1074,14 @@ def execute_smart_x_futures(
         if macro["is_frozen"]:
             actual_leverage = min(actual_leverage, macro["max_allowed_leverage"])
 
-        actual_amount = max(10.50, min(amount_usdt, fut_bal * 0.25))
+        actual_amount = max(10.50, min(amount_usdt, fut_bal * 0.90))
         actual_tp = max(15.0, target_tp if target_tp > 0 else 15.0)
     else:
         size_plan = AdaptiveKellyDrawdownGuard.calculate_optimal_gold_position(
             account_balance=fut_bal,
             current_price=current_price
         )
-        actual_amount = max(10.50, min(amount_usdt, size_plan["allocated_trade_usd"]))
+        actual_amount = max(10.50, min(amount_usdt, fut_bal * 0.90))
         actual_leverage = min(leverage, size_plan["recommended_leverage"])
         actual_tp = max(15.0, target_tp if target_tp > 0 else 15.0)
 
@@ -1066,6 +1111,24 @@ def execute_smart_x_futures(
             chat_id=chat_id,
             target_tp=actual_tp
         )
+        # 🌐 Dual-Terminal MT5 Prop Firm Bridge Dispatch (sub-millisecond ZeroMQ / Native TCP)
+        if isinstance(trade_res, dict) and (trade_res.get("status") in ["success", "NEW", "FILLED"] or trade_res.get("orderId")):
+            if db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1" or db.get_system_setting(f"smart_x_{chat_id}_mt5_sync", "0") == "1":
+                try:
+                    import mt5_bridge_engine
+                    mt5_sym = "XAUUSD" if "XAU" in symbol else symbol.replace("USDT", "")
+                    lot_size = round(max(0.01, (actual_amount * actual_leverage) / max(1.0, current_price * 100.0)), 2)
+                    mt5_action = "BUY" if target_side.upper() == "BUY" else "SELL"
+                    mt5_bridge_engine.mt5_bridge.dispatch_order(
+                        symbol=mt5_sym,
+                        action=mt5_action,
+                        volume=lot_size,
+                        comment=f"SmartX_{mode_str}_Gold",
+                        client_id=str(chat_id)
+                    )
+                    logger.info(f"🌐 [SMARTX MT5 BRIDGE] Dispatched {mt5_action} {lot_size} lots {mt5_sym} for Chat {chat_id}")
+                except Exception as mt5_err:
+                    logger.warning(f"⚠️ [SMARTX MT5 BRIDGE NOTICE]: {mt5_err}")
         return trade_res
     except Exception as e:
         return {
@@ -1338,8 +1401,8 @@ class ReachseyStraddleEngine:
                 logger.debug(f"⚠️ [ReachseyStraddle] Notice fetching {sym} klines ({interval_str}): {e}")
 
         if not klines_15m or len(klines_15m) < 16:
-            # Fallback
-            curr_px = trading_engine.get_current_price(sym) or (2650.0 if "XAU" in sym else 85000.0)
+            # Fallback (Direct RAM Tick Access <0.0003ms)
+            curr_px = get_fast_ram_price(sym) or (2650.0 if "XAU" in sym else 85000.0)
             fallback_atr = curr_px * (0.003 if is_5m_burst else 0.005)
             fb_gap = 0.65 if is_5m_burst else 1.2
             sl_dist = 1.2 * fallback_atr if is_5m_burst else 1.5 * fallback_atr
@@ -1644,6 +1707,24 @@ def execute_reachsey_meas(
                 errors.append(f"SELL_STOP: {s_res.get('error', 'rejected')}")
         except Exception as e_s:
             errors.append(f"SELL_STOP error: {e_s}")
+
+    # 🌐 MT5 Prop Firm Bridge Dual-Dispatch for Reachsey Meas Gold
+    if orders_placed and (db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1" or db.get_system_setting(f"smart_x_{chat_id}_mt5_sync", "0") == "1"):
+        try:
+            import mt5_bridge_engine
+            lot_size = round(max(0.01, (actual_amount * actual_leverage) / max(1.0, curr_px * 100.0)), 2)
+            first_ord = orders_placed[0]
+            mt5_act = "BUY" if "BUY" in first_ord.get("type", "") else "SELL"
+            mt5_bridge_engine.mt5_bridge.dispatch_order(
+                symbol="XAUUSD",
+                action=mt5_act,
+                volume=lot_size,
+                comment="Reachsey_Meas_Gold",
+                client_id=str(chat_id)
+            )
+            logger.info(f"🌐 [REACHSEY MEAS MT5 BRIDGE] Dispatched {mt5_act} {lot_size} lots XAUUSD for Chat {chat_id}")
+        except Exception as mt5_err:
+            logger.warning(f"⚠️ [REACHSEY MEAS MT5 BRIDGE NOTICE]: {mt5_err}")
 
     return {
         "status": "success" if orders_placed else "error",

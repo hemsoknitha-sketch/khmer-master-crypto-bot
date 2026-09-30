@@ -13633,11 +13633,13 @@ class TelegramBotThread(BaseThread):
                                 chat_id, target_symbol, sig["side"], amount, leverage, target_tp, mode_label
                             )
                             if exec_res.get("status") in ["success", "NEW", "FILLED"] or exec_res.get("orderId"):
-                                p = await asyncio.to_thread(trading_engine.get_current_price, target_symbol)
+                                p = await asyncio.to_thread(smart_x_engine.get_fast_ram_price, target_symbol)
+                                conf_val = float(sig.get('confidence_pct', 0.0))
+                                conf_badge = " [APEX 98%+ CONVICTION]" if conf_val >= 98.0 else ""
                                 notif = (
-                                    f"👑 *[SMARTX GOLD {mode_label} ENTRY]* 🎯\n"
+                                    f"👑 *[SMARTX GOLD {mode_label} ENTRY]{conf_badge}* 🎯\n"
                                     f"{div}\n"
-                                    f"• Direction  : `{sig['side']} ({sig.get('confidence_pct')}% Conf)`\n"
+                                    f"• Direction  : `{sig['side']} ({conf_val}% Conf)`\n"
                                     f"• Symbol     : `XAUUSDT (Perpetual Futures)`\n"
                                     f"• Entry Price: `${p:,.2f}`\n"
                                     f"• Capital    : `${amount:.2f} USDT` ({leverage}x)\n"

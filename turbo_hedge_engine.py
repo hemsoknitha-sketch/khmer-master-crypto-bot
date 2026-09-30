@@ -1316,7 +1316,10 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         target_notional_for_risk = 0.25 / max(0.01, (stop_dist_pct / 100.0))
         target_margin_for_risk = target_notional_for_risk / max(1, effective_leverage)
         scaled_amount = max(4.00, target_margin_for_risk * dna.get("margin_scale_factor", 1.0))
-        dynamic_amount_usdt = min(amount_usdt, scaled_amount)
+        if symbol in ["XAUUSDT", "PAXGUSDT"]:
+            dynamic_amount_usdt = min(amount_usdt, avail_bal * 0.90)
+        else:
+            dynamic_amount_usdt = min(amount_usdt, scaled_amount)
 
         # 🛡️ Strict Margin Safety Shield:
         if avail_bal < dynamic_amount_usdt or avail_bal < 8.0:
@@ -2004,7 +2007,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_scale_out_level", "0")
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_derisked_recovery", "0")
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_peak_bounce_roi", "0.0")
-            cooldown_dur = 1800 if is_breakeven_triggered else 14400
+            cooldown_dur = 30 if symbol in ["XAUUSDT", "PAXGUSDT"] else (1800 if is_breakeven_triggered else 14400)
             add_symbol_cooldown(symbol, cooldown_dur)
 
             tot_pnl_str = db.get_system_setting(f"turbo_hedge_{chat_id}_{symbol}_total_harvested_pnl", "0.0")
@@ -2063,7 +2066,8 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
         if is_close_successful(close_res):
             db.remove_turbo_hedge_bot(chat_id, symbol)
-            add_symbol_cooldown(symbol, 14400)
+            cooldown_dur_stag = 30 if symbol in ["XAUUSDT", "PAXGUSDT"] else 14400
+            add_symbol_cooldown(symbol, cooldown_dur_stag)
 
         is_quiet = db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
         if not is_quiet and app and hasattr(app, "bot"):
@@ -2102,7 +2106,8 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         db.update_system_setting(f"turbo_hedge_{chat_id}_last_close_timestamp", str(now_ts))
         if is_close_successful(close_res):
             db.remove_turbo_hedge_bot(chat_id, symbol)
-            add_symbol_cooldown(symbol, 10800)
+            cooldown_dur_sl = 60 if symbol in ["XAUUSDT", "PAXGUSDT"] else 10800
+            add_symbol_cooldown(symbol, cooldown_dur_sl)
             db.log_turbo_hedge_trade_history(chat_id, symbol, current_side, entry_price, mark_price, position_amt, net_pnl_usdt, roi_pct, "ANTI_WHIPSAW_STOP_LOSS")
             try:
                 import macro_auto_trade_engine
