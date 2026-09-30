@@ -1839,6 +1839,31 @@ def execute_reachsey_crypto(
     orders_placed = []
     errors = []
 
+    # 🦅 Sky Net Universal Cross-Engine Zero-Opposing Gatekeeper
+    try:
+        import sky_net_orchestrator
+        sk_b_ok, sk_b_reason, _ = sky_net_orchestrator.validate_cross_engine_entry(
+            chat_id=chat_id,
+            symbol=target_sym,
+            proposed_side="BUY",
+            requesting_engine="smartx"
+        )
+        if not sk_b_ok:
+            levels["is_buy_blocked"] = True
+            errors.append(f"SKY_NET_GUARD (BUY): {sk_b_reason}")
+
+        sk_s_ok, sk_s_reason, _ = sky_net_orchestrator.validate_cross_engine_entry(
+            chat_id=chat_id,
+            symbol=target_sym,
+            proposed_side="SELL",
+            requesting_engine="smartx"
+        )
+        if not sk_s_ok:
+            levels["is_sell_blocked"] = True
+            errors.append(f"SKY_NET_GUARD (SELL): {sk_s_reason}")
+    except Exception as e_sk:
+        print(f"⚠️ [SkyNet Reachsey Guard Error]: {e_sk}")
+
     # BUY-STOP Order
     if not levels["is_buy_blocked"]:
         try:
@@ -1862,6 +1887,21 @@ def execute_reachsey_crypto(
                     "tp": levels["buy_tp"],
                     "orderId": b_res.get("orderId")
                 })
+                try:
+                    import sky_net_orchestrator
+                    sky_net_orchestrator.register_cross_engine_execution(
+                        chat_id=chat_id,
+                        symbol=target_sym,
+                        side="BUY",
+                        engine="smartx",
+                        margin_usdt=actual_amount,
+                        leverage=actual_leverage,
+                        entry_price=levels["buy_stop_trigger"],
+                        confidence=89.0,
+                        metadata={"type": "BUY_STOP", "orderId": b_res.get("orderId")}
+                    )
+                except Exception:
+                    pass
             else:
                 errors.append(f"BUY_STOP: {b_res.get('error', 'rejected')}")
         except Exception as e_b:
@@ -1890,6 +1930,21 @@ def execute_reachsey_crypto(
                     "tp": levels["sell_tp"],
                     "orderId": s_res.get("orderId")
                 })
+                try:
+                    import sky_net_orchestrator
+                    sky_net_orchestrator.register_cross_engine_execution(
+                        chat_id=chat_id,
+                        symbol=target_sym,
+                        side="SELL",
+                        engine="smartx",
+                        margin_usdt=actual_amount,
+                        leverage=actual_leverage,
+                        entry_price=levels["sell_stop_trigger"],
+                        confidence=89.0,
+                        metadata={"type": "SELL_STOP", "orderId": s_res.get("orderId")}
+                    )
+                except Exception:
+                    pass
             else:
                 errors.append(f"SELL_STOP: {s_res.get('error', 'rejected')}")
         except Exception as e_s:

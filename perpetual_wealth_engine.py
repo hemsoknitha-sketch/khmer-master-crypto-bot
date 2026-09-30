@@ -1429,6 +1429,21 @@ class PerpetualWealthGeneratorEngine:
                         _active_wealth_exec_keys.add(exec_key)
 
                         try:
+                            # 🦅 Sky Net Universal Cross-Engine Zero-Opposing Gatekeeper
+                            try:
+                                import sky_net_orchestrator
+                                sk_ok, sk_reason, sk_meta = sky_net_orchestrator.validate_cross_engine_entry(
+                                    chat_id=chat_id,
+                                    symbol=sym,
+                                    proposed_side=side,
+                                    requesting_engine="wealth"
+                                )
+                                if not sk_ok:
+                                    print(f"🛑 [SKY NET GATEKEEPER] Wealth entry blocked for {sym} ({side}): {sk_reason}")
+                                    continue
+                            except Exception as sk_err:
+                                print(f"⚠️ [SKY NET NOTICE]: {sk_err}")
+
                             # Dynamic Asset DNA Volatility Sizing (Fixed Dollar Risk Parity <= $1.50 Cap)
                             cand_atr = cand.get("atr_pct", 1.5)
                             cand_sizing = PerpetualWealthGeneratorEngine.calculate_asset_dna_sizing(
@@ -1517,6 +1532,20 @@ class PerpetualWealthGeneratorEngine:
                                 print(f"🌐 [WEALTH MT5 BRIDGE] Dispatched {mt5_action} {lot_size} lots {mt5_sym} for Chat {chat_id}")
                             except Exception as mt5_err:
                                 print(f"⚠️ [WEALTH MT5 BRIDGE NOTICE]: {mt5_err}")
+
+                            # 🦅 Sky Net Universal Cross-Engine Registration
+                            try:
+                                import sky_net_orchestrator
+                                sky_net_orchestrator.register_cross_engine_execution(
+                                    chat_id=chat_id,
+                                    symbol=sym,
+                                    side=side,
+                                    engine_name="wealth",
+                                    margin_amount=margin_per_coin,
+                                    leverage=leverage
+                                )
+                            except Exception:
+                                pass
 
                             # Preserves Invariant 30 requirement: add_wealth_cooldown(sym, duration_seconds=900)
                             add_wealth_cooldown(sym, duration_seconds=900)

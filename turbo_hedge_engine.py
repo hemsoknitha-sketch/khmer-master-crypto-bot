@@ -1235,6 +1235,22 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
 
     _active_executing_keys.add(exec_key)
     try:
+        # 🦅 APEX 5-ENGINE SKY NET CONFLUENCE & ZERO-OPPOSING GATEKEEPER
+        if chat_id > 0 and side.upper() in ["BUY", "SELL"]:
+            try:
+                import sky_net_orchestrator
+                sk_ok, sk_reason, sk_meta = sky_net_orchestrator.validate_cross_engine_entry(
+                    chat_id=chat_id,
+                    symbol=symbol,
+                    proposed_side=side,
+                    requesting_engine="turbo_hedge"
+                )
+                if not sk_ok:
+                    print(f"🛑 [SKY NET GATEKEEPER] Turbo Hedge order blocked for {symbol} ({side}): {sk_reason}")
+                    return {"status": "skipped", "reason": f"SKY_NET_GUARD: {sk_reason}"}
+            except Exception as sk_err:
+                print(f"⚠️ [SKY NET NOTICE]: {sk_err}")
+
         # 🛡️ Super Delta-Neutral Route Handler: Spot Buy 1x + Futures Short 1x with Atomic Rollback Protection
         if side.upper() in ["HEDGE", "DELTA_NEUTRAL"]:
             return execute_super_delta_neutral_hedge(api_key, api_secret, symbol, amount_usdt, leverage=max(1, leverage), chat_id=chat_id)
@@ -1388,6 +1404,20 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                     db.add_turbo_hedge_bot(chat_id, symbol, amount_usdt, effective_leverage, side, target_tp=target_tp, is_bot_initiated=True)
                 except Exception as db_err:
                     print(f"⚠️ [TURBO HEDGE BOT DB NOTICE]: {db_err}")
+
+                # 🦅 Sky Net Universal Cross-Engine Registration
+                try:
+                    import sky_net_orchestrator
+                    sky_net_orchestrator.register_cross_engine_execution(
+                        chat_id=chat_id,
+                        symbol=symbol,
+                        side=side,
+                        engine_name="turbo_hedge",
+                        margin_amount=dynamic_amount_usdt,
+                        leverage=effective_leverage
+                    )
+                except Exception as sk_reg_err:
+                    pass
 
                 # 🏛️ MT5 Prop Firm Bridge Dual-Dispatch (< 0.001ms Non-Blocking)
                 try:

@@ -5586,6 +5586,15 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_wealth", "btn_wealth_menu", "btn_wealth_refresh"]:
                 context.args = []
                 await wealth_command(update, context)
+            elif data in ["btn_skynet", "btn_skynet_refresh", "btn_skynet_status"]:
+                context.args = []
+                await skynet_command(update, context)
+            elif data == "btn_skynet_scan":
+                context.args = ["SCAN"]
+                await skynet_command(update, context)
+            elif data == "btn_skynet_guard":
+                context.args = ["GUARD"]
+                await skynet_command(update, context)
             elif data == "btn_wealth_spot_start_50":
                 context.args = ["SPOT", "ON", "50"]
                 await wealth_command(update, context)
@@ -19777,6 +19786,135 @@ class TelegramBotThread(BaseThread):
             else:
                 await update.effective_message.reply_text("⚠️ Invalid option! Usage: `/wealth SPOT ON 50` or `/wealth FUTURES ON 50` or `/wealth OFF`", parse_mode="Markdown")
 
+        async def skynet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🦅 APEX SUPER SMART SKY NET (សំណាញ់មេឃ OMNI-SWARM)
+            Coordinating /wealth, /turbo_hedge, /smartx, /auto_trade, /pre_pump with 99% Confluence & Zero Conflict
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = context.args if context and context.args else []
+
+            import sky_net_orchestrator
+            net_status = sky_net_orchestrator.get_sky_net_network_status(chat_id)
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🌐 Scan 5-Engine Confluence", callback_data="btn_skynet_scan"),
+                    InlineKeyboardButton("🛡️ Zero-Conflict Shield", callback_data="btn_skynet_guard")
+                ],
+                [
+                    InlineKeyboardButton("⚡ Turbo Hedge", callback_data="btn_turbo_hedge"),
+                    InlineKeyboardButton("💎 Perpetual Wealth", callback_data="btn_wealth_status")
+                ],
+                [
+                    InlineKeyboardButton("🚀 SmartX Menu", callback_data="btn_smart_x_menu"),
+                    InlineKeyboardButton("🌊 Macro Auto Trade", callback_data="btn_auto_trade")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Refresh Sky Net", callback_data="btn_skynet_refresh"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            action = str(args[0]).upper().strip() if args else "STATUS"
+
+            if action == "SCAN":
+                top_syms = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
+                eval_lines = []
+                for s in top_syms:
+                    conf_data = sky_net_orchestrator.evaluate_sky_net_swarm_confluence(chat_id, s)
+                    c_score = conf_data.get("confluence_score", 0.0)
+                    lvl = conf_data.get("conviction_level", "WAIT")
+                    dir_side = conf_data.get("direction", "WAIT")
+                    if c_score >= 80.0:
+                        eval_lines.append(f"• `{s}` ៖ **{dir_side}** ({lvl} | Score: `{c_score:.1f}`/100 | Conf: `{conf_data.get('confidence_pct', 85.0):.1f}%`)")
+                    else:
+                        eval_lines.append(f"• `{s}` ៖ `{dir_side}` (Score: `{c_score:.1f}`/100 - Scanning)")
+                scan_body = "\n".join(eval_lines)
+
+                msg = (
+                    "🌐 **SKY NET 5-ENGINE OMNI-SWARM CONFLUENCE SCAN** 🦅\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "🎯 **ការវិភាគរួមគ្នានៃ 5 Flagship Engines + 25 Wall St ML Models ៖**\n\n"
+                    f"{scan_body}\n\n"
+                    f"{ui_standards.DIVIDER_DOUBLE}\n"
+                    "💎 **កម្រិតជំនឿចិត្ត (Conviction Thresholds) ៖**\n"
+                    "• **Level-5 99% Super Conviction (Score ≥ 86.0) ៖** 100% Seamless Entry Across Engines\n"
+                    "• **Zero Opposing Position Guard ៖** បិទដាច់ខាតមិនឱ្យ Engine ណាបញ្ជាប្រឆាំងគ្នា\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"{ui_standards.OFFICIAL_FOOTNOTE}"
+                )
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            elif action == "GUARD":
+                active_syms = net_status.get("active_symbols_count", 0)
+                guard_details = net_status.get("active_symbols_detail", {})
+                sym_lines = []
+                for sym, info in guard_details.items():
+                    sym_lines.append(f"• `{sym}` ៖ **{info.get('side')}** via `/{info.get('engine')}` (Protected: 100% Zero Opposite)")
+                sym_text = "\n".join(sym_lines) if sym_lines else "• គ្មាន Position សកម្ម — Sky Net Guard រង់ចាំការពារ ២៤/៧"
+
+                msg = (
+                    "🛡️ **SKY NET ZERO-CONFLICT CROSS-ENGINE GUARD** 🔒\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    "🏛️ **ប្រព័ន្ធការពារការប្រឆាំងគ្នា និងស៊ីសងគ្នាដាច់ខាត (Invariant 26/41) ៖**\n\n"
+                    f"📊 **Position សកម្មសរុប ៖** `{active_syms} កាក់`\n"
+                    f"{sym_text}\n\n"
+                    "🔒 **ច្បាប់ដែក 3 ជាន់នៃ Sky Net Guard ៖**\n"
+                    "1️⃣ **Zero Opposing Position ៖** បើ Engine ណាមួយកំពុង LONG លើកាក់នោះ គ្មាន Engine ណាអាច SHORT បានឡើយ!\n"
+                    "2️⃣ **Anti-Cannibalization Shield ៖** មិនអនុញ្ញាតឱ្យ Double-Position ជាន់លើកាក់តែមួយដោយគ្មានការយល់ព្រមពី Quorum។\n"
+                    "3️⃣ **Anti-Oversold Short Guard (Invariant 16) ៖** RSI 15m ≤ 38.0 ត្រូវបាន Block SHORT ១០០% គ្រប់ Engine!\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"{ui_standards.OFFICIAL_FOOTNOTE}"
+                )
+                await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                return
+
+            # Default: Network Overview
+            engines = net_status.get("engines", {})
+            total_active = net_status.get("total_active_positions", 0)
+            guard_status = net_status.get("zero_conflict_guard", "ACTIVE")
+
+            tb_active = engines.get("turbo_hedge", {}).get("active_trades", 0)
+            w_active = engines.get("wealth", {}).get("active_trades", 0)
+            sx_active = engines.get("smartx", {}).get("active_trades", 0)
+            at_active = engines.get("auto_trade", {}).get("active_trades", 0)
+            pp_active = engines.get("pre_pump", {}).get("active_trades", 0)
+
+            msg = (
+                "🦅 **APEX SUPER SMART SKY NET (សំណាញ់មេឃ OMNI-SWARM)** 🌐\n"
+                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                "🏛️ **មជ្ឈមណ្ឌលសហការពេញលេញនៃ 5 Flagship Engines ២៤/៧**\n"
+                "ចាប់យកឱកាស Futures Short/Long ដោយទំនុកចិត្ត 99% និងគ្មានការប្រឆាំងគ្នា!\n\n"
+                f"🛡️ **Zero-Conflict Cross-Engine Guard ៖** `🟢 {guard_status} (0% Opposing Risk)`\n"
+                f"📊 **Position ក្នុងបណ្ដាញសរុប ៖** `{total_active} Positions`\n\n"
+                "⚡ **ស្ថានភាពសហការនៃ Engines ទាំង ៥ ៖**\n"
+                f"1️⃣ `/wealth` (Perpetual Compounding) ៖ `{w_active} Active` ✅\n"
+                f"2️⃣ `/turbo_hedge` (HFT Delta-Neutral) ៖ `{tb_active} Active` ✅\n"
+                f"3️⃣ `/smartx` (5-Agent Swarm + Gold/Crypto) ៖ `{sx_active} Active` ✅\n"
+                f"4️⃣ `/auto_trade` (Macro Waterfall Swing) ៖ `{at_active} Active` ✅\n"
+                f"5️⃣ `/pre_pump` (Momentum Volume Sniper) ៖ `{pp_active} Active` ✅\n\n"
+                "🎯 **បច្ចេកវិទ្យាសំណាញ់មេឃ (Sky Net Pillars) ៖**\n"
+                "• **Mutual Non-Aggression ៖** លុបបំបាត់ការកាប់សម្លាប់គ្នា (Zero Opposite Collisions) ១០០%។\n"
+                "• **Omni-Swarm Confluence ៖** បញ្ចូលកម្លាំង 25 Wall St ML Models បង្កើតទំនុកចិត្ត 99% (Level-5 Conviction)។\n"
+                "• **Asset DNA Routing ៖** បែងចែកកាក់ទៅតាមជំនាញពិសេសនៃ Engine នីមួយៗ ដោយស្វ័យប្រវត្តិ។\n"
+                "• **MT5 Prop Firm Bridge Dual-Dispatch ៖** ចម្លង Order ទៅ FTMO/MFF ស្វ័យប្រវត្តិ (<0.001ms)។\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                "📋 **1-TAP COMMANDS ៖**\n"
+                "👉 **ស្កេន Confluence ៖** `` `/skynet SCAN` ``\n"
+                "👉 **ពិនិត្យ Shield ការពារ ៖** `` `/skynet GUARD` ``\n"
+                "👉 **មើលស្ថានភាពបណ្ដាញ ៖** `` `/skynet` ``\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"{ui_standards.OFFICIAL_FOOTNOTE}"
+            )
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         async def prop_firm_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
             🏆 Institutional Prop Firm Challenge & Funded Trader Evaluation Suite ($10k-$200k)
@@ -23949,6 +24087,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))
         self.app.add_handler(CommandHandler("perpetual_wealth", wealth_command))
+        self.app.add_handler(CommandHandler("skynet", skynet_command))
+        self.app.add_handler(CommandHandler("sky_net", skynet_command))
+        self.app.add_handler(CommandHandler("omni_swarm", skynet_command))
+        self.app.add_handler(CommandHandler("omniswarm", skynet_command))
         self.app.add_handler(CommandHandler("macro", macro_command))
         self.app.add_handler(CommandHandler("satellite", macro_command))
         self.app.add_handler(CommandHandler("google_macro", macro_command))

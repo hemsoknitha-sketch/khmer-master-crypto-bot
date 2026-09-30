@@ -539,6 +539,20 @@ def is_symbol_safe_for_macro_trade(chat_id: int, symbol: str, proposed_side: str
     if not symbol.endswith("USDT"):
         symbol += "USDT"
 
+    # 0. 🦅 Sky Net Universal Cross-Engine Zero-Opposing Gatekeeper
+    try:
+        import sky_net_orchestrator
+        sk_ok, sk_reason, sk_meta = sky_net_orchestrator.validate_cross_engine_entry(
+            chat_id=chat_id,
+            symbol=symbol,
+            proposed_side=proposed_side,
+            requesting_engine="auto_trade"
+        )
+        if not sk_ok:
+            return False, f"SKY_NET_GUARD: {sk_reason}"
+    except Exception as e_sk:
+        print(f"⚠️ [SkyNetMacroCheckError]: {e_sk}")
+
     # 1. Check /turbo_hedge active positions and Symbiotic Pairing
     try:
         turbo_bots = db.get_active_turbo_hedge_bots() or []
@@ -678,6 +692,23 @@ def execute_macro_auto_trade(
         target_tp = 25.0
         db.add_macro_trade(chat_id, symbol, actual_margin, leverage, side, target_tp, entry_price, strategy)
 
+        # 🌐 Sky Net Cross-Engine Network Registration
+        try:
+            import sky_net_orchestrator
+            sky_net_orchestrator.register_cross_engine_execution(
+                chat_id=chat_id,
+                symbol=symbol,
+                side=side,
+                engine="auto_trade",
+                margin_usdt=actual_margin,
+                leverage=leverage,
+                entry_price=entry_price,
+                confidence=confidence,
+                metadata={"strategy": strategy, "actual_qty": actual_qty}
+            )
+        except Exception as e_skynet:
+            print(f"⚠️ [SkyNet Macro Register Error]: {e_skynet}")
+
         # 🏛️ MT5 Prop Firm Bridge Dual-Dispatch (< 0.001ms Non-Blocking)
         try:
             if db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1":
@@ -787,6 +818,11 @@ async def monitor_macro_auto_trades(app):
             pnl_info = await asyncio.to_thread(trading_engine.get_futures_position_pnl, keys[0], keys[1], symbol)
             if not pnl_info.get("has_position"):
                 db.remove_macro_trade(chat_id, symbol)
+                try:
+                    import sky_net_orchestrator
+                    sky_net_orchestrator.release_cross_engine_position(chat_id, symbol, "auto_trade")
+                except Exception:
+                    pass
                 continue
 
             real_pnl = float(pnl_info.get("unrealizedProfit", 0.0))
@@ -880,6 +916,11 @@ async def monitor_macro_auto_trades(app):
                 close_res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, keys[0], keys[1], symbol)
                 db.remove_macro_trade(chat_id, symbol)
                 db.clear_symbiotic_micro_profit(chat_id, symbol)
+                try:
+                    import sky_net_orchestrator
+                    sky_net_orchestrator.release_cross_engine_position(chat_id, symbol, "auto_trade")
+                except Exception:
+                    pass
 
                 if app and hasattr(app, "bot"):
                     try:

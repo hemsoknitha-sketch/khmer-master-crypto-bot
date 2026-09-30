@@ -45,6 +45,7 @@ def get_public_bot_commands():
         BotCommand("smartx_reachsey_crypto", "🪙 Reachsey Crypto Multi-Asset Stop"),
         BotCommand("scalp", "🏓 Micro-Volatility Precision Scalper"),
         BotCommand("auto_trade", "🤖 24/7 Hands-Free Multi-Asset Auto-Trader"),
+        BotCommand("skynet", "🦅 Super Smart Sky Net Omni-Swarm Quorum"),
 
         # --- [4] CEDEFI & ARBITRAGE ENGINES (MEV & High-Yield Harvester) ---
         BotCommand("capital", "🏛️ Capital.com TradFi (Gold, Oil, S&P 500)"),

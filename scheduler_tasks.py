@@ -4898,6 +4898,22 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                 if already_trading or is_pp_active:
                     continue
 
+                # 🦅 Sky Net Universal Cross-Engine Zero-Opposing Gatekeeper
+                try:
+                    import sky_net_orchestrator
+                    sk_ok, sk_reason, sk_meta = await asyncio.to_thread(
+                        sky_net_orchestrator.validate_cross_engine_entry,
+                        chat_id=chat_id,
+                        symbol=symbol,
+                        proposed_side=side,
+                        requesting_engine="pre_pump"
+                    )
+                    if not sk_ok:
+                        print(f"🛡️ [SKY NET PRE-PUMP GUARD] {symbol} blocked: {sk_reason}")
+                        continue
+                except Exception as e_sk:
+                    print(f"⚠️ [SkyNet PrePump Guard Error]: {e_sk}")
+
                 # Anti-Duplicate Spot Holding Shield: If already holding >= $5 worth on Spot, skip duplicate buys
                 if stage == "SPOT_BUY_SCOUT":
                     base_asset = symbol[:-4] if symbol.endswith("USDT") else symbol
@@ -4977,6 +4993,26 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             await asyncio.to_thread(db.update_system_setting, f"pre_pump_peak_roi_{chat_id}_{symbol}", "0.0")
 
                     if order_success:
+                        # 🌐 Sky Net Cross-Engine Network Registration
+                        try:
+                            import sky_net_orchestrator
+                            reg_lev = 1 if stage == "SPOT_BUY_SCOUT" else effective_leverage
+                            reg_side = "BUY" if (stage == "SPOT_BUY_SCOUT" or side == "BUY") else "SELL"
+                            await asyncio.to_thread(
+                                sky_net_orchestrator.register_cross_engine_execution,
+                                chat_id=chat_id,
+                                symbol=symbol,
+                                side=reg_side,
+                                engine="pre_pump",
+                                margin_usdt=invest_amount,
+                                leverage=reg_lev,
+                                entry_price=current_price,
+                                confidence=float(conf) if str(conf).replace('.', '', 1).isdigit() else 88.0,
+                                metadata={"stage": stage, "character": character, "qty": qty}
+                            )
+                        except Exception as e_skynet:
+                            print(f"⚠️ [SkyNet PrePump Register Error]: {e_skynet}")
+
                         # 🏛️ MT5 Prop Firm Bridge Dual-Dispatch (< 0.001ms Non-Blocking)
                         try:
                             if await asyncio.to_thread(db.get_system_setting, f"mt5_ai_auto_trade_{chat_id}", "0") == "1":
@@ -5155,6 +5191,11 @@ async def pre_pump_positions_monitor(app: Application):
                     db.update_system_setting(f"pre_pump_active_{chat_id}_{sym}", "0")
                     db.update_system_setting(peak_key, "0.0")
                     db.update_system_setting(f"pre_pump_entry_time_{chat_id}_{sym}", "0.0")
+                    try:
+                        import sky_net_orchestrator
+                        sky_net_orchestrator.release_cross_engine_position(chat_id, sym, "pre_pump")
+                    except Exception:
+                        pass
 
                     user_lang = await asyncio.to_thread(db.get_user_language, chat_id)
                     pnl_sign = "+" if unRealizedProfit >= 0 else ""
