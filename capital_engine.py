@@ -2181,10 +2181,10 @@ class CapitalAutonomousEngine:
             return ["US500", "GOLD", "NVDA", "TSLA", "US100", "GOOGL", "META", "OIL_CRUDE"]
         # London Session (08:00 - 13:30 UTC = 15:00 - 20:30 Phnom Penh)
         elif 8 <= hour_utc < 13:
-            return ["US500", "GOLD", "US100", "GERMANY40", "OIL_CRUDE", "SILVER", "BTCUSD"]
+            return ["US500", "GOLD", "US100", "GERMANY40", "OIL_CRUDE", "SILVER", "NVDA"]
         # Asian Session (00:00 - 08:00 UTC = 07:00 - 15:00 Phnom Penh)
         else:
-            return ["US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD"]
+            return ["US500", "GOLD", "US100", "GERMANY40", "SILVER", "OIL_CRUDE"]
 
     def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
         """
@@ -3159,29 +3159,34 @@ class CapitalAutonomousEngine:
             final_action = setup.get("final_action", "HOLD")
             confidence = setup.get("final_confidence", 0)
 
-            # Strict Invariant: Only setups with confidence >= 75% and actionable signal
-            if final_action in ["BUY", "SELL"] and confidence >= 75:
+            # Strict Invariant: Only setups with confidence >= 75% (or >= 90% for high-spread Crypto CFDs)
+            min_conf = 90 if any(c in resolved_epic.upper() for c in ["BTC", "ETH", "SOL"]) else 75
+            if final_action in ["BUY", "SELL"] and confidence >= min_conf:
                 adx_val = setup.get("adx", 25.0)
                 rvol_val = setup.get("rvol", 1.0)
 
-                # Institutional Volume Filter (Invariant 43): Discard ghost volume setups (RVOL < 0.35x) to eliminate spread drag
-                if rvol_val < 0.35:
-                    logger.debug(f"🛡️ [LOW RVOL FILTER] Discarding {resolved_epic} setup (RVOL: {rvol_val:.2f}x < 0.35x minimum liquidity threshold).")
+                # Institutional Volume Filter (Invariant 43): Discard ghost volume setups to eliminate spread drag
+                min_rvol = 0.75 if any(c in resolved_epic.upper() for c in ["BTC", "ETH", "SOL"]) else 0.35
+                if rvol_val < min_rvol:
+                    logger.debug(f"🛡️ [LOW RVOL FILTER] Discarding {resolved_epic} setup (RVOL: {rvol_val:.2f}x < {min_rvol:.2f}x minimum liquidity threshold).")
                     continue
                 # Institutional Confluence Multiplier:
                 # Top priority (+50) on 100% Win Rate & Ultra-Low Spread Assets: US500 (S&P 500), GOLD, NVDA, TSLA
-                # Secondary (+35) for other Tech/Indices; Modest (+10) for Oil/DAX; Disfavored (-10) for Gas
+                # Secondary (+35) for other Tech/Indices; Modest (+25) for German DAX / Silver; Modest (+10) for Oil
+                # Heavy penalty (-15) on high-spread Crypto CFDs (Binance is preferred for Crypto); Disfavored (-20) for Gas
                 leverage_boost = 0.0
                 if any(x in resolved_epic.upper() for x in ["US500", "SP500", "GOLD", "NVDA", "TSLA"]):
                     leverage_boost = 50.0
                 elif any(x in resolved_epic.upper() for x in ["US100", "NASDAQ", "GOOGL", "META", "AAPL", "MSFT"]):
                     leverage_boost = 35.0
-                elif any(x in resolved_epic.upper() for x in ["SILVER", "BTCUSD", "ETHUSD"]):
+                elif any(x in resolved_epic.upper() for x in ["GERMANY40", "DAX", "SILVER", "AMD"]):
                     leverage_boost = 25.0
-                elif any(x in resolved_epic.upper() for x in ["OIL_CRUDE", "OIL", "GERMANY40"]):
+                elif any(x in resolved_epic.upper() for x in ["OIL_CRUDE", "OIL"]):
                     leverage_boost = 10.0
+                elif any(x in resolved_epic.upper() for x in ["BTCUSD", "ETHUSD", "SOLUSD"]):
+                    leverage_boost = -15.0  # Penalize high-spread crypto CFDs in favor of pure TradFi
                 elif any(x in resolved_epic.upper() for x in ["NATURALGAS", "GAS"]):
-                    leverage_boost = -10.0
+                    leverage_boost = -20.0
                 # Composite Institutional Edge Score: confidence * 1.5 + ADX + RVOL * 10 + leverage_boost
                 rank_score = (confidence * 1.5) + adx_val + (rvol_val * 10.0) + leverage_boost
                 candidate_setups.append((rank_score, epic, resolved_epic, setup))
