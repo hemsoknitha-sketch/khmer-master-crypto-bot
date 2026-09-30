@@ -5339,6 +5339,11 @@ async def gold_turbo_monitor(app: Application):
             is_legacy_turbo = bool(cfg.get("is_enabled"))
             is_smartx_active = (db.get_system_setting(f"smart_x_{chat_id}_active", "0") == "1")
             smartx_mode = db.get_system_setting(f"smart_x_{chat_id}_mode", "SONIC").upper()
+            is_quiet = (
+                db.get_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0") == "1"
+                or db.get_system_setting(f"smart_x_{chat_id}_quiet_mode", "0") == "1"
+                or db.get_system_setting(f"quiet_mode_{chat_id}", "0") == "1"
+            )
 
             # 1. Execute AGI AUTO Swarm (Dynamic MoE Regime Switching)
             if is_smartx_active and smartx_mode in ["AUTO", "AGI"]:
@@ -5371,7 +5376,10 @@ async def gold_turbo_monitor(app: Application):
                                 "━━━━━━━━━━━━\n"
                                 "_AGI Autonomous Swarm Engine Active 24/7._"
                             )
-                            await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                            if not is_quiet:
+                                await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                            else:
+                                print(f"🤫 [SMARTX AGI SILENT] Chat {chat_id}: Executed TURBO {side} XAUUSDT smoothly without notification spam.")
                         except Exception as err:
                             print(f"Error sending auto turbo notif: {err}")
 
@@ -5402,7 +5410,10 @@ async def gold_turbo_monitor(app: Application):
                                 "━━━━━━━━━━━━\n"
                                 "_AGI Autonomous Swarm Engine Active 24/7._"
                             )
-                            await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                            if not is_quiet:
+                                await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                            else:
+                                print(f"🤫 [SMARTX AGI SILENT] Chat {chat_id}: Executed SONIC {side} XAUUSDT smoothly without notification spam.")
                         except Exception as err:
                             print(f"Error sending auto sonic notif: {err}")
 
@@ -5433,7 +5444,10 @@ async def gold_turbo_monitor(app: Application):
                             "━━━━━━━━━━━━\n"
                             "_TURBO High-Frequency Engine Active 24/7._"
                         )
-                        await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                        if not is_quiet:
+                            await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                        else:
+                            print(f"🤫 [SMARTX GOLD SILENT] Chat {chat_id}: Executed TURBO {side} XAUUSDT smoothly without notification spam.")
                     except Exception as err:
                         print(f"Error sending turbo gold notif: {err}")
 
@@ -5464,7 +5478,10 @@ async def gold_turbo_monitor(app: Application):
                             "━━━━━━━━━━━━\n"
                             "_SONIC Institutional Scalp Engine Active 24/7._"
                         )
-                        await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                        if not is_quiet:
+                            await app.bot.send_message(chat_id=chat_id, text=notif, parse_mode="Markdown")
+                        else:
+                            print(f"🤫 [SMARTX GOLD SILENT] Chat {chat_id}: Executed SONIC {side} XAUUSDT smoothly without notification spam.")
                     except Exception as err:
                         print(f"Error sending sonic gold notif: {err}")
 

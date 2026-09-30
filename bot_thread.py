@@ -17293,10 +17293,14 @@ class TelegramBotThread(BaseThread):
             action = str(args[0]).upper().strip()
             if action in ["ON", "ENABLE", "1"]:
                 db.update_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "1")
+                db.update_system_setting(f"smart_x_{chat_id}_quiet_mode", "1")
+                db.update_system_setting(f"quiet_mode_{chat_id}", "1")
                 if target_msg:
                     await target_msg.reply_text("🤫 **Quiet Silent Mode បានបើក!** ប្រព័ន្ធនឹងការពារគណនី និងរត់ស្កេន 24/7 ដោយស្ងៀមស្ងាត់មិនផ្ញើសាររំខានឡើយ។", parse_mode="Markdown")
             elif action in ["OFF", "DISABLE", "0"]:
                 db.update_system_setting(f"turbo_hedge_{chat_id}_quiet_mode", "0")
+                db.update_system_setting(f"smart_x_{chat_id}_quiet_mode", "0")
+                db.update_system_setting(f"quiet_mode_{chat_id}", "0")
                 if target_msg:
                     await target_msg.reply_text("🔔 **Quiet Silent Mode ត្រូវបានបិទ!** ប្រព័ន្ធនឹងផ្ញើសារជូនដំណឹង Telegram ជាធម្មតា។", parse_mode="Markdown")
 
