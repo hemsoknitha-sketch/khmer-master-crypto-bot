@@ -216,6 +216,9 @@ def is_mt5_supported_symbol(symbol: str) -> Tuple[bool, str]:
 # =========================================================================
 APEX_OMNI_UNIVERSE = [
     {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.01, "category": "Metals", "name": "Gold / USD"},
+    {"symbol": "BTCUSD", "raw_symbol": "BTCUSD", "lot_size": 0.01, "category": "Crypto", "name": "Bitcoin / USD"},
+    {"symbol": "ETHUSD", "raw_symbol": "ETHUSD", "lot_size": 0.01, "category": "Crypto", "name": "Ethereum / USD"},
+    {"symbol": "SOLUSD", "raw_symbol": "SOLUSD", "lot_size": 0.01, "category": "Crypto", "name": "Solana / USD"},
     {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.01, "category": "Forex", "name": "Euro / USD"},
     {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.01, "category": "Forex", "name": "GBP / USD"},
     {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.01, "category": "Forex", "name": "USD / JPY"},
@@ -263,10 +266,10 @@ class MT5QuantumSignalCitadel:
         except Exception:
             pass
 
-        # Interbank Rollover Spread Freeze (21:30 - 23:15 UTC daily - broker spread blowout protection)
+        # Interbank Rollover Spread Freeze (21:30 - 23:15 UTC daily - TradFi broker spread blowout protection)
         utc_now = datetime.now(timezone.utc)
         utc_time_float = utc_now.hour + (utc_now.minute / 60.0)
-        if 21.5 <= utc_time_float <= 23.25:
+        if 21.5 <= utc_time_float <= 23.25 and not any(c in raw_clean for c in ["BTC", "ETH", "SOL"]):
             return "SKIP", 50.0, "INTERBANK_ROLLOVER_SPREAD_FREEZE"
 
         # 1. Fetch Live Google Macro Satellite Alpha
@@ -2681,6 +2684,17 @@ class MT5BridgeEngine:
                     sym_clean = normalize_mt5_symbol(raw_sym)
                     asset_cat = asset_info.get("category", "Forex")
 
+                    # 24/7 Market Hours Gatekeeper:
+                    # Traditional Forex, Metals, Stocks, and Indices are closed on weekends
+                    # (Friday 21:00 UTC to Sunday 21:00 UTC).
+                    # When TradFi is closed, automatically bypass closed markets and focus 100% on 24/7 Crypto (BTCUSD, ETHUSD, SOLUSD)!
+                    utc_scan = datetime.now(timezone.utc)
+                    utc_h = utc_scan.hour + (utc_scan.minute / 60.0)
+                    w_day = utc_scan.weekday()  # 0 = Mon, 4 = Fri, 5 = Sat, 6 = Sun
+                    is_tradfi_closed = (w_day == 4 and utc_h >= 21.0) or (w_day == 5) or (w_day == 6 and utc_h < 21.0)
+                    if is_tradfi_closed and asset_cat != "Crypto":
+                        continue
+
                     # Step 2.1: Filter candidate VIP users for this specific symbol
                     candidate_users = []
                     for u in list(eligible_vip_users):
@@ -2708,8 +2722,12 @@ class MT5BridgeEngine:
                         if (now_ts - last_d) < 3.0:
                             continue
 
-                        # Balance-specific asset restrictions (Standard < $25 only Forex)
-                        if not u["is_cent_account"] and u["real_usd_balance"] < 25.0 and asset_cat != "Forex":
+                        # Cent account broker protection: Cent accounts (USC) typically do not offer Crypto CFDs
+                        if u["is_cent_account"] and asset_cat == "Crypto":
+                            continue
+
+                        # Balance-specific asset restrictions (Standard < $25 only Forex or Crypto)
+                        if not u["is_cent_account"] and u["real_usd_balance"] < 25.0 and asset_cat not in ["Forex", "Crypto"]:
                             continue
 
                         candidate_users.append(u)
