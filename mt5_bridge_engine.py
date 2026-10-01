@@ -27,6 +27,8 @@ import select
 import logging
 import threading
 import asyncio
+import re
+import concurrent.futures
 from typing import Dict, Any, Optional, List, Tuple, Union, Set
 from datetime import datetime, timezone
 import html
@@ -206,6 +208,34 @@ def is_mt5_supported_symbol(symbol: str) -> Tuple[bool, str]:
         return True, f"{s}USD"
 
     return False, s
+
+
+# =========================================================================
+# APEX OMNI-SWARM 20 INSTITUTIONAL HIGH-ALPHA FOREX & METALS UNIVERSE
+# (Synchronized across all Standard & Cent VIP accounts for concurrent execution)
+# =========================================================================
+APEX_OMNI_UNIVERSE = [
+    {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.01, "category": "Metals", "name": "Gold / USD"},
+    {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.01, "category": "Forex", "name": "Euro / USD"},
+    {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.01, "category": "Forex", "name": "GBP / USD"},
+    {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.01, "category": "Forex", "name": "USD / JPY"},
+    {"symbol": "AUDUSD", "raw_symbol": "AUDUSD", "lot_size": 0.01, "category": "Forex", "name": "AUD / USD"},
+    {"symbol": "USDCAD", "raw_symbol": "USDCAD", "lot_size": 0.01, "category": "Forex", "name": "USD / CAD"},
+    {"symbol": "USDCHF", "raw_symbol": "USDCHF", "lot_size": 0.01, "category": "Forex", "name": "USD / CHF"},
+    {"symbol": "NZDUSD", "raw_symbol": "NZDUSD", "lot_size": 0.01, "category": "Forex", "name": "NZD / USD"},
+    {"symbol": "EURJPY", "raw_symbol": "EURJPY", "lot_size": 0.01, "category": "Forex", "name": "EUR / JPY"},
+    {"symbol": "GBPJPY", "raw_symbol": "GBPJPY", "lot_size": 0.01, "category": "Forex", "name": "GBP / JPY"},
+    {"symbol": "AUDJPY", "raw_symbol": "AUDJPY", "lot_size": 0.01, "category": "Forex", "name": "AUD / JPY"},
+    {"symbol": "CADJPY", "raw_symbol": "CADJPY", "lot_size": 0.01, "category": "Forex", "name": "CAD / JPY"},
+    {"symbol": "EURGBP", "raw_symbol": "EURGBP", "lot_size": 0.01, "category": "Forex", "name": "EUR / GBP"},
+    {"symbol": "EURAUD", "raw_symbol": "EURAUD", "lot_size": 0.01, "category": "Forex", "name": "EUR / AUD"},
+    {"symbol": "GBPAUD", "raw_symbol": "GBPAUD", "lot_size": 0.01, "category": "Forex", "name": "GBP / AUD"},
+    {"symbol": "EURCAD", "raw_symbol": "EURCAD", "lot_size": 0.01, "category": "Forex", "name": "EUR / CAD"},
+    {"symbol": "GBPCAD", "raw_symbol": "GBPCAD", "lot_size": 0.01, "category": "Forex", "name": "GBP / CAD"},
+    {"symbol": "NZDJPY", "raw_symbol": "NZDJPY", "lot_size": 0.01, "category": "Forex", "name": "NZD / JPY"},
+    {"symbol": "AUDNZD", "raw_symbol": "AUDNZD", "lot_size": 0.01, "category": "Forex", "name": "AUD / NZD"},
+    {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.01, "category": "Metals", "name": "Silver / USD"},
+]
 
 
 class MT5QuantumSignalCitadel:
@@ -635,6 +665,7 @@ class MT5BridgeEngine:
         self._last_account_dispatch_time: Dict[str, float] = {}  # {account_id: timestamp}
         self._last_admin_hijack_warn: Dict[int, float] = {}  # {chat_id: timestamp}
         self._accounts_without_c_suffix: Set[str] = set()
+        self._last_global_scan_time: float = 0.0
         
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
@@ -1974,17 +2005,19 @@ class MT5BridgeEngine:
         time.sleep(10.0)  # Initial warmup
         while self.is_running:
             try:
-                time.sleep(5.0)
+                time.sleep(3.0)
                 now_ts = time.time()
                 active_users = db.get_all_active_mt5_auto_users() if hasattr(db, "get_all_active_mt5_auto_users") else []
                 if not active_users:
                     continue
 
+                eligible_vip_users = []
+                super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+
                 for chat_id in active_users:
                     now_ts = time.time()
                     cfg = db.get_user_mt5_config(chat_id)
                     raw_acc = str(cfg.get("login", "")).strip()
-                    import re
                     clean_digits = re.sub(r'[^0-9]', '', raw_acc)
                     acc_id = clean_digits if clean_digits else raw_acc
                     if not acc_id:
@@ -2356,126 +2389,202 @@ class MT5BridgeEngine:
                         self._last_auto_trade_log[str(chat_id)] = now_ts
                         logger.info(f"🌊 [MT5 AUTO-TRADE RADAR] User {chat_id} (Acc #{acc_id}): Active ({current_open_count}/{max_assets} Positions) | Real Bal: ${real_usd_balance:,.2f} | PnL: ${total_pnl:+.2f} | 33 AI Models Swarm Active.")
 
-                    # Only scan for new entries every 20 seconds
-                    if (now_ts - self._last_entry_scan.get(str(chat_id), 0.0)) < 20.0:
-                        continue
-                    self._last_entry_scan[str(chat_id)] = now_ts
-
+                    # Capacity Gatekeeper: User must have available position slots
                     if current_open_count >= max_assets:
                         continue
 
-                    # Scan and execute unfilled asset allocations via Quantum Citadel 95% Confluence
-                    for a in allocations:
-                        raw_sym = str(a.get("raw_symbol", a.get("symbol", ""))).upper()
-                        sym_target = str(a.get("symbol", raw_sym)).upper()
-                        sym_clean = normalize_mt5_symbol(raw_sym)
+                    # Pending dispatch debounce per account (Zero double-dispatch race condition)
+                    last_dispatch = self._last_account_dispatch_time.get(acc_id, 0.0)
+                    if (now_ts - last_dispatch) < 15.0:
+                        continue
 
-                        if raw_sym in open_symbols or sym_target in open_symbols or sym_clean in open_symbols:
+                    # Small Balance Max Concurrent Positions Guard:
+                    # If real balance < $25.00 on Standard Account, NEVER hold more than 1 position at a time to prevent margin exhaustion!
+                    if not is_cent_account and real_usd_balance < 25.0 and current_open_count >= 1:
+                        continue
+                    elif is_cent_account and raw_bal < 300.0 and current_open_count >= 2:
+                        continue
+
+                    # User is fully eligible for Omni-Swarm synchronized entry!
+                    eligible_vip_users.append({
+                        "chat_id": chat_id,
+                        "acc_id": acc_id,
+                        "session": session,
+                        "is_cent_account": is_cent_account,
+                        "real_usd_balance": real_usd_balance,
+                        "raw_bal": raw_bal,
+                        "max_assets": max_assets,
+                        "current_open_count": current_open_count,
+                        "open_symbols": open_symbols,
+                        "auto_cfg": auto_cfg
+                    })
+
+                # =========================================================
+                # PHASE 2: GLOBAL APEX OMNI-SWARM SIGNAL SCAN & PARALLEL DISPATCH
+                # (Evaluates Institutional Universe ONCE & Dispatches Concurrently
+                # to ALL Eligible VIP Users at Sub-Millisecond Speed!)
+                # =========================================================
+                if not eligible_vip_users:
+                    continue
+
+                # Debounce global market scan (every 10s)
+                if (now_ts - self._last_global_scan_time) < 10.0:
+                    continue
+                self._last_global_scan_time = now_ts
+
+                for asset_info in APEX_OMNI_UNIVERSE:
+                    if not eligible_vip_users:
+                        break
+
+                    raw_sym = str(asset_info.get("symbol", "")).upper()
+                    sym_clean = normalize_mt5_symbol(raw_sym)
+                    asset_cat = asset_info.get("category", "Forex")
+
+                    # Step 2.1: Filter candidate VIP users for this specific symbol
+                    candidate_users = []
+                    for u in list(eligible_vip_users):
+                        u_chat = u["chat_id"]
+                        u_acc = u["acc_id"]
+                        u_open_syms = u["open_symbols"]
+                        u_curr_count = u["current_open_count"]
+                        u_max = u["max_assets"]
+
+                        # Check available slots
+                        if u_curr_count >= u_max:
                             continue
 
-                        # 120-Minute Consecutive Loss Circuit Breaker Lockout Check
+                        # Check anti-stacking: does user already hold this symbol?
+                        if raw_sym in u_open_syms or sym_clean in u_open_syms:
+                            continue
+
+                        # Check consecutive loss circuit breaker lockout (120 min)
                         lockout_t = max(
-                            self._symbol_lockout_until.get(f"{acc_id}_{sym_clean}", 0.0),
-                            self._symbol_lockout_until.get(f"{acc_id}_{raw_sym}", 0.0),
-                            self._symbol_lockout_until.get(f"{acc_id}_{sym_target}", 0.0)
+                            self._symbol_lockout_until.get(f"{u_acc}_{sym_clean}", 0.0),
+                            self._symbol_lockout_until.get(f"{u_acc}_{raw_sym}", 0.0)
                         )
                         if now_ts < lockout_t:
-                            rem_min = int((lockout_t - now_ts) / 60.0)
-                            logger.debug(f"🔒 [CIRCUIT BREAKER LOCK] Account {acc_id} Symbol {sym_clean} in 120m cooldown ({rem_min}m remaining). Skipping.")
                             continue
 
-                        # Mandatory Post-Trade Anti-Whipsaw Cooldown (15 minutes = 900s after trade close)
+                        # Check post-close cooldown (15m = 900s)
                         last_close_t = max(
-                            self._last_symbol_close_time.get(f"{acc_id}_{sym_clean}", 0.0),
-                            self._last_symbol_close_time.get(f"{acc_id}_{raw_sym}", 0.0),
-                            self._last_symbol_close_time.get(f"{acc_id}_{sym_target}", 0.0),
-                            self._last_symbol_close_time.get(f"{chat_id}_{sym_clean}", 0.0)
+                            self._last_symbol_close_time.get(f"{u_acc}_{sym_clean}", 0.0),
+                            self._last_symbol_close_time.get(f"{u_chat}_{sym_clean}", 0.0)
                         )
                         if (now_ts - last_close_t) < 900.0:
-                            rem_s = int(900.0 - (now_ts - last_close_t))
-                            logger.debug(f"⏳ [POST-CLOSE COOLDOWN] Account {acc_id} Symbol {sym_clean} resting for {rem_s}s after trade close. Skipping.")
                             continue
 
-                        # Inter-Trade Anti-Whipsaw Cooldown (180s = 3 minutes per symbol)
+                        # Check inter-trade anti-whipsaw cooldown (180s)
                         last_trade_t = max(
-                            self._last_symbol_trade_time.get(f"{chat_id}_{raw_sym}", 0.0),
-                            self._last_symbol_trade_time.get(f"{chat_id}_{sym_target}", 0.0),
-                            self._last_symbol_trade_time.get(f"{chat_id}_{sym_clean}", 0.0),
-                            self._last_symbol_trade_time.get(f"{acc_id}_{sym_clean}", 0.0)
+                            self._last_symbol_trade_time.get(f"{u_chat}_{raw_sym}", 0.0),
+                            self._last_symbol_trade_time.get(f"{u_chat}_{sym_clean}", 0.0),
+                            self._last_symbol_trade_time.get(f"{u_acc}_{sym_clean}", 0.0)
                         )
                         if (now_ts - last_trade_t) < 180.0:
                             continue
 
-                        lot = float(a.get("lot_size", 0.01))
-                        # Small Balance Lot Clamping (Invariants 1.1 & 33)
-                        if real_usd_balance < 50.0:
-                            lot = 0.01
-                        elif real_usd_balance < 200.0:
-                            lot = min(0.02, lot)
-                        elif real_usd_balance < 500.0:
-                            lot = min(0.05, lot)
-                        elif real_usd_balance < 1000.0:
-                            lot = min(0.10, lot)
-                        else:
-                            lot = max(0.01, min(1.0, lot))
-
-                        # Dynamic Symbol Adaptation for Server 2 Standard vs Server 5 Cent
-                        dispatch_sym = self.adapt_symbol_for_session(sym_clean, session)
-
-                        # Evaluate Quantum Signal via 33 AI Models & Google Macro Satellite
-                        action, confidence, signal_reason = MT5QuantumSignalCitadel.evaluate_quantum_signal(raw_sym, sym_target)
-
-                        # Strict Gatekeeper: Only high-conviction 95% edge setups entered
-                        if action == "SKIP" or confidence < 90.0:
+                        # Balance-specific asset restrictions (Standard < $25 only Forex)
+                        if not u["is_cent_account"] and u["real_usd_balance"] < 25.0 and asset_cat != "Forex":
                             continue
 
-                        # Calculate Super Smart ATR-Based Server-Side SL & TP with Live Quotes & Relative Distances
-                        quote_obj = self.get_live_symbol_quote(dispatch_sym) or self.get_live_symbol_quote(sym_target) or self.get_live_symbol_quote(raw_sym) or self.get_live_symbol_quote(sym_clean)
-                        c_price = float(quote_obj.get("mid", 0.0) if quote_obj else 0.0)
-                        atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(dispatch_sym, action, current_price=c_price)
-                        sl_price = float(atr_params.get("sl_price", 0.0))
-                        tp_price = float(atr_params.get("tp_price", 0.0))
-                        sl_dist = float(atr_params.get("sl_dist", 0.0))
-                        tp_dist = float(atr_params.get("tp_dist", 0.0))
+                        candidate_users.append(u)
 
-                        # Pending dispatch debounce per account (Zero double-dispatch race condition)
-                        last_dispatch = self._last_account_dispatch_time.get(acc_id, 0.0)
-                        if (now_ts - last_dispatch) < 15.0:
-                            logger.debug(f"⏳ [DISPATCH DEBOUNCE] Account {acc_id} has recent order in flight ({now_ts - last_dispatch:.1f}s ago). Waiting for fill.")
-                            break
+                    # If no VIP user can trade this symbol right now, skip to next asset
+                    if not candidate_users:
+                        continue
 
-                        # Small Balance Max Concurrent Positions Guard:
-                        # If real balance < $25.00 on Standard Account, NEVER hold more than 1 position at a time to prevent margin exhaustion!
-                        if not is_cent_account and real_usd_balance < 25.0 and current_open_count >= 1:
-                            logger.debug(f"🛡️ [MARGIN SAFETY GUARD] Account {acc_id} has ${real_usd_balance:.2f} balance and already {current_open_count} open position. Skipping new entry.")
-                            break
-                        elif is_cent_account and raw_bal < 300.0 and current_open_count >= 2:
-                            logger.debug(f"🛡️ [MARGIN SAFETY GUARD] Cent Account {acc_id} has {raw_bal:.0f} USC balance and already {current_open_count} open positions. Skipping new entry.")
-                            break
+                    # Step 2.2: Evaluate Quantum Signal ONCE across 33 AI Models
+                    action, confidence, signal_reason = MT5QuantumSignalCitadel.evaluate_quantum_signal(raw_sym, raw_sym)
+                    if action == "SKIP" or confidence < 90.0:
+                        continue
 
-                        logger.info(f"🚀 [MT5 QUANTUM CITADEL] 95% Conviction Signal: {action} {lot} {dispatch_sym} (SL: {sl_price}, TP: {tp_price}, Dist: {sl_dist}/{tp_dist}, Reason: {signal_reason}, Conf: {confidence:.0f}%) for User {chat_id} (Acc #{acc_id})!")
-                        res = self.dispatch_order(
-                            symbol=dispatch_sym,
-                            action=action,
-                            lot=lot,
-                            sl=sl_price,
-                            tp=tp_price,
-                            sl_dist=sl_dist,
-                            tp_dist=tp_dist,
-                            comment=f"MT5_{signal_reason[:15]}",
-                            magic=888999,
-                            target_account=acc_id
-                        )
-                        self._last_account_dispatch_time[acc_id] = now_ts
-                        if res.get("clients_reached", 0) > 0:
-                            self._last_symbol_trade_time[f"{chat_id}_{raw_sym}"] = now_ts
-                            self._last_symbol_trade_time[f"{chat_id}_{sym_target}"] = now_ts
-                            self._last_symbol_trade_time[f"{chat_id}_{sym_clean}"] = now_ts
-                            open_symbols.add(raw_sym)
-                            open_symbols.add(sym_target)
-                            open_symbols.add(sym_clean)
-                            current_open_count += 1
-                            break
+                    # Step 2.3: Calculate Super Smart ATR SL & TP ONCE with live quotes
+                    quote_obj = self.get_live_symbol_quote(raw_sym) or self.get_live_symbol_quote(sym_clean)
+                    c_price = float(quote_obj.get("mid", 0.0) if quote_obj else 0.0)
+                    atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(raw_sym, action, current_price=c_price)
+                    sl_price = float(atr_params.get("sl_price", 0.0))
+                    tp_price = float(atr_params.get("tp_price", 0.0))
+                    sl_dist = float(atr_params.get("sl_dist", 0.0))
+                    tp_dist = float(atr_params.get("tp_dist", 0.0))
+
+                    logger.info(
+                        f"🚀 [OMNI-SWARM CITADEL] 95% Conviction Signal Fired: {action} {raw_sym} "
+                        f"(SL: {sl_price}, TP: {tp_price}, Reason: {signal_reason}, Conf: {confidence:.0f}%)! "
+                        f"Simultaneously executing across {len(candidate_users)} VIP Users in parallel..."
+                    )
+
+                    # Step 2.4: Ultra-Fast Parallel Swarm Fan-Out
+                    def _dispatch_for_user(u_info):
+                        try:
+                            u_chat = u_info["chat_id"]
+                            u_acc = u_info["acc_id"]
+                            u_sess = u_info["session"]
+                            u_is_cent = u_info["is_cent_account"]
+                            u_real_b = u_info["real_usd_balance"]
+                            u_raw_b = u_info["raw_bal"]
+                            u_cfg = u_info["auto_cfg"]
+
+                            # Personalize lot sizing
+                            user_lot = float(u_cfg.get("lot_size", 0.01) or 0.01)
+                            if u_is_cent:
+                                if u_raw_b < 500.0:
+                                    user_lot = 0.01
+                                elif u_raw_b < 2000.0:
+                                    user_lot = min(0.05, max(0.01, user_lot))
+                                else:
+                                    user_lot = min(1.0, max(0.01, user_lot))
+                            else:
+                                if u_real_b < 50.0:
+                                    user_lot = 0.01
+                                elif u_real_b < 200.0:
+                                    user_lot = min(0.02, user_lot)
+                                elif u_real_b < 500.0:
+                                    user_lot = min(0.05, user_lot)
+                                elif u_real_b < 1000.0:
+                                    user_lot = min(0.10, user_lot)
+                                else:
+                                    user_lot = max(0.01, min(1.0, user_lot))
+
+                            # Dynamically adapt symbol for user session (Server 2 clean, Server 5 .C, Exness c)
+                            dispatch_sym = self.adapt_symbol_for_session(sym_clean, u_sess)
+
+                            res = self.dispatch_order(
+                                symbol=dispatch_sym,
+                                action=action,
+                                lot=user_lot,
+                                sl=sl_price,
+                                tp=tp_price,
+                                sl_dist=sl_dist,
+                                tp_dist=tp_dist,
+                                comment=f"SWARM_{signal_reason[:12]}",
+                                magic=888999,
+                                target_account=u_acc
+                            )
+
+                            now_d = time.time()
+                            self._last_account_dispatch_time[u_acc] = now_d
+                            if res.get("clients_reached", 0) > 0:
+                                self._last_symbol_trade_time[f"{u_chat}_{raw_sym}"] = now_d
+                                self._last_symbol_trade_time[f"{u_chat}_{sym_clean}"] = now_d
+                                self._last_symbol_trade_time[f"{u_acc}_{sym_clean}"] = now_d
+                                u_info["open_symbols"].add(raw_sym)
+                                u_info["open_symbols"].add(sym_clean)
+                                u_info["current_open_count"] += 1
+                                logger.info(f"✅ [OMNI-SWARM FILLED] User {u_chat} (Acc #{u_acc}): Entered {action} {user_lot} {dispatch_sym}!")
+                                return True
+                        except Exception as ex:
+                            logger.error(f"⚠️ [OMNI-SWARM DISPATCH ERROR] User {u_info.get('acc_id')}: {ex}")
+                        return False
+
+                    # Execute parallel fan-out
+                    if len(candidate_users) == 1:
+                        _dispatch_for_user(candidate_users[0])
+                    else:
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=min(32, len(candidate_users))) as executor:
+                            futures = [executor.submit(_dispatch_for_user, u) for u in candidate_users]
+                            concurrent.futures.wait(futures, timeout=5.0)
+
+                    # Update eligible users pool (remove those who reached max capacity)
+                    eligible_vip_users = [u for u in eligible_vip_users if u["current_open_count"] < u["max_assets"]]
             except Exception as e:
                 logger.error(f"⚠️ [MT5 AUTO-TRADE WORKER ERROR]: {e}")
 
