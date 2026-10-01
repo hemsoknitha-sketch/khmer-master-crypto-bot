@@ -1031,7 +1031,7 @@ def run_audit():
         log_fail(str(e))
 
     # 32. 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity & Non-Premature Breakeven Protocol (Invariant 39)
-    print("\n[CHECK 32/35] Verifying 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity & Non-Premature Breakeven Protocol (Invariant 39)...")
+    print("\n[CHECK 32/36] Verifying 500-Coin Mathematical DNA Profiling, Fixed-Dollar Risk Parity & Non-Premature Breakeven Protocol (Invariant 39)...")
     try:
         with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
             pw_code = f.read()
@@ -1075,7 +1075,7 @@ def run_audit():
 
 
     # 33. Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Risk Protocol & 5-Layer Defense (Invariant 40)
-    print("\n[CHECK 33/35] Verifying Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Risk Protocol & 5-Layer Defense (Invariant 40)...")
+    print("\n[CHECK 33/36] Verifying Autonomous Solana On-Chain DEX Execution Engine (/smart_swap), Tri-Tier Risk Protocol & 5-Layer Defense (Invariant 40)...")
     try:
         with open("smart_swap_engine.py", "r", encoding="utf-8") as f:
             swap_code = f.read()
@@ -1144,7 +1144,7 @@ def run_audit():
 
 
     # 34. Institutional Five-Layer Security Citadel, Latency Virtualizer & Prop Firm Compliance (Invariant 41)
-    print("\n[CHECK 34/35] Verifying Institutional Five-Layer Security Citadel, Latency Virtualizer & Prop Firm Compliance (Invariant 41)...")
+    print("\n[CHECK 34/36] Verifying Institutional Five-Layer Security Citadel, Latency Virtualizer & Prop Firm Compliance (Invariant 41)...")
     try:
         import system_security_citadel as sc
         with open("AGENTS.md", "r", encoding="utf-8") as f:
@@ -1216,7 +1216,7 @@ def run_audit():
     except Exception as e:
         failures.append(f"Invariant 41 check failed: {e}")
     # 35. Super Smart Sky Net Omni-Swarm Quorum & Zero-Conflict Cross-Engine Guard (Invariant 42)
-    print("\n[CHECK 35/35] Verifying Super Smart Sky Net Omni-Swarm Quorum & Zero-Conflict Cross-Engine Guard (Invariant 42)...")
+    print("\n[CHECK 35/36] Verifying Super Smart Sky Net Omni-Swarm Quorum & Zero-Conflict Cross-Engine Guard (Invariant 42)...")
     try:
         import sky_net_orchestrator as sno
         with open("AGENTS.md", "r", encoding="utf-8") as f:
@@ -1303,6 +1303,69 @@ def run_audit():
             log_fail("Sky Net Omni-Swarm (Invariant 42) specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 42 check failed: {e}")
+        log_fail(str(e))
+
+    # 36. Anti-Exhaustion Structural Confluence, Anti-Top/Bottom Guard & Capital Allocation Ring-Fence (Invariant 43)
+    print("\n[CHECK 36/36] Verifying Anti-Exhaustion Structural Confluence, Anti-Top/Bottom Guard & Capital Allocation Ring-Fence (Invariant 43)...")
+    try:
+        with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
+            pw_code = f.read()
+        with open("sky_net_orchestrator.py", "r", encoding="utf-8") as f:
+            sno_code = f.read()
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+
+        has_inv43 = "Invariant 43" in agents_code and "Anti-Exhaustion Structural Confluence" in agents_code
+        has_upper_wick_guard = "Anti-Top Exhaustion" in pw_code and "upper_wick" in pw_code
+        has_bearish_div = "Bearish RSI Divergence" in pw_code
+        has_lower_wick_guard = "Anti-Bottom Absorption" in pw_code and "lower_wick" in pw_code
+        has_bullish_div = "Bullish RSI Divergence" in pw_code
+        has_pullback_limit = "LIMIT Pullback @" in pw_code or "pullback_price" in pw_code
+        has_capital_ring_fence = "wealth_capital_cap" in pw_code and "0.35" in pw_code
+        has_skynet_top_fomo = "ANTI_TOP_FOMO_GUARD" in sno_code
+        has_skynet_wealth_cap = "WEALTH_CAPITAL_RING_FENCE_REACHED" in sno_code
+
+        # Dynamic Unit Test 1: Sky Net Anti-Top FOMO Guard (RSI > 65.0 must block BUY)
+        block_fomo_ok, block_fomo_reason, _ = sno.validate_cross_engine_entry(
+            chat_id=999999,
+            symbol="BTCUSDT",
+            proposed_side="BUY",
+            requesting_engine="wealth",
+            rsi_15m=72.0
+        )
+        unit_test_top_guard = (not block_fomo_ok and "ANTI_TOP_FOMO_GUARD" in block_fomo_reason)
+
+        # Dynamic Unit Test 2: Sky Net Anti-Oversold Short Guard (RSI <= 42.0 must block SHORT)
+        block_oversold_ok, block_oversold_reason, _ = sno.validate_cross_engine_entry(
+            chat_id=999999,
+            symbol="BTCUSDT",
+            proposed_side="SELL",
+            requesting_engine="wealth",
+            rsi_15m=40.0
+        )
+        unit_test_bottom_guard = (not block_oversold_ok and "ANTI_OVERSOLD_SHORT_GUARD" in block_oversold_reason)
+
+        # Dynamic Unit Test 3: Technical evaluation in Perpetual Wealth Engine executes cleanly
+        import perpetual_wealth_engine
+        eval_res = perpetual_wealth_engine.PerpetualWealthGeneratorEngine.evaluate_symbol_technicals("BTCUSDT", target_side="BUY")
+        unit_test_eval = isinstance(eval_res, dict) and "is_valid" in eval_res
+
+        all_inv43_tests = (
+            unit_test_top_guard and
+            unit_test_bottom_guard and
+            unit_test_eval
+        )
+
+        if (has_inv43 and has_upper_wick_guard and has_bearish_div and
+            has_lower_wick_guard and has_bullish_div and has_pullback_limit and
+            has_capital_ring_fence and has_skynet_top_fomo and has_skynet_wealth_cap and
+            all_inv43_tests):
+            log_pass("Anti-Exhaustion Structural Confluence, Anti-Top/Bottom Guard & Capital Allocation Ring-Fence (Invariant 43) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 43 check failed: inv43={has_inv43}, upper_wick={has_upper_wick_guard}, bearish_div={has_bearish_div}, lower_wick={has_lower_wick_guard}, bullish_div={has_bullish_div}, pullback={has_pullback_limit}, capital_cap={has_capital_ring_fence}, skynet_fomo={has_skynet_top_fomo}, skynet_cap={has_skynet_wealth_cap}, unit_tests={all_inv43_tests}")
+            log_fail("Anti-Exhaustion & Capital Allocation Ring-Fence (Invariant 43) specification missing or unit test failure!")
+    except Exception as e:
+        failures.append(f"Invariant 43 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

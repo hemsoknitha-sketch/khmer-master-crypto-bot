@@ -322,8 +322,8 @@ class PerpetualWealthGeneratorEngine:
                 if quote_volume < 15_000_000.0 or last_price <= 0.0:
                     continue
 
-                # Golden Sweet Spot for LONG: +1.8% to +9.0% (Tightened from +14% to eliminate Local Top FOMO Chasing)
-                if allow_long and (1.8 <= price_change_pct <= 9.0):
+                # Golden Sweet Spot for LONG: +1.5% to +6.5% (Strict Anti-Exhaustion & Anti-Top FOMO Invariant 43)
+                if allow_long and (1.5 <= price_change_pct <= 6.5):
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_symbol_technicals(symbol, target_side="BUY")
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -335,6 +335,7 @@ class PerpetualWealthGeneratorEngine:
                             "quote_volume": quote_volume,
                             "rsi_15m": tech_eval.get("rsi_15m", 58.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
+                            "ema20_15m": tech_eval.get("ema20_15m", last_price),
                             "rvol": tech_eval.get("rvol", 2.2),
                             "chg_1h": tech_eval.get("chg_1h", 1.0),
                             "chg_15m": tech_eval.get("chg_15m", 0.5),
@@ -345,8 +346,8 @@ class PerpetualWealthGeneratorEngine:
                             "orderbook_ratio": tech_eval.get("orderbook_ratio", 1.25),
                             "reason": tech_eval.get("reason", "Futures Golden Sweet-Spot Momentum")
                         })
-                # Sweet Spot for SHORT: -1.8% to -8.5% (Tightened from -12% to eliminate Local Bottom Short-Squeeze Sinks)
-                elif allow_short and (-8.5 <= price_change_pct <= -1.8):
+                # Sweet Spot for SHORT: -1.5% to -6.0% (Strict Anti-Bottom Short-Squeeze Invariant 43)
+                elif allow_short and (-6.0 <= price_change_pct <= -1.5):
                     tech_eval = PerpetualWealthGeneratorEngine.evaluate_symbol_technicals(symbol, target_side="SELL")
                     if tech_eval.get("is_valid"):
                         candidates.append({
@@ -358,6 +359,7 @@ class PerpetualWealthGeneratorEngine:
                             "quote_volume": quote_volume,
                             "rsi_15m": tech_eval.get("rsi_15m", 45.0),
                             "ema50_15m": tech_eval.get("ema50_15m", last_price),
+                            "ema20_15m": tech_eval.get("ema20_15m", last_price),
                             "rvol": tech_eval.get("rvol", 2.2),
                             "chg_1h": tech_eval.get("chg_1h", -1.0),
                             "chg_15m": tech_eval.get("chg_15m", -0.5),
@@ -480,35 +482,107 @@ class PerpetualWealthGeneratorEngine:
             atr_14 = (sum(trs) / len(trs)) if trs else (current_price * 0.015)
             atr_pct = round((atr_14 / current_price) * 100.0, 2) if current_price > 0 else 1.5
 
-            # 7. Direction-Specific Technical Guards (Invariant 16, RSI boundaries, EMA alignment)
+            # 7. Direction-Specific Technical Guards (Invariant 16 & Invariant 43: Anti-Exhaustion & Anti-Top/Bottom Guard)
+            # Candle Structure & Wick Exhaustion Sentinel
+            last_c = klines[-1]
+            c_open, c_high, c_low, c_close = float(last_c[1]), float(last_c[2]), float(last_c[3]), float(last_c[4])
+            c_range = max(1e-6, c_high - c_low)
+            upper_wick = c_high - max(c_open, c_close)
+            lower_wick = min(c_open, c_close) - c_low
+
             if target_side == "BUY":
-                if rsi_15m > 63.5:
-                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 63.5 (Anti-FOMO Top Rejection)"}
+                # A. Upper Wick Rejection Guard (Shooting Star / Whale Distribution Dump)
+                if (upper_wick / c_range) >= 0.35 and c_range > (atr_14 * 0.4):
+                    return {"is_valid": False, "reason": f"Anti-Top Exhaustion (Invariant 43): Upper Wick rejection ({upper_wick/c_range*100:.1f}% >= 35%) indicates Whale Distribution!"}
+
+                # B. Bearish RSI Divergence Sentinel (Price Higher High with RSI Lower High)
+                if len(highs) >= 15:
+                    peak_p1 = max(highs[-4:])
+                    peak_p2 = max(highs[-12:-4])
+                    if peak_p1 > peak_p2 * 1.003:
+                        idx_p2 = highs[-12:-4].index(peak_p2) + (len(highs) - 12)
+                        closes_p2 = closes[:idx_p2+1]
+                        if len(closes_p2) >= 15:
+                            g_p2, l_p2 = [], []
+                            for j in range(1, 15):
+                                d = closes_p2[-j] - closes_p2[-j-1]
+                                if d >= 0: g_p2.append(d); l_p2.append(0.0)
+                                else: g_p2.append(0.0); l_p2.append(abs(d))
+                            ag_p2 = sum(g_p2)/14.0 if g_p2 else 0.0
+                            al_p2 = sum(l_p2)/14.0 if l_p2 else 0.0001
+                            rsi_p2 = 100.0 - (100.0 / (1.0 + (ag_p2 / al_p2)))
+                            if rsi_15m < (rsi_p2 - 2.5):
+                                return {"is_valid": False, "reason": f"Bearish RSI Divergence (Invariant 43): Higher price (${peak_p1:.4f} > ${peak_p2:.4f}) but lower RSI ({rsi_15m:.1f} < {rsi_p2:.1f}) - Climax Top Trap!"}
+
+                # C. Parabolic Overextension Guard: Price must be near EMA20 support (<= 0.6% above EMA20)
+                if current_price > (ema20 * 1.006):
+                    return {"is_valid": False, "reason": f"Overextended > 0.6% above 15m EMA20 (+{((current_price - ema20)/ema20)*100:.2f}%) - Anti-Top FOMO Guard (Invariant 43)"}
+
+                # D. Market Structure Higher Low (HL) Support Confirmation
+                if len(lows) >= 12:
+                    recent_min_low = min(lows[-4:])
+                    prior_min_low = min(lows[-12:-4])
+                    if recent_min_low < prior_min_low * 0.997:
+                        return {"is_valid": False, "reason": "Market Structure Failure: Price printing Lower Lows (Downtrend / Falling Knife - BUY rejected)"}
+
+                if rsi_15m > 62.0:
+                    return {"is_valid": False, "reason": f"Overbought Peak RSI {rsi_15m:.1f} > 62.0 (Anti-FOMO Top Rejection)"}
                 if rsi_15m < 50.0:
                     return {"is_valid": False, "reason": f"Bearish / Choppy RSI {rsi_15m:.1f} < 50.0 (No Bull Momentum)"}
-                if current_price > (ema20 * 1.015):
-                    return {"is_valid": False, "reason": "Parabolic Overextension (> 1.5% above 15m EMA20) - Anti-Top FOMO Guard"}
                 if current_price < (ema50 * 0.998):
                     return {"is_valid": False, "reason": "Price below 15m EMA50 (Macro Trend broken)"}
                 if current_price < (0.994 * ema20):
                     return {"is_valid": False, "reason": "Price below 15m EMA20 (Pullback too deep)"}
                 if plus_di <= minus_di:
                     return {"is_valid": False, "reason": f"Bearish DMI Dominance (+DI {plus_di:.1f} <= -DI {minus_di:.1f})"}
+
             else:  # SELL / SHORT
-                # Invariant 16: Anti-Oversold Short Guard (15m RSI <= 38.0 strictly blocks SHORT)
+                # A. Invariant 16 & Invariant 43: Anti-Oversold & Capitulation Short Guard
                 if rsi_15m <= 38.0:
                     return {
                         "is_valid": False,
                         "rsi_15m": rsi_15m,
                         "reason": f"Invariant 16 Triggered: 15m RSI {rsi_15m:.1f} <= 38.0 (Anti-Oversold Short Guard)"
                     }
-                # Broadened Anti-Capitulation Short Guard: Never short into oversold bounce territory
                 if rsi_15m <= 42.0:
-                    return {"is_valid": False, "reason": f"Approaching Oversold RSI {rsi_15m:.1f} <= 42.0 (Anti-Capitulation Short Guard)"}
-                if rsi_15m > 52.5:
-                    return {"is_valid": False, "reason": f"Bullish / Overbought RSI {rsi_15m:.1f} > 52.5 (No Bear Momentum)"}
-                if current_price < (ema20 * 0.985):
-                    return {"is_valid": False, "reason": "Parabolic Waterfall (> 1.5% below 15m EMA20) - Anti-Bottom Short Guard"}
+                    return {"is_valid": False, "reason": f"Approaching Oversold RSI {rsi_15m:.1f} <= 42.0 (Anti-Capitulation Short Guard Invariant 43)"}
+
+                # B. Lower Wick Absorption Guard (Hammer / Buying Defense / Spring)
+                if (lower_wick / c_range) >= 0.35 and c_range > (atr_14 * 0.4):
+                    return {"is_valid": False, "reason": f"Anti-Bottom Absorption (Invariant 43): Lower Wick absorption ({lower_wick/c_range*100:.1f}% >= 35%) indicates Whale Buying defense / Spring!"}
+
+                # C. Bullish RSI Divergence Sentinel (Price Lower Low with RSI Higher Low)
+                if len(lows) >= 15:
+                    trough_p1 = min(lows[-4:])
+                    trough_p2 = min(lows[-12:-4])
+                    if trough_p1 < trough_p2 * 0.997:
+                        idx_p2 = lows[-12:-4].index(trough_p2) + (len(lows) - 12)
+                        closes_p2 = closes[:idx_p2+1]
+                        if len(closes_p2) >= 15:
+                            g_p2, l_p2 = [], []
+                            for j in range(1, 15):
+                                d = closes_p2[-j] - closes_p2[-j-1]
+                                if d >= 0: g_p2.append(d); l_p2.append(0.0)
+                                else: g_p2.append(0.0); l_p2.append(abs(d))
+                            ag_p2 = sum(g_p2)/14.0 if g_p2 else 0.0
+                            al_p2 = sum(l_p2)/14.0 if l_p2 else 0.0001
+                            rsi_p2 = 100.0 - (100.0 / (1.0 + (ag_p2 / al_p2)))
+                            if rsi_15m > (rsi_p2 + 2.5):
+                                return {"is_valid": False, "reason": f"Bullish RSI Divergence (Invariant 43): Lower price (${trough_p1:.4f} < ${trough_p2:.4f}) but higher RSI ({rsi_15m:.1f} > {rsi_p2:.1f}) - Short Squeeze Trap!"}
+
+                # D. Parabolic Waterfall Overextension Guard: Price must be near EMA20 resistance (<= 0.6% below EMA20)
+                if current_price < (ema20 * 0.994):
+                    return {"is_valid": False, "reason": f"Overextended > 0.6% below 15m EMA20 (-{((ema20 - current_price)/ema20)*100:.2f}%) - Anti-Bottom Short Guard (Invariant 43)"}
+
+                # E. Market Structure Lower High (LH) Resistance Confirmation
+                if len(highs) >= 12:
+                    recent_max_high = max(highs[-4:])
+                    prior_max_high = max(highs[-12:-4])
+                    if recent_max_high > prior_max_high * 1.003:
+                        return {"is_valid": False, "reason": "Market Structure Failure: Price printing Higher Highs (Uptrend / Short Squeeze - SHORT rejected)"}
+
+                if rsi_15m > 52.0:
+                    return {"is_valid": False, "reason": f"Bullish / Overbought RSI {rsi_15m:.1f} > 52.0 (No Bear Momentum)"}
                 if current_price > (ema50 * 1.006):
                     return {"is_valid": False, "reason": "Price above 15m EMA50 (Macro Bull Trend - Short rejected)"}
                 if current_price > (ema20 * 1.010):
@@ -516,7 +590,7 @@ class PerpetualWealthGeneratorEngine:
                 if minus_di <= plus_di:
                     return {"is_valid": False, "reason": f"Bullish DMI Dominance (-DI {minus_di:.1f} <= +DI {plus_di:.1f})"}
 
-            # 8. Orderbook L2 depth check
+            # 8. Orderbook L2 depth check with Institutional Wall Ratio (Invariant 43)
             ob_ratio = 1.20
             try:
                 ob_url = f"{trading_engine.FUTURES_URL}/fapi/v1/depth?symbol={symbol}&limit=20"
@@ -528,12 +602,12 @@ class PerpetualWealthGeneratorEngine:
                     if asks > 0:
                         ob_ratio = bids / asks
             except Exception:
-                ob_ratio = 1.15 if target_side == "BUY" else 0.85
+                ob_ratio = 1.20 if target_side == "BUY" else 0.80
 
-            if target_side == "BUY" and ob_ratio < 0.95:
-                return {"is_valid": False, "reason": f"Heavy Orderbook sell wall (Bid/Ask ratio: {ob_ratio:.2f} < 0.95)"}
-            if target_side == "SELL" and ob_ratio > 1.05:
-                return {"is_valid": False, "reason": f"Heavy Orderbook buy wall (Bid/Ask ratio: {ob_ratio:.2f} > 1.05)"}
+            if target_side == "BUY" and ob_ratio < 1.15:
+                return {"is_valid": False, "reason": f"Insufficient Orderbook Bid Wall (Bid/Ask ratio: {ob_ratio:.2f} < 1.15 - Whale Support Missing)"}
+            if target_side == "SELL" and ob_ratio > 0.85:
+                return {"is_valid": False, "reason": f"Insufficient Orderbook Ask Wall (Bid/Ask ratio: {ob_ratio:.2f} > 0.85 - Whale Absorption Risk)"}
 
             # 9. 33 Wall Street AI Models Ensemble Confluence (MoE Router + CatBoost + LightGBM + XGBoost + Trend Classifier)
             ai_ensemble_res = SmartXEngine.evaluate_ai_ensemble(symbol, klines_15m=klines)
@@ -654,9 +728,9 @@ class PerpetualWealthGeneratorEngine:
             elif rvol >= 2.2 and adx_15m >= 28.0 and ob_ratio >= 1.15:
                 ai_conf = max(ai_conf, 95.5)
 
-            # Minimum AI confidence hurdle for Futures (Rigorous institutional hurdle: >= 8.0/10.0 and >= 88.0% confidence)
-            if ai_score < 8.0 or ai_conf < 88.0:
-                return {"is_valid": False, "reason": f"Insufficient Confluence AI Score ({ai_score:.1f} < 8.0, 33-AI Conf: {ai_conf:.1f}% < 88.0%)"}
+            # Minimum AI confidence hurdle for Futures (Rigorous institutional hurdle: >= 8.6/10.0 and >= 92.0% confidence)
+            if ai_score < 8.6 or ai_conf < 92.0:
+                return {"is_valid": False, "reason": f"Insufficient Confluence AI Score ({ai_score:.1f} < 8.6, 33-AI Conf: {ai_conf:.1f}% < 92.0%)"}
 
             res_data = {
                 "is_valid": True,
@@ -1416,6 +1490,24 @@ class PerpetualWealthGeneratorEngine:
                     if total_active_count >= max_coins or avail_free_usdt < margin_per_coin:
                         continue
 
+                    # Invariant 43: Wealth Capital Ring-Fencing & Anti-Starvation Guard
+                    # Wealth is strictly capped at max 35% of total wallet capital.
+                    # Guarantees >= 65% of wallet equity is permanently ring-fenced for SmartX, Turbo Hedge, and Auto Trade!
+                    wealth_active_margin_usdt = sum(
+                        ((abs(float(p.get("positionAmt", 0.0))) * float(p.get("entryPrice") or p.get("markPrice") or 0.0)) / max(1, int(p.get("leverage") or 10)))
+                        for p in (open_pos or [])
+                        if p.get("symbol") in open_symbols
+                    )
+                    wealth_capital_cap = wallet_usdt * 0.35
+                    if (wealth_active_margin_usdt + margin_per_coin) > wealth_capital_cap:
+                        print(f"🛡️ [WEALTH CAPITAL RING-FENCE (Invariant 43)] User {chat_id}: Wealth margin (${wealth_active_margin_usdt:.2f} + ${margin_per_coin:.2f}) reaches 35% wallet ceiling (${wealth_capital_cap:.2f}). 65% margin strictly reserved for SmartX, Turbo Hedge, & Auto Trade!")
+                        continue
+
+                    # Also preserve free margin buffer >= $15.00 for higher-priority engines on accounts >= $50
+                    if (avail_free_usdt - margin_per_coin) < 15.00 and wallet_usdt >= 50.0:
+                        print(f"🛡️ [WEALTH FREE MARGIN PRESERVATION (Invariant 43)] User {chat_id}: Preserving $15.00+ free margin for SmartX & Turbo Hedge.")
+                        continue
+
                     # Select best candidate not already open or pending
                     for cand in candidates:
                         sym = cand["symbol"]
@@ -1478,25 +1570,28 @@ class PerpetualWealthGeneratorEngine:
                             if qty <= 0 or (qty * last_price) < 5.05:
                                 continue
 
-                            # Aggressive Instant Market Execution to capture breakout momentum (Zero Adverse Selection)
-                            limit_entry_p = trading_engine.format_price_to_tick_size(sym, last_price)
-                            entry_mode_tag = "MARKET (Instant Scale-Up & Re-Arm)" if is_scaleup else "MARKET (Instant Fill)"
-                            print(f"🚀 [24/7 WEALTH GENERATOR AGGRESSIVE ENTRY] User {chat_id}: Executing {sym} {side} {entry_mode_tag} @ ${limit_entry_p} (${margin_per_coin:.2f} USDT x{leverage} lev, ATR: {cand_atr:.1f}%)...")
+                            # Pullback Sweet-Spot Execution (Zero Top/Bottom Chasing Invariant 43):
+                            # If price is at or below EMA20 * 1.002, market execute at sweet spot
+                            # If price is slightly above sweet spot, place Pullback LIMIT Order to avoid chasing
+                            is_at_sweet_spot = (last_price <= (cand.get("ema20_15m", last_price) * 1.002)) if side == "BUY" else (last_price >= (cand.get("ema20_15m", last_price) * 0.998))
 
-                            # Execute MARKET order for immediate fill
-                            order_res = trading_engine.place_futures_order(
-                                api_key=api_key,
-                                api_secret=api_secret,
-                                symbol=sym,
-                                side=side,
-                                quantity=qty,
-                                leverage=leverage,
-                                order_type="MARKET"
-                            )
-
-                            is_placed = bool(order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")))
-                            if not is_placed:
-                                # Fallback to LIMIT touching book if MARKET temporarily rejected
+                            if is_at_sweet_spot:
+                                limit_entry_p = trading_engine.format_price_to_tick_size(sym, last_price)
+                                entry_mode_tag = "MARKET (Sweet-Spot Retest Fill)" if not is_scaleup else "MARKET (Instant Scale-Up & Re-Arm)"
+                                print(f"🚀 [24/7 WEALTH SWEET-SPOT ENTRY] User {chat_id}: Executing {sym} {side} {entry_mode_tag} @ ${limit_entry_p} (${margin_per_coin:.2f} USDT x{leverage} lev, ATR: {cand_atr:.1f}%)...")
+                                order_res = trading_engine.place_futures_order(
+                                    api_key=api_key,
+                                    api_secret=api_secret,
+                                    symbol=sym,
+                                    side=side,
+                                    quantity=qty,
+                                    leverage=leverage,
+                                    order_type="MARKET"
+                                )
+                            else:
+                                target_limit_p = trading_engine.format_price_to_tick_size(sym, pullback_price)
+                                entry_mode_tag = f"LIMIT Pullback @ ${target_limit_p} (Zero Top/Bottom Chasing - Invariant 43)"
+                                print(f"🎯 [24/7 WEALTH PULLBACK LIMIT] User {chat_id}: Placing {sym} {side} {entry_mode_tag} (${margin_per_coin:.2f} USDT x{leverage} lev)...")
                                 order_res = trading_engine.place_futures_order(
                                     api_key=api_key,
                                     api_secret=api_secret,
@@ -1505,10 +1600,11 @@ class PerpetualWealthGeneratorEngine:
                                     quantity=qty,
                                     leverage=leverage,
                                     order_type="LIMIT",
-                                    price=limit_entry_p,
+                                    price=target_limit_p,
                                     time_in_force="GTC"
                                 )
-                                is_placed = bool(order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")))
+
+                            is_placed = bool(order_res and (order_res.get("status") in ["success", "NEW", "FILLED"] or order_res.get("orderId")))
 
                             if not is_placed:
                                 err_msg = str(order_res.get('error') if isinstance(order_res, dict) else '')

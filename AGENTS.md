@@ -1,5 +1,5 @@
 # KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 2.8.0 (Absolute Ground Truth Lock - The 42 Pillars)  
+**Document Version:** 2.9.0 (Absolute Ground Truth Lock - The 43 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -583,7 +583,42 @@ Any modification that breaks any of the following 30 invariants is considered an
      - Atomic RAM Cache + SQLite WAL persistence for active positions across engines.
      - Position release protocol (`release_cross_engine_position`): When a position closes via TP, SL, or Breakeven, the symbol is released with a 30-second cooldown buffer before re-entry evaluation.
      - Sub-millisecond (< 0.001ms) non-blocking replication of Sky Net executions to MT5 Prop Firm bridges (FTMO/MFF).
-- **Enforcement:** Verified by `audit_system.py` [CHECK 35/35].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 35/36].
+
+### Invariant 43: Anti-Exhaustion Structural Confluence & Fiduciary Capital Allocation Guard (The 43rd Pillar)
+- **Location:** `perpetual_wealth_engine.py` (`scan_golden_sweet_spot_candidates`, `evaluate_symbol_technicals`, `execute_wealth_harvest_cycle`), `sky_net_orchestrator.py` (`validate_cross_engine_entry`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty (Section 1.1) and Zero Technical Negligence, the system strictly eliminates the Top Chasing / Buying Exhaustion Trap and Bottom Panic Short Trap, while enforcing strict capital ring-fencing across the trading portfolio:
+  1. **Anti-Top Chasing & Buying Exhaustion Elimination (ហាមដាច់ខាតការដេញទិញកាក់ចំកម្រិតកំពូល) ៖**
+     - **Tightened Sweet-Spot Scan:** Golden Sweet Spot for LONG entries is strictly clamped to $+1.5\% \le \Delta_{24\text{h}} \le +6.5\%$. Chasing coins up $+10\%$ to $+14\%$ is strictly prohibited because they are in the climax distribution zone of whales.
+     - **Upper Wick Rejection Sentinel:** If the latest 15m candle exhibits an upper wick ratio $\frac{\text{Upper Wick}}{\text{Candle Range}} \ge 35\%$ on significant volatility ($\text{Range} > 0.4 \times \text{ATR}_{14}$), the asset is exhibiting whale selling rejection and BUY orders are unconditionally blocked.
+     - **Bearish RSI Divergence Sentinel:** Over the last 15 candles, if price forms a Higher High ($P_{\text{recent}} > P_{\text{prior}} \times 1.003$) while 15m RSI forms a Lower High ($\text{RSI}_{\text{recent}} < \text{RSI}_{\text{prior}} - 2.5$), the move is a Climax Fakeout and BUY orders are unconditionally blocked.
+     - **Overextension from EMA20 Guard:** Current price must be within $\le +0.6\%$ of the 15m EMA20. Parabolic extensions $> +0.6\%$ above EMA20 are blocked from instant market execution to prevent taking immediate drawdowns on mean reversion.
+     - **Market Structure Higher Low (HL) Support Confirmation:** Price must confirm a structural Higher Low base ($\min(\text{Low}_{-4:}) \ge \min(\text{Low}_{-12:-4}) \times 0.997$). Assets printing Lower Lows (falling knives) are blocked from BUY.
+  2. **Anti-Bottom Shorting & Short Squeeze Trap Elimination (ហាមដាច់ខាតការបើក Short ចំបាត) ៖**
+     - **Tightened Sweet-Spot Scan:** Sweet Spot for SHORT entries is strictly clamped to $-6.0\% \le \Delta_{24\text{h}} \le -1.5\%$.
+     - **Lower Wick Absorption Sentinel:** If the latest 15m candle exhibits a lower wick ratio $\frac{\text{Lower Wick}}{\text{Candle Range}} \ge 35\%$ on significant volatility, smart money is absorbing sell dumps and SHORT orders are unconditionally blocked.
+     - **Bullish RSI Divergence Sentinel:** Over the last 15 candles, if price forms a Lower Low while 15m RSI forms a Higher Low, the asset is primed for a violent short squeeze and SHORT orders are unconditionally blocked.
+     - **Overextension below EMA20 Guard:** Current price must be within $\le -0.6\%$ of 15m EMA20. Shorting deep into the waterfall ($> 0.6\%$ below EMA20) is blocked.
+     - **Market Structure Lower High (LH) Resistance Confirmation:** Price must confirm a structural Lower High breakdown ($\max(\text{High}_{-4:}) \le \max(\text{High}_{-12:-4}) \times 1.003$).
+     - **Strict Invariant 16 Oversold Guard:** $15\text{m RSI} \le 42.0$ unconditionally blocks all SHORT orders across all engines.
+  3. **Pullback Sweet-Spot Execution Standard (Maker Fee & Zero Top Fill) ៖**
+     - The engine is prohibited from throwing blind MARKET orders when price is extended above support.
+     - If price is at the support retest ($\le \text{EMA20} \times 1.002$), sweet-spot fill is granted.
+     - If price is slightly above support, the engine places a **Pullback LIMIT Order** at $\text{EMA20} \times 1.001$, guaranteeing the position is filled only upon a genuine technical retest with 0.02% Maker fee.
+  4. **Dynamic Capital Allocation Ring-Fence & Fiduciary Priority Hierarchy (ការពារមិនឱ្យ /wealth លេប Margin ទាំងអស់) ៖**
+     - **Wealth Margin Ceiling ($\le 35\%$):** Total margin allocated to `/wealth` positions across the user's futures account is strictly capped at $\le 35\%$ of total wallet equity ($E_{\text{wallet}}$).
+     - **Permanent Ring-Fence for Institutional Engines ($\ge 65\%$):** At least $65\%$ of wallet equity and free margin is permanently ring-fenced and reserved for high-conviction institutional engines (`/smartx`, `/turbo_hedge`, and `/auto_trade`).
+     - **Engine Priority Arbitration:**
+       * *Priority 1 (Apex):* `/smartx` (Gold AGI & 25-ML Wall Street Ensembles) — execution allowed down to $\$5.00$ free margin.
+       * *Priority 2:* `/turbo_hedge` (Delta-Neutral HFT & Reversal) — execution allowed down to $\$5.00$ free margin.
+       * *Priority 3:* `/auto_trade` (Macro Waterfall Swing) — execution allowed down to $\$5.00$ free margin.
+       * *Priority 4:* `/pre_pump` (Whale Accumulation Sniper).
+       * *Priority 5:* `/wealth` (Continuous Momentum Harvester) — blocked if wealth margin $\ge 35\%$ or free margin $< \$15.00$ (on accounts $\ge \$50$).
+  5. **Orderbook L2 Whale Depth Ratio & Conviction Hurdle ៖**
+     - BUY requires Bid/Ask ratio $\ge 1.15$ (Whale Bid Wall support).
+     - SELL requires Bid/Ask ratio $\le 0.85$ (Whale Ask Wall resistance).
+     - Minimum AI Score $\ge 8.6/10.0$ and AI Confidence $\ge 92.0\%$ (with 33 Wall Street Models agreement).
+- **Enforcement:** Verified by `audit_system.py` [CHECK 36/36].
 
 ---
 
@@ -591,8 +626,8 @@ Any modification that breaks any of the following 30 invariants is considered an
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 42 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 35 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 43 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 36 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main

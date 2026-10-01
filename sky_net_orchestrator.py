@@ -443,11 +443,11 @@ def validate_cross_engine_entry(
     if now < _SKY_NET_COOLDOWNS.get(lock_key, 0.0):
         return False, "SKY_NET_COOLDOWN_ACTIVE", {}
 
-    # 1. Invariant 16 Anti-Oversold Short Guard Check
+    # 1. Invariant 16 & Invariant 43 Anti-Oversold & Anti-Top FOMO Guard Check
     if norm_proposed == "SELL":
         if rsi_15m is not None:
-            if float(rsi_15m) <= 38.0:
-                return False, f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI {float(rsi_15m):.1f} <= 38.0 (Invariant 16)", {}
+            if float(rsi_15m) <= 42.0:
+                return False, f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI {float(rsi_15m):.1f} <= 42.0 (Invariant 16/43)", {}
         else:
             try:
                 klines = trading_engine.get_klines(sym, interval="15m", limit=20, is_spot=False)
@@ -466,10 +466,13 @@ def validate_cross_engine_entry(
                     avg_l = sum(losses) / 14.0 if losses else 0.0001
                     rs = avg_g / avg_l if avg_l > 0 else 1.0
                     calc_rsi = 100.0 - (100.0 / (1.0 + rs))
-                    if calc_rsi <= 38.0:
-                        return False, f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI {calc_rsi:.1f} <= 38.0 (Invariant 16)", {}
+                    if calc_rsi <= 42.0:
+                        return False, f"ANTI_OVERSOLD_SHORT_GUARD: 15m RSI {calc_rsi:.1f} <= 42.0 (Invariant 16/43)", {}
             except Exception:
                 pass
+    elif norm_proposed == "BUY":
+        if rsi_15m is not None and float(rsi_15m) > 65.0:
+            return False, f"ANTI_TOP_FOMO_GUARD: 15m RSI {float(rsi_15m):.1f} > 65.0 (Invariant 43)", {}
 
     # 2. Cross-Engine Ownership & Mutual Non-Aggression Check
     active_map = get_all_active_symbols_across_engines(chat_id)
@@ -500,13 +503,35 @@ def validate_cross_engine_entry(
     # 3. Sky Net 99% Swarm Confluence Evaluation
     swarm = evaluate_sky_net_swarm_confluence(sym, norm_proposed)
 
-    # 4. Check Free Margin Safety Buffer
+    # 4. Invariant 43: Engine Priority Arbitration & Capital Ring-Fence
     keys = db.get_user_api(chat_id)
     if keys and keys[0] and keys[1]:
         try:
             free_margin = trading_engine.get_futures_free_margin(keys[0], keys[1])
-            if free_margin < 8.50:
-                return False, f"INSUFFICIENT_SKY_NET_FREE_MARGIN (${free_margin:.2f} < $8.50 Buffer)", swarm
+            req_eng = str(requesting_engine).lower()
+
+            # Wealth Ring-Fence: strictly capped to <= 35% of total wallet balance
+            if req_eng in ["wealth", "wealth_futures", "wealth_spot"]:
+                fut_bal = trading_engine.get_futures_balance(keys[0], keys[1])
+                wallet_usdt = float(fut_bal) if isinstance(fut_bal, (int, float)) else (float(fut_bal.get("available_balance", 0.0)) if isinstance(fut_bal, dict) else 0.0)
+
+                # Check active margin currently used by wealth
+                wealth_margin_in_use = 0.0
+                for act_sym, act_data in active_map.items():
+                    if act_data.get("engine") in ["wealth", "wealth_futures", "wealth_spot"]:
+                        wealth_margin_in_use += float(act_data.get("margin", 8.0))
+
+                if wallet_usdt > 0 and (wealth_margin_in_use >= (wallet_usdt * 0.35)):
+                    return False, f"WEALTH_CAPITAL_RING_FENCE_REACHED: Wealth margin (${wealth_margin_in_use:.2f}) >= 35% of wallet (${wallet_usdt:.2f}). 65% strictly reserved for SmartX / Turbo Hedge / Auto Trade (Invariant 43)", swarm
+
+                if free_margin < 15.00 and wallet_usdt >= 50.0:
+                    return False, f"WEALTH_FREE_MARGIN_RING_FENCE: Preserving $15.00+ for SmartX/TurboHedge (Free: ${free_margin:.2f})", swarm
+                elif free_margin < 8.50:
+                    return False, f"INSUFFICIENT_SKY_NET_FREE_MARGIN (${free_margin:.2f} < $8.50 Buffer)", swarm
+            else:
+                # Priority 1-3 Engines (SmartX, Turbo Hedge, Auto Trade)
+                if free_margin < 5.00:
+                    return False, f"INSUFFICIENT_FREE_MARGIN_FOR_PRIORITY_ENGINE (${free_margin:.2f} < $5.00)", swarm
         except Exception:
             pass
 

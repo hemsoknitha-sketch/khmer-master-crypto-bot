@@ -1431,7 +1431,7 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                             action=mt5_action,
                             lot=mt5_lot,
                             comment=f"TURBO_{side}_{effective_leverage}X",
-                            client_id=chat_id
+                            client_id=str(chat_id)
                         )
                 except Exception as mt5_err:
                     print(f"⚠️ [MT5 BRIDGE SYNC NOTICE]: {mt5_err}")
