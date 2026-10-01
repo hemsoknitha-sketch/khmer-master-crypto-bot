@@ -2031,6 +2031,51 @@ class MT5BridgeEngine:
 
         return {"success": True, "ticket": ticket, "new_sl": new_sl, "new_tp": new_tp, "clients_reached": clients_reached}
 
+    def _delayed_reverse_flip_dispatch(
+        self,
+        symbol: str,
+        action: str,
+        lot: float,
+        sl: float,
+        tp: float,
+        client_id: int,
+        target_account: str,
+        prev_ticket: int
+    ):
+        """
+        Executes institutional delayed reverse-flip after profit harvest.
+        Waits 0.8s for exchange/broker to settle order closure, then opens opposing wave rider order.
+        """
+        try:
+            time.sleep(0.8)
+            res = self.dispatch_order(
+                symbol=symbol,
+                action=action,
+                lot=lot,
+                sl=sl,
+                tp=tp,
+                client_id=client_id,
+                target_account=target_account,
+                comment=f"AI_FLIP_#{prev_ticket}"
+            )
+            logger.info(f"🔄 [REVERSE-FLIP DISPATCHED] {action} {symbol} (Lot: {lot}) for #{target_account} result: {res}")
+            if client_id and res.get("success"):
+                flip_msg = (
+                    f"🔄 <b>[MT5 AUTONOMOUS REVERSE-FLIP]</b>\n"
+                    f"━━━━━━━━━━━━\n"
+                    f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{symbol}</code>\n"
+                    f"🎯 <b>ទិសដៅថ្មី ៖</b> <b>{action}</b> (Wave Rider កើបចំណេញបន្ត)\n"
+                    f"💵 <b>ទំហំ Lot ៖</b> <code>{lot}</code>\n"
+                    f"🛑 <b>Stop Loss ៖</b> <code>{sl}</code>\n"
+                    f"🎯 <b>Take Profit ៖</b> <code>{tp}</code>\n"
+                    f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{target_account}</code>\n"
+                    f"━━━━━━━━━━━━\n"
+                    f"<i>✨ Apex Super Brain AI បានបិទកើបចំណេញ និងត្រឡប់ទិសបើក {action} ភ្លាមៗ (&lt;0.8s) ដើម្បីកើបផលចំណេញទាំងសងខាង!</i>"
+                )
+                _dispatch_telegram_alert(client_id, flip_msg)
+        except Exception as e:
+            logger.error(f"⚠️ [REVERSE-FLIP ERROR]: {e}")
+
     def get_client_session(self, account_or_chat_id: Union[str, int]) -> Optional[Dict[str, Any]]:
         """Retrieves an active MT5 client session by account ID or chat ID."""
         acc_str = str(account_or_chat_id)
@@ -2323,12 +2368,37 @@ class MT5BridgeEngine:
                     if not session:
                         continue
 
+                    # Cent Account Detection & Balance Normalization (Institutional Multi-Tier Sizing)
+                    curr_str = str(getattr(session, "currency", "USD")).upper().strip()
+                    broker_str = str(getattr(session, "broker", "")).lower()
+                    firm_str = str(getattr(session, "firm_name", "")).lower()
+                    srv_str = str(getattr(session, "server", "")).lower()
+                    is_cent_account = (
+                        curr_str in ["USC", "CENT", "EUAC", "GBPC"]
+                        or "cent" in broker_str
+                        or "micro" in broker_str
+                        or "server 5" in srv_str
+                        or "server 5" in firm_str
+                        or "cent account" in firm_str
+                    )
+                    if "server 2" in srv_str or "server 2" in firm_str or "standard" in srv_str or "ftmo" in broker_str:
+                        if curr_str not in ["USC", "CENT"]:
+                            is_cent_account = False
+                    sess_bal = getattr(session, "balance", None)
+                    raw_bal = float(sess_bal if sess_bal is not None else 0.0)
+                    real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
+
                     auto_cfg = db.get_user_mt5_auto_config(chat_id)
-                    if not auto_cfg or not auto_cfg.get("enabled", False):
+                    is_auto_active = auto_cfg.get("enabled", False) or (db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1")
+
+                    # Fiduciary Capital Protection: If auto-trade is disabled and NO positions are open, skip.
+                    # BUT if positions are OPEN, the Harvester ALWAYS runs to protect capital from catastrophic drawdowns!
+                    if not is_auto_active and not open_positions:
                         continue
 
                     # =========================================================
                     # 1. ASYMMETRIC 10x PROFIT & RISK HARVESTER (Invariants 1.1, 24, 35)
+                    # Dynamic Cent (USC) & Standard (USD) Auto-Calibration
                     # =========================================================
                     profit_target_usd = float(auto_cfg.get("profit_target_usd", 7.50) or 7.50)
                     base_risk_usd = float(auto_cfg.get("risk_per_trade_usd", 2.50) or 2.50)
@@ -2352,14 +2422,30 @@ class MT5BridgeEngine:
                             if not p_type or p_type == "BUY":
                                 p_type = str(self._ticket_metadata[ticket].get("action", "BUY")).upper()
 
-                        # Asset-specific ATR risk buffer (Gold requires min -$5.00/oz to absorb spread & noise)
                         is_gold = ("XAU" in sym or "GOLD" in sym)
-                        if is_gold:
-                            max_risk_usd = max(5.00, base_risk_usd * 2.0)
-                        elif any(idx in sym for idx in ["US30", "DJ30", "SP500", "US500", "NAS100"]):
-                            max_risk_usd = max(4.50, base_risk_usd * 1.8)
+
+                        # Cent Account vs Standard Account Threshold Calibration:
+                        # On Cent Account, MT5 returns profit in USC (100 USC = $1.00 USD).
+                        # 0.10 lot of Gold on Cent account yields ~10 USC per $1 move in Gold.
+                        # +200 USC = $2.00 USD (+200 pips).
+                        if is_cent_account:
+                            unit_label = "USC"
+                            gold_be_trigger = 35.0   # +35 USC ($0.35 USD / +35 pips)
+                            gold_be_offset = 0.20    # Lock SL +$0.20/oz in profit
+                            gold_ratchet_peak = 50.0 # +50 USC ($0.50 USD / +50 pips)
+                            fx_be_trigger = 25.0
+                            fx_ratchet_peak = 35.0
+                            scaled_profit_target = min(profit_target_usd * 100.0, 180.0) # +180 USC (+180 pips TP)
+                            scaled_max_risk = 150.0  # Hard stop at -150 USC (-$1.50 USD)
                         else:
-                            max_risk_usd = max(2.50, base_risk_usd)
+                            unit_label = "USD"
+                            gold_be_trigger = max(5.00, base_risk_usd * 2.0)
+                            gold_be_offset = 1.00
+                            gold_ratchet_peak = 10.00
+                            fx_be_trigger = max(3.50, base_risk_usd * 1.5)
+                            fx_ratchet_peak = 8.00
+                            scaled_profit_target = profit_target_usd
+                            scaled_max_risk = max(5.00, base_risk_usd * 2.0)
 
                         # Track peak profit
                         peak = self._ticket_peak_profit.get(ticket, 0.0)
@@ -2372,14 +2458,11 @@ class MT5BridgeEngine:
                         # (Locks Server-Side SL with Breathing Room to Prevent Choking)
                         # =====================================================
                         if is_gold:
-                            # Gold 15m ATR is $5.00 - $12.00. Don't choke at $2.50!
-                            # Wait until trade achieves at least +$7.50 (1.2x ATR / 1.5R) before moving SL.
-                            gold_be_trigger = max(7.50, base_risk_usd * 2.5)
                             if peak >= gold_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
-                                be_sl = round(open_p + 1.50, 2) if p_type == "BUY" else round(open_p - 1.50, 2)
+                                be_sl = round(open_p + gold_be_offset, 2) if p_type == "BUY" else round(open_p - gold_be_offset, 2)
                                 self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
                                 self._ticket_sl_modified[ticket] = True
-                                logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Gold Ticket #{ticket} to {be_sl} (Peak was +${peak:.2f})")
+                                logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Gold Ticket #{ticket} to {be_sl} (Peak was +{peak:.2f} {unit_label})")
                                 try:
                                     if chat_id:
                                         msg_be = (
@@ -2388,46 +2471,45 @@ class MT5BridgeEngine:
                                             f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
                                             f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
                                             f"🔒 <b>កម្រិត Stop Loss ថ្មី ៖</b> <code>{be_sl}</code> (កាត់ហានិភ័យ & ចាក់សោរចំណេញ)\n"
-                                            f"💵 <b>ប្រាក់ចំណេញឡើងដល់ ៖</b> <b>+${peak:,.2f} USD</b>\n"
+                                            f"💵 <b>ប្រាក់ចំណេញឡើងដល់ ៖</b> <b>+{peak:,.2f} {unit_label}</b>\n"
                                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
                                             f"━━━━━━━━━━━━\n"
-                                            f"<i>✨ Breakeven Armor បានរុញ SL ទៅចំនុចសុវត្ថិភាព +$1.50 គ្មានហានិភ័យឡើយ!</i>"
+                                            f"<i>✨ Breakeven Armor បានរុញ SL ទៅចំនុចសុវត្ថិភាព គ្មានហានិភ័យឡើយ!</i>"
                                         )
                                         _dispatch_telegram_alert(chat_id, msg_be)
                                 except Exception:
                                     pass
                         else:
-                            fx_be_trigger = max(3.50, base_risk_usd * 1.5)
                             if peak >= fx_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
                                 digits = 3 if "JPY" in sym else 5
                                 be_offset = 0.05 if "JPY" in sym else 0.0005
                                 be_sl = round(open_p + be_offset, digits) if p_type == "BUY" else round(open_p - be_offset, digits)
                                 self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
                                 self._ticket_sl_modified[ticket] = True
-                                logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Ticket #{ticket} ({sym}) to {be_sl} (Peak was +${peak:.2f})")
+                                logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Ticket #{ticket} ({sym}) to {be_sl} (Peak was +{peak:.2f} {unit_label})")
 
                         should_harvest = False
                         reason = ""
 
                         if is_gold:
-                            # Asymmetric 10x Trailing Ratchet for Runner Profits (Locks 82% of peak when peak >= $12.00)
-                            if peak >= 12.00 and profit <= (peak * 0.82):
+                            # Asymmetric 10x Trailing Ratchet for Runner Profits (Locks 82% of peak)
+                            if peak >= gold_ratchet_peak and profit <= (peak * 0.82):
                                 should_harvest = True
-                                reason = f"ASYMMETRIC_10X_RATCHET (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
+                                reason = f"ASYMMETRIC_10X_RATCHET (Peak: +{peak:.2f} {unit_label} -> Lock: +{profit:.2f} {unit_label})"
                         else:
-                            if peak >= 8.00 and profit <= (peak * 0.82):
+                            if peak >= fx_ratchet_peak and profit <= (peak * 0.82):
                                 should_harvest = True
-                                reason = f"ASYMMETRIC_10X_RATCHET (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
+                                reason = f"ASYMMETRIC_10X_RATCHET (Peak: +{peak:.2f} {unit_label} -> Lock: +{profit:.2f} {unit_label})"
 
                         # Target Profit Hit for configured targets:
-                        if not should_harvest and profit >= profit_target_usd:
+                        if not should_harvest and profit >= scaled_profit_target:
                             should_harvest = True
-                            reason = f"TARGET_PROFIT_HARVEST (+${profit:.2f} >= +${profit_target_usd:.2f})"
+                            reason = f"TARGET_PROFIT_HARVEST (+{profit:.2f} {unit_label} >= +{scaled_profit_target:.2f} {unit_label})"
 
                         # Mathematical Hard Stop Loss Guard (Invariant 1.1 & 35)
-                        elif not should_harvest and profit <= -max_risk_usd:
+                        elif not should_harvest and profit <= -scaled_max_risk:
                             should_harvest = True
-                            reason = f"STOP_LOSS_GUARD (-${abs(profit):.2f} <= -${max_risk_usd:.2f})"
+                            reason = f"STOP_LOSS_GUARD (-{abs(profit):.2f} {unit_label} <= -{scaled_max_risk:.2f} {unit_label})"
 
                         if should_harvest:
                             is_loss = (profit < 0.0)
@@ -2443,28 +2525,67 @@ class MT5BridgeEngine:
                                 MT5SMCCitadelEngine.record_trade_outcome(symbol=sym, action=act_p, won=(profit >= 0.0), pnl=profit)
                             except Exception:
                                 pass
+
+                            # Autonomous Reverse-Flip for Gold (Wave Rider: Harvest Buy -> Instant Flip Sell, Harvest Sell -> Instant Flip Buy)
+                            if is_gold and profit > 0 and "STOP_LOSS" not in reason:
+                                try:
+                                    opp_action = "SELL" if p_type == "BUY" else "BUY"
+                                    rsi_5m = float(market_data.get_symbol_rsi("XAUUSDT", interval="5m"))
+                                    rsi_15m = float(market_data.get_symbol_rsi("XAUUSDT", interval="15m"))
+                                    can_flip = True
+                                    # Invariant 16: Anti-Oversold Short Guard (Never short oversold bottom)
+                                    if opp_action == "SELL" and (rsi_15m <= 38.0 or rsi_5m <= 32.0):
+                                        can_flip = False
+                                    # Anti-Peak Buy Guard: Never flip buy into extreme overbought top
+                                    elif opp_action == "BUY" and (rsi_15m >= 68.0 or rsi_5m >= 70.0):
+                                        can_flip = False
+
+                                    if can_flip:
+                                        flip_lot = float(p.get("volume", 0.01) or 0.01)
+                                        flip_quote = self.get_live_symbol_quote(sym) or self.get_live_symbol_quote("XAUUSD")
+                                        cur_mid = float(flip_quote.get("mid", 0.0) if flip_quote else 0.0)
+                                        if cur_mid > 0:
+                                            flip_sl_dist = 4.50 if not is_cent_account else 3.00
+                                            flip_tp_dist = 12.00 if not is_cent_account else 8.00
+                                            flip_sl = round(cur_mid + flip_sl_dist, 2) if opp_action == "SELL" else round(cur_mid - flip_sl_dist, 2)
+                                            flip_tp = round(cur_mid - flip_tp_dist, 2) if opp_action == "SELL" else round(cur_mid + flip_tp_dist, 2)
+                                            logger.info(f"🔄 [INSTANT REVERSE-FLIP TRIGGERED] Gold #{ticket} closed +{profit:.2f} {unit_label}. Launching {opp_action} {sym} (Lot: {flip_lot}, SL: {flip_sl}, TP: {flip_tp})...")
+                                            threading.Thread(
+                                                target=self._delayed_reverse_flip_dispatch,
+                                                args=(sym, opp_action, flip_lot, flip_sl, flip_tp, chat_id, acc_id, ticket),
+                                                daemon=True
+                                            ).start()
+                                except Exception as ex_flip:
+                                    logger.warning(f"⚠️ Gold reverse-flip notice: {ex_flip}")
+
                             try:
                                 if chat_id:
                                     clean_reason = html.escape(str(reason))
+                                    display_val = f"{abs(profit):,.2f} {unit_label}"
+                                    if is_cent_account:
+                                        display_val += f" (${abs(profit)/100.0:,.2f} USD)"
                                     if is_loss:
                                         msg_harvest = (
                                             f"🛡️ <b>[MT5 AUTO RISK STOP-LOSS]</b>\n"
                                             f"━━━━━━━━━━━━\n"
                                             f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
                                             f"📉 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
-                                            f"🔻 <b>កាត់ហានិភ័យស្វ័យប្រវត្តិ ៖</b> <b>-${abs(profit):,.2f} USD</b>\n"
+                                            f"🔻 <b>កាត់ហានិភ័យស្វ័យប្រវត្តិ ៖</b> <b>-{display_val}</b>\n"
                                             f"🛡️ <b>យន្តការការពារ ៖</b> {clean_reason}\n"
                                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
                                             f"━━━━━━━━━━━━\n"
                                             f"<i>✨ Apex Super Brain AI បានកាត់ហានិភ័យការពារដើមទុន មិនឱ្យខាតធ្ងន់ធ្ងរឡើយ!</i>"
                                         )
                                     else:
+                                        profit_str = f"+{profit:,.2f} {unit_label}"
+                                        if is_cent_account:
+                                            profit_str += f" (+${profit/100.0:,.2f} USD)"
                                         msg_harvest = (
                                             f"💰 <b>[MT5 ASYMMETRIC 10x PROFIT HARVEST]</b>\n"
                                             f"━━━━━━━━━━━━\n"
                                             f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
                                             f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
-                                            f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>+${profit:,.2f} USD</b>\n"
+                                            f"💵 <b>ប្រាក់ចំណេញកើបបាន ៖</b> <b>{profit_str}</b>\n"
                                             f"🛡️ <b>យន្តការ ៖</b> {clean_reason}\n"
                                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>{acc_id}</code>\n"
                                             f"━━━━━━━━━━━━\n"
@@ -2534,26 +2655,6 @@ class MT5BridgeEngine:
                         {"symbol": "AUDNZD", "raw_symbol": "AUDNZD", "lot_size": 0.10, "category": "Forex"},
                         {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.10, "category": "Metals"},
                     ]
-
-                    # Cent Account Detection & Sub-$300 Real Balance Gatekeeper
-                    curr_str = str(getattr(session, "currency", "USD")).upper().strip()
-                    broker_str = str(getattr(session, "broker", "")).lower()
-                    firm_str = str(getattr(session, "firm_name", "")).lower()
-                    srv_str = str(getattr(session, "server", "")).lower()
-                    is_cent_account = (
-                        curr_str in ["USC", "CENT", "EUAC", "GBPC"]
-                        or "cent" in broker_str
-                        or "micro" in broker_str
-                        or "server 5" in srv_str
-                        or "server 5" in firm_str
-                        or "cent account" in firm_str
-                    )
-                    if "server 2" in srv_str or "server 2" in firm_str or "standard" in srv_str or "ftmo" in broker_str:
-                        if curr_str not in ["USC", "CENT"]:
-                            is_cent_account = False
-                    sess_bal = getattr(session, "balance", None)
-                    raw_bal = float(sess_bal if sess_bal is not None else 0.0)
-                    real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
 
                     allocations = auto_cfg.get("allocations", []) or (default_cent_20_universe if is_cent_account else default_10_universe)
                     if is_cent_account and len(allocations) < 15:

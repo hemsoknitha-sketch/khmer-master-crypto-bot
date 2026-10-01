@@ -4702,15 +4702,19 @@ def save_user_mt5_auto_config(chat_id: int, config: dict) -> bool:
 
 def get_user_mt5_auto_config(chat_id: int) -> dict:
     """Retrieves VIP user's Super Smart MT5 Auto-Trade allocation configuration."""
+    is_active = (get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1")
     try:
         raw = get_system_setting(f"mt5_auto_config_{chat_id}", "")
         if raw:
             import json
-            return json.loads(raw)
+            cfg = json.loads(raw)
+            if "enabled" not in cfg or not cfg.get("enabled"):
+                cfg["enabled"] = is_active
+            return cfg
     except Exception:
         pass
     return {
-        "enabled": False,
+        "enabled": is_active,
         "capital": 100.0,
         "max_assets": 5,
         "capital_per_asset": 20.0,
