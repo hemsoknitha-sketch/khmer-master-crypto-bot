@@ -725,6 +725,9 @@ class MT5BridgeEngine:
         self._last_symbol_close_time: Dict[str, float] = {}
         self._ticket_peak_profit: Dict[int, float] = {}
         self._ticket_sl_modified: Dict[int, bool] = {}
+        self._ticket_last_trailed_sl: Dict[int, float] = {}
+        self._ticket_last_modify_time: Dict[int, float] = {}
+        self._ticket_last_alert_sl: Dict[int, float] = {}
         
         # Consecutive Loss Circuit Breaker & 120-Minute Cooldown Lock (Invariants 1.1, 35)
         self._consecutive_losses: Dict[str, int] = {}  # {f"{account_id}_{symbol}": count}
@@ -2457,11 +2460,24 @@ class MT5BridgeEngine:
                         # DYNAMIC SERVER-SIDE BREAKEVEN ARMOR MODIFICATION
                         # (Locks Server-Side SL with Breathing Room to Prevent Choking)
                         # =====================================================
+                        # =====================================================
+                        # DYNAMIC SERVER-SIDE BREAKEVEN ARMOR & MULTI-TIER TRAILING SL
+                        # (Progressive Multi-Tier Profit Lock: Breakeven Armor + Trailing Ratchet)
+                        # =====================================================
+                        cur_p = float(p.get("current_price", 0.0) or 0.0)
+                        if cur_p <= 0:
+                            sym_quote = self.get_live_symbol_quote(sym) or self.get_live_symbol_quote(normalize_mt5_symbol(sym))
+                            if sym_quote:
+                                cur_p = float(sym_quote.get("bid" if p_type == "BUY" else "ask", 0.0) or sym_quote.get("mid", 0.0))
+
                         if is_gold:
+                            # Level 1: Breakeven Armor Trigger
                             if peak >= gold_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
                                 be_sl = round(open_p + gold_be_offset, 2) if p_type == "BUY" else round(open_p - gold_be_offset, 2)
                                 self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
                                 self._ticket_sl_modified[ticket] = True
+                                self._ticket_last_trailed_sl[ticket] = be_sl
+                                self._ticket_last_modify_time[ticket] = now_ts
                                 logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Gold Ticket #{ticket} to {be_sl} (Peak was +{peak:.2f} {unit_label})")
                                 try:
                                     if chat_id:
@@ -2469,7 +2485,7 @@ class MT5BridgeEngine:
                                             f"🛡️ <b>[MT5 BREAKEVEN ARMOR LOCKED]</b>\n"
                                             f"━━━━━━━━━━━━\n"
                                             f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
-                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
+                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> ({p_type})\n"
                                             f"🔒 <b>កម្រិត Stop Loss ថ្មី ៖</b> <code>{be_sl}</code> (កាត់ហានិភ័យ & ចាក់សោរចំណេញ)\n"
                                             f"💵 <b>ប្រាក់ចំណេញឡើងដល់ ៖</b> <b>+{peak:,.2f} {unit_label}</b>\n"
                                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
@@ -2479,14 +2495,104 @@ class MT5BridgeEngine:
                                         _dispatch_telegram_alert(chat_id, msg_be)
                                 except Exception:
                                     pass
+
+                            # Level 2+: Progressive Server-Side Trailing SL Lock (Locks 70% of distance on broker)
+                            elif peak >= gold_ratchet_peak and open_p > 0 and cur_p > 0:
+                                last_mod_t = self._ticket_last_modify_time.get(ticket, 0.0)
+                                if (now_ts - last_mod_t) >= 3.0:
+                                    if p_type == "BUY" and cur_p > open_p:
+                                        gain = cur_p - open_p
+                                        locked_dist = gain * 0.70
+                                        trail_sl = round(open_p + locked_dist, 2)
+                                        effective_sl = max(cur_sl, self._ticket_last_trailed_sl.get(ticket, 0.0))
+                                        if trail_sl >= (effective_sl + 0.40) and trail_sl < (cur_p - 0.40):
+                                            self.dispatch_modify(ticket=ticket, new_sl=trail_sl, new_tp=cur_tp, target_account=acc_id)
+                                            self._ticket_last_trailed_sl[ticket] = trail_sl
+                                            self._ticket_last_modify_time[ticket] = now_ts
+                                            logger.info(f"🚀 [MT5 TRAILING SL LOCKED] Ticket #{ticket} (BUY Gold) Trailing SL -> {trail_sl} (Locked: +${locked_dist:.2f}/oz, Peak: +{peak:.2f} {unit_label})")
+                                            last_alert_sl = self._ticket_last_alert_sl.get(ticket, 0.0)
+                                            if (trail_sl - last_alert_sl) >= 1.50 or last_alert_sl == 0.0:
+                                                self._ticket_last_alert_sl[ticket] = trail_sl
+                                                try:
+                                                    if chat_id:
+                                                        msg_trail = (
+                                                            f"🚀 <b>[MT5 TRAILING PROFIT LOCKED]</b>\n"
+                                                            f"━━━━━━━━━━━━\n"
+                                                            f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> (BUY)\n"
+                                                            f"🔒 <b>Trailing SL ថ្មី ៖</b> <code>{trail_sl}</code> (ចាក់សោ 70% នៃចម្ងាយចំណេញ)\n"
+                                                            f"💵 <b>ប្រាក់ចំណេញបច្ចុប្បន្ន ៖</b> <b>+{profit:,.2f} {unit_label}</b> (Peak: +{peak:,.2f})\n"
+                                                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
+                                                            f"━━━━━━━━━━━━\n"
+                                                            f"<i>✨ Trailing Take Profit កំពុងប្រដេញតាមកើបផលចំណេញអតិបរមា គ្មានហានិភ័យឡើយ!</i>"
+                                                        )
+                                                        _dispatch_telegram_alert(chat_id, msg_trail)
+                                                except Exception:
+                                                    pass
+
+                                    elif p_type == "SELL" and cur_p < open_p:
+                                        gain = open_p - cur_p
+                                        locked_dist = gain * 0.70
+                                        trail_sl = round(open_p - locked_dist, 2)
+                                        effective_sl = min(cur_sl, self._ticket_last_trailed_sl.get(ticket, 999999.0)) if (cur_sl > 0 or ticket in self._ticket_last_trailed_sl) else 999999.0
+                                        if trail_sl <= (effective_sl - 0.40) and trail_sl > (cur_p + 0.40):
+                                            self.dispatch_modify(ticket=ticket, new_sl=trail_sl, new_tp=cur_tp, target_account=acc_id)
+                                            self._ticket_last_trailed_sl[ticket] = trail_sl
+                                            self._ticket_last_modify_time[ticket] = now_ts
+                                            logger.info(f"🚀 [MT5 TRAILING SL LOCKED] Ticket #{ticket} (SELL Gold) Trailing SL -> {trail_sl} (Locked: +${locked_dist:.2f}/oz, Peak: +{peak:.2f} {unit_label})")
+                                            last_alert_sl = self._ticket_last_alert_sl.get(ticket, 999999.0)
+                                            if (last_alert_sl - trail_sl) >= 1.50 or last_alert_sl == 999999.0:
+                                                self._ticket_last_alert_sl[ticket] = trail_sl
+                                                try:
+                                                    if chat_id:
+                                                        msg_trail = (
+                                                            f"🚀 <b>[MT5 TRAILING PROFIT LOCKED]</b>\n"
+                                                            f"━━━━━━━━━━━━\n"
+                                                            f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> (SELL)\n"
+                                                            f"🔒 <b>Trailing SL ថ្មី ៖</b> <code>{trail_sl}</code> (ចាក់សោ 70% នៃចម្ងាយចំណេញ)\n"
+                                                            f"💵 <b>ប្រាក់ចំណេញបច្ចុប្បន្ន ៖</b> <b>+{profit:,.2f} {unit_label}</b> (Peak: +{peak:,.2f})\n"
+                                                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
+                                                            f"━━━━━━━━━━━━\n"
+                                                            f"<i>✨ Trailing Take Profit កំពុងប្រដេញតាមកើបផលចំណេញអតិបរមា គ្មានហានិភ័យឡើយ!</i>"
+                                                        )
+                                                        _dispatch_telegram_alert(chat_id, msg_trail)
+                                                except Exception:
+                                                    pass
+
                         else:
+                            digits = 3 if "JPY" in sym else 5
+                            # Level 1: Breakeven Armor Trigger
                             if peak >= fx_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
-                                digits = 3 if "JPY" in sym else 5
                                 be_offset = 0.05 if "JPY" in sym else 0.0005
                                 be_sl = round(open_p + be_offset, digits) if p_type == "BUY" else round(open_p - be_offset, digits)
                                 self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
                                 self._ticket_sl_modified[ticket] = True
+                                self._ticket_last_trailed_sl[ticket] = be_sl
+                                self._ticket_last_modify_time[ticket] = now_ts
                                 logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Ticket #{ticket} ({sym}) to {be_sl} (Peak was +{peak:.2f} {unit_label})")
+
+                            # Level 2+: Progressive Server-Side Trailing SL Lock for Forex
+                            elif peak >= fx_ratchet_peak and open_p > 0 and cur_p > 0:
+                                last_mod_t = self._ticket_last_modify_time.get(ticket, 0.0)
+                                if (now_ts - last_mod_t) >= 3.0:
+                                    min_step = 0.03 if "JPY" in sym else 0.0003
+                                    if p_type == "BUY" and cur_p > open_p:
+                                        gain = cur_p - open_p
+                                        trail_sl = round(open_p + (gain * 0.70), digits)
+                                        effective_sl = max(cur_sl, self._ticket_last_trailed_sl.get(ticket, 0.0))
+                                        if trail_sl >= (effective_sl + min_step) and trail_sl < (cur_p - min_step):
+                                            self.dispatch_modify(ticket=ticket, new_sl=trail_sl, new_tp=cur_tp, target_account=acc_id)
+                                            self._ticket_last_trailed_sl[ticket] = trail_sl
+                                            self._ticket_last_modify_time[ticket] = now_ts
+                                    elif p_type == "SELL" and cur_p < open_p:
+                                        gain = open_p - cur_p
+                                        trail_sl = round(open_p - (gain * 0.70), digits)
+                                        effective_sl = min(cur_sl, self._ticket_last_trailed_sl.get(ticket, 999999.0)) if (cur_sl > 0 or ticket in self._ticket_last_trailed_sl) else 999999.0
+                                        if trail_sl <= (effective_sl - min_step) and trail_sl > (cur_p + min_step):
+                                            self.dispatch_modify(ticket=ticket, new_sl=trail_sl, new_tp=cur_tp, target_account=acc_id)
+                                            self._ticket_last_trailed_sl[ticket] = trail_sl
+                                            self._ticket_last_modify_time[ticket] = now_ts
 
                         should_harvest = False
                         reason = ""
@@ -2517,6 +2623,10 @@ class MT5BridgeEngine:
                             logger.info(f"{log_icon} Ticket #{ticket} ({sym}) | {reason}! Executing 0.5ms market close...")
                             self.dispatch_close(ticket=ticket, symbol=sym, comment=f"AI_HARVEST_{profit:+.2f}", target_account=acc_id)
                             self._ticket_peak_profit.pop(ticket, None)
+                            self._ticket_sl_modified.pop(ticket, None)
+                            self._ticket_last_trailed_sl.pop(ticket, None)
+                            self._ticket_last_modify_time.pop(ticket, None)
+                            self._ticket_last_alert_sl.pop(ticket, None)
 
                             # Record trade outcome for Self-Auto Training in MT5SMCCitadelEngine
                             try:
@@ -2599,6 +2709,10 @@ class MT5BridgeEngine:
                     for t in list(self._ticket_peak_profit.keys()):
                         if t not in current_tickets:
                             self._ticket_peak_profit.pop(t, None)
+                            self._ticket_sl_modified.pop(t, None)
+                            self._ticket_last_trailed_sl.pop(t, None)
+                            self._ticket_last_modify_time.pop(t, None)
+                            self._ticket_last_alert_sl.pop(t, None)
 
                     # =========================================================
                     # 2. POSITION SIZING & DEBOUNCED RADAR SCAN (Every 20s)
