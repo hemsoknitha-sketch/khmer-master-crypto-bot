@@ -2265,11 +2265,11 @@ class CapitalAutonomousEngine:
         base_quant["final_confidence"] = final_conf
         base_quant["macro_bias"] = macro_bias
 
-        # Adjust signal if macro and technicals align
+        # Adjust signal if macro and technicals align (Requires solid raw technical baseline >= 65)
         raw_sig = base_quant.get("signal", "HOLD_NEUTRAL")
-        if raw_sig in ["BUY", "STRONG_BUY"] and final_conf >= 75:
+        if raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75:
             base_quant["final_action"] = "BUY"
-        elif raw_sig in ["SELL", "STRONG_SELL"] and final_conf >= 75:
+        elif raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75:
             base_quant["final_action"] = "SELL"
         else:
             base_quant["final_action"] = "HOLD"
@@ -2705,8 +2705,8 @@ class CapitalAutonomousEngine:
 
         # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
         entry_p = float(setup.get("ask", 0.0) if final_action == "BUY" else setup.get("bid", 0.0))
-        sl_p = float(setup.get("stop_loss", 0.0))
-        tp_p = float(setup.get("take_profit", 0.0))
+        sl_p = float(setup.get("sl") or setup.get("stop_loss", 0.0))
+        tp_p = float(setup.get("tp") or setup.get("take_profit", 0.0))
         size = get_capital_kelly_sizer().calculate_lot_size(
             chat_id=chat_id,
             epic=resolved_epic,
@@ -4056,6 +4056,7 @@ class CapitalOpeningRangeBreakoutEngine:
             or_low = range_data["or_low"]
             or_range = range_data["or_range"]
             or_mid = range_data["or_mid"]
+            atr = range_data.get("atr", or_range)
 
             # Query current live market price
             bid, ask, mid = engine.get_current_price(resolved_epic)
@@ -4074,17 +4075,54 @@ class CapitalOpeningRangeBreakoutEngine:
             if not direction:
                 continue
 
+            # Evaluate Institutional Technical Quant Confluence for BOTH directions
+            quant = engine.evaluate_tradfi_quant_signal(resolved_epic)
+            rsi_val = quant.get("rsi", 50.0)
+
             # Invariant 16: Anti-Oversold Short Guard
-            if direction == "SELL":
-                quant = engine.evaluate_tradfi_quant_signal(resolved_epic)
-                rsi_val = quant.get("rsi", 50.0)
-                if rsi_val <= 38.0:
-                    logger.info(f"🛡️ [ORB GUARD] Blocked {session_name} SELL on {resolved_epic}: Invariant 16 RSI Guard active (RSI {rsi_val:.1f} <= 38.0)!")
+            if direction == "SELL" and rsi_val <= 38.0:
+                logger.info(f"🛡️ [ORB GUARD] Blocked {session_name} SELL on {resolved_epic}: Invariant 16 RSI Guard active (RSI {rsi_val:.1f} <= 38.0)!")
+                continue
+
+            # Anti-Exhaustion Top Guard & Bearish Momentum Guard for BUY
+            if direction == "BUY":
+                if rsi_val >= 68.0:
+                    logger.info(f"🛡️ [ORB GUARD] Blocked {session_name} BUY on {resolved_epic}: Anti-Exhaustion Top Guard active (RSI {rsi_val:.1f} >= 68.0 Overbought)!")
+                    continue
+                if rsi_val < 45.0:
+                    logger.info(f"🛡️ [ORB GUARD] Blocked {session_name} BUY on {resolved_epic}: Bearish Momentum Guard active (RSI {rsi_val:.1f} < 45.0)!")
                     continue
 
-            # Volume expansion confirmation
-            rvol = quant.get("rvol", 1.25) if 'quant' in locals() else 1.25
-            if rvol < 1.05:
+            # Candlestick Confirmation & Anti-Fakeout Rejection Wick Guard (Turtle Soup Shield)
+            candles_5m = engine.get_historical_prices(resolved_epic, resolution="MINUTE_5", max_bars=3)
+            if candles_5m:
+                last_c = candles_5m[-1]
+                c_close = last_c.get("close", mid)
+                c_high = last_c.get("high", mid)
+                c_low = last_c.get("low", mid)
+                c_rng = max(0.0001, c_high - c_low)
+
+                if direction == "BUY":
+                    if c_close < or_high:
+                        logger.debug(f"🛡️ [ORB CANDLE] {resolved_epic} 5m close (${c_close:.2f}) below Range High (${or_high:.2f}). Waiting for bar close.")
+                        continue
+                    upper_wick = c_high - max(last_c.get("open", c_close), c_close)
+                    if (upper_wick / c_rng) > 0.35:
+                        logger.info(f"🛡️ [ORB FAKEOUT GUARD] Blocked {session_name} BUY on {resolved_epic}: Upper rejection wick ({upper_wick/c_rng*100:.1f}%) exceeds 35% (Seller Absorption/Turtle Soup Fakeout)!")
+                        continue
+                elif direction == "SELL":
+                    if c_close > or_low:
+                        logger.debug(f"🛡️ [ORB CANDLE] {resolved_epic} 5m close (${c_close:.2f}) above Range Low (${or_low:.2f}). Waiting for bar close.")
+                        continue
+                    lower_wick = min(last_c.get("open", c_close), c_close) - c_low
+                    if (lower_wick / c_rng) > 0.35:
+                        logger.info(f"🛡️ [ORB FAKEOUT GUARD] Blocked {session_name} SELL on {resolved_epic}: Lower rejection wick ({lower_wick/c_rng*100:.1f}%) exceeds 35% (Buyer Absorption/Turtle Soup Fakeout)!")
+                        continue
+
+            # Volume expansion confirmation (Real RVOL filter)
+            rvol = quant.get("rvol", 1.0)
+            if rvol < 1.15:
+                logger.info(f"🛡️ [ORB RVOL] Blocked {session_name} {direction} on {resolved_epic}: RVOL ({rvol:.2f}x) < 1.15x minimum expansion!")
                 continue
 
             # Breakout Confirmed!
