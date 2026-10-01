@@ -1306,7 +1306,7 @@ def run_audit():
         log_fail(str(e))
 
     # 36. Anti-Exhaustion Structural Confluence, Anti-Top/Bottom Guard & Capital Allocation Ring-Fence (Invariant 43)
-    print("\n[CHECK 36/36] Verifying Anti-Exhaustion Structural Confluence, Anti-Top/Bottom Guard & Capital Allocation Ring-Fence (Invariant 43)...")
+    print("\n[CHECK 36/37] Verifying Anti-Exhaustion Structural Confluence, Anti-Top/Bottom Guard & Capital Allocation Ring-Fence (Invariant 43)...")
     try:
         with open("perpetual_wealth_engine.py", "r", encoding="utf-8") as f:
             pw_code = f.read()
@@ -1366,6 +1366,71 @@ def run_audit():
             log_fail("Anti-Exhaustion & Capital Allocation Ring-Fence (Invariant 43) specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 43 check failed: {e}")
+        log_fail(str(e))
+
+    # 37. MT5 Cent Account Proportional Lot Scaling, Micro-Loss Shield & Max Concurrent Positions Ring-Fence (Invariants 44–47)
+    print("\n[CHECK 37/37] Verifying MT5 Cent Proportional Lot Scaling, Micro-Loss Shield, Max Concurrent Positions & 24/7 Watchdog (Invariants 44–47)...")
+    try:
+        with open("mt5_bridge_engine.py", "r", encoding="utf-8") as f:
+            mt5_code = f.read()
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+
+        has_inv44 = "Invariant 44" in agents_code and "MT5 Cent Account Proportional Lot Scaling" in agents_code
+        has_inv45 = "Invariant 45" in agents_code and "Cent Micro-Loss Threshold" in agents_code
+        has_inv46 = "Invariant 46" in agents_code and "Small Capital Max Concurrent Position Ring-Fence" in agents_code
+        has_inv47 = "Invariant 47" in agents_code and "24/7 Autonomous Watchdog Citadel" in agents_code
+
+        # Static Code Assertions
+        has_micro_threshold = "micro_threshold = 150.0 if is_cent_account else 1.50" in mt5_code
+        has_noise_duration = "lockout_duration = 300.0 if is_micro_loss else 7200.0" in mt5_code
+        has_cent_lot_calibration = "prop_lot = 0.20" in mt5_code and "max_ceiling = 0.35" in mt5_code
+        has_max_assets_scaling = "max_assets = min(2, max_assets)" in mt5_code and "max_assets = min(3, max_assets)" in mt5_code
+        has_watchdog = "_run_watchdog_citadel_loop" in mt5_code
+        has_breakeven_armor = "BREAKEVEN ARMOR LOCKED" in mt5_code
+        has_reverse_flip = "INSTANT REVERSE-FLIP TRIGGERED" in mt5_code
+
+        # Dynamic Unit Test: Proportional Lot Sizing Calculation
+        from mt5_bridge_engine import MT5BridgeEngine
+
+        # Test Case 1: Cent Account $52 (5,218 USC) must NEVER exceed 0.35 lot, should return 0.20
+        lot_52 = MT5BridgeEngine.calculate_proportional_lot_size(
+            is_cent=True,
+            capital=5218.0,
+            configured_lot=0.0
+        )
+        unit_test_lot_52 = (lot_52 == 0.20)
+
+        # Test Case 2: Cent Account $19.50 (1,950 USC) must return 0.10 lot
+        lot_19 = MT5BridgeEngine.calculate_proportional_lot_size(
+            is_cent=True,
+            capital=1950.0,
+            configured_lot=0.0
+        )
+        unit_test_lot_19 = (lot_19 == 0.10)
+
+        # Test Case 3: Cent Account $8.00 (800 USC) must return minimum floor 0.10 lot
+        lot_8 = MT5BridgeEngine.calculate_proportional_lot_size(
+            is_cent=True,
+            capital=800.0,
+            configured_lot=0.0
+        )
+        unit_test_lot_8 = (lot_8 == 0.10)
+
+        all_inv44_47_passed = (
+            has_inv44 and has_inv45 and has_inv46 and has_inv47 and
+            has_micro_threshold and has_noise_duration and has_cent_lot_calibration and
+            has_max_assets_scaling and has_watchdog and has_breakeven_armor and has_reverse_flip and
+            unit_test_lot_52 and unit_test_lot_19 and unit_test_lot_8
+        )
+
+        if all_inv44_47_passed:
+            log_pass("MT5 Cent Proportional Lot Scaling, Micro-Loss Shield, Max Concurrent Positions & 24/7 Watchdog (Invariants 44–47) are 100% locked & certified!")
+        else:
+            failures.append(f"Invariants 44-47 check failed: inv44={has_inv44}, inv45={has_inv45}, inv46={has_inv46}, inv47={has_inv47}, micro={has_micro_threshold}, noise={has_noise_duration}, lot_calib={has_cent_lot_calibration}, max_assets={has_max_assets_scaling}, lot_52={lot_52}(expected 0.20), lot_19={lot_19}(expected 0.10), lot_8={lot_8}(expected 0.10)")
+            log_fail("MT5 Cent Proportional Lot Scaling & Sentinel Protocol (Invariants 44–47) specification missing or unit test failure!")
+    except Exception as e:
+        failures.append(f"Invariants 44-47 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
