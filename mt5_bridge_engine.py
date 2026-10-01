@@ -439,6 +439,43 @@ class MT5QuantumSignalCitadel:
             except Exception:
                 pass
 
+        # E. APEX 9 SMART MONEY CONCEPTS (SMC) CITADEL MULTI-TIMEFRAME ANALYSIS (M15, M30, H1, H4)
+        # Analyzes all 9 SMC Pillars:
+        # 1. Order Blocks (OB) - Bullish & Bearish mitigation zones
+        # 2. Fair Value Gaps (FVG) - 3-candle imbalance & magnetic retests
+        # 3. Supply and Demand Zones (SnD) - RBR, RBD, DBR, DBD bases
+        # 4. Change of Character (CHoCH) - Market structure shift / trend reversal
+        # 5. Break of Structure (BOS) - Trend continuation
+        # 6. Liquidity Pools (LP) - Equal Highs (EQH/BSL) & Equal Lows (EQL/SSL)
+        # 7. Stop-Loss Hunting (Sweep) - Turtle Soup / Liquidity grabs
+        # 8. False Breakouts (Judas Swing / SFP) - Trapped retail breakout reversals
+        # 9. Kill Zones (KZ) - London Open, NY Open, Asian Range institutional windows
+        try:
+            from mt5_smc_citadel import MT5SMCCitadelEngine
+            smc_res = MT5SMCCitadelEngine.analyze_9_smc_confluence(raw_clean)
+            smc_action = smc_res.get("action", "WAIT")
+            smc_conf = float(smc_res.get("confidence", 0.0) or 0.0)
+            smc_reason = smc_res.get("reason", "")
+
+            # 1. Contradiction Guard: If macro signal opposes SMC institutional bias, BLOCK trade to preserve capital!
+            if action in ["BUY", "SELL"] and smc_action in ["BUY", "SELL"] and action != smc_action:
+                logger.warning(f"🛡️ [SMC CONTRADICTION GUARD] Blocked {action} on {raw_clean}: SMC detected opposing institutional {smc_action} ({smc_reason})!")
+                return "SKIP", 50.0, f"SMC_CONTRADICTION_{smc_action}"
+
+            # 2. Confluence Boost: If macro signal agrees with SMC, elevate confidence to institutional apex level
+            if action in ["BUY", "SELL"] and smc_action == action:
+                confidence = max(confidence, smc_conf)
+                signal_reason = f"{signal_reason}+SMC_CONFLUENCE"
+
+            # 3. Independent SMC Institutional Trigger: If macro didn't fire, but SMC detects elite >=90% setup
+            elif action in ["SKIP", None, ""] and smc_action in ["BUY", "SELL"] and smc_conf >= 90.0:
+                action = smc_action
+                confidence = smc_conf
+                signal_reason = smc_reason
+
+        except Exception as ex:
+            logger.debug(f"SMC analysis pass: {ex}")
+
         # Strict Gatekeeper: Minimum 90.0% Confidence Required (Target 95% Win Rate)
         if not action or confidence < 90.0:
             return "SKIP", confidence, f"CONFIDENCE_BELOW_90 ({confidence:.0f}%)"
@@ -455,6 +492,33 @@ class MT5QuantumSignalCitadel:
         """
         raw_clean = normalize_mt5_symbol(symbol)
         act_norm = "BUY" if str(action).upper() in ["BUY", "LONG"] else "SELL"
+
+        # SMC Multi-Timeframe Structural SL/TP Priority (Order Blocks & Liquidity Sweeps)
+        try:
+            from mt5_smc_citadel import MT5SMCCitadelEngine
+            cached_smc = MT5SMCCitadelEngine.get_cached_analysis(symbol) or MT5SMCCitadelEngine.get_cached_analysis(raw_clean)
+            if cached_smc and cached_smc.get("action") == act_norm:
+                smc_sl = float(cached_smc.get("sl_price", 0.0) or 0.0)
+                smc_tp = float(cached_smc.get("tp_price", 0.0) or 0.0)
+                curr_p = current_price if current_price > 0 else float(cached_smc.get("entry_price", 0.0) or 0.0)
+                if smc_sl > 0 and smc_tp > 0 and curr_p > 0:
+                    if (act_norm == "BUY" and smc_sl < curr_p < smc_tp) or (act_norm == "SELL" and smc_tp < curr_p < smc_sl):
+                        sl_dist = round(abs(curr_p - smc_sl), 5)
+                        tp_dist = round(abs(curr_p - smc_tp), 5)
+                        digits = 2 if ("XAU" in raw_clean or "GOLD" in raw_clean or "BTC" in raw_clean or "US30" in raw_clean) else (3 if "JPY" in raw_clean else 5)
+                        return {
+                            "sl_price": round(smc_sl, digits),
+                            "tp_price": round(smc_tp, digits),
+                            "sl_dist": sl_dist,
+                            "tp_dist": tp_dist,
+                            "risk_usd": round(sl_dist * 1.0, 2),
+                            "profit_target_usd": round(tp_dist * 1.0, 2),
+                            "current_price": curr_p,
+                            "digits": digits,
+                            "smc_structural": True
+                        }
+        except Exception:
+            pass
 
         # 1. GOLD & METALS (XAUUSD / GOLD)
         if "XAU" in raw_clean or "GOLD" in raw_clean:
@@ -1684,20 +1748,8 @@ class MT5BridgeEngine:
                     "clients_reached": 0
                 }
 
-            lockout_t = max(
-                self._symbol_lockout_until.get(f"{target_account}_{sym_norm}", 0.0),
-                self._symbol_lockout_until.get(f"{target_account}_{symbol}", 0.0)
-            )
-            if now_ts < lockout_t:
-                rem_m = max(1, int((lockout_t - now_ts) / 60.0))
-                logger.debug(f"⏳ [DISPATCH GUARD] Account #{target_account} Symbol {sym_norm} is in lockout ({rem_m}m remaining). Skipping dispatch.")
-                return {
-                    "success": False,
-                    "status": "symbol_lockout",
-                    "account_id": target_account,
-                    "reason": "SYMBOL_LOCKOUT",
-                    "clients_reached": 0
-                }
+            # Zero Cooldown Standard: Blind symbol lockout removed in favor of 9 SMC structural validation
+            # (Order Blocks, FVGs, CHoCH/BOS, Liquidity Sweeps, Kill Zones)
 
         # Small Capital Suicide Lot Clamp & Strict Lot Floor (Invariants 1.1, 8, 33, 43)
         # Enforces minimum floor: 0.10 Lot for Cent Account | 0.01 Lot for Standard Account
@@ -2572,30 +2624,10 @@ class MT5BridgeEngine:
                         if raw_sym in u_open_syms or sym_clean in u_open_syms:
                             continue
 
-                        # Check consecutive loss circuit breaker lockout (120 min)
-                        lockout_t = max(
-                            self._symbol_lockout_until.get(f"{u_acc}_{sym_clean}", 0.0),
-                            self._symbol_lockout_until.get(f"{u_acc}_{raw_sym}", 0.0)
-                        )
-                        if now_ts < lockout_t:
-                            continue
-
-                        # Check post-close cooldown (15m = 900s)
-                        last_close_t = max(
-                            self._last_symbol_close_time.get(f"{u_acc}_{sym_clean}", 0.0),
-                            self._last_symbol_close_time.get(f"{u_chat}_{sym_clean}", 0.0)
-                        )
-                        if (now_ts - last_close_t) < 900.0:
-                            continue
-
-                        # Check inter-trade anti-whipsaw cooldown (180s)
-                        last_trade_t = max(
-                            self._last_symbol_trade_time.get(f"{u_chat}_{raw_sym}", 0.0),
-                            self._last_symbol_trade_time.get(f"{u_chat}_{sym_clean}", 0.0),
-                            self._last_symbol_trade_time.get(f"{u_acc}_{sym_clean}", 0.0)
-                        )
-                        if (now_ts - last_trade_t) < 180.0:
-                            continue
+                        # Zero Blind Cooldown Invariant:
+                        # Blind timer cooldowns (900s post-close, 180s anti-whipsaw, 120m lockout) are completely
+                        # unlocked across all asset classes in favor of dynamic 9 Smart Money Concepts (SMC)
+                        # multi-timeframe structural validation (M15, M30, H1, H4). Anti-stacking is strictly preserved.
 
                         # Balance-specific asset restrictions (Standard < $25 only Forex)
                         if not u["is_cent_account"] and u["real_usd_balance"] < 25.0 and asset_cat != "Forex":
