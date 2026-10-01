@@ -23152,8 +23152,9 @@ class TelegramBotThread(BaseThread):
                             max_pos = 3 if budget <= 15.0 else 2
 
                         db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
-                        pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         live_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=target_is_demo)
+                        await asyncio.to_thread(live_engine.sync_closed_positions, chat_id)
+                        pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         bal_data = await asyncio.to_thread(live_engine.get_account_balance)
                         live_bal = bal_data.get("balance", 0.0)
                         live_avail = bal_data.get("available", 0.0)
@@ -23242,8 +23243,9 @@ class TelegramBotThread(BaseThread):
                             except ValueError:
                                 pass
                         db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
-                        pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         demo_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
+                        await asyncio.to_thread(demo_engine.sync_closed_positions, chat_id)
+                        pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         bal_data = await asyncio.to_thread(demo_engine.get_account_balance)
                         demo_bal = bal_data.get("balance", 0.0)
                         demo_avail = bal_data.get("available", 0.0)
@@ -23409,6 +23411,14 @@ class TelegramBotThread(BaseThread):
             pnl_val = data.get("active_pnl", 0.0)
             pnl_badge = f"+${pnl_val:,.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):,.2f}"
 
+            pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
+            if pnl_stat.get("total_trades", 0) > 0:
+                closed_pnl_kh = f"📜 **ប្រវត្តិ Auto (Closed) ៖** `Win: {pnl_stat.get('win_count')}/{pnl_stat.get('total_trades')} ({pnl_stat.get('win_rate')}%) | សរុប: ${pnl_stat.get('total_pnl'):+,.2f} USD`\n"
+                closed_pnl_en = f"📜 **Auto History (Closed):** `Win: {pnl_stat.get('win_count')}/{pnl_stat.get('total_trades')} ({pnl_stat.get('win_rate')}%) | Net: ${pnl_stat.get('total_pnl'):+,.2f} USD`\n"
+            else:
+                closed_pnl_kh = ""
+                closed_pnl_en = ""
+
             auto_badge = f"🟢 ACTIVE (${auto_budget:,.0f})" if is_auto_on else "⚪ OFF"
             is_orb_on = db.is_capital_orb_enabled(chat_id)
             orb_badge = "🟢 ACTIVE" if is_orb_on else "⚪ OFF"
@@ -23483,6 +23493,7 @@ class TelegramBotThread(BaseThread):
                     f"💵 **ទុនទំនេរ (Available) ៖** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **ប្រាក់ចំណេញ PnL ៖** `{pnl_badge} {data.get('currency')}`\n"
                     f"📊 **Live Positions ៖** `{data.get('positions_count', 0)} កំពុងដំណើរការ`\n"
+                    f"{closed_pnl_kh}"
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"🏆 **Prop Firm Challenge ៖** `{prop_badge} [ដាច់ដោយឡែក 100%]`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -23528,6 +23539,7 @@ class TelegramBotThread(BaseThread):
                     f"💵 **Live Available:** `${data.get('available', 0.0):,.2f} {data.get('currency')}`\n"
                     f"📈 **Active PnL:** `{pnl_badge} {data.get('currency')}`\n"
                     f"📊 **Live Positions:** `{data.get('positions_count', 0)} open`\n"
+                    f"{closed_pnl_en}"
                     f"{ui_standards.DIVIDER_LIGHT}\n"
                     f"🏆 **Prop Firm Challenge:** `{prop_badge} [100% Isolated]`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"

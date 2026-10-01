@@ -2737,8 +2737,8 @@ def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float)
     cursor.execute("""
         UPDATE capital_auto_trades
         SET exit_price = ?, pnl = ?, status = 'CLOSED', closed_at = ?
-        WHERE deal_id = ? AND status = 'OPEN'
-    """, (exit_price, pnl, now_str, str(deal_id)))
+        WHERE (deal_id = ? OR deal_reference = ?) AND status = 'OPEN'
+    """, (exit_price, pnl, now_str, str(deal_id), str(deal_id)))
     conn.commit()
     conn.close()
 
@@ -2756,6 +2756,19 @@ def get_capital_auto_pnl_summary(chat_id: int) -> dict:
             WHERE chat_id = ? AND status = 'CLOSED'
         """, (chat_id,))
         row = cursor.fetchone()
+        
+        # Fallback for admin or single-vault instances: check all closed trades if user-specific query has 0
+        if (not row or row[0] == 0):
+            cursor.execute("""
+                SELECT COUNT(*),
+                       COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(pnl), 0.0)
+                FROM capital_auto_trades
+                WHERE status = 'CLOSED'
+            """)
+            row = cursor.fetchone()
+
         conn.close()
         if row and row[0] > 0:
             total = row[0]

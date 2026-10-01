@@ -283,8 +283,10 @@ class CapitalComEngine:
     # --------------------------------------------------------------------------
     # Account & Capital Overview
     # --------------------------------------------------------------------------
+    # Account & Capital Overview
+    # --------------------------------------------------------------------------
     def get_accounts(self) -> Dict[str, Any]:
-        """Fetches full account information, equity, and margin balances."""
+        """Fetches full account information, equity, and margin balances with smart funded account selection."""
         if not self.ensure_session():
             err_detail = self.last_auth_error or "Unable to establish valid session."
             return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
@@ -296,12 +298,47 @@ class CapitalComEngine:
                 if res.status_code == 200:
                     data = res.json()
                     accounts = data.get("accounts", [])
-                    primary = accounts[0] if accounts else {}
-                    self.account_currency = primary.get("currency", "USD")
+                    
+                    # Smart Account Selection:
+                    primary = None
+                    # Priority 1: Match authenticated session account ID (from POST /session currentAccountId)
+                    if self.active_account_id:
+                        for acc in accounts:
+                            if str(acc.get("accountId")) == str(self.active_account_id):
+                                primary = acc
+                                break
+                    
+                    # Priority 2: Account marked preferred
+                    if not primary:
+                        for acc in accounts:
+                            if acc.get("preferred") is True:
+                                primary = acc
+                                break
+                                
+                    # Priority 3: Account with positive balance, funds, or available cash
+                    if not primary:
+                        for acc in accounts:
+                            b_data = acc.get("balance") or {}
+                            if isinstance(b_data, dict):
+                                b_val = float(b_data.get("balance") or b_data.get("funds") or b_data.get("equity") or b_data.get("available") or 0.0)
+                            else:
+                                b_val = float(b_data or 0.0)
+                            if b_val > 0.0:
+                                primary = acc
+                                break
+                                
+                    # Priority 4: Fallback to first account
+                    if not primary and accounts:
+                        primary = accounts[0]
+                        
+                    if primary:
+                        self.active_account_id = primary.get("accountId")
+                        self.account_currency = primary.get("currency", "USD")
+
                     return {
                         "success": True,
                         "accounts": accounts,
-                        "primary_account": primary
+                        "primary_account": primary or {}
                     }
                 elif res.status_code == 401 and attempt == 0:
                     self.cst_token = None
@@ -323,7 +360,7 @@ class CapitalComEngine:
 
     def get_account_balance(self) -> Dict[str, Any]:
         """
-        Returns a simplified, institutional balance breakdown:
+        Returns a simplified, institutional balance breakdown with full schema fallback:
         {balance, available_cash, equity, pnl, currency, is_demo}
         """
         acc_info = self.get_accounts()
@@ -342,18 +379,112 @@ class CapitalComEngine:
         primary = acc_info.get("primary_account", {})
         balance_info = primary.get("balance", {})
         
+        if not isinstance(balance_info, dict):
+            balance_val = float(balance_info or 0.0)
+            avail_val = balance_val
+            deposit_val = 0.0
+            pnl_val = 0.0
+            equity_val = balance_val
+        else:
+            balance_val = float(
+                balance_info.get("balance")
+                or balance_info.get("funds")
+                or balance_info.get("equity")
+                or balance_info.get("available")
+                or 0.0
+            )
+            avail_val = float(
+                balance_info.get("available")
+                or balance_info.get("availableCash")
+                or balance_info.get("funds")
+                or balance_info.get("balance")
+                or 0.0
+            )
+            deposit_val = float(balance_info.get("deposit") or balance_info.get("margin") or 0.0)
+            pnl_val = float(balance_info.get("profitLoss") or balance_info.get("pnl") or 0.0)
+            equity_val = float(balance_info.get("equity") or (balance_val + pnl_val))
+        
         return {
             "success": True,
             "account_id": primary.get("accountId"),
-            "account_name": primary.get("accountName", "Capital.com Demo"),
-            "balance": float(balance_info.get("balance", 0.0)),
-            "available": float(balance_info.get("available", 0.0)),
-            "deposit": float(balance_info.get("deposit", 0.0)),  # Margin used
-            "pnl": float(balance_info.get("profitLoss", 0.0)),
+            "account_name": primary.get("accountName", "Capital.com Main"),
+            "balance": balance_val,
+            "available": avail_val,
+            "deposit": deposit_val,  # Margin used
+            "equity": equity_val,
+            "pnl": pnl_val,
             "currency": primary.get("currency", "USD"),
             "status": primary.get("status", "ACTIVE"),
             "is_demo": self.is_demo
         }
+
+    def sync_closed_positions(self, chat_id: Optional[int] = None) -> int:
+        """
+        Synchronizes broker-closed trades (Stop-Loss or Take-Profit hit on Capital.com)
+        with the local database. Automatically detects positions in capital_auto_trades
+        that are no longer open on the broker, computes final exit price and PnL, and marks them CLOSED.
+        """
+        try:
+            import database as db
+            cid = chat_id or getattr(self, "_custom_chat_id", None)
+            conn = db.get_db_connection()
+            cur = conn.cursor()
+            if cid:
+                cur.execute("""
+                    SELECT deal_id, epic, direction, size, entry_price, sl, tp
+                    FROM capital_auto_trades
+                    WHERE chat_id = ? AND status = 'OPEN'
+                """, (cid,))
+            else:
+                cur.execute("""
+                    SELECT deal_id, epic, direction, size, entry_price, sl, tp
+                    FROM capital_auto_trades
+                    WHERE status = 'OPEN'
+                """)
+            open_db_trades = cur.fetchall()
+            conn.close()
+
+            if not open_db_trades:
+                return 0
+
+            broker_positions = self.get_open_positions()
+            broker_deal_ids = {str(p.get("position", {}).get("dealId")) for p in broker_positions if p.get("position", {}).get("dealId")}
+
+            reconciled = 0
+            for row in open_db_trades:
+                deal_id, epic, direction, size, entry_price, sl, tp = row
+                if deal_id and str(deal_id) not in broker_deal_ids:
+                    # Deal is no longer open on broker: it was closed!
+                    mkt = self.get_market_details(epic)
+                    current_mid = float(mkt.get("mid", entry_price))
+                    size_val = float(size) if size else 0.01
+
+                    # Reconstruct exit price based on direction and SL/TP bounds
+                    if direction.upper() == "BUY":
+                        if sl and sl > 0 and current_mid <= sl:
+                            exit_price = sl
+                        elif tp and tp > 0 and current_mid >= tp:
+                            exit_price = tp
+                        else:
+                            exit_price = current_mid
+                        pnl = round((exit_price - float(entry_price)) * size_val, 2)
+                    else:
+                        if sl and sl > 0 and current_mid >= sl:
+                            exit_price = sl
+                        elif tp and tp > 0 and current_mid <= tp:
+                            exit_price = tp
+                        else:
+                            exit_price = current_mid
+                        pnl = round((float(entry_price) - exit_price) * size_val, 2)
+
+                    db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=exit_price, pnl=pnl)
+                    reconciled += 1
+                    logger.info(f"🔄 [CAPITAL SYNC] Reconciled broker-closed trade {deal_id} ({epic} {direction}): Exit ${exit_price:,.2f}, PnL ${pnl:+,.2f}")
+
+            return reconciled
+        except Exception as e_sync:
+            logger.debug(f"Capital closed position sync notice: {e_sync}")
+            return 0
 
     # --------------------------------------------------------------------------
     # Market Data & Live Pricing (Gold, Indices, Oil, Forex)
@@ -758,6 +889,16 @@ class CapitalComEngine:
                 res = self.close_position(deal_id)
                 if res.get("success"):
                     closed.append({"deal_id": deal_id, "epic": epic})
+                    try:
+                        import database as db
+                        upl = float(pos.get("upl", 0.0))
+                        size = float(pos.get("size", 0.0))
+                        level = float(pos.get("level", 0.0))
+                        dir_str = pos.get("direction", "BUY").upper()
+                        exit_p = level + (upl / size) if dir_str == "BUY" and size > 0 else (level - (upl / size) if size > 0 else level)
+                        db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=exit_p, pnl=upl)
+                    except Exception:
+                        pass
                 else:
                     errors.append({"deal_id": deal_id, "error": res.get("error")})
 
@@ -1463,6 +1604,13 @@ def get_tradfi_dashboard(chat_id: Optional[int] = None, is_demo: Optional[bool] 
         engine = get_user_capital_engine(chat_id, is_demo=is_demo)
     else:
         engine = get_capital_engine(is_demo=is_demo)
+    
+    # Auto-synchronize any broker-closed trades (SL/TP hit on Capital.com)
+    try:
+        engine.sync_closed_positions(chat_id)
+    except Exception:
+        pass
+
     data = engine.get_tradfi_dashboard_data()
     if chat_id:
         import database as db
@@ -2286,6 +2434,12 @@ class CapitalAutonomousEngine:
         DUAL-LAYER DEFENSE: Software Autonomous Retracement Exit protects 80%-85% of peak UPL
         even if broker-side SL is delayed, rejected, or market reverses sharply.
         """
+        # Step 0: Synchronize any broker-closed positions (e.g. SL or TP hit) with local database
+        try:
+            engine.sync_closed_positions(chat_id)
+        except Exception as e_sync:
+            logger.debug(f"Broker position sync notice: {e_sync}")
+
         positions = engine.get_open_positions()
         if not positions:
             return 0, 0, 0
@@ -2383,6 +2537,7 @@ class CapitalAutonomousEngine:
                     self._be_locked_set.discard(deal_id)
                     try:
                         import database as db
+                        db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=current_price, pnl=upl)
                         conn = db.get_db_connection()
                         cur = conn.cursor()
                         cur.execute("DELETE FROM system_settings WHERE key = ?", (f"cap_peak_{deal_id}",))
@@ -2434,6 +2589,7 @@ class CapitalAutonomousEngine:
                     self._be_locked_set.discard(deal_id)
                     try:
                         import database as db
+                        db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=current_price, pnl=upl)
                         conn = db.get_db_connection()
                         cur = conn.cursor()
                         cur.execute("DELETE FROM system_settings WHERE key = ?", (f"cap_peak_{deal_id}",))
