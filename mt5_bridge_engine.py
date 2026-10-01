@@ -1322,7 +1322,24 @@ class MT5BridgeEngine:
                 losses = self._consecutive_losses[streak_key]
                 logger.warning(f"⚠️ [STREAK COUNTER] Account {account_id} Symbol {sym_clean} Consecutive Losses: {losses}")
                 if losses >= 2:
-                    is_micro_loss = (abs(pnl) < 1.50)
+                    is_cent_account = False
+                    with self._clients_lock:
+                        s_check = self.clients.get(account_id)
+                        if s_check:
+                            c_curr = str(getattr(s_check, "currency", "USD")).upper().strip()
+                            c_brok = str(getattr(s_check, "broker", "")).lower()
+                            c_firm = str(getattr(s_check, "firm_name", "")).lower()
+                            c_srv = str(getattr(s_check, "server", "")).lower()
+                            is_cent_account = (
+                                c_curr in ["USC", "CENT", "EUAC", "GBPC"]
+                                or "cent" in c_brok
+                                or "micro" in c_brok
+                                or "server 5" in c_srv
+                                or "server 5" in c_firm
+                                or "cent account" in c_firm
+                            )
+                    micro_threshold = 150.0 if is_cent_account else 1.50
+                    is_micro_loss = (abs(pnl) < micro_threshold)
                     lockout_duration = 300.0 if is_micro_loss else 7200.0
                     lockout_until = now_ts + lockout_duration
                     self._symbol_lockout_until[streak_key] = lockout_until
@@ -1602,30 +1619,30 @@ class MT5BridgeEngine:
             # Cent Account (cap is in USC, e.g. $10 = 1,000 USC; $29.13 = 2,913 USC; $100 = 10,000 USC)
             # 1 Lot Cent = 100,000 cents ($1,000 USD notional). 0.10 Lot uses ~10-20 USC margin.
             # Minimum Floor: 0.10 Lot (Non-negotiable)
-            if cap < 1000.0:        # < $10 USD (e.g. 300 - 999 USC)
+            if cap < 1000.0:        # < $10 USD
+                prop_lot = 0.10
+                max_ceiling = 0.15
+            elif cap < 2500.0:      # $10 - $25 USD (e.g. $20 -> 0.10 Lot)
                 prop_lot = 0.10
                 max_ceiling = 0.20
-            elif cap < 2500.0:      # $10 - $25 USD
+            elif cap < 5000.0:      # $25 - $50 USD
+                prop_lot = 0.15
+                max_ceiling = 0.25
+            elif cap < 10000.0:     # $50 - $100 USD (e.g. $52 -> 0.20 Lot, NOT 0.70!)
                 prop_lot = 0.20
-                max_ceiling = 0.40
-            elif cap < 5000.0:      # $25 - $50 USD (e.g. 2,913 USC -> 0.35 Lot)
-                prop_lot = 0.35
-                max_ceiling = 0.80
-            elif cap < 10000.0:     # $50 - $100 USD
-                prop_lot = 0.70
-                max_ceiling = 1.50
+                max_ceiling = 0.35
             elif cap < 25000.0:     # $100 - $250 USD
-                prop_lot = 1.50
-                max_ceiling = 3.00
+                prop_lot = 0.35
+                max_ceiling = 0.60
             elif cap < 50000.0:     # $250 - $500 USD
-                prop_lot = 3.00
-                max_ceiling = 6.00
+                prop_lot = 0.60
+                max_ceiling = 1.00
             elif cap < 100000.0:    # $500 - $1,000 USD
-                prop_lot = 5.00
-                max_ceiling = 10.00
+                prop_lot = 1.00
+                max_ceiling = 2.00
             else:                   # >= $1,000 USD (>= 100,000 USC)
-                prop_lot = round(min(20.00, (cap / 10000.0) * 0.70), 2)
-                max_ceiling = 20.00
+                prop_lot = round(min(5.00, (cap / 100000.0) * 1.50), 2)
+                max_ceiling = 5.00
 
             if cfg_lot > 0.0:
                 final_lot = min(max_ceiling, max(prop_lot, cfg_lot))
@@ -2651,7 +2668,9 @@ class MT5BridgeEngine:
                                         can_flip = False
 
                                     if can_flip:
-                                        flip_lot = float(p.get("volume", 0.01) or 0.01)
+                                        flip_lot = float(p.get("lots", 0.0) or p.get("volume", 0.0) or 0.10)
+                                        if is_cent_account and flip_lot < 0.10:
+                                            flip_lot = 0.10
                                         flip_quote = self.get_live_symbol_quote(sym) or self.get_live_symbol_quote("XAUUSD")
                                         cur_mid = float(flip_quote.get("mid", 0.0) if flip_quote else 0.0)
                                         if cur_mid > 0:
@@ -2823,14 +2842,18 @@ class MT5BridgeEngine:
                         # Cent Account Multi-Asset Scaling (GTCFX Server 5 - USC ¢):
                         # raw_bal is denominated in USC (e.g. $29.13 = 2,913.00 USC).
                         # 0.01 lot Cent uses only ~2.00 USC margin on Forex pairs and ~5.30 USC on Gold.
-                        if raw_bal < 300.0:  # < $3.00 USD
+                        # Cent Account Multi-Asset Scaling (Institutional Risk Parity):
+                        # Limits concurrent open positions strictly to protect margin and prevent portfolio correlation drag:
+                        if raw_bal < 1000.0:      # < $10.00 USD
+                            max_assets = 1
+                        elif raw_bal < 3000.0:    # $10 - $30 USD (e.g. $20 account -> max 2 positions!)
                             max_assets = min(2, max_assets)
-                        elif raw_bal < 1000.0:  # < $10.00 USD
+                        elif raw_bal < 6000.0:    # $30 - $60 USD (e.g. $50 account -> max 3 positions!)
+                            max_assets = min(3, max_assets)
+                        elif raw_bal < 15000.0:   # $60 - $150 USD
+                            max_assets = min(4, max_assets)
+                        else:                     # >= $150 USD
                             max_assets = min(5, max_assets)
-                        elif raw_bal < 2000.0:  # < $20.00 USD
-                            max_assets = min(10, max_assets)
-                        else:  # >= $20.00 USD (>= 2,000 USC)
-                            max_assets = min(20, max_assets)
                         allocations = [a for a in allocations if a.get("category") in ["Metals", "Forex"]]
                     current_open_count = len(open_positions)
 
