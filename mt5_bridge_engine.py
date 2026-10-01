@@ -1757,11 +1757,24 @@ class MT5BridgeEngine:
 
         # Small Capital Suicide Lot Clamp & Strict Lot Floor (Invariants 1.1, 8, 33, 43)
         # Enforces minimum floor: 0.10 Lot for Cent Account | 0.01 Lot for Standard Account
-        if target_account and target_account in self.clients:
-            sess_obj = self.clients[target_account]
+        target_key = str(target_account).strip() if target_account else ""
+        sess_obj = self.clients.get(target_key) or self.clients.get(target_account) if target_account else None
+        if sess_obj:
             curr_str = str(getattr(sess_obj, "currency", "USD")).upper().strip()
             broker_str = str(getattr(sess_obj, "broker", "")).lower()
-            is_cent = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
+            firm_str = str(getattr(sess_obj, "firm_name", "")).lower()
+            srv_str = str(getattr(sess_obj, "server", "")).lower()
+            is_cent = (
+                curr_str in ["USC", "CENT", "EUAC", "GBPC"]
+                or "cent" in broker_str
+                or "micro" in broker_str
+                or "server 5" in srv_str
+                or "server 5" in firm_str
+                or "cent account" in firm_str
+            )
+            if "server 2" in srv_str or "server 2" in firm_str or "standard" in srv_str or "ftmo" in broker_str:
+                if curr_str not in ["USC", "CENT"]:
+                    is_cent = False
             sess_b = getattr(sess_obj, "balance", None)
             raw_b = float(sess_b if sess_b is not None else 0.0)
             real_b = (raw_b / 100.0) if is_cent else raw_b
@@ -2478,7 +2491,19 @@ class MT5BridgeEngine:
                     # Cent Account Detection & Sub-$300 Real Balance Gatekeeper
                     curr_str = str(getattr(session, "currency", "USD")).upper().strip()
                     broker_str = str(getattr(session, "broker", "")).lower()
-                    is_cent_account = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
+                    firm_str = str(getattr(session, "firm_name", "")).lower()
+                    srv_str = str(getattr(session, "server", "")).lower()
+                    is_cent_account = (
+                        curr_str in ["USC", "CENT", "EUAC", "GBPC"]
+                        or "cent" in broker_str
+                        or "micro" in broker_str
+                        or "server 5" in srv_str
+                        or "server 5" in firm_str
+                        or "cent account" in firm_str
+                    )
+                    if "server 2" in srv_str or "server 2" in firm_str or "standard" in srv_str or "ftmo" in broker_str:
+                        if curr_str not in ["USC", "CENT"]:
+                            is_cent_account = False
                     sess_bal = getattr(session, "balance", None)
                     raw_bal = float(sess_bal if sess_bal is not None else 0.0)
                     real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
