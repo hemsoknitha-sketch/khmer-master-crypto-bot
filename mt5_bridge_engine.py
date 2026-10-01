@@ -27,7 +27,7 @@ import select
 import logging
 import threading
 import asyncio
-from typing import Dict, Any, Optional, List, Tuple, Union
+from typing import Dict, Any, Optional, List, Tuple, Union, Set
 from datetime import datetime, timezone
 import html
 
@@ -634,6 +634,7 @@ class MT5BridgeEngine:
         self._live_quotes: Dict[str, Dict[str, Any]] = {}  # {symbol: {"ask": float, "bid": float, "mid": float, "timestamp": float}}
         self._last_account_dispatch_time: Dict[str, float] = {}  # {account_id: timestamp}
         self._last_admin_hijack_warn: Dict[int, float] = {}  # {chat_id: timestamp}
+        self._accounts_without_c_suffix: Set[str] = set()
         
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
@@ -1289,9 +1290,20 @@ class MT5BridgeEngine:
                 _dispatch_telegram_alert(admin_chat_id, help_text)
             elif retcode == 10006:
                 clean_sym = normalize_mt5_symbol(symbol)
-                self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 600.0
-                self._symbol_lockout_until[f"{account_id}_{clean_sym}"] = now_ts + 600.0
-                logger.warning(f"⚠️ [SYMBOL NOT FOUND LOCK] Account #{account_id} symbol '{symbol}' locked for 10m to prevent log spam.")
+                # If symbol had a broker suffix (.C, c, etc.) and was rejected with 10006:
+                if symbol != clean_sym:
+                    self._accounts_without_c_suffix.add(str(account_id))
+                    logger.warning(
+                        f"🛡️ [ADAPTIVE BROKER HEALER] Account #{account_id} rejected suffixed '{symbol}' with 10006. "
+                        f"Auto-switching account to standard clean symbol '{clean_sym}' without suffix!"
+                    )
+                    # Un-lock the clean symbol so the engine can trade it immediately!
+                    self._symbol_lockout_until.pop(f"{account_id}_{clean_sym}", None)
+                    # Lock only the invalid suffixed symbol for 24 hours
+                    self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 86400.0
+                else:
+                    self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 600.0
+                    logger.warning(f"⚠️ [SYMBOL NOT FOUND LOCK] Account #{account_id} symbol '{symbol}' locked for 10m to prevent log spam.")
             elif retcode == 10015:
                 clean_sym = normalize_mt5_symbol(symbol)
                 self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 120.0
@@ -1413,16 +1425,27 @@ class MT5BridgeEngine:
         curr_str = str(getattr(session, "currency", "USD")).upper().strip()
         broker_str = str(getattr(session, "broker", "")).lower()
         server_str = str(getattr(session, "server", "") or getattr(session, "firm_name", "")).lower()
+        acc_id = str(getattr(session, "account_id", ""))
 
-        is_cent = (
-            curr_str in ["USC", "CENT", "EUAC", "GBPC"]
-            or "cent" in broker_str
-            or "micro" in broker_str
-            or "server 5" in server_str
-            or "cent" in server_str
+        # 1. Accounts that have rejected .C or are flagged without suffix
+        if acc_id and acc_id in self._accounts_without_c_suffix:
+            return clean
+
+        # 2. Server 2 / Standard Server / Prop Firm guard:
+        # GTCGlobalSA-Server 2 is a standard server where symbols are clean (XAUUSD, USDJPY, etc.).
+        # FTMO and FundedNext also use clean symbols.
+        if "server 2" in server_str or "standard" in server_str or "ftmo" in broker_str or "fundednext" in broker_str:
+            return clean
+
+        # 3. Only Server 5 on GTC (or explicit cent/micro servers) uses .C suffix
+        is_cent_suffix_needed = (
+            ("server 5" in server_str)
+            or ("gtc" in broker_str and "server 5" in server_str)
+            or ("exness" in broker_str and ("cent" in broker_str or curr_str == "USC"))
+            or ("micro" in broker_str and "server 2" not in server_str)
         )
 
-        if is_cent:
+        if is_cent_suffix_needed:
             if "exness" in broker_str:
                 return f"{clean}c"
             return f"{clean}.C"
@@ -1549,7 +1572,8 @@ class MT5BridgeEngine:
             curr_str = str(getattr(sess_obj, "currency", "USD")).upper().strip()
             broker_str = str(getattr(sess_obj, "broker", "")).lower()
             is_cent = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
-            raw_b = float(getattr(sess_obj, "balance", 100.0) or 100.0)
+            sess_b = getattr(sess_obj, "balance", None)
+            raw_b = float(sess_b if sess_b is not None else 0.0)
             real_b = (raw_b / 100.0) if is_cent else raw_b
 
             if real_b < 50.0 and lot_norm > 0.05:
@@ -2250,7 +2274,8 @@ class MT5BridgeEngine:
                     curr_str = str(getattr(session, "currency", "USD")).upper().strip()
                     broker_str = str(getattr(session, "broker", "")).lower()
                     is_cent_account = (curr_str in ["USC", "CENT", "EUAC", "GBPC"] or "cent" in broker_str or "micro" in broker_str)
-                    raw_bal = float(getattr(session, "balance", 100.0) or 100.0)
+                    sess_bal = getattr(session, "balance", None)
+                    raw_bal = float(sess_bal if sess_bal is not None else 0.0)
                     real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
 
                     allocations = auto_cfg.get("allocations", []) or (default_cent_20_universe if is_cent_account else default_10_universe)
@@ -2264,6 +2289,14 @@ class MT5BridgeEngine:
                         if (now_ts - self._last_auth_log.get(min_log_k, 0.0)) >= 900.0:
                             self._last_auth_log[min_log_k] = now_ts
                             logger.warning(f"⚠️ [LOW CAPITAL GUARD] Account #{acc_id} has ${real_usd_balance:.2f} USD (< $5.00 minimum required for margin). Pausing auto-trade until deposit.")
+                        continue
+
+                    # Strict Cent Account Sub-50 USC Minimum Capital Gatekeeper:
+                    if is_cent_account and raw_bal < 50.0:
+                        min_log_k = f"low_cap_cent_{acc_id}"
+                        if (now_ts - self._last_auth_log.get(min_log_k, 0.0)) >= 900.0:
+                            self._last_auth_log[min_log_k] = now_ts
+                            logger.warning(f"⚠️ [LOW CAPITAL GUARD] Cent Account #{acc_id} has {raw_bal:.2f} USC (< 50 USC minimum required). Pausing auto-trade until deposit.")
                         continue
 
                     # Strict Sub-$300 / Cent Account Gatekeeper:
