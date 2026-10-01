@@ -2042,11 +2042,14 @@ class MT5BridgeEngine:
 
                         # =====================================================
                         # DYNAMIC SERVER-SIDE BREAKEVEN ARMOR MODIFICATION
-                        # (Locks Server-Side SL so market close slippage is 0)
+                        # (Locks Server-Side SL with Breathing Room to Prevent Choking)
                         # =====================================================
                         if is_gold:
-                            if peak >= 2.50 and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
-                                be_sl = round(open_p + 0.50, 2) if p_type == "BUY" else round(open_p - 0.50, 2)
+                            # Gold 15m ATR is $5.00 - $12.00. Don't choke at $2.50!
+                            # Wait until trade achieves at least +$7.50 (1.2x ATR / 1.5R) before moving SL.
+                            gold_be_trigger = max(7.50, base_risk_usd * 2.5)
+                            if peak >= gold_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
+                                be_sl = round(open_p + 1.50, 2) if p_type == "BUY" else round(open_p - 1.50, 2)
                                 self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
                                 self._ticket_sl_modified[ticket] = True
                                 logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Gold Ticket #{ticket} to {be_sl} (Peak was +${peak:.2f})")
@@ -2057,19 +2060,20 @@ class MT5BridgeEngine:
                                             f"━━━━━━━━━━━━\n"
                                             f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
                                             f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code>\n"
-                                            f"🔒 <b>កម្រិត Stop Loss ថ្មី ៖</b> <code>{be_sl}</code> (កាត់ហានិភ័យ = $0.00)\n"
+                                            f"🔒 <b>កម្រិត Stop Loss ថ្មី ៖</b> <code>{be_sl}</code> (កាត់ហានិភ័យ & ចាក់សោរចំណេញ)\n"
                                             f"💵 <b>ប្រាក់ចំណេញឡើងដល់ ៖</b> <b>+${peak:,.2f} USD</b>\n"
                                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
                                             f"━━━━━━━━━━━━\n"
-                                            f"<i>✨ Breakeven Armor បានរុញ SL ទៅចំនុចសុវត្ថិភាព 100% គ្មានហានិភ័យឡើយ!</i>"
+                                            f"<i>✨ Breakeven Armor បានរុញ SL ទៅចំនុចសុវត្ថិភាព +$1.50 គ្មានហានិភ័យឡើយ!</i>"
                                         )
                                         _dispatch_telegram_alert(chat_id, msg_be)
                                 except Exception:
                                     pass
                         else:
-                            if peak >= 1.50 and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
+                            fx_be_trigger = max(3.50, base_risk_usd * 1.5)
+                            if peak >= fx_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
                                 digits = 3 if "JPY" in sym else 5
-                                be_offset = 0.03 if "JPY" in sym else 0.0003
+                                be_offset = 0.05 if "JPY" in sym else 0.0005
                                 be_sl = round(open_p + be_offset, digits) if p_type == "BUY" else round(open_p - be_offset, digits)
                                 self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
                                 self._ticket_sl_modified[ticket] = True
@@ -2079,19 +2083,19 @@ class MT5BridgeEngine:
                         reason = ""
 
                         if is_gold:
-                            # Asymmetric 10x Trailing Ratchet for Runner Profits
-                            if peak >= 18.00 and profit <= (peak * 0.85):
+                            # Asymmetric 10x Trailing Ratchet for Runner Profits (Locks 82% of peak when peak >= $12.00)
+                            if peak >= 12.00 and profit <= (peak * 0.82):
                                 should_harvest = True
                                 reason = f"ASYMMETRIC_10X_RATCHET (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
                         else:
-                            if peak >= 14.00 and profit <= (peak * 0.85):
+                            if peak >= 8.00 and profit <= (peak * 0.82):
                                 should_harvest = True
                                 reason = f"ASYMMETRIC_10X_RATCHET (Peak: +${peak:.2f} -> Lock: +${profit:.2f})"
 
-                        # Target Profit Hit for quick scalps:
-                        if not should_harvest and profit >= profit_target_usd and peak < (profit_target_usd * 0.6):
+                        # Target Profit Hit for configured targets:
+                        if not should_harvest and profit >= profit_target_usd:
                             should_harvest = True
-                            reason = f"TARGET_HIT (+${profit:.2f} >= +${profit_target_usd:.2f})"
+                            reason = f"TARGET_PROFIT_HARVEST (+${profit:.2f} >= +${profit_target_usd:.2f})"
 
                         # Mathematical Hard Stop Loss Guard (Invariant 1.1 & 35)
                         elif not should_harvest and profit <= -max_risk_usd:
