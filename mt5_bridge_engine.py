@@ -1547,34 +1547,39 @@ class MT5BridgeEngine:
             return max(0.10, round(final_lot, 2))
         else:
             # Standard Account (cap is in USD)
-            # 1 Standard Lot = $100,000 notional. 0.01 Lot uses ~$2-26 USD margin.
+            # Wall Street Risk Citadel Sizing Schedule (Strict Institutional Tiers):
+            # • < $1,000 USD (including $500 - $1,000 USD): 0.01 Lot
+            # • $1,000 - $2,000 USD: 0.05 Lot
+            # • $2,000 - $5,000 USD: 0.10 Lot (0.1 Lot)
+            # • $5,000 - $10,000 USD: 0.25 Lot
+            # • $10,000 - $20,000 USD: 0.50 Lot
+            # • $20,000 - $50,000 USD: 1.00 Lot
+            # • $50,000 - $100,000 USD: 2.50 Lot
+            # • >= $100,000 USD: 4.00 Lot (up to max 10.00 Lot)
             # Minimum Floor: 0.01 Lot (Non-negotiable)
-            if cap < 50.0:          # < $50 USD (Small Capital Shield)
+            if cap < 1000.0:        # < $1,000 USD ($500 - $1,000 USD -> 0.01 Lot)
                 prop_lot = 0.01
-                max_ceiling = 0.01
-            elif cap < 150.0:       # $50 - $150 USD
-                prop_lot = 0.02
-                max_ceiling = 0.03
-            elif cap < 300.0:       # $150 - $300 USD
-                prop_lot = 0.03
-                max_ceiling = 0.05
-            elif cap < 500.0:       # $300 - $500 USD
+                max_ceiling = 0.02
+            elif cap < 2000.0:      # $1,000 - $2,000 USD -> 0.05 Lot
                 prop_lot = 0.05
-                max_ceiling = 0.10
-            elif cap < 1000.0:      # $500 - $1,000 USD
+                max_ceiling = 0.08
+            elif cap < 5000.0:      # $2,000 - $5,000 USD -> 0.10 Lot
                 prop_lot = 0.10
                 max_ceiling = 0.20
-            elif cap < 2500.0:      # $1,000 - $2,500 USD
-                prop_lot = 0.20
+            elif cap < 10000.0:     # $5,000 - $10,000 USD -> 0.25 Lot
+                prop_lot = 0.25
                 max_ceiling = 0.40
-            elif cap < 5000.0:      # $2,500 - $5,000 USD
-                prop_lot = 0.40
+            elif cap < 20000.0:     # $10,000 - $20,000 USD -> 0.50 Lot
+                prop_lot = 0.50
                 max_ceiling = 0.80
-            elif cap < 10000.0:     # $5,000 - $10,000 USD
-                prop_lot = 0.80
-                max_ceiling = 1.50
-            else:                   # >= $10,000 USD
-                prop_lot = round(min(10.00, (cap / 1000.0) * 0.10), 2)
+            elif cap < 50000.0:     # $20,000 - $50,000 USD -> 1.00 Lot
+                prop_lot = 1.00
+                max_ceiling = 2.00
+            elif cap < 100000.0:    # $50,000 - $100,000 USD -> 2.50 Lot
+                prop_lot = 2.50
+                max_ceiling = 3.50
+            else:                   # >= $100,000 USD -> 4.00 Lot
+                prop_lot = round(min(10.00, 4.00 + ((cap - 100000.0) / 100000.0) * 2.0), 2)
                 max_ceiling = 10.00
 
             if cap < 50.0:

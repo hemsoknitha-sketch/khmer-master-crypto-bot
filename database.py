@@ -4627,24 +4627,31 @@ def calculate_mt5_smart_allocation(
             calc_lot = round(max(0.10, base_lot), 2)
         else:
             # Standard Account: Floor 0.01 Lot strictly enforced!
-            if capital_per_asset < 50.0:              # < $50 USD
+            # Wall Street Risk Citadel Sizing Schedule (Strict Institutional Tiers):
+            # • < $1,000 USD (including $500 - $1,000 USD): 0.01 Lot
+            # • $1,000 - $2,000 USD: 0.05 Lot
+            # • $2,000 - $5,000 USD: 0.10 Lot (0.1 Lot)
+            # • $5,000 - $10,000 USD: 0.25 Lot
+            # • $10,000 - $20,000 USD: 0.50 Lot
+            # • $20,000 - $50,000 USD: 1.00 Lot
+            # • $50,000 - $100,000 USD: 2.50 Lot
+            # • >= $100,000 USD: 4.00 Lot
+            if cap < 1000.0:              # < $1,000 USD ($500 - $1,000 -> 0.01 Lot)
                 base_lot = 0.01
-            elif capital_per_asset < 150.0:           # $50 - $150 USD
-                base_lot = 0.02
-            elif capital_per_asset < 300.0:           # $150 - $300 USD
-                base_lot = 0.03
-            elif capital_per_asset < 500.0:           # $300 - $500 USD
+            elif cap < 2000.0:            # $1,000 - $2,000 USD -> 0.05 Lot
                 base_lot = 0.05
-            elif capital_per_asset < 1000.0:          # $500 - $1,000 USD
+            elif cap < 5000.0:            # $2,000 - $5,000 USD -> 0.10 Lot
                 base_lot = 0.10
-            elif capital_per_asset < 2500.0:          # $1,000 - $2,500 USD
-                base_lot = 0.20
-            elif capital_per_asset < 5000.0:          # $2,500 - $5,000 USD
-                base_lot = 0.40
-            elif capital_per_asset < 10000.0:         # $5,000 - $10,000 USD
-                base_lot = 0.80
-            else:
-                base_lot = round(min(10.00, (capital_per_asset / 1000.0) * 0.10), 2)
+            elif cap < 10000.0:           # $5,000 - $10,000 USD -> 0.25 Lot
+                base_lot = 0.25
+            elif cap < 20000.0:           # $10,000 - $20,000 USD -> 0.50 Lot
+                base_lot = 0.50
+            elif cap < 50000.0:           # $20,000 - $50,000 USD -> 1.00 Lot
+                base_lot = 1.00
+            elif cap < 100000.0:          # $50,000 - $100,000 USD -> 2.50 Lot
+                base_lot = 2.50
+            else:                         # >= $100,000 USD -> 4.00 Lot
+                base_lot = round(min(10.00, 4.00 + ((cap - 100000.0) / 100000.0) * 2.0), 2)
             calc_lot = round(max(0.01, base_lot), 2)
 
         total_planned_lots += calc_lot
