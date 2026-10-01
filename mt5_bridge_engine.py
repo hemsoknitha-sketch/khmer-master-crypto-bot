@@ -1551,6 +1551,10 @@ class MT5BridgeEngine:
         p = dict(base_payload)
         p["symbol"] = sess_sym
         p["signature"] = self.generate_signature(p)
+        if session.socket_conn:
+            return self._send_raw_socket(session.socket_conn, p)
+        return False
+
     @staticmethod
     def calculate_proportional_lot_size(
         is_cent: bool,
@@ -1832,9 +1836,10 @@ class MT5BridgeEngine:
         skipped_prop = False
         with self._clients_lock:
             # 1. Direct targeted account
-            if target_account and target_account in self.clients:
+            t_acc_str = str(target_account).strip() if target_account else ""
+            if t_acc_str and (t_acc_str in self.clients or target_account in self.clients):
                 target_found = True
-                session = self.clients[target_account]
+                session = self.clients.get(t_acc_str) or self.clients.get(target_account)
                 if not session.is_prop_compliant:
                     skipped_prop = True
                     logger.warning(f"🛡️ [DISPATCH GUARD] Skipped account {target_account} due to Prop Firm Breach status.")
@@ -2628,6 +2633,11 @@ class MT5BridgeEngine:
                         # Blind timer cooldowns (900s post-close, 180s anti-whipsaw, 120m lockout) are completely
                         # unlocked across all asset classes in favor of dynamic 9 Smart Money Concepts (SMC)
                         # multi-timeframe structural validation (M15, M30, H1, H4). Anti-stacking is strictly preserved.
+
+                        # Inter-dispatch pacing: Ensure at least 3.0s between consecutive new orders for the same account
+                        last_d = self._last_account_dispatch_time.get(u_acc, 0.0)
+                        if (now_ts - last_d) < 3.0:
+                            continue
 
                         # Balance-specific asset restrictions (Standard < $25 only Forex)
                         if not u["is_cent_account"] and u["real_usd_balance"] < 25.0 and asset_cat != "Forex":
