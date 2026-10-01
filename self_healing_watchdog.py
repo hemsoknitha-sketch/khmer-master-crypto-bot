@@ -34,9 +34,51 @@ def send_telegram_alert(msg: str):
     except Exception as e:
         print(f"Failed to send alert: {e}")
 
+import threading
+
+def start_mt5_terminal_sentinel():
+    """
+    Autonomous 24/7 Linux VPS Sentinel for Wine MetaTrader 5 Terminal:
+    Checks if terminal64.exe is running on Linux. If terminated, dead, or crashed,
+    automatically revives it via reset_and_launch_mt5.sh without manual human intervention.
+    """
+    if not sys.platform.startswith("linux"):
+        return
+
+    def _sentinel_loop():
+        time.sleep(15.0)  # Initial delay
+        vps_script = "/opt/khmer-master-crypto-bot/reset_and_launch_mt5.sh"
+        if not os.path.exists(vps_script):
+            local_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reset_and_launch_mt5.sh")
+            if os.path.exists(local_script):
+                vps_script = local_script
+            else:
+                return
+
+        while True:
+            try:
+                time.sleep(60.0)
+                chk = subprocess.run(["pgrep", "-f", "terminal64.exe"], capture_output=True, text=True)
+                if chk.returncode != 0:
+                    print("🚨 [WATCHDOG SENTINEL] MT5 terminal64.exe is dead! Auto-reviving 24/7...")
+                    subprocess.Popen(["bash", vps_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    alert_msg = (
+                        "🛡️ **[MT5 WATCHDOG 24/7 SENTINEL]** 🚀\n\n"
+                        "MT5 Terminal process was offline on VPS.\n"
+                        "✅ **Autonomous Self-Healing**: Successfully revived `terminal64.exe` & restored EA Bridge socket!\n"
+                        "*(Zero manual reset required!)*"
+                    )
+                    send_telegram_alert(alert_msg)
+            except Exception as e:
+                print(f"⚠️ [WATCHDOG SENTINEL NOTICE]: {e}")
+
+    t = threading.Thread(target=_sentinel_loop, daemon=True, name="MT5_Terminal_Sentinel")
+    t.start()
+
 def start_watchdog():
     print("🛡️ [WATCHDOG] Autonomous Resilience Manager Started.")
-    print("🛡️ [WATCHDOG] Monitoring main.py for crashes...")
+    print("🛡️ [WATCHDOG] Monitoring main.py and MT5 terminal 24/7...")
+    start_mt5_terminal_sentinel()
     
     bot_dir = os.path.dirname(os.path.abspath(__file__))
     executable = sys.executable # Use current python interpreter

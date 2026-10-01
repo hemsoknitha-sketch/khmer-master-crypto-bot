@@ -500,6 +500,8 @@ class MT5QuantumSignalCitadel:
             if cached_smc and cached_smc.get("action") == act_norm:
                 smc_sl = float(cached_smc.get("sl_price", 0.0) or 0.0)
                 smc_tp = float(cached_smc.get("tp_price", 0.0) or 0.0)
+                partial_tp = float(cached_smc.get("partial_tp_price", 0.0) or 0.0)
+                be_price = float(cached_smc.get("be_price", 0.0) or 0.0)
                 curr_p = current_price if current_price > 0 else float(cached_smc.get("entry_price", 0.0) or 0.0)
                 if smc_sl > 0 and smc_tp > 0 and curr_p > 0:
                     if (act_norm == "BUY" and smc_sl < curr_p < smc_tp) or (act_norm == "SELL" and smc_tp < curr_p < smc_sl):
@@ -509,6 +511,8 @@ class MT5QuantumSignalCitadel:
                         return {
                             "sl_price": round(smc_sl, digits),
                             "tp_price": round(smc_tp, digits),
+                            "partial_tp_price": round(partial_tp, digits) if partial_tp > 0 else 0.0,
+                            "be_price": round(be_price, digits) if be_price > 0 else 0.0,
                             "sl_dist": sl_dist,
                             "tp_dist": tp_dist,
                             "risk_usd": round(sl_dist * 1.0, 2),
@@ -1155,6 +1159,8 @@ class MT5BridgeEngine:
 
             if not compliant:
                 now_ts = time.time()
+                if getattr(session, "breach_timestamp", 0.0) <= 0.0:
+                    session.breach_timestamp = now_ts
                 last_breach_alert = self._last_auth_log.get(f"prop_breach_{account_id}", 0.0)
                 if session.status != "LOCKED_PROP_BREACH" or (now_ts - last_breach_alert >= 60.0):
                     self._last_auth_log[f"prop_breach_{account_id}"] = now_ts
@@ -1171,6 +1177,7 @@ class MT5BridgeEngine:
                     }
                     self._send_raw_socket(sock, emergency_msg)
             else:
+                session.breach_timestamp = 0.0
                 if session.status == "LOCKED_PROP_BREACH":
                     session.status = "ONLINE"
 
@@ -1244,6 +1251,14 @@ class MT5BridgeEngine:
 
         db.update_mt5_bridge_order_close(ticket=ticket, close_price=close_price, pnl=pnl, status=status)
         logger.info(f"💰 [MT5 ORDER CLOSED] Account {account_id} closed #{ticket}! Symbol: {symbol or 'N/A'}, Close Price: {close_price}, PnL: ${pnl:+,.2f}")
+
+        # Self-Auto Training Feedback for MT5SMCCitadelEngine
+        try:
+            from mt5_smc_citadel import MT5SMCCitadelEngine
+            act = str(meta.get("action", "BUY")).upper()
+            MT5SMCCitadelEngine.record_trade_outcome(symbol=symbol, action=act, won=(pnl >= 0.0), pnl=pnl)
+        except Exception:
+            pass
 
         # Real-time Virtual Multi-User Ledger Profit Harvester & Treasury Inflow Engine (Invariant 44)
         try:
@@ -2123,8 +2138,11 @@ class MT5BridgeEngine:
                     for acc_id, session in self.clients.items():
                         if not session.is_prop_compliant:
                             breach_t = getattr(session, "breach_timestamp", 0.0)
+                            if breach_t <= 0.0:
+                                session.breach_timestamp = now
+                                breach_t = now
                             cooling_limit = 60.0 if session.equity >= (session.daily_start_equity * 0.88) else 120.0
-                            if breach_t > 0 and (now - breach_t) >= cooling_limit:
+                            if (now - breach_t) >= cooling_limit:
                                 logger.info(f"🛡️ [WATCHDOG HEALER] Auto-healing Prop Compliance for Account {acc_id} after {int(now - breach_t)}s cooling-off!")
                                 self.reset_prop_compliance(acc_id)
                                 session.breach_timestamp = 0.0
@@ -2144,7 +2162,22 @@ class MT5BridgeEngine:
                                 except Exception:
                                     pass
 
-                # 1.1 Autonomous Auto-Healer for Symbol Lockout (Anti-Permanent Lockout)
+                # 1.1 Autonomous Midnight 00:00:00 UTC Reset for All Accounts (Daily Baseline Reset)
+                current_utc_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                if getattr(self, "_last_daily_reset_date", "") != current_utc_date:
+                    self._last_daily_reset_date = current_utc_date
+                    with self._clients_lock:
+                        for acc_id, session in self.clients.items():
+                            cur_b = session.equity if session.equity > 0 else session.balance
+                            if cur_b > 0:
+                                session.daily_start_equity = cur_b
+                                session.initial_balance = cur_b
+                                session.is_prop_compliant = True
+                                session.status = "ONLINE"
+                                session.breach_timestamp = 0.0
+                                logger.info(f"🌅 [MIDNIGHT 00:00 UTC BASELINE RESET] Account {acc_id} baseline reset to ${cur_b:,.2f} for new trading day!")
+
+                # 1.2 Autonomous Auto-Healer for Symbol Lockout (Anti-Permanent Lockout)
                 expired_locks = [k for k, exp in list(self._symbol_lockout_until.items()) if now >= exp]
                 for k in expired_locks:
                     self._symbol_lockout_until.pop(k, None)
@@ -2399,6 +2432,14 @@ class MT5BridgeEngine:
                             logger.info(f"{log_icon} Ticket #{ticket} ({sym}) | {reason}! Executing 0.5ms market close...")
                             self.dispatch_close(ticket=ticket, symbol=sym, comment=f"AI_HARVEST_{profit:+.2f}", target_account=acc_id)
                             self._ticket_peak_profit.pop(ticket, None)
+
+                            # Record trade outcome for Self-Auto Training in MT5SMCCitadelEngine
+                            try:
+                                from mt5_smc_citadel import MT5SMCCitadelEngine
+                                act_p = str(p.get("type", "BUY")).upper()
+                                MT5SMCCitadelEngine.record_trade_outcome(symbol=sym, action=act_p, won=(profit >= 0.0), pnl=profit)
+                            except Exception:
+                                pass
                             try:
                                 if chat_id:
                                     clean_reason = html.escape(str(reason))
@@ -2443,8 +2484,11 @@ class MT5BridgeEngine:
                     # Dynamic Self-Healing: Check if session breached prop and if cooling off finished
                     if not session.is_prop_compliant:
                         breach_t = getattr(session, "breach_timestamp", 0.0)
+                        if breach_t <= 0.0:
+                            session.breach_timestamp = now_ts
+                            breach_t = now_ts
                         cooling_limit = 60.0 if session.equity >= (session.daily_start_equity * 0.88) else 120.0
-                        if breach_t > 0 and (now_ts - breach_t) >= cooling_limit:
+                        if (now_ts - breach_t) >= cooling_limit:
                             logger.info(f"🛡️ [AUTO-HEALER] Cooling-off complete for account {acc_id} ({int(now_ts - breach_t)}s). Resetting baseline and resuming auto 24/7!")
                             self.reset_prop_compliance(acc_id)
                             session.breach_timestamp = 0.0

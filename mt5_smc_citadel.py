@@ -42,6 +42,67 @@ class MT5SMCCitadelEngine:
     # Latest Confluence Analysis Cache: { symbol: result_dict }
     _LAST_ANALYSIS: Dict[str, Dict[str, Any]] = {}
 
+    # Adaptive Self-Auto Training Concept Weights (Continuous Hebbian/RL Adaptation)
+    _SMC_CONCEPT_WEIGHTS: Dict[str, float] = {
+        "H4_MACRO": 20.0,
+        "H4_OB": 15.0,
+        "H1_BOS_CHOCH": 15.0,
+        "H1_FVG": 12.0,
+        "M30_SND": 12.0,
+        "M15_SWEEP": 25.0,
+        "M15_FAKEOUT": 15.0,
+        "M15_OB": 15.0,
+        "M15_FVG": 12.0,
+        "M15_CHOCH": 15.0,
+        "EQUILIBRIUM_OTE": 20.0,
+        "IDM_SWEEP": 15.0,
+        "KILL_ZONE": 12.0
+    }
+    _PERFORMANCE_HISTORY: List[Dict[str, Any]] = []
+
+    @classmethod
+    def get_concept_weight(cls, concept_key: str, default_val: float) -> float:
+        """Returns adaptive trained weight for a concept."""
+        return cls._SMC_CONCEPT_WEIGHTS.get(concept_key, default_val)
+
+    @classmethod
+    def record_trade_outcome(cls, symbol: str, action: str, won: bool, pnl: float = 0.0) -> Dict[str, Any]:
+        """
+        Self-Auto Training & Calibration Engine:
+        Reinforcement Weight Update: Continuously adjusts SMC concept weights
+        based on empirical win/loss outcomes across live trades.
+        """
+        clean = cls.clean_symbol(symbol)
+        last_rec = cls._LAST_ANALYSIS.get(clean) or cls._LAST_ANALYSIS.get(symbol.upper().strip()) or {}
+        factors = last_rec.get("confluence_factors", [])
+        
+        lr = 0.8  # Learning rate / adaptation step
+        delta = lr if won else -lr
+        
+        updated_concepts = []
+        for factor in factors:
+            for k in cls._SMC_CONCEPT_WEIGHTS:
+                if k.lower() in factor.lower() or factor.lower().startswith(k.lower()[:4]):
+                    old_w = cls._SMC_CONCEPT_WEIGHTS[k]
+                    new_w = round(max(5.0, min(35.0, old_w + delta)), 2)
+                    cls._SMC_CONCEPT_WEIGHTS[k] = new_w
+                    updated_concepts.append((k, new_w))
+                    
+        res = {
+            "symbol": clean,
+            "action": action,
+            "won": won,
+            "pnl": pnl,
+            "updated_concepts": updated_concepts,
+            "timestamp": time.time()
+        }
+        cls._PERFORMANCE_HISTORY.append(res)
+        if len(cls._PERFORMANCE_HISTORY) > 200:
+            cls._PERFORMANCE_HISTORY.pop(0)
+            
+        logger.info(f"🧠 [SMC SELF-AUTO TRAINING] {clean} ({action}) Outcome: {'WON' if won else 'LOSS'} (${pnl:+.2f}) | Adapted Weights: {updated_concepts}")
+        return res
+
     @classmethod
     def get_cached_analysis(cls, symbol: str) -> Optional[Dict[str, Any]]:
         """Returns the most recent SMC analysis for a symbol if within 180s."""
@@ -632,13 +693,104 @@ class MT5SMCCitadelEngine:
         }
 
     # =========================================================================
-    # MASTER 9 SMC MULTI-TIMEFRAME SYNTHESIS (M15, M30, H1, H4)
+    # CONCEPT 10: ICT DEALING RANGE EQUILIBRIUM & OPTIMAL TRADE ENTRY (OTE)
+    # =========================================================================
+    @classmethod
+    def detect_dealing_range_equilibrium(cls, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Calculates ICT Dealing Range Equilibrium (50%) and Optimal Trade Entry (OTE 61.8% - 78.6%):
+          - Premium Zone: Upper 50% (High probability selling, strictly blocks long expansion)
+          - Discount Zone: Lower 50% (High probability buying, strictly blocks short dumping)
+          - Bullish OTE: 61.8% to 78.6% retracement in discount
+          - Bearish OTE: 61.8% to 78.6% retracement in premium
+        """
+        default_res = {
+            "range_high": 0.0,
+            "range_low": 0.0,
+            "eq": 0.0,
+            "current_price": 0.0,
+            "pct_in_range": 50.0,
+            "zone": "EQUILIBRIUM",
+            "ote_bullish": False,
+            "ote_bearish": False
+        }
+        if df is None or len(df) < 15:
+            return default_res
+
+        highs = df['high'].values
+        lows = df['low'].values
+        closes = df['close'].values
+        current_price = float(closes[-1])
+
+        range_high = float(np.max(highs[-30:]))
+        range_low = float(np.min(lows[-30:]))
+        full_range = range_high - range_low
+        if full_range <= 0:
+            return default_res
+
+        eq = range_low + (full_range * 0.50)
+        pct_in_range = ((current_price - range_low) / full_range) * 100.0
+
+        # Bullish OTE: Deep retracement into discount (between 21.4% and 42.0% from bottom)
+        ote_bullish = (21.4 <= pct_in_range <= 42.0)
+        # Bearish OTE: Deep retracement into premium (between 58.0% and 78.6% from bottom)
+        ote_bearish = (58.0 <= pct_in_range <= 78.6)
+
+        zone = "PREMIUM" if current_price > eq else ("DISCOUNT" if current_price < eq else "EQUILIBRIUM")
+        return {
+            "range_high": range_high,
+            "range_low": range_low,
+            "eq": eq,
+            "current_price": current_price,
+            "pct_in_range": round(pct_in_range, 1),
+            "zone": zone,
+            "ote_bullish": ote_bullish,
+            "ote_bearish": ote_bearish
+        }
+
+    # =========================================================================
+    # CONCEPT 11: INDUCEMENT (IDM) & LIQUIDITY TRAP SWEEPS
+    # =========================================================================
+    @classmethod
+    def detect_inducement_sweep(cls, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Detects Smart Money Inducement (IDM) Sweeps:
+        Minor swing pullback (retail bait) swept before tapping the major order block.
+        Prevents early entry traps.
+        """
+        res = {"bullish_idm_swept": False, "bearish_idm_swept": False, "idm_level": 0.0, "reason": "NONE"}
+        if df is None or len(df) < 12:
+            return res
+
+        highs = df['high'].values
+        lows = df['low'].values
+        closes = df['close'].values
+        current_close = float(closes[-1])
+
+        # Minor pullback low inside the last 6-8 bars
+        minor_low = float(np.min(lows[-7:-2]))
+        minor_high = float(np.max(highs[-7:-2]))
+
+        # Bullish IDM sweep: previous candle dipped below minor_low and current close is above it
+        if float(lows[-1]) < minor_low and current_close > minor_low:
+            res["bullish_idm_swept"] = True
+            res["idm_level"] = minor_low
+            res["reason"] = f"Bullish_IDM_Swept_{minor_low:.5f}"
+        elif float(highs[-1]) > minor_high and current_close < minor_high:
+            res["bearish_idm_swept"] = True
+            res["idm_level"] = minor_high
+            res["reason"] = f"Bearish_IDM_Swept_{minor_high:.5f}"
+
+        return res
+
+    # =========================================================================
+    # MASTER 11 SMC INSTITUTIONAL MULTI-TIMEFRAME SYNTHESIS (M15, M30, H1, H4)
     # =========================================================================
     @classmethod
     def analyze_9_smc_confluence(cls, symbol: str) -> Dict[str, Any]:
         """
-        Unified Institutional Synthesis across all 9 Smart Money Concepts on M15, M30, H1, H4:
-        Evaluates Macro Trend, Structure, Order Blocks, FVGs, Liquidity Sweeps, and Kill Zones.
+        Unified Institutional Synthesis across all 11 Smart Money Concepts on M15, M30, H1, H4:
+        Evaluates Macro Trend, Equilibrium/OTE, Order Blocks, FVGs, Inducements, Liquidity Sweeps, and Kill Zones.
         Returns:
           {
             "action": "BUY" | "SELL" | "WAIT",
@@ -647,6 +799,8 @@ class MT5SMCCitadelEngine:
             "entry_price": float,
             "sl_price": float,
             "tp_price": float,
+            "partial_tp_price": float,
+            "be_price": float,
             "rr_ratio": float,
             "confluence_factors": list
           }
@@ -658,6 +812,8 @@ class MT5SMCCitadelEngine:
             "entry_price": 0.0,
             "sl_price": 0.0,
             "tp_price": 0.0,
+            "partial_tp_price": 0.0,
+            "be_price": 0.0,
             "rr_ratio": 0.0,
             "confluence_factors": []
         }
@@ -689,59 +845,92 @@ class MT5SMCCitadelEngine:
         # ---------------------------------------------------------------------
         # H4 & H1 MACRO STRUCTURE (Macro Bias, Major OBs, Major SnD)
         # ---------------------------------------------------------------------
+        h4_bos = {"bullish_bos": False, "bearish_bos": False}
+        h4_choch = {"bullish_choch": False, "bearish_choch": False}
+        h4_obs = []
+
         if df_h4 is not None and len(df_h4) >= 10:
             h4_bos = cls.detect_bos(df_h4)
             h4_choch = cls.detect_choch(df_h4)
             h4_obs = cls.detect_order_blocks(df_h4)
 
+            w_h4_macro = cls.get_concept_weight("H4_MACRO", 20.0)
             if h4_bos["bullish_bos"] or h4_choch["bullish_choch"]:
-                bullish_score += 20.0
+                bullish_score += w_h4_macro
                 confluence_factors.append("H4_Macro_Bullish_Structure")
             elif h4_bos["bearish_bos"] or h4_choch["bearish_choch"]:
-                bearish_score += 20.0
+                bearish_score += w_h4_macro
                 confluence_factors.append("H4_Macro_Bearish_Structure")
 
             # Check if testing H4 Order Block
+            w_h4_ob = cls.get_concept_weight("H4_OB", 15.0)
             for ob in h4_obs:
                 if ob["is_testing"] and ob["type"] == "BULLISH_OB":
-                    bullish_score += 15.0
+                    bullish_score += w_h4_ob
                     confluence_factors.append("H4_Bullish_OB_Retest")
                 elif ob["is_testing"] and ob["type"] == "BEARISH_OB":
-                    bearish_score += 15.0
+                    bearish_score += w_h4_ob
                     confluence_factors.append("H4_Bearish_OB_Retest")
 
         if df_h1 is not None and len(df_h1) >= 10:
             h1_bos = cls.detect_bos(df_h1)
             h1_choch = cls.detect_choch(df_h1)
             h1_fvgs = cls.detect_fair_value_gaps(df_h1)
-            h1_lps = cls.detect_liquidity_pools(df_h1)
 
+            w_h1_bos = cls.get_concept_weight("H1_BOS_CHOCH", 15.0)
             if h1_bos["bullish_bos"] or h1_choch["bullish_choch"]:
-                bullish_score += 15.0
+                bullish_score += w_h1_bos
                 confluence_factors.append("H1_Bullish_BOS_CHoCH")
             elif h1_bos["bearish_bos"] or h1_choch["bearish_choch"]:
-                bearish_score += 15.0
+                bearish_score += w_h1_bos
                 confluence_factors.append("H1_Bearish_BOS_CHoCH")
 
+            w_h1_fvg = cls.get_concept_weight("H1_FVG", 12.0)
             for fvg in h1_fvgs:
                 if fvg["is_testing"] and fvg["type"] == "BULLISH_FVG":
-                    bullish_score += 12.0
+                    bullish_score += w_h1_fvg
                     confluence_factors.append("H1_Bullish_FVG_Mitigation")
                 elif fvg["is_testing"] and fvg["type"] == "BEARISH_FVG":
-                    bearish_score += 12.0
+                    bearish_score += w_h1_fvg
                     confluence_factors.append("H1_Bearish_FVG_Mitigation")
 
         # ---------------------------------------------------------------------
-        # M30 & M15 EXECUTION (Liquidity Sweep, Order Block, SnD, CHoCH)
+        # CONCEPT 10: ICT DEALING RANGE EQUILIBRIUM & OTE VALUATION
+        # ---------------------------------------------------------------------
+        ref_df_eq = df_h1 if df_h1 is not None and len(df_h1) >= 15 else df_m15
+        eq_info = cls.detect_dealing_range_equilibrium(ref_df_eq)
+        eq_zone = eq_info.get("zone", "EQUILIBRIUM")
+        w_ote = cls.get_concept_weight("EQUILIBRIUM_OTE", 20.0)
+
+        if eq_zone == "DISCOUNT":
+            bullish_score += w_ote * 0.7
+            confluence_factors.append(f"Discount_Zone_{eq_info.get('pct_in_range', 50)}%")
+            if eq_info.get("ote_bullish"):
+                bullish_score += w_ote * 0.5
+                confluence_factors.append("Bullish_OTE_618_786_Zone")
+            # Strictly penalize selling in discount
+            bearish_score = max(0.0, bearish_score - 20.0)
+        elif eq_zone == "PREMIUM":
+            bearish_score += w_ote * 0.7
+            confluence_factors.append(f"Premium_Zone_{eq_info.get('pct_in_range', 50)}%")
+            if eq_info.get("ote_bearish"):
+                bearish_score += w_ote * 0.5
+                confluence_factors.append("Bearish_OTE_618_786_Zone")
+            # Strictly penalize buying in premium
+            bullish_score = max(0.0, bullish_score - 20.0)
+
+        # ---------------------------------------------------------------------
+        # M30 & M15 EXECUTION (Liquidity Sweep, Order Block, SnD, CHoCH, IDM)
         # ---------------------------------------------------------------------
         if df_m30 is not None and len(df_m30) >= 10:
             m30_snd = cls.detect_supply_demand_zones(df_m30)
+            w_m30_snd = cls.get_concept_weight("M30_SND", 12.0)
             for z in m30_snd:
                 if z["is_testing"] and z["type"] == "DEMAND":
-                    bullish_score += 12.0
+                    bullish_score += w_m30_snd
                     confluence_factors.append(f"M30_Demand_{z['pattern']}_Tap")
                 elif z["is_testing"] and z["type"] == "SUPPLY":
-                    bearish_score += 12.0
+                    bearish_score += w_m30_snd
                     confluence_factors.append(f"M30_Supply_{z['pattern']}_Tap")
 
         # M15 Precision Trigger (Sniper Level)
@@ -751,54 +940,86 @@ class MT5SMCCitadelEngine:
         m15_sweep = cls.detect_stop_loss_hunting(df_m15, m15_lps)
         m15_fakeout = cls.detect_false_breakouts(df_m15)
         m15_choch = cls.detect_choch(df_m15)
+        idm_info = cls.detect_inducement_sweep(df_m15)
 
         # Concept 7: Liquidity Sweep (Turtle Soup)
+        w_sweep = cls.get_concept_weight("M15_SWEEP", 25.0)
         if m15_sweep["bullish_sweep"]:
-            bullish_score += 25.0
+            bullish_score += w_sweep
             confluence_factors.append(m15_sweep["reason"])
         elif m15_sweep["bearish_sweep"]:
-            bearish_score += 25.0
+            bearish_score += w_sweep
             confluence_factors.append(m15_sweep["reason"])
 
         # Concept 8: False Breakout (Judas Swing)
+        w_fakeout = cls.get_concept_weight("M15_FAKEOUT", 15.0)
         if m15_fakeout["bullish_fakeout"]:
-            bullish_score += 15.0
+            bullish_score += w_fakeout
             confluence_factors.append(m15_fakeout["reason"])
         elif m15_fakeout["bearish_fakeout"]:
-            bearish_score += 15.0
+            bearish_score += w_fakeout
             confluence_factors.append(m15_fakeout["reason"])
 
+        # Concept 11: Inducement Sweep (IDM)
+        w_idm = cls.get_concept_weight("IDM_SWEEP", 15.0)
+        if idm_info.get("bullish_idm_swept"):
+            bullish_score += w_idm
+            confluence_factors.append(idm_info["reason"])
+        elif idm_info.get("bearish_idm_swept"):
+            bearish_score += w_idm
+            confluence_factors.append(idm_info["reason"])
+
         # Concept 1 & 2 on M15: Order Block & FVG
+        w_m15_ob = cls.get_concept_weight("M15_OB", 15.0)
         for ob in m15_obs:
             if ob["is_testing"] and ob["type"] == "BULLISH_OB":
-                bullish_score += 15.0
+                bullish_score += w_m15_ob
                 confluence_factors.append("M15_Bullish_OB_Test")
             elif ob["is_testing"] and ob["type"] == "BEARISH_OB":
-                bearish_score += 15.0
+                bearish_score += w_m15_ob
                 confluence_factors.append("M15_Bearish_OB_Test")
 
+        w_m15_fvg = cls.get_concept_weight("M15_FVG", 12.0)
         for fvg in m15_fvgs:
             if fvg["is_testing"] and fvg["type"] == "BULLISH_FVG":
-                bullish_score += 12.0
+                bullish_score += w_m15_fvg
                 confluence_factors.append("M15_Bullish_FVG_Fill")
             elif fvg["is_testing"] and fvg["type"] == "BEARISH_FVG":
-                bearish_score += 12.0
+                bearish_score += w_m15_fvg
                 confluence_factors.append("M15_Bearish_FVG_Fill")
 
+        w_m15_choch = cls.get_concept_weight("M15_CHOCH", 15.0)
         if m15_choch["bullish_choch"]:
-            bullish_score += 15.0
+            bullish_score += w_m15_choch
             confluence_factors.append("M15_Bullish_CHoCH_Trigger")
         elif m15_choch["bearish_choch"]:
-            bearish_score += 15.0
+            bearish_score += w_m15_choch
             confluence_factors.append("M15_Bearish_CHoCH_Trigger")
 
         # ---------------------------------------------------------------------
-        # EVALUATE CONFLUENCE DECISION (Strict 95% Institutional Target)
+        # MULTI-TIMEFRAME MACRO ALIGNMENT GATE
+        # ---------------------------------------------------------------------
+        h4_is_bearish = (df_h4 is not None and len(df_h4) >= 10 and (h4_bos.get("bearish_bos") or h4_choch.get("bearish_choch")))
+        h4_is_bullish = (df_h4 is not None and len(df_h4) >= 10 and (h4_bos.get("bullish_bos") or h4_choch.get("bullish_choch")))
+        testing_h4_demand = any(ob.get("is_testing") and ob.get("type") == "BULLISH_OB" for ob in h4_obs) if df_h4 is not None else False
+        testing_h4_supply = any(ob.get("is_testing") and ob.get("type") == "BEARISH_OB" for ob in h4_obs) if df_h4 is not None else False
+
+        # If H4 is strongly Bearish, block M15 BUY unless tapping major H4 Demand!
+        if h4_is_bearish and not testing_h4_demand:
+            bullish_score = min(bullish_score, 45.0)
+        # If H4 is strongly Bullish, block M15 SELL unless tapping major H4 Supply!
+        if h4_is_bullish and not testing_h4_supply:
+            bearish_score = min(bearish_score, 45.0)
+
+        # ---------------------------------------------------------------------
+        # EVALUATE CONFLUENCE DECISION (Strict 95%+ Institutional Target)
         # ---------------------------------------------------------------------
         action = "WAIT"
         confidence = 50.0
         sl_price = 0.0
         tp_price = 0.0
+        partial_tp_price = 0.0
+        be_price = 0.0
         rr_ratio = 0.0
 
         # Calculate local ATR for SL/TP positioning
@@ -808,29 +1029,69 @@ class MT5SMCCitadelEngine:
         tr_list = [max(m15_highs[i] - m15_lows[i], abs(m15_highs[i] - m15_closes[i-1]), abs(m15_lows[i] - m15_closes[i-1])) for i in range(1, len(m15_closes))]
         m15_atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else (current_price * 0.002)
 
-        if bullish_score >= 65.0 and (bullish_score - bearish_score) >= 25.0:
+        if bullish_score >= 68.0 and (bullish_score - bearish_score) >= 25.0 and eq_zone != "PREMIUM":
             action = "BUY"
-            confidence = min(96.0, 85.0 + ((bullish_score - 65.0) / 35.0) * 11.0)
+            confidence = min(96.5, 88.0 + ((bullish_score - 68.0) / 32.0) * 8.5)
             # SL strictly below recent M15 swing low / swept level
             local_low = min(m15_lows[-5:])
             sl_price = round(local_low - (m15_atr * 0.5), 5)
             risk_dist = max(current_price * 0.001, current_price - sl_price)
-            # TP target: 1:3.0 Asymmetric Reward
-            tp_price = round(current_price + (risk_dist * 3.0), 5)
-            rr_ratio = round((tp_price - current_price) / max(0.00001, current_price - sl_price), 2)
 
-        elif bearish_score >= 65.0 and (bearish_score - bullish_score) >= 25.0:
+            # Structural TP target: look for nearest opposing H1/H4 Supply zone or EQH (BSL pool)
+            structural_hurdles = []
+            if df_h1 is not None:
+                for z in cls.detect_supply_demand_zones(df_h1):
+                    if z.get("type") == "SUPPLY" and z.get("bottom", 0.0) > current_price:
+                        structural_hurdles.append(z["bottom"])
+            for bsl in m15_lps.get("bsl_pools", []):
+                if bsl > current_price:
+                    structural_hurdles.append(bsl)
+
+            if structural_hurdles and min(structural_hurdles) > (current_price + risk_dist * 1.5):
+                tp_price = round(min(structural_hurdles), 5)
+            else:
+                tp_price = round(current_price + (risk_dist * 3.0), 5)
+
+            rr_ratio = round((tp_price - current_price) / max(0.00001, current_price - sl_price), 2)
+            if rr_ratio < 1.8:
+                action = "WAIT"
+                confidence = 50.0
+
+            partial_tp_price = round(current_price + (risk_dist * 1.5), 5)
+            be_price = round(current_price + (current_price * 0.0002), 5)
+
+        elif bearish_score >= 68.0 and (bearish_score - bullish_score) >= 25.0 and eq_zone != "DISCOUNT":
             action = "SELL"
-            confidence = min(96.0, 85.0 + ((bearish_score - 65.0) / 35.0) * 11.0)
+            confidence = min(96.5, 88.0 + ((bearish_score - 68.0) / 32.0) * 8.5)
             # SL strictly above recent M15 swing high / swept level
             local_high = max(m15_highs[-5:])
             sl_price = round(local_high + (m15_atr * 0.5), 5)
             risk_dist = max(current_price * 0.001, sl_price - current_price)
-            # TP target: 1:3.0 Asymmetric Reward
-            tp_price = round(current_price - (risk_dist * 3.0), 5)
-            rr_ratio = round((current_price - tp_price) / max(0.00001, sl_price - current_price), 2)
 
-        reason_str = f"SMC_9Concepts_{action}_{confidence:.0f}%_RR{rr_ratio}:1_{'_'.join(confluence_factors[:4])}"
+            # Structural TP target: look for nearest opposing H1/H4 Demand zone or EQL (SSL pool)
+            structural_hurdles = []
+            if df_h1 is not None:
+                for z in cls.detect_supply_demand_zones(df_h1):
+                    if z.get("type") == "DEMAND" and z.get("top", 0.0) < current_price:
+                        structural_hurdles.append(z["top"])
+            for ssl in m15_lps.get("ssl_pools", []):
+                if ssl < current_price:
+                    structural_hurdles.append(ssl)
+
+            if structural_hurdles and max(structural_hurdles) < (current_price - risk_dist * 1.5):
+                tp_price = round(max(structural_hurdles), 5)
+            else:
+                tp_price = round(current_price - (risk_dist * 3.0), 5)
+
+            rr_ratio = round((current_price - tp_price) / max(0.00001, sl_price - current_price), 2)
+            if rr_ratio < 1.8:
+                action = "WAIT"
+                confidence = 50.0
+
+            partial_tp_price = round(current_price - (risk_dist * 1.5), 5)
+            be_price = round(current_price - (current_price * 0.0002), 5)
+
+        reason_str = f"SMC_11Concepts_{action}_{confidence:.0f}%_RR{rr_ratio}:1_{'_'.join(confluence_factors[:4])}"
 
         clean_sym = symbol.replace("/", "").replace("_", "").replace("-", "").upper().strip()
         res = {
@@ -841,11 +1102,14 @@ class MT5SMCCitadelEngine:
             "entry_price": current_price,
             "sl_price": sl_price,
             "tp_price": tp_price,
+            "partial_tp_price": partial_tp_price,
+            "be_price": be_price,
             "rr_ratio": rr_ratio,
             "confluence_factors": confluence_factors,
             "bullish_score": bullish_score,
             "bearish_score": bearish_score,
             "kill_zone": kz_info["active_zone"],
+            "equilibrium_zone": eq_zone,
             "timestamp": time.time()
         }
         cls._LAST_ANALYSIS[symbol.upper().strip()] = res
