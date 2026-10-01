@@ -1295,7 +1295,7 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         pnl_info = trading_engine.get_futures_position_pnl(api_key, api_secret, symbol)
         if pnl_info.get("has_position") and pnl_info.get("side") == side.upper():
             print(f"🛡️ [TURBO HEDGE OVERTRADE GUARD] {symbol} {side} position is already active on Binance. Skipping duplicate order stacking.")
-            return {"status": "success", "message": "Position already active"}
+            return {"status": "skipped", "reason": "POSITION_ALREADY_ACTIVE", "message": "Position already active"}
 
         # 🛡️ ANTI-OVERSOLD SHORT GUARD: Strictly block SELL / SHORT if 15m RSI <= 38.0
         if side.upper() == "SELL":
@@ -1397,7 +1397,7 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
                 except Exception as ex:
                     print(f"Auto-prune DB error: {ex}")
 
-        if isinstance(res, dict) and (res.get("status") in ["success", "NEW", "FILLED"] or res.get("orderId")):
+        if isinstance(res, dict) and (res.get("orderId") or (res.get("status") in ["success", "NEW", "FILLED"] and res.get("status") != "skipped" and "already active" not in str(res.get("message", "")).lower())):
             db.update_system_setting(f"turbo_hedge_{chat_id}_{symbol}_initiated_by_bot", "1")
             if chat_id > 0:
                 try:

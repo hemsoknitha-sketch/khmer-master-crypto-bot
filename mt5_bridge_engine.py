@@ -1287,6 +1287,23 @@ class MT5BridgeEngine:
                     "👉 សូមបញ្ចូលទុនបន្ថែម (Top-up) ទៅក្នុងគណនី MT5 ដើម្បីបន្តដំណើរការ Trade!"
                 )
                 _dispatch_telegram_alert(admin_chat_id, help_text)
+            elif retcode == 10006:
+                clean_sym = normalize_mt5_symbol(symbol)
+                self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 600.0
+                self._symbol_lockout_until[f"{account_id}_{clean_sym}"] = now_ts + 600.0
+                logger.warning(f"⚠️ [SYMBOL NOT FOUND LOCK] Account #{account_id} symbol '{symbol}' locked for 10m to prevent log spam.")
+            elif retcode == 10015:
+                clean_sym = normalize_mt5_symbol(symbol)
+                self._symbol_lockout_until[f"{account_id}_{symbol}"] = now_ts + 120.0
+                self._symbol_lockout_until[f"{account_id}_{clean_sym}"] = now_ts + 120.0
+                logger.warning(f"⚠️ [INVALID PRICE LOCK] Account #{account_id} symbol '{symbol}' cooling down for 2m.")
+            elif retcode == 10031:
+                self._account_trade_disabled_until[str(account_id)] = now_ts + 60.0
+                with self._clients_lock:
+                    s_cli = self.clients.get(account_id)
+                    if s_cli:
+                        s_cli.is_broker_connected = False
+                logger.warning(f"⚠️ [NO CONNECTION LOCK] Account #{account_id} terminal lost broker connection. 60s cooldown applied.")
 
         # Auto-Healer: If rejection is due to local EA prop breach, calibrate baseline & resume immediately
         if "PROP_BREACH" in reason or "PROP_BREACH_LOCAL" in reason:
@@ -1495,6 +1512,36 @@ class MT5BridgeEngine:
                 except Exception:
                     pass
 
+        # Check Account-Level Trade Disabled Cooldown (Retcode 10017) & Symbol Lockout
+        now_ts = time.time()
+        if target_account and str(target_account) != "BROADCAST":
+            disabled_until = self._account_trade_disabled_until.get(str(target_account), 0.0)
+            if now_ts < disabled_until:
+                rem_m = max(1, int((disabled_until - now_ts) / 60.0))
+                logger.debug(f"⏳ [DISPATCH GUARD] Account #{target_account} is in cooldown ({rem_m}m remaining) due to Retcode 10017 (Trade Disabled). Skipping dispatch.")
+                return {
+                    "success": False,
+                    "status": "account_disabled_cooldown",
+                    "account_id": target_account,
+                    "reason": "RETCODE_10017_COOLDOWN",
+                    "clients_reached": 0
+                }
+
+            lockout_t = max(
+                self._symbol_lockout_until.get(f"{target_account}_{sym_norm}", 0.0),
+                self._symbol_lockout_until.get(f"{target_account}_{symbol}", 0.0)
+            )
+            if now_ts < lockout_t:
+                rem_m = max(1, int((lockout_t - now_ts) / 60.0))
+                logger.debug(f"⏳ [DISPATCH GUARD] Account #{target_account} Symbol {sym_norm} is in lockout ({rem_m}m remaining). Skipping dispatch.")
+                return {
+                    "success": False,
+                    "status": "symbol_lockout",
+                    "account_id": target_account,
+                    "reason": "SYMBOL_LOCKOUT",
+                    "clients_reached": 0
+                }
+
         # Small Capital Suicide Lot Clamp (Invariants 1.1, 8, 33)
         # Prevents dangerous over-leveraging where manual Web or Telegram orders request 1.0+ lot on a sub-$50 account
         if target_account and target_account in self.clients:
@@ -1603,6 +1650,8 @@ class MT5BridgeEngine:
                     target_found = True
                     if not session.is_prop_compliant:
                         skipped_prop = True
+                        continue
+                    if now_ts < self._account_trade_disabled_until.get(str(acc_id), 0.0):
                         continue
                     if session.socket_conn:
                         if self._send_session_order(session, payload, sym_norm):

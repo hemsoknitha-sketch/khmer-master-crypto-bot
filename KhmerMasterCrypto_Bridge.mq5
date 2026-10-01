@@ -681,87 +681,102 @@ void HandleOrderSend(const string json)
    double fill_price = 0.0;
 
    StringToUpper(action_req);
+   ENUM_SYMBOL_TRADE_EXECUTION exec_mode = (ENUM_SYMBOL_TRADE_EXECUTION)SymbolInfoInteger(symbol, SYMBOL_TRADE_EXECUTION);
+   double order_price = (exec_mode == SYMBOL_TRADE_EXECUTION_MARKET) ? 0.0 : ((action_req == "BUY") ? ask : bid);
+
    if(action_req == "BUY")
    {
       ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-      success = m_trade.Buy(lot, symbol, ask, sl, tp, comment);
+      success = m_trade.Buy(lot, symbol, order_price, sl, tp, comment);
       if(!success)
       {
          // Retry with IOC
          m_trade.SetTypeFilling(ORDER_FILLING_IOC);
-         ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-         success = m_trade.Buy(lot, symbol, ask, sl, tp, comment);
+         success = m_trade.Buy(lot, symbol, order_price, sl, tp, comment);
       }
       if(!success)
       {
          // Retry with RETURN
          m_trade.SetTypeFilling(ORDER_FILLING_RETURN);
-         ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-         success = m_trade.Buy(lot, symbol, ask, sl, tp, comment);
+         success = m_trade.Buy(lot, symbol, order_price, sl, tp, comment);
       }
-      fill_price = ask;
+      fill_price = SymbolInfoDouble(symbol, SYMBOL_ASK);
    }
    else if(action_req == "SELL")
    {
       bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-      success = m_trade.Sell(lot, symbol, bid, sl, tp, comment);
+      success = m_trade.Sell(lot, symbol, order_price, sl, tp, comment);
       if(!success)
       {
+         // Retry with IOC
          m_trade.SetTypeFilling(ORDER_FILLING_IOC);
-         bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-         success = m_trade.Sell(lot, symbol, bid, sl, tp, comment);
+         success = m_trade.Sell(lot, symbol, order_price, sl, tp, comment);
       }
       if(!success)
       {
+         // Retry with RETURN
          m_trade.SetTypeFilling(ORDER_FILLING_RETURN);
-         bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-         success = m_trade.Sell(lot, symbol, bid, sl, tp, comment);
+         success = m_trade.Sell(lot, symbol, order_price, sl, tp, comment);
       }
-      fill_price = bid;
+      fill_price = SymbolInfoDouble(symbol, SYMBOL_BID);
    }
 
-   // 4. RETCODE 10016 ZERO-STOP SHIELD: Fallback for brokers requiring Market Execution or rejecting initial stops
-   if(!success && m_trade.ResultRetcode() == 10016)
+   // 4. RETCODE 10015 / 10016 ZERO-STOP & MARKET-PRICE SHIELD:
+   // Fallback for brokers requiring pure market orders (price=0.0) or rejecting initial stops
+   uint last_retcode = m_trade.ResultRetcode();
+   if(!success && (last_retcode == 10015 || last_retcode == 10016 || last_retcode == 10004 || last_retcode == 10029))
    {
-      PrintFormat("🛡️ [RETCODE 10016 SHIELD] Broker rejected stops. Retrying Market Order with zero stops for %s...", symbol);
+      PrintFormat("🛡️ [ZERO-STOP SHIELD] Broker rejected with retcode %d. Retrying Market Order with price=0.0 & zero stops for %s...", last_retcode, symbol);
       m_trade.SetTypeFillingBySymbol(symbol);
       if(action_req == "BUY")
       {
-         ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-         success = m_trade.Buy(lot, symbol, ask, 0.0, 0.0, comment);
+         success = m_trade.Buy(lot, symbol, 0.0, 0.0, 0.0, comment);
          if(!success)
          {
             m_trade.SetTypeFilling(ORDER_FILLING_IOC);
-            ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-            success = m_trade.Buy(lot, symbol, ask, 0.0, 0.0, comment);
+            success = m_trade.Buy(lot, symbol, 0.0, 0.0, 0.0, comment);
          }
-         fill_price = ask;
+         fill_price = SymbolInfoDouble(symbol, SYMBOL_ASK);
       }
       else if(action_req == "SELL")
       {
-         bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-         success = m_trade.Sell(lot, symbol, bid, 0.0, 0.0, comment);
+         success = m_trade.Sell(lot, symbol, 0.0, 0.0, 0.0, comment);
          if(!success)
          {
             m_trade.SetTypeFilling(ORDER_FILLING_IOC);
-            bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-            success = m_trade.Sell(lot, symbol, bid, 0.0, 0.0, comment);
+            success = m_trade.Sell(lot, symbol, 0.0, 0.0, 0.0, comment);
          }
-         fill_price = bid;
+         fill_price = SymbolInfoDouble(symbol, SYMBOL_BID);
       }
 
       if(success)
       {
          ticket = m_trade.ResultOrder();
          if(ticket == 0) ticket = m_trade.ResultDeal();
-         PrintFormat("🎯 [ORDER FILLED VIA ZERO-STOP SHIELD] #%d | %s %s %.2f. Modifying position with stops...", ticket, action_req, symbol, lot);
+         PrintFormat("🎯 [ORDER FILLED VIA ZERO-STOP SHIELD] #%I64u | %s %s %.2f. Modifying position with stops...", ticket, action_req, symbol, lot);
          if(ticket > 0 && (sl > 0.0 || tp > 0.0))
          {
-            Sleep(50);
-            m_trade.PositionModify(ticket, sl, tp);
+            Sleep(100);
+            ulong pos_ticket = ticket;
+            if(!PositionSelectByTicket(pos_ticket))
+            {
+               for(int p = PositionsTotal() - 1; p >= 0; p--)
+               {
+                  if(m_position.SelectByIndex(p) && m_position.Symbol() == symbol)
+                  {
+                     pos_ticket = m_position.Ticket();
+                     break;
+                  }
+               }
+            }
+            if(pos_ticket > 0)
+            {
+               m_trade.PositionModify(pos_ticket, sl, tp);
+            }
          }
       }
    }
+
 
    if(success)
    {
@@ -856,6 +871,10 @@ void HandleModifyStops(const string json)
 bool IsSymbolTradable(const string sym)
 {
    if(sym == "" || !SymbolInfoInteger(sym, SYMBOL_EXIST)) return false;
+   if(!SymbolInfoInteger(sym, SYMBOL_SELECT))
+   {
+      SymbolSelect(sym, true);
+   }
    long mode = SymbolInfoInteger(sym, SYMBOL_TRADE_MODE);
    return (mode != SYMBOL_TRADE_MODE_DISABLED);
 }
@@ -865,6 +884,8 @@ bool IsSymbolTradable(const string sym)
 //+------------------------------------------------------------------+
 string MatchBrokerSymbol(const string base_sym)
 {
+   if(base_sym == "") return "";
+
    // 1. Direct match with tradable verification
    if(IsSymbolTradable(base_sym))
    {
@@ -880,6 +901,16 @@ string MatchBrokerSymbol(const string base_sym)
    StringReplace(root_sym, ".i", "");
    StringReplace(root_sym, ".pro", "");
    StringReplace(root_sym, ".m", "");
+   StringReplace(root_sym, "micro", "");
+   if(StringLen(root_sym) > 4 && StringSubstr(root_sym, StringLen(root_sym) - 1, 1) == "c")
+   {
+      root_sym = StringSubstr(root_sym, 0, StringLen(root_sym) - 1);
+   }
+   if(StringLen(root_sym) > 4 && StringSubstr(root_sym, StringLen(root_sym) - 1, 1) == "m")
+   {
+      root_sym = StringSubstr(root_sym, 0, StringLen(root_sym) - 1);
+   }
+
    if(root_sym != base_sym && IsSymbolTradable(root_sym))
    {
       SymbolSelect(root_sym, true);
@@ -888,25 +919,31 @@ string MatchBrokerSymbol(const string base_sym)
 
    // 2. Common broker suffixes & prefixes (with tradable priority)
    string variations[];
-   ArrayResize(variations, 18);
-   variations[0]  = root_sym + ".i";
-   variations[1]  = root_sym + "_i";
-   variations[2]  = root_sym + ".pro";
-   variations[3]  = root_sym + "c";
-   variations[4]  = root_sym + ".c";
-   variations[5]  = root_sym + ".C";
-   variations[6]  = root_sym + "m";
-   variations[7]  = root_sym + ".m";
+   ArrayResize(variations, 24);
+   variations[0]  = root_sym + ".C";
+   variations[1]  = root_sym + ".c";
+   variations[2]  = root_sym + "c";
+   variations[3]  = root_sym + ".pro";
+   variations[4]  = root_sym + ".i";
+   variations[5]  = root_sym + "_i";
+   variations[6]  = root_sym + ".m";
+   variations[7]  = root_sym + "m";
    variations[8]  = "r" + root_sym;
    variations[9]  = (root_sym == "XAUUSD") ? "GOLD" : "";
    variations[10] = (root_sym == "GOLD") ? "XAUUSD" : "";
-   variations[11] = (root_sym == "XAUUSD") ? "GOLD.i" : "";
-   variations[12] = (root_sym == "XAUUSD") ? "GOLD_i" : "";
-   variations[13] = (root_sym == "XAUUSD") ? "GOLD.c" : "";
-   variations[14] = (root_sym == "XAUUSD") ? "XAUUSD.c" : "";
+   variations[11] = (root_sym == "XAUUSD") ? "GOLD.C" : "";
+   variations[12] = (root_sym == "XAUUSD") ? "GOLD.c" : "";
+   variations[13] = (root_sym == "XAUUSD") ? "GOLD.pro" : "";
+   variations[14] = (root_sym == "XAUUSD") ? "XAUUSD.pro" : "";
    variations[15] = (root_sym == "US30") ? "DJ30" : "";
-   variations[16] = (root_sym == "US500") ? "SP500" : "";
-   variations[17] = (root_sym == "NAS100") ? "USTEC" : "";
+   variations[16] = (root_sym == "US30") ? "WS30" : "";
+   variations[17] = (root_sym == "US500") ? "SP500" : "";
+   variations[18] = (root_sym == "US500") ? "SPX500" : "";
+   variations[19] = (root_sym == "NAS100") ? "USTEC" : "";
+   variations[20] = (root_sym == "NAS100") ? "NDX100" : "";
+   variations[21] = root_sym + ".raw";
+   variations[22] = root_sym + ".ecn";
+   variations[23] = root_sym + ".std";
 
    for(int i = 0; i < ArraySize(variations); i++)
    {
@@ -922,7 +959,7 @@ string MatchBrokerSymbol(const string base_sym)
    for(int i = 0; i < total_mw; i++)
    {
       string s = SymbolName(i, false);
-      if(StringFind(s, base_sym) >= 0 && IsSymbolTradable(s))
+      if((StringFind(s, base_sym) >= 0 || StringFind(s, root_sym) >= 0) && IsSymbolTradable(s))
       {
          SymbolSelect(s, true);
          return s;
@@ -934,7 +971,7 @@ string MatchBrokerSymbol(const string base_sym)
    for(int i = 0; i < total_all; i++)
    {
       string s = SymbolName(i, true);
-      if(StringFind(s, base_sym) >= 0 && IsSymbolTradable(s))
+      if((StringFind(s, base_sym) >= 0 || StringFind(s, root_sym) >= 0) && IsSymbolTradable(s))
       {
          SymbolSelect(s, true);
          return s;
@@ -946,6 +983,11 @@ string MatchBrokerSymbol(const string base_sym)
    {
       SymbolSelect(base_sym, true);
       return base_sym;
+   }
+   if(SymbolInfoInteger(root_sym, SYMBOL_EXIST))
+   {
+      SymbolSelect(root_sym, true);
+      return root_sym;
    }
 
    return "";

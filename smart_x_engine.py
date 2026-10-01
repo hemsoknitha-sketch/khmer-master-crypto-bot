@@ -1112,7 +1112,7 @@ def execute_smart_x_futures(
             target_tp=actual_tp
         )
         # 🌐 Dual-Terminal MT5 Prop Firm Bridge Dispatch (sub-millisecond ZeroMQ / Native TCP)
-        if isinstance(trade_res, dict) and (trade_res.get("status") in ["success", "NEW", "FILLED"] or trade_res.get("orderId")):
+        if isinstance(trade_res, dict) and (trade_res.get("orderId") or (trade_res.get("status") in ["success", "NEW", "FILLED"] and trade_res.get("status") != "skipped" and "already active" not in str(trade_res.get("message", "")).lower())):
             if db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1" or db.get_system_setting(f"smart_x_{chat_id}_mt5_sync", "0") == "1":
                 try:
                     import mt5_bridge_engine
