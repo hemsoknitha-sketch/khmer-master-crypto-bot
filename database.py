@@ -4524,7 +4524,6 @@ def calculate_mt5_smart_allocation(
         cap = float(capital)
     except (ValueError, TypeError):
         cap = 100.0
-    cap = max(10.0, min(1000000.0, cap))
 
     try:
         n_assets = int(max_assets)
@@ -4534,6 +4533,17 @@ def calculate_mt5_smart_allocation(
 
     srv_upper = str(account_server or "").upper()
     is_cent = "SERVER 5" in srv_upper or "CENT" in srv_upper
+
+    # Min capital floor: $3 USD for Cent accounts, $10 USD for Standard accounts
+    min_cap_floor = 3.0 if is_cent else 10.0
+    cap = max(min_cap_floor, min(1000000.0, cap))
+
+    # If capital was at default 100.0 but a live balance exists, align with actual capital
+    if balance > 0.0 and (capital is None or capital == 100.0 or capital <= 0.0):
+        if is_cent:
+            cap = max(min_cap_floor, round(float(balance) / 100.0, 2))
+        else:
+            cap = max(min_cap_floor, round(float(balance), 2))
 
     master_universe = [
         {"symbol": "XAUUSD", "name": "Gold / USD", "category": "Metals", "weight": 0.20, "adr_pips": 250},
@@ -4595,10 +4605,47 @@ def calculate_mt5_smart_allocation(
     for a in selected_assets:
         sym_name = a["symbol"] + (".c" if is_cent else "")
         if is_cent:
+            # Cent Account: Floor 0.10 Lot strictly enforced!
+            # cent_equity_per_asset in USC
             cent_equity_per_asset = capital_per_asset * 100.0
-            calc_lot = round(max(0.01, min(5.00, (cent_equity_per_asset / 1000.0) * 0.05)), 2)
+            if cent_equity_per_asset < 1000.0:        # < $10 USD
+                base_lot = 0.10
+            elif cent_equity_per_asset < 2500.0:      # $10 - $25 USD
+                base_lot = 0.20
+            elif cent_equity_per_asset < 5000.0:      # $25 - $50 USD
+                base_lot = 0.35
+            elif cent_equity_per_asset < 10000.0:     # $50 - $100 USD
+                base_lot = 0.70
+            elif cent_equity_per_asset < 25000.0:     # $100 - $250 USD
+                base_lot = 1.50
+            elif cent_equity_per_asset < 50000.0:     # $250 - $500 USD
+                base_lot = 3.00
+            elif cent_equity_per_asset < 100000.0:    # $500 - $1,000 USD
+                base_lot = 5.00
+            else:
+                base_lot = round(min(20.00, (cent_equity_per_asset / 10000.0) * 0.70), 2)
+            calc_lot = round(max(0.10, base_lot), 2)
         else:
-            calc_lot = round(max(0.01, min(1.00, (capital_per_asset / 100.0) * 0.02)), 2)
+            # Standard Account: Floor 0.01 Lot strictly enforced!
+            if capital_per_asset < 50.0:              # < $50 USD
+                base_lot = 0.01
+            elif capital_per_asset < 150.0:           # $50 - $150 USD
+                base_lot = 0.02
+            elif capital_per_asset < 300.0:           # $150 - $300 USD
+                base_lot = 0.03
+            elif capital_per_asset < 500.0:           # $300 - $500 USD
+                base_lot = 0.05
+            elif capital_per_asset < 1000.0:          # $500 - $1,000 USD
+                base_lot = 0.10
+            elif capital_per_asset < 2500.0:          # $1,000 - $2,500 USD
+                base_lot = 0.20
+            elif capital_per_asset < 5000.0:          # $2,500 - $5,000 USD
+                base_lot = 0.40
+            elif capital_per_asset < 10000.0:         # $5,000 - $10,000 USD
+                base_lot = 0.80
+            else:
+                base_lot = round(min(10.00, (capital_per_asset / 1000.0) * 0.10), 2)
+            calc_lot = round(max(0.01, base_lot), 2)
 
         total_planned_lots += calc_lot
         asset_allocations.append({

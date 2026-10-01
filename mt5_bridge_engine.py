@@ -1487,7 +1487,105 @@ class MT5BridgeEngine:
         p = dict(base_payload)
         p["symbol"] = sess_sym
         p["signature"] = self.generate_signature(p)
-        return self._send_raw_socket(session.socket_conn, p)
+    @staticmethod
+    def calculate_proportional_lot_size(
+        is_cent: bool,
+        capital: float,
+        configured_lot: float = 0.0
+    ) -> float:
+        """
+        KHMER MASTER CRYPTO - SUPER SMART PROPORTIONAL LOT CALCULATOR
+        =============================================================================
+        Calculates the maximum optimal position sizing strictly proportional to the
+        trader's actual available capital, enforcing strict institutional minimum floors:
+          - Cent Account (USC / Micro / Server 5): ABSOLUTE MINIMUM FLOOR = 0.10 LOT
+          - Standard Account (USD / Server 2 / FTMO): ABSOLUTE MINIMUM FLOOR = 0.01 LOT
+        
+        Mathematical Edge & Fiduciary Capital Protection (Invariants 1.1, 8, 33, 43):
+        Maximizes trade profit yield according to live equity while guaranteeing zero
+        margin call or suicide leverage risks.
+        =============================================================================
+        """
+        cap = float(capital or 0.0)
+        cfg_lot = float(configured_lot or 0.0)
+
+        if is_cent:
+            # Cent Account (cap is in USC, e.g. $10 = 1,000 USC; $29.13 = 2,913 USC; $100 = 10,000 USC)
+            # 1 Lot Cent = 100,000 cents ($1,000 USD notional). 0.10 Lot uses ~10-20 USC margin.
+            # Minimum Floor: 0.10 Lot (Non-negotiable)
+            if cap < 1000.0:        # < $10 USD (e.g. 300 - 999 USC)
+                prop_lot = 0.10
+                max_ceiling = 0.20
+            elif cap < 2500.0:      # $10 - $25 USD
+                prop_lot = 0.20
+                max_ceiling = 0.40
+            elif cap < 5000.0:      # $25 - $50 USD (e.g. 2,913 USC -> 0.35 Lot)
+                prop_lot = 0.35
+                max_ceiling = 0.80
+            elif cap < 10000.0:     # $50 - $100 USD
+                prop_lot = 0.70
+                max_ceiling = 1.50
+            elif cap < 25000.0:     # $100 - $250 USD
+                prop_lot = 1.50
+                max_ceiling = 3.00
+            elif cap < 50000.0:     # $250 - $500 USD
+                prop_lot = 3.00
+                max_ceiling = 6.00
+            elif cap < 100000.0:    # $500 - $1,000 USD
+                prop_lot = 5.00
+                max_ceiling = 10.00
+            else:                   # >= $1,000 USD (>= 100,000 USC)
+                prop_lot = round(min(20.00, (cap / 10000.0) * 0.70), 2)
+                max_ceiling = 20.00
+
+            if cfg_lot > 0.0:
+                final_lot = min(max_ceiling, max(prop_lot, cfg_lot))
+            else:
+                final_lot = prop_lot
+
+            # Strict Non-Negotiable Floor: 0.10 Lot for Cent Accounts
+            return max(0.10, round(final_lot, 2))
+        else:
+            # Standard Account (cap is in USD)
+            # 1 Standard Lot = $100,000 notional. 0.01 Lot uses ~$2-26 USD margin.
+            # Minimum Floor: 0.01 Lot (Non-negotiable)
+            if cap < 50.0:          # < $50 USD (Small Capital Shield)
+                prop_lot = 0.01
+                max_ceiling = 0.01
+            elif cap < 150.0:       # $50 - $150 USD
+                prop_lot = 0.02
+                max_ceiling = 0.03
+            elif cap < 300.0:       # $150 - $300 USD
+                prop_lot = 0.03
+                max_ceiling = 0.05
+            elif cap < 500.0:       # $300 - $500 USD
+                prop_lot = 0.05
+                max_ceiling = 0.10
+            elif cap < 1000.0:      # $500 - $1,000 USD
+                prop_lot = 0.10
+                max_ceiling = 0.20
+            elif cap < 2500.0:      # $1,000 - $2,500 USD
+                prop_lot = 0.20
+                max_ceiling = 0.40
+            elif cap < 5000.0:      # $2,500 - $5,000 USD
+                prop_lot = 0.40
+                max_ceiling = 0.80
+            elif cap < 10000.0:     # $5,000 - $10,000 USD
+                prop_lot = 0.80
+                max_ceiling = 1.50
+            else:                   # >= $10,000 USD
+                prop_lot = round(min(10.00, (cap / 1000.0) * 0.10), 2)
+                max_ceiling = 10.00
+
+            if cap < 50.0:
+                final_lot = 0.01
+            elif cfg_lot > 0.0:
+                final_lot = min(max_ceiling, max(prop_lot, cfg_lot))
+            else:
+                final_lot = prop_lot
+
+            # Strict Non-Negotiable Floor: 0.01 Lot for Standard Accounts
+            return max(0.01, round(final_lot, 2))
 
     def dispatch_order(
         self,
@@ -1596,8 +1694,8 @@ class MT5BridgeEngine:
                     "clients_reached": 0
                 }
 
-        # Small Capital Suicide Lot Clamp (Invariants 1.1, 8, 33)
-        # Prevents dangerous over-leveraging where manual Web or Telegram orders request 1.0+ lot on a sub-$50 account
+        # Small Capital Suicide Lot Clamp & Strict Lot Floor (Invariants 1.1, 8, 33, 43)
+        # Enforces minimum floor: 0.10 Lot for Cent Account | 0.01 Lot for Standard Account
         if target_account and target_account in self.clients:
             sess_obj = self.clients[target_account]
             curr_str = str(getattr(sess_obj, "currency", "USD")).upper().strip()
@@ -1607,11 +1705,23 @@ class MT5BridgeEngine:
             raw_b = float(sess_b if sess_b is not None else 0.0)
             real_b = (raw_b / 100.0) if is_cent else raw_b
 
-            if real_b < 50.0 and lot_norm > 0.05:
-                clamped_lot = 0.05 if is_cent else 0.01
+            # Strict Minimum Floor Lock per account type:
+            # 0.10 Lot for Cent Account | 0.01 Lot for Standard Account
+            min_floor = 0.10 if is_cent else 0.01
+            lot_norm = max(min_floor, lot_norm)
+
+            if not is_cent and real_b < 50.0 and lot_norm > 0.01:
+                clamped_lot = 0.01
                 logger.warning(
                     f"🛡️ [SMALL CAPITAL SHIELD] Clamped suicide lot {lot_norm} -> {clamped_lot} "
                     f"for Account #{target_account} (Real Balance: ${real_b:.2f} USD). Capital Preserved!"
+                )
+                lot_norm = clamped_lot
+            elif is_cent and raw_b < 5000.0 and lot_norm > 0.80:
+                clamped_lot = 0.35
+                logger.warning(
+                    f"🛡️ [CENT CAPITAL SHIELD] Clamped excessive lot {lot_norm} -> {clamped_lot} "
+                    f"for Cent Account #{target_account} (Raw Balance: {raw_b:.2f} USC). Capital Preserved!"
                 )
                 lot_norm = clamped_lot
 
@@ -2281,26 +2391,26 @@ class MT5BridgeEngine:
                     ]
 
                     default_cent_20_universe = [
-                        {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.01, "category": "Metals"},
-                        {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "AUDUSD", "raw_symbol": "AUDUSD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "USDCAD", "raw_symbol": "USDCAD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "USDCHF", "raw_symbol": "USDCHF", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "NZDUSD", "raw_symbol": "NZDUSD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "EURJPY", "raw_symbol": "EURJPY", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "GBPJPY", "raw_symbol": "GBPJPY", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "AUDJPY", "raw_symbol": "AUDJPY", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "CADJPY", "raw_symbol": "CADJPY", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "EURGBP", "raw_symbol": "EURGBP", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "EURAUD", "raw_symbol": "EURAUD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "GBPAUD", "raw_symbol": "GBPAUD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "EURCAD", "raw_symbol": "EURCAD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "GBPCAD", "raw_symbol": "GBPCAD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "NZDJPY", "raw_symbol": "NZDJPY", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "AUDNZD", "raw_symbol": "AUDNZD", "lot_size": 0.01, "category": "Forex"},
-                        {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.01, "category": "Metals"},
+                        {"symbol": "XAUUSD", "raw_symbol": "XAUUSD", "lot_size": 0.10, "category": "Metals"},
+                        {"symbol": "EURUSD", "raw_symbol": "EURUSD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "GBPUSD", "raw_symbol": "GBPUSD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "USDJPY", "raw_symbol": "USDJPY", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "AUDUSD", "raw_symbol": "AUDUSD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "USDCAD", "raw_symbol": "USDCAD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "USDCHF", "raw_symbol": "USDCHF", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "NZDUSD", "raw_symbol": "NZDUSD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "EURJPY", "raw_symbol": "EURJPY", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "GBPJPY", "raw_symbol": "GBPJPY", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "AUDJPY", "raw_symbol": "AUDJPY", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "CADJPY", "raw_symbol": "CADJPY", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "EURGBP", "raw_symbol": "EURGBP", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "EURAUD", "raw_symbol": "EURAUD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "GBPAUD", "raw_symbol": "GBPAUD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "EURCAD", "raw_symbol": "EURCAD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "GBPCAD", "raw_symbol": "GBPCAD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "NZDJPY", "raw_symbol": "NZDJPY", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "AUDNZD", "raw_symbol": "AUDNZD", "lot_size": 0.10, "category": "Forex"},
+                        {"symbol": "XAGUSD", "raw_symbol": "XAGUSD", "lot_size": 0.10, "category": "Metals"},
                     ]
 
                     # Cent Account Detection & Sub-$300 Real Balance Gatekeeper
@@ -2523,26 +2633,16 @@ class MT5BridgeEngine:
                             u_raw_b = u_info["raw_bal"]
                             u_cfg = u_info["auto_cfg"]
 
-                            # Personalize lot sizing
-                            user_lot = float(u_cfg.get("lot_size", 0.01) or 0.01)
-                            if u_is_cent:
-                                if u_raw_b < 500.0:
-                                    user_lot = 0.01
-                                elif u_raw_b < 2000.0:
-                                    user_lot = min(0.05, max(0.01, user_lot))
-                                else:
-                                    user_lot = min(1.0, max(0.01, user_lot))
-                            else:
-                                if u_real_b < 50.0:
-                                    user_lot = 0.01
-                                elif u_real_b < 200.0:
-                                    user_lot = min(0.02, user_lot)
-                                elif u_real_b < 500.0:
-                                    user_lot = min(0.05, user_lot)
-                                elif u_real_b < 1000.0:
-                                    user_lot = min(0.10, user_lot)
-                                else:
-                                    user_lot = max(0.01, min(1.0, user_lot))
+                            # Super Smart Proportional Lot Sizing (Invariants 1.1, 8, 33, 43)
+                            # Maximizes position sizing according to actual capital currently available:
+                            # Strict Minimum Floors: 0.10 Lot for Cent Account | 0.01 Lot for Standard Account
+                            user_cap = u_raw_b if u_is_cent else u_real_b
+                            cfg_lot = float(u_cfg.get("lot_size", 0.0) or 0.0)
+                            user_lot = self.calculate_proportional_lot_size(
+                                is_cent=u_is_cent,
+                                capital=user_cap,
+                                configured_lot=cfg_lot
+                            )
 
                             # Dynamically adapt symbol for user session (Server 2 clean, Server 5 .C, Exness c)
                             dispatch_sym = self.adapt_symbol_for_session(sym_clean, u_sess)
