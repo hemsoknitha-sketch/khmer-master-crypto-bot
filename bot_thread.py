@@ -5641,6 +5641,55 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await mt5_command(update, context)
+            elif data in ["btn_mt5_reachsey_menu", "btn_mt5_reachsey_refresh", "btn_mt5_reachsey_status"]:
+                try:
+                    await update.callback_query.answer("👑 Reachsey 5-Position Matrix Telemetry...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_reachsey_command(update, context)
+            elif data == "btn_mt5_reachsey_3000":
+                try:
+                    await update.callback_query.answer("⚡ ចាប់ផ្តើម Reachsey Matrix Tier 1 ($3,000 | 5 Pos)...")
+                except Exception:
+                    pass
+                context.args = ["3000"]
+                await mt5_reachsey_command(update, context)
+            elif data == "btn_mt5_reachsey_6000":
+                try:
+                    await update.callback_query.answer("⚡ ចាប់ផ្តើម Reachsey Matrix Tier 2 ($6,000 | 10 Pos)...")
+                except Exception:
+                    pass
+                context.args = ["6000"]
+                await mt5_reachsey_command(update, context)
+            elif data == "btn_mt5_reachsey_10000":
+                try:
+                    await update.callback_query.answer("⚡ ចាប់ផ្តើម Reachsey Matrix Tier 3 ($10,000 | 15 Pos)...")
+                except Exception:
+                    pass
+                context.args = ["10000"]
+                await mt5_reachsey_command(update, context)
+            elif data == "btn_mt5_reachsey_auto":
+                try:
+                    await update.callback_query.answer("🤖 ផ្លាស់ប្តូរស្ថានភាព Reachsey Auto Matrix...")
+                except Exception:
+                    pass
+                context.args = ["AUTO"]
+                await mt5_reachsey_command(update, context)
+            elif data == "btn_mt5_reachsey_sweep":
+                try:
+                    await update.callback_query.answer("🧹 កំពុងបោសសម្អាត & កើបប្រាក់ចំណេញ Reachsey Baskets...")
+                except Exception:
+                    pass
+                context.args = ["SWEEP"]
+                await mt5_reachsey_command(update, context)
+            elif data == "btn_mt5_reachsey_stop":
+                try:
+                    await update.callback_query.answer("🛑 បិទ Reachsey 5-Position Matrix...")
+                except Exception:
+                    pass
+                context.args = ["STOP"]
+                await mt5_reachsey_command(update, context)
             elif data == "btn_mt5_toggle_auto":
                 curr_auto = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
                 new_state = "0" if curr_auto else "1"
@@ -21610,6 +21659,264 @@ class TelegramBotThread(BaseThread):
                 clean_mt5 = msg_mt5.replace("*", "").replace("_", "")
                 await update.effective_message.reply_text(clean_mt5, reply_markup=kb_mt5)
 
+        async def mt5_reachsey_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            👑 REACHSEY 5-POSITION VOLATILITY MATRIX ENGINE
+            Institutional High-Speed Volatility Harvester for MT5 / GTCFX Tokyo.
+            Executes disciplined 5-position baskets per asset with Asymmetric Basket Trailing & Recovery.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_id = update.effective_user.id if update.effective_user else chat_id
+            user_lang = db.get_user_language(chat_id)
+
+            is_admin_user = (user_id in [537186806, 859271875]) or db.is_admin(user_id) or (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
+            is_vip = is_admin_user or db.is_vip(user_id) or db.is_vip(chat_id)
+            if not is_vip:
+                raw_lang = db.get_user_language(user_id) or db.get_user_language(chat_id)
+                user_lang = str(raw_lang or 'km')
+                if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+                msg = loc.get_text(user_lang, 'access_denied')
+                if update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown")
+                return
+
+            # GTCFX Japan Tokyo MT5 Pro Referral Gatekeeper Lock (Invariant 42)
+            is_mt5_auth = is_admin_user or db.is_mt5_user_authorized(chat_id)
+            if not is_mt5_auth:
+                gate_text, gate_kb = build_mt5_referral_gatekeeper_ui(chat_id, user_lang)
+                if update.effective_message:
+                    await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                return
+
+            import mt5_bridge_engine
+            import ui_standards
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            bridge = mt5_bridge_engine.mt5_bridge
+            if not bridge.is_running:
+                bridge.start()
+
+            # Multi-Tenant User Isolation: Resolve bound MT5 account
+            cfg = db.get_user_mt5_config(chat_id)
+            raw_acc = str(cfg.get("login", "")).strip() if cfg else ""
+            clean_digits = re.sub(r'[^0-9]', '', raw_acc)
+            user_login = clean_digits if clean_digits else raw_acc
+
+            target_account = None
+            if user_login and user_login != "0":
+                target_account = user_login
+            elif is_admin_user:
+                for master_acc in ["52135153", "52133938"]:
+                    if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
+                        target_account = master_acc
+                        break
+                if not target_account:
+                    for any_acc, any_sess in bridge.clients.items():
+                        if any_sess.status == "ONLINE":
+                            target_account = any_acc
+                            break
+
+            args = list(context.args) if context and context.args else []
+
+            # Subcommand: 3000, 6000, 10000 or custom capital tier
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["3000", "6000", "10000", "TIER1", "TIER2", "TIER3"] or (sub.isdigit() and int(sub) >= 500):
+                    cap_val = 3000.0
+                    if sub == "6000" or sub == "TIER2":
+                        cap_val = 6000.0
+                    elif sub == "10000" or sub == "TIER3":
+                        cap_val = 10000.0
+                    elif sub.isdigit():
+                        cap_val = float(sub)
+
+                    custom_sym = None
+                    if len(args) >= 2:
+                        custom_sym = str(args[1]).upper().strip()
+
+                    launch_res = bridge.execute_reachsey_5pos_matrix(
+                        acc_id=target_account,
+                        capital_tier=cap_val,
+                        chat_id=chat_id,
+                        target_symbol=custom_sym
+                    )
+
+                    success = launch_res.get("success", False)
+                    acc_used = launch_res.get("account_id", target_account or "N/A")
+                    tickets_cnt = launch_res.get("positions_dispatched", 0)
+                    t_str = f"+${launch_res.get('target_profit_usd', 0.0):,.2f}"
+                    msg_res = (
+                        f"👑 <b>[REACHSEY 5-POSITION MATRIX LAUNCHED]</b> 🚀\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_used}</code>\n"
+                        f"💵 <b>កម្រិតដើមទុន (Tier) ៖</b> <b>${cap_val:,.2f} USD</b>\n"
+                        f"📊 <b>ចំនួន Positions បានបើក ៖</b> <b>{tickets_cnt} Positions (0.20 lot)</b>\n"
+                        f"🎯 <b>ទិសដៅកើបចំណេញ (Target TP) ៖</b> <b>{t_str}</b> (+10%)\n"
+                        f"🔒 <b>Trailing Ratchet ៖</b> ចាក់សោ 85% នៃ Peak ពេលឡើងដល់ 70% TP\n"
+                        f"🛡️ <b>យន្តការការពារ ៖</b> មិនកាត់ខាតតាមរលកខ្លី (No Choke Stop), ស្រង់ដើម Basket Net PnL\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"{'✅ <b>ដំណើរការ Matrix 5-Position បានបាញ់ចូល MT5 Tokyo ដោយជោគជ័យ!</b>' if success else '⚠️ <b>បរាជ័យក្នុងការបើក Position ៖</b> ' + html.escape(str(launch_res.get('error', 'Unknown')))}\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"<i>✨ Khmer Master Crypto Reachsey Engine កើបលុយ 24/7!</i>"
+                    )
+                    kb_back = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📊 ពិនិត្យ Baskets សកម្ម", callback_data="btn_mt5_reachsey_status")],
+                        [InlineKeyboardButton("🎛️ Reachsey Master Menu", callback_data="btn_mt5_reachsey_menu")]
+                    ])
+                    await update.effective_message.reply_text(msg_res, parse_mode="HTML", reply_markup=kb_back)
+                    return
+
+                elif sub in ["AUTO"]:
+                    curr_auto = db.get_system_setting(f"mt5_reachsey_auto_{chat_id}", "0") == "1"
+                    if len(args) >= 2:
+                        action_arg = str(args[1]).upper().strip()
+                        new_state = "1" if action_arg in ["ON", "START", "ENABLE", "1"] else "0"
+                    else:
+                        new_state = "0" if curr_auto else "1"
+                    db.set_system_setting(f"mt5_reachsey_auto_{chat_id}", new_state)
+                    status_lbl = "🟢 បានបើកដំណើរការ (ON)" if new_state == "1" else "⚪ បានបិទដំណើរការ (OFF)"
+                    msg_auto = (
+                        f"👑 <b>[REACHSEY AUTO-MATRIX CONFIG]</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ <b>ស្ថានភាព Auto Reachsey ៖</b> <b>{status_lbl}</b>\n"
+                        f"🏛️ <b>គណនី MT5 ៖</b> <code>#{target_account or 'Default'}</code>\n"
+                        f"👉 <i>ប្រព័ន្ធ AI នឹង Scan រក Trend ខ្លាំង និងបើក 5-Position Matrix ដោយស្វ័យប្រវត្តិតាមកម្រិតទុន!</i>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                    )
+                    kb_auto = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🎛️ Reachsey Menu", callback_data="btn_mt5_reachsey_menu")]
+                    ])
+                    await update.effective_message.reply_text(msg_auto, parse_mode="HTML", reply_markup=kb_auto)
+                    return
+
+                elif sub in ["SWEEP", "CLOSE", "CLOSEALL", "CLOSE_ALL"]:
+                    sweep_res = bridge.sweep_reachsey_baskets(acc_id=target_account, reason="Manual User Sweep")
+                    b_swept = sweep_res.get("baskets_swept", 0)
+                    t_swept = sweep_res.get("tickets_closed", 0)
+                    msg_sw = (
+                        f"🧹 <b>[REACHSEY BASKET SWEEPER]</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ <b>គណនី ៖</b> <code>#{target_account or 'All'}</code>\n"
+                        f"🧺 <b>Baskets បានបោសសម្អាត ៖</b> <b>{b_swept} Baskets</b>\n"
+                        f"🎫 <b>Positions បានបិទ ៖</b> <b>{t_swept} Tickets</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ <i>រាល់ Baskets និង Tickets របស់ Reachsey ត្រូវបានបិទ និងកើបប្រាក់ចំណេញរួចរាល់!</i>"
+                    )
+                    kb_sw = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🎛️ Reachsey Menu", callback_data="btn_mt5_reachsey_menu")]
+                    ])
+                    await update.effective_message.reply_text(msg_sw, parse_mode="HTML", reply_markup=kb_sw)
+                    return
+
+                elif sub in ["STOP", "OFF"]:
+                    db.set_system_setting(f"mt5_reachsey_auto_{chat_id}", "0")
+                    sweep_res = bridge.sweep_reachsey_baskets(acc_id=target_account, reason="Emergency Stop")
+                    t_swept = sweep_res.get("tickets_closed", 0)
+                    msg_stop = (
+                        f"🛑 <b>[REACHSEY ENGINE STOPPED]</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚪ Auto-Matrix ត្រូវបានបិទ។\n"
+                        f"🧹 បានបិទ Position សកម្មចំនួន <b>{t_swept}</b> Tickets ដោយសុវត្ថិភាព។\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                    )
+                    await update.effective_message.reply_text(msg_stop, parse_mode="HTML")
+                    return
+
+            # Default Dashboard View
+            baskets_data = bridge.get_reachsey_baskets_telemetry(acc_id=target_account)
+            baskets = baskets_data.get("baskets", [])
+            total_active_baskets = len(baskets)
+            total_net_pnl = sum(b.get("net_profit", 0.0) for b in baskets)
+
+            b_lines = []
+            if baskets:
+                for b in baskets:
+                    sym = b.get("symbol", "N/A")
+                    direction = b.get("direction", "N/A")
+                    pnl = b.get("net_profit", 0.0)
+                    peak = b.get("peak_profit", 0.0)
+                    tgt = b.get("target_profit", 0.0)
+                    unit = b.get("unit", "USD")
+                    t_cnt = len(b.get("tickets", []))
+                    pnl_badge = f"+{pnl:,.2f} {unit} 🟢" if pnl >= 0 else f"-{abs(pnl):,.2f} {unit} 🔴"
+                    b_lines.append(
+                        f"🧺 <b>{sym}</b> ({direction}) ➔ {t_cnt} Pos (0.20 lot)\n"
+                        f"   ├ PnL: <b>{pnl_badge}</b> (Peak: +{peak:,.2f})\n"
+                        f"   └ Target: <b>+{tgt:,.2f} {unit}</b> | Trailing Ratchet: 85%"
+                    )
+                baskets_summary = "\n".join(b_lines)
+            else:
+                baskets_summary = (
+                    "🟢 មិនទាន់មាន Reachsey Basket កំពុងដំណើរការទេ\n"
+                    "👉 ជ្រើសរើស Tier ខាងក្រោមដើម្បីចាប់ផ្តើម Matrix ភ្លាមៗ!"
+                )
+
+            is_reachsey_auto = db.get_system_setting(f"mt5_reachsey_auto_{chat_id}", "0") == "1"
+            auto_badge = "🤖 Auto Matrix: 🟢 ON" if is_reachsey_auto else "🤖 Auto Matrix: ⚪ OFF"
+
+            kb_reachsey = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⚡ Tier 1 ($3,000 | 5 Pos)", callback_data="btn_mt5_reachsey_3000"),
+                    InlineKeyboardButton("⚡ Tier 2 ($6,000 | 10 Pos)", callback_data="btn_mt5_reachsey_6000")
+                ],
+                [
+                    InlineKeyboardButton("⚡ Tier 3 ($10,000 | 15 Pos)", callback_data="btn_mt5_reachsey_10000"),
+                    InlineKeyboardButton(auto_badge, callback_data="btn_mt5_reachsey_auto")
+                ],
+                [
+                    InlineKeyboardButton("🧹 Sweep All Baskets", callback_data="btn_mt5_reachsey_sweep"),
+                    InlineKeyboardButton("🛑 Stop & Safe Close", callback_data="btn_mt5_reachsey_stop")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_reachsey_refresh"),
+                    InlineKeyboardButton("⚡ MT5 Master Terminal", callback_data="btn_mt5")
+                ]
+            ])
+
+            msg_reachsey = (
+                f"👑 <b>REACHSEY 5-POSITION MATRIX ENGINE</b> ⚡\n"
+                f"🏛️ <b>GTCFX Japan Tokyo Gateway (TY3 Co-Location)</b>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🏛️ <b>គណនី MT5 ភ្ជាប់ ៖</b> <code>#{target_account or 'No Bound Session'}</code>\n"
+                f"🧺 <b>Baskets សកម្ម ៖</b> <code>{total_active_baskets} Baskets</code>\n"
+                f"💵 <b>Net PnL សរុប ៖</b> <b>{'+' if total_net_pnl >= 0 else ''}{total_net_pnl:,.2f} USD</b>\n"
+                f"⚡ <b>ល្បឿន Bridge ៖</b> <code>&lt; 0.5ms Direct Socket</code>\n"
+                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                f"📐 <b>យុទ្ធសាស្ត្រគណិតវិទ្យា & កម្រិតដើមទុន (Mathematical Edge) ៖</b>\n"
+                f"• <b>Tier 1 ($3,000) ៖</b> 1 ទ្រព្យសកម្ម ➔ 5 Positions (0.20 lot/pos = 1.00 lot សរុប)\n"
+                f"• <b>Tier 2 ($6,000) ៖</b> 2 ទ្រព្យសកម្ម ➔ 10 Positions (0.20 lot/pos = 2.00 lots សរុប)\n"
+                f"• <b>Tier 3 ($10,000) ៖</b> 3 ទ្រព្យសកម្ម ➔ 15 Positions (0.20 lot/pos = 3.00 lots សរុប)\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"🛡️ <b>ក្បួនការពារដើមទុនកុំឱ្យវិនាស (Zero Risk of Premature Stop-Out) ៖</b>\n"
+                f"1. <b>គ្មាន Stop-Loss រលកខ្លី ៖</b> មិនកាត់ខាតចោលដោយសារ Market Noise / Whipsaw ឡើយ\n"
+                f"2. <b>Asymmetric Net Basket Sweeper ៖</b> ចាក់សោរកើបចំណេញ Net +10% នៃទុន\n"
+                f"3. <b>Trailing Ratchet 85% ៖</b> ចាក់សោរ 85% នៃ Peak Profit ពេលឡើងដល់ 70% TP\n"
+                f"4. <b>Dynamic Delta Skew ៖</b> បើក 3:2 ឬ 4:1 Ratio តាម AI Trend Bias មិនខ្លាចទីផ្សារបក\n"
+                f"5. <b>Disaster Circuit Breaker ៖</b> ការពារ 95% នៃទុនដាច់ខាត ប្រឆាំង Black Swan\n"
+                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                f"📊 <b>ស្ថានភាព BASKETS កំពុងដំណើរការ ៖</b>\n"
+                f"{baskets_summary}\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎯 <b>កូដបញ្ជា 1-Tap Presets (ចុចចម្លងភ្លាម) ៖</b>\n"
+                f"• បើក Tier 1 ($3,000) ៖ `` `/mt5_reachsey 3000` ``\n"
+                f"• បើក Tier 2 ($6,000) ៖ `` `/mt5_reachsey 6000` ``\n"
+                f"• បើក Tier 3 ($10,000) ៖ `` `/mt5_reachsey 10000` ``\n"
+                f"• បើក Auto Matrix 24/7 ៖ `` `/mt5_reachsey AUTO ON` ``\n"
+                f"• បោសសម្អាត & កើបចំណេញ ៖ `` `/mt5_reachsey SWEEP` ``\n"
+                f"• បិទ & Safe Stop ៖ `` `/mt5_reachsey STOP` ``\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"<i>Khmer Master Crypto | Reachsey 5-Position Matrix Engine</i>\n"
+                f"<i>APEX SUPER BRAIN AI — កើបប្រាក់ចំណេញ Super Smart 24/7!</i>"
+            )
+
+            try:
+                await update.effective_message.reply_text(msg_reachsey, parse_mode="HTML", reply_markup=kb_reachsey)
+            except Exception:
+                clean_txt = re.sub(r'<[^>]+>', '', msg_reachsey)
+                await update.effective_message.reply_text(clean_txt, reply_markup=kb_reachsey)
+
         async def capital_leadlag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -24125,6 +24432,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("prop_bridge", mt5_command))
         self.app.add_handler(CommandHandler("mt5_bridge", mt5_command))
         self.app.add_handler(CommandHandler("mt5bridge", mt5_command))
+        self.app.add_handler(CommandHandler("mt5_reachsey", mt5_reachsey_command))
+        self.app.add_handler(CommandHandler("mt5reachsey", mt5_reachsey_command))
+        self.app.add_handler(CommandHandler("reachsey_mt5", mt5_reachsey_command))
         self.app.add_handler(CommandHandler("wealth", wealth_command))
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))

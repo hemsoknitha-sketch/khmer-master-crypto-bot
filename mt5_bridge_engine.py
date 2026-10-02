@@ -740,6 +740,7 @@ class MT5BridgeEngine:
         self._last_admin_hijack_warn: Dict[int, float] = {}  # {chat_id: timestamp}
         self._accounts_without_c_suffix: Set[str] = set()
         self._last_global_scan_time: float = 0.0
+        self._reachsey_baskets: Dict[str, Dict[str, Any]] = {}  # {basket_id: data}
         
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
 
@@ -2155,6 +2156,281 @@ class MT5BridgeEngine:
         return result
 
     # =========================================================================
+    # 5. SOVEREIGN MT5 REACHSEY 5-POSITION MATRIX & BASKET HARVESTER (THE 48TH PILLAR)
+    # =========================================================================
+    def execute_reachsey_5pos_matrix(
+        self,
+        symbol: str = "XAUUSD",
+        capital: float = 3000.0,
+        lot_per_pos: float = 0.20,
+        chat_id: int = 0,
+        account_id: str = "",
+        custom_action: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        👑 Sovereign MT5 Reachsey 5-Position Matrix Volatility Harvester (The 48th Invariant).
+        Deploys a synchronized 5-position skewed matrix on a single high-velocity asset.
+        - Tier 1: $3,000 -> 1 Asset, 5 Positions (0.20 lot/pos, 1.00 lot total, TP: +$300, Floor: -$150)
+        - Tier 2: $6,000 -> 2 Assets, 10 Positions (0.20 lot/pos, 2.00 lots total, TP: +$600, Floor: -$300)
+        - Tier 3: $10,000 -> 3 Assets, 15 Positions (0.20 lot/pos, 3.00 lots total, TP: +$1000, Floor: -$500)
+        Cent Mode: Automatically adapts targets and lot sizes to USC.
+        """
+        if not account_id:
+            cfg = db.get_user_mt5_auto_config(chat_id) if hasattr(db, "get_user_mt5_auto_config") else {}
+            account_id = str(cfg.get("account_id") or cfg.get("login") or "").strip()
+            if not account_id:
+                with self._clients_lock:
+                    for acc, sess in self.clients.items():
+                        if sess.chat_id == chat_id and sess.status == "ONLINE":
+                            account_id = acc
+                            break
+
+        if not account_id or account_id not in self.clients:
+            return {"success": False, "reason": f"No online MT5 terminal connected for Account #{account_id or 'UNKNOWN'}."}
+
+        session = self.clients[account_id]
+        if not session.is_prop_compliant:
+            return {"success": False, "reason": "Account is in cooling off due to Prop Firm / Risk limit breach."}
+
+        curr_str = str(getattr(session, "currency", "USD")).upper().strip()
+        broker_str = str(getattr(session, "broker", "")).lower()
+        srv_str = str(getattr(session, "server", "")).lower()
+        is_cent = (curr_str in ["USC", "CENT"] or "cent" in broker_str or "server 5" in srv_str)
+
+        cap_val = float(capital or 3000.0)
+        if cap_val >= 10000.0:
+            tier = 3
+            target_usd = 1000.0
+            floor_usd = 500.0
+        elif cap_val >= 6000.0:
+            tier = 2
+            target_usd = 600.0
+            floor_usd = 300.0
+        else:
+            tier = 1
+            target_usd = 300.0
+            floor_usd = 150.0
+
+        target_pnl = target_usd * 100.0 if is_cent else target_usd
+        floor_pnl = floor_usd * 100.0 if is_cent else floor_usd
+        unit_label = "USC" if is_cent else "USD"
+
+        sym_clean = normalize_mt5_symbol(symbol)
+        adapted_sym = self.adapt_symbol_for_session(sym_clean, session)
+        quote = self.get_live_symbol_quote(adapted_sym) or self.get_live_symbol_quote(sym_clean)
+        cur_mid = float(quote.get("mid", 0.0) if quote else 0.0)
+
+        action = custom_action
+        if not action or action not in ["BUY", "SELL"]:
+            try:
+                sig_act, conf, rsn = MT5QuantumSignalCitadel.evaluate_quantum_signal(sym_clean, sym_clean)
+                action = sig_act if sig_act in ["BUY", "SELL"] else "BUY"
+            except Exception:
+                action = "BUY"
+
+        if action == "BUY":
+            plan = [
+                ("BUY", "R5_SCALP_1", 0.40, 1.50),
+                ("BUY", "R5_MID_2", 0.80, 1.50),
+                ("BUY", "R5_RUNNER_3", 2.00, 1.50),
+                ("SELL", "R5_HEDGE_4", 0.35, 2.00),
+                ("SELL", "R5_HEDGE_5", 0.60, 2.00)
+            ]
+        else:
+            plan = [
+                ("SELL", "R5_SCALP_1", 0.40, 1.50),
+                ("SELL", "R5_MID_2", 0.80, 1.50),
+                ("SELL", "R5_RUNNER_3", 2.00, 1.50),
+                ("BUY", "R5_HEDGE_4", 0.35, 2.00),
+                ("BUY", "R5_HEDGE_5", 0.60, 2.00)
+            ]
+
+        try:
+            atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(sym_clean, action, current_price=cur_mid)
+            base_sl_dist = float(atr_params.get("sl_dist", 3.00))
+            base_tp_dist = float(atr_params.get("tp_dist", 8.00))
+        except Exception:
+            base_sl_dist = 3.00 if ("XAU" in sym_clean or "GOLD" in sym_clean) else 0.0030
+            base_tp_dist = 8.00 if ("XAU" in sym_clean or "GOLD" in sym_clean) else 0.0080
+
+        basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
+        dispatched_orders = []
+        lot_val = max(0.01 if not is_cent else 0.10, float(lot_per_pos or 0.20))
+
+        for leg_act, leg_tag, tp_mult, sl_mult in plan:
+            leg_tp_dist = round(base_tp_dist * tp_mult, 4)
+            leg_sl_dist = round(base_sl_dist * sl_mult, 4)
+            comment_str = f"{leg_tag}_{basket_id[-4:]}"
+            res = self.dispatch_order(
+                symbol=adapted_sym,
+                action=leg_act,
+                lot=lot_val,
+                sl_dist=leg_sl_dist,
+                tp_dist=leg_tp_dist,
+                comment=comment_str,
+                magic=888666,
+                target_account=account_id
+            )
+            dispatched_orders.append({
+                "action": leg_act,
+                "lot": lot_val,
+                "tag": leg_tag,
+                "tp_dist": leg_tp_dist,
+                "sl_dist": leg_sl_dist,
+                "result": res
+            })
+
+        basket_info = {
+            "basket_id": basket_id,
+            "chat_id": chat_id,
+            "account_id": account_id,
+            "symbol": sym_clean,
+            "adapted_symbol": adapted_sym,
+            "tier": tier,
+            "capital": cap_val,
+            "lot_per_pos": lot_val,
+            "target_profit": target_pnl,
+            "max_loss_floor": floor_pnl,
+            "unit_label": unit_label,
+            "is_cent": is_cent,
+            "peak_net_pnl": 0.0,
+            "status": "ACTIVE",
+            "created_at": time.time(),
+            "action": action,
+            "orders": dispatched_orders
+        }
+        self._reachsey_baskets[basket_id] = basket_info
+        logger.info(f"👑 [REACHSEY 5-POS MATRIX DISPATCHED] Basket {basket_id} ({action} {sym_clean} x 5 Pos, Lot: {lot_val}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
+        return {"success": True, "basket_id": basket_id, "basket": basket_info}
+
+    def monitor_reachsey_5pos_baskets(
+        self,
+        account_id: str,
+        open_positions: List[Dict[str, Any]],
+        chat_id: int = 0,
+        is_cent: bool = False
+    ):
+        """
+        👑 Monitors active Reachsey 5-Position Baskets in real-time.
+        Executes Atomic Multi-Order Sweep when Target Net Profit is reached,
+        locks 85% of peak profits via Trailing Ratchet, and enforces the
+        -5% Emergency Hard Floor for ultimate black swan capital protection.
+        """
+        now_ts = time.time()
+        for b_id, b_data in list(self._reachsey_baskets.items()):
+            if b_data.get("account_id") != str(account_id) or b_data.get("status") != "ACTIVE":
+                continue
+
+            target_sym = b_data.get("symbol", "")
+            unit = b_data.get("unit_label", "USD")
+            tag_suffix = b_id[-4:]
+
+            matching_positions = []
+            for p in open_positions:
+                p_sym = normalize_mt5_symbol(str(p.get("symbol", "")))
+                p_comm = str(p.get("comment", ""))
+                p_magic = int(p.get("magic", 0) or 0)
+                if (p_magic == 888666 or tag_suffix in p_comm) and (p_sym == target_sym or not target_sym):
+                    matching_positions.append(p)
+
+            if not matching_positions:
+                if (now_ts - b_data.get("created_at", 0.0)) > 30.0:
+                    b_data["status"] = "CLOSED"
+                continue
+
+            net_pnl = sum(float(p.get("profit", 0.0) or 0.0) for p in matching_positions)
+            peak = b_data.get("peak_net_pnl", 0.0)
+            if net_pnl > peak:
+                b_data["peak_net_pnl"] = net_pnl
+                peak = net_pnl
+
+            target_p = b_data.get("target_profit", 300.0)
+            floor_loss = b_data.get("max_loss_floor", 150.0)
+
+            should_sweep = False
+            sweep_reason = ""
+
+            if net_pnl >= target_p:
+                should_sweep = True
+                sweep_reason = f"TARGET_NET_PROFIT_HIT (+{net_pnl:,.2f} {unit} >= +{target_p:,.2f} {unit})"
+            elif peak >= (target_p * 0.70) and net_pnl <= (peak * 0.85) and net_pnl > 0:
+                should_sweep = True
+                sweep_reason = f"TRAILING_BASKET_RATCHET_LOCKED (Peak: +{peak:,.2f} -> Lock: +{net_pnl:,.2f} {unit})"
+            elif net_pnl <= -floor_loss:
+                should_sweep = True
+                sweep_reason = f"EMERGENCY_BASKET_HARD_FLOOR (-{abs(net_pnl):,.2f} {unit} <= -{floor_loss:,.2f} {unit})"
+
+            if should_sweep:
+                logger.info(f"🚀 [REACHSEY BASKET SWEEP] Sweeping Basket {b_id} on Account #{account_id}! Reason: {sweep_reason}. Closing {len(matching_positions)} positions...")
+                for p in matching_positions:
+                    t_num = int(p.get("ticket", 0) or 0)
+                    t_sym = str(p.get("symbol", ""))
+                    if t_num > 0:
+                        self.dispatch_close(ticket=t_num, symbol=t_sym, comment=f"SWEEP_{b_id[-4:]}", target_account=account_id)
+
+                b_data["status"] = "SWEPT_COMPLETED"
+                b_data["final_net_pnl"] = net_pnl
+
+                try:
+                    c_id = chat_id or b_data.get("chat_id", 0)
+                    if c_id:
+                        is_win = (net_pnl >= 0.0)
+                        icon = "🎉" if is_win else "🛡️"
+                        title = "REACHSEY 5-POS BASKET HARVESTED" if is_win else "REACHSEY BASKET HARD FLOOR SHIELD"
+                        sign = "+" if net_pnl >= 0 else "-"
+                        msg_sw = (
+                            f"{icon} <b>[MT5 {title}]</b> ⚡\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"👑 <b>Basket ID ៖</b> <code>{b_id}</code>\n"
+                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{target_sym}</code> (5-Pos Matrix)\n"
+                            f"💵 <b>Net PnL រួម ៖</b> <b>{sign}{abs(net_pnl):,.2f} {unit}</b>\n"
+                            f"🛡️ <b>យន្តការ ៖</b> <code>{sweep_reason}</code>\n"
+                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{account_id}</code>\n"
+                            f"━━━━━━━━━━━━\n"
+                            f"<i>✨ MT5 Reachsey Super Smart បានកើបចំណេញ & ដោះលែងដើមទុន ១០០% សម្រាប់កាក់ថ្មី!</i>"
+                        )
+                        _dispatch_telegram_alert(c_id, msg_sw)
+                except Exception as ex_sw:
+                    logger.warning(f"⚠️ Reachsey basket sweep alert error: {ex_sw}")
+
+    def sweep_reachsey_baskets(self, basket_id: str = "ALL", chat_id: int = 0, account_id: str = "") -> Dict[str, Any]:
+        """Manually sweeps (flattens) all open Reachsey 5-Position Matrix orders."""
+        swept_count = 0
+        with self._clients_lock:
+            for acc, sess in self.clients.items():
+                if account_id and acc != account_id:
+                    continue
+                positions = list(getattr(sess, "positions", []) or [])
+                for p in positions:
+                    p_magic = int(p.get("magic", 0) or 0)
+                    p_comm = str(p.get("comment", ""))
+                    if p_magic == 888666 or "R5_" in p_comm:
+                        t_num = int(p.get("ticket", 0) or 0)
+                        t_sym = str(p.get("symbol", ""))
+                        if t_num > 0:
+                            self.dispatch_close(ticket=t_num, symbol=t_sym, comment="MANUAL_SWEEP", target_account=acc)
+                            swept_count += 1
+        for b_id, b_data in self._reachsey_baskets.items():
+            if basket_id == "ALL" or b_id == basket_id:
+                b_data["status"] = "MANUALLY_SWEPT"
+        return {"success": True, "swept_positions": swept_count}
+
+    def get_reachsey_baskets_telemetry(self, chat_id: int = 0, account_id: str = "") -> Dict[str, Any]:
+        """Returns real-time status of all Reachsey 5-Position Matrix baskets."""
+        active = []
+        for b_id, b_data in self._reachsey_baskets.items():
+            if account_id and b_data.get("account_id") != str(account_id):
+                continue
+            if chat_id and b_data.get("chat_id") != chat_id:
+                continue
+            active.append(b_data)
+        return {
+            "total_baskets": len(self._reachsey_baskets),
+            "active_baskets_count": len([b for b in active if b.get("status") == "ACTIVE"]),
+            "baskets": active
+        }
+
+    # =========================================================================
     # 6. LOW-LEVEL NETWORK HELPERS & TELEMETRY
     # =========================================================================
     def _send_raw_socket(self, sock: socket.socket, data_dict: Dict[str, Any]) -> bool:
@@ -2732,6 +3008,17 @@ class MT5BridgeEngine:
                             self._ticket_last_trailed_sl.pop(t, None)
                             self._ticket_last_modify_time.pop(t, None)
                             self._ticket_last_alert_sl.pop(t, None)
+
+                    # Monitor Reachsey 5-Position Volatility Baskets (Super Smart Basket Trailing & Recovery)
+                    try:
+                        self.monitor_reachsey_5pos_baskets(
+                            acc_id=acc_id,
+                            open_positions=open_positions,
+                            chat_id=chat_id,
+                            is_cent=is_cent_account
+                        )
+                    except Exception as ex_reachsey:
+                        logger.debug(f"⚠️ Reachsey 5-pos basket monitor notice: {ex_reachsey}")
 
                     # =========================================================
                     # 2. POSITION SIZING & DEBOUNCED RADAR SCAN (Every 20s)

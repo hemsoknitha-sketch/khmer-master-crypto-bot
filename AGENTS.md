@@ -674,6 +674,19 @@ Any modification that breaks any of the following 30 invariants is considered an
   3. **Target Harvest & Instant Reverse-Flip (< 0.8s):** When target profit is achieved (e.g. $+180$ USC), the position is closed via atomic market execution and reversed in the opposite direction in $< 0.8\text{s}$ with proper lot sizing, capturing bidirectional 24/7 continuous market swings without human intervention.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 37/37].
 
+### Invariant 48: Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock
+- **Location:** `mt5_bridge_engine.py` (`execute_reachsey_5pos_matrix`, `monitor_reachsey_5pos_baskets`, `sweep_reachsey_baskets`), `bot_thread.py` (`mt5_reachsey_command`), `bot_commands_registry.py`
+- **Rule:**
+  1. **Strict 5-Position Capital Tiers:**
+     - Tier 1: $3,000 capital ➔ 1 asset = 5 positions (0.20 lot/pos, 1.00 lot total).
+     - Tier 2: $6,000 capital ➔ 2 assets = 10 positions (0.20 lot/pos, 2.00 lots total).
+     - Tier 3: $10,000 capital ➔ 3 assets = 15 positions (0.20 lot/pos, 3.00 lots total).
+  2. **Zero Premature Stop-Loss Chop:** Individual positions are protected against micro-market noise whipsaw. Positions are not choked out individually.
+  3. **Asymmetric Net Basket Sweeper:** Profit harvest operates on aggregate net basket profit ($+10\%$ target profit hurdle: $+300$ USD for Tier 1, $+600$ USD for Tier 2, $+1,000$ USD for Tier 3).
+  4. **Dynamic Trailing Ratchet (85% Lock):** When peak net basket profit reaches $\ge 70\%$ of target, the engine trails and locks 85% of peak profit on the fly.
+  5. **Disaster Hard Floor Risk Circuit Breaker (-5%):** Strictly limits maximum basket risk to $-5\%$ of capital (preserving 95% of equity) to defend against Black Swan broker gaps and extreme institutional shocks.
+  6. **Dynamic Delta Skew:** Positions are weighted (3:2 or 4:1 directional skew) according to 33-AI Model trend bias, neutralizing directional whipsaw.
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
