@@ -21341,6 +21341,22 @@ class TelegramBotThread(BaseThread):
                     v_pool = db.get_virtual_pool_metrics()
                     v_txs = db.get_virtual_transactions(chat_id, limit=6)
 
+                    v_acc_id = v_ledger.get('account_id', '')
+                    client_sess = bridge.get_client_session(v_acc_id) or bridge.get_client_session(chat_id)
+                    real_broker_bal = float(client_sess.get("balance", 0.0)) if client_sess else 0.0
+                    real_broker_eq = float(client_sess.get("equity", 0.0)) if client_sess else 0.0
+                    is_broker_online = (client_sess.get("status") == "ONLINE") if client_sess else False
+
+                    broker_bal_badge = f"${real_broker_bal:,.2f} USD 🟢 (LIVE)" if real_broker_bal > 0 else f"${real_broker_bal:,.2f} USD ⚪ (Unfunded / $0.00)"
+                    vault_type_badge = "🟢 REAL LIVE MASTER VAULT" if real_broker_bal > 0 else "🟡 VIRTUAL DEMO MIRROR (Simulation Mode)"
+                    unfunded_notice = ""
+                    if real_broker_bal <= 0:
+                        unfunded_notice = (
+                            f"⚠️ <i>ចំណាំស្មោះត្រង់ ៖ គណនី MT5 ជាក់ស្តែងលើ Broker មាន ${real_broker_bal:,.2f} USD (មិនទាន់មានលុយពិត)។ "
+                            f"តួលេខក្នុង Vault នេះជាទុននិម្មិត (Virtual Demo Mirror) សម្រាប់តេស្តតាមដាន Master AI Copy ប៉ុណ្ណោះ។</i>\n"
+                            f"{ui_standards.DIVIDER_LIGHT}\n"
+                        )
+
                     v_eq = v_ledger.get('virtual_equity', 100.0)
                     v_cap = v_ledger.get('allocated_capital', 100.0)
                     v_pnl = v_ledger.get('realized_profit', 0.0)
@@ -21405,7 +21421,9 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"{action_msg}"
                         f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code> (Vault ID: <code>#{v_ledger.get('account_id')}</code>)\n"
-                        f"💰 <b>ដើមទុនបែងចែក (Allocated Capital) ៖</b> <b>${v_cap:,.2f} USD</b>\n"
+                        f"🧪 <b>ប្រភេទគណនី ៖</b> <code>{vault_type_badge}</code>\n"
+                        f"🏦 <b>សមតុល្យពិតលើ MT5 Broker ៖</b> <b>{broker_bal_badge}</b>\n"
+                        f"💰 <b>ដើមទុនបែងចែកក្នុង Vault ៖</b> <b>${v_cap:,.2f} USD</b>\n"
                         f"💎 <b>សមតុល្យបច្ចុប្បន្ន (Virtual Equity) ៖</b> <b>${v_eq:,.2f} USD</b>\n"
                         f"🟢 <b>ប្រាក់ចំណេញសុទ្ធកើបបាន ៖</b> <b>{v_pnl_str}</b> (Net {v_split:.0f}%)\n"
                         f"⚖️ <b>រូបមន្តបែងចែកចំណេញ ៖</b> <code>{v_split:.0f}% VIP / {100-v_split:.0f}% Super Admin</code>\n"
@@ -21414,6 +21432,7 @@ class TelegramBotThread(BaseThread):
                         f"🌐 <b>ចំណែកក្នុង Master Pool ៖</b> <b>{v_share}%</b> (Pool AUM: ${pool_aum:,.2f})\n"
                         f"🏛️ <b>Broker Gateway ៖</b> <code>GTCFX Tokyo (TY3 Co-Location &lt; 0.5ms)</code>\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"{unfunded_notice}"
                         f"📜 <b>ប្រវត្តិប្រតិបត្តិការចុងក្រោយ (Audit Ledger Trail) ៖</b>\n"
                         f"{tx_display}\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
