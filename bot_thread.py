@@ -5,6 +5,8 @@ import time
 import hashlib
 import sys
 import os
+import re
+import html
 
 IS_HEADLESS_VPS = ("--cli" in sys.argv or "--no-gui" in sys.argv or "--offscreen" in sys.argv)
 
