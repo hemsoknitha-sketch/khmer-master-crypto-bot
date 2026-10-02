@@ -5833,6 +5833,59 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["VAULT", cap_val]
                 await mt5_command(update, context)
+            elif data == "btn_mt5_vault_deposit":
+                try:
+                    await update.callback_query.answer("📥 ដំណើរការដាក់ទុន Virtual Vault...")
+                except Exception:
+                    pass
+                context.args = ["DEPOSIT"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_vault_withdraw":
+                try:
+                    await update.callback_query.answer("📤 ដំណើរការដកប្រាក់ Virtual Vault...")
+                except Exception:
+                    pass
+                context.args = ["WITHDRAW"]
+                await mt5_command(update, context)
+            elif data in ["btn_mt5_vault_dep_100", "btn_mt5_vault_dep_250", "btn_mt5_vault_dep_500", "btn_mt5_vault_dep_1000"]:
+                dep_v = data.replace("btn_mt5_vault_dep_", "")
+                try:
+                    await update.callback_query.answer(f"📥 បញ្ចូលទុន ${dep_v} USD ទៅកាន់ Vault...")
+                except Exception:
+                    pass
+                context.args = ["DEPOSIT", dep_v]
+                await mt5_command(update, context)
+            elif data in ["btn_mt5_vault_with_50", "btn_mt5_vault_with_100", "btn_mt5_vault_with_all"]:
+                try:
+                    await update.callback_query.answer("📤 កំពុងដំណើរការដកប្រាក់...")
+                except Exception:
+                    pass
+                with_arg = "ALL" if "all" in data else data.replace("btn_mt5_vault_with_", "")
+                context.args = ["WITHDRAW", with_arg]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_vault_risk_cycle":
+                try:
+                    v_led = db.get_or_create_virtual_ledger(chat_id)
+                    cur_risk = v_led.get("risk_level", "BALANCED")
+                    risk_map = {"CONSERVATIVE": "BALANCED", "BALANCED": "AGGRESSIVE", "AGGRESSIVE": "CONSERVATIVE"}
+                    next_risk = risk_map.get(cur_risk, "BALANCED")
+                    db.update_virtual_ledger_allocation(chat_id, capital=v_led.get("allocated_capital", 100.0), risk_level=next_risk, auto_reinvest=v_led.get("auto_reinvest", True))
+                    await update.callback_query.answer(f"🛡️ កម្រិត Risk ប្តូរទៅ ៖ {next_risk}!")
+                except Exception:
+                    pass
+                context.args = ["VAULT"]
+                await mt5_command(update, context)
+            elif data == "btn_mt5_vault_reinvest_toggle":
+                try:
+                    v_led = db.get_or_create_virtual_ledger(chat_id)
+                    cur_reinv = bool(v_led.get("auto_reinvest", True))
+                    new_reinv = not cur_reinv
+                    db.update_virtual_ledger_allocation(chat_id, capital=v_led.get("allocated_capital", 100.0), risk_level=v_led.get("risk_level", "BALANCED"), auto_reinvest=new_reinv)
+                    await update.callback_query.answer(f"🔄 Compound Grid ៖ {'បើក ON' if new_reinv else 'បិទ OFF'}!")
+                except Exception:
+                    pass
+                context.args = ["VAULT"]
+                await mt5_command(update, context)
             elif data == "btn_mt5_download_ea":
                 try:
                     await update.callback_query.answer("📥 កំពុងរៀបចំផ្ញើឯកសារ EA Bridge (.mq5)...")
@@ -20542,6 +20595,16 @@ class TelegramBotThread(BaseThread):
             target_account = user_login if (not is_admin_user or user_login) else None
 
             args = list(context.args) if context and context.args else []
+            raw_cmd = ""
+            if update.effective_message and update.effective_message.text:
+                raw_cmd = update.effective_message.text.split()[0].replace("/", "").lower()
+            if raw_cmd in ["vault", "mt5_vault", "mt5vault", "ledger"] and (not args or args[0].upper() not in ["VAULT", "LEDGER", "PORTFOLIO", "WALLET", "ALLOC", "DEPOSIT", "WITHDRAW", "TOPUP", "CASHOUT"]):
+                args.insert(0, "VAULT")
+            elif raw_cmd in ["deposit", "topup"] and (not args or args[0].upper() not in ["DEPOSIT", "TOPUP"]):
+                args.insert(0, "DEPOSIT")
+            elif raw_cmd in ["withdraw", "cashout"] and (not args or args[0].upper() not in ["WITHDRAW", "CASHOUT"]):
+                args.insert(0, "WITHDRAW")
+
             if args:
                 sub = str(args[0]).upper().strip()
 
@@ -21124,15 +21187,156 @@ class TelegramBotThread(BaseThread):
                         await update.effective_message.reply_text(msg_reset.replace("*", "").replace("_", ""))
                     return
 
-                # --- 7. VIRTUAL MULTI-USER PORTFOLIO & LEDGER VIEW: VAULT / LEDGER / WALLET ---
-                elif sub in ["VAULT", "LEDGER", "PORTFOLIO", "WALLET", "ALLOC"]:
-                    # Check if user passed capital allocation (e.g. /mt5 VAULT 250 or /mt5 ALLOC 500)
-                    if len(args) >= 2:
+                # --- 7. VIRTUAL MULTI-USER PORTFOLIO & LEDGER VIEW: VAULT / LEDGER / WALLET / DEPOSIT / WITHDRAW ---
+                elif sub in ["VAULT", "LEDGER", "PORTFOLIO", "WALLET", "ALLOC", "DEPOSIT", "WITHDRAW", "TOPUP", "CASHOUT"]:
+                    action_msg = ""
+                    is_dep = (sub in ["DEPOSIT", "TOPUP"]) or (len(args) >= 2 and str(args[1]).upper() in ["DEPOSIT", "TOPUP"])
+                    is_with = (sub in ["WITHDRAW", "CASHOUT"]) or (len(args) >= 2 and str(args[1]).upper() in ["WITHDRAW", "CASHOUT"])
+                    is_risk = (len(args) >= 2 and str(args[1]).upper() in ["RISK"])
+                    is_reinv = (len(args) >= 2 and str(args[1]).upper() in ["REINVEST", "COMPOUND"])
+
+                    # 1. LIVE DEPOSIT CONTROLLER
+                    if is_dep:
+                        dep_str = ""
+                        if sub in ["DEPOSIT", "TOPUP"] and len(args) >= 2:
+                            dep_str = str(args[1]).replace("$", "").replace("USD", "").strip()
+                        elif len(args) >= 3 and str(args[1]).upper() in ["DEPOSIT", "TOPUP"]:
+                            dep_str = str(args[2]).replace("$", "").replace("USD", "").strip()
+
+                        if dep_str and dep_str.replace(".", "", 1).isdigit() and float(dep_str) > 0:
+                            dep_amt = float(dep_str)
+                            dep_res = db.deposit_virtual_ledger(chat_id, dep_amt, notes="Telegram Live Deposit")
+                            if dep_res.get("success"):
+                                action_msg = f"🎉 <b>[DEPOSIT SUCCESSFUL]</b>\n✅ បានបញ្ចូលដើមទុន <b>+${dep_amt:,.2f} USD</b> ទៅក្នុង Virtual Vault ដោយជោគជ័យ!\n\n"
+                        else:
+                            # Show Interactive Deposit Gateway Screen
+                            dep_gateway_kb = InlineKeyboardMarkup([
+                                [
+                                    InlineKeyboardButton("🚀 +$100 (Micro)", callback_data="btn_mt5_vault_dep_100"),
+                                    InlineKeyboardButton("💎 +$250 (Std)", callback_data="btn_mt5_vault_dep_250")
+                                ],
+                                [
+                                    InlineKeyboardButton("🏆 +$500 (Pro)", callback_data="btn_mt5_vault_dep_500"),
+                                    InlineKeyboardButton("👑 +$1,000 (VIP)", callback_data="btn_mt5_vault_dep_1000")
+                                ],
+                                [
+                                    InlineKeyboardButton("🏛️ ត្រឡប់ទៅ Vault", callback_data="btn_mt5_vault"),
+                                    InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
+                                ]
+                            ])
+                            dep_guide_msg = (
+                                f"📥 <b>[MT5 CLOUD VIRTUAL VAULT DEPOSIT GATEWAY]</b> 💎\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code>\n"
+                                f"💰 <b>ជ្រើសរើសទំហំទុនវិនិយោគ Real Live ៖</b>\n\n"
+                                f"🔹 <b>ជម្រើសទី ១ (1-Tap Fast Allocation) ៖</b>\n"
+                                f"• <code>/mt5 DEPOSIT 100</code> — បញ្ចូលទុន $100 USD\n"
+                                f"• <code>/mt5 DEPOSIT 250</code> — បញ្ចូលទុន $250 USD\n"
+                                f"• <code>/mt5 DEPOSIT 500</code> — បញ្ចូលទុន $500 USD\n"
+                                f"• <code>/mt5 DEPOSIT 1000</code> — បញ្ចូលទុន $1,000 USD\n\n"
+                                f"🔹 <b>ជម្រើសទី ២ (Crypto Settlement USDT) ៖</b>\n"
+                                f"• <b>Network ៖</b> Arbitrum One / TRC20 / BEP20\n"
+                                f"• <b>Master Deposit Address ៖</b>\n"
+                                f"<code>0x71C83D43c19b12a98402A8b255755106b83f3db3</code>\n\n"
+                                f"🔹 <b>ជម្រើសទី ៣ (Bank / Broker Internal Transfer) ៖</b>\n"
+                                f"• <b>Broker Transfer ៖</b> GTCFX Account #<code>52135153</code>\n"
+                                f"• <b>Local Bank (ABA) ៖</b> ទាក់ទង Super Admin @KhmerMasterCrypto\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"<i>ចុចប៊ូតុងខាងក្រោមដើម្បីជ្រើសរើសកញ្ចប់ទុនភ្លាមៗ ៖</i>"
+                            )
+                            try:
+                                await update.effective_message.reply_text(dep_guide_msg, parse_mode="HTML", reply_markup=dep_gateway_kb)
+                            except Exception:
+                                clean_dep = dep_guide_msg.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "")
+                                await update.effective_message.reply_text(clean_dep, reply_markup=dep_gateway_kb)
+                            return
+
+                    # 2. LIVE WITHDRAWAL CONTROLLER
+                    elif is_with:
+                        w_str = ""
+                        if sub in ["WITHDRAW", "CASHOUT"] and len(args) >= 2:
+                            w_str = str(args[1]).replace("$", "").replace("USD", "").strip()
+                        elif len(args) >= 3 and str(args[1]).upper() in ["WITHDRAW", "CASHOUT"]:
+                            w_str = str(args[2]).replace("$", "").replace("USD", "").strip()
+
+                        v_cur = db.get_or_create_virtual_ledger(chat_id)
+                        cur_bal = float(v_cur.get("current_balance", 0.0))
+
+                        if w_str:
+                            if w_str.upper() in ["ALL", "MAX"]:
+                                w_amt = cur_bal
+                            elif w_str.replace(".", "", 1).isdigit():
+                                w_amt = float(w_str)
+                            else:
+                                w_amt = 0.0
+
+                            if w_amt > 0:
+                                with_res = db.withdraw_virtual_ledger(chat_id, w_amt, notes="Telegram Live Withdrawal")
+                                if with_res.get("success"):
+                                    action_msg = f"💸 <b>[WITHDRAWAL PROCESSED]</b>\n✅ បានដកប្រាក់ <b>-${w_amt:,.2f} USD</b> ពី Vault ដោយជោគជ័យ!\nសមតុល្យនៅសល់ ៖ <b>${with_res.get('new_balance', 0.0):,.2f} USD</b>\n\n"
+                                else:
+                                    action_msg = f"⚠️ <b>[WITHDRAWAL NOTICE]</b> ៖ {with_res.get('error', 'សមតុល្យមិនគ្រប់គ្រាន់')}\n\n"
+                        else:
+                            # Show Interactive Withdrawal Gateway Screen
+                            with_gateway_kb = InlineKeyboardMarkup([
+                                [
+                                    InlineKeyboardButton("📤 ដក $50", callback_data="btn_mt5_vault_with_50"),
+                                    InlineKeyboardButton("📤 ដក $100", callback_data="btn_mt5_vault_with_100")
+                                ],
+                                [
+                                    InlineKeyboardButton("💰 ដកទាំងអស់ (ALL)", callback_data="btn_mt5_vault_with_all")
+                                ],
+                                [
+                                    InlineKeyboardButton("🏛️ ត្រឡប់ទៅ Vault", callback_data="btn_mt5_vault"),
+                                    InlineKeyboardButton("🎛️ MT5 Dashboard", callback_data="btn_mt5")
+                                ]
+                            ])
+                            with_guide_msg = (
+                                f"📤 <b>[MT5 CLOUD VIRTUAL VAULT WITHDRAWAL]</b> 💎\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code>\n"
+                                f"💎 <b>សមតុល្យដែលអាចដកបាន ៖</b> <b>${cur_bal:,.2f} USD</b>\n"
+                                f"🟢 <b>ប្រាក់ចំណេញសុទ្ធកើបបាន ៖</b> <b>+${v_cur.get('realized_profit', 0.0):,.2f} USD</b>\n"
+                                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                                f"⌨️ <b>បញ្ជា 1-Tap Copyable Presets ៖</b>\n"
+                                f"• <code>/mt5 WITHDRAW 50</code> — ដកប្រាក់ $50 USD\n"
+                                f"• <code>/mt5 WITHDRAW 100</code> — ដកប្រាក់ $100 USD\n"
+                                f"• <code>/mt5 WITHDRAW ALL</code> — ដកសមតុល្យទាំងអស់\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"<i>ចុចប៊ូតុងខាងក្រោមដើម្បីដកប្រាក់ភ្លាមៗ ៖</i>"
+                            )
+                            try:
+                                await update.effective_message.reply_text(with_guide_msg, parse_mode="HTML", reply_markup=with_gateway_kb)
+                            except Exception:
+                                clean_with = with_guide_msg.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "")
+                                await update.effective_message.reply_text(clean_with, reply_markup=with_gateway_kb)
+                            return
+
+                    # 3. LIVE RISK LEVEL CONTROLLER
+                    elif is_risk and len(args) >= 3:
+                        new_r = str(args[2]).upper().strip()
+                        if new_r in ["CONSERVATIVE", "BALANCED", "AGGRESSIVE"]:
+                            v_curr = db.get_or_create_virtual_ledger(chat_id)
+                            db.update_virtual_ledger_allocation(chat_id, capital=v_curr.get("allocated_capital", 100.0), risk_level=new_r, auto_reinvest=v_curr.get("auto_reinvest", True))
+                            action_msg = f"🛡️ <b>កម្រិតការពារ Risk ត្រូវបានប្តូរទៅជា ៖</b> <code>{new_r}</code>!\n\n"
+
+                    # 4. LIVE COMPOUND GRID CONTROLLER
+                    elif is_reinv and len(args) >= 3:
+                        reinv_val = str(args[2]).upper().strip() in ["ON", "TRUE", "1", "YES"]
+                        v_curr = db.get_or_create_virtual_ledger(chat_id)
+                        db.update_virtual_ledger_allocation(chat_id, capital=v_curr.get("allocated_capital", 100.0), risk_level=v_curr.get("risk_level", "BALANCED"), auto_reinvest=reinv_val)
+                        action_msg = f"🔄 <b>ប្រព័ន្ធ Compound Grid ត្រូវបានប្តូរទៅជា ៖</b> <code>{'ON (សកម្ម)' if reinv_val else 'OFF (បិទ)'}</code>!\n\n"
+
+                    # 5. LIVE CAPITAL ALLOCATION (e.g. /mt5 VAULT 250)
+                    elif len(args) >= 2 and not is_dep and not is_with:
                         raw_val = str(args[1]).replace("$", "").replace("USD", "").strip()
                         if raw_val.replace(".", "", 1).isdigit():
                             new_cap = float(raw_val)
-                            db.update_virtual_ledger_allocation(chat_id, capital=new_cap, risk_level="BALANCED", auto_reinvest=True)
+                            v_curr = db.get_or_create_virtual_ledger(chat_id)
+                            db.update_virtual_ledger_allocation(chat_id, capital=new_cap, risk_level=v_curr.get("risk_level", "BALANCED"), auto_reinvest=v_curr.get("auto_reinvest", True))
+                            action_msg = f"💰 <b>[ALLOCATION UPDATED]</b> ដើមទុនបែងចែកថ្មី ៖ <b>${new_cap:,.2f} USD</b>\n\n"
 
+                    # RENDER FLAGSHIP MASTER CLOUD VIRTUAL PORTFOLIO & LEDGER
                     v_ledger = db.get_or_create_virtual_ledger(chat_id)
                     v_pool = db.get_virtual_pool_metrics()
                     v_txs = db.get_virtual_transactions(chat_id, limit=6)
@@ -21141,24 +21345,40 @@ class TelegramBotThread(BaseThread):
                     v_cap = v_ledger.get('allocated_capital', 100.0)
                     v_pnl = v_ledger.get('realized_profit', 0.0)
                     v_pnl_str = f"+${v_pnl:,.2f} 🟢" if v_pnl >= 0 else f"-${abs(v_pnl):,.2f} 🔴"
-                    v_reinv = "🟢 ACTIVE (Compound Grid)" if v_ledger.get('auto_reinvest') else "⚪ STANDBY"
+                    v_reinv_on = bool(v_ledger.get('auto_reinvest', True))
+                    v_reinv = "🟢 ACTIVE (Compound Grid)" if v_reinv_on else "⚪ STANDBY"
                     v_risk = v_ledger.get('risk_level', 'BALANCED')
                     v_share = v_ledger.get('pool_share_pct', 0.0)
                     v_split = v_ledger.get('profit_split_pct', 80.0)
+                    reinv_badge = "ON" if v_reinv_on else "OFF"
+                    pool_aum = v_pool.get('total_aum', v_pool.get('total_pool_aum', 125100.0))
 
                     tx_lines = []
                     for tx in v_txs:
                         t_typ = tx.get('type', 'PROFIT_SHARE')
                         t_amt = tx.get('amount', 0.0)
                         t_sym = tx.get('symbol') or "MT5"
-                        raw_time = str(tx.get('created_at', ''))[:16]
+                        raw_time = str(tx.get('timestamp') or tx.get('created_at', ''))[:16]
                         t_time = raw_time if raw_time.strip() else "Recent"
                         t_sign = "+" if t_amt >= 0 else "-"
-                        typ_badge = "🟢 <b>PROFIT</b>" if t_amt >= 0 else "🔴 <b>RISK_ADJ</b>"
+                        if t_typ == 'DEPOSIT':
+                            typ_badge = "📥 <b>DEPOSIT</b>"
+                        elif t_typ == 'WITHDRAW':
+                            typ_badge = "📤 <b>WITHDRAW</b>"
+                        elif t_typ == 'CAPITAL_ALLOCATE':
+                            typ_badge = "💼 <b>ALLOCATE</b>"
+                        elif t_typ == 'INITIAL_ALLOCATION':
+                            typ_badge = "💎 <b>INITIAL</b>"
+                        else:
+                            typ_badge = "🟢 <b>PROFIT</b>" if t_amt >= 0 else "🔴 <b>RISK_ADJ</b>"
                         tx_lines.append(f"• <code>{t_time}</code> | {typ_badge} ៖ <b>{t_sign}${abs(t_amt):,.2f}</b> (<code>{t_sym}</code>)")
                     tx_display = "\n".join(tx_lines) if tx_lines else "  <i>មិនទាន់មានប្រតិបត្តិការថ្មីនៅឡើយទេ</i>"
 
                     vault_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("📥 ដាក់ទុន Deposit", callback_data="btn_mt5_vault_deposit"),
+                            InlineKeyboardButton("📤 ដកប្រាក់ Withdraw", callback_data="btn_mt5_vault_withdraw")
+                        ],
                         [
                             InlineKeyboardButton("🚀 $100 (Micro)", callback_data="btn_mt5_vault_alloc_100"),
                             InlineKeyboardButton("💎 $250 (Std)", callback_data="btn_mt5_vault_alloc_250")
@@ -21166,6 +21386,10 @@ class TelegramBotThread(BaseThread):
                         [
                             InlineKeyboardButton("🏆 $500 (Pro)", callback_data="btn_mt5_vault_alloc_500"),
                             InlineKeyboardButton("👑 $1,000 (VIP)", callback_data="btn_mt5_vault_alloc_1000")
+                        ],
+                        [
+                            InlineKeyboardButton(f"🛡️ Risk: {v_risk}", callback_data="btn_mt5_vault_risk_cycle"),
+                            InlineKeyboardButton(f"🔄 Reinvest: {reinv_badge}", callback_data="btn_mt5_vault_reinvest_toggle")
                         ],
                         [
                             InlineKeyboardButton("🔄 Refresh Vault", callback_data="btn_mt5_vault"),
@@ -21179,6 +21403,7 @@ class TelegramBotThread(BaseThread):
                     msg_vault = (
                         f"🏛️ <b>[MASTER CLOUD VIRTUAL PORTFOLIO & LEDGER]</b> 💎\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"{action_msg}"
                         f"👤 <b>VIP Investor ៖</b> <code>{chat_id}</code> (Vault ID: <code>#{v_ledger.get('account_id')}</code>)\n"
                         f"💰 <b>ដើមទុនបែងចែក (Allocated Capital) ៖</b> <b>${v_cap:,.2f} USD</b>\n"
                         f"💎 <b>សមតុល្យបច្ចុប្បន្ន (Virtual Equity) ៖</b> <b>${v_eq:,.2f} USD</b>\n"
@@ -21186,7 +21411,7 @@ class TelegramBotThread(BaseThread):
                         f"⚖️ <b>រូបមន្តបែងចែកចំណេញ ៖</b> <code>{v_split:.0f}% VIP / {100-v_split:.0f}% Super Admin</code>\n"
                         f"🔄 <b>ប្រព័ន្ធ Compound Grid ៖</b> <b>{v_reinv}</b>\n"
                         f"🛡️ <b>កម្រិតការពារ Risk ៖</b> <code>{v_risk}</code> ({v_ledger.get('risk_per_trade_pct', 1.5)}% / Trade)\n"
-                        f"🌐 <b>ចំណែកក្នុង Master Pool ៖</b> <b>{v_share}%</b> (Pool AUM: ${v_pool.get('total_pool_aum', 125100.0):,.2f})\n"
+                        f"🌐 <b>ចំណែកក្នុង Master Pool ៖</b> <b>{v_share}%</b> (Pool AUM: ${pool_aum:,.2f})\n"
                         f"🏛️ <b>Broker Gateway ៖</b> <code>GTCFX Tokyo (TY3 Co-Location &lt; 0.5ms)</code>\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
                         f"📜 <b>ប្រវត្តិប្រតិបត្តិការចុងក្រោយ (Audit Ledger Trail) ៖</b>\n"
@@ -21198,6 +21423,8 @@ class TelegramBotThread(BaseThread):
                         f"• <code>/mt5 VAULT 500</code> — កំណត់ទុន $500 (Pro)\n"
                         f"• <code>/mt5 VAULT 1000</code> — កំណត់ទុន $1,000 (VIP)\n"
                         f"• <code>/mt5 VAULT 3000</code> — កំណត់ទុន $3,000 (Elite)\n"
+                        f"• <code>/mt5 DEPOSIT 100</code> — បញ្ចូលទុនបន្ថែម $100\n"
+                        f"• <code>/mt5 WITHDRAW 50</code> — ដកប្រាក់ចំណេញ $50\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"✨ <i>ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វវត្តិកម្រិត Cloud 24/7!</i>\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -24887,6 +25114,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("prop_bridge", mt5_command))
         self.app.add_handler(CommandHandler("mt5_bridge", mt5_command))
         self.app.add_handler(CommandHandler("mt5bridge", mt5_command))
+        self.app.add_handler(CommandHandler("mt5_vault", mt5_command))
+        self.app.add_handler(CommandHandler("mt5vault", mt5_command))
+        self.app.add_handler(CommandHandler("vault", mt5_command))
         self.app.add_handler(CommandHandler("mt5_reachsey", mt5_reachsey_command))
         self.app.add_handler(CommandHandler("mt5reachsey", mt5_reachsey_command))
         self.app.add_handler(CommandHandler("reachsey_mt5", mt5_reachsey_command))
