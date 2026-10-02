@@ -2257,14 +2257,18 @@ class MT5BridgeEngine:
         raw_bal = float(sess_bal if sess_bal is not None else 0.0)
         real_usd = (raw_bal / 100.0) if is_cent else raw_bal
 
+        sym_clean = normalize_mt5_symbol(symbol)
+        adapted_sym = self.adapt_symbol_for_session(sym_clean, session)
+        is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
+
         if is_cent:
             # Cent Account Mode (Invariant 44 & 48 Master Plan):
-            # Account balance is in USC (e.g. 3,190 USC = $31.90 USD).
-            # Micro-lot: 0.02 lot per position (total 0.10 lot for 5 pos).
-            # Target (+10%): raw_bal * 0.10 (e.g. +319 USC = +$3.19 USD).
-            # Hard Floor (-5%): raw_bal * 0.05 (e.g. -160 USC = -$1.60 USD).
+            # Account balance is in USC (e.g. 2,602 USC = $26.02 USD).
+            # Micro-lot: 0.10 lot per position for Gold (0.1 oz = ~$0.50 margin), 0.02 for others.
+            # Target (+10%): raw_bal * 0.10 (e.g. +260 USC = +$2.60 USD).
+            # Hard Floor (-5%): raw_bal * 0.05 (e.g. -130 USC = -$1.30 USD).
             tier = 1
-            lot_val = 0.02 if not lot_per_pos else float(lot_per_pos)
+            lot_val = 0.10 if is_gold else 0.02
             target_pnl = max(50.0, round(raw_bal * 0.10, 2))
             floor_pnl = max(25.0, round(raw_bal * 0.05, 2))
             unit_label = "USC"
@@ -2289,9 +2293,6 @@ class MT5BridgeEngine:
             floor_pnl = floor_usd
             unit_label = "USD"
             lot_val = max(0.01, float(lot_per_pos or 0.20))
-
-        sym_clean = normalize_mt5_symbol(symbol)
-        adapted_sym = self.adapt_symbol_for_session(sym_clean, session)
         quote = self.get_live_symbol_quote(adapted_sym) or self.get_live_symbol_quote(sym_clean)
         cur_mid = float(quote.get("mid", 0.0) if quote else 0.0)
 
@@ -2336,7 +2337,8 @@ class MT5BridgeEngine:
 
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
         dispatched_orders = []
-        lot_val = max(0.01 if not is_cent else 0.10, float(lot_per_pos or 0.20))
+        if not is_cent:
+            lot_val = max(0.01, float(lot_per_pos or 0.20))
 
         for leg_act, leg_tag, tp_mult, sl_mult in plan:
             leg_tp_dist = round(base_tp_dist * tp_mult, 4)
@@ -3215,7 +3217,10 @@ class MT5BridgeEngine:
                                 existing_basket_syms = {str(b.get("symbol", "")).upper() for b in active_reachsey_baskets}
                                 broker_open_syms = {normalize_mt5_symbol(str(p.get("symbol", ""))) for p in open_positions}
                                 target_sym = None
-                                candidate_syms = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD", "ETHUSD"]
+                                # Pillar 48 & 49: Strict High-Volatility Shield for Reachsey Matrix
+                                # Low-volatility/sideway forex assets (EURUSD, GBPUSD, USDJPY) are mathematically incompatible
+                                # with high-speed volatility harvesters and are 100% strictly excluded.
+                                candidate_syms = ["XAUUSD"] if is_cent_account else ["XAUUSD", "BTCUSD", "ETHUSD", "US30", "US100"]
                                 for cs in candidate_syms:
                                     if cs not in existing_basket_syms and cs not in broker_open_syms:
                                         target_sym = cs
