@@ -1293,6 +1293,24 @@ class MT5BridgeEngine:
         db.update_mt5_bridge_order_close(ticket=ticket, close_price=close_price, pnl=pnl, status=status)
         logger.info(f"💰 [MT5 ORDER CLOSED] Account {account_id} closed #{ticket}! Symbol: {symbol or 'N/A'}, Close Price: {close_price}, PnL: ${pnl:+,.2f}")
 
+        # Realized PnL Accumulation for Active Reachsey 5-Position Baskets (Invariant 48)
+        if is_reachsey_leg:
+            for b_id, b_data in self._reachsey_baskets.items():
+                if b_data.get("status") == "ACTIVE" and str(b_data.get("account_id")) == str(account_id):
+                    b_suffix = b_id[-4:]
+                    matched_leg = False
+                    if b_suffix and (b_suffix in comment):
+                        matched_leg = True
+                    elif ticket and (ticket in b_data.get("dispatched_tickets", set())):
+                        matched_leg = True
+                    elif "R5_" in comment:
+                        matched_leg = True
+
+                    if matched_leg:
+                        b_data["realized_pnl"] = round(float(b_data.get("realized_pnl", 0.0) or 0.0) + pnl, 2)
+                        logger.info(f"👑 [REACHSEY REALIZED PNL ACCUMULATED] Basket {b_id}: Ticket #{ticket} closed with PnL ${pnl:+,.2f} | Cumulative Realized: ${b_data['realized_pnl']:+,.2f}")
+                        break
+
         # Self-Auto Training Feedback for MT5SMCCitadelEngine
         try:
             from mt5_smc_citadel import MT5SMCCitadelEngine
@@ -2337,19 +2355,19 @@ class MT5BridgeEngine:
 
         if action == "BUY":
             plan = [
-                ("BUY", "R5_SCALP_1", 0.40, 1.50),
-                ("BUY", "R5_MID_2", 0.80, 1.50),
-                ("BUY", "R5_RUNNER_3", 2.00, 1.50),
-                ("SELL", "R5_HEDGE_4", 0.35, 2.00),
-                ("SELL", "R5_HEDGE_5", 0.60, 2.00)
+                ("BUY", "R5_LEG_1", 0.0, 4.0),
+                ("BUY", "R5_LEG_2", 0.0, 4.0),
+                ("BUY", "R5_LEG_3", 0.0, 4.0),
+                ("SELL", "R5_HEDGE_4", 0.0, 4.0),
+                ("SELL", "R5_HEDGE_5", 0.0, 4.0)
             ]
         else:
             plan = [
-                ("SELL", "R5_SCALP_1", 0.40, 1.50),
-                ("SELL", "R5_MID_2", 0.80, 1.50),
-                ("SELL", "R5_RUNNER_3", 2.00, 1.50),
-                ("BUY", "R5_HEDGE_4", 0.35, 2.00),
-                ("BUY", "R5_HEDGE_5", 0.60, 2.00)
+                ("SELL", "R5_LEG_1", 0.0, 4.0),
+                ("SELL", "R5_LEG_2", 0.0, 4.0),
+                ("SELL", "R5_LEG_3", 0.0, 4.0),
+                ("BUY", "R5_HEDGE_4", 0.0, 4.0),
+                ("BUY", "R5_HEDGE_5", 0.0, 4.0)
             ]
 
         is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
@@ -2372,8 +2390,8 @@ class MT5BridgeEngine:
             lot_val = max(0.01, float(lot_per_pos or 0.20))
 
         for leg_act, leg_tag, tp_mult, sl_mult in plan:
-            leg_tp_dist = round(base_tp_dist * tp_mult, 4)
-            leg_sl_dist = round(base_disaster_sl * sl_mult, 4)
+            leg_tp_dist = round(base_tp_dist * tp_mult, 4) if tp_mult > 0 else 0.0
+            leg_sl_dist = round(base_disaster_sl * sl_mult, 4) if sl_mult > 0 else 0.0
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
             res = self.dispatch_order(
                 symbol=adapted_sym,
@@ -2403,11 +2421,18 @@ class MT5BridgeEngine:
             "tier": tier,
             "capital": cap_val,
             "lot_per_pos": lot_val,
+            "total_lot": round(lot_val * len(plan), 2),
             "target_profit": target_pnl,
             "max_loss_floor": floor_pnl,
             "unit_label": unit_label,
             "is_cent": is_cent,
             "peak_net_pnl": 0.0,
+            "current_net_pnl": 0.0,
+            "realized_pnl": 0.0,
+            "net_profit": 0.0,
+            "peak_profit": 0.0,
+            "direction": action,
+            "unit": unit_label,
             "status": "ACTIVE",
             "created_at": time.time(),
             "action": action,
@@ -2416,7 +2441,22 @@ class MT5BridgeEngine:
         }
         self._reachsey_baskets[basket_id] = basket_info
         logger.info(f"👑 [REACHSEY 5-POS MATRIX DISPATCHED] Basket {basket_id} ({action} {sym_clean} x 5 Pos, Lot: {lot_val}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
-        return {"success": True, "basket_id": basket_id, "basket": basket_info}
+        return {
+            "success": True,
+            "basket_id": basket_id,
+            "account_id": account_id,
+            "positions_dispatched": len(dispatched_orders),
+            "target_profit_usd": target_pnl if unit_label == "USD" else (target_pnl / 100.0),
+            "target_profit": target_pnl,
+            "max_loss_floor": floor_pnl,
+            "unit_label": unit_label,
+            "symbol": sym_clean,
+            "action": action,
+            "direction": action,
+            "lot_per_pos": lot_val,
+            "total_lot": round(lot_val * len(dispatched_orders), 2),
+            "basket": basket_info
+        }
 
     def monitor_reachsey_5pos_baskets(
         self,
@@ -2465,6 +2505,8 @@ class MT5BridgeEngine:
 
                 if is_match:
                     matching_positions.append(p)
+                    if p_ticket > 0 and isinstance(b_data.get("dispatched_tickets"), set):
+                        b_data["dispatched_tickets"].add(p_ticket)
 
             if not matching_positions:
                 acc_open_on_sym = [
@@ -2473,14 +2515,24 @@ class MT5BridgeEngine:
                 ]
                 if not acc_open_on_sym and (now_ts - b_data.get("created_at", 0.0)) > 15.0:
                     b_data["status"] = "CLOSED"
-                    logger.info(f"👑 [REACHSEY BASKET CLOSED] Basket {b_id} on Account #{account_id} completed. All positions closed on broker.")
+                    b_data["final_net_pnl"] = b_data.get("realized_pnl", 0.0)
+                    logger.info(f"👑 [REACHSEY BASKET CLOSED] Basket {b_id} on Account #{account_id} completed. All positions closed on broker. Final Realized PnL: ${b_data.get('realized_pnl', 0.0):+,.2f}")
                 continue
 
-            net_pnl = sum(float(p.get("profit", 0.0) or 0.0) for p in matching_positions)
+            floating_pnl = sum(float(p.get("profit", 0.0) or 0.0) for p in matching_positions)
+            realized_pnl = float(b_data.get("realized_pnl", 0.0) or 0.0)
+            net_pnl = round(floating_pnl + realized_pnl, 2)
             peak = b_data.get("peak_net_pnl", 0.0)
             if net_pnl > peak:
                 b_data["peak_net_pnl"] = net_pnl
                 peak = net_pnl
+
+            b_data["current_net_pnl"] = net_pnl
+            b_data["net_profit"] = net_pnl
+            b_data["peak_profit"] = peak
+            b_data["direction"] = b_data.get("action", "BUY")
+            b_data["unit"] = unit
+            b_data["tickets"] = list(b_data.get("dispatched_tickets", set()))
 
             target_p = b_data.get("target_profit", 300.0)
             floor_loss = b_data.get("max_loss_floor", 150.0)
@@ -2613,7 +2665,14 @@ class MT5BridgeEngine:
                 continue
             if chat_id and b_data.get("chat_id") != chat_id:
                 continue
-            active.append(b_data)
+            enriched = dict(b_data)
+            enriched["direction"] = enriched.get("direction") or enriched.get("action", "BUY")
+            enriched["net_profit"] = enriched.get("net_profit", enriched.get("current_net_pnl", enriched.get("final_net_pnl", 0.0)))
+            enriched["peak_profit"] = enriched.get("peak_profit", enriched.get("peak_net_pnl", 0.0))
+            enriched["unit"] = enriched.get("unit") or enriched.get("unit_label", "USD")
+            t_set = enriched.get("dispatched_tickets", set())
+            enriched["tickets"] = list(enriched.get("tickets") or (list(t_set) if isinstance(t_set, (set, list)) else []) or enriched.get("orders", []))
+            active.append(enriched)
         return {
             "total_baskets": len(self._reachsey_baskets),
             "active_baskets_count": len([b for b in active if b.get("status") == "ACTIVE"]),

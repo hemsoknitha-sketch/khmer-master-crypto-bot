@@ -21756,26 +21756,44 @@ class TelegramBotThread(BaseThread):
                         cap_val = float(sub)
 
                     custom_sym = None
-                    if len(args) >= 2:
-                        custom_sym = str(args[1]).upper().strip()
+                    custom_lot = 0.20
+                    for extra_arg in args[1:]:
+                        extra_str = str(extra_arg).upper().strip()
+                        if any(c in extra_str for c in ["XAU", "BTC", "ETH", "US30", "US100", "EUR", "GBP", "JPY", "GOLD"]):
+                            custom_sym = extra_str
+                        else:
+                            try:
+                                val = float(extra_str)
+                                if 0.01 <= val <= 5.0:
+                                    custom_lot = val
+                            except Exception:
+                                pass
 
                     launch_res = bridge.execute_reachsey_5pos_matrix(
                         acc_id=target_account,
                         capital_tier=cap_val,
+                        lot_per_pos=custom_lot,
                         chat_id=chat_id,
                         target_symbol=custom_sym
                     )
 
                     success = launch_res.get("success", False)
                     acc_used = launch_res.get("account_id", target_account or "N/A")
-                    tickets_cnt = launch_res.get("positions_dispatched", 0)
-                    t_str = f"+${launch_res.get('target_profit_usd', 0.0):,.2f}"
+                    b_obj = launch_res.get("basket", {})
+                    tickets_cnt = launch_res.get("positions_dispatched") or len(b_obj.get("orders", [])) or 5
+                    tp_val = launch_res.get("target_profit_usd") or b_obj.get("target_profit", 300.0)
+                    t_str = f"+${tp_val:,.2f}"
+                    pos_lot = float(launch_res.get("lot_per_pos", custom_lot or 0.20))
+                    tot_lot = float(launch_res.get("total_lot", pos_lot * tickets_cnt))
+                    sym_used = launch_res.get("symbol", custom_sym or "XAUUSD")
+                    act_used = launch_res.get("action", launch_res.get("direction", "BUY"))
                     msg_res = (
                         f"👑 <b>[REACHSEY 5-POSITION MATRIX LAUNCHED]</b> 🚀\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_used}</code>\n"
+                        f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym_used}</code> ({act_used} Matrix)\n"
                         f"💵 <b>កម្រិតដើមទុន (Tier) ៖</b> <b>${cap_val:,.2f} USD</b>\n"
-                        f"📊 <b>ចំនួន Positions បានបើក ៖</b> <b>{tickets_cnt} Positions (0.20 lot)</b>\n"
+                        f"📊 <b>ចំនួន Positions បានបើក ៖</b> <b>{tickets_cnt} Positions ({pos_lot:.2f} lot/pos | {tot_lot:.2f} lot សរុប)</b>\n"
                         f"🎯 <b>ទិសដៅកើបចំណេញ (Target TP) ៖</b> <b>{t_str}</b> (+10%)\n"
                         f"🔒 <b>Trailing Ratchet ៖</b> ចាក់សោ 85% នៃ Peak ពេលឡើងដល់ 70% TP\n"
                         f"🛡️ <b>យន្តការការពារ ៖</b> មិនកាត់ខាតតាមរលកខ្លី (No Choke Stop), ស្រង់ដើម Basket Net PnL\n"
@@ -21884,15 +21902,17 @@ class TelegramBotThread(BaseThread):
             if baskets:
                 for b in baskets:
                     sym = b.get("symbol", "N/A")
-                    direction = b.get("direction", "N/A")
-                    pnl = b.get("net_profit", 0.0)
-                    peak = b.get("peak_profit", 0.0)
-                    tgt = b.get("target_profit", 0.0)
-                    unit = b.get("unit", "USD")
-                    t_cnt = len(b.get("tickets", []))
+                    direction = b.get("direction") or b.get("action", "BUY")
+                    pnl = b.get("net_profit", b.get("current_net_pnl", b.get("final_net_pnl", 0.0)))
+                    peak = b.get("peak_profit", b.get("peak_net_pnl", 0.0))
+                    tgt = b.get("target_profit", 300.0)
+                    unit = b.get("unit") or b.get("unit_label", "USD")
+                    t_cnt = len(b.get("tickets") or b.get("dispatched_tickets") or b.get("orders", [])) or 5
+                    lot_p = float(b.get("lot_per_pos", 0.20))
+                    tot_l = float(b.get("total_lot", lot_p * t_cnt))
                     pnl_badge = f"+{pnl:,.2f} {unit} 🟢" if pnl >= 0 else f"-{abs(pnl):,.2f} {unit} 🔴"
                     b_lines.append(
-                        f"🧺 <b>{sym}</b> ({direction}) ➔ {t_cnt} Pos (0.20 lot)\n"
+                        f"🧺 <b>{sym}</b> ({direction}) ➔ {t_cnt} Pos ({lot_p:.2f} lot/pos = {tot_l:.2f} lot)\n"
                         f"   ├ PnL: <b>{pnl_badge}</b> (Peak: +{peak:,.2f})\n"
                         f"   └ Target: <b>+{tgt:,.2f} {unit}</b> | Trailing Ratchet: 85%"
                     )

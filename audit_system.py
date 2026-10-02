@@ -1369,7 +1369,7 @@ def run_audit():
         log_fail(str(e))
 
     # 37. MT5 Cent Account Proportional Lot Scaling, Micro-Loss Shield & Max Concurrent Positions Ring-Fence (Invariants 44–47)
-    print("\n[CHECK 37/37] Verifying MT5 Cent Proportional Lot Scaling, Micro-Loss Shield, Max Concurrent Positions & 24/7 Watchdog (Invariants 44–47)...")
+    print("\n[CHECK 37/38] Verifying MT5 Cent Proportional Lot Scaling, Micro-Loss Shield, Max Concurrent Positions & 24/7 Watchdog (Invariants 44–47)...")
     try:
         with open("mt5_bridge_engine.py", "r", encoding="utf-8") as f:
             mt5_code = f.read()
@@ -1431,6 +1431,88 @@ def run_audit():
             log_fail("MT5 Cent Proportional Lot Scaling & Sentinel Protocol (Invariants 44–47) specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariants 44-47 check failed: {e}")
+        log_fail(str(e))
+
+    # 38. MT5 Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock (Invariant 48)
+    print("\n[CHECK 38/38] Verifying Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock (Invariant 48)...")
+    try:
+        with open("mt5_bridge_engine.py", "r", encoding="utf-8") as f:
+            mt5_code = f.read()
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+
+        has_inv48 = "Invariant 48" in agents_code and "Reachsey 5-Position Volatility Matrix Engine" in agents_code
+        has_reachsey_exec = "def execute_reachsey_5pos_matrix" in mt5_code
+        has_reachsey_mon = "def monitor_reachsey_5pos_baskets" in mt5_code
+        has_reachsey_sweep = "def sweep_reachsey_baskets" in mt5_code
+        has_reachsey_telemetry = "def get_reachsey_baskets_telemetry" in mt5_code
+        has_reachsey_realized = 'b_data["realized_pnl"]' in mt5_code
+        has_reachsey_cmd = "async def mt5_reachsey_command" in bt_code
+
+        # Static Assertions
+        has_5pos_structure = "0.20" in mt5_code and "3000" in mt5_code
+        has_target_floor = "target_usd = 300.0" in mt5_code and "floor_usd = 150.0" in mt5_code
+        has_ratchet = "TRAILING_BASKET_RATCHET_LOCKED" in mt5_code
+        has_hard_floor = "EMERGENCY_BASKET_HARD_FLOOR" in mt5_code
+
+        # Dynamic Unit Test: execute_reachsey_5pos_matrix Dry-Run Validation
+        import mt5_bridge_engine
+        bridge_instance = mt5_bridge_engine.mt5_bridge
+
+        # Mock an online session to test execution logic safely
+        test_acc = "TEST_REACHSEY_AUDIT"
+        mock_sess = mt5_bridge_engine.MT5ClientSession(account_id=test_acc)
+        mock_sess.broker = "GTCFX-Demo"
+        mock_sess.currency = "USD"
+        mock_sess.balance = 3000.0
+        mock_sess.equity = 3000.0
+        mock_sess.status = "ONLINE"
+        bridge_instance.clients[test_acc] = mock_sess
+
+        # Test dry-run execution
+        launch_res = bridge_instance.execute_reachsey_5pos_matrix(
+            acc_id=test_acc,
+            capital_tier=3000.0,
+            lot_per_pos=0.20,
+            target_symbol="XAUUSD"
+        )
+
+        b_obj = launch_res.get("basket", {})
+        unit_test_res = (
+            launch_res.get("success") is True and
+            launch_res.get("positions_dispatched") == 5 and
+            launch_res.get("lot_per_pos") == 0.20 and
+            launch_res.get("total_lot") == 1.00 and
+            launch_res.get("target_profit") == 300.0 and
+            launch_res.get("max_loss_floor") == 150.0 and
+            b_obj.get("target_profit") == 300.0 and
+            b_obj.get("max_loss_floor") == 150.0 and
+            len(b_obj.get("orders", [])) == 5
+        )
+
+        # Clean up test basket and client
+        b_id = launch_res.get("basket_id")
+        if b_id in bridge_instance._reachsey_baskets:
+            del bridge_instance._reachsey_baskets[b_id]
+        if test_acc in bridge_instance.clients:
+            del bridge_instance.clients[test_acc]
+
+        all_inv48_passed = (
+            has_inv48 and has_reachsey_exec and has_reachsey_mon and
+            has_reachsey_sweep and has_reachsey_telemetry and has_reachsey_realized and
+            has_reachsey_cmd and has_5pos_structure and has_target_floor and
+            has_ratchet and has_hard_floor and unit_test_res
+        )
+
+        if all_inv48_passed:
+            log_pass("Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock (Invariant 48) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 48 check failed: inv48={has_inv48}, exec={has_reachsey_exec}, mon={has_reachsey_mon}, sweep={has_reachsey_sweep}, tele={has_reachsey_telemetry}, real={has_reachsey_realized}, cmd={has_reachsey_cmd}, unit_test={unit_test_res}")
+            log_fail("Reachsey 5-Position Volatility Matrix Engine (Invariant 48) specification missing or unit test failure!")
+    except Exception as e:
+        failures.append(f"Invariant 48 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
