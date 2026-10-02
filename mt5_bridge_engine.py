@@ -741,6 +741,7 @@ class MT5BridgeEngine:
         self._accounts_without_c_suffix: Set[str] = set()
         self._last_global_scan_time: float = 0.0
         self._reachsey_baskets: Dict[str, Dict[str, Any]] = {}  # {basket_id: data}
+        self._reachsey_all_tickets: Set[int] = set()
         
         # Silent Mode for Intermediate Breakeven & Trailing Modifications:
         # Executes SL modifications directly on MT5 broker silently, preserving capital and
@@ -1262,8 +1263,20 @@ class MT5BridgeEngine:
                     if not isinstance(b_data.get("dispatched_tickets"), set):
                         b_data["dispatched_tickets"] = set(b_data.get("dispatched_tickets") or [])
                     b_suffix = str(b_data.get("basket_id", ""))[-4:]
-                    if b_suffix and (b_suffix in str(sig_meta.get("comment", ""))):
+                    sig_comm = str(sig_meta.get("comment", ""))
+                    is_reach = (
+                        sig_meta.get("is_reachsey")
+                        or int(sig_meta.get("magic", 0)) == 888666
+                        or (b_suffix and b_suffix in sig_comm)
+                        or "R5_" in sig_comm
+                    )
+                    if is_reach:
                         b_data["dispatched_tickets"].add(ticket)
+                        if not hasattr(self, "_reachsey_all_tickets"):
+                            self._reachsey_all_tickets = set()
+                        self._reachsey_all_tickets.add(ticket)
+                        self._ticket_metadata[ticket]["is_reachsey"] = True
+                        self._ticket_metadata[ticket]["magic"] = 888666
         logger.info(f"🎯 [MT5 ORDER FILLED] Account {account_id} filled order! Ticket: #{ticket}, Symbol: {symbol or 'N/A'}, Price: {open_price}")
 
     def _handle_order_closed(self, payload: Dict[str, Any], account_id: str):
@@ -2413,52 +2426,39 @@ class MT5BridgeEngine:
         if action == "BUY":
             if is_extreme_skew:
                 plan = [
-                    ("BUY", "R5_LEG_1", 0.0, 4.0),
-                    ("BUY", "R5_LEG_2", 0.0, 4.0),
-                    ("BUY", "R5_LEG_3", 0.0, 4.0),
-                    ("BUY", "R5_LEG_4", 0.0, 4.0),
-                    ("SELL", "R5_HEDGE_5", 0.0, 4.0)
+                    ("BUY", "R5_LEG_1", 0.0, 0.0),
+                    ("BUY", "R5_LEG_2", 0.0, 0.0),
+                    ("BUY", "R5_LEG_3", 0.0, 0.0),
+                    ("BUY", "R5_LEG_4", 0.0, 0.0),
+                    ("SELL", "R5_HEDGE_5", 0.0, 0.0)
                 ]
             else:
                 plan = [
-                    ("BUY", "R5_LEG_1", 0.0, 4.0),
-                    ("BUY", "R5_LEG_2", 0.0, 4.0),
-                    ("BUY", "R5_LEG_3", 0.0, 4.0),
-                    ("SELL", "R5_HEDGE_4", 0.0, 4.0),
-                    ("SELL", "R5_HEDGE_5", 0.0, 4.0)
+                    ("BUY", "R5_LEG_1", 0.0, 0.0),
+                    ("BUY", "R5_LEG_2", 0.0, 0.0),
+                    ("BUY", "R5_LEG_3", 0.0, 0.0),
+                    ("SELL", "R5_HEDGE_4", 0.0, 0.0),
+                    ("SELL", "R5_HEDGE_5", 0.0, 0.0)
                 ]
         else:
             if is_extreme_skew:
                 plan = [
-                    ("SELL", "R5_LEG_1", 0.0, 4.0),
-                    ("SELL", "R5_LEG_2", 0.0, 4.0),
-                    ("SELL", "R5_LEG_3", 0.0, 4.0),
-                    ("SELL", "R5_LEG_4", 0.0, 4.0),
-                    ("BUY", "R5_HEDGE_5", 0.0, 4.0)
+                    ("SELL", "R5_LEG_1", 0.0, 0.0),
+                    ("SELL", "R5_LEG_2", 0.0, 0.0),
+                    ("SELL", "R5_LEG_3", 0.0, 0.0),
+                    ("SELL", "R5_LEG_4", 0.0, 0.0),
+                    ("BUY", "R5_HEDGE_5", 0.0, 0.0)
                 ]
             else:
                 plan = [
-                    ("SELL", "R5_LEG_1", 0.0, 4.0),
-                    ("SELL", "R5_LEG_2", 0.0, 4.0),
-                    ("SELL", "R5_LEG_3", 0.0, 4.0),
-                    ("BUY", "R5_HEDGE_4", 0.0, 4.0),
-                    ("BUY", "R5_HEDGE_5", 0.0, 4.0)
+                    ("SELL", "R5_LEG_1", 0.0, 0.0),
+                    ("SELL", "R5_LEG_2", 0.0, 0.0),
+                    ("SELL", "R5_LEG_3", 0.0, 0.0),
+                    ("BUY", "R5_HEDGE_4", 0.0, 0.0),
+                    ("BUY", "R5_HEDGE_5", 0.0, 0.0)
                 ]
 
         is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
-        try:
-            atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(sym_clean, action, current_price=cur_mid)
-            atr_val = float(atr_params.get("atr", 3.00) or 3.00)
-            base_tp_dist = float(atr_params.get("tp_dist", 8.00))
-        except Exception:
-            atr_val = 3.00 if is_gold else 0.0030
-            base_tp_dist = 8.00 if is_gold else 0.0080
-
-        # Institutional Disaster Catastrophic Stop Loss:
-        # Prevents premature broker stop-outs during natural intraday wave oscillations.
-        # The Basket Harvester (monitor_reachsey_5pos_baskets) manages active Net PnL (-5% hard floor / +10% target).
-        base_disaster_sl = max(15.00 if is_gold else 0.0120, atr_val * 4.0)
-
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
         dispatched_orders = []
         if is_cent and raw_bal < 10000.0:
@@ -2467,15 +2467,18 @@ class MT5BridgeEngine:
             lot_val = max(0.01, float(lot_per_pos or lot_val))
 
         for leg_act, leg_tag, tp_mult, sl_mult in plan:
-            leg_tp_dist = round(base_tp_dist * tp_mult, 4) if tp_mult > 0 else 0.0
-            leg_sl_dist = round(base_disaster_sl * sl_mult, 4) if sl_mult > 0 else 0.0
+            # Invariant 48: Indivisible Basket Cohabitation Standard
+            # ZERO broker-side SL/TP on individual legs! All 5 legs must stand together until profit!
+            # The Basket Harvester (monitor_reachsey_5pos_baskets) sweeps all 5 legs simultaneously.
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
             res = self.dispatch_order(
                 symbol=adapted_sym,
                 action=leg_act,
                 lot=lot_val,
-                sl_dist=leg_sl_dist,
-                tp_dist=leg_tp_dist,
+                sl=0.0,
+                tp=0.0,
+                sl_dist=0.0,
+                tp_dist=0.0,
                 comment=comment_str,
                 magic=888666,
                 target_account=account_id
@@ -2484,10 +2487,15 @@ class MT5BridgeEngine:
                 "action": leg_act,
                 "lot": lot_val,
                 "tag": leg_tag,
-                "tp_dist": leg_tp_dist,
-                "sl_dist": leg_sl_dist,
+                "tp_dist": 0.0,
+                "sl_dist": 0.0,
                 "result": res
             })
+            sig_id = res.get("signal_id", "")
+            if sig_id and sig_id in self._signal_to_metadata:
+                self._signal_to_metadata[sig_id]["is_reachsey"] = True
+                self._signal_to_metadata[sig_id]["basket_id"] = basket_id
+                self._signal_to_metadata[sig_id]["magic"] = 888666
 
         basket_info = {
             "basket_id": basket_id,
@@ -2627,10 +2635,16 @@ class MT5BridgeEngine:
             floor_loss = b_data.get("max_loss_floor", 150.0)
             min_harvest = b_data.get("min_harvest_milestone", 100.0 if unit == "USD" else 10000.0)
 
-            should_sweep = False
-            sweep_reason = ""
-
-            if net_pnl >= target_p:
+            # Invariant 48: Indivisible Basket Cohabitation & Anti-Decoupling Shield
+            # "លុបចោលការរត់ចោលគ្នា ត្រូវឈររួមជាមួយគ្នារហូតទាល់តែកើបប្រាក់ចំណេញទើបបិតព្រមគ្នាក្នុងល្បឿនលឿនបំផុត"
+            # If any leg was prematurely closed outside our control (broker anomaly / manual intervention)
+            # leaving remaining legs nakedly exposed without their hedge:
+            expected_legs = len(b_data.get("orders", [])) or 5
+            if 0 < len(matching_positions) < expected_legs and (now_ts - b_data.get("created_at", 0.0)) > 10.0:
+                should_sweep = True
+                sweep_reason = f"ANTI_DECOUPLING_EMERGENCY_RECONCILIATION ({len(matching_positions)}/{expected_legs} legs open - Sweeping all remaining to prevent unhedged exposure!)"
+                logger.error(f"🛑 [ANTI-DECOUPLING SHIELD] Basket {b_id} on Account #{account_id} lost leg symmetry ({len(matching_positions)}/{expected_legs} open)! Emergency sweeping remaining legs immediately!")
+            elif net_pnl >= target_p:
                 should_sweep = True
                 sweep_reason = f"TARGET_NET_PROFIT_HIT (+{net_pnl:,.2f} {unit} >= +{target_p:,.2f} {unit})"
             elif peak >= min_harvest:
@@ -3059,11 +3073,26 @@ class MT5BridgeEngine:
                             continue
                         current_tickets.add(ticket)
 
-                        # Invariant 48: Reachsey 5-Position Matrix is managed exclusively at the BASKET level.
-                        # Never apply individual single-trade Stop Loss, Breakeven Armor, or Harvester to Reachsey legs!
+                        # Invariant 48: Reachsey 5-Position Matrix is managed EXCLUSIVELY as an atomic BASKET.
+                        # ZERO LEG DECOUPLING: All 5 legs must stand together until profit is harvested!
+                        # Under NO circumstances shall an individual leg be closed or modified here!
+                        meta_t = self._ticket_metadata.get(ticket, {})
+                        meta_magic = int(meta_t.get("magic", 0) or 0)
+                        meta_comm = str(meta_t.get("comment", ""))
                         p_magic = int(p.get("magic", 0) or 0)
                         p_comm = str(p.get("comment", ""))
-                        if p_magic == 888666 or "R5_" in p_comm or p_comm.startswith("R5_") or "SWEEP_" in p_comm:
+
+                        is_reachsey_leg = (
+                            p_magic == 888666
+                            or meta_magic == 888666
+                            or "R5_" in p_comm or p_comm.startswith("R5_") or "SWEEP_" in p_comm
+                            or "R5_" in meta_comm or meta_comm.startswith("R5_")
+                            or "reachsey" in p_comm.lower() or "reachsey" in meta_comm.lower()
+                            or ticket in getattr(self, "_reachsey_all_tickets", set())
+                            or any(ticket in b.get("dispatched_tickets", set()) for b in self._reachsey_baskets.values())
+                            or is_reachsey_auto
+                        )
+                        if is_reachsey_leg:
                             continue
 
                         profit = float(p.get("profit", 0.0) or 0.0)
