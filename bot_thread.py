@@ -21827,7 +21827,7 @@ class TelegramBotThread(BaseThread):
                     return
 
             # Default Dashboard View
-            baskets_data = bridge.get_reachsey_baskets_telemetry(acc_id=target_account)
+            baskets_data = bridge.get_reachsey_baskets_telemetry(account_id=target_account, chat_id=chat_id)
             baskets = baskets_data.get("baskets", [])
             total_active_baskets = len(baskets)
             total_net_pnl = sum(b.get("net_profit", 0.0) for b in baskets)

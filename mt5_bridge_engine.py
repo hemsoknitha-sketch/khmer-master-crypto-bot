@@ -2165,7 +2165,11 @@ class MT5BridgeEngine:
         lot_per_pos: float = 0.20,
         chat_id: int = 0,
         account_id: str = "",
-        custom_action: Optional[str] = None
+        custom_action: Optional[str] = None,
+        acc_id: str = "",
+        capital_tier: float = 0.0,
+        target_symbol: Optional[str] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         👑 Sovereign MT5 Reachsey 5-Position Matrix Volatility Harvester (The 48th Invariant).
@@ -2175,6 +2179,12 @@ class MT5BridgeEngine:
         - Tier 3: $10,000 -> 3 Assets, 15 Positions (0.20 lot/pos, 3.00 lots total, TP: +$1000, Floor: -$500)
         Cent Mode: Automatically adapts targets and lot sizes to USC.
         """
+        account_id = str(account_id or acc_id or "").strip()
+        if capital_tier > 0:
+            capital = capital_tier
+        if target_symbol:
+            symbol = target_symbol
+
         if not account_id:
             cfg = db.get_user_mt5_auto_config(chat_id) if hasattr(db, "get_user_mt5_auto_config") else {}
             account_id = str(cfg.get("account_id") or cfg.get("login") or "").strip()
@@ -2393,8 +2403,17 @@ class MT5BridgeEngine:
                 except Exception as ex_sw:
                     logger.warning(f"⚠️ Reachsey basket sweep alert error: {ex_sw}")
 
-    def sweep_reachsey_baskets(self, basket_id: str = "ALL", chat_id: int = 0, account_id: str = "") -> Dict[str, Any]:
+    def sweep_reachsey_baskets(
+        self,
+        basket_id: str = "ALL",
+        chat_id: int = 0,
+        account_id: str = "",
+        acc_id: str = "",
+        reason: str = "Manual Sweep",
+        **kwargs
+    ) -> Dict[str, Any]:
         """Manually sweeps (flattens) all open Reachsey 5-Position Matrix orders."""
+        account_id = str(account_id or acc_id or "").strip()
         swept_count = 0
         with self._clients_lock:
             for acc, sess in self.clients.items():
@@ -2415,8 +2434,15 @@ class MT5BridgeEngine:
                 b_data["status"] = "MANUALLY_SWEPT"
         return {"success": True, "swept_positions": swept_count}
 
-    def get_reachsey_baskets_telemetry(self, chat_id: int = 0, account_id: str = "") -> Dict[str, Any]:
+    def get_reachsey_baskets_telemetry(
+        self,
+        chat_id: int = 0,
+        account_id: str = "",
+        acc_id: str = "",
+        **kwargs
+    ) -> Dict[str, Any]:
         """Returns real-time status of all Reachsey 5-Position Matrix baskets."""
+        account_id = str(account_id or acc_id or "").strip()
         active = []
         for b_id, b_data in self._reachsey_baskets.items():
             if account_id and b_data.get("account_id") != str(account_id):
