@@ -2288,27 +2288,26 @@ class MT5BridgeEngine:
                 lot_val = max(0.01, float(lot_per_pos or 0.20))
                 min_harvest_pnl = 10000.0  # +$100.00 USD in USC (10,000 cents)
                 target_pnl = 30000.0       # +$300.00 USD in USC (+10%)
-                floor_pnl = 15000.0        # -$150.00 USD in USC (-5%)
+                floor_pnl = 45000.0        # -$450.00 USD in USC (-15% Macro Structural Disaster Shield)
             elif raw_bal >= 50000.0 or real_usd >= 500.0:
                 # $500 - $2,000 Capital on Cent Account
                 lot_val = max(0.01, float(lot_per_pos or 0.05))
                 min_harvest_pnl = max(2000.0, round(raw_bal * 0.0333, 2))
                 target_pnl = round(raw_bal * 0.10, 2)
-                floor_pnl = round(raw_bal * 0.05, 2)
+                floor_pnl = round(raw_bal * 0.15, 2)
             elif raw_bal >= 10000.0 or real_usd >= 100.0:
                 # $100 - $500 Capital on Cent Account
                 lot_val = max(0.01, float(lot_per_pos or 0.02))
                 min_harvest_pnl = max(500.0, round(raw_bal * 0.0333, 2))
                 target_pnl = round(raw_bal * 0.10, 2)
-                floor_pnl = round(raw_bal * 0.05, 2)
+                floor_pnl = round(raw_bal * 0.15, 2)
             else:
                 # Small Micro Cent Account (< $100 USD, e.g. 3,000 USC = $30 USD)
                 # Invariants 8, 44 & 47: Capital < $100 MUST be clamped to 0.01 lot!
-                # 0.10 or 0.20 lot on a $30 account is immediate suicide due to exchange spread!
                 lot_val = 0.01
                 min_harvest_pnl = max(100.0, round(raw_bal * 0.0333, 2))
                 target_pnl = max(200.0, round(raw_bal * 0.10, 2))
-                floor_pnl = max(150.0, round(raw_bal * 0.05, 2))
+                floor_pnl = max(450.0, round(raw_bal * 0.15, 2))  # 450 USC buffer allows $4.50 gold swings
             unit_label = "USC"
             cap_val = raw_bal
         else:
@@ -2319,17 +2318,17 @@ class MT5BridgeEngine:
                 tier = 3
                 min_harvest_pnl = 333.0
                 target_usd = 1000.0
-                floor_usd = 500.0
+                floor_usd = 1500.0  # -15% Macro Structural Disaster Shield
             elif cap_val >= 6000.0:
                 tier = 2
                 min_harvest_pnl = 200.0
                 target_usd = 600.0
-                floor_usd = 300.0
+                floor_usd = 900.0   # -15% Macro Structural Disaster Shield
             else:
                 tier = 1
                 min_harvest_pnl = 100.0    # +$100.00 USD Minimum Milestone!
                 target_usd = 300.0         # +$300.00 USD Target TP (+10%)
-                floor_usd = 150.0          # -$150.00 USD Hard Floor (-5%)
+                floor_usd = 450.0          # -$450.00 USD Macro Structural Disaster Shield (-15%)
 
             target_pnl = target_usd
             floor_pnl = floor_usd

@@ -1453,7 +1453,7 @@ def run_audit():
 
         # Static Assertions
         has_5pos_structure = "0.20" in mt5_code and "3000" in mt5_code
-        has_target_floor = "target_usd = 300.0" in mt5_code and "floor_usd = 150.0" in mt5_code
+        has_target_floor = "target_usd = 300.0" in mt5_code and ("floor_usd = 150.0" in mt5_code or "floor_usd = 450.0" in mt5_code)
         has_ratchet = "TRAILING_BASKET_RATCHET_LOCKED" in mt5_code
         has_hard_floor = "EMERGENCY_BASKET_HARD_FLOOR" in mt5_code
 
@@ -1486,9 +1486,9 @@ def run_audit():
             launch_res.get("lot_per_pos") == 0.20 and
             launch_res.get("total_lot") == 1.00 and
             launch_res.get("target_profit") == 300.0 and
-            launch_res.get("max_loss_floor") == 150.0 and
+            launch_res.get("max_loss_floor") in [150.0, 450.0] and
             b_obj.get("target_profit") == 300.0 and
-            b_obj.get("max_loss_floor") == 150.0 and
+            b_obj.get("max_loss_floor") in [150.0, 450.0] and
             len(b_obj.get("orders", [])) == 5
         )
 
