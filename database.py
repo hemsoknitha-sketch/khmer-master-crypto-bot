@@ -4724,18 +4724,22 @@ def get_user_mt5_auto_config(chat_id: int) -> dict:
     }
 
 def get_all_active_mt5_auto_users() -> list:
-    """Returns list of chat_ids that have MT5 AI Auto-Trade active."""
+    """Returns list of chat_ids that have MT5 AI Auto-Trade or Reachsey Auto-Matrix active."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT key, value FROM system_settings WHERE key LIKE 'mt5_ai_auto_trade_%' AND value = '1'")
+    cursor.execute("SELECT key, value FROM system_settings WHERE (key LIKE 'mt5_ai_auto_trade_%' OR key LIKE 'mt5_reachsey_auto_%') AND value = '1'")
     rows = cursor.fetchall()
     conn.close()
     users = []
+    seen = set()
     for r in rows:
         parts = r[0].split("_")
-        if len(parts) >= 5:
+        if len(parts) >= 4:
             try:
-                users.append(int(parts[4]))
+                cid = int(parts[-1])
+                if cid not in seen:
+                    seen.add(cid)
+                    users.append(cid)
             except Exception:
                 pass
     return users

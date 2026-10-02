@@ -312,6 +312,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                                     break
 
             is_connected = bool(matched_session and matched_session.status == "ONLINE")
+            currency = getattr(matched_session, "currency", "USD") if matched_session else "USD"
             auto_cfg = db.get_user_mt5_auto_config(chat_id)
             if is_master_bridge:
                 user_cap = float(auto_cfg.get("capital", 0.0) or 0.0)
@@ -336,7 +337,7 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
                     if matched_db and float(matched_db.get("balance", 0.0)) > 0:
                         balance = float(matched_db.get("balance", 0.0))
                         equity = float(matched_db.get("equity", balance))
-                        currency = str(matched_db.get("currency", currency))
+                        currency = str(matched_db.get("currency", currency or "USD"))
                     else:
                         # Fallback to Virtual Multi-User Vault Ledger
                         v_ledger = db.get_or_create_virtual_ledger(chat_id)

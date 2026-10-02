@@ -2685,7 +2685,9 @@ class MT5BridgeEngine:
                     real_usd_balance = (raw_bal / 100.0) if is_cent_account else raw_bal
 
                     auto_cfg = db.get_user_mt5_auto_config(chat_id)
-                    is_auto_active = auto_cfg.get("enabled", False) or (db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1")
+                    is_reachsey_auto = db.get_system_setting(f"mt5_reachsey_auto_{chat_id}", "0") == "1"
+                    standard_auto_active = auto_cfg.get("enabled", False) or (db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "0") == "1")
+                    is_auto_active = standard_auto_active or is_reachsey_auto
 
                     # Fiduciary Capital Protection: If auto-trade is disabled and NO positions are open, skip.
                     # BUT if positions are OPEN, the Harvester ALWAYS runs to protect capital from catastrophic drawdowns!
@@ -3019,6 +3021,61 @@ class MT5BridgeEngine:
                         )
                     except Exception as ex_reachsey:
                         logger.debug(f"⚠️ Reachsey 5-pos basket monitor notice: {ex_reachsey}")
+
+                    # =========================================================
+                    # 1.5 REACHSEY 5-POSITION VOLATILITY MATRIX ENGINE (Invariant 48)
+                    # =========================================================
+                    if is_reachsey_auto:
+                        active_reachsey_baskets = [
+                            b for b in self._reachsey_baskets.values()
+                            if str(b.get("account_id")) == str(acc_id) and b.get("status") == "ACTIVE"
+                        ]
+                        # Determine Capital Tier based on real account balance
+                        if real_usd_balance >= 9000.0:
+                            reachsey_tier = 10000.0
+                            max_reachsey_baskets = 3
+                        elif real_usd_balance >= 5000.0:
+                            reachsey_tier = 6000.0
+                            max_reachsey_baskets = 2
+                        else:
+                            reachsey_tier = 3000.0
+                            max_reachsey_baskets = 1
+
+                        if is_cent_account:
+                            reachsey_tier = 3000.0
+                            max_reachsey_baskets = 1
+
+                        if not hasattr(self, "_last_reachsey_auto_scan"):
+                            self._last_reachsey_auto_scan = {}
+
+                        last_reachsey_scan = self._last_reachsey_auto_scan.get(str(acc_id), 0.0)
+                        if (now_ts - last_reachsey_scan) >= 30.0:
+                            self._last_reachsey_auto_scan[str(acc_id)] = now_ts
+                            logger.info(f"👑 [REACHSEY AUTO-RADAR] User {chat_id} (Acc #{acc_id}): Active Baskets ({len(active_reachsey_baskets)}/{max_reachsey_baskets}) | Tier: ${reachsey_tier:,.0f} | Real Bal: ${real_usd_balance:,.2f} | Scanning Top Volatility Assets...")
+
+                            if len(active_reachsey_baskets) < max_reachsey_baskets:
+                                existing_basket_syms = {str(b.get("symbol", "")).upper() for b in active_reachsey_baskets}
+                                target_sym = None
+                                candidate_syms = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD", "ETHUSD"]
+                                for cs in candidate_syms:
+                                    if cs not in existing_basket_syms:
+                                        target_sym = cs
+                                        break
+                                if target_sym:
+                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position matrix on {target_sym} for account #{acc_id} (Tier: ${reachsey_tier:,.0f})...")
+                                    threading.Thread(
+                                        target=self.execute_reachsey_5pos_matrix,
+                                        kwargs={
+                                            "acc_id": acc_id,
+                                            "capital_tier": reachsey_tier,
+                                            "chat_id": chat_id,
+                                            "target_symbol": target_sym
+                                        },
+                                        daemon=True
+                                    ).start()
+
+                        if not standard_auto_active:
+                            continue
 
                     # =========================================================
                     # 2. POSITION SIZING & DEBOUNCED RADAR SCAN (Every 20s)
