@@ -25,7 +25,16 @@ echo -e "${CYAN}================================================================
 
 ACCOUNT_ID="$1"
 PASSWORD="$2"
-SERVER="${3:-GTCGlobalSA-Server 2}"
+SERVER="$3"
+
+# Auto-detect GTCFX Server 5 (Cent) if account starts with 55 or 77 and server not explicitly given
+if [ -z "$SERVER" ]; then
+    if [[ "$ACCOUNT_ID" =~ ^55 ]] || [[ "$ACCOUNT_ID" =~ ^77 ]]; then
+        SERVER="GTCGlobalSA-Server 5"
+    else
+        SERVER="GTCGlobalSA-Server 2"
+    fi
+fi
 
 # Auto-strip accidental angle brackets <...> if user copied placeholder syntax
 ACCOUNT_ID="${ACCOUNT_ID#<}"

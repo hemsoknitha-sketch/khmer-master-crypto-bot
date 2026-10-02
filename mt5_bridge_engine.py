@@ -2281,24 +2281,34 @@ class MT5BridgeEngine:
 
         if is_cent:
             # Cent Account Mode (Invariant 44 & 48 Master Plan):
-            # Account balance is in USC (e.g. 300,000 USC = $3,000 USD).
+            # Account balance is in USC (e.g. 300,000 USC = $3,000 USD, or 3,000 USC = $30 USD).
             tier = 1
             if raw_bal >= 200000.0 or real_usd >= 2000.0:
-                # $3,000 Capital Tier 1 on Cent Account (300,000 USC)
+                # $3,000 Capital Tier 1 on Cent Account (300,000 USC = $3,000 USD)
                 lot_val = max(0.01, float(lot_per_pos or 0.20))
                 min_harvest_pnl = 10000.0  # +$100.00 USD in USC (10,000 cents)
                 target_pnl = 30000.0       # +$300.00 USD in USC (+10%)
                 floor_pnl = 15000.0        # -$150.00 USD in USC (-5%)
             elif raw_bal >= 50000.0 or real_usd >= 500.0:
-                lot_val = max(0.01, float(lot_per_pos or 0.10))
+                # $500 - $2,000 Capital on Cent Account
+                lot_val = max(0.01, float(lot_per_pos or 0.05))
                 min_harvest_pnl = max(2000.0, round(raw_bal * 0.0333, 2))
                 target_pnl = round(raw_bal * 0.10, 2)
                 floor_pnl = round(raw_bal * 0.05, 2)
+            elif raw_bal >= 10000.0 or real_usd >= 100.0:
+                # $100 - $500 Capital on Cent Account
+                lot_val = max(0.01, float(lot_per_pos or 0.02))
+                min_harvest_pnl = max(500.0, round(raw_bal * 0.0333, 2))
+                target_pnl = round(raw_bal * 0.10, 2)
+                floor_pnl = round(raw_bal * 0.05, 2)
             else:
-                lot_val = 0.10 if is_gold else 0.02
-                min_harvest_pnl = max(50.0, round(raw_bal * 0.0333, 2))
-                target_pnl = max(50.0, round(raw_bal * 0.10, 2))
-                floor_pnl = max(25.0, round(raw_bal * 0.05, 2))
+                # Small Micro Cent Account (< $100 USD, e.g. 3,000 USC = $30 USD)
+                # Invariants 8, 44 & 47: Capital < $100 MUST be clamped to 0.01 lot!
+                # 0.10 or 0.20 lot on a $30 account is immediate suicide due to exchange spread!
+                lot_val = 0.01
+                min_harvest_pnl = max(100.0, round(raw_bal * 0.0333, 2))
+                target_pnl = max(200.0, round(raw_bal * 0.10, 2))
+                floor_pnl = max(150.0, round(raw_bal * 0.05, 2))
             unit_label = "USC"
             cap_val = raw_bal
         else:
@@ -2452,7 +2462,10 @@ class MT5BridgeEngine:
 
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
         dispatched_orders = []
-        lot_val = max(0.01, float(lot_per_pos or lot_val))
+        if is_cent and raw_bal < 10000.0:
+            lot_val = 0.01  # Invariant 8 & 44 & 47: Strict Micro Capital Shield for < $100
+        else:
+            lot_val = max(0.01, float(lot_per_pos or lot_val))
 
         for leg_act, leg_tag, tp_mult, sl_mult in plan:
             leg_tp_dist = round(base_tp_dist * tp_mult, 4) if tp_mult > 0 else 0.0
