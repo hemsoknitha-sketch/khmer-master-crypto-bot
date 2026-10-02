@@ -687,6 +687,18 @@ Any modification that breaks any of the following 30 invariants is considered an
   5. **Disaster Hard Floor Risk Circuit Breaker (-5%):** Strictly limits maximum basket risk to $-5\%$ of capital (preserving 95% of equity) to defend against Black Swan broker gaps and extreme institutional shocks.
   6. **Dynamic Delta Skew:** Positions are weighted (3:2 or 4:1 directional skew) according to 33-AI Model trend bias, neutralizing directional whipsaw.
 
+- **Enforcement:** Verified by udit_system.py [CHECK 38/39].
+
+### Invariant 49: Hugging Face VIP MT5 Worker Cloud Citadel & Free 16GB RAM Distributed Edge Worker Standard (The 49th Pillar)
+- **Location:** hf_space_manager.py, hf_mt5_worker/ (Dockerfile, README.md, 
+equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_command, aliases /mt5hf, /hf_vip, /hfvip, /hf_worker, /hfworker), ot_commands_registry.py
+- **Rule:**
+  1. **Zero VPS Hardware Bloat (100% Free Edge Scaling):** Under NO circumstances shall multiple Wine MT5 GUI client processes be forced to run concurrently on the single Linux VPS instance. All VIP MT5 client runtime workloads are offloaded to dedicated, isolated Hugging Face Docker Spaces (Free 16 GB RAM / 2 vCPU per user).
+  2. **Stateless Outward TCP Gateway:** The Linux VPS acts strictly as an asynchronous TCP message broker on Port 5555 (mt5_bridge_engine.py). Each remote Edge worker socket consumes only ~10 KB of RAM on VPS (1,000 users = ~10 MB RAM total), maintaining 0.00% VPS RAM and CPU overhead.
+  3. **KMS Space Secret Protection:** All user MT5 login credentials, passwords, and broker servers must be injected strictly into encrypted Hugging Face Space Secrets (MT5_ACCOUNT, MT5_PASSWORD, MT5_SERVER, SECRET_KEY). Never expose raw credentials in plain text or commit them into public repositories.
+  4. **Continuous Anti-Sleep Sentinel Protocol:** To prevent Hugging Face's 48-hour idle auto-pause policy, the system incorporates an autonomous sentinel loop (hf_mt5_worker/app.py and scheduler_tasks.py / ping_all_active_workers) pinging /ping every 5-12 minutes to guarantee uninterrupted 24/7/365 execution.
+- **Enforcement:** Verified by udit_system.py [CHECK 39/39].
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

@@ -52,6 +52,7 @@ def get_public_bot_commands():
         BotCommand("forex", "💱 24/7 Multi-Session Forex & Satellite Exchange"),
         BotCommand("mt5", "⚡ Super Smart MT5 & GTCFX Tokyo Terminal"),
         BotCommand("mt5_reachsey", "👑 Reachsey 5-Position Matrix Engine"),
+        BotCommand("mt5_hf", "🤗 Free 16GB Hugging Face VIP MT5 Worker"),
         BotCommand("capital_ib", "🤝 Capital.com IB Spread Rebates (30%-50%)"),
         BotCommand("capital_orb", "🎯 London & NY Opening Range Breakout"),
         BotCommand("capital_kelly", "📐 Fractional Kelly Dynamic Position Sizer"),

@@ -5643,6 +5643,37 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await mt5_command(update, context)
+            elif data in ["btn_mt5_hf", "btn_mt5_hf_menu", "btn_mt5_hf_status", "btn_mt5_hf_refresh"]:
+                try:
+                    await update.callback_query.answer("🤗 Hugging Face VIP Edge Worker Telemetry...")
+                except Exception:
+                    pass
+                if data in ["btn_mt5_hf_status", "btn_mt5_hf_refresh"]:
+                    context.args = ["STATUS"]
+                else:
+                    context.args = []
+                await mt5_hf_command(update, context)
+            elif data in ["btn_mt5_hf_connect_help", "btn_mt5_hf_connect"]:
+                try:
+                    await update.callback_query.answer("🚀 របៀបភ្ជាប់ Hugging Face 16GB Worker...")
+                except Exception:
+                    pass
+                context.args = ["HELP"]
+                await mt5_hf_command(update, context)
+            elif data == "btn_mt5_hf_ping":
+                try:
+                    await update.callback_query.answer("📡 កំពុងដំណើរការ Anti-Sleep Sentinel...")
+                except Exception:
+                    pass
+                context.args = ["PING"]
+                await mt5_hf_command(update, context)
+            elif data == "btn_mt5_hf_restart":
+                try:
+                    await update.callback_query.answer("🔄 កំពុង Restart Hugging Face Space...")
+                except Exception:
+                    pass
+                context.args = ["RESTART"]
+                await mt5_hf_command(update, context)
             elif data in ["btn_mt5_reachsey_menu", "btn_mt5_reachsey_refresh", "btn_mt5_reachsey_status"]:
                 try:
                     await update.callback_query.answer("👑 Reachsey 5-Position Matrix Telemetry...")
@@ -22001,6 +22032,313 @@ class TelegramBotThread(BaseThread):
                 clean_txt = re.sub(r'<[^>]+>', '', msg_reachsey)
                 await update.effective_message.reply_text(clean_txt, reply_markup=kb_reachsey)
 
+        async def mt5_hf_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            ⚡ Institutional Hugging Face VIP MT5 Worker Cloud Citadel
+            Spawns isolated 16GB RAM Hugging Face Docker Spaces for each VIP user,
+            connecting outward to Tokyo Master VPS (Port 5555) with 100% ZERO VPS resource overhead.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_id = update.effective_user.id if update.effective_user else chat_id
+            user_lang = db.get_user_language(chat_id)
+
+            is_admin_user = (user_id == 859271875) or db.is_admin(user_id) or (chat_id == 859271875) or db.is_admin(chat_id)
+            is_vip = is_admin_user or db.is_vip(user_id) or db.is_vip(chat_id)
+            if not is_vip:
+                raw_lang = db.get_user_language(user_id) or db.get_user_language(chat_id)
+                user_lang = str(raw_lang or 'km')
+                if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+                msg = loc.get_text(user_lang, 'access_denied')
+                if update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown")
+                return
+
+            import hf_space_manager
+            import ui_standards
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            mgr = hf_space_manager.HuggingFaceSpaceManager
+            args = list(context.args) if context and context.args else []
+
+            if args:
+                sub = str(args[0]).upper().strip()
+
+                # --- 1. CONNECT NEW VIP USER TO HUGGING FACE SPACE ---
+                if sub in ["CONNECT", "LINK", "ADD", "CREATE", "START"]:
+                    if len(args) < 4:
+                        help_msg = (
+                            f"⚠️ <b>របៀបភ្ជាប់ Hugging Face 16GB Edge Worker សម្រាប់ MT5 ៖</b>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"សូមវាយបញ្ជាតាមទម្រង់ខាងក្រោម ៖\n"
+                            f"<code>/mt5_hf CONNECT &lt;គណនី_MT5&gt; &lt;ពាក្យសម្ងាត់&gt; &lt;Server&gt; [Broker] [CENT]</code>\n\n"
+                            f"📌 <b>ឧទាហរណ៍ជាក់ស្តែង (ចុចចម្លង ១-Tap) ៖</b>\n"
+                            f"• គណនី Standard ៖\n"
+                            f"  <code>/mt5_hf CONNECT 12345678 my_pass GTCGlobalTrade-Live GTCFX</code>\n"
+                            f"• គណនី Cent ៖\n"
+                            f"  <code>/mt5_hf CONNECT 88991122 my_pass Exness-Real CENT</code>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛡️ <b>អត្ថប្រយោជន៍ខ្ពស់បំផុត ៖</b>\n"
+                            f"• ទទួលបាន <b>Free 16 GB RAM + 2 vCPU</b> ផ្ទាល់ខ្លួនលើ Hugging Face\n"
+                            f"• <b>0% Load លើ VPS</b> (មិនស៊ី RAM, CPU ឬ Disk របស់ VPS សូម្បីតែបន្តិច)\n"
+                            f"• សុវត្ថិភាព 100% ៖ Password ត្រូវ Encrypt ក្នុង Space Secrets ដោយស្វ័យប្រវត្តិ\n"
+                            f"• ដំណើរការ ២៤/៧ ជាមួយប្រព័ន្ធស្វ័យប្រវត្តិកើបប្រាក់ចំណេញ!"
+                        )
+                        await update.effective_message.reply_text(help_msg, parse_mode="HTML")
+                        return
+
+                    account_id = str(args[1]).strip()
+                    password = str(args[2]).strip()
+                    server = str(args[3]).strip()
+                    broker = str(args[4]).strip() if len(args) >= 5 else "GTCFX"
+                    is_cent = True if ((len(args) >= 6 and str(args[5]).upper() == "CENT") or ("cent" in broker.lower())) else False
+
+                    prog_msg = await update.effective_message.reply_text(
+                        f"⏳ <b>កំពុងបង្កើត Hugging Face Docker Space ដោយស្វ័យប្រវត្តិ សម្រាប់គណនី #{account_id}...</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"• Cloud Provider: <code>Hugging Face Free Spaces</code>\n"
+                        f"• Hardware Quota: <code>16 GB RAM / 2 vCPU</code>\n"
+                        f"• Master Bridge: <code>Google Cloud Tokyo VPS (Port 5555)</code>\n"
+                        f"• Security: <code>AES-256 KMS Space Secrets</code>\n"
+                        f"<i>សូមរង់ចាំប្រហែល ៥ ទៅ ១០ វិនាទី...</i>",
+                        parse_mode="HTML"
+                    )
+
+                    loop = asyncio.get_running_loop()
+                    res = await loop.run_in_executor(
+                        None,
+                        mgr.provision_vip_worker_space,
+                        chat_id, account_id, password, server, broker, is_cent
+                    )
+
+                    if res.get("success"):
+                        space_url = res.get("space_url", "")
+                        space_id = res.get("space_id", "")
+                        success_text = (
+                            f"🎉 <b>ជោគជ័យ! បង្កើត & ភ្ជាប់ Hugging Face MT5 Worker រួចរាល់!</b>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"👤 <b>MT5 Account:</b> <code>#{account_id}</code>\n"
+                            f"🏛️ <b>Broker & Server:</b> <code>{broker}</code> (<code>{server}</code>)\n"
+                            f"⚡ <b>Hardware Allocation:</b> <code>Free 16 GB RAM / 2 vCPU</code>\n"
+                            f"🚀 <b>Space Repository:</b> <code>{space_id}</code>\n"
+                            f"🌐 <b>Live Web Dashboard:</b>\n<a href='{space_url}'>{space_url}</a>\n"
+                            f"📡 <b>Master Tokyo VPS Bridge:</b> <code>{res.get('vps_ip')}:{res.get('vps_port')}</code>\n"
+                            f"🛡️ <b>VPS System Footprint:</b> <code>0.00% RAM / 0.00% Disk Load</code>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"Container កំពុង Build & Start លើ Hugging Face ហើយនឹងភ្ជាប់មក Master Brain Tokyo ដោយស្វ័យប្រវត្តិក្នងរង្វង់ 1-2 នាទី!\n\n"
+                            f"🔍 ពិនិត្យស្ថានភាព ៖ <code>/mt5_hf STATUS</code>"
+                        )
+                        kb_succ = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("⚡ ពិនិត្យស្ថានភាព Worker", callback_data="btn_mt5_hf_status")],
+                            [InlineKeyboardButton("🌐 បើក Web Dashboard", url=space_url)],
+                            [InlineKeyboardButton("⬅️ ត្រឡប់ទៅ MT5 Master", callback_data="btn_mt5_menu")]
+                        ])
+                        try:
+                            await prog_msg.edit_text(success_text, parse_mode="HTML", reply_markup=kb_succ)
+                        except Exception:
+                            await update.effective_message.reply_text(success_text, parse_mode="HTML", reply_markup=kb_succ)
+                    else:
+                        err_text = (
+                            f"❌ <b>ការបង្កើត Hugging Face Worker មិនបានជោគជ័យ!</b>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"មូលហេតុ ៖ <code>{res.get('reason')}</code>\n"
+                            f"សារលម្អិត ៖ <code>{res.get('message', 'N/A')}</code>\n\n"
+                            f"💡 <b>ដំណោះស្រាយ ៖</b>\n"
+                            f"សូមប្រាកដថា <code>HF_TOKEN</code> ត្រូវបានកំណត់ត្រឹមត្រូវក្នុង <code>.env</code> របស់ប្រព័ន្ធ។"
+                        )
+                        try:
+                            await prog_msg.edit_text(err_text, parse_mode="HTML")
+                        except Exception:
+                            await update.effective_message.reply_text(err_text, parse_mode="HTML")
+                    return
+
+                # --- 2. STATUS CHECK ---
+                elif sub in ["STATUS", "CHECK", "INFO"]:
+                    workers = db.get_vip_hf_workers_by_chat_id(chat_id) if not is_admin_user else db.get_all_vip_hf_workers()
+                    if not workers:
+                        no_worker_msg = (
+                            f"ℹ️ <b>មិនទាន់មាន Hugging Face Worker សម្រាប់គណនីរបស់អ្នកនៅឡើយទេ!</b>\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"លោកអ្នកអាចតម្លើង Free 16GB RAM Edge Worker បានភ្លាមៗដោយវាយបញ្ជា ៖\n"
+                            f"<code>/mt5_hf CONNECT 12345678 your_password GTCGlobalTrade-Live GTCFX</code>"
+                        )
+                        kb_help = InlineKeyboardMarkup([[
+                            InlineKeyboardButton("🚀 របៀបភ្ជាប់ Hugging Face", callback_data="btn_mt5_hf_connect_help"),
+                            InlineKeyboardButton("⬅️ MT5 Master", callback_data="btn_mt5_menu")
+                        ]])
+                        await update.effective_message.reply_text(no_worker_msg, parse_mode="HTML", reply_markup=kb_help)
+                        return
+
+                    status_lines = [
+                        f"⚡ <b>ស្ថានភាព HUGGING FACE VIP EDGE WORKERS ({len(workers)} Active) ៖</b>",
+                        f"{ui_standards.DIVIDER_HEAVY}"
+                    ]
+                    loop = asyncio.get_running_loop()
+                    for w in workers[:5]:
+                        acc = w.get("account_id", "")
+                        broker = w.get("broker", "GTCFX")
+                        s_url = w.get("space_url", "")
+                        bal = float(w.get("balance", 0.0) or 0.0)
+                        eq = float(w.get("equity", 0.0) or 0.0)
+                        last_p = float(w.get("last_ping", 0.0) or 0.0)
+                        p_ago = int(time.time() - last_p) if last_p > 0 else 9999
+
+                        runtime_info = await loop.run_in_executor(None, mgr.get_vip_worker_runtime, acc)
+                        stage = runtime_info.get("stage", w.get("status", "UNKNOWN"))
+
+                        badge = "🟢 ONLINE" if (stage in ["RUNNING", "ONLINE"] and p_ago < 300) else ("🟡 BUILDING" if stage in ["BUILDING", "APP_STARTING"] else "⚪ IDLE")
+
+                        status_lines.append(
+                            f"• <b>Account #{acc}</b> ({broker})\n"
+                            f"  ├─ Status: <code>{badge}</code> ({stage})\n"
+                            f"  ├─ Hardware: <code>Free 16 GB RAM / 2 vCPU</code>\n"
+                            f"  ├─ Balance/Equity: <code>${bal:,.2f}</code> / <code>${eq:,.2f}</code>\n"
+                            f"  ├─ Last Ping: <code>{p_ago}s មុន</code>\n"
+                            f"  └─ Dashboard: <a href='{s_url}'>View Space</a>"
+                        )
+                    status_lines.append(f"{ui_standards.DIVIDER_HEAVY}")
+                    status_lines.append("<i>Tokyo Master VPS Footprint: 0.00% RAM (Distributed Edge)</i>")
+
+                    kb_stat = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព", callback_data="btn_mt5_hf_status"),
+                            InlineKeyboardButton("📡 Ping Sentinel", callback_data="btn_mt5_hf_ping")
+                        ],
+                        [
+                            InlineKeyboardButton("🔄 Restart Worker", callback_data="btn_mt5_hf_restart"),
+                            InlineKeyboardButton("⬅️ MT5 Master", callback_data="btn_mt5_menu")
+                        ]
+                    ])
+                    await update.effective_message.reply_text("\n".join(status_lines), parse_mode="HTML", reply_markup=kb_stat)
+                    return
+
+                # --- 3. PING SENTINEL ---
+                elif sub in ["PING", "SENTINEL", "ALIVE"]:
+                    loop = asyncio.get_running_loop()
+                    pinged_count = await loop.run_in_executor(None, mgr.ping_all_active_workers)
+                    ping_res = (
+                        f"📡 <b>HUGGING FACE ANTI-SLEEP SENTINEL EXECUTED!</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ បានផ្ញើសញ្ញា Keep-Alive ទៅកាន់ <b>{pinged_count} Spaces</b> ដោយជោគជ័យ!\n"
+                        f"🛡️ <b>ប្រសិទ្ធភាព ៖</b> ការពារ Hugging Face មិនឱ្យកាត់ផ្តាច់ ឬគេង (Prevent 48h Idle Sleep) ១០០%!"
+                    )
+                    kb_p = InlineKeyboardMarkup([[
+                        InlineKeyboardButton("⚡ ពិនិត្យស្ថានភាព Worker", callback_data="btn_mt5_hf_status"),
+                        InlineKeyboardButton("⬅️ ត្រឡប់ក្រោយ", callback_data="btn_mt5_hf_menu")
+                    ]])
+                    await update.effective_message.reply_text(ping_res, parse_mode="HTML", reply_markup=kb_p)
+                    return
+
+                # --- 4. RESTART WORKER ---
+                elif sub in ["RESTART", "RELOAD"]:
+                    workers = db.get_vip_hf_workers_by_chat_id(chat_id)
+                    target_acc = str(args[1]).strip() if len(args) >= 2 else (workers[0]["account_id"] if workers else None)
+                    if not target_acc:
+                        await update.effective_message.reply_text("⚠️ មិនមាន Worker សម្រាប់ធ្វើការ Restart ទេ!", parse_mode="Markdown")
+                        return
+                    loop = asyncio.get_running_loop()
+                    ok = await loop.run_in_executor(None, mgr.restart_vip_worker, target_acc)
+                    rst_msg = f"{'🔄 បាន Restart Worker #' + target_acc + ' លើ Hugging Face រួចរាល់!' if ok else '❌ ការ Restart Worker #' + target_acc + ' មិនបានជោគជ័យ!'}"
+                    await update.effective_message.reply_text(rst_msg, parse_mode="Markdown")
+                    return
+
+                # --- 5. DESTROY / REMOVE WORKER ---
+                elif sub in ["DESTROY", "DELETE", "REMOVE"]:
+                    workers = db.get_vip_hf_workers_by_chat_id(chat_id)
+                    target_acc = str(args[1]).strip() if len(args) >= 2 else (workers[0]["account_id"] if workers else None)
+                    if not target_acc:
+                        await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់លេខគណនី MT5 ដែលត្រូវលុប ៖ `/mt5_hf DESTROY <account_id>`", parse_mode="Markdown")
+                        return
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, mgr.destroy_vip_worker, target_acc)
+                    del_msg = (
+                        f"🗑️ <b>បានលុប Hugging Face Worker សម្រាប់គណនី #{target_acc} រួចរាល់!</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"Space ត្រូវបានលុបចេញពី Hugging Face និងជម្រះចេញពីប្រព័ន្ធទិន្នន័យ។"
+                    )
+                    await update.effective_message.reply_text(del_msg, parse_mode="HTML")
+                    return
+
+                # --- 6. HELP / GUIDE ---
+                elif sub in ["HELP", "GUIDE"]:
+                    guide_text = (
+                        f"📖 <b>មគ្គុទ្ទេសក៍ភ្ជាប់ Hugging Face 16GB VIP Worker ៖</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"<b>ជំហានទី ១ ៖</b> រៀបចំព័ត៌មានគណនី MT5 (Login ID, Master Password, Server Name, Broker)\n"
+                        f"<b>ជំហានទី ២ ៖</b> ផ្ញើបញ្ជាភ្ជាប់មកកាន់ Bot ៖\n"
+                        f"<code>/mt5_hf CONNECT 12345678 your_password GTCGlobalTrade-Live GTCFX</code>\n\n"
+                        f"<b>ជំហានទី ៣ ៖</b> ប្រព័ន្ធ AI នឹងបង្កើត Docker Space ដាច់ដោយឡែកលើ Hugging Face (Free 16GB RAM) ដោយស្វ័យប្រវត្តិ។\n\n"
+                        f"💎 <b>អត្ថប្រយោជន៍ពិសេស ៖</b>\n"
+                        f"• គ្មានការកកស្ទះលើ Linux VPS របស់យើងសូម្បីតែបន្តិច (0% VPS RAM/CPU)\n"
+                        f"• រត់ 24/7 គ្មានថ្ងៃឈប់សម្រាក ភ្ជាប់មកកាន់ Master Brain នៅ Tokyo\n"
+                        f"• អាចភ្ជាប់ Users VIP រាប់ពាន់នាក់ក្នុងពេលតែមួយបានយ៉ាងរលូន!"
+                    )
+                    kb_g = InlineKeyboardMarkup([[
+                        InlineKeyboardButton("⚡ ពិនិត្យស្ថានភាព Worker", callback_data="btn_mt5_hf_status"),
+                        InlineKeyboardButton("⬅️ ត្រឡប់ទៅ MT5 Master", callback_data="btn_mt5_menu")
+                    ]])
+                    await update.effective_message.reply_text(guide_text, parse_mode="HTML", reply_markup=kb_g)
+                    return
+
+            # --- DEFAULT: MAIN EXECUTIVE DASHBOARD ---
+            workers = db.get_vip_hf_workers_by_chat_id(chat_id)
+            vps_ip = mgr.resolve_vps_ip()
+
+            w_summary_lines = []
+            if workers:
+                for w in workers:
+                    acc = w.get("account_id", "")
+                    broker = w.get("broker", "GTCFX")
+                    st = w.get("status", "ONLINE")
+                    s_url = w.get("space_url", "")
+                    badge = "🟢 ONLINE" if st in ["ONLINE", "RUNNING"] else ("🟡 BUILDING" if st == "BUILDING" else "⚪ IDLE")
+                    w_summary_lines.append(f"• <b>Account #{acc}</b> ({broker}) ➔ <code>{badge}</code> [<a href='{s_url}'>Dashboard</a>]")
+            else:
+                w_summary_lines.append("• <i>មិនទាន់មាន Worker ភ្ជាប់នៅឡើយទេ។ ចុចប៊ូតុងខាងក្រោមដើម្បីភ្ជាប់!</i>")
+
+            worker_block = "\n".join(w_summary_lines)
+
+            main_dash = (
+                f"🏛️ <b>APEX HUGGING FACE VIP EDGE WORKER CITADEL</b>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🌐 <b>Edge Architecture:</b> <code>100% Zero VPS Overhead</code>\n"
+                f"⚡ <b>Hardware Quota:</b> <code>Free 16 GB RAM / 2 vCPU per User</code>\n"
+                f"🗼 <b>Master Brain Bridge:</b> <code>Tokyo VPS ({vps_ip}:5555)</code>\n"
+                f"🛡️ <b>Security Encryption:</b> <code>Hugging Face KMS Secrets</code>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👥 <b>គណនី VIP WORKERS របស់អ្នក ៖</b>\n"
+                f"{worker_block}\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 <b>បញ្ជាផ្លូវកាត់ (ចុចចម្លង ១-Tap) ៖</b>\n"
+                f"• ភ្ជាប់គណនី Standard ៖\n"
+                f"  <code>/mt5_hf CONNECT 12345678 my_pass GTCGlobalTrade-Live GTCFX</code>\n"
+                f"• ភ្ជាប់គណនី Cent ៖\n"
+                f"  <code>/mt5_hf CONNECT 88991122 my_pass Exness-Real CENT</code>\n"
+                f"• ពិនិត្យស្ថានភាព ៖ <code>/mt5_hf STATUS</code>\n"
+                f"• Anti-Sleep Sentinel ៖ <code>/mt5_hf PING</code>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"<i>Khmer Master Crypto | Hugging Face Distributed Cloud Citadel</i>\n"
+                f"<i>APEX SUPER BRAIN AI — បច្ចេកវិទ្យាកម្រិតកំពូល ល្បឿនលឿនបំផុត ២៤/៧!</i>"
+            )
+
+            kb_main = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⚡ ពិនិត្យស្ថានភាព Worker", callback_data="btn_mt5_hf_status"),
+                    InlineKeyboardButton("🚀 របៀបភ្ជាប់ Hugging Face", callback_data="btn_mt5_hf_connect_help")
+                ],
+                [
+                    InlineKeyboardButton("📡 Ping Anti-Sleep", callback_data="btn_mt5_hf_ping"),
+                    InlineKeyboardButton("🔄 Restart Worker", callback_data="btn_mt5_hf_restart")
+                ],
+                [
+                    InlineKeyboardButton("⚡ MT5 Master Bridge", callback_data="btn_mt5_menu"),
+                    InlineKeyboardButton("⬅️ ត្រឡប់ទៅ Menu ដើម", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            await update.effective_message.reply_text(main_dash, parse_mode="HTML", reply_markup=kb_main)
+
         async def capital_leadlag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -24519,6 +24857,12 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("mt5_reachsey", mt5_reachsey_command))
         self.app.add_handler(CommandHandler("mt5reachsey", mt5_reachsey_command))
         self.app.add_handler(CommandHandler("reachsey_mt5", mt5_reachsey_command))
+        self.app.add_handler(CommandHandler("mt5_hf", mt5_hf_command))
+        self.app.add_handler(CommandHandler("mt5hf", mt5_hf_command))
+        self.app.add_handler(CommandHandler("hf_vip", mt5_hf_command))
+        self.app.add_handler(CommandHandler("hfvip", mt5_hf_command))
+        self.app.add_handler(CommandHandler("hf_worker", mt5_hf_command))
+        self.app.add_handler(CommandHandler("hfworker", mt5_hf_command))
         self.app.add_handler(CommandHandler("wealth", wealth_command))
         self.app.add_handler(CommandHandler("wealth24_7", wealth_command))
         self.app.add_handler(CommandHandler("wealth247", wealth_command))

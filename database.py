@@ -1192,6 +1192,22 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vip_hf_workers (
+            account_id TEXT PRIMARY KEY,
+            chat_id INTEGER,
+            space_id TEXT,
+            space_url TEXT,
+            broker TEXT DEFAULT 'GTCFX',
+            server TEXT DEFAULT 'GTCGlobalTrade-Live',
+            status TEXT DEFAULT 'PROVISIONED',
+            created_at REAL,
+            last_ping REAL,
+            balance REAL DEFAULT 0.0,
+            equity REAL DEFAULT 0.0
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -9753,6 +9769,135 @@ def close_perpetual_wealth_spot_trade(trade_id: int) -> bool:
     except Exception as e:
         print(f"⚠️ [DATABASE] Error in close_perpetual_wealth_spot_trade: {e}")
         return False
+
+def record_vip_hf_worker(
+    account_id: str,
+    chat_id: int,
+    space_id: str,
+    space_url: str,
+    broker: str = "GTCFX",
+    server: str = "GTCGlobalTrade-Live",
+    status: str = "PROVISIONED"
+) -> bool:
+    """Inserts or replaces an active Hugging Face VIP Edge Worker record."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        now_ts = time.time()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS vip_hf_workers (
+                account_id TEXT PRIMARY KEY,
+                chat_id INTEGER,
+                space_id TEXT,
+                space_url TEXT,
+                broker TEXT DEFAULT 'GTCFX',
+                server TEXT DEFAULT 'GTCGlobalTrade-Live',
+                status TEXT DEFAULT 'PROVISIONED',
+                created_at REAL,
+                last_ping REAL,
+                balance REAL DEFAULT 0.0,
+                equity REAL DEFAULT 0.0
+            )
+        ''')
+        cursor.execute('''
+            INSERT OR REPLACE INTO vip_hf_workers
+            (account_id, chat_id, space_id, space_url, broker, server, status, created_at, last_ping)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (str(account_id), chat_id, space_id, space_url, broker, server, status, now_ts, now_ts))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in record_vip_hf_worker: {e}")
+        return False
+
+
+def update_vip_hf_worker_status(account_id: str, status: str, balance: float = None, equity: float = None) -> bool:
+    """Updates runtime status, balance, equity, and last_ping for a VIP HF Worker."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        now_ts = time.time()
+        if balance is not None and equity is not None:
+            cursor.execute('''
+                UPDATE vip_hf_workers
+                SET status = ?, balance = ?, equity = ?, last_ping = ?
+                WHERE account_id = ?
+            ''', (status, float(balance), float(equity), now_ts, str(account_id)))
+        else:
+            cursor.execute('''
+                UPDATE vip_hf_workers
+                SET status = ?, last_ping = ?
+                WHERE account_id = ?
+            ''', (status, now_ts, str(account_id)))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in update_vip_hf_worker_status: {e}")
+        return False
+
+
+def get_vip_hf_worker(account_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves single VIP HF worker details by account ID."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM vip_hf_workers WHERE account_id = ?", (str(account_id),))
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return None
+        cols = [col[0] for col in cursor.description]
+        return dict(zip(cols, row))
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in get_vip_hf_worker: {e}")
+        return None
+
+
+def get_vip_hf_workers_by_chat_id(chat_id: int) -> List[Dict[str, Any]]:
+    """Retrieves all VIP HF workers belonging to a specific Telegram chat ID."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM vip_hf_workers WHERE chat_id = ? ORDER BY created_at DESC", (int(chat_id),))
+        rows = cursor.fetchall()
+        cols = [col[0] for col in cursor.description]
+        conn.close()
+        return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in get_vip_hf_workers_by_chat_id: {e}")
+        return []
+
+
+def get_all_vip_hf_workers() -> List[Dict[str, Any]]:
+    """Retrieves all registered VIP Hugging Face workers."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM vip_hf_workers ORDER BY created_at DESC")
+        rows = cursor.fetchall()
+        cols = [col[0] for col in cursor.description]
+        conn.close()
+        return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in get_all_vip_hf_workers: {e}")
+        return []
+
+
+def delete_vip_hf_worker(account_id: str) -> bool:
+    """Deletes a VIP Hugging Face worker record."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM vip_hf_workers WHERE account_id = ?", (str(account_id),))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"⚠️ [DATABASE] Error in delete_vip_hf_worker: {e}")
+        return False
+
 
 # Initialize and auto-migrate database schema on startup
 try:

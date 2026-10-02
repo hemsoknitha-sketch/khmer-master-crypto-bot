@@ -1434,7 +1434,7 @@ def run_audit():
         log_fail(str(e))
 
     # 38. MT5 Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock (Invariant 48)
-    print("\n[CHECK 38/38] Verifying Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock (Invariant 48)...")
+    print("\n[CHECK 38/39] Verifying Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock (Invariant 48)...")
     try:
         with open("mt5_bridge_engine.py", "r", encoding="utf-8") as f:
             mt5_code = f.read()
@@ -1513,6 +1513,96 @@ def run_audit():
             log_fail("Reachsey 5-Position Volatility Matrix Engine (Invariant 48) specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 48 check failed: {e}")
+        log_fail(str(e))
+
+
+    # 39. Hugging Face VIP MT5 Worker Cloud Citadel & Free 16GB RAM Distributed Edge Worker Standard (Invariant 49)
+    print("\n[CHECK 39/39] Verifying Hugging Face VIP MT5 Worker Cloud Citadel & Free 16GB RAM Distributed Edge Worker Standard (Invariant 49)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_code = f.read()
+        with open("hf_space_manager.py", "r", encoding="utf-8") as f:
+            mgr_code = f.read()
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        with open("bot_commands_registry.py", "r", encoding="utf-8") as f:
+            reg_code = f.read()
+
+        has_inv49 = "Invariant 49" in agents_code and "Hugging Face VIP MT5 Worker Cloud Citadel" in agents_code
+        has_mgr_class = "class HuggingFaceSpaceManager" in mgr_code
+        has_mgr_prov = "def provision_vip_worker_space" in mgr_code
+        has_mgr_runtime = "def get_vip_worker_runtime" in mgr_code
+        has_mgr_restart = "def restart_vip_worker" in mgr_code
+        has_mgr_destroy = "def destroy_vip_worker" in mgr_code
+        has_mgr_ping = "def ping_all_active_workers" in mgr_code
+
+        # Verify hf_mt5_worker edge files exist
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        worker_dir = os.path.join(base_dir, "hf_mt5_worker")
+        has_worker_docker = os.path.exists(os.path.join(worker_dir, "Dockerfile"))
+        has_worker_readme = os.path.exists(os.path.join(worker_dir, "README.md"))
+        has_worker_reqs = os.path.exists(os.path.join(worker_dir, "requirements.txt"))
+        has_worker_app = os.path.exists(os.path.join(worker_dir, "app.py"))
+
+        # Verify database layer for vip_hf_workers
+        import database as db
+        has_db_record = hasattr(db, "record_vip_hf_worker")
+        has_db_status = hasattr(db, "update_vip_hf_worker_status")
+        has_db_get = hasattr(db, "get_vip_hf_worker")
+        has_db_get_chat = hasattr(db, "get_vip_hf_workers_by_chat_id")
+        has_db_delete = hasattr(db, "delete_vip_hf_worker")
+
+        # Verify bot_thread commands and callback routing
+        has_cmd_mt5_hf = "async def mt5_hf_command" in bt_code
+        has_handler_mt5_hf = 'CommandHandler("mt5_hf", mt5_hf_command)' in bt_code
+        has_btn_routing = (
+            "btn_mt5_hf_status" in bt_code and
+            "btn_mt5_hf_connect_help" in bt_code and
+            "btn_mt5_hf_ping" in bt_code and
+            "btn_mt5_hf_restart" in bt_code
+        )
+        has_registry = 'BotCommand("mt5_hf"' in reg_code
+
+        # Dynamic Unit Test: CRUD verification on test worker
+        test_acc = "99999999_TEST_AUDIT"
+        db.record_vip_hf_worker(
+            account_id=test_acc,
+            chat_id=859271875,
+            space_id="hemsinath/mt5-edge-test",
+            space_url="https://hemsinath-mt5-edge-test.hf.space",
+            broker="GTCFX-Audit",
+            server="GTCGlobalTrade-Live",
+            status="PROVISIONED"
+        )
+        w_rec = db.get_vip_hf_worker(test_acc)
+        db_test_pass = (w_rec is not None and w_rec.get("account_id") == test_acc and w_rec.get("broker") == "GTCFX-Audit")
+
+        # Update status test
+        db.update_vip_hf_worker_status(test_acc, "ONLINE", balance=5000.0, equity=5250.0)
+        w_up = db.get_vip_hf_worker(test_acc)
+        db_up_pass = (w_up is not None and w_up.get("status") == "ONLINE" and float(w_up.get("balance", 0.0)) == 5000.0)
+
+        # Clean up test record
+        db.delete_vip_hf_worker(test_acc)
+        w_clean = db.get_vip_hf_worker(test_acc)
+        db_clean_pass = (w_clean is None)
+
+        all_inv49_passed = (
+            has_inv49 and has_mgr_class and has_mgr_prov and has_mgr_runtime and
+            has_mgr_restart and has_mgr_destroy and has_mgr_ping and
+            has_worker_docker and has_worker_readme and has_worker_reqs and has_worker_app and
+            has_db_record and has_db_status and has_db_get and has_db_get_chat and has_db_delete and
+            has_cmd_mt5_hf and has_handler_mt5_hf and has_btn_routing and has_registry and
+            db_test_pass and db_up_pass and db_clean_pass
+        )
+
+        if all_inv49_passed:
+            log_pass("Hugging Face VIP MT5 Worker Cloud Citadel & Free 16GB RAM Distributed Edge Worker Standard (Invariant 49) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 49 check failed: inv49={has_inv49}, mgr_class={has_mgr_class}, prov={has_mgr_prov}, runtime={has_mgr_runtime}, restart={has_mgr_restart}, ping={has_mgr_ping}, docker={has_worker_docker}, readme={has_worker_readme}, reqs={has_worker_reqs}, app={has_worker_app}, db_rec={has_db_record}, db_status={has_db_status}, cmd={has_cmd_mt5_hf}, handler={has_handler_mt5_hf}, btn={has_btn_routing}, reg={has_registry}, db_test={db_test_pass}, db_up={db_up_pass}, db_clean={db_clean_pass}")
+            log_fail("Hugging Face VIP MT5 Worker Cloud Citadel (Invariant 49) specification missing or unit test failure!")
+    except Exception as e:
+        failures.append(f"Invariant 49 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
