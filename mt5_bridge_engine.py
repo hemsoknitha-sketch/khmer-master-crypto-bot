@@ -2315,17 +2315,40 @@ class MT5BridgeEngine:
         cur_mid = float(quote.get("mid", 0.0) if quote else 0.0)
 
         action = custom_action
+        signal_conf = 0.0
+        signal_reason = ""
+
+        # Tier 1: Query MT5SMCCitadelEngine for 9-SMC Multi-Timeframe Confluence (H4, H1, M30, M15)
+        # Analyzes: Order Blocks, FVGs, Inducements, Liquidity Sweeps, Kill Zones, Dealing Range Equilibrium
         if not action or action not in ["BUY", "SELL"]:
             try:
-                sig_act, conf, rsn = MT5QuantumSignalCitadel.evaluate_quantum_signal(sym_clean, sym_clean)
-                if sig_act in ["BUY", "SELL"] and conf >= 75.0:
-                    action = sig_act
-            except Exception as ex:
-                logger.warning(f"⚠️ Reachsey quantum signal eval notice: {ex}")
+                from mt5_smc_citadel import MT5SMCCitadelEngine
+                smc_res = MT5SMCCitadelEngine.analyze_9_smc_confluence(sym_clean)
+                smc_act = str(smc_res.get("action", "WAIT")).upper()
+                smc_conf = float(smc_res.get("confidence", 50.0) or 50.0)
+                if smc_act in ["BUY", "SELL"] and smc_conf >= 68.0:
+                    action = smc_act
+                    signal_conf = smc_conf
+                    signal_reason = f"SMC_{smc_act}_{smc_conf:.1f}%"
+            except Exception as ex_smc:
+                logger.warning(f"⚠️ Reachsey SMC Citadel check notice: {ex_smc}")
 
-        # Dynamic Directional Confluence Engine (Invariant 1.1 & 48 Ground Truth):
-        # Under NO circumstances shall Reachsey blindly default to BUY (3 BUY / 2 SELL)!
-        # If no explicit quantum signal, verify live multi-timeframe RSI & momentum:
+        # Tier 2: Query MT5QuantumSignalCitadel (Google Macro Satellite + 33 Wall Street AI Swarm)
+        try:
+            sig_act, conf, rsn = MT5QuantumSignalCitadel.evaluate_quantum_signal(sym_clean, sym_clean)
+            if sig_act in ["BUY", "SELL"] and conf >= 75.0:
+                if action and action == sig_act:
+                    # Confluence Boost when SMC and Quantum AI both agree!
+                    signal_conf = min(98.5, max(signal_conf, conf) + 5.0)
+                    signal_reason = f"Confluence_{action}_{signal_conf:.1f}%_{rsn[:25]}"
+                elif not action:
+                    action = sig_act
+                    signal_conf = conf
+                    signal_reason = rsn
+        except Exception as ex:
+            logger.warning(f"⚠️ Reachsey quantum signal eval notice: {ex}")
+
+        # Tier 3: Multi-Timeframe Structural RSI Confluence & Invariant 16 Anti-Oversold/Overbought Guard
         if not action or action not in ["BUY", "SELL"]:
             try:
                 rsi_sym = "XAUUSDT" if is_gold else (sym_clean + "USDT")
@@ -2333,42 +2356,72 @@ class MT5BridgeEngine:
                 rsi_5m = float(market_data.get_symbol_rsi(rsi_sym, interval="5m"))
 
                 # Invariant 16: If 15m RSI <= 38.0, SELL is strictly forbidden (Bottom rejection)
-                if rsi_15m <= 38.0:
-                    if rsi_5m > 32.0:
-                        action = "BUY"
-                # If 15m RSI >= 65.0, BUY is strictly forbidden (Peak rejection)
-                elif rsi_15m >= 65.0:
-                    if rsi_5m < 68.0:
-                        action = "SELL"
-                elif rsi_15m >= 53.0 and rsi_5m >= 50.0:
+                if rsi_15m <= 38.0 and rsi_5m > 32.0:
                     action = "BUY"
-                elif rsi_15m <= 47.0 and rsi_5m <= 50.0:
+                    signal_conf = 88.0
+                    signal_reason = f"RSI_BottomRejection_15m_{rsi_15m:.1f}"
+                # If 15m RSI >= 65.0, BUY is strictly forbidden (Peak rejection)
+                elif rsi_15m >= 65.0 and rsi_5m < 68.0:
                     action = "SELL"
+                    signal_conf = 88.0
+                    signal_reason = f"RSI_PeakRejection_15m_{rsi_15m:.1f}"
+                elif rsi_15m >= 56.0 and rsi_5m >= 54.0:
+                    action = "BUY"
+                    signal_conf = 78.0
+                    signal_reason = f"RSI_Momentum_Bullish_15m_{rsi_15m:.1f}"
+                elif rsi_15m <= 44.0 and rsi_5m <= 46.0:
+                    action = "SELL"
+                    signal_conf = 78.0
+                    signal_reason = f"RSI_Momentum_Bearish_15m_{rsi_15m:.1f}"
             except Exception as ex_rsi:
                 logger.warning(f"⚠️ Reachsey RSI trend check notice: {ex_rsi}")
 
-        # Fiduciary Capital Protection: If market is consolidating or choppy (e.g. RSI 48-52),
+        # Strict Fiduciary Protection: If market is consolidating or choppy (confidence < 75%),
         # NEVER gamble with a 5-position matrix. Abort dispatch and preserve 100% capital!
-        if action not in ["BUY", "SELL"]:
-            logger.info(f"⏸️ [REACHSEY DISPATCH ABORTED] Market on {sym_clean} is Neutral/Choppy. No 3 vs 2 directional edge! Capital 100% Protected!")
-            return {"success": False, "reason": f"Market on {sym_clean} is Neutral/Choppy. 100% Capital Protected."}
+        if action not in ["BUY", "SELL"] or signal_conf < 75.0:
+            logger.info(f"⏸️ [REACHSEY DISPATCH ABORTED] Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). No high-conviction directional edge! Capital 100% Protected!")
+            return {"success": False, "reason": f"Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). 100% Capital Protected (Zero Blind Trading)."}
+
+        # Dynamic Delta Skew Geometry (Invariant 48):
+        # - High Confidence (>= 92.0%): 4:1 Extreme Skew (4 Primary vs 1 Hedge, Net Delta = 0.60 Lot)
+        # - Standard Confluence (75.0% - 91.9%): 3:2 Standard Skew (3 Primary vs 2 Hedge, Net Delta = 0.20 Lot)
+        is_extreme_skew = (signal_conf >= 92.0)
+        ratio_label = "4:1" if is_extreme_skew else "3:2"
 
         if action == "BUY":
-            plan = [
-                ("BUY", "R5_LEG_1", 0.0, 4.0),
-                ("BUY", "R5_LEG_2", 0.0, 4.0),
-                ("BUY", "R5_LEG_3", 0.0, 4.0),
-                ("SELL", "R5_HEDGE_4", 0.0, 4.0),
-                ("SELL", "R5_HEDGE_5", 0.0, 4.0)
-            ]
+            if is_extreme_skew:
+                plan = [
+                    ("BUY", "R5_LEG_1", 0.0, 4.0),
+                    ("BUY", "R5_LEG_2", 0.0, 4.0),
+                    ("BUY", "R5_LEG_3", 0.0, 4.0),
+                    ("BUY", "R5_LEG_4", 0.0, 4.0),
+                    ("SELL", "R5_HEDGE_5", 0.0, 4.0)
+                ]
+            else:
+                plan = [
+                    ("BUY", "R5_LEG_1", 0.0, 4.0),
+                    ("BUY", "R5_LEG_2", 0.0, 4.0),
+                    ("BUY", "R5_LEG_3", 0.0, 4.0),
+                    ("SELL", "R5_HEDGE_4", 0.0, 4.0),
+                    ("SELL", "R5_HEDGE_5", 0.0, 4.0)
+                ]
         else:
-            plan = [
-                ("SELL", "R5_LEG_1", 0.0, 4.0),
-                ("SELL", "R5_LEG_2", 0.0, 4.0),
-                ("SELL", "R5_LEG_3", 0.0, 4.0),
-                ("BUY", "R5_HEDGE_4", 0.0, 4.0),
-                ("BUY", "R5_HEDGE_5", 0.0, 4.0)
-            ]
+            if is_extreme_skew:
+                plan = [
+                    ("SELL", "R5_LEG_1", 0.0, 4.0),
+                    ("SELL", "R5_LEG_2", 0.0, 4.0),
+                    ("SELL", "R5_LEG_3", 0.0, 4.0),
+                    ("SELL", "R5_LEG_4", 0.0, 4.0),
+                    ("BUY", "R5_HEDGE_5", 0.0, 4.0)
+                ]
+            else:
+                plan = [
+                    ("SELL", "R5_LEG_1", 0.0, 4.0),
+                    ("SELL", "R5_LEG_2", 0.0, 4.0),
+                    ("SELL", "R5_LEG_3", 0.0, 4.0),
+                    ("BUY", "R5_HEDGE_4", 0.0, 4.0),
+                    ("BUY", "R5_HEDGE_5", 0.0, 4.0)
+                ]
 
         is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
         try:
@@ -2422,6 +2475,11 @@ class MT5BridgeEngine:
             "capital": cap_val,
             "lot_per_pos": lot_val,
             "total_lot": round(lot_val * len(plan), 2),
+            "ratio": ratio_label,
+            "confidence": round(signal_conf, 1),
+            "signal_reason": signal_reason,
+            "net_delta": round((4 * lot_val - 1 * lot_val) if is_extreme_skew else (3 * lot_val - 2 * lot_val), 2),
+            "is_extreme_skew": is_extreme_skew,
             "target_profit": target_pnl,
             "max_loss_floor": floor_pnl,
             "unit_label": unit_label,
@@ -2440,7 +2498,7 @@ class MT5BridgeEngine:
             "dispatched_tickets": set()
         }
         self._reachsey_baskets[basket_id] = basket_info
-        logger.info(f"👑 [REACHSEY 5-POS MATRIX DISPATCHED] Basket {basket_id} ({action} {sym_clean} x 5 Pos, Lot: {lot_val}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
+        logger.info(f"👑 [REACHSEY 5-POS MATRIX DISPATCHED] Basket {basket_id} ({action} {sym_clean} x 5 Pos, Skew: {ratio_label}, Conf: {signal_conf:.1f}%, Lot: {lot_val}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
         return {
             "success": True,
             "basket_id": basket_id,
@@ -2453,6 +2511,10 @@ class MT5BridgeEngine:
             "symbol": sym_clean,
             "action": action,
             "direction": action,
+            "ratio": ratio_label,
+            "confidence": round(signal_conf, 1),
+            "signal_reason": signal_reason,
+            "net_delta": round((4 * lot_val - 1 * lot_val) if is_extreme_skew else (3 * lot_val - 2 * lot_val), 2),
             "lot_per_pos": lot_val,
             "total_lot": round(lot_val * len(dispatched_orders), 2),
             "basket": basket_info

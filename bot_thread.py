@@ -21787,18 +21787,24 @@ class TelegramBotThread(BaseThread):
                     tot_lot = float(launch_res.get("total_lot", pos_lot * tickets_cnt))
                     sym_used = launch_res.get("symbol", custom_sym or "XAUUSD")
                     act_used = launch_res.get("action", launch_res.get("direction", "BUY"))
+                    b_ratio = launch_res.get("ratio") or b_obj.get("ratio", "3:2")
+                    b_conf = float(launch_res.get("confidence") or b_obj.get("confidence", 0.0))
+                    b_delta = float(launch_res.get("net_delta") or b_obj.get("net_delta", 0.20))
+                    b_rsn = launch_res.get("signal_reason") or b_obj.get("signal_reason", "")
+                    fail_reason = launch_res.get("reason") or launch_res.get("error", "Unknown")
                     msg_res = (
                         f"👑 <b>[REACHSEY 5-POSITION MATRIX LAUNCHED]</b> 🚀\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_used}</code>\n"
                         f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym_used}</code> ({act_used} Matrix)\n"
                         f"💵 <b>កម្រិតដើមទុន (Tier) ៖</b> <b>${cap_val:,.2f} USD</b>\n"
-                        f"📊 <b>ចំនួន Positions បានបើក ៖</b> <b>{tickets_cnt} Positions ({pos_lot:.2f} lot/pos | {tot_lot:.2f} lot សរុប)</b>\n"
+                        f"📊 <b>Positions & Skew ៖</b> <b>{tickets_cnt} Pos ({b_ratio} Skew | Δ {b_delta:+.2f} lot)</b>\n"
+                        f"🧠 <b>AI Conviction ៖</b> <b>{b_conf:.1f}%</b> ({b_rsn[:22] if b_rsn else '9-SMC Confluence'})\n"
                         f"🎯 <b>ទិសដៅកើបចំណេញ (Target TP) ៖</b> <b>{t_str}</b> (+10%)\n"
                         f"🔒 <b>Trailing Ratchet ៖</b> ចាក់សោ 85% នៃ Peak ពេលឡើងដល់ 70% TP\n"
-                        f"🛡️ <b>យន្តការការពារ ៖</b> មិនកាត់ខាតតាមរលកខ្លី (No Choke Stop), ស្រង់ដើម Basket Net PnL\n"
+                        f"🛡️ <b>យន្តការការពារ ៖</b> ស្រង់ដើម Basket Net PnL (Zero Blind / Strict Anti-Chop)\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
-                        f"{'✅ <b>ដំណើរការ Matrix 5-Position បានបាញ់ចូល MT5 Tokyo ដោយជោគជ័យ!</b>' if success else '⚠️ <b>បរាជ័យក្នុងការបើក Position ៖</b> ' + html.escape(str(launch_res.get('error', 'Unknown')))}\n"
+                        f"{'✅ <b>ដំណើរការ Matrix 5-Position បានបាញ់ចូល MT5 Tokyo ដោយជោគជ័យ!</b>' if success else '⚠️ <b>ប្រព័ន្ធការពារមូលធន (Protection Abort) ៖</b> ' + html.escape(str(fail_reason))}\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"<i>✨ Khmer Master Crypto Reachsey Engine កើបលុយ 24/7!</i>"
                     )
