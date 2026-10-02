@@ -188,8 +188,27 @@ class HuggingFaceSpaceManager:
             }
 
         except Exception as e:
-            logger.error(f"❌ [HF SPACES ERROR] Failed to provision space for Account #{account_id}: {e}")
-            return {"success": False, "reason": str(e)}
+            err_str = str(e)
+            logger.error(f"❌ [HF SPACES ERROR] Failed to provision space for Account #{account_id}: {err_str}")
+            
+            # Auto-fallback to local database binding so user account is not lost
+            try:
+                db.save_user_mt5_config(chat_id=chat_id, login=str(account_id), server=server, broker=broker, firm_name="HF-Fallback")
+            except Exception:
+                pass
+
+            is_pro = ("402" in err_str or "Payment Required" in err_str or "PRO subscription" in err_str or "requires a PRO" in err_str)
+            if is_pro:
+                return {
+                    "success": False,
+                    "is_pro_required": True,
+                    "reason": "HF_PRO_SUBSCRIPTION_REQUIRED",
+                    "message": "Hugging Face Policy Lock: Hosting Docker Spaces on free cpu-basic requires a PRO subscription ($9/month) on https://huggingface.co/pro. Free tier accounts are limited to Static HTML Spaces.",
+                    "account_id": account_id,
+                    "vps_ip": vps_ip,
+                    "vps_port": BRIDGE_PORT
+                }
+            return {"success": False, "reason": err_str, "message": err_str}
 
     @classmethod
     def get_vip_worker_runtime(cls, account_id: str) -> Dict[str, Any]:

@@ -22139,18 +22139,51 @@ class TelegramBotThread(BaseThread):
                         except Exception:
                             await update.effective_message.reply_text(success_text, parse_mode="HTML", reply_markup=kb_succ)
                     else:
-                        err_text = (
-                            f"❌ <b>ការបង្កើត Hugging Face Worker មិនបានជោគជ័យ!</b>\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"មូលហេតុ ៖ <code>{res.get('reason')}</code>\n"
-                            f"សារលម្អិត ៖ <code>{res.get('message', 'N/A')}</code>\n\n"
-                            f"💡 <b>ដំណោះស្រាយ ៖</b>\n"
-                            f"សូមប្រាកដថា <code>HF_TOKEN</code> ត្រូវបានកំណត់ត្រឹមត្រូវក្នុង <code>.env</code> របស់ប្រព័ន្ធ។"
-                        )
+                        is_pro_req = res.get("is_pro_required") or ("402" in str(res.get("reason", "")))
+                        if is_pro_req:
+                            err_text = (
+                                f"⚠️ <b>[HUGGING FACE POLICY LOCK ៖ ទាមទារ PRO SUBSCRIPTION]</b>\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🏛️ <b>មូលហេតុបច្ចេកទេសពិតប្រាកដ ៖</b>\n"
+                                f"Hugging Face បានប្តូរគោលការណ៍ (Cloud Policy) ៖ ការបង្កើត Docker Container Spaces លើ Free Tier ត្រូវបានបិទ។ Hugging Face ទាមទារឱ្យគណនីមាន <b>PRO Subscription ($9/month)</b> ទើបអាចបង្កើត Docker Space បាន។\n\n"
+                                f"🛡️ <b>គណនីរបស់អ្នកត្រូវបាន Auto-Bind ដោយសុវត្ថិភាព ៖</b>\n"
+                                f"ប្រព័ន្ធបានកត់ត្រាគណនី MT5 <code>#{account_id}</code> ចូលទៅក្នុង Database រួចរាល់!\n"
+                                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                                f"🚀 <b>ដំណោះស្រាយឥតគិតថ្លៃ ១០០% &amp; ដំណើរការភ្លាមៗ ៖</b>\n"
+                                f"1️⃣ <b>ទាញយក EA Bridge (Free 100% - Recommended) ៖</b>\n"
+                                f"  ដោនឡូត EA <code>KhmerMasterCrypto_Bridge.mq5</code> ដាក់លើ MT5 លើកុំព្យូទ័រ ឬទូរស័ព្ទដៃ ដើម្បីភ្ជាប់ត្រង់មកកាន់ Tokyo VPS Bridge\n"
+                                f"  👉 បញ្ជា ៖ <code>/mt5 EA</code>\n\n"
+                                f"2️⃣ <b>វិនិយោគតាម Master Cloud Virtual Vault ៖</b>\n"
+                                f"  ទទួលផលចំណេញស្វ័យប្រវត្តិកើបប្រាក់ ២៤/៧ ដោយមិនបាច់បើកកុំព្យូទ័រ\n"
+                                f"  👉 បញ្ជា ៖ <code>/mt5 VAULT 100</code>\n\n"
+                                f"3️⃣ <b>Upgrade Hugging Face PRO ($9/month) ៖</b>\n"
+                                f"  បើចង់បង្កើត Docker Space លើ Cloud 100% សូមចូលទៅ Subscribe លើ <code>huggingface.co/pro</code>\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"<i>Khmer Master Crypto | Zero Capital Sabotage Standard</i>"
+                            )
+                            kb_err = InlineKeyboardMarkup([
+                                [InlineKeyboardButton("📥 ទាញយក EA Bridge (Free 100%)", callback_data="btn_mt5_download_ea")],
+                                [InlineKeyboardButton("🏛️ Master Cloud Vault", callback_data="btn_mt5_vault")],
+                                [InlineKeyboardButton("🌐 Subscribe HF PRO ($9/mo)", url="https://huggingface.co/pro")],
+                                [InlineKeyboardButton("⬅️ ត្រឡប់ទៅ MT5 Master", callback_data="btn_mt5_menu")]
+                            ])
+                        else:
+                            err_text = (
+                                f"❌ <b>ការបង្កើត Hugging Face Worker មិនបានជោគជ័យ!</b>\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"មូលហេតុ ៖ <code>{res.get('reason')}</code>\n"
+                                f"សារលម្អិត ៖ <code>{res.get('message', 'N/A')}</code>\n\n"
+                                f"💡 <b>ដំណោះស្រាយ ៖</b>\n"
+                                f"សូមប្រាកដថា <code>HF_TOKEN</code> ត្រូវបានកំណត់ត្រឹមត្រូវក្នុង <code>.env</code> របស់ប្រព័ន្ធ។"
+                            )
+                            kb_err = InlineKeyboardMarkup([
+                                [InlineKeyboardButton("⬅️ ត្រឡប់ទៅ MT5 Master", callback_data="btn_mt5_menu")]
+                            ])
+
                         try:
-                            await prog_msg.edit_text(err_text, parse_mode="HTML")
+                            await prog_msg.edit_text(err_text, parse_mode="HTML", reply_markup=kb_err)
                         except Exception:
-                            await update.effective_message.reply_text(err_text, parse_mode="HTML")
+                            await update.effective_message.reply_text(err_text, parse_mode="HTML", reply_markup=kb_err)
                     return
 
                 # --- 2. STATUS CHECK ---
