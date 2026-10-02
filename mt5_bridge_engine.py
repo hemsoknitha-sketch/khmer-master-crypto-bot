@@ -2281,36 +2281,49 @@ class MT5BridgeEngine:
 
         if is_cent:
             # Cent Account Mode (Invariant 44 & 48 Master Plan):
-            # Account balance is in USC (e.g. 2,602 USC = $26.02 USD).
-            # Micro-lot: 0.10 lot per position for Gold (0.1 oz = ~$0.50 margin), 0.02 for others.
-            # Target (+10%): raw_bal * 0.10 (e.g. +260 USC = +$2.60 USD).
-            # Hard Floor (-5%): raw_bal * 0.05 (e.g. -130 USC = -$1.30 USD).
+            # Account balance is in USC (e.g. 300,000 USC = $3,000 USD).
             tier = 1
-            lot_val = 0.10 if is_gold else 0.02
-            target_pnl = max(50.0, round(raw_bal * 0.10, 2))
-            floor_pnl = max(25.0, round(raw_bal * 0.05, 2))
+            if raw_bal >= 200000.0 or real_usd >= 2000.0:
+                # $3,000 Capital Tier 1 on Cent Account (300,000 USC)
+                lot_val = max(0.01, float(lot_per_pos or 0.20))
+                min_harvest_pnl = 10000.0  # +$100.00 USD in USC (10,000 cents)
+                target_pnl = 30000.0       # +$300.00 USD in USC (+10%)
+                floor_pnl = 15000.0        # -$150.00 USD in USC (-5%)
+            elif raw_bal >= 50000.0 or real_usd >= 500.0:
+                lot_val = max(0.01, float(lot_per_pos or 0.10))
+                min_harvest_pnl = max(2000.0, round(raw_bal * 0.0333, 2))
+                target_pnl = round(raw_bal * 0.10, 2)
+                floor_pnl = round(raw_bal * 0.05, 2)
+            else:
+                lot_val = 0.10 if is_gold else 0.02
+                min_harvest_pnl = max(50.0, round(raw_bal * 0.0333, 2))
+                target_pnl = max(50.0, round(raw_bal * 0.10, 2))
+                floor_pnl = max(25.0, round(raw_bal * 0.05, 2))
             unit_label = "USC"
             cap_val = raw_bal
         else:
             # Standard USD Mode ($3,000, $6,000, $10,000 Tiers)
             cap_val = float(capital or real_usd or 3000.0)
+            lot_val = max(0.01, float(lot_per_pos or 0.20))
             if cap_val >= 10000.0:
                 tier = 3
+                min_harvest_pnl = 333.0
                 target_usd = 1000.0
                 floor_usd = 500.0
             elif cap_val >= 6000.0:
                 tier = 2
+                min_harvest_pnl = 200.0
                 target_usd = 600.0
                 floor_usd = 300.0
             else:
                 tier = 1
-                target_usd = 300.0
-                floor_usd = 150.0
+                min_harvest_pnl = 100.0    # +$100.00 USD Minimum Milestone!
+                target_usd = 300.0         # +$300.00 USD Target TP (+10%)
+                floor_usd = 150.0          # -$150.00 USD Hard Floor (-5%)
 
             target_pnl = target_usd
             floor_pnl = floor_usd
             unit_label = "USD"
-            lot_val = max(0.01, float(lot_per_pos or 0.20))
         quote = self.get_live_symbol_quote(adapted_sym) or self.get_live_symbol_quote(sym_clean)
         cur_mid = float(quote.get("mid", 0.0) if quote else 0.0)
 
@@ -2439,8 +2452,7 @@ class MT5BridgeEngine:
 
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
         dispatched_orders = []
-        if not is_cent:
-            lot_val = max(0.01, float(lot_per_pos or 0.20))
+        lot_val = max(0.01, float(lot_per_pos or lot_val))
 
         for leg_act, leg_tag, tp_mult, sl_mult in plan:
             leg_tp_dist = round(base_tp_dist * tp_mult, 4) if tp_mult > 0 else 0.0
@@ -2480,6 +2492,7 @@ class MT5BridgeEngine:
             "signal_reason": signal_reason,
             "net_delta": round((4 * lot_val - 1 * lot_val) if is_extreme_skew else (3 * lot_val - 2 * lot_val), 2),
             "is_extreme_skew": is_extreme_skew,
+            "min_harvest_milestone": min_harvest_pnl,
             "target_profit": target_pnl,
             "max_loss_floor": floor_pnl,
             "unit_label": unit_label,
@@ -2498,7 +2511,7 @@ class MT5BridgeEngine:
             "dispatched_tickets": set()
         }
         self._reachsey_baskets[basket_id] = basket_info
-        logger.info(f"👑 [REACHSEY 5-POS MATRIX DISPATCHED] Basket {basket_id} ({action} {sym_clean} x 5 Pos, Skew: {ratio_label}, Conf: {signal_conf:.1f}%, Lot: {lot_val}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
+        logger.info(f"👑 [REACHSEY 5-POS MATRIX DISPATCHED] Basket {basket_id} ({action} {sym_clean} x 5 Pos, Skew: {ratio_label}, Conf: {signal_conf:.1f}%, Lot: {lot_val}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label} (Min Harvest: +{min_harvest_pnl:,.2f} {unit_label}), Floor: -{floor_pnl:,.2f} {unit_label}")
         return {
             "success": True,
             "basket_id": basket_id,
@@ -2506,6 +2519,8 @@ class MT5BridgeEngine:
             "positions_dispatched": len(dispatched_orders),
             "target_profit_usd": target_pnl if unit_label == "USD" else (target_pnl / 100.0),
             "target_profit": target_pnl,
+            "min_harvest_milestone": min_harvest_pnl,
+            "min_harvest_usd": min_harvest_pnl if unit_label == "USD" else (min_harvest_pnl / 100.0),
             "max_loss_floor": floor_pnl,
             "unit_label": unit_label,
             "symbol": sym_clean,
@@ -2598,6 +2613,7 @@ class MT5BridgeEngine:
 
             target_p = b_data.get("target_profit", 300.0)
             floor_loss = b_data.get("max_loss_floor", 150.0)
+            min_harvest = b_data.get("min_harvest_milestone", 100.0 if unit == "USD" else 10000.0)
 
             should_sweep = False
             sweep_reason = ""
@@ -2605,6 +2621,15 @@ class MT5BridgeEngine:
             if net_pnl >= target_p:
                 should_sweep = True
                 sweep_reason = f"TARGET_NET_PROFIT_HIT (+{net_pnl:,.2f} {unit} >= +{target_p:,.2f} {unit})"
+            elif peak >= min_harvest:
+                # Anti-Regret Trailing Lock (Active once peak profit reaches >= $100 USD / 10,000 USC)
+                # Guaranteed floor: at least 80% of milestone ($80 USD / 8,000 USC) or 85% of peak (whichever is higher).
+                # The moment net profit retreats to or below the trailing lock floor, SWEEP ATOMICALLY!
+                # NEVER sit and watch green profits turn red!
+                guaranteed_floor = max(min_harvest * 0.80, peak * 0.85)
+                if net_pnl <= guaranteed_floor:
+                    should_sweep = True
+                    sweep_reason = f"TRAILING_BASKET_RATCHET_LOCKED (Anti-Regret Peak: +{peak:,.2f} -> Lock: +{net_pnl:,.2f} {unit} >= +{guaranteed_floor:,.2f} {unit})"
             elif peak >= (target_p * 0.70) and net_pnl <= (peak * 0.85) and net_pnl > 0:
                 should_sweep = True
                 sweep_reason = f"TRAILING_BASKET_RATCHET_LOCKED (Peak: +{peak:,.2f} -> Lock: +{net_pnl:,.2f} {unit})"
@@ -2613,6 +2638,9 @@ class MT5BridgeEngine:
                 sweep_reason = f"EMERGENCY_BASKET_HARD_FLOOR (-{abs(net_pnl):,.2f} {unit} <= -{floor_loss:,.2f} {unit})"
 
             if should_sweep:
+                if not hasattr(self, "_reachsey_last_sweep_ts"):
+                    self._reachsey_last_sweep_ts = {}
+                self._reachsey_last_sweep_ts[str(account_id)] = now_ts
                 logger.info(f"🚀 [REACHSEY BASKET SWEEP] Sweeping Basket {b_id} on Account #{account_id}! Reason: {sweep_reason}. Closing {len(matching_positions)} positions...")
                 for p in matching_positions:
                     t_num = int(p.get("ticket", 0) or 0)
@@ -3385,6 +3413,12 @@ class MT5BridgeEngine:
                             self._last_reachsey_auto_scan = {}
 
                         last_reachsey_scan = self._last_reachsey_auto_scan.get(str(acc_id), 0.0)
+                        last_sweep_ts = getattr(self, "_reachsey_last_sweep_ts", {}).get(str(acc_id), 0.0)
+                        if (now_ts - last_sweep_ts) < 60.0:
+                            # 60-second Cooldown: Allows MT5 broker to clear closed tickets cleanly,
+                            # and gives the market time to form a new candle for fresh SMC/Quantum AI analysis!
+                            continue
+
                         if (now_ts - last_reachsey_scan) >= 30.0:
                             self._last_reachsey_auto_scan[str(acc_id)] = now_ts
                             logger.info(f"👑 [REACHSEY AUTO-RADAR] User {chat_id} (Acc #{acc_id}): Active Baskets ({len(active_reachsey_baskets)}/{max_reachsey_baskets}, Open Pos: {len(reachsey_open_positions)}) | Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | Real Bal: ${real_usd_balance:,.2f} | Scanning Top Volatility Assets...")

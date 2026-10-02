@@ -21792,6 +21792,7 @@ class TelegramBotThread(BaseThread):
                     b_delta = float(launch_res.get("net_delta") or b_obj.get("net_delta", 0.20))
                     b_rsn = launch_res.get("signal_reason") or b_obj.get("signal_reason", "")
                     fail_reason = launch_res.get("reason") or launch_res.get("error", "Unknown")
+                    min_h_val = launch_res.get("min_harvest_usd") or (b_obj.get("min_harvest_milestone", 100.0) if b_obj.get("unit_label") == "USD" else (b_obj.get("min_harvest_milestone", 10000.0) / 100.0))
                     msg_res = (
                         f"👑 <b>[REACHSEY 5-POSITION MATRIX LAUNCHED]</b> 🚀\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -21800,8 +21801,9 @@ class TelegramBotThread(BaseThread):
                         f"💵 <b>កម្រិតដើមទុន (Tier) ៖</b> <b>${cap_val:,.2f} USD</b>\n"
                         f"📊 <b>Positions & Skew ៖</b> <b>{tickets_cnt} Pos ({b_ratio} Skew | Δ {b_delta:+.2f} lot)</b>\n"
                         f"🧠 <b>AI Conviction ៖</b> <b>{b_conf:.1f}%</b> ({b_rsn[:22] if b_rsn else '9-SMC Confluence'})\n"
+                        f"💰 <b>កើបចំណេញអប្បបរមា ៖</b> <b>+${min_h_val:,.2f}</b> (Lock 85% នៃ Peak ភ្លាមៗ)\n"
                         f"🎯 <b>ទិសដៅកើបចំណេញ (Target TP) ៖</b> <b>{t_str}</b> (+10%)\n"
-                        f"🔒 <b>Trailing Ratchet ៖</b> ចាក់សោ 85% នៃ Peak ពេលឡើងដល់ 70% TP\n"
+                        f"🔒 <b>Anti-Regret Trailing ៖</b> តាម Lock Profit ខ្ពស់បំផុត (ដាច់ខាតមិនឱ្យស្រកខាតវិញ)\n"
                         f"🛡️ <b>យន្តការការពារ ៖</b> ស្រង់ដើម Basket Net PnL (Zero Blind / Strict Anti-Chop)\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
                         f"{'✅ <b>ដំណើរការ Matrix 5-Position បានបាញ់ចូល MT5 Tokyo ដោយជោគជ័យ!</b>' if success else '⚠️ <b>ប្រព័ន្ធការពារមូលធន (Protection Abort) ៖</b> ' + html.escape(str(fail_reason))}\n"
