@@ -1241,6 +1241,14 @@ class MT5BridgeEngine:
                 "signal_id": signal_id,
                 "fill_time": time.time()
             }
+            # Associate filled ticket with active Reachsey basket
+            for b_data in self._reachsey_baskets.values():
+                if b_data.get("status") == "ACTIVE" and str(b_data.get("account_id")) == str(account_id):
+                    if not isinstance(b_data.get("dispatched_tickets"), set):
+                        b_data["dispatched_tickets"] = set(b_data.get("dispatched_tickets") or [])
+                    b_suffix = str(b_data.get("basket_id", ""))[-4:]
+                    if b_suffix and (b_suffix in str(sig_meta.get("comment", ""))):
+                        b_data["dispatched_tickets"].add(ticket)
         logger.info(f"🎯 [MT5 ORDER FILLED] Account {account_id} filled order! Ticket: #{ticket}, Symbol: {symbol or 'N/A'}, Price: {open_price}")
 
     def _handle_order_closed(self, payload: Dict[str, Any], account_id: str):
@@ -2220,25 +2228,52 @@ class MT5BridgeEngine:
         curr_str = str(getattr(session, "currency", "USD")).upper().strip()
         broker_str = str(getattr(session, "broker", "")).lower()
         srv_str = str(getattr(session, "server", "")).lower()
-        is_cent = (curr_str in ["USC", "CENT"] or "cent" in broker_str or "server 5" in srv_str)
+        firm_str = str(getattr(session, "firm_name", "")).lower()
+        is_cent = (
+            curr_str in ["USC", "CENT", "EUAC", "GBPC"]
+            or "cent" in broker_str
+            or "micro" in broker_str
+            or "server 5" in srv_str
+            or "server 5" in firm_str
+            or "cent account" in firm_str
+        )
 
-        cap_val = float(capital or 3000.0)
-        if cap_val >= 10000.0:
-            tier = 3
-            target_usd = 1000.0
-            floor_usd = 500.0
-        elif cap_val >= 6000.0:
-            tier = 2
-            target_usd = 600.0
-            floor_usd = 300.0
-        else:
+        sess_bal = getattr(session, "balance", 0.0)
+        raw_bal = float(sess_bal if sess_bal is not None else 0.0)
+        real_usd = (raw_bal / 100.0) if is_cent else raw_bal
+
+        if is_cent:
+            # Cent Account Mode (Invariant 44 & 48 Master Plan):
+            # Account balance is in USC (e.g. 3,190 USC = $31.90 USD).
+            # Micro-lot: 0.02 lot per position (total 0.10 lot for 5 pos).
+            # Target (+10%): raw_bal * 0.10 (e.g. +319 USC = +$3.19 USD).
+            # Hard Floor (-5%): raw_bal * 0.05 (e.g. -160 USC = -$1.60 USD).
             tier = 1
-            target_usd = 300.0
-            floor_usd = 150.0
+            lot_val = 0.02 if not lot_per_pos else float(lot_per_pos)
+            target_pnl = max(50.0, round(raw_bal * 0.10, 2))
+            floor_pnl = max(25.0, round(raw_bal * 0.05, 2))
+            unit_label = "USC"
+            cap_val = raw_bal
+        else:
+            # Standard USD Mode ($3,000, $6,000, $10,000 Tiers)
+            cap_val = float(capital or real_usd or 3000.0)
+            if cap_val >= 10000.0:
+                tier = 3
+                target_usd = 1000.0
+                floor_usd = 500.0
+            elif cap_val >= 6000.0:
+                tier = 2
+                target_usd = 600.0
+                floor_usd = 300.0
+            else:
+                tier = 1
+                target_usd = 300.0
+                floor_usd = 150.0
 
-        target_pnl = target_usd * 100.0 if is_cent else target_usd
-        floor_pnl = floor_usd * 100.0 if is_cent else floor_usd
-        unit_label = "USC" if is_cent else "USD"
+            target_pnl = target_usd
+            floor_pnl = floor_usd
+            unit_label = "USD"
+            lot_val = max(0.01, float(lot_per_pos or 0.20))
 
         sym_clean = normalize_mt5_symbol(symbol)
         adapted_sym = self.adapt_symbol_for_session(sym_clean, session)
@@ -2328,7 +2363,8 @@ class MT5BridgeEngine:
             "status": "ACTIVE",
             "created_at": time.time(),
             "action": action,
-            "orders": dispatched_orders
+            "orders": dispatched_orders,
+            "dispatched_tickets": set()
         }
         self._reachsey_baskets[basket_id] = basket_info
         logger.info(f"👑 [REACHSEY 5-POS MATRIX DISPATCHED] Basket {basket_id} ({action} {sym_clean} x 5 Pos, Lot: {lot_val}) on Account #{account_id}! Target: +{target_pnl:,.2f} {unit_label}, Floor: -{floor_pnl:,.2f} {unit_label}")
@@ -2362,15 +2398,34 @@ class MT5BridgeEngine:
 
             matching_positions = []
             for p in open_positions:
-                p_sym = normalize_mt5_symbol(str(p.get("symbol", "")))
-                p_comm = str(p.get("comment", ""))
-                p_magic = int(p.get("magic", 0) or 0)
-                if (p_magic == 888666 or tag_suffix in p_comm or "R5_" in p_comm) and (p_sym == target_sym or not target_sym):
+                p_ticket = int(p.get("ticket", 0) or 0)
+                meta_ticket = self._ticket_metadata.get(p_ticket, {})
+                p_sym = normalize_mt5_symbol(str(p.get("symbol", "") or meta_ticket.get("symbol", "")))
+                p_comm = str(p.get("comment", "") or meta_ticket.get("comment", ""))
+                p_magic = int(p.get("magic", 0) or meta_ticket.get("magic", 0) or 0)
+
+                is_match = False
+                if tag_suffix and (tag_suffix in p_comm):
+                    is_match = True
+                elif p_ticket and (p_ticket in b_data.get("dispatched_tickets", set())):
+                    is_match = True
+                elif (p_magic == 888666 or "R5_" in p_comm) and (p_sym == target_sym or not target_sym):
+                    is_match = True
+                elif is_cent and str(p.get("symbol", "")).endswith(".C") and ("XAU" in str(p.get("symbol", "")).upper()):
+                    if b_data.get("account_id") == str(account_id):
+                        is_match = True
+
+                if is_match:
                     matching_positions.append(p)
 
             if not matching_positions:
-                if (now_ts - b_data.get("created_at", 0.0)) > 30.0:
+                acc_open_on_sym = [
+                    p for p in open_positions
+                    if normalize_mt5_symbol(str(p.get("symbol", ""))) == target_sym
+                ]
+                if not acc_open_on_sym and (now_ts - b_data.get("created_at", 0.0)) > 15.0:
                     b_data["status"] = "CLOSED"
+                    logger.info(f"👑 [REACHSEY BASKET CLOSED] Basket {b_id} on Account #{account_id} completed. All positions closed on broker.")
                 continue
 
             net_pnl = sum(float(p.get("profit", 0.0) or 0.0) for p in matching_positions)
@@ -3103,7 +3158,10 @@ class MT5BridgeEngine:
                             if str(b.get("account_id")) == str(acc_id) and b.get("status") == "ACTIVE"
                         ]
                         # Determine Capital Tier based on real account balance
-                        if real_usd_balance >= 9000.0:
+                        if is_cent_account:
+                            reachsey_tier = raw_bal
+                            max_reachsey_baskets = 1
+                        elif real_usd_balance >= 9000.0:
                             reachsey_tier = 10000.0
                             max_reachsey_baskets = 3
                         elif real_usd_balance >= 5000.0:
@@ -3113,9 +3171,19 @@ class MT5BridgeEngine:
                             reachsey_tier = 3000.0
                             max_reachsey_baskets = 1
 
-                        if is_cent_account:
-                            reachsey_tier = 3000.0
-                            max_reachsey_baskets = 1
+                        # Physical broker position count protection
+                        reachsey_open_positions = [
+                            p for p in open_positions
+                            if int(p.get("magic", 0) or self._ticket_metadata.get(int(p.get("ticket", 0)), {}).get("magic", 0) or 0) == 888666
+                            or "R5_" in str(p.get("comment", "") or self._ticket_metadata.get(int(p.get("ticket", 0)), {}).get("comment", ""))
+                            or (is_cent_account and str(p.get("symbol", "")).endswith(".C"))
+                        ]
+
+                        # Hard Overtrade Citadel: If already reached max baskets or max open positions, never spawn duplicate matrix!
+                        can_deploy_reachsey = (
+                            len(active_reachsey_baskets) < max_reachsey_baskets
+                            and len(reachsey_open_positions) < (5 * max_reachsey_baskets)
+                        )
 
                         if not hasattr(self, "_last_reachsey_auto_scan"):
                             self._last_reachsey_auto_scan = {}
@@ -3123,18 +3191,19 @@ class MT5BridgeEngine:
                         last_reachsey_scan = self._last_reachsey_auto_scan.get(str(acc_id), 0.0)
                         if (now_ts - last_reachsey_scan) >= 30.0:
                             self._last_reachsey_auto_scan[str(acc_id)] = now_ts
-                            logger.info(f"👑 [REACHSEY AUTO-RADAR] User {chat_id} (Acc #{acc_id}): Active Baskets ({len(active_reachsey_baskets)}/{max_reachsey_baskets}) | Tier: ${reachsey_tier:,.0f} | Real Bal: ${real_usd_balance:,.2f} | Scanning Top Volatility Assets...")
+                            logger.info(f"👑 [REACHSEY AUTO-RADAR] User {chat_id} (Acc #{acc_id}): Active Baskets ({len(active_reachsey_baskets)}/{max_reachsey_baskets}, Open Pos: {len(reachsey_open_positions)}) | Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | Real Bal: ${real_usd_balance:,.2f} | Scanning Top Volatility Assets...")
 
-                            if len(active_reachsey_baskets) < max_reachsey_baskets:
+                            if can_deploy_reachsey:
                                 existing_basket_syms = {str(b.get("symbol", "")).upper() for b in active_reachsey_baskets}
+                                broker_open_syms = {normalize_mt5_symbol(str(p.get("symbol", ""))) for p in open_positions}
                                 target_sym = None
                                 candidate_syms = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD", "ETHUSD"]
                                 for cs in candidate_syms:
-                                    if cs not in existing_basket_syms:
+                                    if cs not in existing_basket_syms and cs not in broker_open_syms:
                                         target_sym = cs
                                         break
                                 if target_sym:
-                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position matrix on {target_sym} for account #{acc_id} (Tier: ${reachsey_tier:,.0f})...")
+                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'})...")
                                     threading.Thread(
                                         target=self.execute_reachsey_5pos_matrix,
                                         kwargs={

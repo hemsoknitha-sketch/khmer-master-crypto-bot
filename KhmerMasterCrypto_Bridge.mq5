@@ -315,10 +315,10 @@ void SendHeartbeat()
          if(count > 0) pos_json += ",";
          string p_type = (m_position.PositionType() == POSITION_TYPE_BUY) ? "BUY" : "SELL";
          pos_json += StringFormat(
-            "{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":\"%s\",\"lots\":%.2f,\"open_price\":%.5f,\"current_price\":%.5f,\"sl\":%.5f,\"tp\":%.5f,\"profit\":%.2f}",
+            "{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":\"%s\",\"lots\":%.2f,\"open_price\":%.5f,\"current_price\":%.5f,\"sl\":%.5f,\"tp\":%.5f,\"profit\":%.2f,\"magic\":%I64u,\"comment\":\"%s\"}",
             m_position.Ticket(), m_position.Symbol(), p_type, m_position.Volume(),
             m_position.PriceOpen(), m_position.PriceCurrent(), m_position.StopLoss(),
-            m_position.TakeProfit(), m_position.Profit()
+            m_position.TakeProfit(), m_position.Profit(), m_position.Magic(), m_position.Comment()
          );
          count++;
       }
