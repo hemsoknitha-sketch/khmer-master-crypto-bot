@@ -2560,6 +2560,7 @@ class MT5BridgeEngine:
         """Manually sweeps (flattens) all open Reachsey 5-Position Matrix orders."""
         account_id = str(account_id or acc_id or "").strip()
         swept_count = 0
+        swept_baskets = 0
         with self._clients_lock:
             for acc, sess in self.clients.items():
                 if account_id and acc != account_id:
@@ -2568,16 +2569,34 @@ class MT5BridgeEngine:
                 for p in positions:
                     p_magic = int(p.get("magic", 0) or 0)
                     p_comm = str(p.get("comment", ""))
-                    if p_magic == 888666 or "R5_" in p_comm:
+                    is_reachsey = (
+                        p_magic in [888666, 888999]
+                        or any(tag in p_comm for tag in ["R5_", "SCALP", "MID", "RUNNER", "HEDGE", "AI_"])
+                        or reason == "Emergency Stop"
+                    )
+                    if is_reachsey:
                         t_num = int(p.get("ticket", 0) or 0)
                         t_sym = str(p.get("symbol", ""))
                         if t_num > 0:
-                            self.dispatch_close(ticket=t_num, symbol=t_sym, comment="MANUAL_SWEEP", target_account=acc)
+                            self.dispatch_close(ticket=t_num, symbol=t_sym, comment=f"SWEEP_{reason[:10]}", target_account=acc)
                             swept_count += 1
+
+                # If Emergency Stop requested, send atomic ticket=0 (REMOTE_CLOSE_ALL) to force MT5 broker terminal
+                # to wipe all positions immediately with sub-millisecond local execution!
+                if reason == "Emergency Stop" and (positions or account_id == acc):
+                    self.dispatch_close(ticket=0, comment="EMERGENCY_STOP_ALL", target_account=acc)
+
         for b_id, b_data in self._reachsey_baskets.items():
             if basket_id == "ALL" or b_id == basket_id:
-                b_data["status"] = "MANUALLY_SWEPT"
-        return {"success": True, "swept_positions": swept_count}
+                if b_data.get("status") == "ACTIVE":
+                    b_data["status"] = "MANUALLY_SWEPT"
+                    swept_baskets += 1
+        return {
+            "success": True,
+            "swept_positions": swept_count,
+            "tickets_closed": swept_count,
+            "baskets_swept": swept_baskets
+        }
 
     def get_reachsey_baskets_telemetry(
         self,

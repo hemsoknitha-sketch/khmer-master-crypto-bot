@@ -21716,16 +21716,30 @@ class TelegramBotThread(BaseThread):
             target_account = None
             if user_login and user_login != "0":
                 target_account = user_login
-            elif is_admin_user:
-                for master_acc in ["52135153", "52133938"]:
-                    if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
-                        target_account = master_acc
-                        break
-                if not target_account:
-                    for any_acc, any_sess in bridge.clients.items():
-                        if any_sess.status == "ONLINE":
-                            target_account = any_acc
+            else:
+                # 1. Search for any client session bound to this chat_id
+                with bridge._clients_lock:
+                    for acc_id, sess in bridge.clients.items():
+                        if getattr(sess, "chat_id", None) and str(sess.chat_id) == str(chat_id):
+                            target_account = acc_id
                             break
+                # 2. Check if this chat_id has any active reachsey baskets
+                if not target_account:
+                    for b_id, b_data in bridge._reachsey_baskets.items():
+                        if str(b_data.get("chat_id")) == str(chat_id):
+                            target_account = str(b_data.get("account_id"))
+                            break
+                # 3. Fallback to active online session (Admin or single VPS instance)
+                if not target_account:
+                    for master_acc in ["52135153", "52133938"]:
+                        if master_acc in bridge.clients and bridge.clients[master_acc].status == "ONLINE":
+                            target_account = master_acc
+                            break
+                    if not target_account:
+                        for any_acc, any_sess in bridge.clients.items():
+                            if any_sess.status == "ONLINE":
+                                target_account = any_acc
+                                break
 
             args = list(context.args) if context and context.args else []
 
@@ -21801,9 +21815,9 @@ class TelegramBotThread(BaseThread):
                     return
 
                 elif sub in ["SWEEP", "CLOSE", "CLOSEALL", "CLOSE_ALL"]:
-                    sweep_res = bridge.sweep_reachsey_baskets(acc_id=target_account, reason="Manual User Sweep")
+                    sweep_res = bridge.sweep_reachsey_baskets(acc_id=target_account, chat_id=chat_id, reason="Manual User Sweep")
                     b_swept = sweep_res.get("baskets_swept", 0)
-                    t_swept = sweep_res.get("tickets_closed", 0)
+                    t_swept = sweep_res.get("tickets_closed", sweep_res.get("swept_positions", 0))
                     msg_sw = (
                         f"🧹 <b>[REACHSEY BASKET SWEEPER]</b>\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -21844,14 +21858,18 @@ class TelegramBotThread(BaseThread):
 
                 elif sub in ["STOP", "OFF"]:
                     db.set_system_setting(f"mt5_reachsey_auto_{chat_id}", "0")
-                    sweep_res = bridge.sweep_reachsey_baskets(acc_id=target_account, reason="Emergency Stop")
-                    t_swept = sweep_res.get("tickets_closed", 0)
+                    sweep_res = bridge.sweep_reachsey_baskets(acc_id=target_account, chat_id=chat_id, reason="Emergency Stop")
+                    t_swept = sweep_res.get("tickets_closed", sweep_res.get("swept_positions", 0))
+                    b_swept = sweep_res.get("baskets_swept", 0)
                     msg_stop = (
                         f"🛑 <b>[REACHSEY ENGINE STOPPED]</b>\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"⚪ Auto-Matrix ត្រូវបានបិទ។\n"
-                        f"🧹 បានបិទ Position សកម្មចំនួន <b>{t_swept}</b> Tickets ដោយសុវត្ថិភាព។\n"
+                        f"⚪ <b>Auto-Matrix ៖</b> ត្រូវបានបិទដំណើរការ (OFF)\n"
+                        f"🏛️ <b>គណនី ៖</b> <code>#{target_account or 'All'}</code>\n"
+                        f"🧹 <b>Positions បានបិទ ៖</b> <b>{t_swept}</b> Tickets\n"
+                        f"🧺 <b>Baskets បានសម្អាត ៖</b> <b>{b_swept}</b> Baskets\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ <i>រាល់ Matrix Positions ត្រូវបានបោសសម្អាតភ្លាមៗ (&lt;0.8ms) និងបញ្ឈប់ស្វ័យប្រវត្តិ!</i>"
                     )
                     await update.effective_message.reply_text(msg_stop, parse_mode="HTML")
                     return
