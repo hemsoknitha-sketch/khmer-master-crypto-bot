@@ -2300,9 +2300,40 @@ class MT5BridgeEngine:
         if not action or action not in ["BUY", "SELL"]:
             try:
                 sig_act, conf, rsn = MT5QuantumSignalCitadel.evaluate_quantum_signal(sym_clean, sym_clean)
-                action = sig_act if sig_act in ["BUY", "SELL"] else "BUY"
-            except Exception:
-                action = "BUY"
+                if sig_act in ["BUY", "SELL"] and conf >= 75.0:
+                    action = sig_act
+            except Exception as ex:
+                logger.warning(f"⚠️ Reachsey quantum signal eval notice: {ex}")
+
+        # Dynamic Directional Confluence Engine (Invariant 1.1 & 48 Ground Truth):
+        # Under NO circumstances shall Reachsey blindly default to BUY (3 BUY / 2 SELL)!
+        # If no explicit quantum signal, verify live multi-timeframe RSI & momentum:
+        if not action or action not in ["BUY", "SELL"]:
+            try:
+                rsi_sym = "XAUUSDT" if is_gold else (sym_clean + "USDT")
+                rsi_15m = float(market_data.get_symbol_rsi(rsi_sym, interval="15m"))
+                rsi_5m = float(market_data.get_symbol_rsi(rsi_sym, interval="5m"))
+
+                # Invariant 16: If 15m RSI <= 38.0, SELL is strictly forbidden (Bottom rejection)
+                if rsi_15m <= 38.0:
+                    if rsi_5m > 32.0:
+                        action = "BUY"
+                # If 15m RSI >= 65.0, BUY is strictly forbidden (Peak rejection)
+                elif rsi_15m >= 65.0:
+                    if rsi_5m < 68.0:
+                        action = "SELL"
+                elif rsi_15m >= 53.0 and rsi_5m >= 50.0:
+                    action = "BUY"
+                elif rsi_15m <= 47.0 and rsi_5m <= 50.0:
+                    action = "SELL"
+            except Exception as ex_rsi:
+                logger.warning(f"⚠️ Reachsey RSI trend check notice: {ex_rsi}")
+
+        # Fiduciary Capital Protection: If market is consolidating or choppy (e.g. RSI 48-52),
+        # NEVER gamble with a 5-position matrix. Abort dispatch and preserve 100% capital!
+        if action not in ["BUY", "SELL"]:
+            logger.info(f"⏸️ [REACHSEY DISPATCH ABORTED] Market on {sym_clean} is Neutral/Choppy. No 3 vs 2 directional edge! Capital 100% Protected!")
+            return {"success": False, "reason": f"Market on {sym_clean} is Neutral/Choppy. 100% Capital Protected."}
 
         if action == "BUY":
             plan = [
@@ -2497,6 +2528,11 @@ class MT5BridgeEngine:
                         icon = "🎉" if is_win else "🛡️"
                         title = "REACHSEY 5-POS BASKET HARVESTED" if is_win else "REACHSEY BASKET HARD FLOOR SHIELD"
                         sign = "+" if net_pnl >= 0 else "-"
+                        footer = (
+                            f"<i>✨ MT5 Reachsey Super Smart បានកើបចំណេញ & ដោះលែងដើមទុន ១០០% សម្រាប់កាក់ថ្មី!</i>"
+                            if is_win
+                            else f"<i>🛡️ MT5 Reachsey Hard Floor Shield បានកាត់ផ្ដាច់កាត់បន្ថយហានិភ័យ & ការពារដើមទុន ៩៥% ដោយជោគជ័យ!</i>"
+                        )
                         msg_sw = (
                             f"{icon} <b>[MT5 {title}]</b> ⚡\n"
                             f"━━━━━━━━━━━━\n"
@@ -2506,7 +2542,7 @@ class MT5BridgeEngine:
                             f"🛡️ <b>យន្តការ ៖</b> <code>{sweep_reason}</code>\n"
                             f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{account_id}</code>\n"
                             f"━━━━━━━━━━━━\n"
-                            f"<i>✨ MT5 Reachsey Super Smart បានកើបចំណេញ & ដោះលែងដើមទុន ១០០% សម្រាប់កាក់ថ្មី!</i>"
+                            f"{footer}"
                         )
                         _dispatch_telegram_alert(c_id, msg_sw)
                 except Exception as ex_sw:
