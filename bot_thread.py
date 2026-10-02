@@ -5678,6 +5678,13 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["AUTO"]
                 await mt5_reachsey_command(update, context)
+            elif data == "btn_mt5_reachsey_silent":
+                try:
+                    await update.callback_query.answer("🔕 ប្តូរស្ថានភាព Silent Stealth Mode (បិទ/បើក សាររំខាន)...")
+                except Exception:
+                    pass
+                context.args = ["SILENT"]
+                await mt5_reachsey_command(update, context)
             elif data == "btn_mt5_reachsey_sweep":
                 try:
                     await update.callback_query.answer("🧹 កំពុងបោសសម្អាត & កើបប្រាក់ចំណេញ Reachsey Baskets...")
@@ -21812,6 +21819,29 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(msg_sw, parse_mode="HTML", reply_markup=kb_sw)
                     return
 
+                elif sub in ["SILENT", "MUTE"]:
+                    curr_silent = db.get_system_setting(f"mt5_silent_mode_{chat_id}", "1") == "1"
+                    if len(args) >= 2:
+                        action_arg = str(args[1]).upper().strip()
+                        new_state = "1" if action_arg in ["ON", "START", "ENABLE", "1"] else "0"
+                    else:
+                        new_state = "0" if curr_silent else "1"
+                    db.set_system_setting(f"mt5_silent_mode_{chat_id}", new_state)
+                    status_lbl = "🟢 បានបើក (ON - ស្ងាត់ស្ងៀម ផ្ញើតែរបាយការណ៍ Profit/Loss)" if new_state == "1" else "⚪ បានបិទ (OFF - ផ្ញើគ្រប់សារ Breakeven/Trailing)"
+                    msg_silent = (
+                        f"🔕 <b>[MT5 SILENT STEALTH MODE CONFIG]</b>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ <b>ស្ថានភាព Silent Mode ៖</b> <b>{status_lbl}</b>\n"
+                        f"🏛️ <b>គណនី MT5 ៖</b> <code>#{target_account or 'Default'}</code>\n"
+                        f"👉 <i>Breakeven Armor & Trailing SL រុញការពារទុនលើ Broker ស្ងាត់ៗក្នុង Background (&lt;0.5ms) ហើយ Telegram នឹងផ្ញើតែរបាយការណ៍កើបចំណេញ (Profit Harvest) ឬកាត់ខាត (Loss Floor) ប៉ុណ្ណោះ!</i>\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                    )
+                    kb_sil = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🎛️ Reachsey Menu", callback_data="btn_mt5_reachsey_menu")]
+                    ])
+                    await update.effective_message.reply_text(msg_silent, parse_mode="HTML", reply_markup=kb_sil)
+                    return
+
                 elif sub in ["STOP", "OFF"]:
                     db.set_system_setting(f"mt5_reachsey_auto_{chat_id}", "0")
                     sweep_res = bridge.sweep_reachsey_baskets(acc_id=target_account, reason="Emergency Stop")
@@ -21857,6 +21887,8 @@ class TelegramBotThread(BaseThread):
 
             is_reachsey_auto = db.get_system_setting(f"mt5_reachsey_auto_{chat_id}", "0") == "1"
             auto_badge = "🤖 Auto Matrix: 🟢 ON" if is_reachsey_auto else "🤖 Auto Matrix: ⚪ OFF"
+            is_silent = db.get_system_setting(f"mt5_silent_mode_{chat_id}", "1") == "1"
+            silent_badge = "🔕 សារស្ងាត់: 🟢 ON" if is_silent else "🔔 សារស្ងាត់: ⚪ OFF"
 
             kb_reachsey = InlineKeyboardMarkup([
                 [
@@ -21868,11 +21900,14 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton(auto_badge, callback_data="btn_mt5_reachsey_auto")
                 ],
                 [
-                    InlineKeyboardButton("🧹 Sweep All Baskets", callback_data="btn_mt5_reachsey_sweep"),
-                    InlineKeyboardButton("🛑 Stop & Safe Close", callback_data="btn_mt5_reachsey_stop")
+                    InlineKeyboardButton(silent_badge, callback_data="btn_mt5_reachsey_silent"),
+                    InlineKeyboardButton("🧹 Sweep All Baskets", callback_data="btn_mt5_reachsey_sweep")
                 ],
                 [
-                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_reachsey_refresh"),
+                    InlineKeyboardButton("🛑 Stop & Safe Close", callback_data="btn_mt5_reachsey_stop"),
+                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_reachsey_refresh")
+                ],
+                [
                     InlineKeyboardButton("⚡ MT5 Master Terminal", callback_data="btn_mt5")
                 ]
             ])
@@ -21906,6 +21941,7 @@ class TelegramBotThread(BaseThread):
                 f"• បើក Tier 2 ($6,000) ៖ `` `/mt5_reachsey 6000` ``\n"
                 f"• បើក Tier 3 ($10,000) ៖ `` `/mt5_reachsey 10000` ``\n"
                 f"• បើក Auto Matrix 24/7 ៖ `` `/mt5_reachsey AUTO ON` ``\n"
+                f"• បើក/បិទ សារស្ងាត់ (Silent) ៖ `` `/mt5_reachsey SILENT ON` ``\n"
                 f"• បោសសម្អាត & កើបចំណេញ ៖ `` `/mt5_reachsey SWEEP` ``\n"
                 f"• បិទ & Safe Stop ៖ `` `/mt5_reachsey STOP` ``\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"

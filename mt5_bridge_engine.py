@@ -742,7 +742,22 @@ class MT5BridgeEngine:
         self._last_global_scan_time: float = 0.0
         self._reachsey_baskets: Dict[str, Dict[str, Any]] = {}  # {basket_id: data}
         
+        # Silent Mode for Intermediate Breakeven & Trailing Modifications:
+        # Executes SL modifications directly on MT5 broker silently, preserving capital and
+        # logging to system journal, but suppressing high-frequency intermediate Telegram spam.
+        # Clean Profit / Loss harvest reports are always delivered upon trade & basket completion.
+        self.silent_breakeven_alerts: bool = True
+        
         logger.info(f"🏛️ [MT5 BRIDGE] Initialized. TCP Port: {self.tcp_port}, ZMQ PUB: {self.zmq_pub_port}")
+
+    def is_silent_alerts(self, chat_id: int = 0) -> bool:
+        """Returns True if intermediate Breakeven / Trailing modification alerts are silenced."""
+        try:
+            if hasattr(db, "get_system_setting") and chat_id:
+                return db.get_system_setting(f"mt5_silent_mode_{chat_id}", "1") == "1"
+        except Exception:
+            pass
+        return getattr(self, "silent_breakeven_alerts", True)
 
     # =========================================================================
     # 1. CRYPTOGRAPHIC SIGNATURE & ANTI-REPLAY CITADEL
@@ -2900,22 +2915,23 @@ class MT5BridgeEngine:
                                 self._ticket_last_trailed_sl[ticket] = be_sl
                                 self._ticket_last_modify_time[ticket] = now_ts
                                 logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Gold Ticket #{ticket} to {be_sl} (Peak was +{peak:.2f} {unit_label})")
-                                try:
-                                    if chat_id:
-                                        msg_be = (
-                                            f"🛡️ <b>[MT5 BREAKEVEN ARMOR LOCKED]</b>\n"
-                                            f"━━━━━━━━━━━━\n"
-                                            f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
-                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> ({p_type})\n"
-                                            f"🔒 <b>កម្រិត Stop Loss ថ្មី ៖</b> <code>{be_sl}</code> (កាត់ហានិភ័យ & ចាក់សោរចំណេញ)\n"
-                                            f"💵 <b>ប្រាក់ចំណេញឡើងដល់ ៖</b> <b>+{peak:,.2f} {unit_label}</b>\n"
-                                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
-                                            f"━━━━━━━━━━━━\n"
-                                            f"<i>✨ Breakeven Armor បានរុញ SL ទៅចំនុចសុវត្ថិភាព គ្មានហានិភ័យឡើយ!</i>"
-                                        )
-                                        _dispatch_telegram_alert(chat_id, msg_be)
-                                except Exception:
-                                    pass
+                                if not self.is_silent_alerts(chat_id):
+                                    try:
+                                        if chat_id:
+                                            msg_be = (
+                                                f"🛡️ <b>[MT5 BREAKEVEN ARMOR LOCKED]</b>\n"
+                                                f"━━━━━━━━━━━━\n"
+                                                f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                                f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> ({p_type})\n"
+                                                f"🔒 <b>កម្រិត Stop Loss ថ្មី ៖</b> <code>{be_sl}</code> (កាត់ហានិភ័យ & ចាក់សោរចំណេញ)\n"
+                                                f"💵 <b>ប្រាក់ចំណេញឡើងដល់ ៖</b> <b>+{peak:,.2f} {unit_label}</b>\n"
+                                                f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
+                                                f"━━━━━━━━━━━━\n"
+                                                f"<i>✨ Breakeven Armor បានរុញ SL ទៅចំនុចសុវត្ថិភាព គ្មានហានិភ័យឡើយ!</i>"
+                                            )
+                                            _dispatch_telegram_alert(chat_id, msg_be)
+                                    except Exception:
+                                        pass
 
                             # Level 2+: Progressive Server-Side Trailing SL Lock (Locks 70% of distance on broker)
                             elif peak >= gold_ratchet_peak and open_p > 0 and cur_p > 0:
@@ -2934,22 +2950,23 @@ class MT5BridgeEngine:
                                             last_alert_sl = self._ticket_last_alert_sl.get(ticket, 0.0)
                                             if (trail_sl - last_alert_sl) >= 1.50 or last_alert_sl == 0.0:
                                                 self._ticket_last_alert_sl[ticket] = trail_sl
-                                                try:
-                                                    if chat_id:
-                                                        msg_trail = (
-                                                            f"🚀 <b>[MT5 TRAILING PROFIT LOCKED]</b>\n"
-                                                            f"━━━━━━━━━━━━\n"
-                                                            f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
-                                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> (BUY)\n"
-                                                            f"🔒 <b>Trailing SL ថ្មី ៖</b> <code>{trail_sl}</code> (ចាក់សោ 70% នៃចម្ងាយចំណេញ)\n"
-                                                            f"💵 <b>ប្រាក់ចំណេញបច្ចុប្បន្ន ៖</b> <b>+{profit:,.2f} {unit_label}</b> (Peak: +{peak:,.2f})\n"
-                                                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
-                                                            f"━━━━━━━━━━━━\n"
-                                                            f"<i>✨ Trailing Take Profit កំពុងប្រដេញតាមកើបផលចំណេញអតិបរមា គ្មានហានិភ័យឡើយ!</i>"
-                                                        )
-                                                        _dispatch_telegram_alert(chat_id, msg_trail)
-                                                except Exception:
-                                                    pass
+                                                if not self.is_silent_alerts(chat_id):
+                                                    try:
+                                                        if chat_id:
+                                                            msg_trail = (
+                                                                f"🚀 <b>[MT5 TRAILING PROFIT LOCKED]</b>\n"
+                                                                f"━━━━━━━━━━━━\n"
+                                                                f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                                                f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> (BUY)\n"
+                                                                f"🔒 <b>Trailing SL ថ្មី ៖</b> <code>{trail_sl}</code> (ចាក់សោ 70% នៃចម្ងាយចំណេញ)\n"
+                                                                f"💵 <b>ប្រាក់ចំណេញបច្ចុប្បន្ន ៖</b> <b>+{profit:,.2f} {unit_label}</b> (Peak: +{peak:,.2f})\n"
+                                                                f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
+                                                                f"━━━━━━━━━━━━\n"
+                                                                f"<i>✨ Trailing Take Profit កំពុងប្រដេញតាមកើបផលចំណេញអតិបរមា គ្មានហានិភ័យឡើយ!</i>"
+                                                            )
+                                                            _dispatch_telegram_alert(chat_id, msg_trail)
+                                                    except Exception:
+                                                        pass
 
                                     elif p_type == "SELL" and cur_p < open_p:
                                         gain = open_p - cur_p
@@ -2964,22 +2981,23 @@ class MT5BridgeEngine:
                                             last_alert_sl = self._ticket_last_alert_sl.get(ticket, 999999.0)
                                             if (last_alert_sl - trail_sl) >= 1.50 or last_alert_sl == 999999.0:
                                                 self._ticket_last_alert_sl[ticket] = trail_sl
-                                                try:
-                                                    if chat_id:
-                                                        msg_trail = (
-                                                            f"🚀 <b>[MT5 TRAILING PROFIT LOCKED]</b>\n"
-                                                            f"━━━━━━━━━━━━\n"
-                                                            f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
-                                                            f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> (SELL)\n"
-                                                            f"🔒 <b>Trailing SL ថ្មី ៖</b> <code>{trail_sl}</code> (ចាក់សោ 70% នៃចម្ងាយចំណេញ)\n"
-                                                            f"💵 <b>ប្រាក់ចំណេញបច្ចុប្បន្ន ៖</b> <b>+{profit:,.2f} {unit_label}</b> (Peak: +{peak:,.2f})\n"
-                                                            f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
-                                                            f"━━━━━━━━━━━━\n"
-                                                            f"<i>✨ Trailing Take Profit កំពុងប្រដេញតាមកើបផលចំណេញអតិបរមា គ្មានហានិភ័យឡើយ!</i>"
-                                                        )
-                                                        _dispatch_telegram_alert(chat_id, msg_trail)
-                                                except Exception:
-                                                    pass
+                                                if not self.is_silent_alerts(chat_id):
+                                                    try:
+                                                        if chat_id:
+                                                            msg_trail = (
+                                                                f"🚀 <b>[MT5 TRAILING PROFIT LOCKED]</b>\n"
+                                                                f"━━━━━━━━━━━━\n"
+                                                                f"🎯 <b>Ticket ID ៖</b> <code>#{ticket}</code>\n"
+                                                                f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym}</code> (SELL)\n"
+                                                                f"🔒 <b>Trailing SL ថ្មី ៖</b> <code>{trail_sl}</code> (ចាក់សោ 70% នៃចម្ងាយចំណេញ)\n"
+                                                                f"💵 <b>ប្រាក់ចំណេញបច្ចុប្បន្ន ៖</b> <b>+{profit:,.2f} {unit_label}</b> (Peak: +{peak:,.2f})\n"
+                                                                f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_id}</code>\n"
+                                                                f"━━━━━━━━━━━━\n"
+                                                                f"<i>✨ Trailing Take Profit កំពុងប្រដេញតាមកើបផលចំណេញអតិបរមា គ្មានហានិភ័យឡើយ!</i>"
+                                                            )
+                                                            _dispatch_telegram_alert(chat_id, msg_trail)
+                                                    except Exception:
+                                                        pass
 
                         else:
                             digits = 3 if "JPY" in sym else 5
