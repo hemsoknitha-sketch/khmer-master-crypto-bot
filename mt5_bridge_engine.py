@@ -1236,6 +1236,8 @@ class MT5BridgeEngine:
                 "action": action,
                 "sl": sl_val,
                 "tp": tp_val,
+                "magic": int(sig_meta.get("magic", 0) or 0),
+                "comment": str(sig_meta.get("comment", "")),
                 "signal_id": signal_id,
                 "fill_time": time.time()
             }
@@ -1252,6 +1254,15 @@ class MT5BridgeEngine:
         meta = self._ticket_metadata.pop(ticket, None) or {}
         if not symbol or symbol == "N/A":
             symbol = str(meta.get("symbol", "")).upper()
+        comment = str(payload.get("comment", "") or meta.get("comment", ""))
+        magic = int(payload.get("magic", 0) or meta.get("magic", 0) or 0)
+        is_reachsey_leg = (
+            magic == 888666
+            or "R5_" in comment
+            or comment.startswith("R5_")
+            or "SWEEP_" in comment
+            or "reachsey" in comment.lower()
+        )
 
         self._ticket_sl_modified.pop(ticket, None)
         self._ticket_peak_profit.pop(ticket, None)
@@ -1318,7 +1329,9 @@ class MT5BridgeEngine:
                 self._last_symbol_trade_time[f"{user_chat_id}_{symbol}"] = now_ts
 
             streak_key = f"{account_id}_{sym_clean}"
-            if pnl < 0.0:
+            if is_reachsey_leg:
+                logger.info(f"👑 [REACHSEY BASKET LEG CLOSED] Account {account_id} Ticket #{ticket} ({sym_clean}): PnL ${pnl:+,.2f} (Basket Leg - Excluded from Consecutive Loss Circuit Breaker)")
+            elif pnl < 0.0:
                 self._consecutive_losses[streak_key] = self._consecutive_losses.get(streak_key, 0) + 1
                 losses = self._consecutive_losses[streak_key]
                 logger.warning(f"⚠️ [STREAK COUNTER] Account {account_id} Symbol {sym_clean} Consecutive Losses: {losses}")
@@ -1865,6 +1878,8 @@ class MT5BridgeEngine:
             "tp": tp_norm,
             "sl_dist": sl_dist_norm,
             "tp_dist": tp_dist_norm,
+            "magic": int(magic),
+            "comment": str(comment),
             "account_id": target_account or "BROADCAST",
             "timestamp": time.time()
         }
@@ -2255,13 +2270,19 @@ class MT5BridgeEngine:
                 ("BUY", "R5_HEDGE_5", 0.60, 2.00)
             ]
 
+        is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
         try:
             atr_params = MT5QuantumSignalCitadel.calculate_quantum_atr_sl_tp(sym_clean, action, current_price=cur_mid)
-            base_sl_dist = float(atr_params.get("sl_dist", 3.00))
+            atr_val = float(atr_params.get("atr", 3.00) or 3.00)
             base_tp_dist = float(atr_params.get("tp_dist", 8.00))
         except Exception:
-            base_sl_dist = 3.00 if ("XAU" in sym_clean or "GOLD" in sym_clean) else 0.0030
-            base_tp_dist = 8.00 if ("XAU" in sym_clean or "GOLD" in sym_clean) else 0.0080
+            atr_val = 3.00 if is_gold else 0.0030
+            base_tp_dist = 8.00 if is_gold else 0.0080
+
+        # Institutional Disaster Catastrophic Stop Loss:
+        # Prevents premature broker stop-outs during natural intraday wave oscillations.
+        # The Basket Harvester (monitor_reachsey_5pos_baskets) manages active Net PnL (-5% hard floor / +10% target).
+        base_disaster_sl = max(15.00 if is_gold else 0.0120, atr_val * 4.0)
 
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
         dispatched_orders = []
@@ -2269,7 +2290,7 @@ class MT5BridgeEngine:
 
         for leg_act, leg_tag, tp_mult, sl_mult in plan:
             leg_tp_dist = round(base_tp_dist * tp_mult, 4)
-            leg_sl_dist = round(base_sl_dist * sl_mult, 4)
+            leg_sl_dist = round(base_disaster_sl * sl_mult, 4)
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
             res = self.dispatch_order(
                 symbol=adapted_sym,
@@ -2315,10 +2336,12 @@ class MT5BridgeEngine:
 
     def monitor_reachsey_5pos_baskets(
         self,
-        account_id: str,
-        open_positions: List[Dict[str, Any]],
+        account_id: str = "",
+        open_positions: Optional[List[Dict[str, Any]]] = None,
         chat_id: int = 0,
-        is_cent: bool = False
+        is_cent: bool = False,
+        acc_id: str = "",
+        **kwargs
     ):
         """
         👑 Monitors active Reachsey 5-Position Baskets in real-time.
@@ -2326,6 +2349,8 @@ class MT5BridgeEngine:
         locks 85% of peak profits via Trailing Ratchet, and enforces the
         -5% Emergency Hard Floor for ultimate black swan capital protection.
         """
+        account_id = str(account_id or acc_id or "").strip()
+        open_positions = open_positions or []
         now_ts = time.time()
         for b_id, b_data in list(self._reachsey_baskets.items()):
             if b_data.get("account_id") != str(account_id) or b_data.get("status") != "ACTIVE":
@@ -2340,7 +2365,7 @@ class MT5BridgeEngine:
                 p_sym = normalize_mt5_symbol(str(p.get("symbol", "")))
                 p_comm = str(p.get("comment", ""))
                 p_magic = int(p.get("magic", 0) or 0)
-                if (p_magic == 888666 or tag_suffix in p_comm) and (p_sym == target_sym or not target_sym):
+                if (p_magic == 888666 or tag_suffix in p_comm or "R5_" in p_comm) and (p_sym == target_sym or not target_sym):
                     matching_positions.append(p)
 
             if not matching_positions:
@@ -2380,6 +2405,18 @@ class MT5BridgeEngine:
 
                 b_data["status"] = "SWEPT_COMPLETED"
                 b_data["final_net_pnl"] = net_pnl
+
+                # Basket-Level Circuit Breaker Tracking (Invariant 48)
+                streak_key = f"{account_id}_{target_sym}"
+                if net_pnl < 0:
+                    self._consecutive_losses[streak_key] = self._consecutive_losses.get(streak_key, 0) + 1
+                    b_losses = self._consecutive_losses[streak_key]
+                    if b_losses >= 2:
+                        lockout_until = now_ts + (300.0 if is_cent else 1800.0)
+                        self._symbol_lockout_until[streak_key] = lockout_until
+                        logger.error(f"🛑 [REACHSEY BASKET CIRCUIT BREAKER] Account {account_id} Symbol {target_sym} hit {b_losses} consecutive basket losses! Locked until {datetime.fromtimestamp(lockout_until, timezone.utc).strftime('%H:%M:%S')} UTC!")
+                else:
+                    self._consecutive_losses[streak_key] = 0
 
                 try:
                     c_id = chat_id or b_data.get("chat_id", 0)
@@ -2733,6 +2770,14 @@ class MT5BridgeEngine:
                         if ticket <= 0:
                             continue
                         current_tickets.add(ticket)
+
+                        # Invariant 48: Reachsey 5-Position Matrix is managed exclusively at the BASKET level.
+                        # Never apply individual single-trade Stop Loss, Breakeven Armor, or Harvester to Reachsey legs!
+                        p_magic = int(p.get("magic", 0) or 0)
+                        p_comm = str(p.get("comment", ""))
+                        if p_magic == 888666 or "R5_" in p_comm or p_comm.startswith("R5_") or "SWEEP_" in p_comm:
+                            continue
+
                         profit = float(p.get("profit", 0.0) or 0.0)
                         sym = str(p.get("symbol", "")).upper()
                         open_p = float(p.get("open_price", 0.0) or 0.0)
@@ -3040,13 +3085,14 @@ class MT5BridgeEngine:
                     # Monitor Reachsey 5-Position Volatility Baskets (Super Smart Basket Trailing & Recovery)
                     try:
                         self.monitor_reachsey_5pos_baskets(
+                            account_id=acc_id,
                             acc_id=acc_id,
                             open_positions=open_positions,
                             chat_id=chat_id,
                             is_cent=is_cent_account
                         )
                     except Exception as ex_reachsey:
-                        logger.debug(f"⚠️ Reachsey 5-pos basket monitor notice: {ex_reachsey}")
+                        logger.warning(f"⚠️ Reachsey 5-pos basket monitor notice: {ex_reachsey}")
 
                     # =========================================================
                     # 1.5 REACHSEY 5-POSITION VOLATILITY MATRIX ENGINE (Invariant 48)
