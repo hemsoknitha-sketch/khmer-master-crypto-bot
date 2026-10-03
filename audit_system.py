@@ -1606,6 +1606,97 @@ def run_audit():
         failures.append(f"Invariant 49 check failed: {e}")
         log_fail(str(e))
 
+    # [CHECK 40/40] Verifying Angkor Institutional Private Agreement, Master PDF Blank Space Stamping & Legal Citadel Lock (Invariant 50)...
+    print("\n[CHECK 40/40] Verifying Angkor Institutional Private Agreement, Master PDF Blank Space Stamping & Legal Citadel Lock (Invariant 50)...")
+    try:
+        import hashlib
+        import pypdf
+        import legal_agreement as la
+        import database as db
+
+        # 1. Ground truth in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv50 = "Invariant 50: Angkor Institutional Private Agreement & Master Stamping Architecture" in agents_md
+
+        # 2. Key functions in legal_agreement.py
+        has_tpl_func = hasattr(la, "get_master_agreement_template_path")
+        has_stamp_func = hasattr(la, "generate_stamped_contract_pdf")
+        has_rl_stamp_func = hasattr(la, "generate_stamped_contract_pdf_reportlab")
+        has_gen_func = hasattr(la, "generate_legal_contract_pdf")
+        has_rec_func = hasattr(la, "record_user_legal_contract")
+        has_status_func = hasattr(la, "get_user_agreement_status")
+
+        # 3. Master template Users_agrement.pdf exists
+        tpl_path = la.get_master_agreement_template_path()
+        has_master_pdf = bool(tpl_path and os.path.exists(tpl_path) and os.path.getsize(tpl_path) > 10000)
+
+        # 4. .gitignore whitelisting
+        with open(".gitignore", "r", encoding="utf-8") as f:
+            gi_content = f.read()
+        has_gi_whitelist = "!Users_agrement.pdf" in gi_content
+
+        # 5. requirements.txt includes pypdf
+        with open("requirements.txt", "r", encoding="utf-8") as f:
+            reqs_content = f.read()
+        has_reqs_pypdf = "pypdf" in reqs_content
+
+        # 6. Functional Stamping Test
+        audit_test_id = 999999999
+        audit_test_out = os.path.join(la.PDF_ARCHIVE_DIR, "audit_test_stamp.pdf")
+        stamp_ok = la.generate_stamped_contract_pdf(
+            chat_id=audit_test_id,
+            username="audit_bot",
+            full_name="Audit Test User",
+            phone_number="+85512345678",
+            contract_serial="AQ-AGR-AUDIT-TEST",
+            sha256_hash=hashlib.sha256(b"audit_test").hexdigest(),
+            accepted_time_str="03/10/2026 21:45:00 ICT",
+            output_pdf_path=audit_test_out,
+            is_preview=False
+        )
+        pdf_valid = False
+        if stamp_ok and os.path.exists(audit_test_out) and os.path.getsize(audit_test_out) > 10000:
+            reader = pypdf.PdfReader(audit_test_out)
+            pdf_valid = (len(reader.pages) == 1)
+            os.remove(audit_test_out)
+
+        # 7. Database Persistence Test
+        db_rec_ok = la.record_user_legal_contract(
+            chat_id=audit_test_id,
+            user_id=audit_test_id,
+            username="audit_bot",
+            full_name="Audit Test User",
+            phone_number="+85512345678",
+            contract_serial="AQ-AGR-AUDIT-TEST",
+            sha256_hash="hash123",
+            pdf_path=""
+        )
+        status_rec = la.get_user_agreement_status(audit_test_id)
+        db_valid = bool(db_rec_ok and status_rec.get("accepted") == True)
+
+        # Clean up database test record
+        conn = la.get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM user_legal_agreements WHERE chat_id = ?", (audit_test_id,))
+        conn.commit()
+        conn.close()
+
+        all_inv50_passed = (
+            has_inv50 and has_tpl_func and has_stamp_func and has_rl_stamp_func and
+            has_gen_func and has_rec_func and has_status_func and has_master_pdf and
+            has_gi_whitelist and has_reqs_pypdf and pdf_valid and db_valid
+        )
+
+        if all_inv50_passed:
+            log_pass("Angkor Institutional Private Agreement, Master PDF Blank Space Stamping & Legal Citadel Lock (Invariant 50) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 50 check failed: inv50={has_inv50}, tpl_func={has_tpl_func}, stamp_func={has_stamp_func}, master_pdf={has_master_pdf}, gi={has_gi_whitelist}, reqs={has_reqs_pypdf}, pdf_valid={pdf_valid}, db_valid={db_valid}")
+            log_fail("Angkor Institutional Private Agreement (Invariant 50) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 50 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

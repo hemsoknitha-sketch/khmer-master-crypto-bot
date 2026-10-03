@@ -702,15 +702,21 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
-### Invariant 50: Angkor Institutional Private Agreement & Absolute Risk Waiver Gatekeeper (កិច្ចព្រមព្រៀងឯកជន & ការលះបង់ការទទួលខុសត្រូវ 100% អចិន្ត្រៃយ៍)
-- **Location:** `legal_agreement.py`, `database.py` (`user_legal_agreements`), `bot_thread.py` (`agreement_command`, `btn_agree_terms`, `btn_read_terms`, pre-flight gatekeepers on `/add_api`, `/auto_trade`, `/turbo_hedge`, `/smart_trade`), `bot_commands_registry.py`
+### Invariant 50: Angkor Institutional Private Agreement & Master Stamping Architecture (កិច្ចព្រមព្រៀងឯកជន & ការបោះត្រាហត្ថលេខាឌីជីថលលើឯកសារដើម)
+- **Location:** `legal_agreement.py`, `database.py` (`user_legal_agreements`), `bot_thread.py` (`agreement_command`, `btn_agree_terms`, `btn_preview_terms_pdf`, `btn_download_my_pdf`, `btn_admin_agreements`, pre-flight gatekeepers on `/start`, `/add_api`, `/auto_trade`, `/turbo_hedge`, `/smart_trade`), `Users_agrement.pdf`
 - **Rule:**
   1. **Strict Private Contract & Educational Software Status (ឋានៈកម្មវិធីស្រាវជ្រាវ & កិច្ចសន្យាឯកជន):** Angkor Quant Engine operates strictly as an institutional quantitative research tool and private algorithmic automation suite. It is NOT a financial advisory service, broker, deposit taker, or pooled investment fund.
-  2. **Mandatory Pre-Flight Execution Gatekeeper:** Before any user can store live Binance API keys, activate `/auto_trade ON`, execute live `/turbo_hedge`, or run automated executions in `/smart_trade`, the system programmatically verifies whether the user has signed the digital agreement. Unsigned attempts are intercepted with an interactive Gatekeeper card requiring explicit agreement.
-  3. **Zero Financial Liability & 100% Assumption of Risk (ការលះបង់ការទទួលខុសត្រូវ ១០០%):** Users explicitly agree and affirm that trading cryptocurrencies, derivatives, and forex involves extreme financial risk, including potential loss of principal, broker slippage, exchange API downtime, liquidation, and extreme market volatility. The creator (HEM SINATH), developers, and operators bear ZERO liability for any direct, indirect, or consequential capital losses.
-  4. **Digital Cryptographic Audit Trail:** User agreement is logged in `user_legal_agreements` with immutable cryptographic SHA-256 hash of the agreement text, Unix timestamp, user handle, and client version, creating a legally defensible digital audit trail.
-  5. **1-Tap Review and Compliance Suite (`/agreement`):** Users can review the full 7-article charter anytime via `/agreement` or `/about`, inspect their agreement status, view the SHA-256 verification hash, and access the official terms.
-- **Enforcement:** Verified by `audit_system.py` and pre-flight execution hooks.
+  2. **Mandatory Pre-Flight Execution Gatekeeper on /start:** Before any user can store live Binance API keys, activate `/auto_trade ON`, execute live `/turbo_hedge`, or run automated executions in `/smart_trade`, the system programmatically intercepts unsigned users on `/start` with an interactive Gatekeeper card requiring explicit agreement.
+  3. **Authentic Master Document Invariant (`Users_agrement.pdf` Standard):** The authoritative legal charter is the authentic 1-page master document `Users_agrement.pdf` (containing the complete 5 articles in professional Khmer typography). AI agents and engines are strictly forbidden from rebuilding the contract text from dynamic scratch/HTML. The document `Users_agrement.pdf` is legally valid, sufficient, and non-negotiable.
+  4. **Sub-Millimeter Blank Space Stamping Architecture (ការបោះត្រាលើកន្លែងទំនេរផ្នែកខាងក្រោម):** When a user accepts the agreement, their identity (Chat ID, Username, Name, Phone), contract serial number, ICT timestamp, 100% accepted status, system metadata, digital seal, and SHA-256 cryptographic fingerprint MUST be stamped directly into the empty space at the bottom of `Users_agrement.pdf` (native PDF coordinates: `y = 22.0 pt` to `118.0 pt`, `x = 36.0 pt` to `576.0 pt`, height `96.0 pt`) with an 8.6 pt breathing space below the text and 22 pt bottom margin.
+  5. **Multi-Tier Stamping Engine with HarfBuzz Text Shaping:**
+     - *Tier 1 (Flagship Primary):* `fpdf2` with `uharfbuzz` text shaping and `KantumruyPro-Regular.ttf` for 100% proper Khmer conjuncts and subscript vowels, merged onto `Users_agrement.pdf` via `pypdf`.
+     - *Tier 2 (Defensive Fallback):* `reportlab.pdfgen.canvas` overlay as an immediate in-process fallback.
+     - *Tier 3 (Emergency Fallback):* Pure-Python / browser full generation if template is missing.
+  6. **Immutable WAL SQLite Persistence & SHA-256 Audit Trail:** Every signed agreement is permanently logged in `user_legal_agreements` in SQLite WAL mode (`is_immutable = 1`), with SHA-256 fingerprint, and the stamped PDF is archived in `data/legal_agreements_pdf/`.
+  7. **Instant Telegram PDF Distribution & Super Admin Citadel:** Upon signing, the bot immediately dispatches the official signed PDF to the user's chat. Users can re-download via `btn_download_my_pdf`. Super Admin can inspect and download any user's PDF via `/admin_agreements` and `btn_admin_dl_pdf_<chat_id>`.
+  8. **Git Sync & Linux VPS Whitelist Standard:** `Users_agrement.pdf` and `assets/docs/*.pdf` MUST remain permanently whitelisted in `.gitignore` (`!Users_agrement.pdf`, `!assets/docs/*.pdf`) to guarantee seamless deployment on Google Cloud VPS without template loss.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 40/40] and pre-flight execution hooks.
 
 ---
 
