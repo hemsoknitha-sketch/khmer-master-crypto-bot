@@ -9942,6 +9942,16 @@ def is_user_agreement_accepted(chat_id: int) -> bool:
     import legal_agreement
     return legal_agreement.is_agreement_accepted(chat_id)
 
+def get_all_legal_agreements(limit: int = 50, offset: int = 0):
+    """Retrieves list of all signed legal agreements for admin inspection."""
+    import legal_agreement
+    return legal_agreement.get_all_legal_agreements(limit, offset)
+
+def get_legal_agreements_count() -> int:
+    """Returns total count of signed legal agreements."""
+    import legal_agreement
+    return legal_agreement.get_legal_agreements_count()
+
 
 # Initialize and auto-migrate database schema on startup
 try:

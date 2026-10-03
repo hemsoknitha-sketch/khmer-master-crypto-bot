@@ -3007,6 +3007,7 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🔓 Reset User PIN", callback_data="btn_reset_pin_prompt")
                 ],
                 [
+                    InlineKeyboardButton("📜 User Legal Agreements", callback_data="btn_admin_agreements"),
                     InlineKeyboardButton("☢️ Panic Nuke Shutdown", callback_data="btn_admin_nuke")
                 ],
                 [
@@ -3073,6 +3074,29 @@ class TelegramBotThread(BaseThread):
             import legal_agreement
             agreement_status = legal_agreement.get_user_agreement_status(chat_id)
             is_agreed = bool(agreement_status.get("accepted", False)) or is_admin
+
+            # Mandatory Pre-Flight Legal Agreement Gatekeeper on /start (New Users Only)
+            if not is_agreed and not is_admin:
+                user_phone = ""
+                try:
+                    user_row = db.get_user(chat_id) if hasattr(db, 'get_user') else None
+                    if user_row and isinstance(user_row, dict):
+                        user_phone = user_row.get("phone_number", "")
+                except Exception:
+                    pass
+                card_text, agr_keyboard = legal_agreement.build_new_user_start_agreement_card(
+                    chat_id=chat_id,
+                    first_name=first_name,
+                    username=user.username if user else "",
+                    phone_number=user_phone
+                )
+                msg_target = update.effective_message or update.message
+                if msg_target:
+                    try:
+                        await msg_target.reply_text(card_text, parse_mode="Markdown", reply_markup=agr_keyboard)
+                    except Exception:
+                        await msg_target.reply_text(card_text, parse_mode=None, reply_markup=agr_keyboard)
+                return
 
             # Construct Interactive Navigation Keyboard (Investment Focus)
             base_keyboard = [
@@ -7446,18 +7470,13 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
                 except Exception:
                     await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
-            elif data == "btn_about_accept":
+            elif data in [
+                "btn_agree_terms", "btn_about_accept",
+                "btn_download_my_pdf", "btn_preview_terms_pdf",
+                "btn_admin_agreements", "btn_menu_vip_req"
+            ] or data.startswith("btn_admin_dl_pdf_") or data.startswith("btn_admin_agr_page_"):
                 import legal_agreement
-                legal_agreement.record_user_agreement_acceptance(chat_id=chat_id)
-                try:
-                    await query.answer("✅ អ្នកបានយល់ព្រមកិច្ចព្រមព្រៀងឯកជន V.25.12.1-PRIVATE ដោយជោគជ័យ!", show_alert=True)
-                except Exception:
-                    pass
-                text, keyboard = legal_agreement.build_acceptance_success_card(chat_id=chat_id)
-                try:
-                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
-                except Exception:
-                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+                await legal_agreement.handle_agreement_callback(update, context, data, chat_id)
             elif data in ["btn_menu_portfolio", "btn_portfolio"]:
                 context.args = []
                 await portfolio_command(update, context)
@@ -10624,6 +10643,59 @@ class TelegramBotThread(BaseThread):
                 await delete_sensitive_message(context, chat_id, update.effective_message.message_id, user_lang)
             else:
                 await send_long_message(context, chat_id, msg)
+        async def admin_agreements_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            if not (chat_id == 859271875 or (db.is_admin(chat_id) if hasattr(db, 'is_admin') else False)):
+                err_msg = "⛔ **ACCESS DENIED**: Exclusively restricted to Super Admin Only."
+                msg_target = update.effective_message or update.message
+                if msg_target:
+                    await msg_target.reply_text(err_msg, parse_mode="Markdown")
+                return
+
+            import legal_agreement
+            args = context.args if hasattr(context, 'args') and context.args else []
+            if args:
+                target_str = str(args[0]).strip()
+                try:
+                    target_id = int(target_str)
+                    status = legal_agreement.get_user_agreement_status(target_id)
+                    pdf_path = status.get("pdf_path")
+                    if pdf_path and os.path.exists(pdf_path):
+                        caption_text = (
+                            f"👑 **[ADMIN AUDIT] Signed Legal Contract PDF** 📜\n"
+                            f"• **User ID:** `{target_id}`\n"
+                            f"• **Name:** `{status.get('full_name', 'N/A')}` (@{status.get('username', 'N/A')})\n"
+                            f"• **Phone:** `{status.get('phone_number', 'N/A')}`\n"
+                            f"• **Serial:** `{status.get('contract_serial', 'N/A')}`\n"
+                            f"• **Accepted At:** `{status.get('accepted_at', 'N/A')}`\n"
+                            f"• **SHA-256:** `{status.get('sha256_hash', 'N/A')[:32]}...`"
+                        )
+                        with open(pdf_path, "rb") as pdf_file:
+                            await context.bot.send_document(
+                                chat_id=chat_id,
+                                document=pdf_file,
+                                filename=os.path.basename(pdf_path),
+                                caption=caption_text,
+                                parse_mode="Markdown"
+                            )
+                        return
+                    else:
+                        msg_target = update.effective_message or update.message
+                        if msg_target:
+                            await msg_target.reply_text(f"⚠️ មិនទាន់មានកិច្ចសន្យា ឬរកមិនឃើញឯកសារ PDF សម្រាប់ User ID: `{target_id}` ឡើយ។", parse_mode="Markdown")
+                        return
+                except ValueError:
+                    pass
+
+            card_text, keyboard = legal_agreement.build_admin_agreements_card(page=1)
+            msg_target = update.effective_message or update.message
+            if msg_target:
+                try:
+                    await msg_target.reply_text(card_text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await msg_target.reply_text(card_text, parse_mode=None, reply_markup=keyboard)
             return
 
         async def admin_license_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19359,6 +19431,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("admin", admin_panel_command))
 
         self.app.add_handler(CommandHandler("admin_users", admin_users_command))
+        self.app.add_handler(CommandHandler("admin_agreements", admin_agreements_command))
+        self.app.add_handler(CommandHandler("agreements_admin", admin_agreements_command))
+        self.app.add_handler(CommandHandler("admin_contracts", admin_agreements_command))
         self.app.add_handler(CommandHandler("admin_license", admin_license_command))
         self.app.add_handler(CommandHandler("admin_delete", admin_delete_command))
         self.app.add_handler(CommandHandler("admin_reset_pin", admin_reset_pin_command))

@@ -22,8 +22,10 @@ debug_output*.txt
 dis_output.txt
 ico_silent_logs.txt
 
-# Charts & Temporary Images
+# Charts & Temporary Images & PDFs
 *.png
+*.pdf
+!data/legal_agreements_pdf/.gitkeep
 
 # Root-level AI Model Weights (Canonical tracked in models/ and Hugging Face Hub)
 /*.pkl

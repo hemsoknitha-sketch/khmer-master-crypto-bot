@@ -100,6 +100,7 @@ def get_admin_bot_commands():
         # --- [7] SUPER ADMIN EXCLUSIVE (Placed at the bottom) ---
         BotCommand("admin", "👑 Angkor Admin Executive Control Panel"),
         BotCommand("admin_users", "👥 Angkor VIP Users Directory"),
+        BotCommand("admin_agreements", "📜 Angkor User Legal Contracts & PDF Vault"),
         BotCommand("admin_license", "🔑 Angkor VIP License Manager"),
         BotCommand("admin_broadcast", "📢 Angkor Global Urgent Broadcast"),
         BotCommand("admin_stats", "📊 Angkor Platform Volume & Stats"),
