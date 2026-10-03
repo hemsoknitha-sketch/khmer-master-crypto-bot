@@ -2700,6 +2700,7 @@ class TelegramBotThread(BaseThread):
                     "⚙️ **4. SECURITY & SYSTEM CONTROL**\n"
                     "• `/add_api` - Connect Binance API Keys (RSA / HMAC)\n"
                     "• `/set_pin` - Set 4-6 Digit Security 2FA PIN\n"
+                    "• `/about` - 📜 Client Agreement, Terms & Risk Disclosure\n"
                     "• `/language` - Choose System Language (Khmer / English / Chinese)\n"
                     "• `/stop` - Stop Trading for Single Coin & Market Close\n"
                 )
@@ -2734,6 +2735,7 @@ class TelegramBotThread(BaseThread):
                     "⚙️ **4. 系统控制与安全**\n"
                     "• `/add_api` - 绑定 Binance API Keys\n"
                     "• `/set_pin` - 设置 4-6 位安全 PIN 码\n"
+                    "• `/about` - 📜 客户服务协议与风险披露 (Terms & Agreement)\n"
                     "• `/language` - 切换系统语言 (高棉语 / 英语 / 中文)\n"
                     "• `/stop` - 停止指定币种交易并平仓\n"
                 )
@@ -2768,6 +2770,7 @@ class TelegramBotThread(BaseThread):
                     "⚙️ **៤. SECURITY & SYSTEM CONTROL (ការកំណត់សុវត្ថិភាព)**\n"
                     "• `/add_api` - ភ្ជាប់ Binance API Keys (RSA / HMAC)\n"
                     "• `/set_pin` - កំណត់លេខ 2FA PIN សម្ងាត់ ៤-៦ ខ្ទង់\n"
+                    "• `/about` - 📜 កិច្ចព្រមព្រៀងសេវាកម្ម & ការប្រកាសហានិភ័យ (Terms & Agreement)\n"
                     "• `/language` - ផ្លាស់ប្តូរភាសា (ខ្មែរ / English / 中文)\n"
                     "• `/stop` - បិទ និង Market Close លើកាក់ជាក់លាក់\n"
                 )
@@ -2830,6 +2833,7 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km")
                 ],
                 [
+                    InlineKeyboardButton("📜 Terms & Agreement", callback_data="btn_about_menu"),
                     InlineKeyboardButton("🔄 Refresh Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ]
@@ -3659,6 +3663,45 @@ class TelegramBotThread(BaseThread):
                     await (update.effective_message or update.message).reply_text(err_msg)
 
         trading_journal_command = journal_command
+
+        async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id:
+                return
+            if not await verify_user(update):
+                return
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer("📜 កំពុងបើកកិច្ចព្រមព្រៀង & លក្ខខណ្ឌសេវាកម្ម...")
+                except Exception:
+                    pass
+
+            try:
+                import legal_agreement
+                text, keyboard = legal_agreement.build_about_main_card(chat_id=chat_id)
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await update.callback_query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+                else:
+                    try:
+                        await (update.effective_message or update.message).reply_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await (update.effective_message or update.message).reply_text(text=text, parse_mode=None, reply_markup=keyboard)
+            except Exception as e:
+                err_msg = f"⚠️ Error in About & Legal Agreement: {e}"
+                if update.callback_query:
+                    try:
+                        await update.callback_query.answer(err_msg, show_alert=True)
+                    except Exception:
+                        pass
+                else:
+                    await (update.effective_message or update.message).reply_text(err_msg)
+
+        terms_command = about_command
+        client_agreement_command = about_command
 
 
         async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -7325,6 +7368,87 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(text=sample_text, parse_mode="Markdown", reply_markup=kb)
                 except Exception:
                     await query.edit_message_text(text=sample_text, parse_mode=None, reply_markup=kb)
+            elif data in ["btn_about", "btn_about_menu", "btn_client_agreement", "btn_legal_agreement"]:
+                context.args = []
+                await about_command(update, context)
+            elif data == "btn_about_terms":
+                try:
+                    await query.answer("📜 កំពុងបើកលក្ខខណ្ឌកិច្ចព្រមព្រៀង...")
+                except Exception:
+                    pass
+                import legal_agreement
+                text, keyboard = legal_agreement.build_terms_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_about_risk":
+                try:
+                    await query.answer("⚠️ កំពុងបើកសេចក្តីប្រកាសហានិភ័យ...")
+                except Exception:
+                    pass
+                import legal_agreement
+                text, keyboard = legal_agreement.build_risk_disclosure_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_about_mt5":
+                try:
+                    await query.answer("🏛️ កំពុងបើកលក្ខខណ្ឌ MT5 & Slippage...")
+                except Exception:
+                    pass
+                import legal_agreement
+                text, keyboard = legal_agreement.build_mt5_execution_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_about_liability":
+                try:
+                    await query.answer("🛡️ កំពុងបើកដែនកំណត់ទទួលខុសត្រូវ...")
+                except Exception:
+                    pass
+                import legal_agreement
+                text, keyboard = legal_agreement.build_liability_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_about_privacy":
+                try:
+                    await query.answer("🔒 កំពុងបើកគោលការណ៍ឯកជនភាព & AML...")
+                except Exception:
+                    pass
+                import legal_agreement
+                text, keyboard = legal_agreement.build_privacy_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_about_en":
+                try:
+                    await query.answer("🌐 Loading English Legal Agreement...")
+                except Exception:
+                    pass
+                import legal_agreement
+                text, keyboard = legal_agreement.build_full_english_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_about_accept":
+                import legal_agreement
+                legal_agreement.record_user_agreement_acceptance(chat_id=chat_id)
+                try:
+                    await query.answer("✅ អ្នកបានយល់ព្រមកិច្ចព្រមព្រៀងសេវាកម្ម V.25.12.1 ដោយជោគជ័យ!", show_alert=True)
+                except Exception:
+                    pass
+                text, keyboard = legal_agreement.build_acceptance_success_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
             elif data in ["btn_menu_portfolio", "btn_portfolio"]:
                 context.args = []
                 await portfolio_command(update, context)
@@ -19295,6 +19419,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
         self.app.add_handler(CommandHandler("journal", journal_command))
         self.app.add_handler(CommandHandler("trading_journal", journal_command))
+        self.app.add_handler(CommandHandler("about", about_command))
+        self.app.add_handler(CommandHandler("terms", about_command))
+        self.app.add_handler(CommandHandler("agreement", about_command))
         self.app.add_handler(CommandHandler("report", report_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
         self.app.add_handler(CommandHandler("stop_all", stop_all_command))

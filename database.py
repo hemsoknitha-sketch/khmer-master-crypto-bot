@@ -9921,10 +9921,28 @@ def calculate_journal_metrics(chat_id: int):
     return trading_journal.calculate_journal_metrics(chat_id)
 
 
+# ─── LEGAL AGREEMENT & TERMS CITADEL (Invariant 23 & 36) ───────────────────
+def init_legal_agreement_table():
+    """Initializes the user legal agreement & terms acceptance schema."""
+    import legal_agreement
+    legal_agreement.init_legal_agreement_table()
+
+def record_user_agreement_acceptance(chat_id: int, version: str = "V.25.12.1"):
+    """Records user agreement acceptance."""
+    import legal_agreement
+    return legal_agreement.record_user_agreement_acceptance(chat_id, version)
+
+def get_user_agreement_status(chat_id: int):
+    """Retrieves user agreement acceptance status."""
+    import legal_agreement
+    return legal_agreement.get_user_agreement_status(chat_id)
+
+
 # Initialize and auto-migrate database schema on startup
 try:
     init_db()
     init_trade_journal_table()
+    init_legal_agreement_table()
 except Exception:
     pass
 

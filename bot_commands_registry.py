@@ -86,6 +86,7 @@ def get_public_bot_commands():
         BotCommand("set_pin", "🔒 Angkor Configure 2FA Security PIN"),
         BotCommand("reset_pin", "🔒 Angkor 2FA Security PIN Recovery"),
         BotCommand("citadel", "🛡️ Angkor Risk Citadel & Virtualizer"),
+        BotCommand("about", "📜 Angkor Terms, Agreement & Legal Notice"),
     ]
 
 
