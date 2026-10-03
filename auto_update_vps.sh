@@ -132,6 +132,13 @@ if [ -f "requirements.txt" ]; then
     pip install --no-cache-dir -r requirements.txt >/dev/null 2>&1 || true
 fi
 
+# Ensure headless chromium is available for 100% pixel-perfect Khmer PDF contract rendering
+if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1 && ! command -v google-chrome >/dev/null 2>&1; then
+    echo "📄 [PDF ENGINE] Installing chromium for high-definition Khmer PDF contract rendering..."
+    sudo apt-get update -y >/dev/null 2>&1 || true
+    sudo apt-get install -y chromium-browser chromium >/dev/null 2>&1 || true
+fi
+
 # 6. Run Database Auto-Healer (Fixes any 'database disk image is malformed' with 0% data loss)
 if [ -f "repair_database.py" ]; then
     echo "🛡️ [DB HEALER] Checking & healing database integrity before startup..."

@@ -18,6 +18,8 @@ import sys
 import hashlib
 import sqlite3
 import random
+import shutil
+import subprocess
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Tuple, List, Optional
 
@@ -292,20 +294,77 @@ def get_legal_agreements_count() -> int:
         return 0
 
 
-# ─── HIGH-SECURITY PDF DOCUMENT GENERATION ENGINE ────────────────────────────
+# ─── HIGH-SECURITY 1-PAGE KHMER PDF DOCUMENT GENERATION ENGINE ──────────────
 
-def get_khmer_pdf_font() -> str:
-    """Finds and registers a valid Unicode Khmer font for ReportLab."""
-    candidate_paths = [
+def find_headless_browser_executable() -> Optional[str]:
+    """Finds available Edge, Chrome, or Chromium executable across Windows and Linux."""
+    candidates = [
+        # Linux VPS candidates
+        shutil.which("chromium"),
+        shutil.which("chromium-browser"),
+        shutil.which("google-chrome"),
+        shutil.which("google-chrome-stable"),
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/google-chrome",
+        "/snap/bin/chromium",
+        # Windows candidates
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        shutil.which("msedge"),
+        shutil.which("chrome")
+    ]
+    for c in candidates:
+        if c and os.path.exists(c) and os.path.isfile(c):
+            return c
+    return None
+
+
+def get_khmer_pdf_font_paths() -> Tuple[str, str, str]:
+    """Returns local paths for (KantumruyPro, Moul, KhmerOS) fonts if available."""
+    kantumruy = ""
+    moul = ""
+    khmeros = ""
+
+    for p in [
+        os.path.join(BASE_DIR, "assets", "fonts", "KantumruyPro-Regular.ttf"),
+        os.path.join(os.path.dirname(BASE_DIR), "assets", "fonts", "KantumruyPro-Regular.ttf"),
+        "/usr/share/fonts/truetype/kantumruy/KantumruyPro-Regular.ttf"
+    ]:
+        if os.path.exists(p):
+            kantumruy = p
+            break
+
+    for p in [
+        os.path.join(BASE_DIR, "assets", "fonts", "Moul-Regular.ttf"),
+        os.path.join(os.path.dirname(BASE_DIR), "assets", "fonts", "Moul-Regular.ttf"),
+        "/usr/share/fonts/truetype/moul/Moul-Regular.ttf"
+    ]:
+        if os.path.exists(p):
+            moul = p
+            break
+
+    for p in [
         os.path.join(BASE_DIR, "assets", "fonts", "KhmerOS.ttf"),
         os.path.join(os.path.dirname(BASE_DIR), "assets", "fonts", "KhmerOS.ttf"),
         "/usr/share/fonts/truetype/khmeros/KhmerOS.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "C:/Windows/Fonts/khmeros.ttf",
-        "C:/Windows/Fonts/KhmerOSsiemreap.ttf",
-        "C:/Windows/Fonts/tahoma.ttf",
         "C:/Windows/Fonts/arial.ttf"
-    ]
+    ]:
+        if os.path.exists(p):
+            khmeros = p
+            break
+
+    return kantumruy, moul, khmeros
+
+
+def get_khmer_pdf_font() -> str:
+    """Finds and registers a valid Unicode Khmer font for ReportLab."""
+    k_path, m_path, os_path = get_khmer_pdf_font_paths()
+    candidate_paths = [os_path, k_path, m_path, "C:/Windows/Fonts/khmeros.ttf", "C:/Windows/Fonts/arial.ttf"]
     try:
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
@@ -313,7 +372,7 @@ def get_khmer_pdf_font() -> str:
         return "Helvetica"
 
     for p in candidate_paths:
-        if os.path.exists(p):
+        if p and os.path.exists(p):
             font_id = "KhmerOSCustom"
             try:
                 pdfmetrics.registerFont(TTFont(font_id, p))
@@ -321,6 +380,556 @@ def get_khmer_pdf_font() -> str:
             except Exception:
                 pass
     return "Helvetica"
+
+
+def build_official_agreement_html(
+    chat_id: int,
+    username: str,
+    full_name: str,
+    phone_number: str,
+    contract_serial: str,
+    sha256_hash: str,
+    accepted_time_str: str
+) -> str:
+    """
+    Renders publication-grade 1-page HTML template for Angkor Quant Legal Contract.
+    Features:
+    - 1-Page strict layout without unnecessary overflow
+    - Replaces legacy box/table with sleek executive metadata strip
+    - 100% proper Khmer OpenType text shaping (HarfBuzz engine)
+    - Full text justification (text-align: justify)
+    - High-definition Kantumruy Pro & Moul Khmer typography
+    """
+    k_path, m_path, os_path = get_khmer_pdf_font_paths()
+    k_url = f"url('file:///{k_path.replace(os.sep, '/')}')" if k_path else "sans-serif"
+    m_url = f"url('file:///{m_path.replace(os.sep, '/')}')" if m_path else "serif"
+    os_url = f"url('file:///{os_path.replace(os.sep, '/')}')" if os_path else "sans-serif"
+
+    user_handle = f"@{username}" if username and not username.startswith("@") else (username or "N/A")
+    display_name = full_name or f"User_{chat_id}"
+    display_phone = phone_number or "N/A"
+
+    return f"""<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Moul&display=swap');
+
+@font-face {{
+    font-family: 'KantumruyPro';
+    src: {k_url} format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}}
+@font-face {{
+    font-family: 'KhmerMoul';
+    src: {m_url} format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}}
+@font-face {{
+    font-family: 'KhmerCustom';
+    src: {os_url} format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}}
+
+@page {{
+    size: A4 portrait;
+    margin: 8mm 12mm 8mm 12mm;
+}}
+
+* {{
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}}
+
+body {{
+    font-family: 'KantumruyPro', 'KhmerCustom', 'Khmer OS', sans-serif;
+    color: #0F172A;
+    background: #FFFFFF;
+    margin: 0;
+    padding: 0;
+    font-size: 6.8pt;
+    line-height: 1.35;
+}}
+
+/* ── HEADER ── */
+.header {{
+    text-align: center;
+    border-bottom: 2px solid #D97706;
+    padding-bottom: 4px;
+    margin-bottom: 5px;
+}}
+.title {{
+    font-family: 'KhmerMoul', serif;
+    font-size: 9.5pt;
+    color: #0F172A;
+    margin: 0 0 1px 0;
+    line-height: 1.35;
+}}
+.subtitle {{
+    font-size: 6.5pt;
+    font-weight: 700;
+    color: #B45309;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin: 0;
+}}
+
+/* ── SLEEK PARTICIPANT STRIP (NO UGLY BOX) ── */
+.meta-strip {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #F8FAFC;
+    border-left: 3px solid #D97706;
+    padding: 4px 8px;
+    margin-bottom: 5px;
+    font-size: 6.5pt;
+    color: #334155;
+    border-radius: 0 4px 4px 0;
+}}
+.meta-item b {{
+    color: #0F172A;
+}}
+
+/* ── PREAMBLE ── */
+.preamble {{
+    text-align: justify;
+    text-justify: inter-word;
+    font-size: 6.7pt;
+    line-height: 1.32;
+    color: #334155;
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 4px;
+    padding: 4px 7px;
+    margin-bottom: 5px;
+}}
+
+/* ── ARTICLES (2-COLUMN BALANCED LAYOUT) ── */
+.articles-grid {{
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}}
+.col-left {{
+    width: 50%;
+}}
+.col-right {{
+    width: 50%;
+}}
+
+.article-card {{
+    margin-bottom: 4.5px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 3px;
+    padding: 4px 6px;
+}}
+.article-header {{
+    font-size: 7pt;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 2.5px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #F1F5F9;
+    padding-bottom: 1.5px;
+}}
+.badge {{
+    background: #FEF3C7;
+    color: #92400E;
+    font-size: 6.2pt;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-right: 4px;
+    white-space: nowrap;
+}}
+.clause {{
+    text-align: justify;
+    text-justify: inter-word;
+    font-size: 6.4pt;
+    line-height: 1.32;
+    color: #334155;
+    margin-bottom: 2px;
+}}
+.clause b {{
+    color: #0F172A;
+}}
+
+/* ── DECLARATION ── */
+.declaration-strip {{
+    background: #F0FDF4;
+    border: 1px solid #86EFAC;
+    border-radius: 4px;
+    padding: 3.5px 7px;
+    margin: 4px 0 5px 0;
+    font-size: 6.5pt;
+    line-height: 1.32;
+    color: #166534;
+    text-align: justify;
+    text-justify: inter-word;
+}}
+
+/* ── DUAL SIGNATURE ── */
+.signatures-wrap {{
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+}}
+.sig-card {{
+    width: 50%;
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    padding: 4px 7px;
+    font-size: 6.4pt;
+    line-height: 1.32;
+}}
+.sig-card-title {{
+    font-weight: 700;
+    color: #0F172A;
+    font-size: 6.8pt;
+    border-bottom: 1px dashed #CBD5E1;
+    padding-bottom: 2px;
+    margin-bottom: 2.5px;
+}}
+.sig-badge {{
+    display: inline-block;
+    background: #DCFCE7;
+    color: #15803D;
+    font-weight: 700;
+    font-size: 6pt;
+    padding: 0.5px 4px;
+    border-radius: 2px;
+}}
+.hash-line {{
+    font-family: monospace;
+    font-size: 5.8pt;
+    color: #64748B;
+    word-break: break-all;
+}}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="title">{OFFICIAL_CONTRACT_TITLE}</div>
+    <div class="subtitle">{OFFICIAL_CONTRACT_SUBTITLE}</div>
+</div>
+
+<div class="meta-strip">
+    <div class="meta-item">👤 <b>ឈ្មោះ:</b> {display_name} ({user_handle})</div>
+    <div class="meta-item">🆔 <b>Telegram ID:</b> {chat_id}</div>
+    <div class="meta-item">📱 <b>ទូរសព្ទ:</b> {display_phone}</div>
+    <div class="meta-item">📜 <b>Serial:</b> {contract_serial}</div>
+    <div class="meta-item">🕒 <b>កាលបរិច្ឆេទ:</b> {accepted_time_str}</div>
+</div>
+
+<div class="preamble">
+<b>អារម្ភកថា ៖</b> {OFFICIAL_PREAMBLE}
+</div>
+
+<div class="articles-grid">
+    <div class="col-left">
+        <!-- ARTICLE 1 -->
+        <div class="article-card">
+            <div class="article-header"><span class="badge">ប្រការ ១</span> {OFFICIAL_ARTICLES[0]['title']}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[0]['clauses'][0][0]}:</b> {OFFICIAL_ARTICLES[0]['clauses'][0][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[0]['clauses'][1][0]}:</b> {OFFICIAL_ARTICLES[0]['clauses'][1][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[0]['clauses'][2][0]}:</b> {OFFICIAL_ARTICLES[0]['clauses'][2][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[0]['clauses'][3][0]}:</b> {OFFICIAL_ARTICLES[0]['clauses'][3][1]}</div>
+        </div>
+
+        <!-- ARTICLE 2 -->
+        <div class="article-card">
+            <div class="article-header"><span class="badge">ប្រការ ២</span> {OFFICIAL_ARTICLES[1]['title']}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[1]['clauses'][0][0]}:</b> {OFFICIAL_ARTICLES[1]['clauses'][0][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[1]['clauses'][1][0]}:</b> {OFFICIAL_ARTICLES[1]['clauses'][1][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[1]['clauses'][2][0]}:</b> {OFFICIAL_ARTICLES[1]['clauses'][2][1]}</div>
+        </div>
+
+        <!-- ARTICLE 3 -->
+        <div class="article-card">
+            <div class="article-header"><span class="badge">ប្រការ ៣</span> {OFFICIAL_ARTICLES[2]['title']}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[2]['clauses'][0][0]}:</b> {OFFICIAL_ARTICLES[2]['clauses'][0][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[2]['clauses'][1][0]}:</b> {OFFICIAL_ARTICLES[2]['clauses'][1][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[2]['clauses'][2][0]}:</b> {OFFICIAL_ARTICLES[2]['clauses'][2][1]}</div>
+        </div>
+    </div>
+
+    <div class="col-right">
+        <!-- ARTICLE 4 -->
+        <div class="article-card">
+            <div class="article-header"><span class="badge">ប្រការ ៤</span> {OFFICIAL_ARTICLES[3]['title']}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[3]['clauses'][0][0]}:</b> {OFFICIAL_ARTICLES[3]['clauses'][0][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[3]['clauses'][1][0]}:</b> {OFFICIAL_ARTICLES[3]['clauses'][1][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[3]['clauses'][2][0]}:</b> {OFFICIAL_ARTICLES[3]['clauses'][2][1]}</div>
+        </div>
+
+        <!-- ARTICLE 5 -->
+        <div class="article-card">
+            <div class="article-header"><span class="badge">ប្រការ ៥</span> {OFFICIAL_ARTICLES[4]['title']}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[4]['clauses'][0][0]}:</b> {OFFICIAL_ARTICLES[4]['clauses'][0][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[4]['clauses'][1][0]}:</b> {OFFICIAL_ARTICLES[4]['clauses'][1][1]}</div>
+            <div class="clause"><b>{OFFICIAL_ARTICLES[4]['clauses'][2][0]}:</b> {OFFICIAL_ARTICLES[4]['clauses'][2][1]}</div>
+        </div>
+
+        <!-- DECLARATION -->
+        <div class="declaration-strip">
+            <b>📝 ការប្រកាសយល់ព្រមដោយស្ម័គ្រចិត្ត ៖</b> {OFFICIAL_DECLARATION}
+        </div>
+    </div>
+</div>
+
+<!-- DUAL SIGNATURE BLOCK -->
+<div class="signatures-wrap">
+    <div class="sig-card">
+        <div class="sig-card-title">🏛️ ភាគីប្រព័ន្ធ ANGKOR QUANT AI SYSTEMS</div>
+        <div><b>ស្ថាប័ន:</b> Angkor Quant AI Quantitative Systems (Global Node)</div>
+        <div><b>អភិបាលកិច្ច:</b> System Core Governance & Fiduciary Capital Protector</div>
+        <div><b>ស្ថានភាព:</b> <span class="sig-badge">🟢 DIGITALLY CERTIFIED & SYSTEM LOCKED</span></div>
+        <div class="hash-line">SHA-256: {sha256_hash}</div>
+    </div>
+    <div class="sig-card">
+        <div class="sig-card-title">✍️ ភាគីអ្នកប្រើប្រាស់ (User / VIP Member)</div>
+        <div><b>ឈ្មោះ:</b> {display_name} ({user_handle}) | <b>ID:</b> {chat_id}</div>
+        <div><b>កាលបរិច្ឆេទយល់ព្រម:</b> {accepted_time_str}</div>
+        <div><b>ស្ថានភាព:</b> <span class="sig-badge">🟢 DIGITALLY SIGNED & VERIFIED 100%</span></div>
+        <div><b>កិច្ចសន្យា Serial:</b> {contract_serial}</div>
+    </div>
+</div>
+
+</body>
+</html>"""
+
+
+def generate_browser_pdf(html_content: str, pdf_path: str) -> bool:
+    """Generates PDF using headless Chromium/Chrome/Edge with exact 1-page layout."""
+    browser_exe = find_headless_browser_executable()
+    if not browser_exe:
+        return False
+
+    temp_html_path = pdf_path.replace(".pdf", "_temp.html")
+    try:
+        with open(temp_html_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        cmd = [
+            browser_exe,
+            "--headless",
+            "--disable-gpu",
+            "--no-pdf-header-footer",
+            f"--print-to-pdf={os.path.abspath(pdf_path)}",
+            os.path.abspath(temp_html_path)
+        ]
+        if os.name != "nt":
+            cmd.insert(1, "--no-sandbox")
+            cmd.insert(2, "--disable-dev-shm-usage")
+
+        subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 1000
+    except Exception as ex:
+        print(f"⚠️ [PDF ENGINE] Headless browser generation failed: {ex}")
+        return False
+    finally:
+        if os.path.exists(temp_html_path):
+            try:
+                os.remove(temp_html_path)
+            except Exception:
+                pass
+
+
+def generate_fpdf2_pdf(
+    chat_id: int,
+    username: str,
+    full_name: str,
+    phone_number: str,
+    contract_serial: str,
+    sha256_hash: str,
+    accepted_time_str: str,
+    pdf_path: str
+) -> bool:
+    """Pure-Python high-definition text-shaped PDF generator using fpdf2 + uharfbuzz."""
+    try:
+        from fpdf import FPDF
+        import uharfbuzz  # noqa: F401
+    except ImportError:
+        return False
+
+    try:
+        k_path, _, os_path = get_khmer_pdf_font_paths()
+        target_font = k_path or os_path
+        if not target_font or not os.path.exists(target_font):
+            return False
+
+        pdf = FPDF(orientation='P', unit='mm', format='A4')
+        pdf.set_margins(12, 10, 12)
+        pdf.set_auto_page_break(auto=False)
+        pdf.add_page()
+        pdf.set_text_shaping(True)
+        pdf.add_font("KhmerFont", "", target_font)
+        pdf.set_font("KhmerFont", "", 10)
+
+        # Header
+        pdf.cell(0, 7, OFFICIAL_CONTRACT_TITLE, align='C', new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("KhmerFont", "", 7)
+        pdf.cell(0, 5, OFFICIAL_CONTRACT_SUBTITLE, align='C', new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+
+        # Sleek participant strip (NO UGLY BOX)
+        user_handle = f"@{username}" if username and not username.startswith("@") else (username or "N/A")
+        display_name = full_name or f"User_{chat_id}"
+        meta_line = f"ឈ្មោះ: {display_name} ({user_handle}) | ID: {chat_id} | Serial: {contract_serial} | កាលបរិច្ឆេទ: {accepted_time_str}"
+        pdf.set_fill_color(248, 250, 252)
+        pdf.cell(0, 5, meta_line, fill=True, align='C', new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+
+        # Preamble (Justified)
+        pdf.set_font("KhmerFont", "", 6.5)
+        pdf.multi_cell(0, 3.6, f"អារម្ភកថា ៖ {OFFICIAL_PREAMBLE}", align='J', new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1.5)
+
+        # 5 Articles
+        for art in OFFICIAL_ARTICLES:
+            pdf.set_font("KhmerFont", "", 7)
+            pdf.cell(0, 4, f"{art['num']} ៖ {art['title']}", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("KhmerFont", "", 6.2)
+            for c_title, c_desc in art["clauses"]:
+                pdf.multi_cell(0, 3.2, f"• {c_title} ៖ {c_desc}", align='J', new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(1)
+
+        # Declaration
+        pdf.set_fill_color(240, 253, 244)
+        pdf.multi_cell(0, 3.4, f"📝 ការប្រកាសយល់ព្រម ៖ {OFFICIAL_DECLARATION}", fill=True, align='J', new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+
+        # Dual Signature
+        pdf.set_font("KhmerFont", "", 6.2)
+        sig_text = f"ស្ថាប័ន: Angkor Quant AI Systems (LOCKED) | User: {display_name} (ACCEPTED 100%)\nSHA-256: {sha256_hash}"
+        pdf.multi_cell(0, 3.2, sig_text, align='C')
+
+        pdf.output(pdf_path)
+        return os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 1000
+    except Exception as e:
+        print(f"⚠️ [PDF ENGINE] fpdf2 generation failed: {e}")
+        return False
+
+
+def generate_reportlab_pdf(
+    chat_id: int,
+    username: str,
+    full_name: str,
+    phone_number: str,
+    contract_serial: str,
+    sha256_hash: str,
+    accepted_time_str: str,
+    pdf_path: str
+) -> bool:
+    """ReportLab fallback generator (removes legacy box and uses justified styles)."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+    except ImportError as e_imp:
+        print(f"⚠️ [PDF ENGINE] ReportLab library is not installed: {e_imp}")
+        return False
+
+    try:
+        font_name = get_khmer_pdf_font()
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=A4,
+            rightMargin=28,
+            leftMargin=28,
+            topMargin=22,
+            bottomMargin=22
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'DocTitle',
+            fontName=font_name,
+            fontSize=10,
+            leading=14,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor('#0F172A'),
+            spaceAfter=2
+        )
+        subtitle_style = ParagraphStyle(
+            'DocSubTitle',
+            fontName=font_name,
+            fontSize=7,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor('#B45309'),
+            spaceAfter=4
+        )
+        meta_style = ParagraphStyle(
+            'DocMeta',
+            fontName=font_name,
+            fontSize=6.8,
+            leading=9.5,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor('#334155'),
+            spaceAfter=4
+        )
+        h1_style = ParagraphStyle(
+            'ArticleTitle',
+            fontName=font_name,
+            fontSize=7.8,
+            leading=11,
+            textColor=colors.HexColor('#1E3A8A'),
+            spaceBefore=4,
+            spaceAfter=2
+        )
+        body_style = ParagraphStyle(
+            'DocBody',
+            fontName=font_name,
+            fontSize=6.8,
+            leading=9.5,
+            alignment=TA_JUSTIFY,
+            textColor=colors.HexColor('#334155'),
+            spaceAfter=2
+        )
+
+        story = []
+        story.append(Paragraph(f"<b>{OFFICIAL_CONTRACT_TITLE}</b>", title_style))
+        story.append(Paragraph(f"<b>{OFFICIAL_CONTRACT_SUBTITLE}</b>", subtitle_style))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#D97706"), spaceAfter=5))
+
+        user_handle = f"@{username}" if username and not username.startswith("@") else (username or "N/A")
+        display_name = full_name or f"User_{chat_id}"
+        meta_text = f"👤 <b>ឈ្មោះ:</b> {display_name} ({user_handle}) | 🆔 <b>ID:</b> {chat_id} | 📜 <b>Serial:</b> {contract_serial} | 🕒 <b>កាលបរិច្ឆេទ:</b> {accepted_time_str}"
+        story.append(Paragraph(meta_text, meta_style))
+        story.append(Spacer(1, 2))
+
+        story.append(Paragraph(f"<b>អារម្ភកថា ៖</b> {OFFICIAL_PREAMBLE}", body_style))
+
+        for art in OFFICIAL_ARTICLES:
+            story.append(Paragraph(f"<b>{art['num']} ៖ {art['title']}</b>", h1_style))
+            for c_title, c_desc in art["clauses"]:
+                story.append(Paragraph(f"• <b>{c_title} ៖</b> {c_desc}", body_style))
+
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"<b>📝 ការប្រកាសយល់ព្រម ៖</b> {OFFICIAL_DECLARATION}", body_style))
+        story.append(Spacer(1, 3))
+        sig_summary = f"🏛️ <b>ANGKOR QUANT AI SYSTEMS</b> (🟢 LOCKED) | ✍️ <b>{display_name}</b> (🟢 SIGNED 100%)<br/>SHA-256: {sha256_hash}"
+        story.append(Paragraph(sig_summary, meta_style))
+
+        doc.build(story)
+        return os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 1000
+    except Exception as e_gen:
+        print(f"⚠️ [PDF ENGINE] ReportLab generation failed: {e_gen}")
+        return False
 
 
 def generate_legal_contract_pdf(
@@ -333,190 +942,42 @@ def generate_legal_contract_pdf(
     accepted_time_str: str
 ) -> str:
     """
-    Generates an official, institutional-grade 2-page PDF legal contract document.
-    Archived securely with cryptographic fingerprint and non-custodial declarations.
+    Official Institutional Legal Contract PDF Generator.
+    - Strict 1-Page Layout
+    - Justified text alignment
+    - Replaces legacy box/table with sleek executive metadata strip
+    - High-definition Kantumruy Pro & Moul Khmer font shaping
+    - Multi-tier engine: Headless Browser (Edge/Chromium) -> fpdf2 (uharfbuzz) -> ReportLab
     """
-    try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib import colors
-    except ImportError as e_imp:
-        print(f"⚠️ [PDF ENGINE] ReportLab library is not installed: {e_imp}. Please run: pip install reportlab")
-        return ""
-
     os.makedirs(PDF_ARCHIVE_DIR, exist_ok=True)
     pdf_filename = f"Angkor_Quant_Agreement_{chat_id}_{contract_serial.replace('-', '_')}.pdf"
     pdf_path = os.path.join(PDF_ARCHIVE_DIR, pdf_filename)
 
-    font_name = get_khmer_pdf_font()
-
-    doc = SimpleDocTemplate(
-        pdf_path,
-        pagesize=A4,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36
-    )
-
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'DocTitle',
-        fontName=font_name,
-        fontSize=12,
-        leading=16,
-        alignment=1,
-        textColor=colors.HexColor('#0F172A'),
-        spaceAfter=3
-    )
-    subtitle_style = ParagraphStyle(
-        'DocSubTitle',
-        fontName=font_name,
-        fontSize=8,
-        leading=11,
-        alignment=1,
-        textColor=colors.HexColor('#475569'),
-        spaceAfter=6
-    )
-    h1_style = ParagraphStyle(
-        'ArticleTitle',
-        fontName=font_name,
-        fontSize=9,
-        leading=13,
-        textColor=colors.HexColor('#1E3A8A'),
-        spaceBefore=6,
-        spaceAfter=2
-    )
-    body_style = ParagraphStyle(
-        'DocBody',
-        fontName=font_name,
-        fontSize=7.5,
-        leading=11,
-        textColor=colors.HexColor('#334155'),
-        spaceAfter=3
-    )
-    bullet_style = ParagraphStyle(
-        'DocBullet',
-        fontName=font_name,
-        fontSize=7.5,
-        leading=11,
-        textColor=colors.HexColor('#1E293B'),
-        leftIndent=10,
-        spaceAfter=2
-    )
-    cell_bold = ParagraphStyle(
-        'CellBold',
-        fontName=font_name,
-        fontSize=7.5,
-        leading=10,
-        textColor=colors.HexColor('#0F172A')
-    )
-    cell_val = ParagraphStyle(
-        'CellVal',
-        fontName=font_name,
-        fontSize=7.5,
-        leading=10,
-        textColor=colors.HexColor('#1E293B')
-    )
-
-    story = []
-
-    # 1. Official Header
-    story.append(Paragraph(f"<b>{OFFICIAL_CONTRACT_TITLE}</b>", title_style))
-    story.append(Paragraph(f"<b>{OFFICIAL_CONTRACT_SUBTITLE}</b>", subtitle_style))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#D97706"), spaceAfter=8))
-
-    # 2. Digital Identification & Verification Audit Box
-    user_handle = f"@{username}" if username and not username.startswith("@") else (username or "N/A")
-    display_phone = phone_number or "Not Provided via Telegram"
-    display_name = full_name or "Angkor Quant VIP User"
-
-    audit_data = [
-        [
-            Paragraph("<b>Telegram User ID:</b>", cell_bold), Paragraph(str(chat_id), cell_val),
-            Paragraph("<b>កាលបរិច្ឆេទ & ម៉ោង:</b>", cell_bold), Paragraph(accepted_time_str, cell_val)
-        ],
-        [
-            Paragraph("<b>ឈ្មោះអ្នកប្រើប្រាស់:</b>", cell_bold), Paragraph(display_name, cell_val),
-            Paragraph("<b>Username:</b>", cell_bold), Paragraph(user_handle, cell_val)
-        ],
-        [
-            Paragraph("<b>លេខទូរសព្ទ:</b>", cell_bold), Paragraph(display_phone, cell_val),
-            Paragraph("<b>លេខកូដកិច្ចសន្យា:</b>", cell_bold), Paragraph(contract_serial, cell_val)
-        ],
-        [
-            Paragraph("<b>SHA-256 Hash:</b>", cell_bold), Paragraph(sha256_hash[:32] + "...", cell_val),
-            Paragraph("<b>ស្ថានភាពកិច្ចសន្យា:</b>", cell_bold), Paragraph("🟢 យល់ព្រម & ចាក់សោរឌីជីថល (LOCKED)", cell_val)
-        ]
-    ]
-    t = Table(audit_data, colWidths=[95, 165, 110, 150])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#F8FAFC")),
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#CBD5E1")),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
-        ('TOPPADDING', (0,0), (-1,-1), 2.5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
-    ]))
-    story.append(t)
-    story.append(Spacer(1, 6))
-
-    # 3. Preamble
-    story.append(Paragraph(OFFICIAL_PREAMBLE, body_style))
-
-    # 4. The 5 Articles
-    for art in OFFICIAL_ARTICLES:
-        story.append(Paragraph(f"<b>{art['num']} ៖ {art['title']}</b>", h1_style))
-        if "lead" in art:
-            story.append(Paragraph(art["lead"], body_style))
-        for c_title, c_desc in art["clauses"]:
-            story.append(Paragraph(f"• <b>{c_title} ៖</b> {c_desc}", bullet_style))
-
-    # 5. User Acceptance Declaration
-    story.append(Spacer(1, 4))
-    story.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=6))
-    story.append(Paragraph(f"<b>{OFFICIAL_DECLARATION}</b>", body_style))
-
-    # 6. Formal Digital Signatures Block
-    sig_data = [
-        [
-            Paragraph("<b>តំណាងស្ថាប័ន ANGKOR QUANT ៖</b>", cell_bold),
-            Paragraph("<b>ហត្ថលេខាឌីជីថលអ្នកប្រើប្រាស់ (Digital Signature) ៖</b>", cell_bold)
-        ],
-        [
-            Paragraph(
-                "ស្ថាបនិក & ប្រធានវិស្វករ (HEM SINATH)<br/>"
-                "Angkor Quant AI System Governance<br/>"
-                "<i>Digitally Certified & System Locked</i>",
-                cell_val
-            ),
-            Paragraph(
-                f"<b>Telegram ID:</b> {chat_id}<br/>"
-                f"<b>ឈ្មោះ:</b> {display_name} ({user_handle})<br/>"
-                f"<b>កាលបរិច្ឆេទ:</b> {accepted_time_str}<br/>"
-                f"<b>Serial:</b> {contract_serial}<br/>"
-                "<b>ស្ថានភាព:</b> 🟢 <i>DIGITALLY SIGNED & VERIFIED</i>",
-                cell_val
-            )
-        ]
-    ]
-    st = Table(sig_data, colWidths=[260, 260])
-    st.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#94A3B8")),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#F8FAFC")),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-    ]))
-    story.append(Spacer(1, 4))
-    story.append(KeepTogether(st))
-
+    # Tier 1: Headless Chromium/Chrome/Edge (Top visual fidelity & exact 1-page justified Khmer)
     try:
-        doc.build(story)
-        return pdf_path
-    except Exception as e_gen:
-        print(f"⚠️ [PDF ENGINE] Error generating PDF for {chat_id}: {e_gen}")
-        return ""
+        html_src = build_official_agreement_html(
+            chat_id, username, full_name, phone_number, contract_serial, sha256_hash, accepted_time_str
+        )
+        if generate_browser_pdf(html_src, pdf_path):
+            return pdf_path
+    except Exception as ex_browser:
+        print(f"⚠️ [PDF ENGINE] Tier 1 Headless Browser skipped: {ex_browser}")
+
+    # Tier 2: Pure-Python fpdf2 with uharfbuzz text shaping
+    try:
+        if generate_fpdf2_pdf(chat_id, username, full_name, phone_number, contract_serial, sha256_hash, accepted_time_str, pdf_path):
+            return pdf_path
+    except Exception as ex_fpdf:
+        print(f"⚠️ [PDF ENGINE] Tier 2 fpdf2 skipped: {ex_fpdf}")
+
+    # Tier 3: ReportLab defensive fallback
+    try:
+        if generate_reportlab_pdf(chat_id, username, full_name, phone_number, contract_serial, sha256_hash, accepted_time_str, pdf_path):
+            return pdf_path
+    except Exception as ex_rl:
+        print(f"⚠️ [PDF ENGINE] Tier 3 ReportLab failed: {ex_rl}")
+
+    return ""
 
 
 # ─── INTERACTIVE TELEGRAM UI CARDS ───────────────────────────────────────────
