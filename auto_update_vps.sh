@@ -148,8 +148,11 @@ fi
 # Clean up simulated flash loan trades on VPS database to ensure 100% genuine live stats
 python3 -c "import database as db; db.reset_user_flash_loan_trades()" 2>/dev/null || true
 
-# Sync Hugging Face Models using HF_TOKEN
-if [ -f "sync_local_models.py" ]; then
+# Sync Hugging Face Models and Datasets using HF_TOKEN
+if [ -f "hf_storage_engine.py" ]; then
+    echo "🤗 [HF STORAGE] Pulling latest models, datasets & warming RAM cache from Hugging Face Hub..."
+    python3 hf_storage_engine.py --pull || true
+elif [ -f "sync_local_models.py" ]; then
     echo "🤗 [HF SYNC] Syncing AI Models from Hugging Face Hub..."
     python3 sync_local_models.py || true
 fi
