@@ -1,7 +1,7 @@
 # METAPHYSICS STANDARDS & GROUND TRUTH SPECIFICATION LOCK
-**System:** Khmer Master Crypto AI Investment Bot  
+**System:** Angkor Quant AI Quantitative Intelligence Engine (formerly Khmer Master Crypto)  
 **Classification:** Institutional Grade Autonomous Algorithmic Financial System  
-**Standard Version:** 1.0.0-PROD  
+**Standard Version:** 4.0.0-PROD (AQ47)  
 **Guarantees:** Zero Technical Negligence & Positive Mathematical Expectancy  
 
 ---
@@ -25,7 +25,7 @@ Where:
 ## 2. AXIOM I: ZERO TECHNICAL NEGLIGENCE (ការលុបបំបាត់ការធ្វេសប្រហែសបច្ចេកទេស)
 Technical negligence is defined as any loss of capital, missed trade, or API failure resulting from software defects, unhandled race conditions, or parameter mismatches.
 
-The Khmer Master Crypto Bot enforces **Twelve Ironclad Safeguards**:
+The Angkor Quant AI Engine enforces **Twelve Ironclad Safeguards**:
 
 | No | Threat / Vulnerability | Exchange Error Code / Risk | Architectural Solution | Status |
 |---|---|---|---|---|

@@ -1,5 +1,5 @@
 /**
- * KHMER MASTER CRYPTO - APEX SUPER BRAIN AI WEB GUI CONTROLLER
+ * ANGKOR QUANT - AI QUANTITATIVE INTELLIGENCE WEB GUI CONTROLLER
  * Full AI Graphic Super Brain Design & Cambodia Flag Cybertech Architecture
  * Real-time 0.001ms HFT Stream & Interactive VIP Cockpit
  */
@@ -1985,9 +1985,9 @@ function applySovereignCloaking() {
     try {
         // 1. Header brand title
         const brandMain = document.querySelector('.brand-title-main');
-        if (brandMain) brandMain.textContent = 'KHMER MASTER CRYPTO';
+        if (brandMain) brandMain.textContent = 'ANGKOR QUANT';
         const brandTag = document.querySelector('.brand-tag-ai');
-        if (brandTag) brandTag.textContent = 'APEX SUPER BRAIN AGI';
+        if (brandTag) brandTag.textContent = 'AI QUANTITATIVE INTELLIGENCE';
 
         // 2. Brain Banner
         const brainHeading = document.querySelector('#tab-brain .section-heading');

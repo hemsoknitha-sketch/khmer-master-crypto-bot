@@ -42,7 +42,7 @@ LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_instan
 _lock_fp = None
 
 def acquire_single_instance_lock():
-    """Guarantees only ONE instance of Apex AI Bot runs to prevent Telegram Conflict errors."""
+    """Guarantees only ONE instance of Angkor Quant AI Bot runs to prevent Telegram Conflict errors."""
     global _lock_fp
     try:
         current_pid = os.getpid()
@@ -175,7 +175,7 @@ class DraftReplyWorker(QThread):
 class BotDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("⚡ APEX TURBO AGI v13.00 | INSTITUTIONAL ADMIN DESKTOP EXECUTIVE DASHBOARD 🚀")
+        self.setWindowTitle("🏛️ ANGKOR QUANT v4.0 | AI QUANTITATIVE INTELLIGENCE DASHBOARD 🚀")
         self.setGeometry(100, 100, 1100, 750)
         
         # Apply Modern Dark Mode & Glassmorphic Theme QSS Styling
@@ -554,11 +554,11 @@ class BotDashboard(QMainWindow):
             return
             
         profile_data = self.user_activity_display.toPlainText()
-        prompt = (f"You are the Apex AI Bot's Lead Customer Success Expert and a highly skilled Crypto Arbitrage Specialist. "
+        prompt = (f"You are the Angkor Quant AI's Lead Customer Success Expert and an institutional Quantitative Trading Specialist. "
                   f"Look at this user's activity and chat history:\n\n{profile_data}\n\n"
                   f"Draft a highly persuasive, confident, and personalized response to this user in Khmer. "
-                  f"Provide expert advice on using our High-Volatility Arbitrage systems like /infinity_grid and /scalp. "
-                  f"Don't mention internal technical details, just sound like a billionaire-tier professional helping them win. "
+                  f"Provide expert advice on using our High-Volatility Arbitrage and Quantitative systems like /infinity_matrix and /scalp. "
+                  f"Don't mention internal technical details, just sound like a premier institutional quant professional helping them win. "
                   f"Output ONLY the message text you want to send.")
         
         self.reply_input.setText("✨ AI is thinking... Please wait...")
@@ -709,7 +709,7 @@ class BotDashboard(QMainWindow):
             if self.tray_icon:
                 try:
                     self.tray_icon.showMessage(
-                        "Apex AI Bot",
+                        "Angkor Quant AI",
                         "The system is still running in the background. Right-click the tray icon to quit.",
                         QSystemTrayIcon.Information,
                         2000
@@ -724,7 +724,11 @@ class BotDashboard(QMainWindow):
 
 class ApexVPSHeadlessEngine:
     def __init__(self):
-        print("🚀 Initializing Apex Super AGI v13.00 (24/7 Pure Headless VPS Engine)...")
+        print("🏛️ ======================================================================")
+        print("   ANGKOR QUANT • AI Quantitative Intelligence for Global Markets        ")
+        print("   Version: 4.0.0 (AQ47 Institutional Ground Truth Lock)                 ")
+        print("==========================================================================")
+        print("🚀 Initializing Angkor Quant Engine v4.0.0 (24/7 Pure Headless VPS Engine)...")
         db.init_db()
         import backup_manager
         backup_manager.perform_backup(is_boot=True)
@@ -760,7 +764,11 @@ if __name__ == "__main__":
     is_cli_mode = ("--cli" in sys.argv or "--no-gui" in sys.argv or "--vps" in sys.argv or "--headless" in sys.argv or "-vps" in sys.argv)
     
     if is_cli_mode:
-        print("🚀 Initializing Khmer Master Crypto / Apex TURBO AGI Engine v13.00 Super Brain Edition (24/7 Pure Python Headless CLI Mode)...")
+        print("🏛️ ======================================================================")
+        print("   ANGKOR QUANT • AI Quantitative Intelligence for Global Markets        ")
+        print("   Version: 4.0.0 (AQ47 Institutional Ground Truth Lock)                 ")
+        print("==========================================================================")
+        print("🚀 Initializing Angkor Quant Engine v4.0.0 (24/7 Pure Python Headless CLI Mode)...")
         db.init_db()
         import backup_manager
         backup_manager.perform_backup(is_boot=True)

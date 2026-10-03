@@ -522,7 +522,7 @@ class TelegramBotThread(BaseThread):
             if not args and not update.callback_query:
                 if user_lang == 'en':
                     msg = (
-                        "🎯 **KHMER MASTER CRYPTO | LIQUIDATION CASCADE DEEP WICK HUNTER v13.00** 🎯\n"
+                        "🎯 **ANGKOR QUANT | LIQUIDATION CASCADE DEEP WICK HUNTER v13.00** 🎯\n"
                         "════════════\n\n"
                         "📊 **EXECUTIVE WICK HUNTER ARCHITECTURE:**\n"
                         "• 🤖 **AI Ensemble Models** ៖ `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model` + `RVOL Spike Scanner`\n"
@@ -537,7 +537,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "🎯 **KHMER MASTER CRYPTO | 爆仓瀑布插针捕手 (Deep Wick Hunter) v13.00** 🎯\n"
+                        "🎯 **ANGKOR QUANT | 爆仓瀑布插针捕手 (Deep Wick Hunter) v13.00** 🎯\n"
                         "════════════\n\n"
                         "📊 **机构级插针捕手架构：**\n"
                         "• 🤖 **AI 模型协同** ៖ `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model` + `RVOL Spike Scanner`\n"
@@ -552,7 +552,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "🎯 **KHMER MASTER CRYPTO | LIQUIDATION CASCADE DEEP WICK HUNTER v13.00** 🎯\n"
+                        "🎯 **ANGKOR QUANT | LIQUIDATION CASCADE DEEP WICK HUNTER v13.00** 🎯\n"
                         "════════════\n\n"
                         "📊 **EXECUTIVE WICK HUNTER ARCHITECTURE (ស្ថាបត្យកម្មទិញបាត DEEP WICK) ៖**\n"
                         "• 🤖 **AI Models សហការ** ៖ `HMM Regime Classifier` + `ONNX Sub-10ms HFT Model` + `RVOL Spike Scanner`\n"
@@ -661,7 +661,7 @@ class TelegramBotThread(BaseThread):
             if not args and not update.callback_query:
                 if user_lang == 'en':
                     msg = (
-                        "⚡️ **KHMER MASTER CRYPTO | SUB-5MS CROSS-EXCHANGE ARBITRAGE v13.00** ⚡️\n"
+                        "⚡️ **ANGKOR QUANT | SUB-5MS CROSS-EXCHANGE ARBITRAGE v13.00** ⚡️\n"
                         "════════════\n\n"
                         "📊 **INSTITUTIONAL ARBITRAGE ARCHITECTURE:**\n"
                         "• 🤖 **AI Model Swarm** ៖ `Apex Multi-Venue Microstructure Intelligence™`\n"
@@ -676,7 +676,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "⚡️ **KHMER MASTER CRYPTO | 亚毫秒级跨交易所套利引擎 v13.00** ⚡️\n"
+                        "⚡️ **ANGKOR QUANT | 亚毫秒级跨交易所套利引擎 v13.00** ⚡️\n"
                         "════════════\n\n"
                         "📊 **机构级套利架构：**\n"
                         "• 🤖 **AI 模型集成** ៖ `Apex 多市场微观结构智能量化矩阵™`\n"
@@ -691,7 +691,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "⚡️ **KHMER MASTER CRYPTO | SUB-5MS CROSS-EXCHANGE ARBITRAGE v13.00** ⚡️\n"
+                        "⚡️ **ANGKOR QUANT | SUB-5MS CROSS-EXCHANGE ARBITRAGE v13.00** ⚡️\n"
                         "════════════\n\n"
                         "📊 **INSTITUTIONAL ARBITRAGE ARCHITECTURE (ស្ថាបត្យកម្មវិនិយោគ 0% RISK) ៖**\n"
                         "• 🤖 **AI Models សហការ** ៖ `Apex Multi-Venue Microstructure Intelligence™`\n"
@@ -2146,7 +2146,7 @@ class TelegramBotThread(BaseThread):
                             f"• ម៉ាស៊ីនបម្រើ Gas Node ៖ {kp_masked} `(Institutional Dedicated Node)`\n"
                             "• 🌐 បណ្តាញប្រតិបត្តិការ ៖ `Arbitrum One Nitro L2 (<0.42ms Sub-millisecond)`\n"
                             f"• 📡 ស្ថានភាពបច្ចុប្បន្ន ៖ `{fund_badge_km}`\n"
-                            "• 🎁 ថ្លៃសេវា Gas សម្រាប់ VIP ៖ `ឥតគិតថ្លៃ $0.00 (Gas Fee 100% Subsidized by Khmer Master Crypto)`\n"
+                            "• 🎁 ថ្លៃសេវា Gas សម្រាប់ VIP ៖ `ឥតគិតថ្លៃ $0.00 (Gas Fee 100% Subsidized by Angkor Quant)`\n"
                             f"• 📜 Aave V3 Smart Contract ៖ `{contract_addr}`\n\n"
                             "════════════\n"
                             "✅ **ស្ថានភាពល្អឥតខ្ចោះ ៖** ម៉ាស៊ីនបម្រើ Keeper Relayer កំពុងរ៉ាប់រងថ្លៃ Gas ១០០% សម្រាប់លោកអ្នក! លោកអ្នកមិនបាច់បង់ថ្លៃ Gas ឡើយ។ ប្រព័ន្ធកំពុងដំណើរការ Live Flash Loan Arbitrage ហើយផ្ទេរប្រាក់ចំណេញសុទ្ធជា USDT ត្រង់ចូល MetaMask របស់អ្នក!\n\n"
@@ -2168,7 +2168,7 @@ class TelegramBotThread(BaseThread):
                             f"• Relayer Node: {kp_masked} `(Institutional Dedicated Node)`\n"
                             "• 🌐 Execution Network: `Arbitrum One Nitro L2 (<0.42ms Sub-millisecond)`\n"
                             f"• 📡 Gas Status: `{fund_badge_en}`\n"
-                            "• 🎁 VIP Gas Fee: `$0.00 (100% Subsidized by Khmer Master Crypto)`\n"
+                            "• 🎁 VIP Gas Fee: `$0.00 (100% Subsidized by Angkor Quant)`\n"
                             f"• 📜 Aave V3 Smart Contract: `{contract_addr}`\n\n"
                             "════════════\n"
                             "✅ **Optimal Status!** The platform's Keeper Relayer covers 100% of all transaction gas on your behalf! Real net profits are routed directly to your MetaMask wallet!\n\n"
@@ -2320,7 +2320,7 @@ class TelegramBotThread(BaseThread):
             # DEFAULT: Master Help Card for Flash Loan
             if user_lang == 'km':
                 msg = (
-                    "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
+                    "⚡️ **ANGKOR QUANT | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
                     "════════════\n\n"
                     f"📡 **ស្ថានភាពប្រព័ន្ធ 24/7** ៖ `{auto_badge_km}`\n"
                     f"🏆 **ប្រាក់ចំណេញពិតកើបបានលើ Blockchain** ៖ `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} ប្រតិបត្តិការ)\n"
@@ -2360,7 +2360,7 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 msg = (
-                    "⚡️ **KHMER MASTER CRYPTO | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
+                    "⚡️ **ANGKOR QUANT | MEV & FLASH LOAN ARBITRAGE v13.00** ⚡️\n"
                     "════════════\n\n"
                     f"📡 **24/7 System Status**: `{auto_badge}`\n"
                     f"🏆 **Live Settled Profit on Blockchain**: `+${tot_fl_profit:,.2f} USDT` ({tot_fl_trades} trades)\n"
@@ -2643,7 +2643,7 @@ class TelegramBotThread(BaseThread):
             if is_admin:
                 if user_lang == 'en':
                     admin_header = (
-                        "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
+                        "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
                         "════════════\n"
                         "⚡ **SYSTEM STATUS** ៖ `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
                         "🧠 **AGI SUPER BRAIN** ៖ `5-Agent Swarm + 12 Wall Street ML Active`\n"
@@ -2652,7 +2652,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     admin_header = (
-                        "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
+                        "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
                         "════════════\n"
                         "⚡ **系统状态** ៖ `🟢 24/7 在线` | `延迟: <15ms`\n"
                         "🧠 **AGI 超级大脑** ៖ `5模型 Swarm + 12 Wall Street ML 激活`\n"
@@ -2661,7 +2661,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     admin_header = (
-                        "🎛️ **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00** 🎛️\n"
+                        "🎛️ **ANGKOR QUANT / APEX AGI ENGINE v13.00** 🎛️\n"
                         "════════════\n"
                         "⚡ **ស្ថានភាពប្រព័ន្ធ ៖** `🟢 ONLINE 24/7` | `Latency: <15ms`\n"
                         "🧠 **AGI SUPER BRAIN ៖** `5-Model Swarm + 12 Wall Street ML Active`\n"
@@ -3033,7 +3033,7 @@ class TelegramBotThread(BaseThread):
                     persistent_bar = get_persistent_bot_bar_keyboard(chat_id)
                     await context.bot.send_message(
                         chat_id=chat_id,
-                        text="⚡ **KHMER MASTER CRYPTO | APEX AGI v13.00** 🛡️\n_របារបញ្ជា Quick Actions ត្រូវបានភ្ជាប់ទៅកាន់គណនីរបស់អ្នករួចរាល់ 24/7!_",
+                        text="⚡ **ANGKOR QUANT | APEX AGI v13.00** 🛡️\n_របារបញ្ជា Quick Actions ត្រូវបានភ្ជាប់ទៅកាន់គណនីរបស់អ្នករួចរាល់ 24/7!_",
                         parse_mode="Markdown",
                         reply_markup=persistent_bar
                     )
@@ -3104,7 +3104,7 @@ class TelegramBotThread(BaseThread):
                 admin_health_line_en = "\n• Live VPS Diagnostics (Admin) ៖ `` `/health` ``" if is_admin else ""
 
                 welcome_msg = (
-                    "🚀 **KHMER MASTER CRYPTO | APEX AGI v13.00** 💎\n"
+                    "🚀 **ANGKOR QUANT | APEX AGI v13.00** 💎\n"
                     "════════════\n"
                     f"Welcome **{first_name}**! Welcome to the institutional-grade Wall Street AI Algorithmic Trading Platform!\n\n"
                     "🛡️ **ACCOUNT & RISK CONTROLS:**\n"
@@ -3152,7 +3152,7 @@ class TelegramBotThread(BaseThread):
                 admin_health_line_zh = "\n• 服务器诊断 (管理员) ៖ `` `/health` ``" if is_admin else ""
 
                 welcome_msg = (
-                    "🚀 **KHMER MASTER CRYPTO | APEX AGI v13.00** 💎\n"
+                    "🚀 **ANGKOR QUANT | APEX AGI v13.00** 💎\n"
                     "════════════\n"
                     f"欢迎 **{first_name}**！欢迎使用华尔街级 AI 机构量化交易系统！\n\n"
                     "🛡️ **账户与风控护盾:**\n"
@@ -3200,7 +3200,7 @@ class TelegramBotThread(BaseThread):
                 admin_health_line_km = "\n• ឆែកសុខភាព Live VPS (Admin) ៖ `` `/health` ``" if is_admin else ""
 
                 welcome_msg = (
-                    "🚀 **KHMER MASTER CRYPTO | APEX AGI v13.00** 💎\n"
+                    "🚀 **ANGKOR QUANT | APEX AGI v13.00** 💎\n"
                     "════════════\n"
                     f"សួស្តី **{first_name}**! ស្វាគមន៍មកកាន់ប្រព័ន្ធវិនិយោគស្វ័យប្រវត្តិកម្រិតស្ថាប័ន Wall Street AI Trading Platform!\n\n"
                     "🛡️ **គណនី & យន្តការសុវត្ថិភាពវិនិយោគ:**\n"
@@ -3742,14 +3742,14 @@ class TelegramBotThread(BaseThread):
             if not keys:
                 if user_lang == 'en':
                     empty_msg = (
-                        "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
+                        "💰 **ANGKOR QUANT / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                         "════════════\n"
                         "❌ **No Binance API Keys connected yet!**\n\n"
                         "💡 *Please tap **[🔑 Add Binance API]** below to bind your API Keys first:*"
                     )
                 else:
                     empty_msg = (
-                        "💰 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
+                        "💰 **ANGKOR QUANT / APEX AGI ENGINE v13.00 | LIVE BALANCE** 💰\n"
                         "════════════\n"
                         "❌ **ពុំទាន់មាន Binance API Keys ភ្ជាប់ក្នុងប្រព័ន្ធនៅឡើយ!**\n\n"
                         "💡 *សូមចុចប៊ូតុង **[🔑 Add Binance API]** ខាងក្រោមដើម្បីភ្ជាប់ API Keys របស់អ្នកជាមុនសិន ៖*"
@@ -4166,7 +4166,7 @@ class TelegramBotThread(BaseThread):
                     
                     if user_lang == 'en':
                         usage_card = (
-                            "📈 **KHMER MASTER CRYPTO | WALL STREET ML 24H PREDICTOR v13.00** 📈\n"
+                            "📈 **ANGKOR QUANT | WALL STREET ML 24H PREDICTOR v13.00** 📈\n"
                             "════════════\n\n"
                             "📊 **INSTITUTIONAL QUANTITATIVE PREDICTION SUITE:**\n"
                             "• 🤖 **Deep Momentum Classifiers™** ៖ Proprietary high-dimensional non-linear trend ensembles\n"
@@ -4180,7 +4180,7 @@ class TelegramBotThread(BaseThread):
                         )
                     elif user_lang == 'zh':
                         usage_card = (
-                            "📈 **KHMER MASTER CRYPTO | 华尔街 ML 24小时 K 线预测引擎 v13.00** 📈\n"
+                            "📈 **ANGKOR QUANT | 华尔街 ML 24小时 K 线预测引擎 v13.00** 📈\n"
                             "════════════\n\n"
                             "📊 **机构级量化预测智能矩阵：**\n"
                             "• 🤖 **深度动量分类器™** ៖ 独家高维非线性多周期趋势决策集群\n"
@@ -4194,7 +4194,7 @@ class TelegramBotThread(BaseThread):
                         )
                     else:
                         usage_card = (
-                            "📈 **KHMER MASTER CRYPTO | WALL STREET ML 24H PREDICTOR v13.00** 📈\n"
+                            "📈 **ANGKOR QUANT | WALL STREET ML 24H PREDICTOR v13.00** 📈\n"
                             "════════════\n\n"
                             "📊 **ស្ថាបត្យកម្មព្យាករណ៍កម្រិតស្ថាប័ន (INSTITUTIONAL AI PREDICTOR) ៖**\n"
                             "• 🤖 **Deep Momentum Classifiers™** ៖ បណ្តុំខួរក្បាលឆ្លាតវៃវិភាគទិសដៅរលកសន្ទុះទីផ្សារពហុវិមាត្រ\n"
@@ -4394,7 +4394,7 @@ class TelegramBotThread(BaseThread):
                     
                     if user_lang == 'en':
                         usage_msg = (
-                            "🧠 **KHMER MASTER CRYPTO | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
+                            "🧠 **ANGKOR QUANT | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
                             "════════════\n\n"
                             "📊 **5-AGENT AGI SWARM ARCHITECTURE:**\n"
                             "• 1️⃣ **Trend Agent** ៖ EMA 20/50/200 Cross, Supertrend, Market Structure\n"
@@ -4410,7 +4410,7 @@ class TelegramBotThread(BaseThread):
                         )
                     elif user_lang == 'zh':
                         usage_msg = (
-                            "🧠 **KHMER MASTER CRYPTO | 5-Agent AGI 360° 智能市场分析师 v13.00** 🧠\n"
+                            "🧠 **ANGKOR QUANT | 5-Agent AGI 360° 智能市场分析师 v13.00** 🧠\n"
                             "════════════\n\n"
                             "📊 **5-AGENT AGI 蜂群研判架构：**\n"
                             "• 1️⃣ **趋势 Agent** ៖ EMA 20/50/200 交叉、Supertrend 结构\n"
@@ -4426,7 +4426,7 @@ class TelegramBotThread(BaseThread):
                         )
                     else:
                         usage_msg = (
-                            "🧠 **KHMER MASTER CRYPTO | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
+                            "🧠 **ANGKOR QUANT | 5-AGENT AGI MARKET ANALYZER v13.00** 🧠\n"
                             "════════════\n\n"
                             "📊 **5-AGENT AGI SWARM ARCHITECTURE (ស្ថាបត្យកម្ម AI វិភាគ ៥ ជំនាញ) ៖**\n"
                             "• 1️⃣ **Trend Agent** ៖ វិភាគនិន្នាការ EMA 20/50/200 Cross & Market Structure\n"
@@ -4614,7 +4614,7 @@ class TelegramBotThread(BaseThread):
                 from ui_standards import DIVIDER_DOUBLE
                 greeting_card = (
                     "✨ **មគ្គុទ្ទេសក៍គ្រីបតូខ្មែរ**\n"
-                    "**Khmer Master Crypto | Turbo Apex AGI!**\n"
+                    "**Angkor Quant | Turbo Apex AGI!**\n"
                     f"{DIVIDER_DOUBLE}\n"
                     "ជាប្រព័ន្ធវិភាគបរិមាណវិស័យ និងយុទ្ធសាស្ត្រ រាល់ការវិភាគ និងការសម្រេចចិត្តនឹងត្រូវធ្វើឡើងតាមរយៈការសំយោគទិន្នន័យពហុវិមាត្រ ដើម្បីផ្តល់ចំណេះដឹងបន្ថែមជូនលោកអ្នក!\n\n"
                     "👉 _សូមឆ្លើយតប ឬសួរសំនួរដោយ Reply សារនេះ!_"
@@ -4805,7 +4805,7 @@ class TelegramBotThread(BaseThread):
             mode_badge = "🧪 PAPER TRADING" if is_paper else "🚀 REAL LIVE TRADING"
             
             help_card = (
-                "🤖 **KHMER MASTER CRYPTO / APEX AGI ENGINE v13.00 | USER MANUAL** 🤖\n"
+                "🤖 **ANGKOR QUANT / APEX AGI ENGINE v13.00 | USER MANUAL** 🤖\n"
                 "════════════\n"
                 "📘 **សៀវភៅណែនាំប្រើប្រាស់ និងបញ្ជាជួញដូរ AGI (USER GUIDE v13.00)**\n"
                 f"🛡️ **TRADING ENGINE**: `{mode_badge}` | `ISOLATED MARGIN`\n"
@@ -4976,11 +4976,11 @@ class TelegramBotThread(BaseThread):
             ])
             
             loading_msg = (
-                "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00**\n\n_Scanning Binance Top Gainers, Losers & RVOL Volume Surge (>2.5x)..._"
+                "🔥 **ANGKOR QUANT | TOP VOLATILITY & RVOL RADAR v13.00**\n\n_Scanning Binance Top Gainers, Losers & RVOL Volume Surge (>2.5x)..._"
                 if user_lang == 'en' else
-                ("🔥 **KHMER MASTER CRYPTO | Top 振幅与 RVOL 异常雷达 v13.00**\n\n_正在获取 Binance 24h 涨跌幅榜、暴跌反弹榜及 RVOL 成交量异常榜 (>2.5x)..._"
+                ("🔥 **ANGKOR QUANT | Top 振幅与 RVOL 异常雷达 v13.00**\n\n_正在获取 Binance 24h 涨跌幅榜、暴跌反弹榜及 RVOL 成交量异常榜 (>2.5x)..._"
                  if user_lang == 'zh' else
-                 "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00**\n\n_កំពុងស្កេនកាក់ដែលឡើង/ចុះខ្លាំងជាងគេ 24h និងកាក់មាន RVOL Volume Surge ខ្ពស់បំផុត (>2.5x)..._")
+                 "🔥 **ANGKOR QUANT | TOP VOLATILITY & RVOL RADAR v13.00**\n\n_កំពុងស្កេនកាក់ដែលឡើង/ចុះខ្លាំងជាងគេ 24h និងកាក់មាន RVOL Volume Surge ខ្ពស់បំផុត (>2.5x)..._")
             )
 
             status_msg = None
@@ -5016,13 +5016,13 @@ class TelegramBotThread(BaseThread):
                 if not isinstance(analysis, str): analysis = str(analysis or "")
                 
                 header_title = (
-                    "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
+                    "🔥 **ANGKOR QUANT | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
                     "════════════\n\n"
                     if user_lang == 'en' else
-                    ("🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
+                    ("🔥 **ANGKOR QUANT | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
                      "════════════\n\n"
                      if user_lang == 'zh' else
-                     "🔥 **KHMER MASTER CRYPTO | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
+                     "🔥 **ANGKOR QUANT | TOP VOLATILITY & RVOL RADAR v13.00** 🚀\n"
                      "════════════\n\n")
                 )
 
@@ -5113,11 +5113,11 @@ class TelegramBotThread(BaseThread):
             ])
 
             loading_text = (
-                "📰 **KHMER MASTER CRYPTO | GLOBAL NEWS SYNTHESIS v13.00**\n\n_Fetching real-time breaking news & compiling 3-paragraph AGI journalistic impact report..._"
+                "📰 **ANGKOR QUANT | GLOBAL NEWS SYNTHESIS v13.00**\n\n_Fetching real-time breaking news & compiling 3-paragraph AGI journalistic impact report..._"
                 if user_lang == 'en' else
-                ("📰 **KHMER MASTER CRYPTO | 3段式加密行业新闻简报 v13.00**\n\n_正在获取实时突发新闻并由 AGI 撰写三段式新闻深度分析..._"
+                ("📰 **ANGKOR QUANT | 3段式加密行业新闻简报 v13.00**\n\n_正在获取实时突发新闻并由 AGI 撰写三段式新闻深度分析..._"
                  if user_lang == 'zh' else
-                 "📰 **KHMER MASTER CRYPTO | GLOBAL NEWS SYNTHESIS v13.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងសង្ខេប ៣ កថាខណ្ឌ អមជាមួយការវាយតម្លៃផលប៉ះពាល់..._")
+                 "📰 **ANGKOR QUANT | GLOBAL NEWS SYNTHESIS v13.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងសង្ខេប ៣ កថាខណ្ឌ អមជាមួយការវាយតម្លៃផលប៉ះពាល់..._")
             )
 
             status_msg = None
@@ -7143,7 +7143,7 @@ class TelegramBotThread(BaseThread):
                 await language_command(update, context)
             elif data in ["btn_start_refresh", "btn_start_welcome"]:
                 try:
-                    await update.callback_query.answer("🚀 ស្វាគមន៍មកកាន់ Khmer Master Crypto AGI!")
+                    await update.callback_query.answer("🚀 ស្វាគមន៍មកកាន់ Angkor Quant AGI!")
                 except Exception:
                     pass
                 await start_command(update, context)
@@ -7939,7 +7939,7 @@ class TelegramBotThread(BaseThread):
             if len(args) != 3:
                 if user_lang == 'en':
                     guide_card = (
-                        "🔑 **KHMER MASTER CRYPTO | MULTI-EXCHANGE API MANAGER v13.00** 🔑\n"
+                        "🔑 **ANGKOR QUANT | MULTI-EXCHANGE API MANAGER v13.00** 🔑\n"
                         "════════════\n\n"
                         "🛡️ **SECURITY & PERMISSION GUIDELINES:**\n"
                         "• **Enable Reading**: `REQUIRED` (Sync balances & active positions)\n"
@@ -7959,7 +7959,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     guide_card = (
-                        "🔑 **KHMER MASTER CRYPTO | 多交易所 API 管理器 v13.00** 🔑\n"
+                        "🔑 **ANGKOR QUANT | 多交易所 API 管理器 v13.00** 🔑\n"
                         "════════════\n\n"
                         "🛡️ **安全与权限指南：**\n"
                         "• **允许读取 (Reading)**: `必须勾选` (同步账户余额与持仓)\n"
@@ -7979,7 +7979,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     guide_card = (
-                        "🔑 **KHMER MASTER CRYPTO | MULTI-EXCHANGE API MANAGER v13.00** 🔑\n"
+                        "🔑 **ANGKOR QUANT | MULTI-EXCHANGE API MANAGER v13.00** 🔑\n"
                         "════════════\n\n"
                         "🛡️ **SECURITY & PERMISSION GUIDELINES (លក្ខខណ្ឌសុវត្ថិភាព) ៖**\n"
                         "• **Enable Reading**: `REQUIRED` (ឆែកមើលសមតុល្យ & Position ទាំងអស់)\n"
@@ -9303,7 +9303,7 @@ class TelegramBotThread(BaseThread):
                 if chat_type in ["group", "supergroup"]:
                     from ui_standards import DIVIDER_HEAVY
                     welcome_text = (
-                        "🤖 **KHMER MASTER CRYPTO BOT CONNECTED!** ⚡\n"
+                        "🤖 **ANGKOR QUANT BOT CONNECTED!** ⚡\n"
                         f"{DIVIDER_HEAVY}\n\n"
                         f"🏛️ **Community Name ៖** `{chat_title}`\n"
                         f"🆔 **Community ID ៖** `{chat_id}`\n"
@@ -12166,7 +12166,7 @@ class TelegramBotThread(BaseThread):
                     "👉 🛑 *បិទដំណើរការ Gold Turbo ៖*\n"
                     "`/gold_turbo OFF 1234`\n"
                     f"{div}\n"
-                    "_Khmer Master Crypto | APEX SUPER BRAIN AI_"
+                    "_Angkor Quant | APEX SUPER BRAIN AI_"
                 )
                 await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
@@ -12252,7 +12252,7 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE DELTA-NEUTRAL ENGINE v13.00** 🛡️\n"
+                        "⚡ **ANGKOR QUANT | TURBO HEDGE DELTA-NEUTRAL ENGINE v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n\n"
                         "💡 **PRO TIP**: `/turbo_hedge` is your 100% Pure Futures Institutional Delta-Neutral & Directional Hedge Engine!\n"
                         "💡 For 100% Pure Spot Accumulation without liquidation risk, use `/smart_trade`!\n\n"
@@ -12284,7 +12284,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE 机构级高频对冲引擎 v13.00** 🛡️\n"
+                        "⚡ **ANGKOR QUANT | TURBO HEDGE 机构级高频对冲引擎 v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n\n"
                         "💡 **提示**：`/turbo_hedge` 是纯合约 (Futures) 机构级 Delta-Neutral 与双向对冲引擎！现货零爆仓积累请使用 `/smart_trade`！\n\n"
                         "🏛️ **VIP 分层财富协议 (70:20:10 资金配比):**\n"
@@ -12315,7 +12315,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "⚡ **KHMER MASTER CRYPTO | TURBO HEDGE DELTA-NEUTRAL ENGINE v13.00** 🛡️\n"
+                        "⚡ **ANGKOR QUANT | TURBO HEDGE DELTA-NEUTRAL ENGINE v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n\n"
                         "💡 **ការណែនាំពិសេស** ៖ `/turbo_hedge` គឺជាម៉ាស៊ីន 100% Pure Futures Delta-Neutral & Directional Hedge!\n"
                         "💡 សម្រាប់ Spot Accumulation កាន់កាប់កាក់សុទ្ធ 0% Liquidation Risk សូមប្រើ `/smart_trade`!\n\n"
@@ -13258,7 +13258,7 @@ class TelegramBotThread(BaseThread):
 
             div = "━━━━━━━━━━━━"
             footnote = (
-                "_Khmer Master Crypto_\n"
+                "_Angkor Quant_\n"
                 "_APEX SUPER BRAIN AI_\n"
                 "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             )
@@ -13291,7 +13291,7 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "👑 *KHMER MASTER CRYPTO | SMARTX GOLD QUANT*\n"
+                        "👑 *ANGKOR QUANT | SMARTX GOLD QUANT*\n"
                         f"{div}\n"
                         "🥇 *INSTITUTIONAL GOLD MATRIX (XAUUSDT Futures / PAXGUSDT Spot)*\n"
                         f"{div}\n"
@@ -13326,7 +13326,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "👑 *KHMER MASTER CRYPTO | SMARTX 机构黄金量化*\n"
+                        "👑 *ANGKOR QUANT | SMARTX 机构黄金量化*\n"
                         f"{div}\n"
                         "🥇 *机构黄金双引擎 (XAUUSDT 合约 / PAXGUSDT 现货)*\n"
                         f"{div}\n"
@@ -13361,7 +13361,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "👑 *KHMER MASTER CRYPTO | SMARTX GOLD QUANT*\n"
+                        "👑 *ANGKOR QUANT | SMARTX GOLD QUANT*\n"
                         f"{div}\n"
                         "🥇 *100% ផ្តោតលើមាសស្ថាប័ន (XAUUSDT Futures / PAXGUSDT Spot)*\n"
                         f"{div}\n"
@@ -13520,7 +13520,7 @@ class TelegramBotThread(BaseThread):
                         f"• Hyperparameters : `{sync_res.get('total_configs')} Configs`\n"
                         f"• Status: `🟢 Operational in /smartx Gold Engine`\n"
                         f"{div}\n"
-                        "_Khmer Master Crypto | APEX SUPER BRAIN AI_"
+                        "_Angkor Quant | APEX SUPER BRAIN AI_"
                     )
                 else:
                     resp_text = f"⚠️ [HF SYNC] Notice: {sync_res.get('message')}"
@@ -13885,7 +13885,7 @@ class TelegramBotThread(BaseThread):
                         f"🔒 *Order Book ៖* គ្មាន Pending STOP_MARKET orders សេសសល់ឡើយ។\n"
                         f"💵 *Margin ៖* Margin ទាំងអស់ត្រូវបានដោះលែងមកវិញ ១០០%។\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
+                        f"_Angkor Quant_\n"
                         f"_APEX SUPER BRAIN AI_"
                     ) if is_khmer else (
                         f"🛑 *REACHSEY MEAS (GOLD) PENDING STOP MATRIX CANCELLED!* ⚡\n"
@@ -13894,7 +13894,7 @@ class TelegramBotThread(BaseThread):
                         f"🔒 *Order Book:* Zero remaining pending STOP_MARKET orders.\n"
                         f"💵 *Margin:* 100% margin released safely.\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
+                        f"_Angkor Quant_\n"
                         f"_APEX SUPER BRAIN AI_"
                     )
                     try:
@@ -14015,7 +14015,7 @@ class TelegramBotThread(BaseThread):
                 f"• `` `/smartx_reachsey_meas STOP` `` _(លុបចោលបញ្ជាស្ទាក់មាសទាំងអស់)_\n"
                 f"• `` `/smartx_reachsey_meas 30 10` `` _(ទុន $30 USDT | Leverage 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"_Khmer Master Crypto_\n"
+                f"_Angkor Quant_\n"
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             ) if is_khmer else (
@@ -14047,7 +14047,7 @@ class TelegramBotThread(BaseThread):
                 f"• `` `/smartx_reachsey_meas STOP` `` _(Cancel all open Gold stop orders)_\n"
                 f"• `` `/smartx_reachsey_meas 30 10` `` _($30 USDT | 10x Leverage)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"_Khmer Master Crypto_\n"
+                f"_Angkor Quant_\n"
                 f"_APEX SUPER BRAIN AI_\n"
                 f"Risk-Free Passive Wealth Generation 24/7!"
             )
@@ -14110,7 +14110,7 @@ class TelegramBotThread(BaseThread):
                         f"🔒 *Order Book ៖* គ្មាន Pending STOP_MARKET orders សេសសល់ឡើយ។\n"
                         f"💵 *Margin ៖* Margin ទាំងអស់ត្រូវបានដោះលែងមកវិញ ១០០%។\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
+                        f"_Angkor Quant_\n"
                         f"_APEX SUPER BRAIN AI_"
                     ) if is_khmer else (
                         f"🛑 *REACHSEY CRYPTO PENDING STOP MATRIX CANCELLED!* ⚡\n"
@@ -14119,7 +14119,7 @@ class TelegramBotThread(BaseThread):
                         f"🔒 *Order Book:* Zero remaining pending STOP_MARKET orders.\n"
                         f"💵 *Margin:* 100% margin released safely.\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
+                        f"_Angkor Quant_\n"
                         f"_APEX SUPER BRAIN AI_"
                     )
                     try:
@@ -14297,7 +14297,7 @@ class TelegramBotThread(BaseThread):
                 f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(បាញ់ Top 1 លើ 5M Micro-Burst)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(វិនិយោគលើ SOL ទុន $25 | 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"_Khmer Master Crypto_\n"
+                f"_Angkor Quant_\n"
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             ) if is_khmer else (
@@ -14334,7 +14334,7 @@ class TelegramBotThread(BaseThread):
                 f"• `` `/smartx_reachsey_crypto AUTO 5M` `` _(Auto Radar on 5M Micro-Burst)_\n"
                 f"• `` `/smartx_reachsey_crypto SOL 25 10` `` _(Trade SOL $25 | 10x)_\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"_Khmer Master Crypto_\n"
+                f"_Angkor Quant_\n"
                 f"_APEX SUPER BRAIN AI_\n"
                 f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
             )
@@ -14387,7 +14387,7 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     menu_text = (
-                        f"⚡ **KHMER MASTER CRYPTO | /smart_swap INSTITUTIONAL ON-CHAIN ENGINE** 🛡️\n"
+                        f"⚡ **ANGKOR QUANT | /smart_swap INSTITUTIONAL ON-CHAIN ENGINE** 🛡️\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                         f"💡 **Special Recommendation:** `/smart_swap` is the institutional-grade multi-chain DEX aggregator & AI sniper engine on **Solana, Ethereum, and BNB Chain**.\n\n"
                         f"📊 **6-PILLAR INSTITUTIONAL ON-CHAIN ARCHITECTURE:**\n"
@@ -14408,7 +14408,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     menu_text = (
-                        f"⚡ **KHMER MASTER CRYPTO | /smart_swap ម៉ាស៊ីនជួញដូរ ON-CHAIN SUPER SMART** 🛡️\n"
+                        f"⚡ **ANGKOR QUANT | /smart_swap ម៉ាស៊ីនជួញដូរ ON-CHAIN SUPER SMART** 🛡️\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                         f"💡 **ការណែនាំពិសេស ៖** `/smart_swap` គឺជាម៉ាស៊ីនជួញដូរ DEX Aggregator និង AI Gem Sniper កំពូលនៅលើបណ្តាញ **Solana, Ethereum, និង BNB Chain**!\n\n"
                         f"📊 **ស្ថាបត្យកម្ម INSTITUTIONAL ON-CHAIN កំពូលទាំង ៦ ៖**\n"
@@ -14480,7 +14480,7 @@ class TelegramBotThread(BaseThread):
                     ]
 
                 wallet_card = (
-                    f"💳 **KHMER MASTER CRYPTO | DEDICATED SOLANA WALLET** 🛰️\n"
+                    f"💳 **ANGKOR QUANT | DEDICATED SOLANA WALLET** 🛰️\n"
                     f"*(ស្ថាបត្យកម្មកាបូបផ្ទាល់ខ្លួន ១០០% Non-Custodial Multi-Tenant)*\n"
                     f"────────────\n\n"
                     f"👤 **ម្ចាស់កាបូប (Telegram ID) ៖** `{chat_id}`\n\n"
@@ -14553,7 +14553,7 @@ class TelegramBotThread(BaseThread):
                     tx_url = res.get("solscan_url", f"https://solscan.io/tx/{tx_h}")
                     receipt_dest = res.get("recipient", dest_addr)
                     receipt_card = (
-                        "🚀 **KHMER MASTER CRYPTO | SOL WITHDRAWAL SUCCESS** 💸\n"
+                        "🚀 **ANGKOR QUANT | SOL WITHDRAWAL SUCCESS** 💸\n"
                         "────────────\n\n"
                         f"💰 **ចំនួនទឹកប្រាក់បានដក ៖** `{sol_amt:.5f} SOL`\n"
                         f"📍 **កាបូបទទួល (Recipient) ៖** `{receipt_dest}`\n"
@@ -14603,7 +14603,7 @@ class TelegramBotThread(BaseThread):
                 pub_b58 = key_data.get("public_key", "")
 
                 key_card = (
-                    "⚠️ **KHMER MASTER CRYPTO | SOLANA PRIVATE KEY EXPORT** 🔐\n"
+                    "⚠️ **ANGKOR QUANT | SOLANA PRIVATE KEY EXPORT** 🔐\n"
                     "────────────\n\n"
                     f"📍 **Public Address ៖** `{pub_b58}`\n\n"
                     "🔑 **Base58 Private Key (ចុចដើម្បីចម្លង ៖)**\n"
@@ -15047,7 +15047,7 @@ class TelegramBotThread(BaseThread):
                                 )
 
                             card = (
-                                f"⚡ **KHMER MASTER CRYPTO | SMART SWAP GEM SNIPER SUCCESS** 🚀\n"
+                                f"⚡ **ANGKOR QUANT | SMART SWAP GEM SNIPER SUCCESS** 🚀\n"
                                 f"{ui_standards.DIVIDER_DOUBLE}\n\n"
                                 f"🪙 **កាក់គោលដៅ (Target Gem) ៖** `{gem_name}` ({chain_out})\n"
                                 f"🔄 **ស្ថានភាព ២៤/៧ ៖** `🟢 24/7 AUTOPILOT ACTIVE (ស្កេន & កើបចំណេញជាប់រហូត)`\n"
@@ -15213,7 +15213,7 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     usage = (
-                        "📈 **KHMER MASTER CRYPTO | SPOT SNOWBALL COMPOUND GRID v13.00** 📈\n"
+                        "📈 **ANGKOR QUANT | SPOT SNOWBALL COMPOUND GRID v13.00** 📈\n"
                         "════════════\n\n"
                         "📊 **SPOT COMPOUND ARCHITECTURE (100% Spot, Zero Liquidation):**\n"
                         f"• **System Status**: {status_str}\n"
@@ -15229,7 +15229,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     usage = (
-                        "📈 **KHMER MASTER CRYPTO | 现货滚雪球复利网格 (Compound Grid) v13.00** 📈\n"
+                        "📈 **ANGKOR QUANT | 现货滚雪球复利网格 (Compound Grid) v13.00** 📈\n"
                         "════════════\n\n"
                         "📊 **现货复利架构 (100% 现货，零爆仓风险)：**\n"
                         f"• **系统状态**: {status_str}\n"
@@ -15245,7 +15245,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     usage = (
-                        "📈 **KHMER MASTER CRYPTO | SPOT SNOWBALL COMPOUND GRID v13.00** 📈\n"
+                        "📈 **ANGKOR QUANT | SPOT SNOWBALL COMPOUND GRID v13.00** 📈\n"
                         "════════════\n\n"
                         "📊 **ស្ថាបត្យកម្មវិនិយោគ SPOT COMPOUND (Spot 100% គ្មាន Liquidation) ៖**\n"
                         f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
@@ -15761,7 +15761,7 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "💎 **KHMER MASTER CRYPTO | SUPER SMART SPOT ACCUMULATOR v13.00** 🛡️\n"
+                        "💎 **ANGKOR QUANT | SUPER SMART SPOT ACCUMULATOR v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "🏛️ **100% PURE SPOT CAPITAL | 0% LEVERAGE | 0% LIQUIDATION RISK**\n\n"
                         f"💵 **Spot USDT Balance ៖** `${spot_bal:,.2f} USDT`\n"
@@ -15791,7 +15791,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "💎 **KHMER MASTER CRYPTO | SUPER SMART SPOT ACCUMULATOR v13.00** 🛡️\n"
+                        "💎 **ANGKOR QUANT | SUPER SMART SPOT ACCUMULATOR v13.00** 🛡️\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         "🏛️ **100% PURE SPOT CAPITAL | គ្មាន LEVERAGE | ហានិភ័យបែកកុង 0.0%**\n\n"
                         f"💵 **សមតុល្យ Spot USDT Balance ៖** `${spot_bal:,.2f} USDT`\n"
@@ -16759,7 +16759,7 @@ class TelegramBotThread(BaseThread):
             ])
 
             msg = (
-                "🛡️ **KHMER MASTER CRYPTO v13.00 AGI | CAPITAL PROTECTION NOTICE** 🛡️\n"
+                "🛡️ **ANGKOR QUANT v13.00 AGI | CAPITAL PROTECTION NOTICE** 🛡️\n"
                 "════════════\n\n"
                 "⚠️ **ការធ្វើបច្ចុប្បន្នភាពសុវត្ថិភាពដើមទុន v13.00 ៖**\n"
                 "មុខងារ `/auto_arb` ត្រូវ បានធ្វើបច្ចុប្បន្នភាពបង្រួមចូលទៅក្នុង **`Funding Harvester`** និង **`Turbo Hedge Engine`** ដើម្បីការពារប្រាក់ដើមទុនសមាជិក VIP ពីការខាតបង់ Binance Taker Fee (0.10% Roundtrip)។\n\n"
@@ -16866,7 +16866,7 @@ class TelegramBotThread(BaseThread):
 
                 if user_lang == 'en':
                     msg = (
-                        "📈 **KHMER MASTER CRYPTO | DYNAMIC COMPOUND INFINITY MATRIX v13.00** 📈\n"
+                        "📈 **ANGKOR QUANT | DYNAMIC COMPOUND INFINITY MATRIX v13.00** 📈\n"
                         "════════════\n\n"
                         "📊 **EXECUTIVE COMPOUND MATRIX ARCHITECTURE:**\n"
                         f"• **System Status**: {status_str}\n"
@@ -16882,7 +16882,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     msg = (
-                        "📈 **KHMER MASTER CRYPTO | 动态复利网格矩阵引擎 (Infinity Matrix) v13.00** 📈\n"
+                        "📈 **ANGKOR QUANT | 动态复利网格矩阵引擎 (Infinity Matrix) v13.00** 📈\n"
                         "════════════\n\n"
                         "📊 **机构级复利网格架构：**\n"
                         f"• **当前状态**: {status_str}\n"
@@ -16898,7 +16898,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "📈 **KHMER MASTER CRYPTO | DYNAMIC COMPOUND INFINITY MATRIX v13.00** 📈\n"
+                        "📈 **ANGKOR QUANT | DYNAMIC COMPOUND INFINITY MATRIX v13.00** 📈\n"
                         "════════════\n\n"
                         "📊 **EXECUTIVE COMPOUND MATRIX ARCHITECTURE (ស្ថាបត្យកម្មវិនិយោគ COMPOUND) ៖**\n"
                         f"• **ស្ថានភាពប្រព័ន្ធ ៖** {status_str}\n"
@@ -17599,7 +17599,7 @@ class TelegramBotThread(BaseThread):
                 
                 if user_lang == 'en':
                     usage_card = (
-                        "🛑 **KHMER MASTER CRYPTO | EMERGENCY STOP CONTROLLER v13.00** 🛑\n"
+                        "🛑 **ANGKOR QUANT | EMERGENCY STOP CONTROLLER v13.00** 🛑\n"
                         "════════════\n\n"
                         "⚡ **SUB-30MS CIRCUIT BREAKER ARCHITECTURE:**\n"
                         "• 🎯 **Single-Coin Stop** ៖ Market Close & stop trading engine for specific symbol\n"
@@ -17612,7 +17612,7 @@ class TelegramBotThread(BaseThread):
                     )
                 elif user_lang == 'zh':
                     usage_card = (
-                        "🛑 **KHMER MASTER CRYPTO | 紧急平仓与停止控制台 v13.00** 🛑\n"
+                        "🛑 **ANGKOR QUANT | 紧急平仓与停止控制台 v13.00** 🛑\n"
                         "════════════\n\n"
                         "⚡ **毫秒级断路器与极速平仓架构：**\n"
                         "• 🎯 **单币种停止** ៖ 极速平仓并停止目标币种的 AI 交易引擎\n"
@@ -17625,7 +17625,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     usage_card = (
-                        "🛑 **KHMER MASTER CRYPTO | EMERGENCY STOP CONTROLLER v13.00** 🛑\n"
+                        "🛑 **ANGKOR QUANT | EMERGENCY STOP CONTROLLER v13.00** 🛑\n"
                         "════════════\n\n"
                         "⚡ **SUB-30MS CIRCUIT BREAKER ARCHITECTURE (ស្ថាបត្យកម្មបិទអាសន្ន <30ms) ៖**\n"
                         "• 🎯 **Single-Coin Stop** ៖ Market Close (<30ms) និងបិទ Bot លើកាក់ជាក់លាក់\n"
@@ -18042,7 +18042,7 @@ class TelegramBotThread(BaseThread):
                     )
                 else:
                     msg = (
-                        "🏥 **KHMER MASTER CRYPTO | SUPER SMART VPS HEALTH** ⚡\n"
+                        "🏥 **ANGKOR QUANT | SUPER SMART VPS HEALTH** ⚡\n"
                         "════════════\n\n"
                         "🖥️ **GOOGLE CLOUD VPS (Tokyo asia-northeast1-a):**\n"
                         "• **Machine Profile**: `Google Cloud e2-standard-4`\n"
@@ -18095,7 +18095,7 @@ class TelegramBotThread(BaseThread):
             except Exception as e:
                 print(f"❌ [HEALTH COMMAND ERROR]: {e}")
                 err_msg = (
-                    "🏥 **KHMER MASTER CRYPTO | VPS HEALTH DIAGNOSTICS** ⚡\n"
+                    "🏥 **ANGKOR QUANT | VPS HEALTH DIAGNOSTICS** ⚡\n"
                     "════════════\n"
                     "🟢 **SYSTEM STATUS**: `24/7/365 ACTIVE`\n"
                     f"• **Process ID (PID)**: `{os.getpid()}`\n"
@@ -18493,7 +18493,7 @@ class TelegramBotThread(BaseThread):
 
             if user_lang == 'en':
                 msg = (
-                    "🧠 **KHMER MASTER CRYPTO | /sync_brain AI SUPER ENGINE** ⚡\n"
+                    "🧠 **ANGKOR QUANT | /sync_brain AI SUPER ENGINE** ⚡\n"
                     "════════════\n"
                     f"⏰ **Timestamp ៖** `{now_str} (UTC+7)`\n"
                     "🛡️ **Authorization ៖** `SUPER ADMIN / QUANT ARCHITECT`\n"
@@ -18525,7 +18525,7 @@ class TelegramBotThread(BaseThread):
                 )
             elif user_lang == 'zh':
                 msg = (
-                    "🧠 **KHMER MASTER CRYPTO | /sync_brain AI 神经网络超级引擎** ⚡\n"
+                    "🧠 **ANGKOR QUANT | /sync_brain AI 神经网络超级引擎** ⚡\n"
                     "════════════\n"
                     f"⏰ **时间戳 ៖** `{now_str} (UTC+7)`\n"
                     "🛡️ **权限级别 ៖** `超级管理员 / 首席量化架构师`\n"
@@ -18557,7 +18557,7 @@ class TelegramBotThread(BaseThread):
                 )
             else:
                 msg = (
-                    "🧠 **KHMER MASTER CRYPTO | /sync_brain AI SUPER ENGINE** ⚡\n"
+                    "🧠 **ANGKOR QUANT | /sync_brain AI SUPER ENGINE** ⚡\n"
                     "════════════\n"
                     f"⏰ **ពេលវេលា ៖** `{now_str} (UTC+7)`\n"
                     "🛡️ **ការអនុញ្ញាត ៖** `SUPER ADMIN / QUANT ARCHITECT`\n"
@@ -20391,7 +20391,7 @@ class TelegramBotThread(BaseThread):
                     f"🧭 **បើកផែនទី ៤ ដំណាក់កាល ៖** `` `/capital PROP WIZARD` ``\n"
                     f"🔌 **តេស្ត API Connection ៖** `` `/capital PROP CHECK` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"ប្រព័ន្ធជួយប្រឡងយកគណនី $10,000 ដល់ $200,000 ជាប់ ១០០%!"
                 )
@@ -20426,7 +20426,7 @@ class TelegramBotThread(BaseThread):
                     f"🧭 **Open Wizard:** `` `/capital PROP WIZARD` ``\n"
                     f"🔌 **Test Connection:** `` `/capital PROP CHECK` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Institutional Funded Trader Passing System 24/7!"
                 )
@@ -20480,7 +20480,7 @@ class TelegramBotThread(BaseThread):
                     f"2️⃣ ពិនិត្យឱ្យច្បាស់ថាបានបំពេញ Invite Code (`{std_pro_code}`, `{std_l15_code}`, `{cent_code}` ឬ `{std_l20_code}`)\n"
                     f"3️⃣ ចុចប៊ូតុង **[ 📋 ស្នើសុំផ្ទៀងផ្ទាត់ MT5 ID ]** ខាងក្រោម ដើម្បីទទួលបានការអនុម័តភ្លាមៗ!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_"
                 )
             else:
@@ -20508,7 +20508,7 @@ class TelegramBotThread(BaseThread):
                     f"2️⃣ Ensure Invite Code is set to `{std_pro_code}`, `{std_l15_code}`, `{cent_code}` or `{std_l20_code}`\n"
                     f"3️⃣ Click **[ 📋 Request Verification ]** below for instant Super Admin approval!\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_"
                 )
 
@@ -20736,7 +20736,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{'✅ **AI Swarm កំពុងដំណើរការស្វែងរក Setup លើទ្រព្យសកម្មទាំងនេះ ដើម្បី Execute ដោយស្វ័យប្រវត្តិ!**' if new_state else '⚪ **ប្រព័ន្ធបានផ្អាកការចូល Order ថ្មីដោយស្វ័យប្រវត្តិ។ Positions កំពុងរត់នៅតែត្រូវបានការពារដោយ Stop-Loss! (ចុចប៊ូតុងខាងក្រោមបើចង់បិទទាំងអស់ភ្លាមៗ)**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     else:
@@ -20775,7 +20775,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{'✅ **AI Swarm actively scanning these assets to execute trades autonomously!**' if new_state else '⚪ **Autonomous execution paused. Open positions remain shielded by Stop-Loss! (Use button below to close all immediately)**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
 
@@ -20845,7 +20845,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{'✅ **បញ្ជូន Sniper Order ទៅកាន់ MT5 ជោគជ័យ!**' if reached > 0 else '⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     else:
@@ -20860,7 +20860,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{'✅ **Sniper order successfully dispatched to MT5!**' if reached > 0 else '⚠️ **No MT5 terminals connected.**'}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     try:
@@ -20928,7 +20928,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{'✅ **បញ្ជូន Order ទៅកាន់ GTCFX MT5 ជោគជ័យ!**' if reached > 0 else ('⚠️ **មិនទាន់មាន MT5 Terminal ណាភ្ជាប់នៅឡើយទេ។** សូមភ្ជាប់ EA `KhmerMasterCrypto_Bridge.mq5` លើ MT5!' if is_admin_user else '⚠️ **ប្រព័ន្ធ MT5 Gateway កំពុងរង់ចាំការតភ្ជាប់... សូមព្យាយាមម្តងទៀតក្នុងពេលបន្តិចទៀត!**')}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     else:
@@ -20944,7 +20944,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{'✅ **Order successfully dispatched to GTCFX MT5!**' if reached > 0 else ('⚠️ **No MT5 terminals connected.** Please attach `KhmerMasterCrypto_Bridge.mq5` in MT5!' if is_admin_user else '⚠️ **MT5 Gateway Standby... Please try again in a moment!**')}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     try:
@@ -21103,7 +21103,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{prop_text_kh}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     else:
@@ -21117,7 +21117,7 @@ class TelegramBotThread(BaseThread):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"{prop_text_en}\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         )
                     try:
@@ -21447,7 +21447,7 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"✨ <i>ដើមទុនរបស់អ្នកត្រូវបានការពារ និងជួញដូរស្វវត្តិកម្រិត Cloud 24/7!</i>\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"<i>Khmer Master Crypto</i>\n"
+                        f"<i>Angkor Quant</i>\n"
                         f"<i>APEX SUPER BRAIN AI</i>"
                     )
                     try:
@@ -21513,7 +21513,7 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"✨ <i>ប្រព័ន្ធបែងចែកចំណូល និងកម្រៃថែទាំដំណើរការស្វ័យប្រវត្តិកម្រិតស្ថាប័ន ២៤/៧!</i>\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"<i>Khmer Master Crypto</i>\n"
+                        f"<i>Angkor Quant</i>\n"
                         f"<i>APEX SUPER BRAIN AI</i>"
                     )
                     try:
@@ -21602,7 +21602,7 @@ class TelegramBotThread(BaseThread):
 
                     vps_ip = os.getenv("MT5_PUBLIC_IP", "34.153.209.188")
                     guide_text = (
-                        f"📥 <b>[KHMER MASTER CRYPTO - MT5 BRIDGE EA V13.0]</b> 🚀\n"
+                        f"📥 <b>[ANGKOR QUANT - MT5 BRIDGE EA V13.0]</b> 🚀\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🏛️ <b>សម្រាប់ដោតលើ MT5 ផ្ទាល់ខ្លួន (PC / Laptop / VPS)</b>\n"
                         f"⚡ <b>Zero DLL Direct Socket (&lt; 0.5ms HFT Bridge)</b>\n"
@@ -21898,7 +21898,7 @@ class TelegramBotThread(BaseThread):
                     f"• សាកល្បងល្បឿន Ping ៖ `` `/mt5 TEST` ``\n"
                     f"• ដោះសោរ Prop Risk Shield ៖ `` `/mt5 RESET` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Institutional GTCFX Tokyo MT5 Bridge Active 24/7!"
                 )
@@ -21934,7 +21934,7 @@ class TelegramBotThread(BaseThread):
                     f"• Test Latency: `` `/mt5 TEST` ``\n"
                     f"• Reset Prop Risk Shield: `` `/mt5 RESET` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Institutional GTCFX Tokyo MT5 Bridge Active 24/7!"
                 )
@@ -22085,7 +22085,7 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
                         f"{'✅ <b>ដំណើរការ Matrix 5-Position បានបាញ់ចូល MT5 Tokyo ដោយជោគជ័យ!</b>' if success else '⚠️ <b>ប្រព័ន្ធការពារមូលធន (Protection Abort) ៖</b> ' + html.escape(str(fail_reason))}\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"<i>✨ Khmer Master Crypto Reachsey Engine កើបលុយ 24/7!</i>"
+                        f"<i>✨ Angkor Quant Reachsey Engine កើបលុយ 24/7!</i>"
                     )
                     kb_back = InlineKeyboardMarkup([
                         [InlineKeyboardButton("📊 ពិនិត្យ Baskets សកម្ម", callback_data="btn_mt5_reachsey_status")],
@@ -22268,7 +22268,7 @@ class TelegramBotThread(BaseThread):
                 f"• បោសសម្អាត & កើបចំណេញ ៖ `` `/mt5_reachsey SWEEP` ``\n"
                 f"• បិទ & Safe Stop ៖ `` `/mt5_reachsey STOP` ``\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"<i>Khmer Master Crypto | Reachsey 5-Position Matrix Engine</i>\n"
+                f"<i>Angkor Quant | Reachsey 5-Position Matrix Engine</i>\n"
                 f"<i>APEX SUPER BRAIN AI — កើបប្រាក់ចំណេញ Super Smart 24/7!</i>"
             )
 
@@ -22405,7 +22405,7 @@ class TelegramBotThread(BaseThread):
                                 f"3️⃣ <b>Upgrade Hugging Face PRO ($9/month) ៖</b>\n"
                                 f"  បើចង់បង្កើត Docker Space លើ Cloud 100% សូមចូលទៅ Subscribe លើ <code>huggingface.co/pro</code>\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                                f"<i>Khmer Master Crypto | Zero Capital Sabotage Standard</i>"
+                                f"<i>Angkor Quant | Zero Capital Sabotage Standard</i>"
                             )
                             kb_err = InlineKeyboardMarkup([
                                 [InlineKeyboardButton("📥 ទាញយក EA Bridge (Free 100%)", callback_data="btn_mt5_download_ea")],
@@ -22597,7 +22597,7 @@ class TelegramBotThread(BaseThread):
                 f"• ពិនិត្យស្ថានភាព ៖ <code>/mt5_hf STATUS</code>\n"
                 f"• Anti-Sleep Sentinel ៖ <code>/mt5_hf PING</code>\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"<i>Khmer Master Crypto | Hugging Face Distributed Cloud Citadel</i>\n"
+                f"<i>Angkor Quant | Hugging Face Distributed Cloud Citadel</i>\n"
                 f"<i>APEX SUPER BRAIN AI — បច្ចេកវិទ្យាកម្រិតកំពូល ល្បឿនលឿនបំផុត ២៤/៧!</i>"
             )
 
@@ -22709,7 +22709,7 @@ class TelegramBotThread(BaseThread):
                     f"• `` `/capital leadlag ON` ``\n"
                     f"• `` `/capital leadlag OFF` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"High-Frequency Pure Latency Alpha 24/7!"
                 )
@@ -22746,7 +22746,7 @@ class TelegramBotThread(BaseThread):
                     f"• `` `/capital leadlag ON` ``\n"
                     f"• `` `/capital leadlag OFF` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"High-Frequency Pure Latency Alpha 24/7!"
                 )
@@ -22856,7 +22856,7 @@ class TelegramBotThread(BaseThread):
                     f"• `` `/capital orb ON` ``\n"
                     f"• `` `/capital orb OFF` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"London & Wall Street Opening Range Breakout Matrix 24/7!"
                 )
@@ -22889,7 +22889,7 @@ class TelegramBotThread(BaseThread):
                     f"• `` `/capital orb ON` ``\n"
                     f"• `` `/capital orb OFF` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"London & Wall Street Opening Range Breakout Matrix 24/7!"
                 )
@@ -23017,7 +23017,7 @@ class TelegramBotThread(BaseThread):
                     f"• ប្តូរ Mode ៖ `` `/capital kelly MODE BALANCED` ``\n"
                     f"• កំណត់ Risk ៖ `` `/capital kelly RISK 2.0` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"រូបមន្តគណិតវិជ្ជាបង្កើនផលចំណេញធរណីមាត្រ ២៤/៧!"
                 )
@@ -23052,7 +23052,7 @@ class TelegramBotThread(BaseThread):
                     f"• Sizing Mode: `` `/capital kelly MODE BALANCED` ``\n"
                     f"• Risk Clamp: `` `/capital kelly RISK 2.0` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Geometric Compounding & Drawdown Minimization 24/7!"
                 )
@@ -23186,7 +23186,7 @@ class TelegramBotThread(BaseThread):
                     f"• បើក/បិទ ៖ `` `/capital spread ON` `` | `` `/capital spread OFF` ``\n"
                     f"• កំណត់ Hurdle ៖ `` `/capital spread HURDLE 10` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"លុបបំបាត់ការបាត់បង់ថ្លៃទឹក Spread ធានាចំណេញសុទ្ធ ២៤/៧!"
                 )
@@ -23221,7 +23221,7 @@ class TelegramBotThread(BaseThread):
                     f"• Toggle: `` `/capital spread ON` `` | `` `/capital spread OFF` ``\n"
                     f"• Set Hurdle: `` `/capital spread HURDLE 10` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Institutional Zero-Spread-Drag Net Profit Protection 24/7!"
                 )
@@ -23524,7 +23524,7 @@ class TelegramBotThread(BaseThread):
                     kb_rows.append(btn_row)
 
                 kb_rows.append([InlineKeyboardButton("🔄 Refresh List", callback_data="btn_admin_mt5_refresh")])
-                msg_text = "\n".join(lines) + f"\n{ui_standards.DIVIDER_HEAVY}\n_Khmer Master Crypto_\n_APEX SUPER BRAIN AI_"
+                msg_text = "\n".join(lines) + f"\n{ui_standards.DIVIDER_HEAVY}\n_Angkor Quant_\n_APEX SUPER BRAIN AI_"
                 await update.effective_message.reply_text(msg_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_rows))
                 return
 
@@ -23570,7 +23570,7 @@ class TelegramBotThread(BaseThread):
                             f"គណនី MT5 របស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ និងអនុម័តដោយ Super Admin រួចរាល់ហើយ!\n"
                             f"អ្នកអាចដំណើរការ `/mt5` ឬ Web GUI MT5 Pro Terminal បានពេញលេញ ២៤/៧!\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"_Khmer Master Crypto_\n"
+                            f"_Angkor Quant_\n"
                             f"_APEX SUPER BRAIN AI_"
                         ),
                         parse_mode="Markdown"
@@ -23652,7 +23652,7 @@ class TelegramBotThread(BaseThread):
                     f"⚡ **Tokyo Connection ៖** {online_badge}\n"
                     f"🤖 **AI Auto-Trade ៖** {ai_badge}\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_"
                 )
                 kb_insp = [
@@ -24553,7 +24553,7 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET` `` | `` `/capital SCHEDULE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
                 )
@@ -24599,7 +24599,7 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET` `` | `` `/capital SCHEDULE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Risk Protection & Wealth Generation 24/7!"
                 )
@@ -24754,7 +24754,7 @@ class TelegramBotThread(BaseThread):
                         f"   • Sign up as an **Introducing Broker (IB)** for free\n\n"
                         f"2. **Get Your Partner Code:**\n"
                         f"   • Locate your IB partner tracking ID in Capital.com portal\n\n"
-                        f"3. **Link to Khmer Master Crypto Bot:**\n"
+                        f"3. **Link to Angkor Quant Bot:**\n"
                         f"   • Run command `` `/capital IB SET <your_code>` ``\n"
                         f"   • Example: `` `/capital IB SET KM888` ``\n\n"
                         f"4. **Share with Community & Investors:**\n"
@@ -24806,7 +24806,7 @@ class TelegramBotThread(BaseThread):
                     f"• មើលតារាង Spread ៖ `` `/capital IB STATS` ``\n"
                     f"• មគ្គុទ្ទេសក៍ចុះឈ្មោះ ៖ `` `/capital IB GUIDE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"ប្រភពចំណូលសកម្ម & អកម្ម គ្មានហានិភ័យ ២៤/៧!"
                 )
@@ -24843,7 +24843,7 @@ class TelegramBotThread(BaseThread):
                     f"• Spread Rates: `` `/capital IB STATS` ``\n"
                     f"• Registration Guide: `` `/capital IB GUIDE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Risk-Free Passive Wealth Generation 24/7!"
                 )
@@ -24911,7 +24911,7 @@ class TelegramBotThread(BaseThread):
                         f"• `Permian & Cushing Reservoirs` ➔ Thermal Flare & Storage Levels\n"
                         f"• `Pilbara & Western Australia` ➔ Iron Ore / Mining Activity Index\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
+                        f"_Angkor Quant_\n"
                         f"_APEX SUPER BRAIN AI_\n"
                         f"Physical World Alpha for Forex Precision!"
                     )
@@ -24945,7 +24945,7 @@ class TelegramBotThread(BaseThread):
                         f"• **Z-Score $\\le -1.85$ ៖** Long Mean Reversion ឆ្ពោះទៅ $\\mu$\n"
                         f"• **Breakeven Armor ៖** ចាក់សោរដើមទុននៅ $+3.0\\%$ ROI\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
+                        f"_Angkor Quant_\n"
                         f"_APEX SUPER BRAIN AI_\n"
                         f"Stochastic Edge in Range-Bound Markets!"
                     )
@@ -24974,7 +24974,7 @@ class TelegramBotThread(BaseThread):
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🛡️ **កម្រិតអនុម័ត ៖** ទាមទារ $\\ge 80\\%$ Consensus ទើបបញ្ជាទិញស្វ័យប្រវត្តិ!\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto_\n"
+                        f"_Angkor Quant_\n"
                         f"_APEX SUPER BRAIN AI_\n"
                         f"Zero Blind Investing Standard 24/7!"
                     )
@@ -25056,7 +25056,7 @@ class TelegramBotThread(BaseThread):
                     f"• មើលផ្កាយរណប ៖ `` `/forex SATELLITE` ``\n"
                     f"• មើល OU Matrix ៖ `` `/forex OU` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"ម៉ាស៊ីនជួញដូររូបិយប័ណ្ណឆ្លាតវៃបំផុត ២៤/៧!"
                 )
@@ -25091,7 +25091,7 @@ class TelegramBotThread(BaseThread):
                     f"• Satellite Radar: `` `/forex SATELLITE` ``\n"
                     f"• OU Parameters: `` `/forex OU` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
+                    f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
                     f"Ultra-Fast & Smart Forex Wealth Generation 24/7!"
                 )
@@ -25169,6 +25169,31 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("security_citadel", citadel_command))
         self.app.add_handler(CommandHandler("citadel_status", citadel_command))
 
+        # --- ANGKOR QUANT COMPATIBILITY & TRANSITION ALIASES ---
+        self.app.add_handler(CommandHandler("command", skynet_command))
+        self.app.add_handler(CommandHandler("angkor_command", skynet_command))
+        self.app.add_handler(CommandHandler("angkor_wealth", wealth_command))
+        self.app.add_handler(CommandHandler("angkor_capital", capital_command))
+        self.app.add_handler(CommandHandler("angkor_mt5", mt5_command))
+        self.app.add_handler(CommandHandler("angkor_forex", forex_command))
+        self.app.add_handler(CommandHandler("angkor_whales", whales_command))
+        self.app.add_handler(CommandHandler("angkor_crash", flash_crash_command))
+        self.app.add_handler(CommandHandler("angkor_radar", pre_pump_command))
+        self.app.add_handler(CommandHandler("angkor_news", news_command))
+        self.app.add_handler(CommandHandler("angkor_analyze", analyze_command))
+        self.app.add_handler(CommandHandler("angkor_predict", predict_command))
+        self.app.add_handler(CommandHandler("aq_admin", admin_panel_command))
+        self.app.add_handler(CommandHandler("aq_users", admin_users_command))
+        self.app.add_handler(CommandHandler("aq_license", admin_license_command))
+        self.app.add_handler(CommandHandler("aq_broadcast", admin_broadcast_command))
+        self.app.add_handler(CommandHandler("aq_stats", admin_stats_command))
+        self.app.add_handler(CommandHandler("aq_config", admin_config_command))
+        self.app.add_handler(CommandHandler("aq_health", health_command))
+        self.app.add_handler(CommandHandler("aq_sync", sync_brain_command))
+        self.app.add_handler(CommandHandler("aq_capital", admin_capital_command))
+        self.app.add_handler(CommandHandler("aq_mt5", admin_mt5_command))
+        self.app.add_handler(CommandHandler("aq_emergency", admin_nuke_command))
+
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         from telegram.ext import CallbackQueryHandler
         self.app.add_handler(CallbackQueryHandler(admin_license_callback, pattern="^lic_"))
@@ -25214,7 +25239,7 @@ class TelegramBotThread(BaseThread):
 
         self.app.post_init = post_init_set_commands
 
-        # --- KHMER MASTER CRYPTO v13.00 AGI SUPER BRAIN SCHEDULER ---
+        # --- ANGKOR QUANT v13.00 AGI SUPER BRAIN SCHEDULER ---
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
         import scheduler_tasks
         import capital_orchestrator

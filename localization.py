@@ -6,9 +6,9 @@ DEFAULT_LANG = 'khmer'
 MESSAGES = {
     'khmer': {
         'access_denied': "❌ សុំទោស អ្នកមិនមានសិទ្ធិប្រើប្រាស់មុខងារ AI នេះទេ។\nសូមទាក់ទង Admin ដើម្បីស្នើសុំសិទ្ធិជាសមាជិក VIP។",
-        'welcome_msg': "👋 ស្វាគមន៍មកកាន់ Apex AI Bot (VIP Member)!\nខ្ញុំគឺជា Super Smart AI ដែលអាចនិយាយភាសា (English, ខ្មែរ, 中文)។\nសូមផ្ញើទិន្នន័យទីផ្សារមកកាន់ខ្ញុំ ដើម្បីអោយខ្ញុំវិភាគ, ឬប្រើប្រាស់ `/analyze <ឈ្មោះកាក់>`។",
+        'welcome_msg': "👋 ស្វាគមន៍មកកាន់ **Angkor Quant AI** (VIP Member)!\n🏛️ **AI Quantitative Intelligence for Global Markets** (English, ខ្មែរ, 中文)។\nសូមផ្ញើទិន្នន័យទីផ្សារមកកាន់ខ្ញុំ ដើម្បីអោយខ្ញុំវិភាគ, ឬប្រើប្រាស់ `/analyze <ឈ្មោះកាក់>`។",
         'analyze_usage': "❌ សូមបញ្ចូលឈ្មោះកាក់។ ឧទាហរណ៍: `/analyze BTC`",
-        'fetching_live_data': "🔍 កំពុងទាញយកទិន្នន័យផ្ទាល់សម្រាប់ {symbol} ពី Binance...",
+        'fetching_live_data': "🔍 កំពុងទាញយកទិន្នន័យផ្ទាល់សម្រាប់ {symbol}...",
         'generating_chart': "📊 កំពុងបង្កើតតារាង, ទស្សន៍ទាយ ML Prediction & វិភាគហានិភ័យ Macro AI...",
         'processing_request': "🤖 កំពុងដំណើរការសំណើរបស់អ្នក...",
         'alert_usage': "❌ របៀបប្រើប្រាស់: `/alert <កាក់> < > <តម្លៃ>`\nឧទាហរណ៍: `/alert BTC < 60000`",
@@ -16,7 +16,8 @@ MESSAGES = {
         'condition_invalid': "❌ លក្ខខណ្ឌត្រូវតែជា '<' ឫ '>'.",
         'alert_set': "✅ ការរំលឹកត្រូវបានកំណត់: ខ្ញុំនឹងរំលឹកអ្នកនៅពេល **{symbol}** ទៅដល់ **{condition} ${price}**.",
         'help_text': (
-            "🤖 **Apex AI Bot - មឺនុយបញ្ជា (Menu)**\n\n"
+            "🏛️ **ANGKOR QUANT - មឺនុយបញ្ជា (Menu)**\n"
+            "_{AQ_TAGLINE}_\n\n"
             "💼 **គ្រប់គ្រងគណនី (Account & Portfolio)**\n"
             "👉 `/start` - បើកដំណើរការប្រព័ន្ធ\n"
             "👉 `/portfolio` - ពិនិត្យប្រាក់ចំណេញ និងកាក់ដែលកំពុងកាន់\n"
@@ -162,8 +163,8 @@ MESSAGES = {
             "   └ 1-Tap Copy ដើម្បីបើកដំណើរការ ៖ `` `/pre_pump ON 50 1234` ``\n\n"
             "━━━━━━━━━━━━\n"
             "⚙️ *Apex Super Brain កំពុងដំណើរការស្វ័យប្រវត្តិ ២៤ម៉ោង/ថ្ងៃ ដោយសុវត្ថិភាព 0% Risk!*\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_"
         ),
 
         'whale_deposit_alert': (
@@ -183,8 +184,8 @@ MESSAGES = {
             "📉 *Futures Top 20 Dumpers Scanner ៖*\n"
             "`/turbo_hedge TOP 20 10 SELL 5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'whale_withdrawal_alert': (
@@ -204,8 +205,8 @@ MESSAGES = {
             "🚀 *Futures Top 20 Gainers Scanner ៖*\n"
             "`/turbo_hedge TOP 20 10 BUY 5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'funding_rate_alert': (
@@ -220,8 +221,8 @@ MESSAGES = {
             "`/turbo_hedge HEDGE BTC 100 1234`\n"
             "`/turbo_hedge BTCUSDT 20 10 AUTO 2.5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'macro_event_alert': (
@@ -237,8 +238,8 @@ MESSAGES = {
             "👉 *បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖*\n"
             "`{exec_cmd}`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'smart_dca_usage': "❌ របៀបប្រើប្រាស់: `/smart_dca <ឈ្មោះកាក់> <ទំហំប្រាក់> <PIN>`\nឧទាហរណ៍: `/smart_dca BTC 100 1234`",
@@ -262,9 +263,9 @@ MESSAGES = {
     },
     'english': {
         'access_denied': "❌ Sorry, you do not have permission to use this AI feature.\nPlease contact the Admin to request VIP access.",
-        'welcome_msg': "👋 Welcome to Apex AI Bot (VIP Member)!\nI am a Super Smart AI (English, ខ្មែរ, 中文).\nSend me any market data to analyze, or use `/analyze <symbol>`.",
+        'welcome_msg': "👋 Welcome to **Angkor Quant AI** (VIP Member)!\n🏛️ **AI Quantitative Intelligence for Global Markets** (English, ខ្មែរ, 中文).\nSend me any market data to analyze, or use `/analyze <symbol>`.",
         'analyze_usage': "❌ Please provide a symbol. Example: `/analyze BTC`",
-        'fetching_live_data': "🔍 Fetching Live Data for {symbol} from Binance...",
+        'fetching_live_data': "🔍 Fetching Live Data for {symbol}...",
         'generating_chart': "📊 Generating Chart, ML Prediction & Macro AI Risk Analysis...",
         'processing_request': "🤖 Processing your request...",
         'alert_usage': "❌ Usage: `/alert <SYMBOL> < > <PRICE>`\nExample: `/alert BTC < 60000`",
@@ -272,7 +273,8 @@ MESSAGES = {
         'condition_invalid': "❌ Condition must be '<' or '>'.",
         'alert_set': "✅ Alert Set: I will notify you when **{symbol}** goes **{condition} ${price}**.",
         'help_text': (
-            "🤖 **Apex AI Bot - Command Menu**\n\n"
+            "🏛️ **ANGKOR QUANT - Command Menu**\n"
+            "_AI Quantitative Intelligence for Global Markets_\n\n"
             "💼 **Account & Portfolio**\n"
             "👉 `/start` - Start the bot\n"
             "👉 `/portfolio` - Check your PnL & active positions\n"
@@ -404,8 +406,8 @@ MESSAGES = {
             "   └ 1-Tap Copy to activate: `` `/pre_pump ON 50 1234` ``\n\n"
             "━━━━━━━━━━━━\n"
             "⚙️ *Apex Super Brain is running autonomously 24/7 with zero risk!*\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_"
         ),
 
         'whale_deposit_alert': (
@@ -425,8 +427,8 @@ MESSAGES = {
             "📉 *Futures Top 20 Dumpers Auto-Scanner:*\n"
             "`/turbo_hedge TOP 20 10 SELL 5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'whale_withdrawal_alert': (
@@ -446,8 +448,8 @@ MESSAGES = {
             "🚀 *Futures Top 20 Gainers Auto-Scanner:*\n"
             "`/turbo_hedge TOP 20 10 BUY 5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'funding_rate_alert': (
@@ -462,8 +464,8 @@ MESSAGES = {
             "`/turbo_hedge HEDGE BTC 100 1234`\n"
             "`/turbo_hedge BTCUSDT 20 10 AUTO 2.5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'macro_event_alert': (
@@ -479,8 +481,8 @@ MESSAGES = {
             "👉 *1-Tap Copyable Execution Command:*\n"
             "`{exec_cmd}`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'smart_dca_usage': "❌ Usage: `/smart_dca <SYMBOL> <AMOUNT> <PIN>`\nExample: `/smart_dca BTC 100 1234`",
@@ -504,9 +506,9 @@ MESSAGES = {
     },
     'chinese': {
         'access_denied': "❌ 抱歉，您没有权限使用此 AI 功能。\n请联系管理员申请 VIP 权限。",
-        'welcome_msg': "👋 欢迎使用 Apex AI Bot (VIP 成员)!\n我是一个超级智能 AI (支持 English, ខ្មែរ, 中文)。\n发送任何市场数据让我分析，或使用 `/analyze <代币>`。",
+        'welcome_msg': "👋 欢迎使用 **Angkor Quant AI** (吴哥量化 VIP 成员)!\n🏛️ **全球市场 AI 量化智能 (AI Quantitative Intelligence for Global Markets)**\n支持 English, ខ្មែរ, 中文。发送任何市场数据让我分析，或使用 `/analyze <代币>`。",
         'analyze_usage': "❌ 请提供代币名称。例如: `/analyze BTC`",
-        'fetching_live_data': "🔍 正在从 Binance 获取 {symbol} 的实时数据...",
+        'fetching_live_data': "🔍 正在获取 {symbol} 的实时数据...",
         'generating_chart': "📊 正在生成图表、ML 预测和宏观 AI 风险分析...",
         'processing_request': "🤖 正在处理您的请求...",
         'alert_usage': "❌ 用法: `/alert <代币> < > <价格>`\n例如: `/alert BTC < 60000`",
@@ -514,7 +516,8 @@ MESSAGES = {
         'condition_invalid': "❌ 条件必须是 '<' 或 '>'。",
         'alert_set': "✅ 警报已设置: 当 **{symbol}** 达到 **{condition} ${price}** 时，我将通知您。",
         'help_text': (
-            "🤖 **Apex AI Bot - 命令菜单 (Menu)**\n\n"
+            "🏛️ **ANGKOR QUANT - 命令菜单 (Menu)**\n"
+            "_全球市场 AI 量化智能_\n\n"
             "💼 **账户和投资组合 (Account & Portfolio)**\n"
             "👉 `/start` - 启动机器人\n"
             "👉 `/portfolio` - 查看您的投资组合和利润\n"
@@ -616,8 +619,8 @@ MESSAGES = {
             "📉 *合约跌幅榜 TOP 20 扫描:*\n"
             "`/turbo_hedge TOP 20 10 SELL 5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'whale_withdrawal_alert': (
@@ -637,8 +640,8 @@ MESSAGES = {
             "🚀 *合约涨幅榜 TOP 20 自动扫描:*\n"
             "`/turbo_hedge TOP 20 10 BUY 5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'funding_rate_alert': (
@@ -653,8 +656,8 @@ MESSAGES = {
             "`/turbo_hedge HEDGE BTC 100 1234`\n"
             "`/turbo_hedge BTCUSDT 20 10 AUTO 2.5 1234`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'macro_event_alert': (
@@ -670,8 +673,8 @@ MESSAGES = {
             "👉 *一键复制执行指令 (1-Tap Copyable):*\n"
             "`{exec_cmd}`\n"
             "━━━━━━━━━━━━\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_\n"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_\n"
             "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         ),
         'smart_dca_usage': "❌ 用法: `/smart_dca <代币> <金额> <PIN>`\n例如: `/smart_dca BTC 100 1234`",
@@ -725,8 +728,8 @@ MESSAGES = {
             "   └ 一键快捷开启 ៖ `` `/pre_pump ON 50 1234` ``\n\n"
             "━━━━━━━━━━━━\n"
             "⚙️ *Apex Super Brain 24/7 自主运行，安全保本 0% Risk！*\n"
-            "_Khmer Master Crypto_\n"
-            "_APEX SUPER BRAIN AI_"
+            "_Angkor Quant_\n"
+            "_AI Quantitative Intelligence for Global Markets_"
         )
     }
 }

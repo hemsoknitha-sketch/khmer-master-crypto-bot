@@ -416,17 +416,17 @@ async def daily_market_brief(app: Application, ai_engine):
         code = str(lang or 'khmer').lower().strip()
         if code in ['en', 'english']:
             brief = texts.get('english') or texts.get('khmer', '')
-            header = f"🌅 **KHMER MASTER CRYPTO | DAILY MARKET BRIEF**\n{ui_standards.DIVIDER_HEAVY}"
+            header = f"🌅 **ANGKOR QUANT | DAILY MARKET BRIEF**\n{ui_standards.DIVIDER_HEAVY}"
         elif code in ['zh', 'chinese', 'cn']:
             brief = texts.get('chinese') or texts.get('khmer', '')
-            header = f"🌅 **KHMER MASTER CRYPTO | 每日机构市场晨报**\n{ui_standards.DIVIDER_HEAVY}"
+            header = f"🌅 **ANGKOR QUANT | 每日机构市场晨报**\n{ui_standards.DIVIDER_HEAVY}"
         else:
             brief = texts.get('khmer') or texts.get('english', '')
-            header = f"🌅 **KHMER MASTER CRYPTO | របាយការណ៍ទីផ្សារពេលព្រឹក**\n{ui_standards.DIVIDER_HEAVY}"
+            header = f"🌅 **ANGKOR QUANT | របាយការណ៍ទីផ្សារពេលព្រឹក**\n{ui_standards.DIVIDER_HEAVY}"
 
         footer = (
             f"\n\n{ui_standards.DIVIDER_HEAVY}\n"
-            f"_Khmer Master Crypto_\n"
+            f"_Angkor Quant_\n"
             f"_APEX SUPER BRAIN AI_\n"
             f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
         )
@@ -1885,7 +1885,7 @@ async def check_smart_money(app: Application, ai_engine=None):
                         f"👉 **1-Tap Spot Buy ៖**\n"
                         f"`` `/turbo_hedge SPOT {token_symbol} 50 1234` ``\n"
                         f"━━━━━━━━━━━━\n"
-                        f"_Khmer Master Crypto | APEX SUPER BRAIN_"
+                        f"_Angkor Quant | APEX SUPER BRAIN_"
                     )
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                     smart_kb = InlineKeyboardMarkup([
@@ -2131,7 +2131,7 @@ async def sentiment_sniper(app: Application, ai_engine):
                         f"👉 **1-Tap Execution ({'BUY' if sentiment == 'BULLISH' else 'SELL'}) ៖**\n"
                         f"`` `/turbo_hedge {symbol_to_trade} 20 10 {'BUY' if sentiment == 'BULLISH' else 'SELL'} 2.5 1234` ``\n"
                         f"━━━━━━━━━━━━\n"
-                        f"_Khmer Master Crypto | APEX SUPER BRAIN_"
+                        f"_Angkor Quant | APEX SUPER BRAIN_"
                     )
                     
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -5050,7 +5050,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             f"• **Stop-Loss ៖** `1.5%`\n"
                             f"• **Zero Bag-Holding ៖** `HFT Trailing Lock (+0.12% Net Floor)`\n"
                             f"━━━━━━━━━━━━\n"
-                            f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                            f"_Angkor Quant APEX SUPER BRAIN AI 24/7!_"
                         )
                         try:
                             await app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
@@ -5208,7 +5208,7 @@ async def pre_pump_positions_monitor(app: Application):
                         f"💵 **PnL ជាក់ស្ដែង ៖** `{pnl_sign}${unRealizedProfit:,.2f} USDT`\n"
                         f"🔓 **ដោះលែងទុន (Margin) ៖** `រួចរាល់ ១០០%`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                        f"_Angkor Quant APEX SUPER BRAIN AI 24/7!_"
                     ) if user_lang == 'khmer' else (
                         f"{badge_title}\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -5218,7 +5218,7 @@ async def pre_pump_positions_monitor(app: Application):
                         f"💵 **Realized PnL:** `{pnl_sign}${unRealizedProfit:,.2f} USDT`\n"
                         f"🔓 **Margin Capital:** `100% Released`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                        f"_Angkor Quant APEX SUPER BRAIN AI 24/7!_"
                     )
                     if app and hasattr(app, "bot"):
                         try:
@@ -5815,7 +5815,7 @@ async def funding_harvester_monitor(app: Application):
                         f"• **ស្ថានភាព ៖** `ទូទាត់ប្រាក់ចំណេញ Funding Cash រួចរាល់!`\n"
                         f"• **លទ្ធផល ៖** `ចាក់សោប្រាក់ចំណេញសុទ្ធ Delta-Neutral 100%!`\n"
                         f"━━━━━━━━━━━━\n"
-                        f"_Khmer Master Crypto APEX SUPER BRAIN AI 24/7!_"
+                        f"_Angkor Quant APEX SUPER BRAIN AI 24/7!_"
                     )
                     try:
                         await app.bot.send_message(chat_id=chat_id, text=exit_msg, parse_mode="Markdown")
@@ -7143,7 +7143,7 @@ async def build_vip_8hour_executive_report(chat_id: int):
         f"{DIVIDER_DOUBLE}\n"
         f"💡 _របាយការណ៍សរុបស្វ័យប្រវត្តិរៀងរាល់ ៨ ម៉ោងម្តង ជូន VIP Users!_\n"
         f"{DIVIDER_HEAVY}\n"
-        f"_Khmer Master Crypto_\n"
+        f"_Angkor Quant_\n"
         f"_APEX SUPER BRAIN AI_\n"
         f"ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
     )

@@ -1,13 +1,14 @@
-# KHMER MASTER CRYPTO - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK
-**Document Version:** 3.0.0 (Absolute Ground Truth Lock - The 47 Pillars)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ47)
+**Document Version:** 4.0.0 (Angkor Quant Master Specification - The 47 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
+**Lineage Note:** Formerly developed under the Khmer Master Crypto project identity, now elevated to Angkor Quant — AI Quantitative Intelligence for Global Markets. Founder: HEM SINATH.
 
 ---
 
 ## 1. MISSION & SYSTEM OBJECTIVE
-**Khmer Master Crypto AI Bot** is an institutional-grade, fully automated crypto algorithmic trading and intelligence engine operating on Binance Spot and Binance USDT-M Futures.
+**Angkor Quant AI Engine** (formerly Khmer Master Crypto) is an institutional-grade, fully automated crypto algorithmic trading and intelligence engine operating on Binance Spot and Binance USDT-M Futures.
 
 The system is engineered upon two non-negotiable axioms:
 1. **Zero Technical Negligence (លុបបំបាត់ការធ្វេសប្រហែសបច្ចេកទេស ១០០%):** No trade or financial capital shall ever be lost due to software defects, unhandled API rejections (-1013, -4061, -4411, -2019, -4140), position side desynchronization, cross-wallet liquidation spillover, or duplicate function collisions.

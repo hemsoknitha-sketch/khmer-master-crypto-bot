@@ -22,28 +22,34 @@ SEP_LIGHT = DIVIDER_LIGHT
 SEP_DASH = DIVIDER_DASH
 SEP_DOUBLE = DIVIDER_DOUBLE
 
-# Official Institutional Header & Footer Standards (Zero Line-Wrap Invariant)
+# Official Brand Identity Standards (ANGKOR QUANT)
+AQ_BRAND_NAME = "ANGKOR QUANT"
+AQ_TAGLINE = "AI Quantitative Intelligence for Global Markets"
+AQ_SHORT_DESC = "AI Quant • Automated Trading • Global Markets"
+AQ_VERSION = "Angkor Quant v4.0 (AQ47)"
+
 SUPER_ADMIN_ID = 859271875
 
 INSTITUTIONAL_HEADER = (
-    "💎 **KHMER MASTER CRYPTO | APEX SUPER BRAIN AGI** ⚡\n"
+    "🏛️ **ANGKOR QUANT** ⚡\n"
+    f"_{AQ_TAGLINE}_\n"
     f"{DIVIDER_DOUBLE}\n"
 )
 
 INSTITUTIONAL_FOOTER = (
     f"\n{DIVIDER_LIGHT}\n"
-    "💡 នេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម\n"
-    "សូមធ្វើការសម្រេចចិត្តដោយទទួលខុសត្រូវ!"
+    "🏛️ **ANGKOR QUANT** • AI Quantitative Intelligence\n"
+    "💡 នេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម • សូមធ្វើការសម្រេចចិត្តដោយទទួលខុសត្រូវ!"
 )
 
 # Backward-compatible aliases
 HEADER_STANDARD = INSTITUTIONAL_HEADER
 FOOTER_STANDARD = INSTITUTIONAL_FOOTER
 
-# Official Institutional Footnote (Legacy)
+# Official Institutional Footnote
 OFFICIAL_FOOTNOTE = (
-    "_Khmer Master Crypto_\n"
-    "_APEX SUPER BRAIN AI_\n"
+    "_Angkor Quant_\n"
+    "_AI Quantitative Intelligence for Global Markets_\n"
     "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
 )
 

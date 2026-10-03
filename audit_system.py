@@ -1,6 +1,6 @@
 """
-Khmer Master Crypto / Apex TURBO AGI v13.00
-AUTOMATED SYSTEM AUDIT & GROUND TRUTH SPECIFICATION LOCK
+ANGKOR QUANT - AI Quantitative Intelligence for Global Markets
+v4.0.0 (AQ47 Master Institutional Specification Lock)
 =========================================================
 This script deterministically verifies that the entire system complies with
 Institutional Grade Software Engineering, Zero Technical Negligence, and
@@ -29,7 +29,7 @@ def log_fail(msg):
 
 def run_audit():
     print("=" * 70)
-    print("  KHMER MASTER CRYPTO - INSTITUTIONAL AUDIT & SPECIFICATION LOCK")
+    print("  ANGKOR QUANT - INSTITUTIONAL AUDIT & SPECIFICATION LOCK (AQ47)")
     print("=" * 70)
     
     failures = []

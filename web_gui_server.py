@@ -1,5 +1,5 @@
 """
-Khmer Master Crypto / Apex AGI v13.00
+Angkor Quant / AI Quantitative Intelligence v4.0 (AQ47)
 TELEGRAM MINI APP WEB GUI SERVER & ASYNC REST API ENGINE (ULTRA-FAST & STABLE)
 ================================================================================
 Asynchronous HTTP & WebSocket server powered by aiohttp to serve the modern Cyberpunk
@@ -672,7 +672,7 @@ async def handle_api_health(request: web.Request) -> web.Response:
     uptime = time.time() - _START_TIME
     data = {
         "status": "ok",
-        "system": "Khmer Master Crypto APEX AGI v13.00",
+        "system": "Angkor Quant AI v4.0 (AQ47)",
         "uptime_sec": round(uptime, 2),
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "hft_latency_ms": 0.01
@@ -1280,8 +1280,8 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
                     f"👉 **គណនីរួចរាល់ ១០០% សម្រាប់ដំណើរការជួញដូរ Super Smart 24/7!**\n"
                     f"💡 _អាចបញ្ជាបើកដំណើរការ Auto-Trade ៖_ `/mt5 AUTO ON 100 5`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
-                    f"_APEX SUPER BRAIN AI_"
+                    f"_Angkor Quant_\n"
+                    f"_AI Quantitative Intelligence for Global Markets_"
                 )
                 asyncio.create_task(notification_manager.send_telegram_alert(chat_id, user_msg))
             else:
@@ -1308,8 +1308,8 @@ async def handle_api_mt5_bind(request: web.Request) -> web.Response:
                     f"2️⃣ ឬទាក់ទង Super Admin @hemsoknitha ដើម្បីអនុម័តសិទ្ធិវិនិយោគ!\n"
                     f"👉 អ្នកក៏អាចប្រើបញ្ជា `` `/mt5` `` លើ Telegram ដើម្បីពិនិត្យសិទ្ធិឡើងវិញបានគ្រប់ពេល។\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"_Khmer Master Crypto_\n"
-                    f"_APEX SUPER BRAIN AI_"
+                    f"_Angkor Quant_\n"
+                    f"_AI Quantitative Intelligence for Global Markets_"
                 )
                 asyncio.create_task(notification_manager.send_telegram_alert(chat_id, user_msg))
 
@@ -1370,8 +1370,8 @@ async def handle_api_mt5_order(request: web.Request) -> web.Response:
                 f"• 🪙 **Cent Account (Server 5) ៖** {GTC_CENT_REFERRAL_URL} (`{GTC_CENT_INVITE_CODE}`)\n\n"
                 f"👉 ប្រើបញ្ជា `` `/mt5` `` លើ Bot ដើម្បីស្នើសុំផ្ទៀងផ្ទាត់ ឬទាក់ទង Super Admin @hemsoknitha\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                f"_Khmer Master Crypto_\n"
-                f"_APEX SUPER BRAIN AI_"
+                f"_Angkor Quant_\n"
+                f"_AI Quantitative Intelligence for Global Markets_"
             )
             asyncio.create_task(notification_manager.send_telegram_alert(chat_id, warn_msg))
 
