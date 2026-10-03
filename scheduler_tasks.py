@@ -4859,6 +4859,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
     import trading_engine
     import dynamic_ranking
     from pre_pump_engine import pre_pump_engine
+    import btc_lead_guard
     import time
     
     pre_pump_users = await asyncio.to_thread(db.get_pre_pump_users)
@@ -4866,10 +4867,15 @@ async def pre_pump_sniper_monitor(app, ai_engine):
         return
 
     # Scan top 35 active futures candidates (highest liquidity & momentum sweet-spot)
-    symbols = await asyncio.to_thread(dynamic_ranking.fetch_top_futures_candidates, 35)
-    if not symbols:
-        symbols = await asyncio.to_thread(dynamic_ranking.get_top_500_coins, 35)
+    raw_symbols = await asyncio.to_thread(dynamic_ranking.fetch_top_futures_candidates, 35)
+    if not raw_symbols:
+        raw_symbols = await asyncio.to_thread(dynamic_ranking.get_top_500_coins, 35)
     
+    # Filter out mega-caps (BTC/ETH) and stablecoins - Pre-Pump targets high-volatility mid-cap explosive breakout setups
+    symbols = [s for s in raw_symbols if s not in ["BTCUSDT", "ETHUSDT", "USDCUSDT", "FDUSDUSDT", "PAXGUSDT"]]
+    if not symbols:
+        symbols = [s for s in raw_symbols if s.endswith("USDT") and s not in ["USDCUSDT", "FDUSDUSDT"]]
+
     # Evaluate with concurrency limiter (semaphore 6) to guarantee zero API rate-limiting
     sem = asyncio.Semaphore(6)
     async def bounded_eval(sym):
@@ -4890,8 +4896,20 @@ async def pre_pump_sniper_monitor(app, ai_engine):
             character = meta.get("character", "WHALE_ACCUMULATION")
             conf = meta.get("confidence_pct", 85.0)
             rec_leverage = meta.get("recommended_leverage", 10)
+            atr_15m = float(meta.get("atr_15m", current_price * 0.018))
+            sl_price = float(meta.get("sl_price", current_price * 0.982 if side == "BUY" else current_price * 1.018))
+            atr_sl_pct = float(meta.get("sl_pct", 1.8))
 
-            print(f"🎯 [PRE-PUMP & 33 AI MODELS] Signal triggered for {symbol} at ${current_price}! Character: {character}, Action: {stage} {side}, Conf: {conf}%, Lev: {rec_leverage}x")
+            # 🛡️ Bitcoin Lead Impulse Shock Guard: Block Altcoin Longs if BTC is dumping
+            try:
+                btc_stat = btc_lead_guard.get_btc_impulse_status()
+                if btc_stat.get("status") == "DUMPING" and side == "BUY":
+                    print(f"🛡️ [PRE-PUMP BTC SHOCK GUARD] Skipped LONG on {symbol}: BTC is DUMPING ({btc_stat.get('price_1m_change')}%)!")
+                    continue
+            except Exception:
+                pass
+
+            print(f"🎯 [PRE-PUMP & 33 AI MODELS] Signal triggered for {symbol} at ${current_price}! Character: {character}, Action: {stage} {side}, Conf: {conf}%, Lev: {rec_leverage}x, ATR-SL: ${sl_price:.4f} (-{atr_sl_pct:.2f}%)")
             
             # Execute trades for all opted-in VIP users
             for chat_id, invest_amount in pre_pump_users:
@@ -4963,7 +4981,7 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                         if "error" not in order and "code" not in order:
                             order_success = True
                             PRE_PUMP_USER_COOLDOWN_CACHE[(chat_id, symbol)] = now_ts
-                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, buy_price=current_price, stop_loss_pct=1.5)
+                            await asyncio.to_thread(db.add_active_trade, chat_id, symbol, qty, buy_price=current_price, stop_loss_pct=atr_sl_pct)
                     else:
                         # Stage 2: High-Confidence Precision Futures Entry (BUY Long or SELL Short)
                         fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
@@ -5008,6 +5026,8 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             await asyncio.to_thread(db.update_system_setting, f"pre_pump_margin_{chat_id}_{symbol}", str(invest_amount))
                             await asyncio.to_thread(db.update_system_setting, f"pre_pump_qty_{chat_id}_{symbol}", str(qty))
                             await asyncio.to_thread(db.update_system_setting, f"pre_pump_peak_roi_{chat_id}_{symbol}", "0.0")
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_sl_price_{chat_id}_{symbol}", str(sl_price))
+                            await asyncio.to_thread(db.update_system_setting, f"pre_pump_sl_pct_{chat_id}_{symbol}", str(atr_sl_pct))
 
                     if order_success:
                         # 🌐 Sky Net Cross-Engine Network Registration
@@ -5064,8 +5084,11 @@ async def pre_pump_sniper_monitor(app, ai_engine):
                             f"• **AI Confidence ៖** `{conf}%`\n"
                             f"{capital_line}\n"
                             f"• **តម្លៃចូល (Entry) ៖** `${current_price:,.4f}`\n"
-                            f"• **Stop-Loss ៖** `1.5%`\n"
-                            f"• **Zero Bag-Holding ៖** `HFT Trailing Lock (+0.12% Net Floor)`\n"
+                            f"• **Dynamic ATR Stop-Loss ៖** `${sl_price:,.4f}` (`-{atr_sl_pct:.2f}%` | Noise-Immune)\n"
+                            f"• **Risk Parity Ceiling ៖** `Capped <= $1.80 USDT`\n"
+                            f"• **Breakeven Armor ៖** `Lock +3.5% Net Floor @ Peak >= +10.0% ROI`\n"
+                            f"• **Golden 85% Ratchet ៖** `Armed @ Peak >= +15.0% ROI`\n"
+                            f"• **Moonshot Targets ៖** `TP1: +20% | TP2: +35% | TP3: +60% ROI`\n"
                             f"━━━━━━━━━━━━\n"
                             f"_Angkor Quant APEX SUPER BRAIN AI 24/7!_"
                         )
@@ -5079,10 +5102,11 @@ async def pre_pump_positions_monitor(app: Application):
     """
     Continuous Background Monitor for Pre-Pump Futures Positions (Invariant 26 & Invariant 24).
     Enforces:
-    1. 1.5% Price Hard Stop-Loss (15% ROI at 10x).
-    2. Breakeven Armor & Golden 85% Profit Ratchet.
-    3. Take Profit Moonshot Targets (+25.0% ROI).
-    4. Dedicated Anti-Stagnation Release (if held >= 180m with flat volume).
+    1. Dynamic ATR Volatility Stop-Loss & Fixed Dollar Risk Parity Ceiling (<= $1.80 USDT).
+    2. Non-Premature Breakeven Armor (lock +3.5% ROI net floor once peak hits >= 10.0%).
+    3. Golden 85% Profit Ratchet (once peak hits >= 15.0%).
+    4. Multi-Tier Moonshot Profit Target (+35.0% ROI).
+    5. Dedicated Anti-Stagnation Release (if held >= 120m with flat volume).
     """
     try:
         import database as db
@@ -5153,7 +5177,16 @@ async def pre_pump_positions_monitor(app: Application):
                 close_reason = ""
                 badge_title = "🚀 **[PRE-PUMP & 33 AI MODELS EXIT]** 🎯"
 
-                # Fixed Dollar Risk Parity Calculation (Loss capped at <= $1.20 USD or -6.0% ROI)
+                # Dynamic ATR Stop-Loss & Risk Parity parameters
+                sl_price_str = db.get_system_setting(f"pre_pump_sl_price_{chat_id}_{sym}", "0.0")
+                sl_pct_str = db.get_system_setting(f"pre_pump_sl_pct_{chat_id}_{sym}", "2.0")
+                try:
+                    sl_price = float(sl_price_str) if sl_price_str else 0.0
+                    atr_sl_pct = float(sl_pct_str) if sl_pct_str else 2.0
+                except (ValueError, TypeError):
+                    sl_price = 0.0
+                    atr_sl_pct = 2.0
+
                 margin_str = db.get_system_setting(f"pre_pump_margin_{chat_id}_{sym}", "")
                 try:
                     pos_margin_est = float(margin_str) if margin_str else (abs(amt) * entry_price) / max(1, leverage)
@@ -5161,16 +5194,25 @@ async def pre_pump_positions_monitor(app: Application):
                     pos_margin_est = (abs(amt) * entry_price) / max(1, leverage)
                 loss_dollar_est = abs(min(0.0, roi_pct) / 100.0) * pos_margin_est
 
-                # 1. Fixed Dollar Risk Parity Stop-Loss (Max Loss Capped <= $1.20 USD or -6.0% ROI)
-                if roi_pct <= -6.0 or (roi_pct < 0 and loss_dollar_est >= 1.20):
+                # 1. Dynamic ATR & Fixed-Dollar Risk Parity Stop-Loss (Noise-Immune)
+                is_atr_breached = False
+                if sl_price > 0.0:
+                    if amt > 0 and mark_price <= sl_price:
+                        is_atr_breached = True
+                    elif amt < 0 and mark_price >= sl_price:
+                        is_atr_breached = True
+
+                atr_roi_threshold = -(atr_sl_pct * leverage)
+
+                if is_atr_breached or (roi_pct <= atr_roi_threshold) or (roi_pct < 0 and loss_dollar_est >= 1.80):
                     should_close = True
-                    close_reason = f"Pre-Pump Risk Parity SL (ROI {roi_pct:.1f}%, Capped <= $1.20)"
-                    badge_title = "🛑 **[PRE-PUMP RISK PARITY SL EXIT]** 🛡️"
+                    close_reason = f"Pre-Pump Dynamic ATR SL (ROI {roi_pct:.1f}%, Capped <= $1.80)"
+                    badge_title = "🛑 **[PRE-PUMP DYNAMIC ATR SL EXIT]** 🛡️"
 
                 # 2. Breathing Breakeven Armor (lock at +3.5% ROI net floor once peak hits >= 10.0%)
                 elif curr_peak >= 10.0 and roi_pct <= 3.5:
                     should_close = True
-                    close_reason = f"Pre-Pump Breakeven Armor (Peak +{curr_peak:.1f}%, Locked +3.5% ROI)"
+                    close_reason = f"Pre-Pump Breakeven Armor (Peak +{curr_peak:.1f}%, Locked +3.5% Net Floor)"
                     badge_title = "🛡️ **[PRE-PUMP BREAKEVEN ARMOR EXIT]** 🔒"
 
                 # 3. Golden 85% Ratchet (once peak hits >= 15.0%)
@@ -5179,17 +5221,17 @@ async def pre_pump_positions_monitor(app: Application):
                     close_reason = f"Pre-Pump Golden 85% Ratchet (Peak +{curr_peak:.1f}%)"
                     badge_title = "💰 **[PRE-PUMP 85% PROFIT RATCHET]** 🏆"
 
-                # 4. Moonshot Profit Target (+30.0% ROI)
-                elif roi_pct >= 30.0:
+                # 4. Multi-Tier Moonshot Profit Target (+35.0% ROI)
+                elif roi_pct >= 35.0:
                     should_close = True
-                    close_reason = "Pre-Pump Moonshot Target (+30.0% ROI)"
+                    close_reason = "Pre-Pump Moonshot Target (+35.0% ROI)"
                     badge_title = "🎯 **[PRE-PUMP MOONSHOT PROFIT TARGET]** 🚀"
 
-                # 5. Dedicated Anti-Stagnation Release (Held >= 180m with flat volume)
-                elif trade_age_min >= 180.0 and abs(roi_pct) <= 0.8 and curr_peak < 1.8:
+                # 5. Dedicated Anti-Stagnation Release (Held >= 120m with flat volume)
+                elif trade_age_min >= 120.0 and abs(roi_pct) <= 1.0 and curr_peak < 2.0:
                     should_close = True
                     close_reason = f"Pre-Pump Stagnation Release (Held {trade_age_min:.0f}m, Flat Volume)"
-                    badge_title = "⏰ **[PRE-PUMP - ANTI-STAGNATION RELEASE]** 🔄"
+                    badge_title = "⏰ **[PRE-PUMP ANTI-STAGNATION RELEASE]** 🔄"
 
                 if should_close:
                     side_to_close = "SELL" if amt > 0 else "BUY"
@@ -5208,6 +5250,8 @@ async def pre_pump_positions_monitor(app: Application):
                     db.update_system_setting(f"pre_pump_active_{chat_id}_{sym}", "0")
                     db.update_system_setting(peak_key, "0.0")
                     db.update_system_setting(f"pre_pump_entry_time_{chat_id}_{sym}", "0.0")
+                    db.update_system_setting(f"pre_pump_sl_price_{chat_id}_{sym}", "0.0")
+                    db.update_system_setting(f"pre_pump_sl_pct_{chat_id}_{sym}", "0.0")
                     try:
                         import sky_net_orchestrator
                         sky_net_orchestrator.release_cross_engine_position(chat_id, sym, "pre_pump")
