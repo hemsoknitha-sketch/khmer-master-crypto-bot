@@ -370,6 +370,13 @@ class AIInvestmentEngine:
             except Exception:
                 pass
 
+            # Preload & warm RAM Hot Cache for nanosecond latency (< 0.0005 ms per Invariant 29)
+            try:
+                import hf_storage_engine
+                hf_storage_engine.HF_STORAGE.warmup_ram_cache()
+            except Exception:
+                pass
+
             repo = repo_id or os.getenv("HF_MODEL_REPO", "hemsinath/apex-ai-brain-models").strip()
             
             # Gather model file details

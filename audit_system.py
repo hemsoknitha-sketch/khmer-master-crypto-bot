@@ -1695,6 +1695,68 @@ def run_audit():
             log_fail("Angkor Institutional Private Agreement (Invariant 50) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 50 check failed: {e}")
+    # [CHECK 41/41] Verifying Hugging Face Ultra-Fast Multi-Tiered Storage & Nanosecond RAM Citadel Lock (Invariant 51)...
+    print("\n[CHECK 41/41] Verifying Hugging Face Ultra-Fast Multi-Tiered Storage & Nanosecond RAM Citadel Lock (Invariant 51)...")
+    try:
+        import hf_storage_engine as hse
+
+        # 1. Ground truth in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv51 = "Invariant 51: Hugging Face Ultra-Fast Multi-Tiered Storage" in agents_md
+
+        # 2. Key methods in hf_storage_engine.py
+        has_class = hasattr(hse, "HuggingFaceStorageEngine")
+        has_singleton = hasattr(hse, "HF_STORAGE")
+        engine = hse.HF_STORAGE
+        has_ram_set = hasattr(engine, "set_ram")
+        has_ram_get = hasattr(engine, "get_ram")
+        has_get_data = hasattr(engine, "get_data")
+        has_save_data = hasattr(engine, "save_data")
+        has_backup = hasattr(engine, "backup_all_system_data")
+        has_pull = hasattr(engine, "pull_all_system_data")
+        has_warmup = hasattr(engine, "warmup_ram_cache")
+        has_bench = hasattr(engine, "benchmark_ram_latency")
+
+        # 3. Dynamic RAM Benchmark Test (< 0.001 ms per Invariant 29/51)
+        bench = engine.benchmark_ram_latency(iterations=500)
+        is_nanosecond_fast = bool(bench.get("certified_fast") and bench.get("avg_latency_ms", 1.0) < 0.001)
+
+        # 4. Telegram UI & Command Routing in bot_thread.py
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        has_cmd_hf_data = "async def hf_data_command" in bt_code
+        has_handler_hf_data = 'CommandHandler("hf_data", hf_data_command)' in bt_code
+        has_btn_backup = "btn_hf_data_backup" in bt_code
+        has_btn_pull = "btn_hf_data_pull" in bt_code
+        has_btn_warm = "btn_hf_data_warm" in bt_code
+        has_btn_status = "btn_hf_data_status" in bt_code
+
+        # 5. Registry in bot_commands_registry.py
+        with open("bot_commands_registry.py", "r", encoding="utf-8") as f:
+            reg_code = f.read()
+        has_registry_hf = 'BotCommand("hf_data"' in reg_code
+
+        # 6. ai_engine RAM Warmup Hook
+        with open("ai_engine.py", "r", encoding="utf-8") as f:
+            ai_code = f.read()
+        has_ai_warmup = "hf_storage_engine.HF_STORAGE.warmup_ram_cache()" in ai_code
+
+        all_inv51_passed = (
+            has_inv51 and has_class and has_singleton and has_ram_set and has_ram_get and
+            has_get_data and has_save_data and has_backup and has_pull and has_warmup and
+            has_bench and is_nanosecond_fast and has_cmd_hf_data and has_handler_hf_data and
+            has_btn_backup and has_btn_pull and has_btn_warm and has_btn_status and
+            has_registry_hf and has_ai_warmup
+        )
+
+        if all_inv51_passed:
+            log_pass(f"Hugging Face Ultra-Fast Multi-Tiered Storage & Nanosecond RAM Citadel (Invariant 51) is 100% locked & certified! (Measured: {bench.get('avg_latency_ms'):.6f} ms / lookup)")
+        else:
+            failures.append(f"Invariant 51 check failed: inv51={has_inv51}, class={has_class}, bench_fast={is_nanosecond_fast}, cmd={has_cmd_hf_data}, btn={has_btn_backup}, reg={has_registry_hf}, ai_warm={has_ai_warmup}")
+            log_fail("Hugging Face Ultra-Fast Multi-Tiered Storage (Invariant 51) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 51 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

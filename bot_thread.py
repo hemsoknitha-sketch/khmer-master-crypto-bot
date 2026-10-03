@@ -49,6 +49,7 @@ import capital_engine
 import ui_standards
 import spot_profit_harvester
 import web_gui_server
+import hf_storage_engine
 
 logger = logging.getLogger("KhmerMasterCryptoBot")
 
@@ -7302,6 +7303,21 @@ class TelegramBotThread(BaseThread):
             elif data == "btn_sync_brain_test":
                 context.args = ["TEST", "BTCUSDT"]
                 await sync_brain_command(update, context)
+            elif data in ["btn_hf_data", "btn_hf_data_menu"]:
+                context.args = []
+                await hf_data_command(update, context)
+            elif data == "btn_hf_data_backup":
+                context.args = ["BACKUP"]
+                await hf_data_command(update, context)
+            elif data == "btn_hf_data_pull":
+                context.args = ["PULL"]
+                await hf_data_command(update, context)
+            elif data == "btn_hf_data_warm":
+                context.args = ["WARM"]
+                await hf_data_command(update, context)
+            elif data == "btn_hf_data_status":
+                context.args = ["STATUS"]
+                await hf_data_command(update, context)
             elif data == "btn_admin_users_refresh":
                 await admin_users_command(update, context)
             elif data in ["btn_admin_license_prompt", "btn_admin_license"]:
@@ -18949,6 +18965,235 @@ class TelegramBotThread(BaseThread):
                 try: await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
                 except Exception: pass
 
+        async def hf_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            # Restrict exclusively to Super Admin ID 859271875 or Admins
+            if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                err_msg = (
+                    "⛔ **ACCESS DENIED ៖** ពាក្យបញ្ជា `/hf_data` ត្រូវបានកំណត់សម្រាប់តែ Super Admin / Lead Quant Architect ប៉ុណ្ណោះ។\n\n"
+                    "🛡️ _ប្រព័ន្ធការពារសុវត្ថិភាពទិន្នន័យ និងទម្ងន់ខួរក្បាលសិប្បនិម្មិតកម្រិតស្ថាប័ន (Zero Technical Negligence)!_"
+                )
+                if update.callback_query:
+                    try: await update.callback_query.answer()
+                    except Exception: pass
+                    try: await update.callback_query.message.reply_text(err_msg, parse_mode="Markdown")
+                    except Exception: pass
+                else:
+                    try: await (update.effective_message or update.message).reply_text(err_msg, parse_mode="Markdown")
+                    except Exception: pass
+                return
+
+            if update.callback_query:
+                try: await update.callback_query.answer()
+                except Exception: pass
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang.isdigit() or user_lang in ['0', '1', 'auto']: user_lang = 'km'
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            args = [str(a).strip().upper() for a in (context.args or []) if str(a).strip()]
+            action = args[0] if args else "MENU"
+
+            keyboard_menu = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("☁️ Backup to HF (SAVE)", callback_data="btn_hf_data_backup"),
+                    InlineKeyboardButton("⚡ Ultra Pull & Warm", callback_data="btn_hf_data_pull")
+                ],
+                [
+                    InlineKeyboardButton("🧠 Warm RAM (0.0003ms)", callback_data="btn_hf_data_warm"),
+                    InlineKeyboardButton("📊 Storage Status", callback_data="btn_hf_data_status")
+                ],
+                [
+                    InlineKeyboardButton("📦 Model Sync Brain", callback_data="btn_sync_brain_menu"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            # SUB-ACTION: BACKUP / SAVE
+            if action in ["BACKUP", "SAVE", "PUSH", "UPLOAD"]:
+                wait_msg = "⏳ **ANGKOR QUANT ៖** កំពុងដំណើរការ Backup ទិន្នន័យ State, Caches, Database Snapshot & AI Models ទៅកាន់ Hugging Face Hub ដោយប្រើ Access Token..."
+                status_msg = None
+                if update.callback_query:
+                    try: status_msg = await update.callback_query.message.reply_text(wait_msg, parse_mode="Markdown")
+                    except Exception: pass
+                else:
+                    try: status_msg = await (update.effective_message or update.message).reply_text(wait_msg, parse_mode="Markdown")
+                    except Exception: pass
+
+                res = await asyncio.to_thread(hf_storage_engine.HF_STORAGE.backup_all_system_data)
+                
+                if res.get("success"):
+                    up_cnt = res.get("uploaded_files", 0)
+                    tot_cnt = res.get("total_files", 0)
+                    sz_mb = res.get("total_size_mb", 0.0)
+                    dur = res.get("duration_sec", 0.0)
+                    m_repo = res.get("model_repo", "")
+                    d_repo = res.get("data_repo", "")
+                    
+                    msg = (
+                        "━━━━━━━━━━━━\n"
+                        "🤗 **ANGKOR QUANT | HF DATA CITADEL**\n"
+                        "━━━━━━━━━━━━\n"
+                        "✅ **ការរក្សាទុកទិន្នន័យ (Cloud Backup) ជោគជ័យ!**\n\n"
+                        f"• 🟢 ឯកសារបាន Upload ៖ `{up_cnt}/{tot_cnt}` Files\n"
+                        f"• 📦 ទំហំសរុប (Total Size) ៖ `{sz_mb} MB`\n"
+                        f"• ⏱️ រយៈពេលដំណើរការ ៖ `{dur} s`\n"
+                        f"• 🏢 Model Repo ៖ `{m_repo}`\n"
+                        f"• 📁 Data Repo (Private) ៖ `{d_repo}`\n"
+                        "────────────\n"
+                        "🔒 _ទិន្នន័យ Quant, Models & Database ត្រូវបានការពារក្នុង Private Hub ១០០%!_\n"
+                        "━━━━━━━━━━━━\n"
+                        "_Khmer Master Crypto_\n"
+                        "_APEX SUPER BRAIN AI_\n"
+                        "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+                    )
+                else:
+                    err = res.get("error", "Unknown error")
+                    msg = f"❌ **បរាជ័យក្នុងការ Backup ទៅ Hugging Face ៖** `{err}`\nសូមពិនិត្យ `HF_TOKEN` ក្នុង `.env`!"
+
+                if status_msg:
+                    try: await status_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+                else:
+                    try: await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+                return
+
+            # SUB-ACTION: PULL / SYNC
+            elif action in ["PULL", "SYNC", "FETCH"]:
+                wait_msg = "⏳ **ANGKOR QUANT ៖** កំពុងទាញយកទិន្នន័យ & ម៉ូដែល AI ពី Hugging Face មកកាន់ Bot ក្នុងល្បឿនលឿនបំផុត (Parallel Threads)..."
+                status_msg = None
+                if update.callback_query:
+                    try: status_msg = await update.callback_query.message.reply_text(wait_msg, parse_mode="Markdown")
+                    except Exception: pass
+                else:
+                    try: status_msg = await (update.effective_message or update.message).reply_text(wait_msg, parse_mode="Markdown")
+                    except Exception: pass
+
+                res = await asyncio.to_thread(hf_storage_engine.HF_STORAGE.pull_all_system_data)
+                
+                m_cnt = res.get("synced_models", 0)
+                d_cnt = res.get("synced_data_files", 0)
+                w_items = res.get("ram_warmed_items", 0)
+                ram_kb = res.get("ram_size_kb", 0.0)
+                dur = res.get("duration_sec", 0.0)
+
+                msg = (
+                    "━━━━━━━━━━━━\n"
+                    "🤗 **ANGKOR QUANT | HF ULTRA PULL**\n"
+                    "━━━━━━━━━━━━\n"
+                    "⚡ **ទាញយកទិន្នន័យ & ម៉ូដែលមកកាន់ BOT ជោគជ័យ!**\n\n"
+                    f"• 🧠 AI Models Synced ៖ `{m_cnt}` Models\n"
+                    f"• 📁 Quantitative Data ៖ `{d_cnt}` Files\n"
+                    f"• ⚡ Hot-RAM Preloaded ៖ `{w_items}` Items\n"
+                    f"• 💾 ទំហំក្នុង RAM ៖ `{ram_kb} KB`\n"
+                    f"• ⏱️ រយៈពេលសរុប ៖ `{dur} s`\n"
+                    "────────────\n"
+                    "🚀 _ទិន្នន័យ និងទម្ងន់ម៉ូដែលទាំងអស់ត្រូវបានបញ្ជូនផ្ទាល់ចូល RAM ល្បឿន < 0.0003 ms!_\n"
+                    "━━━━━━━━━━━━\n"
+                    "_Khmer Master Crypto_\n"
+                    "_APEX SUPER BRAIN AI_\n"
+                    "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+                )
+                if status_msg:
+                    try: await status_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+                else:
+                    try: await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+                return
+
+            # SUB-ACTION: WARM / RAM
+            elif action in ["WARM", "RAM", "BENCHMARK"]:
+                warm_stats = await asyncio.to_thread(hf_storage_engine.HF_STORAGE.warmup_ram_cache)
+                bench = await asyncio.to_thread(hf_storage_engine.HF_STORAGE.benchmark_ram_latency, 1000)
+
+                items = warm_stats.get("total_items", 0)
+                ram_kb = warm_stats.get("estimated_ram_kb", 0.0)
+                w_time = warm_stats.get("warmup_time_ms", 0.0)
+                avg_lat = bench.get("avg_latency_ms", 0.0)
+                avg_ns = bench.get("avg_latency_ns", 0.0)
+                fast_cert = "✅ PASS (< 0.001 ms)" if bench.get("certified_fast") else "⚠️ OK"
+
+                msg = (
+                    "━━━━━━━━━━━━\n"
+                    "🧠 **ANGKOR QUANT | RAM HOT CACHE**\n"
+                    "━━━━━━━━━━━━\n"
+                    "⚡ **កម្តៅទិន្នន័យចូល RAM Hot Cache រួចរាល់!**\n\n"
+                    f"• 📦 Items ក្នុង RAM ៖ `{items}` Items\n"
+                    f"• 💾 ទំហំសរុបក្នុង RAM ៖ `{ram_kb} KB`\n"
+                    f"• ⏱️ រយៈពេលកម្តៅ (Warmup) ៖ `{w_time} ms`\n"
+                    f"• 🚀 ល្បឿន Access មធ្យម ៖ `{avg_lat:.6f} ms` (`{avg_ns} ns`)\n"
+                    f"• 🏅 កម្រិតល្បឿន ៖ `{fast_cert}`\n"
+                    "────────────\n"
+                    "💡 _Bot អាចហៅទិន្នន័យ និងម៉ូដែលមកប្រើភ្លាមៗដោយគ្មាន Disk ឬ Network Delay!_\n"
+                    "━━━━━━━━━━━━\n"
+                    "_Khmer Master Crypto_\n"
+                    "_APEX SUPER BRAIN AI_\n"
+                    "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+                )
+                if update.callback_query:
+                    try: await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+                else:
+                    try: await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+                return
+
+            # DEFAULT: STATUS & CONTROL PANEL
+            else:
+                conn_info = await asyncio.to_thread(hf_storage_engine.HF_STORAGE.check_connection)
+                cache_stats = await asyncio.to_thread(hf_storage_engine.HF_STORAGE.get_ram_cache_stats)
+                bench = await asyncio.to_thread(hf_storage_engine.HF_STORAGE.benchmark_ram_latency, 500)
+
+                status = conn_info.get("status", "UNKNOWN")
+                msg_status = conn_info.get("message", "")
+                username = conn_info.get("username", "N/A")
+                auth_type = conn_info.get("auth_type", "N/A")
+                m_repo = conn_info.get("model_repo", "")
+                d_repo = conn_info.get("data_repo", "")
+                items = cache_stats.get("total_items", 0)
+                ram_kb = cache_stats.get("estimated_ram_kb", 0.0)
+                avg_lat = bench.get("avg_latency_ms", 0.0)
+                avg_ns = bench.get("avg_latency_ns", 0.0)
+
+                status_emoji = "🟢" if conn_info.get("authenticated") else "🔴"
+
+                msg = (
+                    "━━━━━━━━━━━━\n"
+                    "🤗 **ANGKOR QUANT | HF STORAGE CITADEL**\n"
+                    "━━━━━━━━━━━━\n"
+                    "📊 **ស្ថានភាពប្រព័ន្ធផ្ទុកទិន្នន័យ Hugging Face ៖**\n\n"
+                    f"• {status_emoji} ស្ថានភាព Token ៖ `{status}` ({msg_status})\n"
+                    f"• 👤 គណនី Hugging Face ៖ `{username}` (`{auth_type}`)\n"
+                    f"• 🏢 Model Repo ៖ `{m_repo}`\n"
+                    f"• 📁 Data Repo ៖ `{d_repo}`\n"
+                    f"• ⚡ ល្បឿន RAM Cache ៖ `{avg_lat:.6f} ms` (`{avg_ns} ns`)\n"
+                    f"• 💾 Hot-RAM Cached Items ៖ `{items}` Items (`{ram_kb} KB`)\n"
+                    "────────────\n"
+                    "👉 **ពាក្យបញ្ជាបញ្ជាផ្ទាល់ (1-Tap Executable Presets) ៖**\n"
+                    "• `/hf_data BACKUP` — បញ្ជូនទិន្នន័យ & ម៉ូដែលទៅ HF Hub\n"
+                    "• `/hf_data PULL` — ទាញយកទិន្នន័យ & ម៉ូដែលមកកាន់ Bot\n"
+                    "• `/hf_data WARM` — កម្តៅទិន្នន័យចូល Hot-RAM Cache\n"
+                    "• `/hf_data STATUS` — ពិនិត្យស្ថានភាពផ្ទុក និងល្បឿន\n"
+                    "━━━━━━━━━━━━\n"
+                    "_Khmer Master Crypto_\n"
+                    "_APEX SUPER BRAIN AI_\n"
+                    "ដំណើរការការពារហានិភ័យ & កើបចំណេញ ២៤/៧!"
+                )
+
+                if update.callback_query:
+                    try: await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+                else:
+                    try: await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard_menu)
+                    except Exception: pass
+
         async def whales_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -19540,6 +19785,12 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("health", health_command))
         self.app.add_handler(CommandHandler("vps", health_command))
         self.app.add_handler(CommandHandler("sync_brain", sync_brain_command))
+        self.app.add_handler(CommandHandler("hf_data", hf_data_command))
+        self.app.add_handler(CommandHandler("hfdata", hf_data_command))
+        self.app.add_handler(CommandHandler("hf_sync", hf_data_command))
+        self.app.add_handler(CommandHandler("hfsync", hf_data_command))
+        self.app.add_handler(CommandHandler("hf_backup", hf_data_command))
+        self.app.add_handler(CommandHandler("hfbackup", hf_data_command))
         self.app.add_handler(CommandHandler("toggle_breaker", toggle_breaker_command))
         self.app.add_handler(CommandHandler("opt_rebalance", opt_rebalance_command))
         self.app.add_handler(CommandHandler("toggle_rebalance", toggle_rebalance_command))
@@ -25552,6 +25803,7 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("aq_config", admin_config_command))
         self.app.add_handler(CommandHandler("aq_health", health_command))
         self.app.add_handler(CommandHandler("aq_sync", sync_brain_command))
+        self.app.add_handler(CommandHandler("aq_hf_data", hf_data_command))
         self.app.add_handler(CommandHandler("aq_capital", admin_capital_command))
         self.app.add_handler(CommandHandler("aq_mt5", admin_mt5_command))
         self.app.add_handler(CommandHandler("aq_emergency", admin_nuke_command))

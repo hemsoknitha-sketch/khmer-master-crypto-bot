@@ -107,6 +107,7 @@ def get_admin_bot_commands():
         BotCommand("admin_config", "⚙️ Angkor Live System Configuration"),
         BotCommand("health", "🩺 Angkor VPS Health & Diagnostics"),
         BotCommand("sync_brain", "📦 Angkor Hot-Reload AI Models"),
+        BotCommand("hf_data", "🤗 Angkor Ultra-Fast HF Storage"),
         BotCommand("admin_capital", "🏢 Angkor Capital Live Approver"),
         BotCommand("admin_mt5", "🏛️ Angkor MT5 Live Approver"),
         BotCommand("admin_nuke", "🛑 Angkor Emergency Kill Switch & Shutdown"),
