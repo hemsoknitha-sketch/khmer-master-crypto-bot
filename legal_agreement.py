@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-ANGKOR QUANT - CLIENT AGREEMENT, TERMS OF SERVICE & RISK DISCLOSURE
-Document Version: V.25.12.1 (Institutional Legal Citadel)
-Ground Truth Authority: AGENTS.md (Invariants 1.1, 15, 23, 24, 36)
+ANGKOR QUANT - PRIVATE SYSTEM USAGE AGREEMENT & ABSOLUTE RISK WAIVER
+Document Version: V.25.12.1-PRIVATE (Private Proprietary Edition)
+Ground Truth Authority: AGENTS.md (Invariants 1.1, 13, 15, 23, 24)
 
-Formal Client Agreement, Terms of Service, MetaTrader 5 Execution & Risk Disclosure
-harmonized between:
-- GTC Global Trade Capital Co. Limited (License Number: 40354, Port Vila, Vanuatu)
-- Angkor Quant AI Quantitative Intelligence Engine (Version 4.0 / AQ47)
+Customized Agreement specifically for Private / Proprietary Algorithmic Software Usage:
+1. 100% User Sole Financial & Operational Responsibility.
+2. Platform Zero Guarantee & Absolute Disclaimer of Liability for Losses,
+   Setup / Configuration Errors, Glitches, Network Downtime, or System Crashes.
+3. Private Proprietary Software License ("AS IS" & "AS AVAILABLE").
+4. Complete Waiver of Claims & Non-Custodial Capital Architecture.
 """
 
 import os
@@ -28,10 +30,9 @@ from ui_standards import (
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "bot_database.db")
 
-AGREEMENT_VERSION = "V.25.12.1"
-BROKER_ENTITY = "GTC Global Trade Capital Co. Limited"
-BROKER_LICENSE = "License No. 40354 (VFSC, Vanuatu)"
-BROKER_ADDRESS = "1/Floor, B&P House, Kumul Highway, Port Vila, Vanuatu"
+AGREEMENT_VERSION = "V.25.12.1-PRIVATE"
+PLATFORM_NAME = "Angkor Quant AI Quantitative Engine"
+PLATFORM_CODE = "AQ47 Master System (formerly Khmer Master Crypto)"
 
 
 # ─── DATABASE INITIALIZATION & TRACKING ──────────────────────────────────────
@@ -44,7 +45,7 @@ def get_db_connection():
 
 
 def init_legal_agreement_table():
-    """Initializes table for tracking user agreement acceptance."""
+    """Initializes table for tracking user private agreement acceptance."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -61,7 +62,7 @@ def init_legal_agreement_table():
 
 
 def record_user_agreement_acceptance(chat_id: int, version: str = AGREEMENT_VERSION) -> bool:
-    """Records that a user has explicitly accepted the Client Agreement."""
+    """Records that a user has explicitly accepted the Private Usage Agreement."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -82,7 +83,7 @@ def record_user_agreement_acceptance(chat_id: int, version: str = AGREEMENT_VERS
 
 
 def get_user_agreement_status(chat_id: int) -> Dict[str, Any]:
-    """Checks whether a user has accepted the current agreement version."""
+    """Checks whether a user has accepted the private agreement."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -101,7 +102,7 @@ def get_user_agreement_status(chat_id: int) -> Dict[str, Any]:
     return {"accepted": False, "version": None, "accepted_at": None, "status": "PENDING"}
 
 
-# ─── NAVIGATION KEYBOARDS ───────────────────────────────────────────────────
+# ─── NAVIGATION KEYBOARDS (Invariant 11: 100% Routed) ─────────────────────────
 
 def get_about_keyboard(current_section: str = "main", is_accepted: bool = False) -> InlineKeyboardMarkup:
     """
@@ -113,17 +114,17 @@ def get_about_keyboard(current_section: str = "main", is_accepted: bool = False)
     # Navigation buttons grid
     nav_row_1 = []
     if current_section != "terms":
-        nav_row_1.append(InlineKeyboardButton("📜 លក្ខខណ្ឌកិច្ចព្រមព្រៀង", callback_data="btn_about_terms"))
+        nav_row_1.append(InlineKeyboardButton("📜 ការប្រើប្រាស់ឯកជន", callback_data="btn_about_terms"))
     if current_section != "risk":
-        nav_row_1.append(InlineKeyboardButton("⚠️ សេចក្តីប្រកាសហានិភ័យ", callback_data="btn_about_risk"))
+        nav_row_1.append(InlineKeyboardButton("⚠️ ហានិភ័យ & ទទួលខុសត្រូវ", callback_data="btn_about_risk"))
     if nav_row_1:
         buttons.append(nav_row_1)
 
     nav_row_2 = []
     if current_section != "mt5":
-        nav_row_2.append(InlineKeyboardButton("🏛️ MT5 & Latency Alpha", callback_data="btn_about_mt5"))
+        nav_row_2.append(InlineKeyboardButton("⚙️ កំហុសរៀបចំ & គាំងប្រព័ន្ធ", callback_data="btn_about_mt5"))
     if current_section != "liability":
-        nav_row_2.append(InlineKeyboardButton("🛡️ ដែនកំណត់ទទួលខុសត្រូវ", callback_data="btn_about_liability"))
+        nav_row_2.append(InlineKeyboardButton("🛡️ គ្មានការធានា & លះបង់សំណង", callback_data="btn_about_liability"))
     if nav_row_2:
         buttons.append(nav_row_2)
 
@@ -131,13 +132,13 @@ def get_about_keyboard(current_section: str = "main", is_accepted: bool = False)
     if current_section != "privacy":
         nav_row_3.append(InlineKeyboardButton("🔒 ឯកជនភាព & 2FA PIN", callback_data="btn_about_privacy"))
     if current_section != "en":
-        nav_row_3.append(InlineKeyboardButton("🌐 English Legal Text", callback_data="btn_about_en"))
+        nav_row_3.append(InlineKeyboardButton("🌐 English Private Terms", callback_data="btn_about_en"))
     if nav_row_3:
         buttons.append(nav_row_3)
 
     # Acceptance Action Button
     if not is_accepted:
-        buttons.append([InlineKeyboardButton("✅ ខ្ញុំបានអាន យល់ច្បាស់ និងយល់ព្រមកិច្ចព្រមព្រៀង", callback_data="btn_about_accept")])
+        buttons.append([InlineKeyboardButton("✅ ខ្ញុំយល់ព្រមទទួលខុសត្រូវខ្លួនឯង & មិនទាមទារសំណង", callback_data="btn_about_accept")])
     else:
         buttons.append([InlineKeyboardButton("✅ បានយល់ព្រមកិច្ចព្រមព្រៀងរួចរាល់ (Accepted)", callback_data="btn_about_menu")])
 
@@ -153,226 +154,207 @@ def get_about_keyboard(current_section: str = "main", is_accepted: bool = False)
     return InlineKeyboardMarkup(buttons)
 
 
-# ─── BILINGUAL LEGAL CARDS (Khmer & English) ────────────────────────────────
+# ─── BILINGUAL PRIVATE LEGAL CARDS (Khmer & English) ─────────────────────────
 
 def build_about_main_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """Overview card introducing the Agreement, Licensing, Status & Structure."""
+    """Overview card introducing the Private Usage Agreement, Risk Disclaimer & Structure."""
     status = get_user_agreement_status(chat_id)
     accepted_badge = f"✅ _បានយល់ព្រមនៅ {status['accepted_at']}_" if status["accepted"] else "⏳ _មិនទាន់បានចុចយល់ព្រម (Pending Review)_"
 
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "📜 **កិច្ចព្រមព្រៀងអតិថិជន & លក្ខខណ្ឌសេវាកម្ម** 🏛️\n"
-        f"**Client Agreement & Terms of Service** `{AGREEMENT_VERSION}`\n"
+        "📜 **កិច្ចព្រមព្រៀងប្រើប្រាស់ប្រព័ន្ធឯកជន & ការលះបង់ការទាមទារសំណង** 🛡️\n"
+        f"**Private Quantitative Software Agreement & Risk Waiver** `{AGREEMENT_VERSION}`\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "🏛️ **ស្ថាប័ន & អាជ្ញាប័ណ្ណផ្លូវការ (Regulatory Entity) ៖**\n"
-        f"• **ក្រុមហ៊ុនដៃគូ** ៖ `{BROKER_ENTITY}`\n"
-        f"• **លេខអាជ្ញាប័ណ្ណ** ៖ `{BROKER_LICENSE}`\n"
-        f"• **អាសយដ្ឋាន** ៖ `{BROKER_ADDRESS}`\n"
-        "• **ប្រព័ន្ធបច្ចេកវិទ្យា** ៖ `Angkor Quant AI Engine v4.0 (AQ47)`\n\n"
-        "⚖️ **ស្ថានភាពមិនមែនជាស្ថាប័នទទួលប្រាក់បញ្ញើ (Clause 39) ៖**\n"
-        "សូមបញ្ជាក់យ៉ាងច្បាស់ថា ក្រុមហ៊ុន និងប្រព័ន្ធ Angkor Quant **មិនមែនជាស្ថាប័នទទួលប្រាក់បញ្ញើ (Not an Authorized Deposit-Taking Institution)** ឡើយ។ "
-        "ដើមទុនទាំងអស់ស្ថិតក្នុងកាបូប Binance (Spot/Futures) ឬគណនី Broker MetaTrader 5 ផ្ទាល់ខ្លួនរបស់អ្នកប្រើប្រាស់ ១០០% (Non-Custodial)។ "
-        "ប្រព័ន្ធគ្មានសិទ្ធិដកប្រាក់ចេញពីគណនីរបស់អ្នកជាដាច់ខាត!\n\n"
-        "📋 **រចនាសម្ព័ន្ធកិច្ចព្រមព្រៀង ៧ ជំពូកសំខាន់ៗ ៖**\n"
-        "1. **លក្ខខណ្ឌសេវាកម្ម & ការគ្រប់គ្រងទុន** (Clauses 18, 19, 20)\n"
-        "2. **សេចក្តីប្រកាសហានិភ័យ & អានុភាព Leverage** (Clause 24 & Sched 1)\n"
-        "3. **MetaTrader 5, Latency & Slippage Tolerance** (Clause 37)\n"
-        "4. **ដែនកំណត់នៃការទទួលខុសត្រូវ & សំណង** (Clause 22 & Waiver)\n"
-        "5. **ការការពារទិន្នន័យ, AML & សុវត្ថិភាព 2FA** (Clause 29)\n"
-        "6. **ឧបទ្ទវហេតុប្រធានស័ក្តិ (Force Majeure)** (Clause 27)\n"
-        "7. **ច្បាប់គ្រប់គ្រង & យុត្តាធិការតុលាការ** (Clause 35: Vanuatu)\n\n"
+        "🏛️ **លក្ខណៈនៃប្រព័ន្ធ & គោលបំណងឯកជន (Private Proprietary System) ៖**\n"
+        f"• **ឈ្មោះប្រព័ន្ធ** ៖ `{PLATFORM_NAME}`\n"
+        f"• **កូដស្ថាបត្យកម្ម** ៖ `{PLATFORM_CODE}`\n"
+        "• **ប្រភេទនៃការប្រើប្រាស់** ៖ `ការស្រាវជ្រាវ & ជួញដូរជាលក្ខណៈឯកជន (Private Personal Use Only)`\n"
+        "• **លក្ខណៈដើមទុន** ៖ `Non-Custodial ១០០% (គ្រប់គ្រងក្នុងគណនីផ្ទាល់ខ្លួនរបស់អ្នក)`\n\n"
+        "⚖️ **គោលការណ៍គ្រឹះនៃការទទួលខុសត្រូវ & គ្មានការធានា (Core Principles) ៖**\n"
+        "1️⃣ **ការទទួលខុសត្រូវដោយខ្លួនឯង ១០០% ៖** អ្នកប្រើប្រាស់ជាអ្នកសម្រេចចិត្តដោយស្ម័គ្រចិត្តក្នុងការដាក់ទុន បើក/បិទ Position និងជ្រើសរើស Leverage។ រាល់ការខាតបង់ ឬហានិភ័យហិរញ្ញវត្ថុណាមួយ គឺជាការទទួលខុសត្រូវទាំងស្រុងរបស់អ្នកប្រើប្រាស់តែម្នាក់ឯង។\n"
+        "2️⃣ **ប្រព័ន្ធមិនធានាចំពោះការខាតបង់ឡើយ ៖** គ្មានការធានាប្រាក់ចំណេញ ឬធានាមិនខាតបង់នោះឡើយ។\n"
+        "3️⃣ **ប្រព័ន្ធមិនទទួលខុសត្រូវចំពោះកំហុសឆ្គងក្នុងការរៀបចំ ៖** ការកំណត់ខុសពីសំណាក់អ្នកប្រើប្រាស់ ដូចជាទំហំទុន Leverage ឬ API មិនស្ថិតក្រោមការទទួលខុសត្រូវរបស់ប្រព័ន្ធឡើយ។\n"
+        "4️⃣ **ប្រព័ន្ធមិនទទួលខុសត្រូវចំពោះការរអាក់រអួល ឬគាំងដំណើរការ ៖** បញ្ហាដាច់អ៊ីនធឺណិត ការគាំង VPS កំហុសកូដ Bug ឬការគាំង Server Exchange មិនអាចយកជាមូលដ្ឋានទាមទារសំណងបានឡើយ។\n\n"
         f"📊 **ស្ថានភាពកិច្ចព្រមព្រៀងរបស់អ្នក ៖**\n{accepted_badge}\n\n"
-        "👉 _សូមចុចលើប៊ូតុងខាងក្រោមដើម្បីអានជំពូកនីមួយៗឱ្យបានច្បាស់លាស់ មុនពេលចុចយល់ព្រម!_"
+        "👉 _សូមចុចលើប៊ូតុងខាងក្រោមដើម្បីពិនិត្យលម្អិតជំពូកនីមួយៗ មុនពេលចុចយល់ព្រម!_"
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("main", status["accepted"])
 
 
 def build_terms_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """Terms of Service: Amendment, Termination & Application of Account Funds."""
+    """Terms of Private Use, Non-Custodial Architecture & Proprietary IP."""
     status = get_user_agreement_status(chat_id)
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "📜 **ជំពូកទី ១ ៖ លក្ខខណ្ឌកិច្ចព្រមព្រៀង & មូលនិធិគណនី** 💼\n"
-        f"**Amendment, Termination & Account Funds (Clauses 18, 19, 20)**\n"
+        "📜 **ជំពូកទី ១ ៖ លក្ខខណ្ឌនៃការប្រើប្រាស់ជាលក្ខណៈឯកជន** 💼\n"
+        f"**Private Proprietary License & Non-Custodial Terms**\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "1️⃣ **កិច្ចសន្យាគ្រប់គ្រង Margin FX, Options & CFDs (18.1) ៖**\n"
-        "កំណែកិច្ចព្រមព្រៀងដែលបានផ្សព្វផ្សាយនៅពេលអ្នកចូល Position នឹងគ្រប់គ្រងរាល់កិច្ចសន្យាជួញដូរទាំងអស់ជាផ្លូវការ។\n\n"
-        "2️⃣ **សិទ្ធិកែប្រែ ឬផ្លាស់ប្តូរកិច្ចព្រមព្រៀង (18.2) ៖**\n"
-        "ក្រុមហ៊ុនរក្សាសិទ្ធិកែប្រែកិច្ចព្រមព្រៀង ដោយជូនដំណឹងជាលាយលក្ខណ៍អក្សរ ផ្អែកលើហេតុផលសមស្របដូចជា៖\n"
-        "• ធ្វើឱ្យខសន្យាកាន់តែច្បាស់លាស់ និងផ្តល់អត្ថប្រយោជន៍ដល់អ្នក\n"
-        "• ការកែសម្រួលថ្លៃដើមសេវាកម្មស្របច្បាប់\n"
-        "• ការអនុលោមតាមការផ្លាស់ប្តូរច្បាប់ បទប្បញ្ញត្តិ ឬសេចក្តីសម្រេចរបស់តុលាការ\n"
-        "• ការប្រែប្រួលនៃលក្ខខណ្ឌទីផ្សារសកល\n\n"
-        "3️⃣ **សិទ្ធិតវ៉ារបស់អ្នកប្រើប្រាស់ (18.3 - 14 Days Objection) ៖**\n"
-        "ប្រសិនបើអ្នកមិនយល់ស្របនឹងការផ្លាស់ប្តូរ អ្នកត្រូវតែជូនដំណឹងមកយើងក្នុងរយៈពេល **១៤ ថ្ងៃ**។ ប្រសិនបើគ្មានការតវ៉ាទេ "
-        "អ្នកត្រូវបានចាត់ទុកជាយល់ព្រមដោយស្វ័យប្រវត្តិ។ ក្នុងករណីអ្នកតវ៉ា គណនីរបស់អ្នកនឹងត្រូវបិទបញ្ចប់ Position ដោយសមស្រប។\n\n"
-        "4️⃣ **សិទ្ធិបញ្ចប់កិច្ចព្រមព្រៀង (18.5 & 18.6) ៖**\n"
-        "ទាំងអ្នកប្រើប្រាស់ និងក្រុមហ៊ុន មានសិទ្ធិបញ្ចប់កិច្ចព្រមព្រៀងនៅពេលណាក៏បាន ដោយជូនដំណឹងជាមុន។ Position បើកចំហទាំងអស់ត្រូវតែបិទបញ្ចប់ ហើយកាតព្វកិច្ចដែលនៅសេសសល់ត្រូវតែទូទាត់ឱ្យបានរួចរាល់។\n\n"
-        "5️⃣ **ការអនុវត្តមូលនិធិគណនី (Clause 19) ៖**\n"
-        "ក្រុមហ៊ុនមានសិទ្ធិកាត់ប្រាក់ ឬប្តូររូបិយប័ណ្ណតាមអត្រាពាណិជ្ជកម្ម ដើម្បីទូទាត់កាតព្វកិច្ចជួញដូររបស់អ្នកប្រើប្រាស់ "
-        "និងមានសិទ្ធិផ្អាកការជួញដូរឧបករណ៍ណាមួយដោយជូនដំណឹងមុនយ៉ាងតិច ៧ ថ្ងៃ (Clause 20)។"
+        "1️⃣ **គោលបំណងនៃការប្រើប្រាស់ជាលក្ខណៈឯកជន ៖**\n"
+        "ប្រព័ន្ធ Angkor Quant ត្រូវបានរៀបចំ និងផ្តល់ជូនសម្រាប់តែការស្រាវជ្រាវ វិភាគគណិតវិទ្យា និងការជួញដូរស្វ័យប្រវត្តិតាមលក្ខណៈ **ឯកជនផ្ទាល់ខ្លួន (Private Personal Use)** ឬក្នុងរង្វង់ VIP ឯកជនដែលទទួលបានការអនុញ្ញាតតែប៉ុណ្ណោះ។\n\n"
+        "2️⃣ **ស្ថានភាពមិនមែនជាស្ថាប័នហិរញ្ញវត្ថុសាធារណៈ ៖**\n"
+        "• ប្រព័ន្ធនេះ **មិនមែន** ជាធនាគារ ស្ថាប័នទទួលប្រាក់បញ្ញើ ឬមូលនិធិគ្រប់គ្រងប្រាក់វិនិយោគសាធារណៈ (No Fund Management) ឡើយ\n"
+        "• ប្រព័ន្ធមិនផ្តល់សេវាកម្មប្រឹក្សាវិនិយោគ ហិរញ្ញវត្ថុ គណនេយ្យ ឬច្បាប់ផ្ទាល់ខ្លួនដល់សាធារណជនឡើយ\n"
+        "• ដើមទុនទាំងអស់ស្ថិតក្នុងគណនី Binance ឬ MT5 Broker ផ្ទាល់ខ្លួនរបស់អ្នកប្រើប្រាស់ ១០០% (Non-Custodial) ដោយប្រព័ន្ធគ្មានសិទ្ធិដកប្រាក់ឡើយ\n\n"
+        "3️⃣ **ការផ្តល់ជូនតាមស្ថានភាពជាក់ស្តែង (\"AS IS\") ៖**\n"
+        "កម្មវិធីកូដ និងប្រព័ន្ធស្វ័យប្រវត្តិត្រូវបានផ្តល់ជូន \"តាមស្ថានភាពជាក់ស្តែង\" (AS IS) និង \"តាមដែលអាចរកបាន\" (AS AVAILABLE) ដោយគ្មានការធានាលើលទ្ធផល ភាពឥតខ្ចោះ ឬការសមស្របសម្រាប់គោលដៅវិនិយោគជាក់លាក់ណាមួយឡើយ\n\n"
+        "4️⃣ **សិទ្ធិកម្មសិទ្ធិបញ្ញា & ការរក្សាការសម្ងាត់ ៖**\n"
+        "កូដប្រព័ន្ធ យុទ្ធសាស្ត្រ Quant និងរូបមន្តគណិតវិទ្យាទាំងអស់ជាកម្មសិទ្ធិបញ្ញាផ្តាច់មុខ។ ហាមដាច់ខាតការលួចចម្លង ចែករំលែកជាសាធារណៈ ឬកែច្នៃចែកចាយបន្តដោយគ្មានការអនុញ្ញាតជាលាយលក្ខណ៍អក្សរ។"
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("terms", status["accepted"])
 
 
 def build_risk_disclosure_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """Risk Disclosure, Leverage, Suitability & Anti-Guarantee Fiduciary Clause."""
+    """100% User Sole Financial & Operational Risk Responsibility."""
     status = get_user_agreement_status(chat_id)
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "⚠️ **ជំពូកទី ២ ៖ សេចក្តីប្រកាសហានិភ័យ & អានុភាព LEVERAGE** 📉\n"
-        f"**Risk Disclosure, Warranties & Suitability (Clause 24 & Sched 1)**\n"
+        "⚠️ **ជំពូកទី ២ ៖ ការទទួលខុសត្រូវលើការខាតបង់ & ហានិភ័យដោយខ្លួនឯង** 📉\n"
+        f"**100% User Sole Financial Responsibility & Anti-Guarantee Covenant**\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "🚨 **ការព្រមានពីហានិភ័យខ្ពស់នៃដេរីវេទីវ (High Risk Derivatives) ៖**\n"
-        "កិច្ចសន្យា Margin FX, Crypto Futures, និង CFDs គឺជាឧបករណ៍ហិរញ្ញវត្ថុដែលមានកម្រិតហានិភ័យខ្ពស់ខ្លាំង។ "
-        "អានុភាព (Leverage) អាចផ្តល់ផលចំណេញខ្ពស់ ប៉ុន្តែក៏អាចបណ្តាលឱ្យអ្នក **បាត់បង់ប្រាក់ដើមទុនទាំងអស់ (Total Capital Loss)** ក្នុងរយៈពេលដ៏ខ្លី!\n\n"
-        "⚖️ **ការធានា និងការយល់ព្រមរបស់អ្នកប្រើប្រាស់ (24.1) ៖**\n"
-        "នៅពេលប្រើប្រាស់ប្រព័ន្ធនេះ អ្នកបញ្ជាក់ និងធានាថា៖\n"
-        "• អ្នកមានសមត្ថភាពពេញលេញតាមផ្លូវច្បាប់ មិនស្ថិតក្រោមវិវាទក្ស័យធន\n"
-        "• អ្នកមិនប្រើប្រាស់ប្រព័ន្ធដើម្បីជួញដូរដោយប្រើព័ត៌មានផ្ទៃក្នុង (Insider Trading) ឬការបន្លំទីផ្សារ (Market Manipulation) ឡើយ\n"
-        "• **ភាពសមស្រប (Suitability 24.1.i)** ៖ អ្នកបានយល់ច្បាស់ពីហានិភ័យខ្ពស់ និងបានពិចារណាលើស្ថានភាពហិរញ្ញវត្ថុផ្ទាល់ខ្លួនរបស់អ្នក\n"
-        "• **គ្មានការប្រឹក្សាផ្ទាល់ខ្លួន (24.1.l)** ៖ Angkor Quant និងក្រុមហ៊ុន មិនផ្តល់ការប្រឹក្សាផ្នែកច្បាប់ ពន្ធដារ ឬហិរញ្ញវត្ថុផ្ទាល់ខ្លួនឡើយ\n\n"
-        "🛡️ **គោលការណ៍វិស្វកម្មស្មោះត្រង់ គ្មានការធានាប្រាក់ចំណេញ (AQ Invariant 1.1 & 24) ៖**\n"
-        "ផ្អែកលើកតិកាសញ្ញាវិស្វកម្មស្មោះត្រង់ (Sacred Covenant of Brutal Engineering Honesty) ៖\n"
-        "• ប្រព័ន្ធ Angkor Quant ដំណើរការលើគំរូគណិតវិទ្យា Mathematical Edge ($E[X] > 0$) មិនមែនជាការសន្យា ឬធានាប្រាក់ចំណេញឡើយ\n"
-        "• **ដាច់ខាតគ្មានបុគ្គល ឬកូដណាអាចធានាប្រាក់ចំណេញ ១០០% បានឡើយ!**\n"
-        "• អ្នកប្រើប្រាស់ជាអ្នកទទួលខុសត្រូវ ១០០% លើការកំណត់ទុន និងកម្រិត Leverage។"
+        "🚨 **ហានិភ័យទីផ្សារ & អានុភាព Leverage ៖**\n"
+        "ការជួញដូររូបិយប័ណ្ណឌីជីថល (Crypto Spot / Futures) និង Forex / Gold ផ្ទុកនូវកម្រិតហានិភ័យខ្ពស់បំផុត និងភាពប្រែប្រួលតម្លៃខ្លាំងក្លាដែលមិនអាចព្យាករណ៍ទុកជាមុនបាន។ "
+        "ការប្រើប្រាស់អានុភាព (Leverage) អាចបង្កើនផលចំណេញ ប៉ុន្តែក៏អាចបណ្តាលឱ្យ **បាត់បង់ប្រាក់ដើមទុនទាំងអស់ (Total Capital Liquidation)** ក្នុងរយៈពេលដ៏ខ្លីបំផុត!\n\n"
+        "⚖️ **ការទទួលខុសត្រូវចំពោះការខាតបង់ និងហានិភ័យដោយខ្លួនឯង ១០០% ៖**\n"
+        "នៅពេលអ្នកប្រើប្រាស់ប្រព័ន្ធនេះ អ្នកបញ្ជាក់ យល់ព្រម និងធានាថា៖\n"
+        "• អ្នកជាអ្នកសម្រេចចិត្តដោយស្ម័គ្រចិត្ត ១០០% ក្នុងការដាក់ទុន ការជ្រើសរើសទំហំ Position និងកម្រិត Leverage\n"
+        "• រាល់ការខាតបង់ហិរញ្ញវត្ថុទាំងអស់ មិនថាបណ្តាលមកពីចលនាទីផ្សារ ឬកត្តាផ្សេងៗ គឺជាការទទួលខុសត្រូវរបស់អ្នកប្រើប្រាស់តែម្នាក់ឯងដោយខ្លួនឯង\n"
+        "• អ្នកប្រើប្រាស់មានស្ថានភាពហិរញ្ញវត្ថុរឹងមាំ និងមានសមត្ថភាពពេញលេញក្នុងការទទួលយកការខាតបង់ដើមទុនដោយគ្មានផលប៉ះពាល់ដល់ជីវភាពរស់នៅ\n\n"
+        "🛡️ **កតិកាសញ្ញាវិស្វកម្មស្មោះត្រង់ គ្មានការធានាប្រាក់ចំណេញ (Zero Guarantee) ៖**\n"
+        "ផ្អែកលើកតិកាសញ្ញាវិស្វកម្មស្មោះត្រង់ (AQ Invariant 1.1) ៖\n"
+        "• ប្រព័ន្ធដំណើរការលើប្រៀបឈ្នះបែបគណិតវិទ្យា ($E[X] > 0$) មិនមែនជាការសន្យា ឬធានាប្រាក់ចំណេញឡើយ\n"
+        "• **ដាច់ខាតគ្មានបុគ្គល ឬកូដកម្មវិធីណាអាចធានាប្រាក់ចំណេញ ឬធានាថាមិនខាតបង់ជូនអ្នកប្រើប្រាស់បានឡើយ!**"
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("risk", status["accepted"])
 
 
 def build_mt5_execution_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """MetaTrader 5 Order Execution, Slippage Tolerance & Latency Standards."""
+    """Disclaimer on Setup Errors, Technical Glitches, Crashes & Downtime."""
     status = get_user_agreement_status(chat_id)
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "🏛️ **ជំពូកទី ៣ ៖ METATRADER 5, LATENCY & SLIPPAGE TOLERANCE** ⚡\n"
-        f"**Order Execution Management (Clause 37 & Tokyo HFT Bridge)**\n"
+        "⚙️ **ជំពូកទី ៣ ៖ កំហុសឆ្គងក្នុងការរៀបចំ & ការរអាក់រអួលគាំងប្រព័ន្ធ** ⚡\n"
+        f"**Disclaimer for Setup Mistakes, System Downtime & Glitches**\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "💻 **ដំណោះស្រាយភាគីទីបី MetaTrader 5 (Clause 37) ៖**\n"
-        "MetaTrader គឺជាកម្មវិធីភាគីទីបី (Third-Party Solution) ដែលតភ្ជាប់ទៅកាន់ប្រព័ន្ធ Execution របស់ Broker។ "
-        "ក្រុមហ៊ុន និង Angkor Quant មិនមានការគ្រប់គ្រងលើកំហុសបច្ចេកទេសផ្ទៃក្នុងរបស់ Software ភាគីទីបីនេះឡើយ។\n\n"
-        "🎯 **Instant Orders vs Market Orders & Slippage Deviation ៖**\n"
-        "• នៅពេលប្រើប្រាស់ Market Orders តម្លៃអាចនឹងរអិល (Slippage) តិចតួចនៅពេលទីផ្សារមានចលនាខ្លាំង\n"
-        "• អ្នកប្រើប្រាស់អាចគ្រប់គ្រងហានិភ័យ Slippage តាមរយៈការកំណត់ Maximum Deviation នៅលើ Client Terminal (Setting Deviation = 0 ឬ 1 pip)\n\n"
-        "⚡ **ការគ្រប់គ្រងភាពយឺតយ៉ាវ (Latency Management) ៖**\n"
-        "• ភាពយឺតយ៉ាវបណ្តាញ (Network Latency) អាចគ្រប់គ្រងបានតាមរយៈការប្រើប្រាស់ Virtual Private Server (VPS) និងប្រព័ន្ធអ៊ីនធឺណិតល្បឿនលឿន\n"
-        "• ស្ថាបត្យកម្ម Angkor Quant ត្រូវបាន Co-locate នៅតំបន់ Tokyo VPS (`asia-northeast1`) ដើម្បីរក្សា Latency កម្រិត Sub-millisecond (< 0.42 ms)\n\n"
-        "🛡️ **គោលការណ៍ Slippage 1 Pip Standard (Clause 37) ៖**\n"
-        "ក្រុមហ៊ុនទទួលស្គាល់ថា Latency គឺជាធម្មជាតិនៃបណ្តាញអ៊ីនធឺណិត។ ហេតុនេះ ប្រព័ន្ធអនុញ្ញាតឱ្យមាន Slippage ត្រឹម **1 Pip** "
-        "ទាំងផលចំណេញ និងផលខាត។ ប្រសិនបើអតិថិជនមិនចង់ឱ្យមាន Slippage ទាល់តែសោះ ត្រូវកំណត់ Deviation = 0។"
+        "ប្រព័ន្ធ Angkor Quant, ស្ថាបនិក, វិស្វករ និងអ្នកអភិវឌ្ឍន៍ **មិនធានា និងមិនទទួលខុសត្រូវជាដាច់ខាត** ចំពោះការខាតបង់ដែលបណ្តាលមកពីកត្តាដូចខាងក្រោម៖\n\n"
+        "1️⃣ **កំហុសឆ្គងក្នុងការរៀបចំរបស់អ្នកប្រើប្រាស់ (User Setup Mistakes) ៖**\n"
+        "• ការបញ្ចូល API Keys, Passwords, ឬ Server Details ខុស\n"
+        "• ការកំណត់ទំហំទុន (Capital Size), Margin, Lot Size ឬ Leverage មិនសមស្របនឹងសមតុល្យគណនី\n"
+        "• ការជ្រើសរើស Mode ខុស (ដូចជាជ្រើសរើស Cross Margin ជំនួស Isolated, ឬបើកកាក់ខុស)\n"
+        "• ការចុចបញ្ជា Manual ខុសក្បួន ឬការកែប្រែកូដ/ប៉ារ៉ាម៉ែត្រដោយខ្លួនឯង\n\n"
+        "2️⃣ **ការរអាក់រអួល ឬគាំងដំណើរការរបស់ប្រព័ន្ធ (Downtime & System Crashes) ៖**\n"
+        "• ការគាំងប្រព័ន្ធកូដ (Software Glitches / Crashes / Exceptions)\n"
+        "• ការដាច់ចរន្តអគ្គិសនី ឬម៉ាស៊ីនបម្រើការ VPS Reboot / Maintenance\n"
+        "• ភាពយឺតយ៉ាវបណ្តាញអ៊ីនធឺណិត (Network Latency Spikes / Packet Loss)\n"
+        "• ការរអាក់រអួល ឬដាច់សេវា Telegram Bot API\n\n"
+        "3️⃣ **កត្តាភាគីទីបី (Third-Party Outages & Market Slippage) ៖**\n"
+        "• ការគាំង ឬ Freeze នៃម៉ាស៊ីនបម្រើការ Binance Exchange ឬ MetaTrader 5 Broker\n"
+        "• ការរអិលថ្លៃ (Slippage) និង Spread រីកធំពេលទីផ្សារប្រែប្រួលខ្លាំង\n"
+        "• ការបដិសេធ Order (Errors -1013, -4061, -4411) ឬការផ្អាកទីផ្សារ (Trading Halted)។"
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("mt5", status["accepted"])
 
 
 def build_liability_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """Limitation of Liability, Indemnity, Force Majeure & Governing Law."""
+    """Total Disclaimer of Liability, Waiver of Claims & Indemnity."""
     status = get_user_agreement_status(chat_id)
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "🛡️ **ជំពូកទី ៤ ៖ ដែនកំណត់ទទួលខុសត្រូវ & យុត្តាធិការតុលាការ** ⚖️\n"
-        f"**Limitation of Liability, Indemnity & Jurisdiction (Clauses 22, 27, 35)**\n"
+        "🛡️ **ជំពូកទី ៤ ៖ គ្មានការធានា & ការលះបង់ការទាមទារសំណងដាច់ខាត** ⚖️\n"
+        f"**Absolute Disclaimer of Liability & Complete Waiver of Claims**\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "1️⃣ **ដែនកំណត់នៃការទទួលខុសត្រូវ (Limitation of Liability 22.1 - 22.4) ៖**\n"
-        "• ក្រុមហ៊ុន និងក្រុមការងារ Angkor Quant ទទួលខុសត្រូវត្រឹមតែការខាតបង់ណាដែលជាផលវិបាកផ្ទាល់ និងអាចព្យាករណ៍បានសមហេតុផលប៉ុណ្ណោះ\n"
-        "• **មិនទទួលខុសត្រូវចំពោះការខាតបង់ប្រយោល (Indirect Losses 22.2)** ដែលកើតឡើងជាផលរំខាននៃហេតុការណ៍ចម្បងឡើយ\n"
-        "• **មិនទទួលខុសត្រូវចំពោះការបាត់បង់ប្រាក់ចំណេញ ឬឱកាស (Loss of Profit / Opportunity 22.3)** ជាដាច់ខាត\n\n"
-        "2️⃣ **កាតព្វកិច្ចសំណង & ការលើកលែងការទាមទារ (Indemnity 22.5 & Waiver) ៖**\n"
-        "អ្នកប្រើប្រាស់យល់ព្រមការពារ និងមិនទាមទារសំណងពីក្រុមហ៊ុន បុគ្គលិក អ្នកតំណាង ឬដៃគូពាក់ព័ន្ធ ចំពោះការខាតបង់ "
-        "ពន្ធដារ ការចំណាយ ឬថ្លៃមេធាវី ដែលបណ្តាលមកពីការរំលោភកិច្ចព្រមព្រៀង ឬការសម្រេចចិត្តជួញដូររបស់អ្នកឡើយ "
-        "លើកលែងតែករណីដែលការខាតបង់នោះបណ្តាលមកពីការធ្វេសប្រហែសធ្ងន់ធ្ងរ (Gross Negligence) របស់ក្រុមហ៊ុនផ្ទាល់។\n\n"
-        "3️⃣ **ឧបទ្ទវហេតុប្រធានស័ក្តិ (Force Majeure Clause 27) ៖**\n"
-        "ក្រុមហ៊ុន និងប្រព័ន្ធមិនទទួលខុសត្រូវចំពោះការពន្យារពេល ឬការខកខានដែលបណ្តាលមកពីកត្តាហួសពីការគ្រប់គ្រង ដូចជា៖ "
-        "ការដាច់ចរន្តអគ្គិសនី ការដាច់បណ្តាញទូរគមនាគមន៍សកល ការផ្អាកទីផ្សារ (Market Suspension) ឬចលាចលសង្គមឡើយ។\n\n"
-        "4️⃣ **ច្បាប់គ្រប់គ្រង & យុត្តាធិការ (Governing Law Clause 35) ៖**\n"
-        "កិច្ចព្រមព្រៀងនេះត្រូវបានគ្រប់គ្រង និងបកស្រាយស្របតាមច្បាប់នៃ **សាធារណរដ្ឋវ៉ានូអាទូ (Republic of Vanuatu)**។"
+        "1️⃣ **ការលើកលែងការទទួលខុសត្រូវជាដាច់ខាត (Absolute Disclaimer) ៖**\n"
+        "ក្នុងកម្រិតអតិបរិមាដែលអនុញ្ញាតដោយច្បាប់ ប្រព័ន្ធ Angkor Quant, ស្ថាបនិក, វិស្វករ និងអ្នកពាក់ព័ន្ធទាំងអស់ **មិនទទួលខុសត្រូវជាដាច់ខាត** ចំពោះ៖\n"
+        "• ការខាតបង់ប្រាក់ដើមទុន (Direct Financial Loss) ឬការបាត់បង់ប្រាក់ចំណេញ (Loss of Profit)\n"
+        "• ការបាត់បង់ឱកាសអាជីវកម្ម ឬការខាតបង់ដោយប្រយោល (Consequential / Indirect Loss)\n"
+        "• រាល់ការខូចខាតដែលកើតចេញពីការប្រើប្រាស់ ការពឹងផ្អែក ឬការមិនអាចដំណើរការបាននៃប្រព័ន្ធនេះ\n\n"
+        "2️⃣ **ការលះបង់ការទាមទារសំណង (Complete Waiver of Claims) ៖**\n"
+        "តាមរយៈការចុចយល់ព្រម ឬការបន្តប្រើប្រាស់ប្រព័ន្ធនេះ អ្នកប្រើប្រាស់យល់ព្រមជាផ្លូវការថា៖\n"
+        "• **លះបង់សិទ្ធិទាំងអស់ក្នុងការប្តឹងផ្តល់** ទាមទារសំណង ឬទាមទារការសងការខាតបង់ពីក្រុមការងារ និងប្រព័ន្ធជាដាច់ខាត\n"
+        "• យល់ព្រមការពារ និងមិនទាមទារសំណង (Indemnify and Hold Harmless) ពីស្ថាបនិក និងអ្នកអភិវឌ្ឍន៍ ចំពោះរាល់ទំនួលខុសត្រូវផ្លូវច្បាប់ ឬពាក្យបណ្តឹងណាមួយ\n\n"
+        "3️⃣ **ការទទួលស្គាល់ហានិភ័យពេញលេញ (Voluntary Assumption of Risk) ៖**\n"
+        "អ្នកប្រើប្រាស់បញ្ជាក់ថាបានអាន យល់ច្បាស់ និងទទួលយកហានិភ័យទាំងអស់ខាងលើដោយស្ម័គ្រចិត្ត និងដោយគ្មានការបង្ខិតបង្ខំឡើយ។"
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("liability", status["accepted"])
 
 
 def build_privacy_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """Privacy, AML/CFT Data Compliance & 2FA Security Architecture."""
+    """Data Privacy, Non-Custodial Keys & 2FA PIN Security Standard."""
     status = get_user_agreement_status(chat_id)
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "🔒 **ជំពូកទី ៥ ៖ ឯកជនភាព, AML & សុវត្ថិភាព 2FA PIN** 🛡️\n"
-        f"**Privacy, Anti-Money Laundering & Security Standards (Clause 29)**\n"
+        "🔒 **ជំពូកទី ៥ ៖ សុវត្ថិភាពទិន្នន័យ, API KEYS & 2FA PIN** 🛡️\n"
+        f"**Private Security Architecture & Two-Factor Authentication**\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "1️⃣ **ការការពារទិន្នន័យផ្ទាល់ខ្លួន & AML/CFT (Clause 29.1) ៖**\n"
-        "ព័ត៌មានដែលទទួលបានពីអ្នកប្រើប្រាស់ត្រូវបានរក្សាទុក និងដំណើរការស្របតាមច្បាប់ការពារទិន្នន័យ (Data Protection) "
-        "និងបទប្បញ្ញត្តិប្រឆាំងការសម្អាតប្រាក់ និងហិរញ្ញប្បទានភេរវកម្ម (Anti-Money Laundering & Counter-Terrorism Financing)។\n\n"
-        "2️⃣ **ការចែករំលែកទិន្នន័យស្របច្បាប់ (Clause 29.3 & 29.4) ៖**\n"
-        "ទិន្នន័យអាចត្រូវបានបង្ហាញជូនតែអាជ្ញាធរមានសមត្ថកិច្ច ឬភ្នាក់ងារត្រួតពិនិត្យអត្តសញ្ញាណ (Identity Checks) "
-        "ក្នុងគោលបំណងទប់ស្កាត់បទល្មើសហិរញ្ញវត្ថុតែប៉ុណ្ណោះ។\n\n"
-        "3️⃣ **ស្ថាបត្យកម្ម Non-Custodial & សុវត្ថិភាព 2FA PIN ៖**\n"
-        "• ប្រព័ន្ធ Angkor Quant មិនរក្សាទុក Private Key នៃកាបូបរបស់អ្នកឡើយ\n"
-        "• Binance API Keys ត្រូវបានការពារដោយការ Encrypt កម្រិតខ្ពស់ និងតម្រូវឱ្យបិទសិទ្ធិដកប្រាក់ (Withdrawal Disabled) ជានិច្ច\n"
-        "• រាល់ការបញ្ជាទិញទំហំធំ ឬការកែប្រែការកំណត់យុទ្ធសាស្ត្រ តម្រូវឱ្យផ្ទៀងផ្ទាត់លេខកូដសម្ងាត់ **2FA Security PIN 4 ខ្ទង់** ជានិច្ច។"
+        "1️⃣ **ស្ថាបត្យកម្ម Non-Custodial សុវត្ថិភាព ៖**\n"
+        "• ប្រព័ន្ធ Angkor Quant មិនរក្សាទុក Private Key នៃកាបូបគ្រីបតូរបស់អ្នកឡើយ\n"
+        "• Binance API Keys ត្រូវបានការពារយ៉ាងតឹងរ៉ឹងក្នុងកម្រិត Encrypted Storage ហើយតម្រូវឱ្យ **បិទសិទ្ធិដកប្រាក់ (Withdrawal Disabled)** ជានិច្ច\n"
+        "• ប្រព័ន្ធមិនអាចដក ឬផ្ទេរប្រាក់របស់អ្នកចេញពីគណនីបានឡើយ\n\n"
+        "2️⃣ **កាតព្វកិច្ចសុវត្ថិភាពរបស់អ្នកប្រើប្រាស់ ៖**\n"
+        "• អ្នកប្រើប្រាស់មានកាតព្វកិច្ចរក្សាការសម្ងាត់នៃគណនី Telegram ផ្ទាល់ខ្លួន API Keys និងលេខកូដសម្ងាត់ **2FA PIN ៤ ខ្ទង់** ដោយខ្លួនឯង\n"
+        "• រាល់ការបញ្ជាទិញ ឬការប្រតិបត្តិការដែលផ្ញើចេញពី Telegram ID របស់អ្នក ត្រូវបានចាត់ទុកថាជាការសម្រេចចិត្តផ្ទាល់ខ្លួនរបស់អ្នកប្រើប្រាស់ជាផ្លូវការ\n\n"
+        "3️⃣ **ការរក្សាការសម្ងាត់ឯកជន ៖**\n"
+        "ព័ត៌មាននៃការប្រើប្រាស់របស់អ្នកត្រូវបានរក្សាទុកជាការសម្ងាត់ក្នុងទម្រង់ SQLite WAL Database មូលដ្ឋាន ដោយគ្មានការលក់ ឬចែកចាយទិន្នន័យទៅភាគីខាងក្រៅឡើយ។"
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("privacy", status["accepted"])
 
 
 def build_full_english_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """Official English Legal Summary directly addressing GTC Agreement V.25.12.1."""
+    """Official English Private Usage Agreement & Total Risk Waiver."""
     status = get_user_agreement_status(chat_id)
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "🌐 **GTC GLOBAL TRADE CAPITAL - CLIENT AGREEMENT SUMMARY** 🏛️\n"
-        f"**Official Legal Text Overview** `{AGREEMENT_VERSION}`\n"
+        "🌐 **ANGKOR QUANT - PRIVATE SYSTEM USAGE AGREEMENT** 🏛️\n"
+        f"**Private Proprietary Edition & Complete Risk Waiver** `{AGREEMENT_VERSION}`\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "🏛️ **1. Company Entity & Licensing:**\n"
-        f"• **Company:** `{BROKER_ENTITY}`\n"
-        f"• **License:** `{BROKER_LICENSE}`\n"
-        f"• **Address:** `{BROKER_ADDRESS}`\n"
-        "• **Status:** Not an Authorized Deposit-Taking Institution (Clause 39).\n\n"
-        "📜 **2. Amendment & Termination (Clause 18):**\n"
-        "• Current version published on the website governs all margin FX, options, and CFD contracts.\n"
-        "• Company may amend with written notice for good reasons (clarity, compliance, market conditions).\n"
-        "• 14-day objection window: client may object, leading to orderly position closure without penalty.\n\n"
-        "⚠️ **3. Risk Disclosure & Suitability (Clause 24):**\n"
-        "• Derivatives involve substantial risk of capital loss due to leverage.\n"
-        "• Client warrants full legal capacity, solvency, and compliance with anti-insider trading laws.\n"
-        "• Angkor Quant & GTC do not provide personalized financial, legal, or tax advice.\n\n"
-        "⚡ **4. MetaTrader & Execution Latency (Clause 37):**\n"
-        "• MetaTrader is a third-party solution. Latency is inherent to internet communications.\n"
-        "• 1-pip slippage tolerance policy applies in both company's and client's favor.\n"
-        "• Clients can control slippage via local deviation settings.\n\n"
-        "⚖️ **5. Limitation of Liability & Governing Law (Clauses 22 & 35):**\n"
-        "• Non-liability for indirect, consequential losses or loss of profit/opportunity.\n"
-        "• Client indemnifies Company against non-gross-negligence claims.\n"
-        "• Governed by and construed under the laws of the **Republic of Vanuatu**.\n\n"
-        "👉 _Click the button below to accept and record your agreement._"
+        "📜 **1. Private Proprietary Software License:**\n"
+        "The Angkor Quant AI Quantitative Engine is provided strictly for private, personal quantitative research and autonomous execution. "
+        "It is NOT a public financial service, authorized deposit-taking institution, or investment fund manager. "
+        "All assets remain 100% within your personal exchange/broker accounts in a strictly non-custodial architecture.\n\n"
+        "⚠️ **2. 100% User Sole Financial Responsibility:**\n"
+        "Trading digital assets, futures, margin FX, and commodities involves high volatility and extreme risk of capital destruction. "
+        "The user assumes 100% sole responsibility for all financial losses, liquidation events, and trading decisions. "
+        "There is absolutely ZERO guarantee of profit ($E[X] > 0$ model represents mathematical edge, not a profit warranty).\n\n"
+        "⚙️ **3. Disclaimer for Setup Mistakes, Glitches & Downtime:**\n"
+        "The system, founders, and developers expressly disclaim ANY and ALL liability for:\n"
+        "• User setup errors (wrong API keys, incorrect margin, excessive leverage, invalid lot size, or manual misconfigurations).\n"
+        "• System downtime, software crashes, bugs, exceptions, VPS reboots, or network latency spikes.\n"
+        "• Third-party exchange/broker outages, freeze events, execution slippage, or order rejections (-1013, -4061).\n\n"
+        "🛡️ **4. Absolute Waiver of Claims & Indemnity:**\n"
+        "By accessing or utilizing this system, the user irrevocably waives all rights to file claims, seek damages, or demand compensation "
+        "against Angkor Quant, its developers, or its founders. Software is provided strictly 'AS IS' and 'AS AVAILABLE'.\n\n"
+        "👉 _Click the button below to formally accept and record your agreement._"
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("en", status["accepted"])
 
 
 def build_acceptance_success_card(chat_id: int = 0) -> Tuple[str, InlineKeyboardMarkup]:
-    """Confirmation card when user accepts the agreement."""
+    """Confirmation card when user accepts the private agreement."""
     status = get_user_agreement_status(chat_id)
     accepted_time = status.get("accepted_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     msg = (
         f"{INSTITUTIONAL_HEADER}"
-        "🎉 **ការយល់ព្រមកិច្ចព្រមព្រៀងទទួលបានជោគជ័យ!** ✅\n"
-        f"**Client Agreement Formally Accepted**\n"
+        "🎉 **ការយល់ព្រមកិច្ចព្រមព្រៀងឯកជនទទួលបានជោគជ័យ!** ✅\n"
+        f"**Private Usage Agreement Formally Accepted**\n"
         f"{DIVIDER_HEAVY}\n\n"
-        "📋 **ព័ត៌មានលម្អិតនៃការកត់ត្រាផ្លូវច្បាប់ ៖**\n"
+        "📋 **ព័ត៌មានលម្អិតនៃការកត់ត្រា ៖**\n"
         f"• **Telegram User ID** ៖ `{chat_id}`\n"
         f"• **កំណែកិច្ចព្រមព្រៀង** ៖ `{AGREEMENT_VERSION}`\n"
         f"• **កាលបរិច្ឆេទយល់ព្រម** ៖ `{accepted_time}`\n"
-        "• **ស្ថានភាពគណនី** ៖ `VERIFIED & FULLY COMPLIANT ✅`\n\n"
+        "• **ស្ថានភាពទទួលខុសត្រូវ** ៖ `យល់ព្រមទទួលខុសត្រូវខ្លួនឯង ១០០% & មិនទាមទារសំណង`\n"
+        "• **ស្ថានភាពគណនី** ៖ `VERIFIED & FULLY ACTIVE ✅`\n\n"
         "💡 **សិទ្ធិ & អត្ថប្រយោជន៍ដែលបានបើកដំណើរការ ៖**\n"
         "1. ចូលប្រើប្រាស់ពេញលេញលើ **Angkor Quant AI Engine v4.0**\n"
         "2. ដំណើរការប្រព័ន្ធស្វ័យប្រវត្តិកម្ម **Turbo Hedge**, **SmartX Swarm**, និង **Trading Journal**\n"
-        "3. ទទួលបានការការពារហានិភ័យដោយស្វ័យប្រវត្តិតាមស្តង់ដារ **Zero Technical Negligence**\n\n"
+        "3. ដំណើរការប្រព័ន្ធការពារហានិភ័យស្វ័យប្រវត្តិ **Zero Technical Negligence**\n\n"
         "👉 _សូមចុចប៊ូតុងខាងក្រោមដើម្បីចូលទៅកាន់ផ្ទាំងបញ្ជាមេ Master Control Panel!_"
         f"{INSTITUTIONAL_FOOTER}"
     )

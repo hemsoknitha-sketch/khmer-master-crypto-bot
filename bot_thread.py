@@ -3673,7 +3673,7 @@ class TelegramBotThread(BaseThread):
 
             if update.callback_query:
                 try:
-                    await update.callback_query.answer("📜 កំពុងបើកកិច្ចព្រមព្រៀង & លក្ខខណ្ឌសេវាកម្ម...")
+                    await update.callback_query.answer("📜 កំពុងបើកកិច្ចព្រមព្រៀងឯកជន & ការលះបង់ការទាមទារសំណង...")
                 except Exception:
                     pass
 
@@ -7373,7 +7373,7 @@ class TelegramBotThread(BaseThread):
                 await about_command(update, context)
             elif data == "btn_about_terms":
                 try:
-                    await query.answer("📜 កំពុងបើកលក្ខខណ្ឌកិច្ចព្រមព្រៀង...")
+                    await query.answer("📜 កំពុងបើកលក្ខខណ្ឌប្រើប្រាស់ឯកជន...")
                 except Exception:
                     pass
                 import legal_agreement
@@ -7384,7 +7384,7 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
             elif data == "btn_about_risk":
                 try:
-                    await query.answer("⚠️ កំពុងបើកសេចក្តីប្រកាសហានិភ័យ...")
+                    await query.answer("⚠️ កំពុងបើកការទទួលខុសត្រូវហានិភ័យ...")
                 except Exception:
                     pass
                 import legal_agreement
@@ -7395,7 +7395,7 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
             elif data == "btn_about_mt5":
                 try:
-                    await query.answer("🏛️ កំពុងបើកលក្ខខណ្ឌ MT5 & Slippage...")
+                    await query.answer("⚙️ កំពុងបើកការកំណត់លើកំហុស & ការគាំងប្រព័ន្ធ...")
                 except Exception:
                     pass
                 import legal_agreement
@@ -7406,7 +7406,7 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
             elif data == "btn_about_liability":
                 try:
-                    await query.answer("🛡️ កំពុងបើកដែនកំណត់ទទួលខុសត្រូវ...")
+                    await query.answer("🛡️ កំពុងបើកការលើកលែងការទទួលខុសត្រូវ...")
                 except Exception:
                     pass
                 import legal_agreement
@@ -7417,7 +7417,7 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
             elif data == "btn_about_privacy":
                 try:
-                    await query.answer("🔒 កំពុងបើកគោលការណ៍ឯកជនភាព & AML...")
+                    await query.answer("🔒 កំពុងបើកសុវត្ថិភាពទិន្នន័យ & 2FA PIN...")
                 except Exception:
                     pass
                 import legal_agreement
@@ -7428,7 +7428,7 @@ class TelegramBotThread(BaseThread):
                     await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
             elif data == "btn_about_en":
                 try:
-                    await query.answer("🌐 Loading English Legal Agreement...")
+                    await query.answer("🌐 Loading English Private Terms...")
                 except Exception:
                     pass
                 import legal_agreement
@@ -7441,7 +7441,7 @@ class TelegramBotThread(BaseThread):
                 import legal_agreement
                 legal_agreement.record_user_agreement_acceptance(chat_id=chat_id)
                 try:
-                    await query.answer("✅ អ្នកបានយល់ព្រមកិច្ចព្រមព្រៀងសេវាកម្ម V.25.12.1 ដោយជោគជ័យ!", show_alert=True)
+                    await query.answer("✅ អ្នកបានយល់ព្រមកិច្ចព្រមព្រៀងឯកជន V.25.12.1-PRIVATE ដោយជោគជ័យ!", show_alert=True)
                 except Exception:
                     pass
                 text, keyboard = legal_agreement.build_acceptance_success_card(chat_id=chat_id)
