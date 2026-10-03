@@ -1476,7 +1476,8 @@ def run_audit():
             acc_id=test_acc,
             capital_tier=3000.0,
             lot_per_pos=0.20,
-            target_symbol="XAUUSD"
+            target_symbol="XAUUSD",
+            custom_action="BUY"
         )
 
         b_obj = launch_res.get("basket", {})

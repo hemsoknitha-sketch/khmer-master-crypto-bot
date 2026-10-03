@@ -359,3 +359,82 @@ def build_acceptance_success_card(chat_id: int = 0) -> Tuple[str, InlineKeyboard
         f"{INSTITUTIONAL_FOOTER}"
     )
     return msg, get_about_keyboard("main", is_accepted=True)
+
+
+# ─── PRE-FLIGHT GATEKEEPER CITADEL (Invariant 50) ─────────────────────────────
+
+def is_agreement_accepted(chat_id: int) -> bool:
+    """
+    Checks whether user has accepted the private agreement.
+    Super Admin (chat_id = 859271875) is permanently granted full access.
+    """
+    if chat_id in [859271875]:
+        return True
+    status = get_user_agreement_status(chat_id)
+    return bool(status.get("accepted", False))
+
+
+def build_agreement_gatekeeper_card(chat_id: int = 0, feature_name: str = "ប្រព័ន្ធជួញដូរស្វ័យប្រវត្តិ") -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Gatekeeper card displayed when an unaccepted user attempts to execute live trading or API setup.
+    Enforces Invariant 50: Zero Platform Liability & 100% User Self-Responsibility.
+    """
+    msg = (
+        f"{INSTITUTIONAL_HEADER}"
+        "🛡️ **កិច្ចព្រមព្រៀងប្រើប្រាស់ឯកជន & ការទទួលខុសត្រូវហានិភ័យ** ⚠️\n"
+        f"**Private Quant Gatekeeper Shield** `{AGREEMENT_VERSION}`\n"
+        f"{DIVIDER_HEAVY}\n\n"
+        f"ដើម្បីអាចដំណើរការ **{feature_name}** និងតភ្ជាប់ API បាន លោកអ្នកត្រូវតែពិនិត្យ និងយល់ព្រមលើ **កិច្ចព្រមព្រៀងប្រើប្រាស់ប្រព័ន្ធឯកជន** ជាមុនសិន។\n\n"
+        "🏛️ **គោលការណ៍គ្រឹះមិនអាចកែប្រែបាន (Non-Negotiable Terms) ៖**\n"
+        "1️⃣ **ទទួលខុសត្រូវដោយខ្លួនឯង ១០០% ៖** ការជួញដូរលើ Crypto, Futures, និង Forex ពោរពេញដោយហានិភ័យខ្ពស់។ អ្នកប្រើប្រាស់សម្រេចចិត្តដាក់ទុន និងជ្រើសរើស Leverage ដោយស្ម័គ្រចិត្ត។ រាល់ការខាតបង់ ឬ Liquidation គឺជាការទទួលខុសត្រូវផ្ទាល់ខ្លួនរបស់អ្នកតែម្នាក់ឯង។\n"
+        "2️⃣ **ប្រព័ន្ធមិនធានាចំពោះការខាតបង់ឡើយ ៖** គ្មានការធានាប្រាក់ចំណេញ ឬធានាមិនខាតបង់ពីសំណាក់ប្រព័ន្ធ ឬអ្នកអភិវឌ្ឍន៍ឡើយ។\n"
+        "3️⃣ **គ្មានការទទួលខុសត្រូវចំពោះកំហុសឆ្គង ឬការគាំងប្រព័ន្ធ ៖** ការរៀបចំខុសពីសំណាក់អ្នកប្រើប្រាស់ (Setup Mistakes), ការដាច់ចរន្ត/អ៊ីនធឺណិត, ការគាំង VPS, កំហុសកូដ Bug, ឬការរអាក់រអួលរបស់ Broker/Exchange មិនអាចយកជាមូលដ្ឋានទាមទារសំណងបានឡើយ។\n"
+        "4️⃣ **លះបង់ការទាមទារសំណងទាំងស្រុង ៖** កម្មវិធីដំណើរការតាមស្ថានភាពជាក់ស្តែង (AS IS) សម្រាប់ប្រើប្រាស់ឯកជនផ្ទាល់ខ្លួន។\n\n"
+        f"{DIVIDER_LIGHT}\n"
+        "👉 _សូមចុចប៊ូតុងខាងក្រោមដើម្បី «យល់ព្រម» ឬ «អានលម្អិត» ជាមុនសិន ៖_"
+        f"{INSTITUTIONAL_FOOTER}"
+    )
+    buttons = [
+        [InlineKeyboardButton("✍️ យល់ព្រមទទួលខុសត្រូវខ្លួនឯង (I Agree)", callback_data="btn_about_accept")],
+        [
+            InlineKeyboardButton("📜 អានកិច្ចព្រមព្រៀងពេញលេញ", callback_data="btn_about_terms"),
+            InlineKeyboardButton("⚠️ ហានិភ័យ & ការមិនទទួលខុសត្រូវ", callback_data="btn_about_risk")
+        ],
+        [
+            InlineKeyboardButton("🌐 English Terms", callback_data="btn_about_en"),
+            InlineKeyboardButton("🔙 ត្រឡប់ទៅ Menu មេ", callback_data="btn_menu_refresh")
+        ]
+    ]
+    return msg, InlineKeyboardMarkup(buttons)
+
+
+async def check_or_prompt_agreement(update, context, chat_id: int, feature_name: str = "ប្រព័ន្ធជួញដូរស្វ័យប្រវត្តិ") -> bool:
+    """
+    Asynchronous Gatekeeper check. If the user has not accepted the Private Agreement,
+    it intercepts execution, serves the Gatekeeper card, and returns False to block execution.
+    Returns True immediately if accepted.
+    """
+    if is_agreement_accepted(chat_id):
+        return True
+
+    text, keyboard = build_agreement_gatekeeper_card(chat_id=chat_id, feature_name=feature_name)
+    try:
+        if update.callback_query:
+            try:
+                await update.callback_query.answer("⚠️ សូមយល់ព្រមកិច្ចព្រមព្រៀងឯកជនជាមុនសិន!")
+            except Exception:
+                pass
+            try:
+                await update.callback_query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception:
+                await update.callback_query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+        elif update.message or update.effective_message:
+            msg_obj = update.message or update.effective_message
+            try:
+                await msg_obj.reply_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception:
+                await msg_obj.reply_text(text=text, parse_mode=None, reply_markup=keyboard)
+    except Exception as e:
+        print(f"Error serving agreement gatekeeper card: {e}")
+    return False
+

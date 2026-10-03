@@ -702,6 +702,18 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 50: Angkor Institutional Private Agreement & Absolute Risk Waiver Gatekeeper (កិច្ចព្រមព្រៀងឯកជន & ការលះបង់ការទទួលខុសត្រូវ 100% អចិន្ត្រៃយ៍)
+- **Location:** `legal_agreement.py`, `database.py` (`user_legal_agreements`), `bot_thread.py` (`agreement_command`, `btn_agree_terms`, `btn_read_terms`, pre-flight gatekeepers on `/add_api`, `/auto_trade`, `/turbo_hedge`, `/smart_trade`), `bot_commands_registry.py`
+- **Rule:**
+  1. **Strict Private Contract & Educational Software Status (ឋានៈកម្មវិធីស្រាវជ្រាវ & កិច្ចសន្យាឯកជន):** Angkor Quant Engine operates strictly as an institutional quantitative research tool and private algorithmic automation suite. It is NOT a financial advisory service, broker, deposit taker, or pooled investment fund.
+  2. **Mandatory Pre-Flight Execution Gatekeeper:** Before any user can store live Binance API keys, activate `/auto_trade ON`, execute live `/turbo_hedge`, or run automated executions in `/smart_trade`, the system programmatically verifies whether the user has signed the digital agreement. Unsigned attempts are intercepted with an interactive Gatekeeper card requiring explicit agreement.
+  3. **Zero Financial Liability & 100% Assumption of Risk (ការលះបង់ការទទួលខុសត្រូវ ១០០%):** Users explicitly agree and affirm that trading cryptocurrencies, derivatives, and forex involves extreme financial risk, including potential loss of principal, broker slippage, exchange API downtime, liquidation, and extreme market volatility. The creator (HEM SINATH), developers, and operators bear ZERO liability for any direct, indirect, or consequential capital losses.
+  4. **Digital Cryptographic Audit Trail:** User agreement is logged in `user_legal_agreements` with immutable cryptographic SHA-256 hash of the agreement text, Unix timestamp, user handle, and client version, creating a legally defensible digital audit trail.
+  5. **1-Tap Review and Compliance Suite (`/agreement`):** Users can review the full 7-article charter anytime via `/agreement` or `/about`, inspect their agreement status, view the SHA-256 verification hash, and access the official terms.
+- **Enforcement:** Verified by `audit_system.py` and pre-flight execution hooks.
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.

@@ -3069,6 +3069,11 @@ class TelegramBotThread(BaseThread):
             user_api = db.get_user_api(chat_id) if hasattr(db, 'get_user_api') else None
             has_api = bool(user_api and len(user_api) >= 2 and user_api[0])
 
+            # Private Agreement Status Check
+            import legal_agreement
+            agreement_status = legal_agreement.get_user_agreement_status(chat_id)
+            is_agreed = bool(agreement_status.get("accepted", False)) or is_admin
+
             # Construct Interactive Navigation Keyboard (Investment Focus)
             base_keyboard = [
                 [
@@ -3093,7 +3098,8 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
                 ],
                 [
-                    InlineKeyboardButton("🔑 Setup API", callback_data="btn_menu_api")
+                    InlineKeyboardButton("🔑 Setup API", callback_data="btn_menu_api"),
+                    InlineKeyboardButton("📜 កិច្ចព្រមព្រៀងឯកជន", callback_data="btn_about_menu")
                 ]
             ]
 
@@ -3121,7 +3127,8 @@ class TelegramBotThread(BaseThread):
                     f"• **Account Tier**: `{user_role_en}`\n"
                     f"• **Execution Mode**: `{mode_badge_en}`\n"
                     "• **Margin Guard**: `🛡️ 100% ISOLATED (Zero Contagion Guarantee)`\n"
-                    f"• **Binance API**: `{api_status_en}`\n\n"
+                    f"• **Binance API**: `{api_status_en}`\n"
+                    f"• **Private Agreement**: `{'🟢 Accepted (V.25.12.1-PRIVATE)' if is_agreed else '🟡 Pending Review (Tap Terms Below)'}`\n\n"
                     "💎 **INSTITUTIONAL INVESTMENT ENGINES (PROPRIETARY AI):**\n"
                     "1. 💎 **24/7 Perpetual Wealth**: Autonomous capital compounding (100% capital preservation with 0% liquidation risk, institutional profit-locking armor & smart capital rotation)\n"
                     "2. 🛡️ **Apex Turbo Hedge**: Dual-side volatility harvesting technology (Autonomous risk shielding that captures returns whether market pumps or dumps)\n"
@@ -3169,7 +3176,8 @@ class TelegramBotThread(BaseThread):
                     f"• **账户级别**: `{user_role_zh}`\n"
                     f"• **交易模式**: `{mode_badge_zh}`\n"
                     "• **保证金模式**: `🛡️ 100% 逐仓隔离 (零穿仓传染风险)`\n"
-                    f"• **API 状态**: `{api_status_zh}`\n\n"
+                    f"• **API 状态**: `{api_status_zh}`\n"
+                    f"• **私人协议**: `{'🟢 已同意 (V.25.12.1-PRIVATE)' if is_agreed else '🟡 待同意 (点击下方协议阅读)'}`\n\n"
                     "💎 **机构级核心量化投资引擎 (华尔街专利架构):**\n"
                     "1. 💎 **24/7 永续财富引擎**: 全天候全自动复利增值 (现货 100% 保本 0% 爆仓风险，配备机构级利润锁定装甲与智能资产轮动)\n"
                     "2. 🛡️ **极速对冲引擎**: 双向波动率智能收割技术 (无论牛熊涨跌均可全自动捕获收益，提供全方位的风控护盾)\n"
@@ -3217,7 +3225,8 @@ class TelegramBotThread(BaseThread):
                     f"• **ឋានៈគណនី**: `{user_role_km}`\n"
                     f"• **ទម្រង់ជួញដូរ**: `{mode_badge_km}`\n"
                     "• **Margin Guard**: `🛡️ 100% ISOLATED (គ្មានហានិភ័យឆ្លងកាបូប)`\n"
-                    f"• **ស្ថានភាព API**: `{api_status_km}`\n\n"
+                    f"• **ស្ថានភាព API**: `{api_status_km}`\n"
+                    f"• **កិច្ចព្រមព្រៀងឯកជន**: `{'🟢 បានយល់ព្រម (V.25.12.1-PRIVATE)' if is_agreed else '🟡 មិនទាន់យល់ព្រម (ចុចអានខាងក្រោម)'}`\n\n"
                     "💎 **ប្រព័ន្ធយុទ្ធសាស្ត្រវិនិយោគស្វ័យប្រវត្តិកម្រិតស្ថាប័ន (Institutional AI Engines):**\n"
                     "1. 💎 **24/7 Perpetual Wealth**: ប្រព័ន្ធបង្កើតទ្រព្យអកម្មស្វ័យប្រវត្តិ ២៤/៧ (Spot 100% គ្មានហានិភ័យ Liquidation ជាមួយបច្ចេកវិទ្យាចាក់សោប្រាក់ចំណេញសុទ្ធ និងបង្វិលទុនឆ្លាតវៃ)\n"
                     "2. 🛡️ **Angkor Turbo Hedge**: បច្ចេកវិទ្យាច្បាមចំណេញរាល់ការប្រែប្រួលទីផ្សារទ្វេទិស (គ្រប់គ្រងហានិភ័យស្វ័យប្រវត្តិ មិនខ្វល់ទីផ្សារឡើងឬចុះ គ្រប់គ្រងហានិភ័យកម្រិតខ្ពស់លើគណនីគ្រប់ទំហំ)\n"
@@ -8133,6 +8142,11 @@ class TelegramBotThread(BaseThread):
             else:
                 user_lang = 'km'
 
+            # Pre-Flight Private Agreement Gatekeeper (Invariant 50)
+            import legal_agreement
+            if not await legal_agreement.check_or_prompt_agreement(update, context, chat_id, "ការភ្ជាប់ Binance API"):
+                return
+
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
@@ -12604,6 +12618,12 @@ class TelegramBotThread(BaseThread):
 
             action = str(args[0]).upper().strip()
 
+            # Pre-Flight Private Agreement Gatekeeper (Invariant 50)
+            if action not in ["STATUS", "INFO"] and not (action in ["WEALTH", "PROTOCOL", "LAYERED"] and (len(args) == 1 or str(args[1]).upper().strip() in ["STATUS", "INFO"])):
+                import legal_agreement
+                if not await legal_agreement.check_or_prompt_agreement(update, context, chat_id, "Turbo Hedge Engine"):
+                    return
+
             if action in ["WEALTH", "PROTOCOL", "LAYERED"]:
                 sub_action = str(args[1]).upper().strip() if len(args) > 1 else "STATUS"
                 import turbo_hedge_engine
@@ -12893,6 +12913,14 @@ class TelegramBotThread(BaseThread):
                     await msg_target.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
                 await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)
                 return
+
+            # Pre-Flight Private Agreement Gatekeeper (Invariant 50)
+            if args and len(args) > 0:
+                first_arg = str(args[0]).upper().strip()
+                if first_arg not in ["STATUS", "INFO"]:
+                    import legal_agreement
+                    if not await legal_agreement.check_or_prompt_agreement(update, context, chat_id, "Smart Trade Engine"):
+                        return
 
             # 🧠 Super Smart Poly-Format Argument Parser for Futures, Spot & Hedge Modes:
             raw_args = [a.strip() for a in args]
@@ -16761,6 +16789,9 @@ class TelegramBotThread(BaseThread):
                     return
 
                 if action == "ON":
+                    import legal_agreement
+                    if not await legal_agreement.check_or_prompt_agreement(update, context, chat_id, "Macro Auto-Trade"):
+                        return
                     trade_amt = amount
                     if len(args) >= 2:
                         try:

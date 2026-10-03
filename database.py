@@ -9937,6 +9937,11 @@ def get_user_agreement_status(chat_id: int):
     import legal_agreement
     return legal_agreement.get_user_agreement_status(chat_id)
 
+def is_user_agreement_accepted(chat_id: int) -> bool:
+    """Checks whether user has accepted the private agreement."""
+    import legal_agreement
+    return legal_agreement.is_agreement_accepted(chat_id)
+
 
 # Initialize and auto-migrate database schema on startup
 try:

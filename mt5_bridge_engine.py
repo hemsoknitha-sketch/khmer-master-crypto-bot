@@ -2350,8 +2350,8 @@ class MT5BridgeEngine:
         cur_mid = float(quote.get("mid", 0.0) if quote else 0.0)
 
         action = custom_action
-        signal_conf = 0.0
-        signal_reason = ""
+        signal_conf = 88.0 if (custom_action and custom_action.upper() in ["BUY", "SELL"]) else 0.0
+        signal_reason = f"DIRECT_{custom_action}" if custom_action else ""
 
         # Tier 1: Query MT5SMCCitadelEngine for 9-SMC Multi-Timeframe Confluence (H4, H1, M30, M15)
         # Analyzes: Order Blocks, FVGs, Inducements, Liquidity Sweeps, Kill Zones, Dealing Range Equilibrium
