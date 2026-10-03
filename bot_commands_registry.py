@@ -78,6 +78,7 @@ def get_public_bot_commands():
         BotCommand("balance", "💰 Angkor Multi-Wallet USDT Balance"),
         BotCommand("portfolio", "💼 Angkor Unified Portfolio & Net PnL"),
         BotCommand("status", "📊 Angkor Active Trades & Live PnL"),
+        BotCommand("journal", "📓 Angkor Trading Journal & Mistake Tag"),
         BotCommand("report", "📊 Angkor Multi-Timeframe Engine Audit"),
         BotCommand("paper_trading", "🧪 Angkor Paper vs Live Trading Mode"),
         BotCommand("alert", "🔔 Angkor Real-Time Price Alert"),

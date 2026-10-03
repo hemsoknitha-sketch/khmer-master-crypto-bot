@@ -2677,6 +2677,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - View total PnL and active trading positions\n"
                     "• `/balance` - Check Spot & Futures Balances Real-Time\n"
                     "• `/status` - View 24/7 Engine Execution & Order Status\n"
+                    "• `/journal` - 📓 Trading Journal & Discipline Mistake Tagging\n"
                     "• `/report` - 📊 Multi-Timeframe & Engine VIP Audit Report\n"
                     "• `/stop ALL` - Emergency Stop All Active Trading Engines\n\n"
                     "🚀 **2. FLAGSHIP AUTONOMOUS TRADING ENGINES**\n"
@@ -2710,6 +2711,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - 查看总 PnL 及所有持仓\n"
                     "• `/balance` - 实时查询 Spot 与 Futures 余额\n"
                     "• `/status` - 查看 24/7 交易引擎运行状态\n"
+                    "• `/journal` - 📓 交易日记与纪律标签 (Trading Journal)\n"
                     "• `/report` - 📊 多周期与各引擎 VIP 审计报表\n"
                     "• `/stop ALL` - 紧急一键停止所有运行引擎\n\n"
                     "🚀 **2. 核心自主交易引擎**\n"
@@ -2743,6 +2745,7 @@ class TelegramBotThread(BaseThread):
                     "• `/portfolio` - ពិនិត្យប្រាក់ចំណេញ PnL និង Position ទាំងអស់\n"
                     "• `/balance` - សារពើភ័ណ្ឌ Spot & Futures Balance Real-Time\n"
                     "• `/status` - ស្ថានភាពរ៉ាន់ Bot ក្នុង Real-Time 24/7\n"
+                    "• `/journal` - 📓 Trading Journal & Mistake Tagging (កែប្រែវិន័យ & ចិត្តសាស្ត្រ)\n"
                     "• `/report` - 📊 របាយការណ៍សវនកម្ម VIP (Daily, Monthly, Engines)\n"
                     "• `/stop ALL` - បិទប្រព័ន្ធរ៉ាន់ Bot ទាំងអស់ (Soft / Hard Stop)\n\n"
                     "🚀 **២. FLAGSHIP AUTONOMOUS TRADING ENGINES (ម៉ាស៊ីនវិនិយោគស្វ័យប្រវត្តិ)**\n"
@@ -2792,7 +2795,11 @@ class TelegramBotThread(BaseThread):
             keyboard = [
                 [
                     InlineKeyboardButton("📊 24H Executive Report", callback_data="btn_executive_report"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    InlineKeyboardButton("📓 Trading Journal", callback_data="btn_journal")
+                ],
+                [
+                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio"),
+                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh")
                 ],
                 [
                     InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
@@ -2803,27 +2810,26 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("💎 24/7 Wealth", callback_data="btn_wealth_status")
                 ],
                 [
-                    InlineKeyboardButton("💰 Live Balance", callback_data="btn_balance_refresh"),
-                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
-                ],
-                [
                     InlineKeyboardButton("🌾 Funding Harvester", callback_data="btn_funding_harvester"),
-                    InlineKeyboardButton("📈 Infinity Matrix", callback_data="btn_infinity_grid_launch")
+                    InlineKeyboardButton("⚡ Sub-5ms Cross Arb", callback_data="btn_cross_arb")
                 ],
                 [
                     InlineKeyboardButton("🏆 PAXG Gold Guard", callback_data="btn_gold_radar"),
                     InlineKeyboardButton("🎯 Flash Crash Wick", callback_data="btn_snipe_launch")
                 ],
                 [
-                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt"),
-                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt")
+                    InlineKeyboardButton("📈 Infinity Matrix", callback_data="btn_infinity_grid_launch"),
+                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
                 ],
                 [
-                    InlineKeyboardButton("📰 Crypto News", callback_data="btn_news_refresh"),
-                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api")
+                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
+                    InlineKeyboardButton("📰 Crypto News", callback_data="btn_news_refresh")
                 ],
                 [
-                    InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km"),
+                    InlineKeyboardButton("🔑 Add Binance API", callback_data="btn_menu_api"),
+                    InlineKeyboardButton("🌐 Language", callback_data="btn_lang_km")
+                ],
+                [
                     InlineKeyboardButton("🔄 Refresh Master Control Panel", callback_data="btn_menu_refresh")
                 ]
             ]
@@ -3615,6 +3621,44 @@ class TelegramBotThread(BaseThread):
                     await (update.effective_message or update.message).reply_text(err_txt)
 
         executive_summary_command = report_command
+
+        async def journal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id:
+                return
+            if not await verify_user(update):
+                return
+
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer("⚡ កំពុងបើក Trading Journal & Mistake Tagging...")
+                except Exception:
+                    pass
+
+            try:
+                import trading_journal
+                text, keyboard = trading_journal.build_journal_card(chat_id=chat_id, page=0)
+                if update.callback_query:
+                    try:
+                        await update.callback_query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await update.callback_query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+                else:
+                    try:
+                        await (update.effective_message or update.message).reply_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await (update.effective_message or update.message).reply_text(text=text, parse_mode=None, reply_markup=keyboard)
+            except Exception as e:
+                err_msg = f"⚠️ Error in Trading Journal: {e}"
+                if update.callback_query:
+                    try:
+                        await update.callback_query.answer(err_msg, show_alert=True)
+                    except Exception:
+                        pass
+                else:
+                    await (update.effective_message or update.message).reply_text(err_msg)
+
+        trading_journal_command = journal_command
 
 
         async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -7198,6 +7242,86 @@ class TelegramBotThread(BaseThread):
                 "btn_report_smart_trade", "btn_report_wealth", "btn_report_grid", "btn_report_flash_loan"
             ] or data.startswith("btn_report_"):
                 await report_command(update, context)
+            elif data in ["btn_journal", "btn_journal_menu", "btn_trading_journal"]:
+                context.args = []
+                await journal_command(update, context)
+            elif data.startswith("btn_journal_page_"):
+                try:
+                    p_num = int(data.split("_")[-1])
+                except Exception:
+                    p_num = 0
+                import trading_journal
+                text, keyboard = trading_journal.build_journal_card(chat_id=chat_id, page=p_num)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data.startswith("btn_tag_trade_"):
+                try:
+                    t_id = int(data.split("_")[-1])
+                except Exception:
+                    t_id = 0
+                import trading_journal
+                text, keyboard = trading_journal.build_tagging_card(trade_id=t_id, chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data.startswith("btn_set_tag_"):
+                parts = data.replace("btn_set_tag_", "").split("_", 1)
+                if len(parts) >= 2:
+                    t_id = int(parts[0])
+                    tag_k = parts[1]
+                    import trading_journal
+                    success = trading_journal.tag_journal_trade(trade_id=t_id, chat_id=chat_id, tag_key=tag_k)
+                    toast = f"✅ Tagged Trade #{t_id} as {trading_journal.TAG_CATALOG.get(tag_k, {}).get('label', tag_k)}!" if success else "⚠️ Tagging Failed!"
+                    try:
+                        await query.answer(toast, show_alert=False)
+                    except Exception:
+                        pass
+                    text, keyboard = trading_journal.build_journal_card(chat_id=chat_id, page=0)
+                    try:
+                        await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                    except Exception:
+                        await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_journal_expectancy":
+                import trading_journal
+                text, keyboard = trading_journal.build_performance_expectancy_card(chat_id=chat_id)
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    await query.edit_message_text(text=text, parse_mode=None, reply_markup=keyboard)
+            elif data == "btn_journal_confluence_sample":
+                import trading_journal
+                checklist = trading_journal.build_confluence_checklist(
+                    symbol="BTCUSDT",
+                    side="LONG",
+                    timeframe="15m",
+                    structure="Bullish BOS (Higher High Confirmed)",
+                    value_zone="Pullback to 50% S/R Demand Block",
+                    trend_filter="Price > EMA 50 & EMA 200 (Golden Slope)",
+                    calendar_status="Zero Red News in next 30m (Clean)",
+                    anti_panic_rsi=54.2,
+                    risk_kelly_pct=1.5,
+                    rr_ratio=2.5
+                )
+                from ui_standards import DIVIDER_DOUBLE
+                sample_text = (
+                    "📋 **PRE-FLIGHT CONFLUENCE CHECKLIST** ⚡\n"
+                    "_ស្តង់ដារត្រួតពិនិត្យ ៦ ដំណាក់កាលមុនពេលចូល Trade_\n"
+                    f"{DIVIDER_DOUBLE}\n"
+                    f"{checklist}\n\n"
+                    "💡 _គំរូ Checklist នេះត្រូវបានផ្ទៀងផ្ទាត់ស្វ័យប្រវត្តិក្នងគ្រប់ Trade ទាំងអស់របស់ Angkor Quant!_"
+                )
+                from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+                kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📓 ត្រឡប់ទៅ Journal", callback_data="btn_journal_page_0")],
+                    [InlineKeyboardButton("🔙 ត្រឡប់ទៅ Menu", callback_data="btn_menu_refresh")]
+                ])
+                try:
+                    await query.edit_message_text(text=sample_text, parse_mode="Markdown", reply_markup=kb)
+                except Exception:
+                    await query.edit_message_text(text=sample_text, parse_mode=None, reply_markup=kb)
             elif data in ["btn_menu_portfolio", "btn_portfolio"]:
                 context.args = []
                 await portfolio_command(update, context)
@@ -19166,6 +19290,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("snipe", pre_pump_command))
         self.app.add_handler(CommandHandler("auto_snipe", pre_pump_command))
         self.app.add_handler(CommandHandler("portfolio", portfolio_command))
+        self.app.add_handler(CommandHandler("journal", journal_command))
+        self.app.add_handler(CommandHandler("trading_journal", journal_command))
         self.app.add_handler(CommandHandler("report", report_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
         self.app.add_handler(CommandHandler("stop_all", stop_all_command))

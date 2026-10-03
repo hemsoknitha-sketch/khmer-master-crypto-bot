@@ -9899,9 +9899,32 @@ def delete_vip_hf_worker(account_id: str) -> bool:
         return False
 
 
+# ─── TRADING JOURNAL & MISTAKE TAGGING CITADEL (Invariant 47 & 50) ─────────
+def init_trade_journal_table():
+    """Initializes the trade journal review & mistake tagging schema."""
+    import trading_journal
+    trading_journal.init_trade_journal_table()
+
+def get_journal_trades(chat_id: int, limit: int = 5, offset: int = 0):
+    """Retrieves paginated journal trade entries for a specific user."""
+    import trading_journal
+    return trading_journal.get_journal_trades(chat_id, limit, offset)
+
+def tag_journal_trade(trade_id: int, chat_id: int, tag_key: str, notes: str = ""):
+    """Tags a closed trade with a specific discipline label and updates metrics."""
+    import trading_journal
+    return trading_journal.tag_journal_trade(trade_id, chat_id, tag_key, notes)
+
+def calculate_journal_metrics(chat_id: int):
+    """Computes professional quantitative trading metrics and discipline score."""
+    import trading_journal
+    return trading_journal.calculate_journal_metrics(chat_id)
+
+
 # Initialize and auto-migrate database schema on startup
 try:
     init_db()
+    init_trade_journal_table()
 except Exception:
     pass
 
