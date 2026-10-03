@@ -299,13 +299,18 @@ def get_khmer_pdf_font() -> str:
     candidate_paths = [
         os.path.join(BASE_DIR, "assets", "fonts", "KhmerOS.ttf"),
         os.path.join(os.path.dirname(BASE_DIR), "assets", "fonts", "KhmerOS.ttf"),
+        "/usr/share/fonts/truetype/khmeros/KhmerOS.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "C:/Windows/Fonts/khmeros.ttf",
         "C:/Windows/Fonts/KhmerOSsiemreap.ttf",
         "C:/Windows/Fonts/tahoma.ttf",
         "C:/Windows/Fonts/arial.ttf"
     ]
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+    except ImportError:
+        return "Helvetica"
 
     for p in candidate_paths:
         if os.path.exists(p):
@@ -331,10 +336,14 @@ def generate_legal_contract_pdf(
     Generates an official, institutional-grade 2-page PDF legal contract document.
     Archived securely with cryptographic fingerprint and non-custodial declarations.
     """
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+    except ImportError as e_imp:
+        print(f"⚠️ [PDF ENGINE] ReportLab library is not installed: {e_imp}. Please run: pip install reportlab")
+        return ""
 
     os.makedirs(PDF_ARCHIVE_DIR, exist_ok=True)
     pdf_filename = f"Angkor_Quant_Agreement_{chat_id}_{contract_serial.replace('-', '_')}.pdf"
@@ -502,8 +511,12 @@ def generate_legal_contract_pdf(
     story.append(Spacer(1, 4))
     story.append(KeepTogether(st))
 
-    doc.build(story)
-    return pdf_path
+    try:
+        doc.build(story)
+        return pdf_path
+    except Exception as e_gen:
+        print(f"⚠️ [PDF ENGINE] Error generating PDF for {chat_id}: {e_gen}")
+        return ""
 
 
 # ─── INTERACTIVE TELEGRAM UI CARDS ───────────────────────────────────────────
@@ -1042,7 +1055,11 @@ async def handle_agreement_callback(update: Update, context: ContextTypes.DEFAUL
             serial = status.get("contract_serial") or f"AQ-AGR-RESTORE-{chat_id}"
             h_val = status.get("sha256_hash") or hashlib.sha256(serial.encode()).hexdigest()
             t_str = status.get("accepted_at") or datetime.now().strftime("%d/%m/%Y %H:%M:%S ICT")
-            pdf_path = generate_legal_contract_pdf(chat_id, username, full_name, phone, serial, h_val, t_str)
+            try:
+                pdf_path = generate_legal_contract_pdf(chat_id, username, full_name, phone, serial, h_val, t_str)
+            except Exception as e_pdf:
+                print(f"⚠️ Error regenerating contract PDF: {e_pdf}")
+                pdf_path = ""
 
         if pdf_path and os.path.exists(pdf_path):
             try:
@@ -1076,7 +1093,11 @@ async def handle_agreement_callback(update: Update, context: ContextTypes.DEFAUL
         preview_serial = f"AQ-AGR-PREVIEW-{chat_id}"
         h_val = hashlib.sha256(preview_serial.encode()).hexdigest()
         now_str = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y %H:%M:%S ICT")
-        pdf_path = generate_legal_contract_pdf(chat_id, username, first_name, "", preview_serial, h_val, now_str)
+        try:
+            pdf_path = generate_legal_contract_pdf(chat_id, username, first_name, "", preview_serial, h_val, now_str)
+        except Exception as e_prev:
+            print(f"⚠️ Error previewing contract PDF: {e_prev}")
+            pdf_path = ""
         if pdf_path and os.path.exists(pdf_path):
             try:
                 with open(pdf_path, "rb") as pdf_file:
@@ -1089,6 +1110,9 @@ async def handle_agreement_callback(update: Update, context: ContextTypes.DEFAUL
                     )
             except Exception as e_prev:
                 print(f"Error previewing PDF: {e_prev}")
+        else:
+            if query:
+                await query.answer("⚠️ មិនអាចទាញយក PDF បានទេ (កំពុងរៀបចំប្រព័ន្ធ ឬខ្វះ reportlab)!", show_alert=True)
         return
 
     # 4. Super Admin Agreements Dashboard
@@ -1130,15 +1154,19 @@ async def handle_agreement_callback(update: Update, context: ContextTypes.DEFAUL
             serial = status.get("contract_serial") or f"AQ-AGR-RESTORE-{t_chat_id}"
             h_val = status.get("sha256_hash") or hashlib.sha256(serial.encode()).hexdigest()
             t_str = status.get("accepted_at") or datetime.now().strftime("%d/%m/%Y %H:%M:%S ICT")
-            pdf_path = generate_legal_contract_pdf(
-                t_chat_id,
-                status.get("username", ""),
-                status.get("full_name", f"User_{t_chat_id}"),
-                status.get("phone_number", ""),
-                serial,
-                h_val,
-                t_str
-            )
+            try:
+                pdf_path = generate_legal_contract_pdf(
+                    t_chat_id,
+                    status.get("username", ""),
+                    status.get("full_name", f"User_{t_chat_id}"),
+                    status.get("phone_number", ""),
+                    serial,
+                    h_val,
+                    t_str
+                )
+            except Exception as e_pdf:
+                print(f"⚠️ Error regenerating contract PDF for admin: {e_pdf}")
+                pdf_path = ""
 
         if pdf_path and os.path.exists(pdf_path):
             caption_text = (
@@ -1162,7 +1190,7 @@ async def handle_agreement_callback(update: Update, context: ContextTypes.DEFAUL
                 await query.answer("✅ PDF ត្រូវបានទាញយក និងផ្ញើជូនរួចរាល់!")
         else:
             if query:
-                await query.answer("⚠️ រកមិនឃើញឯកសារ PDF របស់អ្នកប្រើប្រាស់នេះឡើយ!", show_alert=True)
+                await query.answer("⚠️ រកមិនឃើញ ឬមិនអាចទាញយក PDF បានឡើយ! (សូមពិនិត្យការដំឡើង reportlab)", show_alert=True)
         return
 
     # 6. VIP Request Information Card
