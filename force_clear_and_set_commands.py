@@ -49,7 +49,7 @@ async def force_reset_menu():
     public_commands = bot_commands_registry.get_public_bot_commands()
     admin_commands = bot_commands_registry.get_admin_bot_commands()
 
-    print("✨ [2/3] Registering v13.00 Absolute Ultimate AGI Public VIP Commands...")
+    print("✨ [2/3] Registering Angkor Quant v4.0 (AQ47) Public VIP Commands...")
     try:
         await bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
         await bot.set_my_commands(public_commands, scope=BotCommandScopeAllPrivateChats())

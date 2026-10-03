@@ -34,7 +34,7 @@ async def set_menu_commands():
             await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=859271875))
         except Exception:
             pass
-        print("[SUCCESS] Telegram Bot Menu updated to v13.00 Absolute Ultimate AGI Public VIP & Super Admin Scopes!")
+        print("[SUCCESS] Telegram Bot Menu updated to Angkor Quant v4.0 (AQ47) Public VIP & Super Admin Scopes!")
     except Exception as e:
         print(f"[ERROR] Error setting commands: {e}")
 
