@@ -3215,8 +3215,8 @@ class TelegramBotThread(BaseThread):
                     "• **Margin Guard**: `🛡️ 100% ISOLATED (គ្មានហានិភ័យឆ្លងកាបូប)`\n"
                     f"• **ស្ថានភាព API**: `{api_status_km}`\n\n"
                     "💎 **ប្រព័ន្ធយុទ្ធសាស្ត្រវិនិយោគស្វ័យប្រវត្តិកម្រិតស្ថាប័ន (Institutional AI Engines):**\n"
-                    "1. 💎 **24/7 Perpetual Wealth**: ប្រព័ន្ធបង្កើតទ្រព្យអកម្មស្វ័យប្រវត្តិ ២៤/៧ (ការពារដើមទុន ១០០% គ្មានហានិភ័យ Liquidation ជាមួយបច្ចេកវិទ្យាចាក់សោប្រាក់ចំណេញសុទ្ធ និងបង្វិលទុនឆ្លាតវៃ)\n"
-                    "2. 🛡️ **Apex Turbo Hedge**: បច្ចេកវិទ្យាច្បាមចំណេញរាល់ការប្រែប្រួលទីផ្សារទ្វេទិស (គ្រប់គ្រងហានិភ័យស្វ័យប្រវត្តិ មិនខ្វល់ទីផ្សារឡើងឬចុះ ធានាសុវត្ថិភាពខ្ពស់លើគណនីគ្រប់ទំហំ)\n"
+                    "1. 💎 **24/7 Perpetual Wealth**: ប្រព័ន្ធបង្កើតទ្រព្យអកម្មស្វ័យប្រវត្តិ ២៤/៧ (Spot 100% គ្មានហានិភ័យ Liquidation ជាមួយបច្ចេកវិទ្យាចាក់សោប្រាក់ចំណេញសុទ្ធ និងបង្វិលទុនឆ្លាតវៃ)\n"
+                    "2. 🛡️ **Angkor Turbo Hedge**: បច្ចេកវិទ្យាច្បាមចំណេញរាល់ការប្រែប្រួលទីផ្សារទ្វេទិស (គ្រប់គ្រងហានិភ័យស្វ័យប្រវត្តិ មិនខ្វល់ទីផ្សារឡើងឬចុះ គ្រប់គ្រងហានិភ័យកម្រិតខ្ពស់លើគណនីគ្រប់ទំហំ)\n"
                     "3. 👑 **SmartX Apex AI Brain**: ប្រព័ន្ធខួរក្បាលសិប្បនិម្មិតកម្រិតកំពូល ដំណើរការស្វ័យប្រវត្តិពហុស្រទាប់ (វិភាគស៊ីជម្រៅលើទិន្នន័យទីផ្សារពិភពលោក និងទិសដៅចរន្តសាច់ប្រាក់ Smart Money)\n"
                     "4. ⚡ **Quantum CeDeFi Arbitrage**: ប្រព័ន្ធទាញយកផលចំណេញរវាងផ្សារកណ្តាល និងវិមជ្ឈការក្នុងកម្រិតល្បឿនពន្លឺ ដោយគ្មានហានិភ័យលើប្រាក់ដើមទុនរបស់អ្នកប្រើប្រាស់ឡើយ\n"
                     "5. ❄️ **Spot Snowball Matrix**: យុទ្ធសាស្ត្រសន្សំ និងពង្រីកចំនួនកាក់ដោយស្វ័យប្រវត្តិ (ទិញទាប-លក់ខ្ពស់ជាប្រចាំ គ្មានហានិភ័យបាត់បង់កាក់ ឬ Liquidation សូម្បីតែមួយសេន)\n"
@@ -4323,6 +4323,7 @@ class TelegramBotThread(BaseThread):
                 
                 prediction = await asyncio.to_thread(self.ai_engine.chat_with_user, prompt, history=[])
                 if not isinstance(prediction, str): prediction = str(prediction or "")
+                prediction = ui_standards.sanitize_anti_guarantee_text(prediction)
                 
                 try: await context.bot.delete_message(chat_id=chat_id, message_id=status_msg.message_id)
                 except: pass
@@ -4522,6 +4523,7 @@ class TelegramBotThread(BaseThread):
                 chat_history = db.get_chat_history(chat_id, limit=10)
                 analysis_result = await asyncio.to_thread(self.ai_engine.chat_with_user, summary, history=chat_history)
                 if not isinstance(analysis_result, str): analysis_result = str(analysis_result or "")
+                analysis_result = ui_standards.sanitize_anti_guarantee_text(analysis_result)
                 db.add_chat_history(chat_id, 'model', analysis_result)
                 
                 action_keyboard = InlineKeyboardMarkup([
@@ -4688,6 +4690,7 @@ class TelegramBotThread(BaseThread):
 
                 analysis_result = await asyncio.to_thread(self.ai_engine.chat_with_user, ai_input, history=chat_history)
                 if not isinstance(analysis_result, str): analysis_result = str(analysis_result or "")
+                analysis_result = ui_standards.sanitize_anti_guarantee_text(analysis_result)
 
                 db.add_chat_history(chat_id, 'model', analysis_result)
                 
@@ -11453,7 +11456,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Allocated Margin**: `${amount:,.2f} USDT`\n"
                     f"• **Hedge Leverage**: `{leverage}x Futures Short`\n"
                     "• **Crash Monitor Strategy**: `Automated Crash Short Trigger (BTC/Market Dump > -1.0%)`\n"
-                    "• **Protection Guarantee**: `100% Spot Portfolio Downside Lock & Zero Liquidations`\n\n"
+                    "• **Portfolio Protection**: `Spot Portfolio Risk Mitigation & Zero Liquidations`\n\n"
                     "📋 **1-TAP COMMAND EXECUTIONS:**\n"
                     "👉 **ដើម្បីបើកដំណើរការ ៖**\n`` `/hedge_mode ON 50 1234` ``\n\n"
                     "👉 **ដើម្បីបិទដំណើរការ ៖**\n`` `/hedge_mode OFF 1234` ``"
@@ -12746,7 +12749,7 @@ class TelegramBotThread(BaseThread):
                     "• 🛒 **Spot Mode (1x 0% Liquidation Risk)** ៖ វិនិយោគ Spot ផ្ទាល់ គ្មានហានិភ័យ Liquidation ឡើយ\n"
                     "• 🚀 **Futures Mode (1x-15x Leverage)** ៖ វិនិយោគ Futures ជាមួយ AI Trailing Lock & Auto-Flip Protection\n"
                     "• 💰 **Amount Parameter ($5 / 5%)** ៖ កំណត់ទុន $5 USDT ឬ 5% នៃសមតុល្យក្នុងមួយកាក់ (អប្បបរមា $5 USDT)\n"
-                    "• 🛡️ **2FA PIN Protection** ៖ ទាមទារការផ្ទៀងផ្ទាត់ PIN 4 ខ្ទង់ចុងក្រោយ ដើម្បីធានាសុវត្ថិភាព 100%\n\n"
+                    "• 🛡️ **2FA PIN Protection** ៖ ទាមទារការផ្ទៀងផ្ទាត់ PIN 4 ខ្ទង់ចុងក្រោយ ដើម្បីពង្រឹងសុវត្ថិភាពកម្រិតខ្ពស់\n\n"
                     "📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
                     "🛒 **[SPOT MODE EXECUTIONS]:**\n"
                     "👉 **Spot Single Coin Buy ៖**\n`` `/turbo_hedge SPOT SOL 50 1234` ``\n"
@@ -16890,7 +16893,7 @@ class TelegramBotThread(BaseThread):
                 "💡 **អនុសាសន៍យុទ្ធសាស្ត្រ v13.00 ៖**\n"
                 "• ប្រសិនបើអ្នកចង់ប្រមូលផលចំណេញពីអត្រាការប្រាក់ ៖ ប្រើប្រាស់ `/funding_harvester`\n"
                 "• ប្រសិនបើអ្នកចង់ស្កេនកើបចំណេញ 24/7 ៖ ប្រើប្រាស់ `/turbo_hedge TOP 20 10 AUTO 2.50 <PIN>`\n\n"
-                "✅ _ប្រព័ន្ធកំណែថ្មី v13.00 ការពារ Fee Erosion ១០០% និងធានាប្រាក់ចំណេញសុទ្ធ!_"
+                "✅ _ប្រព័ន្ធកំណែថ្មី v13.00 ការពារ Fee Erosion ១០០% និងជួយបង្កើនប្រាក់ចំណេញសុទ្ធ!_"
             )
             await (update.effective_message or update.message).reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
             await delete_sensitive_message(context, chat_id, (update.effective_message.message_id if update.effective_message else None), user_lang)

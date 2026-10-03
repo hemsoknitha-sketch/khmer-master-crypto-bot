@@ -16,6 +16,7 @@ if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
 import google.generativeai as genai
 from datetime import datetime
 import numpy as np
+from ui_standards import get_risk_disclaimer, sanitize_anti_guarantee_text, DIVIDER_LIGHT, DIVIDER_DOUBLE
 
 try:
     from huggingface_hub import InferenceClient
@@ -40,7 +41,10 @@ class AIInvestmentEngine:
             with open(prompt_file, "r", encoding="utf-8") as f:
                 base_prompt = f.read()
         except Exception:
-            base_prompt = "You are a financial AI. Analyze the market data:"
+            base_prompt = (
+                "You are Angkor Quant Chief Quantitative AGI Strategist. Analyze the market with absolute fiduciary honesty. "
+                "NEVER make 100% guarantees, zero-risk claims, or promise 100% safe profits. Always mandate Stop-Loss and risk management."
+            )
             
         self.base_prompt = base_prompt
         self._cache = {}
@@ -113,14 +117,14 @@ class AIInvestmentEngine:
             self.load_trained_brain_models()
 
     def analyze_with_deepseek_r1(self, symbol: str = "BTCUSDT", prompt: str = None) -> str:
-        """Call DeepSeek-R1 AGI Model តាមរយៈ HF Token ឥតគិតថ្លៃ 100%"""
+        """Call DeepSeek-R1 AGI Model តាមរយៈ HF Token"""
         if not self.hf_client:
             return None
         try:
             response = self.hf_client.chat_completion(
                 model="deepseek-ai/DeepSeek-R1",
                 messages=[
-                    {"role": "system", "content": f"You are the Apex AGI Super Brain advisor for {symbol} in Khmer language."},
+                    {"role": "system", "content": f"You are the Angkor Quant AGI advisor for {symbol} in Khmer language. Adhere to absolute fiduciary honesty. NEVER make 100% guarantees or claim zero risk. Always enforce Stop-Loss and risk discipline."},
                     {"role": "user", "content": prompt or f"Analyze {symbol} current price structure, trend, and targets."}
                 ],
                 max_tokens=600,
@@ -132,14 +136,14 @@ class AIInvestmentEngine:
             return None
 
     def analyze_with_llama_70b(self, symbol: str = "BTCUSDT", prompt: str = None) -> str:
-        """Call Llama-3.3-70B-Instruct Model តាមរយៈ HF Token ឥតគិតថ្លៃ 100%"""
+        """Call Llama-3.3-70B-Instruct Model តាមរយៈ HF Token"""
         if not self.hf_client:
             return None
         try:
             response = self.hf_client.chat_completion(
                 model="meta-llama/Llama-3.3-70B-Instruct",
                 messages=[
-                    {"role": "system", "content": f"You are the Apex AGI Super Brain financial advisor for {symbol} in Khmer language."},
+                    {"role": "system", "content": f"You are the Angkor Quant AGI financial advisor for {symbol} in Khmer language. Adhere to absolute fiduciary honesty. NEVER make 100% guarantees or claim zero risk. Always enforce Stop-Loss and risk discipline."},
                     {"role": "user", "content": prompt or f"Provide quantitative signal analysis for {symbol}."}
                 ],
                 max_tokens=600,
@@ -157,7 +161,7 @@ class AIInvestmentEngine:
             response = self.hf_client.chat_completion(
                 model="Qwen/Qwen2.5-Coder-32B-Instruct",
                 messages=[
-                    {"role": "system", "content": f"You are the Quantitative Math & Risk-Reward Advisor for {symbol} in Khmer language."},
+                    {"role": "system", "content": f"You are the Quantitative Math & Risk-Reward Advisor for {symbol} in Khmer language. Adhere to absolute fiduciary honesty. NEVER make 100% guarantees or claim zero risk. Calculate probability and enforce Stop-Loss."},
                     {"role": "user", "content": prompt or f"Calculate Win-Rate, Stop-Loss and Take-Profit risk ratio for {symbol}."}
                 ],
                 max_tokens=600,
@@ -175,7 +179,7 @@ class AIInvestmentEngine:
             response = self.hf_client.chat_completion(
                 model="mistralai/Mistral-7B-Instruct-v0.3",
                 messages=[
-                    {"role": "system", "content": f"You are the Fast 15s High-Frequency Scalper for {symbol} in Khmer language."},
+                    {"role": "system", "content": f"You are the Fast 15s High-Frequency Scalper for {symbol} in Khmer language. Adhere to fiduciary honesty. Never claim zero risk or 100% wins."},
                     {"role": "user", "content": prompt or f"Provide immediate momentum scalp signal for {symbol}."}
                 ],
                 max_tokens=400,
@@ -813,6 +817,21 @@ class AIInvestmentEngine:
         result = "\n".join(cleaned_lines).strip()
         result = re.sub(r'\n{3,}', '\n\n', result)
 
+        # 7. Apply Fiduciary Anti-Guarantee Sanitizer (Permanently purges 100% false guarantees)
+        result = sanitize_anti_guarantee_text(result)
+
+        # 8. Mandatory Fiduciary Risk Reminder for market analyses and setups
+        has_analysis = any(k in result for k in ["ផ្នែកទី ១", "ផ្នែកទី ៣", "BULLISH", "BEARISH", "Institutional Verdict", "Win Rate", "Stop-loss", "Stop-Loss", "Leverage"])
+        has_disclaimer = any(k in result for k in ["ការក្រើនរំលឹកពីហានិភ័យ", "Risk Reminder", "风险提示", "ហានិភ័យខ្ពស់", "ការទទួលខុសត្រូវ"])
+        if has_analysis and not has_disclaimer:
+            lang = "km"
+            if "Institutional Verdict" in result or "Quantitative and Macro Evidence" in result:
+                lang = "en"
+            elif any('\u4e00' <= char <= '\u9fff' for char in result[:300]):
+                lang = "zh"
+            disclaimer = get_risk_disclaimer(lang)
+            result = f"{result}\n\n{DIVIDER_LIGHT}\n{disclaimer}"
+
         # Telegram character ceiling clamp: Keep strictly within 100 - 3500 chars
         if len(result) > 3500:
             truncated = result[:3500]
@@ -838,13 +857,12 @@ class AIInvestmentEngine:
             'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'suosdey'
         ]
         if not has_query and len(clean_t.split()) <= 5 and any(g in clean_t for g in greeting_tokens):
-            from ui_standards import DIVIDER_DOUBLE
             return (
-                "✨ **មគ្គុទ្ទេសក៍គ្រីបតូខ្មែរ**\n"
-                "**Khmer Master Crypto | Turbo Apex AGI!**\n"
+                "✨ **មគ្គុទ្ទេសក៍គ្រីបតូស្ថាប័ន**\n"
+                "**Angkor Quant | AI Quantitative Intelligence!**\n"
                 f"{DIVIDER_DOUBLE}\n"
-                "ជាប្រព័ន្ធវិភាគបរិមាណវិស័យ និងយុទ្ធសាស្ត្រ រាល់ការវិភាគ និងការសម្រេចចិត្តនឹងត្រូវធ្វើឡើងតាមរយៈការសំយោគទិន្នន័យពហុវិមាត្រ ដើម្បីផ្តល់ចំណេះដឹងបន្ថែមជូនលោកអ្នក!\n\n"
-                "👉 _សូមឆ្លើយតប ឬសួរសំនួរដោយ Reply សារនេះ!_"
+                "ជាប្រព័ន្ធវិភាគបរិមាណវិស័យ និងយុទ្ធសាស្ត្រ។ រាល់ការវិភាគផ្អែកលើទិន្នន័យជាក់ស្តែង និងគំរូស្ថិតិ (គ្មានការធានា ១០០% ឡើយ)។\n\n"
+                "👉 _សូមឆ្លើយតប ឬសួរសំណួរដោយ Reply សារនេះ!_"
             )
 
         cache_key = hashlib.md5(user_input.encode('utf-8')).hexdigest()
@@ -855,7 +873,11 @@ class AIInvestmentEngine:
                 return cached_response
                 
         current_date_str = datetime.now().strftime("%d %B %Y %H:%M")
-        context_header = f"[SYSTEM DIRECTIVE: Respond ONLY in clean, executive, high-level financial presentation text. DO NOT output internal reflections, reasoning steps, constraints list, or thinking process under any circumstances. Current time: {current_date_str}]\n\n"
+        context_header = (
+            f"[SYSTEM DIRECTIVE: Respond ONLY in clean, executive, high-level financial presentation text. "
+            f"MANDATORY INVARIANT: Adhere to absolute fiduciary honesty. NEVER make 100% guarantees, zero-risk claims, or promise 100% safe capital. "
+            f"Always mandate Stop-Loss, highlight downside risks, and remind users to invest responsibly. Current time: {current_date_str}]\n\n"
+        )
         full_user_input = context_header + user_input
         
         # Prepare retry list with primary model first
