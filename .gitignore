@@ -25,6 +25,8 @@ ico_silent_logs.txt
 # Charts & Temporary Images & PDFs
 *.png
 *.pdf
+!Users_agrement.pdf
+!assets/docs/*.pdf
 !data/legal_agreements_pdf/.gitkeep
 
 # Root-level AI Model Weights (Canonical tracked in models/ and Hugging Face Hub)

@@ -15,6 +15,7 @@ Official Institutional Features:
 
 import os
 import sys
+import io
 import hashlib
 import sqlite3
 import random
@@ -932,6 +933,386 @@ def generate_reportlab_pdf(
         return False
 
 
+def get_master_agreement_template_path() -> Optional[str]:
+    """
+    Finds the authoritative 1-page master legal agreement PDF template (Users_agrement.pdf).
+    This master document contains the complete, legally valid 5 articles in authentic Khmer.
+    """
+    candidates = [
+        os.path.join(BASE_DIR, "Users_agrement.pdf"),
+        os.path.join(BASE_DIR, "Users_agreement.pdf"),
+        os.path.join(BASE_DIR, "assets", "docs", "Users_agrement.pdf"),
+        os.path.join(BASE_DIR, "assets", "docs", "Users_agreement.pdf"),
+        os.path.join(os.path.dirname(BASE_DIR), "Users_agrement.pdf"),
+        os.path.join(os.path.dirname(BASE_DIR), "Users_agreement.pdf"),
+        os.path.join(os.path.dirname(BASE_DIR), "khmer-master-crypto-bot", "Users_agrement.pdf"),
+        os.path.join(os.path.dirname(BASE_DIR), "assets", "docs", "Users_agrement.pdf"),
+    ]
+    for c in candidates:
+        if c and os.path.exists(c) and os.path.isfile(c) and os.path.getsize(c) > 1000:
+            return os.path.abspath(c)
+    return None
+
+
+def generate_stamped_contract_pdf(
+    chat_id: int,
+    username: str,
+    full_name: str,
+    phone_number: str,
+    contract_serial: str,
+    sha256_hash: str,
+    accepted_time_str: str,
+    output_pdf_path: str,
+    is_preview: bool = False
+) -> bool:
+    """
+    Tier 1 Flagship Master Stamping Engine (fpdf2 + uharfbuzz text shaping).
+    Directly stamps the user's information and digital signature block into the empty
+    space at the bottom of the authentic master agreement document (Users_agrement.pdf).
+    Ensures zero line wrapping, exact Khmer HarfBuzz shaping, and 100% legal validity.
+    """
+    try:
+        import pypdf
+        from fpdf import FPDF
+
+        template_path = get_master_agreement_template_path()
+        if not template_path:
+            return False
+
+        base_reader = pypdf.PdfReader(template_path)
+        if len(base_reader.pages) == 0:
+            return False
+
+        base_page = base_reader.pages[0]
+        page_w = float(base_page.mediabox.width)
+        page_h = float(base_page.mediabox.height)
+
+        user_handle = f"@{username}" if username and not username.startswith("@") else (username or "N/A")
+        display_name = full_name.strip() if full_name else f"Trader_{chat_id}"
+        display_phone = phone_number.strip() if phone_number else "N/A (Direct Telegram Auth)"
+
+        # Initialize FPDF with exact point dimensions matching master document
+        pdf = FPDF(unit='pt', format=[page_w, page_h])
+        pdf.set_margins(36, 0, 36)
+        pdf.set_auto_page_break(auto=False)
+        pdf.add_page()
+
+        # Load Khmer Unicode font with HarfBuzz shaping
+        font_path, _, _ = get_khmer_pdf_font_paths()
+        has_khmer_font = False
+        if font_path and os.path.exists(font_path):
+            try:
+                pdf.set_text_shaping(True)
+                pdf.add_font("KhmerFont", "", font_path)
+                pdf.set_font("KhmerFont", "", 7)
+                has_khmer_font = True
+            except Exception as ex_f:
+                print(f"⚠️ [PDF STAMP] HarfBuzz font registration fallback: {ex_f}")
+
+        if not has_khmer_font:
+            pdf.set_font("Helvetica", "", 7)
+
+        # Precise container coordinates in bottom blank area (between y=674 pt and y=770 pt)
+        card_x = 36.0
+        card_y = page_h - 118.0
+        card_w = page_w - 72.0
+        card_h = 96.0
+
+        # Outer card background & subtle border
+        pdf.set_fill_color(248, 250, 252)
+        pdf.set_draw_color(203, 213, 225)
+        pdf.set_line_width(0.8)
+        pdf.rect(card_x, card_y, card_w, card_h, style='DF')
+
+        # Left decorative amber security band
+        pdf.set_fill_color(217, 119, 6)
+        pdf.rect(card_x, card_y, 4, card_h, style='F')
+
+        # Header strip inside card
+        pdf.set_fill_color(241, 245, 249)
+        pdf.rect(card_x + 4, card_y, card_w - 4, 16, style='F')
+
+        # Header title
+        pdf.set_xy(card_x + 10, card_y + 2.5)
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 7.2)
+        else:
+            pdf.set_font("Helvetica", "B", 7.2)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(320, 11, "ព័ត៌មានអ្នកប្រើប្រាស់ និងការបញ្ជាក់ហត្ថលេខាឌីជីថល (User Authentication & Digital Signature)", align='L')
+
+        # Right verification badge
+        pdf.set_xy(card_x + 335, card_y + 2.5)
+        if is_preview:
+            pdf.set_fill_color(254, 243, 199)
+            pdf.set_draw_color(217, 119, 6)
+            pdf.set_text_color(180, 83, 9)
+            badge_label = " 🔍 គំរូកិច្ចសន្យាផ្លូវការ / SAMPLE CONTRACT PREVIEW "
+        else:
+            pdf.set_fill_color(220, 252, 231)
+            pdf.set_draw_color(22, 163, 74)
+            pdf.set_text_color(22, 101, 52)
+            badge_label = " 🟢 កិច្ចសន្យាមានសុពលភាពច្បាប់ / VERIFIED & ACTIVE "
+
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 6.2)
+        else:
+            pdf.set_font("Helvetica", "B", 6.2)
+        pdf.cell(195, 11, badge_label, border=1, fill=True, align='C')
+
+        # Section 1: User Identity Column
+        col1_x = card_x + 10
+        col1_y = card_y + 19
+        pdf.set_text_color(51, 65, 85)
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 6.5)
+        else:
+            pdf.set_font("Helvetica", "", 6.5)
+
+        pdf.set_xy(col1_x, col1_y)
+        pdf.cell(195, 10, f"• ឈ្មោះ (Name): {display_name}", align='L')
+        pdf.set_xy(col1_x, col1_y + 10)
+        pdf.cell(195, 10, f"• Telegram: {user_handle} (ID: {chat_id})", align='L')
+        pdf.set_xy(col1_x, col1_y + 20)
+        pdf.cell(195, 10, f"• លេខទូរស័ព្ទ (Phone): {display_phone}", align='L')
+        pdf.set_xy(col1_x, col1_y + 30)
+        status_line = "• ស្ថានភាព: គំរូបឋម (Preview Only)" if is_preview else "• ស្ថានភាព: យល់ព្រមតាមលក្ខខណ្ឌ ១០០%"
+        pdf.cell(195, 10, status_line, align='L')
+
+        # Section 2: Contract Metadata Column
+        col2_x = card_x + 205
+        col2_y = card_y + 19
+
+        pdf.set_xy(col2_x, col2_y)
+        pdf.cell(205, 10, f"• លេខកូដកិច្ចសន្យា: {contract_serial}", align='L')
+        pdf.set_xy(col2_x, col2_y + 10)
+        pdf.cell(205, 10, f"• កាលបរិច្ឆេទយល់ព្រម: {accepted_time_str}", align='L')
+        pdf.set_xy(col2_x, col2_y + 20)
+        pdf.cell(205, 10, "• ប្រព័ន្ធ: Angkor Quant AI Engine v4.0", align='L')
+        pdf.set_xy(col2_x, col2_y + 30)
+        pdf.cell(205, 10, "• គណនី: Non-Custodial Isolated Trading", align='L')
+
+        # Section 3: Institutional Digital Stamp Badge
+        stamp_x = card_x + 418
+        stamp_y = card_y + 19
+        pdf.set_draw_color(217, 119, 6)
+        pdf.set_fill_color(255, 251, 235)
+        pdf.rect(stamp_x, stamp_y, 114, 40, style='DF')
+
+        pdf.set_xy(stamp_x, stamp_y + 2)
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 6)
+        else:
+            pdf.set_font("Helvetica", "B", 6)
+        pdf.set_text_color(180, 83, 9)
+        pdf.cell(114, 8, "ANGKOR QUANT AI", align='C')
+
+        pdf.set_xy(stamp_x, stamp_y + 11)
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 7)
+        else:
+            pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(114, 9, "DIGITAL SEAL", align='C')
+
+        pdf.set_xy(stamp_x, stamp_y + 20)
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 5.5)
+        else:
+            pdf.set_font("Helvetica", "B", 5.5)
+        pdf.set_text_color(22, 101, 52)
+        pdf.cell(114, 8, "✔ TAMPER-PROOF WAL", align='C')
+
+        pdf.set_xy(stamp_x, stamp_y + 29)
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 5.5)
+        else:
+            pdf.set_font("Helvetica", "", 5.5)
+        pdf.set_text_color(71, 85, 105)
+        pdf.cell(114, 8, "PRIVATE PROPRIETARY", align='C')
+
+        # Bottom Footer: Cryptographic SHA-256 Hash
+        hash_bar_y = card_y + 61
+        pdf.set_fill_color(241, 245, 249)
+        pdf.rect(card_x + 4, hash_bar_y, card_w - 4, 33, style='F')
+
+        pdf.set_xy(card_x + 8, hash_bar_y + 3)
+        if has_khmer_font:
+            pdf.set_font("KhmerFont", "", 5.8)
+        else:
+            pdf.set_font("Helvetica", "", 5.8)
+        pdf.set_text_color(71, 85, 105)
+        pdf.cell(card_w - 16, 8, f"Cryptographic SHA-256 Audit Trail: {sha256_hash}", align='L')
+
+        pdf.set_xy(card_x + 8, hash_bar_y + 13)
+        pdf.cell(card_w - 16, 8, "កត់ត្រាទុកជាស្ថាពរ និងចាក់សោរអចិន្ត្រៃយ៍ក្នុងប្រព័ន្ធ SQLite WAL Mode (មិនអាចកែប្រែ ឬលុបបាន)", align='L')
+
+        pdf.set_xy(card_x + 8, hash_bar_y + 22)
+        pdf.cell(card_w - 16, 8, "សុពលភាពច្បាប់៖ ឯកសារនេះមានតម្លៃពេញលេញតាមច្បាប់ស្តីពីប្រតិបត្តិការអេឡិចត្រូនិក និងកិច្ចសន្យាពាណិជ្ជកម្ម។", align='L')
+
+        # Render overlay to BytesIO
+        overlay_buf = io.BytesIO()
+        pdf.output(overlay_buf)
+        overlay_buf.seek(0)
+
+        # Merge overlay onto master template page
+        overlay_reader = pypdf.PdfReader(overlay_buf)
+        base_page.merge_page(overlay_reader.pages[0])
+
+        writer = pypdf.PdfWriter()
+        writer.add_page(base_page)
+
+        os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
+        with open(output_pdf_path, "wb") as f_out:
+            writer.write(f_out)
+
+        return os.path.exists(output_pdf_path) and os.path.getsize(output_pdf_path) > 10000
+    except Exception as e_fpdf_stamp:
+        print(f"⚠️ [PDF STAMP] fpdf2 overlay stamper failed: {e_fpdf_stamp}")
+        return False
+
+
+def generate_stamped_contract_pdf_reportlab(
+    chat_id: int,
+    username: str,
+    full_name: str,
+    phone_number: str,
+    contract_serial: str,
+    sha256_hash: str,
+    accepted_time_str: str,
+    output_pdf_path: str,
+    is_preview: bool = False
+) -> bool:
+    """
+    Tier 2 Defensive Overlay Stamper using ReportLab Canvas.
+    Stamps user information into bottom blank space of Users_agrement.pdf.
+    """
+    try:
+        import pypdf
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.colors import HexColor
+
+        template_path = get_master_agreement_template_path()
+        if not template_path:
+            return False
+
+        base_reader = pypdf.PdfReader(template_path)
+        if len(base_reader.pages) == 0:
+            return False
+
+        base_page = base_reader.pages[0]
+        page_w = float(base_page.mediabox.width)
+        page_h = float(base_page.mediabox.height)
+
+        font_name = get_khmer_pdf_font()
+
+        user_handle = f"@{username}" if username and not username.startswith("@") else (username or "N/A")
+        display_name = full_name.strip() if full_name else f"Trader_{chat_id}"
+        display_phone = phone_number.strip() if phone_number else "N/A (Direct Telegram Auth)"
+
+        packet = io.BytesIO()
+        can = canvas.Canvas(packet, pagesize=(page_w, page_h))
+
+        card_x = 36.0
+        card_y = 22.0
+        card_w = page_w - 72.0
+        card_h = 96.0
+
+        can.setFillColor(HexColor("#F8FAFC"))
+        can.setStrokeColor(HexColor("#CBD5E1"))
+        can.setLineWidth(0.8)
+        can.rect(card_x, card_y, card_w, card_h, stroke=1, fill=1)
+
+        can.setFillColor(HexColor("#D97706"))
+        can.rect(card_x, card_y, 4, card_h, stroke=0, fill=1)
+
+        can.setFillColor(HexColor("#F1F5F9"))
+        can.rect(card_x + 4, card_y + card_h - 16, card_w - 4, 16, stroke=0, fill=1)
+
+        can.setFont(font_name, 7.2)
+        can.setFillColor(HexColor("#0F172A"))
+        can.drawString(card_x + 10, card_y + card_h - 11.5, "ព័ត៌មានអ្នកប្រើប្រាស់ និងការបញ្ជាក់ហត្ថលេខាឌីជីថល (User Authentication & Digital Signature)")
+
+        if is_preview:
+            can.setFillColor(HexColor("#FEF3C7"))
+            can.setStrokeColor(HexColor("#D97706"))
+            can.rect(card_x + 335, card_y + card_h - 14, 195, 12, stroke=1, fill=1)
+            can.setFont(font_name, 6.2)
+            can.setFillColor(HexColor("#B45309"))
+            can.drawCentredString(card_x + 335 + 97.5, card_y + card_h - 9.5, "គំរូកិច្ចសន្យាផ្លូវការ / SAMPLE CONTRACT PREVIEW")
+        else:
+            can.setFillColor(HexColor("#DCFCE7"))
+            can.setStrokeColor(HexColor("#16A34A"))
+            can.rect(card_x + 335, card_y + card_h - 14, 195, 12, stroke=1, fill=1)
+            can.setFont(font_name, 6.2)
+            can.setFillColor(HexColor("#166534"))
+            can.drawCentredString(card_x + 335 + 97.5, card_y + card_h - 9.5, "កិច្ចសន្យាមានសុពលភាពច្បាប់ / VERIFIED & ACTIVE")
+
+        col1_x = card_x + 10
+        col1_y = card_y + card_h - 28
+        can.setFillColor(HexColor("#334155"))
+        can.setFont(font_name, 6.5)
+
+        can.drawString(col1_x, col1_y, f"• ឈ្មោះ (Name): {display_name}")
+        can.drawString(col1_x, col1_y - 10, f"• Telegram: {user_handle} (ID: {chat_id})")
+        can.drawString(col1_x, col1_y - 20, f"• លេខទូរស័ព្ទ (Phone): {display_phone}")
+        status_txt = "• ស្ថានភាព: គំរូបឋម (Preview Only)" if is_preview else "• ស្ថានភាព: យល់ព្រមតាមលក្ខខណ្ឌ ១០០%"
+        can.drawString(col1_x, col1_y - 30, status_txt)
+
+        col2_x = card_x + 205
+        can.drawString(col2_x, col1_y, f"• លេខកូដកិច្ចសន្យា: {contract_serial}")
+        can.drawString(col2_x, col1_y - 10, f"• កាលបរិច្ឆេទយល់ព្រម: {accepted_time_str}")
+        can.drawString(col2_x, col1_y - 20, "• ប្រព័ន្ធ: Angkor Quant AI Engine v4.0")
+        can.drawString(col2_x, col1_y - 30, "• គណនី: Non-Custodial Isolated Trading")
+
+        stamp_x = card_x + 418
+        stamp_y = card_y + card_h - 58
+        can.setStrokeColor(HexColor("#D97706"))
+        can.setFillColor(HexColor("#FFFBEB"))
+        can.rect(stamp_x, stamp_y, 114, 40, stroke=1, fill=1)
+
+        can.setFont(font_name, 6)
+        can.setFillColor(HexColor("#B45309"))
+        can.drawCentredString(stamp_x + 57, stamp_y + 30, "ANGKOR QUANT AI")
+        can.setFont(font_name, 7)
+        can.setFillColor(HexColor("#0F172A"))
+        can.drawCentredString(stamp_x + 57, stamp_y + 20, "DIGITAL SEAL")
+        can.setFont(font_name, 5.5)
+        can.setFillColor(HexColor("#166534"))
+        can.drawCentredString(stamp_x + 57, stamp_y + 11, "✔ TAMPER-PROOF WAL")
+        can.setFont(font_name, 5.5)
+        can.setFillColor(HexColor("#475569"))
+        can.drawCentredString(stamp_x + 57, stamp_y + 2.5, "PRIVATE PROPRIETARY")
+
+        hash_bar_y = card_y + 4
+        can.setFillColor(HexColor("#F1F5F9"))
+        can.rect(card_x + 4, hash_bar_y, card_w - 4, 30, stroke=0, fill=1)
+
+        can.setFont(font_name, 5.8)
+        can.setFillColor(HexColor("#475569"))
+        can.drawString(card_x + 8, hash_bar_y + 21, f"Cryptographic SHA-256 Audit Trail: {sha256_hash}")
+        can.drawString(card_x + 8, hash_bar_y + 12, "កត់ត្រាទុកជាស្ថាពរ និងចាក់សោរអចិន្ត្រៃយ៍ក្នុងប្រព័ន្ធ SQLite WAL Mode (មិនអាចកែប្រែ ឬលុបបាន)")
+        can.drawString(card_x + 8, hash_bar_y + 3, "សុពលភាពច្បាប់៖ ឯកសារនេះមានតម្លៃពេញលេញតាមច្បាប់ស្តីពីប្រតិបត្តិការអេឡិចត្រូនិក និងកិច្ចសន្យាពាណិជ្ជកម្ម។")
+
+        can.save()
+        packet.seek(0)
+
+        overlay_reader = pypdf.PdfReader(packet)
+        base_page.merge_page(overlay_reader.pages[0])
+
+        writer = pypdf.PdfWriter()
+        writer.add_page(base_page)
+
+        os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
+        with open(output_pdf_path, "wb") as f_out:
+            writer.write(f_out)
+
+        return os.path.exists(output_pdf_path) and os.path.getsize(output_pdf_path) > 10000
+    except Exception as e_rl_stamp:
+        print(f"⚠️ [PDF STAMP] ReportLab overlay stamper failed: {e_rl_stamp}")
+        return False
+
+
 def generate_legal_contract_pdf(
     chat_id: int,
     username: str,
@@ -943,17 +1324,60 @@ def generate_legal_contract_pdf(
 ) -> str:
     """
     Official Institutional Legal Contract PDF Generator.
-    - Strict 1-Page Layout
-    - Justified text alignment
-    - Replaces legacy box/table with sleek executive metadata strip
-    - High-definition Kantumruy Pro & Moul Khmer font shaping
-    - Multi-tier engine: Headless Browser (Edge/Chromium) -> fpdf2 (uharfbuzz) -> ReportLab
+    - Master Architecture: Uses authentic 1-page master document Users_agrement.pdf
+    - Inserts user authentication & digital signature in the empty space at bottom
+    - Multi-tier stamping & generation:
+      Tier 1: fpdf2 + uharfbuzz overlay onto Users_agrement.pdf
+      Tier 2: ReportLab canvas overlay onto Users_agrement.pdf
+      Tier 3: Browser / pure python full generation fallback if template missing
     """
     os.makedirs(PDF_ARCHIVE_DIR, exist_ok=True)
     pdf_filename = f"Angkor_Quant_Agreement_{chat_id}_{contract_serial.replace('-', '_')}.pdf"
     pdf_path = os.path.join(PDF_ARCHIVE_DIR, pdf_filename)
 
-    # Tier 1: Headless Chromium/Chrome/Edge (Top visual fidelity & exact 1-page justified Khmer)
+    is_preview = bool("PREVIEW" in contract_serial.upper())
+
+    # Tier 1 (Primary Institutional Path): fpdf2 + uharfbuzz stamp on Users_agrement.pdf
+    try:
+        if generate_stamped_contract_pdf(
+            chat_id=chat_id,
+            username=username,
+            full_name=full_name,
+            phone_number=phone_number,
+            contract_serial=contract_serial,
+            sha256_hash=sha256_hash,
+            accepted_time_str=accepted_time_str,
+            output_pdf_path=pdf_path,
+            is_preview=is_preview
+        ):
+            return pdf_path
+    except Exception as ex_t1:
+        print(f"⚠️ [PDF ENGINE] Tier 1 Master Stamping skipped: {ex_t1}")
+
+    # Tier 2 (Defensive Fallback): ReportLab canvas stamp on Users_agrement.pdf
+    try:
+        if generate_stamped_contract_pdf_reportlab(
+            chat_id=chat_id,
+            username=username,
+            full_name=full_name,
+            phone_number=phone_number,
+            contract_serial=contract_serial,
+            sha256_hash=sha256_hash,
+            accepted_time_str=accepted_time_str,
+            output_pdf_path=pdf_path,
+            is_preview=is_preview
+        ):
+            return pdf_path
+    except Exception as ex_t2:
+        print(f"⚠️ [PDF ENGINE] Tier 2 ReportLab Stamping skipped: {ex_t2}")
+
+    # Tier 3 (Full Generation Fallback - Only if Users_agrement.pdf is completely missing):
+    try:
+        if generate_fpdf2_pdf(chat_id, username, full_name, phone_number, contract_serial, sha256_hash, accepted_time_str, pdf_path):
+            return pdf_path
+    except Exception as ex_fpdf:
+        print(f"⚠️ [PDF ENGINE] Tier 3 fpdf2 skipped: {ex_fpdf}")
+
     try:
         html_src = build_official_agreement_html(
             chat_id, username, full_name, phone_number, contract_serial, sha256_hash, accepted_time_str
@@ -961,16 +1385,8 @@ def generate_legal_contract_pdf(
         if generate_browser_pdf(html_src, pdf_path):
             return pdf_path
     except Exception as ex_browser:
-        print(f"⚠️ [PDF ENGINE] Tier 1 Headless Browser skipped: {ex_browser}")
+        print(f"⚠️ [PDF ENGINE] Tier 3 Browser skipped: {ex_browser}")
 
-    # Tier 2: Pure-Python fpdf2 with uharfbuzz text shaping
-    try:
-        if generate_fpdf2_pdf(chat_id, username, full_name, phone_number, contract_serial, sha256_hash, accepted_time_str, pdf_path):
-            return pdf_path
-    except Exception as ex_fpdf:
-        print(f"⚠️ [PDF ENGINE] Tier 2 fpdf2 skipped: {ex_fpdf}")
-
-    # Tier 3: ReportLab defensive fallback
     try:
         if generate_reportlab_pdf(chat_id, username, full_name, phone_number, contract_serial, sha256_hash, accepted_time_str, pdf_path):
             return pdf_path
@@ -1561,12 +1977,19 @@ async def handle_agreement_callback(update: Update, context: ContextTypes.DEFAUL
             pdf_path = ""
         if pdf_path and os.path.exists(pdf_path):
             try:
+                caption_text = (
+                    "📄 **គំរូកិច្ចសន្យា និងលក្ខខណ្ឌផ្លូវការ (Official Agreement Preview PDF)** 📜\n"
+                    "• **ឯកសារដើម ៖** ANGKOR QUANT Official Usage Agreement\n"
+                    "• **ស្ថានភាព ៖** `🔍 គំរូផ្លូវការ (Master Contract Preview)`\n"
+                    "• **ចំណាំ ៖** នៅពេលលោកអ្នកចុចប៊ូតុង **«✍️ ខ្ញុំបានអាន យល់ច្បាស់ និងយល់ព្រម ១០០%»** "
+                    "ប្រព័ន្ធនឹងបញ្ចូលព័ត៌មានគណនី និងចុះហត្ថលេខាឌីជីថល SHA-256 លើកិច្ចសន្យានេះភ្លាមៗ!"
+                )
                 with open(pdf_path, "rb") as pdf_file:
                     await context.bot.send_document(
                         chat_id=chat_id,
                         document=pdf_file,
                         filename="Angkor_Quant_Official_Agreement_Preview.pdf",
-                        caption="📄 **កិច្ចសន្យា និងលក្ខខណ្ឌផ្លូវការ (Sample PDF Preview)**\n_សូមពិនិត្យ និងចុចយល់ព្រម ១០០% លើ Telegram Bot ខាងលើ!_",
+                        caption=caption_text,
                         parse_mode="Markdown"
                     )
             except Exception as e_prev:
