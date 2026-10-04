@@ -15,6 +15,8 @@ import turbo_hedge_engine
 import smart_x_engine
 import capital_engine
 import ui_standards
+import ai_news_engine
+import google_macro_satellite
 
 logger = logging.getLogger("SchedulerTasks")
 
@@ -460,277 +462,214 @@ async def check_price_alerts(app: Application):
                 print(f"Failed to send alert to {chat_id}: {e}")
 
 async def check_crypto_news(app: Application, ai_engine):
-    """Fetches the latest crypto news, scores it, and broadcasts high-impact news."""
-    print("📰 Checking Crypto News (RSS)...")
+    """
+    Angkor Quant Institutional News & Global Macro Radar
+    Sub-3-minute multi-feed ingestion across TradFi Macro + Institutional Crypto wires.
+    Filters high-impact events (Score >= 8), runs parallel AI analysis (<2.5s),
+    injects live Google Macro Satellite pulse, and broadcasts to VIP chats with HD cover image.
+    """
+    logger.info("📰 [ANGKOR QUANT NEWS RADAR] Checking Live Macro & Crypto Wires...")
     try:
-        # Cleanup old news to keep DB clean
+        # Cleanup old news entries to keep database lean
         db.cleanup_old_news()
-        
-        url = "https://cointelegraph.com/rss"
-        response = await asyncio.to_thread(requests.get, url, timeout=15)
-        response.raise_for_status()
-        
-        root = ET.fromstring(response.text)
-        items = root.findall('.//item')
-        
-        vip_users_lang = db.get_vip_users_with_lang()
-        if not vip_users_lang:
+
+        target_recipients, _ = get_alert_target_recipients("news")
+        if not target_recipients:
             return
+
+        # 1. Multi-Feed Real-Time Ingestion (7 Feeds: Google News, Yahoo Finance, CNBC, CoinDesk, CoinTelegraph, Decrypt, CryptoPotato)
+        news_items = await asyncio.to_thread(ai_news_engine.fetch_live_news, None, 10)
+        if not news_items:
+            return
+
+        # Helpers for News Formatting
+        from urllib.parse import urlparse
+        def get_source_name(src_link, fallback_src="Global Market Wire"):
+            if not src_link: return fallback_src
+            netloc = urlparse(src_link).netloc.lower()
+            if 'cointelegraph' in netloc: return "CoinTelegraph"
+            elif 'coindesk' in netloc: return "CoinDesk"
+            elif 'bloomberg' in netloc: return "Bloomberg Crypto"
+            elif 'reuters' in netloc: return "Reuters Financial"
+            elif 'decrypt' in netloc: return "Decrypt"
+            elif 'theblock' in netloc: return "The Block"
+            elif 'cryptopanic' in netloc: return "CryptoPanic"
+            elif 'binance' in netloc: return "Binance News"
+            elif 'yahoo' in netloc: return "Yahoo Finance"
+            elif 'cnbc' in netloc: return "CNBC Markets"
+            elif 'google' in netloc: return "Google Macro Wire"
+            elif 'cryptopotato' in netloc: return "CryptoPotato"
+            return fallback_src or netloc.replace("www.", "").capitalize() or "Angkor Quant Wire"
+
+        def format_khmer_datetime(dt=None):
+            from datetime import datetime, timezone, timedelta
+            tz_cambodia = timezone(timedelta(hours=7))
+            if dt is None:
+                dt = datetime.now(tz_cambodia)
+            elif dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc).astimezone(tz_cambodia)
+            else:
+                dt = dt.astimezone(tz_cambodia)
+
+            kh_days = ["ច័ន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍", "អាទិត្យ"]
+            kh_months = ["មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"]
+            kh_digits = {'0':'០', '1':'១', '2':'២', '3':'៣', '4':'៤', '5':'៥', '6':'៦', '7':'៧', '8':'៨', '9':'៩'}
             
-        # Only check the top 5 most recent
-        for item in items[:5]:
-            title_elem = item.find('title')
-            link_elem = item.find('link')
-            desc_elem = item.find('description')
+            def to_kh_num(val):
+                return "".join(kh_digits.get(c, c) for c in f"{val:02d}" if c.isdigit())
             
-            if title_elem is None or link_elem is None:
-                continue
-                
-            title = title_elem.text
-            link = link_elem.text
-            description = desc_elem.text if desc_elem is not None else ""
+            day_name = kh_days[dt.weekday()]
+            month_name = kh_months[dt.month - 1]
+            day_str = to_kh_num(dt.day)
+            year_str = "".join(kh_digits.get(c, c) for c in str(dt.year))
+            time_str = f"{to_kh_num(dt.hour)}:{to_kh_num(dt.minute)}"
             
-            # Remove HTML tags from description
-            description = re.sub(r'<[^>]+>', '', description)
+            return f"ថ្ងៃ{day_name} ទី{day_str} ខែ{month_name} ឆ្នាំ{year_str} ម៉ោង {time_str} (GMT+7)"
+
+        # High-Precision Sanitizer Function for News Broadcasts
+        def clean_final_news_text(txt, fallback_title="", lang="khmer"):
+            if not txt: return ""
             
-            if db.is_news_seen(link):
-                continue
-                
-            # Extract featured image URL from RSS XML item
-            image_url = None
-            media_tag = item.find('{http://search.yahoo.com/mrss/}content') or item.find('media:content')
-            if media_tag is not None and media_tag.get('url'):
-                image_url = media_tag.get('url')
-            if not image_url:
-                enc_tag = item.find('enclosure')
-                if enc_tag is not None and enc_tag.get('url') and 'image' in str(enc_tag.get('type', '')):
-                    image_url = enc_tag.get('url')
-            if not image_url and desc_elem is not None:
-                img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', desc_elem.text)
-                if img_match:
-                    image_url = img_match.group(1)
+            # 1. Purge reasoning & thinking tags
+            txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL | re.IGNORECASE)
+            txt = re.sub(r"<thought>.*?</thought>", "", txt, flags=re.DOTALL | re.IGNORECASE)
+            txt = re.sub(r"```think.*?```", "", txt, flags=re.DOTALL | re.IGNORECASE)
+            txt = re.sub(r"\[THINKING\].*?\[/THINKING\]", "", txt, flags=re.DOTALL | re.IGNORECASE)
 
-            # Process this new article
-            db.mark_news_seen(link)
-
-            # Helpers for News Formatting
-            from urllib.parse import urlparse
-            def get_source_name(src_link):
-                if not src_link: return "CoinTelegraph"
-                netloc = urlparse(src_link).netloc.lower()
-                if 'cointelegraph' in netloc: return "CoinTelegraph"
-                elif 'coindesk' in netloc: return "CoinDesk"
-                elif 'bloomberg' in netloc: return "Bloomberg Crypto"
-                elif 'reuters' in netloc: return "Reuters Financial"
-                elif 'decrypt' in netloc: return "Decrypt"
-                elif 'theblock' in netloc: return "The Block"
-                elif 'cryptopanic' in netloc: return "CryptoPanic"
-                elif 'binance' in netloc: return "Binance News"
-                return netloc.replace("www.", "").capitalize() or "Global Crypto Terminal"
-
-            def format_khmer_datetime(dt=None):
-                from datetime import datetime, timezone, timedelta
-                tz_cambodia = timezone(timedelta(hours=7))
-                if dt is None:
-                    dt = datetime.now(tz_cambodia)
-                elif dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc).astimezone(tz_cambodia)
-                else:
-                    dt = dt.astimezone(tz_cambodia)
-
-                kh_days = ["ច័ន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍", "អាទិត្យ"]
-                kh_months = ["មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"]
-                kh_digits = {'0':'០', '1':'១', '2':'២', '3':'៣', '4':'៤', '5':'៥', '6':'៦', '7':'៧', '8':'៨', '9':'៩'}
-                
-                def to_kh_num(val):
-                    return "".join(kh_digits.get(c, c) for c in f"{val:02d}" if c.isdigit())
-                
-                day_name = kh_days[dt.weekday()]
-                month_name = kh_months[dt.month - 1]
-                day_str = to_kh_num(dt.day)
-                year_str = "".join(kh_digits.get(c, c) for c in str(dt.year))
-                time_str = f"{to_kh_num(dt.hour)}:{to_kh_num(dt.minute)}"
-                
-                return f"ថ្ងៃ{day_name} ទី{day_str} ខែ{month_name} ឆ្នាំ{year_str} ម៉ោង {time_str} (GMT+7)"
-            
-            # 1. Khmer Article (Strict Chuon Nath Executive Standard - 3 Seamless Paragraphs)
-            kh_prompt = (
-                f"អ្នកគឺជាប្រធាននិពន្ធសារព័ត៌មានហិរញ្ញវត្ថុគ្រីបតូស្ថាប័នជាន់ខ្ពស់ (Executive Financial News Chief Editor)។\n"
-                f"សូមសរសេរអត្ថបទព័ត៌មានវិភាគស៊ីជម្រៅកម្រិតស្ថាប័នជាភាសាខ្មែរផ្លូវការ ត្រឹមត្រូវតាមក្បួនអក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ឱ្យបានក្បោះក្បាយ មានប្រវែងចន្លោះពី 1,800 ដល់ 2,500 តួអក្សរ (ដើម្បីធានាការផ្ញើចេញរួមគ្នាជាមួយរូបភាពក្នុងសារតែមួយគត់នៃ Telegram) ដោយផ្អែកលើព័ត៌មានខាងក្រោម ៖\n"
-                f"ចំណងជើង ៖ {title}\n"
-                f"ខ្លឹមសារ ៖ {description}\n\n"
-                f"វិធានតឹងរ៉ឹងបំផុតសម្រាប់ការសរសេរ (CRITICAL INSTRUCTIONS) ៖\n"
-                f"១. សរសេរជា ៣ កថាខណ្ឌពេញលេញ តភ្ជាប់គ្នាយ៉ាងរលូនជាលក្ខណៈនិទានរឿងសារព័ត៌មានអាជីព។\n"
-                f"២. ហាមដាច់ខាតមិនឱ្យសរសេរស្លាក ឬពាក្យសម្គាល់ដូចជា «ផ្នែកទី១», «ផ្នែកទី២», «ផ្នែកទី៣», «កថាខណ្ឌទី១», «កថាខណ្ឌទី២», «កថាខណ្ឌទី៣», «Para 1», «Para 2», «Para 3», «Section 1» ឬ «សេចក្តីព្រាង» នៅលើក្បាលកថាខណ្ឌឡើយ! ត្រូវសរសេរចូលជាសាច់រឿងអត្ថបទតែម្តង។\n"
-                f"៣. ភ្ជាប់ពាក្យបច្ចេកទេសហិរញ្ញវត្ថុ និងគ្រីបតូជាភាសាអង់គ្លេសក្នុងវង់ក្រចកជានិច្ច (Dual Technical Vocabulary) ដូចជា ៖ សាច់ប្រាក់ងាយស្រួល (Liquidity), មូលបត្របំប្លែងជាថូខឹន (Tokenized Securities), លំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows), អត្រាការប្រាក់គោល (Benchmark Interest Rates), ការកើនឡើងសន្ទុះទីផ្សារ (Bullish Momentum), ស្ថិរភាពប្រព័ន្ធ (Systemic Stability) ជាដើម។\n"
-                f"៤. រចនាសម្ព័ន្ធអត្ថបទទាំង ៣ កថាខណ្ឌ ៖\n"
-                f"   - កថាខណ្ឌទីមួយ ៖ ចាប់ផ្តើមភ្លាមដោយឈ្មោះទីក្រុងសារព័ត៌មាន (ឧទាហរណ៍ ៖ «ទីក្រុងញូវយ៉ក ៖» ឬ «ទីក្រុងវ៉ាស៊ីនតោន ៖») រួចរៀបរាប់ពីហេតុការណ៍ចម្បង តួលេខទំហំទឹកប្រាក់ ស្ថាប័នពាក់ព័ន្ធ និងបរិបទនៃព្រឹត្តិការណ៍។\n"
-                f"   - កថាខណ្ឌទីពីរ ៖ វិភាគស៊ីជម្រៅលើផលប៉ះពាល់ទីផ្សារ លំហូរសាច់ប្រាក់ងាយស្រួល (Liquidity), ចលនាទិញសន្សំរបស់ត្រីបាឡែន (Whale Accumulation), ទីផ្សារដេរីវ៉េទីវ (Derivatives) និងទស្សនវិស័យម៉ាក្រូសេដ្ឋកិច្ច។\n"
-                f"   - កថាខណ្ឌទីបី ៖ វិភាគផ្នែកក្របខ័ណ្ឌគតិយុត្ត បទប្បញ្ញត្តិច្បាប់ និងការការពារហានិភ័យសម្រាប់វិនិយោគិន ដោយត្រូវបញ្ចប់កថាខណ្ឌទីបីដោយសញ្ញាខណ្ឌ «៕» ជានិច្ច។\n"
-                f"៥. ដាច់ខាតហាមសរសេរពាក្យដូចជា \"Dual Technical Vocabulary\", \"Structure\", \"Goal\", \"Khmer Refinement\", \"Para\", \"Draft\", ឬសរសេរកំណត់ចំណាំការគិត (Thinking/Scratchpad) មុន ឬក្រោយអត្ថបទជាដាច់ខាត! ចាប់ផ្តើមអក្សរដំបូងនៃអត្ថបទដោយឈ្មោះទីក្រុងសារព័ត៌មានភ្លាម (ឧទាហរណ៍ ៖ «ទីក្រុងញូវយ៉ក ៖»)។"
-            )
-            khmer_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, kh_prompt)
-
-            # 2. English Article
-            en_prompt = (
-                f"Write an institutional 3-paragraph financial news analysis in clean English (approx 1,500 - 2,000 characters) for: {title}. {description}\n"
-                f"Rules: Strictly NO internal thinking, scratchpads, or notes (NO 'Goal:', 'Structure:', 'Refinement:'). NO paragraph labels (e.g. Paragraph 1:). Start directly with dateline city (e.g. NEW YORK —). Cover event, macro liquidity, and regulatory impact."
-            )
-            english_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, en_prompt)
-
-            # 3. Chinese Article
-            zh_prompt = (
-                f"请为以下新闻撰写3段深度机构级中文财经新闻分析 (约 800 - 1,200 字): {title}. {description}\n"
-                f"严格要求: 严禁包含任何内部思考、草稿笔记(如 Goal、Structure、Refinement 等)。严禁包含段落标签(如第一段、段落1等)。直接以地点电头开始(如 纽约讯 —)，深入分析事件、流动性影响与监管合规。"
-            )
-            chinese_analysis = await asyncio.to_thread(ai_engine.analyze_opportunity, zh_prompt)
-
-            # High-Precision Sanitizer Function for News Broadcasts
-            def clean_final_news_text(txt, fallback_title="", lang="khmer"):
-                if not txt: return ""
-                
-                # 1. Purge reasoning & thinking tags
-                txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL | re.IGNORECASE)
-                txt = re.sub(r"<thought>.*?</thought>", "", txt, flags=re.DOTALL | re.IGNORECASE)
-                txt = re.sub(r"```think.*?```", "", txt, flags=re.DOTALL | re.IGNORECASE)
-                txt = re.sub(r"\[THINKING\].*?\[/THINKING\]", "", txt, flags=re.DOTALL | re.IGNORECASE)
-
-                # 2. Extract clean final block if Gemini generated scratchpad/drafts followed by final article
-                if lang == "khmer":
-                    # Matches any city name with or without ទីក្រុង/រាជធានី followed by ៖ or : (e.g. ឡុងដ៍ ៖, សិង្ហបុរី ៖, ទីក្រុងញូវយ៉ក ៖)
-                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*)?[\u1780-\u17ff]{2,20}\s*[៖:]', txt))
-                    if dateline_matches:
-                        last_idx = dateline_matches[-1].start()
-                        prefix = txt[:last_idx].lower()
-                        has_draft_markers = any(k in prefix for k in [
-                            "khmer refinement", "refinement:", "goal:", "dual technical", "structure:", "para 3", "end with",
-                            "dateline:", "terms:", "focus:", "check ending", "mental check"
-                        ])
-                        if has_draft_markers or last_idx > 50:
-                            candidate = txt[last_idx:].strip()
-                            if len(candidate) > 200:
-                                txt = candidate
-                elif lang == "english":
-                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:[A-Z\s]{3,20})\s*[-—–:]', txt))
-                    if dateline_matches:
-                        last_idx = dateline_matches[-1].start()
+            # 2. Extract clean final block if Gemini generated scratchpad/drafts followed by final article
+            if lang == "khmer":
+                dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*)?[\u1780-\u17ff]{2,20}\s*[៖:]', txt))
+                if dateline_matches:
+                    last_idx = dateline_matches[-1].start()
+                    prefix = txt[:last_idx].lower()
+                    has_draft_markers = any(k in prefix for k in [
+                        "khmer refinement", "refinement:", "goal:", "dual technical", "structure:", "para 3", "end with",
+                        "dateline:", "terms:", "focus:", "check ending", "mental check"
+                    ])
+                    if has_draft_markers or last_idx > 50:
                         candidate = txt[last_idx:].strip()
                         if len(candidate) > 200:
                             txt = candidate
-                elif lang == "chinese":
-                    dateline_matches = list(re.finditer(r'(?:^|\n)\s*[\u4e00-\u9fa5]{2,6}(?:讯|电)?\s*[-—–:]', txt))
-                    if dateline_matches:
-                        last_idx = dateline_matches[-1].start()
-                        candidate = txt[last_idx:].strip()
-                        if len(candidate) > 150:
-                            txt = candidate
+            elif lang == "english":
+                dateline_matches = list(re.finditer(r'(?:^|\n)\s*(?:[A-Z\s]{3,20})\s*[-—–:]', txt))
+                if dateline_matches:
+                    last_idx = dateline_matches[-1].start()
+                    candidate = txt[last_idx:].strip()
+                    if len(candidate) > 200:
+                        txt = candidate
+            elif lang == "chinese":
+                dateline_matches = list(re.finditer(r'(?:^|\n)\s*[\u4e00-\u9fa5]{2,6}(?:讯|电)?\s*[-—–:]', txt))
+                if dateline_matches:
+                    last_idx = dateline_matches[-1].start()
+                    candidate = txt[last_idx:].strip()
+                    if len(candidate) > 150:
+                        txt = candidate
 
-                lines = []
-                bad_prefixes = [
-                    "chief ai", "persona", "wait,", "the prompt", "formal khmer", 
-                    "title:", "description:", "3 paragraphs", "paragraph 1", "paragraph 2", 
-                    "paragraph 3", "event:", "context:", "impact:", "score:", "analysis:",
-                    "translation:", "note:", "system directive", "read full article",
-                    "confirm structure", "khmer translation", "draft (khmer)", "structure:",
-                    "goal:", "dual technical vocabulary:", "end with", "para 1:", "para 2:", "para 3:",
-                    "para 1", "para 2", "para 3", "legal/regulatory", "regulatory landscape", 
-                    "compliance requirements", "step 1", "step 2", "final symbol",
-                    "dateline:", "terms:", "focus:", "* check ending", "check ending:",
-                    "(mental check", "mental check", "let's use", "let us use", "spelling:",
-                    "*   check ending", "check ending: must end with"
-                ]
+            lines = []
+            bad_prefixes = [
+                "chief ai", "persona", "wait,", "the prompt", "formal khmer", 
+                "title:", "description:", "3 paragraphs", "paragraph 1", "paragraph 2", 
+                "paragraph 3", "event:", "context:", "impact:", "score:", "analysis:",
+                "translation:", "note:", "system directive", "read full article",
+                "confirm structure", "khmer translation", "draft (khmer)", "structure:",
+                "goal:", "dual technical vocabulary:", "end with", "para 1:", "para 2:", "para 3:",
+                "para 1", "para 2", "para 3", "legal/regulatory", "regulatory landscape", 
+                "compliance requirements", "step 1", "step 2", "final symbol",
+                "dateline:", "terms:", "focus:", "* check ending", "check ending:",
+                "(mental check", "mental check", "let's use", "let us use", "spelling:",
+                "*   check ending", "check ending: must end with"
+            ]
 
-                for line in txt.split("\n"):
-                    l = line.strip()
-                    if not l:
-                        continue
+            for line in txt.split("\n"):
+                l = line.strip()
+                if not l:
+                    continue
+                l_lower = l.lower()
+
+                # Strip "Khmer Refinement:" prefix if present on a substantial paragraph
+                if re.match(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', l, flags=re.IGNORECASE):
+                    l = re.sub(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', '', l, flags=re.IGNORECASE).strip()
                     l_lower = l.lower()
-
-                    # Strip "Khmer Refinement:" prefix if present on a substantial paragraph
-                    if re.match(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', l, flags=re.IGNORECASE):
-                        l = re.sub(r'^(?:khmer refinement|english refinement|refinement|draft)[៖:]\s*', '', l, flags=re.IGNORECASE).strip()
-                        l_lower = l.lower()
-                        if len(l) < 50:
-                            continue
-
-                    # Drop lines matching bad prefixes
-                    if any(l_lower.startswith(bad) for bad in bad_prefixes):
+                    if len(l) < 50:
                         continue
 
-                    # Drop lines that are purely section/paragraph labels
-                    is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
-                    is_short_subhead = (len(l) < 90) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+|goal|structure|refinement|dual technical|dateline|terms|focus)', l, flags=re.IGNORECASE))
-                    if is_pure_label or is_short_subhead:
+                # Drop lines matching bad prefixes
+                if any(l_lower.startswith(bad) for bad in bad_prefixes):
+                    continue
+
+                # Drop lines that are purely section/paragraph labels
+                is_pure_label = bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:\s*[៖:]\s*[\*\_]*|\s*[\*\_]*)$', l, flags=re.IGNORECASE))
+                is_short_subhead = (len(l) < 90) and bool(re.match(r'^(?:[\*\_#\-\s📌🔥🚨📰]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+|goal|structure|refinement|dual technical|dateline|terms|focus)', l, flags=re.IGNORECASE))
+                if is_pure_label or is_short_subhead:
+                    continue
+
+                if "->" in l or "=>" in l or l_lower.startswith("title"):
+                    continue
+
+                # For Khmer language, filter out lines that are purely English/meta scratchpad
+                if lang == "khmer":
+                    has_khmer = any('\u1780' <= c <= '\u17ff' for c in l)
+                    if not has_khmer and len(l.split()) > 2:
+                        continue
+                    if re.match(r'^(?:end with|final symbol|para \d|goal|structure|dateline|terms|focus|check ending|\* check|\(mental check)', l_lower):
                         continue
 
-                    if "->" in l or "=>" in l or l_lower.startswith("title"):
-                        continue
+                # Strip any leading paragraph/section label embedded at the start of a sentence
+                l = re.sub(
+                    r'^(?:[\*\_#\-\s📌]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:[\*\_#\-\s]*)[៖:]\s*',
+                    '',
+                    l,
+                    flags=re.IGNORECASE
+                ).strip()
 
-                    # For Khmer language, filter out lines that are purely English/meta scratchpad
-                    if lang == "khmer":
-                        has_khmer = any('\u1780' <= c <= '\u17ff' for c in l)
-                        if not has_khmer and len(l.split()) > 2:
-                            continue
-                        if re.match(r'^(?:end with|final symbol|para \d|goal|structure|dateline|terms|focus|check ending|\* check|\(mental check)', l_lower):
-                            continue
+                if l:
+                    lines.append(l)
 
-                    # Strip any leading paragraph/section label embedded at the start of a sentence
-                    l = re.sub(
-                        r'^(?:[\*\_#\-\s📌]*)(?:ផ្នែកទី\s*\d+|កថាខណ្ឌទី\s*\d+|para(?:graph)?\s*\d+|section\s*\d+|part\s*\d+)(?:[\*\_#\-\s]*)[៖:]\s*',
-                        '',
-                        l,
-                        flags=re.IGNORECASE
-                    ).strip()
+            res = "\n\n".join(lines).strip()
 
-                    if l:
-                        lines.append(l)
+            # 3. Post-processing deduplication: Ensure no repeated draft exists
+            city_m = re.match(r'^((?:(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*)?[\u1780-\u17ff]{2,20}\s*[៖:])', res)
+            if city_m:
+                dateline_tag = city_m.group(1).strip()
+                sub_idx = res.find(dateline_tag, len(dateline_tag))
+                if sub_idx != -1 and sub_idx > 150:
+                    second_part = res[sub_idx:].strip()
+                    if len(second_part) > 200:
+                        res = second_part
 
-                res = "\n\n".join(lines).strip()
+            # 4. Enforce strict character limit (Max 2,500 chars) so Telegram NEVER splits into 2 messages
+            if len(res) > 2500:
+                last_end = res.rfind("៕", 0, 2500)
+                if last_end != -1 and last_end > 1000:
+                    res = res[:last_end + 1].strip()
+                else:
+                    res = res[:2500].strip() + "..."
 
-                # 3. Post-processing deduplication: Ensure no repeated draft exists
-                city_m = re.match(r'^((?:(?:ទីក្រុង|រាជធានី|ខេត្ត)\s*)?[\u1780-\u17ff]{2,20}\s*[៖:])', res)
-                if city_m:
-                    dateline_tag = city_m.group(1).strip()
-                    # Check if dateline_tag appears again later in the output (e.g. repeated draft)
-                    sub_idx = res.find(dateline_tag, len(dateline_tag))
-                    if sub_idx != -1 and sub_idx > 150:
-                        second_part = res[sub_idx:].strip()
-                        if len(second_part) > 200:
-                            res = second_part
+            if len(res) < 20:
+                res = (
+                    f"ទីក្រុងញូវយ៉ក ៖ យោងតាមរបាយការណ៍ហិរញ្ញវត្ថុទាន់ហេតុការណ៍ ការវិវត្តនៃ «{fallback_title}» "
+                    f"បានបង្កើតនូវសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងខ្លាំងក្លាក្នុងទីផ្សារទ្រព្យឌីជីថលសកល។ "
+                    f"ការវិភាគផ្នែកបរិមាណវិស័យបង្ហាញពីស្ថិរភាពទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) និងការកាត់បន្ថយហានិភ័យនៃប្រតិបត្តិការជានិរន្តរ៍ជូនវិនិយោគិនទាំងអស់៕"
+                )
+            return res
 
-                # 4. Enforce strict character limit (Max 2,500 chars) so Telegram NEVER splits into 2 messages
-                if len(res) > 2500:
-                    last_end = res.rfind("៕", 0, 2500)
-                    if last_end != -1 and last_end > 1000:
-                        res = res[:last_end + 1].strip()
-                    else:
-                        res = res[:2500].strip() + "..."
-
-                if len(res) < 20:
-                    res = (
-                        f"ទីក្រុងញូវយ៉ក ៖ យោងតាមរបាយការណ៍ហិរញ្ញវត្ថុទាន់ហេតុការណ៍ ការវិវត្តនៃ «{fallback_title}» "
-                        f"បានបង្កើតនូវសន្ទុះសាច់ប្រាក់ងាយស្រួល (Liquidity Momentum) យ៉ាងខ្លាំងក្លាក្នុងទីផ្សារទ្រព្យឌីជីថលសកល។ "
-                        f"ការវិភាគផ្នែកបរិមាណវិស័យបង្ហាញពីស្ថិរភាពទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows) និងការកាត់បន្ថយហានិភ័យនៃប្រតិបត្តិការជានិរន្តរ៍ជូនវិនិយោគិនទាំងអស់៕"
-                    )
-                return res
-
-            texts = {
-                'khmer': clean_final_news_text(khmer_analysis, title, 'khmer'),
-                'english': clean_final_news_text(english_analysis, title, 'english'),
-                'chinese': clean_final_news_text(chinese_analysis, title, 'chinese')
-            }
+        for item in news_items:
+            title = item.get("title", "").strip()
+            link = item.get("link", "").strip()
+            description = item.get("description", "").strip()
+            image_url = item.get("image_url", "").strip()
+            item_source = item.get("source", "")
             
-            score = 8
-            if any(w in title.lower() for w in ['etf', 'sec', 'binance', 'fed', 'rate', 'hack', 'record', 'billion', 'million']):
-                score = 9
-            
-            # Dynamic Asset, Bias, and Footnote Command Calculation
-            title_lower = (title + " " + description).lower()
-            # Multi-Tier Institutional News Intelligence Evaluation (Super Fast & Super Smart)
+            if not title or not link:
+                continue
+
+            if db.is_news_seen(link):
+                continue
+
             t_lower = title.lower()
             d_lower = description.lower()
 
-            # 1. Target Coin Resolution (Expanded Multi-Asset Mapping)
+            # Target Coin Resolution (Expanded Multi-Asset Mapping)
             coin_map = [
                 ("BTCUSDT", ["btc", "bitcoin"]),
                 ("ETHUSDT", ["eth", "ethereum"]),
@@ -758,7 +697,7 @@ async def check_crypto_news(app: Application, ai_engine):
                         target_sym = sym
                         break
 
-            # 2. Institutional Lexical Engine with Critical Triggers & Negation Guards
+            # Institutional Lexical Engine with Critical Triggers & Negation Guards
             INSTITUTIONAL_BEARISH_KEYWORDS = [
                 "put down", "shut down", "shutdown", "close", "closing", "liquidate", "liquidating", "liquidation",
                 "terminate", "terminating", "termination", "delist", "delisting", "withdraw", "withdrawing", "withdrawn",
@@ -768,7 +707,7 @@ async def check_crypto_news(app: Application, ai_engine):
                 "dump", "dumps", "crash", "crashes", "plunge", "plunges", "bleeding", "collapse", "collapses",
                 "investigation", "subpoena", "lawsuit", "sue", "sued", "fraud", "scam", "hack", "hacked", "exploit",
                 "exploited", "fine", "penalty", "crackdown", "ban", "banned", "bear", "bearish", "selloff", "panic",
-                "drop", "drops", "fall", "falls", "decline", "declines", "threat", "risk off", "de-risk"
+                "drop", "drops", "fall", "falls", "decline", "declines", "threat", "risk off", "de-risk", "rate hike", "hawkish"
             ]
 
             INSTITUTIONAL_BULLISH_KEYWORDS = [
@@ -776,7 +715,8 @@ async def check_crypto_news(app: Application, ai_engine):
                 "debut", "debuts", "expand", "expansion", "partnership", "soar", "soars", "surge", "surges", "jump", "jumps",
                 "rally", "rallies", "record", "high", "highs", "strongest", "bull", "bullish", "all-time high", "ath",
                 "breakout", "accumulate", "accumulation", "accumulating", "buying", "buyback", "adopt", "adoption",
-                "rebound", "rebounds", "recover", "recovery", "treasury reserve", "milestone", "gain", "gains", "pump", "boost"
+                "rebound", "rebounds", "recover", "recovery", "treasury reserve", "milestone", "gain", "gains", "pump", "boost",
+                "rate cut", "easing", "stimulus", "dovish", "soft landing"
             ]
 
             NEGATION_PATTERNS = [
@@ -785,10 +725,10 @@ async def check_crypto_news(app: Application, ai_engine):
 
             critical_bearish_triggers = [
                 "put down", "shut down", "closing", "liquidat", "delist", "terminate",
-                "reject", "deny", "unwind", "subpoena", "lawsuit", "bankrupt", "low net assets"
+                "reject", "deny", "unwind", "subpoena", "lawsuit", "bankrupt", "low net assets", "exploit", "hack"
             ]
             critical_bullish_triggers = [
-                "approved", "greenlight", "record inflow", "adoption", "treasury reserve", "all-time high"
+                "approved", "greenlight", "record inflow", "adoption", "treasury reserve", "all-time high", "rate cut"
             ]
 
             bear_score = 0
@@ -806,7 +746,7 @@ async def check_crypto_news(app: Application, ai_engine):
                     else:
                         bull_score += 15 if any(ct in kw for ct in critical_bullish_triggers) else 10
 
-            # Description evaluation (Strict Negation Guard)
+            # Description evaluation
             for kw in INSTITUTIONAL_BEARISH_KEYWORDS:
                 if kw in d_lower:
                     bear_score += 4
@@ -818,7 +758,38 @@ async def check_crypto_news(app: Application, ai_engine):
                     else:
                         bull_score += 2
 
-            # 3. Multi-Model AI Engine Fast Classification
+            # Calculate Initial Impact Score (0 - 10)
+            score = 6
+            high_impact_terms = [
+                'etf', 'sec', 'binance', 'fed', 'federal reserve', 'rate cut', 'rate hike', 'powell',
+                'interest rate', 'hack', 'record', 'billion', 'cpi', 'inflation', 'treasury',
+                'liquidation', 'delist', 'lawsuit', 'bankruptcy', 'soar', 'crash', 'all-time high'
+            ]
+            if any(w in t_lower for w in high_impact_terms):
+                score = 8
+            if any(ct in t_lower for ct in critical_bearish_triggers) or any(ct in t_lower for ct in critical_bullish_triggers):
+                score = 9
+            if abs(bear_score - bull_score) >= 20:
+                score = min(10, score + 1)
+
+            # 🛡️ THE GATEKEEPER: Discard routine low-impact RSS noise (< 8) in microseconds
+            if score < 8:
+                db.mark_news_seen(link)
+                continue
+
+            # Process high-impact breaking news article
+            db.mark_news_seen(link)
+
+            # 🌐 Fetch Live Google Macro Satellite Pulse (< 1ms cache / thread-pooled)
+            macro_data = await asyncio.to_thread(google_macro_satellite.fetch_google_macro_satellite_data)
+            dxy_val = float(macro_data.get('dxy_index', 100.25))
+            dxy_chg = float(macro_data.get('dxy_change_pct', -0.15))
+            sp500_val = float(macro_data.get('sp500_price', 7650.0))
+            sp500_chg = float(macro_data.get('sp500_change_pct', 0.35))
+            us10y_val = float(macro_data.get('us10y_yield', 4.25))
+            fed_odds = float(macro_data.get('prediction_odds', {}).get('fed_rate_cut_prob', 78.5))
+
+            # Fast AI Bias Classification
             ai_bias = None
             ai_confidence = 88.0
             if ai_engine and hasattr(ai_engine, "analyze_opportunity"):
@@ -845,7 +816,7 @@ async def check_crypto_news(app: Application, ai_engine):
                 except Exception as e:
                     print(f"⚠️ [AI NEWS SENTIMENT NOTICE]: {e}")
 
-            # 4. Synthesize Multi-Model Verdict
+            # Synthesize Final Verdict
             if ai_bias:
                 if ai_bias == "BEARISH":
                     sentiment = "BEARISH"
@@ -875,7 +846,49 @@ async def check_crypto_news(app: Application, ai_engine):
                     trade_side = "HEDGE"
                     win_rate = 85.0
 
-            # 5. Market Bias Strings & Footnote Command
+            # 1. Khmer Article (Strict Chuon Nath Executive Standard - 3 Seamless Paragraphs)
+            kh_prompt = (
+                f"អ្នកគឺជាប្រធាននិពន្ធសារព័ត៌មានហិរញ្ញវត្ថុគ្រីបតូស្ថាប័នជាន់ខ្ពស់ (Executive Financial News Chief Editor)។\n"
+                f"សូមសរសេរអត្ថបទព័ត៌មានវិភាគស៊ីជម្រៅកម្រិតស្ថាប័នជាភាសាខ្មែរផ្លូវការ ត្រឹមត្រូវតាមក្បួនអក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ឱ្យបានក្បោះក្បាយ មានប្រវែងចន្លោះពី 1,800 ដល់ 2,500 តួអក្សរ (ដើម្បីធានាការផ្ញើចេញរួមគ្នាជាមួយរូបភាពក្នុងសារតែមួយគត់នៃ Telegram) ដោយផ្អែកលើព័ត៌មានខាងក្រោម ៖\n"
+                f"ចំណងជើង ៖ {title}\n"
+                f"ខ្លឹមសារ ៖ {description}\n\n"
+                f"វិធានតឹងរ៉ឹងបំផុតសម្រាប់ការសរសេរ (CRITICAL INSTRUCTIONS) ៖\n"
+                f"១. សរសេរជា ៣ កថាខណ្ឌពេញលេញ តភ្ជាប់គ្នាយ៉ាងរលូនជាលក្ខណៈនិទានរឿងសារព័ត៌មានអាជីព។\n"
+                f"២. ហាមដាច់ខាតមិនឱ្យសរសេរស្លាក ឬពាក្យសម្គាល់ដូចជា «ផ្នែកទី១», «ផ្នែកទី២», «ផ្នែកទី៣», «កថាខណ្ឌទី១», «កថាខណ្ឌទី២», «កថាខណ្ឌទី៣», «Para 1», «Para 2», «Para 3», «Section 1» ឬ «សេចក្តីព្រាង» នៅលើក្បាលកថាខណ្ឌឡើយ! ត្រូវសរសេរចូលជាសាច់រឿងអត្ថបទតែម្តង។\n"
+                f"៣. ភ្ជាប់ពាក្យបច្ចេកទេសហិរញ្ញវត្ថុ និងគ្រីបតូជាភាសាអង់គ្លេសក្នុងវង់ក្រចកជានិច្ច (Dual Technical Vocabulary) ដូចជា ៖ សាច់ប្រាក់ងាយស្រួល (Liquidity), មូលបត្របំប្លែងជាថូខឹន (Tokenized Securities), លំហូរទុនវិនិយោគិនស្ថាប័ន (Institutional Inflows), អត្រាការប្រាក់គោល (Benchmark Interest Rates), ការកើនឡើងសន្ទុះទីផ្សារ (Bullish Momentum), ស្ថិរភាពប្រព័ន្ធ (Systemic Stability) ជាដើម។\n"
+                f"៤. រចនាសម្ព័ន្ធអត្ថបទទាំង ៣ កថាខណ្ឌ ៖\n"
+                f"   - កថាខណ្ឌទីមួយ ៖ ចាប់ផ្តើមភ្លាមដោយឈ្មោះទីក្រុងសារព័ត៌មាន (ឧទាហរណ៍ ៖ «ទីក្រុងញូវយ៉ក ៖» ឬ «ទីក្រុងវ៉ាស៊ីនតោន ៖») រួចរៀបរាប់ពីហេតុការណ៍ចម្បង តួលេខទំហំទឹកប្រាក់ ស្ថាប័នពាក់ព័ន្ធ និងបរិបទនៃព្រឹត្តិការណ៍។\n"
+                f"   - កថាខណ្ឌទីពីរ ៖ វិភាគស៊ីជម្រៅលើផលប៉ះពាល់ទីផ្សារ លំហូរសាច់ប្រាក់ងាយស្រួល (Liquidity), ចលនាទិញសន្សំរបស់ត្រីបាឡែន (Whale Accumulation), ទីផ្សារដេរីវ៉េទីវ (Derivatives) និងទស្សនវិស័យម៉ាក្រូសេដ្ឋកិច្ច។\n"
+                f"   - កថាខណ្ឌទីបី ៖ វិភាគផ្នែកក្របខ័ណ្ឌគតិយុត្ត បទប្បញ្ញត្តិច្បាប់ និងការការពារហានិភ័យសម្រាប់វិនិយោគិន ដោយត្រូវបញ្ចប់កថាខណ្ឌទីបីដោយសញ្ញាខណ្ឌ «៕» ជានិច្ច។\n"
+                f"៥. ដាច់ខាតហាមសរសេរពាក្យដូចជា \"Dual Technical Vocabulary\", \"Structure\", \"Goal\", \"Khmer Refinement\", \"Para\", \"Draft\", ឬសរសេរកំណត់ចំណាំការគិត (Thinking/Scratchpad) មុន ឬក្រោយអត្ថបទជាដាច់ខាត! ចាប់ផ្តើមអក្សរដំបូងនៃអត្ថបទដោយឈ្មោះទីក្រុងសារព័ត៌មានភ្លាម (ឧទាហរណ៍ ៖ «ទីក្រុងញូវយ៉ក ៖»)។"
+            )
+
+            # 2. English Article
+            en_prompt = (
+                f"Write an institutional 3-paragraph financial news analysis in clean English (approx 1,500 - 2,000 characters) for: {title}. {description}\n"
+                f"Rules: Strictly NO internal thinking, scratchpads, or notes (NO 'Goal:', 'Structure:', 'Refinement:'). NO paragraph labels (e.g. Paragraph 1:). Start directly with dateline city (e.g. NEW YORK —). Cover event, macro liquidity, and regulatory impact."
+            )
+
+            # 3. Chinese Article
+            zh_prompt = (
+                f"请为以下新闻撰写3段深度机构级中文财经新闻分析 (约 800 - 1,200 字): {title}. {description}\n"
+                f"严格要求: 严禁包含任何内部思考、草稿笔记(如 Goal、Structure、Refinement 等)。严禁包含段落标签(如第一段、段落1等)。直接以地点电头开始(如 纽约讯 —)，深入分析事件、流动性影响与监管合规。"
+            )
+
+            # Parallel AI Synthesis via asyncio.gather (< 2.5s Total)
+            kh_task = asyncio.to_thread(ai_engine.analyze_opportunity, kh_prompt)
+            en_task = asyncio.to_thread(ai_engine.analyze_opportunity, en_prompt)
+            zh_task = asyncio.to_thread(ai_engine.analyze_opportunity, zh_prompt)
+
+            khmer_analysis, english_analysis, chinese_analysis = await asyncio.gather(kh_task, en_task, zh_task)
+
+            texts = {
+                'khmer': clean_final_news_text(khmer_analysis, title, 'khmer'),
+                'english': clean_final_news_text(english_analysis, title, 'english'),
+                'chinese': clean_final_news_text(chinese_analysis, title, 'chinese')
+            }
+
+            # Market Bias Strings & Footnote Command
             if sentiment == "BEARISH":
                 market_bias_km = "🔴 BEARISH DISTRIBUTION (ស្ថាប័នកាត់បន្ថយហានិភ័យ / បិទបញ្ចប់ ETF)"
                 market_bias_en = "🔴 BEARISH DISTRIBUTION (Institutional De-risking / ETF Closure)"
@@ -892,12 +905,12 @@ async def check_crypto_news(app: Application, ai_engine):
                 market_bias_zh = "⚪ 波动率扩张 (Delta中性对冲)"
                 footnote_cmd = f"/turbo_hedge HEDGE {target_sym} 50"
 
-            source_name = get_source_name(link)
+            source_name = get_source_name(link, item_source)
             kh_date_str = format_khmer_datetime()
 
-            # 6. Interactive 1-Tap Action Keyboard (Invariant 11 Compliance)
+            # Interactive 1-Tap Action Keyboard (Invariant 11 Compliance)
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            from ui_standards import DIVIDER_HEAVY
+            from ui_standards import DIVIDER_HEAVY, DIVIDER_LIGHT
             sym_display = target_sym.replace("USDT", "")
             if trade_side == "SELL":
                 news_kb = InlineKeyboardMarkup([
@@ -927,246 +940,261 @@ async def check_crypto_news(app: Application, ai_engine):
                     ]
                 ])
 
-            print(f"News: '{title}' - Impact Score: {score}/10 | Target: {target_sym} {trade_side} ({sentiment}) | Image: {image_url}")
-            if score >= 7:
-                async def process_news_alert_and_auto_trade(chat_id, lang):
-                    raw_l = str(lang or 'khmer').lower()
-                    if raw_l in ['km', 'khmer']: user_l = 'khmer'
-                    elif raw_l in ['zh', 'chinese', 'cn']: user_l = 'chinese'
-                    else: user_l = 'english'
+            print(f"🔥 [HIGH IMPACT NEWS {score}/10]: '{title}' | Target: {target_sym} {trade_side} ({sentiment}) | Cover: {image_url}")
 
-                    # 1. Check & Execute 24/7 Automated Trading First
-                    auto_trade_state = None  # None, "EXECUTED", "BLOCKED_RSI", "INSUFFICIENT_BAL"
-                    exec_info = {}
-                    try:
-                        config = db.get_auto_trade_config(chat_id)
-                        if config and config.get("enabled") and score >= 8:
-                            if db.can_user_buy(chat_id):
-                                keys = db.get_user_api(chat_id)
-                                if keys:
-                                    api_key, api_secret = keys
-                                    trade_amount = float(config.get("amount", 30.0))
-                                    trailing_pct = float(config.get("trailing_pct", 2.5))
-                                    user_lev = 10  # Small capital protection clamp (Invariant 8)
+            async def process_news_alert_and_auto_trade(chat_id, lang):
+                raw_l = str(lang or 'khmer').lower()
+                if raw_l in ['km', 'khmer']: user_l = 'khmer'
+                elif raw_l in ['zh', 'chinese', 'cn']: user_l = 'chinese'
+                else: user_l = 'english'
 
-                                    if trade_side == "SELL":
-                                        fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
-                                        trade_amount = min(trade_amount, fut_bal)
-                                        if trade_amount >= 5.0:
-                                            # 🛡️ Anti-Oversold Short Guard for News Auto-Trade (Invariant 16)
-                                            rsi_val = await asyncio.to_thread(market_data.get_symbol_rsi, target_sym, "15m")
-                                            if rsi_val <= 42.0:
-                                                print(f"🛑 [NEWS AUTO-TRADE OVERSOLD SHORT GUARD] {target_sym}: 15m RSI {rsi_val:.1f} <= 42.0. Aborting news auto-short!")
-                                                auto_trade_state = "BLOCKED_RSI"
-                                                exec_info = {"rsi": rsi_val, "symbol": target_sym}
-                                            else:
-                                                res = await asyncio.to_thread(
-                                                    trading_engine.place_futures_short,
-                                                    api_key, api_secret, target_sym, trade_amount, user_lev
-                                                )
-                                                if res and "error" not in str(res).lower():
-                                                    entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
-                                                    if entry_price == 0.0:
-                                                        entry_price = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
-                                                    qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
-                                                    auto_trade_state = "EXECUTED"
-                                                    exec_info = {
-                                                        "engine": "/auto_trade (Futures Short)",
-                                                        "symbol": target_sym,
-                                                        "amount": trade_amount,
-                                                        "leverage": user_lev,
-                                                        "price": entry_price,
-                                                        "trailing": trailing_pct
-                                                    }
-                                    elif trade_side == "BUY":
-                                        trade_amount = max(10.50, trade_amount)  # Spot MIN_NOTIONAL floor (Invariant 1)
-                                        spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
-                                        if spot_bal >= trade_amount:
+                # 1. Check & Execute 24/7 Automated Trading First
+                auto_trade_state = None  # None, "EXECUTED", "BLOCKED_RSI", "INSUFFICIENT_BAL"
+                exec_info = {}
+                try:
+                    config = db.get_auto_trade_config(chat_id)
+                    if config and config.get("enabled") and score >= 8:
+                        if db.can_user_buy(chat_id):
+                            keys = db.get_user_api(chat_id)
+                            if keys:
+                                api_key, api_secret = keys
+                                trade_amount = float(config.get("amount", 30.0))
+                                trailing_pct = float(config.get("trailing_pct", 2.5))
+                                user_lev = 10  # Small capital protection clamp (Invariant 8)
+
+                                if trade_side == "SELL":
+                                    fut_bal = await asyncio.to_thread(trading_engine.get_futures_balance, api_key, api_secret, "USDT")
+                                    trade_amount = min(trade_amount, fut_bal)
+                                    if trade_amount >= 5.0:
+                                        # 🛡️ Anti-Oversold Short Guard for News Auto-Trade (Invariant 16)
+                                        rsi_val = await asyncio.to_thread(market_data.get_symbol_rsi, target_sym, "15m")
+                                        if rsi_val <= 42.0:
+                                            print(f"🛑 [NEWS AUTO-TRADE OVERSOLD SHORT GUARD] {target_sym}: 15m RSI {rsi_val:.1f} <= 42.0. Aborting news auto-short!")
+                                            auto_trade_state = "BLOCKED_RSI"
+                                            exec_info = {"rsi": rsi_val, "symbol": target_sym}
+                                        else:
                                             res = await asyncio.to_thread(
-                                                trading_engine.place_market_buy,
-                                                api_key, api_secret, target_sym, trade_amount
+                                                trading_engine.place_futures_short,
+                                                api_key, api_secret, target_sym, trade_amount, user_lev
                                             )
                                             if res and "error" not in str(res).lower():
-                                                buy_price = float(res.get("price", 0.0))
-                                                if buy_price == 0.0:
-                                                    buy_price = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
-                                                qty = float(res.get("origQty", 0.0))
-                                                if qty > 0 and buy_price > 0:
-                                                    db.add_active_trade(chat_id, target_sym, qty, buy_price, trailing_pct)
+                                                entry_price = float(res.get("avgPrice") or res.get("price") or 0.0)
+                                                if entry_price == 0.0:
+                                                    entry_price = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
+                                                qty = float(res.get("origQty") or res.get("executedQty") or 0.0)
                                                 auto_trade_state = "EXECUTED"
                                                 exec_info = {
-                                                    "engine": "/auto_trade (Spot Buy / Zero Liquidation)",
+                                                    "engine": "/auto_trade (Futures Short)",
                                                     "symbol": target_sym,
                                                     "amount": trade_amount,
-                                                    "leverage": 1,
-                                                    "price": buy_price,
+                                                    "leverage": user_lev,
+                                                    "price": entry_price,
                                                     "trailing": trailing_pct
                                                 }
-                                    elif trade_side == "HEDGE":
-                                        # 🛡️ Volatility Expansion is strictly kept as Informational Market Advisory (Zero Auto-Order)
-                                        # Protects user margin from unexpected dual-side locks: HEDGE is NEVER auto-executed.
-                                        pass
-                    except Exception as e_auto:
-                        print(f"⚠️ [NEWS AUTO-TRADE NOTICE for {chat_id}]: {e_auto}")
+                                elif trade_side == "BUY":
+                                    trade_amount = max(10.50, trade_amount)  # Spot MIN_NOTIONAL floor (Invariant 1)
+                                    spot_bal = await asyncio.to_thread(trading_engine.get_spot_balance, api_key, api_secret, "USDT")
+                                    if spot_bal >= trade_amount:
+                                        res = await asyncio.to_thread(
+                                            trading_engine.place_market_buy,
+                                            api_key, api_secret, target_sym, trade_amount
+                                        )
+                                        if res and "error" not in str(res).lower():
+                                            buy_price = float(res.get("price", 0.0))
+                                            if buy_price == 0.0:
+                                                buy_price = await asyncio.to_thread(trading_engine.get_current_price, target_sym)
+                                            qty = float(res.get("origQty", 0.0))
+                                            if qty > 0 and buy_price > 0:
+                                                db.add_active_trade(chat_id, target_sym, qty, buy_price, trailing_pct)
+                                            auto_trade_state = "EXECUTED"
+                                            exec_info = {
+                                                "engine": "/auto_trade (Spot Buy / Zero Liquidation)",
+                                                "symbol": target_sym,
+                                                "amount": trade_amount,
+                                                "leverage": 1,
+                                                "price": buy_price,
+                                                "trailing": trailing_pct
+                                            }
+                                elif trade_side == "HEDGE":
+                                    # 🛡️ Volatility Expansion is strictly kept as Informational Market Advisory (Zero Auto-Order)
+                                    pass
+                except Exception as e_auto:
+                    print(f"⚠️ [NEWS AUTO-TRADE NOTICE for {chat_id}]: {e_auto}")
 
-                    # 2. Build Execution / Action Section
-                    if auto_trade_state == "EXECUTED":
-                        if user_l == 'khmer':
-                            action_section = (
-                                f"⚡ **ស្ថានភាពប្រតិបត្តិការស្វ័យប្រវត្តិ (24/7 AUTO-PILOT EXECUTION) ៖**\n"
-                                f"• **ស្ថានភាព ៖** 🟢 `បានបើកដំណើរការវិនិយោគ AUTO រួចរាល់ដោយជោគជ័យ!`\n"
-                                f"• **មុខងារ (Engine) ៖** `{exec_info.get('engine')}`\n"
-                                f"• **ទ្រព្យសកម្ម (Symbol) ៖** `{exec_info.get('symbol')}`\n"
-                                f"• **ទំហំទុន & Leverage ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x ISOLATED`\n"
-                                f"• **តម្លៃចូល (Entry Price) ៖** `${exec_info.get('price', 0):,.4f}`\n"
-                                f"• **ការពារហានិភ័យ ៖** `Dynamic Trailing Lock (+0.12% Net Floor)`\n\n"
-                                f"💡 _ប្រព័ន្ធបានចាប់ឱកាស និងបើក Position ជូនស្វ័យប្រវត្តិភ្លាមៗ មិនបាច់រង់ចាំចុចឡើយ!_"
-                            )
-                        elif user_l == 'chinese':
-                            action_section = (
-                                f"⚡ **自动跟单执行状态 (24/7 AUTO-PILOT EXECUTION) ៖**\n"
-                                f"• **状态 ៖** 🟢 `已自动成功建仓完毕!`\n"
-                                f"• **执行引擎 ៖** `{exec_info.get('engine')}`\n"
-                                f"• **目标资产 ៖** `{exec_info.get('symbol')}`\n"
-                                f"• **资金规模 & 杠杆 ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x 逐仓`\n"
-                                f"• **入场价格 ៖** `${exec_info.get('price', 0):,.4f}`\n"
-                                f"• **风控体系 ៖** `动态追踪止盈锁利 (+0.12% 净利润底线)`\n\n"
-                                f"💡 _AI 已毫秒级全自动抢跑建仓，无需手动点击确认!_"
-                            )
-                        else:
-                            action_section = (
-                                f"⚡ **24/7 AUTO-PILOT EXECUTION STATUS ៖**\n"
-                                f"• **Status ៖** 🟢 `Automated Position Opened Successfully!`\n"
-                                f"• **Engine ៖** `{exec_info.get('engine')}`\n"
-                                f"• **Symbol ៖** `{exec_info.get('symbol')}`\n"
-                                f"• **Capital & Leverage ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x ISOLATED`\n"
-                                f"• **Entry Price ៖** `${exec_info.get('price', 0):,.4f}`\n"
-                                f"• **Risk Shield ៖** `Dynamic Trailing Lock (+0.12% Net Profit Floor)`\n\n"
-                                f"💡 _AI has executed the trade on your behalf without manual waiting!_"
-                            )
-                    elif auto_trade_state == "BLOCKED_RSI":
-                        if user_l == 'khmer':
-                            action_section = (
-                                f"🛡️ **ការការពារហានិភ័យស្វ័យប្រវត្តិ (RISK SHIELD TRIGGERED) ៖**\n"
-                                f"• **ស្ថានភាព ៖** ⚠️ `ផ្អាកការបើក Short ដោយស្វ័យប្រវត្តិ`\n"
-                                f"• **មូលហេតុ ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) ស្ថិតក្នុងតំបន់ Oversold (ហានិភ័យ Short Squeeze)`\n"
-                                f"• **ការពារដើមទុន ៖** `អនុលោមតាមក្បួន Invariant 16 មិនលក់បាតទីផ្សារដាច់ខាត`"
-                            )
-                        elif user_l == 'chinese':
-                            action_section = (
-                                f"🛡️ **风控防线已拦截 (RISK SHIELD TRIGGERED) ៖**\n"
-                                f"• **状态 ៖** ⚠️ `已自动拦截本次做空`\n"
-                                f"• **原因 ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) 处于超卖底部 (防空头挤压 Short Squeeze)`\n"
-                                f"• **资产保护 ៖** `坚决执行 Invariant 16 绝不在恐慌底部追空`"
-                            )
-                        else:
-                            action_section = (
-                                f"🛡️ **AUTO-TRADE RISK SHIELD TRIGGERED ៖**\n"
-                                f"• **Status ៖** ⚠️ `Automated Short Suppressed`\n"
-                                f"• **Reason ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) is oversold (Short Squeeze Risk)`\n"
-                                f"• **Capital Shield ៖** `Invariant 16: Zero bottom selling in panic zones`"
-                            )
-                    else:
-                        if trade_side == "HEDGE":
-                            if user_l == 'khmer':
-                                action_section = (
-                                    f"👉 **ជម្រើសបញ្ជាជួញដូរ (1-Tap Optional Execution) ៖**\n"
-                                    f"`` `{footnote_cmd}` ``\n\n"
-                                    f"💡 _សេចក្តីបញ្ជាក់ ៖ ដំណឹងនេះជាប្រភេទ Volatility Expansion (ទីផ្សាររលកបោកខ្លាំង) ប្រព័ន្ធរក្សាទុកជាការជូនដំណឹង (Advisory Only) មិនបើក Auto-Hedge ដោយស្វ័យប្រវត្តិនាំឱ្យកកទុនឡើយ! អ្នកអាចចុចបើកដោយដៃតាមការស្ម័គ្រចិត្ត។_"
-                                )
-                            elif user_l == 'chinese':
-                                action_section = (
-                                    f"👉 **自选对冲指令 (1-Tap Optional Execution) ៖**\n"
-                                    f"`` `{footnote_cmd}` ``\n\n"
-                                    f"💡 _提示 ៖ 本消息属于波动率扩张（震荡洗盘），系统仅作预警提示（坚决不自动锁仓对冲），避免占用可用资金。您可按需手动点击执行。_"
-                                )
-                            else:
-                                action_section = (
-                                    f"👉 **Optional Action Execution (1-Tap Copyable) ៖**\n"
-                                    f"`` `{footnote_cmd}` ``\n\n"
-                                    f"💡 _Notice: Volatility Expansion events are strictly Advisory Only (Zero Auto-Hedge to prevent locking margin). You may execute manually at your discretion._"
-                                )
-                        else:
-                            if user_l == 'khmer':
-                                action_section = (
-                                    f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
-                                    f"`` `{footnote_cmd}` ``\n\n"
-                                    f"💡 _បើក /auto_trade ON 30 ឬ /turbo_hedge ON 50 ដើម្បីឱ្យ AI ចូលជួញដូរស្វ័យប្រវត្តិភ្លាមៗពេលមានដំណឹង!_"
-                                )
-                            elif user_l == 'chinese':
-                                action_section = (
-                                    f"👉 **一键快捷执行 ៖**\n"
-                                    f"`` `{footnote_cmd}` ``\n\n"
-                                    f"💡 _开启 /auto_trade ON 30 或 /turbo_hedge ON 50 即可享受新闻毫秒级自动建仓!_"
-                                )
-                            else:
-                                action_section = (
-                                    f"👉 **1-Tap Action Execution ៖**\n"
-                                    f"`` `{footnote_cmd}` ``\n\n"
-                                    f"💡 _Enable /auto_trade ON 30 or /turbo_hedge ON 50 for instant automated news trading!_"
-                                )
-
-                    # 3. Compose Final Alert Message with Invariant 13 Dividers
+                # 2. Build Execution / Action Section
+                if auto_trade_state == "EXECUTED":
                     if user_l == 'khmer':
-                        alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n"
-                        alert_msg += f"📰 **{title}**\n\n"
-                        alert_msg += f"🌐 **ប្រភព ៖** {source_name} | 📅 **{kh_date_str}**\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n\n"
-                        alert_msg += f"{texts['khmer']}\n\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n"
-                        alert_msg += "📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
-                        alert_msg += f"• **ទិសដៅទីផ្សារ (Market Bias) ៖** {market_bias_km}\n"
-                        alert_msg += f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{win_rate}%`\n"
-                        alert_msg += f"• **ទ្រព្យសកម្មគោលដៅ ៖** `{target_sym}`\n\n"
-                        alert_msg += f"{action_section}\n\n"
-                        alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({link})\n\n"
-                        alert_msg += f"{DIVIDER_LIGHT}\n"
-                        alert_msg += "💡 _ដំណឹងនេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម_\n"
-                        alert_msg += "_សូមធ្វើការសម្រេចចិត្តដោយមានទំនួលខុសត្រូវ!_"
+                        action_section = (
+                            f"⚡ **ស្ថានភាពប្រតិបត្តិការស្វ័យប្រវត្តិ (24/7 AUTO-PILOT EXECUTION) ៖**\n"
+                            f"• **ស្ថានភាព ៖** 🟢 `បានបើកដំណើរការវិនិយោគ AUTO រួចរាល់ដោយជោគជ័យ!`\n"
+                            f"• **មុខងារ (Engine) ៖** `{exec_info.get('engine')}`\n"
+                            f"• **ទ្រព្យសកម្ម (Symbol) ៖** `{exec_info.get('symbol')}`\n"
+                            f"• **ទំហំទុន & Leverage ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x ISOLATED`\n"
+                            f"• **តម្លៃចូល (Entry Price) ៖** `${exec_info.get('price', 0):,.4f}`\n"
+                            f"• **ការពារហានិភ័យ ៖** `Dynamic Trailing Lock (+0.12% Net Floor)`\n\n"
+                            f"💡 _ប្រព័ន្ធបានចាប់ឱកាស និងបើក Position ជូនស្វ័យប្រវត្តិភ្លាមៗ មិនបាច់រង់ចាំចុចឡើយ!_"
+                        )
                     elif user_l == 'chinese':
-                        now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
-                        alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n"
-                        alert_msg += f"📰 **{title}**\n\n"
-                        alert_msg += f"🌐 **来源 ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n\n"
-                        alert_msg += f"{texts['chinese']}\n\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n"
-                        alert_msg += "📊 **机构最终裁决 (INSTITUTIONAL VERDICT) ៖**\n"
-                        alert_msg += f"• **市场偏向 (Market Bias) ៖** {market_bias_zh}\n"
-                        alert_msg += f"• **AI 胜率置信度 ៖** `{win_rate}%`\n"
-                        alert_msg += f"• **目标资产 ៖** `{target_sym}`\n\n"
-                        alert_msg += f"{action_section}\n\n"
-                        alert_msg += f"🔗 [阅读完整新闻]({link})\n\n"
-                        alert_msg += f"{DIVIDER_LIGHT}\n"
-                        alert_msg += "💡 _此信息仅作为深入研究之参考基准_\n"
-                        alert_msg += "_请审慎评估风险并对投资决策负责！_"
+                        action_section = (
+                            f"⚡ **自动跟单执行状态 (24/7 AUTO-PILOT EXECUTION) ៖**\n"
+                            f"• **状态 ៖** 🟢 `已自动成功建仓完毕!`\n"
+                            f"• **执行引擎 ៖** `{exec_info.get('engine')}`\n"
+                            f"• **目标资产 ៖** `{exec_info.get('symbol')}`\n"
+                            f"• **资金规模 & 杠杆 ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x 逐仓`\n"
+                            f"• **入场价格 ៖** `${exec_info.get('price', 0):,.4f}`\n"
+                            f"• **风控体系 ៖** `动态追踪止盈锁利 (+0.12% 净利润底线)`\n\n"
+                            f"💡 _AI 已毫秒级全自动抢跑建仓，无需手动点击确认!_"
+                        )
                     else:
-                        now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
-                        alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n"
-                        alert_msg += f"📰 **{title}**\n\n"
-                        alert_msg += f"🌐 **Source ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n\n"
-                        alert_msg += f"{texts['english']}\n\n"
-                        alert_msg += f"{DIVIDER_HEAVY}\n"
-                        alert_msg += "📊 **INSTITUTIONAL VERDICT ៖**\n"
-                        alert_msg += f"• **Market Bias ៖** {market_bias_en}\n"
-                        alert_msg += f"• **AI Confidence Win Rate ៖** `{win_rate}%`\n"
-                        alert_msg += f"• **Target Asset ៖** `{target_sym}`\n\n"
-                        alert_msg += f"{action_section}\n\n"
-                        alert_msg += f"🔗 [Read Full Article]({link})\n\n"
-                        alert_msg += f"{DIVIDER_LIGHT}\n"
-                        alert_msg += "💡 _This intelligence serves as a foundation for further research._\n"
-                        alert_msg += "_Please exercise due diligence and trade responsibly!_"
+                        action_section = (
+                            f"⚡ **24/7 AUTO-PILOT EXECUTION STATUS ៖**\n"
+                            f"• **Status ៖** 🟢 `Automated Position Opened Successfully!`\n"
+                            f"• **Engine ៖** `{exec_info.get('engine')}`\n"
+                            f"• **Symbol ៖** `{exec_info.get('symbol')}`\n"
+                            f"• **Capital & Leverage ៖** `${exec_info.get('amount', 0):,.2f} USDT` | `{exec_info.get('leverage', 10)}x ISOLATED`\n"
+                            f"• **Entry Price ៖** `${exec_info.get('price', 0):,.4f}`\n"
+                            f"• **Risk Shield ៖** `Dynamic Trailing Lock (+0.12% Net Profit Floor)`\n\n"
+                            f"💡 _AI has executed the trade on your behalf without manual waiting!_"
+                        )
+                elif auto_trade_state == "BLOCKED_RSI":
+                    if user_l == 'khmer':
+                        action_section = (
+                            f"🛡️ **ការការពារហានិភ័យស្វ័យប្រវត្តិ (RISK SHIELD TRIGGERED) ៖**\n"
+                            f"• **ស្ថានភាព ៖** ⚠️ `ផ្អាកការបើក Short ដោយស្វ័យប្រវត្តិ`\n"
+                            f"• **មូលហេតុ ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) ស្ថិតក្នុងតំបន់ Oversold (ហានិភ័យ Short Squeeze)`\n"
+                            f"• **ការពារដើមទុន ៖** `អនុលោមតាមក្បួន Invariant 16 មិនលក់បាតទីផ្សារដាច់ខាត`"
+                        )
+                    elif user_l == 'chinese':
+                        action_section = (
+                            f"🛡️ **风控防线已拦截 (RISK SHIELD TRIGGERED) ៖**\n"
+                            f"• **状态 ៖** ⚠️ `已自动拦截本次做空`\n"
+                            f"• **原因 ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) 处于超卖底部 (防空头挤压 Short Squeeze)`\n"
+                            f"• **资产保护 ៖** `坚决执行 Invariant 16 绝不在恐慌底部追空`"
+                        )
+                    else:
+                        action_section = (
+                            f"🛡️ **AUTO-TRADE RISK SHIELD TRIGGERED ៖**\n"
+                            f"• **Status ៖** ⚠️ `Automated Short Suppressed`\n"
+                            f"• **Reason ៖** `15m RSI ({exec_info.get('rsi', 0):.1f}) is oversold (Short Squeeze Risk)`\n"
+                            f"• **Capital Shield ៖** `Invariant 16: Zero bottom selling in panic zones`"
+                        )
+                else:
+                    if trade_side == "HEDGE":
+                        if user_l == 'khmer':
+                            action_section = (
+                                f"👉 **ជម្រើសបញ្ជាជួញដូរ (1-Tap Optional Execution) ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _សេចក្តីបញ្ជាក់ ៖ ដំណឹងនេះជាប្រភេទ Volatility Expansion (ទីផ្សាររលកបោកខ្លាំង) ប្រព័ន្ធរក្សាទុកជាការជូនដំណឹង (Advisory Only) មិនបើក Auto-Hedge ដោយស្វ័យប្រវត្តិនាំឱ្យកកទុនឡើយ! អ្នកអាចចុចបើកដោយដៃតាមការស្ម័គ្រចិត្ត។_"
+                            )
+                        elif user_l == 'chinese':
+                            action_section = (
+                                f"👉 **自选对冲指令 (1-Tap Optional Execution) ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _提示 ៖ 本消息属于波动率扩张（震荡洗盘），系统仅作预警提示（坚决不自动锁仓对冲），避免占用可用资金。您可按需手动点击执行。_"
+                            )
+                        else:
+                            action_section = (
+                                f"👉 **Optional Action Execution (1-Tap Copyable) ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _Notice: Volatility Expansion events are strictly Advisory Only (Zero Auto-Hedge to prevent locking margin). You may execute manually at your discretion._"
+                            )
+                    else:
+                        if user_l == 'khmer':
+                            action_section = (
+                                f"👉 **បញ្ជាជួញដូរស្វ័យប្រវត្តិ (1-Tap Copyable Execution) ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _បើក /auto_trade ON 30 ឬ /turbo_hedge ON 50 ដើម្បីឱ្យ AI ចូលជួញដូរស្វ័យប្រវត្តិភ្លាមៗពេលមានដំណឹង!_"
+                            )
+                        elif user_l == 'chinese':
+                            action_section = (
+                                f"👉 **一键快捷执行 ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _开启 /auto_trade ON 30 或 /turbo_hedge ON 50 即可享受新闻毫秒级自动建仓!_"
+                            )
+                        else:
+                            action_section = (
+                                f"👉 **1-Tap Action Execution ៖**\n"
+                                f"`` `{footnote_cmd}` ``\n\n"
+                                f"💡 _Enable /auto_trade ON 30 or /turbo_hedge ON 50 for instant automated news trading!_"
+                            )
 
-                    return alert_msg
+                # 3. Compose Final Alert Message with Invariant 13 Dividers & Google Macro Satellite Pulse
+                if user_l == 'khmer':
+                    alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n"
+                    alert_msg += f"📰 **{title}**\n\n"
+                    alert_msg += f"🌐 **ប្រភព ៖** {source_name} | 📅 **{kh_date_str}**\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n\n"
+                    alert_msg += f"{texts['khmer']}\n\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n"
+                    alert_msg += "📊 **សេចក្តីសន្និដ្ឋានស្ថាប័ន (INSTITUTIONAL VERDICT) ៖**\n"
+                    alert_msg += f"• **ទិសដៅទីផ្សារ (Market Bias) ៖** {market_bias_km}\n"
+                    alert_msg += f"• **អត្រាជោគជ័យ AI (Win Rate Probability) ៖** `{win_rate}%`\n"
+                    alert_msg += f"• **ទ្រព្យសកម្មគោលដៅ ៖** `{target_sym}`\n\n"
+                    alert_msg += "🌐 **ផ្កាយរណបម៉ាក្រូសេដ្ឋកិច្ច (GOOGLE MACRO SATELLITE) ៖**\n"
+                    alert_msg += f"• **សន្ទស្សន៍ប្រាក់ដុល្លារ (DXY) ៖** `{dxy_val:.2f} ({dxy_chg:+.2f}%)`\n"
+                    alert_msg += f"• **ផ្សារហ៊ុនអាមេរិក (S&P 500) ៖** `{sp500_val:,.1f} ({sp500_chg:+.2f}%)`\n"
+                    alert_msg += f"• **ទិន្នផលសញ្ញាប័ណ្ណ (US 10Y Yield) ៖** `{us10y_val:.2f}%`\n"
+                    alert_msg += f"• **ប្រូបាបកាត់បន្ថយការប្រាក់ Fed ៖** `{fed_odds:.1f}%`\n\n"
+                    alert_msg += f"{action_section}\n\n"
+                    alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({link})\n\n"
+                    alert_msg += f"{DIVIDER_LIGHT}\n"
+                    alert_msg += "💡 _ដំណឹងនេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម_\n"
+                    alert_msg += "_សូមធ្វើការសម្រេចចិត្តដោយមានទំនួលខុសត្រូវ!_"
+                elif user_l == 'chinese':
+                    now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n"
+                    alert_msg += f"📰 **{title}**\n\n"
+                    alert_msg += f"🌐 **来源 ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n\n"
+                    alert_msg += f"{texts['chinese']}\n\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n"
+                    alert_msg += "📊 **机构最终裁决 (INSTITUTIONAL VERDICT) ៖**\n"
+                    alert_msg += f"• **市场偏向 (Market Bias) ៖** {market_bias_zh}\n"
+                    alert_msg += f"• **AI 胜率置信度 ៖** `{win_rate}%`\n"
+                    alert_msg += f"• **目标资产 ៖** `{target_sym}`\n\n"
+                    alert_msg += "🌐 **谷歌宏观卫星脉搏 (GOOGLE MACRO SATELLITE) ៖**\n"
+                    alert_msg += f"• **美元指数 (DXY) ៖** `{dxy_val:.2f} ({dxy_chg:+.2f}%)`\n"
+                    alert_msg += f"• **标普 500 指数 (S&P 500) ៖** `{sp500_val:,.1f} ({sp500_chg:+.2f}%)`\n"
+                    alert_msg += f"• **美债 10 年期收益率 ៖** `{us10y_val:.2f}%`\n"
+                    alert_msg += f"• **美联储降息概率 ៖** `{fed_odds:.1f}%`\n\n"
+                    alert_msg += f"{action_section}\n\n"
+                    alert_msg += f"🔗 [阅读完整新闻]({link})\n\n"
+                    alert_msg += f"{DIVIDER_LIGHT}\n"
+                    alert_msg += "💡 _此信息仅作为深入研究之参考基准_\n"
+                    alert_msg += "_请审慎评估风险并对投资决策负责！_"
+                else:
+                    now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n"
+                    alert_msg += f"📰 **{title}**\n\n"
+                    alert_msg += f"🌐 **Source ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n\n"
+                    alert_msg += f"{texts['english']}\n\n"
+                    alert_msg += f"{DIVIDER_HEAVY}\n"
+                    alert_msg += "📊 **INSTITUTIONAL VERDICT ៖**\n"
+                    alert_msg += f"• **Market Bias ៖** {market_bias_en}\n"
+                    alert_msg += f"• **AI Confidence Win Rate ៖** `{win_rate}%`\n"
+                    alert_msg += f"• **Target Asset ៖** `{target_sym}`\n\n"
+                    alert_msg += "🌐 **GOOGLE MACRO SATELLITE PULSE ៖**\n"
+                    alert_msg += f"• **US Dollar Index (DXY) ៖** `{dxy_val:.2f} ({dxy_chg:+.2f}%)`\n"
+                    alert_msg += f"• **S&P 500 Index ៖** `{sp500_val:,.1f} ({sp500_chg:+.2f}%)`\n"
+                    alert_msg += f"• **US 10-Year Yield ៖** `{us10y_val:.2f}%`\n"
+                    alert_msg += f"• **Fed Rate Cut Expectation ៖** `{fed_odds:.1f}%`\n\n"
+                    alert_msg += f"{action_section}\n\n"
+                    alert_msg += f"🔗 [Read Full Article]({link})\n\n"
+                    alert_msg += f"{DIVIDER_LIGHT}\n"
+                    alert_msg += "💡 _This intelligence serves as a foundation for further research._\n"
+                    alert_msg += "_Please exercise due diligence and trade responsibly!_"
 
-                target_recipients, _ = get_alert_target_recipients("news")
-                await parallel_broadcast(app, target_recipients, process_news_alert_and_auto_trade, photo_path=image_url, reply_markup=news_kb)
+                return alert_msg
+
+            await parallel_broadcast(app, target_recipients, process_news_alert_and_auto_trade, photo_path=image_url, reply_markup=news_kb)
+            # 🛡️ Break after 1 high-impact broadcast per cycle to prevent notification flood
+            break
     except Exception as e:
-        print(f"Error checking crypto news: {e}")
+        logger.error(f"Error checking crypto news: {e}")
 
 async def check_economic_calendar(app: Application, ai_engine=None):
     """Fetches economic calendar, uses AI to predict impact, and executes front-run trades."""

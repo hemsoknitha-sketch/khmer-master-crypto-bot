@@ -5279,37 +5279,64 @@ class TelegramBotThread(BaseThread):
                 )
 
             delivered = False
-            # 🛡️ APEX ZERO-HANG PHOTO DISPATCH: Strictly capped at 2.5s deadline
+            # 🛡️ APEX UNIFIED COVER PHOTO DISPATCH (Single-Bubble LinkPreviewOptions)
             if image_url:
                 try:
-                    photo_msg = await asyncio.wait_for(context.bot.send_photo(chat_id=chat_id, photo=image_url), timeout=2.5)
-                    if photo_msg:
-                        try:
-                            await context.bot.send_message(
-                                chat_id=chat_id,
-                                text=report_text,
-                                parse_mode="Markdown",
-                                reply_markup=keyboard,
-                                disable_web_page_preview=False
-                            )
-                            delivered = True
-                            if status_msg:
-                                try: await status_msg.delete()
-                                except Exception: pass
-                        except Exception:
-                            clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
-                            await context.bot.send_message(
-                                chat_id=chat_id,
-                                text=clean_txt,
-                                reply_markup=keyboard,
-                                disable_web_page_preview=False
-                            )
-                            delivered = True
-                            if status_msg:
-                                try: await status_msg.delete()
-                                except Exception: pass
-                except Exception as e_ph:
-                    print(f"⚠️ Fast cover photo skipped/timed out: {e_ph}")
+                    from telegram import LinkPreviewOptions
+                    lpo = LinkPreviewOptions(url=str(image_url), prefer_large_media=True, show_above_text=True)
+                    try:
+                        await context.bot.send_message(
+                            chat_id=chat_id,
+                            text=report_text,
+                            parse_mode="Markdown",
+                            link_preview_options=lpo,
+                            reply_markup=keyboard
+                        )
+                        delivered = True
+                        if status_msg:
+                            try: await status_msg.delete()
+                            except Exception: pass
+                    except Exception:
+                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                        await context.bot.send_message(
+                            chat_id=chat_id,
+                            text=clean_txt,
+                            link_preview_options=lpo,
+                            reply_markup=keyboard
+                        )
+                        delivered = True
+                        if status_msg:
+                            try: await status_msg.delete()
+                            except Exception: pass
+                except Exception as e_lpo:
+                    print(f"⚠️ LinkPreviewOptions notice: {e_lpo}")
+                    try:
+                        photo_msg = await asyncio.wait_for(context.bot.send_photo(chat_id=chat_id, photo=image_url), timeout=2.5)
+                        if photo_msg:
+                            try:
+                                await context.bot.send_message(
+                                    chat_id=chat_id,
+                                    text=report_text,
+                                    parse_mode="Markdown",
+                                    reply_markup=keyboard
+                                )
+                                delivered = True
+                                if status_msg:
+                                    try: await status_msg.delete()
+                                    except Exception: pass
+                            except Exception:
+                                clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                                await context.bot.send_message(
+                                    chat_id=chat_id,
+                                    text=clean_txt,
+                                    reply_markup=keyboard
+                                )
+                                delivered = True
+                                if status_msg:
+                                    try: await status_msg.delete()
+                                    except Exception: pass
+                    except Exception as e_ph:
+                        print(f"⚠️ Fast cover photo skipped/timed out: {e_ph}")
 
             # 🛡️ In-Place Instant Status Update Fallback (Guarantees zero lost messages)
             if not delivered:
@@ -26094,9 +26121,11 @@ class TelegramBotThread(BaseThread):
         self.scheduler.add_job(
             scheduler_tasks.check_crypto_news,
             'interval',
-            minutes=15,
+            minutes=3,
             args=[self.app, self.ai_engine],
-            id='check_crypto_news'
+            id='check_crypto_news',
+            max_instances=1,
+            coalesce=True
         )
 
         self.scheduler.add_job(
