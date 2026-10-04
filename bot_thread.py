@@ -5237,11 +5237,11 @@ class TelegramBotThread(BaseThread):
             ])
 
             loading_text = (
-                "📰 **ANGKOR QUANT | GLOBAL NEWS SYNTHESIS v13.00**\n\n_Fetching real-time breaking news & compiling 3-paragraph AGI journalistic impact report..._"
+                "📰 **ANGKOR QUANT | GLOBAL MACRO & CRYPTO WIRE v14.00**\n\n_Synthesizing real-time TradFi & Crypto breaking news with Google Satellite Macro confluence..._"
                 if user_lang == 'en' else
-                ("📰 **ANGKOR QUANT | 3段式加密行业新闻简报 v13.00**\n\n_正在获取实时突发新闻并由 AGI 撰写三段式新闻深度分析..._"
+                ("📰 **ANGKOR QUANT | 全球宏观与加密行业电讯 v14.00**\n\n_正在汇聚 TradFi 宏观与加密突发新闻，并由 AGI 撰写深度量化分析..._"
                  if user_lang == 'zh' else
-                 "📰 **ANGKOR QUANT | GLOBAL NEWS SYNTHESIS v13.00**\n\n_កំពុងទាញយកព័ត៌មានក្តៅៗ Real-Time និងសង្ខេប ៣ កថាខណ្ឌ អមជាមួយការវាយតម្លៃផលប៉ះពាល់..._")
+                 "📰 **ANGKOR QUANT | GLOBAL MACRO & CRYPTO WIRE v14.00**\n\n_កំពុងទាញយកព័ត៌មានទាន់ហេតុការណ៍ TradFi + Crypto និងសំយោគទិន្នន័យផ្កាយរណបម៉ាក្រូសេដ្ឋកិច្ចកម្រិតស្ថាប័ន..._")
             )
 
             status_msg = None
@@ -5256,27 +5256,26 @@ class TelegramBotThread(BaseThread):
             report = await asyncio.to_thread(ai_news_engine.generate_news_report, target_symbol, user_lang, self.ai_engine)
             report_text = str(report or "")
 
-            # Append 1-Tap Execution Commands to news report!
+            # 🛡️ Extract cover image URL from NewsReportResult (Fixes unlinked image_url bug)
+            image_url = getattr(report, "image_url", None)
+            if not image_url and hasattr(report, "image_url"):
+                image_url = report.image_url
+
+            # Append concise 1-Tap Execution Presets
             if user_lang == 'en':
                 report_text += (
-                    "\n\n📋 **1-TAP COMMAND EXECUTIONS:**\n\n"
-                    "👉 **Scan Global Breaking News Synthesis ៖**\n`` `/news SCAN` ``\n\n"
-                    "👉 **Single-Coin News & Impact (BTC / SOL / ETH) ៖**\n`` `/news BTC` ``\n"
-                    "`` `/news SOL` ``"
+                    "\n\n📋 **1-TAP QUICK SCAN ៖**\n"
+                    "`` `/news SCAN` `` | `` `/news BTC` `` | `` `/news ETH` `` | `` `/news SOL` ``"
                 )
             elif user_lang == 'zh':
                 report_text += (
-                    "\n\n📋 **一键复制指令：**\n\n"
-                    "👉 **扫描全球加密行业新闻简报 ៖**\n`` `/news SCAN` ``\n\n"
-                    "👉 **单币种新闻与市场影响 (BTC / SOL / ETH) ៖**\n`` `/news BTC` ``\n"
-                    "`` `/news SOL` ``"
+                    "\n\n📋 **一键快捷扫描 ៖**\n"
+                    "`` `/news SCAN` `` | `` `/news BTC` `` | `` `/news ETH` `` | `` `/news SOL` ``"
                 )
             else:
                 report_text += (
-                    "\n\n📋 **1-TAP COMMAND EXECUTIONS (ចម្លងប្រើប្រាស់ 1-TAP) ៖**\n\n"
-                    "👉 **ស្កេនព័ត៌មាន Crypto ក្តៅៗ ៣ កថាខណ្ឌ ៖**\n`` `/news SCAN` ``\n\n"
-                    "👉 **ស្កេនព័ត៌មានលើកាក់ទោល (BTC / SOL / ETH) ៖**\n`` `/news BTC` ``\n"
-                    "`` `/news SOL` ``"
+                    "\n\n📋 **បញ្ជាស្កេនរហ័ស 1-TAP ៖**\n"
+                    "`` `/news SCAN` `` | `` `/news BTC` `` | `` `/news ETH` `` | `` `/news SOL` ``"
                 )
 
             photo_sent = False
@@ -5286,23 +5285,29 @@ class TelegramBotThread(BaseThread):
                         try: await status_msg.delete()
                         except Exception: pass
 
-                    if len(report_text) <= 1000:
-                        try:
-                            await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=report_text, parse_mode="Markdown", reply_markup=keyboard)
-                            photo_sent = True
-                        except Exception:
-                            clean_cap = report_text.replace('*', '').replace('`', '').replace('_', '')
-                            await context.bot.send_photo(chat_id=chat_id, photo=image_url, caption=clean_cap[:1000], reply_markup=keyboard)
-                            photo_sent = True
-                    else:
-                        # Full original image first, followed by FULL untruncated 3-paragraph news report!
-                        try:
-                            await context.bot.send_photo(chat_id=chat_id, photo=image_url)
-                        except Exception as e_img:
-                            print(f"⚠️ Photo send notice: {e_img}")
-                        
-                        await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
-                        photo_sent = True
+                    # Send high-resolution cover photo first, followed by full 1,500-2,500 char master article!
+                    try:
+                        await context.bot.send_photo(chat_id=chat_id, photo=image_url)
+                    except Exception as e_img:
+                        print(f"⚠️ Photo send notice: {e_img}")
+                    
+                    try:
+                        await context.bot.send_message(
+                            chat_id=chat_id,
+                            text=report_text,
+                            parse_mode="Markdown",
+                            reply_markup=keyboard,
+                            disable_web_page_preview=False
+                        )
+                    except Exception:
+                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                        await context.bot.send_message(
+                            chat_id=chat_id,
+                            text=clean_txt,
+                            reply_markup=keyboard,
+                            disable_web_page_preview=False
+                        )
+                    photo_sent = True
                 except Exception as e_ph:
                     print(f"⚠️ Photo dispatch fallback: {e_ph}")
 
@@ -5311,11 +5316,19 @@ class TelegramBotThread(BaseThread):
                     try:
                         await status_msg.edit_text(text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
                     except Exception:
-                        await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                        try:
+                            await status_msg.edit_text(text=clean_txt, reply_markup=keyboard, disable_web_page_preview=False)
+                        except Exception:
+                            await context.bot.send_message(chat_id=chat_id, text=clean_txt, reply_markup=keyboard, disable_web_page_preview=False)
                 else:
-                    await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                    try:
+                        await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                    except Exception:
+                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                        await context.bot.send_message(chat_id=chat_id, text=clean_txt, reply_markup=keyboard, disable_web_page_preview=False)
 
-            self.log_signal.emit(f"📰 Sent Super Smart AI News v13.00 to {chat_id}")
+            self.log_signal.emit(f"📰 Sent Angkor Quant AI News v14.00 to {chat_id}")
             return
 
         async def send_gold_message_safe(context, chat_id, text, keyboard=None):
