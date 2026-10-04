@@ -380,10 +380,15 @@ def _build_rich_dynamic_fallback(
     fng_label = macro_data.get("search_sentiment", {}).get("fear_greed_label", "Greed")
     macro_regime = macro_data.get("macro_regime", "MODERATE_BULLISH")
 
+    def _clean_link(u: str) -> str:
+        if not u: return "https://finance.yahoo.com"
+        if "news.google.com" in u and len(u) > 90: return "https://news.google.com"
+        return u
+
     if lang == "en":
         headlines_md = "\n".join([
-            f"{i+1}. {'🟢' if it['sentiment']=='BULLISH' else ('🔴' if it['sentiment']=='BEARISH' else '⚪')} [{it['title'][:80]}]({it['link']}) — _{it['source']}_"
-            for i, it in enumerate(news_items[:3])
+            f"{i+1}. {'🟢' if it['sentiment']=='BULLISH' else ('🔴' if it['sentiment']=='BEARISH' else '⚪')} [{it['title'][:75]}]({_clean_link(it['link'])}) — _{it['source']}_"
+            for i, it in enumerate(news_items[:2])
         ])
         article = (
             f"📰 **ANGKOR QUANT | GLOBAL MACRO & CRYPTO WIRE v14.00** 🌐\n"
@@ -412,8 +417,8 @@ def _build_rich_dynamic_fallback(
 
     elif lang == "zh":
         headlines_md = "\n".join([
-            f"{i+1}. {'🟢' if it['sentiment']=='BULLISH' else ('🔴' if it['sentiment']=='BEARISH' else '⚪')} [{it['title'][:80]}]({it['link']}) — _{it['source']}_"
-            for i, it in enumerate(news_items[:3])
+            f"{i+1}. {'🟢' if it['sentiment']=='BULLISH' else ('🔴' if it['sentiment']=='BEARISH' else '⚪')} [{it['title'][:75]}]({_clean_link(it['link'])}) — _{it['source']}_"
+            for i, it in enumerate(news_items[:2])
         ])
         article = (
             f"📰 **ANGKOR QUANT | 全球宏观与加密行业电讯 v14.00** 🌐\n"
@@ -443,8 +448,8 @@ def _build_rich_dynamic_fallback(
     else:
         # Full Institutional Khmer Master Article (Strict Chuon Nath Standard: 1,800 - 2,200 Characters)
         headlines_md = "\n".join([
-            f"{i+1}. {'🟢' if it['sentiment']=='BULLISH' else ('🔴' if it['sentiment']=='BEARISH' else '⚪')} [{it['title'][:80]}]({it['link']}) — _{it['source']}_"
-            for i, it in enumerate(news_items[:3])
+            f"{i+1}. {'🟢' if it['sentiment']=='BULLISH' else ('🔴' if it['sentiment']=='BEARISH' else '⚪')} [{it['title'][:75]}]({_clean_link(it['link'])}) — _{it['source']}_"
+            for i, it in enumerate(news_items[:2])
         ])
 
         article = (
