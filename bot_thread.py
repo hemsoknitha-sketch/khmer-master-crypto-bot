@@ -9374,8 +9374,8 @@ class TelegramBotThread(BaseThread):
                 max_lev_limit = db.get_system_setting("max_leverage_limit", "20") if hasattr(db, 'get_system_setting') else "20"
                 hft_speed = db.get_system_setting("hft_speed_ms", "10") if hasattr(db, 'get_system_setting') else "10"
                 max_slippage = db.get_system_setting("max_slippage_pct", "0.5") if hasattr(db, 'get_system_setting') else "0.5"
-                alert_grp = db.get_system_setting("alert_group_id", "Not set (Private DMs)")
-                routing_mode = db.get_system_setting("alert_routing_mode", "GROUP_ONLY" if alert_grp != "Not set (Private DMs)" else "PRIVATE_ONLY")
+                alert_grp = db.get_system_setting("alert_group_id", "") or "Disabled (100% Private User DMs)"
+                routing_mode = db.get_system_setting("alert_routing_mode", "PRIVATE_ONLY")
 
                 if user_lang == 'en':
                     msg = (
@@ -9387,13 +9387,11 @@ class TelegramBotThread(BaseThread):
                         f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (Max Futures Leverage Ceiling)\n"
                         f"• `hft_speed_ms` ៖ `{hft_speed} ms` (Sub-Second HFT Engine Speed)\n"
                         f"• `max_slippage_pct` ៖ `{max_slippage}%` (Max Slippage Tolerance Guard)\n"
-                        f"• `alert_group_id` ៖ `{alert_grp}` (Telegram Alert Group/Channel)\n"
-                        f"• `alert_routing_mode` ៖ `{routing_mode}` (GROUP_ONLY / BOTH / PRIVATE_ONLY)\n\n"
+                        f"• `alert_group_id` ៖ `{alert_grp}` (Terminated / Private Direct Standard)\n"
+                        f"• `alert_routing_mode` ៖ `{routing_mode}` (100% Direct to Private User Bot Chats)\n\n"
                         "📋 **1-TAP PARAMETER CONTROL SYNTAX:**\n"
-                        "👉 **Route Alerts & Whale Wall Radar to Group ID:**\n"
-                        "`` `/admin_config alert_group_id -100xxxxxxxxxx` ``\n\n"
-                        "👉 **Set Alert Routing Mode (GROUP_ONLY / BOTH):**\n"
-                        "`` `/admin_config alert_routing_mode GROUP_ONLY` ``\n\n"
+                        "👉 **Confirm Super Smart Private Direct Routing:**\n"
+                        "`` `/admin_config alert_routing_mode PRIVATE_ONLY` ``\n\n"
                         "👉 **Toggle Global Rebalance (1/0):**\n"
                         "`` `/admin_config global_rebalance 1` ``\n\n"
                         "👉 **Set Max Leverage Ceiling Limit:**\n"
@@ -9413,13 +9411,11 @@ class TelegramBotThread(BaseThread):
                         f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (合约杠杆上限保护)\n"
                         f"• `hft_speed_ms` ៖ `{hft_speed} ms` (高频引擎执行速度)\n"
                         f"• `max_slippage_pct` ៖ `{max_slippage}%` (最大滑点容忍上限)\n"
-                        f"• `alert_group_id` ៖ `{alert_grp}` (行情与巨鲸雷达推送群组)\n"
-                        f"• `alert_routing_mode` ៖ `{routing_mode}` (GROUP_ONLY / BOTH)\n\n"
+                        f"• `alert_group_id` ៖ `{alert_grp}` (已停用群组推送 / 独立私聊直通)\n"
+                        f"• `alert_routing_mode` ៖ `{routing_mode}` (100% 独立私聊推送)\n\n"
                         "📋 **1-TAP 参数修改命令：**\n"
-                        "👉 **设置新闻与巨鲸雷达专属群组 ID：**\n"
-                        "`` `/admin_config alert_group_id -100xxxxxxxxxx` ``\n\n"
-                        "👉 **设置推送模式 (GROUP_ONLY / BOTH)：**\n"
-                        "`` `/admin_config alert_routing_mode GROUP_ONLY` ``\n\n"
+                        "👉 **确认 Super Smart 独立私聊推送：**\n"
+                        "`` `/admin_config alert_routing_mode PRIVATE_ONLY` ``\n\n"
                         "👉 **设置全局再平衡开关 (1/0)：**\n"
                         "`` `/admin_config global_rebalance 1` ``\n\n"
                         "👉 **设置合约杠杆上限 (x)：**\n"
@@ -9439,19 +9435,17 @@ class TelegramBotThread(BaseThread):
                         f"• `max_leverage_limit` ៖ `{max_lev_limit}x` (Max Futures Leverage Ceiling)\n"
                         f"• `hft_speed_ms` ៖ `{hft_speed} ms` (HFT Execution Engine Speed)\n"
                         f"• `max_slippage_pct` ៖ `{max_slippage}%` (Slippage Tolerance Guard)\n"
-                        f"• `alert_group_id` ៖ `{alert_grp}` (Telegram Alert Group/Channel)\n"
-                        f"• `alert_routing_mode` ៖ `{routing_mode}` (GROUP_ONLY / BOTH / PRIVATE_ONLY)\n\n"
+                        f"• `alert_group_id` ៖ `{alert_grp}` (ផ្អាកបញ្ជូនចូល Group / ត្រឡប់ចូល Private Bot)\n"
+                        f"• `alert_routing_mode` ៖ `{routing_mode}` (100% ផ្ញើត្រង់ចូល Users BOT Chat)\n\n"
                         "📋 **1-TAP PARAMETER CONTROL SYNTAX ៖**\n"
-                        "👉 **កំណត់ Group ID ទទួលសារ News & Whale Wall Radar ៖**\n"
-                        "`` `/admin_config alert_group_id -100xxxxxxxxxx` ``\n\n"
-                        "👉 **កំណត់ទម្រង់បញ្ជូន (GROUP_ONLY / BOTH / PRIVATE_ONLY) ៖**\n"
-                        "`` `/admin_config alert_routing_mode GROUP_ONLY` ``\n\n"
+                        "👉 **បញ្ជាក់ Super Smart Private Direct Alerts ៖**\n"
+                        "`` `/admin_config alert_routing_mode PRIVATE_ONLY` ``\n\n"
                         "👉 **កំណត់ Global Rebalance (1/0) ៖**\n"
                         "`` `/admin_config global_rebalance 1` ``\n\n"
                         "👉 **កំណត់ Max Leverage Ceiling Limit ៖**\n"
                         "`` `/admin_config max_leverage_limit 20` ``\n\n"
                         "👉 **កំណត់ HFT Speed (ms) ៖**\n"
-                        "`` `/admin_config hft_speed_ms 10` ``\n\n"
+                        "`` `/admin_config hft_speed_ms 10` ``\n"
                         "════════════\n"
                         "💡 _ចុច Refresh Config ឬ Admin Panel ខាងក្រោម ដើម្បីគ្រប់គ្រងប្រព័ន្ធរ៉ាន់ Real-Time ៖_"
                     )
@@ -9535,16 +9529,18 @@ class TelegramBotThread(BaseThread):
                     f"🆔 **Group ID** ៖ `{chat_id}`\n"
                     f"📋 **ប្រភេទ Chat** ៖ `{chat_type}`\n"
                     "════════════\n\n"
-                    "👉 **បញ្ជា 1-Tap ដើម្បីបង្វែរសារ Alert ព័ត៌មាន & Whale Wall មកក្នុង Group នេះ ៖**\n"
-                    f"`` `/admin_config alert_group_id {chat_id}` ``\n\n"
-                    "💡 _បន្ទាប់ពីកំណត់រួច សារ Alert ព័ត៌មានទាន់ហេតុការណ៍ និង Radar ត្រីបាឡែនទាំងអស់ នឹងត្រូវផ្ញើមកក្នុង Group នេះទាំងស្រុង ដោយមិនផ្ញើរំខានចូល Bot ឯកជនរបស់សមាជិកឡើយ!_"
+                    "🛡️ **SUPER SMART PRIVATE DIRECT ROUTING NOTICE ៖**\n"
+                    "• ប្រព័ន្ធត្រូវបានកំណត់តាមបទដ្ឋាន Super Smart Private Direct ដោយបញ្ចប់ការផ្ញើ Alert គ្រប់យ៉ាងចូល Group Chat ID។\n"
+                    "• គ្រប់សារ Alert ទាំងអស់ (News, Whale Wall, Daily Brief) **ត្រូវបានត្រឡប់ទៅផ្ញើចូល Users BOT Chat ផ្ទាល់រៀងៗខ្លួនជាធម្មតាឡើងវិញ** ដើម្បីធានាសុវត្ថិភាព ឯកជនភាព និងភាសាផ្ទាល់ខ្លួន។\n\n"
+                    "👉 **បញ្ជា 1-Tap ដើម្បីផ្ទៀងផ្ទាត់ ឬកំណត់ Private Direct Routing ៖**\n"
+                    "`` `/set_alert_group` ``"
                 )
             else:
                 msg = (
                     "ℹ️ **TELEGRAM CHAT ID RADAR** 📡\n"
                     "════════════\n"
                     f"🆔 `ID: {chat_id}` (នេះជា Chat ឯកជន)\n\n"
-                    "💡 *ដើម្បីដឹង Group ID សូម Add Bot នេះចូលទៅក្នុង Telegram Group / Channel របស់អ្នក រួចវាយពាក្យ `/group_id` នៅក្នុង Group នោះ!*"
+                    "💡 *សារ Alert ទាំងអស់ត្រូវបានកំណត់ឱ្យផ្ញើចូល Chat ឯកជនរបស់អ្នកផ្ទាល់រួចជាស្រេច (100% Super Smart Private Direct)!*"
                 )
             if update.effective_message:
                 await update.effective_message.reply_text(msg, parse_mode="Markdown")
@@ -9556,23 +9552,21 @@ class TelegramBotThread(BaseThread):
                 await update.effective_message.reply_text("⛔ **ACCESS DENIED**: Restricted to Super Admin.", parse_mode="Markdown")
                 return
 
-            args = context.args if hasattr(context, 'args') and context.args else []
-            target_gid = str(args[0]).strip() if args else str(update.effective_chat.id)
-
-            db.update_system_setting("alert_group_id", target_gid)
-            db.update_system_setting("alert_routing_mode", "GROUP_ONLY")
+            db.update_system_setting("alert_group_id", "")
+            db.update_system_setting("alert_routing_mode", "PRIVATE_ONLY")
 
             success_text = (
-                "🎯 **ALERT & WHALE WALL RADAR GROUP CONFIGURED!** 📡\n"
+                "🎯 **SUPER SMART PRIVATE DIRECT ROUTING ACTIVATED!** 📡\n"
                 "════════════\n"
-                f"🆔 **Active Alert Group ID** ៖ `{target_gid}`\n"
-                f"🔀 **Routing Mode** ៖ `GROUP_ONLY` (100% Zero Private DM Spam)\n"
+                "🛡️ **Status ៖** `100% PRIVATE USER BOT CHATS (DIRECT)` 🟢\n"
+                "🚫 **Group Chat Alerts ៖** `TERMINATED (បញ្ចប់ការផ្ញើចូល Group ទាំងស្រុង)`\n"
                 "════════════\n\n"
-                "✅ *ចាប់ពីពេលនេះតទៅ ៖*\n"
-                "• 📰 ដំណឹងទាន់ហេតុការណ៍ Crypto News (RSS + AI Analysis)\n"
+                "✅ *ការអនុវត្តបទដ្ឋាន Super Smart ៖*\n"
+                "• 📰 ដំណឹងទាន់ហេតុការណ៍ Crypto News (RSS + AI Verdict)\n"
                 "• 🐋 Whale Wall L2 Orderbook Radar (<50ms Front-Run)\n"
                 "• 🌊 On-Chain Whale Movements & Macro Events\n"
-                "👉 **ទាំងអស់នឹងត្រូវបញ្ជូនមកក្នុង Group ID នេះទាំងស្រុង! គណនី Bot ឯកជនរបស់ VIP User ម្នាក់ៗនឹងលែងទទួលសាររំខានទៀតហើយ!**"
+                "• 🌅 Daily Market Brief & ML Predictions\n\n"
+                "👉 **សារ Alert ទាំងអស់ត្រូវបានបញ្ចប់ការផ្ញើចូល Group Chat ID ហើយត្រឡប់មកផ្ញើចូល Users BOT Chat ផ្ទាល់ខ្លួនរបស់សមាជិក VIP ម្នាក់ៗជាធម្មតាវិញ ១០០%!**"
             )
             if update.effective_message:
                 await update.effective_message.reply_text(success_text, parse_mode="Markdown")
@@ -9649,7 +9643,7 @@ class TelegramBotThread(BaseThread):
                     lines.append(f"{idx}. `{title}` ({ctype})\n   🆔 `{gid}`")
 
             lines.append(f"\n{DIVIDER_HEAVY}")
-            lines.append("💡 _គ្រប់សារ Radar & News ទាំងអស់នឹងត្រូវបញ្ជូនទៅកាន់ Communities ខាងលើនេះដោយស្វ័យប្រវត្តិតាមអត្រា ២៥ សារ/វិនាទី!_")
+            lines.append("💡 _Super Smart Private Direct Active: គ្រប់សារ Radar & Intelligence ទាំងអស់ត្រូវបានផ្ញើត្រង់ចូល Users BOT Chat ផ្ទាល់ខ្លួនរៀងៗខ្លួន ដើម្បីធានាឯកជនភាព និងភាសាផ្ទាល់ខ្លួន ១០០%!_")
             await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
 
         async def admin_nuke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

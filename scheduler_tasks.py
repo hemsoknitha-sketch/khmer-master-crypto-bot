@@ -140,51 +140,35 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
 
 def get_alert_target_recipients(alert_type: str = "general") -> tuple[list, bool]:
     """
-    Determines where high-frequency intelligence alerts (News, Whale Wall, Macro)
-    should be delivered across all connected Communities, Groups, and Channels.
-    If 'alert_group_id' or community groups exist in SQLite, delivers alerts
-    directly to those Telegram Groups/Channels, sparing private bot users from notification spam.
-    Returns: (recipients_list, is_group_only)
+    Super Smart Private Direct Intelligence Router (100% Private Bot DMs Standard).
+    Strictly terminates all Group Chat ID broadcasting to protect user privacy,
+    enable per-user language localization, and eliminate group notification spam.
+    Returns: (recipients_list, is_group_only) where recipients_list contains
+    all VIP users in their private 1-on-1 BOT Chats [(chat_id, lang), ...]
+    and is_group_only is ALWAYS False.
     """
-    import os
     import database as db
 
-    group_id_str = db.get_system_setting("alert_group_id", "") or os.getenv("TELEGRAM_ALERT_GROUP_ID", "")
-    group_id_str = str(group_id_str).strip()
-
-    target_groups = []
-    if group_id_str:
-        for p in group_id_str.split(","):
-            p_clean = p.strip()
-            if p_clean:
-                try:
-                    target_groups.append(int(p_clean))
-                except ValueError:
-                    pass
-
-    # Collect from dynamic community groups table
-    if hasattr(db, 'get_active_community_groups'):
-        comm_groups = db.get_active_community_groups() or []
-        for cg in comm_groups:
-            gid = cg[0] if isinstance(cg, (tuple, list)) else cg
-            if gid not in target_groups:
-                target_groups.append(gid)
-
-    routing_mode = str(db.get_system_setting("alert_routing_mode", "GROUP_ONLY" if target_groups else "PRIVATE_ONLY")).upper().strip()
-
-    if target_groups:
-        group_recipients = [(gid, "khmer") for gid in target_groups]
-        if routing_mode == "GROUP_ONLY":
-            # Route exclusively to Communities & Groups, zero private user spam!
-            return group_recipients, True
-        elif routing_mode == "BOTH":
-            vip_users = db.get_vip_users_with_lang() or []
-            existing_gids = set(target_groups)
-            recipients = group_recipients + [u for u in vip_users if (u[0] if isinstance(u, (tuple, list)) else u) not in existing_gids]
-            return recipients, False
-
     vip_users = db.get_vip_users_with_lang() or []
-    return vip_users, False
+    # Super Smart Guard: Filter strictly for positive Telegram user IDs (private 1-on-1 DMs)
+    private_users = []
+    for u in vip_users:
+        cid = u[0] if isinstance(u, (tuple, list)) else u
+        lang = u[1] if isinstance(u, (tuple, list)) and len(u) > 1 else 'khmer'
+        try:
+            cid_int = int(cid)
+            # In Telegram, positive chat IDs (> 0) are strictly private 1-on-1 human user DMs.
+            # Group, Supergroup, and Channel IDs are strictly negative (< 0).
+            if cid_int > 0:
+                private_users.append((cid_int, lang))
+        except (ValueError, TypeError):
+            continue
+
+    if not private_users:
+        # Fallback to Master Admin if no other VIP users are registered
+        private_users = [(859271875, 'khmer')]
+
+    return private_users, False
 
 async def daily_market_brief(app: Application, ai_engine):
     """Fetches market data and broadcasts a morning summary to all VIP users."""
@@ -411,7 +395,7 @@ async def daily_market_brief(app: Application, ai_engine):
     # Generate Chart
     chart_path = market_data.generate_chart(df, symbol)
     
-    # Send to all recipients (Groups & VIPs) using parallel_broadcast
+    # Send to all recipients (100% Private VIP User Bot Chats) using parallel_broadcast
     def get_market_brief_text(lang):
         code = str(lang or 'khmer').lower().strip()
         if code in ['en', 'english']:

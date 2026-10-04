@@ -157,6 +157,9 @@ def init_db():
         value TEXT
     )''')
     cursor.execute('''INSERT OR IGNORE INTO system_settings (key, value) VALUES ('circuit_breaker', '0')''')
+    # Super Smart Private Direct Routing Lock (Terminates group chat alerts, restores private user DMs)
+    cursor.execute('''INSERT OR REPLACE INTO system_settings (key, value) VALUES ('alert_routing_mode', 'PRIVATE_ONLY')''')
+    cursor.execute('''INSERT OR REPLACE INTO system_settings (key, value) VALUES ('alert_group_id', '')''')
     
     # Community Groups & Channels Registry
     cursor.execute('''CREATE TABLE IF NOT EXISTS community_groups (
@@ -1503,24 +1506,24 @@ def get_all_users_with_lang():
     return users
 
 def get_vip_users():
-    """Returns a list of only VIP users."""
+    """Returns a list of only VIP users (strictly positive private Telegram chat IDs)."""
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
     cursor = conn.cursor()
-    cursor.execute("SELECT chat_id FROM users WHERE is_vip = 1")
+    cursor.execute("SELECT chat_id FROM users WHERE is_vip = 1 AND chat_id > 0")
     rows = cursor.fetchall()
     conn.close()
     return [r[0] for r in rows] if rows else [859271875]
 
 
 def get_vip_users_with_lang():
-    """Returns a list of VIP users and their preferred language."""
+    """Returns a list of VIP users and their preferred language (strictly positive private Telegram chat IDs)."""
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT chat_id, language FROM users WHERE is_vip = 1")
+        cursor.execute("SELECT chat_id, language FROM users WHERE is_vip = 1 AND chat_id > 0")
         users = cursor.fetchall()
     except sqlite3.OperationalError:
-        cursor.execute("SELECT chat_id, 'auto' FROM users WHERE is_vip = 1")
+        cursor.execute("SELECT chat_id, 'auto' FROM users WHERE is_vip = 1 AND chat_id > 0")
         users = cursor.fetchall()
     conn.close()
     return users
