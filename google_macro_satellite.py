@@ -22,6 +22,7 @@ import requests
 import json
 import xml.etree.ElementTree as ET
 from typing import Dict, Any
+from concurrent.futures import ThreadPoolExecutor
 
 # In-Memory High-Speed Cache with 60s TTL
 _MACRO_SATELLITE_CACHE: Dict[str, Any] = {}
@@ -88,10 +89,11 @@ def fetch_google_macro_satellite_data(force_refresh: bool = False) -> Dict[str, 
         "TIP": "TIP"
     }
 
-    for key, sym in tradfi_symbols.items():
+    def _fetch_single_sym(item):
+        key, sym = item
         try:
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d"
-            res = requests.get(url, headers=headers, timeout=4)
+            res = requests.get(url, headers=headers, timeout=2.5)
             if res.status_code == 200:
                 result = res.json().get("chart", {}).get("result", [])
                 if result:
@@ -99,26 +101,36 @@ def fetch_google_macro_satellite_data(force_refresh: bool = False) -> Dict[str, 
                     price = float(meta.get("regularMarketPrice", 0.0) or 0.0)
                     prev_close = float(meta.get("chartPreviousClose", price) or price)
                     chg_pct = round(((price - prev_close) / prev_close) * 100.0, 2) if prev_close > 0 else 0.0
-
-                    if key == "DXY" and price > 0:
-                        macro_data["dxy_index"] = round(price, 3)
-                        macro_data["dxy_change_pct"] = chg_pct
-                    elif key == "SP500" and price > 0:
-                        macro_data["sp500_price"] = round(price, 2)
-                        macro_data["sp500_change_pct"] = chg_pct
-                    elif key == "NASDAQ" and price > 0:
-                        macro_data["nasdaq_price"] = round(price, 2)
-                        macro_data["nasdaq_change_pct"] = chg_pct
-                    elif key == "TNX" and price > 0:
-                        macro_data["us10y_yield"] = round(price, 3)
-                    elif key == "GOLD" and price > 0:
-                        macro_data["gold_price"] = round(price, 2)
-                        macro_data["gold_change_pct"] = chg_pct
-                    elif key == "TIP" and price > 0:
-                        macro_data["tip_price"] = round(price, 2)
-                        macro_data["tip_change_pct"] = chg_pct
-        except Exception as err:
+                    return key, price, chg_pct
+        except Exception:
             pass
+        return key, 0.0, 0.0
+
+    try:
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            sym_results = list(executor.map(_fetch_single_sym, tradfi_symbols.items()))
+            for key, price, chg_pct in sym_results:
+                if price <= 0:
+                    continue
+                if key == "DXY":
+                    macro_data["dxy_index"] = round(price, 3)
+                    macro_data["dxy_change_pct"] = chg_pct
+                elif key == "SP500":
+                    macro_data["sp500_price"] = round(price, 2)
+                    macro_data["sp500_change_pct"] = chg_pct
+                elif key == "NASDAQ":
+                    macro_data["nasdaq_price"] = round(price, 2)
+                    macro_data["nasdaq_change_pct"] = chg_pct
+                elif key == "TNX":
+                    macro_data["us10y_yield"] = round(price, 3)
+                elif key == "GOLD":
+                    macro_data["gold_price"] = round(price, 2)
+                    macro_data["gold_change_pct"] = chg_pct
+                elif key == "TIP":
+                    macro_data["tip_price"] = round(price, 2)
+                    macro_data["tip_change_pct"] = chg_pct
+    except Exception:
+        pass
 
     # Compute Real Yield & Regime Delta (Pillar 4)
     macro_data["real_yield_10y"] = round(macro_data["us10y_yield"] - 2.90, 2)

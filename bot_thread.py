@@ -5278,50 +5278,53 @@ class TelegramBotThread(BaseThread):
                     "`` `/news SCAN` `` | `` `/news BTC` `` | `` `/news ETH` `` | `` `/news SOL` ``"
                 )
 
-            photo_sent = False
+            delivered = False
+            # 🛡️ APEX ZERO-HANG PHOTO DISPATCH: Strictly capped at 2.5s deadline
             if image_url:
                 try:
-                    if status_msg:
-                        try: await status_msg.delete()
-                        except Exception: pass
-
-                    # Send high-resolution cover photo first, followed by full 1,500-2,500 char master article!
-                    try:
-                        await context.bot.send_photo(chat_id=chat_id, photo=image_url)
-                    except Exception as e_img:
-                        print(f"⚠️ Photo send notice: {e_img}")
-                    
-                    try:
-                        await context.bot.send_message(
-                            chat_id=chat_id,
-                            text=report_text,
-                            parse_mode="Markdown",
-                            reply_markup=keyboard,
-                            disable_web_page_preview=False
-                        )
-                    except Exception:
-                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
-                        await context.bot.send_message(
-                            chat_id=chat_id,
-                            text=clean_txt,
-                            reply_markup=keyboard,
-                            disable_web_page_preview=False
-                        )
-                    photo_sent = True
+                    photo_msg = await asyncio.wait_for(context.bot.send_photo(chat_id=chat_id, photo=image_url), timeout=2.5)
+                    if photo_msg:
+                        try:
+                            await context.bot.send_message(
+                                chat_id=chat_id,
+                                text=report_text,
+                                parse_mode="Markdown",
+                                reply_markup=keyboard,
+                                disable_web_page_preview=False
+                            )
+                            delivered = True
+                            if status_msg:
+                                try: await status_msg.delete()
+                                except Exception: pass
+                        except Exception:
+                            clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                            await context.bot.send_message(
+                                chat_id=chat_id,
+                                text=clean_txt,
+                                reply_markup=keyboard,
+                                disable_web_page_preview=False
+                            )
+                            delivered = True
+                            if status_msg:
+                                try: await status_msg.delete()
+                                except Exception: pass
                 except Exception as e_ph:
-                    print(f"⚠️ Photo dispatch fallback: {e_ph}")
+                    print(f"⚠️ Fast cover photo skipped/timed out: {e_ph}")
 
-            if not photo_sent:
+            # 🛡️ In-Place Instant Status Update Fallback (Guarantees zero lost messages)
+            if not delivered:
                 if status_msg:
                     try:
                         await status_msg.edit_text(text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
+                        delivered = True
                     except Exception:
                         clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
                         try:
                             await status_msg.edit_text(text=clean_txt, reply_markup=keyboard, disable_web_page_preview=False)
+                            delivered = True
                         except Exception:
-                            await context.bot.send_message(chat_id=chat_id, text=clean_txt, reply_markup=keyboard, disable_web_page_preview=False)
-                else:
+                            pass
+                if not delivered:
                     try:
                         await context.bot.send_message(chat_id=chat_id, text=report_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=False)
                     except Exception:

@@ -77,7 +77,27 @@ class AIInvestmentEngine:
                         if m.name not in self.supported_models:
                             self.supported_models.append(m.name)
                 if self.supported_models:
-                    print(f"✅ [AI ENGINE] Dynamically discovered {len(self.supported_models)} supported Gemini models.")
+                    # ⚡ Institutional Priority: Prioritize ultra-fast modern flash models (3.8-flash, 3.5-flash) first
+                    priority_pref = [
+                        'gemini-3.8-flash',
+                        'gemini-3.5-flash',
+                        'gemini-flash-latest',
+                        'gemini-3.1-flash-lite',
+                        'gemini-2.5-flash',
+                        'gemini-2.0-flash'
+                    ]
+                    sorted_models = []
+                    for pref in priority_pref:
+                        if pref in self.supported_models and pref not in sorted_models:
+                            sorted_models.append(pref)
+                        pref_full = f"models/{pref}"
+                        if pref_full in self.supported_models and pref_full not in sorted_models:
+                            sorted_models.append(pref_full)
+                    for m in self.supported_models:
+                        if m not in sorted_models:
+                            sorted_models.append(m)
+                    self.supported_models = sorted_models
+                    print(f"✅ [AI ENGINE] Dynamically discovered {len(self.supported_models)} supported Gemini models. Primary: {self.supported_models[0]}")
             except Exception as e:
                 err_str = str(e)
                 if "401" in err_str or "invalid authentication" in err_str.lower() or "access_token" in err_str.lower():
@@ -87,21 +107,18 @@ class AIInvestmentEngine:
             
         if not self.supported_models:
             self.supported_models = [
+                'gemini-3.8-flash',
+                'models/gemini-3.8-flash',
+                'gemini-3.5-flash',
+                'models/gemini-3.5-flash',
+                'gemini-flash-latest',
+                'models/gemini-flash-latest',
+                'gemini-3.1-flash-lite',
                 'gemini-2.5-flash',
                 'models/gemini-2.5-flash',
                 'gemini-2.0-flash',
                 'models/gemini-2.0-flash',
-                'gemini-2.5-pro',
-                'models/gemini-2.5-pro',
-                'gemini-2.0-flash-exp',
-                'gemini-1.5-flash',
-                'models/gemini-1.5-flash',
-                'gemini-1.5-flash-latest',
-                'gemini-1.5-flash-001',
-                'gemini-1.5-flash-002',
-                'gemini-1.5-flash-8b',
-                'gemini-1.5-pro',
-                'models/gemini-1.5-pro'
+                'gemini-1.5-flash'
             ]
             
         self.primary_model_name = self.supported_models[0]
@@ -890,26 +907,24 @@ class AIInvestmentEngine:
         # Prepare retry list with primary model first
         retry_models = list(self.supported_models)
         extra_fallbacks = [
+            'gemini-3.8-flash',
+            'models/gemini-3.8-flash',
+            'gemini-3.5-flash',
+            'models/gemini-3.5-flash',
+            'gemini-flash-latest',
+            'models/gemini-flash-latest',
+            'gemini-3.1-flash-lite',
             'gemini-2.5-flash',
             'models/gemini-2.5-flash',
-            'gemini-2.0-flash',
-            'models/gemini-2.0-flash',
-            'gemini-2.5-pro',
-            'models/gemini-2.5-pro',
-            'gemini-2.0-flash-exp',
-            'gemini-1.5-flash',
-            'models/gemini-1.5-flash',
-            'gemini-1.5-flash-latest',
-            'gemini-1.5-flash-8b',
-            'gemini-1.5-pro',
-            'models/gemini-1.5-pro'
+            'gemini-2.0-flash'
         ]
         for fb in extra_fallbacks:
             if fb not in retry_models:
                 retry_models.append(fb)
                 
         last_error = None
-        for m_name in retry_models:
+        # ⚡ Cap to top 4 working models to prevent multi-minute blocking loops
+        for m_name in retry_models[:4]:
             # 1. Try with system_instruction
             try:
                 m_obj = genai.GenerativeModel(m_name, system_instruction=self.base_prompt)
@@ -923,7 +938,8 @@ class AIInvestmentEngine:
                 chat = m_obj.start_chat(history=gemini_history)
                 response = chat.send_message(
                     full_user_input,
-                    generation_config=genai.types.GenerationConfig(temperature=0.7)
+                    generation_config=genai.types.GenerationConfig(temperature=0.7),
+                    request_options={'timeout': 8.0}
                 )
                 if response and response.text:
                     cleaned_txt = self._clean_response(response.text)
@@ -954,7 +970,8 @@ class AIInvestmentEngine:
                     chat = m_obj.start_chat(history=gemini_history)
                     response = chat.send_message(
                         full_user_input,
-                        generation_config=genai.types.GenerationConfig(temperature=0.7)
+                        generation_config=genai.types.GenerationConfig(temperature=0.7),
+                        request_options={'timeout': 8.0}
                     )
                     if response and response.text:
                         cleaned_txt = self._clean_response(response.text)

@@ -582,7 +582,14 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
                 f"`` `/turbo_hedge {target_sym_cmd} 20 10 {trade_side_cmd} 2.5 1234` ``\n\n"
                 f"Respond ONLY with the complete, clean report in {target_lang_name} markdown."
             )
-            ai_res = ai_engine.chat_with_user(ai_prompt, history=[])
+            # 🛡️ APEX ZERO-HANG GUARD: Cap AI execution to a strict 4.5-second deadline
+            executor = ThreadPoolExecutor(max_workers=1)
+            try:
+                future = executor.submit(ai_engine.chat_with_user, ai_prompt, history=[])
+                ai_res = future.result(timeout=4.5)
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
+
             if isinstance(ai_res, str) and len(ai_res.strip()) >= 600:
                 cleaned_text = clean_ai_news_output(ai_res.strip())
                 if cleaned_text and len(cleaned_text) >= 1200:
