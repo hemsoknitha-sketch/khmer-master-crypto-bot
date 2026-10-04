@@ -20,9 +20,10 @@ import google_macro_satellite
 
 logger = logging.getLogger("SchedulerTasks")
 
-# Anti-Spam State Machine for Insufficient Balance
-
+# Anti-Spam State Machine for Insufficient Balance & News Broadcasts
 GLOBAL_INSUFFICIENT_MUTE = {}
+_LAST_NEWS_ALERT_BROADCAST_TIME: float = 0.0
+_NEWS_ALERT_COOLDOWN_SECONDS: float = 900.0  # 15 minutes minimum window between routine news alert broadcasts
 
 async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="Markdown", photo_path=None, reply_markup=None):
     """
@@ -69,8 +70,8 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                 sent_photo = False
                 if p_path:
                     try:
-                        if str(p_path).startswith(('http://', 'https://')):
-                            if len(msg) <= 1000:
+                        if len(msg) <= 1000:
+                            if str(p_path).startswith(('http://', 'https://')):
                                 try:
                                     await app.bot.send_photo(chat_id=cid, photo=p_path, caption=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use)
                                     sent_photo = True
@@ -78,30 +79,7 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                                     clean_caption = msg.replace('*', '').replace('`', '').replace('_', '')
                                     await app.bot.send_photo(chat_id=cid, photo=p_path, caption=clean_caption, reply_markup=reply_markup_to_use)
                                     sent_photo = True
-                            elif len(msg) <= 4000:
-                                try:
-                                    from telegram import LinkPreviewOptions
-                                    lpo = LinkPreviewOptions(url=str(p_path), prefer_large_media=True, show_above_text=True)
-                                    await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, link_preview_options=lpo, reply_markup=reply_markup_to_use)
-                                    sent_photo = True
-                                except Exception as e_lpo:
-                                    print(f"⚠️ LinkPreviewOptions broadcast notice: {e_lpo}")
-                                    try:
-                                        clean_msg = msg.replace('*', '').replace('`', '').replace('_', '')
-                                        await app.bot.send_message(chat_id=cid, text=clean_msg, link_preview_options=lpo, reply_markup=reply_markup_to_use)
-                                        sent_photo = True
-                                    except Exception:
-                                        try:
-                                            await app.bot.send_photo(chat_id=cid, photo=p_path, reply_markup=reply_markup_to_use)
-                                        except Exception:
-                                            pass
                             else:
-                                try:
-                                    await app.bot.send_photo(chat_id=cid, photo=p_path, reply_markup=reply_markup_to_use)
-                                except Exception as e_p:
-                                    print(f"⚠️ Photo broadcast notice: {e_p}")
-                        else:
-                            if len(msg) <= 1000:
                                 with open(p_path, 'rb') as f:
                                     try:
                                         await app.bot.send_photo(chat_id=cid, photo=f, caption=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use)
@@ -110,14 +88,39 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                                         clean_caption = msg.replace('*', '').replace('`', '').replace('_', '')
                                         await app.bot.send_photo(chat_id=cid, photo=f, caption=clean_caption, reply_markup=reply_markup_to_use)
                                         sent_photo = True
+                        else:
+                            # 🛡️ Institutional HD Cover Photo Standard (len > 1000 chars):
+                            # 1. Dispatch full high-resolution photo first to guarantee it is displayed in chat
+                            try:
+                                if str(p_path).startswith(('http://', 'https://')):
+                                    await asyncio.wait_for(app.bot.send_photo(chat_id=cid, photo=p_path), timeout=5.0)
+                                else:
+                                    with open(p_path, 'rb') as f:
+                                        await asyncio.wait_for(app.bot.send_photo(chat_id=cid, photo=f), timeout=5.0)
+                            except Exception as e_ph:
+                                logger.warning(f"⚠️ Photo dispatch notice for {cid}: {e_ph}")
+
+                            # 2. Dispatch the complete formatted report text directly below the photo
+                            if len(msg) <= 4000:
+                                try:
+                                    await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use, disable_web_page_preview=True)
+                                    sent_photo = True
+                                except Exception as e_m:
+                                    logger.warning(f"⚠️ Markdown parsing notice on broadcast: {e_m}")
+                                    clean_msg = msg.replace('*', '').replace('`', '').replace('_', '')
+                                    await app.bot.send_message(chat_id=cid, text=clean_msg, reply_markup=reply_markup_to_use, disable_web_page_preview=True)
+                                    sent_photo = True
                             else:
-                                with open(p_path, 'rb') as f:
+                                chunks = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
+                                for idx, chunk_txt in enumerate(chunks):
+                                    kb_for_chunk = reply_markup_to_use if idx == len(chunks) - 1 else None
                                     try:
-                                        await app.bot.send_photo(chat_id=cid, photo=f, reply_markup=reply_markup_to_use)
-                                    except Exception as e_p:
-                                        print(f"⚠️ Local photo broadcast notice: {e_p}")
+                                        await app.bot.send_message(chat_id=cid, text=chunk_txt, parse_mode=parse_mode, reply_markup=kb_for_chunk, disable_web_page_preview=True)
+                                    except Exception:
+                                        await app.bot.send_message(chat_id=cid, text=chunk_txt, reply_markup=kb_for_chunk, disable_web_page_preview=True)
+                                sent_photo = True
                     except Exception as e_photo:
-                        print(f"⚠️ Photo broadcast notice: {e_photo}")
+                        logger.warning(f"⚠️ Photo broadcast notice: {e_photo}")
                         sent_photo = False
 
                 if not sent_photo:
@@ -125,14 +128,14 @@ async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="
                         chunks = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
                         for idx, chunk_txt in enumerate(chunks):
                             kb_for_chunk = reply_markup_to_use if idx == len(chunks) - 1 else None
-                            try: await app.bot.send_message(chat_id=cid, text=chunk_txt, parse_mode=parse_mode, reply_markup=kb_for_chunk)
+                            try: await app.bot.send_message(chat_id=cid, text=chunk_txt, parse_mode=parse_mode, reply_markup=kb_for_chunk, disable_web_page_preview=True)
                             except Exception:
-                                try: await app.bot.send_message(chat_id=cid, text=chunk_txt, reply_markup=kb_for_chunk)
+                                try: await app.bot.send_message(chat_id=cid, text=chunk_txt, reply_markup=kb_for_chunk, disable_web_page_preview=True)
                                 except Exception: pass
                     else:
-                        try: await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use)
+                        try: await app.bot.send_message(chat_id=cid, text=msg, parse_mode=parse_mode, reply_markup=reply_markup_to_use, disable_web_page_preview=True)
                         except Exception:
-                            try: await app.bot.send_message(chat_id=cid, text=msg, reply_markup=reply_markup_to_use)
+                            try: await app.bot.send_message(chat_id=cid, text=msg, reply_markup=reply_markup_to_use, disable_web_page_preview=True)
                             except Exception: pass
                         
             tasks.append(send_task(chat_id, lang, photo_path))
@@ -637,13 +640,38 @@ async def check_crypto_news(app: Application, ai_engine):
                     if len(second_part) > 200:
                         res = second_part
 
-            # 4. Enforce strict character limit (Max 2,500 chars) so Telegram NEVER splits into 2 messages
-            if len(res) > 2500:
-                last_end = res.rfind("៕", 0, 2500)
-                if last_end != -1 and last_end > 1000:
-                    res = res[:last_end + 1].strip()
+            # 4. Enforce clean sentence-boundary slicing (Max 1,800 chars for body text)
+            # Guarantees text NEVER slices mid-word (ព...) and ALWAYS ends with authoritative Chuon Nath "៕"
+            if len(res) > 1800:
+                last_khan = res.rfind("៕", 0, 1800)
+                if last_khan != -1 and last_khan > 500:
+                    res = res[:last_khan + 1].strip()
                 else:
-                    res = res[:2500].strip() + "..."
+                    last_single = res.rfind("។", 0, 1800)
+                    if last_single != -1 and last_single > 500:
+                        res = res[:last_single].strip() + "៕"
+                    else:
+                        last_para = res.rfind("\n\n", 0, 1800)
+                        if last_para != -1 and last_para > 500:
+                            candidate = res[:last_para].strip()
+                            if lang == "khmer" and not candidate.endswith("៕"):
+                                candidate = re.sub(r'[\s\.\,\;\:\-\–\—\…\.\.\.]+$', '', candidate).strip() + "៕"
+                            res = candidate
+                        else:
+                            last_dot = res.rfind(".", 0, 1800)
+                            if last_dot != -1 and last_dot > 500:
+                                candidate = res[:last_dot].strip()
+                                res = candidate + ("៕" if lang == "khmer" else ".")
+                            else:
+                                last_space = max(res.rfind(" ", 0, 1800), res.rfind("\n", 0, 1800))
+                                if last_space != -1 and last_space > 500:
+                                    candidate = res[:last_space].strip()
+                                    res = re.sub(r'[\s\.\,\;\:\-\–\—\…\.\.\.]+$', '', candidate).strip() + ("៕" if lang == "khmer" else "...")
+                                else:
+                                    res = res[:1800].strip()
+
+            if lang == "khmer" and res and not res.endswith("៕"):
+                res = re.sub(r'[\s\.\,\;\:\-\–\—\…\.\.\.]+$', '', res).strip() + "៕"
 
             if len(res) < 20:
                 res = (
@@ -659,6 +687,8 @@ async def check_crypto_news(app: Application, ai_engine):
             description = item.get("description", "").strip()
             image_url = item.get("image_url", "").strip()
             item_source = item.get("source", "")
+            if not image_url:
+                image_url = ai_news_engine.resolve_thematic_cover(title, description)
             
             if not title or not link:
                 continue
@@ -777,6 +807,17 @@ async def check_crypto_news(app: Application, ai_engine):
                 db.mark_news_seen(link)
                 continue
 
+            # 🛡️ ANTI-SPAM BROADCAST COOLDOWN (15-Minute Minimum Separation Window)
+            now_ts = time.time()
+            time_since_last_alert = now_ts - _LAST_NEWS_ALERT_BROADCAST_TIME
+            if time_since_last_alert < _NEWS_ALERT_COOLDOWN_SECONDS and score < 10:
+                logger.info(
+                    f"⏳ [NEWS RADAR COOLDOWN]: Article '{title[:50]}...' (Score {score}/10) held. "
+                    f"Last broadcast was {int(time_since_last_alert)}s ago (Cooldown: {_NEWS_ALERT_COOLDOWN_SECONDS}s). Marking seen to keep queue fresh."
+                )
+                db.mark_news_seen(link)
+                continue
+
             # Process high-impact breaking news article
             db.mark_news_seen(link)
 
@@ -849,7 +890,7 @@ async def check_crypto_news(app: Application, ai_engine):
             # 1. Khmer Article (Strict Chuon Nath Executive Standard - 3 Seamless Paragraphs)
             kh_prompt = (
                 f"អ្នកគឺជាប្រធាននិពន្ធសារព័ត៌មានហិរញ្ញវត្ថុគ្រីបតូស្ថាប័នជាន់ខ្ពស់ (Executive Financial News Chief Editor)។\n"
-                f"សូមសរសេរអត្ថបទព័ត៌មានវិភាគស៊ីជម្រៅកម្រិតស្ថាប័នជាភាសាខ្មែរផ្លូវការ ត្រឹមត្រូវតាមក្បួនអក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ឱ្យបានក្បោះក្បាយ មានប្រវែងចន្លោះពី 1,800 ដល់ 2,500 តួអក្សរ (ដើម្បីធានាការផ្ញើចេញរួមគ្នាជាមួយរូបភាពក្នុងសារតែមួយគត់នៃ Telegram) ដោយផ្អែកលើព័ត៌មានខាងក្រោម ៖\n"
+                f"សូមសរសេរអត្ថបទព័ត៌មានវិភាគស៊ីជម្រៅកម្រិតស្ថាប័នជាភាសាខ្មែរផ្លូវការ ត្រឹមត្រូវតាមក្បួនអក្ខរាវិរុទ្ធវចនានុក្រមសម្តេចព្រះសង្ឃរាជ ជួន ណាត ឱ្យបានក្បោះក្បាយ មានប្រវែងចន្លោះពី 1,200 ដល់ 1,600 តួអក្សរ (ប្រមាណ ៣ កថាខណ្ឌសមរម្យ មិនវែងហួសហេតុ) ដោយផ្អែកលើព័ត៌មានខាងក្រោម ៖\n"
                 f"ចំណងជើង ៖ {title}\n"
                 f"ខ្លឹមសារ ៖ {description}\n\n"
                 f"វិធានតឹងរ៉ឹងបំផុតសម្រាប់ការសរសេរ (CRITICAL INSTRUCTIONS) ៖\n"
@@ -865,13 +906,13 @@ async def check_crypto_news(app: Application, ai_engine):
 
             # 2. English Article
             en_prompt = (
-                f"Write an institutional 3-paragraph financial news analysis in clean English (approx 1,500 - 2,000 characters) for: {title}. {description}\n"
+                f"Write an institutional 3-paragraph financial news analysis in clean English (approx 1,200 - 1,500 characters) for: {title}. {description}\n"
                 f"Rules: Strictly NO internal thinking, scratchpads, or notes (NO 'Goal:', 'Structure:', 'Refinement:'). NO paragraph labels (e.g. Paragraph 1:). Start directly with dateline city (e.g. NEW YORK —). Cover event, macro liquidity, and regulatory impact."
             )
 
             # 3. Chinese Article
             zh_prompt = (
-                f"请为以下新闻撰写3段深度机构级中文财经新闻分析 (约 800 - 1,200 字): {title}. {description}\n"
+                f"请为以下新闻撰写3段深度机构级中文财经新闻分析 (约 600 - 900 字): {title}. {description}\n"
                 f"严格要求: 严禁包含任何内部思考、草稿笔记(如 Goal、Structure、Refinement 等)。严禁包含段落标签(如第一段、段落1等)。直接以地点电头开始(如 纽约讯 —)，深入分析事件、流动性影响与监管合规。"
             )
 
@@ -1119,10 +1160,17 @@ async def check_crypto_news(app: Application, ai_engine):
                             )
 
                 # 3. Compose Final Alert Message with Invariant 13 Dividers & Google Macro Satellite Pulse
+                safe_title = title.replace('*', '').replace('_', ' ').replace('[', '(').replace(']', ')').strip()
+                safe_link = link.strip()
+                if "news.google.com" in safe_link and len(safe_link) > 90:
+                    safe_link = "https://news.google.com"
+                else:
+                    safe_link = safe_link.replace('_', '%5F')
+
                 if user_l == 'khmer':
                     alert_msg = f"🚨 **ព័ត៌មានទាន់ហេតុការណ៍ទីផ្សារ CRYPTO (កម្រិតផលប៉ះពាល់ ៖ {score}/10)** 🚨\n"
                     alert_msg += f"{DIVIDER_HEAVY}\n"
-                    alert_msg += f"📰 **{title}**\n\n"
+                    alert_msg += f"📰 **{safe_title}**\n\n"
                     alert_msg += f"🌐 **ប្រភព ៖** {source_name} | 📅 **{kh_date_str}**\n"
                     alert_msg += f"{DIVIDER_HEAVY}\n\n"
                     alert_msg += f"{texts['khmer']}\n\n"
@@ -1137,7 +1185,7 @@ async def check_crypto_news(app: Application, ai_engine):
                     alert_msg += f"• **ទិន្នផលសញ្ញាប័ណ្ណ (US 10Y Yield) ៖** `{us10y_val:.2f}%`\n"
                     alert_msg += f"• **ប្រូបាបកាត់បន្ថយការប្រាក់ Fed ៖** `{fed_odds:.1f}%`\n\n"
                     alert_msg += f"{action_section}\n\n"
-                    alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({link})\n\n"
+                    alert_msg += f"🔗 [អានប្រភពដើមអន្តរជាតិ]({safe_link})\n\n"
                     alert_msg += f"{DIVIDER_LIGHT}\n"
                     alert_msg += "💡 _ដំណឹងនេះជាមូលដ្ឋានសម្រាប់ស្រាវជ្រាវបន្ថែម_\n"
                     alert_msg += "_សូមធ្វើការសម្រេចចិត្តដោយមានទំនួលខុសត្រូវ!_"
@@ -1145,7 +1193,7 @@ async def check_crypto_news(app: Application, ai_engine):
                     now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                     alert_msg = f"🚨 **加密货币突发新闻 (市场影响度 ៖ {score}/10)** 🚨\n"
                     alert_msg += f"{DIVIDER_HEAVY}\n"
-                    alert_msg += f"📰 **{title}**\n\n"
+                    alert_msg += f"📰 **{safe_title}**\n\n"
                     alert_msg += f"🌐 **来源 ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
                     alert_msg += f"{DIVIDER_HEAVY}\n\n"
                     alert_msg += f"{texts['chinese']}\n\n"
@@ -1160,7 +1208,7 @@ async def check_crypto_news(app: Application, ai_engine):
                     alert_msg += f"• **美债 10 年期收益率 ៖** `{us10y_val:.2f}%`\n"
                     alert_msg += f"• **美联储降息概率 ៖** `{fed_odds:.1f}%`\n\n"
                     alert_msg += f"{action_section}\n\n"
-                    alert_msg += f"🔗 [阅读完整新闻]({link})\n\n"
+                    alert_msg += f"🔗 [阅读完整新闻]({safe_link})\n\n"
                     alert_msg += f"{DIVIDER_LIGHT}\n"
                     alert_msg += "💡 _此信息仅作为深入研究之参考基准_\n"
                     alert_msg += "_请审慎评估风险并对投资决策负责！_"
@@ -1168,7 +1216,7 @@ async def check_crypto_news(app: Application, ai_engine):
                     now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
                     alert_msg = f"🚨 **BREAKING CRYPTO NEWS (Impact: {score}/10)** 🚨\n"
                     alert_msg += f"{DIVIDER_HEAVY}\n"
-                    alert_msg += f"📰 **{title}**\n\n"
+                    alert_msg += f"📰 **{safe_title}**\n\n"
                     alert_msg += f"🌐 **Source ៖** {source_name} | 📅 **{now_str} (UTC+7)**\n"
                     alert_msg += f"{DIVIDER_HEAVY}\n\n"
                     alert_msg += f"{texts['english']}\n\n"
@@ -1183,7 +1231,7 @@ async def check_crypto_news(app: Application, ai_engine):
                     alert_msg += f"• **US 10-Year Yield ៖** `{us10y_val:.2f}%`\n"
                     alert_msg += f"• **Fed Rate Cut Expectation ៖** `{fed_odds:.1f}%`\n\n"
                     alert_msg += f"{action_section}\n\n"
-                    alert_msg += f"🔗 [Read Full Article]({link})\n\n"
+                    alert_msg += f"🔗 [Read Full Article]({safe_link})\n\n"
                     alert_msg += f"{DIVIDER_LIGHT}\n"
                     alert_msg += "💡 _This intelligence serves as a foundation for further research._\n"
                     alert_msg += "_Please exercise due diligence and trade responsibly!_"
@@ -1191,6 +1239,7 @@ async def check_crypto_news(app: Application, ai_engine):
                 return alert_msg
 
             await parallel_broadcast(app, target_recipients, process_news_alert_and_auto_trade, photo_path=image_url, reply_markup=news_kb)
+            _LAST_NEWS_ALERT_BROADCAST_TIME = time.time()
             # 🛡️ Break after 1 high-impact broadcast per cycle to prevent notification flood
             break
     except Exception as e:

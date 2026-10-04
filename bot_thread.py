@@ -5279,64 +5279,60 @@ class TelegramBotThread(BaseThread):
                 )
 
             delivered = False
-            # 🛡️ APEX UNIFIED COVER PHOTO DISPATCH (Single-Bubble LinkPreviewOptions)
+            # 🛡️ APEX UNIFIED COVER PHOTO DISPATCH (100% Genuine Full-Resolution Delivery)
             if image_url:
                 try:
-                    from telegram import LinkPreviewOptions
-                    lpo = LinkPreviewOptions(url=str(image_url), prefer_large_media=True, show_above_text=True)
-                    try:
-                        await context.bot.send_message(
-                            chat_id=chat_id,
-                            text=report_text,
-                            parse_mode="Markdown",
-                            link_preview_options=lpo,
-                            reply_markup=keyboard
-                        )
-                        delivered = True
-                        if status_msg:
-                            try: await status_msg.delete()
-                            except Exception: pass
-                    except Exception:
-                        clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
-                        await context.bot.send_message(
-                            chat_id=chat_id,
-                            text=clean_txt,
-                            link_preview_options=lpo,
-                            reply_markup=keyboard
-                        )
-                        delivered = True
-                        if status_msg:
-                            try: await status_msg.delete()
-                            except Exception: pass
-                except Exception as e_lpo:
-                    print(f"⚠️ LinkPreviewOptions notice: {e_lpo}")
-                    try:
-                        photo_msg = await asyncio.wait_for(context.bot.send_photo(chat_id=chat_id, photo=image_url), timeout=2.5)
-                        if photo_msg:
-                            try:
-                                await context.bot.send_message(
-                                    chat_id=chat_id,
-                                    text=report_text,
-                                    parse_mode="Markdown",
-                                    reply_markup=keyboard
-                                )
-                                delivered = True
-                                if status_msg:
-                                    try: await status_msg.delete()
-                                    except Exception: pass
-                            except Exception:
-                                clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
-                                await context.bot.send_message(
-                                    chat_id=chat_id,
-                                    text=clean_txt,
-                                    reply_markup=keyboard
-                                )
-                                delivered = True
-                                if status_msg:
-                                    try: await status_msg.delete()
-                                    except Exception: pass
-                    except Exception as e_ph:
-                        print(f"⚠️ Fast cover photo skipped/timed out: {e_ph}")
+                    if len(report_text) <= 1000:
+                        try:
+                            await context.bot.send_photo(
+                                chat_id=chat_id,
+                                photo=image_url,
+                                caption=report_text,
+                                parse_mode="Markdown",
+                                reply_markup=keyboard
+                            )
+                            delivered = True
+                        except Exception:
+                            clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                            await context.bot.send_photo(
+                                chat_id=chat_id,
+                                photo=image_url,
+                                caption=clean_txt,
+                                reply_markup=keyboard
+                            )
+                            delivered = True
+                    else:
+                        # 1. Dispatch full HD photo first
+                        try:
+                            await asyncio.wait_for(context.bot.send_photo(chat_id=chat_id, photo=image_url), timeout=4.0)
+                        except Exception as e_ph:
+                            print(f"⚠️ Fast cover photo notice: {e_ph}")
+
+                        # 2. Dispatch the formatted report text below the photo
+                        try:
+                            await context.bot.send_message(
+                                chat_id=chat_id,
+                                text=report_text,
+                                parse_mode="Markdown",
+                                reply_markup=keyboard,
+                                disable_web_page_preview=True
+                            )
+                            delivered = True
+                        except Exception:
+                            clean_txt = report_text.replace('*', '').replace('`', '').replace('_', '')
+                            await context.bot.send_message(
+                                chat_id=chat_id,
+                                text=clean_txt,
+                                reply_markup=keyboard,
+                                disable_web_page_preview=True
+                            )
+                            delivered = True
+
+                    if delivered and status_msg:
+                        try: await status_msg.delete()
+                        except Exception: pass
+                except Exception as e_disp:
+                    print(f"⚠️ Cover photo dispatch notice: {e_disp}")
 
             # 🛡️ In-Place Instant Status Update Fallback (Guarantees zero lost messages)
             if not delivered:

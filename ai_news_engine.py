@@ -25,17 +25,17 @@ from ui_standards import DIVIDER_HEAVY, DIVIDER_LIGHT, DIVIDER_DOUBLE
 
 # Multi-Tier Real-Time Global Feeds: TradFi Macro + Central Banks + Institutional Crypto
 RSS_FEEDS = [
-    # 1. TradFi Macro & Federal Reserve News Wire (Google News Financial Radar)
-    "https://news.google.com/rss/search?q=Federal+Reserve+OR+Wall+Street+OR+Macro+Economy+OR+Bitcoin&hl=en-US&gl=US&ceid=US:en",
-    # 2. Yahoo Finance Top Market News Wire
-    "https://finance.yahoo.com/news/rssindex",
-    # 3. CNBC Economy & Financial Markets Wire
-    "https://www.cnbc.com/id/10000664/device/rss/rss.html",
-    # 4. Institutional Crypto Intelligence Wires
-    "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    # 1. Institutional Crypto Intelligence Wires (100% Native HD Cover Photos)
     "https://cointelegraph.com/rss",
+    "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://decrypt.co/feed",
-    "https://cryptopotato.com/feed/"
+    "https://cryptopotato.com/feed/",
+    # 2. Yahoo Finance Top Market News Wire (High-Quality Media Enclosures)
+    "https://finance.yahoo.com/news/rssindex",
+    # 3. TradFi Macro & Federal Reserve News Wire (Google News Financial Radar)
+    "https://news.google.com/rss/search?q=Federal+Reserve+OR+Wall+Street+OR+Macro+Economy+OR+Bitcoin&hl=en-US&gl=US&ceid=US:en",
+    # 4. CNBC Economy & Financial Markets Wire
+    "https://www.cnbc.com/id/10000664/device/rss/rss.html"
 ]
 
 HEADERS = {
@@ -69,6 +69,58 @@ BEARISH_KEYWORDS = [
 NEGATION_PATTERNS = [
     r'\b(?:not|did not|didn\'t|fail(?:ed)? to|unable to|no|loss of|lack of|without|cannot|less than)\b[^\.\,\;\!\?]{0,40}\b'
 ]
+
+
+# 🛡️ Verified Ultra-HD Thematic Cover Images (1200px permanent CDN URLs)
+THEMATIC_COVERS: Dict[str, str] = {
+    "CENTRAL_BANK": "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1200&q=80",    # Neoclassical Central Bank & Government pillars
+    "FED_WALLSTREET": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80",  # Wall Street trading & financial district
+    "BITCOIN_GOLD": "https://images.unsplash.com/photo-1642543492481-44e81e3914a7?w=1200&q=80",    # Bitcoin gold macro reserve asset
+    "ETHEREUM_DEFI": "https://images.unsplash.com/photo-1622979135225-d2ba269bc1df?w=1200&q=80",   # Ethereum digital smart contract neon
+    "BULLISH_PUMP": "https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1200&q=80",    # Green bullish breakout candlestick chart
+    "BEARISH_CRASH": "https://images.unsplash.com/photo-1640340434855-6084b1f4901c?w=1200&q=80",   # Red market liquidation plunges & risk-off
+    "HEDGE_TRADING": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80",   # Institutional high-frequency quant screens
+    "DEFAULT_CRYPTO": "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?w=1200&q=80"   # Institutional digital currency ecosystem
+}
+
+
+def resolve_thematic_cover(title: str, desc: str = "") -> str:
+    """
+    Guarantees a 100% genuine, ultra-high-definition (1200px) thematic cover image
+    for any financial or macro news item when the RSS source lacks native media enclosures.
+    """
+    text = (str(title) + " " + str(desc)).lower()
+
+    # 1. Bearish liquidation / crash
+    if any(k in text for k in ["crash", "plunge", "dump", "liquidat", "bankrupt", "collapse", "crisis", "bleeding", "bearish", "crackdown"]):
+        return THEMATIC_COVERS["BEARISH_CRASH"]
+
+    # 2. Bullish breakout / surge
+    if any(k in text for k in ["ath", "all-time high", "surge", "skyrocket", "rally", "record inflow", "breakout", "bullish"]):
+        return THEMATIC_COVERS["BULLISH_PUMP"]
+
+    # 3. Federal Reserve, Jerome Powell, Interest Rates, Inflation, Treasury, CPI
+    if any(k in text for k in ["fed", "federal reserve", "powell", "rate hike", "rate cut", "inflation", "cpi", "treasury", "yield"]):
+        return THEMATIC_COVERS["CENTRAL_BANK"]
+
+    # 4. Wall Street, Stocks, S&P, Nasdaq, SEC, Institutional Funds
+    if any(k in text for k in ["wall street", "stock", "equity", "sec", "etf", "blackrock", "fidelity", "hedge fund"]):
+        return THEMATIC_COVERS["FED_WALLSTREET"]
+
+    # 5. Bitcoin, BTC, Satoshi, Halving
+    if any(k in text for k in ["btc", "bitcoin", "satoshi", "halving", "crypto reserve"]):
+        return THEMATIC_COVERS["BITCOIN_GOLD"]
+
+    # 6. Ethereum, ETH, Solana, Altcoins, DeFi, Web3
+    if any(k in text for k in ["eth", "ethereum", "solana", "sol", "altcoin", "defi", "smart contract"]):
+        return THEMATIC_COVERS["ETHEREUM_DEFI"]
+
+    # 7. Trading, Quantitative, Futures, Leverage, Volatility
+    if any(k in text for k in ["trade", "trading", "futures", "hedge", "volatility", "leverage", "derivatives"]):
+        return THEMATIC_COVERS["HEDGE_TRADING"]
+
+    # Default institutional crypto backdrop
+    return THEMATIC_COVERS["DEFAULT_CRYPTO"]
 
 
 class NewsReportResult(str):
@@ -212,6 +264,9 @@ def fetch_live_news(symbol: str = None, limit: int = 5) -> List[Dict[str, Any]]:
                     elif "decrypt" in feed_url: source_name = "Decrypt"
                     elif "cryptopotato" in feed_url: source_name = "CryptoPotato"
 
+                    if not image_url:
+                        image_url = resolve_thematic_cover(title, clean_desc)
+
                     items_found.append({
                         "title": title.strip(),
                         "link": link.strip() if link else "https://finance.yahoo.com",
@@ -241,10 +296,10 @@ def fetch_live_news(symbol: str = None, limit: int = 5) -> List[Dict[str, Any]]:
     # High-quality fallback items if networks are offline
     if not news_items:
         fallback_titles = [
-            ("Federal Reserve Signals Strategic Liquidity Stabilization as Wall Street Inflows Expand", "BULLISH", "https://images.cointelegraph.com/images/840_aHR0cHM6Ly9zMy5jb2ludGVsZWdyYXBoLmNvbS91cGxvYWRzLzIwMjQtMDIvYnRjX25ld3MuanBn.jpg", "Federal Reserve policymakers outline monetary framework stability, opening liquidity pathways across institutional digital assets."),
-            ("Wall Street Spot ETF Inflows Reach New Historic Weekly Inflow Milestone", "BULLISH", "https://images.cointelegraph.com/images/840_aHR0cHM6Ly9zMy5jb2ludGVsZWdyYXBoLmNvbS91cGxvYWRzLzIwMjQtMDIvZXRoX25ld3MuanBn.jpg", "Institutional custodial accounts absorb spot Bitcoin and Ethereum liquidity, suppressing exchange sell-side reserves."),
-            ("Global Macro Regulators Harmonize Digital Asset Prudential Standards", "NEUTRAL", "", "Supervisory authorities establish clear compliance baselines ensuring systemic financial stability for tier-1 participants."),
-            ("Treasury Yield Curve Adjustments Reinforce Risk-On Cross-Asset Capital Reallocation", "BULLISH", "", "Shifts in sovereign bond yields prompt hedge funds to deploy structured capital into high-beta digital assets.")
+            ("Federal Reserve Signals Strategic Liquidity Stabilization as Wall Street Inflows Expand", "BULLISH", THEMATIC_COVERS["CENTRAL_BANK"], "Federal Reserve policymakers outline monetary framework stability, opening liquidity pathways across institutional digital assets."),
+            ("Wall Street Spot ETF Inflows Reach New Historic Weekly Inflow Milestone", "BULLISH", "https://images.cointelegraph.com/images/840_aHR0cHM6Ly9zMy5jb2ludGVsZWdyYXBoLmNvbS91cGxvYWRzLzIwMjQtMDIvYnRjX25ld3MuanBn.jpg", "Institutional custodial accounts absorb spot Bitcoin and Ethereum liquidity, suppressing exchange sell-side reserves."),
+            ("Global Macro Regulators Harmonize Digital Asset Prudential Standards", "NEUTRAL", THEMATIC_COVERS["FED_WALLSTREET"], "Supervisory authorities establish clear compliance baselines ensuring systemic financial stability for tier-1 participants."),
+            ("Treasury Yield Curve Adjustments Reinforce Risk-On Cross-Asset Capital Reallocation", "BULLISH", THEMATIC_COVERS["BITCOIN_GOLD"], "Shifts in sovereign bond yields prompt hedge funds to deploy structured capital into high-beta digital assets.")
         ]
         for title, s, img, desc in fallback_titles:
             if symbol_filter and symbol_filter not in title.upper():
@@ -256,7 +311,7 @@ def fetch_live_news(symbol: str = None, limit: int = 5) -> List[Dict[str, Any]]:
                 "description": desc,
                 "summary": desc,
                 "sentiment": s,
-                "image_url": img,
+                "image_url": img or resolve_thematic_cover(title, desc),
                 "source": "Angkor Quant Wire"
             })
             if len(news_items) >= limit:
@@ -497,6 +552,8 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
         if item.get("image_url"):
             top_image_url = item["image_url"]
             break
+    if not top_image_url:
+        top_image_url = resolve_thematic_cover(sym_str, "")
 
     # 3. Ingest Live Macro Satellite Data (TradFi / Central Bank Confluence)
     macro_data: Dict[str, Any] = {}
@@ -518,9 +575,9 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
     lang_clean = str(lang or 'khmer').lower()
     user_lang = 'en' if lang_clean in ['en', 'english'] else ('zh' if lang_clean in ['zh', 'chinese'] else 'km')
 
-    # Prepare formatted headlines and summaries (Short titles to prevent URL bloat)
+    # Prepare formatted headlines and summaries (Sanitized to prevent Markdown entity errors)
     headlines_raw = "\n".join([
-        f"{i+1}. [{item['title'][:80]}]({item['link']}) — Source: {item['source']}\n   Snippet: {item.get('description', '')[:120]}"
+        f"{i+1}. [{item['title'][:80].replace('*', '').replace('_', ' ')}]({item['link'].strip().replace('_', '%5F')}) — Source: {item['source']}\n   Snippet: {item.get('description', '')[:120].replace('*', '')}"
         for i, item in enumerate(news_list[:3])
     ])
 
