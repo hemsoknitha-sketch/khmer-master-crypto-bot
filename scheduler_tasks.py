@@ -471,6 +471,7 @@ async def check_crypto_news(app: Application, ai_engine):
     Filters high-impact events (Score >= 8), runs parallel AI analysis (<2.5s),
     injects live Google Macro Satellite pulse, and broadcasts to VIP chats with HD cover image.
     """
+    global _LAST_NEWS_ALERT_BROADCAST_TIME
     logger.info("📰 [ANGKOR QUANT NEWS RADAR] Checking Live Macro & Crypto Wires...")
     try:
         # Cleanup old news entries to keep database lean

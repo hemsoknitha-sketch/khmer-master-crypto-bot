@@ -2948,6 +2948,7 @@ class MT5BridgeEngine:
 
                 eligible_vip_users = []
                 super_admins = getattr(db, "SUPER_ADMIN_MT5_ACCOUNTS", {"52135153", "52133938"})
+                all_cycle_tickets = set()
 
                 for chat_id in active_users:
                     now_ts = time.time()
@@ -3080,6 +3081,7 @@ class MT5BridgeEngine:
                         if ticket <= 0:
                             continue
                         current_tickets.add(ticket)
+                        all_cycle_tickets.add(ticket)
 
                         # Invariant 48: Reachsey 5-Position Matrix is managed EXCLUSIVELY as an atomic BASKET.
                         # ZERO LEG DECOUPLING: All 5 legs must stand together until profit is harvested!
@@ -3165,11 +3167,16 @@ class MT5BridgeEngine:
                             # Level 1: Breakeven Armor Trigger
                             if peak >= gold_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
                                 be_sl = round(open_p + gold_be_offset, 2) if p_type == "BUY" else round(open_p - gold_be_offset, 2)
-                                self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
-                                self._ticket_sl_modified[ticket] = True
-                                self._ticket_last_trailed_sl[ticket] = be_sl
-                                self._ticket_last_modify_time[ticket] = now_ts
-                                logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Gold Ticket #{ticket} to {be_sl} (Peak was +{peak:.2f} {unit_label})")
+                                already_protected = (p_type == "BUY" and cur_sl >= (be_sl - 0.05)) or (p_type == "SELL" and cur_sl > 0 and cur_sl <= (be_sl + 0.05))
+                                if already_protected:
+                                    self._ticket_sl_modified[ticket] = True
+                                    self._ticket_last_trailed_sl[ticket] = be_sl
+                                else:
+                                    self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
+                                    self._ticket_sl_modified[ticket] = True
+                                    self._ticket_last_trailed_sl[ticket] = be_sl
+                                    self._ticket_last_modify_time[ticket] = now_ts
+                                    logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Gold Ticket #{ticket} to {be_sl} (Peak was +{peak:.2f} {unit_label})")
                                 if not self.is_silent_alerts(chat_id):
                                     try:
                                         if chat_id:
@@ -3260,11 +3267,16 @@ class MT5BridgeEngine:
                             if peak >= fx_be_trigger and not self._ticket_sl_modified.get(ticket, False) and open_p > 0:
                                 be_offset = 0.05 if "JPY" in sym else 0.0005
                                 be_sl = round(open_p + be_offset, digits) if p_type == "BUY" else round(open_p - be_offset, digits)
-                                self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
-                                self._ticket_sl_modified[ticket] = True
-                                self._ticket_last_trailed_sl[ticket] = be_sl
-                                self._ticket_last_modify_time[ticket] = now_ts
-                                logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Ticket #{ticket} ({sym}) to {be_sl} (Peak was +{peak:.2f} {unit_label})")
+                                already_protected = (p_type == "BUY" and cur_sl >= (be_sl - 1e-4)) or (p_type == "SELL" and cur_sl > 0 and cur_sl <= (be_sl + 1e-4))
+                                if already_protected:
+                                    self._ticket_sl_modified[ticket] = True
+                                    self._ticket_last_trailed_sl[ticket] = be_sl
+                                else:
+                                    self.dispatch_modify(ticket=ticket, new_sl=be_sl, new_tp=cur_tp, target_account=acc_id)
+                                    self._ticket_sl_modified[ticket] = True
+                                    self._ticket_last_trailed_sl[ticket] = be_sl
+                                    self._ticket_last_modify_time[ticket] = now_ts
+                                    logger.info(f"🛡️ [BREAKEVEN ARMOR LOCKED] Server-side SL modified for Ticket #{ticket} ({sym}) to {be_sl} (Peak was +{peak:.2f} {unit_label})")
 
                             # Level 2+: Progressive Server-Side Trailing SL Lock for Forex
                             elif peak >= fx_ratchet_peak and open_p > 0 and cur_p > 0:
@@ -3401,14 +3413,6 @@ class MT5BridgeEngine:
                             except Exception as ex:
                                 logger.warning(f"⚠️ Telegram harvest alert error: {ex}")
 
-                    # Prune stale tickets
-                    for t in list(self._ticket_peak_profit.keys()):
-                        if t not in current_tickets:
-                            self._ticket_peak_profit.pop(t, None)
-                            self._ticket_sl_modified.pop(t, None)
-                            self._ticket_last_trailed_sl.pop(t, None)
-                            self._ticket_last_modify_time.pop(t, None)
-                            self._ticket_last_alert_sl.pop(t, None)
 
                     # Monitor Reachsey 5-Position Volatility Baskets (Super Smart Basket Trailing & Recovery)
                     try:
@@ -3667,6 +3671,15 @@ class MT5BridgeEngine:
                         "open_symbols": open_symbols,
                         "auto_cfg": auto_cfg
                     })
+
+                # Prune stale tickets across all active accounts
+                for t in list(self._ticket_peak_profit.keys()):
+                    if t not in all_cycle_tickets:
+                        self._ticket_peak_profit.pop(t, None)
+                        self._ticket_sl_modified.pop(t, None)
+                        self._ticket_last_trailed_sl.pop(t, None)
+                        self._ticket_last_modify_time.pop(t, None)
+                        self._ticket_last_alert_sl.pop(t, None)
 
                 # =========================================================
                 # PHASE 2: GLOBAL APEX OMNI-SWARM SIGNAL SCAN & PARALLEL DISPATCH

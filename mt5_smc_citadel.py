@@ -136,14 +136,53 @@ class MT5SMCCitadelEngine:
         "GBPCAD": "GBPCAD=X",
         "NZDJPY": "NZDJPY=X",
         "AUDNZD": "AUDNZD=X",
+        # Major Indices & Futures (Active 23/5 on Yahoo Finance)
+        "US500": "ES=F",
+        "SP500": "ES=F",
+        "SPX500": "ES=F",
+        "US100": "NQ=F",
+        "NAS100": "NQ=F",
+        "USTEC": "NQ=F",
+        "NASDAQ": "NQ=F",
         "US30": "YM=F",
         "DJ30": "YM=F",
+        "DOW": "YM=F",
+        "US2000": "RTY=F",
+        "RUT": "RTY=F",
+        "GERMANY40": "^GDAXI",
+        "GER40": "^GDAXI",
+        "DE40": "^GDAXI",
+        "DAX": "^GDAXI",
+        "UK100": "^FTSE",
+        "JP225": "^N225",
+        "HK50": "^HSI",
+        # Commodities
+        "OIL_CRUDE": "CL=F",
+        "OIL": "CL=F",
+        "USOIL": "CL=F",
+        "WTI": "CL=F",
+        "OIL_BRENT": "BZ=F",
+        "BRENT": "BZ=F",
+        "UKOIL": "BZ=F",
+        "NATURALGAS": "NG=F",
+        "NATGAS": "NG=F",
+        "GAS": "NG=F",
+        "COPPER": "HG=F",
+        # Crypto
         "BTCUSD": "BTC-USD",
         "ETHUSD": "ETH-USD",
         "SOLUSD": "SOL-USD",
+        # Equities
         "NVDA": "NVDA",
         "AAPL": "AAPL",
-        "TSLA": "TSLA"
+        "TSLA": "TSLA",
+        "GOOGL": "GOOGL",
+        "GOOG": "GOOGL",
+        "META": "META",
+        "AMZN": "AMZN",
+        "MSFT": "MSFT",
+        "AMD": "AMD",
+        "INTC": "INTC"
     }
 
     @classmethod
@@ -198,8 +237,15 @@ class MT5SMCCitadelEngine:
 
         # Strategy 2: yfinance for Forex, Indices, Stocks & Global Metals
         if df is None or len(df) < 20:
-            yf_ticker = cls._YF_MAP.get(clean_sym, f"{clean_sym}=X")
+            yf_ticker = cls._YF_MAP.get(clean_sym)
+            if not yf_ticker:
+                if len(clean_sym) == 6 and clean_sym.isalpha():
+                    yf_ticker = f"{clean_sym}=X"
+                else:
+                    yf_ticker = clean_sym
             try:
+                import logging as _py_logging
+                _py_logging.getLogger("yfinance").setLevel(_py_logging.CRITICAL)
                 import yfinance as yf
                 yf_interval = timeframe if timeframe in ["15m", "30m", "1h"] else "1h"
                 period = "5d" if timeframe in ["15m", "30m"] else "1mo"
