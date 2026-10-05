@@ -85,6 +85,21 @@
                     class="text-neon-emerald">ISOLATED</strong></div>
         </div>
 
+        <!-- Feature 2: Super Smart Session Kill Zones HUD Bar -->
+        <div class="hud-session-bar" id="hud-session-radar">
+            <div class="session-live-info">
+                <span class="session-pulse-dot"></span>
+                <span class="session-label">វេនទីផ្សារ (SESSION):</span>
+                <strong id="session-active-name" class="text-neon-gold">🇺🇸 NEW YORK WALL STREET (20:30-03:45 ICT)</strong>
+                <span id="session-swap-shield" class="badge-shield-small">🛡️ Zero-Swap Shield</span>
+            </div>
+            <div class="session-mode-toggles">
+                <button class="btn-session-mode active" data-mode="SMART_SESSION_TIMED" id="btn-mode-smart">🎯 Smart Session</button>
+                <button class="btn-session-mode" data-mode="SCHEDULE_MON_FRI" id="btn-mode-monfri">⏰ ចន្ទ-សុក្រ</button>
+                <button class="btn-session-mode" data-mode="24/7" id="btn-mode-247">🔄 24/7 Mode</button>
+            </div>
+        </div>
+
         <!-- Main Content Area -->
         <main class="main-content">
 
@@ -99,7 +114,10 @@
                             <span class="hero-badge-tag">INSTITUTIONAL QUANTUM VAULT</span>
                             <span class="hero-label">ទ្រព្យសម្បត្តិសរុប (EST. NET WORTH)</span>
                         </div>
-                        <span id="pnl-24h-badge" class="badge badge-success">+14.85% (24H)</span>
+                        <div class="hero-action-pills">
+                            <span id="pnl-24h-badge" class="badge badge-success">+14.85% (24H)</span>
+                            <button id="btn-open-pnl-modal" class="btn-pnl-share" title="Generate Shareable PnL Card">📸 PnL Card</button>
+                        </div>
                     </div>
                     <div class="hero-balance-row">
                         <span class="currency-symbol">$</span>
@@ -264,6 +282,189 @@
                             </div>
                             <span class="shield-status text-neon-purple">ENCLAVE LOCKED</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Feature 1: Capital.com Institutional TradFi Cockpit Card -->
+                <div class="glass-card capital-tradfi-card" id="card-capital-tradfi">
+                    <div class="card-header-flex">
+                        <div class="card-title-group">
+                            <div class="card-title-flex-row">
+                                <span class="badge-icon-inline">🏛️</span>
+                                <h3 class="card-title">CAPITAL.COM TRADFI COCKPIT</h3>
+                            </div>
+                            <span class="card-subtitle">Gold (XAU/USD), Crude Oil (WTI), S&P 500, US Stocks & Crypto CFDs</span>
+                        </div>
+                        <div class="capital-header-actions">
+                            <span id="capital-acc-badge" class="badge badge-success">🟢 LIVE MAINNET</span>
+                            <label class="switch switch-sm" title="Toggle Capital Auto Trading">
+                                <input type="checkbox" id="toggle-capital-auto-top" data-engine="capital_auto">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Capital Balances Grid -->
+                    <div class="capital-metrics-grid">
+                        <div class="cap-metric-box">
+                            <span class="cap-metric-label">សមតុល្យ (Balance)</span>
+                            <strong id="cap-bal-val" class="cap-metric-val text-neon-gold">$0.00 USD</strong>
+                        </div>
+                        <div class="cap-metric-box">
+                            <span class="cap-metric-label">ដើមទុនសុទ្ធ (Equity)</span>
+                            <strong id="cap-eq-val" class="cap-metric-val text-neon-cyan">$0.00 USD</strong>
+                        </div>
+                        <div class="cap-metric-box">
+                            <span class="cap-metric-label">Free Margin</span>
+                            <strong id="cap-free-val" class="cap-metric-val text-neon-emerald">$0.00 USD</strong>
+                        </div>
+                        <div class="cap-metric-box">
+                            <span class="cap-metric-label">Active PnL</span>
+                            <strong id="cap-pnl-val" class="cap-metric-val text-neon-emerald">+$0.00</strong>
+                        </div>
+                    </div>
+
+                    <!-- Live TradFi Market Quotes Strip -->
+                    <div class="tradfi-quotes-ticker" id="tradfi-quotes-ticker">
+                        <div class="quote-pill"><span class="q-sym">GOLD:</span> <strong id="q-gold-bid" class="text-neon-gold">4,129.50</strong> <span id="q-gold-chg" class="q-chg">+0.4%</span></div>
+                        <div class="quote-pill"><span class="q-sym">US500:</span> <strong id="q-sp-bid" class="text-neon-cyan">7,771.70</strong> <span id="q-sp-chg" class="q-chg">+0.6%</span></div>
+                        <div class="quote-pill"><span class="q-sym">OIL:</span> <strong id="q-oil-bid" class="text-neon-emerald">89.09</strong> <span id="q-oil-chg" class="q-chg">-1.3%</span></div>
+                        <div class="quote-pill"><span class="q-sym">NATGAS:</span> <strong id="q-gas-bid" class="text-neon-purple">3.193</strong> <span id="q-gas-chg" class="q-chg">+1.4%</span></div>
+                        <div class="quote-pill"><span class="q-sym">BTC/USD:</span> <strong id="q-btc-bid" class="text-neon-cyan">85,303.00</strong> <span id="q-btc-chg" class="q-chg">-0.6%</span></div>
+                    </div>
+
+                    <!-- Open TradFi CFD Positions -->
+                    <div class="capital-positions-section">
+                        <div class="positions-subhead">
+                            <span>⚡ បញ្ជី Position កំពុងរត់ (Active CFDs)</span>
+                            <span id="cap-pos-count-badge" class="badge badge-cyber">0 Position</span>
+                        </div>
+                        <div id="capital-positions-list" class="capital-pos-list">
+                            <div class="empty-state-mini" id="cap-empty-positions">
+                                <span>🛡️ គ្មាន Position កំពុងរត់ឡើយ — ប្រព័ន្ធកំពុងស្កេនតាម Kill Zone</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 3: Sky Net 360° Daily Governor & Risk Gauges Card -->
+                <div class="glass-card governor-card" id="card-governor-gauges">
+                    <div class="card-header-flex">
+                        <div class="card-title-group">
+                            <div class="card-title-flex-row">
+                                <span class="badge-icon-inline">🎯</span>
+                                <h3 class="card-title">SKY NET 360° DAILY GOVERNOR & RISK GAUGES</h3>
+                            </div>
+                            <span class="card-subtitle">ចាក់សោប្រាក់ចំណេញ +5% & កាត់ខាតកម្រិតទាបបំផុត -2.5% (Wall Street Invariant 52)</span>
+                        </div>
+                        <span id="gov-status-badge" class="badge badge-success">🟢 ACTIVE (NO LOCK)</span>
+                    </div>
+
+                    <div class="governor-gauges-row">
+                        <!-- Daily Profit Target Gauge -->
+                        <div class="gov-gauge-box">
+                            <div class="circular-meter" id="meter-profit-target">
+                                <svg class="circle-svg" viewBox="0 0 100 100">
+                                    <circle class="circle-track" cx="50" cy="50" r="42"></circle>
+                                    <circle class="circle-fill fill-emerald" id="circle-target-fill" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="140"></circle>
+                                </svg>
+                                <div class="meter-content">
+                                    <span id="gov-pnl-pct-text" class="meter-val text-neon-emerald">+3.2%</span>
+                                    <span class="meter-sub">Goal: +5.0%</span>
+                                </div>
+                            </div>
+                            <span class="gauge-caption">🏆 គោលដៅចំណេញប្រចាំថ្ងៃ (Daily Target)</span>
+                        </div>
+
+                        <!-- Drawdown Safety Floor Gauge -->
+                        <div class="gov-gauge-box">
+                            <div class="circular-meter" id="meter-loss-floor">
+                                <svg class="circle-svg" viewBox="0 0 100 100">
+                                    <circle class="circle-track" cx="50" cy="50" r="42"></circle>
+                                    <circle class="circle-fill fill-crimson" id="circle-floor-fill" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="240"></circle>
+                                </svg>
+                                <div class="meter-content">
+                                    <span id="gov-loss-pct-text" class="meter-val text-neon-cyan">0.0%</span>
+                                    <span class="meter-sub">Ceiling: -2.5%</span>
+                                </div>
+                            </div>
+                            <span class="gauge-caption">🛡️ ខែលទប់ការខាតបង់ (Loss Floor)</span>
+                        </div>
+
+                        <!-- Breakeven Armor Status Card -->
+                        <div class="gov-status-pillar">
+                            <div class="armor-status-box">
+                                <span class="armor-icon">🛡️</span>
+                                <div>
+                                    <strong class="text-neon-emerald">Breakeven Armor™</strong>
+                                    <p>ARMED (85% Dynamic ATR Trailing TP)</p>
+                                </div>
+                            </div>
+                            <div class="armor-status-box">
+                                <span class="armor-icon">⚡</span>
+                                <div>
+                                    <strong class="text-neon-cyan">Dynamic Positions Scaler</strong>
+                                    <p id="gov-scaler-desc">3 ទៅ 10 Positions តាមទំហំទុនជាក់ស្តែង</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 4: SMC Citadel 9-Confluence Radar Scanner Card -->
+                <div class="glass-card smc-radar-card" id="card-smc-radar">
+                    <div class="card-header-flex">
+                        <div class="card-title-group">
+                            <div class="card-title-flex-row">
+                                <span class="badge-icon-inline">🧠</span>
+                                <h3 class="card-title">SMC CITADEL 9-CONFLUENCE RADAR SCANNER</h3>
+                            </div>
+                            <span class="card-subtitle">Order Blocks, Fair Value Gaps (FVG), Liquidity Sweeps & Smart Money Flow (90-99% Conf)</span>
+                        </div>
+                        <span class="badge badge-cyber">Wall St Institutional Math</span>
+                    </div>
+
+                    <div class="smc-scanner-grid" id="smc-scanner-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Feature 5: IB Rebate & Spread Accumulation Progress Card -->
+                <div class="glass-card rebate-tracker-card" id="card-ib-rebates">
+                    <div class="card-header-flex">
+                        <div class="card-title-group">
+                            <div class="card-title-flex-row">
+                                <span class="badge-icon-inline">💎</span>
+                                <h3 class="card-title">VIP PARTNER REBATE & SPREAD TRACKER</h3>
+                            </div>
+                            <span class="card-subtitle">តាមដានកម្រៃជើងសារ 30% - 50% & គោលដៅ Spread $500 - $2,000 (Tier 2/3/4)</span>
+                        </div>
+                        <span id="ib-tier-badge" class="badge badge-accent">🥈 Silver Partner (30%)</span>
+                    </div>
+
+                    <div class="rebate-progress-section">
+                        <div class="rebate-bar-header">
+                            <span>គោលដៅ Spread Tier 2 ($500 ក្នុង 60-90 ថ្ងៃ)</span>
+                            <strong id="rebate-spread-txt" class="text-neon-gold">$0.00 / $500.00 USD</strong>
+                        </div>
+                        <div class="progress-track-custom">
+                            <div id="rebate-progress-fill" class="progress-fill-custom" style="width: 25%;"></div>
+                        </div>
+                        <div class="rebate-tiers-pills">
+                            <span class="tier-pill active">Tier 1: $50 (30%)</span>
+                            <span class="tier-pill">Tier 2: $500 (35%)</span>
+                            <span class="tier-pill">Tier 3: $1,000 (40%)</span>
+                            <span class="tier-pill">Tier 4: $2,000 (50%)</span>
+                        </div>
+                    </div>
+
+                    <div class="referral-share-box">
+                        <div class="ref-input-group">
+                            <input type="text" id="ib-referral-input" class="cyber-input" readonly value="https://capital.com/referafriend-pro">
+                            <button id="btn-copy-referral" class="btn-copy">📋 Copy Link</button>
+                            <button id="btn-show-qr" class="btn-qr">📱 QR Code</button>
+                        </div>
+                        <p class="ref-hint">ចែករំលែក Link នេះដើម្បីទទួលបានកម្រៃជើងសារ Rebate ផ្ទាល់ចូលគណនី ២៤/៧!</p>
                     </div>
                 </div>
             </section>
@@ -1378,6 +1579,25 @@
                         <p class="engine-ctrl-desc">បង្វែរប្រាក់ចំណេញសុទ្ធទៅជាមាស Gold PAXG និង Bitcoin
                             រក្សាទ្រព្យរឹងមាំយូរអង្វែង</p>
                     </div>
+
+                    <!-- Engine 8: Capital.com TradFi Autonomous Engine -->
+                    <div class="glass-card engine-ctrl-card">
+                        <div class="engine-ctrl-header">
+                            <div class="engine-badge-icon">🏛️</div>
+                            <div class="engine-ctrl-meta">
+                                <div class="engine-title-flex">
+                                    <h4>Capital.com TradFi Engine</h4>
+                                    <span id="badge-capital_auto" class="badge badge-success">🟢 RUNNING 24/7</span>
+                                </div>
+                                <span>Gold, Oil, US500, US Equities & Crypto CFDs</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-capital_auto" data-engine="capital_auto">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <p class="engine-ctrl-desc">ម៉ាស៊ីនជួញដូរស្វ័យប្រវត្តិតាម Session Kill Zones ជាមួយ Breakeven Armor និង SMC 9-Confluence</p>
+                    </div>
                 </div>
             </section>
 
@@ -1426,10 +1646,30 @@
         </nav>
     </div>
 
+    <!-- Feature 6: 1-Tap Shareable Graphic PnL Card Generator Modal -->
+    <div id="modal-pnl-card" class="pnl-modal-backdrop hidden">
+        <div class="pnl-modal-box">
+            <div class="pnl-modal-header">
+                <div class="pnl-modal-title">
+                    <span>📸</span>
+                    <h3>ANGKOR QUANT PNL SHARE CARD</h3>
+                </div>
+                <button id="btn-close-pnl-modal" class="btn-modal-close">&times;</button>
+            </div>
+            <div class="pnl-canvas-wrapper">
+                <canvas id="pnlCanvas" width="600" height="750"></canvas>
+            </div>
+            <div class="pnl-modal-actions">
+                <button id="btn-download-pnl" class="btn-cyber-primary">📥 ទាញយករូបភាព (Save Image)</button>
+                <button id="btn-close-pnl-modal-bottom" class="btn-cyber-secondary">បិទ (Close)</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.3.0"></script>
+    <script src="app.js?v=2.4.0"></script>
 </body>
 
 </html>

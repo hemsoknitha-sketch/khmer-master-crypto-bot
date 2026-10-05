@@ -3480,3 +3480,517 @@ input:checked + .slider:before {
 .badge-vtx.withdraw { background: rgba(255, 82, 82, 0.2); color: #FF5252; }
 .badge-vtx.allocate { background: rgba(255, 213, 79, 0.2); color: #FFD54F; }
 
+/* ==========================================================================
+   FEATURE 2: SUPER SMART SESSION KILL ZONES HUD BAR
+   ========================================================================== */
+.hud-session-bar {
+    background: linear-gradient(90deg, rgba(13, 27, 62, 0.85), rgba(6, 13, 33, 0.95));
+    border-bottom: 1px solid rgba(0, 242, 254, 0.2);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    backdrop-filter: blur(10px);
+}
+.session-live-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    flex-wrap: wrap;
+}
+.session-pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: #00E676;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #00E676;
+    animation: pulseDot 1.5s infinite;
+}
+@keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.6; }
+}
+.badge-shield-small {
+    background: rgba(255, 183, 3, 0.15);
+    border: 1px solid rgba(255, 183, 3, 0.4);
+    color: #FFB703;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+}
+.session-mode-toggles {
+    display: flex;
+    gap: 4px;
+}
+.btn-session-mode {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-session-mode:hover {
+    background: rgba(0, 242, 254, 0.1);
+    color: #00F2FE;
+    border-color: rgba(0, 242, 254, 0.4);
+}
+.btn-session-mode.active {
+    background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(79, 172, 254, 0.15));
+    border-color: #00F2FE;
+    color: #00F2FE;
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+}
+
+/* ==========================================================================
+   FEATURE 6 BUTTON: PNL CARD GENERATOR
+   ========================================================================== */
+.hero-action-pills {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.btn-pnl-share {
+    background: linear-gradient(135deg, #FFB703, #FB8500);
+    border: none;
+    color: #020B1E;
+    font-weight: 800;
+    font-size: 10.5px;
+    padding: 4px 10px;
+    border-radius: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 0 10px rgba(255, 183, 3, 0.4);
+    transition: transform 0.15s ease;
+}
+.btn-pnl-share:hover {
+    transform: scale(1.05);
+}
+
+/* ==========================================================================
+   FEATURE 1: CAPITAL.COM TRADFI COCKPIT
+   ========================================================================== */
+.capital-tradfi-card {
+    border-top: 2px solid rgba(255, 183, 3, 0.6);
+}
+.capital-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.capital-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+}
+@media (max-width: 600px) {
+    .capital-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.cap-metric-box {
+    background: rgba(13, 27, 62, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.cap-metric-label {
+    font-size: 10.5px;
+    color: var(--text-muted);
+}
+.cap-metric-val {
+    font-size: 13px;
+    font-family: var(--font-mono);
+}
+.tradfi-quotes-ticker {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+}
+.quote-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 11px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.quote-pill .q-sym {
+    color: var(--text-muted);
+    font-weight: 700;
+}
+.quote-pill .q-chg {
+    font-size: 9.5px;
+    color: #00E676;
+}
+.capital-positions-section {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+}
+.positions-subhead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+.capital-pos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.pos-row-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+}
+.pos-row-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pos-dir-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 800;
+}
+.pos-dir-badge.buy { background: rgba(0, 230, 118, 0.2); color: #00E676; }
+.pos-dir-badge.sell { background: rgba(255, 82, 82, 0.2); color: #FF5252; }
+.btn-close-pos {
+    background: rgba(255, 82, 82, 0.15);
+    border: 1px solid rgba(255, 82, 82, 0.3);
+    color: #FF5252;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+}
+.empty-state-mini {
+    padding: 14px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   FEATURE 3: SKY NET 360° GOVERNOR & RISK GAUGES
+   ========================================================================== */
+.governor-gauges-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+.gov-gauge-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 140px;
+}
+.circular-meter {
+    position: relative;
+    width: 90px;
+    height: 90px;
+}
+.circle-svg {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+}
+.circle-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 8;
+}
+.circle-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s ease;
+}
+.circle-fill.fill-emerald { stroke: #00E676; }
+.circle-fill.fill-crimson { stroke: #FF5252; }
+.meter-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+.meter-val {
+    font-size: 14px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+}
+.meter-sub {
+    font-size: 8.5px;
+    color: var(--text-muted);
+}
+.gauge-caption {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-align: center;
+}
+.gov-status-pillar {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+}
+.armor-status-box {
+    background: rgba(13, 27, 62, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+}
+.armor-status-box p {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    margin: 2px 0 0 0;
+}
+
+/* ==========================================================================
+   FEATURE 4: SMC CITADEL 9-CONFLUENCE RADAR SCANNER
+   ========================================================================== */
+.smc-scanner-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+.smc-item-card {
+    background: rgba(13, 27, 62, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.smc-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.smc-sym {
+    font-weight: 800;
+    font-size: 12px;
+}
+.smc-conf-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 800;
+}
+.smc-conf-badge.buy { background: rgba(0, 230, 118, 0.2); color: #00E676; }
+.smc-conf-badge.sell { background: rgba(255, 82, 82, 0.2); color: #FF5252; }
+.smc-conf-badge.wait { background: rgba(255, 183, 3, 0.2); color: #FFB703; }
+.smc-zone-tag {
+    font-size: 9.5px;
+    color: var(--neon-cyan);
+    font-weight: 700;
+}
+.smc-reason-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* ==========================================================================
+   FEATURE 5: IB REBATE & SPREAD TRACKER
+   ========================================================================== */
+.rebate-progress-section {
+    margin-bottom: 14px;
+}
+.rebate-bar-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 6px;
+}
+.progress-track-custom {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.progress-fill-custom {
+    height: 100%;
+    background: linear-gradient(90deg, #FFB703, #00F2FE);
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+.rebate-tiers-pills {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    color: var(--text-muted);
+}
+.tier-pill.active {
+    color: #FFB703;
+    font-weight: 800;
+}
+.referral-share-box {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+}
+.ref-input-group {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.ref-input-group input {
+    flex: 1;
+    font-size: 11px;
+}
+.btn-copy, .btn-qr {
+    background: rgba(0, 242, 254, 0.15);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    color: #00F2FE;
+    font-weight: 700;
+    font-size: 10.5px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-copy:hover, .btn-qr:hover {
+    background: rgba(0, 242, 254, 0.25);
+}
+.ref-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* ==========================================================================
+   FEATURE 6: PNL CARD MODAL & HIGH-RES CANVAS
+   ========================================================================== */
+.pnl-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+}
+.pnl-modal-backdrop.hidden {
+    display: none;
+}
+.pnl-modal-box {
+    background: #060D21;
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    border-radius: 14px;
+    box-shadow: 0 0 30px rgba(0, 242, 254, 0.25);
+    max-width: 440px;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.pnl-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pnl-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pnl-modal-title h3 {
+    font-size: 12.5px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+.btn-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+}
+.pnl-canvas-wrapper {
+    padding: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #020713;
+}
+#pnlCanvas {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.pnl-modal-actions {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.btn-cyber-primary {
+    flex: 1;
+    background: linear-gradient(135deg, #00F2FE, #4FACFE);
+    border: none;
+    color: #020B1E;
+    font-weight: 800;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-cyber-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+

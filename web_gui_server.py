@@ -21,6 +21,9 @@ import trading_engine
 import portfolio_engine
 import spot_profit_harvester
 import mt5_bridge_engine
+import capital_engine
+import portfolio_circuit_breaker
+import mt5_smc_citadel
 
 DEFAULT_VIP_CHAT_ID = int(os.getenv("TELEGRAM_ADMIN_ID", "859271875"))
 _START_TIME = time.time()
@@ -1095,6 +1098,9 @@ async def handle_api_engine_states(request: web.Request) -> web.Response:
         vault_setting = db.get_system_setting(f"spot_wealth_vault_{chat_id}", "ACTIVE")
         is_vault_active = bool(vault_setting != "STOPPED")
 
+        # 8. Capital.com TradFi Autonomous Engine
+        is_capital_active = bool(db.is_capital_auto_enabled(chat_id))
+
         resp = web.json_response({
             "status": "success",
             "chat_id": chat_id,
@@ -1105,7 +1111,8 @@ async def handle_api_engine_states(request: web.Request) -> web.Response:
                 "compound_grid": is_grid_active,
                 "infinity_matrix": is_inf_active,
                 "auto_trade": is_autotrade_active,
-                "spot_vault": is_vault_active
+                "spot_vault": is_vault_active,
+                "capital_auto": is_capital_active
             }
         })
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -1155,12 +1162,169 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
             db.update_system_setting(f"macro_auto_trade_{chat_id}_enabled", "1" if enable else "0")
         elif engine_name in ["spot_vault", "vault", "gold_vault"]:
             db.update_system_setting(f"spot_wealth_vault_{chat_id}", "ACTIVE" if enable else "STOPPED")
+        elif engine_name in ["capital_auto", "capital", "tradfi"]:
+            db.set_capital_auto_config(chat_id, enabled=enable)
         else:
             return web.json_response({"status": "error", "message": f"Unknown engine: {engine_name}"}, status=400)
 
         resp = web.json_response({"status": "success", "engine": engine_name, "enabled": enable, "chat_id": chat_id})
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
         return resp
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+# ==============================================================================
+# CAPITAL.COM TRADFI & SMART SESSION REST API HANDLERS
+# ==============================================================================
+
+async def handle_api_capital_overview(request: web.Request) -> web.Response:
+    """
+    Returns live Capital.com TradFi dashboard, Session Kill Zones status,
+    Sky Net 360° Governor risk metrics, SMC Citadel 9-Confluence signals,
+    and IB Rebate progress for VIP WebApp.
+    """
+    try:
+        chat_id = _get_chat_id_from_req(request)
+        if not chat_id:
+            chat_id = DEFAULT_VIP_CHAT_ID
+
+        # 1. Fetch TradFi dashboard
+        tradfi = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id)
+
+        # 2. Schedule & Kill Zone status
+        schedule_mode = db.get_capital_schedule_mode(chat_id) or "SMART_SESSION_TIMED"
+        is_active, reason, sched_info = capital_engine.is_capital_trading_schedule_active(schedule_mode)
+
+        # 3. Sky Net 360° Daily Governor & Risk Floor
+        gov_status = portfolio_circuit_breaker.CapitalDailyAGIGovernor.get_user_status(chat_id)
+
+        # 4. IB Rebate & Spread Accumulation Tracker ($500 target)
+        ib_data = await asyncio.to_thread(capital_engine.get_capital_ib_dashboard, chat_id)
+        raw_rebate = float(ib_data.get("total_rebate_usd", 0.0) or 0.0)
+        accum_spread = round(raw_rebate * 3.33, 2)  # 30% rebate equates to ~3.33x spread
+
+        # 5. SMC Citadel 9-Confluence Live Scanner
+        smc_assets = ["XAUUSD", "US500", "EURUSD", "BTCUSD", "OIL_CRUDE"]
+        smc_radar = []
+        for sym in smc_assets:
+            try:
+                sig = await asyncio.to_thread(mt5_smc_citadel.MT5SMCCitadelEngine.analyze_9_smc_confluence, sym)
+                if sig:
+                    smc_radar.append({
+                        "symbol": sym,
+                        "action": sig.get("action", "WAIT"),
+                        "confidence": float(sig.get("confidence", 50.0)),
+                        "equilibrium_zone": sig.get("equilibrium_zone", "NEUTRAL"),
+                        "reason": str(sig.get("reason", "Structural Balance")).split("_")[0],
+                        "entry_price": float(sig.get("entry_price", 0.0))
+                    })
+            except Exception:
+                pass
+
+        is_auto_on = bool(db.is_capital_auto_enabled(chat_id))
+        equity_val = float(tradfi.get("equity", 200.0) or 200.0)
+
+        data = {
+            "chat_id": chat_id,
+            "tradfi": tradfi,
+            "schedule": {
+                "mode": schedule_mode,
+                "is_active": is_active,
+                "reason": reason,
+                "current_session": sched_info.get("current_session", "NEW_YORK"),
+                "session_name_kh": sched_info.get("session_name_kh", ""),
+                "session_name_en": sched_info.get("session_name_en", ""),
+                "is_tradfi_weekend": sched_info.get("is_tradfi_weekend", False),
+                "now_ict": sched_info.get("now_ict", "")
+            },
+            "governor": {
+                "today": gov_status.get("today", ""),
+                "daily_pnl_usd": float(gov_status.get("daily_pnl_usd", 0.0)),
+                "daily_pnl_pct": float(gov_status.get("daily_pnl_pct", 0.0)),
+                "target_pct": float(gov_status.get("target_pct", 5.0)),
+                "floor_pct": float(gov_status.get("floor_pct", 2.5)),
+                "is_target_locked": bool(gov_status.get("is_target_locked", False)),
+                "is_loss_locked": bool(gov_status.get("is_loss_locked", False)),
+                "can_trade": bool(gov_status.get("can_trade", True)),
+                "status": str(gov_status.get("status", "ACTIVE_MONITORING")),
+                "breakeven_armor": "ARMED (85% ATR Trailing)"
+            },
+            "ib_rebates": {
+                "tier": ib_data.get("tier", "SILVER"),
+                "rebate_pct": float(ib_data.get("rebate_pct", 30.0)),
+                "tier_badge": ib_data.get("tier_badge", "🥈 Silver IB (30%)"),
+                "referral_link": ib_data.get("referral_link", ""),
+                "total_rebate_usd": raw_rebate,
+                "accumulated_spread_usd": accum_spread,
+                "target_spread_tier2": 500.0,
+                "target_spread_tier4": 2000.0
+            },
+            "smc_radar": smc_radar,
+            "auto_trading": {
+                "enabled": is_auto_on,
+                "max_positions": capital_engine.get_dynamic_max_positions_for_equity(equity_val)
+            }
+        }
+
+        resp = web.json_response({"status": "success", "data": data})
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        return resp
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+async def handle_api_capital_schedule(request: web.Request) -> web.Response:
+    """Updates Capital.com schedule mode (SMART_SESSION_TIMED, SCHEDULE_MON_FRI, 24/7)."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        mode = str(data.get("mode", "SMART_SESSION_TIMED")).upper().strip()
+        if mode not in ["SMART_SESSION_TIMED", "SCHEDULE_MON_FRI", "24/7"]:
+            return web.json_response({"status": "error", "message": f"Invalid mode: {mode}"}, status=400)
+
+        db.set_capital_schedule_mode(chat_id, mode)
+        is_active, reason, info = capital_engine.is_capital_trading_schedule_active(mode)
+        return web.json_response({
+            "status": "success",
+            "chat_id": chat_id,
+            "mode": mode,
+            "is_active": is_active,
+            "reason": reason,
+            "session_name_kh": info.get("session_name_kh", ""),
+            "session_name_en": info.get("session_name_en", "")
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+async def handle_api_capital_toggle(request: web.Request) -> web.Response:
+    """Toggles Capital.com Auto Trading on/off."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        enable = bool(data.get("enable", True))
+        db.set_capital_auto_config(chat_id, enabled=enable)
+        return web.json_response({
+            "status": "success",
+            "chat_id": chat_id,
+            "enabled": enable
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+async def handle_api_capital_close_pos(request: web.Request) -> web.Response:
+    """Closes an open Capital.com position."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        deal_id = data.get("deal_id")
+        if not deal_id:
+            return web.json_response({"status": "error", "message": "deal_id required"}, status=400)
+        user_engine = capital_engine.get_user_capital_engine(chat_id)
+        res = await asyncio.to_thread(user_engine.close_position, deal_id)
+        return web.json_response({"status": "success", "result": res})
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
@@ -1998,6 +2162,12 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/api/mt5/ledger/transactions", handle_api_mt5_ledger_transactions)
     app.router.add_get("/api/mt5/pool/overview", handle_api_mt5_pool_overview)
     app.router.add_get("/api/mt5/treasury", handle_api_mt5_treasury)
+
+    # Capital.com TradFi, Smart Session & Risk Governor routes
+    app.router.add_get("/api/capital/overview", handle_api_capital_overview)
+    app.router.add_post("/api/capital/schedule", handle_api_capital_schedule)
+    app.router.add_post("/api/capital/toggle", handle_api_capital_toggle)
+    app.router.add_post("/api/capital/close", handle_api_capital_close_pos)
 
     return app
 
