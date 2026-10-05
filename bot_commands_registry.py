@@ -80,6 +80,8 @@ def get_public_bot_commands():
         BotCommand("status", "📊 Angkor Active Trades & Live PnL"),
         BotCommand("journal", "📓 Angkor Trading Journal & Mistake Tag"),
         BotCommand("report", "📊 Angkor Multi-Timeframe Engine Audit"),
+        BotCommand("audit", "👑 APEX VIP 24H Daily Audit & Fleet Telemetry"),
+        BotCommand("daily_audit", "⏰ 24H Daily Institutional Audit"),
         BotCommand("paper_trading", "🧪 Angkor Paper vs Live Trading Mode"),
         BotCommand("alert", "🔔 Angkor Real-Time Price Alert"),
         BotCommand("stop", "🛑 Angkor Emergency Stop Trading"),

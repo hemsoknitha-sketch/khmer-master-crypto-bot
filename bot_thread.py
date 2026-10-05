@@ -3548,7 +3548,7 @@ class TelegramBotThread(BaseThread):
                     timeframe = "8h"
                 elif suffix in ["daily", "monthly", "yearly", "lifetime"]:
                     timeframe = suffix
-                elif suffix in ["macro_auto_trade", "turbo_hedge", "smart_x", "smart_swap", "smart_trade", "wealth", "grid", "flash_loan"]:
+                elif suffix in ["macro_auto_trade", "turbo_hedge", "smart_x", "smart_swap", "smart_trade", "wealth", "grid", "flash_loan", "capital", "reachsey"]:
                     engine_filter = suffix
                 elif suffix in ["all", "all_engines", "all_platforms"]:
                     engine_filter = None
@@ -3580,6 +3580,10 @@ class TelegramBotThread(BaseThread):
                     engine_filter = "grid"
                 elif arg0 in ["flash_loan", "flash", "arb", "mev", "arbitrage", "funding"]:
                     engine_filter = "flash_loan"
+                elif arg0 in ["capital", "tradfi", "gold_tradfi", "oil", "cfd"]:
+                    engine_filter = "capital"
+                elif arg0 in ["reachsey", "reach_sey", "matrix", "5pos", "basket"]:
+                    engine_filter = "reachsey"
 
                 if len(args) > 1:
                     arg1 = args[1]
@@ -3609,6 +3613,10 @@ class TelegramBotThread(BaseThread):
                         engine_filter = "grid"
                     elif arg1 in ["flash_loan", "flash", "arb", "mev", "arbitrage", "funding"]:
                         engine_filter = "flash_loan"
+                    elif arg1 in ["capital", "tradfi", "gold_tradfi", "oil", "cfd"]:
+                        engine_filter = "capital"
+                    elif arg1 in ["reachsey", "reach_sey", "matrix", "5pos", "basket"]:
+                        engine_filter = "reachsey"
 
             try:
                 import scheduler_tasks
@@ -7373,8 +7381,9 @@ class TelegramBotThread(BaseThread):
                 "btn_executive_report", "btn_report_refresh", "btn_report_daily", 
                 "btn_report_monthly", "btn_report_yearly", "btn_report_lifetime", 
                 "btn_report_turbo_hedge", "btn_report_smart_x", "btn_report_smart_swap", 
-                "btn_report_smart_trade", "btn_report_wealth", "btn_report_grid", "btn_report_flash_loan"
-            ] or data.startswith("btn_report_"):
+                "btn_report_smart_trade", "btn_report_wealth", "btn_report_grid", "btn_report_flash_loan",
+                "btn_report_capital", "btn_report_reachsey", "btn_audit", "btn_daily_audit", "btn_apex_audit"
+            ] or data.startswith("btn_report_") or data.startswith("btn_audit_"):
                 await report_command(update, context)
             elif data in ["btn_journal", "btn_journal_menu", "btn_trading_journal"]:
                 context.args = []
@@ -19810,6 +19819,11 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("terms", about_command))
         self.app.add_handler(CommandHandler("agreement", about_command))
         self.app.add_handler(CommandHandler("report", report_command))
+        self.app.add_handler(CommandHandler("audit", report_command))
+        self.app.add_handler(CommandHandler("daily_audit", report_command))
+        self.app.add_handler(CommandHandler("dailyaudit", report_command))
+        self.app.add_handler(CommandHandler("apex_audit", report_command))
+        self.app.add_handler(CommandHandler("vip_audit", report_command))
         self.app.add_handler(CommandHandler("stop", stop_command))
         self.app.add_handler(CommandHandler("stop_all", stop_all_command))
         self.app.add_handler(CommandHandler("stopall", stop_all_command))

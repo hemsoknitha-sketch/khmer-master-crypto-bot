@@ -6214,6 +6214,17 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     is_funding = db.is_funding_harvester_enabled(chat_id)
     funding_act = "ACTIVE" if is_funding else "STANDBY"
 
+    cap_alloc = float(db.get_system_setting(f"capital_alloc_{chat_id}", "0.0") or 0.0)
+    cap_act = "ACTIVE" if (db.get_system_setting(f"capital_active_{chat_id}", "0") == "1" or cap_alloc > 0) else "STANDBY"
+    cap_pnl = engines.get("capital", {}).get("pnl", 0.0)
+    cap_res_str = f"${cap_alloc:,.2f} USD" if cap_alloc > 0 else "$0.00 (Standby)"
+
+    reach_setting = (db.get_system_setting(f"reachsey_active_{chat_id}", "0") == "1")
+    reach_act = "ACTIVE" if reach_setting else "STANDBY"
+    reach_pnl = engines.get("reachsey", {}).get("pnl", 0.0)
+    reach_alloc = float(db.get_system_setting(f"reachsey_alloc_{chat_id}", "0.0") or 0.0)
+    reach_res_str = f"${reach_alloc:,.2f} USD" if reach_alloc > 0 else "$0.00 (Standby)"
+
     # Query real live open positions & floating PnL across platforms
     live_open_positions = []
     live_floating_pnl = 0.0
@@ -6446,6 +6457,56 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             sep,
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
         ])
+    elif cur_eng == "capital":
+        import portfolio_circuit_breaker
+        gov_status = portfolio_circuit_breaker.CapitalDailyAGIGovernor.get_user_status(chat_id, total_equity) if hasattr(portfolio_circuit_breaker, 'CapitalDailyAGIGovernor') else {}
+        is_tgt_locked = gov_status.get("is_target_locked", False)
+        is_floor_hit = gov_status.get("is_loss_locked", False)
+        gov_str = "🏆 TARGET LOCKED (+5%)" if is_tgt_locked else ("🛡️ LOSS FLOOR (-2.5%)" if is_floor_hit else "🟢 NORMAL (+5% Cap / -2.5% Floor)")
+        msg_lines = [
+            f"👑 *APEX VIP AUDIT — 🏛️ CAPITAL.COM TRADFI*",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ *Mode ៖* `TradFi CFDs (Gold, US500, US100, Crude Oil)`",
+            sep,
+            f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
+            f"💵 TradFi Bal : `${cap_alloc:,.2f}`",
+            f"📈 Futures / Spot: `${total_equity:,.2f}`",
+            f"💎 Net Total : `${total_equity + cap_alloc:,.2f}`",
+            sep,
+            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន CAPITAL (SPECS)*",
+            f"├ 🏛️ ស្ថានភាព     : `[{cap_act}]`",
+            f"├ 💵 ទុនបម្រុង     : `{cap_res_str}`",
+            f"├ 🛡️ Sky Net 360° : `7-Layer Pre-Flight Confluence`",
+            f"├ 🎯 AGI Governor : `{gov_str}`",
+            f"├ 🌾 Spread Guard : `Max 10x Hurdle (Spread <= 0.90$)`",
+            f"├ 📐 Kelly Sizer  : `Fractional Kelly Criterion (0.25x)`",
+            f"└ 🔒 Trailing Lock: `Breakeven Armor & 85% Cash Harvest`",
+            sep,
+            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
+        ]
+    elif cur_eng == "reachsey":
+        import reachsey_matrix_engine
+        reach_info = reachsey_matrix_engine.get_reachsey_status(chat_id) if hasattr(reachsey_matrix_engine, 'get_reachsey_status') else {}
+        baskets_cnt = reach_info.get("active_baskets_count", 0)
+        msg_lines = [
+            f"👑 *APEX VIP AUDIT — 👑 REACHSEY 5-POSITION MATRIX*",
+            f"⏰ `{now_str} UTC+7` | `{tf_label.upper()}`",
+            f"🛡️ *Mode ៖* `5-Position Basket (4:1 Skew) & Net Basket Sweeper`",
+            sep,
+            f"💰 *ទុនជាក់ស្តែង (EQUITY)*",
+            f"💵 Reserve   : `${reach_alloc:,.2f}`",
+            f"💎 Net Total : `${total_equity:,.2f}`",
+            sep,
+            f"⚙️ *ប៉ារ៉ាម៉ែត្រម៉ាស៊ីន REACHSEY (SPECS)*",
+            f"├ 👑 ស្ថានភាព     : `[{reach_act}]`",
+            f"├ 🧺 Active Basket: `{baskets_cnt} Live Baskets`",
+            f"├ 📊 Position Skew: `4 Primary : 1 Counter-Hedge (80:20)`",
+            f"├ 🎯 Basket Target: `+$300.00 (Min Harvest: +$100.00)`",
+            f"├ 🛡️ Max Basket DD: `-$450.00 Maximum Portfolio Floor`",
+            f"└ ⚡ Execution    : `Sub-5ms Rapid Multi-Pos Fan-Out`",
+            sep,
+            f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
+        ]
     else:
         # MASTER ALL LIVE TRADING PLATFORMS AUDIT
         float_emoji = "🟢" if live_floating_pnl >= 0 else "🔴"
@@ -6482,9 +6543,21 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             f"├ 💵 DEX      : `Solana / EVM Sub-5ms Arbitrage`" if swap_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/smart_swap AUTO 50 1234` ``",
             f"\n🌾 *Flash Loan & Funding* (`/flash_loan`) `[{flash_act}]`",
             f"├ 💵 Yield    : `Delta-Neutral Yield + Tokyo HFT MEV`" if flash_act == "ACTIVE" else f"└ 1-Tap Copy ៖ `` `/flash_loan_keeper AUTO ON 1234` ``",
+        ]
+        if cap_act == "ACTIVE" or cap_alloc > 0:
+            msg_lines.extend([
+                f"\n🏛️ *TradFi CFDs & Gold* (`/capital`) `[{cap_act}]`",
+                f"├ 💵 ទុនបម្រុង : `{cap_res_str}` | Sky Net 360° & AGI Governor"
+            ])
+        if reach_act == "ACTIVE" or reach_alloc > 0 or reach_setting:
+            msg_lines.extend([
+                f"\n👑 *Reachsey 5-Pos Matrix* (`/reachsey`) `[{reach_act}]`",
+                f"├ 💵 ទុនបម្រុង : `{reach_res_str}` | 5-Pos Basket (80:20 Skew)"
+            ])
+        msg_lines.extend([
             sep,
             f"📋 *សកម្មភាពជួញដូរ ({tf_label})*"
-        ]
+        ])
 
     if not recent_trades:
         msg_lines.append("🟢 `ទុនរៀបរយ - គ្មាន Position ត្រាំ`")
@@ -6519,7 +6592,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
                 f"├ {pnl_emoji} PnL     : `{pnl_val:+,.2f}` (`{t_roi:+,.1f}%`)",
                 f"├ 💸 Fee     : `-${t_comm:,.2f}`",
                 f"├ 🌾 Fund    : `{t_fund:+,.2f}`",
-                f"└ 💎 *Net*    : *{t_net:+,.2f} USDT*"
+                f"└ 💎 Net    : `{t_net:+,.2f} USDT`"
             ])
             if idx < min(3, len(recent_trades)):
                 msg_lines.append(dash_sep)
@@ -6530,6 +6603,8 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     trade_roi = (trade_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
     swap_roi = (swap_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
     grid_roi = (grid_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+    cap_roi = (cap_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
+    reach_roi = (reach_pnl / base_cap * 100.0) if base_cap > 0 else 0.0
 
     net_sign = "+" if net_profit >= 0 else ""
     growth_sign = "+" if growth_pct >= 0 else ""
@@ -6554,6 +6629,24 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             OFFICIAL_FOOTNOTE
         ])
     else:
+        summary_rows = [
+            ("💎 `/wealth`", wealth_pnl, wealth_roi),
+            ("🚀 `/turbo_hedge`", turbo_pnl, turbo_roi),
+            ("🧠 `/smart_x`", smartx_pnl, smartx_roi),
+            ("📊 `/smart_trade`", trade_pnl, trade_roi),
+            ("⚡ `/smart_swap`", swap_pnl, swap_roi),
+            ("📊 `/compound_grid`", grid_pnl, grid_roi),
+        ]
+        if cap_act == "ACTIVE" or cap_pnl != 0 or cap_alloc > 0:
+            summary_rows.append(("🏛️ `/capital`", cap_pnl, cap_roi))
+        if reach_act == "ACTIVE" or reach_pnl != 0 or reach_setting:
+            summary_rows.append(("👑 `/reachsey`", reach_pnl, reach_roi))
+
+        roi_lines = []
+        for i, (eng_tag, eng_val, eng_r) in enumerate(summary_rows):
+            pfx = "└" if i == len(summary_rows) - 1 else "├"
+            roi_lines.append(f"{pfx} {eng_tag:<18}: `{eng_val:+,.2f} ({eng_r:+.2f}%)`")
+
         msg_lines.extend([
             sep,
             f"🏆 *សរុបលទ្ធផលសុទ្ធ ({tf_label.upper()})*",
@@ -6565,12 +6658,7 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
             line_sep,
             f"💎 *NET PROFIT : {net_sign}${net_profit:,.2f} USDT*",
             f"📈 *{growth_label} : {growth_sign}{growth_pct:.2f}% Net*",
-            f"├ 💎 `/wealth`      : `{wealth_pnl:+,.2f} ({wealth_roi:+.2f}%)`",
-            f"├ 🚀 `/turbo_hedge` : `{turbo_pnl:+,.2f} ({turbo_roi:+.2f}%)`",
-            f"├ 🧠 `/smart_x`     : `{smartx_pnl:+,.2f} ({smartx_roi:+.2f}%)`",
-            f"├ 📊 `/smart_trade` : `{trade_pnl:+,.2f} ({trade_roi:+.2f}%)`",
-            f"├ ⚡ `/smart_swap`  : `{swap_pnl:+,.2f} ({swap_roi:+.2f}%)`",
-            f"└ 📊 `/compound_grid`: `{grid_pnl:+,.2f} ({grid_roi:+.2f}%)`",
+            *roi_lines,
             sep,
             OFFICIAL_FOOTNOTE
         ])
@@ -6588,6 +6676,8 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
     b_swap = "✅ Smart Swap" if cur_eng == "smart_swap" else "⚡ Smart Swap"
     b_grid = "✅ Spot Grids" if cur_eng == "grid" else "📊 Spot Grids"
     b_flash = "✅ Flash & Arb" if cur_eng == "flash_loan" else "🌾 Flash & Arb"
+    b_cap = "✅ TradFi Capital" if cur_eng == "capital" else "🏛️ TradFi Capital"
+    b_reach = "✅ Reachsey Matrix" if cur_eng == "reachsey" else "👑 Reachsey Matrix"
     b_all = "✅ All Platforms" if cur_eng == "all" else "🌐 All Platforms"
 
     keyboard = InlineKeyboardMarkup([
@@ -6610,6 +6700,10 @@ async def build_executive_summary_report(chat_id: int, timeframe: str = "daily",
         [
             InlineKeyboardButton(b_grid, callback_data=f"btn_report_eng_grid_{cur_tf}"),
             InlineKeyboardButton(b_flash, callback_data=f"btn_report_eng_flash_loan_{cur_tf}")
+        ],
+        [
+            InlineKeyboardButton(b_cap, callback_data=f"btn_report_eng_capital_{cur_tf}"),
+            InlineKeyboardButton(b_reach, callback_data=f"btn_report_eng_reachsey_{cur_tf}")
         ],
         [
             InlineKeyboardButton(b_all, callback_data=f"btn_report_eng_all_{cur_tf}"),

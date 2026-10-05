@@ -8220,6 +8220,10 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
         ef = "grid"
     elif ef in ["flash_loan", "flash", "arb", "mev", "arbitrage", "funding"]:
         ef = "flash_loan"
+    elif ef in ["capital", "tradfi", "cfd"]:
+        ef = "capital"
+    elif ef in ["reachsey", "matrix", "basket"]:
+        ef = "reachsey"
     else:
         ef = None
 
@@ -8239,7 +8243,9 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
         "smart_trade": {"name": "/smart_trade", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
         "smart_swap": {"name": "/smart_swap", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
         "grid": {"name": "/compound_grid", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
-        "flash_loan": {"name": "/flash_loan", "pnl": 0.0, "trades": 0, "wins": 0, "active": False}
+        "flash_loan": {"name": "/flash_loan", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
+        "capital": {"name": "/capital", "pnl": 0.0, "trades": 0, "wins": 0, "active": False},
+        "reachsey": {"name": "/reachsey", "pnl": 0.0, "trades": 0, "wins": 0, "active": False}
     }
 
     # Check active engines across all trading platforms
@@ -8286,6 +8292,18 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
     except Exception:
         pass
 
+    try:
+        cap_on = (get_system_setting(f"capital_active_{chat_id}", "0") == "1") or float(get_system_setting(f"capital_alloc_{chat_id}", "0.0") or 0.0) > 0
+        engines["capital"]["active"] = bool(cap_on)
+    except Exception:
+        pass
+
+    try:
+        reach_on = (get_system_setting(f"reachsey_active_{chat_id}", "0") == "1")
+        engines["reachsey"]["active"] = bool(reach_on)
+    except Exception:
+        pass
+
     recent_trades = []
 
     try:
@@ -8325,6 +8343,10 @@ def get_user_multi_timeframe_report_data(chat_id: int, timeframe: str = "daily",
                 eng_key = "smart_x"
             elif "SWAP" in reason_str or "DEX" in reason_str:
                 eng_key = "smart_swap"
+            elif "CAPITAL" in reason_str or "TRADFI" in reason_str:
+                eng_key = "capital"
+            elif "REACHSEY" in reason_str or "BASKET" in reason_str:
+                eng_key = "reachsey"
             else:
                 eng_key = "smart_trade"
 
