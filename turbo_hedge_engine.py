@@ -198,7 +198,13 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 "HYPEUSDT", "LITEUSDT", "DEXEUSDT", "BZUSDT", "CLUSDT", "XAUUSDT", "XAGUSDT", "TRUMPUSDT", "HFTUSDT", "GWEIUSDT", 
                 "EPICUSDT", "USD1USDT", "SPCXUSDT", "OPENAIUSDT", "FIGMAUSDT", "STRIPEUSDT", "BYTEDANCEUSDT", "ANTHROPICUSDT"
             }
-            EXCLUDED_SYMBOLS = TRADFI_STOCK_SYMBOLS
+            TOXIC_MEME_SYMBOLS = {
+                "PONSUSDT", "LYNUSDT", "4USDT", "USELESSUSDT", "CRDOUSDT", "BRUSDT", 
+                "VELVETUSDT", "TSTUSDT", "PUMPBTCUSDT", "SOONUSDT", "ESPUSDT", "AKEUSDT", 
+                "NILUSDT", "PHAROSUSDT", "TRIAUSDT", "CLOUSDT", "TOWNSUSDT", "PHAUSDT",
+                "MAGICUSDT", "COHRUSDT", "SOXLUSDT", "GOOGLUSDT", "ANTHROPICUSDT", "OPENAIUSDT"
+            }
+            EXCLUDED_SYMBOLS = TRADFI_STOCK_SYMBOLS | TOXIC_MEME_SYMBOLS
             monitoring_set = get_binance_monitoring_symbols()
             for t in tickers:
                 sym = t.get("symbol", "")
@@ -222,7 +228,7 @@ def get_active_high_velocity_coins(limit: int = 30) -> list:
                 if sym_info and sym_info.get("status") != "TRADING":
                     continue
 
-                if quote_vol >= 10000000.0:  # Tier 1 Liquidity Fortress: Strictly require >= $10M 24h volume to eliminate low-cap slippage
+                if quote_vol >= 30000000.0:  # Institutional Liquidity Fortress: Strictly require >= $30M 24h volume
                     # 🎯 EARLY BREAKOUT SWEET-SPOT SCORING (+3.0% to +12.0% Golden Window)
                     if 3.0 <= abs_change <= 12.0:
                         # Maximum score in the prime early breakout window (peak around 7.0% - 8.0%)
@@ -408,6 +414,17 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
             print(f"🛡️ [SPOT SAFETY SHIELD] Skipped {symbol} (Binance Monitoring/Delisting Tag: {tags})")
             return {"side": "SKIP", "confidence_pct": 0.0, "reason": "MONITORING_OR_DELISTING_TAGGED"}
 
+    # 🛡️ INSTITUTIONAL LIQUIDITY SHIELD: Strictly block toxic illiquid meme coins
+    TOXIC_MEME_SYMBOLS = {
+        "PONSUSDT", "LYNUSDT", "4USDT", "USELESSUSDT", "CRDOUSDT", "BRUSDT", 
+        "VELVETUSDT", "TSTUSDT", "PUMPBTCUSDT", "SOONUSDT", "ESPUSDT", "AKEUSDT", 
+        "NILUSDT", "PHAROSUSDT", "TRIAUSDT", "CLOUSDT", "TOWNSUSDT", "PHAUSDT",
+        "MAGICUSDT", "COHRUSDT", "SOXLUSDT", "GOOGLUSDT", "ANTHROPICUSDT", "OPENAIUSDT"
+    }
+    if symbol in TOXIC_MEME_SYMBOLS:
+        print(f"🛡️ [INSTITUTIONAL LIQUIDITY SHIELD] {symbol}: Toxic/Illiquid token is blacklisted -> SKIPPED!")
+        return {"side": "SKIP", "confidence_pct": 0.0, "reason": "TOXIC_MEME_BLACKLISTED"}
+
     # 🛡️ SUPER SMART EARLY BREAKOUT SWEET-SPOT & ANTI-OVEREXTENSION GUARD
     # Hard reject any coin that has pumped > +20.0% or dumped < -20.0% (Eliminates buying pump tops like IOST/FORM/FF/XAN)
     try:
@@ -535,9 +552,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     t_json = t_res.json()
                     change_24h = float(t_json.get("priceChangePercent", 0.0) or 0.0)
                     quote_volume_24h = float(t_json.get("quoteVolume", 0.0) or 0.0)
-                    # 🛡️ INSTITUTIONAL LIQUIDITY FLOOR: Minimum $10,000,000 USDT 24h volume required (Anti-Chop Floor)
-                    if quote_volume_24h > 0 and quote_volume_24h < 10000000.0:
-                        print(f"🛡️ [LOW 24H VOLUME SHIELD] {symbol}: 24h volume ${quote_volume_24h:,.0f} < $10,000,000 -> SKIPPED!")
+                    # 🛡️ INSTITUTIONAL LIQUIDITY FLOOR: Minimum $30,000,000 USDT 24h volume required (Anti-Chop Floor)
+                    if quote_volume_24h > 0 and quote_volume_24h < 30000000.0:
+                        print(f"🛡️ [LOW 24H VOLUME SHIELD] {symbol}: 24h volume ${quote_volume_24h:,.0f} < $30,000,000 -> SKIPPED!")
                         return {"side": "SKIP", "confidence_pct": 50.0, "reason": "LOW_24H_VOLUME"}
                 
                 if not is_spot_mode:
@@ -551,9 +568,9 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     d_data = d_res.json()
                     bids_val = sum([float(b[0]) * float(b[1]) for b in d_data.get("bids", [])])
                     asks_val = sum([float(a[0]) * float(a[1]) for a in d_data.get("asks", [])])
-                    # 🛡️ SLIPPAGE & THIN ORDERBOOK GUARD: Minimum $60,000 top-20 depth required
-                    if (bids_val + asks_val) > 0 and (bids_val + asks_val) < 60000.0:
-                        print(f"🛡️ [THIN ORDERBOOK SHIELD] {symbol}: Top 20 depth ${bids_val+asks_val:,.0f} < $60,000 -> SKIPPED!")
+                    # 🛡️ SLIPPAGE & THIN ORDERBOOK GUARD: Minimum $100,000 top-20 depth required
+                    if (bids_val + asks_val) > 0 and (bids_val + asks_val) < 100000.0:
+                        print(f"🛡️ [THIN ORDERBOOK SHIELD] {symbol}: Top 20 depth ${bids_val+asks_val:,.0f} < $100,000 -> SKIPPED!")
                         return {"side": "SKIP", "confidence_pct": 50.0, "reason": "THIN_ORDERBOOK_DEPTH"}
                     if bids_val >= 100000.0 and bids_val > 1.8 * max(1.0, asks_val):
                         whale_bid_wall = True
@@ -1227,6 +1244,17 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
         print(f"🛡️ [TURBO HEDGE COOLDOWN GUARD] {symbol} is currently in Blacklist Cooldown. Skipping order execution.")
         return {"status": "skipped", "reason": f"{symbol} in 2-hour cooldown"}
 
+    # 🛡️ INSTITUTIONAL LIQUIDITY SHIELD: Strictly block toxic illiquid meme coins
+    TOXIC_MEME_SYMBOLS = {
+        "PONSUSDT", "LYNUSDT", "4USDT", "USELESSUSDT", "CRDOUSDT", "BRUSDT", 
+        "VELVETUSDT", "TSTUSDT", "PUMPBTCUSDT", "SOONUSDT", "ESPUSDT", "AKEUSDT", 
+        "NILUSDT", "PHAROSUSDT", "TRIAUSDT", "CLOUSDT", "TOWNSUSDT", "PHAUSDT",
+        "MAGICUSDT", "COHRUSDT", "SOXLUSDT", "GOOGLUSDT", "ANTHROPICUSDT", "OPENAIUSDT"
+    }
+    if symbol in TOXIC_MEME_SYMBOLS:
+        print(f"🛡️ [INSTITUTIONAL SHIELD] Execution blocked for blacklisted meme/synthetic {symbol}.")
+        return {"status": "skipped", "reason": f"{symbol} in toxic meme blacklist"}
+
     exec_key = f"{chat_id}_{symbol}"
     # 🚫 Overtrade Guard: Prevent concurrent duplicate executions per user/symbol
     if exec_key in _active_executing_keys:
@@ -1319,19 +1347,19 @@ def execute_turbo_hedge_trade(api_key: str, api_secret: str, symbol: str, amount
             return {"status": "error", "message": f"Failed to fetch price for {symbol}"}
 
         # 🛡️ 2. Volatility-Adjusted Position Sizing (Asset-DNA Sizing Engine):
-        # Target Risk = $0.25 USDT (1R Micro Cap)
-        # Position Size (Qty) = Risk ($0.25) / Stop Distance ($)
+        # Target Risk = $1.00 - $1.25 USDT (Institutional Hard Risk Cap with 2% ATR Noise Cushion)
+        # Position Size (Qty) = Risk ($1.10) / Stop Distance ($)
         dna = market_data.profile_asset_dna(symbol)
         sl_mult = dna.get("sl_atr_mult", 2.0)
         cushion_pct = dna.get("noise_cushion_pct", 1.8)
         stop_dist_pct = max(cushion_pct, dna.get("atr_pct", 1.5) * sl_mult)
         
         # Volatility-adjusted margin sizing:
-        # High-Beta/Meme (PEPE/DOGE) uses smaller margin ($4-$6 USDT) to ensure dollar risk remains <= $0.25
-        # Low-Beta/Macro (BTC/ETH) uses standard margin ($10-$15 USDT)
-        target_notional_for_risk = 0.25 / max(0.01, (stop_dist_pct / 100.0))
+        # Standard institutional margin ($5.00 - $10.00 USDT) calibrated so that a 2.0% - 2.5% ATR move equals exactly ~$1.10 loss.
+        target_risk_dollars = 1.10
+        target_notional_for_risk = target_risk_dollars / max(0.015, (stop_dist_pct / 100.0))
         target_margin_for_risk = target_notional_for_risk / max(1, effective_leverage)
-        scaled_amount = max(4.00, target_margin_for_risk * dna.get("margin_scale_factor", 1.0))
+        scaled_amount = max(5.00, target_margin_for_risk * dna.get("margin_scale_factor", 1.0))
         if symbol in ["XAUUSDT", "PAXGUSDT"]:
             dynamic_amount_usdt = min(amount_usdt, avail_bal * 0.90)
         else:
@@ -1693,39 +1721,39 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     bot_amt = float(bot_info.get("amount", 10.0))
 
     if is_hedge:
-        target_dollar_tp = max(0.20, float(target_tp) if float(target_tp) > 0 else 0.50)
+        target_dollar_tp = max(2.50, float(target_tp) if float(target_tp) > 0 else 3.00)
         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
-        is_peak_locked = (net_pnl_usdt >= 0.15 and peak_pnl >= 0.25 and net_pnl_usdt <= peak_pnl * 0.85)
+        is_peak_locked = (peak_pnl >= 2.00 and net_pnl_usdt <= peak_pnl * 0.85)
     elif is_spot:
-        effective_tp_pct = 2.0
-        target_dollar_tp = max(0.25, bot_amt * (effective_tp_pct / 100.0))
+        effective_tp_pct = 25.0
+        target_dollar_tp = max(2.50, bot_amt * (effective_tp_pct / 100.0))
         retain_ratio = 0.85
-        is_peak_locked = (peak_pnl >= 0.25 and (net_pnl_usdt <= peak_pnl * 0.85 or net_pnl_usdt < 0.15))
+        is_peak_locked = (peak_pnl >= 2.00 and (net_pnl_usdt <= peak_pnl * 0.85 or net_pnl_usdt < 1.60))
         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
     else:
-        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
-        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 15.0
-        if user_custom_tp > 50.0 or user_custom_tp < 5.0:
-            user_custom_tp = 15.0
+        user_tp_setting_str = db.get_system_setting(f"turbo_hedge_{chat_id}_top_tp", "25.0")
+        user_custom_tp = float(user_tp_setting_str) if user_tp_setting_str.replace('.', '', 1).replace('-', '', 1).isdigit() else 25.0
+        if user_custom_tp > 75.0 or user_custom_tp < 15.0:
+            user_custom_tp = 25.0
             try:
-                db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", "15.0")
+                db.update_system_setting(f"turbo_hedge_{chat_id}_top_tp", "25.0")
             except Exception:
                 pass
         effective_tp_pct = min(float(target_tp), user_custom_tp) if target_tp > 0 else user_custom_tp
-        if effective_tp_pct <= 0 or effective_tp_pct > 50.0:
-            effective_tp_pct = 15.0
-        # Dynamic 5X Target: Minimum $1.50+ net target (5R Asymmetric Profit Floor)
-        target_dollar_tp = max(1.50, bot_amt * (effective_tp_pct / 100.0))
+        if effective_tp_pct <= 0 or effective_tp_pct > 75.0:
+            effective_tp_pct = 25.0
+        # Dynamic 5X Target: Minimum $2.50+ net target (5R Asymmetric Profit Floor)
+        target_dollar_tp = max(2.50, bot_amt * (effective_tp_pct / 100.0))
 
-        # 🏆 THE GOLDEN PROFIT RATCHET & BREAKEVEN ARMOR (Strict Invariant 24 & 5X Asymmetric Standard)
-        # 1. Any position reaching +$0.60+ USDT or +5.0% ROI enters Golden Ratchet mode.
+        # 🏆 THE GOLDEN PROFIT RATCHET & BREAKEVEN ARMOR (Strict Invariant 24 & Institutional Standard)
+        # 1. Any position reaching +$2.00+ USDT or +20.0% ROI enters Golden Ratchet mode.
         # 2. Retains at least 85% of peak profit (Max 15% pullback from peak).
-        # 3. Premature +2.5% / $0.25 exit 100% disabled so runners develop to 5R-15R targets (+15% to +50% ROI).
-        has_hit_profit_peak = (peak_pnl >= 0.60 or peak_roi >= 5.0 or peak_pnl >= target_dollar_tp)
+        # 3. Premature sub-$1.00 exit 100% disabled so runners develop to 5R-15R targets (+25% to +50% ROI / +$2.50 - +$4.00+).
+        has_hit_profit_peak = (peak_pnl >= 2.00 or peak_roi >= 20.0 or peak_pnl >= target_dollar_tp)
         is_pullback_from_peak = False
         if has_hit_profit_peak:
             pullback_threshold = peak_pnl * 0.85
-            guaranteed_floor = max(0.40, pullback_threshold)
+            guaranteed_floor = max(1.60, pullback_threshold)
             if net_pnl_usdt <= guaranteed_floor:
                 is_pullback_from_peak = True
 
@@ -1768,23 +1796,19 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     guaranteed_floor = 0.0
 
     if is_hedge:
-        if peak_pnl >= 0.20:
+        if peak_pnl >= 2.00:
             is_breakeven_armed = True
-            min_guaranteed_roi = 0.20
-            min_guaranteed_pnl = 0.15
+            min_guaranteed_roi = 15.0
+            min_guaranteed_pnl = 1.60
     elif is_spot:
-        spot_arm_roi = max(5.0, curr_atr_pct * 1.5)  # Upgraded to >= +5.0% ROI Hurdle for 5X Asymmetry
-        if peak_roi >= spot_arm_roi or peak_pnl >= max(0.60, bot_amt * 0.05):
+        spot_arm_roi = max(15.0, curr_atr_pct * 3.0)  # Institutional Standard: >= +15.0% ROI Hurdle
+        if peak_roi >= spot_arm_roi or peak_pnl >= max(2.00, bot_amt * 0.15):
             is_breakeven_armed = True
-            if peak_roi < 8.0:
-                min_guaranteed_roi = max(3.5, peak_roi * 0.75)
-                min_guaranteed_pnl = max(0.40, peak_pnl * 0.75)
-            else:
-                min_guaranteed_roi = max(6.5, peak_roi * 0.85)
-                min_guaranteed_pnl = max(0.70, peak_pnl * 0.85)
+            min_guaranteed_roi = max(12.0, peak_roi * 0.80)
+            min_guaranteed_pnl = max(1.60, peak_pnl * 0.80)
 
             chandelier_stop_p = peak_mark_p - (2.0 * curr_atr_val)
-            be_spot_stop_p = entry_price * 1.0120
+            be_spot_stop_p = entry_price * 1.0150
             effective_spot_stop = max(be_spot_stop_p, chandelier_stop_p)
             if mark_price <= effective_spot_stop:
                 is_chandelier_triggered = True
@@ -1809,36 +1833,30 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         else:
             peak_bounce_roi = 0.0
 
-        is_bounce_armed = (is_derisked and (bounce_roi >= 5.0 or peak_bounce_roi >= 5.0))
-        # 🛡️ Arm Golden Ratchet at >= +5.0% ROI or >= +$0.60 net or bounce armed (Eliminates premature +2.5% exit)
-        if peak_roi >= 5.0 or roi_pct >= 5.0 or peak_pnl >= 0.60 or is_bounce_armed or scale_out_level == 1:
+        is_bounce_armed = (is_derisked and (bounce_roi >= 15.0 or peak_bounce_roi >= 15.0))
+        # 🛡️ Arm Golden Ratchet at >= +20.0% ROI or >= +$2.00 net (Eliminates premature sub-$1 exits)
+        if peak_roi >= 20.0 or roi_pct >= 20.0 or peak_pnl >= 2.00 or is_bounce_armed or scale_out_level == 1:
             is_breakeven_armed = True
             effective_peak = max(peak_roi, peak_bounce_roi)
 
-            # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER (Strict Invariant 24 & 5X Asymmetric Standard):
-            # Universal Golden 85% Ratchet: Once peak profit reaches >= $0.60 or effective_peak >= 5.0% ROI,
+            # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER (Strict Invariant 24 & Institutional Standard):
+            # Universal Golden 85% Ratchet: Once peak profit reaches >= $2.00,
             # at least 85% of peak profit is permanently ratcheted and protected.
             ratchet_pnl_85 = peak_pnl * 0.85
             ratchet_roi_85 = effective_peak * 0.85
 
-            if peak_pnl >= 3.50 or effective_peak >= 35.0:
-                min_guaranteed_pnl = max(3.00, ratchet_pnl_85)  # Locks 15R+ ($3.00+ net floor)
-                min_guaranteed_roi = max(30.0, ratchet_roi_85)
-            elif peak_pnl >= 2.50 or effective_peak >= 25.0:
-                min_guaranteed_pnl = max(2.10, ratchet_pnl_85)  # Locks 10R ($2.10+ net floor)
-                min_guaranteed_roi = max(20.0, ratchet_roi_85)
-            elif peak_pnl >= 1.50 or effective_peak >= 15.0:
-                min_guaranteed_pnl = max(1.20, ratchet_pnl_85)  # Locks 5R ($1.20+ net floor - 5x higher than max loss!)
-                min_guaranteed_roi = max(12.0, ratchet_roi_85)
-            elif peak_pnl >= 0.80 or effective_peak >= 8.0:
-                min_guaranteed_pnl = max(0.65, ratchet_pnl_85)  # Locks 3R ($0.65+ net floor)
-                min_guaranteed_roi = max(6.5, ratchet_roi_85)
-            elif peak_pnl >= 0.50 or effective_peak >= 5.0:
-                min_guaranteed_pnl = max(0.40, ratchet_pnl_85)  # Locks 2R ($0.40+ net floor)
-                min_guaranteed_roi = max(4.0, ratchet_roi_85)
+            if peak_pnl >= 4.00 or effective_peak >= 40.0:
+                min_guaranteed_pnl = max(3.40, ratchet_pnl_85)  # Locks $3.40+ net floor
+                min_guaranteed_roi = max(34.0, ratchet_roi_85)
+            elif peak_pnl >= 3.00 or effective_peak >= 30.0:
+                min_guaranteed_pnl = max(2.50, ratchet_pnl_85)  # Locks $2.50+ net floor
+                min_guaranteed_roi = max(25.0, ratchet_roi_85)
+            elif peak_pnl >= 2.00 or effective_peak >= 20.0:
+                min_guaranteed_pnl = max(1.60, ratchet_pnl_85)  # Locks $1.60+ net floor
+                min_guaranteed_roi = max(16.0, ratchet_roi_85)
             else:
-                min_guaranteed_pnl = 0.35
-                min_guaranteed_roi = 3.5
+                min_guaranteed_pnl = 1.50
+                min_guaranteed_roi = 15.0
 
             ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
             # Volatility-Adaptive Chandelier ATR Multiplier: 2.5x for runner wave expansion, 2.0x at peak
@@ -1881,12 +1899,12 @@ async def _monitor_single_active_bot(app, bot_info: dict):
     # Target harvest triggers only on macro profit target (>= +35% ROI / >= +$3.50 net) or Golden 85% Ratchet pullback.
     is_tp_harvested = False
     if is_hedge:
-        target_dollar_tp = max(0.20, float(target_tp) if float(target_tp) > 0 else 0.50)
+        target_dollar_tp = max(2.50, float(target_tp) if float(target_tp) > 0 else 3.00)
         is_tp_harvested = (net_pnl_usdt >= target_dollar_tp)
     elif is_spot:
-        is_tp_harvested = (roi_pct >= 20.0 or net_pnl_usdt >= max(2.50, bot_amt * 0.20))
+        is_tp_harvested = (roi_pct >= 25.0 or net_pnl_usdt >= max(2.50, bot_amt * 0.25))
     else:
-        is_tp_harvested = (net_pnl_usdt >= max(3.50, bot_amt * 0.35) or roi_pct >= 35.0)
+        is_tp_harvested = (net_pnl_usdt >= max(2.50, bot_amt * 0.25) or roi_pct >= 25.0)
 
     # 📊 Real-Time Zero-Blind Heartbeat Log for Active Positions (Invariant 24)
     if peak_pnl >= 0.30 or net_pnl_usdt >= 0.30:
@@ -1894,7 +1912,7 @@ async def _monitor_single_active_bot(app, bot_info: dict):
         mode_label = "100% FULL POSITION"
         print(f"📊 [TURBO HEDGE TRACKING ({mode_label})] {symbol}: Real PnL +${real_pnl_usdt:.2f} (Net: +${net_pnl_usdt:.2f}, ROI: +{roi_pct:.1f}%) | Peak: +${peak_pnl:.2f} | Ratchet Floor: ${guaranteed_disp:.2f} | Mark: {mark_price:.5f}")
 
-    # Stop Loss & Hard Circuit Breaker (Tightened to 1R -$0.20 to -$0.25 USD Cap to guarantee 5X Asymmetric Edge):
+    # Stop Loss & Hard Circuit Breaker (Institutional Standard -$1.00 to -$1.25 USD Cap):
     now_ts = int(time.time())
     if is_hedge:
         is_stop_loss_hit = False
@@ -1921,11 +1939,12 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             # Dynamic Volatility-Adaptive Stop Loss ROI:
             # Sized with true 1.8x - 2.5x 15m ATR Volatility Cushion (equivalent to -1.5% to -2.8% price drop room)
             # giving real breathing room beyond microstructure random noise while keeping dollar risk bounded!
-            sl_roi_thresh = -min(22.0, max(12.0, curr_atr_pct * sl_mult * float(active_lev)))
-            sl_dollar_thresh = -max(0.60, bot_amt * 0.18)
+            sl_roi_thresh = -min(25.0, max(15.0, curr_atr_pct * sl_mult * float(active_lev)))
+            # 🛡️ INSTITUTIONAL STANDARD: Firmly clamp Stop Loss between -$1.00 and -$1.25 USDT
+            sl_dollar_thresh = -min(1.25, max(1.00, bot_amt * 0.12))
             raw_sl_hit = (
                 (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
-                (is_spot and (net_pnl_usdt <= -max(0.35, bot_amt * 0.025) or roi_pct <= -max(2.0, cushion_pct * 1.2)))
+                (is_spot and (net_pnl_usdt <= -1.25 or roi_pct <= -max(2.5, cushion_pct * 1.2)))
             )
 
             if raw_sl_hit:
@@ -1942,10 +1961,10 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             else:
                 is_stop_loss_hit = False
 
-        # Hard Circuit Breaker: Absolute emergency safety ceiling at -28.0% ROI or -$0.90 USD
+        # Hard Circuit Breaker: Absolute emergency safety ceiling clamped strictly at -$1.25 USD or -25.0% ROI
         is_hard_circuit_breaker = (
-            (not is_spot and (net_pnl_usdt <= -max(0.90, bot_amt * 0.25) or roi_pct <= -28.0)) or
-            (is_spot and (net_pnl_usdt <= -max(0.60, bot_amt * 0.04) or roi_pct <= -4.0))
+            (not is_spot and (net_pnl_usdt <= -1.25 or roi_pct <= -25.0)) or
+            (is_spot and (net_pnl_usdt <= -1.25 or roi_pct <= -4.0))
         )
 
     last_flip_key = f"{chat_id}_{symbol}"
@@ -2520,10 +2539,10 @@ async def monitor_turbo_hedge_bots(app):
                 if eval_side == "SKIP":
                     continue
 
-                # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 95.0% for Ultra-Tier)
+                # 🎯 1. Sniper High-Confluence Mode (Calibrated Confidence Gate >= 90.0% for Institutional Tier)
                 cand_conf = float(eval_res.get("confidence_pct", 0.0) or 0.0)
                 user_min_gate = float(db.get_system_setting(f"turbo_hedge_min_conf_{target_chat_id}", "0.0"))
-                min_conf_threshold = user_min_gate if user_min_gate >= 80.0 else (90.0 if is_recovery_mode else 88.0)
+                min_conf_threshold = user_min_gate if user_min_gate >= 85.0 else 90.0
                 if cand_conf < min_conf_threshold:
                     print(f"⚠️ [HIGH-VELOCITY SCANNER SKIP] {c_cand} AI Confidence ({cand_conf:.1f}%) < {min_conf_threshold}%. Skipping to next high-momentum coin!")
                     continue
@@ -2553,6 +2572,24 @@ async def monitor_turbo_hedge_bots(app):
                     print(f"🌟 [AI KELLY GOLDEN OPPORTUNITY ({cand_conf:.1f}%)] {c_cand}: Scaled position to ${actual_trade_amount:.2f} USDT ({kelly_mult}x multiplier) for maximum profit extraction!")
                 else:
                     print(f"⚡ [AI KELLY STANDARD TIER ({cand_conf:.1f}%)] {c_cand}: Allocated standard ${actual_trade_amount:.2f} USDT position.")
+
+                # 🛡️ 3. DAILY INSTITUTIONAL FREQUENCY CAP (Anti-Overtrading Shield - Max 5 Trades/24h):
+                daily_trade_cap = int(db.get_system_setting(f"daily_trade_cap_{target_chat_id}", "5"))
+                twenty_four_hours_ago = time.time() - 86400
+                day_trade_cnt = 0
+                try:
+                    conn_cnt = db.get_db_connection()
+                    c_cnt = conn_cnt.cursor()
+                    c_cnt.execute("SELECT COUNT(*) FROM trade_history WHERE chat_id = ? AND exit_time >= ?", (str(target_chat_id), twenty_four_hours_ago))
+                    row_cnt = c_cnt.fetchone()
+                    day_trade_cnt = row_cnt[0] if row_cnt else 0
+                    conn_cnt.close()
+                except Exception:
+                    day_trade_cnt = 0
+
+                if day_trade_cnt >= daily_trade_cap:
+                    print(f"🛡️ [DAILY FREQUENCY CAP] User {target_chat_id}: Executed {day_trade_cnt}/{daily_trade_cap} trades in last 24h. New entries paused to protect capital!")
+                    break
 
                 # ⏱️ 2. Staggered Entry Shield: Enforce 30-second delay between entries to prevent rapid-fire overtrading
                 now_t = time.time()

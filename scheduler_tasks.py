@@ -5265,19 +5265,19 @@ async def pre_pump_positions_monitor(app: Application):
 
                 atr_roi_threshold = -(atr_sl_pct * leverage)
 
-                if is_atr_breached or (roi_pct <= atr_roi_threshold) or (roi_pct < 0 and loss_dollar_est >= 1.80):
+                if is_atr_breached or (roi_pct <= atr_roi_threshold) or (roi_pct < 0 and loss_dollar_est >= 1.25):
                     should_close = True
-                    close_reason = f"Pre-Pump Dynamic ATR SL (ROI {roi_pct:.1f}%, Capped <= $1.80)"
+                    close_reason = f"Pre-Pump Dynamic ATR SL (ROI {roi_pct:.1f}%, Capped <= $1.25)"
                     badge_title = "🛑 **[PRE-PUMP DYNAMIC ATR SL EXIT]** 🛡️"
 
-                # 2. Breathing Breakeven Armor (lock at +3.5% ROI net floor once peak hits >= 10.0%)
-                elif curr_peak >= 10.0 and roi_pct <= 3.5:
+                # 2. Breathing Breakeven Armor (lock at +15.0% ROI net floor once peak hits >= 25.0%)
+                elif curr_peak >= 25.0 and roi_pct <= 15.0:
                     should_close = True
-                    close_reason = f"Pre-Pump Breakeven Armor (Peak +{curr_peak:.1f}%, Locked +3.5% Net Floor)"
+                    close_reason = f"Pre-Pump Breakeven Armor (Peak +{curr_peak:.1f}%, Locked +15.0% Net Floor)"
                     badge_title = "🛡️ **[PRE-PUMP BREAKEVEN ARMOR EXIT]** 🔒"
 
-                # 3. Golden 85% Ratchet (once peak hits >= 15.0%)
-                elif curr_peak >= 15.0 and roi_pct <= (curr_peak * 0.85):
+                # 3. Golden 85% Ratchet (once peak hits >= 25.0%)
+                elif curr_peak >= 25.0 and roi_pct <= (curr_peak * 0.85):
                     should_close = True
                     close_reason = f"Pre-Pump Golden 85% Ratchet (Peak +{curr_peak:.1f}%)"
                     badge_title = "💰 **[PRE-PUMP 85% PROFIT RATCHET]** 🏆"
