@@ -2357,36 +2357,40 @@ class CapitalAutonomousEngine:
     def get_session_priority_assets(self) -> List[str]:
         """
         Determines active tradable instruments based on global market hours (UTC+7 Phnom Penh):
-        - Monday to Friday (ចន្ទ ដល់ សុក្រ): 100% Full Priority on Real TradFi Markets (US500, GOLD, NVDA, TSLA prioritized):
-            * Asian / Daytime Session (07:00 - 15:00): US500, GOLD, OIL_CRUDE
-            * London Session (15:00 - 20:30): US500, GOLD, OIL_CRUDE, GERMANY40
-            * Wall Street NY Session (20:30 - 04:00): US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL_CRUDE
-        - Saturday & Sunday (សៅរ៍ និង អាទិត្យ 24/7): 100% Dedicated to 24/7 Crypto CFDs:
-            * BTCUSD, ETHUSD, SOLUSD (TradFi markets are closed)
+        - Monday to Friday: Full Priority on Real TradFi Markets + Institutional Kill Zones:
+            * Asian / Tokyo Kill Zone (00:00 - 07:00 UTC = 07:00 - 14:00 ICT): USDJPY, AUDUSD, NZDUSD, US500, GOLD, SILVER, GERMANY40, BTCUSD
+            * London Kill Zone (07:00 - 13:30 UTC = 14:00 - 20:30 ICT): EURUSD, GBPUSD, GERMANY40, US500, GOLD, US100, OIL_CRUDE, SILVER, NVDA
+            * Wall Street NY Session (13:30 - 20:45 UTC = 20:30 - 03:45 ICT): US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL_CRUDE, GERMANY40, BTCUSD
+            * Overnight Swap Shield Lull (20:45 - 23:59 UTC = 03:45 - 07:00 ICT): BTCUSD, ETHUSD, SOLUSD (TradFi paused to eliminate rollover swap drag)
+        - Saturday & Sunday (24/7): 100% Dedicated to 24/7 Crypto CFDs:
+            * BTCUSD, ETHUSD, SOLUSD (Zero-Swap & Weekend Gap Shield active on TradFi)
         """
         import datetime
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         weekday = now_dt.weekday()  # Monday = 0, Friday = 4, Saturday = 5, Sunday = 6
         hour_utc = now_dt.hour
+        utc_min = hour_utc * 60 + now_dt.minute
         
-        # TradFi weekend closure: Friday 21:00 UTC to Sunday 22:00 UTC (Saturday 04:00 to Monday 05:00 Phnom Penh)
-        is_weekend = (weekday == 5) or (weekday == 4 and hour_utc >= 21) or (weekday == 6 and hour_utc < 22)
+        # TradFi weekend closure: Friday 20:45 UTC to Sunday 22:00 UTC (Saturday 03:45 to Monday 05:00 Phnom Penh)
+        is_weekend = (weekday == 5) or (weekday == 4 and utc_min >= 1245) or (weekday == 6 and utc_min < 1320)
         
         if is_weekend:
             # 100% Dedicated to 24/7 Crypto CFDs on Weekends (TradFi markets closed)
             return ["BTCUSD", "ETHUSD", "SOLUSD"]
             
-        # Monday to Friday: 100% Full Priority on Real TradFi Markets (US500, GOLD, NVDA, TSLA prioritized first)
-        # Wall Street NY Session (13:30 - 21:00 UTC = 20:30 - 04:00 Phnom Penh)
-        # 100% Win-Rate Assets (US500, NVDA, TSLA, GOLD) given top execution slots
-        if 13 <= hour_utc < 21:
-            return ["US500", "GOLD", "NVDA", "TSLA", "US100", "GOOGL", "META", "OIL_CRUDE"]
-        # London Session (08:00 - 13:30 UTC = 15:00 - 20:30 Phnom Penh)
-        elif 8 <= hour_utc < 13:
-            return ["US500", "GOLD", "US100", "GERMANY40", "OIL_CRUDE", "SILVER", "NVDA"]
-        # Asian Session (00:00 - 08:00 UTC = 07:00 - 15:00 Phnom Penh)
+        # Monday to Friday: Institutional Kill Zones
+        # Wall Street NY Session (13:30 - 20:45 UTC = 20:30 - 03:45 Phnom Penh)
+        if 810 <= utc_min < 1245:
+            return ["US500", "GOLD", "NVDA", "TSLA", "US100", "GOOGL", "META", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
+        # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh)
+        elif 420 <= utc_min < 810:
+            return ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA"]
+        # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh)
+        elif 0 <= utc_min < 420:
+            return ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD"]
+        # Late Night Rollover Lull (20:45 - 23:59 UTC = 03:45 - 07:00 Phnom Penh): Zero-Swap Shield -> Crypto CFDs
         else:
-            return ["US500", "GOLD", "US100", "GERMANY40", "SILVER", "OIL_CRUDE"]
+            return ["BTCUSD", "ETHUSD", "SOLUSD"]
 
     def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
         """
@@ -2974,6 +2978,12 @@ class CapitalAutonomousEngine:
                 logger.debug(f"🛡️ [SMALL CAPITAL SHIELD] Skipping {cand_res_epic} for user {chat_id} (Budget: ${budget:.2f}, Avail: ${user_avail:.2f} < $100).")
                 continue
 
+            # Session-timed compatibility check for this specific asset under user's schedule mode
+            is_cand_allowed, cand_reason, _ = is_capital_trading_schedule_active(user_sched_mode, epic=cand_res_epic)
+            if not is_cand_allowed:
+                logger.debug(f"⏳ [SCHEDULE FILTER] Skipping {cand_res_epic} for user {chat_id}: {cand_reason}")
+                continue
+
             target_setup_tuple = cand
             break
 
@@ -3170,7 +3180,7 @@ class CapitalAutonomousEngine:
         chat_id = prop_user["chat_id"]
         # Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00 - 23:50 ICT vs 24/7 VIP Reset Mode)
         user_sched_mode = prop_user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
-        is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(user_sched_mode)
+        is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(user_sched_mode, epic=resolved_epic)
         if not is_sched_active:
             logger.debug(f"⏳ [CAPITAL SCHEDULE] Prop trader {chat_id} trade entry paused: {sched_reason}")
             return False
@@ -5815,60 +5825,162 @@ def get_capital_skynet_360_radar() -> CapitalSkyNet360Radar:
     return CAPITAL_SKYNET_360_RADAR
 
 
-def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI") -> Tuple[bool, str, Dict[str, Any]]:
+def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI", epic: str = "") -> Tuple[bool, str, Dict[str, Any]]:
     """
-    Evaluates whether Capital.com auto trading entries are active based on Cambodia Time (UTC+7 / ICT):
-    - Default Schedule: Monday to Friday from 07:00 AM to 11:50 PM (23:50) Cambodia Time (UTC+7).
-    - Standby Phase: From 23:50 to 07:00 ICT on weekdays, and all day Saturday & Sunday.
+    Evaluates whether Capital.com auto trading entries are active based on Cambodia Time (UTC+7 / ICT) & Global Kill Zones:
+    - Mode 1: Default Schedule (SCHEDULE_MON_FRI):
+      Monday to Friday from 07:00 AM to 11:50 PM (23:50) Cambodia Time (UTC+7).
+      Standby Phase: From 23:50 to 07:00 ICT on weekdays, and all day Saturday & Sunday.
       During Standby, new trade entries are paused while Breakeven Armor, SL & Trailing TP run 24/7.
-    - VIP 24/7 Override: If schedule_mode is '24/7' / 'RESET' / 'ALWAYS_ON', allows continuous trading 24/7.
+    - Mode 2: VIP 24/7 Override (24/7 / RESET / ALWAYS_ON):
+      Continuous trading 24/7 unrestricted across all open markets.
+    - Mode 3: Super Smart Session-Timed (SMART_SESSION_TIMED / SMART_SESSION / TIMED):
+      Aligns entries strictly with the 3 Institutional Kill Zones + Zero-Swap Shield + Weekend Crypto 24/7 Continuity:
+      * Tokyo/Asian Kill Zone (00:00 - 07:00 UTC / 07:00 - 14:00 ICT): SMC Liquidity Sweep & Mean Reversion (USDJPY, AUDUSD, NZDUSD, GOLD, US500).
+      * London Kill Zone (07:00 - 13:30 UTC / 14:00 - 20:30 ICT): 15m ORB + SMC FVG/Judas Swing (EURUSD, GBPUSD, GERMANY40, US500, GOLD, US100, OIL).
+      * New York Wall Street (13:30 - 20:45 UTC / 20:30 - 03:45 ICT): Apex Trend + SMC Order Blocks (US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL).
+      * Zero-Swap & Weekend Gap Shield: Friday after 20:45 UTC to Sunday 22:00 UTC strictly blocks TradFi entries to avoid 3-day rollover swap and weekend gap risk.
+      * Weekend Crypto Continuity: Crypto CFDs (BTCUSD, ETHUSD, SOLUSD) trade 24/7 continuously to steadily harvest spreads towards Tier 2/3/4 milestones.
     """
     import datetime
     
     mode_str = str(schedule_mode).upper().strip()
     is_247_mode = mode_str in ["24/7", "247", "RESET", "ALWAYS_ON", "CONTINUOUS", "ALL_TIME"]
+    is_smart_session = mode_str in [
+        "SMART_SESSION_TIMED", "SMART_SESSION", "SMART", "SESSION_TIMED", "TIMED", "SESSION", "SMART_TIMED"
+    ]
     
-    # Cambodia Time (ICT = UTC+7)
+    # Cambodia Time (ICT = UTC+7) & UTC
     ict_tz = datetime.timezone(datetime.timedelta(hours=7))
     now_ict = datetime.datetime.now(ict_tz)
-    weekday = now_ict.weekday()  # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
-    time_minutes = now_ict.hour * 60 + now_ict.minute
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    
+    weekday_ict = now_ict.weekday()  # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    time_minutes_ict = now_ict.hour * 60 + now_ict.minute
+    
+    weekday_utc = now_utc.weekday()
+    utc_min = now_utc.hour * 60 + now_utc.minute
     
     start_minutes = 7 * 60        # 07:00 AM (420 mins)
     end_minutes = 23 * 60 + 50    # 11:50 PM / 23:50 (1430 mins)
     
-    is_weekday = weekday in [0, 1, 2, 3, 4]  # Monday (0) to Friday (4)
-    is_time_window = start_minutes <= time_minutes < end_minutes
+    is_weekday = weekday_ict in [0, 1, 2, 3, 4]  # Monday (0) to Friday (4)
+    is_time_window = start_minutes <= time_minutes_ict < end_minutes
     
     weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     weekday_khmer = ["ចន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍", "អាទិត្យ"]
     
-    current_day_str = weekday_names[weekday]
-    current_day_kh = weekday_khmer[weekday]
+    current_day_str = weekday_names[weekday_ict]
+    current_day_kh = weekday_khmer[weekday_ict]
     current_time_str = now_ict.strftime("%H:%M:%S ICT")
     
+    # TradFi Weekend Gap & 3-Day Rollover Swap Lockout:
+    # Friday 20:45 UTC (1245 mins / 03:45 Sat ICT) to Sunday 22:00 UTC (1320 mins / 05:00 Mon ICT)
+    is_tradfi_weekend = (
+        (weekday_utc == 5) or 
+        (weekday_utc == 4 and utc_min >= 1245) or 
+        (weekday_utc == 6 and utc_min < 1320)
+    )
+    
+    # Determine Active Institutional Kill Zone
+    if is_tradfi_weekend:
+        current_session = "WEEKEND_CRYPTO_CONTINUITY"
+        session_name_kh = "🪙 ចុងសប្តាហ៍ Crypto 24/7 (TradFi Standby)"
+        session_name_en = "🪙 Weekend Crypto Continuity 24/7 (TradFi Gap Shield)"
+    elif 0 <= now_utc.hour < 7:  # 00:00 - 07:00 UTC = 07:00 - 14:00 ICT
+        current_session = "TOKYO_ASIAN"
+        session_name_kh = "🇯🇵 Tokyo/Asian Kill Zone (07:00-14:00 ICT)"
+        session_name_en = "🇯🇵 Tokyo/Asian Kill Zone (07:00-14:00 ICT)"
+    elif 420 <= utc_min < 810:  # 07:00 - 13:30 UTC = 14:00 - 20:30 ICT
+        current_session = "LONDON"
+        session_name_kh = "🇬🇧 London Kill Zone (14:00-20:30 ICT)"
+        session_name_en = "🇬🇧 London Kill Zone (14:00-20:30 ICT)"
+    elif 810 <= utc_min < 1245:  # 13:30 - 20:45 UTC = 20:30 - 03:45 ICT
+        current_session = "NEW_YORK"
+        session_name_kh = "🇺🇸 New York Wall Street (20:30-03:45 ICT)"
+        session_name_en = "🇺🇸 New York Wall Street (20:30-03:45 ICT)"
+    else:  # 20:45 - 23:59 UTC = 03:45 - 07:00 ICT (Overnight Rollover Lull)
+        current_session = "SWAP_SHIELD_CRYPTO"
+        session_name_kh = "🛡️ Rollover Swap Shield (Crypto 24/7 Active)"
+        session_name_en = "🛡️ Rollover Swap Shield (Crypto 24/7 Active)"
+        
+    epic_upper = str(epic).upper().strip() if epic else ""
+    is_crypto_asset = any(c in epic_upper for c in ["BTC", "ETH", "SOL"])
+
     info = {
-        "schedule_mode": "24/7" if is_247_mode else "SCHEDULE_MON_FRI",
+        "schedule_mode": (
+            "24/7" if is_247_mode 
+            else ("SMART_SESSION_TIMED" if is_smart_session else "SCHEDULE_MON_FRI")
+        ),
         "now_ict": current_time_str,
         "weekday": current_day_str,
         "weekday_kh": current_day_kh,
         "is_weekday": is_weekday,
         "is_within_time_window": is_time_window,
+        "current_session": current_session,
+        "session_name_kh": session_name_kh,
+        "session_name_en": session_name_en,
+        "is_tradfi_weekend": is_tradfi_weekend,
         "start_time": "07:00 ICT",
         "end_time": "23:50 ICT",
-        "is_247_override": is_247_mode
+        "is_247_override": is_247_mode,
+        "is_smart_session": is_smart_session
     }
-    
+
+    # 1. VIP 24/7 Mode
     if is_247_mode:
         return True, "24/7 Continuous Mode Active (VIP Reset)", info
-    
+
+    # 2. Super Smart Session-Timed Mode
+    if is_smart_session:
+        # Crypto CFDs trade 24/7 continuously across all sessions and on weekends
+        if is_crypto_asset:
+            return True, f"Crypto CFD 24/7 Continuous Active ({session_name_en})", info
+            
+        # If TradFi Weekend Gap Shield is active, block new TradFi entries
+        if is_tradfi_weekend:
+            if epic:
+                return False, f"TradFi Weekend Gap Shield Active ({session_name_en} | Protected until Monday 05:00 ICT)", info
+            # If no epic specified, general engine is active because Crypto CFDs are tradeable
+            return True, f"Smart Session Timed ({session_name_en})", info
+
+        # Rollover Swap Shield (03:45 - 07:00 ICT): Block TradFi to avoid high overnight swap charges
+        if current_session == "SWAP_SHIELD_CRYPTO":
+            if epic:
+                return False, f"TradFi Rollover Swap Shield Active (03:45-07:00 ICT | Blocked to eliminate financing drag)", info
+            return True, f"Smart Session Timed ({session_name_en})", info
+
+        # Session-specific asset compatibility for TradFi assets
+        if epic:
+            if current_session == "TOKYO_ASIAN":
+                # Tokyo/Asian Focus: USDJPY, AUDUSD, NZDUSD, GOLD, SILVER, US500
+                tokyo_allowed = ["USDJPY", "AUDUSD", "NZDUSD", "GOLD", "SILVER", "US500", "SP500"]
+                if any(k in epic_upper for k in tokyo_allowed):
+                    return True, f"Tokyo Kill Zone Active for {epic}", info
+                return False, f"Asset {epic} outside Tokyo Kill Zone (Opens London 14:00 / NY 20:30 ICT)", info
+                
+            elif current_session == "LONDON":
+                # London Focus: EURUSD, GBPUSD, GERMANY40, DAX, US500, GOLD, US100, OIL, SILVER
+                london_allowed = ["EURUSD", "GBPUSD", "GERMANY40", "DAX", "US500", "SP500", "GOLD", "US100", "OIL", "SILVER"]
+                if any(k in epic_upper for k in london_allowed):
+                    return True, f"London Kill Zone Active for {epic}", info
+                return False, f"Asset {epic} outside London Kill Zone (Opens NY 20:30 ICT)", info
+
+            elif current_session == "NEW_YORK":
+                # New York Peak Session: US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL, GERMANY40
+                return True, f"New York Wall Street Active for {epic}", info
+
+        # General engine check without epic: Always True in SMART_SESSION_TIMED
+        return True, f"Smart Session Timed ({session_name_en})", info
+
+    # 3. Standard SCHEDULE_MON_FRI
     if is_weekday and is_time_window:
         return True, f"Active Window ({current_day_str} {current_time_str} | 07:00-23:50 ICT)", info
     
     if not is_weekday:
-        return False, f"Weekend Standby ({current_day_str} {current_time_str} | Active Mon-Fri 07:00-23:50 ICT. Type /capital RESET for 24/7)", info
+        return False, f"Weekend Standby ({current_day_str} {current_time_str} | Active Mon-Fri 07:00-23:50 ICT. Type /capital RESET or /capital SMART_SESSION)", info
     
-    return False, f"Night Standby ({current_time_str} | Resumes 07:00 ICT. Type /capital RESET for 24/7)", info
+    return False, f"Night Standby ({current_time_str} | Resumes 07:00 ICT. Type /capital RESET or /capital SMART_SESSION)", info
 
 async def run_capital_auto_cycle(app=None):
     """Entry point for APScheduler in scheduler_tasks.py."""

@@ -6343,6 +6343,14 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["RESET"]
                 await capital_command(update, context)
+            elif data in ["btn_cap_smart_session", "btn_cap_smart", "btn_cap_timed", "btn_cap_session"]:
+                db.set_capital_schedule_mode(chat_id, "SMART_SESSION_TIMED")
+                try:
+                    await update.callback_query.answer("🎯 Capital Auto: បានកំណត់ Super Smart Session-Timed (Kill Zones + Crypto 24/7)!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["SMART_SESSION"]
+                await capital_command(update, context)
             elif data in ["btn_cap_schedule_monfri", "btn_cap_schedule", "btn_cap_mon_fri"]:
                 db.set_capital_schedule_mode(chat_id, "SCHEDULE_MON_FRI")
                 try:
@@ -6351,6 +6359,11 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["SCHEDULE"]
                 await capital_command(update, context)
+            elif data in ["btn_cap_swap_shield_info", "btn_cap_swap_shield"]:
+                try:
+                    await update.callback_query.answer("🛡️ Zero-Swap Shield: ផ្អាក TradFi យប់ថ្ងៃសុក្រ ដល់ ចន្ទ ដើម្បីកាត់បន្ថយ Swap ៣ថ្ងៃ & Gap Risk! Crypto CFDs បន្តកើប Spread ២៤/៧!", show_alert=True)
+                except Exception:
+                    pass
             elif data == "btn_cap_req_verify":
                 try:
                     await update.callback_query.answer("✅ បានផ្ញើសំណើផ្ទៀងផ្ទាត់ទៅកាន់ Super Admin រួចរាល់!", show_alert=True)
@@ -24406,6 +24419,8 @@ class TelegramBotThread(BaseThread):
                     args = ["AUTO", "STATUS"]
                 elif args[0].upper() not in ["AUTO"]:
                     args = ["AUTO"] + args
+            elif cmd_text in ["capital_smart_session", "capitalsmartsession", "smart_session", "smartsession"]:
+                args = ["SMART_SESSION"]
             elif cmd_text in ["capital_leadlag", "capitalleadlag", "leadlag"]:
                 await capital_leadlag_command(update, context)
                 return
@@ -24741,6 +24756,66 @@ class TelegramBotThread(BaseThread):
                     await update.effective_message.reply_text(sched_msg, parse_mode="Markdown", reply_markup=sched_kb)
                     return
 
+                elif action in ["SMART_SESSION", "SMARTSESSION", "SMART_SESSION_TIMED", "TIMED", "SESSION", "SMART"]:
+                    db.set_capital_schedule_mode(chat_id, "SMART_SESSION_TIMED")
+                    is_active_sched, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active("SMART_SESSION_TIMED")
+                    sess_kh = sched_dict.get("session_name_kh", "Kill Zones + Crypto 24/7")
+                    sess_en = sched_dict.get("session_name_en", "Kill Zones + Crypto 24/7")
+
+                    smart_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("⏰ ចន្ទ-សុក្រ (Mon-Fri)", callback_data="btn_cap_schedule_monfri"),
+                            InlineKeyboardButton("🔄 24/7 Reset Mode", callback_data="btn_cap_reset_247")
+                        ],
+                        [
+                            InlineKeyboardButton("🤖 Capital Auto", callback_data="btn_cap_auto_toggle"),
+                            InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                        ]
+                    ])
+                    smart_msg = (
+                        f"🎯 **CAPITAL.COM SUPER SMART SESSION-TIMED ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ **របៀបប្រតិបត្តិការ ៖** `Super Smart វិនិយោគតាមម៉ោង/វេនទីផ្សារ`\n"
+                        f"📶 **វេនទីផ្សារបច្ចុប្បន្ន ៖** `{sess_kh}`\n"
+                        f"⏰ **ម៉ោងបច្ចុប្បន្ន ៖** `{sched_dict.get('weekday_kh', '')} {sched_dict.get('now_ict', '')}`\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"🏛️ **INSTITUTIONAL 3 KILL ZONES MATRIX ៖**\n"
+                        f"• 🇯🇵 **Tokyo / Asian (07:00-14:00 ICT) ៖**\n"
+                        f"  `USDJPY, AUDUSD, NZDUSD, GOLD, US500` (Liquidity Sweep & Mean Reversion)\n"
+                        f"• 🇬🇧 **London Fix (14:00-20:30 ICT) ៖**\n"
+                        f"  `EURUSD, GBPUSD, GERMANY40, US500, GOLD, US100` (15m ORB + SMC FVG)\n"
+                        f"• 🇺🇸 **Wall Street NY (20:30-03:45 ICT) ៖**\n"
+                        f"  `US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL` (Apex Trend + SMC OB)\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"🛡️ **ZERO-SWAP & WEEKEND GAP SHIELD ៖**\n"
+                        f"• **សុក្រ 03:45 ព្រឹក ដល់ ចន្ទ 05:00 ព្រឹក ICT ៖** ផ្អាកចូល TradFi ដាច់ខាត (ការពារ Swap ៣ថ្ងៃ & Gap Risk)\n"
+                        f"• 🪙 **Crypto CFDs (BTC, ETH, SOL) ៖** ដំណើរការ ២៤/៧ ជាប់រហូត គ្មានថ្ងៃឈប់សម្រាកដើម្បីកើប Spread សម្រេច Tier 2/3/4!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _បញ្ជាប្តូរ ៖_ `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``"
+                    ) if user_lang == 'khmer' else (
+                        f"🎯 **CAPITAL.COM SUPER SMART SESSION-TIMED ACTIVATED!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ **Operating Mode:** `Super Smart Session-Timed (Institutional Kill Zones)`\n"
+                        f"📶 **Current Session:** `{sess_en}`\n"
+                        f"⏰ **Local Time:** `{sched_dict.get('weekday', '')} {sched_dict.get('now_ict', '')}`\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"🏛️ **INSTITUTIONAL 3 KILL ZONES MATRIX:**\n"
+                        f"• 🇯🇵 **Tokyo / Asian (07:00-14:00 ICT):**\n"
+                        f"  `USDJPY, AUDUSD, NZDUSD, GOLD, US500` (SMC Liquidity Sweep)\n"
+                        f"• 🇬🇧 **London Fix (14:00-20:30 ICT):**\n"
+                        f"  `EURUSD, GBPUSD, GERMANY40, US500, GOLD, US100` (15m ORB + FVG)\n"
+                        f"• 🇺🇸 **Wall Street NY (20:30-03:45 ICT):**\n"
+                        f"  `US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL` (Apex Trend + SMC OB)\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"🛡️ **ZERO-SWAP & WEEKEND GAP SHIELD:**\n"
+                        f"• **Fri 20:45 UTC to Sun 22:00 UTC:** TradFi entries locked (Protects 3-day swap rollover & weekend gaps)\n"
+                        f"• 🪙 **Crypto CFDs (BTC, ETH, SOL):** Active 24/7 non-stop to accumulate institutional spread rebates!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _Switch Modes:_ `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``"
+                    )
+                    await update.effective_message.reply_text(smart_msg, parse_mode="Markdown", reply_markup=smart_kb)
+                    return
+
             # Auto config & status
             is_auto_on = db.is_capital_auto_enabled(chat_id)
             auto_cfg = db.get_capital_auto_config(chat_id)
@@ -24755,14 +24830,23 @@ class TelegramBotThread(BaseThread):
             is_spread_on = db.is_capital_spread_guard_enabled(chat_id)
             spread_btn_text = "🛡️ Spread Guard: ON 🟢" if is_spread_on else "🛡️ Spread Guard: OFF ⚪"
 
+            sched_mode = auto_cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
+            btn_smart_text = "🎯 Smart Session ✅" if sched_mode in ["SMART_SESSION_TIMED", "SMART_SESSION", "TIMED", "SESSION", "SMART"] else "🎯 Smart Session"
+            btn_monfri_text = "⏰ ចន្ទ-សុក្រ ✅" if sched_mode == "SCHEDULE_MON_FRI" else "⏰ ចន្ទ-សុក្រ (Mon-Fri)"
+            btn_247_text = "🔄 24/7 Mode ✅" if sched_mode in ["24/7", "247", "RESET", "ALWAYS_ON"] else "🔄 24/7 Mode"
+
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle"),
                     InlineKeyboardButton(leadlag_btn_text, callback_data="btn_cap_leadlag_toggle")
                 ],
                 [
-                    InlineKeyboardButton("🔄 Reset / 24/7 Mode", callback_data="btn_cap_reset_247"),
-                    InlineKeyboardButton("⏰ Mon-Fri (7am-11:50pm)", callback_data="btn_cap_schedule_monfri")
+                    InlineKeyboardButton(btn_smart_text, callback_data="btn_cap_smart_session"),
+                    InlineKeyboardButton(btn_monfri_text, callback_data="btn_cap_schedule_monfri")
+                ],
+                [
+                    InlineKeyboardButton(btn_247_text, callback_data="btn_cap_reset_247"),
+                    InlineKeyboardButton("🛡️ Zero-Swap Shield", callback_data="btn_cap_swap_shield_info")
                 ],
                 [
                     InlineKeyboardButton(orb_btn_text, callback_data="btn_cap_orb_toggle"),
@@ -25196,9 +25280,12 @@ class TelegramBotThread(BaseThread):
             # Schedule Status Badge
             sched_mode = auto_cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
             is_sched_active, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active(sched_mode)
-            if sched_mode == "24/7":
+            if sched_mode in ["24/7", "247", "RESET", "ALWAYS_ON"]:
                 sched_badge_kh = "🔄 24/7 Continuous (RESET Mode 🟢)"
                 sched_badge_en = "🔄 24/7 Continuous (RESET Mode 🟢)"
+            elif sched_mode in ["SMART_SESSION_TIMED", "SMART_SESSION", "TIMED", "SESSION", "SMART"]:
+                sched_badge_kh = f"🎯 Smart Session 🟢 ({sched_dict.get('session_name_kh', 'Kill Zones + Crypto 24/7')})"
+                sched_badge_en = f"🎯 Smart Session 🟢 ({sched_dict.get('session_name_en', 'Kill Zones + Crypto 24/7')})"
             elif is_sched_active:
                 sched_badge_kh = f"🟢 OPEN ({sched_dict.get('weekday_kh', 'ចន្ទ-សុក្រ')} 07:00-23:50 ICT)"
                 sched_badge_en = f"🟢 OPEN ({sched_dict.get('weekday', 'Mon-Fri')} 07:00-23:50 ICT)"
@@ -25247,7 +25334,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle) ៖** កាត់បន្ថយ Spread Drag មកត្រឹម <= 10%\n"
                     f"• **Kelly Sizer ($f^*) ៖** គណនា Lot ល្អបំផុតកាត់បន្ថយ Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET_DAILY` `` | `` `/capital SCHEDULE` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -25294,7 +25381,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle):** Limits spread drag to <= 10%\n"
                     f"• **Kelly Sizer ($f^*$) :** Optimal mathematical lot scaling\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET_DAILY` `` | `` `/capital SCHEDULE` ``\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -25800,6 +25887,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capitalcom", capital_command))
         self.app.add_handler(CommandHandler("capital_auto", capital_command))
         self.app.add_handler(CommandHandler("capitalauto", capital_command))
+        self.app.add_handler(CommandHandler("capital_smart_session", capital_command))
+        self.app.add_handler(CommandHandler("capitalsmartsession", capital_command))
+        self.app.add_handler(CommandHandler("smart_session", capital_command))
+        self.app.add_handler(CommandHandler("smartsession", capital_command))
         self.app.add_handler(CommandHandler("capital_leadlag", capital_leadlag_command))
         self.app.add_handler(CommandHandler("capitalleadlag", capital_leadlag_command))
         self.app.add_handler(CommandHandler("leadlag", capital_leadlag_command))
