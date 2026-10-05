@@ -1695,8 +1695,8 @@ def run_audit():
             log_fail("Angkor Institutional Private Agreement (Invariant 50) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 50 check failed: {e}")
-    # [CHECK 41/41] Verifying Hugging Face Ultra-Fast Multi-Tiered Storage & Nanosecond RAM Citadel Lock (Invariant 51)...
-    print("\n[CHECK 41/41] Verifying Hugging Face Ultra-Fast Multi-Tiered Storage & Nanosecond RAM Citadel Lock (Invariant 51)...")
+    # [CHECK 41/42] Verifying Hugging Face Ultra-Fast Multi-Tiered Storage & Nanosecond RAM Citadel Lock (Invariant 51)...
+    print("\n[CHECK 41/42] Verifying Hugging Face Ultra-Fast Multi-Tiered Storage & Nanosecond RAM Citadel Lock (Invariant 51)...")
     try:
         import hf_storage_engine as hse
 
@@ -1757,6 +1757,88 @@ def run_audit():
             log_fail("Hugging Face Ultra-Fast Multi-Tiered Storage (Invariant 51) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 51 check failed: {e}")
+        log_fail(str(e))
+
+    # [CHECK 42/42] Verifying Capital.com Sky Net 360° Daily Capital Governor & Target Lock (Invariant 52)...
+    print("\n[CHECK 42/42] Verifying Capital.com Sky Net 360° Daily Capital Governor & Target Lock (Invariant 52)...")
+    try:
+        import portfolio_circuit_breaker as pcb
+        import capital_engine as ce
+
+        # 1. Ground truth in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv52 = "Invariant 52: Capital.com Sky Net 360° Daily Capital Governor & Target Lock" in agents_md
+
+        # 2. Key classes & singletons
+        has_gov_class = hasattr(pcb, "CapitalDailyAGIGovernor")
+        has_gov_singleton = hasattr(pcb, "CAPITAL_DAILY_GOVERNOR")
+        has_gov_getter = hasattr(pcb, "get_capital_daily_governor")
+
+        has_radar_class = hasattr(ce, "CapitalSkyNet360Radar")
+        has_radar_getter = hasattr(ce, "get_capital_skynet_360_radar")
+
+        gov = pcb.get_capital_daily_governor()
+        radar = ce.get_capital_skynet_360_radar()
+
+        # 3. Functional Governor Test: Target Lock (+5.0%) and Loss Floor (-2.5%)
+        test_uid = 99999901
+        gov.set_daily_baseline(test_uid, 1000.0)
+        
+        # Test Normal State (+2.0%)
+        st_norm = gov.update_and_check(test_uid, 1020.0)
+        is_normal_ok = st_norm.get("state") == "NORMAL" and st_norm.get("can_trade") is True
+
+        # Test +5% Target Lock (+5.5%)
+        st_win = gov.update_and_check(test_uid, 1055.0)
+        is_win_lock_ok = st_win.get("state") == "TARGET_LOCKED" and st_win.get("can_trade") is False
+
+        # Test Manual Reset
+        gov.reset_daily_governor(test_uid, 1000.0)
+        st_after_reset = gov.get_user_status(test_uid, 1000.0)
+        is_reset_ok = st_after_reset.get("state") == "NORMAL" and st_after_reset.get("can_trade") is True
+
+        # Test -2.5% Loss Floor (-3.0%)
+        st_loss = gov.update_and_check(test_uid, 970.0)
+        is_loss_floor_ok = st_loss.get("state") == "FLOOR_HIT" and st_loss.get("can_trade") is False
+
+        # Clean up test user
+        import database as db
+        today_str = gov.get_today_str()
+        db.update_system_setting(f"cap_daily_start_eq_{test_uid}_{today_str}", "")
+        db.update_system_setting(f"cap_daily_lock_{test_uid}_{today_str}", "")
+
+        # 4. Functional Radar Test: 360 Pre-flight assessment
+        readiness = radar.check_trade_readiness(
+            user_id=12345,
+            symbol="GOLD",
+            side="BUY",
+            current_price=2750.0,
+            spread_pct=0.0002,
+            rsi_15m=50.0
+        )
+        is_radar_ok = isinstance(readiness, dict) and "passed" in readiness and "checks" in readiness and len(readiness["checks"]) == 7
+
+        # 5. Telegram UI integration
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        has_reset_handler = "RESET_DAILY" in bt_code or "GOVERNOR_RESET" in bt_code
+        has_gov_badge = "Sky Net 360" in bt_code or "gov_badge" in bt_code
+
+        all_inv52_passed = (
+            has_inv52 and has_gov_class and has_gov_singleton and has_gov_getter and
+            has_radar_class and has_radar_getter and
+            is_normal_ok and is_win_lock_ok and is_reset_ok and is_loss_floor_ok and
+            is_radar_ok and has_reset_handler and has_gov_badge
+        )
+
+        if all_inv52_passed:
+            log_pass("Capital.com Sky Net 360° Daily Capital Governor & Target Lock (Invariant 52) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 52 check failed: inv52={has_inv52}, gov={has_gov_class}, radar={has_radar_class}, win_lock={is_win_lock_ok}, floor={is_loss_floor_ok}, radar_ok={is_radar_ok}, ui={has_reset_handler}")
+            log_fail("Capital.com Sky Net 360° Daily Capital Governor (Invariant 52) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 52 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

@@ -24422,6 +24422,22 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_ib_command(update, context)
                     return
+                elif action in ["RESET_DAILY", "RESETDAILY", "GOVERNOR_RESET", "RESET_GOVERNOR"]:
+                    import portfolio_circuit_breaker
+                    bal_info = await asyncio.to_thread(capital_engine.get_user_capital_engine(chat_id).get_account_balance)
+                    user_live_bal = float(bal_info.get("balance", 1000.0))
+                    portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, user_live_bal)
+                    res_msg = (
+                        f"🔄 **SKY NET 360° DAILY GOVERNOR RESET!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ _កុងតាក់ចាក់សោរប្រចាំថ្ងៃត្រូវបាន Reset ជោគជ័យ! ទុនដើមថ្ងៃត្រូវបានកំណត់ឡើងវិញស្មើ ${user_live_bal:,.2f} USD។ ម៉ាស៊ីនរួចរាល់សម្រាប់ការវិនិយោគបន្ត!_"
+                    ) if user_lang == 'khmer' else (
+                        f"🔄 **SKY NET 360° DAILY GOVERNOR RESET!** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"✅ _Daily Governor lock cleared! Daily baseline recalibrated to ${user_live_bal:,.2f} USD. Ready for trading!_"
+                    )
+                    await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                    return
                 elif action in ["API", "VAULT", "KEY", "KEYS", "CREDENTIALS", "CREDS"]:
                     sub_args = args[1:]
                     has_creds = db.has_user_capital_credentials(chat_id)
@@ -25147,6 +25163,22 @@ class TelegramBotThread(BaseThread):
             except Exception:
                 pass
 
+            # Pillar 6: Sky Net 360° Daily Capital Governor
+            gov_badge = "ACTIVE 🟢 (Target: +5.0%)"
+            try:
+                import portfolio_circuit_breaker
+                user_bal_flt = float(data.get('balance', 1000.0))
+                gt = portfolio_circuit_breaker.CapitalDailyAGIGovernor.get_daily_telemetry(chat_id, user_bal_flt)
+                g_pnl_pct = gt.get("daily_pnl_pct", 0.0)
+                if gt.get("is_target_locked"):
+                    gov_badge = f"🏆 TARGET LOCKED (+{g_pnl_pct:.2f}% | Paused to Bank Profits)"
+                elif gt.get("is_loss_locked"):
+                    gov_badge = f"🛡️ LOSS FLOOR LOCKED ({g_pnl_pct:.2f}% | Capital Preserved)"
+                else:
+                    gov_badge = f"ACTIVE 🟢 (+{g_pnl_pct:.2f}% / +5.0% Goal)"
+            except Exception:
+                pass
+
             # Schedule Status Badge
             sched_mode = auto_cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
             is_sched_active, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active(sched_mode)
@@ -25188,11 +25220,12 @@ class TelegramBotThread(BaseThread):
                     f"🏢 **Wall St Stocks ៖** Meta: `{meta_p}` | Google: `{googl_p}`\n"
                     f"🪙 **Crypto (ចុងសប្តាហ៍ 24/7) ៖** BTC: `{btc_p}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🏛️ **APEX QUANT 5 PILLARS (Wall Street Guard) ៖**\n"
+                    f"🏛️ **APEX QUANT 6 PILLARS (Wall Street Guard) ៖**\n"
                     f"• **Pillar 1 Red Folder ៖** `{ec_badge}` (30m Pre / 15m Post CPI/NFP)\n"
                     f"• **Pillar 2 Earnings Shield ៖** `ACTIVE 🟢 (48h Pre-Earnings Anti-Gap)`\n"
                     f"• **Pillar 4 TIPS Real Yield ៖** `{ry_badge}`\n"
                     f"• **Pillar 5 Portfolio Breaker ៖** `{cb_badge}`\n"
+                    f"• **Pillar 6 Sky Net 360° Governor ៖** `{gov_badge}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🛡️ **ប្រព័ន្ធការពារដើមទុនស្ថាប័ន (Zero Negligence) ៖**\n"
                     f"• **Breakeven Armor ៖** ចាក់សោ SL ពេលចំណេញ +4.8% ROI\n"
@@ -25200,7 +25233,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle) ៖** កាត់បន្ថយ Spread Drag មកត្រឹម <= 10%\n"
                     f"• **Kelly Sizer ($f^*) ៖** គណនា Lot ល្អបំផុតកាត់បន្ថយ Drawdown\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET` `` | `` `/capital SCHEDULE` ``\n"
+                    f"💡 **គំរូបញ្ជា Auto ៖** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET_DAILY` `` | `` `/capital SCHEDULE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"
@@ -25234,11 +25267,12 @@ class TelegramBotThread(BaseThread):
                     f"🏢 **Wall St Equities:** Meta: `{meta_p}` | Google: `{googl_p}`\n"
                     f"🪙 **Crypto (Weekend 24/7):** BTC: `{btc_p}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🏛️ **APEX QUANT 5 PILLARS (Wall Street Guard):**\n"
+                    f"🏛️ **APEX QUANT 6 PILLARS (Wall Street Guard):**\n"
                     f"• **Pillar 1 Red Folder:** `{ec_badge}` (30m Pre / 15m Post CPI/NFP)\n"
                     f"• **Pillar 2 Earnings Shield:** `ACTIVE 🟢 (48h Pre-Earnings Anti-Gap)`\n"
                     f"• **Pillar 4 TIPS Real Yield:** `{ry_badge}`\n"
                     f"• **Pillar 5 Portfolio Breaker:** `{cb_badge}`\n"
+                    f"• **Pillar 6 Sky Net 360° Governor:** `{gov_badge}`\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🛡️ **Institutional Capital Protection (Zero Negligence):**\n"
                     f"• **Breakeven Armor:** Locks SL at entry on +4.8% ROI\n"
@@ -25246,7 +25280,7 @@ class TelegramBotThread(BaseThread):
                     f"• **Spread Guard (10x Hurdle):** Limits spread drag to <= 10%\n"
                     f"• **Kelly Sizer ($f^*$) :** Optimal mathematical lot scaling\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET` `` | `` `/capital SCHEDULE` ``\n"
+                    f"💡 **Auto Commands:** `` `/capital AUTO ON 50 5` `` | `` `/capital RESET_DAILY` `` | `` `/capital SCHEDULE` ``\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"_Angkor Quant_\n"
                     f"_APEX SUPER BRAIN AI_\n"

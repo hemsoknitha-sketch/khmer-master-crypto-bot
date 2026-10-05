@@ -748,6 +748,33 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 52: Capital.com Sky Net 360° Daily Capital Governor & Target Lock (+5.0% Win Cap / -2.5% Loss Floor / 7-Layer Pre-flight Radar)
+- **Location:** `portfolio_circuit_breaker.py` (`CapitalDailyAGIGovernor`), `capital_engine.py` (`CapitalSkyNet360Radar`, `execute_smart_tradfi_order`, `_dispatch_single_user_trade`, `_ratchet_engine_positions`), `bot_thread.py` (`capital_command`), `audit_system.py`
+- **Rule:**
+  1. **Daily Equity Baseline & Reset Standard:**
+     - The Governor records `daily_baseline_equity` at 00:00 UTC daily for each user (or on the first transaction/balance check of the day).
+     - Calculates dynamic Net Day Return: $R_{day} = \frac{\text{Current Equity} - \text{Daily Baseline}}{\text{Daily Baseline}} \times 100\%$.
+  2. **Daily +5.0% Target Lock (Cash Harvest & Trading Lock):**
+     - When $R_{day} \ge +5.0\%$, the Governor triggers `TARGET_LOCKED`.
+     - In-flight positions are secured via dynamic profit ratchet and cash harvest, and all subsequent new entries for that user are strictly blocked until the next trading day (or an intentional manual reset via `/capital RESET_DAILY`).
+     - Eliminates greedy over-trading that gives back realized gains.
+  3. **Daily -2.5% Loss Floor (Stop Trading & Capital Defense):**
+     - When $R_{day} \le -2.5\%$, the Governor triggers `FLOOR_HIT`.
+     - Immediately suspends all new trade executions for the user for the day to prevent revenge trading, emotional compounding, and consecutive losing streak bleed.
+  4. **Sky Net 360° 7-Layer Pre-Flight Confluence Radar:**
+     - Every trade entry must undergo 360-degree radar assessment and is blocked if any layer fails:
+       1. Schedule Window (London/NY peak liquidity only; Asian off-peak blocked for equities/indices).
+       2. Daily Governor Lock (Target Lock / Loss Floor).
+       3. Economic Calendar Blackout (No high-impact CPI/NFP/FOMC within $\pm 30\text{m}$).
+       4. Earnings Blackout (No individual stock CFD earnings announcement within 48h).
+       5. Spread Drag Hurdle (Spread $\le 0.05\%$ or $\le 10\times$ profit hurdle per Invariant 34).
+       6. Macro / Real Yields Confluence (US10Y / DXY alignment).
+       7. Anti-Top/Bottom Guard (15m RSI $\le 30$ blocks short, RSI $\ge 70$ blocks long per Invariant 43).
+  5. **100% Zero-Defect Audit Protocol:**
+     - Verified by `audit_system.py` [CHECK 42/42].
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.

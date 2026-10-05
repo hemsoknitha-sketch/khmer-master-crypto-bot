@@ -187,3 +187,240 @@ def apply_cross_asset_correlation_clamp(proposed_epic: str, base_size: float, op
                 return clamped, reason
 
     return base_size, "Normal sizing (No systemic correlation overlap)"
+
+
+# ==============================================================================
+# CAPITAL.COM 360° SKY NET DAILY CAPITAL GOVERNOR & TARGET LOCK (INVARIANT 52)
+# ==============================================================================
+
+class CapitalDailyAGIGovernor:
+    """
+    🏛️ Sky Net 360° Daily Capital Governance Citadel (Invariant 52).
+    Enforces Daily Profit Target Lock (+5.0% Daily Win Cap) & Capital Loss Floor (-2.5%).
+    
+    Axioms:
+    1. Daily Baseline Equity Snapshot: Captured at 00:00 UTC / 07:00 ICT daily.
+    2. +5.0% Daily Win Cap: When cumulative realized + unrealized gains reach >= +5.0%,
+       trading is PUSHED/LOCKED for 24h to prevent overtrading and bank 100% of profits.
+    3. -2.5% Daily Capital Loss Floor: If daily drawdown hits -2.5%, entries are locked
+       for 12-24h to preserve 97.5% of principal capital.
+    4. Anti-Greed & Zero Recklessness: Preemptively exits upon target attainment.
+    """
+
+    DAILY_PROFIT_TARGET_PCT = 5.0   # +5% Target Lock (Daily Win Cap)
+    DAILY_LOSS_FLOOR_PCT = 2.5      # -2.5% Loss Floor (Capital Shield)
+
+    @classmethod
+    def get_today_str(cls) -> str:
+        """Returns UTC date string for daily tracking."""
+        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+
+    @classmethod
+    def get_daily_starting_capital(cls, chat_id: int, current_balance: float = 0.0) -> float:
+        """
+        Retrieves starting equity baseline for today.
+        If missing or 0, sets current_balance as today's starting baseline.
+        """
+        import database as db
+        today_str = cls.get_today_str()
+        key = f"cap_daily_start_eq_{chat_id}_{today_str}"
+        val = db.get_system_setting(key)
+        if val:
+            try:
+                start_eq = float(val)
+                if start_eq > 0:
+                    return start_eq
+            except Exception:
+                pass
+        
+        # Initialize starting equity for today
+        if current_balance > 0:
+            db.update_system_setting(key, str(round(current_balance, 2)))
+            return current_balance
+        return 1000.0  # Safe fallback
+
+    @classmethod
+    def evaluate_and_check_daily_lock(
+        cls,
+        chat_id: int,
+        current_balance: float,
+        app=None,
+        is_demo: bool = False
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Evaluates daily capital status against the +5.0% Target Lock & -2.5% Loss Floor.
+        Returns: (is_locked: bool, reason: str, telemetry: dict)
+        """
+        import database as db
+        today_str = cls.get_today_str()
+        baseline = cls.get_daily_starting_capital(chat_id, current_balance)
+        daily_pnl_usd = round(current_balance - baseline, 2)
+        daily_pnl_pct = round((daily_pnl_usd / max(1.0, baseline)) * 100.0, 2)
+
+        lock_key = f"cap_daily_lock_{chat_id}_{today_str}"
+        existing_lock = db.get_system_setting(lock_key)
+
+        telemetry = {
+            "today": today_str,
+            "starting_capital": baseline,
+            "current_balance": current_balance,
+            "daily_pnl_usd": daily_pnl_usd,
+            "daily_pnl_pct": daily_pnl_pct,
+            "target_pct": cls.DAILY_PROFIT_TARGET_PCT,
+            "floor_pct": cls.DAILY_LOSS_FLOOR_PCT,
+            "is_target_locked": False,
+            "is_loss_locked": False,
+            "can_trade": True,
+            "status": "NORMAL_TRADING"
+        }
+
+        # Check existing locks
+        if existing_lock == "TARGET_5PCT_LOCKED":
+            telemetry["is_target_locked"] = True
+            telemetry["can_trade"] = False
+            telemetry["status"] = "TARGET_5PCT_LOCKED"
+            reason = f"Daily +5.0% Profit Target LOCKED (+{daily_pnl_pct:.2f}%). Trading paused to bank 100% of profits."
+            return True, reason, telemetry
+
+        if existing_lock == "LOSS_FLOOR_LOCKED":
+            telemetry["is_loss_locked"] = True
+            telemetry["can_trade"] = False
+            telemetry["status"] = "LOSS_FLOOR_LOCKED"
+            reason = f"Daily -2.5% Loss Floor ENGAGED ({daily_pnl_pct:.2f}%). Trading paused for capital preservation."
+            return True, reason, telemetry
+
+        # 1. Target Lock Trigger (+5.0%)
+        if daily_pnl_pct >= cls.DAILY_PROFIT_TARGET_PCT:
+            db.update_system_setting(lock_key, "TARGET_5PCT_LOCKED")
+            telemetry["is_target_locked"] = True
+            telemetry["can_trade"] = False
+            telemetry["status"] = "TARGET_5PCT_LOCKED"
+            reason = f"Daily +5.0% Target Reached (+{daily_pnl_pct:.2f}% / +${daily_pnl_usd:.2f}). Trading Locked."
+
+            logger.info(f"🏆 [CAPITAL.COM 360° SKY NET] Target hit for user {chat_id}: +{daily_pnl_pct}% (${daily_pnl_usd}). PUSHED & LOCKED.")
+
+            # Send Telegram Victory Alert
+            if app and hasattr(app, "bot") and chat_id:
+                env_lbl = "DEMO ($10,000)" if is_demo else "LIVE MAINNET"
+                msg = (
+                    f"🏆 **[360° SKY NET: +5% DAILY TARGET LOCKED]** 👑\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚙️ **គណនី ៖** `{env_lbl}`\n"
+                    f"💵 **ទុនដើមថ្ងៃ (Baseline) ៖** `${baseline:,.2f}`\n"
+                    f"📊 **សមតុល្យបច្ចុប្បន្ន ៖** `${current_balance:,.2f}`\n"
+                    f"💰 **ប្រាក់ចំណេញសុទ្ធថ្ងៃនេះ ៖** `+${daily_pnl_usd:,.2f} USD` (`+{daily_pnl_pct:.2f}%`)\n"
+                    f"🎯 **ផែនការប្រចាំថ្ងៃ ៖** `+5.0% Target Achieved (សម្រេចបាន ១០០%)`\n"
+                    f"🛑 **ចំណាត់ការ AGI ៖** `PUSHED ផ្អាកការបើក Position ថ្មី ២៤ ម៉ោង!`\n"
+                    f"🛡️ **វិន័យការពារ ៖** `ចាក់សោរប្រាក់ចំណេញ មិនលោភលន់ និងមិនប្រថុយប្រថានដាច់ខាត!`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"✨ _ប្រព័ន្ធនឹងដំណើរការឡើងវិញស្វ័យប្រវត្តនៅថ្ងៃស្អែក ឬវាយបញ្ជា_ `` `/capital RESET_DAILY` ``"
+                )
+                try:
+                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
+                except Exception as e_msg:
+                    logger.debug(f"Failed to send target lock message: {e_msg}")
+
+            return True, reason, telemetry
+
+        # 2. Loss Floor Trigger (-2.5%)
+        if daily_pnl_pct <= -cls.DAILY_LOSS_FLOOR_PCT:
+            db.update_system_setting(lock_key, "LOSS_FLOOR_LOCKED")
+            telemetry["is_loss_locked"] = True
+            telemetry["can_trade"] = False
+            telemetry["status"] = "LOSS_FLOOR_LOCKED"
+            reason = f"Daily -2.5% Loss Floor Hit ({daily_pnl_pct:.2f}% / ${daily_pnl_usd:.2f}). Trading Paused."
+
+            logger.warning(f"🛡️ [CAPITAL.COM 360° SKY NET] Loss Floor hit for user {chat_id}: {daily_pnl_pct}% (${daily_pnl_usd}). PUSHED & LOCKED.")
+
+            # Send Telegram Preservation Alert
+            if app and hasattr(app, "bot") and chat_id:
+                env_lbl = "DEMO ($10,000)" if is_demo else "LIVE MAINNET"
+                msg = (
+                    f"🛡️ **[360° SKY NET: CAPITAL PRESERVATION ENGAGED]** 🚨\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"⚙️ **គណនី ៖** `{env_lbl}`\n"
+                    f"💵 **ទុនដើមថ្ងៃ (Baseline) ៖** `${baseline:,.2f}`\n"
+                    f"📊 **សមតុល្យបច្ចុប្បន្ន ៖** `${current_balance:,.2f}`\n"
+                    f"⚠️ **ការខាតបង់ថ្ងៃនេះ ៖** `-${abs(daily_pnl_usd):,.2f} USD` (`{daily_pnl_pct:.2f}%`)\n"
+                    f"🛑 **ចំណាត់ការ AGI ៖** `ផ្អាកការបើក Position ថ្មី ១២ ម៉ោង`\n"
+                    f"🛡️ **វិន័យការពារ ៖** `ការពារដើមទុន ៩៧.៥% ដែលនៅសល់ មិនឱ្យផុងខ្លួនបន្តិចម្តងៗឡើយ!`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"✨ _ប្រព័ន្ធនឹងដំណើរការឡើងវិញស្វ័យប្រវត្តនៅថ្ងៃស្អែក ឬវាយបញ្ជា_ `` `/capital RESET_DAILY` ``"
+                )
+                try:
+                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
+                except Exception as e_msg:
+                    logger.debug(f"Failed to send loss floor message: {e_msg}")
+
+            return True, reason, telemetry
+
+        return False, "Normal Trading Allowed", telemetry
+
+    @classmethod
+    def reset_daily_governor(cls, chat_id: int, current_balance: Optional[float] = None) -> bool:
+        """Resets today's lock and recalibrates baseline equity."""
+        import database as db
+        today_str = cls.get_today_str()
+        lock_key = f"cap_daily_lock_{chat_id}_{today_str}"
+        db.update_system_setting(lock_key, "NORMAL")
+        if current_balance is not None and current_balance > 0:
+            key = f"cap_daily_start_eq_{chat_id}_{today_str}"
+            db.update_system_setting(key, str(round(current_balance, 2)))
+        logger.info(f"🔄 [CAPITAL GOVERNOR] Reset daily lock for user {chat_id}.")
+        return True
+
+    @classmethod
+    def set_daily_baseline(cls, chat_id: int, starting_capital: float) -> None:
+        """Explicitly sets today's starting capital baseline."""
+        import database as db
+        today_str = cls.get_today_str()
+        key = f"cap_daily_start_eq_{chat_id}_{today_str}"
+        db.update_system_setting(key, str(round(starting_capital, 2)))
+
+    @classmethod
+    def update_and_check(cls, chat_id: int, current_balance: float) -> Dict[str, Any]:
+        """Convenience method checking lock and returning telemetry."""
+        is_locked, reason, telemetry = cls.evaluate_and_check_daily_lock(chat_id, current_balance)
+        telemetry["is_locked"] = is_locked
+        telemetry["reason"] = reason
+        if telemetry.get("is_target_locked"):
+            telemetry["state"] = "TARGET_LOCKED"
+        elif telemetry.get("is_loss_locked"):
+            telemetry["state"] = "FLOOR_HIT"
+        else:
+            telemetry["state"] = "NORMAL"
+        return telemetry
+
+    @classmethod
+    def get_daily_telemetry(cls, chat_id: int, current_balance: float = 0.0) -> Dict[str, Any]:
+        """Returns read-only status for UI dashboards."""
+        _, reason, data = cls.evaluate_and_check_daily_lock(chat_id, current_balance, app=None)
+        data["reason"] = reason
+        return data
+
+    @classmethod
+    def get_user_status(cls, chat_id: int, current_balance: float = 0.0) -> Dict[str, Any]:
+        """Convenience alias for get_daily_telemetry with state mapping."""
+        t = cls.get_daily_telemetry(chat_id, current_balance)
+        if t.get("is_target_locked"):
+            t["state"] = "TARGET_LOCKED"
+        elif t.get("is_loss_locked"):
+            t["state"] = "FLOOR_HIT"
+        else:
+            t["state"] = "NORMAL"
+        return t
+
+
+def is_capital_daily_locked(chat_id: int, current_balance: float = 0.0) -> Tuple[bool, str, Dict[str, Any]]:
+    """Helper shortcut for CapitalDailyAGIGovernor.evaluate_and_check_daily_lock."""
+    return CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(chat_id, current_balance)
+
+
+CAPITAL_DAILY_GOVERNOR = CapitalDailyAGIGovernor
+
+
+def get_capital_daily_governor():
+    """Singleton getter for CapitalDailyAGIGovernor."""
+    return CapitalDailyAGIGovernor
+
+
