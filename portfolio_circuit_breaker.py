@@ -274,30 +274,52 @@ class CapitalDailyAGIGovernor:
             "status": "NORMAL_TRADING"
         }
 
+        # Check if user has enabled 24/7 Citadel Continuous Mode (Invariant 53)
+        # Removes +5% profit freeze to allow 24/7 compounding and widens loss floor to -10% catastrophe floor
+        is_24_7_continuous = (
+            db.get_system_setting(f"cap_24_7_citadel_unlocked_{chat_id}", "0") == "1" or
+            db.get_system_setting(f"cap_continuous_trading_{chat_id}", "0") == "1" or
+            db.get_system_setting("capital_global_24_7_unlocked", "0") == "1"
+        )
+
         # Check existing locks
         if existing_lock == "TARGET_5PCT_LOCKED":
-            telemetry["is_target_locked"] = True
-            telemetry["can_trade"] = False
-            telemetry["status"] = "TARGET_5PCT_LOCKED"
-            reason = f"Daily +5.0% Profit Target LOCKED (+{daily_pnl_pct:.2f}%). Trading paused to bank 100% of profits."
-            return True, reason, telemetry
+            if is_24_7_continuous:
+                telemetry["can_trade"] = True
+                telemetry["status"] = "24_7_CITADEL_COMPOUNDING"
+            else:
+                telemetry["is_target_locked"] = True
+                telemetry["can_trade"] = False
+                telemetry["status"] = "TARGET_5PCT_LOCKED"
+                reason = f"Daily +5.0% Profit Target LOCKED (+{daily_pnl_pct:.2f}%). Trading paused to bank 100% of profits."
+                return True, reason, telemetry
 
         if existing_lock == "LOSS_FLOOR_LOCKED":
-            telemetry["is_loss_locked"] = True
-            telemetry["can_trade"] = False
-            telemetry["status"] = "LOSS_FLOOR_LOCKED"
-            reason = f"Daily -2.5% Loss Floor ENGAGED ({daily_pnl_pct:.2f}%). Trading paused for capital preservation."
-            return True, reason, telemetry
+            if is_24_7_continuous and daily_pnl_pct > -10.0:
+                telemetry["can_trade"] = True
+                telemetry["status"] = "24_7_CITADEL_COMPOUNDING"
+            else:
+                telemetry["is_loss_locked"] = True
+                telemetry["can_trade"] = False
+                telemetry["status"] = "LOSS_FLOOR_LOCKED"
+                reason = f"Daily -2.5% Loss Floor ENGAGED ({daily_pnl_pct:.2f}%). Trading paused for capital preservation."
+                return True, reason, telemetry
 
         # 1. Target Lock Trigger (+5.0%)
         if daily_pnl_pct >= cls.DAILY_PROFIT_TARGET_PCT:
-            db.update_system_setting(lock_key, "TARGET_5PCT_LOCKED")
-            telemetry["is_target_locked"] = True
-            telemetry["can_trade"] = False
-            telemetry["status"] = "TARGET_5PCT_LOCKED"
-            reason = f"Daily +5.0% Target Reached (+{daily_pnl_pct:.2f}% / +${daily_pnl_usd:.2f}). Trading Locked."
+            if is_24_7_continuous:
+                telemetry["is_target_locked"] = False
+                telemetry["can_trade"] = True
+                telemetry["status"] = "24_7_CITADEL_COMPOUNDING"
+                logger.info(f"💎 [24/7 CITADEL UNLOCKED] Daily Target +{daily_pnl_pct}% hit for User {chat_id}. Compounding 24/7 without halting!")
+            else:
+                db.update_system_setting(lock_key, "TARGET_5PCT_LOCKED")
+                telemetry["is_target_locked"] = True
+                telemetry["can_trade"] = False
+                telemetry["status"] = "TARGET_5PCT_LOCKED"
+                reason = f"Daily +5.0% Target Reached (+{daily_pnl_pct:.2f}% / +${daily_pnl_usd:.2f}). Trading Locked."
 
-            logger.info(f"🏆 [CAPITAL.COM 360° SKY NET] Target hit for user {chat_id}: +{daily_pnl_pct}% (${daily_pnl_usd}). PUSHED & LOCKED.")
+                logger.info(f"🏆 [CAPITAL.COM 360° SKY NET] Target hit for user {chat_id}: +{daily_pnl_pct}% (${daily_pnl_usd}). PUSHED & LOCKED.")
 
             # Send Telegram Victory Alert
             if app and hasattr(app, "bot") and chat_id:
@@ -322,13 +344,14 @@ class CapitalDailyAGIGovernor:
 
             return True, reason, telemetry
 
-        # 2. Loss Floor Trigger (-2.5%)
-        if daily_pnl_pct <= -cls.DAILY_LOSS_FLOOR_PCT:
+        # 2. Loss Floor Trigger (-2.5% standard vs -10.0% catastrophe in 24/7 Citadel)
+        active_loss_floor = 10.0 if is_24_7_continuous else cls.DAILY_LOSS_FLOOR_PCT
+        if daily_pnl_pct <= -active_loss_floor:
             db.update_system_setting(lock_key, "LOSS_FLOOR_LOCKED")
             telemetry["is_loss_locked"] = True
             telemetry["can_trade"] = False
             telemetry["status"] = "LOSS_FLOOR_LOCKED"
-            reason = f"Daily -2.5% Loss Floor Hit ({daily_pnl_pct:.2f}% / ${daily_pnl_usd:.2f}). Trading Paused."
+            reason = f"Daily -{active_loss_floor:.1f}% Loss Floor Hit ({daily_pnl_pct:.2f}% / ${daily_pnl_usd:.2f}). Trading Paused."
 
             logger.warning(f"🛡️ [CAPITAL.COM 360° SKY NET] Loss Floor hit for user {chat_id}: {daily_pnl_pct}% (${daily_pnl_usd}). PUSHED & LOCKED.")
 

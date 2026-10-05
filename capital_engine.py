@@ -103,6 +103,43 @@ DEFAULT_CAPITAL_PASSWORD = "Vipheavy@2297!"
 # Global In-Memory Shared RAM Cache for TradFi Quotes (< 0.05ms)
 _SHARED_PRICE_CACHE: Dict[str, Dict[str, Any]] = {}
 
+# MT5 Smart Money Concepts (SMC) Citadel Engine Integration (Invariant 53)
+try:
+    from mt5_smc_citadel import MT5SMCCitadelEngine
+except ImportError:
+    MT5SMCCitadelEngine = None
+
+# ==============================================================================
+# 24/7 SMC CITADEL DYNAMIC POSITION MATRIX (INVARIANT 53)
+# ==============================================================================
+def get_dynamic_max_positions_for_equity(equity: float, user_override: Optional[int] = None) -> int:
+    """
+    Dynamic Capital Slot Allocator for 24/7 SMC Citadel Autonomous Engine (Invariant 53):
+    - Equity < $100: 2 positions (Small Capital Shield)
+    - $100 - $149: 3 positions concurrently
+    - $150 - $199: 4 positions concurrently
+    - $200 - $249: 6 positions concurrently (User Anchor Specification)
+    - $250 - $299: 7 positions concurrently
+    - $300 - $349: 8 positions concurrently
+    - >= $350: 10 positions concurrently
+    """
+    if user_override is not None and user_override > 2:
+        return user_override
+    eq = float(equity or 0.0)
+    if eq >= 350.0:
+        return 10
+    elif eq >= 300.0:
+        return 8
+    elif eq >= 250.0:
+        return 7
+    elif eq >= 200.0:
+        return 6
+    elif eq >= 150.0:
+        return 4
+    elif eq >= 100.0:
+        return 3
+    return 2
+
 
 # ==============================================================================
 # 2. CAPITAL.COM INSTITUTIONAL ENGINE CLASS
@@ -2424,18 +2461,53 @@ class CapitalAutonomousEngine:
             except Exception:
                 pass
 
+        # 2b. MT5 Smart Money Concepts (SMC) Citadel Multi-Timeframe Confluence (Invariant 53)
+        smc_boost = 0.0
+        smc_factors = []
+        try:
+            if MT5SMCCitadelEngine:
+                smc_res = MT5SMCCitadelEngine.analyze_9_smc_confluence(resolved_epic)
+                smc_act = smc_res.get("action", "WAIT")
+                smc_cf = float(smc_res.get("confidence", 50.0))
+                smc_factors = smc_res.get("confluence_factors", [])
+                base_quant["smc_factors"] = smc_factors
+                base_quant["smc_confidence"] = smc_cf
+                base_quant["smc_action"] = smc_act
+
+                raw_sig = base_quant.get("signal", "HOLD_NEUTRAL")
+                if smc_act == "BUY":
+                    smc_boost = min(25.0, (smc_cf - 50.0) * 0.5)
+                elif smc_act == "SELL":
+                    smc_boost = min(25.0, (smc_cf - 50.0) * 0.5)
+
+                # High-confidence SMC structural setup (>= 85%): adopt precise structural SL/TP
+                if smc_act in ["BUY", "SELL"] and smc_cf >= 85.0:
+                    if smc_res.get("sl_price") and smc_res.get("sl_price") > 0:
+                        base_quant["sl"] = smc_res["sl_price"]
+                    if smc_res.get("tp_price") and smc_res.get("tp_price") > 0:
+                        base_quant["tp"] = smc_res["tp_price"]
+        except Exception as e_smc:
+            logger.debug(f"SMC Citadel confluence check note: {e_smc}")
+
         # 3. Final Score Arbitration
         raw_conf = base_quant.get("confidence", 50)
-        final_conf = min(98, max(10, raw_conf + macro_boost + cb_boost))
+        final_conf = min(99.0, max(10.0, raw_conf + macro_boost + cb_boost + smc_boost))
         base_quant["final_confidence"] = final_conf
         base_quant["macro_bias"] = macro_bias
 
-        # Adjust signal if macro and technicals align (Requires solid raw technical baseline >= 65)
+        # Adjust signal if macro, technicals, and SMC align
         raw_sig = base_quant.get("signal", "HOLD_NEUTRAL")
-        if raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75:
+        smc_act = base_quant.get("smc_action", "WAIT")
+        smc_cf = float(base_quant.get("smc_confidence", 50.0))
+
+        if (raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "BUY" and smc_cf >= 85.0):
             base_quant["final_action"] = "BUY"
-        elif raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75:
+            if smc_act == "BUY":
+                base_quant["final_confidence"] = max(final_conf, smc_cf)
+        elif (raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "SELL" and smc_cf >= 85.0):
             base_quant["final_action"] = "SELL"
+            if smc_act == "SELL":
+                base_quant["final_confidence"] = max(final_conf, smc_cf)
         else:
             base_quant["final_action"] = "HOLD"
 
@@ -2828,8 +2900,12 @@ class CapitalAutonomousEngine:
         import database as db
         chat_id = user["chat_id"]
         budget = user.get("budget", 50.0)
-        max_pos = user.get("max_positions", 2)
         user_is_demo = user.get("is_demo", False)  # 100% Live Mainnet Real Capital
+
+        # 24/7 SMC Citadel Dynamic Slot Allocation Matrix (Invariant 53)
+        # $100: 3 pos | $150: 4 pos | $200: 6 pos | $250: 7 pos | $300: 8 pos | $350+: 10 pos
+        max_pos = get_dynamic_max_positions_for_equity(budget, user.get("max_positions"))
+        min_required_margin = max(6.0, budget / (max_pos * 1.35))
 
         # Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00 - 23:50 ICT vs 24/7 VIP Reset Mode)
         user_sched_mode = user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
@@ -2852,9 +2928,9 @@ class CapitalAutonomousEngine:
         except Exception:
             user_avail = budget
 
-        # If available cash is below per-trade budget, skip until profits are harvested
-        if user_avail < budget:
-            logger.debug(f"User {chat_id} available cash (${user_avail:,.2f}) < budget (${budget:,.2f}), waiting for capital.")
+        # Check required margin for next slot rather than total budget
+        if user_avail < min_required_margin:
+            logger.debug(f"User {chat_id} available cash (${user_avail:,.2f}) < required margin (${min_required_margin:,.2f}) for slot, waiting.")
             return False
 
         # Pillar 6: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
@@ -4079,9 +4155,10 @@ class CapitalOpeningRangeBreakoutEngine:
             budget = user_cfg.get("budget", 50.0)
             user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
 
-            # Check max open positions
+            # Check dynamic max open positions (Invariant 53 - 24/7 SMC Citadel Matrix)
             open_pos = await asyncio.to_thread(user_engine.get_open_positions)
-            if len(open_pos) >= user_cfg.get("max_positions", 2):
+            max_pos = get_dynamic_max_positions_for_equity(budget, user_cfg.get("max_positions"))
+            if len(open_pos) >= max_pos:
                 return False
 
             # Small Capital Fortress Shield: bypass Natural Gas on accounts < $100
@@ -4589,8 +4666,10 @@ class CapitalKellyPositionSizer:
         is_crypto = any(c in clean_epic for c in ["BTC", "ETH", "SOL", "XRP"])
         leverage = 5.0 if is_stock else (2.0 if is_crypto else 20.0)
 
-        # Target margin per position: minimum $10.00, up to $15.00 or 40% of budget
-        target_margin = max(10.00, min(25.0, budget * 0.40)) if budget > 0 else 12.00
+        # Dynamic Target Margin Sizing: Allocates safe margin per trade based on dynamic slot limits
+        dynamic_slots = get_dynamic_max_positions_for_equity(budget)
+        slot_margin = budget / (dynamic_slots * 1.35) if dynamic_slots > 0 else 12.0
+        target_margin = max(6.00, min(25.0, slot_margin)) if budget > 0 else 12.00
         target_notional = target_margin * leverage
 
         if entry_price > 0:
@@ -5249,6 +5328,23 @@ class CapitalForexExchangeSuite:
             }
         except Exception:
             user_open_epics = set()
+            open_pos_list = []
+
+        # 24/7 SMC Citadel Dynamic Slot Allocation Matrix (Invariant 53)
+        # $100: 3 pos | $150: 4 pos | $200: 6 pos | $250: 7 pos | $300: 8 pos | $350+: 10 pos
+        max_pos = get_dynamic_max_positions_for_equity(budget, user_cfg.get("max_positions"))
+        if len(open_pos_list) >= max_pos:
+            return False
+
+        min_required_margin = max(6.0, budget / (max_pos * 1.35))
+        try:
+            bal_info = await asyncio.to_thread(user_engine.get_account_balance)
+            user_avail = bal_info.get("available", budget)
+        except Exception:
+            user_avail = budget
+
+        if user_avail < min_required_margin:
+            return False
 
         # Prioritize active session pairs, followed by all supported Forex pairs
         session_pairs = session_info.get("primary_assets", [])
@@ -5281,11 +5377,51 @@ class CapitalForexExchangeSuite:
                     atr=cur_price * 0.0015
                 )
 
-                if ou_setup.get("is_setup") and ou_setup.get("confidence", 0) >= 80:
+                # MT5 Smart Money Concepts (SMC) Citadel 9-Concept Confluence (Invariant 53)
+                smc_setup = {}
+                try:
+                    if MT5SMCCitadelEngine:
+                        smc_setup = await asyncio.to_thread(MT5SMCCitadelEngine.analyze_9_smc_confluence, clean_epic)
+                except Exception as e_smc:
+                    logger.debug(f"SMC Forex evaluation note: {e_smc}")
+
+                smc_action = smc_setup.get("action", "WAIT")
+                smc_conf = float(smc_setup.get("confidence", 50.0))
+                smc_factors = smc_setup.get("confluence_factors", [])
+
+                has_trade_trigger = False
+                action = "WAIT"
+                sl = 0.0
+                tp = 0.0
+                conf = 50.0
+                strat_badge = "SMC_CITADEL"
+
+                # Setup A: Double Institutional Confluence (SMC + OU Mean Reversion) -> 95%-99% Confidence!
+                if ou_setup.get("is_setup") and smc_action in ["BUY", "SELL"] and smc_action == ou_setup["action"]:
+                    has_trade_trigger = True
+                    action = smc_action
+                    conf = min(99.0, max(smc_conf, float(ou_setup["confidence"])) + 6.0)
+                    sl = float(smc_setup.get("sl_price") or ou_setup["sl"])
+                    tp = float(smc_setup.get("tp_price") or ou_setup["tp"])
+                    strat_badge = "🏰 99% SMC CITADEL + OU CONFLUENCE"
+                # Setup B: Standalone SMC Institutional Sniper (>= 80% Confidence)
+                elif smc_action in ["BUY", "SELL"] and smc_conf >= 80.0:
+                    has_trade_trigger = True
+                    action = smc_action
+                    conf = smc_conf
+                    sl = float(smc_setup["sl_price"])
+                    tp = float(smc_setup["tp_price"])
+                    strat_badge = "🏰 9 SMC INSTITUTIONAL SNIPER"
+                # Setup C: Standard OU Mean Reversion (>= 80% Confidence)
+                elif ou_setup.get("is_setup") and ou_setup.get("confidence", 0) >= 80:
+                    has_trade_trigger = True
                     action = ou_setup["action"]
-                    sl = ou_setup["sl"]
-                    tp = ou_setup["tp"]
-                    conf = ou_setup["confidence"]
+                    conf = float(ou_setup["confidence"])
+                    sl = float(ou_setup["sl"])
+                    tp = float(ou_setup["tp"])
+                    strat_badge = "📐 OU MEAN REVERSION"
+
+                if has_trade_trigger and action in ["BUY", "SELL"] and sl > 0 and tp > 0:
 
                     final_lot = CAPITAL_KELLY_SIZER.calculate_position_size(
                         epic=epic,
