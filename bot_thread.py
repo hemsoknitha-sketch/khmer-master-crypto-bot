@@ -6751,6 +6751,36 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_command(update, context)
+            elif data == "btn_cap_auto_budget_200":
+                try:
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    b_inf = c_eng.get_account_balance()
+                    eff_eq = max(200.0, float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                except Exception:
+                    eff_eq = 200.0
+                dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=200.0, max_positions=dyn_pos, is_demo=False)
+                try:
+                    await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $200 (Max {dyn_pos} Positions)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_auto_budget_400":
+                try:
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    b_inf = c_eng.get_account_balance()
+                    eff_eq = max(400.0, float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                except Exception:
+                    eff_eq = 400.0
+                dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=400.0, max_positions=dyn_pos, is_demo=False)
+                try:
+                    await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $400 (Max {dyn_pos} Positions)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
             elif data in ["btn_cap_prop_menu", "btn_prop_firm_menu"]:
                 try:
                     await update.callback_query.answer("🏆 កំពុងបើក Prop Firm Challenge...")
@@ -24665,6 +24695,18 @@ class TelegramBotThread(BaseThread):
 
             # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD
             if args:
+                first_tok = str(args[0]).strip().replace('$', '')
+                is_num_cap = False
+                try:
+                    float(first_tok)
+                    is_num_cap = True
+                except ValueError:
+                    is_num_cap = False
+                if is_num_cap:
+                    args = ["AUTO", "ON"] + args
+                elif first_tok.upper() in ["ON", "START", "RUN", "LIVE", "ENABLE", "OFF", "STOP", "HALT", "DISABLE"]:
+                    args = ["AUTO"] + args
+
                 action = str(args[0]).upper().strip()
                 if action in ["PROP", "PROPFIRM", "CHALLENGE"]:
                     context.args = args[1:]
@@ -25187,10 +25229,10 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh")
                 ],
                 [
-                    InlineKeyboardButton("💰 Budget $10", callback_data="btn_cap_auto_budget_10"),
-                    InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
-                    InlineKeyboardButton("💰 Budget $50", callback_data="btn_cap_auto_budget_50"),
-                    InlineKeyboardButton("💰 Budget $100", callback_data="btn_cap_auto_budget_100")
+                    InlineKeyboardButton("💰 $50 (2 Pos)", callback_data="btn_cap_auto_budget_50"),
+                    InlineKeyboardButton("💰 $100 (3 Pos)", callback_data="btn_cap_auto_budget_100"),
+                    InlineKeyboardButton("💰 $200 (6 Pos)", callback_data="btn_cap_auto_budget_200"),
+                    InlineKeyboardButton("💰 $400 (10 Pos)", callback_data="btn_cap_auto_budget_400")
                 ],
                 [
                     InlineKeyboardButton("🥇 Buy Gold (0.02)", callback_data="btn_cap_buy_gold"),
@@ -25284,10 +25326,10 @@ class TelegramBotThread(BaseThread):
                                 InlineKeyboardButton("🤝 IB Rebate (30%-50%)", callback_data="btn_cap_ib_menu")
                             ],
                             [
-                                InlineKeyboardButton("💰 Budget $10", callback_data="btn_cap_auto_budget_10"),
-                                InlineKeyboardButton("💰 Budget $30", callback_data="btn_cap_auto_budget_30"),
-                                InlineKeyboardButton("💰 Budget $50", callback_data="btn_cap_auto_budget_50"),
-                                InlineKeyboardButton("💰 Budget $100", callback_data="btn_cap_auto_budget_100")
+                                InlineKeyboardButton("💰 $50 (2 Pos)", callback_data="btn_cap_auto_budget_50"),
+                                InlineKeyboardButton("💰 $100 (3 Pos)", callback_data="btn_cap_auto_budget_100"),
+                                InlineKeyboardButton("💰 $200 (6 Pos)", callback_data="btn_cap_auto_budget_200"),
+                                InlineKeyboardButton("💰 $400 (10 Pos)", callback_data="btn_cap_auto_budget_400")
                             ],
                             [
                                 InlineKeyboardButton("🥇 Buy Gold (0.02)", callback_data="btn_cap_buy_gold"),
