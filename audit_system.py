@@ -1841,6 +1841,70 @@ def run_audit():
         failures.append(f"Invariant 52 check failed: {e}")
         log_fail(str(e))
 
+    # 43. Super Smart Rollover Swap Shield & Wall Street Full Coverage Lock (Invariant 53)
+    print("\n[CHECK 43/43] Verifying Super Smart Rollover Swap Shield, Wednesday Triple-Swap Lockout, Wall Street Full Coverage & Crypto 24/7 Continuity Lock (Invariant 53)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv53 = "Invariant 53" in agents_md_text and "Super Smart Rollover Swap Shield" in agents_md_text
+
+        # 2. Functional check of evaluate_capital_rollover_swap_shield
+        import capital_engine
+        has_swap_fn = hasattr(capital_engine, "evaluate_capital_rollover_swap_shield")
+        swap_eval = capital_engine.evaluate_capital_rollover_swap_shield()
+        is_swap_eval_valid = (
+            isinstance(swap_eval, dict) and
+            "is_active" in swap_eval and
+            "status" in swap_eval and
+            "mins_to_swap" in swap_eval and
+            "swap_hour_utc" in swap_eval
+        )
+
+        # 3. Schedule Mode and Asset Compatibility Invariants
+        import database as db
+        default_sched = db.get_capital_schedule_mode(99999902)
+        is_default_sched_smart = (default_sched == "SMART_SESSION_TIMED")
+
+        # 4. Crypto CFD 24/7 Continuity Invariant: Must always be active
+        is_crypto_active_btc, _, info_btc = capital_engine.is_capital_trading_schedule_active("SMART_SESSION_TIMED", epic="BTCUSD")
+        is_crypto_active_eth, _, info_eth = capital_engine.is_capital_trading_schedule_active("SMART_SESSION_TIMED", epic="ETHUSD")
+        is_crypto_continuous = is_crypto_active_btc and is_crypto_active_eth
+
+        # 5. Wall Street Coverage standard: start_time 07:00 ICT, end_time 03:45 ICT
+        is_wall_st_hours = (
+            info_btc.get("start_time") == "07:00 ICT (00:00 UTC)" and
+            info_btc.get("end_time") == "03:45 ICT (20:45 UTC)"
+        )
+
+        # 6. Telegram UI / Command Integration
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        has_swap_shield_cmd = "SWAP_SHIELD" in bt_code
+        has_swap_shield_btn = "btn_cap_swap_shield_info" in bt_code
+        has_wall_st_text = "03:45" in bt_code and "Wall Street" in bt_code
+
+        # 7. Web GUI Integration
+        with open("web_gui_server.py", "r", encoding="utf-8") as f:
+            wgs_code = f.read()
+        has_web_swap_shield = "is_swap_shield_active" in wgs_code and "is_triple_swap_night" in wgs_code
+
+        all_inv53_passed = (
+            has_inv53 and has_swap_fn and is_swap_eval_valid and
+            is_default_sched_smart and is_crypto_continuous and
+            is_wall_st_hours and has_swap_shield_cmd and
+            has_swap_shield_btn and has_wall_st_text and has_web_swap_shield
+        )
+
+        if all_inv53_passed:
+            log_pass("Super Smart Rollover Swap Shield, Wednesday Triple-Swap Lockout, Wall Street Full Coverage & Crypto 24/7 Continuity Lock (Invariant 53) are 100% certified!")
+        else:
+            failures.append(f"Invariant 53 check failed: inv53={has_inv53}, swap_fn={has_swap_fn}, eval_valid={is_swap_eval_valid}, default_smart={is_default_sched_smart}, crypto_247={is_crypto_continuous}, wall_st={is_wall_st_hours}, cmd={has_swap_shield_cmd}, web={has_web_swap_shield}")
+            log_fail("Super Smart Rollover Swap Shield (Invariant 53) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 53 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

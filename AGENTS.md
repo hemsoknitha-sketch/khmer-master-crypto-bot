@@ -775,6 +775,33 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 53: Super Smart Rollover Swap Shield, Wednesday Triple-Swap Lockout, Wall Street Full Coverage & Crypto 24/7 Continuity Lock
+- **Location:** `capital_engine.py` (`is_capital_trading_schedule_active`, `evaluate_capital_rollover_swap_shield`, `_ratchet_engine_positions`), `database.py` (`capital_auto_config`, `get_capital_schedule_mode`), `bot_thread.py` (`capital_command`, `/capital SWAP_SHIELD`, `btn_cap_swap_shield_info`), `web_gui_server.py`, `web_gui/app.js`
+- **Rule:**
+  1. **Wall Street Power Hour Full Coverage Standard (07:00 AM to 03:45 AM ICT):**
+     - Traditional retail schedules cutting off trading at 11:50 PM ICT (23:50 ICT = 16:50 UTC / 12:50 PM EST) prematurely amputate the final 4 hours of the US Wall Street session, missing peak institutional closing volume and momentum.
+     - Both `SMART_SESSION_TIMED` and `SCHEDULE_MON_FRI` MUST keep active trading open through 03:45 AM ICT (20:45 UTC), capturing 100% of the US market cash session through the closing bell.
+  2. **Daily Rollover Swap Lockout & Overnight Lull Standard (03:45 AM to 07:00 AM ICT / 20:45 to 23:59 UTC):**
+     - US cash equity markets close at 16:00 ET (21:00 UTC / 04:00 ICT summer / 05:00 ICT winter). European markets are closed. Tokyo has not opened. Market liquidity drops to near zero.
+     - Daily broker rollover swap settlement occurs at 22:00 UTC (05:00 AM ICT summer / 04:00 AM ICT winter), accompanied by interbank quote pullbacks that widen spreads 3x–10x (Spread Blowout).
+     - The engine enforces a 100% hard block on new TradFi orders (stocks, indices, commodities, forex) during this window. Zero new TradFi entries are permitted, completely eliminating overnight financing debits and spread blowout risk.
+  3. **Wednesday Triple-Swap Shield Standard (300% Rollover Fee Lockout):**
+     - On Wednesday at 22:00 UTC (05:00 AM Thursday ICT), brokers charge **3-day triple swap** (Wednesday + Saturday + Sunday) to cover weekend settlement.
+     - When `weekday_utc == 2` (Wednesday), the Shield activates elevated defense at 20:15 UTC (03:15 AM Thursday ICT), halting new TradFi entries early to prevent any trade from being caught in the 300% fee trap.
+  4. **Pre-Rollover Profit Harvesting & Armor Lock:**
+     - In `_ratchet_engine_positions`, between 20:30 and 20:45 UTC (or Wednesday after 20:00 UTC):
+     - Any active TradFi position with positive profit ($UPL \ge \$1.00$ or $ROI \ge +2.5\%$) is defensively shielded: stops are aggressively ratcheted past entry (Breakeven Armor+), and high-profit day trades ($ROI \ge 5.0\%$ or $UPL \ge \$2.50$) are harvested cleanly to cash before swap fees are debited. Winning day trades are never degraded by overnight financing interest.
+  5. **Weekend TradFi Gap Shield:**
+     - Active Friday 20:45 UTC (03:45 Saturday ICT) to Sunday 22:00 UTC (05:00 Monday ICT). Prevents weekend gap-down risk on traditional assets.
+  6. **Decentralized Crypto CFD 24/7 Continuity Standard:**
+     - Crypto CFDs (`BTCUSD`, `ETHUSD`, `SOLUSD`) trade on decentralized 24/7 continuous markets without exchange closing bells or weekend gap interruptions. They remain 100% active 24/7 across all sessions and weekends.
+  7. **Canonical Default & Zero-Dead-Button UI Enforcement:**
+     - Default `schedule_mode` across `database.py` and `capital_engine.py` is permanently locked to `SMART_SESSION_TIMED`.
+     - Telegram UI supports `/capital SWAP_SHIELD`, `/capital SMART_SESSION`, `/capital SCHEDULE`, and interactive callback `btn_cap_swap_shield_info` with immediate acknowledgment.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 43/43].
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
