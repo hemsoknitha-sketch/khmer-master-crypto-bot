@@ -2733,6 +2733,54 @@ class CapitalAutonomousEngine:
                     continue
 
             # =========================================================================
+            # SUPER SMART ROLLOVER SWAP SHIELD (Pre-Rollover Profit Harvesting & Armor Lock)
+            # Before US market close & daily swap settlement (20:30 - 20:45 UTC / 03:30 - 03:45 ICT),
+            # or on Wednesday Triple-Swap night (3x financing fee):
+            # If an intraday TradFi position has positive profit (UPL >= $1.00 or ROI >= +2.5%),
+            # secure the profit or tighten SL past entry so the trader never pays swap fees on winning day trades!
+            # =========================================================================
+            if not is_crypto and (upl >= 1.00 or roi_pct >= 2.5):
+                now_utc_dt = datetime.datetime.now(datetime.timezone.utc)
+                utc_m = now_utc_dt.hour * 60 + now_utc_dt.minute
+                w_utc = now_utc_dt.weekday()
+                # 20:30 to 20:45 UTC (03:30 to 03:45 ICT) or Wednesday after 20:00 UTC
+                is_pre_rollover = (1230 <= utc_m <= 1245) or (w_utc == 2 and 1200 <= utc_m <= 1245)
+                if is_pre_rollover:
+                    # If high profit (ROI >= 5.0% or UPL >= 2.50), harvest cash cleanly before swap deduction!
+                    if roi_pct >= 5.0 or upl >= 2.50:
+                        tag = "🛡️ [ROLLOVER SWAP SHIELD HARVEST]"
+                        logger.info(f"{tag} Banking ${upl:+.2f} on {epic} before 22:00 UTC swap rollover to avoid overnight financing drag!")
+                        close_res = engine.close_position(deal_id=deal_id)
+                        if close_res.get("success"):
+                            closed_count += 1
+                            self._peak_upl_cache.pop(deal_id, None)
+                            self._be_locked_set.discard(deal_id)
+                            try:
+                                import database as db
+                                db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=current_price, pnl=upl)
+                            except Exception:
+                                pass
+                            if chat_id:
+                                try:
+                                    import notification_manager, ui_standards
+                                    swap_type_kh = "Swap ៣ថ្ងៃ (Triple Swap)" if w_utc == 2 else "Swap ឆ្លងយប់ប្រចាំថ្ងៃ"
+                                    notif_msg = (
+                                        f"🛡️ **[SUPER SMART ROLLOVER SWAP SHIELD]** ⚡\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🏛️ **ឧបករណ៍ TradFi ៖** `{epic}`\n"
+                                        f"🎯 **ទិសដៅ ៖** `{direction}`\n"
+                                        f"💵 **តម្លៃចូល ៖** `${entry_level:,.2f}` | **តម្លៃបិទ ៖** `${current_price:,.2f}`\n"
+                                        f"💰 **ប្រាក់ចំណេញចាក់សោរ ៖** `+${upl:,.2f} USD` (+{roi_pct:.1f}% ROI)\n"
+                                        f"🛡️ **មូលហេតុបិទកើបចំណេញ ៖** `គេចផុតពីកម្រៃ {swap_type_kh} & Spread រីកធំ!`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"✅ _ចាក់សោរកើបចំណេញសុទ្ធ ១០០% មុនពេលផ្សារអាមេរិកបិទទ្វារ!_"
+                                    )
+                                    notification_manager.send_telegram_notification(app, chat_id, notif_msg, category="[SWAP SHIELD HARVEST]")
+                                except Exception as e_notif:
+                                    logger.debug(f"Failed to send swap shield harvest notif: {e_notif}")
+                            continue
+
+            # =========================================================================
             # TIER 2 & 3: THE GOLDEN 80%-85% TRAILING RATCHET (Broker Stop-Loss Update)
             # When profit exceeds >= +7.5% ROI or >= +$2.50 UPL, advance broker Stop-Loss.
             # =========================================================================
@@ -5825,30 +5873,93 @@ def get_capital_skynet_360_radar() -> CapitalSkyNet360Radar:
     return CAPITAL_SKYNET_360_RADAR
 
 
-def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI", epic: str = "") -> Tuple[bool, str, Dict[str, Any]]:
+def evaluate_capital_rollover_swap_shield(now_utc=None) -> Dict[str, Any]:
+    """
+    Evaluates the real-time status of the Super Smart Rollover Swap Shield:
+    - Daily Rollover Swap Settlement: 22:00 UTC (05:00 AM ICT in summer / 04:00 AM ICT in winter).
+    - Overnight Dead Zone: 20:45 UTC to 23:59 UTC (03:45 AM to 07:00 AM ICT).
+    - Wednesday 3-Day Triple Swap: Detects Wednesday night 300% fee settlement.
+    - Weekend TradFi Market Gap: Friday 20:45 UTC to Sunday 22:00 UTC.
+    """
+    import datetime
+    ict_tz = datetime.timezone(datetime.timedelta(hours=7))
+    if now_utc is None:
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+    now_ict = now_utc.astimezone(ict_tz)
+    
+    weekday_utc = now_utc.weekday()
+    utc_min = now_utc.hour * 60 + now_utc.minute
+    
+    is_tradfi_weekend = (
+        (weekday_utc == 5) or 
+        (weekday_utc == 4 and utc_min >= 1245) or 
+        (weekday_utc == 6 and utc_min < 1320)
+    )
+    
+    is_swap_shield_window = (utc_min >= 1245)  # 20:45 - 23:59 UTC = 03:45 - 07:00 ICT
+    is_triple_swap_night = (weekday_utc == 2)  # Wednesday UTC
+    is_wed_shield = (weekday_utc == 2 and utc_min >= 1215)  # Wed after 20:15 UTC (03:15 ICT Thu)
+    
+    is_active = is_tradfi_weekend or is_swap_shield_window or is_wed_shield
+    
+    # Calculate minutes to next daily rollover at 22:00 UTC (1320 mins)
+    if utc_min < 1320:
+        mins_to_swap = 1320 - utc_min
+    else:
+        mins_to_swap = (1440 - utc_min) + 1320
+        
+    status_str = "ACTIVE 🛡️" if is_active else "MONITORING 🟢"
+    
+    return {
+        "is_active": is_active,
+        "status": status_str,
+        "is_tradfi_weekend": is_tradfi_weekend,
+        "is_swap_shield_window": is_swap_shield_window,
+        "is_triple_swap_night": is_triple_swap_night,
+        "now_ict": now_ict.strftime("%H:%M:%S ICT"),
+        "now_utc": now_utc.strftime("%H:%M:%S UTC"),
+        "mins_to_swap": mins_to_swap,
+        "swap_hour_utc": "22:00 UTC",
+        "swap_hour_ict": "05:00 ICT",
+        "us_close_ict": "04:00 ICT (21:00 UTC)",
+        "shield_reason": (
+            "TradFi Weekend Gap Shield (Market Closed)" if is_tradfi_weekend else (
+                "Wednesday Triple-Swap Shield (300% Rollover Fee Avoidance)" if is_wed_shield else (
+                    "Daily Rollover Swap Shield (03:45-07:00 ICT Overnight Lull)" if is_swap_shield_window else
+                    "Institutional Kill Zones Active (Wall Street / London / Tokyo)"
+                )
+            )
+        )
+    }
+
+
+def is_capital_trading_schedule_active(schedule_mode: str = "SMART_SESSION_TIMED", epic: str = "") -> Tuple[bool, str, Dict[str, Any]]:
     """
     Evaluates whether Capital.com auto trading entries are active based on Cambodia Time (UTC+7 / ICT) & Global Kill Zones:
-    - Mode 1: Default Schedule (SCHEDULE_MON_FRI):
-      Monday to Friday from 07:00 AM to 11:50 PM (23:50) Cambodia Time (UTC+7).
-      Standby Phase: From 23:50 to 07:00 ICT on weekdays, and all day Saturday & Sunday.
-      During Standby, new trade entries are paused while Breakeven Armor, SL & Trailing TP run 24/7.
-    - Mode 2: VIP 24/7 Override (24/7 / RESET / ALWAYS_ON):
-      Continuous trading 24/7 unrestricted across all open markets.
-    - Mode 3: Super Smart Session-Timed (SMART_SESSION_TIMED / SMART_SESSION / TIMED):
-      Aligns entries strictly with the 3 Institutional Kill Zones + Zero-Swap Shield + Weekend Crypto 24/7 Continuity:
+    - Mode 1: Super Smart Session-Timed (SMART_SESSION_TIMED / SMART_SESSION / TIMED) [DEFAULT & INSTITUTIONAL STANDARD]:
+      Aligns entries strictly with the 3 Institutional Kill Zones + Super Smart Rollover Swap Shield + Weekend Crypto 24/7 Continuity:
       * Tokyo/Asian Kill Zone (00:00 - 07:00 UTC / 07:00 - 14:00 ICT): SMC Liquidity Sweep & Mean Reversion (USDJPY, AUDUSD, NZDUSD, GOLD, US500).
       * London Kill Zone (07:00 - 13:30 UTC / 14:00 - 20:30 ICT): 15m ORB + SMC FVG/Judas Swing (EURUSD, GBPUSD, GERMANY40, US500, GOLD, US100, OIL).
       * New York Wall Street (13:30 - 20:45 UTC / 20:30 - 03:45 ICT): Apex Trend + SMC Order Blocks (US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL).
-      * Zero-Swap & Weekend Gap Shield: Friday after 20:45 UTC to Sunday 22:00 UTC strictly blocks TradFi entries to avoid 3-day rollover swap and weekend gap risk.
-      * Weekend Crypto Continuity: Crypto CFDs (BTCUSD, ETHUSD, SOLUSD) trade 24/7 continuously to steadily harvest spreads towards Tier 2/3/4 milestones.
+      * Super Smart Rollover Swap Shield (20:45 - 23:59 UTC / 03:45 - 07:00 ICT): 
+        - Daily Rollover settlement window (22:00 UTC / 05:00 ICT).
+        - US & European markets are closed, spreads widen 3x-10x, and volume drops to zero.
+        - Strictly blocks all new TradFi entries to eliminate overnight financing debits & spread blowout.
+      * Wednesday Triple-Swap Shield: Detects Wednesday night (22:00 UTC) when brokers charge 3 days of swap (300% fee). Halts TradFi entries early (from 20:15 UTC / 03:15 ICT Thursday) to prevent holding into the triple-fee window.
+      * Zero-Swap & Weekend Gap Shield: Friday 20:45 UTC (03:45 Saturday ICT) to Sunday 22:00 UTC (05:00 Monday ICT) strictly blocks TradFi to avoid weekend news gaps.
+      * Weekend Crypto Continuity: Crypto CFDs (BTCUSD, ETHUSD, SOLUSD) trade 24/7 continuously without traditional market closing bells.
+    - Mode 2: Mon-Fri Wall Street Full Schedule (SCHEDULE_MON_FRI):
+      Active on weekdays from 07:00 AM ICT through the entire New York session until 03:45 AM ICT (20:45 UTC).
+      Standby & Rollover Swap Shield from 03:45 AM to 07:00 AM ICT, and weekend standby (Saturday 03:45 AM to Monday 07:00 AM ICT).
+    - Mode 3: VIP 24/7 Override (24/7 / RESET / ALWAYS_ON):
+      Continuous trading 24/7 unrestricted across all open markets.
     """
     import datetime
     
     mode_str = str(schedule_mode).upper().strip()
     is_247_mode = mode_str in ["24/7", "247", "RESET", "ALWAYS_ON", "CONTINUOUS", "ALL_TIME"]
-    is_smart_session = mode_str in [
-        "SMART_SESSION_TIMED", "SMART_SESSION", "SMART", "SESSION_TIMED", "TIMED", "SESSION", "SMART_TIMED"
-    ]
+    is_mon_fri = mode_str in ["SCHEDULE_MON_FRI", "MON_FRI", "MONFRI", "WEEKDAY"]
+    is_smart_session = not is_247_mode and not is_mon_fri  # Defaults to SMART_SESSION_TIMED
     
     # Cambodia Time (ICT = UTC+7) & UTC
     ict_tz = datetime.timezone(datetime.timedelta(hours=7))
@@ -5860,12 +5971,6 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI", 
     
     weekday_utc = now_utc.weekday()
     utc_min = now_utc.hour * 60 + now_utc.minute
-    
-    start_minutes = 7 * 60        # 07:00 AM (420 mins)
-    end_minutes = 23 * 60 + 50    # 11:50 PM / 23:50 (1430 mins)
-    
-    is_weekday = weekday_ict in [0, 1, 2, 3, 4]  # Monday (0) to Friday (4)
-    is_time_window = start_minutes <= time_minutes_ict < end_minutes
     
     weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     weekday_khmer = ["ចន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍", "អាទិត្យ"]
@@ -5882,11 +5987,31 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI", 
         (weekday_utc == 6 and utc_min < 1320)
     )
     
+    # Rollover Swap Window & Overnight Lull:
+    # 20:45 UTC to 23:59 UTC = 03:45 ICT to 07:00 ICT (US markets closed, European markets closed, daily swap charged at 22:00 UTC)
+    is_swap_shield_window = (utc_min >= 1245)
+    
+    # Wednesday Triple-Swap Detection (Wednesday UTC = Thursday morning ICT):
+    # Daily rollover at 22:00 UTC on Wednesday charges 3 days of swap fees (Triple Swap)!
+    is_triple_swap_night = (weekday_utc == 2)
+    # Wednesday heightened swap window begins at 20:15 UTC (03:15 ICT Thursday)
+    is_wednesday_triple_swap_window = (weekday_utc == 2 and utc_min >= 1215)
+    
+    is_swap_shield_active = is_swap_shield_window or is_wednesday_triple_swap_window
+    
     # Determine Active Institutional Kill Zone
     if is_tradfi_weekend:
         current_session = "WEEKEND_CRYPTO_CONTINUITY"
-        session_name_kh = "🪙 ចុងសប្តាហ៍ Crypto 24/7 (TradFi Standby)"
+        session_name_kh = "🪙 ចុងសប្តាហ៍ Crypto 24/7 (TradFi Gap Shield)"
         session_name_en = "🪙 Weekend Crypto Continuity 24/7 (TradFi Gap Shield)"
+    elif is_wednesday_triple_swap_window:
+        current_session = "WEDNESDAY_TRIPLE_SWAP_SHIELD"
+        session_name_kh = "⚠️ Wednesday Triple-Swap Shield (Swap ៣ថ្ងៃ | Crypto 24/7)"
+        session_name_en = "⚠️ Wednesday Triple-Swap Shield (3x Rollover | Crypto 24/7)"
+    elif is_swap_shield_window:
+        current_session = "SWAP_SHIELD_CRYPTO"
+        session_name_kh = "🛡️ Rollover Swap Shield (03:45-07:00 ICT | Crypto 24/7)"
+        session_name_en = "🛡️ Rollover Swap Shield (03:45-07:00 ICT | Crypto 24/7)"
     elif 0 <= now_utc.hour < 7:  # 00:00 - 07:00 UTC = 07:00 - 14:00 ICT
         current_session = "TOKYO_ASIAN"
         session_name_kh = "🇯🇵 Tokyo/Asian Kill Zone (07:00-14:00 ICT)"
@@ -5899,30 +6024,39 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI", 
         current_session = "NEW_YORK"
         session_name_kh = "🇺🇸 New York Wall Street (20:30-03:45 ICT)"
         session_name_en = "🇺🇸 New York Wall Street (20:30-03:45 ICT)"
-    else:  # 20:45 - 23:59 UTC = 03:45 - 07:00 ICT (Overnight Rollover Lull)
+    else:  # Fallback
         current_session = "SWAP_SHIELD_CRYPTO"
         session_name_kh = "🛡️ Rollover Swap Shield (Crypto 24/7 Active)"
         session_name_en = "🛡️ Rollover Swap Shield (Crypto 24/7 Active)"
         
     epic_upper = str(epic).upper().strip() if epic else ""
-    is_crypto_asset = any(c in epic_upper for c in ["BTC", "ETH", "SOL"])
+    is_crypto_asset = any(c in epic_upper for c in ["BTC", "ETH", "SOL", "XRP"])
+    
+    # Is TradFi active globally (Weekday between Monday 00:00 UTC and Friday 20:45 UTC, outside swap shield):
+    is_tradfi_open = not is_tradfi_weekend and not is_swap_shield_active
 
     info = {
         "schedule_mode": (
             "24/7" if is_247_mode 
-            else ("SMART_SESSION_TIMED" if is_smart_session else "SCHEDULE_MON_FRI")
+            else ("SCHEDULE_MON_FRI" if is_mon_fri else "SMART_SESSION_TIMED")
         ),
         "now_ict": current_time_str,
+        "now_utc": now_utc.strftime("%H:%M:%S UTC"),
         "weekday": current_day_str,
         "weekday_kh": current_day_kh,
-        "is_weekday": is_weekday,
-        "is_within_time_window": is_time_window,
+        "is_weekday": not is_tradfi_weekend,
+        "is_tradfi_open": is_tradfi_open,
+        "is_within_time_window": is_tradfi_open,
         "current_session": current_session,
         "session_name_kh": session_name_kh,
         "session_name_en": session_name_en,
         "is_tradfi_weekend": is_tradfi_weekend,
-        "start_time": "07:00 ICT",
-        "end_time": "23:50 ICT",
+        "is_swap_shield_active": is_swap_shield_active,
+        "is_triple_swap_night": is_triple_swap_night,
+        "swap_settlement_utc": "22:00 UTC",
+        "swap_settlement_ict": "05:00 ICT",
+        "start_time": "07:00 ICT (00:00 UTC)",
+        "end_time": "03:45 ICT (20:45 UTC)",
         "is_247_override": is_247_mode,
         "is_smart_session": is_smart_session
     }
@@ -5944,10 +6078,16 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI", 
             # If no epic specified, general engine is active because Crypto CFDs are tradeable
             return True, f"Smart Session Timed ({session_name_en})", info
 
-        # Rollover Swap Shield (03:45 - 07:00 ICT): Block TradFi to avoid high overnight swap charges
-        if current_session == "SWAP_SHIELD_CRYPTO":
+        # Wednesday Triple Swap Shield
+        if is_wednesday_triple_swap_window:
             if epic:
-                return False, f"TradFi Rollover Swap Shield Active (03:45-07:00 ICT | Blocked to eliminate financing drag)", info
+                return False, f"Wednesday Triple-Swap Shield Active (Swap ៣ថ្ងៃ | ផ្អាកចូល TradFi ដើម្បីគេចពីកម្រៃការប្រាក់ 300%)", info
+            return True, f"Smart Session Timed ({session_name_en})", info
+
+        # Rollover Swap Shield (03:45 - 07:00 ICT): Block TradFi to avoid high overnight swap charges & dead volume
+        if is_swap_shield_window:
+            if epic:
+                return False, f"TradFi Rollover Swap Shield Active (03:45-07:00 ICT | Blocked to eliminate financing drag & wide spreads)", info
             return True, f"Smart Session Timed ({session_name_en})", info
 
         # Session-specific asset compatibility for TradFi assets
@@ -5973,14 +6113,17 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SCHEDULE_MON_FRI", 
         # General engine check without epic: Always True in SMART_SESSION_TIMED
         return True, f"Smart Session Timed ({session_name_en})", info
 
-    # 3. Standard SCHEDULE_MON_FRI
-    if is_weekday and is_time_window:
-        return True, f"Active Window ({current_day_str} {current_time_str} | 07:00-23:50 ICT)", info
-    
-    if not is_weekday:
-        return False, f"Weekend Standby ({current_day_str} {current_time_str} | Active Mon-Fri 07:00-23:50 ICT. Type /capital RESET or /capital SMART_SESSION)", info
-    
-    return False, f"Night Standby ({current_time_str} | Resumes 07:00 ICT. Type /capital RESET or /capital SMART_SESSION)", info
+    # 3. Modernized SCHEDULE_MON_FRI (Full Wall Street Coverage 07:00 to 03:45 ICT)
+    if is_crypto_asset:
+        return True, f"Crypto CFD 24/7 Continuous Active ({session_name_en})", info
+
+    if is_tradfi_weekend:
+        return False, f"Weekend Standby ({current_day_str} {current_time_str} | TradFi Markets Closed. Resumes Mon 07:00 ICT)", info
+
+    if is_swap_shield_active:
+        return False, f"Rollover Swap Shield Active ({current_time_str} | 03:45-07:00 ICT | US Markets Closed & Swap Protection. Resumes 07:00 ICT)", info
+
+    return True, f"Active Window ({current_day_str} {current_time_str} | 07:00-03:45 ICT Full Wall Street Coverage)", info
 
 async def run_capital_auto_cycle(app=None):
     """Entry point for APScheduler in scheduler_tasks.py."""

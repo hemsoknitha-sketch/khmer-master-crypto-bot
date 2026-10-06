@@ -1236,6 +1236,9 @@ async def handle_api_capital_overview(request: web.Request) -> web.Response:
                 "session_name_kh": sched_info.get("session_name_kh", ""),
                 "session_name_en": sched_info.get("session_name_en", ""),
                 "is_tradfi_weekend": sched_info.get("is_tradfi_weekend", False),
+                "is_swap_shield_active": sched_info.get("is_swap_shield_active", False),
+                "is_triple_swap_night": sched_info.get("is_triple_swap_night", False),
+                "swap_settlement_ict": sched_info.get("swap_settlement_ict", "05:00 ICT"),
                 "now_ict": sched_info.get("now_ict", "")
             },
             "governor": {
@@ -1292,7 +1295,10 @@ async def handle_api_capital_schedule(request: web.Request) -> web.Response:
             "is_active": is_active,
             "reason": reason,
             "session_name_kh": info.get("session_name_kh", ""),
-            "session_name_en": info.get("session_name_en", "")
+            "session_name_en": info.get("session_name_en", ""),
+            "is_swap_shield_active": info.get("is_swap_shield_active", False),
+            "is_triple_swap_night": info.get("is_triple_swap_night", False),
+            "swap_settlement_ict": info.get("swap_settlement_ict", "05:00 ICT")
         })
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)

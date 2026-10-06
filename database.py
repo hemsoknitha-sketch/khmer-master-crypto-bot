@@ -979,7 +979,7 @@ def init_db():
             budget REAL DEFAULT 50.0,
             max_positions INTEGER DEFAULT 2,
             last_trade_time REAL DEFAULT 0.0,
-            schedule_mode TEXT DEFAULT 'SCHEDULE_MON_FRI',
+            schedule_mode TEXT DEFAULT 'SMART_SESSION_TIMED',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
@@ -2559,7 +2559,7 @@ def get_capital_auto_config(chat_id: int) -> dict:
                 "max_positions": int(row[2] or 2),
                 "last_trade_time": float(row[3] or 0.0),
                 "is_demo": bool(row[4]) if len(row) > 4 and row[4] is not None else False,
-                "schedule_mode": str(row[5]) if len(row) > 5 and row[5] else "SCHEDULE_MON_FRI"
+                "schedule_mode": str(row[5]) if len(row) > 5 and row[5] else "SMART_SESSION_TIMED"
             }
     except Exception:
         try:
@@ -2576,7 +2576,7 @@ def get_capital_auto_config(chat_id: int) -> dict:
                     "max_positions": int(row[2] or 2),
                     "last_trade_time": float(row[3] or 0.0),
                     "is_demo": bool(row[4]) if len(row) > 4 and row[4] is not None else False,
-                    "schedule_mode": "SCHEDULE_MON_FRI"
+                    "schedule_mode": "SMART_SESSION_TIMED"
                 }
         except Exception:
             try:
@@ -2593,11 +2593,11 @@ def get_capital_auto_config(chat_id: int) -> dict:
                         "max_positions": int(row[2] or 2),
                         "last_trade_time": float(row[3] or 0.0),
                         "is_demo": False,
-                        "schedule_mode": "SCHEDULE_MON_FRI"
+                        "schedule_mode": "SMART_SESSION_TIMED"
                     }
             except Exception:
                 conn.close()
-    return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0, "is_demo": False, "schedule_mode": "SCHEDULE_MON_FRI"}
+    return {"enabled": False, "budget": 50.0, "max_positions": 2, "last_trade_time": 0.0, "is_demo": False, "schedule_mode": "SMART_SESSION_TIMED"}
 
 def is_capital_auto_enabled(chat_id: int) -> bool:
     """Fast check if a user has enabled Capital.com Autonomous Trading."""
@@ -2610,9 +2610,9 @@ def set_capital_auto_config(
     budget: float = 50.0,
     max_positions: int = 2,
     is_demo: bool = False,
-    schedule_mode: str = "SCHEDULE_MON_FRI"
+    schedule_mode: str = "SMART_SESSION_TIMED"
 ):
-    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False, Mon-Fri 07:00-23:50 ICT)."""
+    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False, SMART_SESSION_TIMED)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2622,7 +2622,7 @@ def set_capital_auto_config(
     except Exception:
         pass
     try:
-        cursor.execute("ALTER TABLE capital_auto_config ADD COLUMN schedule_mode TEXT DEFAULT 'SCHEDULE_MON_FRI'")
+        cursor.execute("ALTER TABLE capital_auto_config ADD COLUMN schedule_mode TEXT DEFAULT 'SMART_SESSION_TIMED'")
         conn.commit()
     except Exception:
         pass
@@ -2641,8 +2641,8 @@ def set_capital_auto_config(
     conn.commit()
     conn.close()
 
-def set_capital_schedule_mode(chat_id: int, schedule_mode: str = "SCHEDULE_MON_FRI"):
-    """Sets schedule mode ('SCHEDULE_MON_FRI' or '24/7') for Capital Auto."""
+def set_capital_schedule_mode(chat_id: int, schedule_mode: str = "SMART_SESSION_TIMED"):
+    """Sets schedule mode ('SMART_SESSION_TIMED', 'SCHEDULE_MON_FRI' or '24/7') for Capital Auto."""
     cfg = get_capital_auto_config(chat_id)
     set_capital_auto_config(
         chat_id=chat_id,
@@ -2654,9 +2654,9 @@ def set_capital_schedule_mode(chat_id: int, schedule_mode: str = "SCHEDULE_MON_F
     )
 
 def get_capital_schedule_mode(chat_id: int) -> str:
-    """Returns the schedule mode ('SCHEDULE_MON_FRI' or '24/7') for a user."""
+    """Returns the schedule mode ('SMART_SESSION_TIMED', 'SCHEDULE_MON_FRI' or '24/7') for a user."""
     cfg = get_capital_auto_config(chat_id)
-    return cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
+    return cfg.get("schedule_mode", "SMART_SESSION_TIMED")
 
 def update_capital_auto_last_trade_time(chat_id: int, last_time: float):
     """Updates the last trade timestamp for cooldown calculations."""
@@ -2679,7 +2679,7 @@ def get_active_capital_auto_users() -> list:
             "budget": float(r[1]),
             "max_positions": int(r[2]),
             "is_demo": bool(r[3]) if len(r) > 3 and r[3] is not None else False,
-            "schedule_mode": str(r[4]) if len(r) > 4 and r[4] else "SCHEDULE_MON_FRI"
+            "schedule_mode": str(r[4]) if len(r) > 4 and r[4] else "SMART_SESSION_TIMED"
         } for r in rows]
     except Exception:
         try:
@@ -2691,7 +2691,7 @@ def get_active_capital_auto_users() -> list:
                 "budget": float(r[1]),
                 "max_positions": int(r[2]),
                 "is_demo": bool(r[3]) if len(r) > 3 and r[3] is not None else False,
-                "schedule_mode": "SCHEDULE_MON_FRI"
+                "schedule_mode": "SMART_SESSION_TIMED"
             } for r in rows]
         except Exception:
             try:
@@ -2703,7 +2703,7 @@ def get_active_capital_auto_users() -> list:
                     "budget": float(r[1]),
                     "max_positions": int(r[2]),
                     "is_demo": False,
-                    "schedule_mode": "SCHEDULE_MON_FRI"
+                    "schedule_mode": "SMART_SESSION_TIMED"
                 } for r in rows]
             except Exception:
                 conn.close()

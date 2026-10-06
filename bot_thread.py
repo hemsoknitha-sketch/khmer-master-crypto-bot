@@ -6354,16 +6354,18 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_cap_schedule_monfri", "btn_cap_schedule", "btn_cap_mon_fri"]:
                 db.set_capital_schedule_mode(chat_id, "SCHEDULE_MON_FRI")
                 try:
-                    await update.callback_query.answer("⏰ Capital Auto: បានកំណត់កាលវិភាគ ចន្ទ-សុក្រ (07:00-23:50 ICT)!", show_alert=True)
+                    await update.callback_query.answer("⏰ Capital Auto: បានកំណត់កាលវិភាគ ចន្ទ-សុក្រ (07:00-03:45 ICT គ្របដណ្តប់ Wall Street ពេញលេញ)!", show_alert=True)
                 except Exception:
                     pass
                 context.args = ["SCHEDULE"]
                 await capital_command(update, context)
             elif data in ["btn_cap_swap_shield_info", "btn_cap_swap_shield"]:
                 try:
-                    await update.callback_query.answer("🛡️ Zero-Swap Shield: ផ្អាក TradFi យប់ថ្ងៃសុក្រ ដល់ ចន្ទ ដើម្បីកាត់បន្ថយ Swap ៣ថ្ងៃ & Gap Risk! Crypto CFDs បន្តកើប Spread ២៤/៧!", show_alert=True)
+                    await update.callback_query.answer("🛡️ Super Smart Rollover Swap Shield: ផ្អាក TradFi 03:45-07:00 ICT & ចុងសប្តាហ៍ ដើម្បីការពារកម្រៃ Swap, Swap ៣ថ្ងៃរាត្រីថ្ងៃពុធ និង Spreads រីកធំ!", show_alert=False)
                 except Exception:
                     pass
+                context.args = ["SWAP_SHIELD"]
+                await capital_command(update, context)
             elif data == "btn_cap_req_verify":
                 try:
                     await update.callback_query.answer("✅ បានផ្ញើសំណើផ្ទៀងផ្ទាត់ទៅកាន់ Super Admin រួចរាល់!", show_alert=True)
@@ -24723,6 +24725,10 @@ class TelegramBotThread(BaseThread):
 
                     sched_kb = InlineKeyboardMarkup([
                         [
+                            InlineKeyboardButton("🎯 Smart Session", callback_data="btn_cap_smart_session"),
+                            InlineKeyboardButton("🛡️ Swap Shield", callback_data="btn_cap_swap_shield_info")
+                        ],
+                        [
                             InlineKeyboardButton("🔄 បើក 24/7 Reset Mode", callback_data="btn_cap_reset_247"),
                             InlineKeyboardButton("🤖 Capital Auto", callback_data="btn_cap_auto_toggle")
                         ],
@@ -24731,26 +24737,30 @@ class TelegramBotThread(BaseThread):
                         ]
                     ])
                     sched_msg = (
-                        f"⏰ **CAPITAL.COM MON-FRI SCHEDULE MODE ACTIVATED!** 🟢\n"
+                        f"⏰ **CAPITAL.COM MON-FRI WALL STREET SCHEDULE!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"📅 **ថ្ងៃប្រតិបត្តិការ ៖** `ថ្ងៃចន្ទ ដល់ ថ្ងៃសុក្រ (Monday - Friday)`\n"
-                        f"⏰ **ម៉ោងដំណើរការ ៖** `07:00 ព្រឹក ដល់ 11:50 យប់ (Cambodia Time UTC+7)`\n"
-                        f"⏳ **ម៉ោង Standby ៖** `11:50 យប់ ដល់ 07:00 ព្រឹក & ចុងសប្តាហ៍ (ផ្អាកចូល Trade ថ្មី)`\n"
+                        f"📅 **ថ្ងៃប្រតិបត្តិការ ៖** `ថ្ងៃចន្ទ ដល់ ថ្ងៃសុក្រ (Wall Street Close)`\n"
+                        f"⏰ **ម៉ោងដំណើរការ ៖** `07:00 ព្រឹក ដល់ 03:45 ទៀបភ្លឺ (គ្របដណ្តប់ Wall Street ពេញលេញ!)`\n"
+                        f"🛡️ **Rollover Swap Shield ៖** `03:45 ដល់ 07:00 ព្រឹក (ផ្អាកចូល TradFi ដើម្បីគេចពីកម្រៃ Swap & Spreads រីកធំ)`\n"
+                        f"⏳ **ម៉ោង Standby ចុងសប្តាហ៍ ៖** `សៅរ៍ 03:45 ព្រឹក ដល់ ចន្ទ 05:00 ព្រឹក ICT (TradFi Closed)`\n"
+                        f"🪙 **Crypto CFDs 24/7 ៖** `BTC, ETH, SOL បន្តកើបចំណេញ ២៤/៧ គ្មានថ្ងៃឈប់សម្រាក!`\n"
                         f"📶 **ស្ថានភាពបច្ចុប្បន្ន ៖** `{status_icon}` ({sched_dict.get('weekday_kh', '')} {sched_dict.get('now_ict', '')})\n"
                         f"🛡️ **Position Management ៖** `Breakeven Armor & Trailing TP ការពារ ២៤/៧`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"✨ _ប្រព័ន្ធនឹងស្កេន និងចូល Trade តាមម៉ោងកំណត់ច្បាស់លាស់ ដោយការពារការ Chop ចុងសប្តាហ៍!_\n"
+                        f"✨ _ប្រព័ន្ធស្កេន និងចូល Trade រហូតដល់ផ្សារអាមេរិកបិទទ្វារ (03:45 ICT) ដោយមិនខកខានឱកាស Power Hour!_\n"
                         f"💡 _VIP Users អាចចុច `/capital RESET` ដើម្បីបើកការវិនិយោគ ២៤/៧ ពេញម៉ោងគ្រប់ពេល!_"
                     ) if user_lang == 'khmer' else (
-                        f"⏰ **CAPITAL.COM MON-FRI SCHEDULE MODE ACTIVATED!** 🟢\n"
+                        f"⏰ **CAPITAL.COM MON-FRI WALL STREET SCHEDULE!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"📅 **Trading Days:** `Monday to Friday`\n"
-                        f"⏰ **Trading Window:** `07:00 AM to 11:50 PM (Cambodia Time UTC+7)`\n"
-                        f"⏳ **Standby Window:** `11:50 PM to 07:00 AM & Weekends (New entries paused)`\n"
+                        f"📅 **Trading Days:** `Monday to Friday (Through Wall Street Close)`\n"
+                        f"⏰ **Trading Window:** `07:00 AM to 03:45 AM ICT (Full US Wall Street Coverage)`\n"
+                        f"🛡️ **Rollover Swap Shield:** `03:45 AM to 07:00 AM ICT (TradFi paused to eliminate swap fees & spread blowout)`\n"
+                        f"⏳ **Weekend Standby:** `Saturday 03:45 AM to Monday 05:00 AM ICT (TradFi Closed Worldwide)`\n"
+                        f"🪙 **Crypto CFDs 24/7:** `BTC, ETH, SOL active 24/7 non-stop!`\n"
                         f"📶 **Current Status:** `{status_icon}` ({sched_dict.get('weekday', '')} {sched_dict.get('now_ict', '')})\n"
                         f"🛡️ **Position Guard:** `Breakeven Armor & Trailing TP active 24/7`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"✨ _System operates strictly within high-liquidity market hours!_\n"
+                        f"✨ _System operates through the Wall Street closing bell without missing power hour momentum!_\n"
                         f"💡 _VIP Users may send `/capital RESET` anytime to enable 24/7 continuous trading!_"
                     )
                     await update.effective_message.reply_text(sched_msg, parse_mode="Markdown", reply_markup=sched_kb)
@@ -24765,17 +24775,20 @@ class TelegramBotThread(BaseThread):
                     smart_kb = InlineKeyboardMarkup([
                         [
                             InlineKeyboardButton("⏰ ចន្ទ-សុក្រ (Mon-Fri)", callback_data="btn_cap_schedule_monfri"),
-                            InlineKeyboardButton("🔄 24/7 Reset Mode", callback_data="btn_cap_reset_247")
+                            InlineKeyboardButton("🛡️ Swap Shield Radar", callback_data="btn_cap_swap_shield_info")
                         ],
                         [
-                            InlineKeyboardButton("🤖 Capital Auto", callback_data="btn_cap_auto_toggle"),
+                            InlineKeyboardButton("🔄 24/7 Reset Mode", callback_data="btn_cap_reset_247"),
+                            InlineKeyboardButton("🤖 Capital Auto", callback_data="btn_cap_auto_toggle")
+                        ],
+                        [
                             InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
                         ]
                     ])
                     smart_msg = (
                         f"🎯 **CAPITAL.COM SUPER SMART SESSION-TIMED ACTIVATED!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"⚙️ **របៀបប្រតិបត្តិការ ៖** `Super Smart វិនិយោគតាមម៉ោង/វេនទីផ្សារ`\n"
+                        f"⚙️ **របៀបប្រតិបត្តិការ ៖** `Super Smart វិនិយោគតាមម៉ោង/វេនទីផ្សារស្ថាប័ន`\n"
                         f"📶 **វេនទីផ្សារបច្ចុប្បន្ន ៖** `{sess_kh}`\n"
                         f"⏰ **ម៉ោងបច្ចុប្បន្ន ៖** `{sched_dict.get('weekday_kh', '')} {sched_dict.get('now_ict', '')}`\n"
                         f"{ui_standards.DIVIDER_LIGHT}\n"
@@ -24787,11 +24800,13 @@ class TelegramBotThread(BaseThread):
                         f"• 🇺🇸 **Wall Street NY (20:30-03:45 ICT) ៖**\n"
                         f"  `US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL` (Apex Trend + SMC OB)\n"
                         f"{ui_standards.DIVIDER_LIGHT}\n"
-                        f"🛡️ **ZERO-SWAP & WEEKEND GAP SHIELD ៖**\n"
-                        f"• **សុក្រ 03:45 ព្រឹក ដល់ ចន្ទ 05:00 ព្រឹក ICT ៖** ផ្អាកចូល TradFi ដាច់ខាត (ការពារ Swap ៣ថ្ងៃ & Gap Risk)\n"
+                        f"🛡️ **SUPER SMART ROLLOVER SWAP SHIELD ៖**\n"
+                        f"• 🌙 **រាល់យប់ 03:45 ដល់ 07:00 ព្រឹក ICT ៖** ផ្អាកចូល TradFi ពេលផ្សារអាមេរិកបិទទ្វារ (គេចផុតពីកម្រៃ Swap ឆ្លងយប់ & Spreads រីកធំ)\n"
+                        f"• ⚠️ **Wednesday Triple-Swap Shield ៖** ផ្អាកចូល TradFi យប់ថ្ងៃពុធ (03:15 ICT ព្រឹកព្រហស្បតិ៍) ដើម្បីការពារ Swap ៣ថ្ងៃ (300% Fee)!\n"
+                        f"• 🏖️ **ចុងសប្តាហ៍ (សុក្រ 03:45 ដល់ ចន្ទ 05:00 ICT) ៖** ការពារ Gap Risk ឆ្លងសប្តាហ៍\n"
                         f"• 🪙 **Crypto CFDs (BTC, ETH, SOL) ៖** ដំណើរការ ២៤/៧ ជាប់រហូត គ្មានថ្ងៃឈប់សម្រាកដើម្បីកើប Spread សម្រេច Tier 2/3/4!\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"💡 _បញ្ជាប្តូរ ៖_ `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``"
+                        f"💡 _បញ្ជាប្តូរ ៖_ `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital SWAP_SHIELD` ``"
                     ) if user_lang == 'khmer' else (
                         f"🎯 **CAPITAL.COM SUPER SMART SESSION-TIMED ACTIVATED!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -24807,13 +24822,83 @@ class TelegramBotThread(BaseThread):
                         f"• 🇺🇸 **Wall Street NY (20:30-03:45 ICT):**\n"
                         f"  `US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL` (Apex Trend + SMC OB)\n"
                         f"{ui_standards.DIVIDER_LIGHT}\n"
-                        f"🛡️ **ZERO-SWAP & WEEKEND GAP SHIELD:**\n"
-                        f"• **Fri 20:45 UTC to Sun 22:00 UTC:** TradFi entries locked (Protects 3-day swap rollover & weekend gaps)\n"
+                        f"🛡️ **SUPER SMART ROLLOVER SWAP SHIELD:**\n"
+                        f"• 🌙 **Daily 03:45 AM - 07:00 AM ICT:** TradFi paused during US overnight close to eliminate swap charges & spread blowout\n"
+                        f"• ⚠️ **Wednesday Triple-Swap Shield:** Heightened defense on Wed nights to block 3-day rollover fee trap\n"
+                        f"• 🏖️ **Weekend Gap Shield:** Fri 20:45 UTC to Sun 22:00 UTC strictly protects against weekend gap risk\n"
                         f"• 🪙 **Crypto CFDs (BTC, ETH, SOL):** Active 24/7 non-stop to accumulate institutional spread rebates!\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"💡 _Switch Modes:_ `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital RESET` ``"
+                        f"💡 _Switch Modes:_ `` `/capital SMART_SESSION` `` | `` `/capital SCHEDULE` `` | `` `/capital SWAP_SHIELD` ``"
                     )
                     await update.effective_message.reply_text(smart_msg, parse_mode="Markdown", reply_markup=smart_kb)
+                    return
+
+                elif action in ["SWAP_SHIELD", "SWAP", "ROLLOVER", "SWAPSHIELD"]:
+                    swap_data = capital_engine.evaluate_capital_rollover_swap_shield()
+                    status_str = swap_data.get("status", "MONITORING 🟢")
+                    mins_to_swap = swap_data.get("mins_to_swap", 0)
+                    hrs_rem = mins_to_swap // 60
+                    mins_rem = mins_to_swap % 60
+                    is_trip = swap_data.get("is_triple_swap_night", False)
+                    trip_badge = "⚠️ ACTIVE (3x Rollover Swap Night!)" if is_trip else "⚪ Normal (1x Daily Swap)"
+
+                    swap_kb = InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("🎯 Smart Session", callback_data="btn_cap_smart_session"),
+                            InlineKeyboardButton("⏰ ចន្ទ-សុក្រ (Mon-Fri)", callback_data="btn_cap_schedule_monfri")
+                        ],
+                        [
+                            InlineKeyboardButton("🔄 Refresh Status", callback_data="btn_cap_swap_shield_info"),
+                            InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                        ]
+                    ])
+
+                    swap_msg = (
+                        f"🛡️ **SUPER SMART ROLLOVER SWAP SHIELD AUDIT** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📶 **ស្ថានភាព Shield ៖** `{status_str}`\n"
+                        f"⏰ **ម៉ោងបច្ចុប្បន្ន ៖** `{swap_data.get('now_ict')} ({swap_data.get('now_utc')})`\n"
+                        f"⏳ **ពេលនៅសល់ដល់ Rollover ៖** `{hrs_rem}h {mins_rem}m`\n"
+                        f"🏛️ **ម៉ោងកាត់កម្រៃ Swap ៖** `22:00 UTC (05:00 ព្រឹក ICT)`\n"
+                        f"🇺🇸 **ម៉ោងបិទផ្សារ Wall Street ៖** `04:00 ទៀបភ្លឺ ICT (21:00 UTC)`\n"
+                        f"⚠️ **Wednesday Triple-Swap ៖** `{trip_badge}`\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"📋 **មូលហេតុបិទជួញដូរ TradFi ពេលកណ្តាលអធ្រាត្រ ៖**\n"
+                        f"1. **TradFi Market Closed (គ្មាន Volume) ៖** ផ្សារហ៊ុនអាមេរិក (S&P 500, Nasdaq, NVDA, TSLA) និងអឺរ៉ុប (DAX) បិទទ្វារនៅម៉ោង 04:00-05:00 ទៀបភ្លឺ ICT។ គ្មាន Volume ជួញដូរទាល់តែសោះ!\n"
+                        f"2. **Overnight Financing / Swap Fee Drag ៖** Broker កាត់ថ្លៃការប្រាក់ឆ្លងយប់នៅម៉ោង 22:00 UTC (05:00 ICT)។ ការកាន់កាត់ម៉ោងនេះស៊ីសាច់ប្រាក់ចំណេញ!\n"
+                        f"3. **Spread Explosion (រីកធំ 3x-10x) ៖** ចន្លោះម៉ោង 04:45-05:15 ICT Liquidity Provider ដក Quote ធ្វើឱ្យ Spread រីកធំខ្លាំង ងាយកាត់ SL ខុសទំនង!\n"
+                        f"4. **Wednesday Triple-Swap Trap ៖** យប់ថ្ងៃពុធ Broker កាត់ Swap ៣ ថ្ងៃក្នុងពេលតែមួយ (300% Fee)!\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"🛡️ **ដំណោះស្រាយរបស់ Angkor Quant AI ៖**\n"
+                        f"• ផ្អាកចូល TradFi ដាច់ខាតចាប់ពី 03:45 ដល់ 07:00 ព្រឹក ICT!\n"
+                        f"• Pre-Rollover Harvest ៖ កើបប្រាក់ចំណេញ និងរុញ SL ការពារដើមទុនមុនពេល Swap ចូលមកដល់!\n"
+                        f"• 🪙 Crypto CFDs (BTC, ETH, SOL) បន្តកើបចំណេញ ២៤/៧ គ្មានការរំខាន!\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _កាត់បន្ថយការខាតបង់ដោយសារកម្រៃ Swap ១០០% ស្របតាមក្បួន Zero Technical Negligence!_"
+                    ) if user_lang == 'khmer' else (
+                        f"🛡️ **SUPER SMART ROLLOVER SWAP SHIELD AUDIT** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📶 **Shield Status:** `{status_str}`\n"
+                        f"⏰ **Current Time:** `{swap_data.get('now_ict')} ({swap_data.get('now_utc')})`\n"
+                        f"⏳ **Time to Daily Rollover:** `{hrs_rem}h {mins_rem}m`\n"
+                        f"🏛️ **Broker Swap Settlement:** `22:00 UTC (05:00 AM ICT)`\n"
+                        f"🇺🇸 **US Market Close:** `04:00 AM ICT (21:00 UTC)`\n"
+                        f"⚠️ **Wednesday Triple-Swap:** `{trip_badge}`\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"📋 **Institutional Midnight Trading Reality:**\n"
+                        f"1. **TradFi Market Closed (Zero Volume):** US & European markets close between 04:00-05:00 AM ICT. Liquidity is virtually zero until Tokyo opens at 07:00 AM ICT.\n"
+                        f"2. **Overnight Financing Drag:** Holding CFD positions across 22:00 UTC incurs financing debits (SOFR + 2.5%-3.0% annualized).\n"
+                        f"3. **Spread Explosion (3x-10x):** Interbank spreads blow out between 04:45-05:15 AM ICT during broker settlement.\n"
+                        f"4. **Wednesday Triple-Swap:** Wednesday rolls over 3 full days of financing fees (300% penalty).\n"
+                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                        f"🛡️ **Angkor Quant AI Solution:**\n"
+                        f"• Hard block on new TradFi entries between 03:45 AM and 07:00 AM ICT.\n"
+                        f"• Pre-Rollover Profit Harvest & Armor Lock secures open gains before swap cuts.\n"
+                        f"• 🪙 Crypto CFDs (BTC, ETH, SOL) trade 24/7 continuously.\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"💡 _Zero swap drag and zero spread blowout risk certified!_"
+                    )
+                    await update.effective_message.reply_text(swap_msg, parse_mode="Markdown", reply_markup=swap_kb)
                     return
 
             # Auto config & status
@@ -25278,7 +25363,7 @@ class TelegramBotThread(BaseThread):
                 pass
 
             # Schedule Status Badge
-            sched_mode = auto_cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
+            sched_mode = auto_cfg.get("schedule_mode", "SMART_SESSION_TIMED")
             is_sched_active, sched_desc, sched_dict = capital_engine.is_capital_trading_schedule_active(sched_mode)
             if sched_mode in ["24/7", "247", "RESET", "ALWAYS_ON"]:
                 sched_badge_kh = "🔄 24/7 Continuous (RESET Mode 🟢)"
@@ -25287,11 +25372,11 @@ class TelegramBotThread(BaseThread):
                 sched_badge_kh = f"🎯 Smart Session 🟢 ({sched_dict.get('session_name_kh', 'Kill Zones + Crypto 24/7')})"
                 sched_badge_en = f"🎯 Smart Session 🟢 ({sched_dict.get('session_name_en', 'Kill Zones + Crypto 24/7')})"
             elif is_sched_active:
-                sched_badge_kh = f"🟢 OPEN ({sched_dict.get('weekday_kh', 'ចន្ទ-សុក្រ')} 07:00-23:50 ICT)"
-                sched_badge_en = f"🟢 OPEN ({sched_dict.get('weekday', 'Mon-Fri')} 07:00-23:50 ICT)"
+                sched_badge_kh = f"🟢 OPEN ({sched_dict.get('weekday_kh', 'ចន្ទ-សុក្រ')} 07:00-03:45 ICT)"
+                sched_badge_en = f"🟢 OPEN ({sched_dict.get('weekday', 'Mon-Fri')} 07:00-03:45 ICT)"
             else:
-                sched_badge_kh = f"⏳ STANDBY ({sched_dict.get('weekday_kh', '')} | ផ្អាកចូលថ្មី | Resumes 07:00 ICT)"
-                sched_badge_en = f"⏳ STANDBY ({sched_dict.get('weekday', '')} | Entries Paused | Resumes 07:00 ICT)"
+                sched_badge_kh = f"🛡️ SWAP SHIELD ({sched_dict.get('weekday_kh', '')} | ផ្អាកចូលថ្មី | Resumes 07:00 ICT)"
+                sched_badge_en = f"🛡️ SWAP SHIELD ({sched_dict.get('weekday', '')} | Entries Paused | Resumes 07:00 ICT)"
 
             if user_lang == 'khmer':
                 msg = (

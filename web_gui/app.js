@@ -2065,9 +2065,19 @@ function renderSessionRadar(sched) {
         if (sched.is_tradfi_weekend) {
             shieldEl.textContent = '🛡️ Weekend Gap Shield ACTIVE (Crypto 24/7)';
             shieldEl.style.display = 'inline-block';
-        } else {
-            shieldEl.textContent = '🛡️ Zero-Swap Shield';
+            shieldEl.style.color = '#38bdf8';
+        } else if (sched.is_triple_swap_night) {
+            shieldEl.textContent = '⚠️ Wednesday Triple Swap Shield (3x Rollover)';
             shieldEl.style.display = 'inline-block';
+            shieldEl.style.color = '#f59e0b';
+        } else if (sched.is_swap_shield_active) {
+            shieldEl.textContent = '🛡️ Rollover Swap Shield ACTIVE (03:45-07:00 ICT)';
+            shieldEl.style.display = 'inline-block';
+            shieldEl.style.color = '#38bdf8';
+        } else {
+            shieldEl.textContent = '🛡️ Super Smart Rollover Swap Shield';
+            shieldEl.style.display = 'inline-block';
+            shieldEl.style.color = '#10b981';
         }
     }
     const mode = sched.mode || 'SMART_SESSION_TIMED';
