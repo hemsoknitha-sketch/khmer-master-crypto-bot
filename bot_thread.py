@@ -6480,14 +6480,33 @@ class TelegramBotThread(BaseThread):
             elif data.startswith("btn_cap_admin_on_"):
                 target_uid = int(data.replace("btn_cap_admin_on_", "").strip())
                 db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
-                db.set_capital_auto_config(target_uid, enabled=True, budget=50.0, max_positions=2, is_demo=False)
+                ex_cfg = db.get_capital_auto_config(target_uid)
+                curr_budget = float(ex_cfg.get("budget", 50.0) or 50.0)
+                curr_sched = ex_cfg.get("schedule_mode", "SMART_SESSION_TIMED") or "SMART_SESSION_TIMED"
+                curr_max_pos = int(ex_cfg.get("max_positions", 2) or 2)
+                
+                # Check live account balance to unleash institutional 10 positions
                 try:
-                    await update.callback_query.answer(f"✅ បានបើក Capital Auto Live ($50) សម្រាប់ {target_uid}!", show_alert=True)
+                    u_eng = capital_engine.get_user_capital_engine(target_uid, is_demo=False)
+                    b_inf = u_eng.get_account_balance()
+                    real_bal = float(b_inf.get("balance", 0.0) or 0.0)
+                    if real_bal > 0:
+                        curr_budget = max(curr_budget, real_bal)
+                except Exception:
+                    pass
+                
+                opt_pos = capital_engine.get_dynamic_max_positions_for_equity(curr_budget, curr_max_pos)
+                if curr_budget >= 100.0:
+                    opt_pos = max(opt_pos, curr_max_pos)
+                
+                db.set_capital_auto_config(target_uid, enabled=True, budget=curr_budget, max_positions=opt_pos, is_demo=False, schedule_mode=curr_sched)
+                try:
+                    await update.callback_query.answer(f"✅ បានបើក Capital Auto Live (${curr_budget:,.0f} | {opt_pos} Pos) សម្រាប់ {target_uid}!", show_alert=True)
                 except Exception:
                     pass
                 await update.effective_message.reply_text(
                     f"🟢 **[CAPITAL.COM LIVE AUTO-TRADE ACTIVATED]**\n"
-                    f"User `{target_uid}` ត្រូវបានបើកដំណើរការ Live Real Capital Auto Trade ($50.00/Trade, Max 2 Positions) ដោយជោគជ័យ!",
+                    f"User `{target_uid}` ត្រូវបានបើកដំណើរការ Live Real Capital Auto Trade (${curr_budget:,.2f}/Trade, Max {opt_pos} Positions) ដោយជោគជ័យ!",
                     parse_mode="Markdown"
                 )
                 try:
@@ -6495,7 +6514,7 @@ class TelegramBotThread(BaseThread):
                         f"🎉 **[CAPITAL.COM LIVE VIP AUTO-TRADE ACTIVATED!]** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"គណនី Live Real Capital របស់អ្នកត្រូវបានបើកដំណើរការដោយ Super Admin រួចរាល់ហើយ!\n\n"
-                        f"💰 **ទុនវិនិយោគ ៖** `$50.00 USD / Trade` (Max 2 Positions)\n"
+                        f"💰 **ទុនវិនិយោគ ៖** `${curr_budget:,.2f} USD / Trade` (Max {opt_pos} Positions)\n"
                         f"⚙️ **បរិយាកាស ៖** `🟢 LIVE MAINNET (Real Funds)`\n"
                         f"🛡️ **ការការពារ ៖** `Breakeven Armor & Golden 80% Trailing Ratchet ២៤/៧!`\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -24295,7 +24314,8 @@ class TelegramBotThread(BaseThread):
                 lines.append(f"{ui_standards.DIVIDER_HEAVY}")
                 lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
                 lines.append("• `` `/admin_capital spread` `` (ពិនិត្យ Real Live Total Spread ប្រព័ន្ធទាំងមូល)")
-                lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade ភ្លាម)")
+                lines.append("• `` `/admin_capital on <Account_ID> 400 live 10 24/7` `` (បើក Auto Trade ១០ កាក់ ស្មើដៃ Admin ២៤/៧)")
+                lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade កម្រិតទូទៅ)")
                 lines.append("• `` `/admin_capital off <Account_ID>` `` (បិទ Auto Trade)")
                 lines.append("• `` `/admin_capital approve <Account_ID>` `` (អនុម័តសិទ្ធិ Live)")
                 await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(kb_rows) if kb_rows else None)
@@ -24303,10 +24323,10 @@ class TelegramBotThread(BaseThread):
 
             sub = args[0].upper()
 
-            # Command: /admin_capital ON <chat_id_or_acc_id> [budget] [live|demo]
+            # Command: /admin_capital ON <chat_id_or_acc_id> [budget] [live|demo] [max_positions] [schedule_mode]
             if sub in ["ON", "START", "ACTIVATE", "ENABLE"]:
                 if len(args) < 2:
-                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital on 329979279335052484 50 live 5` ``", parse_mode="Markdown")
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ Account ID ឬ Chat ID: `` `/admin_capital on 1612591526 400 live 10 24/7` ``", parse_mode="Markdown")
                     return
 
                 target_uid, u_record = _resolve_target(args[1])
@@ -24320,10 +24340,25 @@ class TelegramBotThread(BaseThread):
 
                 # Auto verify referral
                 db.set_capital_user_referral_status(target_uid, is_verified=True, referral_code="az48cxia")
-                max_pos = 3 if budget <= 15.0 else 2
                 if len(args) >= 5 and args[4].isdigit():
                     max_pos = int(args[4])
-                db.set_capital_auto_config(target_uid, enabled=True, budget=budget, max_positions=max_pos, is_demo=is_demo)
+                else:
+                    max_pos = capital_engine.get_dynamic_max_positions_for_equity(budget)
+                    if budget <= 15.0:
+                        max_pos = 3
+
+                # Optional 6th argument: Schedule Mode (e.g. 24/7 or SMART_SESSION_TIMED)
+                sched_mode = None
+                if len(args) >= 6:
+                    raw_s = str(args[5]).upper().strip()
+                    if raw_s in ["24/7", "247", "RESET", "ALWAYS_ON", "CONTINUOUS", "ALL_TIME"]:
+                        sched_mode = "24/7"
+                    elif raw_s in ["MON_FRI", "WEEKDAY", "SCHEDULE_MON_FRI"]:
+                        sched_mode = "SCHEDULE_MON_FRI"
+                    elif raw_s in ["TIMED", "SMART", "SMART_SESSION_TIMED"]:
+                        sched_mode = "SMART_SESSION_TIMED"
+
+                db.set_capital_auto_config(target_uid, enabled=True, budget=budget, max_positions=max_pos, is_demo=is_demo, schedule_mode=sched_mode)
 
                 # Fetch real balance for feedback
                 bal_str = "N/A"

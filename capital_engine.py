@@ -3036,9 +3036,19 @@ class CapitalAutonomousEngine:
         user_equity = 0.0
         try:
             bal_info = await asyncio.to_thread(user_engine.get_account_balance)
-            user_avail = float(bal_info.get("available", 0.0) or 0.0)
-            user_bal = float(bal_info.get("balance", 0.0) or 0.0)
-            user_equity = float(bal_info.get("equity", 0.0) or (user_bal if user_bal > 0 else user_avail))
+            if bal_info.get("success"):
+                user_avail = float(bal_info.get("available", 0.0) or 0.0)
+                user_bal = float(bal_info.get("balance", 0.0) or 0.0)
+                user_equity = float(bal_info.get("equity", 0.0) or (user_bal if user_bal > 0 else user_avail))
+                # Fallback to configured budget if available cash is zero or unreturned to prevent false block
+                if user_avail <= 0.0 and budget > 0:
+                    user_avail = budget
+                    user_bal = max(user_bal, budget)
+                    user_equity = max(user_equity, budget)
+            else:
+                user_avail = budget
+                user_bal = budget
+                user_equity = budget
         except Exception:
             user_avail = budget
             user_bal = budget
@@ -5649,7 +5659,7 @@ class CapitalForexExchangeSuite:
         """Sub-millisecond concurrent trade dispatcher for Forex Exchange Suite."""
         chat_id = user_cfg["chat_id"]
         budget = user_cfg.get("budget", 10.0)
-        is_demo = user_cfg.get("is_demo", True)
+        is_demo = bool(user_cfg.get("is_demo", False))
 
         if not is_demo and not db.is_capital_user_authorized(chat_id):
             return False
@@ -5670,8 +5680,14 @@ class CapitalForexExchangeSuite:
         # Available balance check for dynamic equity
         try:
             bal_info = await asyncio.to_thread(user_engine.get_account_balance)
-            user_avail = float(bal_info.get("available", budget) or budget)
-            user_bal = float(bal_info.get("balance", budget) or budget)
+            if bal_info.get("success"):
+                user_avail = float(bal_info.get("available", budget) or budget)
+                user_bal = float(bal_info.get("balance", budget) or budget)
+                if user_avail <= 0.0 and budget > 0:
+                    user_avail = float(budget)
+            else:
+                user_avail = float(budget or 10.0)
+                user_bal = float(budget or 10.0)
         except Exception:
             user_avail = float(budget or 10.0)
             user_bal = float(budget or 10.0)
