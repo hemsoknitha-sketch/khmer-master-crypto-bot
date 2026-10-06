@@ -2504,12 +2504,16 @@ class CapitalAutonomousEngine:
         raw_sig = base_quant.get("signal", "HOLD_NEUTRAL")
         smc_act = base_quant.get("smc_action", "WAIT")
         smc_cf = float(base_quant.get("smc_confidence", 50.0))
+        rsi_val = float(base_quant.get("rsi", 50.0))
 
-        if (raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "BUY" and smc_cf >= 85.0):
+        # Anti-Overbought / Anti-Oversold Guards (Invariant 16 & Dimension 7 Anti-FOMO):
+        # Strictly block BUY if RSI > 70.0 (chasing overbought top)
+        # Strictly block SELL if RSI < 36.0 (panic selling bottom)
+        if ((raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "BUY" and smc_cf >= 85.0)) and rsi_val <= 70.0:
             base_quant["final_action"] = "BUY"
             if smc_act == "BUY":
                 base_quant["final_confidence"] = max(final_conf, smc_cf)
-        elif (raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "SELL" and smc_cf >= 85.0):
+        elif ((raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "SELL" and smc_cf >= 85.0)) and rsi_val >= 36.0:
             base_quant["final_action"] = "SELL"
             if smc_act == "SELL":
                 base_quant["final_confidence"] = max(final_conf, smc_cf)
@@ -3023,10 +3027,11 @@ class CapitalAutonomousEngine:
             for pos in user_open_positions
         }
 
-        # Find the best candidate setup that this user DOES NOT currently hold!
-        target_setup_tuple = None
+        # Iterate through candidate setups descending by rank score.
+        # If candidate #1 fails pre-flight verification (e.g. spread spike, blackout, RSI guard),
+        # continue to the next candidate setup instead of aborting the user's entire cycle!
         for cand in candidate_setups:
-            cand_rank, cand_epic, cand_res_epic, cand_setup = cand
+            cand_rank, cand_epic, cand_res_epic, setup = cand
             if cand_res_epic in user_epics:
                 continue
 
@@ -3042,206 +3047,210 @@ class CapitalAutonomousEngine:
                 logger.debug(f"⏳ [SCHEDULE FILTER] Skipping {cand_res_epic} for user {chat_id}: {cand_reason}")
                 continue
 
-            target_setup_tuple = cand
-            break
+            resolved_epic = cand_res_epic
+            final_action = setup.get("final_action", "HOLD")
+            confidence = setup.get("final_confidence", 0)
+            if final_action not in ["BUY", "SELL"]:
+                continue
 
-        if not target_setup_tuple:
-            return False
-
-        best_rank, best_epic, resolved_epic, setup = target_setup_tuple
-        final_action = setup["final_action"]
-        confidence = setup["final_confidence"]
-
-        # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
-        entry_p = float(setup.get("ask", 0.0) if final_action == "BUY" else setup.get("bid", 0.0))
-        sl_p = float(setup.get("sl") or setup.get("stop_loss", 0.0))
-        tp_p = float(setup.get("tp") or setup.get("take_profit", 0.0))
-        size = get_capital_kelly_sizer().calculate_lot_size(
-            chat_id=chat_id,
-            epic=resolved_epic,
-            entry_price=entry_p,
-            sl_price=sl_p,
-            tp_price=tp_p,
-            confidence_score=confidence,
-            budget=budget,
-            available_equity=user_avail
-        )
-
-        # Pillar 5: Cross-Asset Correlation Clamping (Beta > 0.85 Contagion Shield)
-        try:
-            import portfolio_circuit_breaker
-            size, corr_msg = portfolio_circuit_breaker.apply_cross_asset_correlation_clamp(
-                proposed_epic=resolved_epic,
-                base_size=size,
-                open_epics=list(user_epics)
-            )
-        except Exception as e_cc:
-            logger.debug(f"Correlation clamping note: {e_cc}")
-
-        # Pillar 6: Sky Net 360° Pre-Flight Holistic Verification
-        try:
-            is_360_ok, r_360_msg, _ = get_capital_skynet_360_radar().evaluate_360_preflight(
-                epic=resolved_epic,
-                direction=final_action,
-                engine=user_engine,
+            # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
+            entry_p = float(setup.get("ask", 0.0) if final_action == "BUY" else setup.get("bid", 0.0))
+            sl_p = float(setup.get("sl") or setup.get("stop_loss", 0.0))
+            tp_p = float(setup.get("tp") or setup.get("take_profit", 0.0))
+            size = get_capital_kelly_sizer().calculate_lot_size(
                 chat_id=chat_id,
-                user_avail=user_avail,
-                app=app,
-                is_demo=user_is_demo
-            )
-            if not is_360_ok:
-                logger.info(f"🛡️ [360° RADAR BLOCK] {resolved_epic} {final_action} blocked for User {chat_id}: {r_360_msg}")
-                return False
-        except Exception as e_360:
-            logger.debug(f"360 Pre-flight check note: {e_360}")
-
-        # Instant Concurrent Order Execution (< 0.0005ms Thread Fan-Out)
-        trade_res = await asyncio.to_thread(
-            user_engine.execute_smart_tradfi_order,
-            epic=resolved_epic,
-            direction=final_action,
-            size=size
-        )
-
-        if trade_res.get("success"):
-            deal_ref = trade_res.get("deal_reference", "AUTO")
-            deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
-            entry_px = setup.get("ask" if final_action == "BUY" else "bid", 0.0)
-            sl = trade_res.get("sl", 0.0)
-            tp = trade_res.get("tp", 0.0)
-            executed_size = trade_res.get("size", size or 0.01)
-
-            # Record in database
-            db.record_capital_auto_trade(
-                chat_id=chat_id,
-                deal_id=str(deal_id),
-                deal_reference=str(deal_ref),
                 epic=resolved_epic,
-                direction=final_action,
-                size=executed_size,
-                entry_price=entry_px,
-                sl=sl,
-                tp=tp
+                entry_price=entry_p,
+                sl_price=sl_p,
+                tp_price=tp_p,
+                confidence_score=confidence,
+                budget=budget,
+                available_equity=user_avail
             )
-            db.update_capital_auto_last_trade_time(chat_id, now)
+            if not size or size <= 0:
+                logger.debug(f"Kelly sizer returned zero size for {resolved_epic}, testing next setup.")
+                continue
 
-            # Attribute IB Volume & Spread Rebates to referring partner & master admin
+            # Pillar 5: Cross-Asset Correlation Clamping (Beta > 0.85 Contagion Shield)
             try:
-                partner_id = db.get_user_capital_referrer(chat_id)
-                benchmarks = CAPITAL_IB_MANAGER.SPREAD_BENCHMARKS.get(resolved_epic, {})
-                sp_rate = benchmarks.get("spread_per_lot", 25.0)
-                sp_usd = round(sp_rate * executed_size, 2)
-                
-                # Record for direct partner
-                CAPITAL_IB_MANAGER.record_trade_rebate(
-                    chat_id=partner_id,
-                    asset=resolved_epic,
-                    lots=executed_size,
-                    spread_usd=sp_usd,
-                    client_ref=f"Trader_{chat_id}"
+                import portfolio_circuit_breaker
+                size, corr_msg = portfolio_circuit_breaker.apply_cross_asset_correlation_clamp(
+                    proposed_epic=resolved_epic,
+                    base_size=size,
+                    open_epics=list(user_epics)
                 )
-                
-                # If sub-partner, record 20% Master Override for Super Admin (859271875)
-                if partner_id != 859271875:
-                    override_usd = round(sp_usd * 0.20, 2)
-                    db.record_capital_ib_rebate_log(
-                        chat_id=859271875,
+            except Exception as e_cc:
+                logger.debug(f"Correlation clamping note: {e_cc}")
+
+            if not size or size <= 0:
+                continue
+
+            # Pillar 6: Sky Net 360° Pre-Flight Holistic Verification
+            try:
+                is_360_ok, r_360_msg, _ = get_capital_skynet_360_radar().evaluate_360_preflight(
+                    epic=resolved_epic,
+                    direction=final_action,
+                    engine=user_engine,
+                    chat_id=chat_id,
+                    user_avail=user_avail,
+                    app=app,
+                    is_demo=user_is_demo
+                )
+                if not is_360_ok:
+                    logger.info(f"🛡️ [360° RADAR BLOCK] {resolved_epic} {final_action} blocked for User {chat_id}: {r_360_msg}. Evaluating next candidate setup...")
+                    continue
+            except Exception as e_360:
+                logger.debug(f"360 Pre-flight check note: {e_360}")
+
+            # Instant Concurrent Order Execution (< 0.0005ms Thread Fan-Out)
+            trade_res = await asyncio.to_thread(
+                user_engine.execute_smart_tradfi_order,
+                epic=resolved_epic,
+                direction=final_action,
+                size=size
+            )
+
+            if trade_res.get("success"):
+                deal_ref = trade_res.get("deal_reference", "AUTO")
+                deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
+                entry_px = setup.get("ask" if final_action == "BUY" else "bid", 0.0)
+                sl = trade_res.get("sl", 0.0)
+                tp = trade_res.get("tp", 0.0)
+                executed_size = trade_res.get("size", size or 0.01)
+
+                # Record in database
+                db.record_capital_auto_trade(
+                    chat_id=chat_id,
+                    deal_id=str(deal_id),
+                    deal_reference=str(deal_ref),
+                    epic=resolved_epic,
+                    direction=final_action,
+                    size=executed_size,
+                    entry_price=entry_px,
+                    sl=sl,
+                    tp=tp
+                )
+                db.update_capital_auto_last_trade_time(chat_id, now)
+
+                # Attribute IB Volume & Spread Rebates to referring partner & master admin
+                try:
+                    partner_id = db.get_user_capital_referrer(chat_id)
+                    benchmarks = CAPITAL_IB_MANAGER.SPREAD_BENCHMARKS.get(resolved_epic, {})
+                    sp_rate = benchmarks.get("spread_per_lot", 25.0)
+                    sp_usd = round(sp_rate * executed_size, 2)
+                    
+                    # Record for direct partner
+                    CAPITAL_IB_MANAGER.record_trade_rebate(
+                        chat_id=partner_id,
                         asset=resolved_epic,
                         lots=executed_size,
                         spread_usd=sp_usd,
-                        rebate_usd=override_usd,
-                        client_ref=f"Override_Partner_{partner_id}",
-                        status="OVERRIDE_CREDITED"
+                        client_ref=f"Trader_{chat_id}"
                     )
-            except Exception as e_reb:
-                logger.debug(f"IB Rebate attribution notice: {e_reb}")
-
-            # Send Telegram Notification
-            if app and hasattr(app, "bot"):
-                try:
-                    user_lang = db.get_user_language(chat_id)
-                    import ui_standards
-                    env_lbl = "DEMO ($10,000)" if user_engine.is_demo else "LIVE MAINNET"
-                    dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
-                    adx_str = f"{setup.get('adx', 0):.1f}"
-                    rvol_str = f"{setup.get('rvol', 1.0):.1f}x"
                     
-                    if user_lang == 'khmer':
-                        notif_msg = (
-                            f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"⚙️ **គណនី ៖** `{env_lbl}`\n"
-                            f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
-                            f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
-                            f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
-                            f"📊 **កម្លាំង Trend & Volume ៖** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
-                            f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
-                            f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
-                            f"🛑 **Stop-Loss (1R) ៖** `${sl:,.2f}`\n"
-                            f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
-                            f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"🛡️ **ក្បួនការពារ & កើបចំណេញ Asymmetric R:R ≥ 1:6 ៖**\n"
-                            f"• Tier 1: Breakeven Armor នៅ +4.8% ROI (Wide Breathing Room, Risk -> 0.00R)\n"
-                            f"• Tier 2: Capital Fortress Lock (+1.5R) នៅ +6.8% ROI\n"
-                            f"• Tier 3: The Golden 80% Trailing Ratchet (≥ +7.5% ROI)\n"
-                            f"• Tier 4: Mega Target Harvest (6R+) នៅ +10.0% - +14.0% ROI\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរប្រាក់ចំណេញ និងការពារទុន ២៤/៧!_"
+                    # If sub-partner, record 20% Master Override for Super Admin (859271875)
+                    if partner_id != 859271875:
+                        override_usd = round(sp_usd * 0.20, 2)
+                        db.record_capital_ib_rebate_log(
+                            chat_id=859271875,
+                            asset=resolved_epic,
+                            lots=executed_size,
+                            spread_usd=sp_usd,
+                            rebate_usd=override_usd,
+                            client_ref=f"Override_Partner_{partner_id}",
+                            status="OVERRIDE_CREDITED"
                         )
-                    else:
-                        notif_msg = (
-                            f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"⚙️ **Account:** `{env_lbl}`\n"
-                            f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
-                            f"🎯 **Direction:** `{dir_emoji}`\n"
-                            f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
-                            f"📊 **Trend & Volume:** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
-                            f"📦 **Contract Size:** `{executed_size}`\n"
-                            f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
-                            f"🛑 **Stop-Loss (1R):** `${sl:,.2f}`\n"
-                            f"🎯 **Take-Profit (6R):** `${tp:,.2f}`\n"
-                            f"🔖 **Deal Reference:** `{deal_ref}`\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"🛡️ **Asymmetric R:R >= 1:6 Multi-Tier Protection:**\n"
-                            f"• Tier 1: Breakeven Armor at +4.8% ROI (Wide Breathing Room, Risk -> 0.00R)\n"
-                            f"• Tier 2: Capital Fortress Lock (+1.5R) at +6.8% ROI\n"
-                            f"• Tier 3: Golden 80% Trailing Ratchet (>= +7.5% ROI)\n"
-                            f"• Tier 4: Mega Target Cash Harvest (6R+) at +10.0% - +14.0% ROI\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💡 _AI Engine actively monitoring and trailing profits 24/7!_"
-                        )
-                    await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
-                except Exception as notif_err:
-                    if "blocked by the user" in str(notif_err).lower():
-                        logger.warning(f"[Capital.com] User {chat_id} has blocked the bot in Telegram; skipped notification.")
-                    else:
-                        logger.error(f"Failed to send Capital Auto notification: {notif_err}")
-            return True
+                except Exception as e_reb:
+                    logger.debug(f"IB Rebate attribution notice: {e_reb}")
+
+                # Send Telegram Notification
+                if app and hasattr(app, "bot"):
+                    try:
+                        user_lang = db.get_user_language(chat_id)
+                        import ui_standards
+                        env_lbl = "DEMO ($10,000)" if user_engine.is_demo else "LIVE MAINNET"
+                        dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
+                        adx_str = f"{setup.get('adx', 0):.1f}"
+                        rvol_str = f"{setup.get('rvol', 1.0):.1f}x"
+                        
+                        if user_lang == 'khmer':
+                            notif_msg = (
+                                f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"⚙️ **គណនី ៖** `{env_lbl}`\n"
+                                f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
+                                f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
+                                f"📊 **កម្លាំង Trend & Volume ៖** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
+                                f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
+                                f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R) ៖** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **ក្បួនការពារ & កើបចំណេញ Asymmetric R:R ≥ 1:6 ៖**\n"
+                                f"• Tier 1: Breakeven Armor នៅ +4.8% ROI (Wide Breathing Room, Risk -> 0.00R)\n"
+                                f"• Tier 2: Capital Fortress Lock (+1.5R) នៅ +6.8% ROI\n"
+                                f"• Tier 3: The Golden 80% Trailing Ratchet (≥ +7.5% ROI)\n"
+                                f"• Tier 4: Mega Target Harvest (6R+) នៅ +10.0% - +14.0% ROI\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរប្រាក់ចំណេញ និងការពារទុន ២៤/៧!_"
+                            )
+                        else:
+                            notif_msg = (
+                                f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"⚙️ **Account:** `{env_lbl}`\n"
+                                f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
+                                f"🎯 **Direction:** `{dir_emoji}`\n"
+                                f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
+                                f"📊 **Trend & Volume:** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
+                                f"📦 **Contract Size:** `{executed_size}`\n"
+                                f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R):** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R):** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference:** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **Asymmetric R:R >= 1:6 Multi-Tier Protection:**\n"
+                                f"• Tier 1: Breakeven Armor at +4.8% ROI (Wide Breathing Room, Risk -> 0.00R)\n"
+                                f"• Tier 2: Capital Fortress Lock (+1.5R) at +6.8% ROI\n"
+                                f"• Tier 3: Golden 80% Trailing Ratchet (>= +7.5% ROI)\n"
+                                f"• Tier 4: Mega Target Cash Harvest (6R+) at +10.0% - +14.0% ROI\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _AI Engine actively monitoring and trailing profits 24/7!_"
+                            )
+                        await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
+                    except Exception as notif_err:
+                        if "blocked by the user" in str(notif_err).lower():
+                            logger.warning(f"[Capital.com] User {chat_id} has blocked the bot in Telegram; skipped notification.")
+                        else:
+                            logger.error(f"Failed to send Capital Auto notification: {notif_err}")
+                return True
+            else:
+                logger.warning(f"Order rejected for {resolved_epic} {final_action} (User {chat_id}): {trade_res.get('error')}. Trying next candidate.")
+                continue
+
         return False
 
     async def _dispatch_single_prop_trade(
         self,
         prop_user: Dict[str, Any],
-        setup: Dict[str, Any],
-        best_rank: float,
-        resolved_epic: str,
-        final_action: str,
-        confidence: float,
-        now: float,
+        candidate_setups: Any,
+        best_rank: float = 100.0,
+        resolved_epic: str = "GOLD",
+        final_action: str = "BUY",
+        confidence: float = 80.0,
+        now: Optional[float] = None,
         app=None
     ) -> bool:
         """
         Sub-millisecond concurrent trade dispatcher for Prop Firm Challenge traders.
+        Iterates through candidate setups to ensure valid setups are executed without stalling on rejected candidates.
         """
+        import database as db
         chat_id = prop_user["chat_id"]
-        # Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00 - 23:50 ICT vs 24/7 VIP Reset Mode)
-        user_sched_mode = prop_user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
-        is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(user_sched_mode, epic=resolved_epic)
-        if not is_sched_active:
-            logger.debug(f"⏳ [CAPITAL SCHEDULE] Prop trader {chat_id} trade entry paused: {sched_reason}")
-            return False
+        if now is None:
+            now = time.time()
 
         user_engine = get_user_capital_engine(chat_id, is_demo=True)
         try:
@@ -3271,169 +3280,196 @@ class CapitalAutonomousEngine:
             (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
             for pos in user_open_positions
         }
-        if resolved_epic in user_epics:
-            return False
 
-        # Calculate dynamic fixed-risk position size
-        entry_px = setup.get("ask" if final_action == "BUY" else "bid", 0.0)
-        sl_px = setup.get("sl", entry_px * 0.99)
-        risk_pct = prop_user.get("risk_per_trade_pct", 0.75)
-        prop_size = self.prop_manager.calculate_prop_position_size(
-            equity=curr_equity,
-            risk_pct=risk_pct,
-            entry_price=entry_px,
-            sl_price=sl_px,
-            epic=resolved_epic
-        )
+        user_sched_mode = prop_user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
 
-        # 1. Attempt Capital.com Demo API execution
-        trade_res = await asyncio.to_thread(
-            user_engine.execute_smart_tradfi_order,
-            epic=resolved_epic,
-            direction=final_action,
-            size=prop_size
-        )
+        # Normalize candidates list
+        if isinstance(candidate_setups, list):
+            candidates_list = candidate_setups
+        elif isinstance(candidate_setups, dict):
+            candidates_list = [(best_rank, resolved_epic, resolved_epic, candidate_setups)]
+        else:
+            candidates_list = []
 
-        deal_ref = "PROP"
-        deal_id = "AUTO"
-        sl = trade_res.get("sl", sl_px) if trade_res else sl_px
-        tp = trade_res.get("tp", setup.get("tp", 0.0)) if trade_res else setup.get("tp", 0.0)
-        executed_size = trade_res.get("size", prop_size) if trade_res else prop_size
-        is_executed = bool(trade_res.get("success"))
+        for cand in candidates_list:
+            cand_rank, cand_epic, cand_res_epic, cand_setup = cand
+            if cand_res_epic in user_epics:
+                continue
 
-        if is_executed:
-            deal_ref = trade_res.get("deal_reference", "PROP")
-            deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
+            # Cambodia Time Trading Schedule Gatekeeper
+            is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(user_sched_mode, epic=cand_res_epic)
+            if not is_sched_active:
+                logger.debug(f"⏳ [CAPITAL SCHEDULE] Prop trader {chat_id} trade entry paused for {cand_res_epic}: {sched_reason}")
+                continue
 
-        # 2. Synchronize & Dispatch to MT5 Bridge terminals (FTMO / FundedNext)
-        mt5_dispatched = False
-        try:
-            import mt5_bridge_engine
-            bridge = mt5_bridge_engine.mt5_bridge
-            mt5_session_info = bridge.get_client_session(chat_id)
-            if mt5_session_info:
-                mt5_sym_map = {
-                    "GOLD": "XAUUSD",
-                    "US500": "US500",
-                    "SP500": "US500",
-                    "US100": "USTEC",
-                    "NASDAQ": "USTEC",
-                    "BTCUSD": "BTCUSD",
-                    "ETHUSD": "ETHUSD",
-                    "EURUSD": "EURUSD",
-                    "GBPUSD": "GBPUSD",
-                    "OIL_CRUDE": "USOIL",
-                    "OIL": "USOIL",
-                    "SILVER": "XAGUSD"
-                }
-                mt5_sym = mt5_sym_map.get(resolved_epic.upper(), resolved_epic.upper())
-                sl_dist = abs(entry_px - sl_px) if abs(entry_px - sl_px) > 0 else (entry_px * 0.01)
-                risk_usd = curr_equity * (risk_pct / 100.0)
-                if "XAU" in mt5_sym or "GOLD" in mt5_sym:
-                    calc_lot = risk_usd / (sl_dist * 100.0)
-                elif "BTC" in mt5_sym or "ETH" in mt5_sym:
-                    calc_lot = risk_usd / sl_dist
-                elif any(fx in mt5_sym for fx in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]):
-                    calc_lot = risk_usd / (sl_dist * 100000.0)
-                else:
-                    calc_lot = prop_size
+            c_action = cand_setup.get("final_action", "HOLD")
+            c_conf = cand_setup.get("final_confidence", 0)
+            if c_action not in ["BUY", "SELL"]:
+                continue
 
-                mt5_lot = max(0.01, min(20.0, round(calc_lot, 2)))
-                tp_val = tp if tp > 0 else (entry_px + (entry_px - sl_px) * 6.0 if final_action == "BUY" else entry_px - (sl_px - entry_px) * 6.0)
-                res_mt5 = bridge.dispatch_order(
-                    symbol=mt5_sym,
-                    action=final_action,
-                    lot=mt5_lot,
-                    sl=sl_px,
-                    tp=tp_val,
-                    comment=f"PROP_{int(prop_user.get('account_tier', 10000))}_P{prop_user.get('challenge_phase', 1)}",
-                    client_id=chat_id
-                )
-                if res_mt5.get("success"):
-                    mt5_dispatched = True
-                    if not is_executed:
-                        is_executed = True
-                        deal_ref = f"MT5_{res_mt5.get('signal_id', 'AUTO')[:8]}"
-                        deal_id = deal_ref
-                        executed_size = mt5_lot
-        except Exception as e_mt5:
-            logger.debug(f"MT5 Prop Dispatch exception: {e_mt5}")
-
-        if is_executed:
-            import database as db
-            db.record_capital_auto_trade(
-                chat_id=chat_id,
-                deal_id=str(deal_id),
-                deal_reference=str(deal_ref),
-                epic=resolved_epic,
-                direction=final_action,
-                size=executed_size,
+            # Calculate dynamic fixed-risk position size
+            entry_px = cand_setup.get("ask" if c_action == "BUY" else "bid", 0.0)
+            sl_px = cand_setup.get("sl", entry_px * 0.99)
+            risk_pct = prop_user.get("risk_per_trade_pct", 0.75)
+            prop_size = self.prop_manager.calculate_prop_position_size(
+                equity=curr_equity,
+                risk_pct=risk_pct,
                 entry_price=entry_px,
-                sl=sl,
-                tp=tp
+                sl_price=sl_px,
+                epic=cand_res_epic
             )
 
-            # Send Prop Firm Telegram Notification
-            if app and hasattr(app, "bot"):
-                try:
-                    user_lang = db.get_user_language(chat_id)
-                    import ui_standards
-                    env_lbl = "MT5 BRIDGE + CAPITAL" if mt5_dispatched and trade_res.get("success") else ("MT5 TOKYO BRIDGE" if mt5_dispatched else "CAPITAL DEMO")
-                    dir_emoji = "🟢 LONG / BUY" if final_action == "BUY" else "🔴 SHORT / SELL"
-                    tier_fmt = f"${prop_user.get('account_tier', 10000.0):,.0f}"
-                    phase_lbl = f"Phase {prop_user.get('challenge_phase', 1)}"
-                    risk_usd = curr_equity * (risk_pct / 100.0)
+            # 1. Attempt Capital.com Demo API execution
+            trade_res = await asyncio.to_thread(
+                user_engine.execute_smart_tradfi_order,
+                epic=cand_res_epic,
+                direction=c_action,
+                size=prop_size
+            )
 
-                    if user_lang == 'khmer':
-                        notif_msg = (
-                            f"🏆 **[PROP FIRM CHALLENGE TRADE EXECUTED]** ⚡\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💼 **គណនីប្រឡង ៖** `{tier_fmt}` | `{phase_lbl}`\n"
-                            f"⚙️ **បរិស្ថានជួញដូរ ៖** `{env_lbl}`\n"
-                            f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
-                            f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
-                            f"⚖️ **Fixed Risk ៖** `{risk_pct}% (${risk_usd:,.2f} Max Risk)`\n"
-                            f"📦 **ទំហំ Lot (Dynamic) ៖** `{executed_size} contracts`\n"
-                            f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
-                            f"🛑 **Stop-Loss (1R) ៖** `${sl:,.2f}`\n"
-                            f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
-                            f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"🛡️ **ក្បួនការពារការប្រឡង (100% Zero-Breach Guard) ៖**\n"
-                            f"• Daily Loss Limit Shield: Hard Halt នៅ -3.5%\n"
-                            f"• Target Auto-Halt: ចាក់សោ Pass ភ្លាមៗពេលដល់ Target\n"
-                            f"• Breakeven Armor នៅ +4.8% ROI (Risk -> 0.00R)\n"
-                            f"• Golden 80% Trailing Ratchet ការពារចំណេញកំពូល\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរការប្រឡងឱ្យជាប់ ១០០%!_"
-                        )
+            deal_ref = "PROP"
+            deal_id = "AUTO"
+            sl = trade_res.get("sl", sl_px) if trade_res else sl_px
+            tp = trade_res.get("tp", cand_setup.get("tp", 0.0)) if trade_res else cand_setup.get("tp", 0.0)
+            executed_size = trade_res.get("size", prop_size) if trade_res else prop_size
+            is_executed = bool(trade_res.get("success"))
+
+            if is_executed:
+                deal_ref = trade_res.get("deal_reference", "PROP")
+                deal_id = trade_res.get("response", {}).get("dealId", deal_ref)
+
+            # 2. Synchronize & Dispatch to MT5 Bridge terminals (FTMO / FundedNext)
+            mt5_dispatched = False
+            try:
+                import mt5_bridge_engine
+                bridge = mt5_bridge_engine.mt5_bridge
+                mt5_session_info = bridge.get_client_session(chat_id)
+                if mt5_session_info:
+                    mt5_sym_map = {
+                        "GOLD": "XAUUSD",
+                        "US500": "US500",
+                        "SP500": "US500",
+                        "US100": "USTEC",
+                        "NASDAQ": "USTEC",
+                        "BTCUSD": "BTCUSD",
+                        "ETHUSD": "ETHUSD",
+                        "EURUSD": "EURUSD",
+                        "GBPUSD": "GBPUSD",
+                        "OIL_CRUDE": "USOIL",
+                        "OIL": "USOIL",
+                        "SILVER": "XAGUSD"
+                    }
+                    mt5_sym = mt5_sym_map.get(cand_res_epic.upper(), cand_res_epic.upper())
+                    sl_dist = abs(entry_px - sl_px) if abs(entry_px - sl_px) > 0 else (entry_px * 0.01)
+                    risk_usd = curr_equity * (risk_pct / 100.0)
+                    if "XAU" in mt5_sym or "GOLD" in mt5_sym:
+                        calc_lot = risk_usd / (sl_dist * 100.0)
+                    elif "BTC" in mt5_sym or "ETH" in mt5_sym:
+                        calc_lot = risk_usd / sl_dist
+                    elif any(fx in mt5_sym for fx in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]):
+                        calc_lot = risk_usd / (sl_dist * 100000.0)
                     else:
-                        notif_msg = (
-                            f"🏆 **[PROP FIRM CHALLENGE TRADE EXECUTED]** ⚡\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💼 **Challenge Account:** `{tier_fmt}` | `{phase_lbl}`\n"
-                            f"⚙️ **Environment:** `{env_lbl}`\n"
-                            f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
-                            f"🎯 **Direction:** `{dir_emoji}`\n"
-                            f"⚖️ **Fixed Risk:** `{risk_pct}% (${risk_usd:,.2f} Max Risk)`\n"
-                            f"📦 **Dynamic Lot Size:** `{executed_size} contracts`\n"
-                            f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
-                            f"🛑 **Stop-Loss (1R):** `${sl:,.2f}`\n"
-                            f"🎯 **Take-Profit (6R):** `${tp:,.2f}`\n"
-                            f"🔖 **Deal Reference:** `{deal_ref}`\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"🛡️ **Prop Firm Compliance Shields:**\n"
-                            f"• Daily Drawdown Shield: Hard Halt at -3.5%\n"
-                            f"• Target Auto-Halt: Locks Victory Instantly on Target\n"
-                            f"• Breakeven Armor at +4.8% ROI (Risk -> 0.00R)\n"
-                            f"• Golden 80% Trailing Ratchet\n"
-                            f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"💡 _AI Engine actively executing strict compliance rules!_"
-                        )
-                    await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
-                except Exception as notif_err:
-                    logger.error(f"Failed to send Prop Firm notification: {notif_err}")
-            return True
+                        calc_lot = prop_size
+
+                    mt5_lot = max(0.01, min(20.0, round(calc_lot, 2)))
+                    tp_val = tp if tp > 0 else (entry_px + (entry_px - sl_px) * 6.0 if c_action == "BUY" else entry_px - (sl_px - entry_px) * 6.0)
+                    res_mt5 = bridge.dispatch_order(
+                        symbol=mt5_sym,
+                        action=c_action,
+                        lot=mt5_lot,
+                        sl=sl_px,
+                        tp=tp_val,
+                        comment=f"PROP_{int(prop_user.get('account_tier', 10000))}_P{prop_user.get('challenge_phase', 1)}",
+                        client_id=chat_id
+                    )
+                    if res_mt5.get("success"):
+                        mt5_dispatched = True
+                        if not is_executed:
+                            is_executed = True
+                            deal_ref = f"MT5_{res_mt5.get('signal_id', 'AUTO')[:8]}"
+                            deal_id = deal_ref
+                            executed_size = mt5_lot
+            except Exception as e_mt5:
+                logger.debug(f"MT5 Prop Dispatch exception: {e_mt5}")
+
+            if is_executed:
+                import database as db
+                db.record_capital_auto_trade(
+                    chat_id=chat_id,
+                    deal_id=str(deal_id),
+                    deal_reference=str(deal_ref),
+                    epic=cand_res_epic,
+                    direction=c_action,
+                    size=executed_size,
+                    entry_price=entry_px,
+                    sl=sl,
+                    tp=tp
+                )
+
+                # Send Prop Firm Telegram Notification
+                if app and hasattr(app, "bot"):
+                    try:
+                        user_lang = db.get_user_language(chat_id)
+                        import ui_standards
+                        env_lbl = "MT5 BRIDGE + CAPITAL" if mt5_dispatched and trade_res.get("success") else ("MT5 TOKYO BRIDGE" if mt5_dispatched else "CAPITAL DEMO")
+                        dir_emoji = "🟢 LONG / BUY" if c_action == "BUY" else "🔴 SHORT / SELL"
+                        tier_fmt = f"${prop_user.get('account_tier', 10000.0):,.0f}"
+                        phase_lbl = f"Phase {prop_user.get('challenge_phase', 1)}"
+                        risk_usd = curr_equity * (risk_pct / 100.0)
+
+                        if user_lang == 'khmer':
+                            notif_msg = (
+                                f"🏆 **[PROP FIRM CHALLENGE TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💼 **គណនីប្រឡង ៖** `{tier_fmt}` | `{phase_lbl}`\n"
+                                f"⚙️ **បរិស្ថានជួញដូរ ៖** `{env_lbl}`\n"
+                                f"🏛️ **ឧបករណ៍ TradFi ៖** `{cand_res_epic}`\n"
+                                f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
+                                f"⚖️ **Fixed Risk ៖** `{risk_pct}% (${risk_usd:,.2f} Max Risk)`\n"
+                                f"📦 **ទំហំ Lot (Dynamic) ៖** `{executed_size} contracts`\n"
+                                f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R) ៖** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R) ៖** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **ក្បួនការពារការប្រឡង (100% Zero-Breach Guard) ៖**\n"
+                                f"• Daily Loss Limit Shield: Hard Halt នៅ -3.5%\n"
+                                f"• Target Auto-Halt: ចាក់សោ Pass ភ្លាមៗពេលដល់ Target\n"
+                                f"• Breakeven Armor នៅ +4.8% ROI (Risk -> 0.00R)\n"
+                                f"• Golden 80% Trailing Ratchet ការពារចំណេញកំពូល\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _ម៉ាស៊ីន AI ដំណើរការចាក់សោរការប្រឡងឱ្យជាប់ ១០០%!_"
+                            )
+                        else:
+                            notif_msg = (
+                                f"🏆 **[PROP FIRM CHALLENGE TRADE EXECUTED]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💼 **Challenge Account:** `{tier_fmt}` | `{phase_lbl}`\n"
+                                f"⚙️ **Environment:** `{env_lbl}`\n"
+                                f"🏛️ **TradFi Instrument:** `{cand_res_epic}`\n"
+                                f"🎯 **Direction:** `{dir_emoji}`\n"
+                                f"⚖️ **Fixed Risk:** `{risk_pct}% (${risk_usd:,.2f} Max Risk)`\n"
+                                f"📦 **Dynamic Lot Size:** `{executed_size} contracts`\n"
+                                f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R):** `${sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R):** `${tp:,.2f}`\n"
+                                f"🔖 **Deal Reference:** `{deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ **Prop Firm Compliance Shields:**\n"
+                                f"• Daily Drawdown Shield: Hard Halt at -3.5%\n"
+                                f"• Target Auto-Halt: Locks Victory Instantly on Target\n"
+                                f"• Breakeven Armor at +4.8% ROI (Risk -> 0.00R)\n"
+                                f"• Golden 80% Trailing Ratchet\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"💡 _AI Engine actively executing strict compliance rules!_"
+                            )
+                        await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
+                    except Exception as notif_err:
+                        logger.error(f"Failed to send Prop Firm notification: {notif_err}")
+                return True
+            else:
+                continue
+
         return False
 
     async def execute_autonomous_cycle(self, app=None):
@@ -3581,7 +3617,7 @@ class CapitalAutonomousEngine:
         # Simultaneously dispatches all active evaluation traders in parallel
         if active_prop_users:
             prop_tasks = [
-                self._dispatch_single_prop_trade(prop_user, setup, best_rank, resolved_epic, final_action, confidence, now, app=app)
+                self._dispatch_single_prop_trade(prop_user, candidate_setups, best_rank, resolved_epic, final_action, confidence, now, app=app)
                 for prop_user in active_prop_users
             ]
             await asyncio.gather(*prop_tasks, return_exceptions=True)
