@@ -2608,7 +2608,7 @@ def set_capital_auto_config(
     chat_id: int,
     enabled: bool,
     budget: float = 50.0,
-    max_positions: int = 2,
+    max_positions: Optional[int] = None,
     is_demo: bool = False,
     schedule_mode: str = "SMART_SESSION_TIMED"
 ):
@@ -2626,6 +2626,33 @@ def set_capital_auto_config(
         conn.commit()
     except Exception:
         pass
+
+    # If max_positions not explicitly provided, preserve existing setting if > 2, or calculate via Invariant 53 tier
+    if max_positions is None:
+        try:
+            cursor.execute("SELECT max_positions FROM capital_auto_config WHERE chat_id = ?", (chat_id,))
+            r = cursor.fetchone()
+            if r and r[0] and int(r[0]) > 2:
+                max_positions = int(r[0])
+        except Exception:
+            pass
+
+    if max_positions is None:
+        b_val = float(budget or 0.0)
+        if b_val >= 350.0:
+            max_positions = 10
+        elif b_val >= 300.0:
+            max_positions = 8
+        elif b_val >= 250.0:
+            max_positions = 7
+        elif b_val >= 200.0:
+            max_positions = 6
+        elif b_val >= 150.0:
+            max_positions = 4
+        elif b_val >= 100.0:
+            max_positions = 3
+        else:
+            max_positions = 2
 
     cursor.execute("""
         INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)

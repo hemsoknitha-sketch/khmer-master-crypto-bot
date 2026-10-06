@@ -2951,13 +2951,8 @@ class CapitalAutonomousEngine:
         """
         import database as db
         chat_id = user["chat_id"]
-        budget = user.get("budget", 50.0)
+        budget = float(user.get("budget", 50.0) or 50.0)
         user_is_demo = user.get("is_demo", False)  # 100% Live Mainnet Real Capital
-
-        # 24/7 SMC Citadel Dynamic Slot Allocation Matrix (Invariant 53)
-        # $100: 3 pos | $150: 4 pos | $200: 6 pos | $250: 7 pos | $300: 8 pos | $350+: 10 pos
-        max_pos = get_dynamic_max_positions_for_equity(budget, user.get("max_positions"))
-        min_required_margin = max(6.0, budget / (max_pos * 1.35))
 
         # Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00 - 23:50 ICT vs 24/7 VIP Reset Mode)
         user_sched_mode = user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
@@ -2974,11 +2969,21 @@ class CapitalAutonomousEngine:
         user_engine = get_user_capital_engine(chat_id, is_demo=user_is_demo)
 
         # Available balance safety verification (run concurrently in thread pool)
+        user_bal = 0.0
         try:
             bal_info = await asyncio.to_thread(user_engine.get_account_balance)
-            user_avail = bal_info.get("available", 0.0)
+            user_avail = float(bal_info.get("available", 0.0) or 0.0)
+            user_bal = float(bal_info.get("balance", 0.0) or 0.0)
         except Exception:
             user_avail = budget
+            user_bal = budget
+
+        # 24/7 SMC Citadel Dynamic Slot Allocation Matrix (Invariant 53)
+        # $100: 3 pos | $150: 4 pos | $200: 6 pos | $250: 7 pos | $300: 8 pos | $350+: 10 pos
+        # Super Smart: Use highest of budget, available cash, or live balance to unleash full slots
+        effective_equity = max(budget, user_avail, user_bal)
+        max_pos = get_dynamic_max_positions_for_equity(effective_equity, user.get("max_positions"))
+        min_required_margin = max(6.0, budget / (max_pos * 1.35))
 
         # Check required margin for next slot rather than total budget
         if user_avail < min_required_margin:
@@ -3798,12 +3803,21 @@ class CapitalLeadLagArbitrageEngine:
                     logger.warning(f"🔒 [REFERRAL GATEKEEPER] Lead-Lag trade blocked for User {chat_id}: Unverified Capital.com referral.")
                     return
 
-                budget = user_cfg.get("budget", 50.0)
+                budget = float(user_cfg.get("budget", 50.0) or 50.0)
                 user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
 
-                # Check max open positions
+                # Check max open positions with dynamic equity scaling (Invariant 53)
                 open_pos = user_engine.get_open_positions()
-                if len(open_pos) >= user_cfg.get("max_positions", 2):
+                try:
+                    bal_data = user_engine.get_account_balance()
+                    user_bal = float(bal_data.get("balance", budget) or budget)
+                    user_avail = float(bal_data.get("available", budget) or budget)
+                except Exception:
+                    user_bal = budget
+                    user_avail = budget
+                eff_eq = max(budget, user_bal, user_avail)
+                max_leadlag_pos = get_dynamic_max_positions_for_equity(eff_eq, user_cfg.get("max_positions"))
+                if len(open_pos) >= max_leadlag_pos:
                     return
 
                 # Calculate Dynamic Asymmetric R:R >= 1:6 Stop Loss & Take Profit
@@ -4210,17 +4224,27 @@ class CapitalOpeningRangeBreakoutEngine:
                 logger.warning(f"🔒 [REFERRAL GATEKEEPER] ORB breakout trade blocked for User {chat_id}: Unverified Capital.com referral.")
                 return False
 
-            budget = user_cfg.get("budget", 50.0)
+            budget = float(user_cfg.get("budget", 50.0) or 50.0)
             user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
+
+            # Available balance check for dynamic equity
+            try:
+                bal_data = await asyncio.to_thread(user_engine.get_account_balance)
+                user_avail = float(bal_data.get("available", budget) or budget)
+                user_bal = float(bal_data.get("balance", budget) or budget)
+            except Exception:
+                user_avail = budget
+                user_bal = budget
+            eff_equity = max(budget, user_avail, user_bal)
 
             # Check dynamic max open positions (Invariant 53 - 24/7 SMC Citadel Matrix)
             open_pos = await asyncio.to_thread(user_engine.get_open_positions)
-            max_pos = get_dynamic_max_positions_for_equity(budget, user_cfg.get("max_positions"))
+            max_pos = get_dynamic_max_positions_for_equity(eff_equity, user_cfg.get("max_positions"))
             if len(open_pos) >= max_pos:
                 return False
 
             # Small Capital Fortress Shield: bypass Natural Gas on accounts < $100
-            if budget < 100 and any(g in resolved_epic.upper() for g in ["NATURALGAS", "GAS"]):
+            if eff_equity < 100 and any(g in resolved_epic.upper() for g in ["NATURALGAS", "GAS"]):
                 return False
 
             # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
@@ -4725,9 +4749,10 @@ class CapitalKellyPositionSizer:
         leverage = 5.0 if is_stock else (2.0 if is_crypto else 20.0)
 
         # Dynamic Target Margin Sizing: Allocates safe margin per trade based on dynamic slot limits
-        dynamic_slots = get_dynamic_max_positions_for_equity(budget)
-        slot_margin = budget / (dynamic_slots * 1.35) if dynamic_slots > 0 else 12.0
-        target_margin = max(6.00, min(25.0, slot_margin)) if budget > 0 else 12.00
+        eff_cap = max(float(budget or 0.0), float(available_equity or 0.0))
+        dynamic_slots = get_dynamic_max_positions_for_equity(eff_cap)
+        slot_margin = eff_cap / (dynamic_slots * 1.35) if dynamic_slots > 0 else 12.0
+        target_margin = max(6.00, min(25.0, slot_margin)) if eff_cap > 0 else 12.00
         target_notional = target_margin * leverage
 
         if entry_price > 0:
@@ -5388,19 +5413,23 @@ class CapitalForexExchangeSuite:
             user_open_epics = set()
             open_pos_list = []
 
+        # Available balance check for dynamic equity
+        try:
+            bal_info = await asyncio.to_thread(user_engine.get_account_balance)
+            user_avail = float(bal_info.get("available", budget) or budget)
+            user_bal = float(bal_info.get("balance", budget) or budget)
+        except Exception:
+            user_avail = float(budget or 10.0)
+            user_bal = float(budget or 10.0)
+        eff_equity = max(float(budget or 0.0), user_avail, user_bal)
+
         # 24/7 SMC Citadel Dynamic Slot Allocation Matrix (Invariant 53)
         # $100: 3 pos | $150: 4 pos | $200: 6 pos | $250: 7 pos | $300: 8 pos | $350+: 10 pos
-        max_pos = get_dynamic_max_positions_for_equity(budget, user_cfg.get("max_positions"))
+        max_pos = get_dynamic_max_positions_for_equity(eff_equity, user_cfg.get("max_positions"))
         if len(open_pos_list) >= max_pos:
             return False
 
         min_required_margin = max(6.0, budget / (max_pos * 1.35))
-        try:
-            bal_info = await asyncio.to_thread(user_engine.get_account_balance)
-            user_avail = bal_info.get("available", budget)
-        except Exception:
-            user_avail = budget
-
         if user_avail < min_required_margin:
             return False
 

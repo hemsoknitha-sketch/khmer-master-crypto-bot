@@ -6317,7 +6317,16 @@ class TelegramBotThread(BaseThread):
                     gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
                     await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                     return
-                db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", 50.0), is_demo=is_demo)
+                try:
+                    c_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=is_demo)
+                    b_inf = c_eng.get_account_balance()
+                    eff_eq = max(float(cfg.get("budget", 50.0) or 50.0), float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                except Exception:
+                    eff_eq = float(cfg.get("budget", 50.0) or 50.0)
+                dyn_pos = cfg.get("max_positions")
+                if not dyn_pos or dyn_pos <= 2:
+                    dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", 50.0), max_positions=dyn_pos, is_demo=is_demo)
                 toast_msg = "✅ Capital Auto: បានបើកដំណើរការ!" if new_state else "🛑 Capital Auto: បានបិទ!"
                 try:
                     await update.callback_query.answer(toast_msg)
@@ -6662,33 +6671,61 @@ class TelegramBotThread(BaseThread):
                 context.args = []
                 await capital_spread_command(update, context)
             elif data == "btn_cap_auto_budget_10":
-                db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=3, is_demo=False)
                 try:
-                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $10 (Live Mainnet, Max 3 Positions)!")
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    b_inf = c_eng.get_account_balance()
+                    eff_eq = max(10.0, float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                except Exception:
+                    eff_eq = 10.0
+                dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=dyn_pos, is_demo=False)
+                try:
+                    await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $10 (Max {dyn_pos} Positions)!")
                 except Exception:
                     pass
                 context.args = []
                 await capital_command(update, context)
             elif data == "btn_cap_auto_budget_30":
-                db.set_capital_auto_config(chat_id, enabled=True, budget=30.0)
                 try:
-                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $30!")
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    b_inf = c_eng.get_account_balance()
+                    eff_eq = max(30.0, float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                except Exception:
+                    eff_eq = 30.0
+                dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=30.0, max_positions=dyn_pos, is_demo=False)
+                try:
+                    await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $30 (Max {dyn_pos} Positions)!")
                 except Exception:
                     pass
                 context.args = []
                 await capital_command(update, context)
             elif data == "btn_cap_auto_budget_50":
-                db.set_capital_auto_config(chat_id, enabled=True, budget=50.0)
                 try:
-                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $50!")
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    b_inf = c_eng.get_account_balance()
+                    eff_eq = max(50.0, float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                except Exception:
+                    eff_eq = 50.0
+                dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=50.0, max_positions=dyn_pos, is_demo=False)
+                try:
+                    await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $50 (Max {dyn_pos} Positions)!")
                 except Exception:
                     pass
                 context.args = []
                 await capital_command(update, context)
             elif data == "btn_cap_auto_budget_100":
-                db.set_capital_auto_config(chat_id, enabled=True, budget=100.0)
                 try:
-                    await update.callback_query.answer("💰 បានកំណត់ទុន Auto: $100!")
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    b_inf = c_eng.get_account_balance()
+                    eff_eq = max(100.0, float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                except Exception:
+                    eff_eq = 100.0
+                dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                db.set_capital_auto_config(chat_id, enabled=True, budget=100.0, max_positions=dyn_pos, is_demo=False)
+                try:
+                    await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $100 (Max {dyn_pos} Positions)!")
                 except Exception:
                     pass
                 context.args = []
@@ -24681,7 +24718,14 @@ class TelegramBotThread(BaseThread):
                             gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
                             await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                             return
-                        db.set_capital_auto_config(chat_id, enabled=True, budget=50.0, max_positions=2, is_demo=False, schedule_mode="24/7")
+                        try:
+                            c_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=False)
+                            b_inf = c_eng.get_account_balance()
+                            eff_eq = max(50.0, float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                        except Exception:
+                            eff_eq = 50.0
+                        dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=50.0, max_positions=dyn_pos, is_demo=False, schedule_mode="24/7")
 
                     succ_kb = InlineKeyboardMarkup([
                         [
@@ -25009,39 +25053,41 @@ class TelegramBotThread(BaseThread):
                             await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                             return
 
-                        max_pos = 2
+                        user_explicit_max = None
                         if is_numeric_budget:
                             budget = float(sub_opt)
-                            max_pos = 3 if budget <= 15.0 else 2
                             if len(args) >= 3:
                                 try:
-                                    max_pos = int(args[2])
+                                    user_explicit_max = int(args[2])
                                 except ValueError:
                                     pass
                         elif len(args) >= 3:
                             try:
                                 budget = float(args[2])
                             except ValueError:
-                                budget = 10.0
-                            max_pos = 3 if budget <= 15.0 else 2
+                                budget = 50.0
                             if len(args) >= 4:
                                 try:
-                                    max_pos = int(args[3])
+                                    user_explicit_max = int(args[3])
                                 except ValueError:
                                     pass
                         else:
-                            budget = 10.0
-                            max_pos = 3 if budget <= 15.0 else 2
+                            budget = 50.0
 
-                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
                         live_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=target_is_demo)
                         await asyncio.to_thread(live_engine.sync_closed_positions, chat_id)
                         pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         bal_data = await asyncio.to_thread(live_engine.get_account_balance)
-                        live_bal = bal_data.get("balance", 0.0)
-                        live_avail = bal_data.get("available", 0.0)
+                        live_bal = float(bal_data.get("balance", 0.0) or 0.0)
+                        live_avail = float(bal_data.get("available", 0.0) or 0.0)
                         live_acc_id = bal_data.get("account_id", "")
                         env_mode = "🟢 LIVE MAINNET (Real Funds)" if not target_is_demo else "🟡 DEMO ($10,000 Virtual)"
+
+                        # Dynamic Max Positions Calculation (Invariant 53)
+                        eff_eq = max(budget, live_bal, live_avail)
+                        max_pos = user_explicit_max if (user_explicit_max is not None and user_explicit_max > 0) else capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
 
                         # Rebuild keyboard with updated state
                         keyboard = InlineKeyboardMarkup([
@@ -25117,22 +25163,25 @@ class TelegramBotThread(BaseThread):
                         return
                     elif sub_opt in ["DEMO", "TEST"]:
                         target_is_demo = True
-                        budget = float(args[2]) if len(args) >= 3 else 10.0
-                        max_pos = 3 if budget <= 15.0 else 2
+                        user_explicit_max = None
+                        budget = float(args[2]) if len(args) >= 3 else 50.0
                         if len(args) >= 4:
                             try:
-                                max_pos = int(args[3])
+                                user_explicit_max = int(args[3])
                             except ValueError:
                                 pass
-                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
                         demo_engine = capital_engine.get_user_capital_engine(chat_id, is_demo=True)
                         await asyncio.to_thread(demo_engine.sync_closed_positions, chat_id)
                         pnl_stat = db.get_capital_auto_pnl_summary(chat_id)
                         bal_data = await asyncio.to_thread(demo_engine.get_account_balance)
-                        demo_bal = bal_data.get("balance", 0.0)
-                        demo_avail = bal_data.get("available", 0.0)
+                        demo_bal = float(bal_data.get("balance", 0.0) or 0.0)
+                        demo_avail = float(bal_data.get("available", 0.0) or 0.0)
                         demo_acc_id = bal_data.get("account_id", "")
                         env_mode = "🟡 DEMO ($10,000 Virtual Funds)"
+
+                        eff_eq = max(budget, demo_bal, demo_avail)
+                        max_pos = user_explicit_max if (user_explicit_max is not None and user_explicit_max > 0) else capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
+                        db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
 
                         msg = (
                             f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON (DEMO)** 🟡\n"
