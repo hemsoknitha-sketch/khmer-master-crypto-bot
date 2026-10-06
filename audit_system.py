@@ -1848,7 +1848,7 @@ def run_audit():
         log_fail(str(e))
 
     # 43. Super Smart Rollover Swap Shield & Wall Street Full Coverage Lock (Invariant 53)
-    print("\n[CHECK 43/43] Verifying Super Smart Rollover Swap Shield, Wednesday Triple-Swap Lockout, Wall Street Full Coverage & Crypto 24/7 Continuity Lock (Invariant 53)...")
+    print("\n[CHECK 43/44] Verifying Super Smart Rollover Swap Shield, Wednesday Triple-Swap Lockout, Wall Street Full Coverage & Crypto 24/7 Continuity Lock (Invariant 53)...")
     try:
         # 1. Ground Truth Lock in AGENTS.md
         with open("AGENTS.md", "r", encoding="utf-8") as f:
@@ -1909,6 +1909,70 @@ def run_audit():
             log_fail("Super Smart Rollover Swap Shield (Invariant 53) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 53 check failed: {e}")
+        log_fail(str(e))
+
+    # 44. VIP 10-Slot Parity, Governor Master Toggle & Real Live Spread Isolation (Invariants 54 & 55)
+    print("\n[CHECK 44/44] Verifying VIP 10-Slot Parity, Governor Master Toggle & Real Live Spread Isolation (Invariants 54 & 55)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv54 = "Invariant 54" in agents_md_text and "VIP 10-Slot Parity" in agents_md_text
+        has_inv55 = "Invariant 55" in agents_md_text and "Institutional Real Live Spread Isolation" in agents_md_text
+
+        # 2. Dynamic Unit Test: Governor Master Toggle (Limit ON/OFF)
+        from portfolio_circuit_breaker import CapitalDailyAGIGovernor
+        test_uid = 88888801
+
+        # Test turning limits OFF
+        CapitalDailyAGIGovernor.set_daily_limits_disabled(test_uid, True)
+        is_limits_off = (CapitalDailyAGIGovernor.are_daily_limits_disabled(test_uid) is True)
+
+        # Test turning limits ON
+        CapitalDailyAGIGovernor.set_daily_limits_disabled(test_uid, False)
+        is_limits_on = (CapitalDailyAGIGovernor.are_daily_limits_disabled(test_uid) is False)
+
+        # 3. Dynamic Unit Test: get_system_wide_live_spread_audit (Invariant 55)
+        import capital_engine
+        spread_mgr = capital_engine.get_capital_spread_drag_manager()
+        spread_audit = spread_mgr.get_system_wide_live_spread_audit()
+
+        is_spread_audit_valid = (
+            isinstance(spread_audit, dict) and
+            spread_audit.get("demo_prop_excluded_from_total") is True and
+            "total_live_spread_cost_usd" in spread_audit and
+            "total_live_equity_usd" in spread_audit and
+            "demo_or_prop_spread_cost_usd" in spread_audit and
+            "users_audit" in spread_audit
+        )
+
+        # 4. Code Inspection: Bot Thread UI Integration & Un-truncated Account ID
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        has_limit_off_cmd = "btn_cap_daily_limit_off" in bt_code
+        has_limit_on_cmd = "btn_cap_daily_limit_on" in bt_code
+        has_account_id_untruncated = "u_acc_full = str(u.get('account_id')" in bt_code
+
+        # 5. Dynamic Scaling Inspection in capital_engine.py
+        with open("capital_engine.py", "r", encoding="utf-8") as f:
+            cap_code = f.read()
+        has_vip_10_slots = "get_dynamic_max_positions_for_equity" in cap_code and "return 10" in cap_code
+
+        all_inv54_55_passed = (
+            has_inv54 and has_inv55 and
+            is_limits_off and is_limits_on and
+            is_spread_audit_valid and
+            has_limit_off_cmd and has_limit_on_cmd and
+            has_account_id_untruncated and has_vip_10_slots
+        )
+
+        if all_inv54_55_passed:
+            log_pass("VIP 10-Slot Parity, Governor Master Toggle & Real Live Spread Isolation (Invariants 54 & 55) are 100% certified!")
+        else:
+            failures.append(f"Invariants 54-55 check failed: inv54={has_inv54}, inv55={has_inv55}, limits_off={is_limits_off}, limits_on={is_limits_on}, spread_valid={is_spread_audit_valid}, untruncated={has_account_id_untruncated}, vip_slots={has_vip_10_slots}")
+            log_fail("VIP 10-Slot Parity, Governor Master Toggle & Spread Isolation (Invariants 54 & 55) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariants 54-55 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

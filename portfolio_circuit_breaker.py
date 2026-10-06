@@ -451,6 +451,8 @@ class CapitalDailyAGIGovernor:
             db.get_system_setting(f"cap_daily_governor_disabled_{chat_id}", "0") == "1"
         )
 
+    are_daily_limits_disabled = is_daily_limits_disabled
+
     @classmethod
     def set_daily_baseline(cls, chat_id: int, starting_capital: float) -> None:
         """Explicitly sets today's starting capital baseline."""

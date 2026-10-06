@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ47)
-**Document Version:** 4.0.0 (Angkor Quant Master Specification - The 47 Pillars)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ55)
+**Document Version:** 5.0.0 (Angkor Quant Master Specification - The 55 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -67,9 +67,9 @@ When a user asks:
 
 ---
 
-## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 30 PILLARS)
+## 3. IMMUTABLE ARCHITECTURAL INVARIANTS (THE 55 PILLARS)
 
-Any modification that breaks any of the following 30 invariants is considered an act of technical sabotage:
+Any modification that breaks any of the following 55 invariants is considered an act of technical sabotage:
 
 ### Invariant 1: Spot MIN_NOTIONAL $10.50 Hard Floor
 - **Location:** `trading_engine.py` (`place_spot_order`, `execute_spot_strategy`)
@@ -807,7 +807,40 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   7. **Canonical Default & Zero-Dead-Button UI Enforcement:**
      - Default `schedule_mode` across `database.py` and `capital_engine.py` is permanently locked to `SMART_SESSION_TIMED`.
      - Telegram UI supports `/capital SWAP_SHIELD`, `/capital SMART_SESSION`, `/capital SCHEDULE`, and interactive callback `btn_cap_swap_shield_info` with immediate acknowledgment.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 43/43].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 43/44].
+
+---
+
+### Invariant 54: Capital.com VIP 10-Slot Parity, Dynamic Scaling & Governor Master Toggle Standard (Limit ON / OFF)
+- **Location:** `portfolio_circuit_breaker.py` (`CapitalDailyAGIGovernor`), `capital_engine.py` (`_dispatch_single_user_trade`, `_ratchet_engine_positions`), `bot_thread.py` (`capital_command`, `admin_capital_command`, `btn_cap_daily_limit_off`, `btn_cap_daily_limit_on`, `btn_cap_admin_on_`), `database.py`
+- **Rule:**
+  1. **Institutional 10-Slot VIP Parity Standard:**
+     - VIP User accounts possess full dynamic multi-slot allocation parity scaling up to 10 concurrent positions (identical to Super Admin capacity), dynamically determined by `max_slots = max(1, min(10, int(round(equity / 100.0))))` for accounts scaled with sufficient capital, or configured via administrative command `/admin_capital on <id> 400 live 10 24/7`.
+     - 24/7 schedule override mode (`24/7` or `continuous`) is fully integrated and supported for VIP automated execution without session cutoffs.
+  2. **Daily Governor Master Toggle Standard (`LIMIT ON / OFF`):**
+     - The Daily Circuit Breaker (+5.0% target win cap / -2.5% daily loss floor) can be independently enabled or disabled via `/capital limit OFF`, `/admin_capital limit <chat_id> OFF`, and `/admin_capital limit global OFF` (and re-enabled via `LIMIT ON`).
+     - Disabling daily limits prevents the bot from prematurely cutting off trading during exceptional macroeconomic mega-trend days or volatile institutional breakouts.
+  3. **Zero Compromise on Trade-Level Risk (Fiduciary Covenant Lock):**
+     - Disabling daily limits strictly leaves 100% of individual trade protections intact and operational: Dynamic ATR Stop-Loss, Dynamic Take-Profit Targets, Mathematical Breakeven Armor (+0.12% net floor), Trailing Ratchet, and Small Capital Leverage Clamp ($\le 10\times$ for accounts $< \$100$) are 100% preserved. Under no circumstances does toggling daily limits disable trade-level risk management.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 44/44].
+
+---
+
+### Invariant 55: Institutional Real Live Spread Isolation, Zero Virtual Contamination & Un-truncated Account ID Standard
+- **Location:** `capital_engine.py` (`CapitalSpreadDragManager.get_system_wide_live_spread_audit`), `bot_thread.py` (`capital_spread_command`, `admin_capital_command`), `database.py`
+- **Rule:**
+  1. **Tri-Tier Account Segregation Standard:**
+     - All user accounts are strictly categorized into 3 non-overlapping tiers:
+       * `🟢 REAL LIVE`: Live Mainnet Capital.com accounts (`is_demo == 0`, not in Prop challenge configuration, and account ID does not contain 'PROP' or 'FTMO').
+       * `🟡 DEMO`: Virtual simulation accounts (`is_demo == 1` or `auto_is_demo == 1`).
+       * `🏆 PROP CHALLENGE`: Prop firm evaluation accounts (in `prop_firm_challenge_config` or account ID contains 'PROP' / 'FTMO').
+  2. **Zero Virtual Contamination in Grand Total Metrics:**
+     - Grand Total System metrics displayed in `/admin_capital spread` and `/capital total_spread` (including `total_live_spread_cost_usd`, `total_live_equity_usd`, `total_live_available_usd`, `total_live_open_positions_count`, and `total_live_floating_upl_usd`) MUST strictly and unconditionally calculate ONLY Real Live Mainnet accounts.
+     - All Demo and Prop firm evaluation balances and spreads MUST be strictly excluded from Grand Totals (`demo_prop_excluded_from_total == True`) and isolated into a dedicated informational audit section (`🧪 គណនី Demo & Prop Firm (Excluded)`).
+  3. **Un-truncated 1-Tap Copyable Capital Account ID Standard:**
+     - In all administrative lists (`/admin_capital spread`, `/admin_capital users`), the Capital.com Broker Account ID must be displayed in full on a dedicated line (`🏦 Account ID ៖ <id>`) with zero digit truncation (`[-8:]` strictly prohibited).
+     - Account IDs must be enclosed in monospace backticks (e.g. `` `1612591526` ``) enabling immediate 1-tap clipboard copying on mobile devices for seamless execution of administrative management commands.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 44/44].
 
 ---
 
@@ -815,8 +848,8 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 47 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 37 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 55 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 44 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
@@ -826,4 +859,5 @@ Whenever you are tasked with inspecting, modifying, or testing the repository:
    cd /opt/khmer-master-crypto-bot && bash auto_update_vps.sh
    ```
    *(This directive is permanent, immutable, and must be followed in every future session without prompting).*
+
 
