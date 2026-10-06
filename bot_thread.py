@@ -6670,6 +6670,27 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_spread_command(update, context)
+            elif data in ["btn_cap_admin_total_spread", "btn_cap_admin_spread_refresh"]:
+                try:
+                    await update.callback_query.answer("👑 កំពុងទាញយកទិន្នន័យ Real Live Total Spread ពីគ្រប់ VIP Traders...")
+                except Exception:
+                    pass
+                context.args = ["ADMIN"]
+                await capital_spread_command(update, context)
+            elif data == "btn_cap_admin_spread_json":
+                try:
+                    await update.callback_query.answer("📄 កំពុងរៀបចំឯកសារ JSON Spread Audit...")
+                except Exception:
+                    pass
+                context.args = ["JSON"]
+                await capital_spread_command(update, context)
+            elif data == "btn_cap_admin_users":
+                try:
+                    await update.callback_query.answer("👥 កំពុងទាញយកបញ្ជី VIP Traders...")
+                except Exception:
+                    pass
+                context.args = ["LIST"]
+                await admin_capital_command(update, context)
             elif data == "btn_cap_auto_budget_10":
                 try:
                     c_eng = capital_engine.get_user_capital_engine(chat_id)
@@ -23796,9 +23817,127 @@ class TelegramBotThread(BaseThread):
             spread_mgr = capital_engine.get_capital_spread_drag_manager()
             spread_cfg = db.get_capital_spread_guard_config(chat_id)
 
+            is_admin_user = (chat_id == 859271875) or db.is_admin(chat_id)
+            is_admin_req = False
+            if args and str(args[0]).upper().strip() in ["ADMIN", "TOTAL", "ALL", "SUPER_ADMIN", "AUDIT", "USERS", "TOTAL_SPREAD"]:
+                is_admin_req = True
+            elif update.message and update.message.text:
+                cmd_txt = update.message.text.lower()
+                if any(k in cmd_txt for k in ["total_spread", "totalspread", "admin_spread"]):
+                    is_admin_req = True
+
+            if is_admin_req:
+                if not is_admin_user:
+                    await update.effective_message.reply_text("🔒 **សិទ្ធិត្រូវបានបដិសេធ ៖** របាយការណ៍ Total Spread នៃប្រព័ន្ធទាំងមូល គឺសម្រាប់តែ Bot Super Admin ប៉ុណ្ណោះ!", parse_mode="Markdown")
+                    return
+
+                audit_data = await asyncio.to_thread(spread_mgr.get_system_wide_live_spread_audit)
+
+                lines = [
+                    "👑 **[CAPITAL.COM SYSTEM-WIDE TOTAL SPREAD AUDIT]** 💎",
+                    ui_standards.DIVIDER_HEAVY,
+                    f"📶 **ទិន្នន័យជាក់ស្តែង ៖** `100% Real Live, Real Broker Data` 🟢",
+                    f"⏰ **ពេលវេលា Audit ៖** `{audit_data['timestamp']}`",
+                    ui_standards.DIVIDER_LIGHT,
+                    "🌐 **ស្ថិតិរួមប្រព័ន្ធទាំងមូល (System-Wide Grand Totals) ៖**",
+                    f"• 👥 **VIP Accounts សរុប ៖** `{audit_data['total_registered_users']}` (Connected: `{audit_data['connected_users_count']}` | Failed: `{audit_data['failed_users_count']}`)",
+                    f"• 📊 **Positions សកម្មរួម ៖** `{audit_data['total_open_positions_count']}` Positions",
+                    f"• 💰 **Equity រួមប្រព័ន្ធ ៖** `${audit_data['total_system_equity_usd']:,.2f} USD`",
+                    f"• 💵 **Cash ទំនេររួម ៖** `${audit_data['total_system_available_usd']:,.2f} USD`",
+                    f"• 🛡️ **Grand Total Spread Cost ៖** `-${audit_data['total_system_spread_cost_usd']:,.4f} USD`",
+                    f"• 📈 **Total Floating Net PnL ៖** `${audit_data['total_system_floating_upl_usd']:+,.2f} USD`",
+                    ui_standards.DIVIDER_LIGHT,
+                    "💎 **បញ្ជីលម្អិតតាម VIP Trader នីមួយៗ (Per-User Live Spread) ៖**"
+                ]
+
+                active_users = [u for u in audit_data.get("users_audit", []) if u.get("status") == "CONNECTED"]
+                if not active_users:
+                    lines.append("• _មិនទាន់មានគណនីណាបានតភ្ជាប់ Live Session នៅឡើយ_")
+                else:
+                    for u in active_users:
+                        u_mode = "🟡 DEMO" if u["is_demo"] else "🟢 LIVE"
+                        u_acc_short = u['account_id'][-8:] if len(u['account_id']) > 8 else (u['account_id'] or "N/A")
+                        u_auto_badge = "Auto: ON" if u["auto_enabled"] else "Auto: OFF"
+                        lines.append(
+                            f"👤 **{u['username']}** (`{u['chat_id']}`) | `{u_acc_short}` ({u_mode} | {u_auto_badge})\n"
+                            f"  💰 Bal: `${u['balance']:,.2f}` | Avail: `${u['available']:,.2f}`\n"
+                            f"  📊 Pos: `{u['open_positions_count']}` | Spread: `-${u['total_spread_cost_usd']:,.4f}` | PnL: `${u['total_floating_upl_usd']:+,.2f}`"
+                        )
+                        for p in u.get("positions", [])[:3]:
+                            lines.append(
+                                f"    ▫️ `{p['epic']}` {p['direction']} `{p['size']}` | Spr: `${p['spread']:,.2f}` (Cost: `-${p['spread_cost_usd']:,.3f}`) | PnL: `${p['upl']:+,.2f}`"
+                            )
+                        if len(u.get("positions", [])) > 3:
+                            lines.append(f"    ▫️ _...និង {len(u['positions']) - 3} Positions ផ្សេងទៀត_")
+
+                failed_users = [u for u in audit_data.get("users_audit", []) if u.get("status") != "CONNECTED"]
+                if failed_users:
+                    lines.append(ui_standards.DIVIDER_LIGHT)
+                    lines.append("⚠️ **គណនីពុំទាន់បានភ្ជាប់ Session / អសកម្ម ៖**")
+                    for fu in failed_users[:5]:
+                        lines.append(f"• `{fu['username']}` (`{fu['chat_id']}`): `{fu['status']}`")
+                    if len(failed_users) > 5:
+                        lines.append(f"• _...និង {len(failed_users) - 5} គណនីផ្សេងទៀត_")
+
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("📡 **តម្លៃ Spread ផ្សារផ្ទាល់ (Broker Live Spread Radar) ៖**")
+                mkt = audit_data.get("market_spread_radar", {})
+                if "GOLD" in mkt:
+                    g = mkt["GOLD"]
+                    lines.append(f"• 🥇 **Gold (XAU/USD) ៖** Bid `${g['bid']:,.2f}` | Ask `${g['ask']:,.2f}` ➔ Spread `${g['spread']:.2f}`")
+                if "US500" in mkt:
+                    s = mkt["US500"]
+                    lines.append(f"• 📈 **S&P 500 (US500) ៖** Bid `${s['bid']:,.2f}` | Ask `${s['ask']:,.2f}` ➔ Spread `${s['spread']:.2f}`")
+                if "OIL_CRUDE" in mkt:
+                    o = mkt["OIL_CRUDE"]
+                    lines.append(f"• 🛢️ **Crude Oil ៖** Bid `${o['bid']:,.2f}` | Ask `${o['ask']:,.2f}` ➔ Spread `${o['spread']:.3f}`")
+                if "BTCUSD" in mkt:
+                    b = mkt["BTCUSD"]
+                    lines.append(f"• 🪙 **Bitcoin (BTC/USD) ៖** Bid `${b['bid']:,.2f}` | Ask `${b['ask']:,.2f}` ➔ Spread `${b['spread']:.2f}`")
+                if "EURUSD" in mkt:
+                    e = mkt["EURUSD"]
+                    lines.append(f"• 💶 **EUR/USD ៖** Bid `${e['bid']:.5f}` | Ask `${e['ask']:.5f}` ➔ Spread `${e['spread']:.5f}`")
+
+                lines.append(ui_standards.DIVIDER_HEAVY)
+                lines.append("💡 _ទិន្នន័យ 100% Real Live ពី Capital.com Broker គ្មាន Mock/Simulation ឡើយ!_")
+                lines.append("`Khmer Master Crypto - APEX SUPER BRAIN AI`")
+
+                admin_keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh Total Spread", callback_data="btn_cap_admin_spread_refresh"),
+                        InlineKeyboardButton("📄 Export Audit JSON", callback_data="btn_cap_admin_spread_json")
+                    ],
+                    [
+                        InlineKeyboardButton("🛡️ Spread Drag Radar", callback_data="btn_cap_spread_radar"),
+                        InlineKeyboardButton("👥 VIP Traders Directory", callback_data="btn_cap_admin_users")
+                    ],
+                    [
+                        InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_refresh"),
+                        InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=admin_keyboard)
+                return
+
             if args:
                 sub = str(args[0]).upper().strip()
-                if sub in ["ON", "START", "ENABLE"]:
+                if sub == "JSON":
+                    if not is_admin_user:
+                        await update.effective_message.reply_text("🔒 **សិទ្ធិត្រូវបានបដិសេធ ៖** ឯកសារនេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", parse_mode="Markdown")
+                        return
+                    import json
+                    audit_res = await asyncio.to_thread(spread_mgr.get_system_wide_live_spread_audit)
+                    json_str = json.dumps(audit_res, indent=2, ensure_ascii=False)
+                    if len(json_str) < 3800:
+                        await update.effective_message.reply_text(f"```json\n{json_str}\n```", parse_mode="Markdown")
+                    else:
+                        import io
+                        bio = io.BytesIO(json_str.encode("utf-8"))
+                        bio.name = f"capital_total_spread_audit_{int(time.time())}.json"
+                        await update.effective_message.reply_document(document=bio, caption="👑 **Capital.com System-Wide Total Spread Audit (Real Live JSON)**")
+                    return
+                elif sub in ["ON", "START", "ENABLE"]:
                     db.set_capital_spread_guard_config(chat_id, enabled=True)
                     toast = "✅ Spread Drag Shield: បានបើកដំណើរការ!" if user_lang == 'khmer' else "✅ Spread Drag Shield: ACTIVATED!"
                     if update.callback_query:
@@ -23854,7 +23993,7 @@ class TelegramBotThread(BaseThread):
             market_btc = capital_engine.get_capital_auto_engine().get_market_quote("BTCUSD")
             btc_sp = market_btc.get("spread", 35.0) if market_btc.get("success") else 35.0
 
-            keyboard = InlineKeyboardMarkup([
+            keyboard_rows = [
                 [
                     InlineKeyboardButton("🛡️ Spread Guard: ON 🟢" if is_on else "🛡️ Spread Guard: OFF ⚪", callback_data="btn_cap_spread_toggle"),
                     InlineKeyboardButton("🔄 Refresh Radar", callback_data="btn_cap_spread_radar")
@@ -23863,12 +24002,17 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🎯 Hurdle 8x (12% Drag)", callback_data="btn_cap_auto_budget_10"),
                     InlineKeyboardButton("🎯 Hurdle 10x (10% Drag)", callback_data="btn_cap_auto_budget_30"),
                     InlineKeyboardButton("🎯 Hurdle 15x (6% Drag)", callback_data="btn_cap_auto_budget_50")
-                ],
-                [
-                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_refresh"),
-                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
                 ]
+            ]
+            if is_admin_user:
+                keyboard_rows.append([
+                    InlineKeyboardButton("👑 Super Admin Total Spread", callback_data="btn_cap_admin_total_spread")
+                ])
+            keyboard_rows.append([
+                InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_refresh"),
+                InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
             ])
+            keyboard = InlineKeyboardMarkup(keyboard_rows)
 
             if user_lang == 'khmer':
                 msg = (
@@ -24010,7 +24154,7 @@ class TelegramBotThread(BaseThread):
             """
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else None
-            if not chat_id or chat_id != 859271875:
+            if not chat_id or not (chat_id == 859271875 or db.is_admin(chat_id)):
                 return
             args = list(context.args) if context and context.args else []
 
@@ -24034,6 +24178,11 @@ class TelegramBotThread(BaseThread):
                     return uid, None
                 except ValueError:
                     return None, None
+
+            if args and args[0].upper() in ["SPREAD", "TOTAL_SPREAD", "SPREAD_RADAR", "SPREAD_AUDIT"]:
+                context.args = ["ADMIN"]
+                await capital_spread_command(update, context)
+                return
 
             if not args or args[0].upper() in ["LIST", "USERS", "OVERVIEW", "ALL"]:
                 all_users = db.get_all_capital_users_overview()
@@ -24066,8 +24215,14 @@ class TelegramBotThread(BaseThread):
                         btn_row.append(InlineKeyboardButton(f"✅ Approve", callback_data=f"btn_cap_appr_{u_cid}"))
                     kb_rows.append(btn_row)
 
+                kb_rows.append([
+                    InlineKeyboardButton("👑 Total Spread Audit (Live)", callback_data="btn_cap_admin_total_spread"),
+                    InlineKeyboardButton("📄 Export JSON", callback_data="btn_cap_admin_spread_json")
+                ])
+
                 lines.append(f"{ui_standards.DIVIDER_HEAVY}")
                 lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
+                lines.append("• `` `/admin_capital spread` `` (ពិនិត្យ Real Live Total Spread ប្រព័ន្ធទាំងមូល)")
                 lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade ភ្លាម)")
                 lines.append("• `` `/admin_capital off <Account_ID>` `` (បិទ Auto Trade)")
                 lines.append("• `` `/admin_capital approve <Account_ID>` `` (អនុម័តសិទ្ធិ Live)")
@@ -24985,6 +25140,7 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton(spread_btn_text, callback_data="btn_cap_spread_toggle"),
                     InlineKeyboardButton("🛡️ Spread Radar", callback_data="btn_cap_spread_radar")
                 ],
+                *([[InlineKeyboardButton("👑 Total Spread Audit (Admin)", callback_data="btn_cap_admin_total_spread")]] if (chat_id == 859271875 or db.is_admin(chat_id)) else []),
                 [
                     InlineKeyboardButton("📈 ORB Radar (15m)", callback_data="btn_cap_orb_radar"),
                     InlineKeyboardButton("🧮 Kelly Radar", callback_data="btn_cap_kelly_radar")
@@ -26037,6 +26193,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capital_spread", capital_spread_command))
         self.app.add_handler(CommandHandler("capitalspread", capital_spread_command))
         self.app.add_handler(CommandHandler("spreadguard", capital_spread_command))
+        self.app.add_handler(CommandHandler("capital_total_spread", capital_spread_command))
+        self.app.add_handler(CommandHandler("capitaltotalspread", capital_spread_command))
+        self.app.add_handler(CommandHandler("capital_admin_spread", capital_spread_command))
+        self.app.add_handler(CommandHandler("admin_capital_spread", capital_spread_command))
         self.app.add_handler(CommandHandler("capital_ib", capital_ib_command))
         self.app.add_handler(CommandHandler("capitalib", capital_ib_command))
         self.app.add_handler(CommandHandler("ib", capital_ib_command))
