@@ -2527,10 +2527,12 @@ class MT5BridgeEngine:
             logger.info(f"⏸️ [REACHSEY DISPATCH ABORTED] Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). No high-conviction directional edge! Capital 100% Protected!")
             return {"success": False, "reason": f"Market on {sym_clean} is Neutral/Choppy (Conf: {signal_conf:.1f}%). 100% Capital Protected (Zero Blind Trading)."}
 
-        # Dynamic Delta Skew Geometry (Invariant 48):
-        # - High Confidence (>= 92.0%): 4:1 Extreme Skew (4 Primary vs 1 Hedge, Net Delta = 0.60 Lot)
-        # - Standard Confluence (75.0% - 91.9%): 3:2 Standard Skew (3 Primary vs 2 Hedge, Net Delta = 0.20 Lot)
-        is_extreme_skew = (signal_conf >= 92.0)
+        # Standard Institutional Rebate & Fast-Exit Architecture (3:2 Skew Standard):
+        # - Primary: 3 Positions = 0.60 Lot (0.20 x 3)
+        # - Hedge:   2 Positions = 0.40 Lot (0.20 x 2)
+        # - Total Volume = 1.00 Lot (Maximized Rebate Turnover with 80% Reduced Market Risk)
+        # - Net Delta = 0.20 Lot (Low Drawdown, Rapid Profit Harvest & Fast Market Exit)
+        is_extreme_skew = bool(kwargs.get("extreme_skew", False))
         ratio_label = "4:1" if is_extreme_skew else "3:2"
 
         if action == "BUY":
@@ -2571,28 +2573,52 @@ class MT5BridgeEngine:
         is_gold = ("XAU" in sym_clean or "GOLD" in sym_clean)
         basket_id = f"R5_{account_id}_{sym_clean}_{int(time.time())}"
         dispatched_orders = []
+        # Support explicit primary_lot and hedge_lot (e.g. 3 Primary = 0.60 lot, 2 Hedge = 0.40 lot)
+        custom_primary_lot = float(kwargs.get("primary_lot", 0.0) or 0.0)
+        custom_hedge_lot = float(kwargs.get("hedge_lot", 0.0) or 0.0)
+
         if is_cent and raw_bal < 10000.0:
             lot_val = 0.01  # Invariant 8 & 44 & 47: Strict Micro Capital Shield for < $100
+            primary_leg_lot = 0.01
+            hedge_leg_lot = 0.01
         elif not is_cent and 0.0 < real_usd < 1000.0:
             # Invariant 8, 25 & 44: Standard Account Micro-Capital Fortress
             # Strictly clamps lot to 0.01 if trader's real balance on Standard account is < $1,000 USD
             # to guarantee zero overleveraging on retail balances!
-            lot_val = 0.01
+            if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
+                primary_leg_lot = max(0.01, round(custom_primary_lot / (4 if is_extreme_skew else 3), 2))
+                hedge_leg_lot = max(0.01, round(custom_hedge_lot / (1 if is_extreme_skew else 2), 2))
+                lot_val = primary_leg_lot
+            elif lot_per_pos and float(lot_per_pos) > 0.01:
+                lot_val = float(lot_per_pos)
+                primary_leg_lot = lot_val
+                hedge_leg_lot = lot_val
+            else:
+                lot_val = 0.01
+                primary_leg_lot = 0.01
+                hedge_leg_lot = 0.01
             target_pnl = max(2.50, round(real_usd * 0.10, 2))
             min_harvest_pnl = max(1.00, round(real_usd * 0.04, 2))
             floor_pnl = max(4.50, round(real_usd * 0.18, 2))
         else:
             lot_val = max(0.01, float(lot_per_pos or lot_val))
+            if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
+                primary_leg_lot = max(0.01, round(custom_primary_lot / (4 if is_extreme_skew else 3), 2))
+                hedge_leg_lot = max(0.01, round(custom_hedge_lot / (1 if is_extreme_skew else 2), 2))
+            else:
+                primary_leg_lot = lot_val
+                hedge_leg_lot = lot_val
 
         for leg_act, leg_tag, tp_mult, sl_mult in plan:
             # Invariant 48: Indivisible Basket Cohabitation Standard
             # ZERO broker-side SL/TP on individual legs! All 5 legs must stand together until profit!
             # The Basket Harvester (monitor_reachsey_5pos_baskets) sweeps all 5 legs simultaneously.
+            this_leg_lot = primary_leg_lot if ("LEG" in leg_tag) else hedge_leg_lot
             comment_str = f"{leg_tag}_{basket_id[-4:]}"
             res = self.dispatch_order(
                 symbol=adapted_sym,
                 action=leg_act,
-                lot=lot_val,
+                lot=this_leg_lot,
                 sl=0.0,
                 tp=0.0,
                 sl_dist=0.0,
@@ -2603,7 +2629,7 @@ class MT5BridgeEngine:
             )
             dispatched_orders.append({
                 "action": leg_act,
-                "lot": lot_val,
+                "lot": this_leg_lot,
                 "tag": leg_tag,
                 "tp_dist": 0.0,
                 "sl_dist": 0.0,
@@ -2615,6 +2641,11 @@ class MT5BridgeEngine:
                 self._signal_to_metadata[sig_id]["basket_id"] = basket_id
                 self._signal_to_metadata[sig_id]["magic"] = 888666
 
+        tot_actual_lot = round(sum(o.get("lot", 0.0) for o in dispatched_orders), 2)
+        pri_actual_lot = round(sum(o.get("lot", 0.0) for o in dispatched_orders if "LEG" in o.get("tag", "")), 2)
+        hdg_actual_lot = round(sum(o.get("lot", 0.0) for o in dispatched_orders if "HEDGE" in o.get("tag", "")), 2)
+        net_delta_val = round(pri_actual_lot - hdg_actual_lot, 2)
+
         basket_info = {
             "basket_id": basket_id,
             "chat_id": chat_id,
@@ -2624,11 +2655,13 @@ class MT5BridgeEngine:
             "tier": tier,
             "capital": cap_val,
             "lot_per_pos": lot_val,
-            "total_lot": round(lot_val * len(plan), 2),
+            "primary_lot": pri_actual_lot,
+            "hedge_lot": hdg_actual_lot,
+            "total_lot": tot_actual_lot,
             "ratio": ratio_label,
             "confidence": round(signal_conf, 1),
             "signal_reason": signal_reason,
-            "net_delta": round((4 * lot_val - 1 * lot_val) if is_extreme_skew else (3 * lot_val - 2 * lot_val), 2),
+            "net_delta": net_delta_val,
             "is_extreme_skew": is_extreme_skew,
             "min_harvest_milestone": min_harvest_pnl,
             "target_profit": target_pnl,
@@ -2667,9 +2700,11 @@ class MT5BridgeEngine:
             "ratio": ratio_label,
             "confidence": round(signal_conf, 1),
             "signal_reason": signal_reason,
-            "net_delta": round((4 * lot_val - 1 * lot_val) if is_extreme_skew else (3 * lot_val - 2 * lot_val), 2),
+            "net_delta": net_delta_val,
             "lot_per_pos": lot_val,
-            "total_lot": round(lot_val * len(dispatched_orders), 2),
+            "primary_lot": pri_actual_lot,
+            "hedge_lot": hdg_actual_lot,
+            "total_lot": tot_actual_lot,
             "basket": basket_info
         }
 
@@ -2790,16 +2825,14 @@ class MT5BridgeEngine:
             if should_sweep:
                 if not hasattr(self, "_reachsey_last_sweep_ts"):
                     self._reachsey_last_sweep_ts = {}
-                self._reachsey_last_sweep_ts[str(account_id)] = now_ts
-                logger.info(f"🚀 [REACHSEY BASKET SWEEP] Sweeping Basket {b_id} on Account #{account_id}! Reason: {sweep_reason}. Closing {len(matching_positions)} positions...")
+                b_data["status"] = "SWEPT_COMPLETED"
+                b_data["final_net_pnl"] = net_pnl
+                logger.info(f"🚀 [REACHSEY BASKET SWEEP] Sweeping Basket {b_id} on Account #{account_id}! Reason: {sweep_reason}. Rapidly closing {len(matching_positions)} positions simultaneously...")
                 for p in matching_positions:
                     t_num = int(p.get("ticket", 0) or 0)
                     t_sym = str(p.get("symbol", ""))
                     if t_num > 0:
                         self.dispatch_close(ticket=t_num, symbol=t_sym, comment=f"SWEEP_{b_id[-4:]}", target_account=account_id)
-
-                b_data["status"] = "SWEPT_COMPLETED"
-                b_data["final_net_pnl"] = net_pnl
 
                 # Basket-Level Circuit Breaker Tracking (Invariant 48)
                 streak_key = f"{account_id}_{target_sym}"

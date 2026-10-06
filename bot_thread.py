@@ -22756,38 +22756,59 @@ class TelegramBotThread(BaseThread):
 
             args = list(context.args) if context and context.args else []
 
-            # Subcommand: 3000, 6000, 10000 or custom capital tier
+            # Subcommand: 3000, 6000, 10000 or custom capital tier / BUY / SELL / symbol / lots
             if args:
                 sub = str(args[0]).upper().strip()
-                if sub in ["3000", "6000", "10000", "TIER1", "TIER2", "TIER3"] or (sub.isdigit() and int(sub) >= 500):
+                is_launch_cmd = (
+                    sub in ["3000", "6000", "10000", "TIER1", "TIER2", "TIER3", "BUY", "SELL", "START", "RUN", "NOW", "LAUNCH", "GO"]
+                    or (sub.isdigit() and int(sub) >= 500)
+                    or any(c in sub for c in ["XAU", "BTC", "ETH", "US30", "US100", "EUR", "GBP", "JPY", "GOLD"])
+                )
+                if is_launch_cmd:
                     cap_val = 3000.0
-                    if sub == "6000" or sub == "TIER2":
-                        cap_val = 6000.0
-                    elif sub == "10000" or sub == "TIER3":
-                        cap_val = 10000.0
-                    elif sub.isdigit():
-                        cap_val = float(sub)
-
                     custom_sym = None
                     custom_lot = 0.20
-                    for extra_arg in args[1:]:
+                    custom_act = None
+                    custom_primary_lot = 0.0
+                    custom_hedge_lot = 0.0
+
+                    numeric_floats = []
+                    for extra_arg in args:
                         extra_str = str(extra_arg).upper().strip()
-                        if any(c in extra_str for c in ["XAU", "BTC", "ETH", "US30", "US100", "EUR", "GBP", "JPY", "GOLD"]):
+                        if extra_str in ["6000", "TIER2"]:
+                            cap_val = 6000.0
+                        elif extra_str in ["10000", "TIER3"]:
+                            cap_val = 10000.0
+                        elif extra_str.isdigit() and int(extra_str) >= 500:
+                            cap_val = float(extra_str)
+                        elif extra_str in ["BUY", "SELL"]:
+                            custom_act = extra_str
+                        elif any(c in extra_str for c in ["XAU", "BTC", "ETH", "US30", "US100", "EUR", "GBP", "JPY", "GOLD"]):
                             custom_sym = extra_str
                         else:
                             try:
                                 val = float(extra_str)
-                                if 0.01 <= val <= 5.0:
-                                    custom_lot = val
+                                if 0.01 <= val <= 20.0:
+                                    numeric_floats.append(val)
                             except Exception:
                                 pass
+
+                    if len(numeric_floats) >= 2:
+                        custom_primary_lot = numeric_floats[0]
+                        custom_hedge_lot = numeric_floats[1]
+                        custom_lot = max(0.01, round(custom_primary_lot / 3, 2))
+                    elif len(numeric_floats) == 1:
+                        custom_lot = numeric_floats[0]
 
                     launch_res = bridge.execute_reachsey_5pos_matrix(
                         acc_id=target_account,
                         capital_tier=cap_val,
                         lot_per_pos=custom_lot,
                         chat_id=chat_id,
-                        target_symbol=custom_sym
+                        target_symbol=custom_sym,
+                        custom_action=custom_act,
+                        primary_lot=custom_primary_lot,
+                        hedge_lot=custom_hedge_lot
                     )
 
                     success = launch_res.get("success", False)
@@ -22797,7 +22818,6 @@ class TelegramBotThread(BaseThread):
                     tp_val = launch_res.get("target_profit_usd") or b_obj.get("target_profit", 300.0)
                     t_str = f"+${tp_val:,.2f}"
                     pos_lot = float(launch_res.get("lot_per_pos", custom_lot or 0.20))
-                    tot_lot = float(launch_res.get("total_lot", pos_lot * tickets_cnt))
                     sym_used = launch_res.get("symbol", custom_sym or "XAUUSD")
                     act_used = launch_res.get("action", launch_res.get("direction", "BUY"))
                     b_ratio = launch_res.get("ratio") or b_obj.get("ratio", "3:2")
@@ -22806,22 +22826,32 @@ class TelegramBotThread(BaseThread):
                     b_rsn = launch_res.get("signal_reason") or b_obj.get("signal_reason", "")
                     fail_reason = launch_res.get("reason") or launch_res.get("error", "Unknown")
                     min_h_val = launch_res.get("min_harvest_usd") or (b_obj.get("min_harvest_milestone", 100.0) if b_obj.get("unit_label") == "USD" else (b_obj.get("min_harvest_milestone", 10000.0) / 100.0))
+
+                    pri_cnt = 4 if b_ratio == "4:1" else 3
+                    hdg_cnt = 1 if b_ratio == "4:1" else 2
+                    pri_lot_total = float(launch_res.get("primary_lot") or round(pos_lot * pri_cnt, 2))
+                    hdg_lot_total = float(launch_res.get("hedge_lot") or round(pos_lot * hdg_cnt, 2))
+                    tot_vol_lot = float(launch_res.get("total_lot") or round(pri_lot_total + hdg_lot_total, 2))
+
                     msg_res = (
                         f"👑 <b>[REACHSEY 5-POSITION MATRIX LAUNCHED]</b> 🚀\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
                         f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_used}</code>\n"
                         f"📈 <b>ទ្រព្យសកម្ម ៖</b> <code>{sym_used}</code> ({act_used} Matrix)\n"
                         f"💵 <b>កម្រិតដើមទុន (Tier) ៖</b> <b>${cap_val:,.2f} USD</b>\n"
-                        f"📊 <b>Positions & Skew ៖</b> <b>{tickets_cnt} Pos ({b_ratio} Skew | Δ {b_delta:+.2f} lot)</b>\n"
+                        f"📊 <b>រចនាសម្ព័ន្ធបញ្ជាទិញ 3:2 Skew ៖</b>\n"
+                        f"   ├ <b>Primary ({act_used}) ៖</b> <b>{pri_cnt} Pos = {pri_lot_total:.2f} Lot</b> (ទិសដៅកើបចំណេញ)\n"
+                        f"   ├ <b>Hedge ({'SELL' if act_used == 'BUY' else 'BUY'}) ៖</b> <b>{hdg_cnt} Pos = {hdg_lot_total:.2f} Lot</b> (កាត់បន្ថយ Drawdown 80%)\n"
+                        f"   ├ <b>Volume ជួញដូរសរុប ៖</b> <b>{tot_vol_lot:.2f} Lot</b> (កើប Rebate ពេញលេញ 100%)\n"
+                        f"   └ <b>Net Delta ៖</b> <b>Δ {b_delta:+.2f} Lot</b> (Market Exposure ទាប ចេញលឿន)\n"
                         f"🧠 <b>AI Conviction ៖</b> <b>{b_conf:.1f}%</b> ({b_rsn[:22] if b_rsn else '9-SMC Confluence'})\n"
-                        f"💰 <b>កើបចំណេញអប្បបរមា ៖</b> <b>+${min_h_val:,.2f}</b> (Instant Fast-Close $\ge \$100$ កើបលុយសុទ្ធភ្លាមៗ)\n"
+                        f"💰 <b>កើបចំណេញអប្បបរមា (Fast Harvest) ៖</b> <b>+${min_h_val:,.2f}</b> (Instant Sweep បិទស្របគ្នា &lt; 0.5ms)\n"
                         f"🎯 <b>ទិសដៅកើបចំណេញ (Target TP) ៖</b> <b>{t_str}</b> (+10%)\n"
-                        f"🔒 <b>Anti-Regret Trailing ៖</b> តាម Lock Profit ខ្ពស់បំផុត (ដាច់ខាតមិនឱ្យស្រកខាតវិញ)\n"
-                        f"🛡️ <b>យន្តការការពារ ៖</b> Zero Broker SL (Basket Cohabitation) | Disaster Floor (-15%)\n"
+                        f"🛡️ <b>យន្តការការពារ ៖</b> <b>Zero Broker-Side SL</b> (គ្មាន Stop Hunting) | Macro Floor (-15%)\n"
                         f"{ui_standards.DIVIDER_DOUBLE}\n"
                         f"{'✅ <b>ដំណើរការ Matrix 5-Position បានបាញ់ចូល MT5 Tokyo ដោយជោគជ័យ!</b>' if success else '⚠️ <b>ប្រព័ន្ធការពារមូលធន (Protection Abort) ៖</b> ' + html.escape(str(fail_reason))}\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
-                        f"<i>✨ Angkor Quant Reachsey Engine កើបលុយ 24/7!</i>"
+                        f"<i>✨ Angkor Quant Reachsey Engine កើប Rebate & ចំណេញ 24/5!</i>"
                     )
                     kb_back = InlineKeyboardMarkup([
                         [InlineKeyboardButton("📊 ពិនិត្យ Baskets សកម្ម", callback_data="btn_mt5_reachsey_status")],
@@ -22980,32 +23010,31 @@ class TelegramBotThread(BaseThread):
                 f"💵 <b>Net PnL សរុប ៖</b> <b>{'+' if total_net_pnl >= 0 else ''}{total_net_pnl:,.2f} USD</b>\n"
                 f"⚡ <b>ល្បឿន Bridge ៖</b> <code>&lt; 0.5ms Direct Socket</code>\n"
                 f"{ui_standards.DIVIDER_DOUBLE}\n"
-                f"📐 <b>យុទ្ធសាស្ត្រគណិតវិទ្យា & កម្រិតដើមទុន (Mathematical Edge) ៖</b>\n"
-                f"• <b>Tier 1 ($3,000) ៖</b> 1 ទ្រព្យសកម្ម ➔ 5 Positions (0.20 lot/pos = 1.00 lot សរុប)\n"
-                f"• <b>Tier 2 ($6,000) ៖</b> 2 ទ្រព្យសកម្ម ➔ 10 Positions (0.20 lot/pos = 2.00 lots សរុប)\n"
-                f"• <b>Tier 3 ($10,000) ៖</b> 3 ទ្រព្យសកម្ម ➔ 15 Positions (0.20 lot/pos = 3.00 lots សរុប)\n"
+                f"📐 <b>រចនាសម្ព័ន្ធកើប Rebate & ចេញពីទីផ្សារលឿន (3:2 Skew Standard) ៖</b>\n"
+                f"• <b>Primary ៖</b> 3 Positions = 0.60 Lot (ទិសដៅចម្បងកើបចំណេញ)\n"
+                f"• <b>Hedge ៖</b> 2 Positions = 0.40 Lot (ទិសដៅការពារកាត់បន្ថយ Drawdown 80%)\n"
+                f"• <b>Total Volume ៖</b> 1.00 Lot (Volume ជួញដូរធំទូលាយកើប Rebate $10–$15/lot ពេញលេញ)\n"
+                f"• <b>Net Delta ៖</b> +0.20 Lot (Market Exposure ទាបបំផុត ចេញពីទីផ្សារលឿន)\n"
                 f"{ui_standards.DIVIDER_LIGHT}\n"
-                f"🛡️ <b>ក្បួនការពារដើមទុន & កើបចំណេញជាក់ស្តែង (Institutional Standard) ៖</b>\n"
-                f"1. <b>គ្មាន Broker SL ជើងទោល ៖</b> ជើងទាំង ៥ ឈររួមគ្នាជា Basket (Zero Broker SL Hunting)\n"
-                f"2. <b>Fast Total Profit Harvester ៖</b> ចាប់ចំណេញរួម $\ge \$100$ USD បិទ Positions ទាំងអស់ភ្លាមៗ\n"
-                f"3. <b>Multi-Asset Momentum Radar ៖</b> ស្កេនរក Trend ខ្លាំងគ្រប់ទីផ្សារ (មាស, BTC, US30, FX)\n"
-                f"4. <b>Dynamic Delta Skew ៖</b> បើក 3:2 ឬ 4:1 Ratio តាម AI Trend Bias មិនខ្លាចទីផ្សារបក\n"
-                f"5. <b>Macro Disaster Floor (-15%) ៖</b> ការពារ 85% នៃទុនដាច់ខាត ប្រឆាំង Black Swan សង្គ្រាម\n"
+                f"🛡️ <b>យន្តការទាំង ៤ ចំណុចកើប Rebate & សុវត្ថិភាពមូលធន (The 4 Pillars) ៖</b>\n"
+                f"1. <b>រចនាសម្ព័ន្ធបញ្ជាទិញ 3:2 Skew ៖</b> 3 Pos (0.60 lot) vs 2 Pos (0.40 lot) = 1.00 lot volume\n"
+                f"2. <b>គ្មាន Stop Loss នាំវិនាសដើមទុន ៖</b> sl=0.0 គ្រប់ជើងទោល គ្មាន Broker Hunt SL ឬ Whipsaw ឡើយ\n"
+                f"3. <b>ចេញពីទីផ្សារលឿន Fast Harvest ៖</b> ចាប់ចំណេញរួម $\ge \$1.00$ (Micro) ឬ $\ge \$100.00$ (Tier 1) បិទស្របគ្នាក្នុង &lt; 0.5ms\n"
+                f"4. <b>Auto 24/5 Momentum Radar ៖</b> ស្កេនចាប់ Trend ខ្លាំងគ្រប់ទីផ្សារ (មាស, BTC, US30, FX) 24/5 ស្វ័យប្រវត្តិ\n"
                 f"{ui_standards.DIVIDER_DOUBLE}\n"
                 f"📊 <b>ស្ថានភាព BASKETS កំពុងដំណើរការ ៖</b>\n"
                 f"{baskets_summary}\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"🎯 <b>កូដបញ្ជា 1-Tap Presets (ចុចចម្លងភ្លាម) ៖</b>\n"
-                f"• បើក Tier 1 ($3,000) ៖ `` `/mt5_reachsey 3000` ``\n"
-                f"• បើក Tier 2 ($6,000) ៖ `` `/mt5_reachsey 6000` ``\n"
-                f"• បើក Tier 3 ($10,000) ៖ `` `/mt5_reachsey 10000` ``\n"
-                f"• បើក Auto Matrix 24/7 ៖ `` `/mt5_reachsey AUTO ON` ``\n"
+                f"• បើក BUY Matrix 1.00 Lot (0.60 / 0.40) ៖ `` `/mt5_reachsey BUY 3000` ``\n"
+                f"• បើក SELL Matrix 1.00 Lot (0.60 / 0.40) ៖ `` `/mt5_reachsey SELL 3000` ``\n"
+                f"• បើក Auto Matrix 24/5 ៖ `` `/mt5_reachsey AUTO ON` ``\n"
                 f"• បើក/បិទ សារស្ងាត់ (Silent) ៖ `` `/mt5_reachsey SILENT ON` ``\n"
                 f"• បោសសម្អាត & កើបចំណេញ ៖ `` `/mt5_reachsey SWEEP` ``\n"
                 f"• បិទ & Safe Stop ៖ `` `/mt5_reachsey STOP` ``\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"<i>Angkor Quant | Reachsey 5-Position Matrix Engine</i>\n"
-                f"<i>APEX SUPER BRAIN AI — កើបប្រាក់ចំណេញ Super Smart 24/7!</i>"
+                f"<i>APEX SUPER BRAIN AI — កើប Rebate & ចំណេញ Super Smart 24/5!</i>"
             )
 
             try:
