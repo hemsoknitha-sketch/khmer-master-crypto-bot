@@ -23948,13 +23948,13 @@ class TelegramBotThread(BaseThread):
                     f"📶 **ទិន្នន័យជាក់ស្តែង ៖** `100% Real Live, Real Broker Data` 🟢",
                     f"⏰ **ពេលវេលា Audit ៖** `{audit_data['timestamp']}`",
                     ui_standards.DIVIDER_LIGHT,
-                    "🌐 **ស្ថិតិរួមប្រព័ន្ធទាំងមូល (System-Wide Grand Totals) ៖**",
-                    f"• 👥 **VIP Accounts សរុប ៖** `{audit_data['total_registered_users']}` (Connected: `{audit_data['connected_users_count']}` | Failed: `{audit_data['failed_users_count']}`)",
-                    f"• 📊 **Positions សកម្មរួម ៖** `{audit_data['total_open_positions_count']}` Positions",
-                    f"• 💰 **Equity រួមប្រព័ន្ធ ៖** `${audit_data['total_system_equity_usd']:,.2f} USD`",
-                    f"• 💵 **Cash ទំនេររួម ៖** `${audit_data['total_system_available_usd']:,.2f} USD`",
-                    f"• 🛡️ **Grand Total Spread Cost ៖** `-${audit_data['total_system_spread_cost_usd']:,.4f} USD`",
-                    f"• 📈 **Total Floating Net PnL ៖** `${audit_data['total_system_floating_upl_usd']:+,.2f} USD`",
+                    "🌐 **ស្ថិតិរួមប្រព័ន្ធទាំងមូល (100% Real Live Only) ៖**",
+                    f"• 👥 **VIP Real Live Accounts ៖** `{audit_data['live_connected_users_count']}` គណនី (Excluded Demo/Prop: `{audit_data.get('demo_or_prop_users_count', 0)}`)",
+                    f"• 📊 **Live Positions សកម្ម ៖** `{audit_data['total_open_positions_count']}` Positions (Real Live Only)",
+                    f"• 💰 **Live Equity រួមប្រព័ន្ធ ៖** `${audit_data['total_system_equity_usd']:,.2f} USD`",
+                    f"• 💵 **Live Cash ទំនេររួម ៖** `${audit_data['total_system_available_usd']:,.2f} USD`",
+                    f"• 🛡️ **Grand Total Live Spread Cost ៖** `-${audit_data['total_system_spread_cost_usd']:,.4f} USD` 🟢",
+                    f"• 📈 **Total Live Floating Net PnL ៖** `${audit_data['total_system_floating_upl_usd']:+,.2f} USD`",
                     ui_standards.DIVIDER_LIGHT,
                     "💎 **បញ្ជីលម្អិតតាម VIP Trader នីមួយៗ (Per-User Live Spread) ៖**"
                 ]
@@ -23964,7 +23964,12 @@ class TelegramBotThread(BaseThread):
                     lines.append("• _មិនទាន់មានគណនីណាបានតភ្ជាប់ Live Session នៅឡើយ_")
                 else:
                     for u in active_users:
-                        u_mode = "🟡 DEMO" if u["is_demo"] else "🟢 LIVE"
+                        if u.get("is_prop"):
+                            u_mode = "🏆 PROP [EXCLUDED]"
+                        elif u.get("is_demo"):
+                            u_mode = "🟡 DEMO [EXCLUDED]"
+                        else:
+                            u_mode = "🟢 REAL LIVE [INCLUDED]"
                         u_acc_short = u['account_id'][-8:] if len(u['account_id']) > 8 else (u['account_id'] or "N/A")
                         u_auto_badge = "Auto: ON" if u["auto_enabled"] else "Auto: OFF"
                         lines.append(
@@ -23978,6 +23983,13 @@ class TelegramBotThread(BaseThread):
                             )
                         if len(u.get("positions", [])) > 3:
                             lines.append(f"    ▫️ _...និង {len(u['positions']) - 3} Positions ផ្សេងទៀត_")
+
+                if audit_data.get("demo_or_prop_users_count", 0) > 0:
+                    lines.append(ui_standards.DIVIDER_LIGHT)
+                    lines.append("🧪 **គណនី Demo & Prop Firm (Excluded មិនបូកបញ្ចូលក្នុង Total) ៖**")
+                    lines.append(f"• 👥 **គណនី Excluded ៖** `{audit_data['demo_or_prop_users_count']}` (Demo: `{audit_data.get('demo_connected_users_count', 0)}` | Prop: `{audit_data.get('prop_connected_users_count', 0)}`)")
+                    lines.append(f"• 📊 **Virtual Positions ៖** `{audit_data.get('demo_or_prop_positions_count', 0)}` Positions")
+                    lines.append(f"• 🛡️ **Virtual Spread Drag ៖** `-${audit_data.get('demo_or_prop_spread_cost_usd', 0.0):,.4f} USD` (Virtual/Evaluation)")
 
                 failed_users = [u for u in audit_data.get("users_audit", []) if u.get("status") != "CONNECTED"]
                 if failed_users:
@@ -24303,11 +24315,21 @@ class TelegramBotThread(BaseThread):
                     "👑 **[CAPITAL.COM VIP TRADERS DIRECTORY]** 💎",
                     f"{ui_standards.DIVIDER_HEAVY}"
                 ]
+                try:
+                    prop_uids = {int(p["chat_id"]) for p in db.get_active_prop_firm_users()}
+                except Exception:
+                    prop_uids = set()
+
                 kb_rows = []
                 for u in all_users:
                     u_cid = u["chat_id"]
                     u_acc = u["account_id"] or "N/A"
-                    u_mode = "DEMO" if u["is_demo"] else "LIVE"
+                    if (u_cid in prop_uids) or ("PROP" in str(u_acc).upper()) or ("FTMO" in str(u_acc).upper()):
+                        u_mode = "🏆 PROP"
+                    elif u.get("is_demo", False) or u.get("auto_is_demo", False):
+                        u_mode = "🟡 DEMO"
+                    else:
+                        u_mode = "🟢 LIVE"
                     v_badge = "🟢 VERIFIED" if u["is_referral_verified"] else "🟡 UNVERIFIED"
                     a_badge = f"🟢 ON (${u['auto_budget']:,.0f})" if u["auto_enabled"] else "🛑 OFF"
                     lines.append(

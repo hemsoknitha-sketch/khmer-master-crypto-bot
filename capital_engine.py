@@ -5124,22 +5124,52 @@ class CapitalSpreadDragManager:
         👑 Institutional Super Admin Audit:
         Computes Total Live Spread, Open Positions, and Real Data Exposure across ALL VIP users in /capital.
         Guarantees 100% Real Live data directly from Capital.com broker endpoints.
+        STRICT ISOLATION:
+          - Total System Spread strictly calculates Real Live VIP accounts only.
+          - Demo practice accounts and Prop Firm Challenge accounts are 100% excluded
+            from the Grand Total Live Spread to prevent virtual/simulation contamination.
         """
         all_users = db.get_all_capital_users_overview()
         
+        # Identify active Prop Firm Challenge accounts
+        try:
+            prop_users = db.get_active_prop_firm_users()
+            prop_uids = {int(p["chat_id"]) for p in prop_users}
+        except Exception:
+            prop_uids = set()
+
         system_summary = {
             "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             "total_registered_users": len(all_users),
             "connected_users_count": 0,
             "failed_users_count": 0,
-            "total_open_positions_count": 0,
-            "total_system_equity_usd": 0.0,
-            "total_system_available_usd": 0.0,
-            "total_system_spread_cost_usd": 0.0,
-            "total_system_floating_upl_usd": 0.0,
+            "live_connected_users_count": 0,
+            "demo_or_prop_users_count": 0,
+            "demo_connected_users_count": 0,
+            "prop_connected_users_count": 0,
+            "total_open_positions_count": 0,           # Live Only
+            "total_system_equity_usd": 0.0,             # Live Only
+            "total_system_available_usd": 0.0,          # Live Only
+            "total_system_spread_cost_usd": 0.0,        # Live Only (Grand Total Live Spread)
+            "total_system_floating_upl_usd": 0.0,       # Live Only
+            "total_live_open_positions_count": 0,
+            "total_live_equity_usd": 0.0,
+            "total_live_available_usd": 0.0,
+            "total_live_spread_cost_usd": 0.0,
+            "total_live_floating_upl_usd": 0.0,
+            "demo_or_prop_positions_count": 0,          # Excluded
+            "demo_or_prop_equity_usd": 0.0,             # Excluded
+            "demo_or_prop_available_usd": 0.0,          # Excluded
+            "demo_or_prop_spread_cost_usd": 0.0,        # Excluded
+            "demo_or_prop_floating_upl_usd": 0.0,       # Excluded
+            "demo_positions_count": 0,
+            "demo_spread_cost_usd": 0.0,
+            "prop_positions_count": 0,
+            "prop_spread_cost_usd": 0.0,
             "users_audit": [],
             "market_spread_radar": {},
-            "is_real_live": True
+            "is_real_live": True,
+            "demo_prop_excluded_from_total": True
         }
 
         # 1. Fetch Real Live Market Quotes for Core Benchmark Assets
@@ -5168,16 +5198,27 @@ class CapitalSpreadDragManager:
             u_cid = u["chat_id"]
             u_name = u.get("username") or f"User_{u_cid}"
             u_acc = u.get("account_id") or ""
-            u_is_demo = bool(u.get("is_demo", False))
+            u_is_demo = bool(u.get("is_demo", False)) or bool(u.get("auto_is_demo", False))
+            u_is_prop = (u_cid in prop_uids) or ("PROP" in str(u_acc).upper()) or ("FTMO" in str(u_acc).upper())
             u_auto_on = bool(u.get("auto_enabled", False))
             u_budget = float(u.get("auto_budget", 50.0) or 50.0)
             u_verified = bool(u.get("is_referral_verified", False))
+
+            if u_is_prop:
+                u_account_tier = "PROP_CHALLENGE"
+            elif u_is_demo:
+                u_account_tier = "DEMO"
+            else:
+                u_account_tier = "LIVE"
 
             user_entry = {
                 "chat_id": u_cid,
                 "username": u_name,
                 "account_id": u_acc,
+                "account_tier": u_account_tier,
                 "is_demo": u_is_demo,
+                "is_prop": u_is_prop,
+                "is_live": (u_account_tier == "LIVE"),
                 "is_referral_verified": u_verified,
                 "auto_enabled": u_auto_on,
                 "auto_budget": u_budget,
@@ -5206,13 +5247,10 @@ class CapitalSpreadDragManager:
                 user_entry["available"] = u_avail
                 user_entry["status"] = "CONNECTED"
                 system_summary["connected_users_count"] += 1
-                system_summary["total_system_equity_usd"] += u_bal
-                system_summary["total_system_available_usd"] += u_avail
 
                 # Fetch real live open positions
                 raw_positions = u_engine.get_open_positions()
                 user_entry["open_positions_count"] = len(raw_positions)
-                system_summary["total_open_positions_count"] += len(raw_positions)
 
                 u_spread_cost = 0.0
                 u_upl = 0.0
@@ -5253,8 +5291,31 @@ class CapitalSpreadDragManager:
 
                 user_entry["total_spread_cost_usd"] = round(u_spread_cost, 4)
                 user_entry["total_floating_upl_usd"] = round(u_upl, 2)
-                system_summary["total_system_spread_cost_usd"] += u_spread_cost
-                system_summary["total_system_floating_upl_usd"] += u_upl
+
+                # STRICT SEGREGATION: Only Real Live VIP accounts contribute to Grand Total Live Spread
+                if u_account_tier == "LIVE":
+                    system_summary["live_connected_users_count"] += 1
+                    system_summary["total_system_equity_usd"] += u_bal
+                    system_summary["total_system_available_usd"] += u_avail
+                    system_summary["total_open_positions_count"] += len(raw_positions)
+                    system_summary["total_system_spread_cost_usd"] += u_spread_cost
+                    system_summary["total_system_floating_upl_usd"] += u_upl
+                else:
+                    # Demo or Prop Firm Challenge account: Segregated completely
+                    system_summary["demo_or_prop_users_count"] += 1
+                    system_summary["demo_or_prop_equity_usd"] += u_bal
+                    system_summary["demo_or_prop_available_usd"] += u_avail
+                    system_summary["demo_or_prop_positions_count"] += len(raw_positions)
+                    system_summary["demo_or_prop_spread_cost_usd"] += u_spread_cost
+                    system_summary["demo_or_prop_floating_upl_usd"] += u_upl
+                    if u_account_tier == "DEMO":
+                        system_summary["demo_connected_users_count"] += 1
+                        system_summary["demo_positions_count"] += len(raw_positions)
+                        system_summary["demo_spread_cost_usd"] += u_spread_cost
+                    elif u_account_tier == "PROP_CHALLENGE":
+                        system_summary["prop_connected_users_count"] += 1
+                        system_summary["prop_positions_count"] += len(raw_positions)
+                        system_summary["prop_spread_cost_usd"] += u_spread_cost
 
             except Exception as e_user:
                 logger.warning(f"Error auditing Capital.com for user {u_cid}: {e_user}")
@@ -5263,10 +5324,24 @@ class CapitalSpreadDragManager:
 
             system_summary["users_audit"].append(user_entry)
 
+        # Final Rounding & Aliasing for 100% Real Live Mainnet Totals
         system_summary["total_system_spread_cost_usd"] = round(system_summary["total_system_spread_cost_usd"], 4)
         system_summary["total_system_equity_usd"] = round(system_summary["total_system_equity_usd"], 2)
         system_summary["total_system_available_usd"] = round(system_summary["total_system_available_usd"], 2)
         system_summary["total_system_floating_upl_usd"] = round(system_summary["total_system_floating_upl_usd"], 2)
+
+        system_summary["total_live_spread_cost_usd"] = system_summary["total_system_spread_cost_usd"]
+        system_summary["total_live_equity_usd"] = system_summary["total_system_equity_usd"]
+        system_summary["total_live_available_usd"] = system_summary["total_system_available_usd"]
+        system_summary["total_live_open_positions_count"] = system_summary["total_open_positions_count"]
+        system_summary["total_live_floating_upl_usd"] = system_summary["total_system_floating_upl_usd"]
+
+        system_summary["demo_or_prop_spread_cost_usd"] = round(system_summary["demo_or_prop_spread_cost_usd"], 4)
+        system_summary["demo_or_prop_equity_usd"] = round(system_summary["demo_or_prop_equity_usd"], 2)
+        system_summary["demo_or_prop_available_usd"] = round(system_summary["demo_or_prop_available_usd"], 2)
+        system_summary["demo_or_prop_floating_upl_usd"] = round(system_summary["demo_or_prop_floating_upl_usd"], 2)
+        system_summary["demo_spread_cost_usd"] = round(system_summary["demo_spread_cost_usd"], 4)
+        system_summary["prop_spread_cost_usd"] = round(system_summary["prop_spread_cost_usd"], 4)
 
         return system_summary
 
