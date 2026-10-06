@@ -486,11 +486,12 @@ class CapitalComEngine:
 
             broker_positions = self.get_open_positions()
             broker_deal_ids = {str(p.get("position", {}).get("dealId")) for p in broker_positions if p.get("position", {}).get("dealId")}
+            broker_deal_refs = {str(p.get("position", {}).get("dealReference")) for p in broker_positions if p.get("position", {}).get("dealReference")}
 
             reconciled = 0
             for row in open_db_trades:
                 deal_id, epic, direction, size, entry_price, sl, tp = row
-                if deal_id and str(deal_id) not in broker_deal_ids:
+                if deal_id and (str(deal_id) not in broker_deal_ids and str(deal_id) not in broker_deal_refs):
                     # Deal is no longer open on broker: it was closed!
                     mkt = self.get_market_details(epic)
                     current_mid = float(mkt.get("mid", entry_price))
@@ -772,12 +773,21 @@ class CapitalComEngine:
                 data = res.json()
                 deal_ref = data.get("dealReference")
                 logger.info(f"Order submitted successfully! Epic: {resolved_epic} | Dir: {dir_upper} | Ref: {deal_ref}")
+                conf = self.get_deal_confirmation(deal_ref) if deal_ref else {}
+                if conf.get("is_rejected"):
+                    err_r = conf.get("reason", "Broker Rejected")
+                    logger.warning(f"❌ Order {deal_ref} rejected by broker: {err_r}")
+                    return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref}
+                real_deal_id = conf.get("deal_id") or deal_ref
+                fill_price = conf.get("level")
                 return {
                     "success": True,
                     "epic": resolved_epic,
                     "direction": dir_upper,
                     "size": size,
                     "deal_reference": deal_ref,
+                    "dealId": real_deal_id,
+                    "fill_price": fill_price,
                     "is_demo": self.is_demo,
                     "response": data
                 }
@@ -859,6 +869,54 @@ class CapitalComEngine:
         except Exception as e:
             logger.error(f"Order placement exception: {e}")
             return {"success": False, "error": str(e)}
+
+    def get_deal_confirmation(self, deal_reference: str) -> Dict[str, Any]:
+        """
+        Queries /confirms/{dealReference} to verify if the broker accepted or rejected the deal,
+        and retrieves the assigned permanent dealId and fill level.
+        """
+        if not self.ensure_session():
+            return {"success": False, "error": "No active session"}
+        url = f"{self.base_url}/confirms/{deal_reference}"
+        for attempt in range(2):
+            try:
+                time.sleep(0.12)
+                res = self.session.get(url, headers=self.get_auth_headers(), timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    deal_status = str(data.get("dealStatus", "")).upper()
+                    status = str(data.get("status", "")).upper()
+                    reason = data.get("reason", "")
+                    deal_id = data.get("dealId")
+                    level = data.get("level")
+                    is_accepted = (deal_status == "ACCEPTED" or status in ["OPEN", "ACCEPTED"])
+                    is_rejected = (deal_status == "REJECTED" or status == "REJECTED")
+                    if is_rejected:
+                        logger.warning(f"❌ [CAPITAL CONFIRMS] Deal {deal_reference} REJECTED by broker: {reason}")
+                        return {
+                            "success": False,
+                            "is_rejected": True,
+                            "deal_status": deal_status,
+                            "status": status,
+                            "reason": reason,
+                            "deal_id": deal_id,
+                            "level": level,
+                            "data": data
+                        }
+                    if is_accepted:
+                        return {
+                            "success": True,
+                            "is_rejected": False,
+                            "deal_status": deal_status,
+                            "status": status,
+                            "reason": reason,
+                            "deal_id": deal_id or deal_reference,
+                            "level": level,
+                            "data": data
+                        }
+            except Exception as e:
+                logger.debug(f"Confirm fetch exception: {e}")
+        return {"success": True, "deal_reference": deal_reference, "deal_id": deal_reference}
 
     def close_position(self, deal_id: str) -> Dict[str, Any]:
         """Closes an open position by dealId."""
@@ -4353,14 +4411,16 @@ class CapitalOpeningRangeBreakoutEngine:
 
                         if user_lang == 'khmer':
                             notif_msg = (
+                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** 🟢\n"
                                 f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🤖 **ស្ថានភាព ៖** `បានចូល Position ដោយស្វ័យប្រវត្ត ១០០% (AUTO FILLED)`\n"
                                 f"⚙️ **គណនី ៖** `{env_lbl}`\n"
                                 f"🌐 **Session ៖** `{session_name} OPEN (១៥ នាទីដំបូង)`\n"
                                 f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
                                 f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
                                 f"📊 **15m Range ៖** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
-                                f"💵 **តម្លៃទម្លុះ (Breakout) ៖** `${mid:,.2f}`\n"
+                                f"💵 **តម្លៃទម្លុះ (Breakout Entry) ៖** `${mid:,.2f}`\n"
                                 f"🛑 **Stop-Loss (Range Mid) ៖** `${sl:,.2f}`\n"
                                 f"🎯 **Take-Profit (4R-6R) ៖** `${tp:,.2f}`\n"
                                 f"📦 **ទំហំកិច្ចសន្យា ៖** `{size} contracts`\n"
@@ -4371,12 +4431,14 @@ class CapitalOpeningRangeBreakoutEngine:
                                 f"• Golden 80% Trailing Ratchet\n"
                                 f"• Asymmetric R:R ≥ 1:4 ទៅ 1:6\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                                f"💡 _ចាប់ទាញផលចំណេញពីរលកស្ថាប័ន Wall Street ផ្ទុះឡើង 24/7!_"
+                                f"💡 _ម៉ាស៊ីន AI បានចាប់ទាញផលចំណេញពីរលកស្ថាប័ន Wall Street ផ្ទុះឡើង 24/7!_"
                             )
                         else:
                             notif_msg = (
+                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** 🟢\n"
                                 f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🤖 **Status:** `Successfully Entered & Active (AUTO FILLED)`\n"
                                 f"⚙️ **Account:** `{env_lbl}`\n"
                                 f"🌐 **Session:** `{session_name} OPEN (15m Range)`\n"
                                 f"🏛️ **Instrument:** `{resolved_epic}`\n"
