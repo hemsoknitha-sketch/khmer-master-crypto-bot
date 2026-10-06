@@ -1456,6 +1456,11 @@ def run_audit():
         has_target_floor = "target_usd = 300.0" in mt5_code and ("floor_usd = 150.0" in mt5_code or "floor_usd = 450.0" in mt5_code)
         has_ratchet = "TRAILING_BASKET_RATCHET_LOCKED" in mt5_code
         has_hard_floor = "EMERGENCY_BASKET_HARD_FLOOR" in mt5_code
+        has_4pillars = "The 4 Pillars of Reachsey" in agents_code
+        has_radar = "def scan_top_momentum_reachsey_asset" in mt5_code
+        has_milestone_harvest = "min_harvest_pnl" in mt5_code
+        has_swept_state = "SWEPT_COMPLETED" in mt5_code
+        has_32_skew = "primary_lot" in mt5_code and "hedge_lot" in mt5_code
 
         # Dynamic Unit Test: execute_reachsey_5pos_matrix Dry-Run Validation
         import mt5_bridge_engine
@@ -1504,7 +1509,8 @@ def run_audit():
             has_inv48 and has_reachsey_exec and has_reachsey_mon and
             has_reachsey_sweep and has_reachsey_telemetry and has_reachsey_realized and
             has_reachsey_cmd and has_5pos_structure and has_target_floor and
-            has_ratchet and has_hard_floor and unit_test_res
+            has_ratchet and has_hard_floor and has_4pillars and has_radar and
+            has_milestone_harvest and has_swept_state and has_32_skew and unit_test_res
         )
 
         if all_inv48_passed:

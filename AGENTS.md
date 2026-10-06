@@ -675,20 +675,29 @@ Any modification that breaks any of the following 30 invariants is considered an
   3. **Target Harvest & Instant Reverse-Flip (< 0.8s):** When target profit is achieved (e.g. $+180$ USC), the position is closed via atomic market execution and reversed in the opposite direction in $< 0.8\text{s}$ with proper lot sizing, capturing bidirectional 24/7 continuous market swings without human intervention.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 37/37].
 
-### Invariant 48: Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock
-- **Location:** `mt5_bridge_engine.py` (`execute_reachsey_5pos_matrix`, `monitor_reachsey_5pos_baskets`, `sweep_reachsey_baskets`), `bot_thread.py` (`mt5_reachsey_command`), `bot_commands_registry.py`
+### Invariant 48: Reachsey 5-Position Volatility Matrix Engine & Asymmetric Net Basket Sweeper Lock (The 4 Pillars of Reachsey)
+- **Location:** `mt5_bridge_engine.py` (`execute_reachsey_5pos_matrix`, `monitor_reachsey_5pos_baskets`, `sweep_reachsey_baskets`, `scan_top_momentum_reachsey_asset`), `bot_thread.py` (`mt5_reachsey_command`), `bot_commands_registry.py`
 - **Rule:**
-  1. **Strict 5-Position Capital Tiers:**
-     - Tier 1: $3,000 capital ➔ 1 asset = 5 positions (0.20 lot/pos, 1.00 lot total).
-     - Tier 2: $6,000 capital ➔ 2 assets = 10 positions (0.20 lot/pos, 2.00 lots total).
-     - Tier 3: $10,000 capital ➔ 3 assets = 15 positions (0.20 lot/pos, 3.00 lots total).
-  2. **Zero Premature Stop-Loss Chop:** Individual positions are protected against micro-market noise whipsaw. Positions are not choked out individually.
-  3. **Asymmetric Net Basket Sweeper:** Profit harvest operates on aggregate net basket profit ($+10\%$ target profit hurdle: $+300$ USD for Tier 1, $+600$ USD for Tier 2, $+1,000$ USD for Tier 3).
-  4. **Dynamic Trailing Ratchet (85% Lock):** When peak net basket profit reaches $\ge 70\%$ of target, the engine trails and locks 85% of peak profit on the fly.
-  5. **Disaster Hard Floor Risk Circuit Breaker (-5%):** Strictly limits maximum basket risk to $-5\%$ of capital (preserving 95% of equity) to defend against Black Swan broker gaps and extreme institutional shocks.
-  6. **Dynamic Delta Skew:** Positions are weighted (3:2 or 4:1 directional skew) according to 33-AI Model trend bias, neutralizing directional whipsaw.
+  1. **Pillar 1: 3:2 Skewed Order Structure (1.00 Lot Volume / 0.20 Net Delta Rebate Maximizer):**
+     - Primary: 3 Positions = 0.60 Lot (0.20 lot/pos, directional trend bias).
+     - Hedge: 2 Positions = 0.40 Lot (0.20 lot/pos, volatility defense shield).
+     - Total Volume: 1.00 Lot broker turnover per basket, generating institutional cashback rebates ($10.00–$15.00/lot).
+     - Net Market Delta: +0.20 Lot (80% market risk reduction compared to naked directional trades, allowing ultra-fast breakeven and rapid exit).
+     - Scaled appropriately for micro/cent accounts ($0.01 lot floor on micro balances < $100).
+  2. **Pillar 2: Zero Broker Stop-Loss Hunting (`sl = 0.0` Cohabitation Standard):**
+     - All 5 legs are dispatched with `sl = 0.0` and `tp = 0.0` to completely eliminate broker stop-hunting, artificial spread spikes, and whipsaw chop.
+     - Indivisible Basket Cohabitation: All 5 legs must stand together until collective net profit is achieved. Single-leg closures are strictly prohibited.
+     - Macro Disaster Floor (-15% to -18%): Capital ring-fence protecting 82%–85% of equity against extreme Black Swan systemic tail events.
+  3. **Pillar 3: Fast Milestone Profit Harvest & Sub-0.5ms Simultaneous Sweep:**
+     - Milestone Harvest: Instant cash-in triggered whenever collective basket net profit reaches >= $1.00 USD (100 USC) on micro accounts ($25–$100 capital) or >= $100.00 USD (10,000 USC) on Tier 1 ($2,500–$3,000 capital).
+     - Sub-0.5ms parallel socket closure: All 5 legs are closed simultaneously across TCP direct socket.
+     - `SWEPT_COMPLETED` State Lock: State is atomically updated to `SWEPT_COMPLETED` immediately upon sweep initiation to eliminate race conditions on subsequent market ticks.
+  4. **Pillar 4: 24/5 Autonomous Execution & Multi-Asset Momentum Radar:**
+     - Autonomous background radar scans every 20–30s across high-velocity assets (Gold `XAUUSD`, Silver `XAGUSD`, Bitcoin `BTCUSD`, Ethereum `ETHUSD`, US Indices `US30`/`US100`, and High-Beta FX `GBPJPY`/`EURJPY`).
+     - Confluence Scoring: 9-SMC Confluence, Quantum AI Satellite Signals, and 15m RSI Momentum (blocking shorts if RSI <= 38.0 and longs if RSI >= 65.0).
+     - 60-Second Post-Sweep Cooldown: Prevents rapid re-triggering while broker queues settle and new candle structures emerge.
 
-- **Enforcement:** Verified by udit_system.py [CHECK 38/39].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 38/39].
 
 ### Invariant 49: Hugging Face VIP MT5 Worker Cloud Citadel & Free 16GB RAM Distributed Edge Worker Standard (The 49th Pillar)
 - **Location:** hf_space_manager.py, hf_mt5_worker/ (Dockerfile, README.md, 
