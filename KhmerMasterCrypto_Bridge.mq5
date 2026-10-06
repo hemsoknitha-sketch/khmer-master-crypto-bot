@@ -1001,13 +1001,25 @@ void EvaluateLocalPropCompliance()
    double equity = m_account.Equity();
    if(g_daily_start_equity <= 0 || g_initial_balance <= 0) return;
 
+   // Cent Account & Personal Broker Shield (Invariant 8, 25 & 44-48)
+   string curr = m_account.Currency();
+   StringToUpper(curr);
+   string srv = m_account.Server();
+   bool is_cent = (curr == "USC" || curr == "CENT" || curr == "EUAC" || curr == "GBPC" || StringFind(srv, "Cent") >= 0 || StringFind(srv, "Micro") >= 0);
+   bool is_known_prop = (StringFind(InpFirmName, "FTMO") >= 0 || StringFind(InpFirmName, "FundedNext") >= 0 || StringFind(InpFirmName, "MFF") >= 0);
+
+   // Cent accounts and personal broker accounts are 100% exempt from FTMO prop breach halts
+   if(is_cent || !is_known_prop) return;
+
    double daily_dd_pct = ((equity - g_daily_start_equity) / g_daily_start_equity) * 100.0;
    double total_dd_pct = ((equity - g_initial_balance) / g_initial_balance) * 100.0;
 
    // Small Capital Protection Shield (Invariant 8 & 25): Accounts < $200 receive dynamic spread buffer
    double daily_limit = InpMaxDailyLossPct;
    double max_limit = InpMaxDrawdownPct;
-   if(g_initial_balance < 200.0 || g_daily_start_equity < 200.0)
+   double eff_init_bal = is_cent ? (g_initial_balance / 100.0) : g_initial_balance;
+   double eff_daily_eq = is_cent ? (g_daily_start_equity / 100.0) : g_daily_start_equity;
+   if(eff_init_bal < 200.0 || eff_daily_eq < 200.0)
    {
       daily_limit = 12.0;
       max_limit = 25.0;

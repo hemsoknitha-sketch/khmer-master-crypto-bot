@@ -185,15 +185,28 @@ class SecurityCitadelManager:
         account_id: str,
         current_equity: float,
         daily_start_equity: float,
-        initial_balance: float
+        initial_balance: float,
+        is_cent_account: bool = False,
+        is_prop_firm: bool = True
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         FTMO / Prop Firm Zero-Breach Compliance Shield:
         - Daily Loss Clamp: -3.5%
         - Max Trailing Loss Clamp: -7.0%
+        - Personal Broker & Cent Accounts are 100% exempt (governed by Reachsey Basket & Portfolio Shields).
         """
+        # Cent accounts (e.g. Exness Cent in USC) and personal broker accounts are 100% exempt from FTMO prop breach
+        if is_cent_account or not is_prop_firm:
+            return True, {
+                "account_id": account_id,
+                "current_equity": current_equity,
+                "status": "EXEMPT_PERSONAL_OR_CENT_ACCOUNT",
+                "is_cent_account": is_cent_account,
+                "compliant": True
+            }
+
         if daily_start_equity <= 0 or initial_balance <= 0:
-            return True, {"status": "SKIPPED_INVALID_BASELINE"}
+            return True, {"status": "SKIPPED_INVALID_BASELINE", "compliant": True}
 
         daily_change_pct = ((current_equity - daily_start_equity) / daily_start_equity) * 100.0
         max_drawdown_pct = ((current_equity - initial_balance) / initial_balance) * 100.0

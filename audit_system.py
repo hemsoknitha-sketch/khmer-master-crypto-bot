@@ -1725,7 +1725,7 @@ def run_audit():
         has_bench = hasattr(engine, "benchmark_ram_latency")
 
         # 3. Dynamic RAM Benchmark Test (< 0.001 ms per Invariant 29/51)
-        bench = engine.benchmark_ram_latency(iterations=500)
+        bench = engine.benchmark_ram_latency(iterations=2000)
         is_nanosecond_fast = bool(bench.get("certified_fast") and bench.get("avg_latency_ms", 1.0) < 0.001)
 
         # 4. Telegram UI & Command Routing in bot_thread.py

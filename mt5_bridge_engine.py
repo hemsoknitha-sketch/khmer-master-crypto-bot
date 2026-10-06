@@ -1164,42 +1164,87 @@ class MT5BridgeEngine:
                                 "mid": (b_ask + b_bid) / 2.0,
                                 "timestamp": now_tick_ts
                             }
+            curr_val = str(payload.get("currency", getattr(session, "currency", "USD"))).strip()
+            if curr_val:
+                session.currency = curr_val
+            if chat_id:
+                session.chat_id = chat_id
+
             if session.daily_start_equity <= 0:
                 session.daily_start_equity = daily_start if daily_start > 0 else equity
             if session.initial_balance <= 0:
                 session.initial_balance = initial_bal if initial_bal > 0 else balance
 
+            # Cent Account Detection & Balance Normalization
+            curr_str = str(getattr(session, "currency", payload.get("currency", "USD"))).upper().strip()
+            broker_str = str(getattr(session, "broker", payload.get("broker", ""))).lower()
+            firm_str = str(getattr(session, "firm_name", payload.get("firm_name", ""))).lower()
+            srv_str = str(getattr(session, "server", payload.get("server", ""))).lower()
+            is_cent_account = (
+                curr_str in ["USC", "CENT", "EUAC", "GBPC"]
+                or "cent" in broker_str
+                or "micro" in broker_str
+                or "server 5" in srv_str
+                or "server 5" in firm_str
+                or "cent account" in firm_str
+            )
+            if "server 2" in srv_str or "server 2" in firm_str or "standard" in srv_str or "ftmo" in broker_str:
+                if curr_str not in ["USC", "CENT"]:
+                    is_cent_account = False
+
+            # Check if genuine Prop Firm Challenge account (FTMO, FundedNext, MFF, or explicit prop config)
+            is_prop_firm = False
+            if not is_cent_account:
+                is_known_prop_firm = any(
+                    pf in firm_str or pf in broker_str
+                    for pf in ["ftmo", "fundednext", "mff", "myforexfunds", "trueforexfunds", "e8", "prop firm", "prop challenge"]
+                )
+                eff_chat = session.chat_id or chat_id
+                user_prop_cfg = db.get_prop_firm_config(eff_chat) if eff_chat else {}
+                is_user_prop_enabled = bool(user_prop_cfg.get("is_enabled", False))
+                is_prop_firm = is_known_prop_firm or is_user_prop_enabled
+
             # =================================================================
             # WALL STREET PROP FIRM COMPLIANCE CITADEL (FTMO -3.5% / -7.0%)
             # =================================================================
-            compliant, details = sc.security_citadel.evaluate_prop_firm_compliance(
-                account_id=account_id,
-                current_equity=equity,
-                daily_start_equity=session.daily_start_equity,
-                initial_balance=session.initial_balance
-            )
-            session.is_prop_compliant = compliant
+            if is_prop_firm and not is_cent_account:
+                compliant, details = sc.security_citadel.evaluate_prop_firm_compliance(
+                    account_id=account_id,
+                    current_equity=equity,
+                    daily_start_equity=session.daily_start_equity,
+                    initial_balance=session.initial_balance,
+                    is_cent_account=False,
+                    is_prop_firm=True
+                )
+                session.is_prop_compliant = compliant
 
-            if not compliant:
-                now_ts = time.time()
-                if getattr(session, "breach_timestamp", 0.0) <= 0.0:
-                    session.breach_timestamp = now_ts
-                last_breach_alert = self._last_auth_log.get(f"prop_breach_{account_id}", 0.0)
-                if session.status != "LOCKED_PROP_BREACH" or (now_ts - last_breach_alert >= 60.0):
-                    self._last_auth_log[f"prop_breach_{account_id}"] = now_ts
-                    session.status = "LOCKED_PROP_BREACH"
-                    logger.error(f"🚨 [PROP BREACH] Account {account_id} breached limit: {details}")
-                    # Send Emergency Alert to MT5
-                    emergency_msg = {
-                        "type": "PROP_CIRCUIT_BREAKER",
-                        "account_id": account_id,
-                        "action": "HALT_TRADING",
-                        "reason": details.get("action", "PROP_BREACH"),
-                        "details": details,
-                        "timestamp": int(time.time())
-                    }
-                    self._send_raw_socket(sock, emergency_msg)
+                if not compliant:
+                    now_ts = time.time()
+                    if getattr(session, "breach_timestamp", 0.0) <= 0.0:
+                        session.breach_timestamp = now_ts
+                    last_breach_alert = self._last_auth_log.get(f"prop_breach_{account_id}", 0.0)
+                    if session.status != "LOCKED_PROP_BREACH" or (now_ts - last_breach_alert >= 60.0):
+                        self._last_auth_log[f"prop_breach_{account_id}"] = now_ts
+                        session.status = "LOCKED_PROP_BREACH"
+                        logger.error(f"🚨 [PROP BREACH] Account {account_id} breached limit: {details}")
+                        # Send Emergency Alert to MT5
+                        emergency_msg = {
+                            "type": "PROP_CIRCUIT_BREAKER",
+                            "account_id": account_id,
+                            "action": "HALT_TRADING",
+                            "reason": details.get("action", "PROP_BREACH"),
+                            "details": details,
+                            "timestamp": int(time.time())
+                        }
+                        self._send_raw_socket(sock, emergency_msg)
+                else:
+                    session.breach_timestamp = 0.0
+                    if session.status == "LOCKED_PROP_BREACH":
+                        session.status = "ONLINE"
             else:
+                # Personal Broker or Cent Account: 100% Exempt from FTMO Challenge Lockout
+                compliant = True
+                session.is_prop_compliant = True
                 session.breach_timestamp = 0.0
                 if session.status == "LOCKED_PROP_BREACH":
                     session.status = "ONLINE"
