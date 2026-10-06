@@ -2577,14 +2577,25 @@ class MT5BridgeEngine:
         custom_primary_lot = float(kwargs.get("primary_lot", 0.0) or 0.0)
         custom_hedge_lot = float(kwargs.get("hedge_lot", 0.0) or 0.0)
 
-        if is_cent and raw_bal < 10000.0:
-            lot_val = 0.01  # Invariant 8 & 44 & 47: Strict Micro Capital Shield for < $100
-            primary_leg_lot = 0.01
-            hedge_leg_lot = 0.01
+        if is_cent:
+            if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
+                primary_leg_lot = max(0.01, round(custom_primary_lot / (4 if is_extreme_skew else 3), 2))
+                hedge_leg_lot = max(0.01, round(custom_hedge_lot / (1 if is_extreme_skew else 2), 2))
+                lot_val = primary_leg_lot
+            elif lot_per_pos and float(lot_per_pos) > 0.01:
+                lot_val = float(lot_per_pos)
+                primary_leg_lot = lot_val
+                hedge_leg_lot = lot_val
+            elif raw_bal < 10000.0:
+                lot_val = 0.01  # Invariant 8 & 44 & 47: Strict Micro Capital Shield for < $100
+                primary_leg_lot = 0.01
+                hedge_leg_lot = 0.01
+            else:
+                lot_val = max(0.01, float(lot_per_pos or 0.20))
+                primary_leg_lot = lot_val
+                hedge_leg_lot = lot_val
         elif not is_cent and 0.0 < real_usd < 1000.0:
             # Invariant 8, 25 & 44: Standard Account Micro-Capital Fortress
-            # Strictly clamps lot to 0.01 if trader's real balance on Standard account is < $1,000 USD
-            # to guarantee zero overleveraging on retail balances!
             if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
                 primary_leg_lot = max(0.01, round(custom_primary_lot / (4 if is_extreme_skew else 3), 2))
                 hedge_leg_lot = max(0.01, round(custom_hedge_lot / (1 if is_extreme_skew else 2), 2))
@@ -2601,7 +2612,7 @@ class MT5BridgeEngine:
             min_harvest_pnl = max(1.00, round(real_usd * 0.04, 2))
             floor_pnl = max(4.50, round(real_usd * 0.18, 2))
         else:
-            lot_val = max(0.01, float(lot_per_pos or lot_val))
+            lot_val = max(0.01, float(lot_per_pos or lot_val or 0.20))
             if custom_primary_lot > 0.0 and custom_hedge_lot > 0.0:
                 primary_leg_lot = max(0.01, round(custom_primary_lot / (4 if is_extreme_skew else 3), 2))
                 hedge_leg_lot = max(0.01, round(custom_hedge_lot / (1 if is_extreme_skew else 2), 2))
@@ -3651,7 +3662,7 @@ class MT5BridgeEngine:
                                             break
 
                                 if target_sym:
-                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'})...")
+                                    logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'} | 3 Primary = 0.60 Lot, 2 Hedge = 0.40 Lot | Total: 1.00 Lot)...")
                                     threading.Thread(
                                         target=self.execute_reachsey_5pos_matrix,
                                         kwargs={
@@ -3661,7 +3672,10 @@ class MT5BridgeEngine:
                                             "target_symbol": target_sym,
                                             "custom_action": target_act,
                                             "confidence": target_conf,
-                                            "signal_reason": target_rsn
+                                            "signal_reason": target_rsn,
+                                            "lot_per_pos": 0.20,
+                                            "primary_lot": 0.60,
+                                            "hedge_lot": 0.40
                                         },
                                         daemon=True
                                     ).start()
