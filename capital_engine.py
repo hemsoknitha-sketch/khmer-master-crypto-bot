@@ -2385,10 +2385,10 @@ class CapitalAutonomousEngine:
             return ["US500", "GOLD", "NVDA", "TSLA", "US100", "GOOGL", "META", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
         # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh)
         elif 420 <= utc_min < 810:
-            return ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA"]
+            return ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA", "BTCUSD"]
         # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh)
         elif 0 <= utc_min < 420:
-            return ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD"]
+            return ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "EURUSD"]
         # Late Night Rollover Lull (20:45 - 23:59 UTC = 03:45 - 07:00 Phnom Penh): Zero-Swap Shield -> Crypto CFDs
         else:
             return ["BTCUSD", "ETHUSD", "SOLUSD"]

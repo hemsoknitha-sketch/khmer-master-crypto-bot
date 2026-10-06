@@ -347,8 +347,13 @@ class CapitalDailyAGIGovernor:
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"✨ _ប្រព័ន្ធនឹងដំណើរការឡើងវិញស្វ័យប្រវត្តនៅថ្ងៃស្អែក ឬវាយបញ្ជា_ `` `/capital RESET_DAILY` ``"
                 )
+                from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+                rst_kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 ដោះសោរ Reset Daily Lock ភ្លាមៗ 🔓", callback_data="btn_cap_reset_daily")],
+                    [InlineKeyboardButton("🔄 បើក 24/7 Compounding Mode 💎", callback_data="btn_cap_reset_247")]
+                ])
                 try:
-                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
+                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=rst_kb))
                 except Exception as e_msg:
                     logger.debug(f"Failed to send target lock message: {e_msg}")
 
@@ -380,8 +385,13 @@ class CapitalDailyAGIGovernor:
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"✨ _ប្រព័ន្ធនឹងដំណើរការឡើងវិញស្វ័យប្រវត្តនៅថ្ងៃស្អែក ឬវាយបញ្ជា_ `` `/capital RESET_DAILY` ``"
                 )
+                from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+                floor_kb = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 ដោះសោរ Reset Daily Lock ភ្លាមៗ 🔓", callback_data="btn_cap_reset_daily")],
+                    [InlineKeyboardButton("🔄 បើក 24/7 Compounding Mode 💎", callback_data="btn_cap_reset_247")]
+                ])
                 try:
-                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
+                    asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", reply_markup=floor_kb))
                 except Exception as e_msg:
                     logger.debug(f"Failed to send loss floor message: {e_msg}")
 

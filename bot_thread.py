@@ -6343,6 +6343,19 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
                 context.args = ["AUTO", "DEMO", str(budget)]
+            elif data in ["btn_cap_reset_daily", "btn_cap_governor_reset", "btn_cap_daily_reset"]:
+                import portfolio_circuit_breaker
+                try:
+                    bal_info = await asyncio.to_thread(capital_engine.get_user_capital_engine(chat_id).get_account_balance)
+                    user_live_bal = float(bal_info.get("balance", 1000.0) or 1000.0)
+                except Exception:
+                    user_live_bal = 1000.0
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, user_live_bal)
+                try:
+                    await update.callback_query.answer("🔄 Sky Net Daily Governor Reset ជោគជ័យ! ទុនដើមថ្ងៃត្រូវបានកំណត់ឡើងវិញ។ ម៉ាស៊ីនរួចរាល់សម្រាប់ការវិនិយោគបន្ត!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["RESET_DAILY"]
                 await capital_command(update, context)
             elif data in ["btn_cap_reset_247", "btn_cap_247", "btn_cap_reset"]:
                 db.set_capital_schedule_mode(chat_id, "24/7")

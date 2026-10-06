@@ -2610,9 +2610,9 @@ def set_capital_auto_config(
     budget: float = 50.0,
     max_positions: Optional[int] = None,
     is_demo: bool = False,
-    schedule_mode: str = "SMART_SESSION_TIMED"
+    schedule_mode: Optional[str] = None
 ):
-    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False, SMART_SESSION_TIMED)."""
+    """Sets or updates the Capital.com Autonomous Trading config (Default: Live Mainnet is_demo=False, preserves schedule_mode)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2626,6 +2626,18 @@ def set_capital_auto_config(
         conn.commit()
     except Exception:
         pass
+
+    # If schedule_mode not explicitly provided, preserve existing setting
+    if schedule_mode is None:
+        try:
+            cursor.execute("SELECT schedule_mode FROM capital_auto_config WHERE chat_id = ?", (chat_id,))
+            r_s = cursor.fetchone()
+            if r_s and r_s[0]:
+                schedule_mode = str(r_s[0])
+        except Exception:
+            pass
+    if not schedule_mode:
+        schedule_mode = "SMART_SESSION_TIMED"
 
     # If max_positions not explicitly provided, preserve existing setting if > 2, or calculate via Invariant 53 tier
     if max_positions is None:
