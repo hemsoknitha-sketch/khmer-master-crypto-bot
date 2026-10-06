@@ -284,6 +284,22 @@ class CapitalDailyAGIGovernor:
             user_auto_cfg.get("schedule_mode") in ["24/7", "247", "RESET", "ALWAYS_ON"]
         )
 
+        # Explicit User/Admin Daily Limits Master Toggle:
+        # Completely bypasses daily +5% profit lock & daily loss floor lock,
+        # while 100% preserving per-trade dynamic Stop-Loss, Take-Profit, Breakeven Armor & Trailing Ratchet!
+        is_daily_limit_disabled = (
+            db.get_system_setting(f"cap_daily_limits_disabled_{chat_id}", "0") == "1" or
+            db.get_system_setting("cap_daily_limits_disabled", "0") == "1" or
+            db.get_system_setting("capital_daily_governor_disabled", "0") == "1" or
+            db.get_system_setting(f"cap_daily_governor_disabled_{chat_id}", "0") == "1"
+        )
+        if is_daily_limit_disabled:
+            telemetry["is_target_locked"] = False
+            telemetry["is_loss_locked"] = False
+            telemetry["can_trade"] = True
+            telemetry["status"] = "DAILY_LIMITS_DISABLED_CONTINUOUS"
+            return False, "Daily Limits Disabled (Continuous Trading Active, Per-Trade SL/TP Enforced)", telemetry
+
         # Check existing locks
         if existing_lock == "TARGET_5PCT_LOCKED":
             if is_24_7_continuous:
@@ -411,6 +427,29 @@ class CapitalDailyAGIGovernor:
             db.update_system_setting(key, str(round(current_balance, 2)))
         logger.info(f"🔄 [CAPITAL GOVERNOR] Reset daily lock for user {chat_id}.")
         return True
+
+    @classmethod
+    def set_daily_limits_disabled(cls, chat_id: int, disabled: bool = True) -> bool:
+        """Enables or disables Daily Limits (+5% Target Lock & -2.5% Loss Floor) for a user."""
+        import database as db
+        val = "1" if disabled else "0"
+        db.update_system_setting(f"cap_daily_limits_disabled_{chat_id}", val)
+        if disabled:
+            today_str = cls.get_today_str()
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
+        logger.info(f"🛡️ [CAPITAL GOVERNOR] User {chat_id} Daily Limits Disabled: {disabled}")
+        return True
+
+    @classmethod
+    def is_daily_limits_disabled(cls, chat_id: int) -> bool:
+        """Checks if Daily Limits are disabled for a user or globally."""
+        import database as db
+        return (
+            db.get_system_setting(f"cap_daily_limits_disabled_{chat_id}", "0") == "1" or
+            db.get_system_setting("cap_daily_limits_disabled", "0") == "1" or
+            db.get_system_setting("capital_daily_governor_disabled", "0") == "1" or
+            db.get_system_setting(f"cap_daily_governor_disabled_{chat_id}", "0") == "1"
+        )
 
     @classmethod
     def set_daily_baseline(cls, chat_id: int, starting_capital: float) -> None:

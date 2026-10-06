@@ -6365,6 +6365,24 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["RESET"]
                 await capital_command(update, context)
+            elif data == "btn_cap_daily_limit_off":
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, True)
+                try:
+                    await update.callback_query.answer("🔓 បានបិទ Daily Limit រួចរាល់! ប្រព័ន្ធនឹងជួញដូរបន្តឥតឈប់ឈរ!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["LIMIT"]
+                await capital_command(update, context)
+            elif data == "btn_cap_daily_limit_on":
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, False)
+                try:
+                    await update.callback_query.answer("🔒 បានបើក Daily Limit វិញជោគជ័យ!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = ["LIMIT"]
+                await capital_command(update, context)
             elif data in ["btn_cap_smart_session", "btn_cap_smart", "btn_cap_timed", "btn_cap_session"]:
                 db.set_capital_schedule_mode(chat_id, "SMART_SESSION_TIMED")
                 try:
@@ -24453,6 +24471,46 @@ class TelegramBotThread(BaseThread):
                 await update.effective_message.reply_text(f"❌ បានបដិសេធសិទ្ធិ Live Real Capital សម្រាប់ User `{target_uid}`", parse_mode="Markdown")
                 return
 
+            # Command: /admin_capital LIMIT <chat_id_or_acc_id> [ON|OFF]
+            elif sub in ["LIMIT", "LIMITS", "DAILY_LIMIT", "GOVERNOR"]:
+                if len(args) < 2:
+                    await update.effective_message.reply_text("⚠️ សូមបញ្ជាក់ ៖ `` `/admin_capital limit 1612591526 off` `` ឬ `` `/admin_capital limit global off` ``", parse_mode="Markdown")
+                    return
+                target_str = str(args[1]).strip()
+                sub_opt = str(args[2]).upper().strip() if len(args) > 2 else "OFF"
+                dis = (sub_opt in ["OFF", "DISABLE", "DISABLED", "0", "FALSE", "REMOVE"])
+                import portfolio_circuit_breaker
+                if target_str.upper() in ["GLOBAL", "ALL"]:
+                    db.update_system_setting("cap_daily_limits_disabled", "1" if dis else "0")
+                    status_kh = "🔓 បិទទាំងអស់ (GLOBAL DISABLED)" if dis else "🔒 បើកទាំងអស់ (GLOBAL ENABLED)"
+                    await update.effective_message.reply_text(
+                        f"✅ **[GLOBAL DAILY LIMITS UPDATED]** 🛡️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ **ស្ថានភាពប្រព័ន្ធទាំងមូល ៖** `{status_kh}`\n"
+                        f"🛡️ **ការការពារទុន ៖** `SL/TP, Breakeven Armor & Trailing Ratchet នៅតែការពារ ១០០% លើគ្រប់ Position!`",
+                        parse_mode="Markdown"
+                    )
+                    return
+
+                target_uid, _ = _resolve_target(target_str)
+                if not target_uid:
+                    await update.effective_message.reply_text(f"❌ មិនអាចរកឃើញ User `{target_str}` ឡើយ!", parse_mode="Markdown")
+                    return
+
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(target_uid, dis)
+                status_kh = "🔓 បិទ (DISABLED - ជួញដូរបន្តគ្មានដែនកំណត់ប្រចាំថ្ងៃ)" if dis else "🔒 បើក (ENABLED - ចាក់សោរពេលដល់ +5%)"
+                await update.effective_message.reply_text(
+                    f"✅ **[DAILY LIMITS UPDATED FOR {target_uid}]** 🛡️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👤 **User ID ៖** `{target_uid}`\n"
+                    f"⚙️ **ស្ថានភាព Daily Limit ៖** `{status_kh}`\n"
+                    f"🛡️ **ការការពារទុន ៖** `SL/TP, Breakeven Armor & Trailing Ratchet លើ Position នីមួយៗនៅតែការពារ ១០០%!`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🚀 _ប្រព័ន្ធនឹងជួញដូរតាមការកំណត់ភ្លាមៗ!_",
+                    parse_mode="Markdown"
+                )
+                return
+
         async def admin_mt5_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
             👑 Super Admin Command to manage GTCFX Tokyo MT5 VIP Users & Referral Gatekeeper:
@@ -24780,6 +24838,57 @@ class TelegramBotThread(BaseThread):
                     )
                     await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
                     return
+                elif action in ["LIMIT", "LIMITS", "DAILY_LIMIT", "DAILYLIMIT", "LIMIT_DAILY", "GOVERNOR"]:
+                    sub_opt = str(args[1]).upper().strip() if len(args) > 1 else ""
+                    import portfolio_circuit_breaker
+                    if sub_opt in ["OFF", "DISABLE", "DISABLED", "0", "REMOVE", "FALSE"]:
+                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, True)
+                        res_msg = (
+                            f"🔓 **[SKY NET 360° DAILY LIMITS: DISABLED]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **ស្ថានភាព ៖** `បានដកចេញជោគជ័យ (DISABLED 100%)`\n"
+                            f"🎯 **Daily Profit Lock (+5%) ៖** `បិទ (ជួញដូរបន្តគ្មានដែនកំណត់)`\n"
+                            f"🛑 **Daily Stop-Loss Lock (-2.5%) ៖** `បិទ (មិនបង្កកការបើក Position)`\n"
+                            f"🛡️ **ការការពារទុន ៖** `SL/TP, Breakeven Armor & Trailing Ratchet លើ Position នីមួយៗនៅតែការពារ ១០០%!`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🚀 _ប្រព័ន្ធនឹងជួញដូរបន្តឥតឈប់ឈរ និងមិនខកខានឱកាសវិនិយោគឡើយ!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
+                    elif sub_opt in ["ON", "ENABLE", "ENABLED", "1", "TRUE"]:
+                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, False)
+                        res_msg = (
+                            f"🔒 **[SKY NET 360° DAILY LIMITS: ENABLED]** 🛡️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **ស្ថានភាព ៖** `បានបើកដំណើរការឡើងវិញ (ENABLED)`\n"
+                            f"🎯 **Daily Profit Lock ៖** `+5.0% Target Lock (Bank 100% Profits)`\n"
+                            f"🛑 **Daily Stop-Loss Lock ៖** `-2.5% Loss Floor (Capital Shield)`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _ប្រព័ន្ធនឹងការពារ និងចាក់សោរប្រាក់ចំណេញពេលសម្រេចបាន +5% ប្រចាំថ្ងៃ!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
+                    else:
+                        is_dis = portfolio_circuit_breaker.CapitalDailyAGIGovernor.is_daily_limits_disabled(chat_id)
+                        st_txt = "🔓 បិទ (DISABLED - រត់ឥតឈប់ឈរ)" if is_dis else "🔒 បើក (ENABLED - ចាក់សោរពេលដល់ +5%)"
+                        kb = InlineKeyboardMarkup([
+                            [
+                                InlineKeyboardButton("🔓 បិទ Daily Limit (OFF)", callback_data="btn_cap_daily_limit_off"),
+                                InlineKeyboardButton("🔒 បើក Daily Limit (ON)", callback_data="btn_cap_daily_limit_on")
+                            ]
+                        ])
+                        msg = (
+                            f"⚙️ **[SKY NET 360° DAILY LIMITS STATUS]**\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"📊 **ស្ថានភាពបច្ចុប្បន្ន ៖** `{st_txt}`\n\n"
+                            f"👉 **កូដបញ្ជា ១-Tap ៖**\n"
+                            f"• `` `/capital limit OFF` `` (ដក Daily Limit ចេញដើម្បីកុំឱ្យខកឱកាស)\n"
+                            f"• `` `/capital limit ON` `` (បើក Daily Limit វិញ)\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛡️ _បញ្ជាក់៖ ផែនការ Stop-Loss និង Take-Profit លើ Position នីមួយៗគឺការពារ ១០០% ជានិច្ច!_"
+                        )
+                        await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=kb)
+                        return
                 elif action in ["API", "VAULT", "KEY", "KEYS", "CREDENTIALS", "CREDS"]:
                     sub_args = args[1:]
                     has_creds = db.has_user_capital_credentials(chat_id)
