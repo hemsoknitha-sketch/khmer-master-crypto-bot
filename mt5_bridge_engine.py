@@ -2811,6 +2811,9 @@ class MT5BridgeEngine:
             floor_loss = b_data.get("max_loss_floor", 150.0)
             min_harvest = b_data.get("min_harvest_milestone", 100.0 if unit == "USD" else 10000.0)
 
+            should_sweep = False
+            sweep_reason = ""
+
             # Invariant 48: Indivisible Basket Cohabitation & Anti-Decoupling Shield
             # "លុបចោលការរត់ចោលគ្នា ត្រូវឈររួមជាមួយគ្នារហូតទាល់តែកើបប្រាក់ចំណេញទើបបិតព្រមគ្នាក្នុងល្បឿនលឿនបំផុត"
             # If any leg was prematurely closed outside our control (broker anomaly / manual intervention)

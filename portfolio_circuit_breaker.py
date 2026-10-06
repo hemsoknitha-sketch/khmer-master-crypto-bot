@@ -276,10 +276,12 @@ class CapitalDailyAGIGovernor:
 
         # Check if user has enabled 24/7 Citadel Continuous Mode (Invariant 53)
         # Removes +5% profit freeze to allow 24/7 compounding and widens loss floor to -10% catastrophe floor
+        user_auto_cfg = db.get_capital_auto_config(chat_id) if hasattr(db, "get_capital_auto_config") else {}
         is_24_7_continuous = (
             db.get_system_setting(f"cap_24_7_citadel_unlocked_{chat_id}", "0") == "1" or
             db.get_system_setting(f"cap_continuous_trading_{chat_id}", "0") == "1" or
-            db.get_system_setting("capital_global_24_7_unlocked", "0") == "1"
+            db.get_system_setting("capital_global_24_7_unlocked", "0") == "1" or
+            user_auto_cfg.get("schedule_mode") in ["24/7", "247", "RESET", "ALWAYS_ON"]
         )
 
         # Check existing locks
@@ -295,14 +297,22 @@ class CapitalDailyAGIGovernor:
                 return True, reason, telemetry
 
         if existing_lock == "LOSS_FLOOR_LOCKED":
-            if is_24_7_continuous and daily_pnl_pct > -10.0:
+            active_loss_floor = 10.0 if is_24_7_continuous else cls.DAILY_LOSS_FLOOR_PCT
+            if is_24_7_continuous and daily_pnl_pct > -active_loss_floor:
                 telemetry["can_trade"] = True
                 telemetry["status"] = "24_7_CITADEL_COMPOUNDING"
+            elif daily_pnl_pct > -active_loss_floor:
+                # Self-healing: If current equity is safely above the loss floor (e.g. false trigger from used margin dip),
+                # automatically clear the stale lock and permit normal trading!
+                db.update_system_setting(lock_key, "NORMAL")
+                telemetry["is_loss_locked"] = False
+                telemetry["can_trade"] = True
+                telemetry["status"] = "NORMAL_TRADING"
             else:
                 telemetry["is_loss_locked"] = True
                 telemetry["can_trade"] = False
                 telemetry["status"] = "LOSS_FLOOR_LOCKED"
-                reason = f"Daily -2.5% Loss Floor ENGAGED ({daily_pnl_pct:.2f}%). Trading paused for capital preservation."
+                reason = f"Daily -{active_loss_floor:.1f}% Loss Floor ENGAGED ({daily_pnl_pct:.2f}%). Trading paused for capital preservation."
                 return True, reason, telemetry
 
         # 1. Target Lock Trigger (+5.0%)

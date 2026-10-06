@@ -1292,7 +1292,8 @@ class CapitalComEngine:
         # Pillar 6: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
         try:
             import portfolio_circuit_breaker
-            cur_bal = float(self.get_account_balance().get("available", 1000.0))
+            cur_bal_data = self.get_account_balance()
+            cur_bal = max(float(cur_bal_data.get("equity") or 0.0), float(cur_bal_data.get("balance") or 0.0), float(cur_bal_data.get("available") or 1000.0))
             is_gov_lck, gov_msg, _ = portfolio_circuit_breaker.CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(
                 chat_id=self._custom_chat_id or 0,
                 current_balance=cur_bal,
@@ -2970,18 +2971,21 @@ class CapitalAutonomousEngine:
 
         # Available balance safety verification (run concurrently in thread pool)
         user_bal = 0.0
+        user_equity = 0.0
         try:
             bal_info = await asyncio.to_thread(user_engine.get_account_balance)
             user_avail = float(bal_info.get("available", 0.0) or 0.0)
             user_bal = float(bal_info.get("balance", 0.0) or 0.0)
+            user_equity = float(bal_info.get("equity", 0.0) or (user_bal if user_bal > 0 else user_avail))
         except Exception:
             user_avail = budget
             user_bal = budget
+            user_equity = budget
 
         # 24/7 SMC Citadel Dynamic Slot Allocation Matrix (Invariant 53)
         # $100: 3 pos | $150: 4 pos | $200: 6 pos | $250: 7 pos | $300: 8 pos | $350+: 10 pos
         # Super Smart: Use highest of budget, available cash, or live balance to unleash full slots
-        effective_equity = max(budget, user_avail, user_bal)
+        effective_equity = max(budget, user_equity, user_bal, user_avail)
         max_pos = get_dynamic_max_positions_for_equity(effective_equity, user.get("max_positions"))
         min_required_margin = max(6.0, budget / (max_pos * 1.35))
 
@@ -2993,9 +2997,10 @@ class CapitalAutonomousEngine:
         # Pillar 6: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
         try:
             import portfolio_circuit_breaker
+            eval_balance = max(user_equity, user_bal, user_avail)
             is_gov_lck, gov_reason, _ = portfolio_circuit_breaker.CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(
                 chat_id=chat_id,
-                current_balance=user_avail,
+                current_balance=eval_balance,
                 app=app,
                 is_demo=user_is_demo
             )
@@ -5952,9 +5957,11 @@ class CapitalSkyNet360Radar:
         if chat_id:
             try:
                 import portfolio_circuit_breaker
+                bal_chk = engine.get_account_balance() if engine else {}
+                eval_360_bal = max(float(bal_chk.get("equity") or 0.0), float(bal_chk.get("balance") or 0.0), user_avail)
                 is_locked, lock_reason, gov_data = portfolio_circuit_breaker.CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(
                     chat_id=chat_id,
-                    current_balance=user_avail,
+                    current_balance=eval_360_bal,
                     app=app,
                     is_demo=is_demo
                 )
