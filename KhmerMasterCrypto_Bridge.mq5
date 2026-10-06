@@ -1056,10 +1056,10 @@ void CloseAllBridgeTrades(const string reason)
 
             if(m_trade.PositionClose(ticket))
             {
-               PrintFormat("🛑 [EMERGENCY CLOSE] Closed position #%d (%s) | Close Price: %.5f | PnL: $%.2f", ticket, reason, close_price, pnl);
+               PrintFormat("🛑 [EMERGENCY CLOSE] Closed position #%d (%s) | %s | Close Price: %.5f | PnL: $%.2f", ticket, reason, sym, close_price, pnl);
                string close_json = StringFormat(
-                  "{\"type\":\"ORDER_CLOSED\",\"ticket\":%d,\"close_price\":%.5f,\"pnl\":%.2f,\"status\":\"CLOSED\",\"secret_key\":\"%s\"}\n",
-                  ticket, close_price, pnl, InpSecretKey
+                  "{\"type\":\"ORDER_CLOSED\",\"ticket\":%d,\"symbol\":\"%s\",\"close_price\":%.5f,\"pnl\":%.2f,\"status\":\"CLOSED\",\"secret_key\":\"%s\"}\n",
+                  ticket, sym, close_price, pnl, InpSecretKey
                );
                SendRawString(close_json);
             }

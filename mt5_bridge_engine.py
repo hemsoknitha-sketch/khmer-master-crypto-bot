@@ -1290,8 +1290,19 @@ class MT5BridgeEngine:
         meta = self._ticket_metadata.pop(ticket, None) or {}
         if not symbol or symbol == "N/A":
             symbol = str(meta.get("symbol", "")).upper()
-        comment = str(payload.get("comment", "") or meta.get("comment", ""))
-        magic = int(payload.get("magic", 0) or meta.get("magic", 0) or 0)
+
+        # Database Fallback: Retrieve stored symbol & action if ticket was opened prior to reboot
+        db_order = None
+        if (not symbol or symbol == "N/A") and ticket > 0:
+            try:
+                db_order = db.get_mt5_bridge_order_by_ticket(ticket)
+                if db_order and db_order.get("symbol"):
+                    symbol = str(db_order["symbol"]).upper()
+            except Exception:
+                pass
+
+        comment = str(payload.get("comment", "") or meta.get("comment", "") or (db_order.get("comment", "") if db_order else ""))
+        magic = int(payload.get("magic", 0) or meta.get("magic", 0) or (db_order.get("magic", 0) if db_order else 0) or 0)
         is_reachsey_leg = (
             magic == 888666
             or "R5_" in comment
@@ -1327,8 +1338,9 @@ class MT5BridgeEngine:
         # Self-Auto Training Feedback for MT5SMCCitadelEngine
         try:
             from mt5_smc_citadel import MT5SMCCitadelEngine
-            act = str(meta.get("action", "BUY")).upper()
-            MT5SMCCitadelEngine.record_trade_outcome(symbol=symbol, action=act, won=(pnl >= 0.0), pnl=pnl)
+            act = str(meta.get("action", "") or (db_order.get("action") if db_order else "") or "BUY").upper()
+            if symbol and symbol != "N/A":
+                MT5SMCCitadelEngine.record_trade_outcome(symbol=symbol, action=act, won=(pnl >= 0.0), pnl=pnl)
         except Exception:
             pass
 

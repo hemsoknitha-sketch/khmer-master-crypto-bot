@@ -4442,6 +4442,43 @@ def update_mt5_bridge_order_close(ticket: int, close_price: float, pnl: float, s
         conn.close()
         return False
 
+def get_mt5_bridge_order_by_ticket(ticket: int) -> Optional[dict]:
+    """Retrieves order record by ticket for state persistence & symbol recovery."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, signal_id, account_id, ticket, symbol, action, lot,
+                   sl, tp, open_price, close_price, pnl, magic, comment, status
+            FROM mt5_bridge_orders
+            WHERE ticket = ?
+            ORDER BY id DESC LIMIT 1
+        """, (int(ticket),))
+        r = cursor.fetchone()
+        conn.close()
+        if r:
+            return {
+                "id": r[0],
+                "signal_id": str(r[1]),
+                "account_id": str(r[2]),
+                "ticket": int(r[3]),
+                "symbol": str(r[4]),
+                "action": str(r[5]),
+                "lot": float(r[6]),
+                "sl": float(r[7]),
+                "tp": float(r[8]),
+                "open_price": float(r[9]),
+                "close_price": float(r[10]),
+                "pnl": float(r[11]),
+                "magic": int(r[12]),
+                "comment": str(r[13]),
+                "status": str(r[14])
+            }
+        return None
+    except Exception:
+        conn.close()
+        return None
+
 def get_mt5_bridge_recent_orders(limit: int = 10, account_id: Optional[str] = None) -> list:
     """Retrieves recent MT5 bridged orders for UI audit, optionally filtered by user account."""
     conn = get_db_connection()
