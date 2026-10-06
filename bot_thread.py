@@ -23970,10 +23970,11 @@ class TelegramBotThread(BaseThread):
                             u_mode = "🟡 DEMO [EXCLUDED]"
                         else:
                             u_mode = "🟢 REAL LIVE [INCLUDED]"
-                        u_acc_short = u['account_id'][-8:] if len(u['account_id']) > 8 else (u['account_id'] or "N/A")
+                        u_acc_full = str(u.get('account_id') or 'N/A').strip()
                         u_auto_badge = "Auto: ON" if u["auto_enabled"] else "Auto: OFF"
                         lines.append(
-                            f"👤 **{u['username']}** (`{u['chat_id']}`) | `{u_acc_short}` ({u_mode} | {u_auto_badge})\n"
+                            f"👤 **Trader ៖** `{u['username']}` (Chat ID: `{u['chat_id']}`)\n"
+                            f"  🏦 **Account ID ៖** `{u_acc_full}` ({u_mode} | {u_auto_badge})\n"
                             f"  💰 Bal: `${u['balance']:,.2f}` | Avail: `${u['available']:,.2f}`\n"
                             f"  📊 Pos: `{u['open_positions_count']}` | Spread: `-${u['total_spread_cost_usd']:,.4f}` | PnL: `${u['total_floating_upl_usd']:+,.2f}`"
                         )
@@ -23996,7 +23997,8 @@ class TelegramBotThread(BaseThread):
                     lines.append(ui_standards.DIVIDER_LIGHT)
                     lines.append("⚠️ **គណនីពុំទាន់បានភ្ជាប់ Session / អសកម្ម ៖**")
                     for fu in failed_users[:5]:
-                        lines.append(f"• `{fu['username']}` (`{fu['chat_id']}`): `{fu['status']}`")
+                        fu_acc = str(fu.get('account_id') or 'N/A').strip()
+                        lines.append(f"• `{fu['username']}` (Chat ID: `{fu['chat_id']}` | Acc: `{fu_acc}`): `{fu['status']}`")
                     if len(failed_users) > 5:
                         lines.append(f"• _...និង {len(failed_users) - 5} គណនីផ្សេងទៀត_")
 
