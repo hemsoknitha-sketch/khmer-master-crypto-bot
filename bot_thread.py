@@ -23099,7 +23099,7 @@ class TelegramBotThread(BaseThread):
                 f"🛡️ <b>យន្តការទាំង ៤ ចំណុចកើប Rebate & សុវត្ថិភាពមូលធន (The 4 Pillars) ៖</b>\n"
                 f"1. <b>រចនាសម្ព័ន្ធបញ្ជាទិញ 3:2 Skew ៖</b> 3 Pos (0.60 lot) vs 2 Pos (0.40 lot) = 1.00 lot volume\n"
                 f"2. <b>គ្មាន Stop Loss នាំវិនាសដើមទុន ៖</b> sl=0.0 គ្រប់ជើងទោល គ្មាន Broker Hunt SL ឬ Whipsaw ឡើយ\n"
-                f"3. <b>ចេញពីទីផ្សារលឿន Fast Harvest ៖</b> ចាប់ចំណេញរួម $\ge \$1.00$ (Micro) ឬ $\ge \$100.00$ (Tier 1) បិទស្របគ្នាក្នុង &lt; 0.5ms\n"
+                f"3. <b>ចេញពីទីផ្សារលឿន Fast Harvest ៖</b> ចាប់ចំណេញរួម ≥ $1.00 (Micro) ឬ ≥ $100.00 (Tier 1) បិទស្របគ្នាក្នុង &lt; 0.5ms\n"
                 f"4. <b>Auto 24/5 Momentum Radar ៖</b> ស្កេនចាប់ Trend ខ្លាំងគ្រប់ទីផ្សារ (មាស, BTC, US30, FX) 24/5 ស្វ័យប្រវត្តិ\n"
                 f"{ui_standards.DIVIDER_DOUBLE}\n"
                 f"📊 <b>ស្ថានភាព BASKETS កំពុងដំណើរការ ៖</b>\n"
