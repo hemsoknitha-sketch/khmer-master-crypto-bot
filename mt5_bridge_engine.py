@@ -2227,6 +2227,114 @@ class MT5BridgeEngine:
     # =========================================================================
     # 5. SOVEREIGN MT5 REACHSEY 5-POSITION MATRIX & BASKET HARVESTER (THE 48TH PILLAR)
     # =========================================================================
+    def scan_top_momentum_reachsey_asset(
+        self,
+        account_id: str = "",
+        is_cent_account: bool = False,
+        existing_basket_syms: Optional[Set[str]] = None,
+        broker_open_syms: Optional[Set[str]] = None,
+    ) -> Optional[Tuple[str, str, float, str]]:
+        """
+        👑 Scans across all high-momentum market universes for Reachsey 5-Position Matrix.
+        Evaluates Metals, Crypto, Indices, and High-Beta FX pairs.
+        Ranks by 9-SMC Confluence, Quantum AI, and RSI Momentum.
+        Returns (best_symbol, action, confidence, signal_reason) or None.
+        """
+        existing_basket_syms = existing_basket_syms or set()
+        broker_open_syms = broker_open_syms or set()
+
+        if is_cent_account:
+            # Cent Account Universe: High-liquidity metals & major forex pairs with cent contract availability
+            candidates = ["XAUUSD", "XAGUSD", "EURUSD", "GBPUSD", "USDJPY", "GBPJPY", "EURJPY"]
+        else:
+            # Standard USD Multi-Asset Universe: Metals, Crypto, Indices, High-Beta FX
+            candidates = [
+                "XAUUSD", "XAGUSD",              # Precious Metals
+                "BTCUSD", "ETHUSD", "SOLUSD",    # High-Velocity Crypto
+                "US30", "US100", "GER40",        # Global Mega Indices
+                "GBPJPY", "EURJPY", "GBPUSD"     # High-Beta Forex
+            ]
+
+        session = self.clients.get(str(account_id))
+        scored_candidates: List[Tuple[float, str, str, str]] = []
+
+        for raw_sym in candidates:
+            clean_sym = normalize_mt5_symbol(raw_sym)
+            if clean_sym in existing_basket_syms or clean_sym in broker_open_syms:
+                continue
+
+            # Check if terminal provides quotes
+            adapted = self.adapt_symbol_for_session(clean_sym, session) if session else clean_sym
+            quote = self.get_live_symbol_quote(adapted) or self.get_live_symbol_quote(clean_sym)
+            if not quote or quote.get("mid", 0.0) <= 0.0:
+                continue
+
+            action = None
+            conf = 0.0
+            reason = ""
+
+            # 1. 9-SMC Multi-Timeframe Confluence
+            try:
+                from mt5_smc_citadel import MT5SMCCitadelEngine
+                smc_res = MT5SMCCitadelEngine.analyze_9_smc_confluence(clean_sym)
+                smc_act = str(smc_res.get("action", "WAIT")).upper()
+                smc_conf = float(smc_res.get("confidence", 50.0) or 50.0)
+                if smc_act in ["BUY", "SELL"] and smc_conf >= 68.0:
+                    action = smc_act
+                    conf = smc_conf
+                    reason = f"SMC_{smc_act}_{smc_conf:.1f}%"
+            except Exception:
+                pass
+
+            # 2. Quantum AI Swarm & Macro Confluence
+            try:
+                q_act, q_conf, q_rsn = MT5QuantumSignalCitadel.evaluate_quantum_signal(clean_sym, clean_sym)
+                if q_act in ["BUY", "SELL"] and q_conf >= 75.0:
+                    if action and action == q_act:
+                        # Confluence Boost! Both SMC & Quantum AI agree
+                        conf = min(98.5, max(conf, q_conf) + 6.0)
+                        reason = f"Confluence_{action}_{conf:.1f}%"
+                    elif not action:
+                        action = q_act
+                        conf = q_conf
+                        reason = q_rsn
+            except Exception:
+                pass
+
+            # 3. 15m RSI Momentum Fallback
+            if not action or action not in ["BUY", "SELL"] or conf < 75.0:
+                try:
+                    rsi_sym = clean_sym + "USDT" if "USD" not in clean_sym else clean_sym
+                    if "XAU" in clean_sym or "GOLD" in clean_sym:
+                        rsi_sym = "XAUUSDT"
+                    rsi_15m = float(market_data.get_symbol_rsi(rsi_sym, interval="15m"))
+                    if rsi_15m <= 38.0:
+                        action = "BUY"
+                        conf = max(conf, 82.0)
+                        reason = f"RSI_BottomReject_{rsi_15m:.1f}"
+                    elif rsi_15m >= 65.0:
+                        action = "SELL"
+                        conf = max(conf, 82.0)
+                        reason = f"RSI_PeakReject_{rsi_15m:.1f}"
+                except Exception:
+                    pass
+
+            if action in ["BUY", "SELL"] and conf >= 75.0:
+                # Volatility Multiplier: Gold, Crypto & Indices have inherently higher pip yield
+                vol_boost = 1.0
+                if any(k in clean_sym for k in ["XAU", "BTC", "ETH", "US30", "US100"]):
+                    vol_boost = 1.05
+                final_score = conf * vol_boost
+                scored_candidates.append((final_score, clean_sym, action, reason))
+
+        if not scored_candidates:
+            return None
+
+        # Sort descending by momentum score
+        scored_candidates.sort(key=lambda x: x[0], reverse=True)
+        top_score, top_sym, top_act, top_rsn = scored_candidates[0]
+        return (top_sym, top_act, top_score, top_rsn)
+
     def execute_reachsey_5pos_matrix(
         self,
         symbol: str = "XAUUSD",
@@ -2238,6 +2346,8 @@ class MT5BridgeEngine:
         acc_id: str = "",
         capital_tier: float = 0.0,
         target_symbol: Optional[str] = None,
+        confidence: float = 0.0,
+        signal_reason: str = "",
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -2349,9 +2459,9 @@ class MT5BridgeEngine:
         quote = self.get_live_symbol_quote(adapted_sym) or self.get_live_symbol_quote(sym_clean)
         cur_mid = float(quote.get("mid", 0.0) if quote else 0.0)
 
-        action = custom_action
-        signal_conf = 88.0 if (custom_action and custom_action.upper() in ["BUY", "SELL"]) else 0.0
-        signal_reason = f"DIRECT_{custom_action}" if custom_action else ""
+        action = custom_action.upper() if (custom_action and str(custom_action).upper() in ["BUY", "SELL"]) else None
+        signal_conf = max(88.0, float(confidence or kwargs.get("confidence", 0.0))) if action else 0.0
+        signal_reason = str(signal_reason or kwargs.get("signal_reason", "") or (f"DIRECT_{action}" if action else ""))
 
         # Tier 1: Query MT5SMCCitadelEngine for 9-SMC Multi-Timeframe Confluence (H4, H1, M30, M15)
         # Analyzes: Order Blocks, FVGs, Inducements, Liquidity Sweeps, Kill Zones, Dealing Range Equilibrium
@@ -2655,6 +2765,12 @@ class MT5BridgeEngine:
             elif net_pnl >= target_p:
                 should_sweep = True
                 sweep_reason = f"TARGET_NET_PROFIT_HIT (+{net_pnl:,.2f} {unit} >= +{target_p:,.2f} {unit})"
+            elif net_pnl >= min_harvest:
+                # Instant Total Profit Harvester ($100+ USD / 10,000 USC Milestone Standard)
+                # The moment Basket Net Profit hits >= $100 USD (or 10,000 USC in Cent mode),
+                # sweep immediately to bag actual cash into bank account! Zero hesitation!
+                should_sweep = True
+                sweep_reason = f"INSTANT_TOTAL_PROFIT_HARVEST (+{net_pnl:,.2f} {unit} >= +{min_harvest:,.2f} {unit} Milestone Cash-In)"
             elif peak >= min_harvest:
                 # Anti-Regret Trailing Lock (Active once peak profit reaches >= $100 USD / 10,000 USC)
                 # Guaranteed floor: at least 80% of milestone ($80 USD / 8,000 USC) or 85% of peak (whichever is higher).
@@ -3480,14 +3596,27 @@ class MT5BridgeEngine:
                                 existing_basket_syms = {str(b.get("symbol", "")).upper() for b in active_reachsey_baskets}
                                 broker_open_syms = {normalize_mt5_symbol(str(p.get("symbol", ""))) for p in open_positions}
                                 target_sym = None
-                                # Pillar 48 & 49: Strict High-Volatility Shield for Reachsey Matrix
-                                # Low-volatility/sideway forex assets (EURUSD, GBPUSD, USDJPY) are mathematically incompatible
-                                # with high-speed volatility harvesters and are 100% strictly excluded.
-                                candidate_syms = ["XAUUSD"] if is_cent_account else ["XAUUSD", "BTCUSD", "ETHUSD", "US30", "US100"]
-                                for cs in candidate_syms:
-                                    if cs not in existing_basket_syms and cs not in broker_open_syms:
-                                        target_sym = cs
-                                        break
+                                target_act = None
+                                target_conf = 0.0
+                                target_rsn = ""
+
+                                # Dynamic Multi-Asset Momentum Radar for Reachsey Matrix (Metals, Crypto, Indices, High-Beta FX)
+                                best_cand = self.scan_top_momentum_reachsey_asset(
+                                    account_id=acc_id,
+                                    is_cent_account=is_cent_account,
+                                    existing_basket_syms=existing_basket_syms,
+                                    broker_open_syms=broker_open_syms
+                                )
+                                if best_cand:
+                                    target_sym, target_act, target_conf, target_rsn = best_cand
+                                    logger.info(f"👑 [REACHSEY MOMENTUM RADAR] Selected Top High-Velocity Asset: {target_sym} ({target_act} | Score: {target_conf:.1f}% | {target_rsn})")
+                                else:
+                                    candidate_syms = ["XAUUSD"] if is_cent_account else ["XAUUSD", "BTCUSD", "ETHUSD", "US30", "US100"]
+                                    for cs in candidate_syms:
+                                        if cs not in existing_basket_syms and cs not in broker_open_syms:
+                                            target_sym = cs
+                                            break
+
                                 if target_sym:
                                     logger.info(f"👑 [REACHSEY AUTO-MATRIX TRIGGER] Deploying 5-position matrix on {target_sym} for account #{acc_id} (Tier: {reachsey_tier:,.0f} {'USC' if is_cent_account else 'USD'})...")
                                     threading.Thread(
@@ -3496,7 +3625,10 @@ class MT5BridgeEngine:
                                             "acc_id": acc_id,
                                             "capital_tier": reachsey_tier,
                                             "chat_id": chat_id,
-                                            "target_symbol": target_sym
+                                            "target_symbol": target_sym,
+                                            "custom_action": target_act,
+                                            "confidence": target_conf,
+                                            "signal_reason": target_rsn
                                         },
                                         daemon=True
                                     ).start()
