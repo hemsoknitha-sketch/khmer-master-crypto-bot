@@ -2578,9 +2578,9 @@ class MT5BridgeEngine:
             # Strictly clamps lot to 0.01 if trader's real balance on Standard account is < $1,000 USD
             # to guarantee zero overleveraging on retail balances!
             lot_val = 0.01
-            target_pnl = max(10.0, round(real_usd * 0.10, 2))
-            min_harvest_pnl = max(3.50, round(real_usd * 0.0333, 2))
-            floor_pnl = max(15.0, round(real_usd * 0.15, 2))
+            target_pnl = max(2.50, round(real_usd * 0.10, 2))
+            min_harvest_pnl = max(1.00, round(real_usd * 0.04, 2))
+            floor_pnl = max(4.50, round(real_usd * 0.18, 2))
         else:
             lot_val = max(0.01, float(lot_per_pos or lot_val))
 
