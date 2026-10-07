@@ -67,7 +67,11 @@ const state = {
     isRefreshing: false,
     sseSource: null,
     ws: null,
-    streamConnected: false
+    streamConnected: false,
+    selectedGoldLot: 0.05,
+    goldSoundEnabled: true,
+    goldSignalData: null,
+    lastGoldSignalAction: null
 };
 
 // DOM Elements
@@ -107,6 +111,40 @@ const elements = {
     btnRefresh: document.getElementById('btn-refresh'),
     btnManualSweep: document.getElementById('btn-manual-sweep'),
     toastContainer: document.getElementById('toast-container'),
+
+    // 3D Gold Vault & Live Indicator Elements
+    goldSpotPriceBanner: document.getElementById('gold-spot-price-banner'),
+    goldSessionBadge: document.getElementById('gold-session-badge'),
+    goldSignalActionBadge: document.getElementById('gold-signal-action-badge'),
+    goldSignalRegime: document.getElementById('gold-signal-regime'),
+    goldConfCircleBar: document.getElementById('gold-conf-circle-bar'),
+    goldConfidenceNum: document.getElementById('gold-confidence-num'),
+    goldTelemetrySge: document.getElementById('gold-telemetry-sge'),
+    goldTelemetrySgeSub: document.getElementById('gold-telemetry-sge-sub'),
+    goldTelemetrySmc: document.getElementById('gold-telemetry-smc'),
+    goldTelemetryKillzone: document.getElementById('gold-telemetry-killzone'),
+    goldTelemetryTips: document.getElementById('gold-telemetry-tips'),
+    goldTelemetryVelocity: document.getElementById('gold-telemetry-velocity'),
+    goldCoordEntry: document.getElementById('gold-coord-entry'),
+    goldCoordEntryRange: document.getElementById('gold-coord-entry-range'),
+    goldCoordSl: document.getElementById('gold-coord-sl'),
+    goldCoordRisk: document.getElementById('gold-coord-risk'),
+    goldCoordTp1: document.getElementById('gold-coord-tp1'),
+    goldCoordTp2: document.getElementById('gold-coord-tp2'),
+    goldCoordTp3: document.getElementById('gold-coord-tp3'),
+    goldCoordRr: document.getElementById('gold-coord-rr'),
+    mapSlLabel: document.getElementById('map-sl-label'),
+    mapEntryLabel: document.getElementById('map-entry-label'),
+    mapLivePointer: document.getElementById('map-live-pointer'),
+    mapLiveLabel: document.getElementById('map-live-label'),
+    mapTp1Label: document.getElementById('map-tp1-label'),
+    mapTp2Label: document.getElementById('map-tp2-label'),
+    mapTp3Label: document.getElementById('map-tp3-label'),
+    btnGoldSoundToggle: document.getElementById('btn-gold-sound-toggle'),
+    btnGoldExecMt5: document.getElementById('btn-gold-exec-mt5'),
+    btnGoldExecCapital: document.getElementById('btn-gold-exec-capital'),
+    btnGoldExecBinance: document.getElementById('btn-gold-exec-binance'),
+    goldExecFeedback: document.getElementById('gold-exec-feedback'),
 
     // MT5 Pro Terminal Elements
     mt5StatusPill: document.getElementById('mt5-status-pill'),
@@ -428,6 +466,11 @@ function handleStreamData(data) {
     // Real-Time MT5 Telemetry from Stream
     if (data.mt5_account && Object.keys(data.mt5_account).length > 0) {
         renderMT5FromStream(data.mt5_account, data.mt5_positions, data.mt5_connected, data.mt5_stats);
+    }
+
+    // Real-Time 3D Gold Vault Live Indicator Stream
+    if (data.gold_signal && data.gold_signal.signal) {
+        renderLiveGoldSignal(data.gold_signal);
     }
 }
 
@@ -853,6 +896,207 @@ async function fetchAnalytics() {
         }
     } catch (e) {
         console.error('Analytics fetch error:', e);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 3D Super Fast Live Gold Indicator & Cockpit Controller
+// -----------------------------------------------------------------------------
+function playAudioBeep(freq = 880) {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+    } catch (e) { }
+}
+
+function renderLiveGoldSignal(goldData) {
+    if (!goldData) return;
+    state.goldSignalData = goldData;
+    const sig = goldData.signal || {};
+    const curPrice = Number(goldData.current_price || 0);
+
+    // 1. Live Interbank Spot Banner
+    if (curPrice > 0 && elements.goldSpotPriceBanner) {
+        elements.goldSpotPriceBanner.textContent = `$${formatUSD(curPrice)}`;
+    }
+
+    // 2. Predictive Action Pill & Regime
+    const action = (sig.action || 'BUY').toUpperCase();
+    if (elements.goldSignalActionBadge) {
+        elements.goldSignalActionBadge.className = `gold-action-pill ${action.toLowerCase()}`;
+        elements.goldSignalActionBadge.textContent = action === 'BUY'
+            ? '🟢 STRONG BUY SIGNAL (SMC CONFLUENCE)'
+            : '🔴 STRONG SELL SIGNAL (LIQUIDITY PURGE)';
+    }
+    if (elements.goldSignalRegime && sig.regime) {
+        elements.goldSignalRegime.textContent = sig.regime;
+    }
+
+    // Sound chime on new signal switch
+    if (state.goldSoundEnabled && state.lastGoldSignalAction && state.lastGoldSignalAction !== action) {
+        playAudioBeep(action === 'BUY' ? 880 : 440);
+        triggerHaptic('heavy');
+    }
+    state.lastGoldSignalAction = action;
+
+    // 3. AI Confidence Meter
+    const conf = Number(sig.confidence || 95.0);
+    if (elements.goldConfidenceNum) {
+        elements.goldConfidenceNum.textContent = `${conf.toFixed(1)}%`;
+    }
+    if (elements.goldConfCircleBar) {
+        const clampedConf = Math.min(99.9, Math.max(10, conf));
+        elements.goldConfCircleBar.setAttribute('stroke-dasharray', `${clampedConf}, 100`);
+        elements.goldConfCircleBar.style.stroke = action === 'BUY' ? '#10b981' : '#ef4444';
+    }
+
+    // 4. Confluence Telemetry Grid
+    const sgePrem = Number(sig.sge_premium_usd || 28.5);
+    if (elements.goldTelemetrySge) {
+        elements.goldTelemetrySge.textContent = `${sgePrem >= 0 ? '+' : ''}$${sgePrem.toFixed(2)}/oz`;
+    }
+    if (elements.goldTelemetrySgeSub && sig.central_bank_status) {
+        elements.goldTelemetrySgeSub.textContent = sig.central_bank_status;
+    }
+    if (elements.goldTelemetrySmc && sig.confluence_factors && sig.confluence_factors.length > 0) {
+        elements.goldTelemetrySmc.textContent = sig.confluence_factors[0];
+    }
+    if (elements.goldTelemetryKillzone && sig.kill_zone) {
+        elements.goldTelemetryKillzone.textContent = sig.kill_zone.replace(/_/g, ' ');
+    }
+    if (elements.goldTelemetryTips) {
+        elements.goldTelemetryTips.textContent = sig.tips_real_yield_bias === 'STRONG_BULLISH'
+            ? 'Falling Yields (Bullish Alpha)'
+            : 'Neutral Real Yields';
+    }
+
+    // 5. 3D Coordinates Deck
+    const entry = sig.entry_zone || {};
+    const idealEntry = Number(entry.ideal || curPrice);
+    const minEntry = Number(entry.min || idealEntry - 1.2);
+    const maxEntry = Number(entry.max || idealEntry + 1.2);
+    const sl = Number(sig.stop_loss || (action === 'BUY' ? idealEntry - 6.5 : idealEntry + 6.5));
+    const riskDist = Number(sig.risk_distance || Math.abs(idealEntry - sl));
+    const tp1 = Number(sig.take_profit_1 || (action === 'BUY' ? idealEntry + 13.0 : idealEntry - 13.0));
+    const tp2 = Number(sig.take_profit_2 || (action === 'BUY' ? idealEntry + 26.0 : idealEntry - 26.0));
+    const tp3 = Number(sig.take_profit_3 || (action === 'BUY' ? idealEntry + 42.25 : idealEntry - 42.25));
+    const rr = sig.risk_reward_ratio || '1:6.5';
+
+    if (elements.goldCoordEntry) elements.goldCoordEntry.textContent = `$${formatUSD(idealEntry)}`;
+    if (elements.goldCoordEntryRange) elements.goldCoordEntryRange.textContent = `Zone: $${formatUSD(minEntry)} - $${formatUSD(maxEntry)}`;
+    if (elements.goldCoordSl) elements.goldCoordSl.textContent = `$${formatUSD(sl)}`;
+    if (elements.goldCoordRisk) elements.goldCoordRisk.textContent = `Risk: -$${riskDist.toFixed(2)}/oz (${action === 'BUY' ? 'Below Sweep' : 'Above Highs'})`;
+    if (elements.goldCoordTp1) elements.goldCoordTp1.textContent = `$${formatUSD(tp1)}`;
+    if (elements.goldCoordTp2) elements.goldCoordTp2.textContent = `$${formatUSD(tp2)}`;
+    if (elements.goldCoordTp3) elements.goldCoordTp3.textContent = `$${formatUSD(tp3)}`;
+    if (elements.goldCoordRr) elements.goldCoordRr.textContent = `${rr} R:R`;
+
+    // 6. Holographic 3D Level Depth Map
+    if (elements.mapSlLabel) elements.mapSlLabel.textContent = `SL $${sl.toFixed(1)}`;
+    if (elements.mapEntryLabel) elements.mapEntryLabel.textContent = `Entry $${idealEntry.toFixed(1)}`;
+    if (elements.mapTp1Label) elements.mapTp1Label.textContent = `TP1 $${tp1.toFixed(1)}`;
+    if (elements.mapTp2Label) elements.mapTp2Label.textContent = `TP2 $${tp2.toFixed(1)}`;
+    if (elements.mapTp3Label) elements.mapTp3Label.textContent = `TP3 $${tp3.toFixed(1)}`;
+
+    if (elements.mapLivePointer && curPrice > 0 && sl > 0 && tp3 > 0) {
+        const minTrack = Math.min(sl, tp3);
+        const maxTrack = Math.max(sl, tp3);
+        const span = maxTrack - minTrack;
+        let pct = span > 0 ? ((curPrice - minTrack) / span) * 100 : 35;
+        pct = Math.max(6, Math.min(94, pct));
+        elements.mapLivePointer.style.left = `${pct}%`;
+        if (elements.mapLiveLabel) elements.mapLiveLabel.textContent = `$${formatUSD(curPrice)}`;
+    }
+
+    // 7. Dynamic Execution Buttons Label
+    if (elements.btnGoldExecMt5) {
+        const strong = elements.btnGoldExecMt5.querySelector('strong');
+        if (strong) strong.textContent = `1-Tap Execute ${action} (MT5 GTCFX)`;
+    }
+    if (elements.btnGoldExecCapital) {
+        const strong = elements.btnGoldExecCapital.querySelector('strong');
+        if (strong) strong.textContent = `1-Tap Execute ${action} (Capital.com)`;
+    }
+    if (elements.btnGoldExecBinance) {
+        const strong = elements.btnGoldExecBinance.querySelector('strong');
+        if (strong) strong.textContent = `1-Tap Execute ${action} (Binance PAXG)`;
+    }
+}
+
+async function fetchLiveGoldSignal() {
+    try {
+        const cid = state.chatId || '';
+        const res = await fetch(`/api/gold/live_signal?chat_id=${cid}`);
+        const json = await res.json();
+        if (json.status === 'success' && json.signal) {
+            renderLiveGoldSignal(json);
+        }
+    } catch (e) {
+        console.error('Error fetching live gold signal:', e);
+    }
+}
+
+async function executeGoldTrade(targetEngine) {
+    triggerHaptic('heavy');
+    const lot = state.selectedGoldLot || 0.05;
+    const sig = state.goldSignalData?.signal || {};
+    const action = (sig.action || 'BUY').toUpperCase();
+    const sl = Number(sig.stop_loss || 0);
+    const tp = Number(sig.take_profit_2 || 0);
+
+    showToast(`⚡ កំពុងបញ្ជូន ${action} ${lot} Lots ទៅ ${targetEngine}...`);
+    if (elements.goldExecFeedback) {
+        elements.goldExecFeedback.className = 'gold-exec-feedback pending';
+        elements.goldExecFeedback.textContent = `⏳ Broadcasting ${action} ${lot} lots to ${targetEngine} Tokyo Bridge...`;
+        elements.goldExecFeedback.classList.remove('hidden');
+    }
+
+    try {
+        const res = await fetch('/api/gold/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: state.chatId,
+                target: targetEngine,
+                action: action,
+                lots: lot,
+                sl: sl,
+                tp: tp
+            })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            showToast(`✅ [${targetEngine}] បានបើក Position ${action} ${lot} Lots ជោគជ័យ!`);
+            if (elements.goldExecFeedback) {
+                elements.goldExecFeedback.className = 'gold-exec-feedback success';
+                elements.goldExecFeedback.textContent = `✅ Order Executed on ${json.engine}! Ticket/Details confirmed.`;
+            }
+            if (targetEngine === 'MT5') fetchMT5Status();
+            else fetchPortfolio();
+        } else {
+            showToast(`⚠️ [${targetEngine}] ${json.message || 'Error executing order'}`);
+            if (elements.goldExecFeedback) {
+                elements.goldExecFeedback.className = 'gold-exec-feedback error';
+                elements.goldExecFeedback.textContent = `❌ ${json.message || 'Execution error'}`;
+            }
+        }
+    } catch (err) {
+        showToast(`❌ Error: ${err.message}`);
+        if (elements.goldExecFeedback) {
+            elements.goldExecFeedback.className = 'gold-exec-feedback error';
+            elements.goldExecFeedback.textContent = `❌ Network/Bridge error: ${err.message}`;
+        }
     }
 }
 
@@ -1651,6 +1895,8 @@ function setupEventListeners() {
                 fetchEngineStates();
             } else if (targetTabId === 'tab-mt5') {
                 fetchMT5Status();
+            } else if (targetTabId === 'tab-wealth-vault') {
+                fetchLiveGoldSignal();
             }
         });
     });
@@ -1975,6 +2221,43 @@ function setupEventListeners() {
             showToast('🔄 បានចាកចេញពី Session! សូមបញ្ចូល Telegram Chat ID ថ្មី។');
             fetchMT5Status();
         });
+    }
+
+    // 3D Gold Vault Lot Size Selector Pills
+    document.querySelectorAll('.exec-lot-selector .lot-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.exec-lot-selector .lot-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.selectedGoldLot = parseFloat(btn.getAttribute('data-lot')) || 0.05;
+            triggerHaptic('selection');
+        });
+    });
+
+    // 3D Gold Pre-Alert Sound Toggle
+    if (elements.btnGoldSoundToggle) {
+        elements.btnGoldSoundToggle.addEventListener('click', () => {
+            state.goldSoundEnabled = !state.goldSoundEnabled;
+            triggerHaptic('light');
+            if (state.goldSoundEnabled) {
+                elements.btnGoldSoundToggle.classList.add('active');
+                elements.btnGoldSoundToggle.textContent = '🔔 Pre-Alert Sound: ON';
+                playAudioBeep(880);
+            } else {
+                elements.btnGoldSoundToggle.classList.remove('active');
+                elements.btnGoldSoundToggle.textContent = '🔕 Pre-Alert Sound: OFF';
+            }
+        });
+    }
+
+    // 3D Gold 1-Tap Multi-Engine Execution Buttons
+    if (elements.btnGoldExecMt5) {
+        elements.btnGoldExecMt5.addEventListener('click', () => executeGoldTrade('MT5'));
+    }
+    if (elements.btnGoldExecCapital) {
+        elements.btnGoldExecCapital.addEventListener('click', () => executeGoldTrade('CAPITAL'));
+    }
+    if (elements.btnGoldExecBinance) {
+        elements.btnGoldExecBinance.addEventListener('click', () => executeGoldTrade('BINANCE'));
     }
 }
 
@@ -2536,6 +2819,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchEngineStates();
     fetchMT5Status();
     fetchCapitalOverview();
+    fetchLiveGoldSignal();
 
     // Fast Active Poller for MT5 Tab (Real-Time 2.0s refresh of telemetry & recent orders)
     setInterval(() => {
@@ -2544,6 +2828,14 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchMT5Status();
         }
     }, 2000);
+
+    // Fast Active Poller for Gold Vault 3D Cockpit (Real-Time 1.5s refresh when tab is visible)
+    setInterval(() => {
+        const vaultPane = document.getElementById('tab-wealth-vault');
+        if (vaultPane && vaultPane.classList.contains('active')) {
+            fetchLiveGoldSignal();
+        }
+    }, 1500);
 
     // Fast Poller for Capital TradFi & Session Radar (every 5 seconds)
     setInterval(() => {
@@ -2558,6 +2850,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchEngineStates();
             fetchMT5Status();
             fetchCapitalOverview();
+            fetchLiveGoldSignal();
         }
     }, 20000);
 });

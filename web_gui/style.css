@@ -3993,4 +3993,669 @@ input:checked + .slider:before {
     cursor: pointer;
 }
 
+/* ==========================================================================
+   SUPER SMART 3D BEAUTIFUL DESIGN - GOLD VAULT & LIVE INDICATOR COCKPIT
+   ========================================================================== */
+
+/* 1. 3D Gold Vault Master Banner */
+.banner-gold-vault-3d {
+    background: radial-gradient(120% 120% at 50% 0%, rgba(245, 158, 11, 0.22) 0%, rgba(180, 83, 9, 0.12) 50%, rgba(15, 23, 42, 0.95) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: var(--radius-xl, 18px);
+    box-shadow: 0 15px 35px -10px rgba(245, 158, 11, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.banner-gold-vault-3d::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.12) 0%, transparent 65%);
+    pointer-events: none;
+    animation: goldGlowRay 12s linear infinite;
+}
+
+@keyframes goldGlowRay {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.gold-3d-floating-icon {
+    font-size: 32px;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.25) 0%, rgba(217, 119, 6, 0.4) 100%);
+    border: 1.5px solid rgba(255, 215, 0, 0.6);
+    border-radius: 16px;
+    width: 54px;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    animation: goldFloat 4s ease-in-out infinite;
+}
+
+@keyframes goldFloat {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-5px) rotate(3deg); }
+}
+
+.gold-live-price-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 6px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.gold-live-price-pill .pill-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.8px;
+}
+
+.gold-live-price-pill .pill-val {
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+/* 2. 3D Super Fast Live Indicator Radar Card */
+.gold-radar-3d-card {
+    background: linear-gradient(145deg, rgba(17, 24, 39, 0.92) 0%, rgba(10, 15, 29, 0.96) 100%);
+    border: 1.5px solid rgba(245, 158, 11, 0.45);
+    border-radius: var(--radius-xl, 18px);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 20px 50px -15px rgba(245, 158, 11, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    position: relative;
+    backdrop-filter: blur(20px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.gold-radar-3d-card:hover {
+    box-shadow: 0 25px 60px -12px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.gold-radar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.gold-signal-status-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.gold-pulse-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 12px #10b981;
+    animation: goldPulseRing 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes goldPulseRing {
+    0% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.gold-action-pill {
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.gold-action-pill.buy {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.4) 100%);
+    border: 1.5px solid #10b981;
+    color: #6ee7b7;
+    text-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+}
+
+.gold-action-pill.sell {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.4) 100%);
+    border: 1.5px solid #ef4444;
+    color: #fca5a5;
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+.gold-regime-text {
+    font-size: 11px;
+    font-weight: 700;
+    color: #cbd5e1;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* AI Confidence Radial Circle */
+.gold-conf-meter-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.gold-conf-ring {
+    width: 66px;
+    height: 66px;
+    position: relative;
+}
+
+.circular-chart.gold-chart {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.circular-chart.gold-chart .circle-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 3.2;
+}
+
+.circular-chart.gold-chart .circle {
+    fill: none;
+    stroke-width: 3.2;
+    stroke: url(#goldGradient) #f59e0b;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.6s ease;
+    filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
+}
+
+.gold-conf-inner-val {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+
+.gold-conf-inner-val span {
+    font-size: 12.5px;
+    font-weight: 900;
+    color: #fef08a;
+    line-height: 1;
+}
+
+.gold-conf-inner-val small {
+    font-size: 7px;
+    font-weight: 800;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+}
+
+/* 3. 4-Pillar Confluence Telemetry Grid */
+.gold-telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.gold-telemetry-item {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--radius-md, 12px);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.gold-telemetry-item:hover {
+    transform: translateY(-2px);
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.gt-icon {
+    font-size: 22px;
+}
+
+.gt-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.gt-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.4px;
+}
+
+.gt-content strong {
+    font-size: 13.5px;
+    font-weight: 800;
+    margin: 2px 0;
+}
+
+.gt-content small {
+    font-size: 9.5px;
+    color: #64748b;
+}
+
+/* 4. 3D Mathematical Sniper Trade Coordinates Deck */
+.gold-coords-deck {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+}
+
+.gold-coord-box {
+    background: rgba(15, 23, 42, 0.75);
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease;
+}
+
+.gold-coord-box:hover {
+    transform: translateY(-3px);
+}
+
+.gold-coord-box.entry-box {
+    border: 1.5px solid rgba(6, 182, 212, 0.45);
+    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.15);
+}
+
+.gold-coord-box.sl-box {
+    border: 1.5px solid rgba(239, 68, 68, 0.45);
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15);
+}
+
+.gold-coord-box.tp-box {
+    border: 1.5px solid rgba(245, 158, 11, 0.45);
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);
+}
+
+.gold-coord-box.rr-box {
+    border: 1.5px solid rgba(168, 85, 247, 0.45);
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.15);
+}
+
+.coord-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.coord-icon {
+    font-size: 15px;
+}
+
+.coord-title {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: var(--text-muted, #94a3b8);
+}
+
+.coord-main-val {
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 0.4px;
+    margin-bottom: 4px;
+}
+
+.coord-sub-val {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+.coord-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+}
+
+.badge-cyan { background: rgba(6, 182, 212, 0.15); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.3); }
+.badge-crimson { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+.badge-purple { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+/* TP Ladder List */
+.tp-ladder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tp-step {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.tp-step.highlight {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tp-tag {
+    font-weight: 700;
+    color: #94a3b8;
+}
+
+.tp-price {
+    font-weight: 800;
+}
+
+.tp-gain {
+    font-size: 10px;
+    font-weight: 800;
+}
+
+/* 5. 3D Interactive Visual Level Depth Map */
+.gold-level-map-container {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+
+.level-map-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    font-weight: 800;
+    color: var(--text-muted, #94a3b8);
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.level-track-wrapper {
+    position: relative;
+    padding: 18px 10px;
+}
+
+.level-track-rail {
+    position: relative;
+    height: 6px;
+    background: linear-gradient(90deg, #ef4444 0%, #06b6d4 25%, #10b981 60%, #f59e0b 100%);
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.level-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    transform: translateY(2px);
+}
+
+.node-marker {
+    font-size: 12px;
+    background: #020713;
+    padding: 2px;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.node-text {
+    font-size: 9.5px;
+    font-weight: 800;
+    color: #e2e8f0;
+    white-space: nowrap;
+    margin-top: 4px;
+}
+
+.level-pointer-beam {
+    position: absolute;
+    top: -14px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: left 0.4s ease;
+    z-index: 5;
+}
+
+.pointer-glow-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ffd700;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 16px #ffd700;
+    animation: beamPing 1.5s ease-in-out infinite;
+}
+
+@keyframes beamPing {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 10px #ffd700; }
+    50% { transform: scale(1.3); box-shadow: 0 0 22px #ffd700; }
+}
+
+.pointer-text {
+    font-size: 10px;
+    font-weight: 900;
+    color: #ffd700;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid #ffd700;
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+/* 6. 1-Tap Multi-Engine Execution Deck */
+.gold-execution-deck {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 16px;
+}
+
+.exec-deck-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.exec-lot-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.exec-label {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #e2e8f0;
+}
+
+.lot-pill-group {
+    display: flex;
+    gap: 6px;
+}
+
+.lot-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lot-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.lot-btn.active {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-color: #ffd700;
+    color: #020713;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+.btn-sound-pill {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #94a3b8;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-sound-pill.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: #10b981;
+    color: #6ee7b7;
+}
+
+.exec-buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.btn-gold-3d, .btn-cyan-3d, .btn-neon-3d {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: left;
+    position: relative;
+    border: none;
+}
+
+.btn-gold-3d:active, .btn-cyan-3d:active, .btn-neon-3d:active {
+    transform: translateY(2px);
+}
+
+.btn-gold-3d .btn-icon, .btn-cyan-3d .btn-icon, .btn-neon-3d .btn-icon {
+    font-size: 24px;
+}
+
+.btn-gold-3d .btn-text, .btn-cyan-3d .btn-text, .btn-neon-3d .btn-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-gold-3d .btn-text strong, .btn-cyan-3d .btn-text strong, .btn-neon-3d .btn-text strong {
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.btn-gold-3d .btn-text small, .btn-cyan-3d .btn-text small, .btn-neon-3d .btn-text small {
+    font-size: 9.5px;
+    opacity: 0.85;
+}
+
+.btn-gold-3d {
+    background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+    color: #020713;
+    border: 1px solid #ffd700;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+}
+
+.btn-gold-3d:hover {
+    box-shadow: 0 8px 26px rgba(245, 158, 11, 0.5);
+    transform: translateY(-2px);
+}
+
+.btn-cyan-3d {
+    background: linear-gradient(135deg, #06b6d4 0%, #0369a1 100%);
+    color: #020713;
+    border: 1px solid #67e8f9;
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
+}
+
+.btn-cyan-3d:hover {
+    box-shadow: 0 8px 26px rgba(6, 182, 212, 0.5);
+    transform: translateY(-2px);
+}
+
+.btn-neon-3d {
+    background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+    color: #020713;
+    border: 1px solid #6ee7b7;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+}
+
+.btn-neon-3d:hover {
+    box-shadow: 0 8px 26px rgba(16, 185, 129, 0.5);
+    transform: translateY(-2px);
+}
+
+.gold-exec-feedback {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    animation: fadeIn 0.3s ease;
+}
+
+.gold-exec-feedback.success {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+    color: #6ee7b7;
+}
+
+.gold-exec-feedback.error {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid #ef4444;
+    color: #fca5a5;
+}
+
+
 
