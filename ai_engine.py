@@ -939,7 +939,7 @@ class AIInvestmentEngine:
                 response = chat.send_message(
                     full_user_input,
                     generation_config=genai.types.GenerationConfig(temperature=0.7),
-                    request_options={'timeout': 8.0}
+                    request_options={'timeout': 30.0}
                 )
                 if response and response.text:
                     cleaned_txt = self._clean_response(response.text)
@@ -971,7 +971,7 @@ class AIInvestmentEngine:
                     response = chat.send_message(
                         full_user_input,
                         generation_config=genai.types.GenerationConfig(temperature=0.7),
-                        request_options={'timeout': 8.0}
+                        request_options={'timeout': 30.0}
                     )
                     if response and response.text:
                         cleaned_txt = self._clean_response(response.text)
