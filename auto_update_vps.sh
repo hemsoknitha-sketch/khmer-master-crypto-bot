@@ -157,6 +157,19 @@ elif [ -f "sync_local_models.py" ]; then
     python3 sync_local_models.py || true
 fi
 
+# 6.5. Linux Kernel HFT Network Optimization (Google BBR, TCP_NODELAY & Socket Tuning)
+echo "⚡ [HFT OPTIMIZER] Applying Linux Kernel Google BBR & Zero-Latency Socket Tuning..."
+sudo modprobe tcp_bbr 2>/dev/null || true
+if sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | grep -q bbr; then
+    sudo sysctl -w net.ipv4.tcp_congestion_control=bbr 2>/dev/null || true
+    sudo sysctl -w net.core.default_qdisc=fq 2>/dev/null || true
+fi
+sudo sysctl -w net.ipv4.tcp_fastopen=3 2>/dev/null || true
+sudo sysctl -w net.core.rmem_max=16777216 2>/dev/null || true
+sudo sysctl -w net.core.wmem_max=16777216 2>/dev/null || true
+sudo sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216" 2>/dev/null || true
+sudo sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216" 2>/dev/null || true
+
 # 7. Start Systemd Service Cleanly
 echo "🔄 [SYSTEMD] Starting khmer-master-crypto-bot service on Google Cloud VPS..."
 if [ ! -f "/etc/systemd/system/khmer-master-crypto-bot.service" ]; then

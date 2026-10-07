@@ -468,7 +468,19 @@ function handleStreamData(data) {
         renderMT5FromStream(data.mt5_account, data.mt5_positions, data.mt5_connected, data.mt5_stats);
     }
 
-    // Real-Time 3D Gold Vault Live Indicator Stream
+    // Real-Time 3D Gold Vault Live Indicator Stream (with Micro-Tick 60FPS Laser Beam)
+    if (data.gold_beam_pct !== undefined && elements.mapLivePointer) {
+        window.requestAnimationFrame(() => {
+            elements.mapLivePointer.style.left = `${data.gold_beam_pct}%`;
+            if (data.gold_price && elements.mapLiveLabel) {
+                elements.mapLiveLabel.textContent = `$${formatUSD(data.gold_price)}`;
+            }
+            if (data.gold_price && elements.goldSpotPriceBanner) {
+                elements.goldSpotPriceBanner.textContent = `$${formatUSD(data.gold_price)}`;
+            }
+        });
+    }
+
     if (data.gold_signal && data.gold_signal.signal) {
         renderLiveGoldSignal(data.gold_signal);
     }
@@ -920,9 +932,19 @@ function playAudioBeep(freq = 880) {
     } catch (e) { }
 }
 
+let _goldRafPending = false;
 function renderLiveGoldSignal(goldData) {
     if (!goldData) return;
     state.goldSignalData = goldData;
+    if (_goldRafPending) return;
+    _goldRafPending = true;
+    window.requestAnimationFrame(() => {
+        _goldRafPending = false;
+        _renderGoldSignalDOM(goldData);
+    });
+}
+
+function _renderGoldSignalDOM(goldData) {
     const sig = goldData.signal || {};
     const curPrice = Number(goldData.current_price || 0);
 

@@ -13,8 +13,18 @@ import sys
 import json
 import time
 import asyncio
+import socket
 from datetime import datetime
 from aiohttp import web, WSMsgType
+
+# High-Frequency Rust/C JSON Serializer (10x faster than standard json.dumps)
+try:
+    import orjson
+    def fast_dumps(obj):
+        return orjson.dumps(obj).decode("utf-8")
+except Exception:
+    def fast_dumps(obj):
+        return json.dumps(obj)
 
 import database as db
 import trading_engine
@@ -629,8 +639,8 @@ async def _gui_background_cache_worker():
         try:
             now = time.time()
 
-            # 1. Update BTC and Gold (PAXG) prices every 0.5s via sub-0.05ms fast path
-            if now - _GUI_CACHE["prices"]["timestamp"] >= 0.5:
+            # 1. Update BTC and Gold (PAXG) prices every 0.1s via sub-0.05ms fast path
+            if now - _GUI_CACHE["prices"]["timestamp"] >= 0.1:
                 import websocket_engine
                 btc_p = websocket_engine.get_fast_price("BTCUSDT")
                 if not btc_p:
@@ -672,19 +682,34 @@ async def _gui_background_cache_worker():
                     except Exception:
                         pass
 
-            # 1c. Periodically refresh Live Gold Signal in RAM Cache every 1.0s
-            if now - last_gold_cache_time >= 1.0:
+            # 1c. Periodically refresh Live Gold Signal in RAM Cache every 0.5s
+            if now - last_gold_cache_time >= 0.5:
                 last_gold_cache_time = now
                 try:
                     await get_cached_gold_signal(DEFAULT_VIP_CHAT_ID)
                 except Exception:
                     pass
 
-            # 2. Broadcast live tick to active WebSockets
+            # 2. Broadcast live tick to active WebSockets (100ms HFT stream with orjson)
             if _ACTIVE_WEBSOCKETS:
                 dead_sockets = set()
                 prices = _GUI_CACHE["prices"]
                 ts_str = datetime.now().strftime("%H:%M:%S")
+
+                # Compute real-time Gold laser beam percentage for instant 60FPS positioning
+                g_data = _GUI_CACHE.get("gold_signal", {}).get("data", {})
+                gold_beam_pct = 35.0
+                try:
+                    g_sig = g_data.get("signal", {})
+                    sl_val = float(g_sig.get("stop_loss", 0.0))
+                    tp3_val = float(g_sig.get("take_profit_3", 0.0))
+                    cur_gp = float(g_data.get("current_price", prices.get("PAXGUSDT", 2650.0)))
+                    if sl_val > 0 and tp3_val > 0 and abs(tp3_val - sl_val) > 0:
+                        span = abs(tp3_val - sl_val)
+                        min_t = min(sl_val, tp3_val)
+                        gold_beam_pct = round(max(6.0, min(94.0, ((cur_gp - min_t) / span) * 100.0)), 2)
+                except Exception:
+                    pass
 
                 for ws, chat_id in list(_ACTIVE_WEBSOCKETS):
                     if ws.closed:
@@ -695,7 +720,6 @@ async def _gui_background_cache_worker():
                         p_data = _GUI_CACHE["portfolio"].get(chat_id, {}).get("data", {})
                         w_data = _GUI_CACHE["wealth"].get(chat_id, {}).get("data", {})
                         m_data = _GUI_CACHE.get("mt5", {}).get(chat_id, {}).get("data", {})
-                        g_data = _GUI_CACHE.get("gold_signal", {}).get("data", {})
 
                         tick_payload = {
                             "type": "tick",
@@ -710,6 +734,8 @@ async def _gui_background_cache_worker():
                             "candidates": w_data.get("candidates", []),
                             "btc_price": prices["BTCUSDT"],
                             "paxg_price": prices["PAXGUSDT"],
+                            "gold_price": prices["PAXGUSDT"],
+                            "gold_beam_pct": gold_beam_pct,
                             "mt5_account": m_data.get("account", {}),
                             "mt5_positions": m_data.get("positions", []),
                             "mt5_connected": m_data.get("connected", False),
@@ -717,7 +743,7 @@ async def _gui_background_cache_worker():
                             "gold_signal": g_data,
                             "status": "ONLINE"
                         }
-                        await ws.send_json(tick_payload)
+                        await ws.send_str(fast_dumps(tick_payload))
                     except Exception:
                         dead_sockets.add((ws, chat_id))
 
@@ -729,7 +755,8 @@ async def _gui_background_cache_worker():
         except Exception as e:
             print(f"⚠️ [WEB GUI] Background cache worker notice: {e}")
 
-        await asyncio.sleep(0.5)
+        # Super Fast 100ms (10 FPS) streaming tick cycle
+        await asyncio.sleep(0.1)
 
 
 # ==============================================================================
@@ -739,11 +766,23 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
     """
     Super-Smart High-Frequency WebSocket endpoint (/api/ws).
     Streams live 0.01ms updates with auto-heartbeat, bidirectional ping-pong,
-    and 100% stable connection without resets.
+    TCP_NODELAY zero-buffering, and 100% stable connection without resets.
     """
     ws = web.WebSocketResponse(heartbeat=20.0, max_msg_size=1024 * 1024)
     await ws.prepare(request)
     chat_id = _get_chat_id_from_req(request)
+
+    # Key 2: Enable TCP_NODELAY & Zero Buffer Tuning on WebSocket socket
+    try:
+        transport = request.transport
+        if transport:
+            sock = transport.get_extra_info("socket")
+            if sock and hasattr(socket, "IPPROTO_TCP") and hasattr(socket, "TCP_NODELAY"):
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            if hasattr(transport, "set_nodelay"):
+                transport.set_nodelay(True)
+    except Exception:
+        pass
 
     _ACTIVE_WEBSOCKETS.add((ws, chat_id))
 
