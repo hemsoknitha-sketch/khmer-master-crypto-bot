@@ -838,6 +838,22 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                             side = "SKIP"
                             confidence = 50.0
 
+                    # 🦅 SUPER SMART SKY NET INSTITUTIONAL FUTURES CITADEL CONFLUENCE
+                    if side in ["BUY", "SELL"]:
+                        try:
+                            import super_smart_futures_citadel
+                            trap_eval = super_smart_futures_citadel.SuperSmartFuturesCitadel.evaluate_institutional_futures_trap(symbol, side, interval="15m")
+                            if not trap_eval.get("is_approved"):
+                                print(f"🛑 [SUPER SMART CITADEL FILTER] {symbol} {side} suppressed: {trap_eval.get('rejection_reason')}")
+                                side = "SKIP"
+                                confidence = 50.0
+                            else:
+                                t_score = float(trap_eval.get("confluence_score", 50.0))
+                                confidence = min(99.0, max(confidence, t_score))
+                                print(f"🦅 [SUPER SMART CITADEL VERIFIED] {symbol} {side} | Score: {t_score}% | R:R: 1:{trap_eval.get('risk_reward_ratio')} | {trap_eval.get('conviction_badge')}")
+                        except Exception as c_err:
+                            print(f"⚠️ [CITADEL CONFLUENCE NOTICE] {symbol}: {c_err}")
+
                 except Exception as p_err:
                     print(f"⚠️ [10-PILLAR CONFLUENCE NOTICE] {symbol}: {p_err}")
 
@@ -1506,6 +1522,18 @@ def execute_direct_reverse_flip(api_key: str, api_secret: str, symbol: str, amou
                     "status": "success",
                     "reason": "ANTI_OVERSOLD_SHORT_GUARD",
                     "message": f"Closed position cleanly; aborted SELL flip because 15m RSI ({rsi_val:.1f}) is <= 38.0 (Oversold Bottom Trap Zone)."
+                }
+
+        # 🛡️ ANTI-OVERBOUGHT LONG GUARD: If target_side is BUY, check 15m RSI
+        if target_side.upper() == "BUY":
+            rsi_val = market_data.get_symbol_rsi(symbol, interval="15m")
+            if rsi_val >= 70.0:
+                print(f"🛑 [ANTI-OVERBOUGHT LONG GUARD] {symbol}: 15m RSI {rsi_val:.1f} >= 70.0 (Top Trap Zone). Closing position only; aborting reverse flip into LONG trap!")
+                trading_engine.close_futures_position_for_symbol(api_key, api_secret, symbol)
+                return {
+                    "status": "success",
+                    "reason": "ANTI_OVERBOUGHT_LONG_GUARD",
+                    "message": f"Closed position cleanly; aborted BUY flip because 15m RSI ({rsi_val:.1f}) is >= 70.0 (Overbought Top Trap Zone)."
                 }
 
         # Calculate new target quantity

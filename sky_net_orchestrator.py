@@ -373,6 +373,22 @@ def evaluate_sky_net_swarm_confluence(*args, **kwargs) -> dict:
     except Exception:
         pass
 
+    # 6. Super Smart Futures Citadel Institutional Trap Hunter
+    try:
+        import super_smart_futures_citadel
+        citadel_trap = super_smart_futures_citadel.SuperSmartFuturesCitadel.evaluate_institutional_futures_trap(symbol, norm_side)
+        votes["citadel_trap"] = {
+            "is_approved": citadel_trap.get("is_approved", False),
+            "score": citadel_trap.get("confluence_score", 50.0),
+            "badge": citadel_trap.get("conviction_badge", "")
+        }
+        if citadel_trap.get("is_approved"):
+            score += 15.0
+        elif citadel_trap.get("confluence_score", 50.0) < 40.0:
+            score -= 20.0
+    except Exception:
+        pass
+
     # Determine Sky Net 99% Status
     confluence_score = round(max(0.0, min(100.0, score)), 1)
     is_sky_net_99 = bool(confluence_score >= 86.0)

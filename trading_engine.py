@@ -1572,6 +1572,19 @@ def place_futures_short(api_key: str, api_secret: str, symbol: str, margin_usdt:
             return {"error": f"SHORT aborted: {symbol} RSI ({rsi_val:.1f}) is <= 38.0 (Oversold Trap Zone).", "status": "error"}
     except Exception:
         pass
+
+    # 🦅 SUPER SMART SKY NET INSTITUTIONAL FUTURES CITADEL (Universal Trap & Confluence Gatekeeper)
+    try:
+        import super_smart_futures_citadel
+        is_citadel_ok, citadel_reason, citadel_diag = super_smart_futures_citadel.SuperSmartFuturesCitadel.validate_futures_entry_gatekeeper(
+            symbol=symbol,
+            side="SELL",
+            reduce_only=False
+        )
+        if not is_citadel_ok:
+            return {"error": f"SHORT aborted: SUPER_SMART_CITADEL: {citadel_reason}", "status": "error", "code": 777}
+    except Exception:
+        pass
     
     # Apply dynamic risk management
     risk = calculate_dynamic_risk(margin_usdt, current_price, vol_target, leverage, "SELL")
@@ -2873,6 +2886,25 @@ def place_futures_order(api_key: str, api_secret: str, symbol: str, side: str, q
     quantity = get_futures_max_sellable_qty(symbol, quantity)
     if quantity <= 0:
         return {"status": "error", "error": f"Calculated quantity {quantity} invalid for {symbol}"}
+
+    # 🦅 SUPER SMART SKY NET INSTITUTIONAL FUTURES CITADEL (Universal Trap & Confluence Gatekeeper)
+    if not reduce_only and not kwargs.get("bypass_citadel", False):
+        try:
+            import super_smart_futures_citadel
+            is_citadel_ok, citadel_reason, citadel_diag = super_smart_futures_citadel.SuperSmartFuturesCitadel.validate_futures_entry_gatekeeper(
+                symbol=symbol,
+                side=side,
+                reduce_only=reduce_only
+            )
+            if not is_citadel_ok:
+                return {
+                    "status": "skipped",
+                    "reason": f"SUPER_SMART_CITADEL: {citadel_reason}",
+                    "code": 777,
+                    "diag": citadel_diag
+                }
+        except Exception as citadel_err:
+            print(f"⚠️ [SUPER SMART CITADEL NOTICE] {symbol}: {citadel_err}")
 
     def _send_hft_order(ord_qty: float, ord_lev: int, pos_side: str = None, omit_pos_side: bool = False, use_algo_endpoint: bool = False):
         if not reduce_only:
