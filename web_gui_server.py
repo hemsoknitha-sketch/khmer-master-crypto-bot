@@ -195,7 +195,7 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
     """
     now = time.time()
     cached = _GUI_CACHE.get("gold_signal", {})
-    if cached and (now - cached.get("timestamp", 0) < 2.0) and cached.get("data"):
+    if cached and (now - cached.get("timestamp", 0) < 1.0) and cached.get("data"):
         return cached["data"]
 
     def _compute():
@@ -204,8 +204,28 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
         import central_bank_gold_radar
         import google_macro_satellite
 
-        # 1. Live Spot Gold Price (PAXG / XAUUSD)
-        gold_p = websocket_engine.get_fast_price("PAXGUSDT")
+        # 1. Live Interbank Gold Price (Capital.com GOLD / MT5 XAUUSD / Binance PAXG)
+        gold_p = 0.0
+        try:
+            import capital_engine
+            cap_gold = capital_engine._SHARED_PRICE_CACHE.get("GOLD", {}).get("data", {})
+            if cap_gold and float(cap_gold.get("mid", 0.0)) > 0:
+                gold_p = float(cap_gold.get("mid", 0.0))
+        except Exception:
+            pass
+
+        if gold_p <= 0:
+            try:
+                import mt5_bridge_engine
+                mt5_q = mt5_bridge_engine.get_mt5_bridge().get_live_symbol_quote("XAUUSD")
+                if mt5_q and float(mt5_q.get("mid", 0.0)) > 0:
+                    gold_p = float(mt5_q.get("mid", 0.0))
+            except Exception:
+                pass
+
+        if gold_p <= 0:
+            gold_p = websocket_engine.get_fast_price("PAXGUSDT")
+
         if not gold_p or gold_p <= 0:
             gold_p = float(_GUI_CACHE["prices"].get("PAXGUSDT", 2650.0))
         if gold_p <= 0:
@@ -616,11 +636,27 @@ async def _gui_background_cache_worker():
                 if not btc_p:
                     btc_p = await asyncio.to_thread(trading_engine.get_current_price, "BTCUSDT")
                 paxg_p = websocket_engine.get_fast_price("PAXGUSDT")
+                try:
+                    import capital_engine
+                    cap_gold = capital_engine._SHARED_PRICE_CACHE.get("GOLD", {}).get("data", {})
+                    if cap_gold and float(cap_gold.get("mid", 0.0)) > 0:
+                        paxg_p = float(cap_gold.get("mid", 0.0))
+                except Exception:
+                    pass
+                if not paxg_p:
+                    try:
+                        import mt5_bridge_engine
+                        mt5_q = mt5_bridge_engine.get_mt5_bridge().get_live_symbol_quote("XAUUSD")
+                        if mt5_q and float(mt5_q.get("mid", 0.0)) > 0:
+                            paxg_p = float(mt5_q.get("mid", 0.0))
+                    except Exception:
+                        pass
                 if not paxg_p:
                     paxg_p = await asyncio.to_thread(trading_engine.get_current_price, "PAXGUSDT")
                 _GUI_CACHE["prices"] = {
                     "BTCUSDT": btc_p or _GUI_CACHE["prices"]["BTCUSDT"],
                     "PAXGUSDT": paxg_p or _GUI_CACHE["prices"]["PAXGUSDT"],
+                    "XAUUSD": paxg_p or _GUI_CACHE["prices"].get("XAUUSD", 2650.0),
                     "timestamp": now
                 }
 
@@ -636,8 +672,8 @@ async def _gui_background_cache_worker():
                     except Exception:
                         pass
 
-            # 1c. Periodically refresh Live Gold Signal in RAM Cache every 1.5s
-            if now - last_gold_cache_time >= 1.5:
+            # 1c. Periodically refresh Live Gold Signal in RAM Cache every 1.0s
+            if now - last_gold_cache_time >= 1.0:
                 last_gold_cache_time = now
                 try:
                     await get_cached_gold_signal(DEFAULT_VIP_CHAT_ID)
