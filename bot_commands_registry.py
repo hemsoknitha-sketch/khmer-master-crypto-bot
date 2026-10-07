@@ -58,6 +58,7 @@ def get_public_bot_commands():
         BotCommand("capital_orb", "🎯 Angkor London & NY 15m ORB Breakout"),
         BotCommand("capital_kelly", "📐 Angkor Fractional Kelly Position Sizer"),
         BotCommand("capital_spread", "🛡️ Angkor Spread Drag Elimination (10x)"),
+        BotCommand("capital_news", "⚡ Angkor Post-News Volatility Harvester"),
         BotCommand("flash_loan", "⚡ Angkor Quantum CeDeFi Arbitrage"),
         BotCommand("smart_swap", "⚡ Angkor DEX & AI Gem Sniper"),
         BotCommand("cross_arb", "⚡ Angkor Cross-Market Arbitrage"),

@@ -6775,6 +6775,43 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_spread_command(update, context)
+            elif data in ["btn_cap_news_scalp", "btn_cap_news_scalp_refresh", "btn_cap_news_menu"]:
+                try:
+                    await update.callback_query.answer("🎯 កំពុងទាញយកទិន្នន័យ News Scalp Alpha...")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_news_scalp_command(update, context)
+            elif data == "btn_cap_news_scalp_on":
+                import post_news_scalp_harvester
+                post_news_scalp_harvester.set_news_scalp_enabled(True, chat_id=chat_id)
+                try:
+                    await update.callback_query.answer("⚡ News Scalp Alpha: បានបើកដំណើរការ (ENABLED)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_news_scalp_command(update, context)
+            elif data == "btn_cap_news_scalp_off":
+                import post_news_scalp_harvester
+                post_news_scalp_harvester.set_news_scalp_enabled(False, chat_id=chat_id)
+                try:
+                    await update.callback_query.answer("⏸️ News Scalp Alpha: បានផ្អាក (DISABLED)!")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_news_scalp_command(update, context)
+            elif data == "btn_cap_news_scalp_toggle":
+                import post_news_scalp_harvester
+                curr_st = post_news_scalp_harvester.is_news_scalp_enabled(chat_id)
+                new_st = not curr_st
+                post_news_scalp_harvester.set_news_scalp_enabled(new_st, chat_id=chat_id)
+                toast_msg = "⚡ News Scalp Alpha: បានបើកដំណើរការ!" if new_st else "⏸️ News Scalp Alpha: បានផ្អាក!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
             elif data in ["btn_cap_admin_total_spread", "btn_cap_admin_spread_refresh"]:
                 try:
                     await update.callback_query.answer("👑 កំពុងទាញយកទិន្នន័យ Real Live Total Spread ពីគ្រប់ VIP Traders...")
@@ -24283,6 +24320,127 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def capital_news_scalp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🎯 Institutional Post-News Volatility Harvester & Liquidity Sweep Scalper (News Scalp Alpha).
+            Pillars:
+              1. Zero Toxic Flow Shield (Strict 0 to 2.5m Post-Release Freeze)
+              2. Real-time Live Spread Normalization Sensor (<= 1.30x Baseline)
+              3. Setup 1 - Institutional News Turtle Soup Reversal (R:R >= 1:3 to 1:5)
+              4. Setup 2 - Institutional Displacement & 5m FVG Retest (R:R >= 1:2.5)
+              5. Asymmetric Risk-to-Reward Hard Floor & News Peak Wick SL
+              6. Breakeven Armor (+1.0R Shift) & Dynamic ATR Micro-Trailing Lock
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import ui_standards
+            import post_news_scalp_harvester
+            import economic_calendar_guard
+
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["ON", "START", "ENABLE", "1", "TRUE", "ACTIVE"]:
+                    post_news_scalp_harvester.set_news_scalp_enabled(True, chat_id=chat_id)
+                    toast = "⚡ News Scalp Alpha: បានបើកដំណើរការ!" if user_lang == 'khmer' else "⚡ News Scalp Alpha: ACTIVATED!"
+                    if update.callback_query:
+                        try:
+                            await update.callback_query.answer(toast)
+                        except Exception:
+                            pass
+                    else:
+                        await update.effective_message.reply_text(
+                            f"⚡ **[INSTITUTIONAL NEWS SCALP ALPHA: ACTIVATED]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **ស្ថានភាព ៖** `បានបើកដំណើរការ (ENABLED)`\n"
+                            f"🎯 **គោលបំណង ៖** `ស្ទាក់ចាប់ឱកាស Scalping ក្រោយព័ត៌មាន Red Folder (Turtle Soup & FVG Retest)!`\n"
+                            f"🛡️ **ការការពារទុន ៖** `រង់ចាំ Spread ត្រជាក់ចុះ <= 1.30x ទើបចូល Trade, SL ដាក់លើចុង News Wick!`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _ប្រព័ន្ធនឹងប្រមាញ់យកផលចំណេញដោយស្វ័យប្រវត្តិនាទីទី ៣ ដល់ ទី ១៥ ក្រោយព័ត៌មានចេញ!_",
+                            parse_mode="Markdown"
+                        )
+                    return
+                elif sub in ["OFF", "STOP", "DISABLE", "0", "FALSE"]:
+                    post_news_scalp_harvester.set_news_scalp_enabled(False, chat_id=chat_id)
+                    toast = "⏸️ News Scalp Alpha: បានផ្អាក!" if user_lang == 'khmer' else "⏸️ News Scalp Alpha: DISABLED!"
+                    if update.callback_query:
+                        try:
+                            await update.callback_query.answer(toast)
+                        except Exception:
+                            pass
+                    else:
+                        await update.effective_message.reply_text(
+                            f"⏸️ **[INSTITUTIONAL NEWS SCALP ALPHA: DISABLED]** ⚪\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🛑 **ស្ថានភាព ៖** `បានផ្អាកដំណើរការ (DISABLED)`\n"
+                            f"ℹ️ _ប្រព័ន្ធនឹងអនុវត្តការឈប់សម្រាកថេរ (15m Blackout) ពេលមាន Red Folder ព័ត៌មាន!_",
+                            parse_mode="Markdown"
+                        )
+                    return
+
+            status_data = post_news_scalp_harvester.get_status_report(chat_id=chat_id)
+            is_active = status_data.get("is_enabled", True)
+            status_badge = "🟢 សកម្ម (ស្ទាក់កើបចំណេញ)" if is_active else "⏸️ បិទ (ឈប់សម្រាក)"
+            eco_status = status_data.get("economic_status", {})
+            eco_phase = eco_status.get("phase", "NORMAL")
+            eco_event = eco_status.get("event_name", "គ្មានព្រឹត្តិការណ៍សកម្ម")
+
+            if eco_phase == "PRE_EVENT":
+                eco_badge = f"⏳ មុនព័ត៌មាន ({eco_status.get('minutes_remaining', 0)}m ទៀត): {eco_event}"
+            elif eco_phase == "POST_EVENT":
+                mins_s = eco_status.get("minutes_since", 0)
+                if mins_s < 2.5:
+                    eco_badge = f"🛑 Toxic Window ({mins_s:.1f}m/2.5m Freeze): {eco_event}"
+                else:
+                    eco_badge = f"🎯 Harvester Active ({mins_s:.1f}m/15m): {eco_event}"
+            else:
+                eco_badge = "🟢 Normal Trading (គ្មាន Red Folder សកម្ម)"
+
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⚡ បើក News Scalp (ON)", callback_data="btn_cap_news_scalp_on"),
+                    InlineKeyboardButton("⏸️ ផ្អាក News Scalp (OFF)", callback_data="btn_cap_news_scalp_off")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Refresh ស្ថានភាព", callback_data="btn_cap_news_scalp_refresh"),
+                    InlineKeyboardButton("🛡️ Spread Drag Radar", callback_data="btn_cap_spread_radar")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ Capital Dashboard", callback_data="btn_cap_refresh"),
+                    InlineKeyboardButton("🎛️ Master Menu", callback_data="btn_menu_refresh")
+                ]
+            ])
+
+            msg = (
+                f"🏛️ **[INSTITUTIONAL POST-NEWS VOLATILITY HARVESTER]** ⚡\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"⚙️ **ស្ថានភាព Scalp Engine ៖** `{status_badge}`\n"
+                f"🏛️ **ស្ថានភាពប្រតិទិនសេដ្ឋកិច្ច ៖** `{eco_badge}`\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"💎 **សសរទ្រូងយុទ្ធសាស្ត្រស្ថាប័នទាំង ៦ (6 Institutional Pillars) ៖**\n"
+                f"1. 🛑 **Zero Toxic Flow Shield ៖** បង្កកដាច់ខាត ០ ដល់ ២.៥ នាទីដំបូង (ទប់ស្កាត់ Slippage/Spread Explosion)!\n"
+                f"2. 🛡️ **Dynamic Spread Sensor ៖** ដោះសោរ Trade តែពេល Live Spread ត្រជាក់ចុះ `≤ 1.30x Baseline` ប៉ុណ្ណោះ!\n"
+                f"3. 🏹 **Setup 1: News Turtle Soup ៖** ចាប់ Reversal ពេល News បោស BSL/SSL រួចបន្សល់ទុក Wick `≥ 50%` (R:R `1:3 ដល់ 1:5`)!\n"
+                f"4. 🚀 **Setup 2: FVG Retest ៖** ចាប់ Trend ពិត ពេល Pullback ចូល 5m Fair Value Gap (R:R `≥ 1:2.5`)!\n"
+                f"5. 🎯 **News Peak Wick SL ៖** Stop-Loss ច្បាស់លាស់នៅចុង Wick នៃព័ត៌មាន (ហានិភ័យតូចបំផុត)!\n"
+                f"6. ⚡ **Breakeven Armor ៖** រុញ SL ទៅ Breakeven ភ្លាមពេលចំណេញ `+1.0R` ចាក់សោរទុន ១០០%!\n"
+                f"{ui_standards.DIVIDER_LIGHT}\n"
+                f"🌐 **ទ្រព្យសកម្មអាទិភាព ៖** `GOLD, US500, US30, US100, EURUSD, GBPUSD, USDJPY, BTCUSD`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👉 **កូដបញ្ជា ១-Tap ៖**\n"
+                f"• `` `/capital news_scalp ON` `` (បើកឱ្យប្រព័ន្ធស្ទាក់កើបចំណេញ)\n"
+                f"• `` `/capital news_scalp OFF` `` (បិទឱ្យប្រព័ន្ធសម្រាក ១៥ នាទីពេញ)\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"_Angkor Quant_\n"
+                f"_APEX SUPER BRAIN AI_\n"
+                f"ប្រមាញ់យកផលចំណេញពី Red Folder តាមស្ថាប័នធំ ២៤/៧!"
+            )
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=kb)
+
         def build_capital_referral_gatekeeper_ui(chat_id: int, user_lang: str = "khmer"):
             """
             Capital.com Pro Referral Gatekeeper Lock UI (Invariant 36).
@@ -24889,6 +25047,9 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_spread", "capitalspread", "spreadguard", "spread_guard"]:
                 await capital_spread_command(update, context)
                 return
+            elif cmd_text in ["capital_news", "capitalnews", "news_scalp", "newsscalp", "capital_harvester", "capitalharvester"]:
+                await capital_news_scalp_command(update, context)
+                return
             elif cmd_text in ["prop_firm", "propfirm", "prop"]:
                 await prop_firm_command(update, context)
                 return
@@ -25195,6 +25356,10 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_spread_command(update, context)
                     return
+                elif action in ["NEWS", "NEWS_SCALP", "NEWSSCALP", "HARVESTER", "NEWS_HARVESTER"]:
+                    context.args = args[1:]
+                    await capital_news_scalp_command(update, context)
+                    return
                 elif action in ["RESET", "247", "24/7", "RESET_SCHEDULE", "SCHEDULE_RESET", "ALWAYS_ON", "CONTINUOUS"]:
                     db.set_capital_schedule_mode(chat_id, "24/7")
                     is_auto_on = db.is_capital_auto_enabled(chat_id)
@@ -25443,6 +25608,9 @@ class TelegramBotThread(BaseThread):
             kelly_btn_text = "📐 Kelly Sizer: ON 🟢" if is_kelly_on else "📐 Kelly Sizer: OFF ⚪"
             is_spread_on = db.is_capital_spread_guard_enabled(chat_id)
             spread_btn_text = "🛡️ Spread Guard: ON 🟢" if is_spread_on else "🛡️ Spread Guard: OFF ⚪"
+            import post_news_scalp_harvester
+            is_news_scalp_on = post_news_scalp_harvester.is_news_scalp_enabled(chat_id)
+            news_scalp_btn_text = "⚡ News Scalp: ON 🟢" if is_news_scalp_on else "⚡ News Scalp: OFF ⚪"
 
             sched_mode = auto_cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
             btn_smart_text = "🎯 Smart Session ✅" if sched_mode in ["SMART_SESSION_TIMED", "SMART_SESSION", "TIMED", "SESSION", "SMART"] else "🎯 Smart Session"
@@ -25469,6 +25637,10 @@ class TelegramBotThread(BaseThread):
                 [
                     InlineKeyboardButton(spread_btn_text, callback_data="btn_cap_spread_toggle"),
                     InlineKeyboardButton("🛡️ Spread Radar", callback_data="btn_cap_spread_radar")
+                ],
+                [
+                    InlineKeyboardButton(news_scalp_btn_text, callback_data="btn_cap_news_scalp_toggle"),
+                    InlineKeyboardButton("⚡ News Scalp Alpha", callback_data="btn_cap_news_scalp")
                 ],
                 *([[InlineKeyboardButton("👑 Total Spread Audit (Admin)", callback_data="btn_cap_admin_total_spread")]] if (chat_id == 859271875 or db.is_admin(chat_id)) else []),
                 [
@@ -26531,6 +26703,12 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capitaltotalspread", capital_spread_command))
         self.app.add_handler(CommandHandler("capital_admin_spread", capital_spread_command))
         self.app.add_handler(CommandHandler("admin_capital_spread", capital_spread_command))
+        self.app.add_handler(CommandHandler("capital_news", capital_news_scalp_command))
+        self.app.add_handler(CommandHandler("capitalnews", capital_news_scalp_command))
+        self.app.add_handler(CommandHandler("news_scalp", capital_news_scalp_command))
+        self.app.add_handler(CommandHandler("newsscalp", capital_news_scalp_command))
+        self.app.add_handler(CommandHandler("capital_harvester", capital_news_scalp_command))
+        self.app.add_handler(CommandHandler("news_harvester", capital_news_scalp_command))
         self.app.add_handler(CommandHandler("capital_ib", capital_ib_command))
         self.app.add_handler(CommandHandler("capitalib", capital_ib_command))
         self.app.add_handler(CommandHandler("ib", capital_ib_command))

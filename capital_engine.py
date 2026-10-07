@@ -1408,10 +1408,28 @@ class CapitalComEngine:
             import economic_calendar_guard
             blackout_info = economic_calendar_guard.check_red_folder_blackout()
             if blackout_info.get("is_blackout"):
-                return {
-                    "success": False,
-                    "error": f"LOCKED: Red Folder Economic Release '{blackout_info.get('event_name')}' active ({blackout_info.get('reason')}). Spread blowout shield engaged."
-                }
+                phase = blackout_info.get("phase", "")
+                if phase == "POST_EVENT":
+                    import post_news_scalp_harvester
+                    if post_news_scalp_harvester.is_news_scalp_enabled():
+                        setup = post_news_scalp_harvester.evaluate_news_scalp_setup(resolved_epic, engine=self)
+                        if setup.get("is_approved"):
+                            logger.info(f"⚡ [POST-NEWS MANUAL HARVESTER APPROVED] {resolved_epic} setup {setup.get('setup_type')} permitted.")
+                        else:
+                            return {
+                                "success": False,
+                                "error": f"LOCKED: Post-Event News Cooling ({blackout_info.get('reason')}). Harvester Status: {setup.get('rejection_reason')}."
+                            }
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"LOCKED: Red Folder Economic Release '{blackout_info.get('event_name')}' active ({blackout_info.get('reason')}). Spread blowout shield engaged."
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"LOCKED: Red Folder Economic Release '{blackout_info.get('event_name')}' active ({blackout_info.get('reason')}). Spread blowout shield engaged."
+                    }
         except Exception:
             pass
 
@@ -3660,6 +3678,15 @@ class CapitalAutonomousEngine:
             blackout_info = economic_calendar_guard.check_red_folder_blackout()
             if blackout_info.get("is_blackout"):
                 await economic_calendar_guard.notify_economic_blackout_if_needed(app, blackout_info)
+                phase = blackout_info.get("phase", "")
+                if phase == "POST_EVENT":
+                    import post_news_scalp_harvester
+                    if post_news_scalp_harvester.is_news_scalp_enabled():
+                        logger.info(f"⚡ [POST-NEWS HARVESTER ACTIVE] Event '{blackout_info.get('event_name')}' released {blackout_info.get('minutes_since', 0)}m ago. Evaluating liquidity retests...")
+                        executed_scalps = await post_news_scalp_harvester.scan_and_execute_news_scalps_async(app=app, engine=self)
+                        if executed_scalps:
+                            logger.info(f"🏆 [POST-NEWS HARVESTER] Dispatched {len(executed_scalps)} institutional news scalp positions!")
+                            return
                 logger.warning(f"⏳ [RED FOLDER BLACKOUT] {blackout_info.get('reason')}. Forced Wait Active.")
                 return
         except Exception as e_ec:
@@ -6237,7 +6264,17 @@ class CapitalSkyNet360Radar:
             import economic_calendar_guard
             bo_info = economic_calendar_guard.check_red_folder_blackout()
             if bo_info.get("is_blackout"):
-                return False, f"Economic Calendar Blackout: {bo_info.get('reason')}", {"layer": "ECONOMIC_CALENDAR", "info": bo_info}
+                phase = bo_info.get("phase", "")
+                if phase == "POST_EVENT":
+                    import post_news_scalp_harvester
+                    if post_news_scalp_harvester.is_news_scalp_enabled():
+                        setup = post_news_scalp_harvester.evaluate_news_scalp_setup(resolved_epic, engine=engine)
+                        if not setup.get("is_approved"):
+                            return False, f"Economic Calendar Post-News Blackout: {bo_info.get('reason')} ({setup.get('rejection_reason')})", {"layer": "ECONOMIC_CALENDAR", "info": bo_info}
+                    else:
+                        return False, f"Economic Calendar Blackout: {bo_info.get('reason')}", {"layer": "ECONOMIC_CALENDAR", "info": bo_info}
+                else:
+                    return False, f"Economic Calendar Blackout: {bo_info.get('reason')}", {"layer": "ECONOMIC_CALENDAR", "info": bo_info}
         except Exception:
             pass
 

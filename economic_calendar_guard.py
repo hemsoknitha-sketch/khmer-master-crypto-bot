@@ -193,3 +193,41 @@ async def notify_economic_blackout_if_needed(app, blackout_info: Dict[str, Any])
                     pass
     except Exception:
         pass
+
+
+def is_toxic_window() -> Tuple[bool, float]:
+    """
+    Checks if current time is within the initial 2.5-minute (150s) toxic execution window
+    immediately following a high-impact USD economic release.
+    Returns (is_toxic, seconds_remaining).
+    """
+    bo_info = check_red_folder_blackout()
+    if bo_info.get("phase") == "POST_EVENT":
+        mins_since = float(bo_info.get("minutes_since", 0.0) or 0.0)
+        secs_since = mins_since * 60.0
+        if secs_since < 150.0:
+            return True, round(150.0 - secs_since, 1)
+    return False, 0.0
+
+
+def is_spread_normalized(epic: str, current_spread: float, baseline: Optional[float] = None) -> Tuple[bool, float, float]:
+    """
+    Checks if broker live spread has normalized following a high-impact release.
+    Returns (is_normalized, current_spread, max_allowed_spread).
+    """
+    import post_news_scalp_harvester
+    base = baseline or post_news_scalp_harvester.ASSET_SPREAD_BASELINES.get(str(epic).upper(), 0.50)
+    max_allowed = base * post_news_scalp_harvester.MAX_NORMALIZED_SPREAD_MULTIPLIER
+    is_norm = float(current_spread) <= max_allowed
+    return is_norm, float(current_spread), round(max_allowed, 5)
+
+
+def get_active_post_event_details() -> Optional[Dict[str, Any]]:
+    """
+    Returns details of active post-event economic release if in post-event window.
+    """
+    bo_info = check_red_folder_blackout()
+    if bo_info.get("phase") == "POST_EVENT":
+        return bo_info
+    return None
+

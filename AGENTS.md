@@ -903,6 +903,19 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 59: Institutional Post-News Volatility Harvester (News Scalp Alpha Protocol)
+- **Location:** `post_news_scalp_harvester.py`, `economic_calendar_guard.py`, `capital_engine.py`, `bot_thread.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty (Section 1.1) and Invariant 18 (News Sentiment Technical Confirmation Shield):
+  1. **Zero Toxic Flow Guarantee:** No orders shall ever be placed in the toxic 0 to 2.5-minute (150-second) window immediately following high-impact Red Folder USD releases (FOMC, CPI, NFP, Core PCE).
+  2. **Dynamic Live Spread Normalization Sensor:** Post-event execution is strictly prohibited unless broker live spread is normalized ($\le 1.30\times$ baseline average) and liquidity providers have fully restored the order book depth.
+  3. **Dual Institutional Setups:** Only two execution structures are permitted:
+     - *Setup 1 (News Turtle Soup Reversal):* Sweeps session high/low with exhaustion wick $\ge 45\%$, reclaiming the range with $R:R \ge 1:2.5$ to equilibrium.
+     - *Setup 2 (Institutional Displacement & FVG Retest):* Retest of 5m Fair Value Gap in direction of displacement with normalized spread and $R:R \ge 1:2.5$.
+  4. **News Peak Wick SL & Breakeven Armor:** Stop-Loss is mathematically clamped to the extreme news spike wick. Dynamic Breakeven shift triggers at $+1.0R$.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 46/46].
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.

@@ -2028,6 +2028,54 @@ def run_audit():
         failures.append(f"Invariants 57-58 check failed: {e}")
         log_fail(str(e))
 
+    # -------------------------------------------------------------------------
+    # [CHECK 46/46] Institutional Post-News Volatility Harvester (Invariant 59)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 46/46] Verifying Institutional Post-News Volatility Harvester (Invariant 59)...")
+    try:
+        import post_news_scalp_harvester
+        import economic_calendar_guard
+
+        # 1. Verify module exports and methods
+        has_eval_fn = hasattr(post_news_scalp_harvester, "evaluate_news_scalp_setup")
+        has_scan_fn = hasattr(post_news_scalp_harvester, "scan_and_execute_news_scalps_async")
+        has_status_fn = hasattr(post_news_scalp_harvester, "get_status_report")
+        has_spread_norm_fn = hasattr(economic_calendar_guard, "is_spread_normalized")
+        has_toxic_fn = hasattr(economic_calendar_guard, "is_toxic_window")
+
+        # 2. Dynamic test: spread normalization and status report
+        status_rep = post_news_scalp_harvester.get_status_report()
+        is_rep_valid = isinstance(status_rep, dict) and "is_enabled" in status_rep and "priority_assets" in status_rep
+
+        is_norm_ok, sp_val, max_sp = economic_calendar_guard.is_spread_normalized("GOLD", 0.35)
+        is_spread_logic_ok = (is_norm_ok is True) and (max_sp > sp_val)
+
+        # 3. Verify capital_engine and bot_thread integration
+        with open("capital_engine.py", "r", encoding="utf-8") as f:
+            cap_code = f.read()
+        has_cap_harvester_int = "post_news_scalp_harvester" in cap_code and "scan_and_execute_news_scalps_async" in cap_code
+
+        with open("bot_thread.py", "r", encoding="utf-8") as f:
+            bt_code = f.read()
+        has_bt_cmd = "capital_news_scalp_command" in bt_code
+        has_bt_btn = "btn_cap_news_scalp" in bt_code
+
+        all_inv59_passed = (
+            has_eval_fn and has_scan_fn and has_status_fn and
+            has_spread_norm_fn and has_toxic_fn and
+            is_rep_valid and is_spread_logic_ok and
+            has_cap_harvester_int and has_bt_cmd and has_bt_btn
+        )
+
+        if all_inv59_passed:
+            log_pass("Institutional Post-News Volatility Harvester (Invariant 59) is 100% certified!")
+        else:
+            failures.append(f"Invariant 59 check failed: eval={has_eval_fn}, rep={is_rep_valid}, spread={is_spread_logic_ok}, cap_int={has_cap_harvester_int}, bt_cmd={has_bt_cmd}")
+            log_fail("Institutional Post-News Volatility Harvester (Invariant 59) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 59 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:
