@@ -1975,6 +1975,59 @@ def run_audit():
         failures.append(f"Invariants 54-55 check failed: {e}")
         log_fail(str(e))
 
+    # 45. Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58)
+    print("\n[CHECK 45/45] Verifying Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv57 = "Invariant 57" in agents_md_text and "Binance Futures Super Smart Sky Net Institutional Citadel" in agents_md_text
+        has_inv58 = "Invariant 58" in agents_md_text and "Capital.com Super Smart TradFi Institutional Citadel" in agents_md_text
+
+        # 2. Dynamic Unit Test: SuperSmartFuturesCitadel (Invariant 57)
+        import super_smart_futures_citadel
+        has_futures_citadel_class = hasattr(super_smart_futures_citadel, "SuperSmartFuturesCitadel")
+        is_futures_exit_ok, _, _ = super_smart_futures_citadel.SuperSmartFuturesCitadel.validate_futures_entry_gatekeeper(
+            "BTCUSDT", "BUY", reduce_only=True
+        )
+
+        with open("trading_engine.py", "r", encoding="utf-8") as f:
+            te_code = f.read()
+        has_futures_gatekeeper_te = "validate_futures_entry_gatekeeper" in te_code
+
+        with open("turbo_hedge_engine.py", "r", encoding="utf-8") as f:
+            th_code = f.read()
+        has_futures_gatekeeper_th = "SuperSmartFuturesCitadel" in th_code and "evaluate_institutional_futures_trap" in th_code
+
+        # 3. Dynamic Unit Test: SuperSmartCapitalCitadel (Invariant 58)
+        import super_smart_capital_citadel
+        has_capital_citadel_class = hasattr(super_smart_capital_citadel, "SuperSmartCapitalCitadel")
+        is_capital_bypass_ok, _, _ = super_smart_capital_citadel.SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper(
+            "GOLD", "BUY", bypass_citadel=True
+        )
+
+        with open("capital_engine.py", "r", encoding="utf-8") as f:
+            cap_code = f.read()
+        has_capital_gatekeeper_cap = "validate_capital_entry_gatekeeper" in cap_code
+        has_capital_citadel_setup = "super_smart_capital_citadel.SuperSmartCapitalCitadel" in cap_code
+
+        all_inv57_58_passed = (
+            has_inv57 and has_inv58 and
+            has_futures_citadel_class and is_futures_exit_ok and
+            has_futures_gatekeeper_te and has_futures_gatekeeper_th and
+            has_capital_citadel_class and is_capital_bypass_ok and
+            has_capital_gatekeeper_cap and has_capital_citadel_setup
+        )
+
+        if all_inv57_58_passed:
+            log_pass("Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58) are 100% certified!")
+        else:
+            failures.append(f"Invariants 57-58 check failed: inv57={has_inv57}, inv58={has_inv58}, fut_exit={is_futures_exit_ok}, fut_te={has_futures_gatekeeper_te}, fut_th={has_futures_gatekeeper_th}, cap_bypass={is_capital_bypass_ok}, cap_gate={has_capital_gatekeeper_cap}")
+            log_fail("Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariants 57-58 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

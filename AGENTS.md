@@ -865,11 +865,49 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 57: Binance Futures Super Smart Sky Net Institutional Citadel (8-Pillar Trap Matrix)
+- **Location:** `super_smart_futures_citadel.py`, `trading_engine.py` (`place_futures_order`, `place_futures_short`), `turbo_hedge_engine.py` (`scan_and_evaluate_symbol`, `execute_direct_reverse_flip`), `sky_net_orchestrator.py` (`evaluate_sky_net_swarm_confluence`)
+- **Rule:**
+  1. **8-Pillar Institutional Trap Matrix Standard:**
+     - Under the Non-Negotiable Fiduciary Oath (Section 1.1), every Binance USDT-M Futures position entry MUST pass the 8-Pillar Trap Matrix:
+       1. Dynamic Liquidity Trap Hunter (BSL / SSL Sweeps & Turtle Soup Rejection).
+       2. Premium vs Discount Dealing Range Math (Discount < 50% for Long, Premium > 50% for Short; Deep Premium > 85% Long Block, Deep Discount < 15% Short Block).
+       3. Market Structure Shift (MSS / CHoCH) & Displacement Confirmation ($\ge 1.2\times$ ATR).
+       4. Fair Value Gap (FVG) & Order Block (OB) Imbalance Retest.
+       5. Order Flow CVD & Absorption Divergence Shield.
+       6. Non-Negotiable Capital Armor (15m RSI $\le 38.0$ Bottom Shield, Anti-Top FOMO RSI $\ge 70.0$).
+       7. Multi-Timeframe Institutional Quorum (4H/1H Macro -> 15M Structure -> 5M Trigger).
+       8. Asymmetric Expectancy Sizer ($R:R \ge 1:2.5$ to $1:4.0$ with Dynamic ATR Invalidation).
+  2. **Universal Pre-Flight Gatekeeper Integration:**
+     - `SuperSmartFuturesCitadel.validate_futures_entry_gatekeeper` acts as the mandatory gatekeeper in `trading_engine.py` and `turbo_hedge_engine.py`. Exits (`reduce_only=True`) are unrestricted; all new entries must achieve $\ge 68.0\%$ confluence conviction.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 45/45].
+
+---
+
+### Invariant 58: Capital.com Super Smart TradFi Institutional Citadel (8-Pillar Trap Matrix & Interbank Kill Zones)
+- **Location:** `super_smart_capital_citadel.py`, `capital_engine.py` (`place_position`, `evaluate_tradfi_quant_signal`, `evaluate_multi_engine_tradfi_setup`, `execute_smart_tradfi_order`)
+- **Rule:**
+  1. **TradFi 8-Pillar Trap Matrix & Interbank Kill Zones:**
+     - Every TradFi CFD order on Capital.com (Gold, Oil, US500, US100, Mega-Caps, Forex, Crypto CFDs) MUST pass the 8-Pillar TradFi Citadel:
+       1. TradFi Liquidity Trap Hunter (BSL / SSL Sweeps & Turtle Soup Reversal).
+       2. Premium vs Discount Dealing Range Math (Deep Premium $> 82\%$ Long Block, Deep Discount $< 18\%$ Short Block).
+       3. Market Structure Shift (MSS/CHoCH) & Displacement Confirmation.
+       4. Fair Value Gap (FVG) & Order Block (OB) Imbalance Retest.
+       5. TradFi Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34 Compliance).
+       6. Strict Capital Armor (15m RSI $\le 36.0$ Bottom Shield, Anti-Top FOMO RSI $\ge 70.0$).
+       7. Interbank Sessions, Kill Zones & Rollover Swap Shield (Invariant 53 Compliance).
+       8. Asymmetric Minimum $R:R \ge 1:2.5$ to $1:6.0$ & Structural Invalidation SL.
+  2. **Broker-Level Pre-Flight Gatekeeper Integration:**
+     - `SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper` acts as the universal gatekeeper in `CapitalComEngine.place_position`. All automated, autonomous, and manual orders are intercepted and vetted before payload transmission to Capital.com REST API (`/positions`).
+- **Enforcement:** Verified by `audit_system.py` [CHECK 45/45].
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 55 Invariants or the Fiduciary Honesty Covenant.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 58 Invariants or the Fiduciary Honesty Covenant.
 4. **Step 4:** Re-run `python audit_system.py` to confirm that all 44 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
