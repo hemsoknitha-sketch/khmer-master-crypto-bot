@@ -711,7 +711,8 @@ class CapitalComEngine:
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
         guaranteed_stop: bool = False,
-        max_allowed_spread: Optional[float] = None
+        max_allowed_spread: Optional[float] = None,
+        bypass_citadel: bool = False
     ) -> Dict[str, Any]:
         """
         Executes a Market CFD order on Capital.com with full risk protection.
@@ -723,6 +724,7 @@ class CapitalComEngine:
         - stop_loss: Absolute price level for Stop-Loss
         - take_profit: Absolute price level for Take-Profit
         - max_allowed_spread: Maximum acceptable spread before rejecting order (Spread Guard)
+        - bypass_citadel: If True, bypasses SuperSmartCapitalCitadel validation
         """
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
         dir_upper = direction.upper()
@@ -747,6 +749,25 @@ class CapitalComEngine:
                 "success": False,
                 "error": f"Spread Guard rejection: Current spread {spread} exceeds max limit {max_allowed_spread}."
             }
+
+        # Step 1b: Super Smart Capital Citadel Institutional Gatekeeper Lock
+        if not bypass_citadel:
+            try:
+                import super_smart_capital_citadel
+                is_citadel_ok, citadel_reason, citadel_diag = super_smart_capital_citadel.SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper(
+                    epic=resolved_epic,
+                    direction=dir_upper,
+                    engine=self
+                )
+                if not is_citadel_ok:
+                    logger.warning(f"🛑 [SUPER SMART CAPITAL CITADEL] Order blocked for {resolved_epic} ({dir_upper}): {citadel_reason}")
+                    return {
+                        "success": False,
+                        "error": f"SUPER SMART CITADEL REJECTED: {citadel_reason}",
+                        "citadel_diagnostics": citadel_diag
+                    }
+            except Exception as e_citadel:
+                logger.debug(f"Citadel gatekeeper evaluation note: {e_citadel}")
 
         min_size = market_info.get("min_deal_size", 0.01)
         if size < min_size:
@@ -1236,6 +1257,23 @@ class CapitalComEngine:
                 bullish_score += 10
             elif closes[-1] < closes[-2] < closes[-3]:
                 bearish_score += 10
+
+        # 6. Premium vs Discount Dealing Range Math (SMC / ICT Equilibrium)
+        lookback_window = min(35, len(highs) - 2)
+        sw_high = max(highs[-lookback_window:-2])
+        sw_low = min(lows[-lookback_window:-2])
+        d_range = max(1e-6, sw_high - sw_low)
+        range_pct = ((mid_price - sw_low) / d_range) * 100.0
+
+        if range_pct > 82.0:
+            bullish_score = 0  # Rebuff buying deep premium top
+        elif range_pct < 50.0:
+            bullish_score += 12  # Discount zone accumulation bonus
+
+        if range_pct < 18.0:
+            bearish_score = 0  # Rebuff shorting deep discount bottom
+        elif range_pct > 50.0:
+            bearish_score += 12  # Premium zone distribution bonus
 
         # Invariant 34: Spread Drag Elimination & Asymmetric Minimum 10x Hurdle Protocol
         spread_mgr = get_capital_spread_drag_manager()
@@ -2552,9 +2590,35 @@ class CapitalAutonomousEngine:
         except Exception as e_smc:
             logger.debug(f"SMC Citadel confluence check note: {e_smc}")
 
+        # 2c. Super Smart Capital Citadel 8-Pillar Institutional Trap Confluence
+        citadel_boost = 0.0
+        citadel_approved = True
+        try:
+            import super_smart_capital_citadel
+            tentative_dir = "BUY" if (raw_sig in ["BUY", "STRONG_BUY"] or smc_act == "BUY") else ("SELL" if (raw_sig in ["SELL", "STRONG_SELL"] or smc_act == "SELL") else None)
+            if tentative_dir:
+                cit_diag = super_smart_capital_citadel.SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap(resolved_epic, tentative_dir, engine=engine)
+                c_score = float(cit_diag.get("confluence_score", 50.0))
+                citadel_approved = cit_diag.get("is_approved", False)
+                base_quant["citadel_diagnostics"] = cit_diag
+                base_quant["citadel_score"] = c_score
+                base_quant["citadel_approved"] = citadel_approved
+
+                if citadel_approved:
+                    citadel_boost = min(20.0, (c_score - 50.0) * 0.4)
+                    if cit_diag.get("invalidation_sl"):
+                        base_quant["sl"] = cit_diag["invalidation_sl"]
+                    if cit_diag.get("target_tp_min"):
+                        base_quant["tp"] = cit_diag["target_tp_min"]
+                else:
+                    # Trapped trade veto: penalize confidence
+                    citadel_boost = -35.0
+        except Exception as e_cit:
+            logger.debug(f"Capital Citadel setup evaluation note: {e_cit}")
+
         # 3. Final Score Arbitration
         raw_conf = base_quant.get("confidence", 50)
-        final_conf = min(99.0, max(10.0, raw_conf + macro_boost + cb_boost + smc_boost))
+        final_conf = min(99.0, max(10.0, raw_conf + macro_boost + cb_boost + smc_boost + citadel_boost))
         base_quant["final_confidence"] = final_conf
         base_quant["macro_bias"] = macro_bias
 
@@ -2564,14 +2628,14 @@ class CapitalAutonomousEngine:
         smc_cf = float(base_quant.get("smc_confidence", 50.0))
         rsi_val = float(base_quant.get("rsi", 50.0))
 
-        # Anti-Overbought / Anti-Oversold Guards (Invariant 16 & Dimension 7 Anti-FOMO):
-        # Strictly block BUY if RSI > 70.0 (chasing overbought top)
-        # Strictly block SELL if RSI < 36.0 (panic selling bottom)
-        if ((raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "BUY" and smc_cf >= 85.0)) and rsi_val <= 70.0:
+        # Anti-Overbought / Anti-Oversold Guards & Citadel Trap Clearance:
+        # Strictly block BUY if RSI > 70.0 (chasing overbought top) or Citadel rejected trap
+        # Strictly block SELL if RSI < 36.0 (panic selling bottom) or Citadel rejected trap
+        if ((raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "BUY" and smc_cf >= 85.0)) and rsi_val <= 70.0 and citadel_approved:
             base_quant["final_action"] = "BUY"
             if smc_act == "BUY":
                 base_quant["final_confidence"] = max(final_conf, smc_cf)
-        elif ((raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "SELL" and smc_cf >= 85.0)) and rsi_val >= 36.0:
+        elif ((raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "SELL" and smc_cf >= 85.0)) and rsi_val >= 36.0 and citadel_approved:
             base_quant["final_action"] = "SELL"
             if smc_act == "SELL":
                 base_quant["final_confidence"] = max(final_conf, smc_cf)
