@@ -5560,6 +5560,58 @@ class TelegramBotThread(BaseThread):
                 import traceback
                 traceback.print_exc()
 
+        async def gold_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'khmer').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'khmer'
+            else:
+                user_lang = 'english'
+
+            msg_target = update.effective_message or update.message
+            if update.callback_query:
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
+
+            try:
+                import web_gui_server
+                import scheduler_tasks
+                gold_data = await web_gui_server.get_cached_gold_signal()
+                if not gold_data or gold_data.get("status") != "success":
+                    if msg_target:
+                        await msg_target.reply_text("⚠️ [GOLD SIGNAL] កំពុងរៀបចំទិន្នន័យ សូមរង់ចាំបន្តិច...", parse_mode="Markdown")
+                    return
+
+                alert_text = scheduler_tasks.build_gold_signal_telegram_alert(gold_data, user_lang=user_lang)
+
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh Gold Signal", callback_data="btn_gold_signal_refresh"),
+                        InlineKeyboardButton("🏦 Central Bank Gold Radar", callback_data="btn_cb_gold_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("🏓 Scalp PAXG/USDT", callback_data="btn_scalp_PAXGUSDT"),
+                        InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
+                    ],
+                    [
+                        InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
+                    ]
+                ])
+
+                if msg_target:
+                    await msg_target.reply_text(alert_text, parse_mode="Markdown", reply_markup=keyboard)
+            except Exception as e:
+                print(f"❌ [GOLD SIGNAL ERROR]: {e}")
+                if msg_target:
+                    await msg_target.reply_text(f"⚠️ [GOLD SIGNAL ERROR] {e}")
+
         async def paxg_arbitrage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id
@@ -7436,6 +7488,8 @@ class TelegramBotThread(BaseThread):
                 await funding_harvester_command(update, context)
             elif data in ["btn_gold_radar", "btn_gold_radar_refresh"]:
                 await gold_radar_command(update, context)
+            elif data in ["btn_gold_signal", "btn_gold_signal_refresh"]:
+                await gold_signal_command(update, context)
             elif data == "btn_analyze_prompt":
                 context.args = ["BTCUSDT"]
                 await analyze_command(update, context)
@@ -19921,6 +19975,10 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("flash_crash", flash_crash_command))
         self.app.add_handler(CommandHandler("gold_turbo", gold_turbo_command))
         self.app.add_handler(CommandHandler("gold_guard", gold_radar_command))
+        self.app.add_handler(CommandHandler("gold_signal", gold_signal_command))
+        self.app.add_handler(CommandHandler("goldsignal", gold_signal_command))
+        self.app.add_handler(CommandHandler("gold_math", gold_signal_command))
+        self.app.add_handler(CommandHandler("goldmath", gold_signal_command))
 
         self.app.add_handler(CommandHandler("language", language_command))
         self.app.add_handler(CommandHandler("quiet", quiet_command))
@@ -26696,6 +26754,17 @@ class TelegramBotThread(BaseThread):
             coalesce=True,
             args=[self.app],
             id='gold_turbo_monitor'
+        )
+
+        # 3b. Institutional Gold Signal Live Radar & VIP Broadcast Monitor (Every 30 seconds)
+        self.scheduler.add_job(
+            scheduler_tasks.live_gold_signal_alert_monitor,
+            'interval',
+            seconds=30,
+            max_instances=2,
+            coalesce=True,
+            args=[self.app],
+            id='live_gold_signal_alert_monitor'
         )
 
         # 4. Smart Listing & Volatility Sniper (Every 15 seconds)
