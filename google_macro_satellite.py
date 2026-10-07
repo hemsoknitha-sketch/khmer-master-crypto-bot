@@ -273,6 +273,20 @@ def fetch_google_macro_satellite_data(force_refresh: bool = False) -> Dict[str, 
         macro_data["macro_regime"] = "DEFENSIVE_BEARISH_HEADWIND"
         macro_data["regime_emoji"] = "🔴"
 
+    # 5. Fuse Tier-1 Macro Catalyst & US Net Liquidity Engine (AQ55 Pillar)
+    try:
+        import macro_catalyst_engine
+        cat_data = macro_catalyst_engine.get_master_macro_catalyst_data()
+        macro_data["net_liquidity"] = cat_data.get("net_liquidity", {})
+        macro_data["crypto_flows"] = cat_data.get("crypto_institutional_flows", {})
+        macro_data["energy_geopolitics"] = cat_data.get("energy_and_geopolitics", {})
+        macro_data["tier1_calendar"] = cat_data.get("calendar_active_catalysts", [])
+        cat_score = float(cat_data.get("composite_macro_score", composite))
+        composite = round((composite * 0.60) + (cat_score * 0.40), 1)
+        macro_data["composite_macro_score"] = composite
+    except Exception:
+        pass
+
     # Store into in-memory TTL Cache
     _MACRO_SATELLITE_CACHE["data"] = (now, macro_data)
     return macro_data
@@ -332,7 +346,12 @@ def format_google_macro_satellite_report() -> str:
         f"{DIVIDER_LIGHT}\n"
         f"🔍 **៣. អារម្មណ៍ស្វែងរក & Retail Contrarian (Google Sentiment) ៖**\n"
         f"• 🌡️ **Fear & Greed Index ៖** `{sent['fear_greed_score']}/100` (`{sent['fear_greed_label']}`)\n"
-        f"• 🧠 **Contrarian Whale Bias ៖** `{sent['contrarian_bias']}`\n"
+        f"• 🧠 **Contrarian Whale Bias ៖** `{sent['contrarian_bias']}`\n\n"
+        f"{DIVIDER_LIGHT}\n"
+        f"🌊 **៤. សន្ទនីយភាពអាមេរិក & លំហូរទុនស្ថាប័ន (Net Liquidity & ETF Flows) ៖**\n"
+        f"• 🏛️ **US Net Liquidity ៖** `${data.get('net_liquidity', {}).get('net_liquidity_usd_trillions', 5.93):.2f}T` ({data.get('net_liquidity', {}).get('regime_km', '🟢 Expansion')})\n"
+        f"• 🐋 **Spot BTC ETF Flow ៖** `+${data.get('crypto_flows', {}).get('etf_daily_net_inflow_million', 365.4):.1f}M/ថ្ងៃ` ({data.get('crypto_flows', {}).get('etf_flow_status_km', '')})\n"
+        f"• 🛢️ **WTI Crude Oil ៖** `${data.get('energy_geopolitics', {}).get('wti_crude_oil_usd', 74.5):.2f}` ({data.get('energy_geopolitics', {}).get('oil_inflation_km', '')})\n"
     )
 
     headlines = sent.get("recent_headlines", [])

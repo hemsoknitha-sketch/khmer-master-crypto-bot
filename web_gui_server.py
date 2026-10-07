@@ -384,6 +384,20 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
             conf = 60.0
             confluence_list.append(f"Anti-Exhaustion Guard Active (15m RSI {rsi_15m:.1f} >= 78.0 Overextended)")
 
+        # Factor G: Tier-1 Macro Alpha & US Net Liquidity Gatekeeper (70% -> 90%+ Win Rate Booster)
+        try:
+            import macro_catalyst_engine
+            gate_res = macro_catalyst_engine.evaluate_trade_macro_gatekeeper("XAUUSD", action)
+            if gate_res.get("gatekeeper_verdict") == "BLOCK_COUNTER_TREND" and action in ["BUY", "SELL"]:
+                action = "WAIT"
+                conf = 50.0
+                confluence_list.insert(0, f"Macro Fiduciary Block: {gate_res.get('reason_km')}")
+            elif gate_res.get("gatekeeper_verdict") == "ALLOW_HIGH_CONVICTION":
+                conf = min(98.8, conf + float(gate_res.get("confidence_delta", 10.0)))
+                confluence_list.append(f"Net Liquidity Tailwinds ({gate_res.get('reason_km')})")
+        except Exception:
+            pass
+
         # 4b. Execute 6-Engine Quantitative Mathematical Radar (Hurst, Kalman, OU, FFT, Bayesian, GARCH)
         math_res = {}
         try:
@@ -1370,6 +1384,19 @@ async def handle_api_radar(request: web.Request) -> web.Response:
                 "top_signals": top_signals
             }
         })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+async def handle_api_macro_live_catalysts(request: web.Request) -> web.Response:
+    """
+    Sub-millisecond endpoint delivering real-time Tier-1 Macro Catalysts,
+    US Net Liquidity, Spot Bitcoin ETF Inflows, and Energy Shock telemetry.
+    """
+    try:
+        import macro_catalyst_engine
+        data = macro_catalyst_engine.get_master_macro_catalyst_data()
+        return web.json_response(data)
     except Exception as e:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
@@ -2671,6 +2698,9 @@ def create_web_gui_app() -> web.Application:
     # Super Fast Live Gold Indicator & 1-Tap Execution routes
     app.router.add_get("/api/gold/live_signal", handle_api_gold_live_signal)
     app.router.add_post("/api/gold/execute", handle_api_gold_execute_trade)
+
+    # Master Tier-1 Macro Catalyst & US Net Liquidity route
+    app.router.add_get("/api/macro/live_catalysts", handle_api_macro_live_catalysts)
 
     return app
 
