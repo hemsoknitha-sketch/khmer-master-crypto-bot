@@ -456,19 +456,33 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
             if garch_buf > 0:
                 risk_step = round(max(risk_step, min(11.50, garch_buf)), 2)
 
-        sl_p = round(float(smc_res.get("sl_price") or (entry_p - risk_step if action == "BUY" else entry_p + risk_step)), 2)
+        # Determine structural orientation
+        bull_score = float(smc_res.get("bullish_score", 0.0) or 0.0) if smc_res else 0.0
+        bear_score = float(smc_res.get("bearish_score", 0.0) or 0.0) if smc_res else 0.0
+        is_bull_bias = (action == "BUY") or (action == "WAIT" and bull_score >= bear_score)
 
-        risk_dist = max(3.8, abs(entry_p - sl_p))
-        if action == "BUY":
+        if is_bull_bias:
+            sl_p = round(float(smc_res.get("sl_price") or (entry_p - risk_step)), 2)
+            risk_dist = max(3.8, abs(entry_p - sl_p))
             tp1 = round(entry_p + (risk_dist * 2.0), 2)
             tp2 = round(entry_p + (risk_dist * 3.5), 2)
             tp3 = round(entry_p + (risk_dist * 5.5), 2)
         else:
+            sl_p = round(float(smc_res.get("sl_price") or (entry_p + risk_step)), 2)
+            risk_dist = max(3.8, abs(entry_p - sl_p))
             tp1 = round(entry_p - (risk_dist * 2.0), 2)
             tp2 = round(entry_p - (risk_dist * 3.5), 2)
             tp3 = round(entry_p - (risk_dist * 5.5), 2)
 
         rr_ratio = round(abs(tp3 - entry_p) / risk_dist, 1)
+
+        if action == "WAIT":
+            regime_desc = "SMC RANGE ACCUMULATION (AWAITING LIQUIDITY SWEEP)"
+            confluence_list.insert(0, f"Neutral Accumulation (Bullish {bull_score:.0f} vs Bearish {bear_score:.0f})")
+        elif action == "BUY":
+            regime_desc = "SMC TURTLE SOUP SWEEP & SGE OTC ACCUMULATION"
+        else:
+            regime_desc = "SMC LIQUIDITY PURGE & SMART MONEY DISTRIBUTION"
 
         data = {
             "status": "success",
@@ -478,7 +492,7 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
             "signal": {
                 "action": action,
                 "confidence": round(final_conf, 1),
-                "regime": "SMC LIQUIDITY SWEEP & SGE OTC ACCUMULATION",
+                "regime": regime_desc,
                 "kill_zone": kill_zone,
                 "entry_zone": {
                     "ideal": entry_p,

@@ -954,12 +954,17 @@ function _renderGoldSignalDOM(goldData) {
     }
 
     // 2. Predictive Action Pill & Regime
-    const action = (sig.action || 'BUY').toUpperCase();
+    const action = (sig.action || 'WAIT').toUpperCase();
+    const isWait = (action === 'WAIT' || action === 'HOLD' || action === 'NEUTRAL' || action === 'NEUTRAL_WAIT');
     if (elements.goldSignalActionBadge) {
         elements.goldSignalActionBadge.className = `gold-action-pill ${action.toLowerCase()}`;
-        elements.goldSignalActionBadge.textContent = action === 'BUY'
-            ? '🟢 STRONG BUY SIGNAL (SMC CONFLUENCE)'
-            : '🔴 STRONG SELL SIGNAL (LIQUIDITY PURGE)';
+        if (action === 'BUY') {
+            elements.goldSignalActionBadge.textContent = '🟢 STRONG BUY SIGNAL (SMC CONFLUENCE)';
+        } else if (action === 'SELL') {
+            elements.goldSignalActionBadge.textContent = '🔴 STRONG SELL SIGNAL (LIQUIDITY PURGE)';
+        } else {
+            elements.goldSignalActionBadge.textContent = '🟡 NEUTRAL WAIT (STRUCTURE ACCUMULATION)';
+        }
     }
     if (elements.goldSignalRegime && sig.regime) {
         elements.goldSignalRegime.textContent = sig.regime;
@@ -967,20 +972,20 @@ function _renderGoldSignalDOM(goldData) {
 
     // Sound chime on new signal switch
     if (state.goldSoundEnabled && state.lastGoldSignalAction && state.lastGoldSignalAction !== action) {
-        playAudioBeep(action === 'BUY' ? 880 : 440);
+        playAudioBeep(action === 'BUY' ? 880 : (action === 'SELL' ? 440 : 660));
         triggerHaptic('heavy');
     }
     state.lastGoldSignalAction = action;
 
     // 3. AI Confidence Meter
-    const conf = Number(sig.confidence || 95.0);
+    const conf = Number(sig.confidence || (isWait ? 50.0 : 95.0));
     if (elements.goldConfidenceNum) {
         elements.goldConfidenceNum.textContent = `${conf.toFixed(1)}%`;
     }
     if (elements.goldConfCircleBar) {
         const clampedConf = Math.min(99.9, Math.max(10, conf));
         elements.goldConfCircleBar.setAttribute('stroke-dasharray', `${clampedConf}, 100`);
-        elements.goldConfCircleBar.style.stroke = action === 'BUY' ? '#10b981' : '#ef4444';
+        elements.goldConfCircleBar.style.stroke = action === 'BUY' ? '#10b981' : (action === 'SELL' ? '#ef4444' : '#f59e0b');
     }
 
     // 4. Confluence Telemetry Grid
@@ -1018,7 +1023,8 @@ function _renderGoldSignalDOM(goldData) {
     if (elements.goldCoordEntry) elements.goldCoordEntry.textContent = `$${formatUSD(idealEntry)}`;
     if (elements.goldCoordEntryRange) elements.goldCoordEntryRange.textContent = `Zone: $${formatUSD(minEntry)} - $${formatUSD(maxEntry)}`;
     if (elements.goldCoordSl) elements.goldCoordSl.textContent = `$${formatUSD(sl)}`;
-    if (elements.goldCoordRisk) elements.goldCoordRisk.textContent = `Risk: -$${riskDist.toFixed(2)}/oz (${action === 'BUY' ? 'Below Sweep' : 'Above Highs'})`;
+    const riskDesc = action === 'BUY' ? 'Below Sweep' : (action === 'SELL' ? 'Above Highs' : 'Range Boundary');
+    if (elements.goldCoordRisk) elements.goldCoordRisk.textContent = `Risk: -$${riskDist.toFixed(2)}/oz (${riskDesc})`;
     if (elements.goldCoordTp1) elements.goldCoordTp1.textContent = `$${formatUSD(tp1)}`;
     if (elements.goldCoordTp2) elements.goldCoordTp2.textContent = `$${formatUSD(tp2)}`;
     if (elements.goldCoordTp3) elements.goldCoordTp3.textContent = `$${formatUSD(tp3)}`;
@@ -1032,11 +1038,50 @@ function _renderGoldSignalDOM(goldData) {
     if (elements.mapTp3Label) elements.mapTp3Label.textContent = `TP3 $${tp3.toFixed(1)}`;
 
     if (elements.mapLivePointer && curPrice > 0 && sl > 0 && tp3 > 0) {
-        const minTrack = Math.min(sl, tp3);
-        const maxTrack = Math.max(sl, tp3);
-        const span = maxTrack - minTrack;
-        let pct = span > 0 ? ((curPrice - minTrack) / span) * 100 : 35;
-        pct = Math.max(6, Math.min(94, pct));
+        let pct = 25; // Default positioned at Entry (~25%)
+        const isBullishRail = (sl < tp3);
+
+        if (isBullishRail) {
+            // Bullish progression: SL (left, ~5%) -> Entry (~25%) -> TP1 (~50%) -> TP2 (~75%) -> TP3 (right, ~95%)
+            if (curPrice <= sl) {
+                pct = 5;
+            } else if (curPrice < idealEntry) {
+                const denom = (idealEntry - sl) || 1;
+                pct = 5 + Math.max(0, Math.min(1, (curPrice - sl) / denom)) * 20;
+            } else if (curPrice < tp1) {
+                const denom = (tp1 - idealEntry) || 1;
+                pct = 25 + Math.max(0, Math.min(1, (curPrice - idealEntry) / denom)) * 25;
+            } else if (curPrice < tp2) {
+                const denom = (tp2 - tp1) || 1;
+                pct = 50 + Math.max(0, Math.min(1, (curPrice - tp1) / denom)) * 25;
+            } else if (curPrice < tp3) {
+                const denom = (tp3 - tp2) || 1;
+                pct = 75 + Math.max(0, Math.min(1, (curPrice - tp2) / denom)) * 20;
+            } else {
+                pct = 95;
+            }
+        } else {
+            // Bearish progression: SL (left, ~5%) -> Entry (~25%) -> TP1 (~50%) -> TP2 (~75%) -> TP3 (right, ~95%)
+            // In a SELL: SL is HIGHEST, TP3 is LOWEST. As price falls, progress moves from left to right.
+            if (curPrice >= sl) {
+                pct = 5;
+            } else if (curPrice > idealEntry) {
+                const denom = (sl - idealEntry) || 1;
+                pct = 5 + Math.max(0, Math.min(1, (sl - curPrice) / denom)) * 20;
+            } else if (curPrice > tp1) {
+                const denom = (idealEntry - tp1) || 1;
+                pct = 25 + Math.max(0, Math.min(1, (idealEntry - curPrice) / denom)) * 25;
+            } else if (curPrice > tp2) {
+                const denom = (tp1 - tp2) || 1;
+                pct = 50 + Math.max(0, Math.min(1, (tp1 - curPrice) / denom)) * 25;
+            } else if (curPrice > tp3) {
+                const denom = (tp2 - tp3) || 1;
+                pct = 75 + Math.max(0, Math.min(1, (tp2 - curPrice) / denom)) * 20;
+            } else {
+                pct = 95;
+            }
+        }
+        pct = Math.max(5, Math.min(95, pct));
         elements.mapLivePointer.style.left = `${pct}%`;
         if (elements.mapLiveLabel) elements.mapLiveLabel.textContent = `$${formatUSD(curPrice)}`;
     }
@@ -1044,15 +1089,18 @@ function _renderGoldSignalDOM(goldData) {
     // 7. Dynamic Execution Buttons Label
     if (elements.btnGoldExecMt5) {
         const strong = elements.btnGoldExecMt5.querySelector('strong');
-        if (strong) strong.textContent = `1-Tap Execute ${action} (MT5 GTCFX)`;
+        if (strong) strong.textContent = isWait ? '⏳ Stand By (Neutral Wait)' : `1-Tap Execute ${action} (MT5 GTCFX)`;
+        elements.btnGoldExecMt5.style.opacity = isWait ? '0.6' : '1.0';
     }
     if (elements.btnGoldExecCapital) {
         const strong = elements.btnGoldExecCapital.querySelector('strong');
-        if (strong) strong.textContent = `1-Tap Execute ${action} (Capital.com)`;
+        if (strong) strong.textContent = isWait ? '⏳ Stand By (Neutral Wait)' : `1-Tap Execute ${action} (Capital.com)`;
+        elements.btnGoldExecCapital.style.opacity = isWait ? '0.6' : '1.0';
     }
     if (elements.btnGoldExecBinance) {
         const strong = elements.btnGoldExecBinance.querySelector('strong');
-        if (strong) strong.textContent = `1-Tap Execute ${action} (Binance PAXG)`;
+        if (strong) strong.textContent = isWait ? '⏳ Stand By (Neutral Wait)' : `1-Tap Execute ${action} (Binance PAXG)`;
+        elements.btnGoldExecBinance.style.opacity = isWait ? '0.6' : '1.0';
     }
 }
 
@@ -1073,7 +1121,13 @@ async function executeGoldTrade(targetEngine) {
     triggerHaptic('heavy');
     const lot = state.selectedGoldLot || 0.05;
     const sig = state.goldSignalData?.signal || {};
-    const action = (sig.action || 'BUY').toUpperCase();
+    const action = (sig.action || 'WAIT').toUpperCase();
+
+    if (action === 'WAIT' || action === 'HOLD' || action === 'NEUTRAL' || action === 'NEUTRAL_WAIT') {
+        showToast('⚠️ ទីផ្សារស្ថិតក្នុងស្ថានភាព Neutral Accumulation — គ្មាន Edge ក្នុងការបើក Order ទេ!');
+        return;
+    }
+
     const sl = Number(sig.stop_loss || 0);
     const tp = Number(sig.take_profit_2 || 0);
 
