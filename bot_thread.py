@@ -6398,11 +6398,14 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_cap_reset_daily", "btn_cap_governor_reset", "btn_cap_daily_reset"]:
                 import portfolio_circuit_breaker
                 try:
-                    bal_info = await asyncio.to_thread(capital_engine.get_user_capital_engine(chat_id).get_account_balance)
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    bal_info = await asyncio.to_thread(c_eng.get_account_balance)
                     user_live_bal = float(bal_info.get("balance", 1000.0) or 1000.0)
+                    is_demo = getattr(c_eng, "is_demo", False)
                 except Exception:
                     user_live_bal = 1000.0
-                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, user_live_bal)
+                    is_demo = False
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, user_live_bal, is_demo=is_demo)
                 try:
                     await update.callback_query.answer("🔄 Sky Net Daily Governor Reset ជោគជ័យ! ទុនដើមថ្ងៃត្រូវបានកំណត់ឡើងវិញ។ ម៉ាស៊ីនរួចរាល់សម្រាប់ការវិនិយោគបន្ត!", show_alert=True)
                 except Exception:
@@ -6802,6 +6805,8 @@ class TelegramBotThread(BaseThread):
                     eff_eq = 10.0
                 dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
                 db.set_capital_auto_config(chat_id, enabled=True, budget=10.0, max_positions=dyn_pos, is_demo=False)
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, eff_eq, is_demo=False)
                 try:
                     await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $10 (Max {dyn_pos} Positions)!")
                 except Exception:
@@ -6817,6 +6822,8 @@ class TelegramBotThread(BaseThread):
                     eff_eq = 30.0
                 dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
                 db.set_capital_auto_config(chat_id, enabled=True, budget=30.0, max_positions=dyn_pos, is_demo=False)
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, eff_eq, is_demo=False)
                 try:
                     await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $30 (Max {dyn_pos} Positions)!")
                 except Exception:
@@ -6832,6 +6839,8 @@ class TelegramBotThread(BaseThread):
                     eff_eq = 50.0
                 dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
                 db.set_capital_auto_config(chat_id, enabled=True, budget=50.0, max_positions=dyn_pos, is_demo=False)
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, eff_eq, is_demo=False)
                 try:
                     await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $50 (Max {dyn_pos} Positions)!")
                 except Exception:
@@ -6847,6 +6856,8 @@ class TelegramBotThread(BaseThread):
                     eff_eq = 100.0
                 dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
                 db.set_capital_auto_config(chat_id, enabled=True, budget=100.0, max_positions=dyn_pos, is_demo=False)
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, eff_eq, is_demo=False)
                 try:
                     await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $100 (Max {dyn_pos} Positions)!")
                 except Exception:
@@ -6862,6 +6873,8 @@ class TelegramBotThread(BaseThread):
                     eff_eq = 200.0
                 dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
                 db.set_capital_auto_config(chat_id, enabled=True, budget=200.0, max_positions=dyn_pos, is_demo=False)
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, eff_eq, is_demo=False)
                 try:
                     await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $200 (Max {dyn_pos} Positions)!")
                 except Exception:
@@ -6877,6 +6890,8 @@ class TelegramBotThread(BaseThread):
                     eff_eq = 400.0
                 dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
                 db.set_capital_auto_config(chat_id, enabled=True, budget=400.0, max_positions=dyn_pos, is_demo=False)
+                import portfolio_circuit_breaker
+                portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, eff_eq, is_demo=False)
                 try:
                     await update.callback_query.answer(f"💰 បានកំណត់ទុន Auto: $400 (Max {dyn_pos} Positions)!")
                 except Exception:
@@ -24906,16 +24921,21 @@ class TelegramBotThread(BaseThread):
                     return
                 elif action in ["RESET_DAILY", "RESETDAILY", "GOVERNOR_RESET", "RESET_GOVERNOR"]:
                     import portfolio_circuit_breaker
-                    bal_info = await asyncio.to_thread(capital_engine.get_user_capital_engine(chat_id).get_account_balance)
-                    user_live_bal = float(bal_info.get("balance", 1000.0))
-                    portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, user_live_bal)
+                    c_eng = capital_engine.get_user_capital_engine(chat_id)
+                    bal_info = await asyncio.to_thread(c_eng.get_account_balance)
+                    user_live_bal = float(bal_info.get("balance", 1000.0) or 1000.0)
+                    is_demo = getattr(c_eng, "is_demo", False)
+                    portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, user_live_bal, is_demo=is_demo)
+                    mode_lbl = "🟡 DEMO ($10,000)" if is_demo else "🟢 LIVE MAINNET"
                     res_msg = (
                         f"🔄 **SKY NET 360° DAILY GOVERNOR RESET!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ **បរិស្ថាន ៖** `{mode_lbl}`\n"
                         f"✅ _កុងតាក់ចាក់សោរប្រចាំថ្ងៃត្រូវបាន Reset ជោគជ័យ! ទុនដើមថ្ងៃត្រូវបានកំណត់ឡើងវិញស្មើ ${user_live_bal:,.2f} USD។ ម៉ាស៊ីនរួចរាល់សម្រាប់ការវិនិយោគបន្ត!_"
                     ) if user_lang == 'khmer' else (
                         f"🔄 **SKY NET 360° DAILY GOVERNOR RESET!** 🟢\n"
                         f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"⚙️ **Environment:** `{mode_lbl}`\n"
                         f"✅ _Daily Governor lock cleared! Daily baseline recalibrated to ${user_live_bal:,.2f} USD. Ready for trading!_"
                     )
                     await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
@@ -25554,6 +25574,8 @@ class TelegramBotThread(BaseThread):
                         max_pos = user_explicit_max if (user_explicit_max is not None and user_explicit_max > 0) else capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
 
                         db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
+                        import portfolio_circuit_breaker
+                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, current_balance=live_bal, is_demo=False)
 
                         # Rebuild keyboard with updated state
                         keyboard = InlineKeyboardMarkup([
@@ -25648,6 +25670,8 @@ class TelegramBotThread(BaseThread):
                         eff_eq = max(budget, demo_bal, demo_avail)
                         max_pos = user_explicit_max if (user_explicit_max is not None and user_explicit_max > 0) else capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
                         db.set_capital_auto_config(chat_id, enabled=True, budget=budget, max_positions=max_pos, is_demo=target_is_demo)
+                        import portfolio_circuit_breaker
+                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.reset_daily_governor(chat_id, current_balance=demo_bal, is_demo=True)
 
                         msg = (
                             f"🤖 **CAPITAL.COM TRADFI AUTONOMOUS ENGINE: ON (DEMO)** 🟡\n"

@@ -216,15 +216,16 @@ class CapitalDailyAGIGovernor:
         return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
     @classmethod
-    def get_daily_starting_capital(cls, chat_id: int, current_balance: float = 0.0) -> float:
+    def get_daily_starting_capital(cls, chat_id: int, current_balance: float = 0.0, is_demo: bool = False) -> float:
         """
-        Retrieves starting equity baseline for today.
-        If missing or 0, sets current_balance as today's starting baseline.
+        Retrieves starting equity baseline for today with environment isolation (Invariant 56).
+        If missing or 0, sets current_balance as today's starting baseline for this environment.
         """
         import database as db
         today_str = cls.get_today_str()
-        key = f"cap_daily_start_eq_{chat_id}_{today_str}"
-        val = db.get_system_setting(key)
+        env_tag = "demo" if is_demo else "live"
+        env_key = f"cap_daily_start_eq_{chat_id}_{env_tag}_{today_str}"
+        val = db.get_system_setting(env_key)
         if val:
             try:
                 start_eq = float(val)
@@ -232,10 +233,25 @@ class CapitalDailyAGIGovernor:
                     return start_eq
             except Exception:
                 pass
-        
+
+        # Backwards compatibility fallback for live environment only
+        if not is_demo:
+            legacy_key = f"cap_daily_start_eq_{chat_id}_{today_str}"
+            val_leg = db.get_system_setting(legacy_key)
+            if val_leg:
+                try:
+                    start_eq = float(val_leg)
+                    if start_eq > 0:
+                        db.update_system_setting(env_key, str(round(start_eq, 2)))
+                        return start_eq
+                except Exception:
+                    pass
+
         # Initialize starting equity for today
         if current_balance > 0:
-            db.update_system_setting(key, str(round(current_balance, 2)))
+            db.update_system_setting(env_key, str(round(current_balance, 2)))
+            if not is_demo:
+                db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{today_str}", str(round(current_balance, 2)))
             return current_balance
         return 1000.0  # Safe fallback
 
@@ -248,17 +264,20 @@ class CapitalDailyAGIGovernor:
         is_demo: bool = False
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Evaluates daily capital status against the +5.0% Target Lock & -2.5% Loss Floor.
+        Evaluates daily capital status against the +5.0% Target Lock & -2.5% Loss Floor with Dual-Environment Isolation (Invariant 56).
         Returns: (is_locked: bool, reason: str, telemetry: dict)
         """
         import database as db
         today_str = cls.get_today_str()
-        baseline = cls.get_daily_starting_capital(chat_id, current_balance)
+        baseline = cls.get_daily_starting_capital(chat_id, current_balance, is_demo=is_demo)
         daily_pnl_usd = round(current_balance - baseline, 2)
         daily_pnl_pct = round((daily_pnl_usd / max(1.0, baseline)) * 100.0, 2)
 
-        lock_key = f"cap_daily_lock_{chat_id}_{today_str}"
+        env_tag = "demo" if is_demo else "live"
+        lock_key = f"cap_daily_lock_{chat_id}_{env_tag}_{today_str}"
         existing_lock = db.get_system_setting(lock_key)
+        if not existing_lock and not is_demo:
+            existing_lock = db.get_system_setting(f"cap_daily_lock_{chat_id}_{today_str}")
 
         telemetry = {
             "today": today_str,
@@ -321,6 +340,8 @@ class CapitalDailyAGIGovernor:
                 # Self-healing: If current equity is safely above the loss floor (e.g. false trigger from used margin dip),
                 # automatically clear the stale lock and permit normal trading!
                 db.update_system_setting(lock_key, "NORMAL")
+                if not is_demo:
+                    db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
                 telemetry["is_loss_locked"] = False
                 telemetry["can_trade"] = True
                 telemetry["status"] = "NORMAL_TRADING"
@@ -340,6 +361,8 @@ class CapitalDailyAGIGovernor:
                 logger.info(f"💎 [24/7 CITADEL UNLOCKED] Daily Target +{daily_pnl_pct}% hit for User {chat_id}. Compounding 24/7 without halting!")
             else:
                 db.update_system_setting(lock_key, "TARGET_5PCT_LOCKED")
+                if not is_demo:
+                    db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "TARGET_5PCT_LOCKED")
                 telemetry["is_target_locked"] = True
                 telemetry["can_trade"] = False
                 telemetry["status"] = "TARGET_5PCT_LOCKED"
@@ -379,6 +402,8 @@ class CapitalDailyAGIGovernor:
         active_loss_floor = 10.0 if is_24_7_continuous else cls.DAILY_LOSS_FLOOR_PCT
         if daily_pnl_pct <= -active_loss_floor:
             db.update_system_setting(lock_key, "LOSS_FLOOR_LOCKED")
+            if not is_demo:
+                db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "LOSS_FLOOR_LOCKED")
             telemetry["is_loss_locked"] = True
             telemetry["can_trade"] = False
             telemetry["status"] = "LOSS_FLOOR_LOCKED"
@@ -416,16 +441,40 @@ class CapitalDailyAGIGovernor:
         return False, "Normal Trading Allowed", telemetry
 
     @classmethod
-    def reset_daily_governor(cls, chat_id: int, current_balance: Optional[float] = None) -> bool:
-        """Resets today's lock and recalibrates baseline equity."""
+    def reset_daily_governor(
+        cls,
+        chat_id: int,
+        current_balance: Optional[float] = None,
+        is_demo: Optional[bool] = None
+    ) -> bool:
+        """
+        Resets today's lock and recalibrates baseline equity with Dual-Environment Isolation (Invariant 56).
+        If is_demo is True: resets Demo lock & baseline.
+        If is_demo is False: resets Live lock & baseline.
+        If is_demo is None: resets both Demo and Live locks and baselines.
+        """
         import database as db
         today_str = cls.get_today_str()
-        lock_key = f"cap_daily_lock_{chat_id}_{today_str}"
-        db.update_system_setting(lock_key, "NORMAL")
-        if current_balance is not None and current_balance > 0:
-            key = f"cap_daily_start_eq_{chat_id}_{today_str}"
-            db.update_system_setting(key, str(round(current_balance, 2)))
-        logger.info(f"🔄 [CAPITAL GOVERNOR] Reset daily lock for user {chat_id}.")
+
+        if is_demo is True:
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_demo_{today_str}", "NORMAL")
+            if current_balance is not None and current_balance > 0:
+                db.update_system_setting(f"cap_daily_start_eq_{chat_id}_demo_{today_str}", str(round(current_balance, 2)))
+        elif is_demo is False:
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_live_{today_str}", "NORMAL")
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
+            if current_balance is not None and current_balance > 0:
+                db.update_system_setting(f"cap_daily_start_eq_{chat_id}_live_{today_str}", str(round(current_balance, 2)))
+                db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{today_str}", str(round(current_balance, 2)))
+        else:
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_demo_{today_str}", "NORMAL")
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_live_{today_str}", "NORMAL")
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
+            if current_balance is not None and current_balance > 0:
+                db.update_system_setting(f"cap_daily_start_eq_{chat_id}_live_{today_str}", str(round(current_balance, 2)))
+                db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{today_str}", str(round(current_balance, 2)))
+
+        logger.info(f"🔄 [CAPITAL GOVERNOR] Reset daily lock for user {chat_id} (is_demo={is_demo}, bal={current_balance}).")
         return True
 
     @classmethod
@@ -437,6 +486,8 @@ class CapitalDailyAGIGovernor:
         if disabled:
             today_str = cls.get_today_str()
             db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_live_{today_str}", "NORMAL")
+            db.update_system_setting(f"cap_daily_lock_{chat_id}_demo_{today_str}", "NORMAL")
         logger.info(f"🛡️ [CAPITAL GOVERNOR] User {chat_id} Daily Limits Disabled: {disabled}")
         return True
 
@@ -454,17 +505,19 @@ class CapitalDailyAGIGovernor:
     are_daily_limits_disabled = is_daily_limits_disabled
 
     @classmethod
-    def set_daily_baseline(cls, chat_id: int, starting_capital: float) -> None:
-        """Explicitly sets today's starting capital baseline."""
+    def set_daily_baseline(cls, chat_id: int, starting_capital: float, is_demo: bool = False) -> None:
+        """Explicitly sets today's starting capital baseline for specific environment (Invariant 56)."""
         import database as db
         today_str = cls.get_today_str()
-        key = f"cap_daily_start_eq_{chat_id}_{today_str}"
-        db.update_system_setting(key, str(round(starting_capital, 2)))
+        env_tag = "demo" if is_demo else "live"
+        db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{env_tag}_{today_str}", str(round(starting_capital, 2)))
+        if not is_demo:
+            db.update_system_setting(f"cap_daily_start_eq_{chat_id}_{today_str}", str(round(starting_capital, 2)))
 
     @classmethod
-    def update_and_check(cls, chat_id: int, current_balance: float) -> Dict[str, Any]:
+    def update_and_check(cls, chat_id: int, current_balance: float, is_demo: bool = False) -> Dict[str, Any]:
         """Convenience method checking lock and returning telemetry."""
-        is_locked, reason, telemetry = cls.evaluate_and_check_daily_lock(chat_id, current_balance)
+        is_locked, reason, telemetry = cls.evaluate_and_check_daily_lock(chat_id, current_balance, is_demo=is_demo)
         telemetry["is_locked"] = is_locked
         telemetry["reason"] = reason
         if telemetry.get("is_target_locked"):
@@ -476,16 +529,16 @@ class CapitalDailyAGIGovernor:
         return telemetry
 
     @classmethod
-    def get_daily_telemetry(cls, chat_id: int, current_balance: float = 0.0) -> Dict[str, Any]:
+    def get_daily_telemetry(cls, chat_id: int, current_balance: float = 0.0, is_demo: bool = False) -> Dict[str, Any]:
         """Returns read-only status for UI dashboards."""
-        _, reason, data = cls.evaluate_and_check_daily_lock(chat_id, current_balance, app=None)
+        _, reason, data = cls.evaluate_and_check_daily_lock(chat_id, current_balance, app=None, is_demo=is_demo)
         data["reason"] = reason
         return data
 
     @classmethod
-    def get_user_status(cls, chat_id: int, current_balance: float = 0.0) -> Dict[str, Any]:
+    def get_user_status(cls, chat_id: int, current_balance: float = 0.0, is_demo: bool = False) -> Dict[str, Any]:
         """Convenience alias for get_daily_telemetry with state mapping."""
-        t = cls.get_daily_telemetry(chat_id, current_balance)
+        t = cls.get_daily_telemetry(chat_id, current_balance, is_demo=is_demo)
         if t.get("is_target_locked"):
             t["state"] = "TARGET_LOCKED"
         elif t.get("is_loss_locked"):
@@ -495,9 +548,9 @@ class CapitalDailyAGIGovernor:
         return t
 
 
-def is_capital_daily_locked(chat_id: int, current_balance: float = 0.0) -> Tuple[bool, str, Dict[str, Any]]:
+def is_capital_daily_locked(chat_id: int, current_balance: float = 0.0, is_demo: bool = False) -> Tuple[bool, str, Dict[str, Any]]:
     """Helper shortcut for CapitalDailyAGIGovernor.evaluate_and_check_daily_lock."""
-    return CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(chat_id, current_balance)
+    return CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(chat_id, current_balance, is_demo=is_demo)
 
 
 CAPITAL_DAILY_GOVERNOR = CapitalDailyAGIGovernor
