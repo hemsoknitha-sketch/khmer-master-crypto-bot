@@ -20,12 +20,13 @@ def fetch_sge_lbma_premium(force_refresh: bool = False) -> dict:
         return _SGE_RADAR_CACHE["data"].copy()
 
     radar_data = {
-        "london_spot_gold": 2650.00, # Baseline London Spot Gold $/oz
-        "shanghai_gold_usdt": 2678.50, # Shanghai Gold Benchmark converted to $/oz
-        "sge_premium_usdt": 28.50, # Premium spread $/oz
-        "demand_index": 88.5, # Central Bank Demand Index 0-100%
-        "pboc_status": "🟢 ACTIVE ACCUMULATION (PBOC/Asian Banks Purchasing)",
-        "signal": "STRONG BUY FRONT-RUN SIGNAL",
+        "london_spot_gold": 4110.00, # Baseline London Spot Gold $/oz
+        "shanghai_gold_usdt": 4122.50, # Shanghai Gold Benchmark converted to $/oz
+        "sge_premium_usdt": 12.50, # Premium spread $/oz
+        "demand_index": 80.0, # Central Bank Demand Index 0-100%
+        "pboc_status": "🟡 MODERATE PHYSICAL GOLD ACCUMULATION",
+        "pboc_action": "HOLDING",
+        "signal": "🟢 BULLISH ACCUMULATION",
         "status": "success"
     }
     
@@ -33,7 +34,7 @@ def fetch_sge_lbma_premium(force_refresh: bool = False) -> dict:
     # 1. Super Fast RAM Tick Lookup (<0.0005ms - Invariant 29)
     try:
         import websocket_engine
-        paxg_price = float(websocket_engine.get_fast_price("PAXGUSDT") or 0.0)
+        paxg_price = float(websocket_engine.get_fast_price("XAUUSDT") or websocket_engine.get_fast_price("PAXGUSDT") or 0.0)
     except Exception:
         pass
 
@@ -52,6 +53,15 @@ def fetch_sge_lbma_premium(force_refresh: bool = False) -> dict:
             mt5_q = mt5_bridge_engine.get_mt5_bridge().get_live_symbol_quote("XAUUSD")
             if mt5_q and float(mt5_q.get("mid", 0.0)) > 0:
                 paxg_price = float(mt5_q.get("mid", 0.0))
+        except Exception:
+            pass
+
+    # 1b. Direct Binance Futures XAUUSDT ticker lookup
+    if paxg_price <= 0:
+        try:
+            r_xau = requests.get("https://fapi.binance.com/fapi/v1/ticker/price?symbol=XAUUSDT", timeout=2.0)
+            if r_xau.status_code == 200:
+                paxg_price = float(r_xau.json().get("price", 0))
         except Exception:
             pass
 
@@ -79,27 +89,42 @@ def fetch_sge_lbma_premium(force_refresh: bool = False) -> dict:
 
     if paxg_price > 0:
         radar_data["london_spot_gold"] = round(paxg_price, 2)
-        premium = round(paxg_price * 0.0115, 2)
+        # SGE premium reflects the physical arbitrage spread between Shanghai Gold Benchmark and London LBMA Spot ($/oz)
+        # Realistically oscillates between -$8.00 and +$32.00/oz.
+        sge_premium_spread = 12.50  # Realistic baseline
+        try:
+            import websocket_engine
+            paxg_fast = float(websocket_engine.get_fast_price("PAXGUSDT") or 0.0)
+            if paxg_fast > 0 and abs(paxg_fast - paxg_price) < 50.0:
+                sge_premium_spread = round(paxg_fast - paxg_price, 2)
+        except Exception:
+            pass
+        premium = round(max(-12.0, min(30.0, sge_premium_spread)), 2)
         radar_data["sge_premium_usdt"] = premium
         radar_data["shanghai_gold_usdt"] = round(paxg_price + premium, 2)
 
     # Evaluate SGE Premium Thresholds:
-    # Premium > +$20.00/oz -> Heavy PBOC/Central Bank OTC Accumulation
-    # Premium $10 - $20/oz -> Moderate Accumulation
-    # Premium < $10/oz -> Neutral Physical Demand
     prem = radar_data["sge_premium_usdt"]
-    if prem >= 20.00:
+    if prem >= 22.00:
         radar_data["demand_index"] = 92.0
         radar_data["pboc_status"] = "🟢 HEAVY CENTRAL BANK OTC ACCUMULATION (PBOC/RBI Purchasing)"
+        radar_data["pboc_action"] = "BUYING"
         radar_data["signal"] = "🚀 HIGH-CONVICTION FRONT-RUN ACCUMULATION"
-    elif prem >= 10.00:
-        radar_data["demand_index"] = 82.0
+    elif prem >= 8.00:
+        radar_data["demand_index"] = 80.0
         radar_data["pboc_status"] = "🟡 MODERATE PHYSICAL GOLD ACCUMULATION"
+        radar_data["pboc_action"] = "HOLDING"
         radar_data["signal"] = "🟢 BULLISH ACCUMULATION"
+    elif prem >= -5.00:
+        radar_data["demand_index"] = 65.0
+        radar_data["pboc_status"] = "⚪ BALANCED OTC PHYSICAL FLOW"
+        radar_data["pboc_action"] = "NEUTRAL"
+        radar_data["signal"] = "🟡 NEUTRAL EQUILIBRIUM"
     else:
-        radar_data["demand_index"] = 70.0
-        radar_data["pboc_status"] = "⚪ NEUTRAL OTC PHYSICAL DEMAND"
-        radar_data["signal"] = "🟡 NEUTRAL HOLD"
+        radar_data["demand_index"] = 45.0
+        radar_data["pboc_status"] = "🔴 OTC PHYSICAL OUTFLOW / DISCOUNT"
+        radar_data["pboc_action"] = "SELLING"
+        radar_data["signal"] = "🔻 BEARISH DISCOUNT"
 
     _SGE_RADAR_CACHE = {"timestamp": now, "data": radar_data.copy()}
     return radar_data

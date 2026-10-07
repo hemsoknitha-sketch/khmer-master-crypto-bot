@@ -77,7 +77,7 @@ SUPER_ADMIN_MT5_ACCOUNTS = {MT5_SUPER_ADMIN_TRADING_ACCOUNT, MT5_TREASURY_REBATE
 # ULTRA-FAST IN-MEMORY CACHE BUS (<0.01ms RAM RESPONSE TIME)
 # ==============================================================================
 _GUI_CACHE = {
-    "prices": {"BTCUSDT": 65000.0, "PAXGUSDT": 2580.0, "timestamp": 0.0},
+    "prices": {"BTCUSDT": 65000.0, "PAXGUSDT": 4110.0, "XAUUSDT": 4100.0, "timestamp": 0.0},
     "portfolio": {},     # chat_id -> {"timestamp": float, "data": dict}
     "wealth": {},        # chat_id -> {"timestamp": float, "data": dict}
     "candidates": {"timestamp": 0.0, "data": []},
@@ -216,32 +216,47 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
         import google_macro_satellite
         import market_data
 
-        # 1. Live Interbank Gold Price (Capital.com GOLD / MT5 XAUUSD / Binance PAXG)
+        # 1. Live Interbank Gold Price (MT5 XAUUSD / Capital.com GOLD / Binance Futures XAUUSDT / Binance Spot PAXG)
         gold_p = 0.0
         try:
-            import capital_engine
-            cap_gold = capital_engine._SHARED_PRICE_CACHE.get("GOLD", {}).get("data", {})
-            if cap_gold and float(cap_gold.get("mid", 0.0)) > 0:
-                gold_p = float(cap_gold.get("mid", 0.0))
+            import mt5_bridge_engine
+            mt5_q = mt5_bridge_engine.get_mt5_bridge().get_live_symbol_quote("XAUUSD")
+            if mt5_q and float(mt5_q.get("mid", 0.0)) > 0:
+                gold_p = float(mt5_q.get("mid", 0.0))
         except Exception:
             pass
 
         if gold_p <= 0:
             try:
-                import mt5_bridge_engine
-                mt5_q = mt5_bridge_engine.get_mt5_bridge().get_live_symbol_quote("XAUUSD")
-                if mt5_q and float(mt5_q.get("mid", 0.0)) > 0:
-                    gold_p = float(mt5_q.get("mid", 0.0))
+                import capital_engine
+                cap_gold = capital_engine._SHARED_PRICE_CACHE.get("GOLD", {}).get("data", {})
+                if cap_gold and float(cap_gold.get("mid", 0.0)) > 0:
+                    gold_p = float(cap_gold.get("mid", 0.0))
             except Exception:
                 pass
 
         if gold_p <= 0:
-            gold_p = websocket_engine.get_fast_price("PAXGUSDT")
+            try:
+                gold_p = float(websocket_engine.get_fast_price("XAUUSDT") or 0.0)
+            except Exception:
+                pass
+
+        if gold_p <= 0:
+            try:
+                import requests
+                r_xau = requests.get("https://fapi.binance.com/fapi/v1/ticker/price?symbol=XAUUSDT", timeout=2.0)
+                if r_xau.status_code == 200:
+                    gold_p = float(r_xau.json().get("price", 0.0))
+            except Exception:
+                pass
+
+        if gold_p <= 0:
+            gold_p = float(websocket_engine.get_fast_price("PAXGUSDT") or 0.0)
 
         if not gold_p or gold_p <= 0:
-            gold_p = float(_GUI_CACHE["prices"].get("PAXGUSDT", 2650.0))
+            gold_p = float(_GUI_CACHE["prices"].get("PAXGUSDT", 0.0))
         if gold_p <= 0:
-            gold_p = 2650.0
+            gold_p = 4110.0
 
         # 2. SMC Multi-Timeframe Analysis (M15 Sniper Entry, M30, H1 Structure, H4 Macro Bias)
         smc_res = {}
@@ -249,10 +264,16 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
             if mt5_smc_citadel.MT5SMCCitadelEngine:
                 smc_res = mt5_smc_citadel.MT5SMCCitadelEngine.analyze_9_smc_confluence("XAUUSD")
         except Exception as e:
-            smc_res = {"action": "BUY", "confidence": 88.0, "confluence_factors": ["SMC FVG Retest"]}
+            smc_res = {"action": "WAIT", "confidence": 50.0, "confluence_factors": ["SMC Structure Wait"]}
 
-        raw_action = smc_res.get("action", "BUY")
-        raw_conf = float(smc_res.get("confidence", 85.0))
+        # 2b. Synchronize Interbank Gold Price with SMC candle entry to guarantee ZERO price disparity
+        if smc_res and float(smc_res.get("entry_price", 0.0)) > 0:
+            smc_entry = float(smc_res.get("entry_price", 0.0))
+            if gold_p <= 0 or abs(gold_p - smc_entry) > 80.0:
+                gold_p = smc_entry
+
+        raw_action = smc_res.get("action", "WAIT")
+        raw_conf = float(smc_res.get("confidence", 50.0))
         smc_factors = smc_res.get("confluence_factors", [])
         kill_zone = smc_res.get("kill_zone", "ASIAN_RANGE_ACCUMULATION")
 
@@ -262,15 +283,15 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
             cb_res = central_bank_gold_radar.fetch_sge_lbma_premium()
         except Exception:
             cb_res = {
-                "sge_premium_usdt": 28.50,
-                "demand_index": 92.0,
-                "pboc_status": "🟢 HEAVY CENTRAL BANK OTC ACCUMULATION (PBOC Purchasing)",
-                "signal": "🚀 HIGH-CONVICTION FRONT-RUN ACCUMULATION"
+                "sge_premium_usdt": 12.50,
+                "demand_index": 80.0,
+                "pboc_status": "🟡 MODERATE PHYSICAL GOLD ACCUMULATION",
+                "signal": "🟢 BULLISH ACCUMULATION"
             }
 
-        sge_prem = float(cb_res.get("sge_premium_usdt", 28.50))
-        pboc_status = cb_res.get("pboc_status", "🟢 ACTIVE ACCUMULATION (PBOC Purchasing)")
-        demand_idx = float(cb_res.get("demand_index", 88.5))
+        sge_prem = float(cb_res.get("sge_premium_usdt", 12.50))
+        pboc_status = cb_res.get("pboc_status", "🟡 MODERATE PHYSICAL GOLD ACCUMULATION")
+        demand_idx = float(cb_res.get("demand_index", 80.0))
 
         # 4. Google Macro Satellite Alpha (10Y TIPS Real Yields & DXY Velocity)
         macro_bias = "BULLISH_MACRO"
@@ -288,38 +309,42 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
         except Exception:
             pass
 
-        # 5. Super Smart Multi-Factor Confluence Synthesis & Fiduciary Guards
-        action = raw_action if raw_action in ["BUY", "SELL"] else "BUY"
+        # 5. Super Smart Multi-Factor Confluence Synthesis & Fiduciary Guards (Zero Forced Flips)
+        action = raw_action if raw_action in ["BUY", "SELL"] else "WAIT"
         conf = raw_conf
-        confluence_list = list(smc_factors) if smc_factors else ["M15 Order Block Mitigation"]
+        confluence_list = list(smc_factors) if smc_factors else ["M15 Market Structure"]
 
-        # Factor A: SGE Central Bank Physical Flow Confluence
+        # Factor A: SGE Central Bank Physical Flow Confluence (Strictly Respect Structure, Zero Forced Flips)
         if sge_prem >= 20.0:
             if action == "BUY":
                 conf += 8.5
                 confluence_list.append(f"Heavy Central Bank OTC Accumulation (+${sge_prem:.2f}/oz SGE Premium)")
-            else:
-                # Strong physical OTC drain creates violent short squeeze risk: override retail short bias
-                conf -= 20.0
-                action = "BUY"
-                confluence_list.append(f"SGE Premium (+${sge_prem:.2f}/oz) Overrode Short Bias into Bullish Flow")
-        elif sge_prem >= 10.0:
+            elif action == "SELL":
+                # High physical OTC premium adds caution against aggressive shorting without structural confirmation
+                conf = max(52.0, conf - 10.0)
+                confluence_list.append(f"Caution: SGE Premium (+${sge_prem:.2f}/oz) Signals Physical Demand Support")
+        elif sge_prem >= 8.0:
             if action == "BUY":
                 conf += 4.5
                 confluence_list.append(f"Active PBOC OTC Demand (+${sge_prem:.2f}/oz SGE Premium)")
+        elif sge_prem < -3.0:
+            if action == "SELL":
+                conf += 6.5
+                confluence_list.append(f"SGE Discount ({sge_prem:.2f}/oz) Confirms Physical Liquidity Drain")
 
         # Factor B: Google Macro Satellite & 10Y TIPS Real Yields Synergy
         if tips_bias == "STRONG_BULLISH" or real_yield_10y < 1.40:
             if action == "BUY":
                 conf += 7.5
                 confluence_list.append(f"Falling 10Y TIPS Real Yields ({real_yield_10y:.2f}% Real Yield Alpha)")
-            else:
-                conf -= 8.0
+            elif action == "SELL":
+                conf = max(50.0, conf - 8.0)
         elif tips_bias == "BEARISH" or real_yield_10y > 2.00:
             if action == "SELL":
                 conf += 6.0
-            else:
-                conf -= 10.0
+                confluence_list.append(f"Rising Real Yields ({real_yield_10y:.2f}% Non-Yielding Asset Headwind)")
+            elif action == "BUY":
+                conf = max(50.0, conf - 10.0)
 
         # Factor C: DXY Dollar Index Velocity
         if dxy_signal == "BULLISH_LIQUIDITY" or dxy_index < 101.5:
@@ -328,7 +353,10 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
                 confluence_list.append(f"Softening US Dollar DXY ({dxy_index:.2f} Liquidity Expansion)")
         elif dxy_index > 105.0:
             if action == "BUY":
-                conf -= 6.0
+                conf = max(50.0, conf - 6.0)
+            elif action == "SELL":
+                conf += 5.0
+                confluence_list.append(f"Surging US Dollar DXY ({dxy_index:.2f} Flight to Cash)")
 
         # Factor D: Institutional Kill Zone Window
         if any(z in kill_zone for z in ["London", "NY", "LONDON", "NEW_YORK", "Open"]):
@@ -338,18 +366,22 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
         # Factor E: Strict Invariant 16 Anti-Oversold Short Guard (15m RSI <= 38.0)
         rsi_15m = 50.0
         try:
-            rsi_15m = float(market_data.get_symbol_rsi("PAXGUSDT", "15m"))
+            rsi_15m = float(market_data.get_symbol_rsi("XAUUSDT", "15m"))
         except Exception:
-            pass
+            try:
+                rsi_15m = float(market_data.get_symbol_rsi("PAXGUSDT", "15m"))
+            except Exception:
+                pass
 
         if action == "SELL" and rsi_15m <= 38.0:
-            action = "BUY"
-            conf = 88.0
+            action = "WAIT"
+            conf = 60.0
             confluence_list.append(f"Anti-Oversold Short Guard Active (15m RSI {rsi_15m:.1f} <= 38.0 Bottom Rejection)")
 
         # Factor F: Strict Invariant 43 Anti-Exhaustion Guard (15m RSI >= 78.0)
         if action == "BUY" and rsi_15m >= 78.0:
-            conf = max(76.0, conf - 15.0)
+            action = "WAIT"
+            conf = 60.0
             confluence_list.append(f"Anti-Exhaustion Guard Active (15m RSI {rsi_15m:.1f} >= 78.0 Overextended)")
 
         # 4b. Execute 6-Engine Quantitative Mathematical Radar (Hurst, Kalman, OU, FFT, Bayesian, GARCH)
@@ -368,24 +400,38 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
         except Exception as e:
             pass
 
-        # Fuse Bayesian Posterior Win Probability and Hurst Fractal Dimension
-        bayes_bull = 88.5
+        # Fuse Bayesian Posterior Win Probability and Directional Alignment
+        bayes_bull = 50.0
+        bayes_bear = 50.0
+        final_conf = conf
+        target_prob = 50.0
         if math_res:
-            bayes_bull = float(math_res.get("bayesian_probability", {}).get("bullish_pct", 88.5))
-            hurst_val = float(math_res.get("hurst_exponent", 0.65))
+            bayes_bull = float(math_res.get("bayesian_probability", {}).get("bullish_pct", 50.0))
+            bayes_bear = float(math_res.get("bayesian_probability", {}).get("bearish_pct", 50.0))
+            hurst_val = float(math_res.get("hurst_exponent", 0.50))
             kalman_v = float(math_res.get("kalman", {}).get("velocity", 0.0))
 
             if hurst_val > 0.55:
                 confluence_list.append(f"Hurst Exponent {hurst_val:.2f} (Persistent Trend Alpha)")
+            elif hurst_val < 0.45:
+                confluence_list.append(f"Hurst Exponent {hurst_val:.2f} (Mean Reverting Range)")
             if abs(kalman_v) >= 0.05:
                 confluence_list.append(f"Kalman De-Noised Velocity ({'+' if kalman_v > 0 else ''}{kalman_v:.2f} $/bar)")
-            confluence_list.append(f"Bayesian Win Expectancy {bayes_bull:.1f}% [Mathematical Edge]")
 
-            # Blend Bayesian Probability into Final Confidence Score
-            target_prob = bayes_bull if action == "BUY" else (100.0 - bayes_bull)
-            final_conf = min(98.8, max(78.5, round((conf * 0.40) + (target_prob * 0.60), 1)))
+            # Blend Bayesian Probability matching trade direction
+            if action == "BUY":
+                target_prob = bayes_bull
+                confluence_list.append(f"Bayesian Win Expectancy {target_prob:.1f}% [Mathematical Edge]")
+                final_conf = min(98.8, max(55.0, round((conf * 0.40) + (target_prob * 0.60), 1)))
+            elif action == "SELL":
+                target_prob = bayes_bear
+                confluence_list.append(f"Bayesian Short Expectancy {target_prob:.1f}% [Mathematical Edge]")
+                final_conf = min(98.8, max(55.0, round((conf * 0.40) + (target_prob * 0.60), 1)))
+            else:
+                target_prob = 50.0
+                final_conf = 50.0
         else:
-            final_conf = min(98.8, max(78.5, conf))
+            final_conf = min(98.8, max(50.0, conf))
 
         # 6. Dynamic Volatility Cones & 3D Coordinates Deck
         entry_p = round(float(smc_res.get("entry_price") or gold_p), 2)
@@ -454,18 +500,18 @@ async def get_cached_gold_signal(chat_id: int = 0) -> dict:
                 "real_yield_10y": real_yield_10y,
                 "recommended_lots": 0.05,
                 "mathematical_edge": {
-                    "hurst_exponent": math_res.get("hurst_exponent", 0.68) if math_res else 0.68,
-                    "fractal_dimension": math_res.get("fractal_dimension", 1.32) if math_res else 1.32,
-                    "market_regime": math_res.get("market_regime", "PERSISTENT_TREND") if math_res else "PERSISTENT_TREND",
-                    "kalman_velocity": math_res.get("kalman", {}).get("velocity", 0.25) if math_res else 0.25,
-                    "kalman_bias": math_res.get("kalman", {}).get("velocity_bias", "BULLISH_THRUST") if math_res else "BULLISH_THRUST",
-                    "bayesian_win_probability_pct": bayes_bull,
+                    "hurst_exponent": math_res.get("hurst_exponent", 0.50) if math_res else 0.50,
+                    "fractal_dimension": math_res.get("fractal_dimension", 1.50) if math_res else 1.50,
+                    "market_regime": math_res.get("market_regime", "RANDOM_WALK") if math_res else "RANDOM_WALK",
+                    "kalman_velocity": math_res.get("kalman", {}).get("velocity", 0.0) if math_res else 0.0,
+                    "kalman_bias": math_res.get("kalman", {}).get("velocity_bias", "STATIONARY") if math_res else "STATIONARY",
+                    "bayesian_win_probability_pct": round(target_prob, 1),
                     "garch_forecast_sigma_pct": math_res.get("garch_volatility", {}).get("forecast_sigma_pct", 0.35) if math_res else 0.35,
                     "volatility_cone_usd": math_res.get("garch_volatility", {}).get("volatility_cone_95_usd", 12.50) if math_res else 12.50,
                     "dynamic_sl_buffer_usd": risk_step,
                     "ou_half_life_bars": math_res.get("ornstein_uhlenbeck", {}).get("half_life_bars", 14.5) if math_res else 14.5,
-                    "fft_cycle_phase": math_res.get("fft_cycle", {}).get("cycle_phase", "EXPANSION_ASCENT") if math_res else "EXPANSION_ASCENT",
-                    "math_verdict": math_res.get("math_verdict", "STRONG_BUY") if math_res else "STRONG_BUY"
+                    "fft_cycle_phase": math_res.get("fft_cycle", {}).get("cycle_phase", "EQUILIBRIUM") if math_res else "EQUILIBRIUM",
+                    "math_verdict": math_res.get("math_verdict", ("STRONG_BUY" if action == "BUY" else ("STRONG_SELL" if action == "SELL" else "NEUTRAL_WAIT"))) if math_res else ("STRONG_BUY" if action == "BUY" else ("STRONG_SELL" if action == "SELL" else "NEUTRAL_WAIT"))
                 }
             }
         }

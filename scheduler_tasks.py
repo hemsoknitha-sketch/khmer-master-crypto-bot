@@ -5545,22 +5545,25 @@ def build_gold_signal_telegram_alert(signal_data: dict, user_lang: str = "khmer"
     from datetime import datetime, timezone, timedelta
 
     sig = signal_data.get("signal", {})
-    action = str(sig.get("action", "BUY")).upper()
-    cur_p = float(signal_data.get("current_price", 2650.0))
-    conf = float(sig.get("confidence", 92.0))
+    action = str(sig.get("action", "WAIT")).upper()
+    cur_p = float(signal_data.get("current_price", 4110.0))
+    conf = float(sig.get("confidence", 75.0))
     math_edge = sig.get("mathematical_edge", {})
 
+    entry_zone = sig.get("entry_zone", {})
+    entry_ideal = float(entry_zone.get("ideal", cur_p))
+    if cur_p <= 0 or abs(cur_p - entry_ideal) > 50.0:
+        cur_p = entry_ideal
+
     bayes_prob = float(math_edge.get("bayesian_win_probability_pct", conf))
-    hurst_h = float(math_edge.get("hurst_exponent", 0.68))
-    kalman_v = float(math_edge.get("kalman_velocity", 0.25))
+    hurst_h = float(math_edge.get("hurst_exponent", 0.50))
+    kalman_v = float(math_edge.get("kalman_velocity", 0.0))
     vol_cone = float(math_edge.get("volatility_cone_usd", 12.50))
-    sge_prem = float(sig.get("sge_premium_usd", 28.50))
+    sge_prem = float(sig.get("sge_premium_usd", 12.50))
     tips_bias = sig.get("tips_real_yield_bias", "STRONG_BULLISH")
     real_yield = float(sig.get("real_yield_10y", 1.35))
     kill_zone = str(sig.get("kill_zone", "LONDON_OPEN_KILL_ZONE")).replace("_", " ")
 
-    entry_zone = sig.get("entry_zone", {})
-    entry_ideal = float(entry_zone.get("ideal", cur_p))
     entry_min = float(entry_zone.get("min", entry_ideal - 1.20))
     entry_max = float(entry_zone.get("max", entry_ideal + 1.20))
     sl_p = float(sig.get("stop_loss", entry_ideal - 6.50 if action == "BUY" else entry_ideal + 6.50))
@@ -5586,8 +5589,27 @@ def build_gold_signal_telegram_alert(signal_data: dict, user_lang: str = "khmer"
     }
     dow = days_km.get(now_ict.strftime("%A"), now_ict.strftime("%A"))
 
-    action_emoji = "🟢 STRONG BUY" if action == "BUY" else "🔴 STRONG SELL"
-    action_khmer = "ស្ទាក់ទិញតាមស្ថាប័ន" if action == "BUY" else "សម្រុកលក់តាមស្ថាប័ន"
+    if action == "BUY":
+        action_emoji = "🟢 STRONG BUY"
+        action_khmer = "ស្ទាក់ទិញតាមស្ថាប័ន"
+    elif action == "SELL":
+        action_emoji = "🔴 STRONG SELL"
+        action_khmer = "សម្រុកលក់តាមស្ថាប័ន"
+    else:
+        action_emoji = "🟡 NEUTRAL WAIT"
+        action_khmer = "រង់ចាំការបញ្ជាក់រចនាសម្ព័ន្ធ"
+
+    if action in ["BUY", "SELL"]:
+        preset_block = (
+            f"⚡ **បញ្ជាអនុវត្តរហ័ស (1-Tap Copyable Presets) ៖**\n"
+            f"👉 MT5 Auto-Trade ៖ `` `/order XAUUSD {action} 0.05` ``\n"
+            f"👉 Binance PAXG ៖ `` `/scalp PAXGUSDT 100 1.5` ``\n"
+        )
+    else:
+        preset_block = (
+            f"⚡ **បញ្ជាអនុវត្តរហ័ស (1-Tap Copyable Presets) ៖**\n"
+            f"👉 រង់ចាំរចនាសម្ព័ន្ធ ៖ `` `/gold_signal` `` (ចុចឆែកឡើងវិញ)\n"
+        )
 
     div = ui_standards.DIVIDER_HEAVY
 
@@ -5618,9 +5640,7 @@ def build_gold_signal_telegram_alert(signal_data: dict, user_lang: str = "khmer"
         f"• **US 10Y TIPS Real Yields ៖** `{real_yield:.2f}%` ({tips_bias})\n"
         f"• **Dynamic Volatility Cone ៖** `±${vol_cone:.2f}` (GARCH 95% Band)\n"
         f"{div}\n"
-        f"⚡ **បញ្ជាអនុវត្តរហ័ស (1-Tap Copyable Presets) ៖**\n"
-        f"👉 MT5 Auto-Trade ៖ `` `/order XAUUSD {action} 0.05` ``\n"
-        f"👉 Binance PAXG ៖ `` `/scalp PAXGUSDT 100 1.5` ``\n"
+        f"{preset_block}"
         f"{div}\n"
         f"_Angkor Quant_\n"
         f"_AI Quantitative Intelligence for Global Markets_\n"

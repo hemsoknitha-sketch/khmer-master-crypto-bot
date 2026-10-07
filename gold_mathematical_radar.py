@@ -554,11 +554,62 @@ def analyze_gold_mathematical_edge(
         return _MATH_RADAR_CACHE["data"].copy()
 
     # 1. Prepare Close Prices Array
-    if candles_df is not None and not candles_df.empty and 'close' in candles_df.columns:
+    closes = None
+    if candles_df is not None and not candles_df.empty and 'close' in candles_df.columns and len(candles_df) >= 15:
         closes = candles_df['close'].values.astype(float)
     else:
-        # Fallback synthetic array anchored to current_price
-        closes = np.linspace(current_price - 8.0, current_price, 40)
+        # High-speed direct fetch from Binance Futures if candles_df is not provided
+        try:
+            import requests
+            r_k = requests.get("https://fapi.binance.com/fapi/v1/klines?symbol=XAUUSDT&interval=15m&limit=50", timeout=2.5)
+            if r_k.status_code == 200:
+                raw_k = r_k.json()
+                if isinstance(raw_k, list) and len(raw_k) >= 15:
+                    closes = np.array([float(k[4]) for k in raw_k])
+        except Exception:
+            pass
+
+    # Strictly forbid synthetic upward ramps (np.linspace). If data is truly unavailable, return honest WAIT status!
+    if closes is None or len(closes) < 15:
+        default_risk = round(max(4.80, current_price * 0.0028), 2)
+        return {
+            "status": "waiting_data",
+            "timestamp": now,
+            "current_price": round(current_price, 2),
+            "math_verdict": "NEUTRAL_WAIT",
+            "math_composite_confidence": 50.0,
+            "hurst_exponent": 0.50,
+            "fractal_dimension": 1.50,
+            "market_regime": "RANDOM_WALK",
+            "kalman": {
+                "filtered_price": current_price,
+                "velocity": 0.0,
+                "velocity_bias": "STATIONARY",
+                "thrust_score": 0.0
+            },
+            "ornstein_uhlenbeck": {
+                "equilibrium_mu": current_price,
+                "half_life_bars": 15.0,
+                "z_score": 0.0,
+                "spread_bias": "EQUILIBRIUM"
+            },
+            "fft_cycle": {
+                "dominant_period_bars": 16,
+                "cycle_phase": "EQUILIBRIUM",
+                "cycle_power_pct": 50.0,
+                "cycle_action_bias": "NEUTRAL"
+            },
+            "bayesian_probability": {
+                "bullish_pct": 50.0,
+                "bearish_pct": 50.0,
+                "conviction": "NEUTRAL_EQUILIBRIUM"
+            },
+            "garch_volatility": {
+                "forecast_sigma_pct": 0.35,
+                "volatility_cone_95_usd": round(default_risk * 1.5, 2),
+                "dynamic_risk_buffer_usd": default_risk
+            }
+        }
 
     # 2. Execute 6 Mathematical Engines
     hurst_res = compute_hurst_exponent(closes)
