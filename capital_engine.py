@@ -219,6 +219,8 @@ class CapitalComEngine:
         # In-Memory Cache (Sub-millisecond fast responses)
         self._price_cache: Dict[str, Dict[str, Any]] = {}
         self._cache_ttl = 4.0  # 4 seconds cache for live quotes
+        self._accounts_cache: Dict[str, Any] = {}
+        self._accounts_cache_time: float = 0.0
 
     @property
     def custom_chat_id(self) -> Optional[int]:
@@ -346,8 +348,12 @@ class CapitalComEngine:
     # --------------------------------------------------------------------------
     # Account & Capital Overview
     # --------------------------------------------------------------------------
-    def get_accounts(self) -> Dict[str, Any]:
+    def get_accounts(self, force_refresh: bool = False) -> Dict[str, Any]:
         """Fetches full account information, equity, and margin balances with smart funded account selection."""
+        now = time.time()
+        if not force_refresh and self._accounts_cache and (now - self._accounts_cache_time) < 4.0:
+            return self._accounts_cache
+
         if not self.ensure_session():
             err_detail = self.last_auth_error or "Unable to establish valid session."
             return {"success": False, "error": f"Unable to establish valid session: {err_detail}"}
@@ -396,11 +402,14 @@ class CapitalComEngine:
                         self.active_account_id = primary.get("accountId")
                         self.account_currency = primary.get("currency", "USD")
 
-                    return {
+                    res_acc = {
                         "success": True,
                         "accounts": accounts,
                         "primary_account": primary or {}
                     }
+                    self._accounts_cache = res_acc
+                    self._accounts_cache_time = now
+                    return res_acc
                 elif res.status_code == 401 and attempt == 0:
                     self.cst_token = None
                     self.security_token = None
@@ -478,6 +487,10 @@ class CapitalComEngine:
             "status": primary.get("status", "ACTIVE"),
             "is_demo": self.is_demo
         }
+
+    def invalidate_account_cache(self):
+        """Forces next get_accounts() call to fetch fresh balance from broker."""
+        self._accounts_cache_time = 0.0
 
     def sync_closed_positions(self, chat_id: Optional[int] = None) -> int:
         """
@@ -797,6 +810,28 @@ class CapitalComEngine:
         if size < min_size:
             size = min_size  # Auto-clamp to minimum deal size
 
+        # Step 1c: Pre-Flight Margin Availability Verification (Invariant 33 Zero Negligence)
+        m_factor = float(market_info.get("margin_factor", 0.05) or 0.05)
+        if m_factor > 1.0:
+            m_factor = m_factor / 100.0
+        ref_px = float(market_info.get("ask" if dir_upper == "BUY" else "bid", 0.0) or 0.0)
+        if ref_px > 0:
+            req_margin = ref_px * size * m_factor
+            try:
+                bal_chk = self.get_account_balance()
+                if bal_chk.get("success"):
+                    avail_cash = float(bal_chk.get("available", 0.0) or 0.0)
+                    if req_margin > 0 and avail_cash < req_margin:
+                        logger.warning(f"🛡️ [MARGIN PRE-FLIGHT] Order blocked for {resolved_epic}: Required margin ${req_margin:,.2f} exceeds available cash ${avail_cash:,.2f}.")
+                        return {
+                            "success": False,
+                            "error": f"RC_NOT_ENOUGH_MARGIN: Required ${req_margin:,.2f} > Avail ${avail_cash:,.2f}",
+                            "required_margin": req_margin,
+                            "available_cash": avail_cash
+                        }
+            except Exception as e_bal:
+                logger.debug(f"Balance check error in place_position: {e_bal}")
+
         # Step 2: Prepare Payload
         payload: Dict[str, Any] = {
             "epic": resolved_epic,
@@ -832,6 +867,7 @@ class CapitalComEngine:
                     return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref, "raw_conf": conf}
                 real_deal_id = conf.get("deal_id") or deal_ref
                 fill_price = conf.get("level")
+                self.invalidate_account_cache()
                 return {
                     "success": True,
                     "epic": resolved_epic,
@@ -1117,6 +1153,27 @@ class CapitalComEngine:
         if size < min_size:
             size = min_size  # Auto-clamp to minimum deal size
 
+        # Step 1c: Pre-Flight Margin Availability Verification (Invariant 33 Zero Negligence)
+        m_factor = float(market_info.get("margin_factor", 0.05) or 0.05)
+        if m_factor > 1.0:
+            m_factor = m_factor / 100.0
+        if level > 0:
+            req_margin = level * size * m_factor
+            try:
+                bal_chk = self.get_account_balance()
+                if bal_chk.get("success"):
+                    avail_cash = float(bal_chk.get("available", 0.0) or 0.0)
+                    if req_margin > 0 and avail_cash < req_margin:
+                        logger.warning(f"🛡️ [MARGIN PRE-FLIGHT] Working Order blocked for {resolved_epic}: Required margin ${req_margin:,.2f} exceeds available cash ${avail_cash:,.2f}.")
+                        return {
+                            "success": False,
+                            "error": f"RC_NOT_ENOUGH_MARGIN: Required ${req_margin:,.2f} > Avail ${avail_cash:,.2f}",
+                            "required_margin": req_margin,
+                            "available_cash": avail_cash
+                        }
+            except Exception as e_bal:
+                logger.debug(f"Balance check error in place_working_order: {e_bal}")
+
         prec = _get_tradfi_precision(resolved_epic, level or 0.0)
 
         # Step 2: Prepare Working Order Payload
@@ -1157,6 +1214,7 @@ class CapitalComEngine:
                     logger.warning(f"❌ Working Order {deal_ref} rejected by broker: {err_r} | Raw confirm: {conf.get('data')}")
                     return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref, "raw_conf": conf}
                 real_deal_id = conf.get("deal_id") or deal_ref
+                self.invalidate_account_cache()
                 return {
                     "success": True,
                     "epic": resolved_epic,
@@ -4669,6 +4727,7 @@ class CapitalOpeningRangeBreakoutEngine:
         self._session_ranges: Dict[str, Dict[str, Any]] = {}   # session_key -> { epic -> range_data }
         self._session_trades = set()                           # "{session}_{date}_{epic}"
         self._armed_traps: Dict[str, Dict[str, Any]] = {}     # trap_key -> trap_dict
+        self._arming_in_progress = set()                       # In-flight arming lock preventing duplicate submissions
         self._last_cycle_ts = 0.0
         self._last_oco_check_ts = 0.0
         self._stats = {
@@ -5068,7 +5127,7 @@ class CapitalOpeningRangeBreakoutEngine:
             resolved_epic = EPIC_MAP.get(epic, epic)
             trap_key = f"{session_name}_{date_str}_{resolved_epic}"
 
-            if trap_key in self._armed_traps or trap_key in self._session_trades:
+            if trap_key in self._armed_traps or trap_key in self._session_trades or trap_key in self._arming_in_progress:
                 continue
 
             range_data = self.compute_opening_range(resolved_epic, session_name)
@@ -5103,6 +5162,13 @@ class CapitalOpeningRangeBreakoutEngine:
 
             if not allow_buy_trap and not allow_sell_trap:
                 continue
+
+            # Query instrument market rules once per asset to eliminate redundant latency
+            m_det = engine.get_market_details(resolved_epic)
+            min_deal = float(m_det.get("min_deal_size", 0.01) if m_det else 0.01)
+            m_factor = float(m_det.get("margin_factor", 0.05) if m_det else 0.05)
+            if m_factor > 1.0:
+                m_factor = m_factor / 100.0
 
             trap_entry = {
                 "key": trap_key,
@@ -5145,26 +5211,45 @@ class CapitalOpeningRangeBreakoutEngine:
                 user_engine = get_user_capital_engine(uid, is_demo=is_demo)
                 budget = float(u_cfg.get("budget", 50.0) or 50.0)
 
-                buy_size = get_capital_kelly_sizer().calculate_lot_size(
-                    chat_id=uid, epic=resolved_epic, entry_price=buy_trigger,
-                    sl_price=buy_sl, tp_price=buy_tp, confidence_score=85.0, budget=budget
-                )
-                sell_size = get_capital_kelly_sizer().calculate_lot_size(
-                    chat_id=uid, epic=resolved_epic, entry_price=sell_trigger,
-                    sl_price=sell_sl, tp_price=sell_tp, confidence_score=85.0, budget=budget
-                )
-
+                # Available balance pre-flight check to eliminate RC_NOT_ENOUGH_MARGIN
+                user_avail = budget
                 try:
-                    m_det = await asyncio.to_thread(user_engine.get_market_details, resolved_epic)
-                    min_deal = float(m_det.get("min_deal_size", 0.01) if m_det else 0.01)
-                    buy_size = max(float(buy_size or 0.0), min_deal)
-                    sell_size = max(float(sell_size or 0.0), min_deal)
+                    bal_info = await asyncio.to_thread(user_engine.get_account_balance)
+                    if bal_info.get("success"):
+                        user_avail = float(bal_info.get("available", 0.0) or 0.0)
                 except Exception:
                     pass
 
+                # Dynamic position sizing with available equity awareness
+                buy_size = get_capital_kelly_sizer().calculate_lot_size(
+                    chat_id=uid, epic=resolved_epic, entry_price=buy_trigger,
+                    sl_price=buy_sl, tp_price=buy_tp, confidence_score=85.0, budget=budget,
+                    available_equity=user_avail
+                )
+                sell_size = get_capital_kelly_sizer().calculate_lot_size(
+                    chat_id=uid, epic=resolved_epic, entry_price=sell_trigger,
+                    sl_price=sell_sl, tp_price=sell_tp, confidence_score=85.0, budget=budget,
+                    available_equity=user_avail
+                )
+
+                # Clamp to affordable margin (Invariant 8 & 33)
+                max_affordable_buy = max(0.0, (user_avail * 0.85) / max(1.0, buy_trigger * m_factor))
+                max_affordable_sell = max(0.0, (user_avail * 0.85) / max(1.0, sell_trigger * m_factor))
+
+                user_allow_buy = allow_buy_trap and (max_affordable_buy >= min_deal)
+                user_allow_sell = allow_sell_trap and (max_affordable_sell >= min_deal)
+
+                if not user_allow_buy and not user_allow_sell:
+                    logger.debug(f"🛡️ [ORB MARGIN SHIELD] User {uid} available balance (${user_avail:.2f}) insufficient for min margin on {resolved_epic} (Min Deal: {min_deal}, Req Margin: ~${buy_trigger * min_deal * m_factor:.2f}). Skipped.")
+                    continue
+
+                size_prec = 2 if min_deal >= 0.01 else 4
+                buy_size = round(max(min_deal, min(float(buy_size or min_deal), max_affordable_buy)), size_prec)
+                sell_size = round(max(min_deal, min(float(sell_size or min_deal), max_affordable_sell)), size_prec)
+
                 u_trap = {"buy_deal_id": None, "sell_deal_id": None}
 
-                if allow_buy_trap:
+                if user_allow_buy:
                     buy_res = await asyncio.to_thread(
                         user_engine.place_working_order,
                         epic=resolved_epic,
@@ -5180,7 +5265,7 @@ class CapitalOpeningRangeBreakoutEngine:
                         u_trap["buy_deal_id"] = str(buy_res.get("dealId") or buy_res.get("deal_reference", ""))
                         logger.info(f"🎯 [ORB TRAP] Armed BUY STOP for User {uid} on {resolved_epic} @ ${buy_trigger}")
 
-                if allow_sell_trap:
+                if user_allow_sell:
                     sell_res = await asyncio.to_thread(
                         user_engine.place_working_order,
                         epic=resolved_epic,

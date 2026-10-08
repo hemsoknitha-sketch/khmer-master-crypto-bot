@@ -8308,6 +8308,8 @@ async def perpetual_wealth_monitor(app: Application):
         print(f"⚠️ [PERPETUAL WEALTH MONITOR NOTICE]: {e}")
 
 
+_capital_auto_lock = asyncio.Lock()
+
 async def capital_auto_monitor(app: Application):
     """
     🏛️ 24/7 Capital.com TradFi Autonomous Wealth Harvester Monitor Loop
@@ -8315,12 +8317,17 @@ async def capital_auto_monitor(app: Application):
     Golden 80% Trailing Ratchet, and institutional multi-asset entry setups.
     Fuses Google Macro Satellite + 33 AI Ensemble Models + Radars.
     """
-    try:
-        import capital_engine
-        await capital_engine.run_capital_auto_cycle(app=app)
-    except Exception as e:
-        print(f"⚠️ [CAPITAL AUTO MONITOR NOTICE]: {e}")
+    if _capital_auto_lock.locked():
+        return
+    async with _capital_auto_lock:
+        try:
+            import capital_engine
+            await capital_engine.run_capital_auto_cycle(app=app)
+        except Exception as e:
+            print(f"⚠️ [CAPITAL AUTO MONITOR NOTICE]: {e}")
 
+
+_capital_forex_lock = asyncio.Lock()
 
 async def capital_forex_monitor(app: Application):
     """
@@ -8332,11 +8339,14 @@ async def capital_forex_monitor(app: Application):
     - Weekend: 24/7 Crypto Lead-Lag Arbitrage
     - Compounding IB Spread Rebates ($2.40 - $4.00/lot)
     """
-    try:
-        import capital_engine
-        await capital_engine.run_capital_forex_cycle(app=app)
-    except Exception as e:
-        print(f"⚠️ [CAPITAL FOREX MONITOR NOTICE]: {e}")
+    if _capital_forex_lock.locked():
+        return
+    async with _capital_forex_lock:
+        try:
+            import capital_engine
+            await capital_engine.run_capital_forex_cycle(app=app)
+        except Exception as e:
+            print(f"⚠️ [CAPITAL FOREX MONITOR NOTICE]: {e}")
 
 
 async def reachsey_crypto_monitor(app: Application):
