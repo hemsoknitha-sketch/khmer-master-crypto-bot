@@ -4499,7 +4499,8 @@ class CapitalOpeningRangeBreakoutEngine:
             return None
 
         # Determine start hour and minute for the opening range
-        target_hour = 8 if session_name == "LONDON" else 13
+        # Supports both Broker UTC (08:00 London, 13:30 NY) and Local ICT (15:00 London, 20:30 NY)
+        target_hours = [8, 15] if session_name == "LONDON" else [13, 20]
         target_min = 0 if session_name == "LONDON" else 30
 
         or_candles = []
@@ -4512,7 +4513,7 @@ class CapitalOpeningRangeBreakoutEngine:
                     try:
                         c_hour = int(parts[0])
                         c_min = int(parts[1])
-                        if c_hour == target_hour and (target_min <= c_min < target_min + 15):
+                        if c_hour in target_hours and (target_min <= c_min < target_min + 15):
                             or_candles.append(c)
                     except ValueError:
                         pass
@@ -4616,6 +4617,13 @@ class CapitalOpeningRangeBreakoutEngine:
                 confidence_score=85.0,  # High confidence institutional ORB breakout
                 budget=budget
             )
+            # Dynamic clamp to broker min deal size (eliminates -1013 / min_lot broker rejections)
+            try:
+                mkt_info = await asyncio.to_thread(user_engine.get_market_details, resolved_epic)
+                min_deal = float(mkt_info.get("min_deal_size", 0.01) if mkt_info else 0.01)
+                size = max(float(size or 0.0), min_deal)
+            except Exception:
+                pass
 
             trade_res = await asyncio.to_thread(
                 user_engine.place_position,
@@ -4666,11 +4674,12 @@ class CapitalOpeningRangeBreakoutEngine:
                         user_lang = db.get_user_language(chat_id)
                         import ui_standards
                         env_lbl = "DEMO ($10,000)" if is_demo else "LIVE MAINNET"
+                        exec_emoji = "🟢" if direction == "BUY" else "🔴"
                         dir_emoji = "🟢 LONG BREAKOUT" if direction == "BUY" else "🔴 SHORT BREAKDOWN"
 
                         if user_lang == 'khmer':
                             notif_msg = (
-                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** 🟢\n"
+                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** {exec_emoji}\n"
                                 f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"🤖 **ស្ថានភាព ៖** `បានចូល Position ដោយស្វ័យប្រវត្ត ១០០% (AUTO FILLED)`\n"
@@ -4694,7 +4703,7 @@ class CapitalOpeningRangeBreakoutEngine:
                             )
                         else:
                             notif_msg = (
-                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** 🟢\n"
+                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** {exec_emoji}\n"
                                 f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"🤖 **Status:** `Successfully Entered & Active (AUTO FILLED)`\n"
