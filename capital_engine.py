@@ -1012,6 +1012,236 @@ class CapitalComEngine:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def place_working_order(
+        self,
+        epic: str,
+        direction: str,
+        size: float,
+        level: float,
+        order_type: str = "STOP",
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        guaranteed_stop: bool = False,
+        time_in_force: str = "GOOD_TILL_CANCELLED",
+        good_till_date: Optional[str] = None,
+        max_allowed_spread: Optional[float] = None,
+        bypass_citadel: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Places a pending Working Order (STOP for Breakout Trap, LIMIT for Retest Trap)
+        on Capital.com with attached Stop-Loss & Take-Profit.
+        
+        Parameters:
+        - epic: Instrument symbol (e.g. 'GOLD', 'US500', 'OIL_CRUDE')
+        - direction: 'BUY' or 'SELL'
+        - size: Number of contracts / lot size
+        - level: Trigger price level for the pending order
+        - order_type: 'STOP' (Breakout Trap) or 'LIMIT' (Retest Trap)
+        - stop_loss: Absolute price level for Stop-Loss
+        - take_profit: Absolute price level for Take-Profit
+        - guaranteed_stop: Guaranteed stop execution flag
+        - time_in_force: 'GOOD_TILL_CANCELLED' or 'GOOD_TILL_DATE'
+        - good_till_date: Expiry date string (UTC) if time_in_force is GOOD_TILL_DATE
+        - max_allowed_spread: Maximum acceptable spread before rejecting order
+        - bypass_citadel: If True, bypasses SuperSmartCapitalCitadel validation
+        """
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        dir_upper = direction.upper()
+        type_upper = order_type.upper()
+        if dir_upper not in ["BUY", "SELL"]:
+            return {"success": False, "error": f"Invalid direction: {direction}. Must be 'BUY' or 'SELL'."}
+        if type_upper not in ["STOP", "LIMIT"]:
+            return {"success": False, "error": f"Invalid order_type: {order_type}. Must be 'STOP' or 'LIMIT'."}
+
+        # Step 1: Check Market Status & Spread
+        market_info = self.get_market_details(resolved_epic)
+        if not market_info.get("success"):
+            return {"success": False, "error": f"Market data query failed: {market_info.get('error')}"}
+
+        if market_info.get("market_status") != "TRADEABLE":
+            status = market_info.get("market_status")
+            return {
+                "success": False,
+                "error": f"Market {resolved_epic} is currently {status} (TradFi markets closed on weekends/holidays)."
+            }
+
+        spread = market_info.get("spread", 0.0)
+        if max_allowed_spread and spread > max_allowed_spread:
+            return {
+                "success": False,
+                "error": f"Spread Guard rejection: Current spread {spread} exceeds max limit {max_allowed_spread}."
+            }
+
+        # Step 1b: Super Smart Capital Citadel Institutional Gatekeeper Lock
+        if not bypass_citadel:
+            try:
+                import super_smart_capital_citadel
+                is_citadel_ok, citadel_reason, citadel_diag = super_smart_capital_citadel.SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper(
+                    epic=resolved_epic,
+                    direction=dir_upper,
+                    engine=self
+                )
+                if not is_citadel_ok:
+                    logger.warning(f"🛑 [SUPER SMART CAPITAL CITADEL] Working Order blocked for {resolved_epic} ({dir_upper}): {citadel_reason}")
+                    return {
+                        "success": False,
+                        "error": f"SUPER SMART CITADEL REJECTED: {citadel_reason}",
+                        "citadel_diagnostics": citadel_diag
+                    }
+            except Exception as e_citadel:
+                logger.debug(f"Citadel gatekeeper evaluation note: {e_citadel}")
+
+        min_size = market_info.get("min_deal_size", 0.01)
+        if size < min_size:
+            size = min_size  # Auto-clamp to minimum deal size
+
+        prec = _get_tradfi_precision(resolved_epic, level or 0.0)
+
+        # Step 2: Prepare Working Order Payload
+        payload: Dict[str, Any] = {
+            "epic": resolved_epic,
+            "direction": dir_upper,
+            "size": round(size, 4),
+            "level": round(level, prec),
+            "type": type_upper,
+            "guaranteedStop": guaranteed_stop
+        }
+        if time_in_force:
+            payload["timeInForce"] = time_in_force
+        if good_till_date:
+            payload["goodTillDate"] = good_till_date
+        if stop_loss is not None and stop_loss > 0:
+            payload["stopLevel"] = round(stop_loss, prec)
+        if take_profit is not None and take_profit > 0:
+            payload["profitLevel"] = round(take_profit, prec)
+
+        # Step 3: Transmit Working Order to POST /api/v1/workingorders
+        url = f"{self.base_url}/workingorders"
+        try:
+            res = self.session.post(url, headers=self.get_auth_headers(), json=payload, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                deal_ref = data.get("dealReference")
+                logger.info(f"Working order submitted! Epic: {resolved_epic} | Dir: {dir_upper} | Type: {type_upper} | Level: {level} | Ref: {deal_ref}")
+                conf = self.get_deal_confirmation(deal_ref) if deal_ref else {}
+                if conf.get("is_rejected"):
+                    err_r = conf.get("reason", "Broker Rejected")
+                    logger.warning(f"❌ Working Order {deal_ref} rejected by broker: {err_r}")
+                    return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref}
+                real_deal_id = conf.get("deal_id") or deal_ref
+                return {
+                    "success": True,
+                    "epic": resolved_epic,
+                    "direction": dir_upper,
+                    "order_type": type_upper,
+                    "level": round(level, prec),
+                    "size": size,
+                    "deal_reference": deal_ref,
+                    "dealId": real_deal_id,
+                    "is_demo": self.is_demo,
+                    "response": data
+                }
+            else:
+                err_data = res.json() if res.content else {}
+                err_code = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
+                logger.error(f"Working order placement failed: {err_code}")
+
+                # Auto-Recovery: If exchange rejected attached SL/TP distance, submit clean Working Order first
+                if "stoploss" in err_code.lower() or "profitlevel" in err_code.lower():
+                    logger.warning(f"Exchange SL/TP rejected for working order ({err_code}). Retrying clean Working Order...")
+                    payload_clean = {
+                        "epic": resolved_epic,
+                        "direction": dir_upper,
+                        "size": round(size, 4),
+                        "level": round(level, prec),
+                        "type": type_upper,
+                        "guaranteedStop": guaranteed_stop
+                    }
+                    if time_in_force:
+                        payload_clean["timeInForce"] = time_in_force
+                    res_clean = self.session.post(url, headers=self.get_auth_headers(), json=payload_clean, timeout=10)
+                    if res_clean.status_code == 200:
+                        data = res_clean.json()
+                        deal_ref = data.get("dealReference")
+                        logger.info(f"✅ Clean Working Order filled! Ref: {deal_ref}")
+                        return {
+                            "success": True,
+                            "epic": resolved_epic,
+                            "direction": dir_upper,
+                            "order_type": type_upper,
+                            "level": round(level, prec),
+                            "size": size,
+                            "deal_reference": deal_ref,
+                            "is_demo": self.is_demo,
+                            "response": data
+                        }
+
+                return {"success": False, "error": err_code}
+        except Exception as e:
+            logger.error(f"Working order placement exception: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_working_orders(self) -> List[Dict[str, Any]]:
+        """
+        Retrieves all pending working orders on Capital.com.
+        Endpoint: GET /api/v1/workingorders
+        """
+        if not self.ensure_session():
+            return []
+        url = f"{self.base_url}/workingorders"
+        try:
+            res = self.session.get(url, headers=self.get_auth_headers(), timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                raw_orders = data.get("workingOrders", [])
+                parsed = []
+                for item in raw_orders:
+                    w_order = item.get("workingOrderData", {})
+                    m_data = item.get("marketData", {})
+                    parsed.append({
+                        "deal_id": str(w_order.get("dealId", "")),
+                        "epic": str(m_data.get("epic") or w_order.get("epic", "")),
+                        "direction": str(w_order.get("direction", "")).upper(),
+                        "order_type": str(w_order.get("orderType", "")).upper(),
+                        "order_level": float(w_order.get("orderLevel", 0.0) or 0.0),
+                        "size": float(w_order.get("orderSize", 0.0) or 0.0),
+                        "stop_level": float(w_order.get("stopLevel", 0.0) or 0.0) if w_order.get("stopLevel") else None,
+                        "profit_level": float(w_order.get("profitLevel", 0.0) or 0.0) if w_order.get("profitLevel") else None,
+                        "created_date": w_order.get("createdDate"),
+                        "raw": item
+                    })
+                return parsed
+            else:
+                logger.warning(f"Failed to fetch working orders: HTTP {res.status_code}")
+                return []
+        except Exception as e:
+            logger.error(f"Error querying working orders: {e}")
+            return []
+
+    def cancel_working_order(self, deal_id: str) -> Dict[str, Any]:
+        """
+        Cancels a pending working order (Stop / Limit order) by dealId.
+        Endpoint: DELETE /api/v1/workingorders/{dealId}
+        """
+        if not self.ensure_session():
+            return {"success": False, "error": "No active session"}
+        url = f"{self.base_url}/workingorders/{deal_id}"
+        try:
+            res = self.session.delete(url, headers=self.get_auth_headers(), timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                deal_ref = data.get("dealReference")
+                logger.info(f"✅ Working order {deal_id} cancelled! Deal Ref: {deal_ref}")
+                return {"success": True, "deal_reference": deal_ref, "dealId": deal_id}
+            else:
+                err_data = res.json() if res.content else {}
+                err_code = err_data.get("errorCode", f"HTTP {res.status_code}: {res.text}")
+                logger.warning(f"Failed to cancel working order {deal_id}: {err_code}")
+                return {"success": False, "error": err_code}
+        except Exception as e:
+            logger.error(f"Error cancelling working order {deal_id}: {e}")
+            return {"success": False, "error": str(e)}
+
     def update_position_stops(
         self,
         deal_id: str,
@@ -4373,7 +4603,9 @@ class CapitalOpeningRangeBreakoutEngine:
     def __init__(self):
         self._session_ranges: Dict[str, Dict[str, Any]] = {}   # session_key -> { epic -> range_data }
         self._session_trades = set()                           # "{session}_{date}_{epic}"
+        self._armed_traps: Dict[str, Dict[str, Any]] = {}     # trap_key -> trap_dict
         self._last_cycle_ts = 0.0
+        self._last_oco_check_ts = 0.0
         self._stats = {
             "total_breakouts_detected": 0,
             "orders_dispatched": 0,
@@ -4728,6 +4960,300 @@ class CapitalOpeningRangeBreakoutEngine:
             logger.error(f"Error executing ORB trade for user {chat_id}: {user_orb_e}")
             return False
 
+    async def arm_session_breakout_traps(self, session_name: str, app=None):
+        """
+        Pre-arms Super Smart Working Order Traps (BUY STOP & SELL STOP OCO Bracket)
+        immediately following 15m Range Formation. Eliminates human manual entry errors,
+        slippage, and emotional chasing.
+        """
+        import datetime
+        import database as db
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+        date_str = now_dt.strftime("%Y-%m-%d")
+
+        active_users = db.get_active_capital_orb_users()
+        active_auto_users = db.get_active_capital_auto_users()
+        all_target_users = {}
+        for u in active_users:
+            all_target_users[u["chat_id"]] = u
+        for u in active_auto_users:
+            if u["chat_id"] not in all_target_users:
+                all_target_users[u["chat_id"]] = u
+
+        if not all_target_users:
+            return
+
+        session_info = self.get_current_session_info()
+        assets = session_info.get("assets", self.LONDON_ASSETS)
+        engine = get_capital_engine(is_demo=False)
+
+        for epic in assets:
+            resolved_epic = EPIC_MAP.get(epic, epic)
+            trap_key = f"{session_name}_{date_str}_{resolved_epic}"
+
+            if trap_key in self._armed_traps or trap_key in self._session_trades:
+                continue
+
+            range_data = self.compute_opening_range(resolved_epic, session_name)
+            if not range_data or not range_data.get("is_sane", True):
+                continue
+
+            or_high = range_data["or_high"]
+            or_low = range_data["or_low"]
+            or_range = range_data["or_range"]
+            or_mid = range_data["or_mid"]
+            atr = range_data.get("atr", or_range)
+
+            prec = _get_tradfi_precision(resolved_epic, or_mid)
+            buffer_dist = max(or_mid * 0.0005, or_range * 0.05)
+
+            buy_trigger = round(or_high + buffer_dist, prec)
+            sell_trigger = round(or_low - buffer_dist, prec)
+
+            buy_sl = round(or_mid, prec)
+            buy_tp = round(or_high + (4.0 * or_range), prec)
+
+            sell_sl = round(or_mid, prec)
+            sell_tp = round(or_low - (4.0 * or_range), prec)
+
+            quant = engine.evaluate_tradfi_quant_signal(resolved_epic)
+            rsi_val = quant.get("rsi", 50.0)
+
+            # Invariant 16: Anti-Oversold Short Guard (blocks SELL STOP if RSI <= 38.0)
+            allow_sell_trap = not (rsi_val <= 38.0)
+            # Anti-Exhaustion Top Guard (blocks BUY STOP if RSI >= 68.0)
+            allow_buy_trap = not (rsi_val >= 68.0)
+
+            if not allow_buy_trap and not allow_sell_trap:
+                continue
+
+            trap_entry = {
+                "key": trap_key,
+                "epic": resolved_epic,
+                "session": session_name,
+                "or_high": or_high,
+                "or_low": or_low,
+                "or_mid": or_mid,
+                "buy_trigger": buy_trigger,
+                "sell_trigger": sell_trigger,
+                "buy_sl": buy_sl,
+                "buy_tp": buy_tp,
+                "sell_sl": sell_sl,
+                "sell_tp": sell_tp,
+                "user_orders": {},
+                "status": "ARMED",
+                "timestamp": time.time()
+            }
+
+            super_admin_id = 859271875
+            sorted_uids = sorted(all_target_users.keys(), key=lambda uid: 0 if uid == super_admin_id else 1)
+
+            for uid in sorted_uids:
+                u_cfg = all_target_users[uid]
+                is_demo = u_cfg.get("is_demo", False)
+                if not is_demo and not db.is_capital_user_authorized(uid):
+                    continue
+
+                user_engine = get_user_capital_engine(uid, is_demo=is_demo)
+                budget = float(u_cfg.get("budget", 50.0) or 50.0)
+
+                buy_size = get_capital_kelly_sizer().calculate_lot_size(
+                    chat_id=uid, epic=resolved_epic, entry_price=buy_trigger,
+                    sl_price=buy_sl, tp_price=buy_tp, confidence_score=85.0, budget=budget
+                )
+                sell_size = get_capital_kelly_sizer().calculate_lot_size(
+                    chat_id=uid, epic=resolved_epic, entry_price=sell_trigger,
+                    sl_price=sell_sl, tp_price=sell_tp, confidence_score=85.0, budget=budget
+                )
+
+                try:
+                    m_det = await asyncio.to_thread(user_engine.get_market_details, resolved_epic)
+                    min_deal = float(m_det.get("min_deal_size", 0.01) if m_det else 0.01)
+                    buy_size = max(float(buy_size or 0.0), min_deal)
+                    sell_size = max(float(sell_size or 0.0), min_deal)
+                except Exception:
+                    pass
+
+                u_trap = {"buy_deal_id": None, "sell_deal_id": None}
+
+                if allow_buy_trap:
+                    buy_res = await asyncio.to_thread(
+                        user_engine.place_working_order,
+                        epic=resolved_epic,
+                        direction="BUY",
+                        size=buy_size,
+                        level=buy_trigger,
+                        order_type="STOP",
+                        stop_loss=buy_sl,
+                        take_profit=buy_tp
+                    )
+                    if buy_res.get("success"):
+                        u_trap["buy_deal_id"] = str(buy_res.get("dealId") or buy_res.get("deal_reference", ""))
+                        logger.info(f"🎯 [ORB TRAP] Armed BUY STOP for User {uid} on {resolved_epic} @ ${buy_trigger}")
+
+                if allow_sell_trap:
+                    sell_res = await asyncio.to_thread(
+                        user_engine.place_working_order,
+                        epic=resolved_epic,
+                        direction="SELL",
+                        size=sell_size,
+                        level=sell_trigger,
+                        order_type="STOP",
+                        stop_loss=sell_sl,
+                        take_profit=sell_tp
+                    )
+                    if sell_res.get("success"):
+                        u_trap["sell_deal_id"] = str(sell_res.get("dealId") or sell_res.get("deal_reference", ""))
+                        logger.info(f"🎯 [ORB TRAP] Armed SELL STOP for User {uid} on {resolved_epic} @ ${sell_trigger}")
+
+                if u_trap["buy_deal_id"] or u_trap["sell_deal_id"]:
+                    trap_entry["user_orders"][uid] = u_trap
+                    db.record_capital_orb_trap(
+                        chat_id=uid,
+                        session_name=session_name,
+                        epic=resolved_epic,
+                        trap_type="BREAKOUT_STOP",
+                        buy_deal_id=u_trap["buy_deal_id"] or "",
+                        sell_deal_id=u_trap["sell_deal_id"] or "",
+                        buy_level=buy_trigger,
+                        sell_level=sell_trigger,
+                        sl=buy_sl,
+                        tp=buy_tp,
+                        status="ARMED"
+                    )
+
+                    if app and hasattr(app, "bot"):
+                        try:
+                            user_lang = db.get_user_language(uid)
+                            import ui_standards
+                            env_lbl = "DEMO ($10,000)" if is_demo else "LIVE MAINNET"
+                            if user_lang == 'khmer':
+                                trap_msg = (
+                                    f"🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡\n"
+                                    f"🏛️ **[ស្ថាបត្យកម្មរាយអន្ទាក់ស្វ័យប្រវត្ត ១០០%]** 🛡️\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🤖 **ស្ថានភាព ៖** `អន្ទាក់បានរាយរួចជាស្រេច (PRE-SET ARMED)`\n"
+                                    f"⚙️ **គណនី ៖** `{env_lbl}`\n"
+                                    f"🌐 **Session ៖** `{session_name} OPEN (ចប់ 15m Range)`\n"
+                                    f"🏛️ **ឧបករណ៍ ៖** `{resolved_epic}`\n"
+                                    f"📊 **15m Range ៖** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
+                                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                                    f"🟢 **BUY STOP Trap ៖** `${buy_trigger:,.2f}` (`{buy_size} lot`)\n"
+                                    f"   └ SL: `${buy_sl:,.2f}` (Mid) | TP: `${buy_tp:,.2f}` (+4R)\n"
+                                    f"🔴 **SELL STOP Trap ៖** `${sell_trigger:,.2f}` (`{sell_size} lot`)\n"
+                                    f"   └ SL: `${sell_sl:,.2f}` (Mid) | TP: `${sell_tp:,.2f}` (+4R)\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🛡️ **លក្ខណៈពិសេសការពារដើមទុន ៖**\n"
+                                    f"• **Zero Manual Touch ៖** មិនបាច់ចូលដៃ គ្មានការដេញថ្លៃ (Zero Slippage)\n"
+                                    f"• **OCO Armor ៖** ពេលមួយណា Triggered ប្រព័ន្ធ Cancel ម្ខាងទៀតចោល Auto\n"
+                                    f"• **Pre-Attached SL/TP ៖** មាន Stop-Loss & Take-Profit ចងភ្ជាប់ស្រាប់\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"💡 _ម៉ាស៊ីន AI រាយអន្ទាក់ស្រង់ផលចំណេញតាមស្ថាប័ន Wall Street ដោយសុវត្ថិភាព!_"
+                                )
+                            else:
+                                trap_msg = (
+                                    f"🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡\n"
+                                    f"🏛️ **[Institutional Breakout Bracket Trap]** 🛡️\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🤖 **Status:** `Armed & Monitoring (PRE-SET ARMED)`\n"
+                                    f"⚙️ **Account:** `{env_lbl}`\n"
+                                    f"🌐 **Session:** `{session_name} OPEN (15m Range Closed)`\n"
+                                    f"🏛️ **Instrument:** `{resolved_epic}`\n"
+                                    f"📊 **15m Range:** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
+                                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                                    f"🟢 **BUY STOP Trap:** `${buy_trigger:,.2f}` (`{buy_size} lot`)\n"
+                                    f"   └ SL: `${buy_sl:,.2f}` (Mid) | TP: `${buy_tp:,.2f}` (+4R)\n"
+                                    f"🔴 **SELL STOP Trap:** `${sell_trigger:,.2f}` (`{sell_size} lot`)\n"
+                                    f"   └ SL: `${sell_sl:,.2f}` (Mid) | TP: `${sell_tp:,.2f}` (+4R)\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🛡️ _OCO Protection: When one triggers, opposite side cancels automatically!_"
+                                )
+                            await app.bot.send_message(chat_id=uid, text=trap_msg, parse_mode="Markdown")
+                        except Exception as notif_trap_e:
+                            logger.debug(f"ORB trap notification error: {notif_trap_e}")
+
+            if trap_entry["user_orders"]:
+                self._armed_traps[trap_key] = trap_entry
+                logger.info(f"✅ [ORB 15M] Successfully armed Breakout Traps for {resolved_epic} across {len(trap_entry['user_orders'])} accounts!")
+
+    async def manage_armed_traps_oco(self, app=None):
+        """
+        Monitors armed ORB pending working orders:
+        1. OCO (One-Cancels-the-Other): When a working order triggers and becomes an open position,
+           automatically cancels the pending opposite-side working order.
+        2. Session Expiry Cleanup: Cancels unfilled pending working orders when the trading session expires.
+        """
+        import database as db
+        now = time.time()
+        if (now - self._last_oco_check_ts) < 15.0:
+            return
+        self._last_oco_check_ts = now
+
+        if not self._armed_traps:
+            return
+
+        session_info = self.get_current_session_info()
+        is_breakout_phase = (session_info.get("phase") == "BREAKOUT")
+
+        traps_to_remove = []
+
+        for trap_key, trap in list(self._armed_traps.items()):
+            resolved_epic = trap["epic"]
+            session_name = trap["session"]
+
+            # If breakout window has completely ended, purge expired pending orders
+            if not is_breakout_phase:
+                logger.info(f"⏳ [ORB OCO] Session {session_name} breakout window closed. Cleaning up pending working orders for {resolved_epic}...")
+                for uid, u_orders in trap.get("user_orders", {}).items():
+                    user_cfg = db.get_capital_auto_config(uid)
+                    is_demo = user_cfg.get("is_demo", False)
+                    user_engine = get_user_capital_engine(uid, is_demo=is_demo)
+                    for d_key in ["buy_deal_id", "sell_deal_id"]:
+                        d_id = u_orders.get(d_key)
+                        if d_id:
+                            await asyncio.to_thread(user_engine.cancel_working_order, d_id)
+                    db.update_capital_orb_trap_status(trap_key, "EXPIRED")
+                traps_to_remove.append(trap_key)
+                continue
+
+            # Check fill status across users
+            for uid, u_orders in trap.get("user_orders", {}).items():
+                buy_deal = u_orders.get("buy_deal_id")
+                sell_deal = u_orders.get("sell_deal_id")
+                if not buy_deal and not sell_deal:
+                    continue
+
+                user_cfg = db.get_capital_auto_config(uid)
+                is_demo = user_cfg.get("is_demo", False)
+                user_engine = get_user_capital_engine(uid, is_demo=is_demo)
+
+                open_pos = await asyncio.to_thread(user_engine.get_open_positions)
+                open_deal_ids = {str(p.get("position", {}).get("dealId", "")) for p in open_pos}
+                open_deal_refs = {str(p.get("position", {}).get("dealReference", "")) for p in open_pos}
+                all_open = open_deal_ids | open_deal_refs
+
+                # Check if BUY STOP was triggered & filled
+                buy_filled = (buy_deal and (buy_deal in all_open))
+                # Check if SELL STOP was triggered & filled
+                sell_filled = (sell_deal and (sell_deal in all_open))
+
+                if buy_filled and sell_deal:
+                    logger.info(f"⚡ [ORB OCO] User {uid}: BUY STOP on {resolved_epic} FILLED! Cancelling opposite SELL STOP ({sell_deal})...")
+                    await asyncio.to_thread(user_engine.cancel_working_order, sell_deal)
+                    u_orders["sell_deal_id"] = None
+                    db.update_capital_orb_trap_status(sell_deal, "OCO_CANCELLED")
+                    db.update_capital_orb_trap_status(buy_deal, "TRIGGERED_BUY")
+
+                elif sell_filled and buy_deal:
+                    logger.info(f"⚡ [ORB OCO] User {uid}: SELL STOP on {resolved_epic} FILLED! Cancelling opposite BUY STOP ({buy_deal})...")
+                    await asyncio.to_thread(user_engine.cancel_working_order, buy_deal)
+                    u_orders["buy_deal_id"] = None
+                    db.update_capital_orb_trap_status(buy_deal, "OCO_CANCELLED")
+                    db.update_capital_orb_trap_status(sell_deal, "TRIGGERED_SELL")
+
+        for k in traps_to_remove:
+            self._armed_traps.pop(k, None)
+
     async def execute_orb_cycle(self, app=None):
         """
         Evaluates active ORB session breakouts across TradFi priority assets.
@@ -4748,6 +5274,16 @@ class CapitalOpeningRangeBreakoutEngine:
         session_name = session_info["session"]
         phase = session_info["phase"]
         assets = session_info.get("assets", self.LONDON_ASSETS)
+
+        # Step 0: Manage armed pending traps (OCO triggers & session cleanups)
+        await self.manage_armed_traps_oco(app=app)
+
+        # Step 1: Arm Breakout Bracket Traps during early BREAKOUT phase if not already armed
+        if phase == "BREAKOUT":
+            try:
+                await self.arm_session_breakout_traps(session_name, app=app)
+            except Exception as e_arm:
+                logger.error(f"Error arming ORB session traps: {e_arm}")
 
         import database as db
         active_users = db.get_active_capital_orb_users()
@@ -4946,6 +5482,8 @@ class CapitalOpeningRangeBreakoutEngine:
             "session_info": session_info,
             "tracked_ranges": tracked,
             "ranges": tracked,
+            "armed_traps": len(self._armed_traps),
+            "armed_trap_details": {k: {"epic": v["epic"], "buy_trigger": v["buy_trigger"], "sell_trigger": v["sell_trigger"], "status": v["status"]} for k, v in self._armed_traps.items()},
             "breakouts_detected": self._stats["total_breakouts_detected"],
             "orders_dispatched": self._stats["orders_dispatched"],
             "successful_executions": self._stats["successful_executions"],

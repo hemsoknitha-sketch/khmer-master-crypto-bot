@@ -23926,11 +23926,15 @@ class TelegramBotThread(BaseThread):
             pnl = stats.get("net_pnl", 0.0)
             pnl_str = f"+${pnl:,.2f}" if pnl >= 0 else f"-${abs(pnl):,.2f}"
 
+            armed_traps_count = telemetry.get("armed_traps", 0)
+            armed_badge_kh = f" | ⚡ អន្ទាក់រាយរួច ៖ `{armed_traps_count}` ARMED" if armed_traps_count > 0 else ""
+            armed_badge_en = f" | ⚡ Traps: `{armed_traps_count}` ARMED" if armed_traps_count > 0 else ""
+
             if user_lang == 'khmer':
                 msg = (
                     f"🎯 **LONDON & NEW YORK ORB 15M MATRIX** 🏛️\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🌐 **ស្ថានភាព Engine ៖** `{status_emoji}`\n"
+                    f"🌐 **ស្ថានភាព Engine ៖** `{status_emoji}`{armed_badge_kh}\n"
                     f"⏰ **Session បច្ចុប្បន្ន ៖** `{current_session} ({phase_badge})`\n"
                     f"🏛️ **Asset ស្នូល ៖** `Gold, US500, US100, DAX, Oil, Gas`\n"
                     f"🕒 **កាលវិភាគម៉ោងនៅកម្ពុជា ៖**\n"
@@ -23963,7 +23967,7 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"🎯 **LONDON & NEW YORK ORB 15M MATRIX** 🏛️\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🌐 **Engine Status:** `{status_emoji}`\n"
+                    f"🌐 **Engine Status:** `{status_emoji}`{armed_badge_en}\n"
                     f"⏰ **Current Session:** `{current_session} ({phase_badge})`\n"
                     f"🏛️ **TradFi Assets:** `Gold, US500, US100, DAX, Oil, Gas`\n"
                     f"🕒 **Session Schedule (Phnom Penh UTC+7):**\n"
