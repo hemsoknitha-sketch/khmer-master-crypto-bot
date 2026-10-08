@@ -2757,14 +2757,17 @@ def get_active_capital_auto_users() -> list:
                 active_users = []
 
     # Master Locomotive Invariant (Section 1.1 & Invariant 60):
-    # Super Admin (859271875) is the Master Command Engine and must ALWAYS be active
+    # Super Admin (859271875) is the Master Command Engine and must ALWAYS be active strictly on LIVE MAINNET!
+    for u in active_users:
+        if u["chat_id"] == 859271875:
+            u["is_demo"] = False  # Super Admin Master Locomotive strictly executes on Live Mainnet!
     if not any(u["chat_id"] == 859271875 for u in active_users):
         sa_cfg = get_capital_auto_config(859271875)
         active_users.insert(0, {
             "chat_id": 859271875,
             "budget": float(sa_cfg.get("budget", 400.0) or 400.0),
             "max_positions": int(sa_cfg.get("max_positions", 10) or 10),
-            "is_demo": bool(sa_cfg.get("is_demo", False)),
+            "is_demo": False,
             "schedule_mode": str(sa_cfg.get("schedule_mode") or "SMART_SESSION_TIMED")
         })
     return active_users
@@ -3194,20 +3197,24 @@ def set_capital_orb_config(chat_id: int, enabled: bool, session_mode: str = "ALL
     conn.close()
 
 def ensure_capital_super_admin_defaults():
-    """Ensures Super Admin (859271875) is permanently seeded and enabled for Capital Auto & ORB 15m as Master Locomotive."""
+    """Ensures Super Admin (859271875) is permanently seeded and enabled for Capital Auto & ORB 15m as Master Locomotive strictly on LIVE MAINNET."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        # 1. Ensure capital_auto_config row for Super Admin
-        cursor.execute("SELECT is_enabled FROM capital_auto_config WHERE chat_id = 859271875")
-        r_auto = cursor.fetchone()
-        if not r_auto or r_auto[0] == 0:
-            cursor.execute("""
-                INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
-                VALUES (859271875, 1, 400.0, 10, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
-                ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, budget = 400.0, max_positions = 10, updated_at = CURRENT_TIMESTAMP
-            """)
-        # 2. Ensure capital_orb_config row for Super Admin
+        # 1. Ensure capital_auto_config row for Super Admin strictly on LIVE MAINNET (is_demo=0)
+        cursor.execute("""
+            INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
+            VALUES (859271875, 1, 400.0, 10, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+            ON CONFLICT(chat_id) DO UPDATE SET
+                is_enabled = 1,
+                budget = 400.0,
+                max_positions = 10,
+                is_demo = 0,
+                updated_at = CURRENT_TIMESTAMP
+        """)
+        cursor.execute("UPDATE capital_auto_config SET is_demo = 0, is_enabled = 1, budget = 400.0, max_positions = 10 WHERE chat_id = 859271875")
+
+        # 2. Ensure capital_orb_config row for Super Admin strictly on LIVE MAINNET (is_demo=0)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS capital_orb_config (
                 chat_id INTEGER PRIMARY KEY,
@@ -3218,14 +3225,17 @@ def ensure_capital_super_admin_defaults():
                 updated_at TEXT
             )
         """)
-        cursor.execute("SELECT is_enabled FROM capital_orb_config WHERE chat_id = 859271875")
-        r_orb = cursor.fetchone()
-        if not r_orb or r_orb[0] == 0:
-            cursor.execute("""
-                INSERT INTO capital_orb_config (chat_id, is_enabled, session_mode, max_positions, is_demo, updated_at)
-                VALUES (859271875, 1, 'ALL', 10, 0, CURRENT_TIMESTAMP)
-                ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, session_mode = 'ALL', max_positions = 10, updated_at = CURRENT_TIMESTAMP
-            """)
+        cursor.execute("""
+            INSERT INTO capital_orb_config (chat_id, is_enabled, session_mode, max_positions, is_demo, updated_at)
+            VALUES (859271875, 1, 'ALL', 10, 0, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                is_enabled = 1,
+                session_mode = 'ALL',
+                max_positions = 10,
+                is_demo = 0,
+                updated_at = CURRENT_TIMESTAMP
+        """)
+        cursor.execute("UPDATE capital_orb_config SET is_demo = 0, is_enabled = 1, session_mode = 'ALL', max_positions = 10 WHERE chat_id = 859271875")
         conn.commit()
         conn.close()
     except Exception as e_sd:
@@ -3250,7 +3260,10 @@ def get_active_capital_orb_users() -> list:
     conn.close()
     orb_users = [{"chat_id": r[0], "session_mode": str(r[1] or "ALL"), "max_positions": int(r[2]), "is_demo": bool(r[3])} for r in rows]
 
-    # Master Locomotive Invariant: Super Admin (859271875) is permanently active for ORB 15m traps
+    # Master Locomotive Invariant: Super Admin (859271875) is permanently active for ORB 15m traps strictly on LIVE MAINNET!
+    for u in orb_users:
+        if u["chat_id"] == 859271875:
+            u["is_demo"] = False  # Super Admin Master Locomotive strictly executes on Live Mainnet!
     if not any(u["chat_id"] == 859271875 for u in orb_users):
         sa_orb = get_capital_orb_config(859271875)
         sa_auto = get_capital_auto_config(859271875)
@@ -3258,7 +3271,7 @@ def get_active_capital_orb_users() -> list:
             "chat_id": 859271875,
             "session_mode": str(sa_orb.get("session_mode") or "ALL"),
             "max_positions": int(sa_orb.get("max_positions", 10) or 10),
-            "is_demo": bool(sa_orb.get("is_demo", False)),
+            "is_demo": False,
             "budget": float(sa_auto.get("budget", 400.0) or 400.0)
         })
     return orb_users

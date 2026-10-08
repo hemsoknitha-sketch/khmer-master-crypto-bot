@@ -3452,16 +3452,15 @@ class CapitalAutonomousEngine:
             logger.warning(f"🔒 [REFERRAL GATEKEEPER] TradFi Auto-Trade blocked for User {chat_id}: Unverified Capital.com referral.")
             return False
 
-        # Smart Locomotive Fallback: If Super Admin is configured on Live but has < $10 available cash or is unauthenticated,
-        # dynamically mirror on Capital Demo ($10,000) so Master Locomotive never sits idle!
-        if chat_id == SUPER_ADMIN_ID and not user_is_demo:
+        # Smart Locomotive Fallback: Super Admin is strictly on LIVE MAINNET!
+        # Only fallback to Capital Demo ($10,000) if Live available cash < $10.00
+        if chat_id == SUPER_ADMIN_ID:
+            user_is_demo = False  # Super Admin Master Locomotive strictly executes on Live Mainnet!
             try:
                 chk_engine = get_user_capital_engine(chat_id, is_demo=False)
                 chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
                 chk_avail = float(chk_bal.get("available", 0.0) or 0.0)
-                if chk_bal.get("success") and chk_avail >= 10.0:
-                    user_is_demo = False  # Strictly stay on Live Mainnet!
-                elif not chk_bal.get("success") or chk_avail < 10.0:
+                if not chk_bal.get("success") or chk_avail < 10.0:
                     logger.info(f"🚂 [MASTER LOCOMOTIVE DEMO MIRROR] Super Admin (859271875) Live Avail (${chk_avail:,.2f}) < $10.00. Dynamically mirroring on Capital Demo ($10,000) so Master Locomotive never sits idle!")
                     user_is_demo = True
             except Exception:
@@ -5081,22 +5080,19 @@ class CapitalOpeningRangeBreakoutEngine:
             for uid in sorted_uids:
                 u_cfg = all_target_users[uid]
                 is_demo = u_cfg.get("is_demo", False)
-                if not is_demo and not db.is_capital_user_authorized(uid):
-                    continue
-
-                # Smart Locomotive Fallback: If Super Admin is on Live but has < $10 cash, mirror on Demo ($10,000)
-                if uid == super_admin_id and not is_demo:
+                if uid == super_admin_id:
+                    is_demo = False  # Super Admin Master Locomotive strictly executes on Live Mainnet!
                     try:
                         chk_engine = get_user_capital_engine(uid, is_demo=False)
                         chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
                         chk_avail = float(chk_bal.get("available", 0.0) or 0.0)
-                        if chk_bal.get("success") and chk_avail >= 10.0:
-                            is_demo = False
-                        elif not chk_bal.get("success") or chk_avail < 10.0:
+                        if not chk_bal.get("success") or chk_avail < 10.0:
                             logger.info(f"🚂 [MASTER LOCOMOTIVE DEMO MIRROR] Super Admin (859271875) Live Avail (${chk_avail:,.2f}) < $10.00. Dynamically mirroring on Capital Demo ($10,000) for ORB Trap!")
                             is_demo = True
                     except Exception:
                         pass
+                elif not is_demo and not db.is_capital_user_authorized(uid):
+                    continue
 
                 user_engine = get_user_capital_engine(uid, is_demo=is_demo)
                 budget = float(u_cfg.get("budget", 50.0) or 50.0)
@@ -5172,7 +5168,7 @@ class CapitalOpeningRangeBreakoutEngine:
                         try:
                             user_lang = db.get_user_language(uid)
                             import ui_standards
-                            env_lbl = "DEMO ($10,000)" if is_demo else "LIVE MAINNET"
+                            env_lbl = "🟡 DEMO ($10,000 Virtual)" if is_demo else "🟢 LIVE MAINNET (Real Funds)"
                             is_master = (uid == super_admin_id)
                             head_kh = "👑 **[MASTER LOCOMOTIVE ORB 15M TRAP ARMED]** ⚡" if is_master else "🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡"
                             head_en = "👑 **[MASTER LOCOMOTIVE ORB 15M TRAP ARMED]** ⚡" if is_master else "🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡"

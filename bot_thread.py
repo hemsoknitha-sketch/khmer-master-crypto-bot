@@ -6361,6 +6361,8 @@ class TelegramBotThread(BaseThread):
                 new_state = not curr_state
                 cfg = db.get_capital_auto_config(chat_id)
                 is_demo = cfg.get("is_demo", False)
+                if chat_id == 859271875:
+                    is_demo = False  # Super Admin Master Locomotive strictly trades on LIVE MAINNET!
                 if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
                     try:
                         await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
@@ -6369,16 +6371,17 @@ class TelegramBotThread(BaseThread):
                     gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
                     await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                     return
+                default_b = 400.0 if chat_id == 859271875 else 50.0
                 try:
                     c_eng = capital_engine.get_user_capital_engine(chat_id, is_demo=is_demo)
                     b_inf = c_eng.get_account_balance()
-                    eff_eq = max(float(cfg.get("budget", 50.0) or 50.0), float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
+                    eff_eq = max(float(cfg.get("budget", default_b) or default_b), float(b_inf.get("balance", 0.0) or 0.0), float(b_inf.get("available", 0.0) or 0.0))
                 except Exception:
-                    eff_eq = float(cfg.get("budget", 50.0) or 50.0)
+                    eff_eq = float(cfg.get("budget", default_b) or default_b)
                 dyn_pos = cfg.get("max_positions")
                 if not dyn_pos or dyn_pos <= 2:
                     dyn_pos = capital_engine.get_dynamic_max_positions_for_equity(eff_eq)
-                db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", 50.0), max_positions=dyn_pos, is_demo=is_demo)
+                db.set_capital_auto_config(chat_id, enabled=new_state, budget=cfg.get("budget", default_b), max_positions=dyn_pos, is_demo=is_demo)
                 toast_msg = "✅ Capital Auto: បានបើកដំណើរការ!" if new_state else "🛑 Capital Auto: បានបិទ!"
                 try:
                     await update.callback_query.answer(toast_msg)
@@ -6459,7 +6462,28 @@ class TelegramBotThread(BaseThread):
                     await update.callback_query.answer("🛡️ Super Smart Rollover Swap Shield: ផ្អាក TradFi 03:45-07:00 ICT & ចុងសប្តាហ៍ ដើម្បីការពារកម្រៃ Swap, Swap ៣ថ្ងៃរាត្រីថ្ងៃពុធ និង Spreads រីកធំ!", show_alert=False)
                 except Exception:
                     pass
-                context.args = ["SWAP_SHIELD"]
+            elif data == "btn_cap_env_toggle":
+                cfg = db.get_capital_auto_config(chat_id)
+                curr_demo = bool(cfg.get("is_demo", False))
+                new_demo = not curr_demo
+                if not new_demo and not db.is_capital_user_authorized(chat_id):
+                    try:
+                        await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការដើម្បី Trade Live!", show_alert=True)
+                    except Exception:
+                        pass
+                    gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
+                    await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                    return
+                default_b = 400.0 if chat_id == 859271875 else 50.0
+                db.set_capital_auto_config(chat_id, enabled=db.is_capital_auto_enabled(chat_id), budget=cfg.get("budget", default_b), max_positions=cfg.get("max_positions", 10), is_demo=new_demo)
+                orb_c = db.get_capital_orb_config(chat_id)
+                db.set_capital_orb_config(chat_id, enabled=db.is_capital_orb_enabled(chat_id), session_mode=orb_c.get("session_mode", "ALL"), max_positions=orb_c.get("max_positions", 10), is_demo=new_demo)
+                toast = "🟡 បានប្តូរទៅគណនី DEMO ($10,000 Virtual)!" if new_demo else "🟢 បានប្តូរទៅគណនី LIVE MAINNET (Real Funds)!"
+                try:
+                    await update.callback_query.answer(toast, show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
                 await capital_command(update, context)
             elif data == "btn_cap_mode_toggle":
                 curr_mode = db.get_capital_user_sync_mode(chat_id)
@@ -6836,6 +6860,8 @@ class TelegramBotThread(BaseThread):
                 new_state = not curr_state
                 cfg = db.get_capital_orb_config(chat_id)
                 is_demo = cfg.get("is_demo", False)
+                if chat_id == 859271875:
+                    is_demo = False  # Super Admin Master Locomotive strictly trades on LIVE MAINNET!
                 if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
                     try:
                         await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
@@ -6844,7 +6870,7 @@ class TelegramBotThread(BaseThread):
                     gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
                     await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
                     return
-                db.set_capital_orb_config(chat_id, enabled=new_state)
+                db.set_capital_orb_config(chat_id, enabled=new_state, session_mode=cfg.get("session_mode", "ALL"), max_positions=cfg.get("max_positions", 10), is_demo=is_demo)
                 toast_msg = "🎯 ORB 15m: បានបើកដំណើរការ!" if new_state else "🛑 ORB 15m: បានបិទ!"
                 try:
                     await update.callback_query.answer(toast_msg)
@@ -25898,13 +25924,21 @@ class TelegramBotThread(BaseThread):
             user_sync_mode = db.get_capital_user_sync_mode(chat_id)
             mode_btn_text = "🎯 Mode: Autonomous ✅" if user_sync_mode == "AUTONOMOUS" else "🚂 Mode: Follow Master ✅"
 
+            is_user_demo = bool(auto_cfg.get("is_demo", False))
+            if chat_id == 859271875:
+                is_user_demo = False
+            env_btn_text = "🟢 Mode: LIVE MAINNET ✅" if not is_user_demo else "🟡 Mode: DEMO ($10,000) ✅"
+
             is_super_admin = (chat_id == 859271875 or db.is_admin(chat_id))
             master_sync_on = db.get_capital_master_sync_enabled()
             master_sync_btn_text = "👑 Master Sync: ON 🟢" if master_sync_on else "👑 Master Sync: OFF ⚪"
 
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(mode_btn_text, callback_data="btn_cap_mode_toggle"),
+                    InlineKeyboardButton(env_btn_text, callback_data="btn_cap_env_toggle"),
+                    InlineKeyboardButton(mode_btn_text, callback_data="btn_cap_mode_toggle")
+                ],
+                [
                     InlineKeyboardButton("⚙️ Custom Assets", callback_data="btn_cap_custom_assets")
                 ],
                 *([[
