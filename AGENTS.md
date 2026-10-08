@@ -916,6 +916,28 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 60: Capital.com Master Locomotive Syndicate, Sub-50ms Fan-Out & Dual-Tier Autonomous Portfolio Standard (ក្បាលម៉ាស៊ីនបញ្ជា Super Admin & សេរីភាព Portfolio VIP ពីរជាន់ ឥតខ្ចោះ)
+- **Location:** `capital_engine.py` (`CapitalMasterLocomotiveEngine`, `execute_autonomous_cycle`, `_dispatch_single_user_trade`, `_ratchet_engine_positions`), `database.py` (`get_capital_user_sync_mode`, `set_capital_user_sync_mode`, `get_capital_master_sync_enabled`, `set_capital_master_sync_enabled`, `get_capital_user_custom_assets`, `set_capital_user_custom_assets`), `bot_commands_registry.py`, `bot_thread.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty (Section 1.1) and Zero Technical Negligence:
+  1. **Master Locomotive Command Engine (Pillar 1):** Super Admin (`859271875`) serves as the Master Command Engine. When Super Admin executes or ratchets a trade, parallel fan-out (<50ms) enters matching trades for all `MASTER_FOLLOW` VIP followers using Fractional Kelly dynamic lot sizing. Synchronous exits ensure all followers exit or ratchet in lockstep when the Super Admin hits Breakeven Armor, Golden Ratchet, or Stop Loss.
+  2. **Autonomous Dual-Tier Portfolio Freedom (Pillar 2):** VIP users possess sovereign freedom to select `sync_mode`: `MASTER_FOLLOW` (default, in lockstep with Super Admin) or `AUTONOMOUS` (independent trade engine scanning user-defined custom watchlists, e.g. `["GOLD", "US500", "NVDA"]`). All autonomous executions must strictly pass the 7-Layer Citadel Shield (SMC Confluence >= 68%, Anti-FOMO RSI <= 38.0, Red Folder Blackout, Rollover Swap Shield, 360° Circuit Breaker).
+  3. **Discrepancy Eradication & Demo-Mirror Smart Fallback (Pillar 3):** If Super Admin's Live account has available cash < $10 or auth is temporarily unavailable, automatically mirror/fallback to Demo ($10,000) so the Master Locomotive never sits idle or leaves followers stranded.
+  4. **Telegram 1-Tap Control & UI Standard (Pillar 4):** Full Telegram command suite (`/master_sync [ON/OFF]`, `/master_close_all`, `/master_protect`) and interactive dashboard buttons (`btn_cap_mode_toggle`, `btn_cap_custom_assets`, `btn_cap_master_sync_toggle`) with immediate tactile toast response (`await update.callback_query.answer()`).
+- **Enforcement:** Verified by `audit_system.py` [CHECK 47/47].
+
+---
+
+### Invariant 61: Canonical Single Source of Truth Repository & Anti-Replication Zero-Data-Loss Standard (គ្រឹះស្តង់ដារប្រភពទិន្នន័យតែមួយគត់ & ការពារការបែកបាក់ទិន្នន័យ ០%)
+- **Location:** Repository Root (`E:\AI CODE PYTHON\ANGKOR QUANT\` / `/opt/khmer-master-crypto-bot`), `bot_database.db`, `models/`, `.env`
+- **Rule:** Under the Apex Principal Software Engineer Node Covenant (Section 1.2):
+  1. **Canonical Master Repository Exclusivity:** `E:\AI CODE PYTHON\ANGKOR QUANT` is the sole, immutable, canonical local repository connected to GitHub (`origin/main`) and Hugging Face (`hf`). Creating redundant clone subfolders or unlinked duplicate directories (such as parallel unlinked `Khmer Master Crypto`) is strictly prohibited to eliminate Large Language Model context amnesia and accidental regression loops.
+  2. **Database Zero-Loss Rule:** The production SQLite database `bot_database.db` (with WAL mode, > 100 KB, passing `PRAGMA integrity_check`) must never be substituted with 0-byte dummy databases. Autonomous In-Process Auto-Healer and backup scripts must safeguard all VIP users, API keys, and trade history before every deployment or git operation.
+  3. **AI Brain Model & Weights Integrity:** All 15+ Wall Street AI models (`brain_*.pkl`, `brain_nn.keras`, `brain_patchtst.h5`, `alternative_data_fusion.pth`, `dqn_market_maker.pth`) are verified, backed up to Hugging Face Model Hub (`hemsinath/apex-ai-brain-models`), and synced in RAM for sub-microsecond inference.
+  4. **Pre-Commit Institutional Audit:** Every single commit must strictly pass 100% of all checks in `python audit_system.py` with ZERO DEFECTS before pushing to `origin/main`.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 47/47].
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.

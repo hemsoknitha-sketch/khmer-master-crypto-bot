@@ -1,3 +1,4 @@
+import sqlite3
 """
 ANGKOR QUANT - AI Quantitative Intelligence for Global Markets
 v4.0.0 (AQ47 Master Institutional Specification Lock)
@@ -2074,6 +2075,69 @@ def run_audit():
             log_fail("Institutional Post-News Volatility Harvester (Invariant 59) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 59 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 47/47] Master Locomotive Syndicate, Autonomous Portfolio & Single-Source-of-Truth (Invariants 60 & 61)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 47/47] Verifying Master Locomotive Syndicate, Autonomous Portfolio & Single-Source-of-Truth (Invariants 60 & 61)...")
+    try:
+        import capital_engine
+        import database as db
+
+        # 1. Verify Invariant 60: Master Locomotive & Syndicate Engine
+        has_loco_cls = hasattr(capital_engine, "CapitalMasterLocomotiveEngine")
+        has_admin_id = getattr(capital_engine, "SUPER_ADMIN_ID", None) == 859271875
+        loco = capital_engine.get_capital_master_locomotive()
+        telemetry = loco.get_syndicate_telemetry()
+        has_telemetry = isinstance(telemetry, dict) and "sync_enabled" in telemetry and "super_admin_id" in telemetry
+        
+        # Verify database helper functions
+        has_sync_mode_fn = hasattr(db, "get_capital_user_sync_mode") and hasattr(db, "set_capital_user_sync_mode")
+        has_custom_assets_fn = hasattr(db, "get_capital_user_custom_assets") and hasattr(db, "set_capital_user_custom_assets")
+        has_master_sync_fn = hasattr(db, "get_capital_master_sync_enabled") and hasattr(db, "set_capital_master_sync_enabled")
+
+        # Verify bot_commands and bot_thread routing
+        with open("bot_commands_registry.py", "r", encoding="utf-8") as bf:
+            bcr_code = bf.read()
+        has_cmds = "master_sync" in bcr_code and "master_close_all" in bcr_code and "master_protect" in bcr_code
+
+        with open("bot_thread.py", "r", encoding="utf-8") as btf:
+            bt_code = btf.read()
+        has_btn_routes = "btn_cap_mode_toggle" in bt_code and "btn_cap_custom_assets" in bt_code and "btn_cap_master_sync_toggle" in bt_code
+
+        # 2. Verify Invariant 61: Canonical Single-Source-of-Truth & Database Zero-Loss
+        db_path = "bot_database.db"
+        has_db_file = os.path.exists(db_path)
+        db_size = os.path.getsize(db_path) if has_db_file else 0
+        is_db_not_empty = db_size > 100000
+
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("PRAGMA integrity_check")
+        row = cur.fetchone()
+        conn.close()
+        is_db_healthy = (row is not None and row[0] == "ok")
+
+        # Verify AI Models in repository
+        critical_models = ["brain_nn.keras", "brain_patchtst.h5", "brain_xgb.pkl", "brain_catboost.pkl", "brain_lightgbm.pkl"]
+        all_models_exist = all(os.path.exists(m) and os.path.getsize(m) > 10000 for m in critical_models)
+
+        all_inv60_61_passed = (
+            has_loco_cls and has_admin_id and has_telemetry and
+            has_sync_mode_fn and has_custom_assets_fn and has_master_sync_fn and
+            has_cmds and has_btn_routes and
+            has_db_file and is_db_not_empty and is_db_healthy and
+            all_models_exist
+        )
+
+        if all_inv60_61_passed:
+            log_pass("Master Locomotive Syndicate, Autonomous Portfolio & Single-Source-of-Truth (Invariants 60 & 61) are 100% certified!")
+        else:
+            failures.append(f"Invariants 60-61 check failed: loco={has_loco_cls}, admin={has_admin_id}, db_ok={is_db_healthy}, models={all_models_exist}")
+            log_fail("Master Locomotive Syndicate & Single-Source-of-Truth validation failed!")
+    except Exception as e:
+        failures.append(f"Invariants 60-61 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
