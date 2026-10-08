@@ -3235,24 +3235,14 @@ class MT5BridgeEngine:
                                         break
                         else:
                             # Dedicated VIP account is OFFLINE - Do NOT hijack Admin account!
+                            # Silently skip auto-trade without sending intrusive Telegram alerts.
                             now_t = time.time()
                             if not hasattr(self, "_last_offline_warn"):
                                 self._last_offline_warn = {}
                             last_warn = self._last_offline_warn.get(chat_id, 0.0)
                             if (now_t - last_warn) > 1800.0:
                                 self._last_offline_warn[chat_id] = now_t
-                                msg_off = (
-                                    f"⚠️ <b>[MT5 TERMINAL OFFLINE - មិនទាន់ភ្ជាប់]</b>\n"
-                                    f"━━━━━━━━━━━━\n"
-                                    f"🏛️ <b>គណនី MT5 ៖</b> <code>#{acc_id}</code>\n"
-                                    f"📡 <b>ស្ថានភាព ៖</b> <code>OFFLINE (រង់ចាំការភ្ជាប់ពី MT5)</code>\n"
-                                    f"━━━━━━━━━━━━\n"
-                                    f"👉 <b>ដំណោះស្រាយដើម្បីជួញដូរទុនផ្ទាល់ខ្លួន ៖</b>\n"
-                                    f"1. <b>បើកលើ VPS ៖</b> វាយបញ្ជា <code>bash login_mt5_account.sh {acc_id} &lt;password&gt;</code>\n"
-                                    f"2. <b>បើកលើ PC ៖</b> ចូល MT5 លើកុំព្យូទ័រ ដាក់ EA KhmerMasterCrypto_Bridge.mq5 និងបើក Algo Trading (ពណ៌បៃតង)។"
-                                )
-                                _dispatch_telegram_alert(chat_id, msg_off)
-                                logger.warning(f"⚠️ [MT5 VIP OFFLINE] User {chat_id} account #{acc_id} terminal is not running. Skipped auto-trade to prevent hijacking Admin account!")
+                                logger.info(f"ℹ️ [MT5 VIP OFFLINE] User {chat_id} account #{acc_id} terminal is OFFLINE. Skipped auto-trade safely (Telegram alert silenced).")
                             continue
 
                     if not session:

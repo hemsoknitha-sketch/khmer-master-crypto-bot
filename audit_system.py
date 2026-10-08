@@ -2251,18 +2251,31 @@ def run_audit():
         }
         test_eng._accounts_cache_time = time.time()
 
-        # Attempt to place order requiring margin far exceeding $1.00
-        order_res = test_eng.place_working_order(
-            epic="US100",
-            direction="BUY",
-            size=1.0,
-            level=31000.0,
-            order_type="STOP"
-        )
-        unit_test_passed = (
-            order_res.get("success") is False and
-            "RC_NOT_ENOUGH_MARGIN" in str(order_res.get("error"))
-        )
+        # Deterministic market details for pure margin pre-flight unit testing
+        orig_get_market = test_eng.get_market_details
+        test_eng.get_market_details = lambda epic: {
+            "success": True,
+            "market_status": "TRADEABLE",
+            "spread": 0.5,
+            "margin_factor": 5.0,
+            "min_deal_size": 0.01
+        }
+        try:
+            # Attempt to place order requiring margin far exceeding $1.00 ($31,000 * 1.0 * 5% = $1,550 vs $1.00)
+            order_res = test_eng.place_working_order(
+                epic="US100",
+                direction="BUY",
+                size=1.0,
+                level=31000.0,
+                order_type="STOP",
+                bypass_citadel=True
+            )
+            unit_test_passed = (
+                order_res.get("success") is False and
+                "RC_NOT_ENOUGH_MARGIN" in str(order_res.get("error"))
+            )
+        finally:
+            test_eng.get_market_details = orig_get_market
 
         all_inv63_passed = (
             has_inv63 and has_margin_guard_pos and has_margin_guard_ord and
