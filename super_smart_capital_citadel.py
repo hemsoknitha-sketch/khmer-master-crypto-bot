@@ -29,6 +29,24 @@ import database as db
 logger = logging.getLogger("SuperSmartCapitalCitadel")
 
 
+def _get_tradfi_precision(epic_str: str, price_val: float = 0.0) -> int:
+    """
+    Returns exact price decimal precision for TradFi instruments:
+    - Forex Majors & Minors: 5 decimals (e.g. 1.32038)
+    - JPY Pairs: 3 decimals (e.g. 154.250)
+    - Sub-$5 assets: 4-5 decimals
+    - Indices / Commodities / Crypto CFDs: 2 decimals (e.g. 2650.50)
+    """
+    s = str(epic_str or "").upper()
+    if any(fx in s for fx in ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"]):
+        return 5
+    elif any(fx in s for fx in ["USDJPY", "EURJPY", "GBPJPY", "AUDJPY", "NZDJPY", "CADJPY", "CHFJPY"]):
+        return 3
+    elif 0 < price_val < 5.0:
+        return 5
+    return 2
+
+
 class SuperSmartCapitalCitadel:
     """
     Institutional TradFi Position Opening Gatekeeper & Sky Net Trap Citadel for Capital.com.
@@ -471,16 +489,18 @@ class SuperSmartCapitalCitadel:
         # --------------------------------------------------------------------
         # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & DYNAMIC INVALIDATION
         # --------------------------------------------------------------------
+        prec = _get_tradfi_precision(resolved_epic, curr_price)
+        min_pip_buf = 0.0006 if prec == 5 else (0.06 if prec == 3 else max(0.50, spread * 1.5))
         if norm_side == "BUY":
-            invalidation_sl = round(min(swing_low - (0.25 * atr_15m), curr_price - (1.6 * atr_15m)), 2)
+            invalidation_sl = round(min(swing_low - (0.25 * atr_15m), curr_price - max(min_pip_buf, 1.6 * atr_15m)), prec)
             risk_dist = max(spread * 3.0, curr_price - invalidation_sl)
-            tp_1 = round(curr_price + (risk_dist * 2.5), 2)  # Institutional 1:2.5 Min Hurdle
-            tp_2 = round(curr_price + (risk_dist * 5.0), 2)  # Institutional 1:5.0 Major Target
+            tp_1 = round(curr_price + (risk_dist * 2.5), prec)  # Institutional 1:2.5 Min Hurdle
+            tp_2 = round(curr_price + (risk_dist * 5.0), prec)  # Institutional 1:5.0 Major Target
         else:
-            invalidation_sl = round(max(swing_high + (0.25 * atr_15m), curr_price + (1.6 * atr_15m)), 2)
+            invalidation_sl = round(max(swing_high + (0.25 * atr_15m), curr_price + max(min_pip_buf, 1.6 * atr_15m)), prec)
             risk_dist = max(spread * 3.0, invalidation_sl - curr_price)
-            tp_1 = round(curr_price - (risk_dist * 2.5), 2)
-            tp_2 = round(curr_price - (risk_dist * 5.0), 2)
+            tp_1 = round(curr_price - (risk_dist * 2.5), prec)
+            tp_2 = round(curr_price - (risk_dist * 5.0), prec)
 
         rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
 
@@ -540,9 +560,14 @@ class SuperSmartCapitalCitadel:
             print(f"🛑 [SUPER SMART CAPITAL CITADEL] Entry blocked for {epic} ({direction}): {reason}")
             return False, reason, diag
 
+        prec = _get_tradfi_precision(epic, diag.get("current_price", 0.0))
+        sl_val = diag.get('invalidation_sl', 0.0)
+        tp_val = diag.get('target_tp_min', 0.0)
+        sl_str = f"{sl_val:.{prec}f}" if isinstance(sl_val, (int, float)) else str(sl_val)
+        tp_str = f"{tp_val:.{prec}f}" if isinstance(tp_val, (int, float)) else str(tp_val)
         print(
             f"🦅 [SUPER SMART CAPITAL CITADEL APPROVED] {epic} {direction} | "
             f"Score: {diag.get('confluence_score')}% | R:R: 1:{diag.get('risk_reward_ratio')} | "
-            f"SL: ${diag.get('invalidation_sl')} | TP: ${diag.get('target_tp_min')}"
+            f"SL: ${sl_str} | TP: ${tp_str}"
         )
         return True, "SUPER_SMART_CAPITAL_CLEARANCE_GRANTED", diag

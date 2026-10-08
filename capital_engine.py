@@ -821,9 +821,15 @@ class CapitalComEngine:
                 logger.info(f"Order submitted successfully! Epic: {resolved_epic} | Dir: {dir_upper} | Ref: {deal_ref}")
                 conf = self.get_deal_confirmation(deal_ref) if deal_ref else {}
                 if conf.get("is_rejected"):
-                    err_r = conf.get("reason", "Broker Rejected")
-                    logger.warning(f"❌ Order {deal_ref} rejected by broker: {err_r}")
-                    return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref}
+                    err_r = (
+                        conf.get("reason")
+                        or conf.get("rejectReason")
+                        or conf.get("error")
+                        or conf.get("deal_status")
+                        or "Broker Rejected"
+                    )
+                    logger.warning(f"❌ Order {deal_ref} rejected by broker: {err_r} | Raw confirm: {conf.get('data')}")
+                    return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref, "raw_conf": conf}
                 real_deal_id = conf.get("deal_id") or deal_ref
                 fill_price = conf.get("level")
                 return {
@@ -940,13 +946,24 @@ class CapitalComEngine:
                     data = res.json()
                     deal_status = str(data.get("dealStatus", "")).upper()
                     status = str(data.get("status", "")).upper()
-                    reason = data.get("reason", "")
+                    raw_reason = (
+                        data.get("rejectReason")
+                        or data.get("reason")
+                        or data.get("errorCode")
+                        or data.get("errorMessage")
+                        or data.get("details")
+                        or data.get("description")
+                        or ""
+                    )
+                    reason = str(raw_reason).strip()
                     deal_id = data.get("dealId")
                     level = data.get("level")
                     is_accepted = (deal_status == "ACCEPTED" or status in ["OPEN", "ACCEPTED"])
                     is_rejected = (deal_status == "REJECTED" or status == "REJECTED")
                     if is_rejected:
-                        logger.warning(f"❌ [CAPITAL CONFIRMS] Deal {deal_reference} REJECTED by broker: {reason}")
+                        if not reason:
+                            reason = f"dealStatus={deal_status}, status={status}"
+                        logger.warning(f"❌ [CAPITAL CONFIRMS] Deal {deal_reference} REJECTED by broker: {reason} | Details: {data}")
                         return {
                             "success": False,
                             "is_rejected": True,
@@ -992,6 +1009,7 @@ class CapitalComEngine:
             "success": False,
             "is_rejected": True,
             "error": f"Broker confirmation unverified for {deal_reference}",
+            "reason": f"Broker confirmation unverified for {deal_reference}",
             "deal_reference": deal_reference
         }
 
@@ -1129,9 +1147,15 @@ class CapitalComEngine:
                 logger.info(f"Working order submitted! Epic: {resolved_epic} | Dir: {dir_upper} | Type: {type_upper} | Level: {level} | Ref: {deal_ref}")
                 conf = self.get_deal_confirmation(deal_ref) if deal_ref else {}
                 if conf.get("is_rejected"):
-                    err_r = conf.get("reason", "Broker Rejected")
-                    logger.warning(f"❌ Working Order {deal_ref} rejected by broker: {err_r}")
-                    return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref}
+                    err_r = (
+                        conf.get("reason")
+                        or conf.get("rejectReason")
+                        or conf.get("error")
+                        or conf.get("deal_status")
+                        or "Broker Rejected"
+                    )
+                    logger.warning(f"❌ Working Order {deal_ref} rejected by broker: {err_r} | Raw confirm: {conf.get('data')}")
+                    return {"success": False, "error": f"Broker Rejected: {err_r}", "deal_reference": deal_ref, "raw_conf": conf}
                 real_deal_id = conf.get("deal_id") or deal_ref
                 return {
                     "success": True,
@@ -1259,10 +1283,12 @@ class CapitalComEngine:
 
         url = f"{self.base_url}/positions/{deal_id}"
         payload: Dict[str, Any] = {}
+        test_val = stop_loss or take_profit or 0.0
+        prec = 5 if (0 < test_val < 5.0) else (3 if (5.0 <= test_val < 500.0) else 2)
         if stop_loss is not None and stop_loss > 0:
-            payload["stopLevel"] = round(stop_loss, 4)
+            payload["stopLevel"] = round(stop_loss, prec)
         if take_profit is not None and take_profit > 0:
-            payload["profitLevel"] = round(take_profit, 4)
+            payload["profitLevel"] = round(take_profit, prec)
 
         try:
             res = self.session.put(url, headers=self.get_auth_headers(), json=payload, timeout=10)
@@ -2753,6 +2779,7 @@ class CapitalAutonomousEngine:
         self._peak_upl_cache: Dict[str, float] = {}  # deal_id -> peak_upl
         self._be_locked_set = set()                   # deal_ids that reached Breakeven Armor
         self._asset_cooldowns: Dict[str, float] = {}  # epic -> cooldown_until_ts (Anti-Overtrading Guard)
+        self._user_rejection_cooldowns: Dict[int, float] = {}  # chat_id -> cooldown_until_ts (Debounce Broker Rejections)
         self._last_scan_ts: float = 0.0
         self._scan_interval: float = 25.0             # Scan markets every 25 seconds
         self.prop_manager = PropFirmRiskManager()
@@ -3444,6 +3471,12 @@ class CapitalAutonomousEngine:
         budget = float(user.get("budget", 50.0) or 50.0)
         user_is_demo = user.get("is_demo", False)  # 100% Live Mainnet Real Capital
 
+        # Debounce/Cooldown Shield: Avoid rapid-fire spam on rejected accounts (e.g. broker margin/API issues)
+        if self._user_rejection_cooldowns.get(chat_id, 0.0) > now:
+            remain_cd = int(self._user_rejection_cooldowns[chat_id] - now)
+            logger.debug(f"⏳ [USER COOLDOWN] User {chat_id} in backoff for {remain_cd}s due to recent broker rejection.")
+            return False
+
         # Cambodia Time Trading Schedule Gatekeeper (Mon-Fri 07:00 - 23:50 ICT vs 24/7 VIP Reset Mode)
         user_sched_mode = user.get("schedule_mode") or db.get_capital_schedule_mode(chat_id)
         is_sched_active, sched_reason, _ = is_capital_trading_schedule_active(user_sched_mode)
@@ -3536,9 +3569,13 @@ class CapitalAutonomousEngine:
             for pos in user_open_positions
         }
 
-        # Dual-Tier Freedom: If user chose AUTONOMOUS mode, filter candidate setups to their custom assets
+        # Dual-Tier Freedom: If user chose AUTONOMOUS mode, filter candidate setups to their custom assets.
+        # If user is in MASTER_FOLLOW mode and is NOT Super Admin, yield independent execution to Master Locomotive.
         user_sync_mode = db.get_capital_user_sync_mode(chat_id)
-        if user_sync_mode == "AUTONOMOUS":
+        if chat_id != SUPER_ADMIN_ID and user_sync_mode == "MASTER_FOLLOW":
+            logger.debug(f"🚂 [MASTER SYNC] User {chat_id} is in MASTER_FOLLOW mode. Yielding independent dispatch to Master Locomotive.")
+            return False
+        elif user_sync_mode == "AUTONOMOUS":
             user_custom_assets = db.get_capital_user_custom_assets(chat_id)
             if user_custom_assets:
                 filtered_cands = [
@@ -3767,7 +3804,10 @@ class CapitalAutonomousEngine:
                             logger.error(f"Failed to send Capital Auto notification: {notif_err}")
                 return True
             else:
-                logger.warning(f"Order rejected for {resolved_epic} {final_action} (User {chat_id}): {trade_res.get('error')}. Trying next candidate.")
+                err_msg = str(trade_res.get('error') or '')
+                logger.warning(f"Order rejected for {resolved_epic} {final_action} (User {chat_id}): {err_msg}. Trying next candidate.")
+                if any(k in err_msg.lower() for k in ["broker rejected", "insufficient", "unverified", "attached_order", "market closed"]):
+                    self._user_rejection_cooldowns[chat_id] = now + 120.0
                 continue
 
         return False
@@ -4008,6 +4048,10 @@ class CapitalAutonomousEngine:
                         logger.error(f"Failed to send Prop Firm notification: {notif_err}")
                 return True
             else:
+                err_msg = str(trade_res.get('error') if trade_res else '')
+                logger.warning(f"Prop order rejected for {cand_res_epic} {c_action} (User {chat_id}): {err_msg}. Trying next candidate.")
+                if any(k in err_msg.lower() for k in ["broker rejected", "insufficient", "unverified", "attached_order", "market closed"]):
+                    self._user_rejection_cooldowns[chat_id] = now + 120.0
                 continue
 
         return False
@@ -7532,6 +7576,11 @@ class CapitalMasterLocomotiveEngine:
                 direction=direction,
                 size=f_size
             )
+
+            if not trade_res.get("success"):
+                err_msg = str(trade_res.get('error') or '')
+                logger.warning(f"🚂 [MASTER SYNC FOLLOWER] Trade {direction} {resolved_epic} rejected for follower {f_cid}: {err_msg}")
+                return False
 
             if trade_res.get("success"):
                 dispatched_count += 1
