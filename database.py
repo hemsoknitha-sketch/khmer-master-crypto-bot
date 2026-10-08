@@ -3236,6 +3236,18 @@ def ensure_capital_super_admin_defaults():
                 updated_at = CURRENT_TIMESTAMP
         """)
         cursor.execute("UPDATE capital_orb_config SET is_demo = 0, is_enabled = 1, session_mode = 'ALL', max_positions = 10 WHERE chat_id = 859271875")
+
+        # 3. Purge accidental VIP account collision from Super Admin:
+        # If Super Admin has credentials pointing to another VIP user's account (like 330894176088577220),
+        # remove it so Super Admin cleanly uses the Global Master Account (216890638652757188 from .env)!
+        cursor.execute("SELECT account_id FROM user_capital_credentials WHERE chat_id = 859271875")
+        sa_row = cursor.fetchone()
+        if sa_row and str(sa_row[0]) == "330894176088577220":
+            cursor.execute("DELETE FROM user_capital_credentials WHERE chat_id = 859271875")
+            print("🛡️ [AUTO-HEAL] Purged collided VIP account 330894176088577220 from Super Admin credentials!")
+
+        # 4. Disable Prop Firm mode for Super Admin so Super Admin is strictly on LIVE MAINNET
+        cursor.execute("UPDATE prop_firm_challenge_config SET is_enabled = 0 WHERE chat_id = 859271875")
         conn.commit()
         conn.close()
     except Exception as e_sd:
@@ -3942,6 +3954,33 @@ def get_all_capital_users_overview() -> List[Dict[str, Any]]:
                 "auto_max_pos": int(r[8]) if r[8] is not None else 2,
                 "auto_is_demo": bool(r[9]) if r[9] is not None else False
             })
+
+        # Ensure Super Admin Master Locomotive is always cleanly represented with real live credentials
+        sa_found = False
+        sa_live_acc = os.getenv("CAPITAL_ACCOUNT_ID", "216890638652757188")
+        for u_item in results:
+            if u_item["chat_id"] == 859271875:
+                sa_found = True
+                if u_item["account_id"] == "330894176088577220" or not u_item["account_id"]:
+                    u_item["account_id"] = sa_live_acc
+                    u_item["is_demo"] = False
+                    u_item["auto_is_demo"] = False
+                break
+        if not sa_found:
+            auto_cfg = get_capital_auto_config(859271875)
+            results.insert(0, {
+                "chat_id": 859271875,
+                "account_id": sa_live_acc,
+                "currency": "USD",
+                "is_demo": False,
+                "is_referral_verified": True,
+                "username": "Soknitha (Super Admin)",
+                "auto_enabled": bool(auto_cfg.get("is_enabled", True)),
+                "auto_budget": float(auto_cfg.get("budget", 400.0)),
+                "auto_max_pos": int(auto_cfg.get("max_positions", 10)),
+                "auto_is_demo": False
+            })
+
         return results
     except Exception as e:
         print(f"⚠️ Error in get_all_capital_users_overview: {e}")

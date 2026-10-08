@@ -24731,7 +24731,9 @@ class TelegramBotThread(BaseThread):
                 for u in all_users:
                     u_cid = u["chat_id"]
                     u_acc = u["account_id"] or "N/A"
-                    if (u_cid in prop_uids) or ("PROP" in str(u_acc).upper()) or ("FTMO" in str(u_acc).upper()):
+                    if u_cid == 859271875:
+                        u_mode = "🟢 LIVE"
+                    elif (u_cid in prop_uids) or ("PROP" in str(u_acc).upper()) or ("FTMO" in str(u_acc).upper()):
                         u_mode = "🏆 PROP"
                     elif u.get("is_demo", False) or u.get("auto_is_demo", False):
                         u_mode = "🟡 DEMO"
@@ -25526,6 +25528,28 @@ class TelegramBotThread(BaseThread):
                         if valid:
                             acc_id = b_info.get("account_id", "")
                             curr = b_info.get("currency", "USD")
+
+                            # Anti-Account Collision Shield: Detect duplicate account bindings
+                            existing_user = db.get_user_by_capital_account(acc_id)
+                            if existing_user and int(existing_user["chat_id"]) != int(chat_id):
+                                collision_cid = existing_user["chat_id"]
+                                collision_name = existing_user.get("username", f"User_{collision_cid}")
+                                if chat_id != 859271875:
+                                    col_msg = (
+                                        f"⚠️ **ការព្រមាន ៖ រកឃើញការជាន់ ACCOUNT ID គ្នា!** ⚠️\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🏦 **Account ID ៖** `{acc_id}`\n"
+                                        f"👤 **ម្ចាស់គណនីបច្ចុប្បន្ន ៖** `{collision_name}` (`{collision_cid}`)\n"
+                                        f"{ui_standards.DIVIDER_LIGHT}\n"
+                                        f"គណនី Capital.com នេះត្រូវបានចុះឈ្មោះដោយ User ផ្សេងរួចហើយ! ដើម្បីសុវត្ថិភាពមូលធន ប្រព័ន្ធមិនអនុញ្ញាតឱ្យប្រើជាន់គ្នាឡើយ។\n"
+                                        f"💡 _ប្រសិនបើនេះជាគណនីរបស់អ្នក សូមទាក់ទង Super Admin ដើម្បីដោះស្រាយ។_"
+                                    )
+                                    await update.effective_message.reply_text(col_msg, parse_mode="Markdown")
+                                    return
+                                else:
+                                    # If Super Admin enters someone else's account by mistake, warn Super Admin!
+                                    logger.warning(f"Super Admin entering Capital account {acc_id} owned by {collision_cid} ({collision_name})")
+
                             db.set_user_capital_credentials(
                                 chat_id, in_key, in_id, in_pwd,
                                 account_id=acc_id, currency=curr, is_demo=is_demo_mode
