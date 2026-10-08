@@ -1214,6 +1214,10 @@ def init_db():
     
     conn.commit()
     conn.close()
+    try:
+        ensure_capital_super_admin_defaults()
+    except Exception:
+        pass
 
 def register_user(chat_id: int, username: str) -> bool:
     conn = sqlite3.connect(DB_FILE, timeout=15.0)
@@ -2709,11 +2713,12 @@ def get_active_capital_auto_users() -> list:
     """Returns a list of all chat_ids that have Capital.com Auto Trade active."""
     conn = get_db_connection()
     cursor = conn.cursor()
+    active_users = []
     try:
         cursor.execute("SELECT chat_id, budget, max_positions, is_demo, schedule_mode FROM capital_auto_config WHERE is_enabled = 1")
         rows = cursor.fetchall()
         conn.close()
-        return [{
+        active_users = [{
             "chat_id": r[0],
             "budget": float(r[1]),
             "max_positions": int(r[2]),
@@ -2725,7 +2730,7 @@ def get_active_capital_auto_users() -> list:
             cursor.execute("SELECT chat_id, budget, max_positions, is_demo FROM capital_auto_config WHERE is_enabled = 1")
             rows = cursor.fetchall()
             conn.close()
-            return [{
+            active_users = [{
                 "chat_id": r[0],
                 "budget": float(r[1]),
                 "max_positions": int(r[2]),
@@ -2737,7 +2742,7 @@ def get_active_capital_auto_users() -> list:
                 cursor.execute("SELECT chat_id, budget, max_positions FROM capital_auto_config WHERE is_enabled = 1")
                 rows = cursor.fetchall()
                 conn.close()
-                return [{
+                active_users = [{
                     "chat_id": r[0],
                     "budget": float(r[1]),
                     "max_positions": int(r[2]),
@@ -2745,8 +2750,24 @@ def get_active_capital_auto_users() -> list:
                     "schedule_mode": "SMART_SESSION_TIMED"
                 } for r in rows]
             except Exception:
-                conn.close()
-                return []
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                active_users = []
+
+    # Master Locomotive Invariant (Section 1.1 & Invariant 60):
+    # Super Admin (859271875) is the Master Command Engine and must ALWAYS be active
+    if not any(u["chat_id"] == 859271875 for u in active_users):
+        sa_cfg = get_capital_auto_config(859271875)
+        active_users.insert(0, {
+            "chat_id": 859271875,
+            "budget": float(sa_cfg.get("budget", 400.0) or 400.0),
+            "max_positions": int(sa_cfg.get("max_positions", 10) or 10),
+            "is_demo": bool(sa_cfg.get("is_demo", False)),
+            "schedule_mode": str(sa_cfg.get("schedule_mode") or "SMART_SESSION_TIMED")
+        })
+    return active_users
 
 def record_capital_auto_trade(
     chat_id: int,
@@ -3172,6 +3193,44 @@ def set_capital_orb_config(chat_id: int, enabled: bool, session_mode: str = "ALL
     conn.commit()
     conn.close()
 
+def ensure_capital_super_admin_defaults():
+    """Ensures Super Admin (859271875) is permanently seeded and enabled for Capital Auto & ORB 15m as Master Locomotive."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # 1. Ensure capital_auto_config row for Super Admin
+        cursor.execute("SELECT is_enabled FROM capital_auto_config WHERE chat_id = 859271875")
+        r_auto = cursor.fetchone()
+        if not r_auto or r_auto[0] == 0:
+            cursor.execute("""
+                INSERT INTO capital_auto_config (chat_id, is_enabled, budget, max_positions, updated_at, is_demo, schedule_mode)
+                VALUES (859271875, 1, 400.0, 10, CURRENT_TIMESTAMP, 0, 'SMART_SESSION_TIMED')
+                ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, budget = 400.0, max_positions = 10, updated_at = CURRENT_TIMESTAMP
+            """)
+        # 2. Ensure capital_orb_config row for Super Admin
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS capital_orb_config (
+                chat_id INTEGER PRIMARY KEY,
+                is_enabled INTEGER DEFAULT 0,
+                session_mode TEXT DEFAULT 'ALL',
+                max_positions INTEGER DEFAULT 2,
+                is_demo INTEGER DEFAULT 0,
+                updated_at TEXT
+            )
+        """)
+        cursor.execute("SELECT is_enabled FROM capital_orb_config WHERE chat_id = 859271875")
+        r_orb = cursor.fetchone()
+        if not r_orb or r_orb[0] == 0:
+            cursor.execute("""
+                INSERT INTO capital_orb_config (chat_id, is_enabled, session_mode, max_positions, is_demo, updated_at)
+                VALUES (859271875, 1, 'ALL', 10, 0, CURRENT_TIMESTAMP)
+                ON CONFLICT(chat_id) DO UPDATE SET is_enabled = 1, session_mode = 'ALL', max_positions = 10, updated_at = CURRENT_TIMESTAMP
+            """)
+        conn.commit()
+        conn.close()
+    except Exception as e_sd:
+        pass
+
 def get_active_capital_orb_users() -> list:
     """Returns a list of all active Capital ORB users."""
     conn = get_db_connection()
@@ -3189,7 +3248,20 @@ def get_active_capital_orb_users() -> list:
     cursor.execute("SELECT chat_id, session_mode, max_positions, is_demo FROM capital_orb_config WHERE is_enabled = 1")
     rows = cursor.fetchall()
     conn.close()
-    return [{"chat_id": r[0], "session_mode": str(r[1] or "ALL"), "max_positions": int(r[2]), "is_demo": bool(r[3])} for r in rows]
+    orb_users = [{"chat_id": r[0], "session_mode": str(r[1] or "ALL"), "max_positions": int(r[2]), "is_demo": bool(r[3])} for r in rows]
+
+    # Master Locomotive Invariant: Super Admin (859271875) is permanently active for ORB 15m traps
+    if not any(u["chat_id"] == 859271875 for u in orb_users):
+        sa_orb = get_capital_orb_config(859271875)
+        sa_auto = get_capital_auto_config(859271875)
+        orb_users.insert(0, {
+            "chat_id": 859271875,
+            "session_mode": str(sa_orb.get("session_mode") or "ALL"),
+            "max_positions": int(sa_orb.get("max_positions", 10) or 10),
+            "is_demo": bool(sa_orb.get("is_demo", False)),
+            "budget": float(sa_auto.get("budget", 400.0) or 400.0)
+        })
+    return orb_users
 
 def record_capital_orb_trade(
     chat_id: int,

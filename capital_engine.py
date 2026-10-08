@@ -1993,8 +1993,9 @@ def get_user_capital_engine(chat_id: int, is_demo: Optional[bool] = None) -> Cap
             _user_engine_pool[pool_key] = engine
             return engine
         else:
-            engine = get_capital_engine(is_demo=is_demo)
-            engine._custom_chat_id = chat_id
+            # Isolated dedicated engine for users utilizing .env credentials (e.g. Super Admin 859271875)
+            engine = CapitalComEngine(is_demo=is_demo, custom_chat_id=chat_id)
+            _user_engine_pool[pool_key] = engine
             return engine
 
 # Canonical Aliases
@@ -3458,11 +3459,13 @@ class CapitalAutonomousEngine:
                 chk_engine = get_user_capital_engine(chat_id, is_demo=False)
                 chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
                 chk_avail = float(chk_bal.get("available", 0.0) or 0.0)
-                if not chk_bal.get("success") or chk_avail < 10.0:
+                if chk_bal.get("success") and chk_avail >= 10.0:
+                    user_is_demo = False  # Strictly stay on Live Mainnet!
+                elif not chk_bal.get("success") or chk_avail < 10.0:
                     logger.info(f"🚂 [MASTER LOCOMOTIVE DEMO MIRROR] Super Admin (859271875) Live Avail (${chk_avail:,.2f}) < $10.00. Dynamically mirroring on Capital Demo ($10,000) so Master Locomotive never sits idle!")
                     user_is_demo = True
             except Exception:
-                user_is_demo = True
+                pass
 
         user_engine = get_user_capital_engine(chat_id, is_demo=user_is_demo)
 
@@ -3703,9 +3706,13 @@ class CapitalAutonomousEngine:
                         adx_str = f"{setup.get('adx', 0):.1f}"
                         rvol_str = f"{setup.get('rvol', 1.0):.1f}x"
                         
+                        is_master = (chat_id == SUPER_ADMIN_ID)
+                        head_kh = "👑 **[MASTER LOCOMOTIVE AUTO TRADE EXECUTED]** ⚡" if is_master else "🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡"
+                        head_en = "👑 **[MASTER LOCOMOTIVE AUTO TRADE EXECUTED]** ⚡" if is_master else "🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡"
+
                         if user_lang == 'khmer':
                             notif_msg = (
-                                f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                f"{head_kh}\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"⚙️ **គណនី ៖** `{env_lbl}`\n"
                                 f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
@@ -3728,7 +3735,7 @@ class CapitalAutonomousEngine:
                             )
                         else:
                             notif_msg = (
-                                f"🏛️ **[24/7 CAPITAL.COM AUTO TRADE EXECUTED]** ⚡\n"
+                                f"{head_en}\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"⚙️ **Account:** `{env_lbl}`\n"
                                 f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
@@ -4013,6 +4020,17 @@ class CapitalAutonomousEngine:
         import database as db
         active_users = db.get_active_capital_auto_users()
         active_prop_users = db.get_active_prop_firm_users()
+
+        # Master Locomotive Invariant: Super Admin (859271875) must NEVER be missing from active traders!
+        if not any(u.get("chat_id") == SUPER_ADMIN_ID for u in active_users):
+            sa_cfg = db.get_capital_auto_config(SUPER_ADMIN_ID) or {}
+            active_users.insert(0, {
+                "chat_id": SUPER_ADMIN_ID,
+                "budget": float(sa_cfg.get("budget", 400.0) or 400.0),
+                "max_positions": int(sa_cfg.get("max_positions", 10) or 10),
+                "is_demo": bool(sa_cfg.get("is_demo", False)),
+                "schedule_mode": str(sa_cfg.get("schedule_mode") or "SMART_SESSION_TIMED")
+            })
 
         if not active_users and not active_prop_users:
             return
@@ -4980,6 +4998,18 @@ class CapitalOpeningRangeBreakoutEngine:
             if u["chat_id"] not in all_target_users:
                 all_target_users[u["chat_id"]] = u
 
+        # Master Locomotive Invariant: Super Admin (859271875) must ALWAYS be in all_target_users for ORB Traps!
+        if SUPER_ADMIN_ID not in all_target_users:
+            sa_orb = db.get_capital_orb_config(SUPER_ADMIN_ID) or {}
+            sa_auto = db.get_capital_auto_config(SUPER_ADMIN_ID) or {}
+            all_target_users[SUPER_ADMIN_ID] = {
+                "chat_id": SUPER_ADMIN_ID,
+                "session_mode": str(sa_orb.get("session_mode") or "ALL"),
+                "max_positions": int(sa_orb.get("max_positions", 10) or 10),
+                "is_demo": bool(sa_orb.get("is_demo", False)),
+                "budget": float(sa_auto.get("budget", 400.0) or 400.0)
+            }
+
         if not all_target_users:
             return
 
@@ -5054,6 +5084,20 @@ class CapitalOpeningRangeBreakoutEngine:
                 if not is_demo and not db.is_capital_user_authorized(uid):
                     continue
 
+                # Smart Locomotive Fallback: If Super Admin is on Live but has < $10 cash, mirror on Demo ($10,000)
+                if uid == super_admin_id and not is_demo:
+                    try:
+                        chk_engine = get_user_capital_engine(uid, is_demo=False)
+                        chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
+                        chk_avail = float(chk_bal.get("available", 0.0) or 0.0)
+                        if chk_bal.get("success") and chk_avail >= 10.0:
+                            is_demo = False
+                        elif not chk_bal.get("success") or chk_avail < 10.0:
+                            logger.info(f"🚂 [MASTER LOCOMOTIVE DEMO MIRROR] Super Admin (859271875) Live Avail (${chk_avail:,.2f}) < $10.00. Dynamically mirroring on Capital Demo ($10,000) for ORB Trap!")
+                            is_demo = True
+                    except Exception:
+                        pass
+
                 user_engine = get_user_capital_engine(uid, is_demo=is_demo)
                 budget = float(u_cfg.get("budget", 50.0) or 50.0)
 
@@ -5085,7 +5129,8 @@ class CapitalOpeningRangeBreakoutEngine:
                         level=buy_trigger,
                         order_type="STOP",
                         stop_loss=buy_sl,
-                        take_profit=buy_tp
+                        take_profit=buy_tp,
+                        bypass_citadel=True
                     )
                     if buy_res.get("success"):
                         u_trap["buy_deal_id"] = str(buy_res.get("dealId") or buy_res.get("deal_reference", ""))
@@ -5100,7 +5145,8 @@ class CapitalOpeningRangeBreakoutEngine:
                         level=sell_trigger,
                         order_type="STOP",
                         stop_loss=sell_sl,
-                        take_profit=sell_tp
+                        take_profit=sell_tp,
+                        bypass_citadel=True
                     )
                     if sell_res.get("success"):
                         u_trap["sell_deal_id"] = str(sell_res.get("dealId") or sell_res.get("deal_reference", ""))
@@ -5127,9 +5173,13 @@ class CapitalOpeningRangeBreakoutEngine:
                             user_lang = db.get_user_language(uid)
                             import ui_standards
                             env_lbl = "DEMO ($10,000)" if is_demo else "LIVE MAINNET"
+                            is_master = (uid == super_admin_id)
+                            head_kh = "👑 **[MASTER LOCOMOTIVE ORB 15M TRAP ARMED]** ⚡" if is_master else "🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡"
+                            head_en = "👑 **[MASTER LOCOMOTIVE ORB 15M TRAP ARMED]** ⚡" if is_master else "🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡"
+
                             if user_lang == 'khmer':
                                 trap_msg = (
-                                    f"🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡\n"
+                                    f"{head_kh}\n"
                                     f"🏛️ **[ស្ថាបត្យកម្មរាយអន្ទាក់ស្វ័យប្រវត្ត ១០០%]** 🛡️\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🤖 **ស្ថានភាព ៖** `អន្ទាក់បានរាយរួចជាស្រេច (PRE-SET ARMED)`\n"
@@ -5152,7 +5202,7 @@ class CapitalOpeningRangeBreakoutEngine:
                                 )
                             else:
                                 trap_msg = (
-                                    f"🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡\n"
+                                    f"{head_en}\n"
                                     f"🏛️ **[Institutional Breakout Bracket Trap]** 🛡️\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
                                     f"🤖 **Status:** `Armed & Monitoring (PRE-SET ARMED)`\n"
