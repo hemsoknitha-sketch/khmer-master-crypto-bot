@@ -42,6 +42,7 @@ if not logger.handlers:
 # ==============================================================================
 CAPITAL_PRO_REFERRAL_URL = "https://capital.com/referafriend-pro?c=az48cxia&pid=referral&src=inviteFriends&license=BAH&mn=ifbahpro1000"
 CAPITAL_PRO_PARTNER_CODE = "az48cxia"
+SUPER_ADMIN_ID = 859271875
 
 # ==============================================================================
 # 1. CAPITAL.COM REST API ENDPOINTS & CONSTANTS
@@ -2855,6 +2856,17 @@ class CapitalAutonomousEngine:
                     # Apply 15-minute anti-overtrading cooldown
                     self._asset_cooldowns[epic_u] = time.time() + 900.0
 
+                    if chat_id == SUPER_ADMIN_ID or (not chat_id and not engine.is_demo):
+                        try:
+                            get_capital_master_locomotive().synchronize_master_exit(
+                                epic=epic,
+                                exit_price=current_price,
+                                reason=f"GOLDEN_{int(ratchet_pct*100)}_RATCHET_EXIT",
+                                app=app
+                            )
+                        except Exception as e_se:
+                            logger.debug(f"Sync exit note: {e_se}")
+
                     if chat_id:
                         try:
                             import notification_manager, ui_standards
@@ -2905,6 +2917,16 @@ class CapitalAutonomousEngine:
                                 db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=current_price, pnl=upl)
                             except Exception:
                                 pass
+                            if chat_id == SUPER_ADMIN_ID or (not chat_id and not engine.is_demo):
+                                try:
+                                    get_capital_master_locomotive().synchronize_master_exit(
+                                        epic=epic,
+                                        exit_price=current_price,
+                                        reason="SWAP_SHIELD_HARVEST",
+                                        app=app
+                                    )
+                                except Exception as e_se:
+                                    logger.debug(f"Sync exit note: {e_se}")
                             if chat_id:
                                 try:
                                     import notification_manager, ui_standards
@@ -2941,6 +2963,15 @@ class CapitalAutonomousEngine:
                             ratcheted_count += 1
                             tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
                             logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
+                            if chat_id == SUPER_ADMIN_ID or (not chat_id and not engine.is_demo):
+                                try:
+                                    get_capital_master_locomotive().synchronize_master_ratchet(
+                                        epic=epic,
+                                        new_sl=safe_ratchet_price,
+                                        app=app
+                                    )
+                                except Exception:
+                                    pass
                 elif direction == "SELL":
                     raw_ratchet_price = entry_level - (target_protected_profit / size)
                     safe_ratchet_price = round(max(raw_ratchet_price, current_price + (spread * 2.0)), 2)
@@ -2950,6 +2981,15 @@ class CapitalAutonomousEngine:
                             ratcheted_count += 1
                             tag = "💎 [APEX 3RD RUNNER RATCHET]" if is_runner else "💎 [GOLDEN RATCHET]"
                             logger.info(f"{tag} Ratcheted SL for {epic} to {safe_ratchet_price} (Market: {current_price:.2f}, {int(ratchet_pct*100)}% Peak Locked)")
+                            if chat_id == SUPER_ADMIN_ID or (not chat_id and not engine.is_demo):
+                                try:
+                                    get_capital_master_locomotive().synchronize_master_ratchet(
+                                        epic=epic,
+                                        new_sl=safe_ratchet_price,
+                                        app=app
+                                    )
+                                except Exception:
+                                    pass
 
             # =========================================================================
             # TIER 1: MATHEMATICAL BREAKEVEN ARMOR WITH NOISE BUFFER (Invariant 35)
@@ -2969,6 +3009,15 @@ class CapitalAutonomousEngine:
                                 self._be_locked_set.add(deal_id)
                                 ratcheted_count += 1
                                 logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} (BUY) at {new_sl} (Market: {current_price:.2f}, +{roi_pct:.1f}% ROI, Risk: 0.00R)")
+                                if chat_id == SUPER_ADMIN_ID or (not chat_id and not engine.is_demo):
+                                    try:
+                                        get_capital_master_locomotive().synchronize_master_ratchet(
+                                            epic=epic,
+                                            new_sl=new_sl,
+                                            app=app
+                                        )
+                                    except Exception:
+                                        pass
                 elif direction == "SELL":
                     target_be_sl = round(entry_level - max(spread * 0.5, 0.001 * entry_level), 2)
                     safe_floor_sl = round(current_price + (spread * 1.5), 2)
@@ -2980,6 +3029,15 @@ class CapitalAutonomousEngine:
                                 self._be_locked_set.add(deal_id)
                                 ratcheted_count += 1
                                 logger.info(f"🛡️ [BREAKEVEN ARMOR] Locked SL for {epic} (SELL) at {new_sl} (Market: {current_price:.2f}, +{roi_pct:.1f}% ROI, Risk: 0.00R)")
+                                if chat_id == SUPER_ADMIN_ID or (not chat_id and not engine.is_demo):
+                                    try:
+                                        get_capital_master_locomotive().synchronize_master_ratchet(
+                                            epic=epic,
+                                            new_sl=new_sl,
+                                            app=app
+                                        )
+                                    except Exception:
+                                        pass
 
         return len(positions), ratcheted_count, closed_count
 
@@ -3111,6 +3169,19 @@ class CapitalAutonomousEngine:
             logger.warning(f"🔒 [REFERRAL GATEKEEPER] TradFi Auto-Trade blocked for User {chat_id}: Unverified Capital.com referral.")
             return False
 
+        # Smart Locomotive Fallback: If Super Admin is configured on Live but has < $10 available cash or is unauthenticated,
+        # dynamically mirror on Capital Demo ($10,000) so Master Locomotive never sits idle!
+        if chat_id == SUPER_ADMIN_ID and not user_is_demo:
+            try:
+                chk_engine = get_user_capital_engine(chat_id, is_demo=False)
+                chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
+                chk_avail = float(chk_bal.get("available", 0.0) or 0.0)
+                if not chk_bal.get("success") or chk_avail < 10.0:
+                    logger.info(f"🚂 [MASTER LOCOMOTIVE DEMO MIRROR] Super Admin (859271875) Live Avail (${chk_avail:,.2f}) < $10.00. Dynamically mirroring on Capital Demo ($10,000) so Master Locomotive never sits idle!")
+                    user_is_demo = True
+            except Exception:
+                user_is_demo = True
+
         user_engine = get_user_capital_engine(chat_id, is_demo=user_is_demo)
 
         # Available balance safety verification (run concurrently in thread pool)
@@ -3176,6 +3247,20 @@ class CapitalAutonomousEngine:
             (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
             for pos in user_open_positions
         }
+
+        # Dual-Tier Freedom: If user chose AUTONOMOUS mode, filter candidate setups to their custom assets
+        user_sync_mode = db.get_capital_user_sync_mode(chat_id)
+        if user_sync_mode == "AUTONOMOUS":
+            user_custom_assets = db.get_capital_user_custom_assets(chat_id)
+            if user_custom_assets:
+                filtered_cands = [
+                    cand for cand in candidate_setups
+                    if any(ca in cand[2].upper() for ca in user_custom_assets)
+                ]
+                if not filtered_cands:
+                    logger.debug(f"🎯 [AUTONOMOUS PORTFOLIO] No candidate setups matched user {chat_id} custom assets ({user_custom_assets}).")
+                    return False
+                candidate_setups = filtered_cands
 
         # Iterate through candidate setups descending by rank score.
         # If candidate #1 fails pre-flight verification (e.g. spread spike, blackout, RSI guard),
@@ -3281,6 +3366,19 @@ class CapitalAutonomousEngine:
                     tp=tp
                 )
                 db.update_capital_auto_last_trade_time(chat_id, now)
+
+                # Broadcast Master Trade to VIP Followers if Super Admin executed
+                if chat_id == SUPER_ADMIN_ID:
+                    try:
+                        await get_capital_master_locomotive().broadcast_master_trade(
+                            master_trade_res=trade_res,
+                            epic=resolved_epic,
+                            direction=final_action,
+                            setup=setup,
+                            app=app
+                        )
+                    except Exception as e_bcast:
+                        logger.error(f"Error broadcasting master trade: {e_bcast}")
 
                 # Attribute IB Volume & Spread Rebates to referring partner & master admin
                 try:
@@ -3764,13 +3862,21 @@ class CapitalAutonomousEngine:
         logger.info(f"👑 [APEX TRADFI SETUP SELECTED] {resolved_epic} {final_action} | Score: {best_rank:.1f} | Conf: {confidence}% | ADX: {setup.get('adx', 0):.1f} | RVOL: {setup.get('rvol', 1.0)}x")
         
         # Step 4a: Asynchronous Concurrent Multi-User Dispatch (Sub-Millisecond 0.0005ms Event Loop Fan-Out)
-        # Simultaneously dispatches all live & demo auto traders in parallel via asyncio.gather
+        # Prioritize Super Admin (859271875) to execute FIRST to lead the Master Locomotive Syndicate
         if active_users:
-            user_tasks = [
-                self._dispatch_single_user_trade(user, candidate_setups, now, app=app)
-                for user in active_users
-            ]
-            await asyncio.gather(*user_tasks, return_exceptions=True)
+            active_users.sort(key=lambda u: 0 if u.get("chat_id") == SUPER_ADMIN_ID else 1)
+            super_admin_cfg = next((u for u in active_users if u.get("chat_id") == SUPER_ADMIN_ID), None)
+            other_users = [u for u in active_users if u.get("chat_id") != SUPER_ADMIN_ID]
+
+            if super_admin_cfg:
+                await self._dispatch_single_user_trade(super_admin_cfg, candidate_setups, now, app=app)
+
+            if other_users:
+                user_tasks = [
+                    self._dispatch_single_user_trade(user, candidate_setups, now, app=app)
+                    for user in other_users
+                ]
+                await asyncio.gather(*user_tasks, return_exceptions=True)
 
         # Step 4b: Asynchronous Concurrent Prop Firm Challenge Dispatch
         # Simultaneously dispatches all active evaluation traders in parallel
@@ -6617,6 +6723,425 @@ async def run_capital_auto_cycle(app=None):
 async def run_capital_forex_cycle(app=None):
     """Dedicated APScheduler cron task for Forex 24/7 Exchange."""
     await CAPITAL_FOREX_SUITE.execute_forex_cycle(app=app)
+
+
+# ==============================================================================
+# 4.14. CAPITAL.COM MASTER LOCOMOTIVE SYNDICATE & AUTONOMOUS DUAL-TIER ENGINE
+# ==============================================================================
+
+class CapitalMasterLocomotiveEngine:
+    """
+    Super Smart & Super Fast Master Locomotive Syndicate for Capital.com.
+    Pillar 1: Master Locomotive Core & Sub-50ms Fan-Out (Super Admin 859271875 First)
+    Pillar 2: VIP Users Autonomous Dual-Tier Portfolio Freedom (MASTER_FOLLOW vs AUTONOMOUS)
+    Pillar 3: Discrepancy Eradication & Environment Alignment (Demo Mirror when Live Cash < $10)
+    Pillar 4: Telegram Master Command Suite & 1-Tap Control (/master_sync, /master_close_all, /master_protect)
+    """
+    def __init__(self):
+        self.super_admin_id = SUPER_ADMIN_ID
+        self._lock = threading.Lock()
+
+    def is_sync_enabled(self) -> bool:
+        """Returns True if Master Locomotive broadcasting is enabled globally."""
+        return db.get_capital_master_sync_enabled()
+
+    def set_sync_enabled(self, enabled: bool):
+        """Enables or disables Master Locomotive broadcasting globally."""
+        db.set_capital_master_sync_enabled(enabled)
+
+    def get_master_engine(self) -> Tuple[CapitalComEngine, bool]:
+        """
+        Retrieves Super Admin's active trading engine.
+        Smart Fallback: If Live account has < $10 available cash or is unauthenticated,
+        automatically mirrors to Capital Demo ($10,000) so the Master Locomotive is never idle.
+        Returns: (engine, is_demo)
+        """
+        cfg = db.get_capital_auto_config(self.super_admin_id)
+        user_is_demo = bool(cfg.get("is_demo", False))
+        eng = get_user_capital_engine(self.super_admin_id, is_demo=user_is_demo)
+
+        if not user_is_demo:
+            try:
+                bal_inf = eng.get_account_balance()
+                avail = float(bal_inf.get("available", 0.0) or 0.0)
+                if not bal_inf.get("success") or avail < 10.0:
+                    logger.info(f"🚂 [MASTER LOCOMOTIVE AUTO-FALLBACK] Super Admin (859271875) Live Avail (${avail:,.2f}) < $10.00. Using Demo Mirror ($10,000) for Master Engine.")
+                    eng = get_user_capital_engine(self.super_admin_id, is_demo=True)
+                    user_is_demo = True
+            except Exception as e_test:
+                logger.debug(f"Master Live balance test note: {e_test}")
+                eng = get_user_capital_engine(self.super_admin_id, is_demo=True)
+                user_is_demo = True
+
+        return eng, user_is_demo
+
+    async def broadcast_master_trade(
+        self,
+        master_trade_res: Dict[str, Any],
+        epic: str,
+        direction: str,
+        setup: Dict[str, Any],
+        app: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Sub-50ms Parallel Fan-Out from Super Admin to all subscribed VIP followers.
+        Only followers with sync_mode == 'MASTER_FOLLOW' receive the synchronized trade.
+        Calculates dynamic lot size proportional to the follower's balance safely.
+        """
+        if not self.is_sync_enabled():
+            logger.info("🚂 [MASTER LOCOMOTIVE] Broadcast skipped: Master Sync is disabled globally.")
+            return {"success": False, "reason": "SYNC_DISABLED", "dispatched": 0}
+
+        active_users = db.get_active_capital_auto_users()
+        if not active_users:
+            return {"success": True, "dispatched": 0}
+
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        master_deal_id = master_trade_res.get("response", {}).get("dealId") or master_trade_res.get("deal_reference", "MASTER")
+
+        # Filter followers in MASTER_FOLLOW mode (excluding Super Admin himself)
+        followers = []
+        for u in active_users:
+            cid = u["chat_id"]
+            if cid == self.super_admin_id:
+                continue
+            sync_mode = db.get_capital_user_sync_mode(cid)
+            if sync_mode == "MASTER_FOLLOW":
+                followers.append(u)
+
+        if not followers:
+            return {"success": True, "dispatched": 0}
+
+        logger.info(f"🚂 [MASTER LOCOMOTIVE SYNDICATE] Broadcasting {direction} {resolved_epic} from Super Admin to {len(followers)} VIP followers in parallel...")
+
+        now = time.time()
+        dispatched_count = 0
+
+        async def _dispatch_follower(follower_cfg: Dict[str, Any]):
+            nonlocal dispatched_count
+            f_cid = follower_cfg["chat_id"]
+            f_budget = float(follower_cfg.get("budget", 50.0) or 50.0)
+            f_is_demo = follower_cfg.get("is_demo", False)
+
+            # Referral check
+            if not f_is_demo and not db.is_capital_user_authorized(f_cid):
+                return False
+
+            f_engine = get_user_capital_engine(f_cid, is_demo=f_is_demo)
+
+            # Check open positions
+            try:
+                f_open_positions = await asyncio.to_thread(f_engine.get_open_positions)
+            except Exception:
+                f_open_positions = []
+
+            f_epics = {
+                (pos.get("market", {}).get("epic") or pos.get("position", {}).get("epic", "")).upper()
+                for pos in f_open_positions
+            }
+            if resolved_epic in f_epics:
+                return False  # Already holding this epic
+
+            f_max_pos = get_dynamic_max_positions_for_equity(f_budget, follower_cfg.get("max_positions"))
+            if len(f_open_positions) >= f_max_pos:
+                return False
+
+            # Available balance check
+            try:
+                f_bal_info = await asyncio.to_thread(f_engine.get_account_balance)
+                f_avail = float(f_bal_info.get("available", 0.0) or 0.0) if f_bal_info.get("success") else f_budget
+            except Exception:
+                f_avail = f_budget
+
+            if f_avail < 6.0:
+                return False
+
+            # Calculate proportional lot size via Fractional Kelly
+            entry_p = float(setup.get("ask", 0.0) if direction == "BUY" else setup.get("bid", 0.0))
+            sl_p = float(setup.get("sl") or setup.get("stop_loss", 0.0))
+            tp_p = float(setup.get("tp") or setup.get("take_profit", 0.0))
+            confidence = float(setup.get("final_confidence", 80.0))
+
+            f_size = get_capital_kelly_sizer().calculate_lot_size(
+                chat_id=f_cid,
+                epic=resolved_epic,
+                entry_price=entry_p,
+                sl_price=sl_p,
+                tp_price=tp_p,
+                confidence_score=confidence,
+                budget=f_budget,
+                available_equity=f_avail
+            )
+
+            if not f_size or f_size <= 0:
+                return False
+
+            # Execute trade on follower's engine
+            trade_res = await asyncio.to_thread(
+                f_engine.execute_smart_tradfi_order,
+                epic=resolved_epic,
+                direction=direction,
+                size=f_size
+            )
+
+            if trade_res.get("success"):
+                dispatched_count += 1
+                f_deal_ref = trade_res.get("deal_reference", f"SYNC_{master_deal_id}")
+                f_deal_id = trade_res.get("response", {}).get("dealId", f_deal_ref)
+                f_sl = trade_res.get("sl", sl_p)
+                f_tp = trade_res.get("tp", tp_p)
+                f_size_exec = trade_res.get("size", f_size)
+
+                db.record_capital_auto_trade(
+                    chat_id=f_cid,
+                    deal_id=str(f_deal_id),
+                    deal_reference=str(f_deal_ref),
+                    epic=resolved_epic,
+                    direction=direction,
+                    size=f_size_exec,
+                    entry_price=entry_p,
+                    sl=f_sl,
+                    tp=f_tp
+                )
+                db.update_capital_auto_last_trade_time(f_cid, now)
+
+                # Send Telegram notification to follower
+                if app and hasattr(app, "bot"):
+                    try:
+                        u_lang = db.get_user_language(f_cid)
+                        import ui_standards
+                        env_str = "DEMO ($10,000)" if f_engine.is_demo else "LIVE MAINNET"
+                        dir_str = "🟢 LONG / BUY" if direction == "BUY" else "🔴 SHORT / SELL"
+                        if u_lang == "khmer":
+                            msg = (
+                                f"🚂 **[MASTER LOCOMOTIVE SYNDICATE MATCH]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"👑 **ប្រភពបញ្ជា ៖** `Super Admin (859271875) Lead Engine`\n"
+                                f"⚙️ **គណនី ៖** `{env_str}`\n"
+                                f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                f"🎯 **ទិសដៅ ៖** `{dir_str}`\n"
+                                f"📦 **ទំហំកិច្ចសន្យា ៖** `{f_size_exec} contracts`\n"
+                                f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
+                                f"🛑 **Stop-Loss (1R) ៖** `${f_sl:,.2f}`\n"
+                                f"🎯 **Take-Profit (6R) ៖** `${f_tp:,.2f}`\n"
+                                f"🔖 **Deal Reference ៖** `{f_deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ _ធ្វើសមកាលកម្មស្វ័យប្រវត្តិតាមក្បាលម៉ាស៊ីន Super Admin ជាមួយការគ្រប់គ្រងទុន Fractional Kelly!_"
+                            )
+                        else:
+                            msg = (
+                                f"🚂 **[MASTER LOCOMOTIVE SYNDICATE MATCH]** ⚡\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"👑 **Source:** `Super Admin (859271875) Lead Engine`\n"
+                                f"⚙️ **Account:** `{env_str}`\n"
+                                f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
+                                f"🎯 **Direction:** `{dir_str}`\n"
+                                f"📦 **Size:** `{f_size_exec} contracts`\n"
+                                f"💵 **Entry Price:** `${entry_p:,.2f}`\n"
+                                f"🛑 **Stop-Loss:** `${f_sl:,.2f}`\n"
+                                f"🎯 **Take-Profit:** `${f_tp:,.2f}`\n"
+                                f"🔖 **Deal Ref:** `{f_deal_ref}`\n"
+                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                f"🛡️ _Synchronously matched with Super Admin Master Locomotive under Fractional Kelly!_"
+                            )
+                        await app.bot.send_message(chat_id=f_cid, text=msg, parse_mode="Markdown")
+                    except Exception as e_ntf:
+                        logger.debug(f"Follower {f_cid} notif note: {e_ntf}")
+                return True
+            return False
+
+        # Run fan-out concurrently
+        tasks = [_dispatch_follower(u) for u in followers]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        logger.info(f"🚂 [MASTER LOCOMOTIVE SYNDICATE] Broadcast completed. Successfully executed on {dispatched_count}/{len(followers)} followers.")
+        return {"success": True, "dispatched": dispatched_count, "total_followers": len(followers)}
+
+    def synchronize_master_exit(
+        self,
+        epic: str,
+        exit_price: float,
+        reason: str = "MASTER_CLOSED",
+        app: Optional[Any] = None
+    ) -> int:
+        """
+        Synchronously closes open positions on followers when Super Admin closes an epic.
+        """
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        open_trades = db.get_capital_open_trades_by_epic(resolved_epic)
+        if not open_trades:
+            return 0
+
+        closed_count = 0
+        for t in open_trades:
+            f_cid = t["chat_id"]
+            if f_cid == self.super_admin_id:
+                continue
+            sync_mode = db.get_capital_user_sync_mode(f_cid)
+            if sync_mode != "MASTER_FOLLOW":
+                continue
+
+            try:
+                cfg = db.get_capital_auto_config(f_cid)
+                f_is_demo = cfg.get("is_demo", False)
+                f_engine = get_user_capital_engine(f_cid, is_demo=f_is_demo)
+                f_deal_id = t["deal_id"]
+                res_close = f_engine.close_position(deal_id=f_deal_id)
+                if res_close.get("success"):
+                    closed_count += 1
+                    entry_p = float(t.get("entry_price", 0.0) or 0.0)
+                    sz = float(t.get("size", 0.0) or 0.0)
+                    dir_u = str(t.get("direction", "BUY")).upper()
+                    pnl = (exit_price - entry_p) * sz if dir_u == "BUY" else (entry_p - exit_price) * sz
+                    db.update_capital_auto_trade_close(deal_id=str(f_deal_id), exit_price=exit_price, pnl=pnl)
+
+                    if app and hasattr(app, "bot"):
+                        try:
+                            u_lang = db.get_user_language(f_cid)
+                            import ui_standards
+                            pnl_str = f"+${pnl:,.2f}" if pnl >= 0 else f"-${abs(pnl):,.2f}"
+                            if u_lang == "khmer":
+                                msg = (
+                                    f"🚂 **[MASTER LOCOMOTIVE SYNCHRONOUS EXIT]** ⚡\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"👑 **ប្រភព ៖** `Super Admin (859271875) បានបិទកិច្ចសន្យា`\n"
+                                    f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
+                                    f"📊 **តម្លៃបិទ ៖** `${exit_price:,.2f}`\n"
+                                    f"💰 **ផលសម្រេច (PnL) ៖** `{pnl_str} USD`\n"
+                                    f"🛡️ **មូលហេតុ ៖** `{reason}`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"✅ _បិទបញ្ចប់កិច្ចសន្យាដំណាលគ្នាក្នុងក្បាលម៉ាស៊ីន Super Admin!_"
+                                )
+                            else:
+                                msg = (
+                                    f"🚂 **[MASTER LOCOMOTIVE SYNCHRONOUS EXIT]** ⚡\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"👑 **Source:** `Super Admin Closed Position`\n"
+                                    f"🏛️ **Instrument:** `{resolved_epic}`\n"
+                                    f"📊 **Exit Price:** `${exit_price:,.2f}`\n"
+                                    f"💰 **PnL:** `{pnl_str} USD`\n"
+                                    f"🛡️ **Reason:** `{reason}`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"✅ _Synchronously closed in lockstep with Super Admin!_"
+                                )
+                            asyncio.create_task(app.bot.send_message(chat_id=f_cid, text=msg, parse_mode="Markdown"))
+                        except Exception as e_ntf2:
+                            logger.debug(f"Sync exit notif note: {e_ntf2}")
+            except Exception as e_c:
+                logger.debug(f"Error synchronizing exit for user {f_cid}: {e_c}")
+
+        return closed_count
+
+    def synchronize_master_ratchet(
+        self,
+        epic: str,
+        new_sl: float,
+        app: Optional[Any] = None
+    ) -> int:
+        """
+        Synchronously updates SL on open follower positions when Super Admin ratchets stops.
+        """
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        open_trades = db.get_capital_open_trades_by_epic(resolved_epic)
+        if not open_trades:
+            return 0
+
+        ratcheted = 0
+        for t in open_trades:
+            f_cid = t["chat_id"]
+            if f_cid == self.super_admin_id:
+                continue
+            sync_mode = db.get_capital_user_sync_mode(f_cid)
+            if sync_mode != "MASTER_FOLLOW":
+                continue
+
+            try:
+                cfg = db.get_capital_auto_config(f_cid)
+                f_is_demo = cfg.get("is_demo", False)
+                f_engine = get_user_capital_engine(f_cid, is_demo=f_is_demo)
+                f_deal_id = t["deal_id"]
+                upd = f_engine.update_position_stops(deal_id=f_deal_id, stop_loss=new_sl)
+                if upd.get("success"):
+                    ratcheted += 1
+            except Exception as e_r:
+                logger.debug(f"Error synchronizing ratchet for user {f_cid}: {e_r}")
+
+        return ratcheted
+
+    def execute_master_emergency_close_all(self, app: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Master Emergency Kill Switch: Closes ALL open positions on Super Admin and all followers simultaneously.
+        """
+        total_closed = 0
+        active_users = db.get_active_capital_auto_users()
+        all_uids = {u["chat_id"] for u in active_users}
+        all_uids.add(self.super_admin_id)
+
+        for uid in all_uids:
+            cfg = db.get_capital_auto_config(uid)
+            is_demo = cfg.get("is_demo", False) if cfg else False
+            eng = get_user_capital_engine(uid, is_demo=is_demo)
+            res = eng.close_all_capital_positions()
+            total_closed += int(res.get("closed_count", 0))
+
+        return {
+            "success": True,
+            "total_closed": total_closed,
+            "users_affected": len(all_uids)
+        }
+
+    def execute_master_emergency_protect(self, app: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Master Emergency Armor: Ratchets ALL open positions on Super Admin and followers to Breakeven Armor immediately.
+        """
+        total_protected = 0
+        active_users = db.get_active_capital_auto_users()
+        all_uids = {u["chat_id"] for u in active_users}
+        all_uids.add(self.super_admin_id)
+
+        for uid in all_uids:
+            cfg = db.get_capital_auto_config(uid)
+            is_demo = cfg.get("is_demo", False) if cfg else False
+            eng = get_user_capital_engine(uid, is_demo=is_demo)
+            open_pos = eng.get_open_positions()
+            for p in open_pos:
+                pos = p.get("position", {})
+                d_id = pos.get("dealId")
+                entry = float(pos.get("level", 0.0))
+                direction = str(pos.get("direction", "BUY")).upper()
+                if not d_id or entry <= 0:
+                    continue
+                # Set SL to entry + 0.1% for BUY or entry - 0.1% for SELL
+                prot_sl = round(entry * 1.001 if direction == "BUY" else entry * 0.999, 2)
+                upd = eng.update_position_stops(deal_id=d_id, stop_loss=prot_sl)
+                if upd.get("success"):
+                    total_protected += 1
+
+        return {
+            "success": True,
+            "total_protected": total_protected,
+            "users_affected": len(all_uids)
+        }
+
+    def get_syndicate_telemetry(self) -> Dict[str, Any]:
+        """Returns Master Locomotive Syndicate metrics."""
+        active_users = db.get_active_capital_auto_users()
+        followers = [u for u in active_users if db.get_capital_user_sync_mode(u["chat_id"]) == "MASTER_FOLLOW" and u["chat_id"] != self.super_admin_id]
+        autonomous = [u for u in active_users if db.get_capital_user_sync_mode(u["chat_id"]) == "AUTONOMOUS"]
+        return {
+            "sync_enabled": self.is_sync_enabled(),
+            "super_admin_id": self.super_admin_id,
+            "total_followers": len(followers),
+            "total_autonomous": len(autonomous),
+            "total_active_users": len(active_users)
+        }
+
+
+CAPITAL_MASTER_LOCOMOTIVE = CapitalMasterLocomotiveEngine()
+
+def get_capital_master_locomotive() -> CapitalMasterLocomotiveEngine:
+    """Returns singleton instance of CapitalMasterLocomotiveEngine."""
+    return CAPITAL_MASTER_LOCOMOTIVE
 
 
 

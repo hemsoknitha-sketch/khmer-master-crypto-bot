@@ -6461,6 +6461,150 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = ["SWAP_SHIELD"]
                 await capital_command(update, context)
+            elif data == "btn_cap_mode_toggle":
+                curr_mode = db.get_capital_user_sync_mode(chat_id)
+                new_mode = "AUTONOMOUS" if curr_mode == "MASTER_FOLLOW" else "MASTER_FOLLOW"
+                db.set_capital_user_sync_mode(chat_id, new_mode)
+                toast = "🎯 បានប្តូរទៅរបៀប Autonomous (ជ្រើសរើស Assets ដោយស្វ័យប្រវត្ត)!" if new_mode == "AUTONOMOUS" else "🚂 បានប្តូរទៅរបៀប Follow Master (ធ្វើសមកាលកម្មតាម Super Admin)!"
+                try:
+                    await update.callback_query.answer(toast, show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_mode_master_follow":
+                db.set_capital_user_sync_mode(chat_id, "MASTER_FOLLOW")
+                try:
+                    await update.callback_query.answer("🚂 បានកំណត់របៀប Follow Master (ធ្វើសមកាលកម្មតាម Super Admin)!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_mode_autonomous":
+                db.set_capital_user_sync_mode(chat_id, "AUTONOMOUS")
+                try:
+                    await update.callback_query.answer("🎯 បានកំណត់របៀប Autonomous (ជ្រើសរើស Assets ដោយស្វ័យប្រវត្ត)!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_custom_assets":
+                try:
+                    await update.callback_query.answer()
+                except Exception:
+                    pass
+                c_assets = db.get_capital_user_custom_assets(chat_id)
+                cur_str = ", ".join(c_assets) if c_assets else "គ្រប់ Session Assets ទាំងអស់ (All Priority)"
+                import ui_standards
+                ast_msg = (
+                    f"⚙️ **[CAPITAL.COM AUTONOMOUS WATCHLIST]** 🎯\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🎯 **របៀបបច្ចុប្បន្ន ៖** `Autonomous Dual-Tier Portfolio`\n"
+                    f"📋 **Watchlist បច្ចុប្បន្ន ៖** `{cur_str}`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"ជ្រើសរើសកញ្ចប់ឧបករណ៍វិនិយោគដែលអ្នកពេញចិត្ត ៖\n"
+                    f"• **🥇 Gold & US500 ៖** មាស & S&P 500 (ឈ្នះខ្ពស់ & Spread ទាបបំផុត)\n"
+                    f"• **💻 Tech Mega-Caps ៖** Nasdaq 100, Nvidia & Tesla\n"
+                    f"• **💱 Forex Majors ៖** EUR/USD, GBP/USD & USD/JPY\n"
+                    f"• **🌐 គ្រប់ Assets ទាំងអស់ ៖** ជួញដូរតាម Apex Golden Setup\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ _គ្រប់ការចូល Position ទាំងអស់ឆ្លងកាត់ការការពារ Citadel 7-Layer ជានិច្ច!_"
+                )
+                ast_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🥇 Gold + S&P 500", callback_data="btn_cap_asset_gold_us500"),
+                        InlineKeyboardButton("💻 Tech (US100/NVDA/TSLA)", callback_data="btn_cap_asset_tech")
+                    ],
+                    [
+                        InlineKeyboardButton("💱 Forex Majors", callback_data="btn_cap_asset_forex"),
+                        InlineKeyboardButton("🌐 គ្រប់ Assets ទាំងអស់", callback_data="btn_cap_asset_all")
+                    ],
+                    [
+                        InlineKeyboardButton("🔙 ត្រឡប់ទៅ /capital", callback_data="btn_cap_menu")
+                    ]
+                ])
+                await update.effective_message.reply_text(ast_msg, parse_mode="Markdown", reply_markup=ast_kb)
+            elif data == "btn_cap_asset_gold_us500":
+                db.set_capital_user_custom_assets(chat_id, ["GOLD", "US500"])
+                db.set_capital_user_sync_mode(chat_id, "AUTONOMOUS")
+                try:
+                    await update.callback_query.answer("✅ បានកំណត់ Watchlist: GOLD & US500 (S&P 500)!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_asset_tech":
+                db.set_capital_user_custom_assets(chat_id, ["US100", "NVDA", "TSLA"])
+                db.set_capital_user_sync_mode(chat_id, "AUTONOMOUS")
+                try:
+                    await update.callback_query.answer("✅ បានកំណត់ Watchlist: US100, NVDA & TSLA!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_asset_forex":
+                db.set_capital_user_custom_assets(chat_id, ["EURUSD", "GBPUSD", "USDJPY"])
+                db.set_capital_user_sync_mode(chat_id, "AUTONOMOUS")
+                try:
+                    await update.callback_query.answer("✅ បានកំណត់ Watchlist: EURUSD, GBPUSD & USDJPY!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_asset_all":
+                db.set_capital_user_custom_assets(chat_id, [])
+                try:
+                    await update.callback_query.answer("✅ បានកំណត់ Watchlist: គ្រប់ Session Assets ទាំងអស់!", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_command(update, context)
+            elif data == "btn_cap_master_sync_toggle":
+                if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                    try:
+                        await update.callback_query.answer("⛔ សម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                curr_sync = db.get_capital_master_sync_enabled()
+                new_sync = not curr_sync
+                db.set_capital_master_sync_enabled(new_sync)
+                toast_s = "🟢 Master Locomotive Sync បានបើក!" if new_sync else "🛑 Master Locomotive Sync បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_s, show_alert=True)
+                except Exception:
+                    pass
+                await master_sync_command(update, context)
+            elif data == "btn_cap_master_sync_refresh":
+                try:
+                    await update.callback_query.answer("🔄 ធ្វើបច្ចុប្បន្នភាព Master Sync!")
+                except Exception:
+                    pass
+                await master_sync_command(update, context)
+            elif data == "btn_cap_master_close_all":
+                if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                    try:
+                        await update.callback_query.answer("⛔ សម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                try:
+                    await update.callback_query.answer("🚨 កំពុងបិទគ្រប់ Positions ទាំងអស់លើ Master និង Followers...")
+                except Exception:
+                    pass
+                await master_close_all_command(update, context)
+            elif data == "btn_cap_master_protect":
+                if not (chat_id == 859271875 or db.is_admin(chat_id)):
+                    try:
+                        await update.callback_query.answer("⛔ សម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                try:
+                    await update.callback_query.answer("🛡️ កំពុងចាក់សោរ Breakeven Armor លើគ្រប់ Positions ទាំងអស់...")
+                except Exception:
+                    pass
+                await master_protect_command(update, context)
             elif data == "btn_cap_req_verify":
                 try:
                     await update.callback_query.answer("✅ បានផ្ញើសំណើផ្ទៀងផ្ទាត់ទៅកាន់ Super Admin រួចរាល់!", show_alert=True)
@@ -24982,6 +25126,136 @@ class TelegramBotThread(BaseThread):
                 )
                 return
 
+        async def master_sync_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            /master_sync [ON/OFF]
+            Controls Master Locomotive Syndicate broadcasting from Super Admin (859271875).
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id or not (chat_id == 859271875 or db.is_admin(chat_id)):
+                await update.effective_message.reply_text("⛔ បញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", parse_mode="Markdown")
+                return
+
+            import capital_engine
+            import ui_standards
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            loco = capital_engine.get_capital_master_locomotive()
+            args = list(context.args) if context and context.args else []
+
+            if args:
+                opt = str(args[0]).upper().strip()
+                if opt in ["ON", "ENABLE", "1", "TRUE", "START"]:
+                    loco.set_sync_enabled(True)
+                    st_txt = "🟢 បានបើកដំណើរការ (ENABLED)"
+                elif opt in ["OFF", "DISABLE", "0", "FALSE", "STOP"]:
+                    loco.set_sync_enabled(False)
+                    st_txt = "⚪ បានបិទដំណើរការ (DISABLED)"
+                else:
+                    st_txt = "🟢 កំពុងដំណើរការ (ENABLED)" if loco.is_sync_enabled() else "⚪ បានបិទ (DISABLED)"
+            else:
+                st_txt = "🟢 កំពុងដំណើរការ (ENABLED)" if loco.is_sync_enabled() else "⚪ បានបិទ (DISABLED)"
+
+            telemetry = loco.get_syndicate_telemetry()
+            tot_f = telemetry.get("total_followers", 0)
+            tot_a = telemetry.get("total_autonomous", 0)
+            tot_u = telemetry.get("total_active_users", 0)
+
+            msg = (
+                f"🚂 **[CAPITAL.COM MASTER LOCOMOTIVE SYNDICATE]** 👑\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👑 **ក្បាលម៉ាស៊ីនបញ្ជា (Master) ៖** `Super Admin (859271875)`\n"
+                f"⚙️ **ស្ថានភាពចម្លងទិញ-លក់ ៖** `{st_txt}`\n"
+                f"👥 **សមាជិក Follow Master ៖** `{tot_f} VIP Traders`\n"
+                f"🎯 **សមាជិក Autonomous Mode ៖** `{tot_a} VIP Traders`\n"
+                f"📊 **អ្នកប្រើប្រាស់សកម្មសរុប ៖** `{tot_u} នាក់`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💡 **លក្ខណៈពិសេសរបស់ប្រព័ន្ធក្បាលម៉ាស៊ីន ៖**\n"
+                f"• Sub-50ms Parallel Fan-Out: បញ្ជាចូលដំណាលគ្នាមិនឱ្យយឺត\n"
+                f"• Fractional Kelly Sizing: បែងចែកទំហំ Lot សមាមាត្រតាមទុន VIP\n"
+                f"• Lockstep Exits: បិទកិច្ចសន្យា & Ratchet ចំណេញដំណាលគ្នា\n"
+                f"• Demo Mirror Fallback: បើទុន Live < $10 ដំណើរការ Demo ស្វ័យប្រវត្ត\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"ចុចប៊ូតុងខាងក្រោមដើម្បីកំណត់ ៖"
+            )
+
+            btn_toggle_txt = "🛑 បិទ Master Sync" if loco.is_sync_enabled() else "🟢 បើក Master Sync"
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(btn_toggle_txt, callback_data="btn_cap_master_sync_toggle")
+                ],
+                [
+                    InlineKeyboardButton("🚨 Master Close All", callback_data="btn_cap_master_close_all"),
+                    InlineKeyboardButton("🛡️ Master Protect", callback_data="btn_cap_master_protect")
+                ],
+                [
+                    InlineKeyboardButton("🔄 ធ្វើបច្ចុប្បន្នភាព", callback_data="btn_cap_master_sync_refresh"),
+                    InlineKeyboardButton("🔙 /capital Menu", callback_data="btn_cap_menu")
+                ]
+            ])
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=kb)
+
+        async def master_close_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            /master_close_all
+            Emergency Kill Switch: Closes all open positions on Master and followers.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id or not (chat_id == 859271875 or db.is_admin(chat_id)):
+                await update.effective_message.reply_text("⛔ បញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", parse_mode="Markdown")
+                return
+
+            import capital_engine
+            import ui_standards
+
+            loco = capital_engine.get_capital_master_locomotive()
+            res = loco.execute_master_emergency_close_all(app=context.application)
+            tot_c = res.get("total_closed", 0)
+            u_aff = res.get("users_affected", 0)
+
+            msg = (
+                f"🚨 **[MASTER EMERGENCY CLOSE ALL EXECUTED]** 🛑\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👑 **បញ្ជាដោយ ៖** `Super Admin (859271875)`\n"
+                f"📊 **ចំនួនកិច្ចសន្យាដែលបានបិទ ៖** `{tot_c} Positions`\n"
+                f"👥 **ចំនួនគណនីដែលបានបិទ ៖** `{u_aff} Accounts`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🛡️ _គ្រប់កិច្ចសន្យាទាំងអស់លើ Master និង Followers ត្រូវបានបិទបញ្ចប់ដោយសុវត្ថិភាព ១០០%!_"
+            )
+            await update.effective_message.reply_text(msg, parse_mode="Markdown")
+
+        async def master_protect_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            /master_protect
+            Emergency Breakeven Armor Lock: Ratchets all positions on Master and followers to breakeven.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else None
+            if not chat_id or not (chat_id == 859271875 or db.is_admin(chat_id)):
+                await update.effective_message.reply_text("⛔ បញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ!", parse_mode="Markdown")
+                return
+
+            import capital_engine
+            import ui_standards
+
+            loco = capital_engine.get_capital_master_locomotive()
+            res = loco.execute_master_emergency_protect(app=context.application)
+            tot_p = res.get("total_protected", 0)
+            u_aff = res.get("users_affected", 0)
+
+            msg = (
+                f"🛡️ **[MASTER EMERGENCY ARMOR PROTECT EXECUTED]** 💎\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"👑 **បញ្ជាដោយ ៖** `Super Admin (859271875)`\n"
+                f"🛡️ **ចំនួនកិច្ចសន្យាដែលបានចាក់សោរ ៖** `{tot_p} Positions`\n"
+                f"👥 **ចំនួនគណនីដែលបានការពារ ៖** `{u_aff} Accounts`\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"💎 _Stop-Loss ត្រូវបានរំកិលទៅកាន់ Breakeven Armor លើគ្រប់កិច្ចសន្យា ហានិភ័យត្រូវបានកាត់បន្ថយមកស្មើ 0.00R!_"
+            )
+            await update.effective_message.reply_text(msg, parse_mode="Markdown")
+
         async def citadel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
             🛡️ 5-Layer System Security Citadel & Latency Virtualizer (Invariant 41).
@@ -25617,7 +25891,26 @@ class TelegramBotThread(BaseThread):
             btn_monfri_text = "⏰ ចន្ទ-សុក្រ ✅" if sched_mode == "SCHEDULE_MON_FRI" else "⏰ ចន្ទ-សុក្រ (Mon-Fri)"
             btn_247_text = "🔄 24/7 Mode ✅" if sched_mode in ["24/7", "247", "RESET", "ALWAYS_ON"] else "🔄 24/7 Mode"
 
+            user_sync_mode = db.get_capital_user_sync_mode(chat_id)
+            mode_btn_text = "🎯 Mode: Autonomous ✅" if user_sync_mode == "AUTONOMOUS" else "🚂 Mode: Follow Master ✅"
+
+            is_super_admin = (chat_id == 859271875 or db.is_admin(chat_id))
+            master_sync_on = db.get_capital_master_sync_enabled()
+            master_sync_btn_text = "👑 Master Sync: ON 🟢" if master_sync_on else "👑 Master Sync: OFF ⚪"
+
             keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(mode_btn_text, callback_data="btn_cap_mode_toggle"),
+                    InlineKeyboardButton("⚙️ Custom Assets", callback_data="btn_cap_custom_assets")
+                ],
+                *([[
+                    InlineKeyboardButton(master_sync_btn_text, callback_data="btn_cap_master_sync_toggle"),
+                    InlineKeyboardButton("🚨 Master Close All", callback_data="btn_cap_master_close_all")
+                ]] if is_super_admin else []),
+                *([[
+                    InlineKeyboardButton("🛡️ Master Protect", callback_data="btn_cap_master_protect"),
+                    InlineKeyboardButton("👑 Total Spread Audit (Admin)", callback_data="btn_cap_admin_total_spread")
+                ]] if is_super_admin else []),
                 [
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle"),
                     InlineKeyboardButton(leadlag_btn_text, callback_data="btn_cap_leadlag_toggle")
@@ -25642,7 +25935,6 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton(news_scalp_btn_text, callback_data="btn_cap_news_scalp_toggle"),
                     InlineKeyboardButton("⚡ News Scalp Alpha", callback_data="btn_cap_news_scalp")
                 ],
-                *([[InlineKeyboardButton("👑 Total Spread Audit (Admin)", callback_data="btn_cap_admin_total_spread")]] if (chat_id == 859271875 or db.is_admin(chat_id)) else []),
                 [
                     InlineKeyboardButton("📈 ORB Radar (15m)", callback_data="btn_cap_orb_radar"),
                     InlineKeyboardButton("🧮 Kelly Radar", callback_data="btn_cap_kelly_radar")
@@ -26089,12 +26381,22 @@ class TelegramBotThread(BaseThread):
                 sched_badge_kh = f"🛡️ SWAP SHIELD ({sched_dict.get('weekday_kh', '')} | ផ្អាកចូលថ្មី | Resumes 07:00 ICT)"
                 sched_badge_en = f"🛡️ SWAP SHIELD ({sched_dict.get('weekday', '')} | Entries Paused | Resumes 07:00 ICT)"
 
+            u_sync_mode = db.get_capital_user_sync_mode(chat_id)
+            c_assets = db.get_capital_user_custom_assets(chat_id)
+            if u_sync_mode == "AUTONOMOUS":
+                sync_badge_kh = f"🎯 Autonomous ({', '.join(c_assets)})"
+                sync_badge_en = f"🎯 Autonomous ({', '.join(c_assets)})"
+            else:
+                sync_badge_kh = "🚂 Follow Master Syndicate (Super Admin 859271875)"
+                sync_badge_en = "🚂 Follow Master Syndicate (Super Admin 859271875)"
+
             if user_lang == 'khmer':
                 msg = (
                     f"🏛️ **CAPITAL.COM TRADFI MULTI-ASSET SUITE** ⚡\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🏦 **គណនីវិនិយោគ ៖** `{env_mode}`\n"
                     f"🆔 **Live Account ID ៖** `{data.get('account_id')}`\n"
+                    f"🚂 **Portfolio Sync Mode ៖** `{sync_badge_kh}`\n"
                     f"🤖 **TradFi Auto Engine ៖** `{auto_badge}`\n"
                     f"⏰ **កាលវិភាគវិនិយោគ ៖** `{sched_badge_kh}`\n"
                     f"🎯 **ORB 15m Matrix ៖** `{orb_badge}`\n"
@@ -26142,6 +26444,7 @@ class TelegramBotThread(BaseThread):
                     f"{ui_standards.DIVIDER_HEAVY}\n"
                     f"🏦 **Investment Account:** `{env_mode}`\n"
                     f"🆔 **Live Account ID:** `{data.get('account_id')}`\n"
+                    f"🚂 **Portfolio Sync Mode:** `{sync_badge_en}`\n"
                     f"🤖 **TradFi Auto Engine:** `{auto_badge}`\n"
                     f"⏰ **Trading Schedule:** `{sched_badge_en}`\n"
                     f"🎯 **ORB 15m Matrix:** `{orb_badge}`\n"
@@ -26703,6 +27006,12 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("capitaltotalspread", capital_spread_command))
         self.app.add_handler(CommandHandler("capital_admin_spread", capital_spread_command))
         self.app.add_handler(CommandHandler("admin_capital_spread", capital_spread_command))
+        self.app.add_handler(CommandHandler("master_sync", master_sync_command))
+        self.app.add_handler(CommandHandler("mastersync", master_sync_command))
+        self.app.add_handler(CommandHandler("master_close_all", master_close_all_command))
+        self.app.add_handler(CommandHandler("mastercloseall", master_close_all_command))
+        self.app.add_handler(CommandHandler("master_protect", master_protect_command))
+        self.app.add_handler(CommandHandler("masterprotect", master_protect_command))
         self.app.add_handler(CommandHandler("capital_news", capital_news_scalp_command))
         self.app.add_handler(CommandHandler("capitalnews", capital_news_scalp_command))
         self.app.add_handler(CommandHandler("news_scalp", capital_news_scalp_command))

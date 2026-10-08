@@ -113,5 +113,8 @@ def get_admin_bot_commands():
         BotCommand("hf_data", "🤗 Angkor Ultra-Fast HF Storage"),
         BotCommand("admin_capital", "🏢 Angkor Capital Live Approver"),
         BotCommand("admin_mt5", "🏛️ Angkor MT5 Live Approver"),
+        BotCommand("master_sync", "🚂 Angkor Master Locomotive Sync"),
+        BotCommand("master_close_all", "🚨 Master Close All Positions"),
+        BotCommand("master_protect", "🛡️ Master Emergency Armor Protection"),
         BotCommand("admin_nuke", "🛑 Angkor Emergency Kill Switch & Shutdown"),
     ]

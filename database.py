@@ -2866,6 +2866,89 @@ def get_capital_auto_trades(chat_id: int, limit: int = 50) -> list:
 
 
 # ==============================================================================
+# CAPITAL.COM MASTER LOCOMOTIVE SYNDICATE & AUTONOMOUS DUAL-TIER PERSISTENCE LAYER
+# ==============================================================================
+
+def get_capital_user_sync_mode(chat_id: int) -> str:
+    """
+    Returns the user's Capital.com synchronization mode:
+    - 'MASTER_FOLLOW': Follows Super Admin's trades directly with Fractional Kelly risk sizing.
+    - 'AUTONOMOUS': Trades user's own preferred asset list independently under Fiduciary Risk Shield.
+    Default for VIP users is 'MASTER_FOLLOW'.
+    """
+    val = get_system_setting(f"cap_sync_mode_{chat_id}", "MASTER_FOLLOW")
+    return str(val).upper().strip() if val else "MASTER_FOLLOW"
+
+def set_capital_user_sync_mode(chat_id: int, mode: str):
+    """Sets the Capital.com synchronization mode ('MASTER_FOLLOW' or 'AUTONOMOUS')."""
+    mode_str = "AUTONOMOUS" if str(mode).upper().strip() in ["AUTONOMOUS", "CUSTOM", "SELF", "AUTO_PORTFOLIO"] else "MASTER_FOLLOW"
+    update_system_setting(f"cap_sync_mode_{chat_id}", mode_str)
+
+def get_capital_master_sync_enabled() -> bool:
+    """Returns True if Master Locomotive Broadcasting from Super Admin (859271875) is active globally."""
+    val = get_system_setting("cap_master_sync_enabled", "1")
+    return val in ["1", "true", "TRUE", "True", "yes"]
+
+def set_capital_master_sync_enabled(enabled: bool):
+    """Enables or disables Master Locomotive Broadcasting globally."""
+    update_system_setting("cap_master_sync_enabled", "1" if enabled else "0")
+
+def get_capital_user_custom_assets(chat_id: int) -> list:
+    """Returns user's custom asset list for AUTONOMOUS mode. Returns empty list if not configured."""
+    val = get_system_setting(f"cap_custom_assets_{chat_id}", "")
+    if not val:
+        return []
+    import json
+    try:
+        if val.startswith("["):
+            return json.loads(val)
+    except Exception:
+        pass
+    return [x.strip().upper() for x in val.split(",") if x.strip()]
+
+def set_capital_user_custom_assets(chat_id: int, assets: list):
+    """Saves user's custom asset list for AUTONOMOUS mode."""
+    clean_assets = [str(x).strip().upper() for x in assets if str(x).strip()]
+    update_system_setting(f"cap_custom_assets_{chat_id}", ",".join(clean_assets))
+
+def get_capital_open_trades_by_epic(epic: str) -> list:
+    """Returns all OPEN trades across all users for a given epic."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, created_at
+            FROM capital_auto_trades
+            WHERE UPPER(epic) = UPPER(?) AND status = 'OPEN'
+        """, (str(epic),))
+        rows = cursor.fetchall()
+        conn.close()
+        cols = ["id", "chat_id", "deal_id", "deal_reference", "epic", "direction", "size", "entry_price", "sl", "tp", "created_at"]
+        return [dict(zip(cols, r)) for r in rows]
+    except Exception:
+        conn.close()
+        return []
+
+def get_capital_open_trades_by_chat_id(chat_id: int) -> list:
+    """Returns all OPEN trades for a specific user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, created_at
+            FROM capital_auto_trades
+            WHERE chat_id = ? AND status = 'OPEN'
+        """, (chat_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        cols = ["id", "chat_id", "deal_id", "deal_reference", "epic", "direction", "size", "entry_price", "sl", "tp", "created_at"]
+        return [dict(zip(cols, r)) for r in rows]
+    except Exception:
+        conn.close()
+        return []
+
+
+# ==============================================================================
 # CAPITAL.COM LEAD-LAG ARBITRAGE PERSISTENCE LAYER
 # ==============================================================================
 
