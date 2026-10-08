@@ -10,6 +10,7 @@ Execution Environment: Demo ($10,000 Virtual Funds) & Live Mainnet
 """
 
 import os
+import re
 import time
 import math
 import datetime
@@ -27,6 +28,24 @@ import database as db
 
 # Automatically load .env configuration
 load_dotenv()
+
+
+def _get_tradfi_precision(epic_str: str, price_val: float = 0.0) -> int:
+    """
+    Returns exact price decimal precision for TradFi instruments:
+    - Forex Majors & Minors: 5 decimals (e.g. 1.32038)
+    - JPY Pairs: 3 decimals (e.g. 154.250)
+    - Sub-$5 assets: 4-5 decimals
+    - Indices / Commodities / Crypto CFDs: 2 decimals (e.g. 2650.50)
+    """
+    s = str(epic_str or "").upper()
+    if any(fx in s for fx in ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"]):
+        return 5
+    elif any(fx in s for fx in ["USDJPY", "EURJPY", "GBPJPY", "AUDJPY", "NZDJPY", "CADJPY", "CHFJPY"]):
+        return 3
+    elif 0 < price_val < 5.0:
+        return 5
+    return 2
 
 # Setup Logger
 logger = logging.getLogger("CapitalComEngine")
@@ -782,10 +801,11 @@ class CapitalComEngine:
             "guaranteedStop": guaranteed_stop
         }
 
+        prec = _get_tradfi_precision(resolved_epic, stop_loss or 0.0)
         if stop_loss is not None and stop_loss > 0:
-            payload["stopLevel"] = round(stop_loss, 4)
+            payload["stopLevel"] = round(stop_loss, prec)
         if take_profit is not None and take_profit > 0:
-            payload["profitLevel"] = round(take_profit, 4)
+            payload["profitLevel"] = round(take_profit, prec)
 
         # Step 3: Transmit Order
         url = f"{self.base_url}/positions"
@@ -823,7 +843,10 @@ class CapitalComEngine:
                 m_sl_min = re.search(r'error\.invalid\.stoploss\.minvalue:\s*([0-9.]+)', err_code)
                 if m_sl_min:
                     min_val = float(m_sl_min.group(1))
-                    adjusted_sl = round(min_val * 1.0005, 2) if dir_upper == "SELL" else round(min_val * 1.0005, 2)
+                    s_raw = m_sl_min.group(1)
+                    dec_places = len(s_raw.split('.')[1]) if '.' in s_raw else _get_tradfi_precision(resolved_epic, min_val)
+                    pip_buf = max(10 ** (-dec_places) * 6, 0.0006 if min_val < 5.0 else min_val * 0.0006)
+                    adjusted_sl = round(min_val + pip_buf if dir_upper == "SELL" else min_val - pip_buf, dec_places)
                     logger.info(f"🔄 Auto-Recovery: Adjusting Stop-Loss to {adjusted_sl} (required min: {min_val}) and retrying...")
                     payload["stopLevel"] = adjusted_sl
                     res_retry = self.session.post(url, headers=self.get_auth_headers(), json=payload, timeout=10)
@@ -845,7 +868,10 @@ class CapitalComEngine:
                 m_sl_max = re.search(r'error\.invalid\.stoploss\.maxvalue:\s*([0-9.]+)', err_code)
                 if m_sl_max:
                     max_val = float(m_sl_max.group(1))
-                    adjusted_sl = round(max_val * 0.9995, 2)
+                    s_raw = m_sl_max.group(1)
+                    dec_places = len(s_raw.split('.')[1]) if '.' in s_raw else _get_tradfi_precision(resolved_epic, max_val)
+                    pip_buf = max(10 ** (-dec_places) * 6, 0.0006 if max_val < 5.0 else max_val * 0.0006)
+                    adjusted_sl = round(max_val - pip_buf if dir_upper == "SELL" else max_val + pip_buf, dec_places)
                     logger.info(f"🔄 Auto-Recovery: Adjusting Stop-Loss to {adjusted_sl} (required max: {max_val}) and retrying...")
                     payload["stopLevel"] = adjusted_sl
                     res_retry = self.session.post(url, headers=self.get_auth_headers(), json=payload, timeout=10)
@@ -896,13 +922,15 @@ class CapitalComEngine:
         """
         Queries /confirms/{dealReference} to verify if the broker accepted or rejected the deal,
         and retrieves the assigned permanent dealId and fill level.
+        Enforces verified open position confirmation to prevent false positive notifications.
         """
         if not self.ensure_session():
             return {"success": False, "error": "No active session"}
         url = f"{self.base_url}/confirms/{deal_reference}"
-        for attempt in range(2):
+        delays = [0.2, 0.4, 0.6, 0.8]
+        for delay in delays:
             try:
-                time.sleep(0.12)
+                time.sleep(delay)
                 res = self.session.get(url, headers=self.get_auth_headers(), timeout=10)
                 if res.status_code == 200:
                     data = res.json()
@@ -938,7 +966,30 @@ class CapitalComEngine:
                         }
             except Exception as e:
                 logger.debug(f"Confirm fetch exception: {e}")
-        return {"success": True, "deal_reference": deal_reference, "deal_id": deal_reference}
+
+        # Post-flight verification: check broker open positions for matching deal reference
+        try:
+            open_pos = self.get_open_positions()
+            for p in open_pos:
+                p_ref = str(p.get("position", {}).get("dealReference") or "")
+                p_deal = str(p.get("position", {}).get("dealId") or "")
+                if deal_reference in (p_ref, p_deal):
+                    return {
+                        "success": True,
+                        "is_rejected": False,
+                        "deal_status": "ACCEPTED",
+                        "deal_id": p_deal or deal_reference,
+                        "level": p.get("position", {}).get("level")
+                    }
+        except Exception as e_chk:
+            logger.debug(f"Position check verification error: {e_chk}")
+
+        return {
+            "success": False,
+            "is_rejected": True,
+            "error": f"Broker confirmation unverified for {deal_reference}",
+            "deal_reference": deal_reference
+        }
 
     def close_position(self, deal_id: str) -> Dict[str, Any]:
         """Closes an open position by dealId."""
@@ -1505,19 +1556,20 @@ class CapitalComEngine:
         mid_px = (bid + ask) / 2.0 if (bid + ask) > 0 else 1.0
         spread = analysis.get("spread", 0.0)
         # Enforce Asymmetric R:R >= 1:6 Mathematical Ratio
+        prec = _get_tradfi_precision(resolved_epic, mid_px)
         min_sl_dist = max(1.5 * atr, spread * 2.5, 0.0025 * mid_px)
         min_tp_dist = max(6.0 * min_sl_dist, 6.0 * atr, 0.015 * mid_px)
 
         if dir_u == "BUY":
             if not sl or sl <= 0 or sl >= bid:
-                sl = round(bid - min_sl_dist, 2)
+                sl = round(bid - min_sl_dist, prec)
             if not tp or tp <= 0 or tp <= ask:
-                tp = round(ask + min_tp_dist, 2)
+                tp = round(ask + min_tp_dist, prec)
         elif dir_u == "SELL":
             if not sl or sl <= 0 or sl <= ask:
-                sl = round(ask + min_sl_dist, 2)
+                sl = round(ask + min_sl_dist, prec)
             if not tp or tp <= 0 or tp >= bid:
-                tp = round(bid - min_tp_dist, 2)
+                tp = round(bid - min_tp_dist, prec)
 
         # 4. Transmit Protected Position
         max_spreads = {
