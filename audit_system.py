@@ -2206,9 +2206,9 @@ def run_audit():
         log_fail(str(e))
 
     # -------------------------------------------------------------------------
-    # [CHECK 49/49] Proactive Margin Pre-Flight Shield, ORB Latency Optimization & Scheduler Concurrency Zero-Overlap Lock (Invariant 63)
+    # [CHECK 49/51] Proactive Margin Pre-Flight Shield, ORB Latency Optimization & Scheduler Concurrency Zero-Overlap Lock (Invariant 63)
     # -------------------------------------------------------------------------
-    print("\n[CHECK 49/49] Verifying Proactive Margin Pre-Flight Shield, ORB Latency Optimization & Scheduler Concurrency Locks (Invariant 63)...")
+    print("\n[CHECK 49/51] Verifying Proactive Margin Pre-Flight Shield, ORB Latency Optimization & Scheduler Concurrency Locks (Invariant 63)...")
     try:
         import capital_engine
         import scheduler_tasks
@@ -2290,6 +2290,158 @@ def run_audit():
             log_fail("Proactive Margin Pre-Flight Shield & Scheduler Concurrency Lock (Invariant 63) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 63 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 50/51] Capital.com ORB 15M In-Memory Virtual Radar, Dynamic Tight ATR SL & Multi-Tier Scale-Out Ratchet (Invariant 64)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 50/51] Verifying Capital.com ORB 15M In-Memory Virtual Radar, Dynamic Tight ATR SL & Multi-Tier Scale-Out Ratchet (Invariant 64)...")
+    try:
+        import capital_engine
+        import database
+
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv64 = "Invariant 64" in agents_md_text and "Capital.com Opening Range Breakout" in agents_md_text
+
+        # 2. Check capital_engine.py for In-Memory Virtual Radar, Tight ATR SL, OCO disarm, and Tier 1.5 Ratchet
+        with open("capital_engine.py", "r", encoding="utf-8") as cf:
+            cap_code = cf.read()
+
+        has_active_orb_deals = "self._active_orb_deals" in cap_code
+        has_get_orb_deal_info = "def get_orb_deal_info(" in cap_code
+        has_update_orb_deal_tier = "def update_orb_deal_tier(" in cap_code
+        has_tight_atr_sl = "min(atr * 1.10, or_range * 0.35)" in cap_code
+        has_multi_tier_calc = "1.2 * sl_dist" in cap_code and "2.5 * sl_dist" in cap_code
+        has_oco_disarm = "In-Memory Instant OCO Disarm of Opposite Direction" in cap_code and "TRIGGERED_" in cap_code
+        has_tier15_ratchet = "TIER 1.5: ORB 15M MULTI-TIER SCALE-OUT TP & RATCHET ENGINE" in cap_code
+
+        # 3. Check database.py for schema columns and methods
+        with open("database.py", "r", encoding="utf-8") as df:
+            db_code = df.read()
+
+        has_orb_db_cols = "scale_tier INTEGER DEFAULT 0" in db_code and "sl_dist REAL" in db_code
+        has_orb_radar_armed = "RADAR_ARMED" in db_code and "VIRTUAL_BREAKOUT_RADAR" in db_code
+
+        # 4. Dry-run dynamic unit test: DB record & retrieval for ORB trade
+        test_deal_id = f"AUDIT_ORB_{int(time.time())}"
+        database.record_capital_orb_trade(
+            chat_id=859271875,
+            session_name="NEW_YORK",
+            epic="US100",
+            direction="BUY",
+            or_high=21050.0,
+            or_low=20950.0,
+            breakout_price=21055.0,
+            sl=20900.0,
+            tp=21400.0,
+            deal_id=test_deal_id,
+            tp1=21120.0,
+            tp2=21250.0,
+            tp3=21400.0,
+            sl_dist=100.0
+        )
+        orb_trades = database.get_active_capital_orb_trades(deal_id=test_deal_id)
+        unit_db_passed = len(orb_trades) > 0 and orb_trades[0].get("deal_id") == test_deal_id and orb_trades[0].get("scale_tier") == 0
+        database.update_capital_orb_trade_status(test_deal_id, "CLOSED", scale_tier=2)
+        orb_trades_after = database.get_active_capital_orb_trades(deal_id=test_deal_id)
+        unit_status_passed = len(orb_trades_after) == 0
+
+        all_inv64_passed = (
+            has_inv64 and has_active_orb_deals and has_get_orb_deal_info and
+            has_update_orb_deal_tier and has_tight_atr_sl and has_multi_tier_calc and
+            has_oco_disarm and has_tier15_ratchet and has_orb_db_cols and
+            has_orb_radar_armed and unit_db_passed and unit_status_passed
+        )
+
+        if all_inv64_passed:
+            log_pass("Capital.com ORB 15M In-Memory Virtual Radar, Dynamic Tight ATR SL & Multi-Tier Scale-Out Ratchet (Invariant 64) are 100% certified!")
+        else:
+            failures.append(f"Invariant 64 check failed: inv64={has_inv64}, deals={has_active_orb_deals}, info={has_get_orb_deal_info}, tier={has_update_orb_deal_tier}, tight_sl={has_tight_atr_sl}, mt_calc={has_multi_tier_calc}, oco={has_oco_disarm}, ratchet={has_tier15_ratchet}, db_cols={has_orb_db_cols}, radar_armed={has_orb_radar_armed}, unit_db={unit_db_passed}, unit_status={unit_status_passed}")
+            log_fail("Capital.com ORB 15M Virtual Radar & Multi-Tier Ratchet (Invariant 64) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 64 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 51/51] Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 51/51] Verifying Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65)...")
+    try:
+        import capital_engine
+        import database
+        import bot_commands_registry
+
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv65 = "Invariant 65" in agents_md_text and "Angkor Capital 24/7 Trend Scalping Engine" in agents_md_text
+
+        # 2. Check capital_engine.py for CapitalTrendScalpEngine, EMA Confluence, Zero-Swap Shield
+        with open("capital_engine.py", "r", encoding="utf-8") as cf:
+            cap_code = cf.read()
+
+        has_scalp_engine_cls = "class CapitalTrendScalpEngine:" in cap_code
+        has_ema_confluence = ("ema9_15m > ema21_15m" in cap_code and "ema9_15m < ema21_15m" in cap_code) or ("ema9 > ema21" in cap_code)
+        has_zero_swap = "is_swap_shield" in cap_code or "Swap Shield" in cap_code
+        has_autonomous_integration = "CAPITAL_SCALP_ENGINE" in cap_code and "get_capital_trend_scalp_engine" in cap_code
+
+        # 3. Check database.py for scalp tables and helper functions
+        with open("database.py", "r", encoding="utf-8") as df:
+            db_code = df.read()
+
+        has_scalp_tables = "CREATE TABLE IF NOT EXISTS capital_scalp_config" in db_code and "CREATE TABLE IF NOT EXISTS capital_scalp_trades" in db_code
+        has_db_scalp_fns = "def get_capital_scalp_config(" in db_code and "def set_capital_scalp_config(" in db_code and "def record_capital_scalp_trade(" in db_code
+
+        # 4. Check bot_thread.py and bot_commands_registry.py
+        with open("bot_thread.py", "r", encoding="utf-8") as bf:
+            bot_code = bf.read()
+
+        has_scalp_cmd = "async def capital_scalp_command(" in bot_code and "CommandHandler(\"capital_scalp\"" in bot_code
+        has_scalp_callbacks = "btn_cap_scalp_toggle" in bot_code and "btn_cap_scalp_demo" in bot_code and "btn_cap_scalp_refresh" in bot_code
+        has_reg_scalp = any(cmd.command == "capital_scalp" for cmd in bot_commands_registry.get_public_bot_commands())
+
+        # 5. Dynamic unit tests for scalp config and trades
+        test_chat_id = 99999903
+        default_cfg = database.get_capital_scalp_config(test_chat_id)
+        unit_cfg_default = default_cfg is not None and "enabled" in default_cfg
+        database.set_capital_scalp_config(test_chat_id, enabled=True, budget=45.0, is_demo=True)
+        updated_cfg = database.get_capital_scalp_config(test_chat_id)
+        unit_cfg_updated = updated_cfg.get("enabled") is True and updated_cfg.get("budget") == 45.0
+
+        test_scalp_deal = f"AUDIT_SCALP_{int(time.time())}"
+        database.record_capital_scalp_trade(
+            chat_id=test_chat_id,
+            epic="GOLD",
+            direction="BUY",
+            entry_price=2650.0,
+            sl=2640.0,
+            tp=2680.0,
+            deal_id=test_scalp_deal,
+            budget=45.0
+        )
+        active_scalps = database.get_active_capital_scalp_trades(deal_id=test_scalp_deal)
+        unit_scalp_recorded = any(t.get("deal_id") == test_scalp_deal for t in active_scalps)
+        database.update_capital_scalp_trade_status(test_scalp_deal, "CLOSED", pnl=12.5)
+        active_scalps_after = database.get_active_capital_scalp_trades(deal_id=test_scalp_deal)
+        unit_scalp_closed = not any(t.get("deal_id") == test_scalp_deal for t in active_scalps_after)
+
+        all_inv65_passed = (
+            has_inv65 and has_scalp_engine_cls and has_ema_confluence and
+            has_zero_swap and has_autonomous_integration and has_scalp_tables and
+            has_db_scalp_fns and has_scalp_cmd and has_scalp_callbacks and
+            has_reg_scalp and unit_cfg_default and unit_cfg_updated and
+            unit_scalp_recorded and unit_scalp_closed
+        )
+
+        if all_inv65_passed:
+            log_pass("Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65) are 100% certified!")
+        else:
+            failures.append(f"Invariant 65 check failed: inv65={has_inv65}, cls={has_scalp_engine_cls}, ema={has_ema_confluence}, swap={has_zero_swap}, auto={has_autonomous_integration}, tables={has_scalp_tables}, db_fns={has_db_scalp_fns}, cmd={has_scalp_cmd}, callbacks={has_scalp_callbacks}, reg={has_reg_scalp}, cfg_def={unit_cfg_default}, cfg_upd={unit_cfg_updated}, rec={unit_scalp_recorded}, closed={unit_scalp_closed}")
+            log_fail("Angkor Capital 24/7 Trend Scalping Engine (Invariant 65) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 65 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

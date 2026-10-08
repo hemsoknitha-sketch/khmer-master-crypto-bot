@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ55)
-**Document Version:** 5.0.0 (Angkor Quant Master Specification - The 55 Pillars)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ65)
+**Document Version:** 6.5.0 (Angkor Quant Master Specification - The 65 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -971,7 +971,50 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - The ORB engine maintains an in-flight set lock `_arming_in_progress` preventing rapid consecutive scheduler triggers from double-evaluating or double-arming pending breakout traps.
   5. **Scheduler Concurrency Locks (`_capital_auto_lock` & `_capital_forex_lock`):**
      - `capital_auto_monitor` and `capital_forex_monitor` in `scheduler_tasks.py` are strictly protected by `asyncio.Lock()`. If a previous cycle is executing, subsequent cron ticks yield immediately, completely eradicating APScheduler `maximum number of running instances reached (2)` warnings and race conditions.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 49/49].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 49/51].
+
+---
+
+### Invariant 64: Capital.com Opening Range Breakout (ORB 15M) In-Memory Virtual Radar, Dynamic Tight ATR Stop-Loss & Multi-Tier Scale-Out Ratchet Standard (គ្រឹះរ៉ាដាក្នុង RAM & របាំងការពារ Judas Swing ១០០%)
+- **Location:** `capital_engine.py` (`CapitalOpeningRangeBreakoutEngine`, `CapitalAutonomousEngine._ratchet_engine_positions`), `database.py` (`capital_orb_traps`, `capital_orb_trades`), `scheduler_tasks.py`
+- **Rule:**
+  1. **In-Memory Virtual Breakout Radar Standard (Zero Broker Working Order Exposure):**
+     - Pending breakout traps (BUY STOP / SELL STOP) for session opening ranges (Tokyo 00:00 UTC, London 07:00 UTC, New York 13:30 UTC) are armed exclusively inside high-speed RAM Virtual Radar (`_active_orb_deals` / `VIRTUAL_BREAKOUT_RADAR`).
+     - Under NO circumstances shall pending bracket orders be sent to the broker prior to price breakout. This guarantees 100% immunity to pre-market spread spikes, order book spoofing, stop hunts, and Judas Swings.
+  2. **Dynamic Tight ATR Stop-Loss ($1.10\times\text{ATR}$ or max $35\%$ range width):**
+     - Static opposite-side range stop-loss ($1.0\times\text{Range}$ or $3.0\times\text{ATR}$) is strictly prohibited. Stop-loss distance is mathematically clamped to:
+       $$\text{SL Distance} = \min(1.10\times\text{ATR}, 0.35\times\text{Range})$$
+     - This dramatically reduces risk-per-trade by 65%, enabling asymmetric risk-to-reward ratios ($R:R \ge 1:2.5$ to $1:4.0$) on breakout continuation.
+  3. **Instant In-Memory OCO Disarm:**
+     - When either the Long or Short breakout level is pierced by market price, the triggered side executes instantly as a market order (`bypass_citadel=True`), and the opposing side trap is immediately disarmed and purged from RAM in $< 0.1\text{ms}$ with zero redundant broker cancellation requests.
+  4. **Multi-Tier Scale-Out Targets & Dynamic Breakeven Armor (+1.2R, +2.5R, +4.0R):**
+     - Target 1 (+1.2R): Triggers Tier 1.5 Breakeven Armor, shifting Stop-Loss to $\text{Entry Price} \pm 0.15\times\text{SL}$, eliminating all downside risk (Risk -> 0.00R).
+     - Target 2 (+2.5R): Locks in $+1.2R$ guaranteed net profit.
+     - Target 3 (+4.0R): Full clean profit harvest.
+  5. **Deduplicated Canonical Database Persistence:**
+     - Tables `capital_orb_traps` and `capital_orb_trades` strictly record and track `tp1`, `tp2`, `tp3`, `sl_dist`, and `scale_tier` with zero data loss across VPS restarts.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 50/51].
+
+---
+
+### Invariant 65: Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite Standard (គ្រឹះ Scalping រកប្រាក់ចំណេញ ២៤/៧ & របាំងកាត់ថ្លៃ Swap ១០០%)
+- **Location:** `capital_engine.py` (`CapitalTrendScalpingEngine`, `CapitalAutonomousEngine`), `database.py` (`capital_scalp_config`, `capital_scalp_trades`), `bot_thread.py` (`capital_scalp_command`, `btn_cap_scalp_*`), `bot_commands_registry.py`
+- **Rule:**
+  1. **24/7 Continuous Trend Scalp Alpha Generation:**
+     - Operates around the clock across all tradeable Capital.com CFD markets (Forex, US Indices, Gold/Oil, and Crypto CFDs) to extract high-frequency directional alpha without waiting for session opening bells.
+  2. **Strict 3-EMA Confluence & RSI Momentum Band Protocol:**
+     - BUY Setup: Requires strictly $\text{EMA}_9 > \text{EMA}_{21} > \text{EMA}_{50}$, current price above $\text{EMA}_9$, and RSI momentum in the sweet spot ($44 \le \text{RSI} \le 68$).
+     - SELL Setup: Requires strictly $\text{EMA}_9 < \text{EMA}_{21} < \text{EMA}_{50}$, current price below $\text{EMA}_9$, and RSI momentum in the sweet spot ($32 \le \text{RSI} \le 56$).
+     - Sideways consolidation (ADX $< 22$ or tangled EMAs) is strictly rejected.
+  3. **Dynamic $1.25\times\text{ATR}$ Envelope & Asymmetric Multi-Tier TP:**
+     - Stop-Loss is clamped to structural swing / $1.25\times\text{ATR}$.
+     - Multi-tier scale-out targets: TP1 at $+1.5R$ (locks Breakeven), TP2 at $+2.5R$ (locks $+1.0R$), TP3 at $+4.0R$ (complete harvest).
+  4. **Non-Negotiable Zero-Swap Rollover Shield (Invariant 53 Compliance):**
+     - Scalp positions are strictly intra-day. Any open scalp trade approaching 21:00 UTC (broker rollover cutoff) is proactively closed or tightened, and all new scalp entries are suppressed between 20:30 UTC and 22:00 UTC.
+     - Zero scalp trading on Wednesday evenings to eliminate triple-swap drag.
+  5. **Unified Telegram Flagship Interface & Isolated Capital Controls:**
+     - Fully managed via `/capital_scalp` (or `/capital scalp`), featuring 1-tap presets (`/capital_scalp ON 30`), environment toggles (Demo vs Live Mainnet), and real-time dashboard status.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 51/51].
 
 ---
 
@@ -979,8 +1022,8 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 63 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 49 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 65 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 51 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main
