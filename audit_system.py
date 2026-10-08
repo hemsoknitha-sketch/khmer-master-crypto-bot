@@ -2141,9 +2141,9 @@ def run_audit():
         log_fail(str(e))
 
     # -------------------------------------------------------------------------
-    # [CHECK 48/48] Anti-Account Collision Shield, Isolated Engine Pool & Super Admin Live Anchor (Invariant 62)
+    # [CHECK 48/49] Anti-Account Collision Shield, Isolated Engine Pool & Super Admin Live Anchor (Invariant 62)
     # -------------------------------------------------------------------------
-    print("\n[CHECK 48/48] Verifying Anti-Account Collision Shield, Isolated Engine Pool & Super Admin Live Anchor (Invariant 62)...")
+    print("\n[CHECK 48/49] Verifying Anti-Account Collision Shield, Isolated Engine Pool & Super Admin Live Anchor (Invariant 62)...")
     try:
         import capital_engine
         import database as db
@@ -2203,6 +2203,80 @@ def run_audit():
             log_fail("Anti-Account Collision Shield & Super Admin Live Anchor (Invariant 62) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 62 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 49/49] Proactive Margin Pre-Flight Shield, ORB Latency Optimization & Scheduler Concurrency Zero-Overlap Lock (Invariant 63)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 49/49] Verifying Proactive Margin Pre-Flight Shield, ORB Latency Optimization & Scheduler Concurrency Locks (Invariant 63)...")
+    try:
+        import capital_engine
+        import scheduler_tasks
+
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv63 = "Invariant 63" in agents_md_text and "Proactive Margin Pre-Flight Shield" in agents_md_text
+
+        # 2. Verify place_position and place_working_order have pre-flight margin guard
+        with open("capital_engine.py", "r", encoding="utf-8") as cf:
+            cap_code = cf.read()
+
+        has_margin_guard_pos = "req_margin = ref_px * size * m_factor" in cap_code and "MARGIN PRE-FLIGHT" in cap_code
+        has_margin_guard_ord = "req_margin = level * size * m_factor" in cap_code and "RC_NOT_ENOUGH_MARGIN" in cap_code
+        has_accounts_cache = "self._accounts_cache" in cap_code and "invalidate_account_cache" in cap_code
+        has_arming_lock = "self._arming_in_progress" in cap_code
+        has_max_affordable = "max_affordable_buy" in cap_code and "max_affordable_sell" in cap_code
+
+        # 3. Verify scheduler_tasks locks
+        with open("scheduler_tasks.py", "r", encoding="utf-8") as sf:
+            sched_code = sf.read()
+
+        has_auto_lock = "_capital_auto_lock = asyncio.Lock()" in sched_code and "_capital_auto_lock.locked()" in sched_code
+        has_forex_lock = "_capital_forex_lock = asyncio.Lock()" in sched_code and "_capital_forex_lock.locked()" in sched_code
+
+        # 4. Dry-run dynamic unit test: verify pre-flight margin rejection without hitting broker
+        test_eng = capital_engine.CapitalComEngine(is_demo=True)
+        # Mock cached balance to $1.00
+        test_eng._accounts_cache = {
+            "success": True,
+            "accounts": [{
+                "accountId": "TEST_AUDIT_MARGIN",
+                "balance": {"available": 1.0, "balance": 1.0, "deposit": 0.0, "pnl": 0.0, "equity": 1.0}
+            }],
+            "primary_account": {
+                "accountId": "TEST_AUDIT_MARGIN",
+                "balance": {"available": 1.0, "balance": 1.0, "deposit": 0.0, "pnl": 0.0, "equity": 1.0}
+            }
+        }
+        test_eng._accounts_cache_time = time.time()
+
+        # Attempt to place order requiring margin far exceeding $1.00
+        order_res = test_eng.place_working_order(
+            epic="US100",
+            direction="BUY",
+            size=1.0,
+            level=31000.0,
+            order_type="STOP"
+        )
+        unit_test_passed = (
+            order_res.get("success") is False and
+            "RC_NOT_ENOUGH_MARGIN" in str(order_res.get("error"))
+        )
+
+        all_inv63_passed = (
+            has_inv63 and has_margin_guard_pos and has_margin_guard_ord and
+            has_accounts_cache and has_arming_lock and has_max_affordable and
+            has_auto_lock and has_forex_lock and unit_test_passed
+        )
+
+        if all_inv63_passed:
+            log_pass("Capital.com TradFi Proactive Margin Pre-Flight Shield, ORB Latency Optimization & Scheduler Concurrency Zero-Overlap Lock Standard (Invariant 63) are 100% certified!")
+        else:
+            failures.append(f"Invariant 63 check failed: inv63={has_inv63}, guard_pos={has_margin_guard_pos}, guard_ord={has_margin_guard_ord}, cache={has_accounts_cache}, arm_lock={has_arming_lock}, affordable={has_max_affordable}, auto_lock={has_auto_lock}, forex_lock={has_forex_lock}, unit_test={unit_test_passed}")
+            log_fail("Proactive Margin Pre-Flight Shield & Scheduler Concurrency Lock (Invariant 63) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 63 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
