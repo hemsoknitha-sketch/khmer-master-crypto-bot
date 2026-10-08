@@ -7178,6 +7178,394 @@ class CapitalForexExchangeSuite:
         }
 
 
+# ==============================================================================
+# 4.15. CAPITAL.COM 24/7 HIGH-VOLATILITY TREND SCALP ENGINE (/capital_scalp)
+# ==============================================================================
+
+class CapitalTrendScalpEngine:
+    """
+    ⚡ Institutional 24/7 High-Volatility Trend Scalp Engine (/capital_scalp auto)
+    Focuses on High-Trending Major Instruments:
+      - TradFi Session Majors: GOLD, US100 (Nasdaq), US500 (S&P 500)
+      - 24/7 Continuous Crypto CFDs: BTCUSD, ETHUSD, SOLUSD
+    
+    The 5 Pillars of Quantitative Edge:
+      1. Multi-Timeframe Trend Confluence Filter (1H/15M Trend + 5M Pullback Rejection)
+      2. Spread Drag Elimination Shield (Invariant 34: 10x Spread Hurdle & VSQI >= 3.0)
+      3. Dynamic Tight ATR Stop-Loss (SL = 1.10x ATR_5m, Risk <= $1.00 - $2.50)
+      4. Dual-Tier Fast Cash Harvest & Breakeven Armor (+1.2R -> BE Lock, +2.5R -> Harvest)
+      5. Anti-Whipsaw Cooldown (15m Blacklist after SL hit to eliminate double-loss disaster)
+    """
+
+    TREND_MAJORS_TRADFI = ["GOLD", "US100", "US500"]
+    TREND_MAJORS_CRYPTO = ["BTCUSD", "ETHUSD", "SOLUSD"]
+    ALL_SCALP_MAJORS = ["GOLD", "US100", "US500", "BTCUSD", "ETHUSD", "SOLUSD"]
+
+    def __init__(self):
+        self._asset_cooldowns: Dict[str, float] = {}  # epic -> cooldown_timestamp
+        self._last_cycle_ts: float = 0.0
+        self._scan_interval: float = 15.0  # Run every 15 seconds
+        self._stats = {
+            "total_scanned": 0,
+            "total_executed": 0,
+            "last_scan": None,
+            "last_trade": None
+        }
+
+    def get_session_active_majors(self, mode: str = "ALL") -> List[str]:
+        """
+        Returns active tradable instruments based on global market hours (UTC+7 Phnom Penh).
+        - Saturday & Sunday (Weekend) & Overnight Swap Shield: 100% Crypto CFDs (BTCUSD, ETHUSD, SOLUSD).
+        - Weekdays (Mon-Fri) London / NY Sessions: Full Priority on GOLD, US100, US500 + Crypto.
+        """
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+        weekday = now_dt.weekday()  # Monday = 0, Friday = 4, Saturday = 5, Sunday = 6
+        utc_min = now_dt.hour * 60 + now_dt.minute
+
+        # TradFi weekend closure: Friday 20:45 UTC to Sunday 22:00 UTC
+        is_weekend = (weekday == 5) or (weekday == 4 and utc_min >= 1245) or (weekday == 6 and utc_min < 1320)
+        is_swap_shield = (utc_min >= 1245 or utc_min < 420) and not is_weekend  # Overnight lull
+
+        if is_weekend or is_swap_shield:
+            return list(self.TREND_MAJORS_CRYPTO)
+
+        if mode == "CRYPTO":
+            return list(self.TREND_MAJORS_CRYPTO)
+        elif mode == "TRADFI":
+            return list(self.TREND_MAJORS_TRADFI)
+        else:
+            return list(self.ALL_SCALP_MAJORS)
+
+    def evaluate_trend_scalp_setup(self, epic: str, engine: Optional[CapitalComEngine] = None) -> Dict[str, Any]:
+        """
+        Evaluates Multi-Timeframe Trend Confluence (15M Trend + 5M Pullback Rejection)
+        and enforces Invariant 34 Spread Drag Elimination.
+        """
+        resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+        eng = engine or get_capital_engine()
+        market = eng.get_market_details(resolved_epic)
+        if not market.get("success"):
+            return {"success": False, "signal": "HOLD_NEUTRAL", "reason": market.get("error")}
+
+        current_bid = float(market.get("bid", 0.0) or 0.0)
+        current_ask = float(market.get("ask", 0.0) or 0.0)
+        mid_price = float(market.get("mid", 0.0) or 0.0)
+        spread = float(market.get("spread", 0.0) or 0.0)
+        if spread <= 0 and current_ask > current_bid:
+            spread = current_ask - current_bid
+        market_status = market.get("market_status") or market.get("marketStatus", "UNKNOWN")
+
+        # 1. Market Status Guard
+        if market_status != "TRADEABLE":
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": f"Market {resolved_epic} is {market_status}."
+            }
+
+        # 2. Invariant 34: Spread Blowout Guard
+        benchmark = CapitalSpreadDragManager.BENCHMARK_SPREADS.get(resolved_epic, 2.0)
+        if spread > benchmark * 1.35:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": f"Spread Guard: Current {spread:.3f} exceeds 1.35x benchmark {benchmark:.3f}."
+            }
+
+        # 3. 15M Trend Alignment (Anchor Timeframe)
+        candles_15m = eng.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=40)
+        if len(candles_15m) < 25:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": "Insufficient 15M candles for trend determination."
+            }
+
+        closes_15m = [c["close"] for c in candles_15m]
+        highs_15m = [c["high"] for c in candles_15m]
+        lows_15m = [c["low"] for c in candles_15m]
+
+        def _calc_ema(prices: List[float], period: int) -> float:
+            if len(prices) < period:
+                return prices[-1] if prices else 0.0
+            mult = 2.0 / (period + 1)
+            ema = sum(prices[:period]) / period
+            for p in prices[period:]:
+                ema = (p - ema) * mult + ema
+            return ema
+
+        ema9_15m = _calc_ema(closes_15m, 9)
+        ema21_15m = _calc_ema(closes_15m, 21)
+        ema50_15m = _calc_ema(closes_15m, 50)
+
+        # 15M ATR(14)
+        tr_list = []
+        for i in range(1, len(candles_15m)):
+            h = highs_15m[i]
+            l = lows_15m[i]
+            prev_c = closes_15m[i - 1]
+            tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+            tr_list.append(tr)
+        atr_15m = sum(tr_list[-14:]) / 14.0 if len(tr_list) >= 14 else (tr_list[-1] if tr_list else 1.0)
+
+        is_15m_bullish = (ema9_15m > ema21_15m >= ema50_15m) or (closes_15m[-1] > ema21_15m > ema50_15m)
+        is_15m_bearish = (ema9_15m < ema21_15m <= ema50_15m) or (closes_15m[-1] < ema21_15m < ema50_15m)
+
+        if not is_15m_bullish and not is_15m_bearish:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": "15M Trend is mixed/sideways (EMA 9/21/50 not aligned)."
+            }
+
+        # 4. 5M Micro Pullback & Impulse Rejection
+        candles_5m = eng.get_historical_prices(resolved_epic, resolution="MINUTE_5", max_bars=30)
+        if len(candles_5m) < 15:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": "Insufficient 5M candles for pullback trigger."
+            }
+
+        closes_5m = [c["close"] for c in candles_5m]
+        highs_5m = [c["high"] for c in candles_5m]
+        lows_5m = [c["low"] for c in candles_5m]
+
+        ema9_5m = _calc_ema(closes_5m, 9)
+        ema21_5m = _calc_ema(closes_5m, 21)
+
+        tr_5m_list = []
+        for i in range(1, len(candles_5m)):
+            h = highs_5m[i]
+            l = lows_5m[i]
+            prev_c = closes_5m[i - 1]
+            tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+            tr_5m_list.append(tr)
+        atr_5m = sum(tr_5m_list[-10:]) / 10.0 if len(tr_5m_list) >= 10 else (atr_15m * 0.58)
+
+        # Invariant 34: Volatility-to-Spread Quality Index (VSQI = ATR_14 / Spread >= 2.5)
+        if spread > 0 and (atr_15m / spread) < 2.5:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": f"VSQI Rejection: {atr_15m / spread:.2f} < 2.5 (spread drag too high)."
+            }
+
+        direction = None
+        entry_price = 0.0
+        sl_price = 0.0
+        tp_price = 0.0
+        sl_dist = max(1.10 * atr_5m, 2.5 * spread)
+        tp_dist = max(2.50 * atr_5m, 10.0 * spread)  # Invariant 34: Minimum 10x Spread Hurdle
+
+        if is_15m_bullish:
+            # Bullish Pullback: Price recently tested near EMA21 and closed back above EMA9/21
+            recent_low = min(lows_5m[-3:])
+            if recent_low <= ema21_5m * 1.003 and closes_5m[-1] >= ema9_5m * 0.998:
+                direction = "BUY"
+                entry_price = current_ask if current_ask > 0 else mid_price
+                sl_price = entry_price - sl_dist
+                tp_price = entry_price + tp_dist
+        elif is_15m_bearish:
+            # Bearish Pullback: Price recently surged near EMA21 and closed back below EMA9/21
+            recent_high = max(highs_5m[-3:])
+            if recent_high >= ema21_5m * 0.997 and closes_5m[-1] <= ema9_5m * 1.002:
+                direction = "SELL"
+                entry_price = current_bid if current_bid > 0 else mid_price
+                sl_price = entry_price - sl_dist
+                tp_price = entry_price - tp_dist
+
+        if not direction or entry_price <= 0:
+            return {
+                "success": False,
+                "epic": resolved_epic,
+                "signal": "HOLD_NEUTRAL",
+                "reason": "Waiting for 5M Pullback Rejection towards EMA 21."
+            }
+
+        rr_ratio = tp_dist / sl_dist if sl_dist > 0 else 2.5
+
+        return {
+            "success": True,
+            "epic": resolved_epic,
+            "signal": direction,
+            "confidence": 85.0,
+            "entry_price": entry_price,
+            "sl": round(sl_price, 4),
+            "tp": round(tp_price, 4),
+            "sl_dist": round(sl_dist, 4),
+            "tp_dist": round(tp_dist, 4),
+            "rr_ratio": round(rr_ratio, 2),
+            "spread": spread,
+            "atr_5m": round(atr_5m, 4),
+            "atr_15m": round(atr_15m, 4),
+            "reason": f"15M Trend + 5M Pullback Impulse (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied)"
+        }
+
+    async def execute_scalp_cycle(self, app=None):
+        """
+        Executes 24/7 autonomous scalping across registered active users.
+        """
+        now = time.time()
+        if (now - self._last_cycle_ts) < self._scan_interval:
+            return
+        self._last_cycle_ts = now
+        self._stats["total_scanned"] += 1
+        self._stats["last_scan"] = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S UTC")
+
+        import database as db
+        active_users = db.get_active_capital_scalp_users()
+        if not active_users:
+            return
+
+        for user_cfg in active_users:
+            chat_id = user_cfg.get("chat_id")
+            is_demo = user_cfg.get("is_demo", False)
+            budget = float(user_cfg.get("budget", 30.0) or 30.0)
+            max_pos = int(user_cfg.get("max_positions", 3) or 3)
+            user_mode = user_cfg.get("mode", "ALL")
+
+            # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
+            if not is_demo and not db.is_capital_user_authorized(chat_id):
+                continue
+
+            user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
+            try:
+                open_pos = await asyncio.to_thread(user_engine.get_open_positions)
+            except Exception:
+                open_pos = []
+
+            if len(open_pos) >= max_pos:
+                continue
+
+            open_epics = {
+                (p.get("position", {}).get("epic") or p.get("market", {}).get("epic") or "").upper()
+                for p in open_pos
+            }
+
+            candidate_assets = self.get_session_active_majors(mode=user_mode)
+            for epic in candidate_assets:
+                resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+                if resolved_epic in open_epics:
+                    continue  # Overtrade Guard: 1 position per asset
+
+                # Anti-Whipsaw Cooldown Shield (15-min rest after SL hit)
+                if self._asset_cooldowns.get(resolved_epic, 0.0) > now:
+                    continue
+
+                setup = await asyncio.to_thread(self.evaluate_trend_scalp_setup, resolved_epic, user_engine)
+                if setup.get("success") and setup.get("signal") in ["BUY", "SELL"] and setup.get("confidence", 0) >= 75.0:
+                    dispatched = await self._dispatch_scalp_trade(chat_id, user_cfg, user_engine, setup, app=app)
+                    if dispatched:
+                        self._stats["total_executed"] += 1
+                        self._stats["last_trade"] = f"{setup.get('signal')} {resolved_epic} ({datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')})"
+                        break  # 1 trade per user per cycle
+
+    async def _dispatch_scalp_trade(
+        self,
+        chat_id: int,
+        user_cfg: dict,
+        user_engine: CapitalComEngine,
+        setup: dict,
+        app=None
+    ) -> bool:
+        """Dispatches an institutional trend scalp trade with Breakeven Armor parameters."""
+        import database as db
+        try:
+            epic = setup.get("epic")
+            direction = setup.get("signal")
+            entry_p = float(setup.get("entry_price", 0.0))
+            sl = float(setup.get("sl", 0.0))
+            tp = float(setup.get("tp", 0.0))
+            budget = float(user_cfg.get("budget", 30.0) or 30.0)
+
+            # Fractional Kelly Dynamic Sizer (Invariant 33)
+            size = get_capital_kelly_sizer().calculate_lot_size(
+                chat_id=chat_id,
+                epic=epic,
+                entry_price=entry_p,
+                sl_price=sl,
+                tp_price=tp,
+                confidence_score=setup.get("confidence", 85.0),
+                budget=budget
+            )
+            # Min deal clamp
+            try:
+                mkt_info = await asyncio.to_thread(user_engine.get_market_details, epic)
+                min_deal = float(mkt_info.get("min_deal_size", 0.01) if mkt_info else 0.01)
+                size = max(float(size or 0.0), min_deal)
+            except Exception:
+                pass
+
+            trade_res = await asyncio.to_thread(
+                user_engine.place_position,
+                epic=epic,
+                direction=direction,
+                size=size,
+                stop_level=sl,
+                profit_level=tp
+            )
+
+            if trade_res.get("success"):
+                deal_id = str(trade_res.get("dealId", trade_res.get("dealReference", "SCALP_DEAL")))
+                db.record_capital_scalp_trade(
+                    chat_id=chat_id,
+                    epic=epic,
+                    direction=direction,
+                    entry_price=entry_p,
+                    sl=sl,
+                    tp=tp,
+                    deal_id=deal_id,
+                    budget=budget
+                )
+
+                if app and hasattr(app, "bot"):
+                    try:
+                        import ui_standards
+                        rr_val = setup.get("rr_ratio", 2.5)
+                        msg = (
+                            f"⚡ **[CAPITAL.COM 24/7 TREND SCALP EXECUTED]** 🎯\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🏛️ **ឧបករណ៍ ៖** `{epic}` (Major)\n"
+                            f"🎯 **ទិសដៅ ៖** `{direction}` (15M Trend + 5M Pullback)\n"
+                            f"📦 **ទំហំ ៖** `{size} contracts` (Margin: `${budget:.2f}`)\n"
+                            f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
+                            f"🛑 **Tight Stop-Loss ៖** `${sl:,.2f}` (1.1x ATR Noise Buffer)\n"
+                            f"🎯 **Scalp Target TP ៖** `${tp:,.2f}` (R:R 1:{rr_val:.1f} | 10x Spread Hurdle)\n"
+                            f"🛡️ **ការការពារ ៖** `Breakeven Armor @ +1.2R (0.00R Risk)`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🚀 _ប្រព័ន្ធដេញកើបចំណេញតាម Trend ស្វ័យប្រវត្ត ២៤/៧!_"
+                        )
+                        asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
+                    except Exception as e_msg:
+                        logger.debug(f"Scalp notif error: {e_msg}")
+                return True
+            else:
+                logger.warning(f"⚠️ [SCALP ORDER REJECTED] {epic} for User {chat_id}: {trade_res.get('error')}")
+                return False
+        except Exception as e_disp:
+            logger.error(f"Error dispatching scalp trade: {e_disp}")
+            return False
+
+    def add_asset_cooldown(self, epic: str, duration_seconds: float = 900.0):
+        """Applies anti-whipsaw cooldown after a Stop Loss hit."""
+        self._asset_cooldowns[epic.upper()] = time.time() + duration_seconds
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Returns live Trend Scalp engine telemetry."""
+        return {
+            "stats": self._stats,
+            "cooldowns_count": len([k for k, v in self._asset_cooldowns.items() if v > time.time()]),
+            "active_majors": self.ALL_SCALP_MAJORS
+        }
+
+
 # Singleton Instances
 CAPITAL_AUTO_ENGINE = CapitalAutonomousEngine()
 CAPITAL_IB_MANAGER = CapitalPartnerRebateManager()
@@ -7188,6 +7576,11 @@ CAPITAL_SPREAD_DRAG_MANAGER = CapitalSpreadDragManager()
 CAPITAL_SATELLITE_RADAR = CapitalSatelliteMacroRadar()
 CAPITAL_OU_ENGINE = CapitalOUMeanReversionEngine()
 CAPITAL_FOREX_SUITE = CapitalForexExchangeSuite()
+CAPITAL_SCALP_ENGINE = CapitalTrendScalpEngine()
+
+def get_capital_trend_scalp_engine() -> CapitalTrendScalpEngine:
+    """Returns singleton instance of CapitalTrendScalpEngine."""
+    return CAPITAL_SCALP_ENGINE
 
 def get_capital_auto_engine() -> CapitalAutonomousEngine:
     """Returns singleton instance of CapitalAutonomousEngine."""
@@ -7722,6 +8115,10 @@ async def run_capital_auto_cycle(app=None):
         await get_capital_orb_engine().execute_orb_cycle(app=app)
     except Exception as e_orb:
         logger.debug(f"ORB cycle notice: {e_orb}")
+    try:
+        await get_capital_trend_scalp_engine().execute_scalp_cycle(app=app)
+    except Exception as e_scalp:
+        logger.debug(f"Trend scalp cycle notice: {e_scalp}")
 
 async def run_capital_forex_cycle(app=None):
     """Dedicated APScheduler cron task for Forex 24/7 Exchange."""

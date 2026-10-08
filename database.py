@@ -3556,6 +3556,240 @@ def get_capital_orb_stats(chat_id: Optional[int] = None) -> dict:
     }
 
 # ==============================================================================
+# CAPITAL 24/7 HIGH-VOLATILITY TREND SCALP ENGINE DATA LAYER (/capital_scalp)
+# ==============================================================================
+
+def get_capital_scalp_config(chat_id: int) -> dict:
+    """Returns /capital_scalp configuration for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_scalp_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            budget REAL DEFAULT 30.0,
+            mode TEXT DEFAULT 'ALL',
+            max_positions INTEGER DEFAULT 3,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        SELECT is_enabled, budget, mode, max_positions, is_demo 
+        FROM capital_scalp_config WHERE chat_id = ?
+    """, (chat_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            "enabled": bool(row[0]),
+            "budget": float(row[1]) if row[1] else 30.0,
+            "mode": str(row[2]) if row[2] else "ALL",
+            "max_positions": int(row[3]) if row[3] else 3,
+            "is_demo": bool(row[4])
+        }
+    # Super Admin default (strictly LIVE MAINNET)
+    is_sa = (chat_id == 859271875)
+    return {
+        "enabled": is_sa,
+        "budget": 30.0,
+        "mode": "ALL",
+        "max_positions": 3,
+        "is_demo": False
+    }
+
+def is_capital_scalp_enabled(chat_id: int) -> bool:
+    return get_capital_scalp_config(chat_id).get("enabled", False)
+
+def set_capital_scalp_config(chat_id: int, enabled: bool, budget: float = 30.0, mode: str = "ALL", max_positions: int = 3, is_demo: bool = False):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_scalp_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            budget REAL DEFAULT 30.0,
+            mode TEXT DEFAULT 'ALL',
+            max_positions INTEGER DEFAULT 3,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    if chat_id == 859271875:
+        is_demo = False  # Super Admin strictly on Live Mainnet
+    cursor.execute("""
+        INSERT INTO capital_scalp_config (chat_id, is_enabled, budget, mode, max_positions, is_demo, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            budget = excluded.budget,
+            mode = excluded.mode,
+            max_positions = excluded.max_positions,
+            is_demo = excluded.is_demo,
+            updated_at = CURRENT_TIMESTAMP
+    """, (chat_id, int(enabled), budget, mode, max_positions, int(is_demo)))
+    conn.commit()
+    conn.close()
+
+def get_active_capital_scalp_users() -> list:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_scalp_config (
+            chat_id INTEGER PRIMARY KEY,
+            is_enabled INTEGER DEFAULT 0,
+            budget REAL DEFAULT 30.0,
+            mode TEXT DEFAULT 'ALL',
+            max_positions INTEGER DEFAULT 3,
+            is_demo INTEGER DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("SELECT chat_id, budget, mode, max_positions, is_demo FROM capital_scalp_config WHERE is_enabled = 1")
+    rows = cursor.fetchall()
+    conn.close()
+    result = []
+    has_sa = False
+    for r in rows:
+        cid = r[0]
+        if cid == 859271875:
+            has_sa = True
+        result.append({
+            "chat_id": cid,
+            "budget": float(r[1]) if r[1] else 30.0,
+            "mode": str(r[2]) if r[2] else "ALL",
+            "max_positions": int(r[3]) if r[3] else 3,
+            "is_demo": bool(r[4])
+        })
+    if not has_sa:
+        sa_cfg = get_capital_scalp_config(859271875)
+        if sa_cfg.get("enabled"):
+            result.append({
+                "chat_id": 859271875,
+                "budget": sa_cfg.get("budget", 30.0),
+                "mode": sa_cfg.get("mode", "ALL"),
+                "max_positions": sa_cfg.get("max_positions", 3),
+                "is_demo": False
+            })
+    return result
+
+def record_capital_scalp_trade(chat_id: int, epic: str, direction: str, entry_price: float, sl: float, tp: float, deal_id: str, status: str = 'OPEN', budget: float = 30.0):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_scalp_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            epic TEXT,
+            direction TEXT,
+            entry_price REAL,
+            sl REAL,
+            tp REAL,
+            deal_id TEXT,
+            status TEXT DEFAULT 'OPEN',
+            pnl REAL DEFAULT 0.0,
+            budget REAL DEFAULT 30.0,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO capital_scalp_trades (chat_id, epic, direction, entry_price, sl, tp, deal_id, status, budget, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """, (chat_id, epic, direction, entry_price, sl, tp, str(deal_id), status, budget))
+    conn.commit()
+    conn.close()
+
+def get_active_capital_scalp_trades(deal_id: Optional[str] = None) -> list:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_scalp_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            epic TEXT,
+            direction TEXT,
+            entry_price REAL,
+            sl REAL,
+            tp REAL,
+            deal_id TEXT,
+            status TEXT DEFAULT 'OPEN',
+            pnl REAL DEFAULT 0.0,
+            budget REAL DEFAULT 30.0,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    if deal_id:
+        cursor.execute("SELECT id, chat_id, epic, direction, entry_price, sl, tp, deal_id, status, pnl, budget, timestamp FROM capital_scalp_trades WHERE deal_id = ? AND status = 'OPEN'", (str(deal_id),))
+    else:
+        cursor.execute("SELECT id, chat_id, epic, direction, entry_price, sl, tp, deal_id, status, pnl, budget, timestamp FROM capital_scalp_trades WHERE status = 'OPEN' ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [{
+        "id": r[0], "chat_id": r[1], "epic": r[2], "direction": r[3],
+        "entry_price": r[4], "sl": r[5], "tp": r[6], "deal_id": r[7],
+        "status": r[8], "pnl": r[9], "budget": r[10], "timestamp": r[11]
+    } for r in rows]
+
+def update_capital_scalp_trade_status(deal_id: str, status: str, pnl: float = 0.0):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_scalp_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            epic TEXT,
+            direction TEXT,
+            entry_price REAL,
+            sl REAL,
+            tp REAL,
+            deal_id TEXT,
+            status TEXT DEFAULT 'OPEN',
+            pnl REAL DEFAULT 0.0,
+            budget REAL DEFAULT 30.0,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("UPDATE capital_scalp_trades SET status = ?, pnl = ? WHERE deal_id = ?", (status, pnl, str(deal_id)))
+    conn.commit()
+    conn.close()
+
+def get_capital_scalp_stats(chat_id: Optional[int] = None) -> dict:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_scalp_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            epic TEXT,
+            direction TEXT,
+            entry_price REAL,
+            sl REAL,
+            tp REAL,
+            deal_id TEXT,
+            status TEXT DEFAULT 'OPEN',
+            pnl REAL DEFAULT 0.0,
+            budget REAL DEFAULT 30.0,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    if chat_id:
+        cursor.execute("SELECT COUNT(*), SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), SUM(pnl) FROM capital_scalp_trades WHERE chat_id = ? AND status != 'OPEN'", (chat_id,))
+    else:
+        cursor.execute("SELECT COUNT(*), SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), SUM(pnl) FROM capital_scalp_trades WHERE status != 'OPEN'")
+    row = cursor.fetchone()
+    conn.close()
+    tot = row[0] if row and row[0] else 0
+    wins = row[1] if row and row[1] else 0
+    pnl = float(row[2]) if row and row[2] else 0.0
+    win_rate = (wins / tot * 100.0) if tot > 0 else 0.0
+    return {
+        "total_trades": tot,
+        "wins": wins,
+        "win_rate": win_rate,
+        "total_pnl": pnl
+    }
+
+# ==============================================================================
 # FRACTIONAL KELLY CRITERION POSITION SIZER DATA LAYER (INVARIANT 33)
 # ==============================================================================
 

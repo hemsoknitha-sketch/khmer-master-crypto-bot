@@ -6885,6 +6885,50 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_orb_command(update, context)
+            elif data == "btn_cap_scalp_toggle":
+                curr_state = db.is_capital_scalp_enabled(chat_id)
+                new_state = not curr_state
+                cfg = db.get_capital_scalp_config(chat_id)
+                is_demo = cfg.get("is_demo", False)
+                if chat_id == 859271875:
+                    is_demo = False  # Super Admin strictly on Live Mainnet
+                if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
+                    try:
+                        await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
+                    except Exception:
+                        pass
+                    gate_text, gate_kb = build_capital_referral_gatekeeper_ui(chat_id, user_lang)
+                    await update.effective_message.reply_text(gate_text, parse_mode="Markdown", reply_markup=gate_kb)
+                    return
+                db.set_capital_scalp_config(chat_id, enabled=new_state, budget=cfg.get("budget", 30.0), mode=cfg.get("mode", "ALL"), max_positions=cfg.get("max_positions", 3), is_demo=is_demo)
+                toast_msg = "⚡ Trend Scalp 24/7: បានបើកដំណើរការ!" if new_state else "🛑 Trend Scalp 24/7: បានបិទ!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_scalp_command(update, context)
+            elif data == "btn_cap_scalp_demo":
+                cfg = db.get_capital_scalp_config(chat_id)
+                curr_demo = cfg.get("is_demo", False)
+                new_demo = not curr_demo
+                if chat_id == 859271875:
+                    new_demo = False  # Super Admin strictly on Live Mainnet
+                db.set_capital_scalp_config(chat_id, enabled=cfg.get("enabled", False), budget=cfg.get("budget", 30.0), mode=cfg.get("mode", "ALL"), max_positions=cfg.get("max_positions", 3), is_demo=new_demo)
+                toast_msg = "🧪 ប្តូរទៅ Demo Practice!" if new_demo else "⚡ ប្តូរទៅ Live Mainnet!"
+                try:
+                    await update.callback_query.answer(toast_msg)
+                except Exception:
+                    pass
+                context.args = []
+                await capital_scalp_command(update, context)
+            elif data == "btn_cap_scalp_refresh":
+                try:
+                    await update.callback_query.answer("📡 កំពុងទាញយកទិន្នន័យ 24/7 Scalp Matrix...")
+                except Exception:
+                    pass
+                context.args = []
+                await capital_scalp_command(update, context)
             elif data == "btn_cap_kelly_toggle":
                 curr_state = db.is_capital_kelly_enabled(chat_id)
                 new_state = not curr_state
@@ -24025,6 +24069,139 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def capital_scalp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_lang = db.get_user_language(chat_id)
+            args = list(context.args) if context and context.args else []
+
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import capital_engine
+            import ui_standards
+
+            scalp_engine = capital_engine.get_capital_trend_scalp_engine()
+            scalp_cfg = db.get_capital_scalp_config(chat_id)
+
+            # Handle Subcommands: ON, OFF, DEMO, LIVE, STATUS, BUDGET
+            if args:
+                sub = str(args[0]).upper().strip()
+                if sub in ["ON", "START", "ENABLE"]:
+                    b_val = scalp_cfg.get("budget", 30.0)
+                    if len(args) > 1:
+                        try:
+                            b_val = float(str(args[1]).replace('$', ''))
+                        except Exception:
+                            pass
+                    db.set_capital_scalp_config(chat_id, enabled=True, budget=b_val, is_demo=scalp_cfg.get("is_demo", False))
+                elif sub in ["DEMO"]:
+                    b_val = scalp_cfg.get("budget", 30.0)
+                    if len(args) > 1:
+                        try:
+                            b_val = float(str(args[1]).replace('$', ''))
+                        except Exception:
+                            pass
+                    db.set_capital_scalp_config(chat_id, enabled=True, budget=b_val, is_demo=True)
+                elif sub in ["LIVE"]:
+                    b_val = scalp_cfg.get("budget", 30.0)
+                    if len(args) > 1:
+                        try:
+                            b_val = float(str(args[1]).replace('$', ''))
+                        except Exception:
+                            pass
+                    db.set_capital_scalp_config(chat_id, enabled=True, budget=b_val, is_demo=False)
+                elif sub in ["OFF", "STOP", "DISABLE"]:
+                    db.set_capital_scalp_config(chat_id, enabled=False, is_demo=scalp_cfg.get("is_demo", False))
+                elif sub in ["MODE"] and len(args) > 1:
+                    target_mode = str(args[1]).upper().strip()
+                    if target_mode in ["ALL", "CRYPTO", "TRADFI"]:
+                        db.set_capital_scalp_config(chat_id, enabled=scalp_cfg.get("enabled", False), budget=scalp_cfg.get("budget", 30.0), mode=target_mode, is_demo=scalp_cfg.get("is_demo", False))
+
+            scalp_cfg = db.get_capital_scalp_config(chat_id)
+            is_scalp_on = scalp_cfg.get("enabled", False)
+            is_demo = scalp_cfg.get("is_demo", False)
+            budget = scalp_cfg.get("budget", 30.0)
+            mode = scalp_cfg.get("mode", "ALL")
+            stats = db.get_capital_scalp_stats(chat_id)
+            active_majors = scalp_engine.get_session_active_majors(mode=mode)
+
+            status_badge = "🟢 ACTIVE (24/7 Trend Scalping)" if is_scalp_on else "⚪ PAUSED (Standby)"
+            acct_badge = "🧪 DEMO PRACTICE" if is_demo else "⚡ LIVE MAINNET"
+            toggle_text = "⚡ Scalp: ON 🟢" if is_scalp_on else "⚡ Scalp: OFF ⚪"
+            demo_text = "🧪 Mode: Demo" if is_demo else "⚡ Mode: Live"
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(toggle_text, callback_data="btn_cap_scalp_toggle"),
+                    InlineKeyboardButton(demo_text, callback_data="btn_cap_scalp_demo")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Refresh Scalp Matrix", callback_data="btn_cap_scalp_refresh"),
+                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions")
+                ],
+                [
+                    InlineKeyboardButton("🏛️ /capital Menu", callback_data="btn_cap_menu"),
+                    InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh")
+                ]
+            ])
+
+            majors_str = ", ".join(active_majors) if active_majors else "GOLD, US100, US500, BTCUSD, ETHUSD, SOLUSD"
+            tot_trades = stats.get("total_trades", 0)
+            wins = stats.get("wins", 0)
+            win_rate = stats.get("win_rate", 0.0)
+            tot_pnl = stats.get("total_pnl", 0.0)
+
+            if user_lang == "khmer":
+                msg = (
+                    f"⚡ **[CAPITAL.COM 24/7 TREND SCALP ENGINE]** 🎯\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🎯 **ទ្រព្យគោលដៅ ៖** `GOLD, US100, US500, BTC, ETH, SOL`\n"
+                    f"📊 **ស្ថានភាព ៖** `{status_badge}`\n"
+                    f"💼 **បរិស្ថានគណនី ៖** `{acct_badge}`\n"
+                    f"💵 **ទុន Margin ក្នុងមួយក្បាច់ ៖** `${budget:.2f} USD` (Kelly Isolated)\n"
+                    f"📡 **កម្រងទ្រព្យសកម្មបច្ចុប្បន្ន ៖** `{majors_str}`\n"
+                    f"🛡️ **ក្បួនការពារ ៖** `Breakeven Armor @ +1.2R (0.00R Risk)`\n"
+                    f"💎 **ការកើបចំណេញ ៖** `10x Spread Hurdle + Golden 85% Ratchet`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🏆 **ស្ថិតិ Scalp សរុប ៖** `{tot_trades} trades` | ឈ្នះ ៖ `{wins}` (`{win_rate:.1f}%`)\n"
+                    f"💰 **ប្រាក់ចំណេញសរុប ៖** `+${tot_pnl:,.2f} USD`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📋 **ពាក្យបញ្ជា Monospace 1-Tap Presets ៖**\n"
+                    f"• បើក Live Scalp ($30): `` `/capital_scalp ON 30` ``\n"
+                    f"• បើក Demo Scalp ($50): `` `/capital_scalp DEMO 50` ``\n"
+                    f"• បិទដំណើរការ Scalp: `` `/capital_scalp OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Angkor Quant_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Trend Impulse Scalp Matrix 24/7!"
+                )
+            else:
+                msg = (
+                    f"⚡ **[CAPITAL.COM 24/7 TREND SCALP ENGINE]** 🎯\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🎯 **Target Majors:** `GOLD, US100, US500, BTC, ETH, SOL`\n"
+                    f"📊 **Status:** `{status_badge}`\n"
+                    f"💼 **Account Environment:** `{acct_badge}`\n"
+                    f"💵 **Margin per Trade:** `${budget:.2f} USD` (Kelly Isolated)\n"
+                    f"📡 **Session Active Assets:** `{majors_str}`\n"
+                    f"🛡️ **Defense:** `Breakeven Armor @ +1.2R (0.00R Risk)`\n"
+                    f"💎 **Profit Harvest:** `10x Spread Hurdle + Golden 85% Ratchet`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"🏆 **Cumulative Scalp Stats:** `{tot_trades} trades` | Wins: `{wins}` (`{win_rate:.1f}%`)\n"
+                    f"💰 **Total Realized PnL:** `+${tot_pnl:,.2f} USD`\n"
+                    f"{ui_standards.DIVIDER_LIGHT}\n"
+                    f"📋 **Monospace 1-Tap Presets:**\n"
+                    f"• Start Live Scalp ($30): `` `/capital_scalp ON 30` ``\n"
+                    f"• Start Demo Scalp ($50): `` `/capital_scalp DEMO 50` ``\n"
+                    f"• Stop Scalping: `` `/capital_scalp OFF` ``\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"_Angkor Quant_\n"
+                    f"_APEX SUPER BRAIN AI_\n"
+                    f"Trend Impulse Scalp Matrix 24/7!"
+                )
+
+            await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+
         async def capital_kelly_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
@@ -25362,8 +25539,11 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_ib", "capitalib", "ib", "rebate", "partner"]:
                 await capital_ib_command(update, context)
                 return
+            elif cmd_text in ["capital_scalp", "capitalscalp"]:
+                await capital_scalp_command(update, context)
+                return
 
-            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD
+            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
             if args:
                 first_tok = str(args[0]).strip().replace('$', '')
                 is_num_cap = False
@@ -25385,6 +25565,10 @@ class TelegramBotThread(BaseThread):
                 elif action in ["IB", "REBATE", "PARTNER"]:
                     context.args = args[1:]
                     await capital_ib_command(update, context)
+                    return
+                elif action in ["SCALP", "TREND_SCALP", "TRENDSCALP"]:
+                    context.args = args[1:]
+                    await capital_scalp_command(update, context)
                     return
                 elif action in ["RESET_DAILY", "RESETDAILY", "GOVERNOR_RESET", "RESET_GOVERNOR"]:
                     import portfolio_circuit_breaker
@@ -25939,6 +26123,8 @@ class TelegramBotThread(BaseThread):
             import post_news_scalp_harvester
             is_news_scalp_on = post_news_scalp_harvester.is_news_scalp_enabled(chat_id)
             news_scalp_btn_text = "⚡ News Scalp: ON 🟢" if is_news_scalp_on else "⚡ News Scalp: OFF ⚪"
+            is_scalp_on = db.is_capital_scalp_enabled(chat_id)
+            scalp_btn_text = "⚡ Scalp: ON 🟢" if is_scalp_on else "⚡ Scalp: OFF ⚪"
 
             sched_mode = auto_cfg.get("schedule_mode", "SCHEDULE_MON_FRI")
             btn_smart_text = "🎯 Smart Session ✅" if sched_mode in ["SMART_SESSION_TIMED", "SMART_SESSION", "TIMED", "SESSION", "SMART"] else "🎯 Smart Session"
@@ -25996,6 +26182,10 @@ class TelegramBotThread(BaseThread):
                 [
                     InlineKeyboardButton(news_scalp_btn_text, callback_data="btn_cap_news_scalp_toggle"),
                     InlineKeyboardButton("⚡ News Scalp Alpha", callback_data="btn_cap_news_scalp")
+                ],
+                [
+                    InlineKeyboardButton(scalp_btn_text, callback_data="btn_cap_scalp_toggle"),
+                    InlineKeyboardButton("⚡ Scalp Radar (24/7)", callback_data="btn_cap_scalp_refresh")
                 ],
                 [
                     InlineKeyboardButton("📈 ORB Radar (15m)", callback_data="btn_cap_orb_radar"),
@@ -27085,6 +27275,8 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("ib", capital_ib_command))
         self.app.add_handler(CommandHandler("rebate", capital_ib_command))
         self.app.add_handler(CommandHandler("partner", capital_ib_command))
+        self.app.add_handler(CommandHandler("capital_scalp", capital_scalp_command))
+        self.app.add_handler(CommandHandler("capitalscalp", capital_scalp_command))
         self.app.add_handler(CommandHandler("forex", forex_command))
         self.app.add_handler(CommandHandler("forex_exchange", forex_command))
         self.app.add_handler(CommandHandler("forexexchange", forex_command))
