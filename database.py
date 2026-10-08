@@ -3309,9 +3309,15 @@ def record_capital_orb_trade(
     sl: float,
     tp: float,
     deal_id: str = "",
-    status: str = "OPEN"
+    status: str = "OPEN",
+    tp1: float = 0.0,
+    tp2: float = 0.0,
+    tp3: float = 0.0,
+    sl_dist: float = 0.0,
+    scale_tier: int = 0,
+    **kwargs
 ) -> int:
-    """Records an executed ORB 15m trade into capital_orb_trades."""
+    """Records an executed ORB 15m trade with Multi-Tier Scale-Out targets into capital_orb_trades."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -3328,25 +3334,106 @@ def record_capital_orb_trade(
             tp REAL,
             deal_id TEXT,
             status TEXT,
-            timestamp TEXT
+            timestamp TEXT,
+            tp1 REAL DEFAULT 0.0,
+            tp2 REAL DEFAULT 0.0,
+            tp3 REAL DEFAULT 0.0,
+            sl_dist REAL DEFAULT 0.0,
+            scale_tier INTEGER DEFAULT 0
         )
     """)
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0")]:
+        try:
+            cursor.execute(f"ALTER TABLE capital_orb_trades ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("""
         INSERT INTO capital_orb_trades
-        (chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, deal_id, status, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, str(deal_id), status, now_str))
+        (chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, deal_id, status, timestamp, tp1, tp2, tp3, sl_dist, scale_tier)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, str(deal_id), status, now_str, tp1, tp2, tp3, sl_dist, scale_tier))
     trade_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return trade_id
 
+def get_active_capital_orb_trades(deal_id: Optional[str] = None) -> list:
+    """Returns all active ORB 15m trades (status = 'OPEN' or 'ACTIVE%')."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS capital_orb_trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            session_name TEXT,
+            epic TEXT,
+            direction TEXT,
+            or_high REAL,
+            or_low REAL,
+            breakout_price REAL,
+            sl REAL,
+            tp REAL,
+            deal_id TEXT,
+            status TEXT,
+            timestamp TEXT,
+            tp1 REAL DEFAULT 0.0,
+            tp2 REAL DEFAULT 0.0,
+            tp3 REAL DEFAULT 0.0,
+            sl_dist REAL DEFAULT 0.0,
+            scale_tier INTEGER DEFAULT 0
+        )
+    """)
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0")]:
+        try:
+            cursor.execute(f"ALTER TABLE capital_orb_trades ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+
+    if deal_id:
+        cursor.execute("SELECT id, chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, deal_id, status, timestamp, tp1, tp2, tp3, sl_dist, scale_tier FROM capital_orb_trades WHERE deal_id = ? AND (status = 'OPEN' OR status LIKE 'ACTIVE%') ORDER BY id DESC", (str(deal_id),))
+    else:
+        cursor.execute("SELECT id, chat_id, session_name, epic, direction, or_high, or_low, breakout_price, sl, tp, deal_id, status, timestamp, tp1, tp2, tp3, sl_dist, scale_tier FROM capital_orb_trades WHERE (status = 'OPEN' OR status LIKE 'ACTIVE%') ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": r[0], "chat_id": r[1], "session_name": r[2], "epic": r[3],
+            "direction": r[4], "or_high": r[5], "or_low": r[6],
+            "breakout_price": r[7], "sl": r[8], "tp": r[9],
+            "deal_id": r[10], "status": r[11], "timestamp": r[12],
+            "tp1": float(r[13] or 0.0), "tp2": float(r[14] or 0.0),
+            "tp3": float(r[15] or 0.0), "sl_dist": float(r[16] or 0.0),
+            "scale_tier": int(r[17] if len(r) > 17 and r[17] is not None else 0)
+        }
+        for r in rows
+    ]
+
+def update_capital_orb_trade_status(deal_id: str, status: str, scale_tier: Optional[int] = None):
+    """Updates status and scale-out tier of an executed ORB trade."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if scale_tier is not None:
+        cursor.execute("""
+            UPDATE capital_orb_trades
+            SET status = ?, scale_tier = ?
+            WHERE deal_id = ?
+        """, (status, scale_tier, str(deal_id)))
+    else:
+        cursor.execute("""
+            UPDATE capital_orb_trades
+            SET status = ?
+            WHERE deal_id = ?
+        """, (status, str(deal_id)))
+    conn.commit()
+    conn.close()
+
 def record_capital_orb_trap(
     chat_id: int,
     session_name: str,
     epic: str,
-    trap_type: str = "BREAKOUT_STOP",
+    trap_type: str = "VIRTUAL_BREAKOUT_RADAR",
     buy_deal_id: str = "",
     sell_deal_id: str = "",
     buy_level: float = 0.0,
@@ -3355,7 +3442,7 @@ def record_capital_orb_trap(
     tp: float = 0.0,
     status: str = "ARMED"
 ) -> int:
-    """Records an armed ORB pending trap into capital_orb_traps."""
+    """Records an armed ORB pending trap or in-memory virtual breakout radar into capital_orb_traps."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -3387,7 +3474,7 @@ def record_capital_orb_trap(
     return trap_id
 
 def get_active_capital_orb_traps(chat_id: Optional[int] = None) -> list:
-    """Returns all currently armed ORB pending traps."""
+    """Returns all currently armed ORB pending traps or in-memory virtual breakout radars."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -3408,9 +3495,9 @@ def get_active_capital_orb_traps(chat_id: Optional[int] = None) -> list:
         )
     """)
     if chat_id:
-        cursor.execute("SELECT id, chat_id, session_name, epic, trap_type, buy_deal_id, sell_deal_id, buy_level, sell_level, sl, tp, status, timestamp FROM capital_orb_traps WHERE chat_id = ? AND status = 'ARMED' ORDER BY id DESC", (chat_id,))
+        cursor.execute("SELECT id, chat_id, session_name, epic, trap_type, buy_deal_id, sell_deal_id, buy_level, sell_level, sl, tp, status, timestamp FROM capital_orb_traps WHERE chat_id = ? AND (status = 'ARMED' OR status = 'RADAR_ARMED') ORDER BY id DESC", (chat_id,))
     else:
-        cursor.execute("SELECT id, chat_id, session_name, epic, trap_type, buy_deal_id, sell_deal_id, buy_level, sell_level, sl, tp, status, timestamp FROM capital_orb_traps WHERE status = 'ARMED' ORDER BY id DESC")
+        cursor.execute("SELECT id, chat_id, session_name, epic, trap_type, buy_deal_id, sell_deal_id, buy_level, sell_level, sl, tp, status, timestamp FROM capital_orb_traps WHERE (status = 'ARMED' OR status = 'RADAR_ARMED') ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
     return [
@@ -3424,14 +3511,14 @@ def get_active_capital_orb_traps(chat_id: Optional[int] = None) -> list:
     ]
 
 def update_capital_orb_trap_status(deal_id_or_id: Any, status: str):
-    """Updates status of an armed ORB pending trap (e.g. TRIGGERED_BUY, TRIGGERED_SELL, CANCELLED, EXPIRED)."""
+    """Updates status of an armed ORB pending trap / virtual radar (e.g. TRIGGERED_BUY, TRIGGERED_SELL, CANCELLED, EXPIRED)."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE capital_orb_traps
         SET status = ?
-        WHERE id = ? OR buy_deal_id = ? OR sell_deal_id = ?
-    """, (status, str(deal_id_or_id), str(deal_id_or_id), str(deal_id_or_id)))
+        WHERE id = ? OR buy_deal_id = ? OR sell_deal_id = ? OR session_name = ?
+    """, (status, str(deal_id_or_id), str(deal_id_or_id), str(deal_id_or_id), str(deal_id_or_id)))
     conn.commit()
     conn.close()
 

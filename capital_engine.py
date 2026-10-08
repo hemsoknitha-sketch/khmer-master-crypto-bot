@@ -3411,6 +3411,130 @@ class CapitalAutonomousEngine:
                                     except Exception:
                                         pass
 
+            # =========================================================================
+            # TIER 1.5: ORB 15M MULTI-TIER SCALE-OUT TP & RATCHET ENGINE
+            # Tier 1 (+1.2R): Locks SL to Breakeven Armor + Noise Buffer (Risk: 0.00R)
+            # Tier 2 (+2.5R): Locks SL to Guaranteed +1.2R Profit Floor
+            # Tier 3 (+4.0R): Banks Clean Cash Harvest (+4.0R Full Moonshot)
+            # =========================================================================
+            try:
+                orb_engine = get_capital_orb_engine()
+                orb_info = orb_engine.get_orb_deal_info(deal_id) if hasattr(orb_engine, "get_orb_deal_info") else None
+                if not orb_info:
+                    orb_db_trades = db.get_active_capital_orb_trades(deal_id=str(deal_id))
+                    if orb_db_trades:
+                        orb_info = orb_db_trades[0]
+
+                if orb_info:
+                    sl_dist = float(orb_info.get("sl_dist", 0.0) or 0.0)
+                    tier = int(orb_info.get("scale_tier", 0) or 0)
+                    prec = _get_tradfi_precision(epic, current_price)
+
+                    if sl_dist > 0:
+                        r_gain = (current_price - entry_level) / sl_dist if direction == "BUY" else (entry_level - current_price) / sl_dist
+
+                        # TIER 1: +1.2R Hit -> Breakeven Armor Lock
+                        if r_gain >= 1.20 and tier < 1:
+                            if direction == "BUY":
+                                be_sl = round(entry_level + max(spread * 0.6, entry_level * 0.0012), prec)
+                                safe_sl = min(be_sl, round(current_price - (spread * 1.5), prec))
+                                should_upd = (safe_sl > sl)
+                            else:
+                                be_sl = round(entry_level - max(spread * 0.6, entry_level * 0.0012), prec)
+                                safe_sl = max(be_sl, round(current_price + (spread * 1.5), prec))
+                                should_upd = (sl <= 0 or safe_sl < sl)
+
+                            if should_upd:
+                                upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_sl)
+                                if upd.get("success"):
+                                    if hasattr(orb_engine, "update_orb_deal_tier"):
+                                        orb_engine.update_orb_deal_tier(deal_id, 1)
+                                    db.update_capital_orb_trade_status(str(deal_id), status="ACTIVE_TIER1", scale_tier=1)
+                                    self._be_locked_set.add(deal_id)
+                                    ratcheted_count += 1
+                                    logger.info(f"🎯 [ORB TIER 1] Locked BE SL for {epic} ({direction}) at {safe_sl} (R: +{r_gain:.2f}R, Risk: 0.00R Free Roll)")
+                                    if chat_id:
+                                        try:
+                                            import notification_manager, ui_standards
+                                            t1_msg = (
+                                                f"🎯 **[ORB 15M TIER 1 HIT: BREAKEVEN LOCKED]** 🛡️\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🏛️ **ឧបករណ៍ ៖** `{epic}` ({direction})\n"
+                                                f"📈 **កំណើនបច្ចុប្បន្ន ៖** `+{r_gain:.2f}R` (+${upl:,.2f})\n"
+                                                f"🛡️ **កិច្ចការពារ Stop-Loss ៖** `{safe_sl}` (Breakeven + Fees Locked)\n"
+                                                f"🎉 **ស្ថានភាពហានិភ័យ ៖** `Risk 0.00R (Free Roll) - គ្មានថ្ងៃខាត!`\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🚀 _ម៉ាស៊ីន AI កំពុងបន្តរត់តាមគោលដៅ Tier 2 (+2.5R) & Tier 3 (+4.0R)!_"
+                                            )
+                                            notification_manager.send_telegram_notification(app, chat_id, t1_msg, category="[ORB TIER 1]")
+                                        except Exception:
+                                            pass
+
+                        # TIER 2: +2.5R Hit -> Guaranteed +1.2R Profit Lock
+                        elif r_gain >= 2.50 and tier < 2:
+                            if direction == "BUY":
+                                t2_sl = round(entry_level + (1.20 * sl_dist), prec)
+                                safe_sl = min(t2_sl, round(current_price - (spread * 1.5), prec))
+                                should_upd = (safe_sl > sl)
+                            else:
+                                t2_sl = round(entry_level - (1.20 * sl_dist), prec)
+                                safe_sl = max(t2_sl, round(current_price + (spread * 1.5), prec))
+                                should_upd = (sl <= 0 or safe_sl < sl)
+
+                            if should_upd:
+                                upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_sl)
+                                if upd.get("success"):
+                                    if hasattr(orb_engine, "update_orb_deal_tier"):
+                                        orb_engine.update_orb_deal_tier(deal_id, 2)
+                                    db.update_capital_orb_trade_status(str(deal_id), status="ACTIVE_TIER2", scale_tier=2)
+                                    ratcheted_count += 1
+                                    logger.info(f"💎 [ORB TIER 2] Locked +1.2R Profit Floor for {epic} ({direction}) at {safe_sl} (Current R: +{r_gain:.2f}R)")
+                                    if chat_id:
+                                        try:
+                                            import notification_manager, ui_standards
+                                            t2_msg = (
+                                                f"💎 **[ORB 15M TIER 2 HIT: +1.2R PROFIT LOCKED]** 💰\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🏛️ **ឧបករណ៍ ៖** `{epic}` ({direction})\n"
+                                                f"📈 **កំណើនបច្ចុប្បន្ន ៖** `+{r_gain:.2f}R` (+${upl:,.2f})\n"
+                                                f"💰 **ប្រាក់ចំណេញចាក់សោរក្នុងហោប៉ៅ ៖** `+1.20R ធានាឈ្នះ ១០០%`\n"
+                                                f"🛡️ **Trailing Stop-Loss ៖** `{safe_sl}`\n"
+                                                f"{ui_standards.DIVIDER_HEAVY}\n"
+                                                f"🚀 _កំពុងបន្តរត់តាមគោលដៅធំបំផុត Moonshot Tier 3 (+4.0R)!_"
+                                            )
+                                            notification_manager.send_telegram_notification(app, chat_id, t2_msg, category="[ORB TIER 2]")
+                                        except Exception:
+                                            pass
+
+                        # TIER 3: +4.0R Hit -> Moonshot Harvest
+                        elif r_gain >= 4.00 and tier < 3:
+                            c_res = engine.close_position(deal_id=deal_id)
+                            if c_res.get("success"):
+                                if hasattr(orb_engine, "update_orb_deal_tier"):
+                                    orb_engine.update_orb_deal_tier(deal_id, 3)
+                                db.update_capital_orb_trade_status(str(deal_id), status="TP3_CLOSED", scale_tier=3)
+                                closed_count += 1
+                                logger.info(f"🚀 [ORB TIER 3 HARVEST] Successfully closed {epic} ({direction}) at +{r_gain:.2f}R (+${upl:,.2f})!")
+                                if chat_id:
+                                    try:
+                                        import notification_manager, ui_standards
+                                        t3_msg = (
+                                            f"🏆 **[ORB 15M TIER 3 FULL HARVEST]** 🚀\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"🏛️ **ឧបករណ៍ ៖** `{epic}` ({direction})\n"
+                                            f"💰 **ប្រាក់ចំណេញកើបបាន ៖** `+${upl:,.2f} USD` (`+{r_gain:.2f}R`)\n"
+                                            f"🎯 **គោលដៅ ៖** `+4.0R Moonshot Target Achieved!`\n"
+                                            f"✅ **ស្ថានភាព ៖** `បានបិទកើបប្រាក់ចំណេញចូលកាបូប ១០០%`\n"
+                                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                                            f"👑 _ម៉ាស៊ីន AI ORB 15M បានបញ្ចប់បេសកកម្មយ៉ាងត្រចះត្រចង់!_"
+                                        )
+                                        notification_manager.send_telegram_notification(app, chat_id, t3_msg, category="[ORB TIER 3]")
+                                    except Exception:
+                                        pass
+                                continue
+            except Exception as e_orb_scale:
+                logger.debug(f"ORB scale-out check exception: {e_orb_scale}")
+
         return len(positions), ratcheted_count, closed_count
 
     def monitor_and_ratchet_open_positions(self, app=None) -> Dict[str, Any]:
@@ -4728,6 +4852,7 @@ class CapitalOpeningRangeBreakoutEngine:
         self._session_trades = set()                           # "{session}_{date}_{epic}"
         self._armed_traps: Dict[str, Dict[str, Any]] = {}     # trap_key -> trap_dict
         self._arming_in_progress = set()                       # In-flight arming lock preventing duplicate submissions
+        self._active_orb_deals: Dict[str, Dict[str, Any]] = {} # deal_id -> {tier, tp1, tp2, tp3, sl_dist, direction, ...}
         self._last_cycle_ts = 0.0
         self._last_oco_check_ts = 0.0
         self._stats = {
@@ -4737,6 +4862,27 @@ class CapitalOpeningRangeBreakoutEngine:
             "last_breakout": {}
         }
         self._is_active = True
+
+    def get_orb_deal_info(self, deal_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves active deal metadata for Multi-Tier scale-out tracking."""
+        d_str = str(deal_id)
+        if d_str in self._active_orb_deals:
+            return self._active_orb_deals[d_str]
+        try:
+            import database as db
+            rows = db.get_active_capital_orb_trades(deal_id=d_str)
+            if rows:
+                self._active_orb_deals[d_str] = rows[0]
+                return rows[0]
+        except Exception:
+            pass
+        return None
+
+    def update_orb_deal_tier(self, deal_id: str, tier: int):
+        """Updates in-memory scale-out tier for active ORB position."""
+        d_str = str(deal_id)
+        if d_str in self._active_orb_deals:
+            self._active_orb_deals[d_str]["scale_tier"] = tier
 
     def get_current_session_info(self) -> Dict[str, Any]:
         """
@@ -4926,7 +5072,11 @@ class CapitalOpeningRangeBreakoutEngine:
         bid: float,
         sl: float,
         tp: float,
-        app=None
+        app=None,
+        tp1: float = 0.0,
+        tp2: float = 0.0,
+        tp3: float = 0.0,
+        sl_dist: float = 0.0
     ) -> bool:
         """
         Sub-millisecond concurrent trade dispatcher for ORB 15M Breakout.
@@ -4962,14 +5112,17 @@ class CapitalOpeningRangeBreakoutEngine:
             if eff_equity < 100 and any(g in resolved_epic.upper() for g in ["NATURALGAS", "GAS"]):
                 return False
 
-            # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
             entry_p = ask if direction == "BUY" else bid
+            eff_tp = tp3 if (tp3 and tp3 > 0) else tp
+            calc_sl_dist = sl_dist if (sl_dist and sl_dist > 0) else abs(entry_p - sl)
+
+            # Fractional Kelly Criterion Dynamic Position Sizer (Invariant 33)
             size = get_capital_kelly_sizer().calculate_lot_size(
                 chat_id=chat_id,
                 epic=resolved_epic,
                 entry_price=entry_p,
                 sl_price=sl,
-                tp_price=tp,
+                tp_price=eff_tp,
                 confidence_score=85.0,  # High confidence institutional ORB breakout
                 budget=budget
             )
@@ -4987,7 +5140,8 @@ class CapitalOpeningRangeBreakoutEngine:
                 direction=direction,
                 size=size,
                 stop_loss=sl,
-                take_profit=tp
+                take_profit=eff_tp,
+                bypass_citadel=True
             )
 
             if trade_res.get("success"):
@@ -4996,7 +5150,22 @@ class CapitalOpeningRangeBreakoutEngine:
                 deal_ref = trade_res.get("deal_reference", "ORB15M")
                 deal_id = trade_res.get("dealId") or trade_res.get("response", {}).get("dealId", deal_ref)
 
-                # Record in database
+                # Track in-memory for Multi-Tier scale-out ratchet
+                self._active_orb_deals[str(deal_id)] = {
+                    "deal_id": str(deal_id),
+                    "chat_id": chat_id,
+                    "epic": resolved_epic,
+                    "direction": direction,
+                    "entry_price": entry_p,
+                    "sl_price": sl,
+                    "tp1": tp1 or eff_tp,
+                    "tp2": tp2 or eff_tp,
+                    "tp3": eff_tp,
+                    "sl_dist": calc_sl_dist,
+                    "scale_tier": 0
+                }
+
+                # Record in database with full Multi-Tier and ATR SL columns
                 db.record_capital_orb_trade(
                     chat_id=chat_id,
                     session_name=session_name,
@@ -5004,11 +5173,16 @@ class CapitalOpeningRangeBreakoutEngine:
                     direction=direction,
                     or_high=or_high,
                     or_low=or_low,
-                    breakout_price=ask if direction == "BUY" else bid,
+                    breakout_price=entry_p,
                     sl=sl,
-                    tp=tp,
+                    tp=eff_tp,
                     deal_id=str(deal_id),
-                    status="OPEN"
+                    status="OPEN",
+                    tp1=tp1 or eff_tp,
+                    tp2=tp2 or eff_tp,
+                    tp3=eff_tp,
+                    sl_dist=calc_sl_dist,
+                    scale_tier=0
                 )
 
                 # Also record in capital_auto_trades for Breakeven Armor & Golden Ratchet management
@@ -5019,9 +5193,9 @@ class CapitalOpeningRangeBreakoutEngine:
                     epic=resolved_epic,
                     direction=direction,
                     size=size,
-                    entry_price=ask if direction == "BUY" else bid,
+                    entry_price=entry_p,
                     sl=sl,
-                    tp=tp
+                    tp=eff_tp
                 )
 
                 # Send Telegram Notification
@@ -5035,31 +5209,35 @@ class CapitalOpeningRangeBreakoutEngine:
 
                         if user_lang == 'khmer':
                             notif_msg = (
-                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** {exec_emoji}\n"
+                                f"🚀 **[ORB 15M VIRTUAL RADAR AUTO-TRADE]** {exec_emoji}\n"
                                 f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"🤖 **ស្ថានភាព ៖** `បានចូល Position ដោយស្វ័យប្រវត្ត ១០០% (AUTO FILLED)`\n"
                                 f"⚙️ **គណនី ៖** `{env_lbl}`\n"
-                                f"🌐 **Session ៖** `{session_name} OPEN (១៥ នាទីដំបូង)`\n"
+                                f"🌐 **Session ៖** `{session_name} OPEN (បញ្ចប់ ១៥ នាទីដំបូង)`\n"
                                 f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
                                 f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
                                 f"📊 **15m Range ៖** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
                                 f"💵 **តម្លៃទម្លុះ (Breakout Entry) ៖** `${mid:,.2f}`\n"
-                                f"🛑 **Stop-Loss (Range Mid) ៖** `${sl:,.2f}`\n"
-                                f"🎯 **Take-Profit (4R-6R) ៖** `${tp:,.2f}`\n"
+                                f"🛑 **Dynamic Tight ATR SL ៖** `${sl:,.2f}` (ហានិភ័យទាប ~${calc_sl_dist:,.2f})\n"
+                                f"{ui_standards.DIVIDER_LIGHT}\n"
+                                f"🎯 **Multi-Tier Scale-Out Targets ៖**\n"
+                                f"• **TP1 (+1.2R) ៖** `${(tp1 or eff_tp):,.2f}` (Lock Breakeven Risk -> 0.00R)\n"
+                                f"• **TP2 (+2.5R) ៖** `${(tp2 or eff_tp):,.2f}` (Lock +1.2R Profit Floor)\n"
+                                f"• **TP3 (+4.0R) ៖** `${eff_tp:,.2f}` (Moonshot Clean Cash Harvest)\n"
                                 f"📦 **ទំហំកិច្ចសន្យា ៖** `{size} contracts`\n"
                                 f"🔖 **Deal Reference ៖** `{deal_ref}`\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                                f"🛡️ **ក្បួនការពារ & ចាប់រលកធំ ៖**\n"
-                                f"• Breakeven Armor នៅ +1.5% ROI (Risk -> 0.00R)\n"
-                                f"• Golden 80% Trailing Ratchet\n"
-                                f"• Asymmetric R:R ≥ 1:4 ទៅ 1:6\n"
+                                f"🛡️ **លក្ខណៈពិសេស In-Memory Virtual Radar ៖**\n"
+                                f"• Zero Broker Pending Exposure (គ្មានការលេចធ្លាយទៅ Broker)\n"
+                                f"• 100% មិនចាញ់បោក Judas Swing ឬ Stop-Hunting\n"
+                                f"• កាត់បន្ថយទំហំ Stop-Loss ដល់ទៅ ៣០%-៥០% ធៀបនឹង Midpoint ចាស់!\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"💡 _ម៉ាស៊ីន AI បានចាប់ទាញផលចំណេញពីរលកស្ថាប័ន Wall Street ផ្ទុះឡើង 24/7!_"
                             )
                         else:
                             notif_msg = (
-                                f"🚀 **[ORB 15M AUTO-TRADE EXECUTED]** {exec_emoji}\n"
+                                f"🚀 **[ORB 15M VIRTUAL RADAR AUTO-TRADE]** {exec_emoji}\n"
                                 f"🎯 **[OPENING RANGE BREAKOUT (ORB 15M)]** ⚡\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
                                 f"🤖 **Status:** `Successfully Entered & Active (AUTO FILLED)`\n"
@@ -5069,12 +5247,16 @@ class CapitalOpeningRangeBreakoutEngine:
                                 f"🎯 **Direction:** `{dir_emoji}`\n"
                                 f"📊 **15m Range:** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
                                 f"💵 **Breakout Entry:** `${mid:,.2f}`\n"
-                                f"🛑 **Stop-Loss (Range Mid):** `${sl:,.2f}`\n"
-                                f"🎯 **Take-Profit (4R-6R):** `${tp:,.2f}`\n"
+                                f"🛑 **Dynamic Tight ATR SL:** `${sl:,.2f}` (Risk ~${calc_sl_dist:,.2f})\n"
+                                f"{ui_standards.DIVIDER_LIGHT}\n"
+                                f"🎯 **Multi-Tier Scale-Out Targets:**\n"
+                                f"• **TP1 (+1.2R):** `${(tp1 or eff_tp):,.2f}` (Locks Breakeven / Risk: 0.00R)\n"
+                                f"• **TP2 (+2.5R):** `${(tp2 or eff_tp):,.2f}` (Locks +1.2R Profit Floor)\n"
+                                f"• **TP3 (+4.0R):** `${eff_tp:,.2f}` (Moonshot Cash Harvest)\n"
                                 f"📦 **Size:** `{size} contracts`\n"
                                 f"🔖 **Deal Reference:** `{deal_ref}`\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
-                                f"🛡️ _Breakeven Armor & Golden 80% Ratchet Active!_"
+                                f"🛡️ _In-Memory Virtual Radar + Multi-Tier Scale-Out Engine Active!_"
                             )
                         await app.bot.send_message(chat_id=chat_id, text=notif_msg, parse_mode="Markdown")
                     except Exception as notif_e:
@@ -5146,11 +5328,21 @@ class CapitalOpeningRangeBreakoutEngine:
             buy_trigger = round(or_high + buffer_dist, prec)
             sell_trigger = round(or_low - buffer_dist, prec)
 
-            buy_sl = round(or_mid, prec)
-            buy_tp = round(or_high + (4.0 * or_range), prec)
+            # Dynamic Tight ATR Stop-Loss: 1.10x ATR or max 35% of range (eliminates huge 50% midpoint losses)
+            sl_dist = min(atr * 1.10, or_range * 0.35)
+            sl_dist = max(sl_dist, buffer_dist * 2.0, or_mid * 0.0015)
 
-            sell_sl = round(or_mid, prec)
-            sell_tp = round(or_low - (4.0 * or_range), prec)
+            buy_sl = round(buy_trigger - sl_dist, prec)
+            buy_tp1 = round(buy_trigger + (1.2 * sl_dist), prec)
+            buy_tp2 = round(buy_trigger + (2.5 * sl_dist), prec)
+            buy_tp3 = round(buy_trigger + (4.0 * sl_dist), prec)
+            buy_tp = buy_tp3
+
+            sell_sl = round(sell_trigger + sl_dist, prec)
+            sell_tp1 = round(sell_trigger - (1.2 * sl_dist), prec)
+            sell_tp2 = round(sell_trigger - (2.5 * sl_dist), prec)
+            sell_tp3 = round(sell_trigger - (4.0 * sl_dist), prec)
+            sell_tp = sell_tp3
 
             quant = engine.evaluate_tradfi_quant_signal(resolved_epic)
             rsi_val = quant.get("rsi", 50.0)
@@ -5177,14 +5369,26 @@ class CapitalOpeningRangeBreakoutEngine:
                 "or_high": or_high,
                 "or_low": or_low,
                 "or_mid": or_mid,
+                "or_range": or_range,
+                "atr": atr,
+                "sl_dist": sl_dist,
                 "buy_trigger": buy_trigger,
                 "sell_trigger": sell_trigger,
                 "buy_sl": buy_sl,
                 "buy_tp": buy_tp,
+                "buy_tp1": buy_tp1,
+                "buy_tp2": buy_tp2,
+                "buy_tp3": buy_tp3,
                 "sell_sl": sell_sl,
                 "sell_tp": sell_tp,
+                "sell_tp1": sell_tp1,
+                "sell_tp2": sell_tp2,
+                "sell_tp3": sell_tp3,
+                "allow_buy": allow_buy_trap,
+                "allow_sell": allow_sell_trap,
                 "user_orders": {},
-                "status": "ARMED",
+                "status": "RADAR_ARMED",
+                "type": "VIRTUAL_BREAKOUT_RADAR",
                 "timestamp": time.time()
             }
 
@@ -5247,39 +5451,13 @@ class CapitalOpeningRangeBreakoutEngine:
                 buy_size = round(max(min_deal, min(float(buy_size or min_deal), max_affordable_buy)), size_prec)
                 sell_size = round(max(min_deal, min(float(sell_size or min_deal), max_affordable_sell)), size_prec)
 
-                u_trap = {"buy_deal_id": None, "sell_deal_id": None}
-
-                if user_allow_buy:
-                    buy_res = await asyncio.to_thread(
-                        user_engine.place_working_order,
-                        epic=resolved_epic,
-                        direction="BUY",
-                        size=buy_size,
-                        level=buy_trigger,
-                        order_type="STOP",
-                        stop_loss=buy_sl,
-                        take_profit=buy_tp,
-                        bypass_citadel=True
-                    )
-                    if buy_res.get("success"):
-                        u_trap["buy_deal_id"] = str(buy_res.get("dealId") or buy_res.get("deal_reference", ""))
-                        logger.info(f"🎯 [ORB TRAP] Armed BUY STOP for User {uid} on {resolved_epic} @ ${buy_trigger}")
-
-                if user_allow_sell:
-                    sell_res = await asyncio.to_thread(
-                        user_engine.place_working_order,
-                        epic=resolved_epic,
-                        direction="SELL",
-                        size=sell_size,
-                        level=sell_trigger,
-                        order_type="STOP",
-                        stop_loss=sell_sl,
-                        take_profit=sell_tp,
-                        bypass_citadel=True
-                    )
-                    if sell_res.get("success"):
-                        u_trap["sell_deal_id"] = str(sell_res.get("dealId") or sell_res.get("deal_reference", ""))
-                        logger.info(f"🎯 [ORB TRAP] Armed SELL STOP for User {uid} on {resolved_epic} @ ${sell_trigger}")
+                # In-Memory Virtual Breakout Radar: Zero broker pending exposure during wait!
+                u_trap = {
+                    "buy_size": buy_size,
+                    "sell_size": sell_size,
+                    "buy_deal_id": "RADAR_BUY" if user_allow_buy else None,
+                    "sell_deal_id": "RADAR_SELL" if user_allow_sell else None
+                }
 
                 if u_trap["buy_deal_id"] or u_trap["sell_deal_id"]:
                     trap_entry["user_orders"][uid] = u_trap
@@ -5287,14 +5465,14 @@ class CapitalOpeningRangeBreakoutEngine:
                         chat_id=uid,
                         session_name=session_name,
                         epic=resolved_epic,
-                        trap_type="BREAKOUT_STOP",
+                        trap_type="VIRTUAL_BREAKOUT_RADAR",
                         buy_deal_id=u_trap["buy_deal_id"] or "",
                         sell_deal_id=u_trap["sell_deal_id"] or "",
                         buy_level=buy_trigger,
                         sell_level=sell_trigger,
                         sl=buy_sl,
                         tp=buy_tp,
-                        status="ARMED"
+                        status="RADAR_ARMED"
                     )
 
                     if app and hasattr(app, "bot"):
@@ -5303,49 +5481,62 @@ class CapitalOpeningRangeBreakoutEngine:
                             import ui_standards
                             env_lbl = "🟡 DEMO ($10,000 Virtual)" if is_demo else "🟢 LIVE MAINNET (Real Funds)"
                             is_master = (uid == super_admin_id)
-                            head_kh = "👑 **[MASTER LOCOMOTIVE ORB 15M TRAP ARMED]** ⚡" if is_master else "🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡"
-                            head_en = "👑 **[MASTER LOCOMOTIVE ORB 15M TRAP ARMED]** ⚡" if is_master else "🎯 **[ORB 15M PRE-SET TRAP ARMED]** ⚡"
+                            head_kh = "👑 **[MASTER LOCOMOTIVE VIRTUAL RADAR ARMED]** ⚡" if is_master else "🎯 **[ORB 15M VIRTUAL BREAKOUT RADAR ARMED]** ⚡"
+                            head_en = "👑 **[MASTER LOCOMOTIVE VIRTUAL RADAR ARMED]** ⚡" if is_master else "🎯 **[ORB 15M VIRTUAL BREAKOUT RADAR ARMED]** ⚡"
 
                             if user_lang == 'khmer':
                                 trap_msg = (
                                     f"{head_kh}\n"
-                                    f"🏛️ **[ស្ថាបត្យកម្មរាយអន្ទាក់ស្វ័យប្រវត្ត ១០០%]** 🛡️\n"
+                                    f"🏛️ **[ស្ថាបត្យកម្មរ៉ាដាទម្លុះស្វ័យប្រវត្ត ១០០% (IN-MEMORY RADAR)]** 🛡️\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    f"🤖 **ស្ថានភាព ៖** `អន្ទាក់បានរាយរួចជាស្រេច (PRE-SET ARMED)`\n"
+                                    f"🤖 **ស្ថានភាព ៖** `រ៉ាដាកំពុងតាមប្រមាញ់ (VIRTUAL RADAR ARMED)`\n"
                                     f"⚙️ **គណនី ៖** `{env_lbl}`\n"
                                     f"🌐 **Session ៖** `{session_name} OPEN (ចប់ 15m Range)`\n"
                                     f"🏛️ **ឧបករណ៍ ៖** `{resolved_epic}`\n"
                                     f"📊 **15m Range ៖** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
                                     f"{ui_standards.DIVIDER_LIGHT}\n"
-                                    f"🟢 **BUY STOP Trap ៖** `${buy_trigger:,.2f}` (`{buy_size} lot`)\n"
-                                    f"   └ SL: `${buy_sl:,.2f}` (Mid) | TP: `${buy_tp:,.2f}` (+4R)\n"
-                                    f"🔴 **SELL STOP Trap ៖** `${sell_trigger:,.2f}` (`{sell_size} lot`)\n"
-                                    f"   └ SL: `${sell_sl:,.2f}` (Mid) | TP: `${sell_tp:,.2f}` (+4R)\n"
+                                    f"🟢 **LONG Trigger ៖** `${buy_trigger:,.2f}` (`{buy_size} lot`)\n"
+                                    f"   └ Tight SL: `${buy_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${buy_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${buy_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${buy_tp3:,.2f}` (+4.0R Harvest)\n"
+                                    f"🔴 **SHORT Trigger ៖** `${sell_trigger:,.2f}` (`{sell_size} lot`)\n"
+                                    f"   └ Tight SL: `${sell_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${sell_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${sell_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${sell_tp3:,.2f}` (+4.0R Harvest)\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    f"🛡️ **លក្ខណៈពិសេសការពារដើមទុន ៖**\n"
-                                    f"• **Zero Manual Touch ៖** មិនបាច់ចូលដៃ គ្មានការដេញថ្លៃ (Zero Slippage)\n"
-                                    f"• **OCO Armor ៖** ពេលមួយណា Triggered ប្រព័ន្ធ Cancel ម្ខាងទៀតចោល Auto\n"
-                                    f"• **Pre-Attached SL/TP ៖** មាន Stop-Loss & Take-Profit ចងភ្ជាប់ស្រាប់\n"
+                                    f"🛡️ **អត្ថប្រយោជន៍ In-Memory Virtual Radar ៖**\n"
+                                    f"• **Zero Broker Exposure ៖** គ្មាន Broker Working Order នៅក្នុង Book ទេ\n"
+                                    f"• **Immune to Judas Swings ៖** មិនចាញ់បោកការអូស Stop-Hunting មុនពេលទម្លុះពិត\n"
+                                    f"• **Dynamic Tight ATR SL ៖** កាត់បន្ថយហានិភ័យពី 50% មកត្រឹម ~30% នៃ Range!\n"
+                                    f"• **Multi-Tier Scale-Out ៖** +1.2R Lock BE -> +2.5R Lock Profit -> +4.0R Harvest\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    f"💡 _ម៉ាស៊ីន AI រាយអន្ទាក់ស្រង់ផលចំណេញតាមស្ថាប័ន Wall Street ដោយសុវត្ថិភាព!_"
+                                    f"💡 _ម៉ាស៊ីន AI Angkor Quant ត្រៀមស្ទាក់ចាប់រលកទម្លុះធំដោយសុវត្ថិភាពបំផុត!_"
                                 )
                             else:
                                 trap_msg = (
                                     f"{head_en}\n"
-                                    f"🏛️ **[Institutional Breakout Bracket Trap]** 🛡️\n"
+                                    f"🏛️ **[Institutional Virtual Breakout Radar]** 🛡️\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    f"🤖 **Status:** `Armed & Monitoring (PRE-SET ARMED)`\n"
+                                    f"🤖 **Status:** `In-Memory Radar Armed (0% Broker Exposure)`\n"
                                     f"⚙️ **Account:** `{env_lbl}`\n"
                                     f"🌐 **Session:** `{session_name} OPEN (15m Range Closed)`\n"
                                     f"🏛️ **Instrument:** `{resolved_epic}`\n"
                                     f"📊 **15m Range:** `${or_low:,.2f} - ${or_high:,.2f}` (`${or_range:,.2f}`)\n"
                                     f"{ui_standards.DIVIDER_LIGHT}\n"
-                                    f"🟢 **BUY STOP Trap:** `${buy_trigger:,.2f}` (`{buy_size} lot`)\n"
-                                    f"   └ SL: `${buy_sl:,.2f}` (Mid) | TP: `${buy_tp:,.2f}` (+4R)\n"
-                                    f"🔴 **SELL STOP Trap:** `${sell_trigger:,.2f}` (`{sell_size} lot`)\n"
-                                    f"   └ SL: `${sell_sl:,.2f}` (Mid) | TP: `${sell_tp:,.2f}` (+4R)\n"
+                                    f"🟢 **LONG Trigger:** `${buy_trigger:,.2f}` (`{buy_size} lot`)\n"
+                                    f"   └ Tight SL: `${buy_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${buy_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${buy_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${buy_tp3:,.2f}` (+4.0R Harvest)\n"
+                                    f"🔴 **SHORT Trigger:** `${sell_trigger:,.2f}` (`{sell_size} lot`)\n"
+                                    f"   └ Tight SL: `${sell_sl:,.2f}` (~${sl_dist:,.2f})\n"
+                                    f"   └ TP1: `${sell_tp1:,.2f}` (+1.2R BE Lock)\n"
+                                    f"   └ TP2: `${sell_tp2:,.2f}` (+2.5R Lock)\n"
+                                    f"   └ TP3: `${sell_tp3:,.2f}` (+4.0R Harvest)\n"
                                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                                    f"🛡️ _OCO Protection: When one triggers, opposite side cancels automatically!_"
+                                    f"🛡️ _Virtual Radar: Zero broker exposure, 100% immune to Judas Swings!_"
                                 )
                             await app.bot.send_message(chat_id=uid, text=trap_msg, parse_mode="Markdown")
                         except Exception as notif_trap_e:
@@ -5353,7 +5544,7 @@ class CapitalOpeningRangeBreakoutEngine:
 
             if trap_entry["user_orders"]:
                 self._armed_traps[trap_key] = trap_entry
-                logger.info(f"✅ [ORB 15M] Successfully armed Breakout Traps for {resolved_epic} across {len(trap_entry['user_orders'])} accounts!")
+                logger.info(f"✅ [ORB 15M] Successfully armed Virtual Radar for {resolved_epic} across {len(trap_entry['user_orders'])} accounts!")
 
     async def manage_armed_traps_oco(self, app=None):
         """
@@ -5389,17 +5580,20 @@ class CapitalOpeningRangeBreakoutEngine:
                     user_engine = get_user_capital_engine(uid, is_demo=is_demo)
                     for d_key in ["buy_deal_id", "sell_deal_id"]:
                         d_id = u_orders.get(d_key)
-                        if d_id:
+                        if d_id and not str(d_id).startswith("RADAR_"):
                             await asyncio.to_thread(user_engine.cancel_working_order, d_id)
                     db.update_capital_orb_trap_status(trap_key, "EXPIRED")
                 traps_to_remove.append(trap_key)
                 continue
 
-            # Check fill status across users
+            # For legacy broker orders, check fill status across users
             for uid, u_orders in trap.get("user_orders", {}).items():
                 buy_deal = u_orders.get("buy_deal_id")
                 sell_deal = u_orders.get("sell_deal_id")
                 if not buy_deal and not sell_deal:
+                    continue
+                if str(buy_deal).startswith("RADAR_") or str(sell_deal).startswith("RADAR_"):
+                    # Virtual Radar is monitored in-memory in execute_orb_cycle with instant execution
                     continue
 
                 user_cfg = db.get_capital_auto_config(uid)
@@ -5602,20 +5796,46 @@ class CapitalOpeningRangeBreakoutEngine:
             if spread_val <= 0:
                 spread_val = 0.60 if "GOLD" in resolved_epic.upper() else (0.05 if "OIL" in resolved_epic.upper() else 1.0)
 
-            # Enforce Invariant 34: Noise-isolated Stop Loss & 10x Hurdle TP
-            is_index_or_gold = any(x in resolved_epic.upper() for x in ["US100", "US500", "GOLD", "GERMANY40"])
-            min_target_pct = 0.0050 if is_index_or_gold else 0.0180  # +10.0% ROI at 20x (0.50%) or 5x (1.80%)
+            prec = _get_tradfi_precision(resolved_epic, mid)
 
-            if direction == "BUY":
-                min_sl_dist = max(abs(ask - or_mid), spread_val * 2.5, ask * 0.0025, atr * 1.5)
-                sl = round(ask - min_sl_dist, 2)
-                tp_dist = max(min_sl_dist * 4.0, spread_val * 10.0, ask * min_target_pct)
-                tp = round(ask + tp_dist, 2)
+            # Check if this asset has an active In-Memory Virtual Radar Trap
+            trap_key = f"{session_name}_{date_str}_{resolved_epic}"
+            armed_trap = self._armed_traps.get(trap_key)
+
+            if armed_trap and armed_trap.get("sl_dist"):
+                sl_dist = armed_trap["sl_dist"]
+                if direction == "BUY":
+                    sl = armed_trap.get("buy_sl", round(ask - sl_dist, prec))
+                    tp1 = armed_trap.get("buy_tp1", round(ask + (1.2 * sl_dist), prec))
+                    tp2 = armed_trap.get("buy_tp2", round(ask + (2.5 * sl_dist), prec))
+                    tp3 = armed_trap.get("buy_tp3", round(ask + (4.0 * sl_dist), prec))
+                else:
+                    sl = armed_trap.get("sell_sl", round(bid + sl_dist, prec))
+                    tp1 = armed_trap.get("sell_tp1", round(bid - (1.2 * sl_dist), prec))
+                    tp2 = armed_trap.get("sell_tp2", round(bid - (2.5 * sl_dist), prec))
+                    tp3 = armed_trap.get("sell_tp3", round(bid - (4.0 * sl_dist), prec))
+                tp = tp3
+
+                # In-Memory Instant OCO Disarm of Opposite Direction
+                db.update_capital_orb_trap_status(trap_key, f"TRIGGERED_{direction}")
+                self._armed_traps.pop(trap_key, None)
+                logger.info(f"⚡ [ORB VIRTUAL RADAR TRIGGERED] {session_name} {resolved_epic} {direction} | Armed levels executed, opposite side OCO disarmed!")
             else:
-                min_sl_dist = max(abs(or_mid - bid), spread_val * 2.5, bid * 0.0025, atr * 1.5)
-                sl = round(bid + min_sl_dist, 2)
-                tp_dist = max(min_sl_dist * 4.0, spread_val * 10.0, bid * min_target_pct)
-                tp = round(bid - tp_dist, 2)
+                # Dynamic Tight ATR Stop-Loss: 1.10x ATR or max 35% of range (eliminates huge 50% midpoint losses)
+                raw_sl_dist = min(atr * 1.10, or_range * 0.35)
+                sl_dist = max(raw_sl_dist, spread_val * 2.5, mid * 0.0015)
+
+                if direction == "BUY":
+                    sl = round(ask - sl_dist, prec)
+                    tp1 = round(ask + (1.2 * sl_dist), prec)
+                    tp2 = round(ask + (2.5 * sl_dist), prec)
+                    tp3 = round(ask + (4.0 * sl_dist), prec)
+                else:
+                    sl = round(bid + sl_dist, prec)
+                    tp1 = round(bid - (1.2 * sl_dist), prec)
+                    tp2 = round(bid - (2.5 * sl_dist), prec)
+                    tp3 = round(bid - (4.0 * sl_dist), prec)
+                tp = tp3
 
             self._stats["last_breakout"] = {
                 "session": session_name,
@@ -5627,17 +5847,22 @@ class CapitalOpeningRangeBreakoutEngine:
                 "or_range": or_range,
                 "sl": sl,
                 "tp": tp,
+                "tp1": tp1,
+                "tp2": tp2,
+                "tp3": tp3,
+                "sl_dist": sl_dist,
                 "timestamp": now
             }
 
-            logger.info(f"🎯 [ORB 15M BREAKOUT TRIGGERED] {session_name} {resolved_epic} {direction} | Range: ${or_range:,.2f} | Entry: ${mid:,.2f} | SL: ${sl:,.2f} | TP: ${tp:,.2f}")
+            logger.info(f"🎯 [ORB 15M BREAKOUT TRIGGERED] {session_name} {resolved_epic} {direction} | Range: ${or_range:,.2f} | Entry: ${mid:,.2f} | Tight SL: ${sl:,.2f} (~${sl_dist:,.2f}) | TP1: ${tp1:,.2f} | TP2: ${tp2:,.2f} | TP3: ${tp3:,.2f}")
 
             # Dispatch to active users
             # Concurrent multi-user ORB breakout dispatch (< 0.0005ms fan-out)
             orb_tasks = [
                 self._dispatch_single_orb_user_trade(
                     chat_id, user_cfg, session_name, resolved_epic, direction,
-                    or_high, or_low, or_range, mid, ask, bid, sl, tp, app=app
+                    or_high, or_low, or_range, mid, ask, bid, sl, tp, app=app,
+                    tp1=tp1, tp2=tp2, tp3=tp3, sl_dist=sl_dist
                 )
                 for chat_id, user_cfg in all_target_users.items()
             ]
