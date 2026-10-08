@@ -2140,6 +2140,71 @@ def run_audit():
         failures.append(f"Invariants 60-61 check failed: {e}")
         log_fail(str(e))
 
+    # -------------------------------------------------------------------------
+    # [CHECK 48/48] Anti-Account Collision Shield, Isolated Engine Pool & Super Admin Live Anchor (Invariant 62)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 48/48] Verifying Anti-Account Collision Shield, Isolated Engine Pool & Super Admin Live Anchor (Invariant 62)...")
+    try:
+        import capital_engine
+        import database as db
+
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv62 = "Invariant 62" in agents_md_text and "Anti-Account Collision Shield" in agents_md_text
+
+        # 2. Verify Super Admin Inclusion in Active Auto and ORB lists
+        auto_users = db.get_active_capital_auto_users()
+        orb_users = db.get_active_capital_orb_users()
+        sa_in_auto = len(auto_users) > 0 and auto_users[0]["chat_id"] == 859271875
+        sa_in_orb = len(orb_users) > 0 and orb_users[0]["chat_id"] == 859271875
+
+        # 3. Verify Dedicated Engine Pool (Anti-Singleton Mutation)
+        has_pool = hasattr(capital_engine, "_user_engine_pool") and isinstance(capital_engine._user_engine_pool, dict)
+        eng1 = capital_engine.get_user_capital_engine(chat_id=859271875, is_demo=False)
+        eng2 = capital_engine.get_user_capital_engine(chat_id=99999999, is_demo=False)
+        is_isolated_pool = (eng1 is not eng2) and (eng1.custom_chat_id == 859271875)
+
+        # 4. Verify Super Admin Auto-Heal & Purge of Collided VIP Account
+        db.ensure_capital_super_admin_defaults()
+        conn = db.get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT account_id FROM user_capital_credentials WHERE chat_id = 859271875")
+        sa_acc_row = cur.fetchone()
+        cur.execute("SELECT is_enabled FROM prop_firm_challenge_config WHERE chat_id = 859271875")
+        prop_row = cur.fetchone()
+        conn.close()
+
+        # Collided VIP account 330894176088577220 must NOT be bound to Super Admin
+        sa_not_collided = (sa_acc_row is None or str(sa_acc_row[0]) != "330894176088577220")
+        prop_disabled = (prop_row is None or prop_row[0] == 0)
+
+        # 5. Verify Anti-Account Collision in bot_thread.py
+        with open("bot_thread.py", "r", encoding="utf-8") as bf:
+            bt_text = bf.read()
+        has_collision_shield = "get_user_by_capital_account" in bt_text and "Anti-Account Collision Shield" in bt_text
+
+        # 6. Verify Breakout Traps bypass Citadel
+        with open("capital_engine.py", "r", encoding="utf-8") as cf:
+            cap_text = cf.read()
+        has_bypass_citadel = "bypass_citadel=True" in cap_text
+
+        all_inv62_passed = (
+            has_inv62 and sa_in_auto and sa_in_orb and
+            has_pool and is_isolated_pool and
+            sa_not_collided and prop_disabled and
+            has_collision_shield and has_bypass_citadel
+        )
+
+        if all_inv62_passed:
+            log_pass("Anti-Account Collision Shield, Isolated Engine Pool & Super Admin Live Anchor (Invariant 62) are 100% certified!")
+        else:
+            failures.append(f"Invariant 62 check failed: inv62={has_inv62}, auto={sa_in_auto}, orb={sa_in_orb}, pool={is_isolated_pool}, not_collided={sa_not_collided}, prop_off={prop_disabled}, shield={has_collision_shield}, bypass={has_bypass_citadel}")
+            log_fail("Anti-Account Collision Shield & Super Admin Live Anchor (Invariant 62) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 62 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

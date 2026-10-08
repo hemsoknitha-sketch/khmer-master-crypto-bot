@@ -220,6 +220,10 @@ class CapitalComEngine:
         self._price_cache: Dict[str, Dict[str, Any]] = {}
         self._cache_ttl = 4.0  # 4 seconds cache for live quotes
 
+    @property
+    def custom_chat_id(self) -> Optional[int]:
+        return self._custom_chat_id
+
     # --------------------------------------------------------------------------
     # Authentication & Session Management
     # --------------------------------------------------------------------------

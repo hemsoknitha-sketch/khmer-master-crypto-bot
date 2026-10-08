@@ -2757,11 +2757,16 @@ def get_active_capital_auto_users() -> list:
                 active_users = []
 
     # Master Locomotive Invariant (Section 1.1 & Invariant 60):
-    # Super Admin (859271875) is the Master Command Engine and must ALWAYS be active strictly on LIVE MAINNET!
+    # Super Admin (859271875) is the Master Command Engine and must ALWAYS be at index 0 strictly on LIVE MAINNET!
     for u in active_users:
         if u["chat_id"] == 859271875:
             u["is_demo"] = False  # Super Admin Master Locomotive strictly executes on Live Mainnet!
-    if not any(u["chat_id"] == 859271875 for u in active_users):
+
+    sa_idx = next((i for i, u in enumerate(active_users) if u["chat_id"] == 859271875), None)
+    if sa_idx is not None and sa_idx > 0:
+        sa_item = active_users.pop(sa_idx)
+        active_users.insert(0, sa_item)
+    elif sa_idx is None:
         sa_cfg = get_capital_auto_config(859271875)
         active_users.insert(0, {
             "chat_id": 859271875,
@@ -3276,7 +3281,12 @@ def get_active_capital_orb_users() -> list:
     for u in orb_users:
         if u["chat_id"] == 859271875:
             u["is_demo"] = False  # Super Admin Master Locomotive strictly executes on Live Mainnet!
-    if not any(u["chat_id"] == 859271875 for u in orb_users):
+
+    sa_idx = next((i for i, u in enumerate(orb_users) if u["chat_id"] == 859271875), None)
+    if sa_idx is not None and sa_idx > 0:
+        sa_item = orb_users.pop(sa_idx)
+        orb_users.insert(0, sa_item)
+    elif sa_idx is None:
         sa_orb = get_capital_orb_config(859271875)
         sa_auto = get_capital_auto_config(859271875)
         orb_users.insert(0, {
