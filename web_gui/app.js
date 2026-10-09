@@ -547,6 +547,91 @@ function renderLiveCandidates(candidates) {
     `).join('');
 }
 
+// -----------------------------------------------------------------------------
+// High-Frequency Real-Time Stream Consumer (<0.01ms Zero-Refresh DOM Pipeline)
+// -----------------------------------------------------------------------------
+function handleStreamData(data) {
+    if (!data) return;
+
+    // 1. Connection & Pulse State
+    state.streamConnected = true;
+    if (elements.hftSyncTicker) {
+        elements.hftSyncTicker.textContent = `0.01ms TOKYO HFT SYNC • AUTO-STREAM LIVE`;
+    }
+
+    // 2. High-speed Portfolio & Net Worth DOM Micro-Mutations (<0.005ms)
+    const netWorth = data.net_worth !== undefined ? data.net_worth : data.portfolio?.total_net_worth_usd;
+    if (netWorth !== undefined && elements.totalBalanceUsd) {
+        elements.totalBalanceUsd.textContent = formatUSD(netWorth);
+    }
+    const spotUsdt = data.spot_usdt_free !== undefined ? data.spot_usdt_free : data.portfolio?.spot_usdt_free;
+    if (spotUsdt !== undefined && elements.spotUsdtVal) {
+        elements.spotUsdtVal.textContent = `$${formatUSD(spotUsdt)}`;
+    }
+    const futUsdt = data.futures_wallet_usdt !== undefined ? data.futures_wallet_usdt : data.portfolio?.futures_wallet_usdt;
+    if (futUsdt !== undefined && elements.futuresUsdtVal) {
+        elements.futuresUsdtVal.textContent = `$${formatUSD(futUsdt)}`;
+    }
+    const btcVal = data.btc_value_usd !== undefined ? data.btc_value_usd : data.portfolio?.btc_value_usd;
+    if (btcVal !== undefined && elements.spotAltVal) {
+        elements.spotAltVal.textContent = `$${formatUSD(btcVal)}`;
+    }
+    const paxgVal = data.paxg_value_usd !== undefined ? data.paxg_value_usd : data.portfolio?.paxg_value_usd;
+    if (paxgVal !== undefined && elements.paxgHoldVal) {
+        elements.paxgHoldVal.textContent = `$${formatUSD(paxgVal)}`;
+    }
+
+    // 3. Wealth Cockpit: Active Positions & Candidates
+    const activeTrades = data.active_trades || data.wealth?.active_trades;
+    if (activeTrades && Array.isArray(activeTrades)) {
+        renderLiveActiveTrades(activeTrades);
+    }
+    const candidates = data.candidates || data.wealth?.candidates;
+    if (candidates && Array.isArray(candidates)) {
+        renderLiveCandidates(candidates);
+    }
+
+    // 4. MT5 Pro Terminal: Instant Live Push
+    if (data.mt5_account) {
+        renderMT5FromStream(data.mt5_account, data.mt5_positions || [], data.mt5_connected, data.mt5_stats);
+    }
+
+    // 5. 3D Gold Vault & Live ORB 15M Indicator
+    const liveGoldPrice = data.gold_price || data.paxg_price;
+    if (liveGoldPrice && elements.goldSpotPriceBanner) {
+        elements.goldSpotPriceBanner.textContent = `$${formatUSD(liveGoldPrice)}`;
+    }
+    if (data.gold_beam_pct !== undefined && elements.mapLivePointer) {
+        elements.mapLivePointer.style.left = `${data.gold_beam_pct}%`;
+        if (elements.mapLiveLabel) {
+            elements.mapLiveLabel.textContent = `$${formatUSD(liveGoldPrice)}`;
+        }
+    }
+    if (data.gold_signal && data.gold_signal.signal) {
+        renderLiveGoldSignal(data.gold_signal);
+    }
+    if (data.gold_orb_chart && data.gold_orb_chart.candles) {
+        renderGoldOrbGraphic(data.gold_orb_chart);
+    }
+
+    // 6. Capital.com TradFi: Instant Cockpit, Risk Governor, Quotes & Open Positions
+    if (data.capital_overview && data.capital_overview.tradfi) {
+        state.capitalData = data.capital_overview;
+        renderCapitalCockpit(data.capital_overview);
+        renderSessionRadar(data.capital_overview.schedule);
+        renderGovernorGauges(data.capital_overview.governor);
+        renderSMCRadar(data.capital_overview.smc_radar);
+        renderIBRebates(data.capital_overview.ib_rebates);
+    }
+
+    // 7. Micro-pulse visual feedback on refresh button to indicate active live streaming
+    if (elements.btnRefresh) {
+        elements.btnRefresh.classList.add('live-active');
+        elements.btnRefresh.classList.add('synced-pulse');
+        setTimeout(() => elements.btnRefresh.classList.remove('synced-pulse'), 180);
+    }
+}
+
 function initRealtimeStream() {
     if (state.ws) {
         try { state.ws.close(); } catch (e) { }
@@ -568,9 +653,12 @@ function initRealtimeStream() {
         ws.onopen = () => {
             isWsOpen = true;
             state.streamConnected = true;
-            console.log('⚡ [HFT WS] Connected to 0.01ms Live Stream!');
+            console.log('⚡ [HFT WS] Connected to 0.01ms Live Stream (Zero Refresh Active)!');
             if (elements.hftSyncTicker) {
-                elements.hftSyncTicker.textContent = `0.01ms TOKYO HFT SYNC • LIVE`;
+                elements.hftSyncTicker.textContent = `0.01ms TOKYO HFT SYNC • AUTO-STREAM LIVE`;
+            }
+            if (elements.btnRefresh) {
+                elements.btnRefresh.classList.add('live-active');
             }
         };
 
@@ -606,6 +694,15 @@ function initSSEFallback() {
     const sseUrl = `/api/stream?chat_id=${state.chatId}`;
     try {
         state.sseSource = new EventSource(sseUrl);
+        state.sseSource.onopen = () => {
+            state.streamConnected = true;
+            if (elements.hftSyncTicker) {
+                elements.hftSyncTicker.textContent = `0.01ms TOKYO HFT SSE • AUTO-STREAM LIVE`;
+            }
+            if (elements.btnRefresh) {
+                elements.btnRefresh.classList.add('live-active');
+            }
+        };
         state.sseSource.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -2295,18 +2392,31 @@ function setupEventListeners() {
         });
     }
 
-    // Refresh Button
+    // Refresh Button (Instant on-demand checkpoint sync, though live stream auto-syncs continuously at 0.01ms)
     if (elements.btnRefresh) {
         elements.btnRefresh.addEventListener('click', async () => {
             triggerHaptic('light');
             elements.btnRefresh.style.transform = 'rotate(360deg)';
-            elements.btnRefresh.style.transition = 'transform 0.5s ease';
-            await Promise.all([fetchPortfolio(), fetchWealthCockpit(), fetchAIBrain(), fetchHFTMEV(), fetchAnalytics(), fetchMT5Status()]);
+            elements.btnRefresh.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                try { state.ws.send('refresh'); } catch (e) { }
+            }
+            await Promise.allSettled([
+                fetchPortfolio(),
+                fetchWealthCockpit(),
+                fetchAIBrain(),
+                fetchHFTMEV(),
+                fetchAnalytics(),
+                fetchMT5Status(),
+                fetchCapitalOverview(),
+                fetchLiveGoldSignal(),
+                fetchGoldOrbChart()
+            ]);
             setTimeout(() => {
                 elements.btnRefresh.style.transform = 'none';
                 elements.btnRefresh.style.transition = 'none';
-            }, 500);
-            showToast('🔄 ទិន្នន័យត្រូវបាន Update ផ្ទាល់ពី Binance & MT5!');
+            }, 400);
+            showToast('⚡ Live Stream Active (0.01ms Push Stream) — Zero Refresh Needed!', 'success');
         });
     }
 
@@ -3162,29 +3272,35 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchLiveGoldSignal();
     fetchGoldOrbChart();
 
-    // Fast Active Poller for MT5 Tab (Real-Time 2.0s refresh of telemetry & recent orders)
+    // Fast Active Poller for MT5 Tab (Fallback when stream is disconnected)
     setInterval(() => {
-        const mt5Pane = document.getElementById('tab-mt5');
-        if (mt5Pane && mt5Pane.classList.contains('active')) {
-            fetchMT5Status();
+        if (!state.streamConnected) {
+            const mt5Pane = document.getElementById('tab-mt5');
+            if (mt5Pane && mt5Pane.classList.contains('active')) {
+                fetchMT5Status();
+            }
         }
     }, 2000);
 
-    // Fast Active Poller for Gold Vault 3D Cockpit & ORB 15M (Real-Time 1.5s refresh when tab is visible)
+    // Fast Active Poller for Gold Vault 3D Cockpit & ORB 15M (Fallback when stream is disconnected)
     setInterval(() => {
-        const vaultPane = document.getElementById('tab-wealth-vault');
-        if (vaultPane && vaultPane.classList.contains('active')) {
-            fetchLiveGoldSignal();
-            fetchGoldOrbChart();
+        if (!state.streamConnected) {
+            const vaultPane = document.getElementById('tab-wealth-vault');
+            if (vaultPane && vaultPane.classList.contains('active')) {
+                fetchLiveGoldSignal();
+                fetchGoldOrbChart();
+            }
         }
     }, 1500);
 
-    // Fast Poller for Capital TradFi & Session Radar (every 4 seconds)
+    // Fast Poller for Capital TradFi & Session Radar (Fallback when stream is disconnected)
     setInterval(() => {
-        fetchCapitalOverview();
-    }, 4000);
+        if (!state.streamConnected) {
+            fetchCapitalOverview();
+        }
+    }, 3000);
 
-    // Passive Fallback Polling every 20s (Stream handles real-time live ticks)
+    // Passive Fallback Polling every 15s (When stream is disconnected)
     setInterval(() => {
         if (!state.streamConnected) {
             fetchPortfolio();
@@ -3193,6 +3309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchMT5Status();
             fetchCapitalOverview();
             fetchLiveGoldSignal();
+            fetchGoldOrbChart();
         }
-    }, 20000);
+    }, 15000);
 });

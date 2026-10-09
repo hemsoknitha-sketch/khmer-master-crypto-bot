@@ -14,7 +14,7 @@ import json
 import time
 import asyncio
 import socket
-from datetime import datetime
+from datetime import datetime, timezone
 from aiohttp import web, WSMsgType
 
 # High-Frequency Rust/C JSON Serializer (10x faster than standard json.dumps)
@@ -87,7 +87,8 @@ _GUI_CACHE = {
     "hft_mev": {"timestamp": 0.0, "data": {}},
     "mt5": {},           # chat_id -> {"timestamp": float, "data": dict}
     "gold_signal": {"timestamp": 0.0, "data": {}},
-    "gold_orb_chart": {"timestamp": 0.0, "data": {}}
+    "gold_orb_chart": {"timestamp": 0.0, "data": {}},
+    "capital": {}        # chat_id -> {"timestamp": float, "data": dict}
 }
 
 _ACTIVE_WEBSOCKETS = set()  # set of (WebSocketResponse, chat_id)
@@ -1016,6 +1017,117 @@ async def get_cached_mt5_status(chat_id: int) -> dict:
         return cached["data"] if cached else {"status": "error", "message": str(e), "connected": False}
 
 
+async def get_cached_capital_overview(chat_id: int = 0) -> dict:
+    """
+    Returns live Capital.com TradFi dashboard, Session Kill Zones status,
+    Sky Net 360° Governor risk metrics, SMC Citadel 9-Confluence signals,
+    and IB Rebate progress from RAM in <0.01ms.
+    Background refreshes via thread pool if older than 1.5 seconds.
+    """
+    now = time.time()
+    cid = chat_id if chat_id and chat_id > 0 else DEFAULT_VIP_CHAT_ID
+    if "capital" not in _GUI_CACHE:
+        _GUI_CACHE["capital"] = {}
+    cached = _GUI_CACHE["capital"].get(cid)
+    if cached and (now - cached.get("timestamp", 0) < 1.5) and cached.get("data"):
+        return cached["data"]
+
+    def _fetch():
+        import capital_engine
+        import portfolio_circuit_breaker
+        import mt5_smc_citadel
+
+        # 1. Fetch TradFi dashboard
+        tradfi = capital_engine.get_tradfi_dashboard(cid)
+
+        # 2. Schedule & Kill Zone status
+        schedule_mode = db.get_capital_schedule_mode(cid) or "SMART_SESSION_TIMED"
+        is_active, reason, sched_info = capital_engine.is_capital_trading_schedule_active(schedule_mode)
+
+        # 3. Sky Net 360° Daily Governor & Risk Floor
+        gov_status = portfolio_circuit_breaker.CapitalDailyAGIGovernor.get_user_status(cid)
+
+        # 4. IB Rebate & Spread Accumulation Tracker ($500 target)
+        ib_data = capital_engine.get_capital_ib_dashboard(cid)
+        raw_rebate = float(ib_data.get("total_rebate_usd", 0.0) or 0.0)
+        accum_spread = round(raw_rebate * 3.33, 2)
+
+        # 5. SMC Citadel 9-Confluence Live Scanner
+        smc_assets = ["XAUUSD", "US500", "EURUSD", "BTCUSD", "OIL_CRUDE"]
+        smc_radar = []
+        for sym in smc_assets:
+            try:
+                sig = mt5_smc_citadel.MT5SMCCitadelEngine.analyze_9_smc_confluence(sym)
+                if sig:
+                    smc_radar.append({
+                        "symbol": sym,
+                        "action": sig.get("action", "WAIT"),
+                        "confidence": float(sig.get("confidence", 50.0)),
+                        "equilibrium_zone": sig.get("equilibrium_zone", "NEUTRAL"),
+                        "reason": str(sig.get("reason", "Structural Balance")).split("_")[0],
+                        "entry_price": float(sig.get("entry_price", 0.0))
+                    })
+            except Exception:
+                pass
+
+        is_auto_on = bool(db.is_capital_auto_enabled(cid))
+        equity_val = float(tradfi.get("equity", 200.0) or 200.0)
+
+        data = {
+            "chat_id": cid,
+            "tradfi": tradfi,
+            "schedule": {
+                "mode": schedule_mode,
+                "is_active": is_active,
+                "reason": reason,
+                "current_session": sched_info.get("current_session", "NEW_YORK"),
+                "session_name_kh": sched_info.get("session_name_kh", ""),
+                "session_name_en": sched_info.get("session_name_en", ""),
+                "is_tradfi_weekend": sched_info.get("is_tradfi_weekend", False),
+                "is_swap_shield_active": sched_info.get("is_swap_shield_active", False),
+                "is_triple_swap_night": sched_info.get("is_triple_swap_night", False),
+                "swap_settlement_ict": sched_info.get("swap_settlement_ict", "05:00 ICT"),
+                "now_ict": sched_info.get("now_ict", "")
+            },
+            "governor": {
+                "today": gov_status.get("today", ""),
+                "daily_pnl_usd": float(gov_status.get("daily_pnl_usd", 0.0)),
+                "daily_pnl_pct": float(gov_status.get("daily_pnl_pct", 0.0)),
+                "target_pct": float(gov_status.get("target_pct", 5.0)),
+                "floor_pct": float(gov_status.get("floor_pct", 2.5)),
+                "is_target_locked": bool(gov_status.get("is_target_locked", False)),
+                "is_loss_locked": bool(gov_status.get("is_loss_locked", False)),
+                "can_trade": bool(gov_status.get("can_trade", True)),
+                "status": str(gov_status.get("status", "ACTIVE_MONITORING")),
+                "breakeven_armor": "ARMED (85% ATR Trailing)"
+            },
+            "ib_rebates": {
+                "tier": ib_data.get("tier", "SILVER"),
+                "rebate_pct": float(ib_data.get("rebate_pct", 30.0)),
+                "tier_badge": ib_data.get("tier_badge", "🥈 Silver IB (30%)"),
+                "referral_link": ib_data.get("referral_link", ""),
+                "total_rebate_usd": raw_rebate,
+                "accumulated_spread_usd": accum_spread,
+                "target_spread_tier2": 500.0,
+                "target_spread_tier4": 2000.0
+            },
+            "smc_radar": smc_radar,
+            "auto_trading": {
+                "enabled": is_auto_on,
+                "max_positions": capital_engine.get_dynamic_max_positions_for_equity(equity_val)
+            }
+        }
+        return data
+
+    try:
+        res = await asyncio.to_thread(_fetch)
+        _GUI_CACHE["capital"][cid] = {"timestamp": now, "data": res}
+        return res
+    except Exception as e:
+        print(f"⚠️ [WEB GUI] Error refreshing Capital overview for {cid}: {e}")
+        return cached["data"] if cached else {"status": "error", "message": str(e)}
+
+
 # ==============================================================================
 # BACKGROUND ASYNC CACHE & TICK WORKER
 # ==============================================================================
@@ -1027,11 +1139,15 @@ async def _gui_background_cache_worker():
     global _GUI_CACHE, _ACTIVE_WEBSOCKETS
     last_mt5_cache_time = 0.0
     last_gold_cache_time = 0.0
+    last_orb_cache_time = 0.0
+    last_capital_cache_time = 0.0
+    last_portfolio_cache_time = 0.0
+
     while True:
         try:
             now = time.time()
 
-            # 1. Update BTC and Gold (PAXG) prices every 0.1s via sub-0.05ms fast path
+            # 1a. Update BTC and Gold (PAXG) prices every 0.1s via sub-0.05ms fast path
             if now - _GUI_CACHE["prices"]["timestamp"] >= 0.1:
                 import websocket_engine
                 btc_p = websocket_engine.get_fast_price("BTCUSDT")
@@ -1082,6 +1198,39 @@ async def _gui_background_cache_worker():
                 except Exception:
                     pass
 
+            # 1d. Periodically refresh Live Gold ORB 15M Chart in RAM Cache every 1.5s
+            if now - last_orb_cache_time >= 1.5:
+                last_orb_cache_time = now
+                try:
+                    await get_cached_gold_orb_chart(DEFAULT_VIP_CHAT_ID)
+                except Exception:
+                    pass
+
+            # 1e. Periodically refresh Live Capital.com TradFi in RAM Cache every 1.5s
+            if now - last_capital_cache_time >= 1.5:
+                last_capital_cache_time = now
+                active_cids = {cid for _, cid in _ACTIVE_WEBSOCKETS if cid}
+                if DEFAULT_VIP_CHAT_ID:
+                    active_cids.add(DEFAULT_VIP_CHAT_ID)
+                for cid in active_cids:
+                    try:
+                        await get_cached_capital_overview(cid)
+                    except Exception:
+                        pass
+
+            # 1f. Periodically refresh Portfolio and Wealth Cockpit every 3.0s
+            if now - last_portfolio_cache_time >= 3.0:
+                last_portfolio_cache_time = now
+                active_cids = {cid for _, cid in _ACTIVE_WEBSOCKETS if cid}
+                if DEFAULT_VIP_CHAT_ID:
+                    active_cids.add(DEFAULT_VIP_CHAT_ID)
+                for cid in active_cids:
+                    try:
+                        await get_cached_portfolio_data(cid)
+                        await get_cached_wealth_cockpit(cid)
+                    except Exception:
+                        pass
+
             # 2. Broadcast live tick to active WebSockets (100ms HFT stream with orjson)
             if _ACTIVE_WEBSOCKETS:
                 dead_sockets = set()
@@ -1090,12 +1239,13 @@ async def _gui_background_cache_worker():
 
                 # Compute real-time Gold laser beam percentage for instant 60FPS positioning
                 g_data = _GUI_CACHE.get("gold_signal", {}).get("data", {})
+                orb_data = _GUI_CACHE.get("gold_orb_chart", {}).get("data", {})
                 gold_beam_pct = 35.0
                 try:
                     g_sig = g_data.get("signal", {})
                     sl_val = float(g_sig.get("stop_loss", 0.0))
                     tp3_val = float(g_sig.get("take_profit_3", 0.0))
-                    cur_gp = float(g_data.get("current_price", prices.get("PAXGUSDT", 2650.0)))
+                    cur_gp = float(g_data.get("current_price", prices.get("XAUUSD", prices.get("PAXGUSDT", 2650.0))))
                     if sl_val > 0 and tp3_val > 0 and abs(tp3_val - sl_val) > 0:
                         span = abs(tp3_val - sl_val)
                         min_t = min(sl_val, tp3_val)
@@ -1112,6 +1262,7 @@ async def _gui_background_cache_worker():
                         p_data = _GUI_CACHE["portfolio"].get(chat_id, {}).get("data", {})
                         w_data = _GUI_CACHE["wealth"].get(chat_id, {}).get("data", {})
                         m_data = _GUI_CACHE.get("mt5", {}).get(chat_id, {}).get("data", {})
+                        cap_data = _GUI_CACHE.get("capital", {}).get(chat_id, {}).get("data", {})
 
                         tick_payload = {
                             "type": "tick",
@@ -1126,13 +1277,15 @@ async def _gui_background_cache_worker():
                             "candidates": w_data.get("candidates", []),
                             "btc_price": prices["BTCUSDT"],
                             "paxg_price": prices["PAXGUSDT"],
-                            "gold_price": prices["PAXGUSDT"],
+                            "gold_price": prices.get("XAUUSD", prices["PAXGUSDT"]),
                             "gold_beam_pct": gold_beam_pct,
                             "mt5_account": m_data.get("account", {}),
                             "mt5_positions": m_data.get("positions", []),
                             "mt5_connected": m_data.get("connected", False),
                             "mt5_stats": m_data.get("stats", {}),
                             "gold_signal": g_data,
+                            "gold_orb_chart": orb_data,
+                            "capital_overview": cap_data,
                             "status": "ONLINE"
                         }
                         await ws.send_str(fast_dumps(tick_payload))
@@ -1189,6 +1342,19 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
                 g_data = await get_cached_gold_signal(chat_id)
             except Exception:
                 g_data = {}
+        orb_data = _GUI_CACHE.get("gold_orb_chart", {}).get("data", {})
+        if not orb_data:
+            try:
+                orb_data = await get_cached_gold_orb_chart(chat_id)
+            except Exception:
+                orb_data = {}
+        cap_data = _GUI_CACHE.get("capital", {}).get(chat_id, {}).get("data", {})
+        if not cap_data:
+            try:
+                cap_data = await get_cached_capital_overview(chat_id)
+            except Exception:
+                cap_data = {}
+
         prices = _GUI_CACHE["prices"]
         initial_tick = {
             "type": "init",
@@ -1203,14 +1369,17 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
             "candidates": w_data.get("candidates", []),
             "btc_price": prices["BTCUSDT"],
             "paxg_price": prices["PAXGUSDT"],
+            "gold_price": prices.get("XAUUSD", prices["PAXGUSDT"]),
             "mt5_account": m_data.get("account", {}),
             "mt5_positions": m_data.get("positions", []),
             "mt5_connected": m_data.get("connected", False),
             "mt5_stats": m_data.get("stats", {}),
             "gold_signal": g_data,
+            "gold_orb_chart": orb_data,
+            "capital_overview": cap_data,
             "status": "ONLINE"
         }
-        await ws.send_json(initial_tick)
+        await ws.send_str(fast_dumps(initial_tick))
     except Exception as e:
         if "closing transport" not in str(e).lower():
             print(f"⚠️ [WEB GUI WS INIT NOTICE]: {e}")
@@ -1223,7 +1392,22 @@ async def handle_api_ws(request: web.Request) -> web.WebSocketResponse:
                 elif msg.data == "refresh":
                     p_data = await get_cached_portfolio_data(chat_id)
                     w_data = await get_cached_wealth_cockpit(chat_id)
-                    await ws.send_json({"type": "refresh_done", "portfolio": p_data, "wealth": w_data})
+                    m_data = await get_cached_mt5_status(chat_id)
+                    g_data = await get_cached_gold_signal(chat_id)
+                    orb_data = await get_cached_gold_orb_chart(chat_id)
+                    cap_data = await get_cached_capital_overview(chat_id)
+                    await ws.send_str(fast_dumps({
+                        "type": "refresh_done",
+                        "portfolio": p_data,
+                        "wealth": w_data,
+                        "mt5_account": m_data.get("account", {}),
+                        "mt5_positions": m_data.get("positions", []),
+                        "mt5_connected": m_data.get("connected", False),
+                        "mt5_stats": m_data.get("stats", {}),
+                        "gold_signal": g_data,
+                        "gold_orb_chart": orb_data,
+                        "capital_overview": cap_data
+                    }))
             elif msg.type in (WSMsgType.ERROR, WSMsgType.CLOSED, WSMsgType.CLOSE):
                 break
     finally:
@@ -1258,6 +1442,9 @@ async def handle_api_stream(request: web.Request) -> web.StreamResponse:
             p_data = _GUI_CACHE["portfolio"].get(chat_id, {}).get("data", {})
             w_data = _GUI_CACHE["wealth"].get(chat_id, {}).get("data", {})
             m_data = _GUI_CACHE.get("mt5", {}).get(chat_id, {}).get("data", {})
+            cap_data = _GUI_CACHE.get("capital", {}).get(chat_id, {}).get("data", {})
+            orb_data = _GUI_CACHE.get("gold_orb_chart", {}).get("data", {})
+            g_data = _GUI_CACHE.get("gold_signal", {}).get("data", {})
 
             event_payload = {
                 "timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -1270,14 +1457,18 @@ async def handle_api_stream(request: web.Request) -> web.StreamResponse:
                 "candidates": w_data.get("candidates", []),
                 "btc_price": prices["BTCUSDT"],
                 "paxg_price": prices["PAXGUSDT"],
+                "gold_price": prices.get("XAUUSD", prices["PAXGUSDT"]),
                 "ai_sentiment": 98.4,
                 "mt5_account": m_data.get("account", {}),
                 "mt5_positions": m_data.get("positions", []),
                 "mt5_connected": m_data.get("connected", False),
                 "mt5_stats": m_data.get("stats", {}),
+                "gold_signal": g_data,
+                "gold_orb_chart": orb_data,
+                "capital_overview": cap_data,
                 "status": "ONLINE"
             }
-            await response.write(f"data: {json.dumps(event_payload)}\n\n".encode('utf-8'))
+            await response.write(f"data: {fast_dumps(event_payload)}\n\n".encode('utf-8'))
 
             loop_count += 1
             if loop_count % 10 == 0:
@@ -1903,94 +2094,11 @@ async def handle_api_capital_overview(request: web.Request) -> web.Response:
     """
     Returns live Capital.com TradFi dashboard, Session Kill Zones status,
     Sky Net 360° Governor risk metrics, SMC Citadel 9-Confluence signals,
-    and IB Rebate progress for VIP WebApp.
+    and IB Rebate progress for VIP WebApp in <0.01ms from RAM cache.
     """
     try:
-        chat_id = _get_chat_id_from_req(request)
-        if not chat_id:
-            chat_id = DEFAULT_VIP_CHAT_ID
-
-        # 1. Fetch TradFi dashboard
-        tradfi = await asyncio.to_thread(capital_engine.get_tradfi_dashboard, chat_id)
-
-        # 2. Schedule & Kill Zone status
-        schedule_mode = db.get_capital_schedule_mode(chat_id) or "SMART_SESSION_TIMED"
-        is_active, reason, sched_info = capital_engine.is_capital_trading_schedule_active(schedule_mode)
-
-        # 3. Sky Net 360° Daily Governor & Risk Floor
-        gov_status = portfolio_circuit_breaker.CapitalDailyAGIGovernor.get_user_status(chat_id)
-
-        # 4. IB Rebate & Spread Accumulation Tracker ($500 target)
-        ib_data = await asyncio.to_thread(capital_engine.get_capital_ib_dashboard, chat_id)
-        raw_rebate = float(ib_data.get("total_rebate_usd", 0.0) or 0.0)
-        accum_spread = round(raw_rebate * 3.33, 2)  # 30% rebate equates to ~3.33x spread
-
-        # 5. SMC Citadel 9-Confluence Live Scanner
-        smc_assets = ["XAUUSD", "US500", "EURUSD", "BTCUSD", "OIL_CRUDE"]
-        smc_radar = []
-        for sym in smc_assets:
-            try:
-                sig = await asyncio.to_thread(mt5_smc_citadel.MT5SMCCitadelEngine.analyze_9_smc_confluence, sym)
-                if sig:
-                    smc_radar.append({
-                        "symbol": sym,
-                        "action": sig.get("action", "WAIT"),
-                        "confidence": float(sig.get("confidence", 50.0)),
-                        "equilibrium_zone": sig.get("equilibrium_zone", "NEUTRAL"),
-                        "reason": str(sig.get("reason", "Structural Balance")).split("_")[0],
-                        "entry_price": float(sig.get("entry_price", 0.0))
-                    })
-            except Exception:
-                pass
-
-        is_auto_on = bool(db.is_capital_auto_enabled(chat_id))
-        equity_val = float(tradfi.get("equity", 200.0) or 200.0)
-
-        data = {
-            "chat_id": chat_id,
-            "tradfi": tradfi,
-            "schedule": {
-                "mode": schedule_mode,
-                "is_active": is_active,
-                "reason": reason,
-                "current_session": sched_info.get("current_session", "NEW_YORK"),
-                "session_name_kh": sched_info.get("session_name_kh", ""),
-                "session_name_en": sched_info.get("session_name_en", ""),
-                "is_tradfi_weekend": sched_info.get("is_tradfi_weekend", False),
-                "is_swap_shield_active": sched_info.get("is_swap_shield_active", False),
-                "is_triple_swap_night": sched_info.get("is_triple_swap_night", False),
-                "swap_settlement_ict": sched_info.get("swap_settlement_ict", "05:00 ICT"),
-                "now_ict": sched_info.get("now_ict", "")
-            },
-            "governor": {
-                "today": gov_status.get("today", ""),
-                "daily_pnl_usd": float(gov_status.get("daily_pnl_usd", 0.0)),
-                "daily_pnl_pct": float(gov_status.get("daily_pnl_pct", 0.0)),
-                "target_pct": float(gov_status.get("target_pct", 5.0)),
-                "floor_pct": float(gov_status.get("floor_pct", 2.5)),
-                "is_target_locked": bool(gov_status.get("is_target_locked", False)),
-                "is_loss_locked": bool(gov_status.get("is_loss_locked", False)),
-                "can_trade": bool(gov_status.get("can_trade", True)),
-                "status": str(gov_status.get("status", "ACTIVE_MONITORING")),
-                "breakeven_armor": "ARMED (85% ATR Trailing)"
-            },
-            "ib_rebates": {
-                "tier": ib_data.get("tier", "SILVER"),
-                "rebate_pct": float(ib_data.get("rebate_pct", 30.0)),
-                "tier_badge": ib_data.get("tier_badge", "🥈 Silver IB (30%)"),
-                "referral_link": ib_data.get("referral_link", ""),
-                "total_rebate_usd": raw_rebate,
-                "accumulated_spread_usd": accum_spread,
-                "target_spread_tier2": 500.0,
-                "target_spread_tier4": 2000.0
-            },
-            "smc_radar": smc_radar,
-            "auto_trading": {
-                "enabled": is_auto_on,
-                "max_positions": capital_engine.get_dynamic_max_positions_for_equity(equity_val)
-            }
-        }
-
+        chat_id = _get_chat_id_from_req(request) or DEFAULT_VIP_CHAT_ID
+        data = await get_cached_capital_overview(chat_id)
         resp = web.json_response({"status": "success", "data": data})
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
         return resp

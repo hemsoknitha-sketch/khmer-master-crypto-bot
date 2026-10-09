@@ -347,6 +347,19 @@ body {
     box-shadow: var(--shadow-glow-cyan);
 }
 
+.btn-icon.live-active {
+    border-color: rgba(0, 242, 254, 0.45);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.25);
+}
+
+.btn-icon.synced-pulse {
+    transform: scale(1.12);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 16px rgba(0, 242, 254, 0.85);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
 /* Sub-Header Live Clocks Bar */
 .hud-ticker-bar {
     display: flex;
