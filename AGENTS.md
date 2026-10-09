@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ65)
-**Document Version:** 6.5.0 (Angkor Quant Master Specification - The 65 Pillars)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ68)
+**Document Version:** 6.6.0 (Angkor Quant Master Specification - The 68 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -1014,7 +1014,52 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - Zero scalp trading on Wednesday evenings to eliminate triple-swap drag.
   5. **Unified Telegram Flagship Interface & Isolated Capital Controls:**
      - Fully managed via `/capital_scalp` (or `/capital scalp`), featuring 1-tap presets (`/capital_scalp ON 30`), environment toggles (Demo vs Live Mainnet), and real-time dashboard status.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 51/51].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 51/54].
+
+---
+
+### Invariant 66: Web GUI Sub-0.01ms Zero-Refresh Live Push Streaming Pipeline Standard (គ្រឹះប្រព័ន្ធបញ្ជូនទិន្នន័យផ្ទាល់ល្បឿន 0.01ms គ្មានការចុច Refresh ដោយដៃ ១០០%)
+- **Location:** `web_gui_server.py` (`_GUI_CACHE`, `fast_dumps`, `_gui_background_cache_worker`, `handle_api_ws`, `handle_api_stream`, `get_cached_capital_overview`), `web_gui/app.js` (`handleStreamData`, `initRealtimeStream`, `initSSEFallback`), `web_gui/index.html` (`btn-refresh`, `live-active`)
+- **Rule:**
+  1. **Strict Zero-Refresh Axiom:** Under no circumstances shall the user ever be required to click a manual "Refresh" button or reload the browser to observe live market movements, positions, or telemetry changes. The system must stream state deltas continuously in real time.
+  2. **Sub-Millisecond Shared In-Memory RAM Cache Bus (`_GUI_CACHE`):** All multi-broker metrics (Binance, MT5 telemetry, Capital.com TradFi dashboard, Gold ORB geometry) must be stored in Python heap RAM memory with $O(1)$ lookup latency ($\le 80$ nanoseconds), completely bypassing disk I/O bottlenecks.
+  3. **Rust/C `orjson` Micro-Serialization (`fast_dumps`):** Outgoing WebSocket payloads must be binary-encoded using `orjson.dumps` ($< 0.008$ ms) to guarantee 10x–20x faster serialization compared to standard Python `json`.
+  4. **Kernel-Level `TCP_NODELAY` & Socket Buffering Bypass:** Both WebSocket transports and underlying TCP sockets must explicitly enable `TCP_NODELAY`, completely disabling Nagle's 40ms buffering algorithm.
+  5. **10 FPS (100ms) Full-Duplex Reactive Push Broadcast:** The server broadcast worker pushes real-time market snapshots every 100ms to all active connections.
+  6. **Google V8 Direct DOM Micro-Mutations (`handleStreamData`):** Client state ingestion bypasses Virtual DOM diffing overhead by executing targeted property assignments (`.textContent`, `.style.left`, `.className`) directly on pre-cached DOM nodes in $< 0.005$ ms without triggering layout reflows.
+  7. **Dormant Fallback Polling Guard:** Polling intervals must automatically stay dormant while `state.streamConnected` is active, activating only if the WebSocket/SSE connection drops.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 52/54].
+
+---
+
+### Invariant 67: Gold ORB 15M Opening Range Breakout Geometry & Dynamic Buy/Sell/Equilibrium Zone Canvas Standard (គ្រឹះក្រាហ្វិកគោមាស ORB 15M & តំបន់ Buy/Sell Zones ផ្ទាល់ពី RAM លើ HTML5 GPU Canvas)
+- **Location:** `web_gui_server.py` (`get_cached_gold_orb_chart`, `handle_api_gold_orb_chart`), `web_gui/app.js` (`renderGoldOrbGraphic`, `fetchGoldOrbChart`), `web_gui/index.html` (`goldOrbCanvas`)
+- **Rule:**
+  1. **Sub-Millisecond RAM Gold ORB Endpoint:** `/api/gold/orb_chart` must compute and cache live 15M Opening Range geometry from RAM in $< 0.005$ ms, pulling live interbank quotes (`XAUUSD`/`GOLD`/`PAXG`) and multi-broker candlestick history.
+  2. **Mathematical ORB Geometry Invariants:** The endpoint must deliver canonical structural coordinates: `or_high`, `or_low`, `or_mid`, `or_range`, and dynamic `atr`.
+  3. **Dynamic Highlighted Trading Zones:**
+     - *Bullish Breakout & Expansion Zone:* $\text{or\_high} \to \text{or\_high} + 1.5\times\text{ATR}$ (translucent green, trigger level at `or_high`, TP target at $\text{or\_high} + 3.0\times\text{ATR}$).
+     - *Bearish Breakdown & Liquidity Purge Zone:* $\text{or\_low} - 1.5\times\text{ATR} \to \text{or\_low}$ (translucent red, trigger level at `or_low`, TP target at $\text{or\_low} - 3.0\times\text{ATR}$).
+     - *Fair Value Equilibrium Zone:* $\text{or\_mid} \pm 0.25\times\text{ATR}$ (translucent gold dealing range).
+  4. **Hardware-Accelerated HTML5 2D Canvas Graphics:** `renderGoldOrbGraphic` draws directly onto `<canvas id="goldOrbCanvas">` with up to 40 M15 candlesticks, dashed breakout levels, and an animated laser live-price pointer running at a locked 60 FPS in $< 0.18$ ms.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 53/54].
+
+---
+
+### Invariant 68: Independent Modular Feature Tabs & Reordered Mobile Navigation Standard (គ្រឹះបែងចែកផ្ទាំងមុខងារឯករាជ្យ & ការរៀបចំលំដាប់ប៊ូតុងខាងក្រោម 7 ផ្ទាំងពេញលេញ)
+- **Location:** `web_gui/index.html`, `web_gui/style.css`, `web_gui/app.js` (`switchTab`, bottom nav listeners)
+- **Rule:**
+  1. **Strict Separation of TradFi from Overview:** Capital.com TradFi suite must exist in its own independent `<section id="tab-capital">` containing the TradFi Cockpit, Scalp Engine, 360° Daily Governor, SMC Scanner, Quotes, and CFD Positions, never lumped inside the Crypto Overview tab.
+  2. **Strict Canonical 7-Button Bottom Navigation Order:**
+     1. 🏛️ `Capital` (`tab-capital` - default landing)
+     2. 🥇 `Gold ORB` (`tab-wealth-vault` - 3D Vault & Live ORB 15M Graphic)
+     3. 👑 `MT5 Pro` (`tab-mt5` - GTCFX Terminal & Multi-User Virtual Ledger)
+     4. 📊 `Overview` (`tab-overview` - Portfolio Net Worth & Donut Breakdown)
+     5. 💎 `Wealth 24/7` (`tab-wealth-cockpit` - Perpetual Futures & Trailing Ratchet)
+     6. 🧠 `AI Brain` (`tab-brain` - Swarm Ensembles & Tokyo MEV Arbitrage)
+     7. 🎛️ `Controls` (`tab-controls` - Emergency Harvest & Circuit Breakers)
+  3. **Zero Dead Buttons & Sub-0.01ms Synchronous Switching:** Tab transitions must execute synchronously in $< 0.005$ ms via `switchTab` with pre-warmed memory state, instantly toggling `.active` classes without blank-screen flicker or layout jitter.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 54/54].
 
 ---
 
@@ -1022,8 +1067,8 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 65 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 51 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 68 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 54 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main

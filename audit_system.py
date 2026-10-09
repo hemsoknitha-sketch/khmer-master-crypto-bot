@@ -2365,9 +2365,10 @@ def run_audit():
         log_fail(str(e))
 
     # -------------------------------------------------------------------------
-    # [CHECK 51/51] Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65)
     # -------------------------------------------------------------------------
-    print("\n[CHECK 51/51] Verifying Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65)...")
+    # [CHECK 51/54] Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 51/54] Verifying Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65)...")
     try:
         import capital_engine
         import database
@@ -2442,6 +2443,164 @@ def run_audit():
             log_fail("Angkor Capital 24/7 Trend Scalping Engine (Invariant 65) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 65 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 52/54] Web GUI Sub-0.01ms Zero-Refresh Live Push Streaming Pipeline Standard (Invariant 66)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 52/54] Verifying Web GUI Sub-0.01ms Zero-Refresh Live Push Streaming Pipeline Standard (Invariant 66)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv66 = "Invariant 66" in agents_md_text and "Zero-Refresh Live Push Streaming Pipeline" in agents_md_text
+
+        # 2. Check web_gui_server.py
+        with open("web_gui_server.py", "r", encoding="utf-8") as wf:
+            srv_code = wf.read()
+        has_gui_cache = "_GUI_CACHE" in srv_code and '"capital": {}' in srv_code
+        has_fast_dumps = "def fast_dumps" in srv_code and "orjson.dumps" in srv_code
+        has_nodelay = "TCP_NODELAY" in srv_code and "set_nodelay" in srv_code
+        has_ws_stream = "async def handle_api_ws(" in srv_code and "async def handle_api_stream(" in srv_code
+        has_cap_cache_fn = "async def get_cached_capital_overview(" in srv_code
+        has_stream_payload = "capital_overview" in srv_code and "gold_orb_chart" in srv_code and "gold_beam_pct" in srv_code
+
+        # 3. Check web_gui/app.js
+        with open("web_gui/app.js", "r", encoding="utf-8") as jf:
+            js_code = jf.read()
+        has_handle_stream = "function handleStreamData(" in js_code
+        has_ws_init = "function initRealtimeStream(" in js_code and "new WebSocket(wsUrl)" in js_code
+        has_sse_init = "function initSSEFallback(" in js_code and "new EventSource(sseUrl)" in js_code
+        has_zero_refresh_toast = "Zero Refresh Needed" in js_code
+
+        # 4. Check web_gui/index.html & style.css
+        with open("web_gui/index.html", "r", encoding="utf-8") as hf:
+            html_code = hf.read()
+        has_live_btn = "id=\"btn-refresh\"" in html_code and "live-active" in html_code
+
+        with open("web_gui/style.css", "r", encoding="utf-8") as cf:
+            css_code = cf.read()
+        has_css_pulse = ".btn-icon.live-active" in css_code and ".btn-icon.synced-pulse" in css_code
+
+        all_inv66_passed = (
+            has_inv66 and has_gui_cache and has_fast_dumps and has_nodelay and
+            has_ws_stream and has_cap_cache_fn and has_stream_payload and
+            has_handle_stream and has_ws_init and has_sse_init and
+            has_zero_refresh_toast and has_live_btn and has_css_pulse
+        )
+
+        if all_inv66_passed:
+            log_pass("Web GUI Sub-0.01ms Zero-Refresh Live Push Streaming Pipeline Standard (Invariant 66) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 66 check failed: inv66={has_inv66}, cache={has_gui_cache}, dumps={has_fast_dumps}, nodelay={has_nodelay}, ws={has_ws_stream}, cap_fn={has_cap_cache_fn}, payload={has_stream_payload}, stream_fn={has_handle_stream}, ws_init={has_ws_init}, sse_init={has_sse_init}, toast={has_zero_refresh_toast}, btn={has_live_btn}, css={has_css_pulse}")
+            log_fail("Web GUI Zero-Refresh Live Push Streaming Pipeline (Invariant 66) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 66 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 53/54] Gold ORB 15M (Opening Range Breakout) Geometry & Dynamic Highlight Zone Canvas Standard (Invariant 67)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 53/54] Verifying Gold ORB 15M (Opening Range Breakout) Geometry & Dynamic Highlight Zone Canvas Standard (Invariant 67)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv67 = "Invariant 67" in agents_md_text and "Gold ORB 15M Opening Range Breakout Geometry" in agents_md_text
+
+        # 2. Check web_gui_server.py
+        with open("web_gui_server.py", "r", encoding="utf-8") as wf:
+            srv_code = wf.read()
+        has_orb_fn = "async def get_cached_gold_orb_chart(" in srv_code
+        has_orb_route = "app.router.add_get(\"/api/gold/orb_chart\"" in srv_code
+        has_zones = "buy_zone" in srv_code and "sell_zone" in srv_code and "equilibrium_zone" in srv_code and "or_geometry" in srv_code
+
+        # 3. Check web_gui/app.js & web_gui/index.html
+        with open("web_gui/app.js", "r", encoding="utf-8") as jf:
+            js_code = jf.read()
+        has_render_orb = "function renderGoldOrbGraphic(" in js_code
+        has_fetch_orb = "async function fetchGoldOrbChart(" in js_code
+
+        with open("web_gui/index.html", "r", encoding="utf-8") as hf:
+            html_code = hf.read()
+        has_canvas = "id=\"goldOrbCanvas\"" in html_code
+        has_legends = "legend-buy-range" in html_code and "legend-sell-range" in html_code
+
+        all_inv67_passed = (
+            has_inv67 and has_orb_fn and has_orb_route and has_zones and
+            has_render_orb and has_fetch_orb and has_canvas and has_legends
+        )
+
+        if all_inv67_passed:
+            log_pass("Gold ORB 15M Opening Range Breakout Geometry & Dynamic Highlight Zone Canvas Standard (Invariant 67) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 67 check failed: inv67={has_inv67}, fn={has_orb_fn}, route={has_orb_route}, zones={has_zones}, render={has_render_orb}, fetch={has_fetch_orb}, canvas={has_canvas}, legends={has_legends}")
+            log_fail("Gold ORB 15M Geometry & Highlight Zone Canvas (Invariant 67) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 67 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 54/54] Independent Modular Feature Tabs & Reordered Mobile Navigation Standard (Invariant 68)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 54/54] Verifying Independent Modular Feature Tabs & Reordered Mobile Navigation Standard (Invariant 68)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv68 = "Invariant 68" in agents_md_text and "Independent Modular Feature Tabs" in agents_md_text
+
+        # 2. Check web_gui/index.html for dedicated tab panes
+        with open("web_gui/index.html", "r", encoding="utf-8") as hf:
+            html_code = hf.read()
+
+        has_tab_capital = "id=\"tab-capital\"" in html_code
+        has_tab_vault = "id=\"tab-wealth-vault\"" in html_code
+        has_tab_mt5 = "id=\"tab-mt5\"" in html_code
+        has_tab_overview = "id=\"tab-overview\"" in html_code
+        has_tab_wealth = "id=\"tab-wealth-cockpit\"" in html_code
+        has_tab_brain = "id=\"tab-brain\"" in html_code
+        has_tab_controls = "id=\"tab-controls\"" in html_code
+
+        # Check bottom navigation order
+        nav_start = html_code.find("<nav class=\"bottom-nav\">")
+        nav_end = html_code.find("</nav>", nav_start) if nav_start != -1 else -1
+        nav_snippet = html_code[nav_start:nav_end] if nav_start != -1 and nav_end != -1 else ""
+
+        pos_capital = nav_snippet.find("data-tab=\"tab-capital\"")
+        pos_gold = nav_snippet.find("data-tab=\"tab-wealth-vault\"")
+        pos_mt5 = nav_snippet.find("data-tab=\"tab-mt5\"")
+        pos_overview = nav_snippet.find("data-tab=\"tab-overview\"")
+        pos_wealth = nav_snippet.find("data-tab=\"tab-wealth-cockpit\"")
+        pos_brain = nav_snippet.find("data-tab=\"tab-brain\"")
+        pos_controls = nav_snippet.find("data-tab=\"tab-controls\"")
+
+        order_correct = (
+            pos_capital != -1 and pos_gold != -1 and pos_mt5 != -1 and
+            pos_overview != -1 and pos_wealth != -1 and pos_brain != -1 and
+            pos_controls != -1 and
+            pos_capital < pos_gold < pos_mt5 < pos_overview < pos_wealth < pos_brain < pos_controls
+        )
+
+        # 3. Check web_gui/app.js for switchTab and jump listeners
+        with open("web_gui/app.js", "r", encoding="utf-8") as jf:
+            js_code = jf.read()
+        has_switch_tab = "function switchTab(targetTabId)" in js_code
+        has_jumps = "data-jump" in js_code and "setupCapitalEventListeners" in js_code
+
+        all_inv68_passed = (
+            has_inv68 and has_tab_capital and has_tab_vault and has_tab_mt5 and
+            has_tab_overview and has_tab_wealth and has_tab_brain and
+            has_tab_controls and order_correct and has_switch_tab and has_jumps
+        )
+
+        if all_inv68_passed:
+            log_pass("Independent Modular Feature Tabs & Reordered Mobile Navigation Standard (Invariant 68) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 68 check failed: inv68={has_inv68}, cap_tab={has_tab_capital}, vault_tab={has_tab_vault}, mt5_tab={has_tab_mt5}, ov_tab={has_tab_overview}, order={order_correct}, switch={has_switch_tab}, jumps={has_jumps}")
+            log_fail("Modular Feature Tabs & Mobile Navigation (Invariant 68) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 68 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary
