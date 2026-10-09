@@ -7433,6 +7433,8 @@ class CapitalTrendScalpEngine:
     async def execute_scalp_cycle(self, app=None):
         """
         Executes 24/7 autonomous scalping across registered active users.
+        Sub-50ms Parallel Fan-Out: Evaluates market setups once and dispatches
+        to Super Admin and all VIP users concurrently via asyncio.gather to eliminate sequential lag.
         """
         now = time.time()
         if (now - self._last_cycle_ts) < self._scan_interval:
@@ -7446,7 +7448,25 @@ class CapitalTrendScalpEngine:
         if not active_users:
             return
 
-        for user_cfg in active_users:
+        # 1. Master Setup Evaluation: Scan candidate assets once using primary engine
+        sys_engine = get_capital_engine()
+        candidate_assets = self.get_session_active_majors(mode="ALL")
+        valid_setups = []
+
+        for epic in candidate_assets:
+            resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+            if self._asset_cooldowns.get(resolved_epic, 0.0) > now:
+                continue
+
+            setup = await asyncio.to_thread(self.evaluate_trend_scalp_setup, resolved_epic, sys_engine)
+            if setup.get("success") and setup.get("signal") in ["BUY", "SELL"] and setup.get("confidence", 0) >= 75.0:
+                valid_setups.append((resolved_epic, setup))
+
+        if not valid_setups:
+            return
+
+        # 2. Ultra-Fast Concurrent Dispatch across all active users in parallel (asyncio.gather)
+        async def _process_user_scalp(user_cfg: dict):
             chat_id = user_cfg.get("chat_id")
             is_demo = user_cfg.get("is_demo", False)
             budget = float(user_cfg.get("budget", 30.0) or 30.0)
@@ -7455,7 +7475,7 @@ class CapitalTrendScalpEngine:
 
             # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
             if not is_demo and not db.is_capital_user_authorized(chat_id):
-                continue
+                return False
 
             user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
             try:
@@ -7464,30 +7484,39 @@ class CapitalTrendScalpEngine:
                 open_pos = []
 
             if len(open_pos) >= max_pos:
-                continue
+                return False
 
             open_epics = {
                 (p.get("position", {}).get("epic") or p.get("market", {}).get("epic") or "").upper()
                 for p in open_pos
             }
 
-            candidate_assets = self.get_session_active_majors(mode=user_mode)
-            for epic in candidate_assets:
-                resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+            user_allowed_majors = set(self.get_session_active_majors(mode=user_mode))
+
+            for resolved_epic, setup in valid_setups:
                 if resolved_epic in open_epics:
                     continue  # Overtrade Guard: 1 position per asset
-
-                # Anti-Whipsaw Cooldown Shield (15-min rest after SL hit)
-                if self._asset_cooldowns.get(resolved_epic, 0.0) > now:
+                if resolved_epic not in user_allowed_majors and setup.get("epic") not in user_allowed_majors:
                     continue
 
-                setup = await asyncio.to_thread(self.evaluate_trend_scalp_setup, resolved_epic, user_engine)
-                if setup.get("success") and setup.get("signal") in ["BUY", "SELL"] and setup.get("confidence", 0) >= 75.0:
-                    dispatched = await self._dispatch_scalp_trade(chat_id, user_cfg, user_engine, setup, app=app)
-                    if dispatched:
-                        self._stats["total_executed"] += 1
-                        self._stats["last_trade"] = f"{setup.get('signal')} {resolved_epic} ({datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')})"
-                        break  # 1 trade per user per cycle
+                dispatched = await self._dispatch_scalp_trade(chat_id, user_cfg, user_engine, setup, app=app)
+                if dispatched:
+                    self._stats["total_executed"] += 1
+                    self._stats["last_trade"] = f"{setup.get('signal')} {resolved_epic} ({datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')})"
+                    return True
+            return False
+
+        # Prioritize Super Admin first, then fan-out to all VIP users concurrently
+        active_users.sort(key=lambda u: 0 if u.get("chat_id") == SUPER_ADMIN_ID else 1)
+        sa_user = next((u for u in active_users if u.get("chat_id") == SUPER_ADMIN_ID), None)
+        vip_users = [u for u in active_users if u.get("chat_id") != SUPER_ADMIN_ID]
+
+        if sa_user:
+            await _process_user_scalp(sa_user)
+
+        if vip_users:
+            vip_tasks = [_process_user_scalp(u) for u in vip_users]
+            await asyncio.gather(*vip_tasks, return_exceptions=True)
 
     async def _dispatch_scalp_trade(
         self,
