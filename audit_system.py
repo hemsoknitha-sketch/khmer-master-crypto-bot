@@ -2603,6 +2603,63 @@ def run_audit():
         failures.append(f"Invariant 68 check failed: {e}")
         log_fail(str(e))
 
+    # -------------------------------------------------------------------------
+    # [CHECK 55/55] Cambodia Securities Exchange (CSX) AI Live Radar (Invariant 69)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 55/55] Verifying Cambodia Securities Exchange (CSX) AI Live Radar & Quantitative Equity Suite (Invariant 69)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md_text = f.read()
+        has_inv69 = "Invariant 69" in agents_md_text and "Cambodia Securities Exchange (CSX) AI Live Radar" in agents_md_text
+
+        # 2. Dynamic Unit Test: CSXEngine
+        import csx_engine
+        engine = csx_engine.get_csx_engine()
+        has_stocks = len(csx_engine.CSX_STOCKS) == 12
+        session_info = engine.get_trading_session_info()
+        has_session = isinstance(session_info, dict) and "phase" in session_info
+
+        # 3. Code Inspection: Database Layer
+        import database as db
+        has_db_init = hasattr(db, "init_csx_tables")
+        has_db_record = hasattr(db, "record_csx_eod_batch")
+        has_db_alert = hasattr(db, "record_csx_alert")
+        has_db_get = hasattr(db, "get_latest_csx_eod")
+
+        # 4. Code Inspection: Scheduler Tasks
+        with open("scheduler_tasks.py", "r", encoding="utf-8") as sf:
+            st_code = sf.read()
+        has_csx_task = "async def csx_market_monitor" in st_code and "_csx_monitor_lock" in st_code
+
+        # 5. Code Inspection: Bot Thread & Bot Commands Registry
+        with open("bot_thread.py", "r", encoding="utf-8") as bf:
+            bt_code = bf.read()
+        has_csx_cmd = "async def csx_command" in bt_code
+        has_csx_handler = "CommandHandler(\"csx\", csx_command)" in bt_code
+        has_csx_callback = "elif data.startswith(\"csx_\"):" in bt_code
+        has_csx_scheduler = "id='csx_market_monitor'" in bt_code
+
+        import bot_commands_registry
+        public_cmds = bot_commands_registry.get_public_bot_commands()
+        has_registry_cmd = any(c.command == "csx" for c in public_cmds)
+
+        all_inv69_passed = (
+            has_inv69 and has_stocks and has_session and
+            has_db_init and has_db_record and has_db_alert and has_db_get and
+            has_csx_task and has_csx_cmd and has_csx_handler and
+            has_csx_callback and has_csx_scheduler and has_registry_cmd
+        )
+
+        if all_inv69_passed:
+            log_pass("Cambodia Securities Exchange (CSX) AI Live Radar & Quantitative Equity Suite (Invariant 69) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 69 check failed: inv69={has_inv69}, stocks={has_stocks}, session={has_session}, db={has_db_init}, task={has_csx_task}, cmd={has_csx_cmd}, handler={has_csx_handler}, cb={has_csx_callback}, sched={has_csx_scheduler}, reg={has_registry_cmd}")
+            log_fail("CSX AI Live Radar Suite (Invariant 69) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 69 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

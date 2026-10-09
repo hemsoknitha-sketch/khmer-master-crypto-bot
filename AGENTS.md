@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ68)
-**Document Version:** 6.6.0 (Angkor Quant Master Specification - The 68 Pillars)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ69)
+**Document Version:** 6.7.0 (Angkor Quant Master Specification - The 69 Pillars)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -1063,12 +1063,40 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 69: Cambodia Securities Exchange (CSX) AI Live Radar, Quantitative Equity Screener & Volume Spike Suite Standard (គ្រឹះរ៉ាដាផ្សារមូលបត្រកម្ពុជា CSX, ម៉ាស៊ីនស្កេនភាគហ៊ុនបរិមាណ & ស្ទាក់ចាប់ Volume ស្ថាប័ន)
+- **Location:** `csx_engine.py`, `database.py`, `scheduler_tasks.py`, `bot_thread.py`, `bot_commands_registry.py`
+- **Rule:**
+  1. **Direct Official Data Feed Integration:** CSX Live Radar must pull real-time equity quotes directly from official CSX TradingView feeds (`api.csx.com.kh/tradingview/api/v1/`) with zero third-party broker intermediary latency.
+  2. **Complete 12-Equity Listed Coverage & Real-Time CSX Index:**
+     - Full automated coverage of all 12 listed equities:
+       - *Main Board (9):* `PWSA`, `GTI`, `PPAP`, `PPSP`, `PAS`, `ABC`, `PEPC`, `MJQE`, `CGSM`.
+       - *Growth Board (3):* `DBDE`, `JSL`, `PCG`.
+     - Live CSX Index points, day change, % change, total market volume (shares), and turnover in both KHR and estimated USD (~4,090 KHR/USD).
+  3. **Institutional Quantitative Confluence & Screeners:**
+     - 14-period RSI (Relative Strength Index) identifying Oversold ($\le 38.0$) value zones and Overbought ($\ge 68.0$) profit zones.
+     - 20-day Average Volume & Relative Volume (RVOL) expansion tracking.
+     - Annual Dividend Yield Screeners & Cash Payout metrics (PWSA, PPAP, PAS, ABC, CGSM, DBDE) for systematic passive income harvesting.
+  4. **Abnormal Volume Spike Harvester:** Stocks exhibiting institutional volume surges (RVOL $\ge 2.0\times$ and turnover $\ge 10,000,000$ KHR) trigger automated Telegram alerts to the Super Admin with a 2-hour per-stock debounce.
+  5. **Cambodia Local Trading Hours (ICT / UTC+7) Clock Awareness:**
+     - Opening Auction (08:00 - 09:00 ICT)
+     - Continuous Morning Session (09:00 - 11:30 ICT)
+     - Lunch Break (11:30 - 12:30 ICT)
+     - Continuous Afternoon Session (12:30 - 14:50 ICT)
+     - Closing Auction (14:50 - 15:00 ICT)
+     - Market Closed / Weekend Closures.
+  6. **Mobile-Fit UI & Zero Unhandled Callbacks Standard:**
+     - Telegram outputs must strictly adhere to `ui_standards.DIVIDER_HEAVY` ($\le 12$ characters, ~2.0 cm mobile-fit).
+     - Interactive inline keyboard navigation (`/csx`, `/csx ABC`, `/csx DIVIDEND`, `/csx SPIKE`) with immediate `await query.answer()` routing.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 55/55].
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.
 2. **Step 2:** Read this file (`AGENTS.md`) and `METAPHYSICS_STANDARDS.md`.
-3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 68 Invariants or the Fiduciary Honesty Covenant.
-4. **Step 4:** Re-run `python audit_system.py` to confirm that all 54 checks remain at 100% `[PASS]`.
+3. **Step 3:** If you propose a change, ensure it maintains or increases the mathematical edge without violating any of the 69 Invariants or the Fiduciary Honesty Covenant.
+4. **Step 4:** Re-run `python audit_system.py` to confirm that all 55 checks remain at 100% `[PASS]`.
 5. **Step 5 (MANDATORY IMMEDIATE GIT PUSH):** Immediately stage, commit, and push all modifications to GitHub:
    ```bash
    git add . && git commit -m "<Clear, professional commit description>" && git push origin main

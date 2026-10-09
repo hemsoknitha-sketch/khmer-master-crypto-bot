@@ -67,6 +67,7 @@ def get_public_bot_commands():
         BotCommand("web3_wallet", "💼 Angkor Web3 Settlement Wallet"),
 
         # --- [5] MARKET INTELLIGENCE & RADARS (AGI & Multi-Timeframe) ---
+        BotCommand("csx", "🏛️ Angkor CSX Stock Radar (Cambodia)"),
         BotCommand("whales", "🐋 Angkor Whale Radar L2"),
         BotCommand("flash_crash", "🎯 Angkor Crash Hunter"),
         BotCommand("pre_pump", "🔥 Angkor Pre-Pump Radar"),

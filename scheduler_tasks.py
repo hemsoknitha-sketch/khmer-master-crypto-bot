@@ -8363,3 +8363,67 @@ async def reachsey_crypto_monitor(app: Application):
         await smart_x_engine.run_reachsey_autonomous_cycle(app=app)
     except Exception as e:
         print(f"⚠️ [REACHSEY CRYPTO MONITOR NOTICE]: {e}")
+
+
+_csx_monitor_lock = asyncio.Lock()
+_csx_last_alert_ts = {}
+
+async def csx_market_monitor(app: Application):
+    """
+    🏛️ Cambodia Securities Exchange (CSX) AI Market Monitor Loop (Invariant 69)
+    Monitors CSX trading sessions, tracks CSX Index & equities, detects abnormal
+    volume spikes (RVOL >= 2.0x), records EOD history, and sends alerts.
+    """
+    if _csx_monitor_lock.locked():
+        return
+    async with _csx_monitor_lock:
+        try:
+            import csx_engine
+            import database as db
+            import ui_standards
+            engine = csx_engine.get_csx_engine()
+            session = engine.get_trading_session_info()
+            
+            # Fetch recent quotes
+            stocks = await engine.refresh_all_stocks(force=False)
+            
+            # Record EOD snapshot if market is in closing or closed phase
+            if session.get("phase") in ("CLOSING_AUCTION", "MARKET_CLOSED"):
+                try:
+                    db.record_csx_eod_batch(stocks)
+                except Exception as e_eod:
+                    logger.debug(f"CSX EOD record error: {e_eod}")
+            
+            # Detect Volume Spikes and alert Super Admin / VIP users
+            now = time.time()
+            for sym, s in stocks.items():
+                rvol = s.get("rvol", 1.0)
+                if rvol >= 2.0 and s.get("turnover", 0.0) >= 10000000.0:  # RVOL >= 2x and turnover >= 10M KHR (~$2,500)
+                    last_alert = _csx_last_alert_ts.get(sym, 0.0)
+                    if (now - last_alert) > 7200.0:  # 2-hour debounce per stock
+                        _csx_last_alert_ts[sym] = now
+                        alert_msg = (
+                            f"⚡ **[CSX ABNORMAL VOLUME SPIKE ALERT]** 🇰🇭\n"
+                            f"🏛️ **ភាគហ៊ុន ៖** `{sym}` ({s.get('name_kh')})\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"🔥 **កម្លាំង RVOL ៖** `{rvol:.2f}x` ធៀបនឹងមធ្យម ២០ ថ្ងៃ!\n"
+                            f"💵 **តម្លៃបច្ចុប្បន្ន ៖** `{s.get('close'):,.0f} KHR` ({'+' if s.get('change',0)>0 else ''}{s.get('pct_change',0):.2f}%)\n"
+                            f"📦 **Volume ថ្ងៃនេះ ៖** `{s.get('volume'):,.0f} ហ៊ុន` (មធ្យម: `{s.get('avg_vol_20'):,.0f}`)\n"
+                            f"💰 **ចរន្តទឹកប្រាក់ ៖** `{s.get('turnover'):,.0f} KHR` (~${s.get('turnover_usd'):,.0f})\n"
+                            f"🎯 **សញ្ញា AI ៖** `{s.get('ai_signal_kh')}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _លំហូរទុនស្ថាប័នកំពុងចាក់ចូលភាគហ៊ុន {sym}!_"
+                        )
+                        db.record_csx_alert("VOLUME_SPIKE", sym, alert_msg)
+                        if app and hasattr(app, "bot"):
+                            try:
+                                await app.bot.send_message(
+                                    chat_id=ui_standards.SUPER_ADMIN_ID,
+                                    text=alert_msg,
+                                    parse_mode="Markdown"
+                                )
+                            except Exception as notif_e:
+                                logger.debug(f"CSX Telegram alert error: {notif_e}")
+        except Exception as e:
+            print(f"⚠️ [CSX MARKET MONITOR NOTICE]: {e}")
+

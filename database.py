@@ -10685,11 +10685,104 @@ def get_legal_agreements_count() -> int:
     return legal_agreement.get_legal_agreements_count()
 
 
+# ─── CAMBODIA SECURITIES EXCHANGE (CSX) AI DATABASE (Invariant 69) ─────────
+def init_csx_tables():
+    """Initializes CSX market history and alert tables."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS csx_eod_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            close REAL,
+            change REAL,
+            pct_change REAL,
+            volume REAL,
+            turnover REAL,
+            turnover_usd REAL,
+            rsi REAL,
+            rvol REAL,
+            recorded_at REAL,
+            UNIQUE(date, symbol)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS csx_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL NOT NULL,
+            alert_type TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            message TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def record_csx_eod_batch(stocks_dict: dict):
+    """Records daily EOD stock records in SQLite."""
+    if not stocks_dict:
+        return
+    import datetime
+    now_ts = time.time()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    for sym, s in stocks_dict.items():
+        date_str = s.get("date") or datetime.date.today().isoformat()
+        cursor.execute('''
+            INSERT INTO csx_eod_history (
+                date, symbol, close, change, pct_change, volume, turnover, turnover_usd, rsi, rvol, recorded_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(date, symbol) DO UPDATE SET
+                close=excluded.close,
+                change=excluded.change,
+                pct_change=excluded.pct_change,
+                volume=excluded.volume,
+                turnover=excluded.turnover,
+                turnover_usd=excluded.turnover_usd,
+                rsi=excluded.rsi,
+                rvol=excluded.rvol,
+                recorded_at=excluded.recorded_at
+        ''', (
+            date_str, sym, s.get("close", 0.0), s.get("change", 0.0), s.get("pct_change", 0.0),
+            s.get("volume", 0.0), s.get("turnover", 0.0), s.get("turnover_usd", 0.0),
+            s.get("rsi", 50.0), s.get("rvol", 1.0), now_ts
+        ))
+    conn.commit()
+    conn.close()
+
+def record_csx_alert(alert_type: str, symbol: str, message: str):
+    """Records a CSX alert."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO csx_alerts (timestamp, alert_type, symbol, message) VALUES (?, ?, ?, ?)",
+        (time.time(), alert_type, symbol, message)
+    )
+    conn.commit()
+    conn.close()
+
+def get_latest_csx_eod() -> list:
+    """Retrieves latest CSX EOD records."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT symbol, close, change, pct_change, volume, turnover, turnover_usd, rsi, rvol, date
+        FROM csx_eod_history
+        ORDER BY recorded_at DESC, turnover DESC
+        LIMIT 12
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
 # Initialize and auto-migrate database schema on startup
 try:
     init_db()
     init_trade_journal_table()
     init_legal_agreement_table()
+    init_csx_tables()
 except Exception:
     pass
 

@@ -5806,6 +5806,65 @@ class TelegramBotThread(BaseThread):
 
             if data == "btn_menu_refresh":
                 await menu_command(update, context)
+            elif data.startswith("csx_"):
+                import csx_engine
+                engine = csx_engine.get_csx_engine()
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+                csx_keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("📊 សង្ខេបទីផ្សារ | Overview", callback_data="csx_view_overview"),
+                        InlineKeyboardButton("🔄 ផ្ទុកឡើងវិញ | Refresh", callback_data="csx_refresh")
+                    ],
+                    [
+                        InlineKeyboardButton("💰 ភាគលាភខ្ពស់ | Dividends", callback_data="csx_view_dividends"),
+                        InlineKeyboardButton("⚡ Volume Spikes", callback_data="csx_view_spikes")
+                    ],
+                    [
+                        InlineKeyboardButton("ABC", callback_data="csx_stock_ABC"),
+                        InlineKeyboardButton("PWSA", callback_data="csx_stock_PWSA"),
+                        InlineKeyboardButton("PAS", callback_data="csx_stock_PAS"),
+                        InlineKeyboardButton("PPAP", callback_data="csx_stock_PPAP")
+                    ],
+                    [
+                        InlineKeyboardButton("CGSM", callback_data="csx_stock_CGSM"),
+                        InlineKeyboardButton("PPSP", callback_data="csx_stock_PPSP"),
+                        InlineKeyboardButton("GTI", callback_data="csx_stock_GTI"),
+                        InlineKeyboardButton("MJQE", callback_data="csx_stock_MJQE")
+                    ],
+                    [
+                        InlineKeyboardButton("DBDE", callback_data="csx_stock_DBDE"),
+                        InlineKeyboardButton("JSL", callback_data="csx_stock_JSL"),
+                        InlineKeyboardButton("PEPC", callback_data="csx_stock_PEPC"),
+                        InlineKeyboardButton("PCG", callback_data="csx_stock_PCG")
+                    ]
+                ])
+
+                action = data[4:]
+                lang_code = 'khmer' if user_lang == 'km' else 'english'
+                if action in ["view_overview", "refresh"]:
+                    if action == "refresh":
+                        await engine.refresh_all_stocks(force=True)
+                    text = await engine.format_market_summary_telegram(lang=lang_code)
+                elif action == "view_dividends":
+                    text = await engine.format_top_dividends_telegram(lang=lang_code)
+                elif action == "view_spikes":
+                    text = await engine.format_volume_spikes_telegram(lang=lang_code)
+                elif action.startswith("stock_"):
+                    sym = action[6:].upper()
+                    text = await engine.format_stock_detail_telegram(sym, lang=lang_code)
+                else:
+                    text = await engine.format_market_summary_telegram(lang=lang_code)
+
+                try:
+                    await query.edit_message_text(text=text, parse_mode="Markdown", reply_markup=csx_keyboard)
+                except Exception:
+                    clean_txt = text.replace('*', '').replace('`', '').replace('_', '')
+                    try:
+                        await query.edit_message_text(text=clean_txt, reply_markup=csx_keyboard)
+                    except Exception:
+                        pass
+                return
             elif data in ["btn_macro_refresh", "btn_macro_satellite", "btn_google_macro", "btn_satellite"]:
                 await macro_command(update, context)
             elif data in ["btn_wealth", "btn_wealth_menu", "btn_wealth_refresh"]:
@@ -27233,6 +27292,88 @@ class TelegramBotThread(BaseThread):
 
             await update.effective_message.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
 
+        async def csx_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🏛️ Flagship Cambodia Securities Exchange (CSX) AI Radar Command (/csx)
+            Direct integration with CSX TradingView live data feed & quantitative engine.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'khmer'
+            else:
+                user_lang = 'english'
+
+            args = list(context.args) if context and context.args else []
+            import csx_engine
+            engine = csx_engine.get_csx_engine()
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            csx_keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📊 សង្ខេបទីផ្សារ | Overview", callback_data="csx_view_overview"),
+                    InlineKeyboardButton("🔄 ផ្ទុកឡើងវិញ | Refresh", callback_data="csx_refresh")
+                ],
+                [
+                    InlineKeyboardButton("💰 ភាគលាភខ្ពស់ | Dividends", callback_data="csx_view_dividends"),
+                    InlineKeyboardButton("⚡ Volume Spikes", callback_data="csx_view_spikes")
+                ],
+                [
+                    InlineKeyboardButton("ABC", callback_data="csx_stock_ABC"),
+                    InlineKeyboardButton("PWSA", callback_data="csx_stock_PWSA"),
+                    InlineKeyboardButton("PAS", callback_data="csx_stock_PAS"),
+                    InlineKeyboardButton("PPAP", callback_data="csx_stock_PPAP")
+                ],
+                [
+                    InlineKeyboardButton("CGSM", callback_data="csx_stock_CGSM"),
+                    InlineKeyboardButton("PPSP", callback_data="csx_stock_PPSP"),
+                    InlineKeyboardButton("GTI", callback_data="csx_stock_GTI"),
+                    InlineKeyboardButton("MJQE", callback_data="csx_stock_MJQE")
+                ],
+                [
+                    InlineKeyboardButton("DBDE", callback_data="csx_stock_DBDE"),
+                    InlineKeyboardButton("JSL", callback_data="csx_stock_JSL"),
+                    InlineKeyboardButton("PEPC", callback_data="csx_stock_PEPC"),
+                    InlineKeyboardButton("PCG", callback_data="csx_stock_PCG")
+                ]
+            ])
+
+            if args:
+                sub = args[0].upper().strip()
+                if sub in csx_engine.CSX_STOCKS:
+                    msg = await engine.format_stock_detail_telegram(sub, lang=user_lang)
+                elif sub in ["DIV", "DIVIDEND", "DIVIDENDS", "YIELD"]:
+                    msg = await engine.format_top_dividends_telegram(lang=user_lang)
+                elif sub in ["SPIKE", "SPIKES", "VOL", "VOLUME", "RVOL"]:
+                    msg = await engine.format_volume_spikes_telegram(lang=user_lang)
+                else:
+                    msg = await engine.format_market_summary_telegram(lang=user_lang)
+            else:
+                msg = await engine.format_market_summary_telegram(lang=user_lang)
+
+            target_msg = update.effective_message or (update.callback_query.message if update.callback_query else None)
+            if target_msg:
+                try:
+                    if update.callback_query:
+                        await target_msg.edit_text(msg, parse_mode="Markdown", reply_markup=csx_keyboard)
+                    else:
+                        await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=csx_keyboard)
+                except Exception:
+                    clean_txt = msg.replace('*', '').replace('`', '').replace('_', '')
+                    if update.callback_query:
+                        await target_msg.edit_text(clean_txt, reply_markup=csx_keyboard)
+                    else:
+                        await target_msg.reply_text(clean_txt, reply_markup=csx_keyboard)
+
+        self.app.add_handler(CommandHandler("csx", csx_command))
+        self.app.add_handler(CommandHandler("csxtrade", csx_command))
+        self.app.add_handler(CommandHandler("cambodia_stock", csx_command))
+        self.app.add_handler(CommandHandler("angkor_csx", csx_command))
+
         self.app.add_handler(CommandHandler("capital", capital_command))
         self.app.add_handler(CommandHandler("capital_com", capital_command))
         self.app.add_handler(CommandHandler("capitalcom", capital_command))
@@ -27748,6 +27889,18 @@ class TelegramBotThread(BaseThread):
         )
 
         self.log_signal.emit("⚙️ Pre-Pump Daily Train job scheduled at 2:00 AM (UTC+7).")
+
+        # 🏛️ CSX AI Market Monitor (Every 60s during trading days/hours)
+        self.scheduler.add_job(
+            scheduler_tasks.csx_market_monitor,
+            'interval',
+            seconds=60,
+            max_instances=1,
+            coalesce=True,
+            args=[self.app],
+            id='csx_market_monitor'
+        )
+        self.log_signal.emit("🏛️ Cambodia Securities Exchange (CSX) AI Monitor job scheduled (60s loop).")
 
         self.scheduler.start()
         self.log_signal.emit("⏰ APScheduler started (Cron Jobs active).")
