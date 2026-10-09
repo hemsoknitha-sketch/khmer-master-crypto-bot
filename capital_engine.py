@@ -83,7 +83,9 @@ EPIC_MAP = {
     "SP500": "US500",           # S&P 500 Index
     "NASDAQ": "US100",          # Nasdaq 100 Tech Index
     "DOW": "US30",              # Dow Jones Industrial Average
-    "DAX": "GERMANY40",         # German DAX 40
+    "DAX": "DE40",              # German DAX 40 (Capital.com canonical epic)
+    "GERMANY40": "DE40",        # German DAX 40
+    "DE40": "DE40",             # German DAX 40
     # US Mega-Cap Stocks
     "META": "META",             # Meta Platforms Inc
     "GOOGL": "GOOGL",           # Alphabet Inc (Google) Class A
@@ -749,7 +751,10 @@ class CapitalComEngine:
         take_profit: Optional[float] = None,
         guaranteed_stop: bool = False,
         max_allowed_spread: Optional[float] = None,
-        bypass_citadel: bool = False
+        bypass_citadel: bool = False,
+        stop_level: Optional[float] = None,
+        profit_level: Optional[float] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Executes a Market CFD order on Capital.com with full risk protection.
@@ -763,6 +768,10 @@ class CapitalComEngine:
         - max_allowed_spread: Maximum acceptable spread before rejecting order (Spread Guard)
         - bypass_citadel: If True, bypasses SuperSmartCapitalCitadel validation
         """
+        if stop_loss is None and stop_level is not None:
+            stop_loss = stop_level
+        if take_profit is None and profit_level is not None:
+            take_profit = profit_level
         resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
         dir_upper = direction.upper()
         if dir_upper not in ["BUY", "SELL"]:
@@ -5934,9 +5943,16 @@ class CapitalKellyPositionSizer:
         "OIL": {"base_low": 0.3, "base_high": 0.8, "min_lot": 0.1, "max_lot": 5.0, "lot_step": 0.1, "precision": 1},
         "OIL_CRUDE": {"base_low": 0.3, "base_high": 0.8, "min_lot": 0.1, "max_lot": 5.0, "lot_step": 0.1, "precision": 1},
         "DAX": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "DE40": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
+        "GERMANY40": {"base_low": 0.05, "base_high": 0.15, "min_lot": 0.05, "max_lot": 1.0, "lot_step": 0.05, "precision": 2},
         "BTCUSD": {"base_low": 0.002, "base_high": 0.005, "min_lot": 0.001, "max_lot": 0.10, "lot_step": 0.001, "precision": 3},
         "ETHUSD": {"base_low": 0.05, "base_high": 0.10, "min_lot": 0.01, "max_lot": 0.50, "lot_step": 0.01, "precision": 2},
         "SOLUSD": {"base_low": 0.2, "base_high": 0.5, "min_lot": 0.05, "max_lot": 5.0, "lot_step": 0.05, "precision": 2},
+        "EURUSD": {"base_low": 100.0, "base_high": 300.0, "min_lot": 100.0, "max_lot": 2000.0, "lot_step": 100.0, "precision": 0},
+        "GBPUSD": {"base_low": 100.0, "base_high": 300.0, "min_lot": 100.0, "max_lot": 2000.0, "lot_step": 100.0, "precision": 0},
+        "USDJPY": {"base_low": 100.0, "base_high": 300.0, "min_lot": 100.0, "max_lot": 2000.0, "lot_step": 100.0, "precision": 0},
+        "AUDUSD": {"base_low": 100.0, "base_high": 300.0, "min_lot": 100.0, "max_lot": 2000.0, "lot_step": 100.0, "precision": 0},
+        "NZDUSD": {"base_low": 100.0, "base_high": 300.0, "min_lot": 100.0, "max_lot": 2000.0, "lot_step": 100.0, "precision": 0},
         "NVDA": {"base_low": 0.25, "base_high": 0.60, "min_lot": 0.05, "max_lot": 3.0, "lot_step": 0.05, "precision": 2},
         "TSLA": {"base_low": 0.15, "base_high": 0.35, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
         "AAPL": {"base_low": 0.20, "base_high": 0.50, "min_lot": 0.05, "max_lot": 2.0, "lot_step": 0.05, "precision": 2},
@@ -6149,9 +6165,12 @@ class CapitalSpreadDragManager:
         "US500": 0.80,
         "US100": 1.50,
         "OIL_CRUDE": 0.04,
-        "BTCUSD": 35.0,
-        "ETHUSD": 2.50,
-        "SOLUSD": 0.20,
+        "DE40": 2.0,
+        "GERMANY40": 2.0,
+        "DAX": 2.0,
+        "BTCUSD": 55.0,
+        "ETHUSD": 3.50,
+        "SOLUSD": 0.60,
         "META": 0.30,
         "GOOGL": 0.25,
         "EURUSD": 0.00012,
@@ -6302,9 +6321,11 @@ class CapitalSpreadDragManager:
         # Check VSQI
         if atr > 0 and current_spread > 0:
             vsqi = atr / current_spread
-            if vsqi < min_vsqi:
+            is_forex_asset = any(fx in resolved_epic for fx in ["EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"])
+            target_min_vsqi = 2.0 if is_forex_asset else min_vsqi
+            if round(vsqi, 2) < target_min_vsqi:
                 self._stats["total_rejected_vsqi"] += 1
-                return False, f"VSQI Rejection: {vsqi:.2f} < {min_vsqi:.1f} (market volatility too compressed relative to transaction friction)."
+                return False, f"VSQI Rejection: {vsqi:.2f} < {target_min_vsqi:.1f} (market volatility too compressed relative to transaction friction)."
 
         return True, "SPREAD_PERFECT"
 
@@ -7224,7 +7245,8 @@ class CapitalTrendScalpEngine:
 
         # TradFi weekend closure: Friday 20:45 UTC to Sunday 22:00 UTC
         is_weekend = (weekday == 5) or (weekday == 4 and utc_min >= 1245) or (weekday == 6 and utc_min < 1320)
-        is_swap_shield = (utc_min >= 1245 or utc_min < 420) and not is_weekend  # Overnight lull
+        # Daily Rollover Swap Shield: strictly 20:45 - 23:59 UTC (03:45 - 07:00 ICT)
+        is_swap_shield = (utc_min >= 1245) and not is_weekend  # Overnight lull
 
         if is_weekend or is_swap_shield:
             return list(self.TREND_MAJORS_CRYPTO)
@@ -7348,13 +7370,13 @@ class CapitalTrendScalpEngine:
             tr_5m_list.append(tr)
         atr_5m = sum(tr_5m_list[-10:]) / 10.0 if len(tr_5m_list) >= 10 else (atr_15m * 0.58)
 
-        # Invariant 34: Volatility-to-Spread Quality Index (VSQI = ATR_14 / Spread >= 2.5)
-        if spread > 0 and (atr_15m / spread) < 2.5:
+        # Invariant 34: Volatility-to-Spread Quality Index (VSQI = ATR_14 / Spread >= 2.0)
+        if spread > 0 and round(atr_15m / spread, 2) < 2.0:
             return {
                 "success": False,
                 "epic": resolved_epic,
                 "signal": "HOLD_NEUTRAL",
-                "reason": f"VSQI Rejection: {atr_15m / spread:.2f} < 2.5 (spread drag too high)."
+                "reason": f"VSQI Rejection: {atr_15m / spread:.2f} < 2.0 (spread drag too high)."
             }
 
         direction = None
@@ -7508,6 +7530,8 @@ class CapitalTrendScalpEngine:
                 epic=epic,
                 direction=direction,
                 size=size,
+                stop_loss=sl,
+                take_profit=tp,
                 stop_level=sl,
                 profit_level=tp
             )
