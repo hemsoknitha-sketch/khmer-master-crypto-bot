@@ -4664,5 +4664,170 @@ input:checked + .slider:before {
     color: #fca5a5;
 }
 
+/* ==============================================================================
+   SUPER SMART LIVE ORB 15M CANDLESTICK GRAPHIC & SEPARATED FEATURE HUBS
+   ============================================================================== */
+.gold-orb-graphic-card {
+    background: linear-gradient(135deg, rgba(10, 18, 36, 0.85) 0%, rgba(2, 6, 18, 0.95) 100%);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(234, 179, 8, 0.2);
+    margin-bottom: 20px;
+    padding: 16px;
+    border-radius: 16px;
+}
+
+.gold-chart-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.orb-legend-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    margin: 12px 0 14px 0;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.orb-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #e2e8f0;
+}
+
+.legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.swatch-buy {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+}
+
+.swatch-eq {
+    background: #eab308;
+    box-shadow: 0 0 8px rgba(234, 179, 8, 0.8);
+}
+
+.swatch-sell {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+
+.swatch-price {
+    background: #00f2fe;
+    box-shadow: 0 0 8px rgba(0, 242, 254, 0.8);
+}
+
+.gold-canvas-wrapper {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    background: radial-gradient(circle at 50% 50%, rgba(12, 24, 48, 0.95) 0%, rgba(2, 6, 16, 0.98) 100%);
+    border: 1px solid rgba(0, 242, 254, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+.gold-orb-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.orb-footer-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px 0 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* Quick Access Hub Jump Cards */
+.hub-jump-card {
+    background: linear-gradient(135deg, rgba(8, 14, 28, 0.75) 0%, rgba(2, 6, 18, 0.85) 100%);
+    border: 1px solid rgba(0, 242, 254, 0.2);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 20px;
+}
+
+.hub-jump-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.hub-pill {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.hub-pill:hover, .hub-pill:active {
+    background: rgba(0, 242, 254, 0.1);
+    border-color: rgba(0, 242, 254, 0.4);
+    transform: translateY(-2px);
+}
+
+.hub-icon {
+    font-size: 20px;
+}
+
+.hub-meta {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    margin: 0 6px;
+    flex: 1;
+}
+
+.hub-meta strong {
+    font-size: 11px;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.hub-meta small {
+    font-size: 9px;
+    color: var(--text-muted);
+}
+
+.hub-arrow {
+    color: var(--neon-cyan);
+    font-size: 14px;
+    font-weight: 800;
+}
+
+@media (max-width: 480px) {
+    .hub-jump-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+}
+
+
 
 

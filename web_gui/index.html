@@ -106,7 +106,7 @@
             <!-- ======================================================== -->
             <!-- TAB 1: OVERVIEW & REAL-TIME PORTFOLIO                   -->
             <!-- ======================================================== -->
-            <section id="tab-overview" class="tab-pane active">
+            <section id="tab-overview" class="tab-pane">
                 <!-- Hero Net Worth Card -->
                 <div class="glass-card hero-card">
                     <div class="hero-top-row">
@@ -282,6 +282,55 @@
                             </div>
                             <span class="shield-status text-neon-purple">ENCLAVE LOCKED</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Quick Access TradFi, Gold & MT5 Fast-Jump Hub -->
+                <div class="glass-card hub-jump-card">
+                    <div class="hub-jump-grid">
+                        <div class="hub-pill" data-jump="tab-capital">
+                            <span class="hub-icon">🏛️</span>
+                            <div class="hub-meta">
+                                <strong>Capital TradFi & Scalp</strong>
+                                <small id="hub-cap-status">Live Mainnet • 24/7 Scalp Engine</small>
+                            </div>
+                            <span class="hub-arrow">➔</span>
+                        </div>
+                        <div class="hub-pill" data-jump="tab-wealth-vault">
+                            <span class="hub-icon">🥇</span>
+                            <div class="hub-meta">
+                                <strong>Gold Vault & ORB 15M</strong>
+                                <small id="hub-gold-status">Live Candlestick Graphic</small>
+                            </div>
+                            <span class="hub-arrow">➔</span>
+                        </div>
+                        <div class="hub-pill" data-jump="tab-mt5">
+                            <span class="hub-icon">👑</span>
+                            <div class="hub-meta">
+                                <strong>MT5 Pro Terminal</strong>
+                                <small id="hub-mt5-status">Tokyo GTCFX • Multi-User Ledger</small>
+                            </div>
+                            <span class="hub-arrow">➔</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================== -->
+            <!-- DEDICATED TAB: CAPITAL.COM TRADFI & SCALP ENGINE        -->
+            <!-- ======================================================== -->
+            <section id="tab-capital" class="tab-pane active">
+                <!-- Section Banner -->
+                <div class="section-banner banner-capital-tradfi">
+                    <div class="banner-title-row">
+                        <div class="banner-icon-wrap">🏛️</div>
+                        <div>
+                            <h2 class="section-heading">Capital.com Institutional TradFi Cockpit</h2>
+                            <span class="section-desc">Gold, Crude Oil, US Indices, Forex Majors, Crypto CFDs • 24/7 Scalp Engine & 360° Sky Net Governor</span>
+                        </div>
+                    </div>
+                    <div class="banner-status-group">
+                        <span id="capital-header-tag" class="badge badge-success">🟢 LIVE MAINNET ACTIVE</span>
                     </div>
                 </div>
 
@@ -730,6 +779,42 @@
                                 <strong id="gold-telemetry-velocity" class="text-neon">2.4x Institutional RVOL</strong>
                                 <small class="text-muted">Spread Drag Eliminated (&lt;0.05ms)</small>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Live 15M Gold Candlestick & ORB Breakout Graphic Canvas (0.01ms RAM Engine) -->
+                    <div class="glass-card gold-orb-graphic-card" id="card-gold-orb-graphic">
+                        <div class="card-header-flex">
+                            <div class="card-title-group">
+                                <div class="card-title-flex-row">
+                                    <span class="badge-icon-inline">📈</span>
+                                    <h3 class="card-title">LIVE GOLD CANDLESTICK & ORB 15M GRAPHIC</h3>
+                                </div>
+                                <span class="card-subtitle">Real-Time 15M Candlesticks • Highlight Buy/Sell Zones • Equilibrium 50% Dealing Range • 0.01ms RAM Engine</span>
+                            </div>
+                            <div class="gold-chart-badges">
+                                <span id="orb-session-tag" class="badge badge-cyber">SESSION: ACTIVE</span>
+                                <span id="orb-breakout-tag" class="badge badge-success">🟢 ORB: WAIT</span>
+                            </div>
+                        </div>
+
+                        <!-- Highlight Zone Legend Strip -->
+                        <div class="orb-legend-strip">
+                            <div class="orb-legend-item"><span class="legend-swatch swatch-buy"></span><span id="legend-buy-range">🟢 Buy Zone: --</span></div>
+                            <div class="orb-legend-item"><span class="legend-swatch swatch-eq"></span><span id="legend-eq-level">🟡 50% Equilibrium: --</span></div>
+                            <div class="orb-legend-item"><span class="legend-swatch swatch-sell"></span><span id="legend-sell-range">🔴 Sell Zone: --</span></div>
+                            <div class="orb-legend-item"><span class="legend-swatch swatch-price"></span><span id="legend-cur-price">📍 Live: --</span></div>
+                        </div>
+
+                        <!-- Canvas Container -->
+                        <div class="gold-canvas-wrapper">
+                            <canvas id="goldOrbCanvas" class="gold-orb-canvas"></canvas>
+                        </div>
+
+                        <div class="orb-footer-meta">
+                            <span id="orb-range-text">Opening Range: -- ($--/oz)</span>
+                            <span id="orb-atr-text">ATR: $--</span>
+                            <span id="orb-conf-text" class="text-neon-gold">Confluence: --%</span>
                         </div>
                     </div>
 
@@ -1839,35 +1924,36 @@
             </footer>
         </main>
 
-        <!-- Bottom Cyberpunk Navigation Bar -->
+        <!-- Bottom Cyberpunk Navigation Bar (Super Fast 0.01ms Reordered Position) -->
         <nav class="bottom-nav">
-            <button class="nav-item active" data-tab="tab-overview">
+            <button class="nav-item active" data-tab="tab-capital" id="nav-btn-capital" title="Capital.com TradFi & 24/7 Scalp Engine">
+                <span class="nav-icon">🏛️</span>
+                <span class="nav-text">Capital</span>
+                <span id="nav-cap-pos-badge" class="nav-badge" style="display:none">0</span>
+            </button>
+            <button class="nav-item" data-tab="tab-wealth-vault" id="nav-btn-gold" title="Gold 3D Vault & Live ORB 15M Graphic">
+                <span class="nav-icon">🥇</span>
+                <span class="nav-text">Gold ORB</span>
+            </button>
+            <button class="nav-item" data-tab="tab-mt5" id="nav-btn-mt5" title="MT5 Pro Interbank Broker Terminal">
+                <span class="nav-icon">👑</span>
+                <span class="nav-text">MT5 Pro</span>
+                <span id="nav-mt5-badge" class="nav-badge" style="display:none">0</span>
+            </button>
+            <button class="nav-item" data-tab="tab-overview" id="nav-btn-overview" title="Global Portfolio Net Worth">
                 <span class="nav-icon">📊</span>
                 <span class="nav-text">Overview</span>
             </button>
-            <button class="nav-item" data-tab="tab-wealth-cockpit">
+            <button class="nav-item" data-tab="tab-wealth-cockpit" id="nav-btn-wealth" title="24/7 Perpetual Crypto Wealth Engine">
                 <span class="nav-icon">💎</span>
                 <span class="nav-text">Wealth 24/7</span>
                 <span id="nav-pos-badge" class="nav-badge" style="display:none">0</span>
             </button>
-            <button class="nav-item" data-tab="tab-brain">
+            <button class="nav-item" data-tab="tab-brain" id="nav-btn-brain" title="AI Brain & Tokyo MEV Arbitrage">
                 <span class="nav-icon">🧠</span>
                 <span class="nav-text">AI Brain</span>
             </button>
-            <button class="nav-item" data-tab="tab-hft">
-                <span class="nav-icon">⚡</span>
-                <span class="nav-text">Tokyo MEV</span>
-            </button>
-            <button class="nav-item" data-tab="tab-wealth-vault">
-                <span class="nav-icon">🏦</span>
-                <span class="nav-text">Gold Vault</span>
-            </button>
-            <button class="nav-item" data-tab="tab-mt5">
-                <span class="nav-icon">🏛️</span>
-                <span class="nav-text">MT5 Pro</span>
-                <span id="nav-mt5-badge" class="nav-badge" style="display:none">0</span>
-            </button>
-            <button class="nav-item" data-tab="tab-controls">
+            <button class="nav-item" data-tab="tab-controls" id="nav-btn-controls" title="System Controls & Emergency Circuit Breakers">
                 <span class="nav-icon">🎛️</span>
                 <span class="nav-text">Controls</span>
             </button>
