@@ -1882,10 +1882,10 @@ class CapitalComEngine:
 
         mid_px = (bid + ask) / 2.0 if (bid + ask) > 0 else 1.0
         spread = analysis.get("spread", 0.0)
-        # Enforce Asymmetric R:R >= 1:6 Mathematical Ratio
+        # Dynamic Volatility Breathing Stop: 2.5x ATR + 3.5x Spread for true market room (Noise-proof)
         prec = _get_tradfi_precision(resolved_epic, mid_px)
-        min_sl_dist = max(1.5 * atr, spread * 2.5, 0.0025 * mid_px)
-        min_tp_dist = max(6.0 * min_sl_dist, 6.0 * atr, 0.015 * mid_px)
+        min_sl_dist = max(2.5 * atr, spread * 3.5, 0.0035 * mid_px)
+        min_tp_dist = max(3.5 * min_sl_dist, 6.0 * atr, 0.015 * mid_px)
 
         if dir_u == "BUY":
             if not sl or sl <= 0 or sl >= bid:
@@ -3209,13 +3209,13 @@ class CapitalAutonomousEngine:
                     continue
 
             # =========================================================================
-            # DUAL-LAYER DEFENSE: AUTONOMOUS SOFTWARE RETRACEMENT EXIT GUARD
-            # When position achieved significant profit (Peak >= +$2.50 or Peak ROI >= 6.8%),
+            # DUAL-LAYER DEFENSE: DELAYED AUTONOMOUS SOFTWARE RETRACEMENT EXIT GUARD
+            # When position achieved significant expansion (Peak >= +$6.00 or Peak ROI >= 14.0%),
             # if price pulls back to or below 80%-85% of peak, close via software market order!
-            # Never allow a $6.00+ winner to bleed all the way back to $0.00 scratch.
+            # Prevents premature shakeouts on micro-pullbacks while securing real cash at targets.
             # =========================================================================
             peak_roi = (peak_upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
-            retrace_trigger = (peak_upl >= 2.50 or peak_roi >= 6.8) and (upl <= (peak_upl * ratchet_pct))
+            retrace_trigger = (peak_upl >= 6.00 or peak_roi >= 14.0) and (upl <= (peak_upl * ratchet_pct)) and (upl > max(2.0, spread * 2.0))
             if retrace_trigger:
                 tag = "💎 [AUTONOMOUS RATCHET HARVEST]"
                 logger.info(f"{tag} Peak was ${peak_upl:.2f}, current UPL ${upl:.2f} reached {int(ratchet_pct*100)}% trailing floor. Executing Market Harvest for {epic}...")
@@ -3330,9 +3330,9 @@ class CapitalAutonomousEngine:
 
             # =========================================================================
             # TIER 2 & 3: THE GOLDEN 80%-85% TRAILING RATCHET (Broker Stop-Loss Update)
-            # When profit exceeds >= +7.5% ROI or >= +$2.50 UPL, advance broker Stop-Loss.
+            # When profit exceeds >= +12.0% ROI or >= +$5.00 UPL, advance broker Stop-Loss.
             # =========================================================================
-            ratchet_broker_eligible = (roi_pct >= 7.5 or peak_upl >= 2.50 or upl >= 2.50) and peak_upl > 0
+            ratchet_broker_eligible = (roi_pct >= 12.0 or peak_upl >= 5.00 or upl >= 5.00) and peak_upl > 0
             if ratchet_broker_eligible:
                 target_protected_profit = peak_upl * ratchet_pct
                 if direction == "BUY":
@@ -3374,11 +3374,11 @@ class CapitalAutonomousEngine:
 
             # =========================================================================
             # TIER 1: MATHEMATICAL BREAKEVEN ARMOR WITH NOISE BUFFER (Invariant 35)
-            # Triggers at >= +4.8% ROI or >= +$1.50 UPL on margin.
+            # Triggers at >= +8.5% ROI or >= +$3.50 UPL on margin (Delayed to give trade breathing room).
             # Guaranteed to place SL strictly below current market price for BUY (and above for SELL)
             # while locking in Entry + (Spread * 0.5) to secure a net positive return after broker fees.
             # =========================================================================
-            if (roi_pct >= 4.8 or upl >= 1.50) and deal_id not in self._be_locked_set:
+            if (roi_pct >= 8.5 or upl >= 3.50) and deal_id not in self._be_locked_set:
                 if direction == "BUY":
                     target_be_sl = round(entry_level + max(spread * 0.5, 0.001 * entry_level), 2)
                     safe_ceiling_sl = round(current_price - (spread * 1.5), 2)
@@ -7383,8 +7383,9 @@ class CapitalTrendScalpEngine:
         entry_price = 0.0
         sl_price = 0.0
         tp_price = 0.0
-        sl_dist = max(1.10 * atr_5m, 2.5 * spread)
-        tp_dist = max(2.50 * atr_5m, 10.0 * spread)  # Invariant 34: Minimum 10x Spread Hurdle
+        # Dynamic Volatility Breathing Stop (2.20x ATR_15m or 3.0x ATR_5m to eradicate noise premature shakeouts)
+        sl_dist = max(2.20 * atr_15m, 3.0 * atr_5m, 3.5 * spread)
+        tp_dist = max(2.50 * sl_dist, 10.0 * spread)  # Invariant 34: Minimum 10x Spread Hurdle
 
         if is_15m_bullish:
             # Bullish Pullback: Price recently tested near EMA21 and closed back above EMA9/21
@@ -7411,13 +7412,45 @@ class CapitalTrendScalpEngine:
                 "reason": "Waiting for 5M Pullback Rejection towards EMA 21."
             }
 
+        # 5. Super Smart 360° Institutional Citadel Trap & Liquidity Sweeps Verification
+        citadel_approved = True
+        citadel_score = 85.0
+        try:
+            import super_smart_capital_citadel
+            cit_eval = super_smart_capital_citadel.SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap(
+                resolved_epic, direction, engine=eng
+            )
+            citadel_approved = cit_eval.get("is_approved", True)
+            citadel_score = float(cit_eval.get("confluence_score", 85.0))
+            if not citadel_approved:
+                return {
+                    "success": False,
+                    "epic": resolved_epic,
+                    "signal": "HOLD_NEUTRAL",
+                    "reason": f"360° Citadel Trap Block: {cit_eval.get('rejection_reason', 'Trap detected')}"
+                }
+            # Structural Invalidation Anchor from Citadel if available
+            if cit_eval.get("invalidation_sl"):
+                cit_sl = float(cit_eval["invalidation_sl"])
+                if direction == "BUY" and cit_sl < entry_price:
+                    sl_dist = max(sl_dist, entry_price - cit_sl)
+                    sl_price = entry_price - sl_dist
+                elif direction == "SELL" and cit_sl > entry_price:
+                    sl_dist = max(sl_dist, cit_sl - entry_price)
+                    sl_price = entry_price + sl_dist
+                tp_dist = max(tp_dist, sl_dist * 2.5)
+                tp_price = entry_price + tp_dist if direction == "BUY" else entry_price - tp_dist
+        except Exception as e_cit:
+            logger.debug(f"360 Citadel check note: {e_cit}")
+
         rr_ratio = tp_dist / sl_dist if sl_dist > 0 else 2.5
+        final_conf = max(85.0, min(98.0, citadel_score))
 
         return {
             "success": True,
             "epic": resolved_epic,
             "signal": direction,
-            "confidence": 85.0,
+            "confidence": round(final_conf, 1),
             "entry_price": entry_price,
             "sl": round(sl_price, 4),
             "tp": round(tp_price, 4),
@@ -7427,7 +7460,7 @@ class CapitalTrendScalpEngine:
             "spread": spread,
             "atr_5m": round(atr_5m, 4),
             "atr_15m": round(atr_15m, 4),
-            "reason": f"15M Trend + 5M Pullback Impulse (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied)"
+            "reason": f"15M Trend + 5M Pullback Impulse + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Breathing SL)"
         }
 
     async def execute_scalp_cycle(self, app=None):
@@ -7589,9 +7622,9 @@ class CapitalTrendScalpEngine:
                             f"🎯 **ទិសដៅ ៖** `{direction}` (15M Trend + 5M Pullback)\n"
                             f"📦 **ទំហំ ៖** `{size} contracts` (Margin: `${budget:.2f}`)\n"
                             f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
-                            f"🛑 **Tight Stop-Loss ៖** `${sl:,.2f}` (1.1x ATR Noise Buffer)\n"
+                            f"🛑 **Dynamic Breathing Stop ៖** `${sl:,.2f}` (2.2x ATR Noise Buffer)\n"
                             f"🎯 **Scalp Target TP ៖** `${tp:,.2f}` (R:R 1:{rr_val:.1f} | 10x Spread Hurdle)\n"
-                            f"🛡️ **ការការពារ ៖** `Breakeven Armor @ +1.2R (0.00R Risk)`\n"
+                            f"🛡️ **ការការពារ ៖** `Delayed Multi-Tier Harvest & Breakeven Armor`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"🚀 _ប្រព័ន្ធដេញកើបចំណេញតាម Trend ស្វ័យប្រវត្ត ២៤/៧!_"
                         )
