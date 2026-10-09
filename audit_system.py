@@ -833,6 +833,9 @@ def run_audit():
         has_be_sell = "safe_floor_sl = round(current_price + (spread * 1.5), 2)" in cap_code and "new_sl = max(target_be_sl, safe_floor_sl)" in cap_code
         has_gold_clamp = 'resolved_epic == "GOLD":' in cap_code and "min_size" in cap_code
         has_inv35 = "Invariant 35" in agents_code and "Mathematical Breakeven Armor" in agents_code
+        has_breathing_sl = "min_sl_dist = max(2.5 * atr, spread * 3.5, 0.0035 * mid_px)" in cap_code
+        has_delayed_harvest = "peak_upl >= 6.00 or peak_roi >= 14.0" in cap_code and "roi_pct >= 8.5 or upl >= 3.50" in cap_code
+        has_citadel_clearance = "evaluate_institutional_tradfi_trap" in cap_code
 
         # Dynamic Unit Test: Mathematical price buffer verification
         entry = 100.0
@@ -859,10 +862,10 @@ def run_audit():
             (eff_sl_sell - cur_p_sell) >= (spread * 1.5)
         )
 
-        if has_cooldowns and has_be_buy and has_be_sell and has_gold_clamp and has_inv35 and math_ok:
+        if has_cooldowns and has_be_buy and has_be_sell and has_gold_clamp and has_inv35 and math_ok and has_breathing_sl and has_delayed_harvest and has_citadel_clearance:
             log_pass("Mathematical Breakeven Armor, Anti-Whipsaw Buffer & 15m Cooldown (Invariant 35) are 100% locked & certified!")
         else:
-            failures.append(f"Invariant 35 check failed: cooldowns={has_cooldowns}, be_buy={has_be_buy}, be_sell={has_be_sell}, gold_clamp={has_gold_clamp}, inv35={has_inv35}, math_ok={math_ok}")
+            failures.append(f"Invariant 35 check failed: cooldowns={has_cooldowns}, be_buy={has_be_buy}, be_sell={has_be_sell}, gold_clamp={has_gold_clamp}, inv35={has_inv35}, math_ok={math_ok}, breathing={has_breathing_sl}, harvest={has_delayed_harvest}, citadel={has_citadel_clearance}")
             log_fail("Mathematical Breakeven Armor (Invariant 35) specification missing or unit test failure!")
     except Exception as e:
         failures.append(f"Invariant 35 check failed: {e}")
@@ -2387,6 +2390,8 @@ def run_audit():
         has_ema_confluence = ("ema9_15m > ema21_15m" in cap_code and "ema9_15m < ema21_15m" in cap_code) or ("ema9 > ema21" in cap_code)
         has_zero_swap = "is_swap_shield" in cap_code or "Swap Shield" in cap_code
         has_autonomous_integration = "CAPITAL_SCALP_ENGINE" in cap_code and "get_capital_trend_scalp_engine" in cap_code
+        has_scalp_breathing_sl = "max(2.20 * atr_15m, 3.0 * atr_5m, 3.5 * spread)" in cap_code
+        has_scalp_citadel = "evaluate_institutional_tradfi_trap" in cap_code and "SuperSmartCapitalCitadel" in cap_code
 
         # 3. Check database.py for scalp tables and helper functions
         with open("database.py", "r", encoding="utf-8") as df:
@@ -2433,13 +2438,14 @@ def run_audit():
             has_zero_swap and has_autonomous_integration and has_scalp_tables and
             has_db_scalp_fns and has_scalp_cmd and has_scalp_callbacks and
             has_reg_scalp and unit_cfg_default and unit_cfg_updated and
-            unit_scalp_recorded and unit_scalp_closed
+            unit_scalp_recorded and unit_scalp_closed and
+            has_scalp_breathing_sl and has_scalp_citadel
         )
 
         if all_inv65_passed:
             log_pass("Angkor Capital 24/7 Trend Scalping Engine, 3-EMA Confluence, Zero-Swap Rollover Shield & Telegram Suite (Invariant 65) are 100% certified!")
         else:
-            failures.append(f"Invariant 65 check failed: inv65={has_inv65}, cls={has_scalp_engine_cls}, ema={has_ema_confluence}, swap={has_zero_swap}, auto={has_autonomous_integration}, tables={has_scalp_tables}, db_fns={has_db_scalp_fns}, cmd={has_scalp_cmd}, callbacks={has_scalp_callbacks}, reg={has_reg_scalp}, cfg_def={unit_cfg_default}, cfg_upd={unit_cfg_updated}, rec={unit_scalp_recorded}, closed={unit_scalp_closed}")
+            failures.append(f"Invariant 65 check failed: inv65={has_inv65}, cls={has_scalp_engine_cls}, ema={has_ema_confluence}, swap={has_zero_swap}, auto={has_autonomous_integration}, tables={has_scalp_tables}, db_fns={has_db_scalp_fns}, cmd={has_scalp_cmd}, callbacks={has_scalp_callbacks}, reg={has_reg_scalp}, cfg_def={unit_cfg_default}, cfg_upd={unit_cfg_updated}, rec={unit_scalp_recorded}, closed={unit_scalp_closed}, breathing={has_scalp_breathing_sl}, citadel={has_scalp_citadel}")
             log_fail("Angkor Capital 24/7 Trend Scalping Engine (Invariant 65) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 65 check failed: {e}")

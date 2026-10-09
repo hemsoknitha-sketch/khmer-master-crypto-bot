@@ -1,5 +1,5 @@
 # ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ69)
-**Document Version:** 6.7.0 (Angkor Quant Master Specification - The 69 Pillars)  
+**Document Version:** 6.8.0 (Angkor Quant Master Specification - The 69 Pillars & TradFi Fiduciary Integrity Lock)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -30,6 +30,20 @@ The system is engineered upon two non-negotiable axioms:
   2. Lay bare the raw mathematical and historical probabilities of capital destruction.
   3. Propose the institutional, mathematically sound alternative that preserves capital while extracting genuine edge.
 - **Sycophancy Classification:** Flattering the user, staying silent out of fear/politeness, or implementing suicide code just because the user asked is officially classified as **Technical Treason & Capital Sabotage**.
+
+### 1.1.1 THE FOUR PILLARS OF CAPITAL.COM TRADFI FIDUCIARY HONESTY & SPREAD FRICTION ELIMINATION
+**(គ្រឹះ៤ប្រការស្មោះត្រង់វិស្វកម្ម & កម្ចាត់កាត់ខាតញាក់ Spread ក្នុង Capital.com TradFi)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
+1. **Pillar 1: Absolute Refusal of No-SL Recklessness (ហាមដាច់ខាតការលុប SL ឬទុកបណ្តោយឱ្យឆេះគណនី):** Leveraged CFD trading ($20\times$) without hard Stop-Loss guarantees eventual account ruin during sudden flash crashes or extreme market volatility. Any request to remove Stop-Loss or "hold through drawdowns without risk bounds" MUST be firmly refused under the Sacred Fiduciary Oath. Capital preservation is non-negotiable.
+2. **Pillar 2: Dynamic Volatility Breathing Stop Standard (កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួល):** Stop-Loss distance must be mathematically shielded by volatility and broker friction:
+   - TradFi Standard: $\text{SL Distance} \ge \max(2.50\times\text{ATR}, 3.5\times\text{Spread}, 0.0035\times\text{Price})$.
+   - Trend Scalp Standard: $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$.
+   - Static or micro stops ($1.0\times\text{ATR}_{5m}$) that get clipped by broker spread expansion or minor oscillations before directional thrust can unfold are strictly prohibited.
+3. **Pillar 3: 360° Citadel Sweep Confirmation & Trap Clearance (ស្ទាក់ចាប់កម្លាំងពិតប្រាកដ & លុបបំបាត់ Sideways Chop Trap):** Every entry must be vetted by Institutional 360° Citadel Trap Clearance with $ADX \ge 25.0$ and multi-timeframe structural confluence to guarantee strong directional momentum ($E[X] > 0$) and prevent entering inside retail trap sweeps.
+4. **Pillar 4: Delayed Multi-Tier Harvest & Fee-Clearing Trailing Ratchet (កម្ចាត់ការកៀរយកចំណេញកម្ទេចកម្ទី $+\$0.14 - +\$0.50$):**
+   - Breakeven Armor is delayed until position achieves genuine momentum ($\ge +8.5\%$ ROI or $\ge +\$3.50$ UPL), ensuring early price oscillations do not choke the trade at scratch.
+   - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$6.00$ or $\ge +14.0\%$ ROI.
+   - Any Retracement Harvest exit must strictly enforce a guaranteed net fee clearing floor ($\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$) to prevent eating crumbs and death by a thousand papercuts.
 
 ### 1.2 THE APEX PRINCIPAL SOFTWARE ENGINEER NODE & DETERMINISTIC STATE MEMORY COVENANT
 **(គ្រឹះវិស្វករស្ថាបត្យករកំពូល & បញ្ជាចងចាំរចនាសម្ព័ន្ធអចិន្ត្រៃយ៍ ប្រឆាំងការភ្លេចភ្លាំង និងការបំបែកកូដ)**
@@ -392,17 +406,25 @@ Any modification that breaks any of the following 55 invariants is considered an
 - **Location:** `capital_engine.py` (`_ratchet_engine_positions`, `execute_autonomous_cycle`, `execute_orb_cycle`, `execute_smart_tradfi_order`), `audit_system.py`
 - **Rule:** To eliminate "Death by a Thousand Papercuts", premature stop-outs, and spread bleed on Capital.com CFD positions:
   1. **Strict Mathematical Price Buffering for Breakeven Armor:**
-     - Breakeven Armor triggers strictly at $\ge +8.0\%$ ROI on margin ($\ge +1.5\text{R}$).
+     - Breakeven Armor triggers strictly at $\ge +8.5\%$ ROI on margin or $\ge +\$3.50$ UPL ($\ge +1.5\text{R}$), providing ample breathing room before shifting stop levels.
      - The modified Stop-Loss for BUY positions MUST be strictly $\le \text{current\_market\_price} - (1.5 \times \text{Spread})$, and for SELL positions MUST be $\ge \text{current\_market\_price} + (1.5 \times \text{Spread})$ — NEVER higher than market price for BUY or lower for SELL.
      - The Stop-Loss locks in at least $\text{Entry} + (0.5 \times \text{Spread})$ for BUY (and $\text{Entry} - 0.5 \times \text{Spread}$ for SELL) to guarantee a genuine net profit after all broker spread costs.
-  2. **15-Minute Anti-Overtrading Asset Cooldown Shield:**
+  2. **Dynamic Volatility Breathing Stop Distance:**
+     - Initial Stop-Loss in `execute_smart_tradfi_order` must enforce:
+       $$\text{SL Distance} \ge \max(2.50 \times \text{ATR}, 3.50 \times \text{Spread}, 0.0035 \times \text{Price})$$
+     - Completely eradicates premature shakeouts from broker spread widening or normal market breathing noise.
+  3. **Delayed Multi-Tier Harvest & Fee-Clearing Trailing Ratchet:**
+     - Position Retracement Exit is delayed until peak UPL achieves $\ge +\$6.00$ or $\ge +14.0\%$ ROI on margin.
+     - Closes only when guaranteed net profit clears fees: $\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$.
+     - Broker Stop-Loss Ratchet is delayed until $\ge +12.0\%$ ROI or peak UPL $\ge +\$5.00$.
+  4. **15-Minute Anti-Overtrading Asset Cooldown Shield:**
      - Whenever a position closes (via SL, TP, or Breakeven), a mandatory 15-minute cooldown (`self._asset_cooldowns[epic] = now + 900.0`) is enforced on that asset.
      - Prevents high-frequency re-entry churn and repeated spread bleed in sideways consolidation.
-  3. **Normalized 1R Dollar Risk Allocation:**
+  5. **Normalized 1R Dollar Risk Allocation:**
      - Sizing across assets is calibrated to equalize 1R dollar risk ($1.20 - $2.50 per trade on micro/small capital), clamping Gold (`GOLD`) to $0.01 - 0.02$ lot so that one loss on Gold cannot overwhelm profits from Oil/Indices/Stocks.
-  4. **Expulsion of Natural Gas from Automated ORB Breakouts:**
+  6. **Expulsion of Natural Gas from Automated ORB Breakouts:**
      - Erratic, wide-spread assets like `NATGAS` are 100% expunged from automated ORB breakout execution.
-  5. **Sub-Millisecond Concurrent Multi-Trader Dispatch (< 0.0005ms Fan-Out Invariant) ៖**
+  7. **Sub-Millisecond Concurrent Multi-Trader Dispatch (< 0.0005ms Fan-Out Invariant):**
      - Sequential iteration loops over multiple active users are strictly eliminated.
      - Trade evaluations, balance verifications, and order executions across all active traders (Live Mainnet and Demo Evaluation) are dispatched simultaneously in parallel via syncio.gather and dedicated thread-pool workers (xecute_autonomous_cycle, xecute_orb_cycle, _execute_lead_lag_trade_worker, xecute_forex_cycle).
      - Eliminates the 4–5 second sequential broker delay between users, guaranteeing identical market snapshot pricing, zero execution disparity, and synchronized Breakeven Armor execution across tens of thousands of traders.
@@ -1006,8 +1028,11 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - BUY Setup: Requires strictly $\text{EMA}_9 > \text{EMA}_{21} > \text{EMA}_{50}$, current price above $\text{EMA}_9$, and RSI momentum in the sweet spot ($44 \le \text{RSI} \le 68$).
      - SELL Setup: Requires strictly $\text{EMA}_9 < \text{EMA}_{21} < \text{EMA}_{50}$, current price below $\text{EMA}_9$, and RSI momentum in the sweet spot ($32 \le \text{RSI} \le 56$).
      - Sideways consolidation (ADX $< 22$ or tangled EMAs) is strictly rejected.
-  3. **Dynamic $1.25\times\text{ATR}$ Envelope & Asymmetric Multi-Tier TP:**
-     - Stop-Loss is clamped to structural swing / $1.25\times\text{ATR}$.
+  3. **Dynamic Volatility Breathing Stop & 360° Citadel Trap Clearance:**
+     - Stop-Loss distance must strictly enforce:
+       $$\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.50\times\text{Spread})$$
+     - Eradicates tight stop-outs ($1.1\times\text{ATR}_{5m}$) and broker spread expansion cuts.
+     - Mandatory 360° Citadel Trap Clearance (`evaluate_institutional_tradfi_trap`) vetting $ADX \ge 25.0$ and liquidity sweeps to eliminate entering into false consolidation traps.
      - Multi-tier scale-out targets: TP1 at $+1.5R$ (locks Breakeven), TP2 at $+2.5R$ (locks $+1.0R$), TP3 at $+4.0R$ (complete harvest).
   4. **Non-Negotiable Zero-Swap Rollover Shield (Invariant 53 Compliance):**
      - Scalp positions are strictly intra-day. Any open scalp trade approaching 21:00 UTC (broker rollover cutoff) is proactively closed or tightened, and all new scalp entries are suppressed between 20:30 UTC and 22:00 UTC.
