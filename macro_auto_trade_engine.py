@@ -991,11 +991,31 @@ async def run_macro_auto_trade_scanner_cycle(app):
                 waterfall_res = await asyncio.to_thread(scan_macro_waterfall_opportunity, sym)
                 if waterfall_res.get("signal"):
                     scored_candidates.append(waterfall_res)
+                    try:
+                        from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                        SuperSmartFuturesCitadel.arm_in_memory_trap(
+                            symbol=sym,
+                            engine_source="AUTO_TRADE",
+                            current_price=waterfall_res.get("entry_price", 0.0),
+                            swing_low=waterfall_res.get("entry_price", 0.0)
+                        )
+                    except Exception:
+                        pass
 
                 # 2. Test Institutional Breakout
                 breakout_res = await asyncio.to_thread(scan_macro_breakout_opportunity, sym)
                 if breakout_res.get("signal"):
                     scored_candidates.append(breakout_res)
+                    try:
+                        from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                        SuperSmartFuturesCitadel.arm_in_memory_trap(
+                            symbol=sym,
+                            engine_source="AUTO_TRADE",
+                            current_price=breakout_res.get("entry_price", 0.0),
+                            swing_high=breakout_res.get("entry_price", 0.0)
+                        )
+                    except Exception:
+                        pass
 
             # Sort by highest confidence score first (Tournament Selection)
             scored_candidates.sort(key=lambda x: x.get("confidence", 0.0), reverse=True)
@@ -1025,6 +1045,14 @@ async def run_macro_auto_trade_scanner_cycle(app):
                 if exec_res.get("status") == "success":
                     _macro_failed_margin_cooldown.pop((chat_id, sym), None)
                     actual_lev = exec_res.get("leverage", base_lev)
+
+                    # In-Memory Virtual Radar OCO Disarm of Opposing Side
+                    try:
+                        from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                        SuperSmartFuturesCitadel.disarm_radar_trap(f"AUTO_TRADE_{sym}", reason=f"EXECUTED_{side}")
+                    except Exception:
+                        pass
+
                     if app and hasattr(app, "bot"):
                         try:
                             strat_title = "🌊 **APEX MACRO WATERFALL SHORT EXECUTED!** 🚀" if side == "SHORT" else "🚀 **APEX MACRO BREAKOUT LONG EXECUTED!** 📈"

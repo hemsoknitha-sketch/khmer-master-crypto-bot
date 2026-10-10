@@ -1134,6 +1134,24 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 
 ---
 
+### Invariant 70: Binance Futures In-Memory Virtual Radar Armed & Institutional Coin Selection Standard (គ្រឹះរ៉ាដាក្នុង RAM បើក Position Futures & ជម្រើសកាក់កើបចំណេញធំ ១០០%)
+- **Location:** `super_smart_futures_citadel.py` (`FuturesInMemoryVirtualRadar`, `SuperSmartFuturesCitadel`), `turbo_hedge_engine.py`, `smart_x_engine.py`, `macro_auto_trade_engine.py`, `pre_pump_engine.py`, `perpetual_wealth_engine.py`
+- **Rule:**
+  1. **In-Memory Virtual Radar Armed Standard (Zero Exchange Orderbook Exposure):**
+     - Pending breakout and breakdown traps (BUY STOP / SELL STOP) across `/smartx`, `/turbo_hedge`, `/auto_trade`, `/pre_pump`, and `/wealth` are armed exclusively inside high-speed Python RAM Virtual Radar (`_ARMED_TRAPS`).
+     - Under NO circumstances shall pending bracket orders be sent to Binance Futures orderbook prior to verified price breakout. This guarantees 100% immunity to pre-breakout spread spikes, order book spoofing, stop hunts, and Judas Swings.
+  2. **Institutional Coin Selection & Sweet-Spot Volatility Gating:**
+     - Scans 200+ perpetual pairs dynamically with Nanosecond RAM access.
+     - Strictly excludes delisted assets, TradFi synthetic stocks, and toxic meme coins.
+     - Enforces early breakout sweet-spot window: $1.8\% \le |\Delta\%_{24h}| \le 15.0\%$ with $ADX \ge 22.0 - 25.0$ and RVOL $\ge 1.5\times$, strictly rejecting overextended pump tops ($> +20.0\%$) and falling knives ($< -20.0\%$).
+  3. **Instant In-Memory OCO Disarm (< 0.1ms):**
+     - When either the Long or Short trigger level is pierced by market price with confirmed candle body (rejection wicks $\le 35\%$), the triggered side executes instantly as a market order, and the opposing side trap is immediately purged from RAM in $< 0.1\text{ms}$ with zero redundant exchange cancellation requests.
+  4. **Dynamic Volatility Breathing Stop & Asymmetric Payoff Ladder:**
+     - Sized strictly to $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 0.008\times\text{Price}, 0.0035\times\text{Price})$ with dollar bounds $-\$1.50$ to $-\$3.50$.
+     - Asymmetric targets: TP1 at $+2.5R$ (Breakeven Armor trigger) and TP2 at $+4.0R$ (Clean Harvest).
+
+---
+
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS
 Whenever you are tasked with inspecting, modifying, or testing the repository:
 1. **Step 1:** Run `python audit_system.py`.

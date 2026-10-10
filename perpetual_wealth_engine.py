@@ -373,6 +373,25 @@ class PerpetualWealthGeneratorEngine:
 
             # Sort by highest AI score, highest RVOL volume spike, and highest 1h fresh momentum
             candidates.sort(key=lambda x: (x["ai_score"], x.get("rvol", 1.0), abs(x.get("chg_1h", 0.0))), reverse=True)
+
+            # Arm In-Memory Virtual Radar Traps in RAM (Zero exchange orderbook exposure)
+            try:
+                from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                for cand_item in candidates[:5]:
+                    c_sym = cand_item["symbol"]
+                    c_px = cand_item["last_price"]
+                    c_atr = c_px * (cand_item.get("atr_pct", 1.5) / 100.0)
+                    SuperSmartFuturesCitadel.arm_in_memory_trap(
+                        symbol=c_sym,
+                        engine_source="WEALTH",
+                        current_price=c_px,
+                        atr_15m=c_atr,
+                        swing_high=c_px * 1.015,
+                        swing_low=c_px * 0.985
+                    )
+            except Exception:
+                pass
+
             return candidates[:limit]
         except Exception as e:
             print(f"⚠️ [PERPETUAL WEALTH SCAN ERROR]: {e}")
@@ -1612,6 +1631,13 @@ class PerpetualWealthGeneratorEngine:
                                 print(f"⚠️ [WEALTH ORDER NOT PLACED] {sym}: {err_msg}")
                                 add_wealth_cooldown(sym, duration_seconds=300)
                                 continue
+
+                            # In-Memory Virtual Radar OCO Disarm of Opposing Side
+                            try:
+                                from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                                SuperSmartFuturesCitadel.disarm_radar_trap(f"WEALTH_{sym}", reason=f"EXECUTED_{side}")
+                            except Exception:
+                                pass
 
                             # MT5 Prop Firm Bridge Dual-Dispatch Synchronization (Apex 98%+ Conviction Execution)
                             try:

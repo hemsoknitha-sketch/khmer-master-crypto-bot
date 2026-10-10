@@ -550,6 +550,16 @@ class PrePumpEngine:
                 if not c_trap.get("is_approved", True):
                     is_technically_valid = False
                     reject_reason = f"Futures Citadel Blocked: {c_trap.get('rejection_reason')}"
+                else:
+                    # Arm in RAM Virtual Radar with zero exchange orderbook exposure
+                    super_smart_futures_citadel.SuperSmartFuturesCitadel.arm_in_memory_trap(
+                        symbol=symbol,
+                        engine_source="PRE_PUMP",
+                        current_price=last_price,
+                        atr_15m=atr_15m,
+                        swing_high=high_price,
+                        swing_low=low_price
+                    )
             except Exception:
                 pass
 
@@ -624,6 +634,16 @@ class PrePumpEngine:
             char_meta["entry_price"] = current_price
             char_meta["is_trifecta"] = is_trifecta
             char_meta["is_ai_strike"] = is_ai_strike
+
+            # In-Memory Virtual Radar OCO Disarm of Opposing Side
+            try:
+                import super_smart_futures_citadel
+                super_smart_futures_citadel.SuperSmartFuturesCitadel.disarm_radar_trap(
+                    f"PRE_PUMP_{symbol}", reason=f"EXECUTED_{char_meta.get('side', 'BUY')}"
+                )
+            except Exception:
+                pass
+
             return True, current_price, char_meta
 
         return False, 0.0, char_meta

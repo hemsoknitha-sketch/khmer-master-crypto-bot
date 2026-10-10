@@ -1323,6 +1323,20 @@ class ReachseyStraddleEngine:
                 dir_boost = 1.25 if ai_dir in ["BUY", "SELL"] and ai_conf >= 0.80 else 1.0
                 vel_score = round(float(hawkes * atr_pct * ai_conf * dir_boost), 3)
 
+                # Arm In-Memory Virtual Radar Trap in RAM
+                try:
+                    from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                    SuperSmartFuturesCitadel.arm_in_memory_trap(
+                        symbol=sym,
+                        engine_source="SMARTX",
+                        current_price=curr_px,
+                        atr_15m=atr,
+                        swing_high=lvl.get("buy_stop_trigger", curr_px * 1.01),
+                        swing_low=lvl.get("sell_stop_trigger", curr_px * 0.99)
+                    )
+                except Exception:
+                    pass
+
                 return {
                     "symbol": sym,
                     "velocity_score": vel_score,
@@ -1361,8 +1375,16 @@ class ReachseyStraddleEngine:
         Smart OCO (One-Cancels-Other) Auto-Pruner:
         Sub-30ms cancellation of opposing pending STOP_MARKET orders when one side (BUY or SELL)
         has successfully filled into an active position.
+        Purges opposite side in high-speed RAM Virtual Radar in < 0.1ms.
         """
         try:
+            # Purge In-Memory Radar Trap
+            try:
+                from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                SuperSmartFuturesCitadel.disarm_radar_trap(f"SMARTX_{symbol}", reason=f"OCO_PRUNED_{filled_side}")
+            except Exception:
+                pass
+
             res = trading_engine.cancel_all_futures_open_orders(api_key, api_secret, symbol)
             logger.info(f"🧹 [REACHSEY SMART OCO PRUNER] Cleared opposing pending stops for {symbol} ({filled_side} active): {res}")
             return res

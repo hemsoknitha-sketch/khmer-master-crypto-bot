@@ -1979,21 +1979,30 @@ def run_audit():
         failures.append(f"Invariants 54-55 check failed: {e}")
         log_fail(str(e))
 
-    # 45. Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58)
-    print("\n[CHECK 45/45] Verifying Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58)...")
+    # 45. Super Smart Institutional Futures & Capital Citadels & In-Memory Radar (Invariants 57, 58 & 70)
+    print("\n[CHECK 45/45] Verifying Super Smart Institutional Futures & Capital Citadels & In-Memory Radar (Invariants 57, 58 & 70)...")
     try:
         # 1. Ground Truth Lock in AGENTS.md
         with open("AGENTS.md", "r", encoding="utf-8") as f:
             agents_md_text = f.read()
         has_inv57 = "Invariant 57" in agents_md_text and "Binance Futures Super Smart Sky Net Institutional Citadel" in agents_md_text
         has_inv58 = "Invariant 58" in agents_md_text and "Capital.com Super Smart TradFi Institutional Citadel" in agents_md_text
+        has_inv70 = "Invariant 70" in agents_md_text and "Binance Futures In-Memory Virtual Radar" in agents_md_text
 
-        # 2. Dynamic Unit Test: SuperSmartFuturesCitadel (Invariant 57)
+        # 2. Dynamic Unit Test: SuperSmartFuturesCitadel & FuturesInMemoryVirtualRadar (Invariants 57 & 70)
         import super_smart_futures_citadel
         has_futures_citadel_class = hasattr(super_smart_futures_citadel, "SuperSmartFuturesCitadel")
+        has_radar_class = hasattr(super_smart_futures_citadel, "FuturesInMemoryVirtualRadar")
         is_futures_exit_ok, _, _ = super_smart_futures_citadel.SuperSmartFuturesCitadel.validate_futures_entry_gatekeeper(
             "BTCUSDT", "BUY", reduce_only=True
         )
+
+        # Dynamic Radar Unit Test: Arm in RAM and instant OCO disarm
+        test_trap = super_smart_futures_citadel.FuturesInMemoryVirtualRadar.arm_radar_trap(
+            "BTCUSDT", "AUDIT_TEST", current_price=60000.0, atr_15m=600.0
+        )
+        is_radar_armed = bool(test_trap and test_trap.get("status") == "ARMED" and test_trap.get("buy_trigger") > 60000.0)
+        is_radar_disarmed = super_smart_futures_citadel.FuturesInMemoryVirtualRadar.disarm_trap("AUDIT_TEST_BTCUSDT", "AUDIT_DISARM")
 
         with open("trading_engine.py", "r", encoding="utf-8") as f:
             te_code = f.read()
@@ -2016,18 +2025,19 @@ def run_audit():
         has_capital_citadel_setup = "super_smart_capital_citadel.SuperSmartCapitalCitadel" in cap_code
 
         all_inv57_58_passed = (
-            has_inv57 and has_inv58 and
-            has_futures_citadel_class and is_futures_exit_ok and
+            has_inv57 and has_inv58 and has_inv70 and
+            has_futures_citadel_class and has_radar_class and is_futures_exit_ok and
+            is_radar_armed and is_radar_disarmed and
             has_futures_gatekeeper_te and has_futures_gatekeeper_th and
             has_capital_citadel_class and is_capital_bypass_ok and
             has_capital_gatekeeper_cap and has_capital_citadel_setup
         )
 
         if all_inv57_58_passed:
-            log_pass("Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58) are 100% certified!")
+            log_pass("Super Smart Institutional Futures & Capital Citadels & In-Memory Radar (Invariants 57, 58 & 70) are 100% certified!")
         else:
-            failures.append(f"Invariants 57-58 check failed: inv57={has_inv57}, inv58={has_inv58}, fut_exit={is_futures_exit_ok}, fut_te={has_futures_gatekeeper_te}, fut_th={has_futures_gatekeeper_th}, cap_bypass={is_capital_bypass_ok}, cap_gate={has_capital_gatekeeper_cap}")
-            log_fail("Super Smart Institutional Futures & Capital Citadels (Invariants 57 & 58) validation failed!")
+            failures.append(f"Invariants 57-58-70 check failed: inv57={has_inv57}, inv58={has_inv58}, inv70={has_inv70}, radar_arm={is_radar_armed}, radar_dis={is_radar_disarmed}")
+            log_fail("Super Smart Institutional Futures & Capital Citadels & In-Memory Radar validation failed!")
     except Exception as e:
         failures.append(f"Invariants 57-58 check failed: {e}")
         log_fail(str(e))

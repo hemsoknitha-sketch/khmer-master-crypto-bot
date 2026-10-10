@@ -177,11 +177,19 @@ def evaluate_spot_ml_consensus(symbol: str, closes_1m: list, volumes_1m: list, c
 
 def get_active_high_velocity_coins(limit: int = 30) -> list:
     """
-    Super Smart Real-Time High-Velocity Futures Coin Scanner:
-    Queries Binance Futures /fapi/v1/ticker/24hr dynamically across 200+ perpetual pairs.
-    Ranks candidates by highest real-time price change % and trading volume.
-    Excludes delisted/non-tradable pairs and recently closed cooldown pairs dynamically.
+    Super Smart Real-Time High-Velocity Futures Coin Scanner (In-Memory Virtual Radar Standard):
+    Leverages SuperSmartFuturesCitadel In-Memory Radar to filter 200+ perpetual pairs dynamically.
+    Ranks candidates by highest real-time price change %, RVOL expansion, and trading volume.
+    Excludes delisted/non-tradable pairs, pump tops (> 20%), knife dumps (< -20%), and cooldown pairs.
     """
+    try:
+        from super_smart_futures_citadel import SuperSmartFuturesCitadel
+        radar_cands = SuperSmartFuturesCitadel.scan_and_rank_futures_radar_universe(limit=limit)
+        if radar_cands and len(radar_cands) >= 5:
+            return [c["symbol"] for c in radar_cands]
+    except Exception as e_rad:
+        print(f"📡 [RADAR SCAN NOTICE] Falling back to standard ticker scanner: {e_rad}")
+
     try:
         url = f"{trading_engine.FUTURES_URL}/fapi/v1/ticker/24hr"
         res = trading_engine.HFT_SESSION.get(url, timeout=5)
@@ -2666,6 +2674,13 @@ async def monitor_turbo_hedge_bots(app):
                     db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_peak_mark_p", str(entry_p))
                     db.update_system_setting(f"turbo_hedge_{target_chat_id}_{c_cand}_trough_mark_p", str(entry_p))
                     
+                    # In-Memory Virtual Radar OCO Disarm of Opposing Side
+                    try:
+                        from super_smart_futures_citadel import SuperSmartFuturesCitadel
+                        SuperSmartFuturesCitadel.disarm_radar_trap(f"TURBO_HEDGE_{c_cand}", reason=f"EXECUTED_{target_side}")
+                    except Exception:
+                        pass
+
                     active_hedge_bots.append({"chat_id": target_chat_id, "symbol": c_cand, "amount": actual_trade_amount, "leverage": unit_leverage, "side": target_side, "target_tp": unit_tp})
                     print(f"🚀 [SUPER SMART HIGH-VELOCITY AUTO-ENTRY] User {target_chat_id} Live Balance ${avail_bal:.2f} -> Auto-entered {c_cand} ({target_side})!")
 
