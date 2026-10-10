@@ -1862,13 +1862,13 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             peak_bounce_roi = 0.0
 
         is_bounce_armed = (is_derisked and (bounce_roi >= 15.0 or peak_bounce_roi >= 15.0))
-        # 🛡️ Arm Golden Ratchet at >= +20.0% ROI or >= +$2.00 net (Eliminates premature sub-$1 exits)
-        if peak_roi >= 20.0 or roi_pct >= 20.0 or peak_pnl >= 2.00 or is_bounce_armed or scale_out_level == 1:
+        # 🛡️ Arm Golden Ratchet at >= +20.0% ROI or >= +$2.50 net (Eliminates premature sub-$1 exits)
+        if peak_roi >= 20.0 or roi_pct >= 20.0 or peak_pnl >= 2.50 or is_bounce_armed or scale_out_level == 1:
             is_breakeven_armed = True
             effective_peak = max(peak_roi, peak_bounce_roi)
 
             # 🛡️ THE GOLDEN PROFIT RATCHET BREAKEVEN LADDER (Strict Invariant 24 & Institutional Standard):
-            # Universal Golden 85% Ratchet: Once peak profit reaches >= $2.00,
+            # Universal Golden 85% Ratchet: Once peak profit reaches >= $2.50,
             # at least 85% of peak profit is permanently ratcheted and protected.
             ratchet_pnl_85 = peak_pnl * 0.85
             ratchet_roi_85 = effective_peak * 0.85
@@ -1879,11 +1879,11 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             elif peak_pnl >= 3.00 or effective_peak >= 30.0:
                 min_guaranteed_pnl = max(2.50, ratchet_pnl_85)  # Locks $2.50+ net floor
                 min_guaranteed_roi = max(25.0, ratchet_roi_85)
-            elif peak_pnl >= 2.00 or effective_peak >= 20.0:
-                min_guaranteed_pnl = max(1.60, ratchet_pnl_85)  # Locks $1.60+ net floor
+            elif peak_pnl >= 2.50 or effective_peak >= 20.0:
+                min_guaranteed_pnl = max(1.80, ratchet_pnl_85)  # Locks $1.80+ net floor
                 min_guaranteed_roi = max(16.0, ratchet_roi_85)
             else:
-                min_guaranteed_pnl = 1.50
+                min_guaranteed_pnl = 1.60
                 min_guaranteed_roi = 15.0
 
             ref_entry = derisked_entry_p if (is_derisked and derisked_entry_p > 0) else entry_price
@@ -1957,22 +1957,22 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             is_stop_loss_hit = (net_pnl_usdt <= min_guaranteed_pnl or roi_pct <= min_guaranteed_roi)
         else:
             # 🧬 Super Smart Asset-Specific Volatility Profiling & Dynamic ATR Volatility Cushion:
-            # - Tier 1 (Macro: BTC, ETH): 1.8x ATR (tight noise band)
-            # - Tier 2 (Momentum: SOL, SUI): 2.0x ATR
-            # - Tier 3 (Meme: PEPE, DOGE, WIF): 2.5x ATR (wide noise cushion to prevent premature wick stop-outs)
+            # - Tier 1 (Macro: BTC, ETH): 2.2x ATR (breathing noise band)
+            # - Tier 2 (Momentum: SOL, SUI): 2.4x ATR
+            # - Tier 3 (Meme: PEPE, DOGE, WIF): 2.8x ATR (wide noise cushion to prevent premature wick stop-outs)
             dna_profile = market_data.profile_asset_dna(symbol)
-            sl_mult = dna_profile.get("sl_atr_mult", 2.0)
+            sl_mult = max(2.2, float(dna_profile.get("sl_atr_mult", 2.2)))
             cushion_pct = dna_profile.get("noise_cushion_pct", 1.8)
             
-            # Dynamic Volatility-Adaptive Stop Loss ROI:
-            # Sized with true 1.8x - 2.5x 15m ATR Volatility Cushion (equivalent to -1.5% to -2.8% price drop room)
-            # giving real breathing room beyond microstructure random noise while keeping dollar risk bounded!
-            sl_roi_thresh = -min(25.0, max(15.0, curr_atr_pct * sl_mult * float(active_lev)))
-            # 🛡️ INSTITUTIONAL STANDARD: Firmly clamp Stop Loss between -$1.00 and -$1.25 USDT
-            sl_dollar_thresh = -min(1.25, max(1.00, bot_amt * 0.12))
+            # Dynamic Volatility-Adaptive Breathing Stop Loss ROI:
+            # Sized with true 2.2x - 2.8x 15m ATR Volatility Cushion (equivalent to -2.0% to -3.5% price drop room)
+            # giving real breathing room beyond microstructure random noise while keeping dollar risk strictly bounded!
+            sl_roi_thresh = -min(28.0, max(16.0, curr_atr_pct * sl_mult * float(active_lev)))
+            # 🛡️ Dynamic Volatility Dollar Risk Cushion (allows breathing room while clamping max loss):
+            sl_dollar_thresh = -max(1.50, min(3.50, bot_amt * 0.20))
             raw_sl_hit = (
                 (not is_spot and (net_pnl_usdt <= sl_dollar_thresh or roi_pct <= sl_roi_thresh)) or
-                (is_spot and (net_pnl_usdt <= -1.25 or roi_pct <= -max(2.5, cushion_pct * 1.2)))
+                (is_spot and (net_pnl_usdt <= -1.50 or roi_pct <= -max(3.0, cushion_pct * 1.5)))
             )
 
             if raw_sl_hit:
@@ -1989,10 +1989,10 @@ async def _monitor_single_active_bot(app, bot_info: dict):
             else:
                 is_stop_loss_hit = False
 
-        # Hard Circuit Breaker: Absolute emergency safety ceiling clamped strictly at -$1.25 USD or -25.0% ROI
+        # Hard Circuit Breaker: Absolute emergency safety ceiling clamped strictly at -$2.50 USD or -30.0% ROI
         is_hard_circuit_breaker = (
-            (not is_spot and (net_pnl_usdt <= -1.25 or roi_pct <= -25.0)) or
-            (is_spot and (net_pnl_usdt <= -1.25 or roi_pct <= -4.0))
+            (not is_spot and (net_pnl_usdt <= -max(2.50, bot_amt * 0.25) or roi_pct <= -30.0)) or
+            (is_spot and (net_pnl_usdt <= -2.50 or roi_pct <= -5.0))
         )
 
     last_flip_key = f"{chat_id}_{symbol}"

@@ -499,11 +499,11 @@ class PrePumpEngine:
         dynamic_lev = int(round(5 + kelly_f * 10.0))
         final_lev = min(15, max(3, max(recommended_leverage, dynamic_lev)))
 
-        # 🛡️ Dynamic ATR-based Stop-Loss Calculation (Noise Immune & Volatility Calibrated)
+        # 🛡️ Dynamic ATR-based Stop-Loss Calculation (Noise Immune & Volatility Calibrated Breathing Stop)
         atr_pct = (atr_15m / max(1e-6, last_price)) * 100.0
-        sl_multiplier = 1.8  # 1.8x ATR guarantees Stop-Loss sits beyond 95% Gaussian market noise
+        sl_multiplier = 2.2  # 2.2x ATR guarantees Stop-Loss sits beyond 98% Gaussian market noise
         sl_distance = atr_15m * sl_multiplier
-        sl_pct_calibrated = max(1.2, min(4.0, (sl_distance / max(1e-6, last_price)) * 100.0))
+        sl_pct_calibrated = max(1.8, min(4.5, (sl_distance / max(1e-6, last_price)) * 100.0))
 
         if side == "BUY":
             sl_price = last_price - (last_price * (sl_pct_calibrated / 100.0))
@@ -539,6 +539,19 @@ class PrePumpEngine:
             elif plus_di <= minus_di:
                 is_technically_valid = False
                 reject_reason = f"Bearish DMI Dominance (+DI {plus_di:.1f} <= -DI {minus_di:.1f})"
+
+        # 4. Super Smart Futures Citadel Institutional Trap Clearance
+        if is_technically_valid:
+            try:
+                import super_smart_futures_citadel
+                c_trap = super_smart_futures_citadel.SuperSmartFuturesCitadel.evaluate_institutional_futures_trap(
+                    symbol, side, interval="15m"
+                )
+                if not c_trap.get("is_approved", True):
+                    is_technically_valid = False
+                    reject_reason = f"Futures Citadel Blocked: {c_trap.get('rejection_reason')}"
+            except Exception:
+                pass
 
         meta = {
             "symbol": symbol,

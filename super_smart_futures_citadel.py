@@ -393,16 +393,19 @@ class SuperSmartFuturesCitadel:
         is_approved = (confluence_score >= 68.0)
 
         # --------------------------------------------------------------------
-        # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & DYNAMIC INVALIDATION
+        # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & DYNAMIC BREATHING STOP
         # --------------------------------------------------------------------
+        # Dynamic Volatility Breathing Stop Distance (eliminates tight stop-outs & noise sweeps):
+        breathing_sl_dist = max(2.20 * atr_15m, curr_price * 0.008, 0.0035 * curr_price)
+
         if norm_side == "BUY":
-            invalidation_sl = round(min(swing_low - (0.25 * atr_15m), curr_price - (1.6 * atr_15m)), 4)
-            risk_dist = max(curr_price * 0.005, curr_price - invalidation_sl)
+            invalidation_sl = round(min(swing_low - (0.35 * atr_15m), curr_price - breathing_sl_dist), 4)
+            risk_dist = max(breathing_sl_dist, curr_price - invalidation_sl)
             tp_1 = round(curr_price + (risk_dist * 2.5), 4)  # Institutional 1:2.5 Min Hurdle
             tp_2 = round(curr_price + (risk_dist * 4.0), 4)  # Institutional 1:4.0 Target
         else:
-            invalidation_sl = round(max(swing_high + (0.25 * atr_15m), curr_price + (1.6 * atr_15m)), 4)
-            risk_dist = max(curr_price * 0.005, invalidation_sl - curr_price)
+            invalidation_sl = round(max(swing_high + (0.35 * atr_15m), curr_price + breathing_sl_dist), 4)
+            risk_dist = max(breathing_sl_dist, invalidation_sl - curr_price)
             tp_1 = round(curr_price - (risk_dist * 2.5), 4)
             tp_2 = round(curr_price - (risk_dist * 4.0), 4)
 

@@ -2093,11 +2093,11 @@ async def run_reachsey_autonomous_cycle(app=None):
                         _REACHSEY_POSITION_PEAKS[peak_key] = roi_pct
                         cur_peak = roi_pct
 
-                    # 2. Breakeven Armor at +3.0% ROI (Locks SL to Entry + Fees)
+                    # 2. Delayed Breakeven Armor at >= +12.0% ROI (Guaranteed Fee Floor Clearing)
                     be_key = f"reachsey_be_{chat_id}_{sym}"
-                    if roi_pct >= 3.0 and not db.cache_get(be_key):
-                        # Calculate Breakeven SL price with fee floor (+0.12%)
-                        be_price = entry_px * 1.0012 if pos_side == "LONG" else entry_px * 0.9988
+                    if roi_pct >= 12.0 and not db.cache_get(be_key):
+                        # Calculate Breakeven SL price with fee floor (+0.35%)
+                        be_price = entry_px * 1.0035 if pos_side == "LONG" else entry_px * 0.9965
                         logger.info(f"🛡️ [REACHSEY BREAKEVEN ARMOR] Activating BE Armor for {sym} {pos_side} (ROI: +{roi_pct:.2f}%) @ ${be_price:,.4f}")
                         db.cache_set(be_key, True, ttl_seconds=1800)
 

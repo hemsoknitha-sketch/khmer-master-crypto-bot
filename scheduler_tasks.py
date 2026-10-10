@@ -2436,13 +2436,13 @@ async def process_single_trailing_stop(app, ai_engine, trade):
     net_profit_pct = trading_engine.calculate_net_pnl_pct(buy_price, current_price) if buy_price and buy_price > 0 else 0.0
     trailing_peak_lock = False
     
-    # 🛡️ 1R Micro Stop-Loss (1.2% Price Floor):
-    eff_sl_pct = min(1.2, float(stop_loss_pct)) if stop_loss_pct else 1.2
+    # 🛡️ Dynamic Volatility Breathing Stop-Loss (1.8% to 2.5% Price Floor):
+    eff_sl_pct = max(1.8, min(4.0, float(stop_loss_pct))) if stop_loss_pct else 2.2
     stop_loss_price = current_highest * (1 - (eff_sl_pct / 100.0))
     # Invariant 24: Breakeven Armor & Golden 85% Profit Ratchet (5X Asymmetry)
     # Once peak gain hits >= 5.0%, ratchets 85% of peak profit permanently.
     if buy_price and buy_price > 0:
-        breakeven_p = buy_price * 1.0025  # Minimum +0.25% fee-clearing floor
+        breakeven_p = buy_price * 1.0035  # Minimum +0.35% fee-clearing floor
         peak_gain_pct = ((current_highest - buy_price) / buy_price) * 100.0
         if peak_gain_pct >= 5.0:
             ratchet_p = buy_price * (1.0 + (peak_gain_pct * 0.85 / 100.0))
@@ -5451,9 +5451,10 @@ async def pre_pump_positions_monitor(app: Application):
 
                 atr_roi_threshold = -(atr_sl_pct * leverage)
 
-                if is_atr_breached or (roi_pct <= atr_roi_threshold) or (roi_pct < 0 and loss_dollar_est >= 1.25):
+                pre_pump_sl_dollar = max(1.80, min(3.50, pos_margin_est * 0.20))
+                if is_atr_breached or (roi_pct <= atr_roi_threshold) or (roi_pct < 0 and loss_dollar_est >= pre_pump_sl_dollar):
                     should_close = True
-                    close_reason = f"Pre-Pump Dynamic ATR SL (ROI {roi_pct:.1f}%, Capped <= $1.25)"
+                    close_reason = f"Pre-Pump Dynamic ATR SL (ROI {roi_pct:.1f}%, Capped <= ${pre_pump_sl_dollar:.2f})"
                     badge_title = "🛑 **[PRE-PUMP DYNAMIC ATR SL EXIT]** 🛡️"
 
                 # 2. Breathing Breakeven Armor (lock at +15.0% ROI net floor once peak hits >= 25.0%)

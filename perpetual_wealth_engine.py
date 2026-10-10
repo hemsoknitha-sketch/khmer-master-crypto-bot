@@ -778,13 +778,13 @@ class PerpetualWealthGeneratorEngine:
         # Fixed Dollar Risk Parity Target: Strict $0.95 USD Risk Ceiling (Asymmetric Expectancy)
         fixed_risk_usd = 0.95
 
-        # Determine ATR-adjusted stop distance % (1.5x ATR with 1.0% to 2.5% bounds)
+        # Determine ATR-adjusted breathing stop distance % (2.2x ATR with 1.8% to 4.5% bounds)
         if atr_pct > 0.0:
-            sl_distance_pct = max(1.0, min(2.5, 1.2 * atr_pct))
-            # Calculate volatility-adjusted margin: Margin = (Risk $0.95 * 100) / (SL% * Leverage)
+            sl_distance_pct = max(1.8, min(4.5, 2.2 * atr_pct))
+            # Calculate volatility-adjusted margin: Margin = (Risk $1.50 * 100) / (SL% * Leverage)
             vol_margin_cap = round((fixed_risk_usd * 100.0) / max(0.1, sl_distance_pct * leverage), 2)
         else:
-            sl_distance_pct = 1.2
+            sl_distance_pct = 2.2
             vol_margin_cap = 8.50
 
         if custom_margin > 0.0:
@@ -1286,14 +1286,15 @@ class PerpetualWealthGeneratorEngine:
                         # and price subsequently pulled back to or below trailing floor (e.g. <= +4.5% ROI)
                         is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)
 
-                        # Fixed Dollar Risk Parity Stop Loss: Strictly clamped at -$0.95 USDT max loss
-                        # Asymmetric Positive Expectancy: 1 Tier 2 win (+$1.60) covers nearly 2 full losses!
+                        # Fixed Dollar Risk Parity & Volatility Breathing Stop Loss (Clamped at -$1.50 Cap):
+                        # Asymmetric Positive Expectancy: Sized with 2.2x ATR breathing room while bounding dollar risk!
+                        pw_sl_dollar_cap = -max(1.50, min(2.50, pos_margin * 0.20))
+                        pw_sl_roi_cap = -min(25.0, max(16.0, 2.2 * (atr_val / max(1e-6, mark_price)) * 100.0 * float(leverage)))
                         is_sl_trigger = (
-                            (unRealizedProfit <= -0.95) or
-                            (net_exit_pnl <= -0.95) or
                             (unRealizedProfit <= -1.50) or
-                            (roi_pct <= -8.5) or
-                            (pos_margin > 0 and unRealizedProfit <= -max(0.50, min(0.95, pos_margin * 0.09)))
+                            (net_exit_pnl <= -1.50) or
+                            (unRealizedProfit <= pw_sl_dollar_cap) or
+                            (roi_pct <= pw_sl_roi_cap)
                         )
                         
                         if is_be_trigger or is_sl_trigger:
@@ -1302,7 +1303,7 @@ class PerpetualWealthGeneratorEngine:
                             if is_be_exit:
                                 reason_tag = f"BREAKEVEN NET FLOOR DEFENSE (+{be_net_floor_roi:.1f}% ROI / +${net_exit_pnl:.2f} Net)" if net_exit_pnl > 0.0 else f"BREAKEVEN CAPITAL DEFENSE (+{roi_pct:.2f}% ROI / ${net_exit_pnl:.2f} Net)"
                             else:
-                                reason_tag = "FIXED DOLLAR RISK PARITY SL ($0.95 Cap)"
+                                reason_tag = "FIXED DOLLAR RISK PARITY SL ($1.50 Cap)"
                             print(f"🛑 [PERPETUAL WEALTH {reason_tag}] User {chat_id}: {sym} reached {roi_pct:.2f}% ROI (PnL: ${unRealizedProfit:+.2f}). Executing protection exit...")
                             trading_engine.place_futures_order(
                                 api_key=api_key,

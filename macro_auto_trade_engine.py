@@ -854,17 +854,20 @@ async def monitor_macro_auto_trades(app):
             reason_tag = ""
 
             # 🛡️ Breakeven Armor & Golden Ratchet (Strict Invariant 24 & 5X-10X Asymmetric Standard):
-            is_be_armed = (peak_roi >= 5.0 or roi_pct >= 5.0 or effective_pnl >= 0.50)
+            # Delayed Breakeven Armor: Arms at genuine momentum (>= +15.0% ROI or >= +$2.50 Net)
+            is_be_armed = (peak_roi >= 15.0 or roi_pct >= 15.0 or effective_pnl >= 2.50)
             if is_be_armed:
-                if effective_pnl <= 0.35 or roi_pct <= 3.5:
+                if effective_pnl <= 1.25 or roi_pct <= 8.5:
                     is_stop_loss = True
                     reason_tag = "MACRO_BREAKEVEN_ARMOR_PROTECT (+3.5% Net Floor)"
             else:
+                # Dynamic Volatility Breathing Stop Loss:
                 dna_prof = market_data.profile_asset_dna(symbol)
-                sl_mult = dna_prof.get("sl_atr_mult", 2.0)
+                sl_mult = max(2.2, float(dna_prof.get("sl_atr_mult", 2.2)))
                 curr_atr_pct = float(dna_prof.get("atr_pct", 1.5))
-                macro_sl_roi = -min(18.0, max(8.0, curr_atr_pct * sl_mult * float(leverage)))
-                raw_macro_sl = (roi_pct <= macro_sl_roi or effective_pnl <= -max(0.60, amount * 0.15))
+                macro_sl_roi = -min(28.0, max(16.0, curr_atr_pct * sl_mult * float(leverage)))
+                macro_sl_dollar = -max(1.50, min(3.50, amount * 0.20))
+                raw_macro_sl = (roi_pct <= macro_sl_roi or effective_pnl <= macro_sl_dollar)
                 
                 if raw_macro_sl:
                     sweep_eval = market_data.evaluate_anti_wick_liquidity_sweep(

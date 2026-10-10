@@ -45,6 +45,24 @@ The system is engineered upon two non-negotiable axioms:
    - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$6.00$ or $\ge +14.0\%$ ROI.
    - Any Retracement Harvest exit must strictly enforce a guaranteed net fee clearing floor ($\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$) to prevent eating crumbs and death by a thousand papercuts.
 
+### 1.1.2 THE SUPER SMART BINANCE FUTURES RISK & PROFIT HARMONIZATION PILLARS (/smartx, /turbo_hedge, /auto_trade, /pre_pump, /wealth)
+**(គ្រឹះរួមបញ្ចូលគ្នាការពារហានិភ័យ & កើបចំណេញកម្រិតកំពូលលើ BINANCE FUTURES ទាំង ៥ ប្រព័ន្ធ)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
+1. **Pillar 1: Universal Dynamic Volatility Breathing Stop Standard (កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួលគ្រីបតូ):**
+   - Sized strictly with dynamic market volatility across all 5 engines:
+     $$\text{SL Distance} \ge \max(2.20 \times \text{ATR}_{15m}, 0.0080 \times \text{Price}, \text{DNA Volatility Cushion})$$
+   - Dollar risk bounds: Clamped strictly between $-\$1.50$ and $-\$3.50$ USDT (proportional to margin, $0.20 \times \text{Margin}$), replacing rigid sub-$1.00 micro-choke stops.
+   - Eliminates premature stop-outs caused by 15m noise wicks, funding fee settlements, and temporary orderbook fluctuations before directional thrust develops.
+2. **Pillar 2: 360° Futures Citadel Sweep & Trap Clearance Gatekeeper:**
+   - Universal pre-flight vetting via `SuperSmartFuturesCitadel.validate_futures_entry_gatekeeper` and `evaluate_institutional_futures_trap` across `/turbo_hedge`, `/smartx`, `/auto_trade`, `/pre_pump`, and `/wealth`.
+   - Strictly enforces $ADX \ge 22.0 - 25.0$, Invariant 16 Anti-Oversold Short Guard (15m RSI $\le 38.0$ blocks Shorts), Anti-Overbought Peak Guard (RSI $\ge 70.0$ blocks Longs), BSL/SSL Liquidity Sweeps, and CVD Absorption divergence.
+3. **Pillar 3: Delayed Multi-Tier Harvest & Fee-Clearing Trailing Ratchet (កម្ចាត់ការកៀរយកចំណេញកម្ទេចកម្ទី $+\$0.14 - +\$0.35$):**
+   - Breakeven Armor is delayed until position achieves genuine momentum ($\ge +12.0\% - +15.0\%$ ROI or $\ge +\$2.50$ Net UPL), locking a fee-cleared profit floor ($\ge +\$1.25$ to $+\$1.80$ Net after exchange taker fees).
+   - Trailing Profit Ratchet is delayed until peak reaches $\ge +25.0\%$ ROI or $\ge +\$3.50 - +\$4.00$ Net, permanently ratcheting $85\%$ of peak gains.
+   - Eliminates micro-profit exits that capture crumbs while taking on full directional risk.
+4. **Pillar 4: Institutional Asymmetric Payoff Profile ($R:R \ge 1:2.5$ to $1:4.0$):**
+   - Every trade targets asymmetric payoff with TP1 at $+2.5R$, TP2 at $+4.0R$, and moonshot runners up to $+10.0R$.
+
 ### 1.2 THE APEX PRINCIPAL SOFTWARE ENGINEER NODE & DETERMINISTIC STATE MEMORY COVENANT
 **(គ្រឹះវិស្វករស្ថាបត្យករកំពូល & បញ្ជាចងចាំរចនាសម្ព័ន្ធអចិន្ត្រៃយ៍ ប្រឆាំងការភ្លេចភ្លាំង និងការបំបែកកូដ)**
 **Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Conversations & Sessions.
