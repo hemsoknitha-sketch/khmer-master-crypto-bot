@@ -1150,6 +1150,25 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - Sized strictly to $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 0.008\times\text{Price}, 0.0035\times\text{Price})$ with dollar bounds $-\$1.50$ to $-\$3.50$.
      - Asymmetric targets: TP1 at $+2.5R$ (Breakeven Armor trigger) and TP2 at $+4.0R$ (Clean Harvest).
 
+### Invariant 71: MetaTrader 5 (MT5) Super Smart Institutional Citadel (8-Pillar Trap Matrix & Interbank Kill Zones)
+- **Location:** `super_smart_mt5_citadel.py`, `mt5_bridge_engine.py` (`dispatch_order`, `get_super_smart_mt5_telemetry`), `bot_thread.py` (`mt5_smart_command`, `/mt5 SMART`), `bot_commands_registry.py`
+- **Rule:**
+  1. **MT5 8-Pillar Institutional Trap Matrix Standard:**
+     - Under the Non-Negotiable Fiduciary Oath (Section 1.1), every MT5 order (Gold XAUUSD, Silver, US30, US100, Forex Majors & Crosses) MUST pass the 8-Pillar MT5 Citadel:
+       1. Interbank Liquidity Trap Hunter (BSL / SSL Sweeps & Turtle Soup Rejection).
+       2. Premium vs Discount Dealing Range Math (Discount < 50% for Longs, Premium > 50% for Shorts; Deep Premium > 82% Long Block, Deep Discount < 18% Short Block).
+       3. Market Structure Shift (MSS/CHoCH) & Displacement Confirmation ($\ge 1.2\times$ ATR).
+       4. Fair Value Gap (FVG) & Institutional Order Block (OB) Retest.
+       5. Broker Live Spread Drag Elimination & 10x Minimum Hurdle (Target $\ge 10\times$ Spread, Invariant 34 Compliance).
+       6. Strict Capital Armor (Anti-Falling-Knife, Anti-Rising-Rocket, Invariant 16 RSI $\le 36.0$ Bottom Shield, Anti-Top FOMO RSI $\ge 70.0$).
+       7. Interbank Sessions, Kill Zones & Rollover Swap Shield (London Open 07:00-10:00 UTC, NY Open 12:00-15:00 UTC, Rollover 20:45-22:15 UTC Shield).
+       8. Asymmetric Payoff Expectancy Sizer ($R:R \ge 1:2.5$ to $1:6.0$ & Dynamic Volatility Breathing Stop $\text{SL Distance} \ge \max(2.50\times\text{ATR}_{15m}, 3.5\times\text{Spread})$).
+  2. **Universal Pre-Flight Gatekeeper Integration:**
+     - `SuperSmartMT5Citadel.validate_mt5_entry_gatekeeper` acts as the universal gatekeeper in `mt5_bridge_engine.py` (`dispatch_order`). All automated, autonomous, and manual orders are intercepted and vetted before socket transmission to MT5 terminals.
+  3. **Unified Telegram Flagship Interface:**
+     - Accessible via `/mt5_smart` (and `/mt5 SMART`), providing real-time session telemetry, 8-Pillar audit cards, and 1-tap presets.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 56/56].
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

@@ -1962,6 +1962,33 @@ class MT5BridgeEngine:
                 )
                 lot_norm = clamped_lot
 
+        # Super Smart MT5 Citadel Gatekeeper (8-Pillar Trap Matrix)
+        is_reachsey_order = (int(magic) == 888666 or kwargs.get("is_reachsey", False) or "R5_" in str(comment) or "R_GOLD_" in str(comment))
+        if not kwargs.get("bypass_gatekeeper", False) and not kwargs.get("reduce_only", False) and not is_reachsey_order:
+            try:
+                from super_smart_mt5_citadel import SuperSmartMT5Citadel
+                is_ok, gate_reason, gate_diag = SuperSmartMT5Citadel.validate_mt5_entry_gatekeeper(
+                    symbol=sym_norm,
+                    proposed_side=act_norm,
+                    session=sess_obj
+                )
+                if not is_ok:
+                    logger.warning(f"🛑 [MT5 CITADEL GATEKEEPER VETO] {act_norm} {sym_norm} blocked: {gate_reason}")
+                    return {
+                        "success": False,
+                        "status": "citadel_gatekeeper_veto",
+                        "symbol": sym_norm,
+                        "reason": gate_reason,
+                        "diagnostics": gate_diag,
+                        "clients_reached": 0
+                    }
+                if sl_norm <= 0.0 and gate_diag.get("sl_price"):
+                    sl_norm = float(gate_diag["sl_price"])
+                if tp_norm <= 0.0 and gate_diag.get("tp_price"):
+                    tp_norm = float(gate_diag["tp_price"])
+            except Exception as ex_cit:
+                logger.debug(f"Citadel gatekeeper note: {ex_cit}")
+
         # Construct Base Signed Payload
         payload = {
             "type": "ORDER_SEND",
@@ -3344,6 +3371,39 @@ class MT5BridgeEngine:
             "total_baskets": len(self._reachsey_baskets),
             "active_baskets_count": len([b for b in active if b.get("status") == "ACTIVE"]),
             "baskets": active
+        }
+
+    def get_super_smart_mt5_telemetry(self, chat_id: int = 0) -> Dict[str, Any]:
+        """Returns comprehensive Super Smart MT5 Citadel telemetry."""
+        from super_smart_mt5_citadel import SuperSmartMT5Citadel
+        session_info = SuperSmartMT5Citadel.get_current_interbank_session()
+        bridge_status = self.get_bridge_status()
+
+        benchmarks = ["XAUUSD", "US30", "EURUSD", "GBPJPY"]
+        radar_results = []
+        for b_sym in benchmarks:
+            try:
+                eval_buy = SuperSmartMT5Citadel.evaluate_institutional_mt5_trap(b_sym, "BUY")
+                eval_sell = SuperSmartMT5Citadel.evaluate_institutional_mt5_trap(b_sym, "SELL")
+                best_eval = eval_buy if eval_buy.get("confluence_score", 0) >= eval_sell.get("confluence_score", 0) else eval_sell
+                radar_results.append({
+                    "symbol": b_sym,
+                    "action": best_eval.get("proposed_side", "BUY"),
+                    "approved": best_eval.get("is_approved", False),
+                    "score": best_eval.get("confluence_score", 0.0),
+                    "reason": best_eval.get("signal_reason") or best_eval.get("rejection_reason", ""),
+                    "price": best_eval.get("current_price", 0.0),
+                    "sl": best_eval.get("sl_price", 0.0),
+                    "tp": best_eval.get("tp_price", 0.0)
+                })
+            except Exception as ex_rad:
+                logger.debug(f"Radar telemetry scan note for {b_sym}: {ex_rad}")
+
+        return {
+            "session": session_info,
+            "bridge": bridge_status,
+            "radar": radar_results,
+            "timestamp": time.time()
         }
 
     # =========================================================================

@@ -5962,6 +5962,38 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
                 context.args = []
+                await mt5_reachsey_command(update, context)
+            elif data in ["btn_mt5_smart", "btn_mt5_smart_refresh"]:
+                try:
+                    await update.callback_query.answer("🧠 Super Smart MT5 Citadel Telemetry...")
+                except Exception:
+                    pass
+                context.args = []
+                await mt5_smart_command(update, context)
+            elif data == "btn_mt5_smart_audit_gold":
+                try:
+                    await update.callback_query.answer("🛡️ កំពុងធ្វើ Audit XAUUSD...")
+                except Exception:
+                    pass
+                context.args = ["AUDIT", "XAUUSD"]
+                await mt5_smart_command(update, context)
+            elif data == "btn_mt5_smart_audit_us30":
+                try:
+                    await update.callback_query.answer("🛡️ កំពុងធ្វើ Audit US30...")
+                except Exception:
+                    pass
+                context.args = ["AUDIT", "US30"]
+                await mt5_smart_command(update, context)
+            elif data == "btn_mt5_smart_sniper" or data.startswith("btn_mt5_smart_sniper_"):
+                sym = "XAUUSD"
+                if data.startswith("btn_mt5_smart_sniper_"):
+                    sym = data.replace("btn_mt5_smart_sniper_", "").upper().strip()
+                try:
+                    await update.callback_query.answer(f"🎯 Firing Super Smart Sniper on {sym}...")
+                except Exception:
+                    pass
+                context.args = ["SCALP", sym]
+                await mt5_command(update, context)
             elif data == "btn_mt5_reachsey_gold":
                 try:
                     await update.callback_query.answer("👑 កំពុងដំណើរការ Reachsey Gold Apex Matrix (10-20 Pos)...")
@@ -21813,6 +21845,12 @@ class TelegramBotThread(BaseThread):
             if args:
                 sub = str(args[0]).upper().strip()
 
+                # --- 0.0 SUPER SMART MT5 CITADEL SUITE ---
+                if sub in ["SMART", "CITADEL", "RADAR"]:
+                    context.args = args[1:]
+                    await mt5_smart_command(update, context)
+                    return
+
                 # --- 0. AI AUTO-TRADE CONTROLLER: AUTO / AUTOTRADE ---
                 if sub in ["AUTO", "AUTOTRADE"]:
                     action_sub = str(args[1]).upper().strip() if len(args) >= 2 else "STATUS"
@@ -23032,6 +23070,10 @@ class TelegramBotThread(BaseThread):
             ai_badge = "🤖 AI Auto-Trade: 🟢 ON" if ai_enabled else "🤖 AI Auto-Trade: ⚪ OFF"
             kb_mt5 = InlineKeyboardMarkup([
                 [
+                    InlineKeyboardButton("🧠 Super Smart MT5 Citadel", callback_data="btn_mt5_smart"),
+                    InlineKeyboardButton("👑 Reachsey Gold Apex", callback_data="btn_mt5_reachsey_gold")
+                ],
+                [
                     InlineKeyboardButton(ai_badge, callback_data="btn_mt5_toggle_auto"),
                     InlineKeyboardButton("🏛️ Virtual Vault", callback_data="btn_mt5_vault")
                 ],
@@ -23149,6 +23191,160 @@ class TelegramBotThread(BaseThread):
             except Exception as e_send_err:
                 clean_mt5 = msg_mt5.replace("*", "").replace("_", "")
                 await update.effective_message.reply_text(clean_mt5, reply_markup=kb_mt5)
+
+        async def mt5_smart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🧠 SUPER SMART MT5 CITADEL & INTERBANK RADAR SUITE
+            Institutional 8-Pillar Trap Matrix, Interbank Kill Zones & Pre-Flight Gatekeeper for MT5.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+            user_id = update.effective_user.id if update.effective_user else chat_id
+            user_lang = db.get_user_language(chat_id)
+
+            is_admin_user = (user_id in [537186806, 859271875]) or db.is_admin(user_id) or (chat_id in [537186806, 859271875]) or db.is_admin(chat_id)
+            is_vip = is_admin_user or db.is_vip(user_id) or db.is_vip(chat_id)
+            if not is_vip:
+                raw_lang = db.get_user_language(user_id) or db.get_user_language(chat_id)
+                user_lang = str(raw_lang or 'km')
+                if user_lang.isdigit() or user_lang in ['0', '1']: user_lang = 'km'
+                msg = loc.get_text(user_lang, 'access_denied')
+                if update.effective_message:
+                    await update.effective_message.reply_text(msg, parse_mode="Markdown")
+                return
+
+            import mt5_bridge_engine
+            import ui_standards
+            from super_smart_mt5_citadel import SuperSmartMT5Citadel
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+            bridge = mt5_bridge_engine.mt5_bridge
+            if not bridge.is_running:
+                bridge.start()
+
+            args = list(context.args) if context and context.args else []
+
+            # Subcommand: AUDIT <SYMBOL>
+            if args and str(args[0]).upper().strip() in ["AUDIT", "CHECK", "SCAN"]:
+                target_sym = str(args[1]).upper().strip() if len(args) >= 2 else "XAUUSD"
+                eval_buy = SuperSmartMT5Citadel.evaluate_institutional_mt5_trap(target_sym, "BUY")
+                eval_sell = SuperSmartMT5Citadel.evaluate_institutional_mt5_trap(target_sym, "SELL")
+
+                best_eval = eval_buy if eval_buy.get("confluence_score", 0) >= eval_sell.get("confluence_score", 0) else eval_sell
+                side = best_eval.get("proposed_side", "BUY")
+                score = best_eval.get("confluence_score", 0.0)
+                is_appr = best_eval.get("is_approved", False)
+                rsn = best_eval.get("signal_reason") or best_eval.get("rejection_reason", "No structural edge")
+                c_p = best_eval.get("current_price", 0.0)
+                sl_p = best_eval.get("sl_price", 0.0)
+                tp_p = best_eval.get("tp_price", 0.0)
+                sl_d = best_eval.get("sl_dist", 0.0)
+                tp_d = best_eval.get("tp_dist", 0.0)
+                sp = best_eval.get("spread", 0.0)
+                phase = best_eval.get("session_phase", "ACTIVE")
+
+                badge = "🟢 <b>APPROVED</b> (Edge Confirmed)" if is_appr else "🛑 <b>VETOED</b> (Capital Protected)"
+                msg_audit = (
+                    f"🛡️ <b>[SUPER SMART MT5 8-PILLAR AUDIT]</b> 🧠\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🪙 <b>ទ្រព្យសកម្ម ៖</b> <code>{target_sym}</code>\n"
+                    f"🎯 <b>ទិសដៅ AI ៖</b> <b>{side}</b> | ស្ថានភាព ៖ {badge}\n"
+                    f"📊 <b>Confluence Score ៖</b> <b>{score:.1f}%</b>\n"
+                    f"🌐 <b>Interbank Phase ៖</b> <code>{phase}</code>\n"
+                    f"💵 <b>តម្លៃបច្ចុប្បន្ន ៖</b> <b>${c_p:,.2f}</b> (Spread: <code>{sp}</code>)\n"
+                    f"🛡️ <b>Breathing Stop (SL) ៖</b> <code>${sl_p:,.2f}</code> (Δ {sl_d})\n"
+                    f"🎯 <b>Asymmetric Target (TP) ៖</b> <code>${tp_p:,.2f}</code> (Δ {tp_d})\n"
+                    f"📝 <b>ការវិភាគរចនាសម្ព័ន្ធ ៖</b> <i>{rsn}</i>\n"
+                    f"{ui_standards.DIVIDER_DOUBLE}\n"
+                    f"<i>Angkor Quant Super Smart MT5 Citadel</i>\n"
+                    f"<i>ដំណើរការការពារមូលធន & កើបចំណេញ ២៤/៥!</i>"
+                )
+                kb_audit = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🎯 បើក Sniper Order", callback_data=f"btn_mt5_smart_sniper_{target_sym}")],
+                    [InlineKeyboardButton("🎛️ Super Smart Menu", callback_data="btn_mt5_smart"), InlineKeyboardButton("⚡ MT5 Dashboard", callback_data="btn_mt5")]
+                ])
+                try:
+                    await update.effective_message.reply_text(msg_audit, parse_mode="HTML", reply_markup=kb_audit)
+                except Exception:
+                    clean_a = re.sub(r'<[^>]+>', '', msg_audit)
+                    await update.effective_message.reply_text(clean_a, reply_markup=kb_audit)
+                return
+
+            # Render Main Super Smart Cockpit
+            telemetry = bridge.get_super_smart_mt5_telemetry(chat_id=chat_id)
+            sess = telemetry.get("session", {})
+            radar = telemetry.get("radar", [])
+            phase_label = sess.get("current_phase", "ACTIVE")
+            utc_clock = sess.get("utc_time", "")
+            ict_clock = sess.get("ict_time", "")
+
+            kz_icon = "🟢 ACTIVE" if (sess.get("is_london_kz") or sess.get("is_ny_kz") or sess.get("is_overlap")) else "⚪ STANDBY"
+
+            radar_lines = ""
+            for item in radar:
+                appr_icon = "🟢" if item.get("approved") else "⚪"
+                radar_lines += (
+                    f"• {appr_icon} <b>{item.get('symbol')}</b> ៖ <b>{item.get('action')}</b> "
+                    f"({item.get('score', 0):.0f}%) | ${item.get('price', 0):,.2f}\n"
+                )
+
+            ai_enabled = db.get_system_setting(f"mt5_ai_auto_trade_{chat_id}", "1") == "1"
+            ai_badge = "🤖 Auto Swarm: 🟢 ON" if ai_enabled else "🤖 Auto Swarm: ⚪ OFF"
+
+            kb_smart = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🎯 Super Smart Sniper (XAUUSD)", callback_data="btn_mt5_smart_sniper"),
+                    InlineKeyboardButton("👑 Reachsey Gold Apex", callback_data="btn_mt5_reachsey_gold")
+                ],
+                [
+                    InlineKeyboardButton("🛡️ 8-Pillar Audit (XAUUSD)", callback_data="btn_mt5_smart_audit_gold"),
+                    InlineKeyboardButton("🛡️ Audit US30", callback_data="btn_mt5_smart_audit_us30")
+                ],
+                [
+                    InlineKeyboardButton(ai_badge, callback_data="btn_mt5_toggle_auto"),
+                    InlineKeyboardButton("🔄 Refresh Telemetry", callback_data="btn_mt5_smart_refresh")
+                ],
+                [
+                    InlineKeyboardButton("⚡ MT5 Master Terminal", callback_data="btn_mt5")
+                ]
+            ])
+
+            msg_smart = (
+                f"🧠 <b>SUPER SMART MT5 INSTITUTIONAL CITADEL</b> ⚡\n"
+                f"🏛️ <b>GTCFX Japan Tokyo Gateway (TY3 Co-Location)</b>\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🌐 <b>Interbank Phase ៖</b> <code>{phase_label}</code> ({kz_icon})\n"
+                f"⏰ <b>Session Clocks ៖</b> <code>{utc_clock}</code> | <code>{ict_clock}</code>\n"
+                f"🛡️ <b>Pre-Flight Gatekeeper ៖</b> <code>8-Pillar Trap Matrix ACTIVE</code>\n"
+                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                f"📊 <b>LIVE INTERBANK RADAR SCANNER ៖</b>\n"
+                f"{radar_lines}"
+                f"{ui_standards.DIVIDER_DOUBLE}\n"
+                f"📐 <b>យន្តការការពារ ៨ ចំណុចស្ថាប័ន (The 8 Pillars) ៖</b>\n"
+                f"1. <b>Liquidity Sweeps ៖</b> BSL/SSL Sweeps & Turtle Soup Rejection\n"
+                f"2. <b>Equilibrium Math ៖</b> Buy in Discount (&lt;50%) | Sell in Premium (&gt;50%)\n"
+                f"3. <b>Displacement ៖</b> MSS / CHoCH Break &gt;= 1.2x ATR\n"
+                f"4. <b>Mitigation ៖</b> Fair Value Gap (FVG) & Order Block Imbalance Retest\n"
+                f"5. <b>Spread Elimination ៖</b> Target &gt;= 10x Spread (Invariant 34)\n"
+                f"6. <b>Capital Armor ៖</b> Anti-Falling-Knife & Anti-Rising-Rocket Guards\n"
+                f"7. <b>Interbank Sessions ៖</b> London & NY Kill Zones + Swap Shield\n"
+                f"8. <b>Asymmetric Payoff ៖</b> R:R &gt;= 1:2.5 to 1:6.0 Dynamic Breathing SL\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"🎯 <b>កូដបញ្ជា 1-Tap Presets ៖</b>\n"
+                f"• Audit ទ្រព្យសកម្ម ៖ `` `/mt5_smart AUDIT XAUUSD` ``\n"
+                f"• បើក Sniper Order ៖ `` `/mt5_smart SNIPER XAUUSD 0.01` ``\n"
+                f"• បើក/បិទ Auto Swarm ៖ `` `/mt5 AUTO ON` `` ឬ `` `/mt5 AUTO OFF` ``\n"
+                f"{ui_standards.DIVIDER_HEAVY}\n"
+                f"<i>Angkor Quant | Super Smart MT5 Citadel</i>\n"
+                f"<i>APEX SUPER BRAIN AI — ការពារមូលធន & កើបចំណេញ ២៤/៥!</i>"
+            )
+
+            try:
+                await update.effective_message.reply_text(msg_smart, parse_mode="HTML", reply_markup=kb_smart)
+            except Exception:
+                clean_txt = re.sub(r'<[^>]+>', '', msg_smart)
+                await update.effective_message.reply_text(clean_txt, reply_markup=kb_smart)
 
         async def mt5_reachsey_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
@@ -27513,6 +27709,9 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("mt5_vault", mt5_command))
         self.app.add_handler(CommandHandler("mt5vault", mt5_command))
         self.app.add_handler(CommandHandler("vault", mt5_command))
+        self.app.add_handler(CommandHandler("mt5_smart", mt5_smart_command))
+        self.app.add_handler(CommandHandler("mt5smart", mt5_smart_command))
+        self.app.add_handler(CommandHandler("smart_mt5", mt5_smart_command))
         self.app.add_handler(CommandHandler("mt5_reachsey", mt5_reachsey_command))
         self.app.add_handler(CommandHandler("mt5reachsey", mt5_reachsey_command))
         self.app.add_handler(CommandHandler("reachsey_mt5", mt5_reachsey_command))

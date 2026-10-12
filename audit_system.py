@@ -2674,6 +2674,57 @@ def run_audit():
             log_fail("CSX AI Live Radar Suite (Invariant 69) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 69 check failed: {e}")
+    # [CHECK 56/56] Verifying MetaTrader 5 (MT5) Super Smart Institutional Citadel (8-Pillar Trap Matrix & Interbank Kill Zones) (Invariant 71)...
+    print("\n[CHECK 56/56] Verifying MetaTrader 5 (MT5) Super Smart Institutional Citadel (8-Pillar Trap Matrix & Interbank Kill Zones) (Invariant 71)...")
+    try:
+        # 1. Ground truth in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv71 = "Invariant 71: MetaTrader 5 (MT5) Super Smart Institutional Citadel" in agents_md
+
+        # 2. super_smart_mt5_citadel.py architecture
+        import super_smart_mt5_citadel as mt5_cit
+        has_cit_class = hasattr(mt5_cit, "SuperSmartMT5Citadel")
+        has_eval_trap = hasattr(mt5_cit.SuperSmartMT5Citadel, "evaluate_institutional_mt5_trap")
+        has_gatekeeper = hasattr(mt5_cit.SuperSmartMT5Citadel, "validate_mt5_entry_gatekeeper")
+        has_session = hasattr(mt5_cit.SuperSmartMT5Citadel, "get_current_interbank_session")
+
+        # 3. Unit test on evaluation
+        eval_res = mt5_cit.SuperSmartMT5Citadel.evaluate_institutional_mt5_trap("XAUUSD", "BUY")
+        has_eval_valid = isinstance(eval_res, dict) and "confluence_score" in eval_res and "is_approved" in eval_res
+
+        # 4. mt5_bridge_engine integration
+        import mt5_bridge_engine as mbe
+        has_bridge_telemetry = hasattr(mbe.MT5BridgeEngine, "get_super_smart_mt5_telemetry")
+        with open("mt5_bridge_engine.py", "r", encoding="utf-8") as bf:
+            mbe_code = bf.read()
+        has_bridge_gatekeeper = "SuperSmartMT5Citadel.validate_mt5_entry_gatekeeper" in mbe_code
+
+        # 5. bot_thread & bot_commands_registry integration
+        with open("bot_thread.py", "r", encoding="utf-8") as bf:
+            bt_code = bf.read()
+        has_mt5_smart_cmd = "async def mt5_smart_command" in bt_code
+        has_mt5_smart_handler = "CommandHandler(\"mt5_smart\", mt5_smart_command)" in bt_code
+        has_mt5_smart_cb = "btn_mt5_smart" in bt_code
+
+        import bot_commands_registry
+        public_cmds = bot_commands_registry.get_public_bot_commands()
+        has_registry_cmd = any(c.command == "mt5_smart" for c in public_cmds)
+
+        all_inv71_passed = (
+            has_inv71 and has_cit_class and has_eval_trap and has_gatekeeper and
+            has_session and has_eval_valid and has_bridge_telemetry and
+            has_bridge_gatekeeper and has_mt5_smart_cmd and has_mt5_smart_handler and
+            has_mt5_smart_cb and has_registry_cmd
+        )
+
+        if all_inv71_passed:
+            log_pass("MT5 Super Smart Institutional Citadel & 8-Pillar Trap Matrix (Invariant 71) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 71 check failed: inv71={has_inv71}, class={has_cit_class}, trap={has_eval_trap}, gate={has_gatekeeper}, sess={has_session}, eval={has_eval_valid}, telem={has_bridge_telemetry}, b_gate={has_bridge_gatekeeper}, cmd={has_mt5_smart_cmd}, handler={has_mt5_smart_handler}, cb={has_mt5_smart_cb}, reg={has_registry_cmd}")
+            log_fail("MT5 Super Smart Institutional Citadel (Invariant 71) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 71 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

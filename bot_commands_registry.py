@@ -52,6 +52,7 @@ def get_public_bot_commands():
         BotCommand("capital", "🏛️ Angkor Capital (Gold, Oil, US500)"),
         BotCommand("forex", "💱 Angkor Forex (24/7 Global Satellite)"),
         BotCommand("mt5", "⚡ Angkor MT5 (Tokyo GTCFX Master Pool)"),
+        BotCommand("mt5_smart", "🧠 Super Smart MT5 Citadel & AI Swarm"),
         BotCommand("mt5_reachsey", "👑 Angkor MT5 Matrix (5-Position Basket)"),
         BotCommand("mt5_hf", "🤗 Angkor MT5 Free 16GB Worker"),
         BotCommand("capital_ib", "🤝 Angkor Capital IB Rebates (30%-50%)"),
