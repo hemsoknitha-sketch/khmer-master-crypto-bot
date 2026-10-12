@@ -398,6 +398,15 @@ def scan_macro_waterfall_opportunity(symbol: str) -> dict:
         if not ai_consensus.get("approved", False):
             return res
 
+        # 360° Citadel Trap Clearance: Ensure smart money hasn't swept SSL (bear trap)
+        try:
+            from super_smart_futures_citadel import SuperSmartFuturesCitadel
+            c_trap = SuperSmartFuturesCitadel.evaluate_institutional_futures_trap(symbol, "SELL", interval="15m")
+            if not c_trap.get("is_approved", True):
+                return res
+        except Exception:
+            pass
+
         adx_bonus = min(8.0, max(0.0, (adx_1h - 25.0) * 0.5))
         vol_bonus = min(7.0, max(0.0, (vol_surge_ratio - 1.8) * 3.5))
         tech_conf = 85.0 + adx_bonus + vol_bonus
@@ -502,6 +511,15 @@ def scan_macro_breakout_opportunity(symbol: str) -> dict:
     )
     if not ai_consensus.get("approved", False):
         return res
+
+    # 360° Citadel Trap Clearance: Ensure smart money hasn't swept BSL (bull trap)
+    try:
+        from super_smart_futures_citadel import SuperSmartFuturesCitadel
+        c_trap = SuperSmartFuturesCitadel.evaluate_institutional_futures_trap(symbol, "BUY", interval="15m")
+        if not c_trap.get("is_approved", True):
+            return res
+    except Exception:
+        pass
 
     adx_bonus = min(8.0, max(0.0, (adx_1h - 25.0) * 0.5))
     vol_bonus = min(7.0, max(0.0, (vol_surge - 1.8) * 3.5))

@@ -1531,12 +1531,15 @@ class ReachseyStraddleEngine:
         gap_dist_buy = gap_mult_buy * atr_14
         gap_dist_sell = gap_mult_sell * atr_14
 
-        buy_stop_trigger = max(recent_high, current_price + gap_dist_buy)
-        sell_stop_trigger = min(recent_low, current_price - gap_dist_sell)
+        # 6.5 Squeeze Displacement Breakout Threshold (Pillar 1 & Turtle Soup Protection)
+        # Requires true displacement beyond swing highs/lows, eliminating fake wick touches
+        displacement_pad = 0.15 * atr_14
+        buy_stop_trigger = max(recent_high + displacement_pad, current_price + gap_dist_buy)
+        sell_stop_trigger = min(recent_low - displacement_pad, current_price - gap_dist_sell)
 
-        # 7. Asymmetric R:R >= 1:10.0 SL/TP Engine (ចំណេញ ១ ដង ទប់ខាត ១០ ដង)
-        sl_mult = 1.2 if is_5m_burst else 1.5
-        sl_dist = sl_mult * atr_14
+        # 7. Dynamic Volatility Breathing Stop & Asymmetric R:R >= 1:10.0 SL/TP Engine (Pillar 1 Standard)
+        # Sized strictly to max(2.20 * ATR, 0.0080 * Price) to eliminate premature micro-noise stop-outs
+        sl_dist = max(2.20 * atr_14, current_price * 0.0080)
         tp_10r_dist = target_rr * sl_dist  # 10R Asymmetric Payoff
 
         buy_sl = buy_stop_trigger - sl_dist
@@ -1885,6 +1888,14 @@ def execute_reachsey_crypto(
             errors.append(f"SKY_NET_GUARD (SELL): {sk_s_reason}")
     except Exception as e_sk:
         print(f"⚠️ [SkyNet Reachsey Guard Error]: {e_sk}")
+
+    # Directional AI Swarm Filter: If AI has high conviction (>= 75%), strictly block opposing counter-trend leg!
+    ai_dir = levels.get("ai_direction", "NEUTRAL")
+    ai_conf = float(levels.get("ai_confidence", 50.0))
+    if ai_dir == "BUY" and ai_conf >= 75.0:
+        levels["is_sell_blocked"] = True
+    elif ai_dir == "SELL" and ai_conf >= 75.0:
+        levels["is_buy_blocked"] = True
 
     # BUY-STOP Order
     if not levels["is_buy_blocked"]:

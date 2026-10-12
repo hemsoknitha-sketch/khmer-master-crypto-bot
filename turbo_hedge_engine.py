@@ -744,20 +744,20 @@ def scan_and_evaluate_symbol(symbol: str, requested_leverage: int = 15, avail_ba
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [STRICT EXCLUSION: ANTI-PEAK BUYING] {symbol}: 24h Change {change_24h:+.1f}% >= +20% or RSI {rsi14_15m:.1f} >= 70 -> Blocked BUY!")
-                elif side == "BUY" and not is_spot_mode and price > ema5_1m * 1.0035:
-                    # Price extended > 0.35% above 1m EMA5 -> Wait for Pullback Retracement!
+                elif side == "BUY" and not is_spot_mode and price > ema5_1m * 1.0080:
+                    # Parabolic Overextension > 0.80% above 1m EMA5 -> Wait for Pullback Retracement!
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price extended > 0.35% above EMA5 -> Waiting for Pullback!")
+                    print(f"🛡️ [PULLBACK RETRACEMENT GUARD] {symbol}: Price overextended > 0.80% above EMA5 -> Waiting for Pullback!")
                 elif side == "SELL" and (change_24h <= -15.0 or rsi14_15m <= 38.0):
                     side = "SKIP"
                     confidence = 50.0
                     print(f"🛡️ [STRICT EXCLUSION: ANTI-BOTTOM SELLING] {symbol}: 24h Change {change_24h:+.1f}% <= -15% or RSI {rsi14_15m:.1f} <= 38.0 -> Blocked SELL!")
-                elif side == "SELL" and not is_spot_mode and price < ema5_1m * 0.9965:
-                    # Price extended > 0.35% below 1m EMA5 -> Wait for Bounce Retracement!
+                elif side == "SELL" and not is_spot_mode and price < ema5_1m * 0.9920:
+                    # Waterfall Overextension > 0.80% below 1m EMA5 -> Wait for Bounce Retracement!
                     side = "SKIP"
                     confidence = 50.0
-                    print(f"🛡️ [BOUNCE RETRACEMENT GUARD] {symbol}: Price extended > 0.35% below EMA5 -> Waiting for Retracement!")
+                    print(f"🛡️ [BOUNCE RETRACEMENT GUARD] {symbol}: Price overextended > 0.80% below EMA5 -> Waiting for Retracement!")
 
             # 🛡️ BTC Lead Impulse Guard & Funding Fee Penalty Guard
             if side != "SKIP" and symbol != "BTCUSDT":

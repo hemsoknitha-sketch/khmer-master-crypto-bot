@@ -519,6 +519,18 @@ def validate_cross_engine_entry(
     # 3. Sky Net 99% Swarm Confluence Evaluation
     swarm = evaluate_sky_net_swarm_confluence(sym, norm_proposed)
 
+    # 🦅 360° CITADEL INSTITUTIONAL TRAP & CONFLUENCE CONVICTION GATEKEEPER
+    # Strictly enforces Invariant 57 & Pillar 2 across all 5 engines for live trading executions:
+    if chat_id != 999999 and not kwargs.get("bypass_citadel", False):
+        cit_trap = swarm.get("votes", {}).get("citadel_trap", {})
+        if isinstance(cit_trap, dict) and cit_trap.get("is_approved") is False:
+            cit_reason = cit_trap.get("rejection_reason") or "INSTITUTIONAL_TRAP_DETECTED"
+            return False, f"CITADEL_TRAP_REJECTED: {cit_reason}", swarm
+
+        confluence_val = float(swarm.get("confluence_score", 0.0))
+        if confluence_val < 60.0:
+            return False, f"LOW_SWARM_CONFLUENCE ({confluence_val:.1f}% < 60.0% Threshold)", swarm
+
     # 4. Invariant 43: Engine Priority Arbitration & Capital Ring-Fence
     keys = db.get_user_api(chat_id)
     if keys and keys[0] and keys[1]:

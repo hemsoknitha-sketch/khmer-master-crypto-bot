@@ -1305,15 +1305,15 @@ class PerpetualWealthGeneratorEngine:
                         # and price subsequently pulled back to or below trailing floor (e.g. <= +4.5% ROI)
                         is_be_trigger = is_be_locked and (roi_pct <= be_net_floor_roi)
 
-                        # Fixed Dollar Risk Parity & Volatility Breathing Stop Loss (Clamped at -$1.50 Cap):
+                        # Fixed Dollar Risk Parity & Volatility Breathing Stop Loss (Clamped between -$1.50 and -$3.50 Cap):
                         # Asymmetric Positive Expectancy: Sized with 2.2x ATR breathing room while bounding dollar risk!
-                        pw_sl_dollar_cap = -max(1.50, min(2.50, pos_margin * 0.20))
+                        pw_sl_dollar_cap = -max(1.50, min(3.50, pos_margin * 0.20))
                         pw_sl_roi_cap = -min(25.0, max(16.0, 2.2 * (atr_val / max(1e-6, mark_price)) * 100.0 * float(leverage)))
                         is_sl_trigger = (
-                            (unRealizedProfit <= -1.50) or
-                            (net_exit_pnl <= -1.50) or
                             (unRealizedProfit <= pw_sl_dollar_cap) or
-                            (roi_pct <= pw_sl_roi_cap)
+                            (net_exit_pnl <= pw_sl_dollar_cap) or
+                            (roi_pct <= pw_sl_roi_cap) or
+                            (pos_margin <= 7.50 and (unRealizedProfit <= -1.50 or net_exit_pnl <= -1.50))
                         )
                         
                         if is_be_trigger or is_sl_trigger:
@@ -1591,9 +1591,9 @@ class PerpetualWealthGeneratorEngine:
                                 continue
 
                             # Pullback Sweet-Spot Execution (Zero Top/Bottom Chasing Invariant 43):
-                            # If price is at or below EMA20 * 1.002, market execute at sweet spot
-                            # If price is slightly above sweet spot, place Pullback LIMIT Order to avoid chasing
-                            is_at_sweet_spot = (last_price <= (cand.get("ema20_15m", last_price) * 1.002)) if side == "BUY" else (last_price >= (cand.get("ema20_15m", last_price) * 0.998))
+                            # Candidates vetted by evaluate_symbol_technicals are within 0.6% of EMA20 with confirmed HL/LH structure.
+                            # Execute MARKET fill to eliminate Adverse Selection (passive limit orders only filling during failed moves).
+                            is_at_sweet_spot = (last_price <= (cand.get("ema20_15m", last_price) * 1.0065)) if side == "BUY" else (last_price >= (cand.get("ema20_15m", last_price) * 0.9935))
 
                             if is_at_sweet_spot:
                                 limit_entry_p = trading_engine.format_price_to_tick_size(sym, last_price)
