@@ -558,6 +558,22 @@ class CapitalComEngine:
                     reconciled += 1
                     logger.info(f"🔄 [CAPITAL SYNC] Reconciled broker-closed trade {deal_id} ({epic} {direction}): Exit ${exit_price:,.2f}, PnL ${pnl:+,.2f}")
 
+                    if pnl < 0:
+                        # Post-StopLoss Quarantine Lock: Blacklist asset for 45 minutes to prevent re-entry knife loops
+                        quarantine_sec = 2700.0  # 45 minutes
+                        epic_u = str(epic or "").upper()
+                        try:
+                            auto_eng = get_capital_auto_engine()
+                            auto_eng._asset_cooldowns[epic_u] = time.time() + quarantine_sec
+                        except Exception:
+                            pass
+                        try:
+                            scalp_eng = get_capital_trend_scalp_engine()
+                            scalp_eng.set_asset_cooldown(epic_u, duration_seconds=quarantine_sec)
+                        except Exception:
+                            pass
+                        logger.warning(f"🛑 [POST-SL QUARANTINE] {epic_u} took loss (${pnl:,.2f}). Quarantined for 45 minutes ({int(quarantine_sec/60)}m anti-whipsaw guard engaged).")
+
             return reconciled
         except Exception as e_sync:
             logger.debug(f"Capital closed position sync notice: {e_sync}")
@@ -1654,6 +1670,36 @@ class CapitalComEngine:
         elif range_pct > 50.0:
             bearish_score += 12  # Premium zone distribution bonus
 
+        # 6b. Institutional Anti-Falling-Knife & Reversal Confirmation Gatekeeper
+        is_falling_knife = False
+        is_rising_rocket = False
+        if len(candles) >= 3:
+            curr_c = candles[-1]
+            prev_c = candles[-2]
+            c_open = float(curr_c.get("open", 0.0))
+            c_close = float(curr_c.get("close", 0.0))
+            c_low = float(curr_c.get("low", 0.0))
+            c_high = float(curr_c.get("high", 0.0))
+            prev_close = float(prev_c.get("close", 0.0))
+
+            # Active Bearish Plunge: Price under EMA20 + Red candle + Lower close
+            if (c_close < ema20) and (c_close < c_open) and (c_close < prev_close):
+                lower_wick = max(0.0, min(c_open, c_close) - c_low)
+                body = max(0.001, abs(c_close - c_open))
+                has_hammer_absorption = (lower_wick >= 1.5 * body)
+                if not has_hammer_absorption:
+                    is_falling_knife = True
+                    bullish_score = 0  # 100% Veto: Do NOT catch active falling knife without reversal!
+
+            # Active Bullish Rocket: Price above EMA20 + Green candle + Higher close
+            if (c_close > ema20) and (c_close > c_open) and (c_close > prev_close):
+                upper_wick = max(0.0, c_high - max(c_open, c_close))
+                body = max(0.001, abs(c_close - c_open))
+                has_shooting_star = (upper_wick >= 1.5 * body)
+                if not has_shooting_star:
+                    is_rising_rocket = True
+                    bearish_score = 0  # 100% Veto: Do NOT short into active green surge!
+
         # Invariant 34: Spread Drag Elimination & Asymmetric Minimum 10x Hurdle Protocol
         spread_mgr = get_capital_spread_drag_manager()
         is_spread_ok, spread_err = spread_mgr.is_spread_acceptable(resolved_epic, spread, atr=atr)
@@ -1669,7 +1715,9 @@ class CapitalComEngine:
                 "ask": current_ask,
                 "spread": spread,
                 "atr": atr,
-                "market_status": market_status
+                "market_status": market_status,
+                "is_falling_knife": is_falling_knife,
+                "is_rising_rocket": is_rising_rocket
             }
 
         spread_audit = {}
@@ -1728,7 +1776,9 @@ class CapitalComEngine:
             "vsqi": spread_audit.get("vsqi", 10.0),
             "sl": sl,
             "tp": tp,
-            "market_status": market_status
+            "market_status": market_status,
+            "is_falling_knife": is_falling_knife,
+            "is_rising_rocket": is_rising_rocket
         }
 
     def execute_smart_tradfi_order(
@@ -3031,11 +3081,26 @@ class CapitalAutonomousEngine:
         # Anti-Overbought / Anti-Oversold Guards & Citadel Trap Clearance:
         # Strictly block BUY if RSI > 70.0 (chasing overbought top) or Citadel rejected trap
         # Strictly block SELL if RSI < 36.0 (panic selling bottom) or Citadel rejected trap
-        if ((raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "BUY" and smc_cf >= 85.0)) and rsi_val <= 70.0 and citadel_approved:
+        is_falling_knife = base_quant.get("is_falling_knife", False)
+        is_rising_rocket = base_quant.get("is_rising_rocket", False)
+
+        if is_falling_knife and ((raw_sig in ["BUY", "STRONG_BUY"]) or smc_act == "BUY"):
+            logger.info(f"🛡️ [ANTI-KNIFE VETO] {resolved_epic} BUY vetoed: Active 15M Bearish Plunge. Awaiting bullish reversal confirmation candle.")
+            base_quant["final_action"] = "HOLD"
+            base_quant["final_confidence"] = 40.0
+            return base_quant
+
+        if is_rising_rocket and ((raw_sig in ["SELL", "STRONG_SELL"]) or smc_act == "SELL"):
+            logger.info(f"🛡️ [ANTI-ROCKET VETO] {resolved_epic} SELL vetoed: Active 15M Bullish Surge. Awaiting bearish rejection candle.")
+            base_quant["final_action"] = "HOLD"
+            base_quant["final_confidence"] = 40.0
+            return base_quant
+
+        if ((raw_sig in ["BUY", "STRONG_BUY"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "BUY" and smc_cf >= 85.0)) and rsi_val <= 70.0 and citadel_approved and not is_falling_knife:
             base_quant["final_action"] = "BUY"
             if smc_act == "BUY":
                 base_quant["final_confidence"] = max(final_conf, smc_cf)
-        elif ((raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "SELL" and smc_cf >= 85.0)) and rsi_val >= 36.0 and citadel_approved:
+        elif ((raw_sig in ["SELL", "STRONG_SELL"] and raw_conf >= 65 and final_conf >= 75) or (smc_act == "SELL" and smc_cf >= 85.0)) and rsi_val >= 36.0 and citadel_approved and not is_rising_rocket:
             base_quant["final_action"] = "SELL"
             if smc_act == "SELL":
                 base_quant["final_confidence"] = max(final_conf, smc_cf)
@@ -6273,8 +6338,8 @@ class CapitalSpreadDragManager:
         Calculates mathematically optimal SL and TP guaranteeing R:R >= 6.0 and TP >= 10.0x spread.
         """
         resolved_epic = epic.upper().replace(".PRO", "").strip()
-        # 1. Downside Risk (1R): Clamped outside market noise
-        min_sl_dist = max(1.5 * atr, spread * 2.5, 0.0025 * entry_price)
+        # 1. Downside Risk (1R): Clamped strictly outside market noise (Pillar 2 TradFi Standard)
+        min_sl_dist = max(2.50 * atr, spread * 3.5, 0.0035 * entry_price)
 
         # 2. Upside Target (6R): Clamped to >= 6.0x risk and >= 10.0x spread
         min_tp_dist = max(min_rr_ratio * min_sl_dist, min_target_spread_ratio * spread, 0.015 * entry_price)
