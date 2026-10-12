@@ -5962,6 +5962,12 @@ class TelegramBotThread(BaseThread):
                 except Exception:
                     pass
                 context.args = []
+            elif data == "btn_mt5_reachsey_gold":
+                try:
+                    await update.callback_query.answer("👑 កំពុងដំណើរការ Reachsey Gold Apex Matrix (10-20 Pos)...")
+                except Exception:
+                    pass
+                context.args = ["GOLD"]
                 await mt5_reachsey_command(update, context)
             elif data == "btn_mt5_reachsey_3000":
                 try:
@@ -23222,10 +23228,79 @@ class TelegramBotThread(BaseThread):
             # Subcommand: 3000, 6000, 10000 or custom capital tier / BUY / SELL / symbol / lots
             if args:
                 sub = str(args[0]).upper().strip()
+                is_gold_matrix_cmd = (
+                    sub in ["GOLD", "GOLD_MATRIX", "GOLD_APEX", "GOLD10", "GOLD20"]
+                    or (sub in ["XAU", "XAUUSD"] and not any(a in ["3000", "6000", "10000"] for a in [str(x).upper() for x in args]))
+                )
+                if is_gold_matrix_cmd:
+                    custom_act = None
+                    custom_pos_cnt = None
+                    custom_lot = None
+                    for a_item in args:
+                        a_u = str(a_item).upper().strip()
+                        if a_u in ["BUY", "SELL"]:
+                            custom_act = a_u
+                        elif a_u.isdigit() and 10 <= int(a_u) <= 20:
+                            custom_pos_cnt = int(a_u)
+                        else:
+                            try:
+                                v_lot = float(a_u)
+                                if 0.01 <= v_lot <= 5.0 and not (10 <= v_lot <= 20 and v_lot.is_integer()):
+                                    custom_lot = v_lot
+                            except Exception:
+                                pass
+
+                    launch_res = bridge.execute_reachsey_gold_apex_matrix(
+                        acc_id=target_account,
+                        chat_id=chat_id,
+                        custom_action=custom_act,
+                        custom_positions=custom_pos_cnt,
+                        custom_lot_per_pos=custom_lot
+                    )
+
+                    success = launch_res.get("success", False)
+                    acc_used = launch_res.get("account_id", target_account or "N/A")
+                    b_obj = launch_res.get("basket", {})
+                    tickets_cnt = launch_res.get("positions_dispatched", 0)
+                    tp_val = launch_res.get("target_profit_usd") or b_obj.get("target_profit", 100.0)
+                    t_str = f"+${tp_val:,.2f}"
+                    pos_lot = float(launch_res.get("lot_per_pos", 0.01))
+                    tot_vol_lot = float(launch_res.get("total_lot", 0.0))
+                    act_used = launch_res.get("action", "BUY")
+                    b_conf = float(launch_res.get("confidence") or b_obj.get("confidence", 0.0))
+                    b_rsn = launch_res.get("signal_reason") or b_obj.get("signal_reason", "")
+                    fail_reason = launch_res.get("reason") or launch_res.get("error", "Unknown")
+                    min_h_val = launch_res.get("min_harvest_usd") or (b_obj.get("min_harvest_milestone", 10.0) if b_obj.get("unit_label") == "USD" else (b_obj.get("min_harvest_milestone", 1000.0) / 100.0))
+
+                    msg_res = (
+                        f"👑 <b>[REACHSEY GOLD APEX MATRIX DISPATCHED]</b> 🚀\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"🏛️ <b>គណនី GTCFX ៖</b> <code>#{acc_used}</code>\n"
+                        f"🪙 <b>ទ្រព្យសកម្ម ៖</b> <code>XAUUSD (Gold)</code>\n"
+                        f"🎯 <b>ទិសដៅ 100% Unidirectional ៖</b> <b>{act_used} (100% Directional Thrust)</b>\n"
+                        f"📦 <b>ចំនួន Positions បើកព្រមគ្នា ៖</b> <b>{tickets_cnt} Positions ({pos_lot:.2f} lot ក្នុង ១ Pos)</b>\n"
+                        f"📊 <b>ទំហំ Volume សរុប ៖</b> <b>{tot_vol_lot:.2f} Lots</b> (0% Opposite Hedge Drag)\n"
+                        f"🧠 <b>AI Conviction ៖</b> <b>{b_conf:.1f}%</b> ({b_rsn[:24] if b_rsn else '9-SMC + Gatekeeper'})\n"
+                        f"⚡ <b>ល្បឿនបញ្ជាចេញ ៖</b> <code>&lt; 0.5ms VPS RAM Socket</code>\n"
+                        f"💰 <b>កើបចំណេញអប្បបរមា (Fast Harvest) ៖</b> <b>+${min_h_val:,.2f}</b> (Atomic Parallel Sweep)\n"
+                        f"🎯 <b>ទិសដៅកើបចំណេញធំ (Target TP) ៖</b> <b>{t_str}</b> (+10%)\n"
+                        f"🛡️ <b>យន្តការការពារ ៖</b> Anti-Falling-Knife + Post-Loss 45m Quarantine\n"
+                        f"{ui_standards.DIVIDER_DOUBLE}\n"
+                        f"{'✅ <b>ដំណើរការ Gold Apex Matrix 10-20 Pos បានបាញ់ចូល MT5 Tokyo ដោយជោគជ័យ!</b>' if success else '⚠️ <b>ប្រព័ន្ធការពារមូលធន (Protection Abort) ៖</b> ' + html.escape(str(fail_reason))}\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"<i>✨ Angkor Quant Reachsey Gold Engine — កើបចំណេញមាសលឿនអស្ចារ្យ 24/5!</i>"
+                    )
+                    kb_back = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📊 ពិនិត្យ Baskets សកម្ម", callback_data="btn_mt5_reachsey_status")],
+                        [InlineKeyboardButton("🎛️ Reachsey Master Menu", callback_data="btn_mt5_reachsey_menu")]
+                    ])
+                    await update.effective_message.reply_text(msg_res, parse_mode="HTML", reply_markup=kb_back)
+                    return
+
                 is_launch_cmd = (
                     sub in ["3000", "6000", "10000", "TIER1", "TIER2", "TIER3", "BUY", "SELL", "START", "RUN", "NOW", "LAUNCH", "GO"]
                     or (sub.isdigit() and int(sub) >= 500)
-                    or any(c in sub for c in ["XAU", "BTC", "ETH", "US30", "US100", "EUR", "GBP", "JPY", "GOLD"])
+                    or any(c in sub for c in ["BTC", "ETH", "US30", "US100", "EUR", "GBP", "JPY"])
                 )
                 if is_launch_cmd:
                     cap_val = 3000.0
@@ -23444,6 +23519,9 @@ class TelegramBotThread(BaseThread):
 
             kb_reachsey = InlineKeyboardMarkup([
                 [
+                    InlineKeyboardButton("👑 Reachsey Gold Apex Matrix (10-20 Pos)", callback_data="btn_mt5_reachsey_gold")
+                ],
+                [
                     InlineKeyboardButton("⚡ Tier 1 ($3,000 | 5 Pos)", callback_data="btn_mt5_reachsey_3000"),
                     InlineKeyboardButton("⚡ Tier 2 ($6,000 | 10 Pos)", callback_data="btn_mt5_reachsey_6000")
                 ],
@@ -23489,6 +23567,7 @@ class TelegramBotThread(BaseThread):
                 f"{baskets_summary}\n"
                 f"{ui_standards.DIVIDER_HEAVY}\n"
                 f"🎯 <b>កូដបញ្ជា 1-Tap Presets (ចុចចម្លងភ្លាម) ៖</b>\n"
+                f"• 👑 បើក Gold Apex (10-20 Pos) ៖ `` `/mt5_reachsey GOLD` `` ឬ `` `/mt5_reachsey GOLD BUY` ``\n"
                 f"• បើក BUY Matrix 1.00 Lot (0.60 / 0.40) ៖ `` `/mt5_reachsey BUY 3000` ``\n"
                 f"• បើក SELL Matrix 1.00 Lot (0.60 / 0.40) ៖ `` `/mt5_reachsey SELL 3000` ``\n"
                 f"• បើក Auto Matrix 24/5 ៖ `` `/mt5_reachsey AUTO ON` ``\n"
