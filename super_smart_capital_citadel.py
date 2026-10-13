@@ -47,6 +47,68 @@ def _get_tradfi_precision(epic_str: str, price_val: float = 0.0) -> int:
     return 2
 
 
+def _calc_adx_14(high_arr: List[float], low_arr: List[float], close_arr: List[float]) -> float:
+    """
+    Computes Wilder's 14-period Average Directional Index (ADX) from 15m OHLC bars.
+    Returns ADX >= 25.0 for strong trending momentum, or < 25.0 for sideways consolidation chop.
+    """
+    if len(close_arr) < 16:
+        return 28.0  # Fallback if historical bars are limited
+    n = len(close_arr)
+    tr_list = []
+    plus_dm = []
+    minus_dm = []
+    for i in range(1, n):
+        h = high_arr[i]
+        l = low_arr[i]
+        prev_h = high_arr[i - 1]
+        prev_l = low_arr[i - 1]
+        prev_c = close_arr[i - 1]
+
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        tr_list.append(tr)
+
+        up_move = h - prev_h
+        down_move = prev_l - l
+
+        if up_move > down_move and up_move > 0:
+            plus_dm.append(up_move)
+        else:
+            plus_dm.append(0.0)
+
+        if down_move > up_move and down_move > 0:
+            minus_dm.append(down_move)
+        else:
+            minus_dm.append(0.0)
+
+    period = 14
+    if len(tr_list) < period:
+        return 28.0
+
+    smooth_tr = sum(tr_list[:period])
+    smooth_plus_dm = sum(plus_dm[:period])
+    smooth_minus_dm = sum(minus_dm[:period])
+
+    dx_list = []
+    for i in range(period, len(tr_list)):
+        smooth_tr = smooth_tr - (smooth_tr / period) + tr_list[i]
+        smooth_plus_dm = smooth_plus_dm - (smooth_plus_dm / period) + plus_dm[i]
+        smooth_minus_dm = smooth_minus_dm - (smooth_minus_dm / period) + minus_dm[i]
+
+        if smooth_tr > 0:
+            plus_di = 100.0 * (smooth_plus_dm / smooth_tr)
+            minus_di = 100.0 * (smooth_minus_dm / smooth_tr)
+            di_sum = plus_di + minus_di
+            if di_sum > 0:
+                dx = 100.0 * abs(plus_di - minus_di) / di_sum
+                dx_list.append(dx)
+
+    if not dx_list:
+        return 28.0
+    adx = sum(dx_list[-period:]) / len(dx_list[-period:]) if len(dx_list) >= period else sum(dx_list) / len(dx_list)
+    return round(float(adx), 2)
+
+
 class SuperSmartCapitalCitadel:
     """
     Institutional TradFi Position Opening Gatekeeper & Sky Net Trap Citadel for Capital.com.
@@ -177,7 +239,7 @@ class SuperSmartCapitalCitadel:
         volumes = [float(c.get("volume", 0.0)) for c in candles_15m]
 
         # --------------------------------------------------------------------
-        # 1. PILLAR 6: NON-NEGOTIABLE SAFETY HARD GUARDS (RSI ARMOR)
+        # 1. PILLAR 6: NON-NEGOTIABLE SAFETY HARD GUARDS (RSI ARMOR & ADX MOMENTUM)
         # --------------------------------------------------------------------
         # Calculate 15m RSI (14 period)
         gains, losses = [], []
@@ -223,6 +285,25 @@ class SuperSmartCapitalCitadel:
                 "proposed_side": norm_side,
                 "is_approved": False,
                 "rejection_reason": reason,
+                "rsi_15m": rsi_15m,
+                "confluence_score": 0.0
+            }
+            cls._CITADEL_CACHE[cache_key] = (now, res)
+            return res
+
+        # Pillar 3: 360° Citadel Sweep Confirmation & Trap Clearance (ADX >= 25.0 Sideways Trap Clearance)
+        adx_15m = _calc_adx_14(highs, lows, closes)
+        if adx_15m < 25.0:
+            reason = (
+                f"CHOPPY_SIDEWAYS_MARKET: 15m ADX ({adx_15m:.1f}) < 25.0 (Pillar 3 Citadel Clearance). "
+                f"Trading inside trendless sideways consolidation is strictly prohibited to eliminate whipsaw bleed."
+            )
+            res = {
+                "epic": resolved_epic,
+                "proposed_side": norm_side,
+                "is_approved": False,
+                "rejection_reason": reason,
+                "adx_15m": adx_15m,
                 "rsi_15m": rsi_15m,
                 "confluence_score": 0.0
             }
@@ -487,20 +568,23 @@ class SuperSmartCapitalCitadel:
         is_approved = (confluence_score >= 68.0)
 
         # --------------------------------------------------------------------
-        # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & DYNAMIC INVALIDATION
+        # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & DYNAMIC VOLATILITY BREATHING STOP (INVARIANTS 34 & 35)
         # --------------------------------------------------------------------
         prec = _get_tradfi_precision(resolved_epic, curr_price)
-        min_pip_buf = 0.0006 if prec == 5 else (0.06 if prec == 3 else max(0.50, spread * 1.5))
+        # Dynamic Volatility Breathing Stop Standard (Invariant 35 / Pillar 2):
+        # SL Distance >= max(2.50 * ATR, 3.5 * Spread, 0.0035 * Price)
+        breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+
         if norm_side == "BUY":
-            invalidation_sl = round(min(swing_low - (0.25 * atr_15m), curr_price - max(min_pip_buf, 1.6 * atr_15m)), prec)
-            risk_dist = max(spread * 3.0, curr_price - invalidation_sl)
-            tp_1 = round(curr_price + (risk_dist * 2.5), prec)  # Institutional 1:2.5 Min Hurdle
-            tp_2 = round(curr_price + (risk_dist * 5.0), prec)  # Institutional 1:5.0 Major Target
+            invalidation_sl = round(min(swing_low - (0.25 * atr_15m), curr_price - breathing_sl_dist), prec)
+            risk_dist = max(breathing_sl_dist, curr_price - invalidation_sl)
+            tp_1 = round(curr_price + max(risk_dist * 2.5, 10.0 * spread), prec)  # Institutional 1:2.5 Min Hurdle & >= 10x spread
+            tp_2 = round(curr_price + max(risk_dist * 5.0, 15.0 * spread), prec)  # Institutional 1:5.0 Major Target
         else:
-            invalidation_sl = round(max(swing_high + (0.25 * atr_15m), curr_price + max(min_pip_buf, 1.6 * atr_15m)), prec)
-            risk_dist = max(spread * 3.0, invalidation_sl - curr_price)
-            tp_1 = round(curr_price - (risk_dist * 2.5), prec)
-            tp_2 = round(curr_price - (risk_dist * 5.0), prec)
+            invalidation_sl = round(max(swing_high + (0.25 * atr_15m), curr_price + breathing_sl_dist), prec)
+            risk_dist = max(breathing_sl_dist, invalidation_sl - curr_price)
+            tp_1 = round(curr_price - max(risk_dist * 2.5, 10.0 * spread), prec)
+            tp_2 = round(curr_price - max(risk_dist * 5.0, 15.0 * spread), prec)
 
         rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
 
@@ -516,6 +600,7 @@ class SuperSmartCapitalCitadel:
             ),
             "rejection_reason": "CLEARANCE_GRANTED" if is_approved else f"CONFLUENCE_SCORE_BELOW_THRESHOLD ({confluence_score} < 68.0)",
             "rsi_15m": rsi_15m,
+            "adx_15m": adx_15m,
             "price_range_pct": price_range_pct,
             "is_discount": is_discount,
             "is_premium": is_premium,

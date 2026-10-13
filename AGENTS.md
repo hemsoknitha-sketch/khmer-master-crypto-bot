@@ -31,19 +31,30 @@ The system is engineered upon two non-negotiable axioms:
   3. Propose the institutional, mathematically sound alternative that preserves capital while extracting genuine edge.
 - **Sycophancy Classification:** Flattering the user, staying silent out of fear/politeness, or implementing suicide code just because the user asked is officially classified as **Technical Treason & Capital Sabotage**.
 
-### 1.1.1 THE FOUR PILLARS OF CAPITAL.COM TRADFI FIDUCIARY HONESTY & SPREAD FRICTION ELIMINATION
-**(គ្រឹះ៤ប្រការស្មោះត្រង់វិស្វកម្ម & កម្ចាត់កាត់ខាតញាក់ Spread ក្នុង Capital.com TradFi)**
+### 1.1.1 THE SIX PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ69)
+**(គ្រឹះ ៦ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58)**
 **Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
-1. **Pillar 1: Absolute Refusal of No-SL Recklessness (ហាមដាច់ខាតការលុប SL ឬទុកបណ្តោយឱ្យឆេះគណនី):** Leveraged CFD trading ($20\times$) without hard Stop-Loss guarantees eventual account ruin during sudden flash crashes or extreme market volatility. Any request to remove Stop-Loss or "hold through drawdowns without risk bounds" MUST be firmly refused under the Sacred Fiduciary Oath. Capital preservation is non-negotiable.
-2. **Pillar 2: Dynamic Volatility Breathing Stop Standard (កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួល):** Stop-Loss distance must be mathematically shielded by volatility and broker friction:
+1. **Pillar 1: Dynamic Volatility Breathing Stop Standard (Invariant 35 - កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួល):**
    - TradFi Standard: $\text{SL Distance} \ge \max(2.50\times\text{ATR}, 3.5\times\text{Spread}, 0.0035\times\text{Price})$.
    - Trend Scalp Standard: $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$.
-   - Static or micro stops ($1.0\times\text{ATR}_{5m}$) that get clipped by broker spread expansion or minor oscillations before directional thrust can unfold are strictly prohibited.
-3. **Pillar 3: 360° Citadel Sweep Confirmation & Trap Clearance (ស្ទាក់ចាប់កម្លាំងពិតប្រាកដ & លុបបំបាត់ Sideways Chop Trap):** Every entry must be vetted by Institutional 360° Citadel Trap Clearance with $ADX \ge 25.0$ and multi-timeframe structural confluence to guarantee strong directional momentum ($E[X] > 0$) and prevent entering inside retail trap sweeps.
-4. **Pillar 4: Delayed Multi-Tier Harvest & Fee-Clearing Trailing Ratchet (កម្ចាត់ការកៀរយកចំណេញកម្ទេចកម្ទី $+\$0.14 - +\$0.50$):**
-   - Breakeven Armor is delayed until position achieves genuine momentum ($\ge +8.5\%$ ROI or $\ge +\$3.50$ UPL), ensuring early price oscillations do not choke the trade at scratch.
+   - Eliminates tight/micro stops ($1.0\times\text{ATR}_{5m}$) that get clipped by broker spread expansion or minor oscillations before directional thrust can unfold. Zero No-SL trading.
+2. **Pillar 2: Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34 - កម្ចាត់ការស៊ីថ្លៃ Spread):**
+   - $\text{Take Profit Distance} \ge 10.0 \times \text{Spread}$ and $R:R \ge 1:2.5$ to $1:6.0$.
+   - Guarantees $\ge 90\%$ of captured market movement converts directly into clean Net Profit, rather than paying broker spread friction.
+3. **Pillar 3: Delayed Breakeven Armor & Multi-Tier Harvest (Invariant 35 - កម្ចាត់ការកៀរយកចំណេញកម្ទេចកម្ទី $+\$0.14 - +\$0.50$):**
+   - Breakeven Armor is delayed until position achieves genuine momentum ($\ge +8.5\%$ ROI or $\ge +\$3.50$ UPL), locking a guaranteed fee-clearing floor ($\text{Entry} \pm 0.5\times\text{Spread}$ Net Floor). Early oscillations never choke trades at scratch.
    - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$6.00$ or $\ge +14.0\%$ ROI.
-   - Any Retracement Harvest exit must strictly enforce a guaranteed net fee clearing floor ($\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$) to prevent eating crumbs and death by a thousand papercuts.
+   - Any Retracement Harvest exit strictly enforces $\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$ to prevent eating crumbs and death by a thousand papercuts.
+4. **Pillar 4: Super Smart 360° Citadel Sweep Confirmation & Trap Clearance (Invariant 58 - ស្ទាក់ចាប់កម្លាំងពិតប្រាកដ & លុបបំបាត់ Sideways Chop Trap):**
+   - Every entry must be vetted by Institutional 360° Citadel Trap Clearance with $ADX \ge 25.0$ and multi-timeframe structural confluence.
+   - Strictly enforces Anti-Oversold Short Guard (15m RSI $\le 36.0$ blocks Shorts) and Anti-Overbought Peak Guard (RSI $\ge 70.0$ blocks Longs).
+5. **Pillar 5: Rollover Swap Shield & Wednesday Triple-Swap Lockout (Invariant 53 - របាំងការពារកម្រៃ Swap ឆ្លងយប់ & 3x Swap):**
+   - Strictly blocks new TradFi entries during the overnight lull between 03:45 AM and 07:00 AM ICT (20:45 to 23:59 UTC), avoiding spread blowout and overnight financing interest.
+   - Enforces early lockout on Wednesday nights (from 03:15 AM Thursday ICT) to completely eliminate 3-day (300%) triple rollover swap charges.
+   - Continuous 24/7 trading is ring-fenced for Crypto CFDs (BTC, ETH, SOL).
+6. **Pillar 6: Daily Capital Governor (Invariant 52 - ចាក់សោរប្រាក់ចំណេញ $+5.0\%$ ឈប់ និងកម្រិតខាតអតិបរមា $-2.5\%$ ផ្អាក):**
+   - Net daily return $+5.0\%$ triggers `TARGET_LOCKED`, locking realized gains and barring new entries for the day.
+   - Daily loss floor $-2.5\%$ triggers `FLOOR_HIT`, suspending entries to preserve capital against revenge trading and losing streaks.
 
 ### 1.1.2 THE SUPER SMART BINANCE FUTURES RISK & PROFIT HARMONIZATION PILLARS (/smartx, /turbo_hedge, /auto_trade, /pre_pump, /wealth)
 **(គ្រឹះរួមបញ្ចូលគ្នាការពារហានិភ័យ & កើបចំណេញកម្រិតកំពូលលើ BINANCE FUTURES ទាំង ៥ ប្រព័ន្ធ)**
