@@ -3156,11 +3156,15 @@ class CapitalAutonomousEngine:
             if not deal_id or entry_level <= 0:
                 continue
 
-            # Dynamic margin rate based on asset class (20x for indices/gold, 5x for stocks, 2x for crypto)
+            # Dynamic margin rate based on actual broker leverage / asset class
             epic_u = epic.upper()
             is_stock = any(s in epic_u for s in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
             is_crypto = any(c in epic_u for c in ["BTC", "ETH", "SOL", "XRP"])
-            margin_rate = 0.20 if is_stock else (0.50 if is_crypto else 0.05)
+            pos_leverage = float(pos.get("leverage") or 0.0)
+            if pos_leverage > 0:
+                margin_rate = 1.0 / pos_leverage
+            else:
+                margin_rate = 0.20 if is_stock else (0.50 if is_crypto else 0.05)
             estimated_margin = max(1.0, entry_level * size * margin_rate)
             roi_pct = (upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
 
@@ -3207,10 +3211,14 @@ class CapitalAutonomousEngine:
             ratchet_pct = 0.85 if is_runner else 0.80
 
             # =========================================================================
-            # TIER 4: CLEAN CASH TARGET HARVEST (Bank 100% Win at Target)
-            # - Apex 3rd Runner: Runs uncapped to +30.0% ROI or >= +$15.00 UPL
-            # - Standard Positions: Clean Cash Harvest at >= +14.0% ROI or >= +$6.00 UPL
-            # - Sky Net 360° Daily Target Lock (+5.0% Daily Goal Achieved): Instant Exit
+            # TIER 4: SUPER SMART ASYMMETRIC CASH TARGET HARVEST (Bank 100% Win at Real Target)
+            # 1. Sky Net 360° Daily Target Lock (+5.0% Daily Goal Achieved): Instant Exit to bank gains
+            # 2. Broker Take-Profit Hit / Near-Target Exhaustion: Reached within 0.75x spread of TP
+            # 3. True Asymmetric Moonshot Target:
+            #    - Apex 3rd Runner: Runs uncapped to +100.0% ROI or >= +$50.00 UPL
+            #    - Standard Positions: Full Moonshot Target at >= +50.0% ROI or >= +$25.00 UPL
+            # Positions with initial momentum are NOT choked early!
+            # Instead, they flow into Tier 2 & 3 (The Golden 80%-85% Trailing Ratchet) to ride the trend!
             # =========================================================================
             target_lock_harvest = False
             if chat_id and upl > 0:
@@ -3228,9 +3236,21 @@ class CapitalAutonomousEngine:
                 except Exception:
                     pass
 
-            harvest_trigger = target_lock_harvest or ((roi_pct >= 30.0 or upl >= 15.0) if is_runner else (roi_pct >= 14.0 or upl >= 6.0))
+            # Detect if current market price has reached or exceeded broker-side Take-Profit level
+            tp_level = float(pos.get("profitLevel", 0.0) or 0.0)
+            tp_target_reached = False
+            if tp_level > 0:
+                if direction == "BUY" and current_price >= (tp_level - (spread * 0.75)):
+                    tp_target_reached = True
+                elif direction == "SELL" and current_price <= (tp_level + (spread * 0.75)):
+                    tp_target_reached = True
+
+            # Full Asymmetric Moonshot target
+            asymmetric_target_reached = (roi_pct >= 100.0 or upl >= 50.0) if is_runner else (roi_pct >= 50.0 or upl >= 25.0)
+
+            harvest_trigger = target_lock_harvest or tp_target_reached or asymmetric_target_reached
             if harvest_trigger:
-                tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else ("🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]")
+                tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else ("🎯 [BROKER TP HARVEST]" if tp_target_reached else ("🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"))
                 logger.info(f"{tag} Reached Target (+{roi_pct:.1f}% ROI / ${upl:+.2f})! Executing Cash Harvest for {epic}...")
                 close_res = engine.close_position(deal_id=deal_id)
                 if close_res.get("success"):
@@ -3253,7 +3273,7 @@ class CapitalAutonomousEngine:
                     if chat_id:
                         try:
                             import notification_manager, ui_standards
-                            tag_kh = "🚀 Apex 3rd Runner Mega Harvest" if is_runner else "🎯 Clean Cash Target Harvest"
+                            tag_kh = "🚀 Apex 3rd Runner Mega Harvest" if is_runner else ("🎯 Take-Profit Target Hit" if tp_target_reached else "🎯 Clean Cash Target Harvest")
                             notif_msg = (
                                 f"🏆 **[CAPITAL.COM PROFIT HARVEST]** ⚡\n"
                                 f"{ui_standards.DIVIDER_HEAVY}\n"
@@ -3280,7 +3300,14 @@ class CapitalAutonomousEngine:
             # Prevents premature shakeouts on micro-pullbacks while securing real cash at targets.
             # =========================================================================
             peak_roi = (peak_upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
-            retrace_trigger = (peak_upl >= 6.00 or peak_roi >= 14.0) and (upl <= (peak_upl * ratchet_pct)) and (upl > max(2.0, spread * 2.0))
+            # Broker SL protection status: If broker already protects profit/breakeven, don't trigger premature market exit on minor pullbacks!
+            broker_sl_protecting = (direction == "BUY" and sl > entry_level) or (direction == "SELL" and sl > 0 and sl < entry_level)
+            retrace_trigger = (
+                (peak_upl >= 6.00 or peak_roi >= 14.0)
+                and (upl <= (peak_upl * ratchet_pct))
+                and (upl > max(2.0, spread * 2.0))
+                and ((peak_upl >= 15.0 or peak_roi >= 30.0) or not broker_sl_protecting)
+            )
             if retrace_trigger:
                 tag = "💎 [AUTONOMOUS RATCHET HARVEST]"
                 logger.info(f"{tag} Peak was ${peak_upl:.2f}, current UPL ${upl:.2f} reached {int(ratchet_pct*100)}% trailing floor. Executing Market Harvest for {epic}...")
@@ -3349,8 +3376,11 @@ class CapitalAutonomousEngine:
                 # 20:30 to 20:45 UTC (03:30 to 03:45 ICT) or Wednesday after 20:00 UTC
                 is_pre_rollover = (1230 <= utc_m <= 1245) or (w_utc == 2 and 1200 <= utc_m <= 1245)
                 if is_pre_rollover:
-                    # If high profit (ROI >= 5.0% or UPL >= 2.50), harvest cash cleanly before swap deduction!
-                    if roi_pct >= 5.0 or upl >= 2.50:
+                    # On Wednesday Triple Swap: Harvest if profit >= 2.50 to avoid 3-day penalty.
+                    # On standard weeknights: Only market-harvest if major target reached (ROI >= 25.0% or UPL >= 15.00),
+                    # otherwise let positions with active trailing stops continue running overnight without interruption!
+                    should_swap_harvest = (w_utc == 2 and (roi_pct >= 5.0 or upl >= 2.50)) or (roi_pct >= 25.0 or upl >= 15.00)
+                    if should_swap_harvest:
                         tag = "🛡️ [ROLLOVER SWAP SHIELD HARVEST]"
                         logger.info(f"{tag} Banking ${upl:+.2f} on {epic} before 22:00 UTC swap rollover to avoid overnight financing drag!")
                         close_res = engine.close_position(deal_id=deal_id)
@@ -3397,12 +3427,13 @@ class CapitalAutonomousEngine:
             # TIER 2 & 3: THE GOLDEN 80%-85% TRAILING RATCHET (Broker Stop-Loss Update)
             # When profit exceeds >= +12.0% ROI or >= +$5.00 UPL, advance broker Stop-Loss.
             # =========================================================================
+            prec = _get_tradfi_precision(epic, current_price)
             ratchet_broker_eligible = (roi_pct >= 12.0 or peak_upl >= 5.00 or upl >= 5.00) and peak_upl > 0
             if ratchet_broker_eligible:
                 target_protected_profit = peak_upl * ratchet_pct
                 if direction == "BUY":
                     raw_ratchet_price = entry_level + (target_protected_profit / size)
-                    safe_ratchet_price = round(min(raw_ratchet_price, current_price - (spread * 2.0)), 2)
+                    safe_ratchet_price = round(min(raw_ratchet_price, current_price - (spread * 2.0)), prec)
                     if safe_ratchet_price > sl and safe_ratchet_price > entry_level:
                         upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
                         if upd.get("success"):
@@ -3420,7 +3451,7 @@ class CapitalAutonomousEngine:
                                     pass
                 elif direction == "SELL":
                     raw_ratchet_price = entry_level - (target_protected_profit / size)
-                    safe_ratchet_price = round(max(raw_ratchet_price, current_price + (spread * 2.0)), 2)
+                    safe_ratchet_price = round(max(raw_ratchet_price, current_price + (spread * 2.0)), prec)
                     if (sl <= 0 or safe_ratchet_price < sl) and safe_ratchet_price < entry_level:
                         upd = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_ratchet_price)
                         if upd.get("success"):
@@ -3444,12 +3475,14 @@ class CapitalAutonomousEngine:
             # while locking in Entry + (Spread * 0.5) to secure a net positive return after broker fees.
             # =========================================================================
             if (roi_pct >= 8.5 or upl >= 3.50) and deal_id not in self._be_locked_set:
+                breathing_cushion = max(spread * 2.5, 0.0015 * current_price)
                 if direction == "BUY":
                     target_be_sl = round(entry_level + max(spread * 0.5, 0.001 * entry_level), 2)
                     safe_ceiling_sl = round(current_price - (spread * 1.5), 2)
                     if safe_ceiling_sl > entry_level:
                         new_sl = min(target_be_sl, safe_ceiling_sl)
-                        if new_sl > sl:
+                        # Ensure market price has sufficient breathing room above new_sl to prevent noise stop-outs
+                        if (current_price - new_sl) >= breathing_cushion and new_sl > sl:
                             upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
                             if upd.get("success"):
                                 self._be_locked_set.add(deal_id)
@@ -3469,7 +3502,8 @@ class CapitalAutonomousEngine:
                     safe_floor_sl = round(current_price + (spread * 1.5), 2)
                     if safe_floor_sl < entry_level:
                         new_sl = max(target_be_sl, safe_floor_sl)
-                        if sl <= 0 or new_sl < sl:
+                        # Ensure market price has sufficient breathing room below new_sl to prevent noise stop-outs
+                        if (new_sl - current_price) >= breathing_cushion and (sl <= 0 or new_sl < sl):
                             upd = engine.update_position_stops(deal_id=deal_id, stop_loss=new_sl)
                             if upd.get("success"):
                                 self._be_locked_set.add(deal_id)
