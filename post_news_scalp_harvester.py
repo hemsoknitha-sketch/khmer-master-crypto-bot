@@ -175,7 +175,7 @@ class PostNewsScalpHarvester:
                 "minutes_since": minutes_since
             }
 
-        if engine is None:
+        if engine is None or not hasattr(engine, "get_market_details"):
             engine = capital_engine.get_capital_engine()
 
         # Step 3: Pillar 2 - Live Spread Normalization Sensor
@@ -405,7 +405,7 @@ class PostNewsScalpHarvester:
         """
         import capital_engine
 
-        if engine is None:
+        if engine is None or not hasattr(engine, "get_market_details"):
             engine = capital_engine.get_capital_engine()
 
         executed = []

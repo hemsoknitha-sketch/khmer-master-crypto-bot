@@ -1992,29 +1992,29 @@ class CapitalComEngine:
             f_btc = executor.submit(self.get_market_details, "BTCUSD")
 
             try:
-                bal = f_bal.result(timeout=4.0)
+                bal = f_bal.result(timeout=8.0)
             except Exception as e_bal:
                 logger.warning(f"TradFi HFT: Balance fetch notice: {e_bal}")
                 bal = {"balance": 0.0, "available": 0.0, "pnl": 0.0, "currency": "USD", "status": "ACTIVE"}
 
             try:
-                positions = f_pos.result(timeout=4.0)
+                positions = f_pos.result(timeout=8.0)
             except Exception as e_pos:
                 logger.warning(f"TradFi HFT: Positions fetch notice: {e_pos}")
                 positions = []
 
             try:
-                gold = f_gold.result(timeout=4.0)
+                gold = f_gold.result(timeout=8.0)
             except Exception as e_g:
                 gold = {"success": False, "error": str(e_g)}
 
             try:
-                gas = f_gas.result(timeout=4.0)
+                gas = f_gas.result(timeout=8.0)
             except Exception as e_gas:
                 gas = {"success": False, "error": str(e_gas)}
 
             try:
-                sp500 = f_sp500.result(timeout=4.0)
+                sp500 = f_sp500.result(timeout=8.0)
             except Exception as e_sp:
                 sp500 = {"success": False, "error": str(e_sp)}
 
@@ -2900,6 +2900,14 @@ class CapitalAutonomousEngine:
         self._last_scan_ts: float = 0.0
         self._scan_interval: float = 25.0             # Scan markets every 25 seconds
         self.prop_manager = PropFirmRiskManager()
+
+    def get_market_details(self, epic: str, force_refresh: bool = False) -> Dict[str, Any]:
+        """Delegates market details query to underlying CapitalComEngine."""
+        return get_capital_engine().get_market_details(epic, force_refresh=force_refresh)
+
+    def get_historical_prices(self, epic: str, resolution: str = "MINUTE_5", max_bars: int = 30) -> List[Dict[str, Any]]:
+        """Delegates historical prices query to underlying CapitalComEngine."""
+        return get_capital_engine().get_historical_prices(epic, resolution=resolution, max_bars=max_bars)
 
     def get_session_priority_assets(self) -> List[str]:
         """
@@ -4418,7 +4426,7 @@ class CapitalAutonomousEngine:
                     import post_news_scalp_harvester
                     if post_news_scalp_harvester.is_news_scalp_enabled():
                         logger.info(f"⚡ [POST-NEWS HARVESTER ACTIVE] Event '{blackout_info.get('event_name')}' released {blackout_info.get('minutes_since', 0)}m ago. Evaluating liquidity retests...")
-                        executed_scalps = await post_news_scalp_harvester.scan_and_execute_news_scalps_async(app=app, engine=self)
+                        executed_scalps = await post_news_scalp_harvester.scan_and_execute_news_scalps_async(app=app, engine=get_capital_engine())
                         if executed_scalps:
                             logger.info(f"🏆 [POST-NEWS HARVESTER] Dispatched {len(executed_scalps)} institutional news scalp positions!")
                             return
