@@ -3239,16 +3239,16 @@ class CapitalAutonomousEngine:
             # Detect if current market price has reached or exceeded broker-side Take-Profit level
             tp_level = float(pos.get("profitLevel", 0.0) or 0.0)
             tp_target_reached = False
-            if tp_level > 0:
-                if direction == "BUY" and current_price >= (tp_level - (spread * 0.75)):
+            if tp_level > 0 and upl > 0:
+                if direction == "BUY" and tp_level > entry_level and current_price >= (tp_level - (spread * 0.75)):
                     tp_target_reached = True
-                elif direction == "SELL" and current_price <= (tp_level + (spread * 0.75)):
+                elif direction == "SELL" and tp_level < entry_level and current_price <= (tp_level + (spread * 0.75)):
                     tp_target_reached = True
 
             # Full Asymmetric Moonshot target
             asymmetric_target_reached = (roi_pct >= 100.0 or upl >= 50.0) if is_runner else (roi_pct >= 50.0 or upl >= 25.0)
 
-            harvest_trigger = target_lock_harvest or tp_target_reached or asymmetric_target_reached
+            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached) and (upl > 0)
             if harvest_trigger:
                 tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else ("🎯 [BROKER TP HARVEST]" if tp_target_reached else ("🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"))
                 logger.info(f"{tag} Reached Target (+{roi_pct:.1f}% ROI / ${upl:+.2f})! Executing Cash Harvest for {epic}...")

@@ -1308,6 +1308,13 @@ class PerpetualWealthGeneratorEngine:
                         # Fixed Dollar Risk Parity & Volatility Breathing Stop Loss (Clamped between -$1.50 and -$3.50 Cap):
                         # Asymmetric Positive Expectancy: Sized with 2.2x ATR breathing room while bounding dollar risk!
                         pw_sl_dollar_cap = -max(1.50, min(3.50, pos_margin * 0.20))
+                        try:
+                            atr_info = market_data.get_symbol_atr(sym)
+                            atr_val = float(atr_info.get("atr_val", 0.0) or 0.0)
+                        except Exception:
+                            atr_val = 0.0
+                        if atr_val <= 0.0 and mark_price > 0:
+                            atr_val = mark_price * 0.015
                         pw_sl_roi_cap = -min(25.0, max(16.0, 2.2 * (atr_val / max(1e-6, mark_price)) * 100.0 * float(leverage)))
                         is_sl_trigger = (
                             (unRealizedProfit <= pw_sl_dollar_cap) or

@@ -34,6 +34,15 @@ def calculate_atr(df, window=14):
     atr = true_range.rolling(window).mean()
     return atr
 
+def is_symbol_in_cooldown(symbol: str) -> bool:
+    """Checks if a symbol is in cooldown across engines (delegates to turbo_hedge_engine or persistent DB)."""
+    try:
+        import turbo_hedge_engine
+        return turbo_hedge_engine.is_symbol_in_cooldown(symbol)
+    except Exception:
+        return False
+
+
 def calculate_adx_and_dmi(highs: list, lows: list, closes: list, period: int = 14) -> tuple:
     """
     Calculates Wilder's ADX(14), +DI, and -DI:

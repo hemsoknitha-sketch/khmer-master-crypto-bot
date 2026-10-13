@@ -591,7 +591,7 @@ class FuturesInMemoryVirtualRadar:
                     continue
                 if sym in monitoring_set:
                     continue
-                if market_data.is_symbol_in_cooldown(sym):
+                if hasattr(market_data, "is_symbol_in_cooldown") and market_data.is_symbol_in_cooldown(sym):
                     continue
 
                 quote_vol = float(t.get("quoteVolume", 0.0) or 0.0)
