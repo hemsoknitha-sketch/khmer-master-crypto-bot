@@ -10777,12 +10777,235 @@ def get_latest_csx_eod() -> list:
     return rows
 
 
+# ==============================================================================
+# ANGKOR QUANT FIDUCIARY ACADEMY (WARREN BUFFETT 12 BOOKS) DATABASE SUITE
+# ==============================================================================
+
+def init_academy_tables():
+    """Initializes Angkor Quant Fiduciary Academy progress and certificate tables."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS academy_users (
+            user_id INTEGER PRIMARY KEY,
+            rank TEXT DEFAULT 'WHITE_BELT',
+            xp INTEGER DEFAULT 0,
+            completed_lessons TEXT DEFAULT '[]',
+            quizzes_passed TEXT DEFAULT '[]',
+            updated_at REAL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS academy_quiz_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            lesson_id INTEGER,
+            score INTEGER,
+            total INTEGER,
+            passed INTEGER,
+            timestamp REAL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS academy_certificates (
+            serial_number TEXT PRIMARY KEY,
+            user_id INTEGER,
+            user_name TEXT,
+            rank TEXT,
+            score_pct REAL,
+            cert_hash TEXT,
+            issued_at TEXT,
+            timestamp REAL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def get_academy_user_progress(user_id: int) -> dict:
+    """Retrieves user's learning progress, rank, and XP in Angkor Quant Academy."""
+    import json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT rank, xp, completed_lessons, quizzes_passed, updated_at FROM academy_users WHERE user_id = ?",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute(
+            "INSERT INTO academy_users (user_id, rank, xp, completed_lessons, quizzes_passed, updated_at) VALUES (?, 'WHITE_BELT', 0, '[]', '[]', ?)",
+            (user_id, time.time())
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "user_id": user_id,
+            "rank": "WHITE_BELT",
+            "xp": 0,
+            "completed_lessons": [],
+            "quizzes_passed": [],
+            "next_lesson": 1
+        }
+    
+    conn.close()
+    rank, xp, lessons_json, quizzes_json, updated_at = row
+    try:
+        completed_lessons = json.loads(lessons_json) if lessons_json else []
+    except Exception:
+        completed_lessons = []
+    try:
+        quizzes_passed = json.loads(quizzes_json) if quizzes_json else []
+    except Exception:
+        quizzes_passed = []
+
+    # Calculate next recommended lesson (1 to 12)
+    next_lesson = 1
+    for lid in range(1, 13):
+        if lid not in completed_lessons:
+            next_lesson = lid
+            break
+        next_lesson = 12
+
+    return {
+        "user_id": user_id,
+        "rank": rank,
+        "xp": xp,
+        "completed_lessons": completed_lessons,
+        "quizzes_passed": quizzes_passed,
+        "next_lesson": next_lesson
+    }
+
+def record_academy_lesson_completed(user_id: int, lesson_id: int, xp_gain: int = 50) -> dict:
+    """Marks a lesson as completed and updates user XP and Belt rank."""
+    import json
+    progress = get_academy_user_progress(user_id)
+    completed_lessons = progress["completed_lessons"]
+    xp = progress["xp"]
+
+    if lesson_id not in completed_lessons:
+        completed_lessons.append(lesson_id)
+        completed_lessons.sort()
+        xp += xp_gain
+
+    # Rank Evaluation:
+    # Tier 1 (1-3) -> WHITE_BELT
+    # Tier 2 (4-6) -> GREEN_BELT
+    # Tier 3 (7-10) -> BROWN_BELT
+    # Tier 4 (11-12) & All passed -> BLACK_BELT
+    num_completed = len(completed_lessons)
+    new_rank = "WHITE_BELT"
+    if num_completed >= 12:
+        new_rank = "BLACK_BELT"
+    elif num_completed >= 6:
+        new_rank = "BROWN_BELT"
+    elif num_completed >= 3:
+        new_rank = "GREEN_BELT"
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE academy_users
+        SET rank = ?, xp = ?, completed_lessons = ?, updated_at = ?
+        WHERE user_id = ?
+    ''', (new_rank, xp, json.dumps(completed_lessons), time.time(), user_id))
+    conn.commit()
+    conn.close()
+
+    progress["rank"] = new_rank
+    progress["xp"] = xp
+    progress["completed_lessons"] = completed_lessons
+    return progress
+
+def record_academy_quiz_result(user_id: int, lesson_id: int, score: int, total: int, passed: bool, xp_gain: int = 100) -> dict:
+    """Logs quiz attempt and updates quizzes_passed list."""
+    import json
+    now_ts = time.time()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO academy_quiz_attempts (user_id, lesson_id, score, total, passed, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (user_id, lesson_id, score, total, 1 if passed else 0, now_ts))
+
+    progress = get_academy_user_progress(user_id)
+    quizzes_passed = progress["quizzes_passed"]
+    xp = progress["xp"]
+
+    if passed and lesson_id not in quizzes_passed:
+        quizzes_passed.append(lesson_id)
+        quizzes_passed.sort()
+        xp += xp_gain
+        cursor.execute('''
+            UPDATE academy_users
+            SET xp = ?, quizzes_passed = ?, updated_at = ?
+            WHERE user_id = ?
+        ''', (xp, json.dumps(quizzes_passed), now_ts, user_id))
+
+    conn.commit()
+    conn.close()
+
+    progress["xp"] = xp
+    progress["quizzes_passed"] = quizzes_passed
+    return progress
+
+def save_academy_certificate(cert_data: dict):
+    """Saves an issued Fiduciary Academy Certificate to SQLite."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO academy_certificates (
+            serial_number, user_id, user_name, rank, score_pct, cert_hash, issued_at, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(serial_number) DO UPDATE SET
+            cert_hash=excluded.cert_hash,
+            issued_at=excluded.issued_at
+    ''', (
+        cert_data["serial_number"],
+        cert_data["user_id"],
+        cert_data.get("user_name", "Valued Investor"),
+        cert_data["rank"],
+        cert_data.get("score_pct", 100.0),
+        cert_data["cert_hash"],
+        cert_data["issued_at"],
+        cert_data["timestamp"]
+    ))
+    conn.commit()
+    conn.close()
+
+def get_academy_certificate_by_user(user_id: int) -> Optional[dict]:
+    """Retrieves the latest verified certificate for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT serial_number, user_id, user_name, rank, score_pct, cert_hash, issued_at, timestamp
+        FROM academy_certificates
+        WHERE user_id = ?
+        ORDER BY timestamp DESC
+        LIMIT 1
+    ''', (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "serial_number": row[0],
+        "user_id": row[1],
+        "user_name": row[2],
+        "rank": row[3],
+        "score_pct": row[4],
+        "cert_hash": row[5],
+        "issued_at": row[6],
+        "timestamp": row[7]
+    }
+
+
 # Initialize and auto-migrate database schema on startup
 try:
     init_db()
     init_trade_journal_table()
     init_legal_agreement_table()
     init_csx_tables()
+    init_academy_tables()
 except Exception:
     pass
 

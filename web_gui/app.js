@@ -2317,6 +2317,8 @@ function setupEventListeners() {
             fetchAIBrain();
         } else if (targetTabId === 'tab-controls') {
             fetchEngineStates();
+        } else if (targetTabId === 'tab-academy') {
+            renderAcademyDashboard();
         }
     }
 
@@ -3311,5 +3313,272 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchLiveGoldSignal();
             fetchGoldOrbChart();
         }
-    }, 15000);
+    // ==============================================================================
+    // ANGKOR QUANT FIDUCIARY ACADEMY (WARREN BUFFETT 12 BOOKS) INTERACTIVE CONTROLLER
+    // ==============================================================================
+    let academyData = null;
+    let activeTier = 'tier_1';
+    let snowballChartInstance = null;
+
+    async function fetchAcademyData() {
+        try {
+            const res = await fetch('/api/academy');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.status === 'success') {
+                academyData = data;
+                renderAcademyHUD(data.progress);
+                renderAcademyTier(activeTier);
+            }
+        } catch (err) {
+            console.warn('[ACADEMY] fetch error:', err);
+        }
+    }
+
+    function renderAcademyHUD(progress) {
+        if (!progress) return;
+        const rankEl = document.getElementById('academy-user-rank');
+        const xpEl = document.getElementById('academy-user-xp');
+        const lessonsEl = document.getElementById('academy-user-lessons');
+        const certEl = document.getElementById('academy-user-cert');
+
+        const rankTitles = {
+            'WHITE_BELT': '🥋 WHITE BELT (សខ្សែក្រវាត់ស)',
+            'GREEN_BELT': '🥋 GREEN BELT (ខ្សែក្រវាត់បៃតង)',
+            'BROWN_BELT': '🥋 BROWN BELT (ខ្សែក្រវាត់ត្នោត)',
+            'BLACK_BELT': '🥋 BLACK BELT (ខ្សែក្រវាត់ខ្មៅ)'
+        };
+
+        if (rankEl) rankEl.textContent = rankTitles[progress.rank] || '🥋 WHITE BELT';
+        if (xpEl) xpEl.textContent = `${progress.xp || 0} XP`;
+        if (lessonsEl) lessonsEl.textContent = `${(progress.completed_lessons || []).length} / 12`;
+        if (certEl) {
+            if ((progress.completed_lessons || []).length >= 12) {
+                certEl.textContent = '🏆 BLACK BELT MASTER';
+                certEl.className = 'text-neon-gold';
+            } else if ((progress.completed_lessons || []).length >= 3) {
+                certEl.textContent = '📜 CERTIFIED GRADUATE';
+                certEl.className = 'text-neon-emerald';
+            } else {
+                certEl.textContent = '⏳ IN PROGRESS (Need 3 Lessons)';
+                certEl.className = 'text-neon-magenta';
+            }
+        }
+    }
+
+    function renderAcademyTier(tierKey) {
+        if (!academyData || !academyData.lessons) return;
+        const grid = document.getElementById('academy-books-grid');
+        if (!grid) return;
+
+        const filtered = academyData.lessons.filter(l => l.tier === tierKey);
+        grid.innerHTML = filtered.map(l => {
+            const statusBadge = l.is_quiz_passed
+                ? '<span class="badge badge-success">✅ Quiz Passed (+100 XP)</span>'
+                : (l.is_completed ? '<span class="badge badge-primary">📖 Read Completed</span>' : '<span class="badge badge-warning">⏳ Not Started</span>');
+
+            return `
+                <div class="glass-card book-lesson-card">
+                    <div class="book-card-header">
+                        <div class="book-number-badge">#${l.id}</div>
+                        <div class="book-meta-col">
+                            <h5>${l.book_title}</h5>
+                            <span class="book-author">${l.author} (${l.year})</span>
+                        </div>
+                    </div>
+                    <div class="book-card-body">
+                        <div class="book-km-title">${l.title_km}</div>
+                        <p class="book-thesis">"${l.core_thesis}"</p>
+                        <div class="book-pillar-tag">🛡️ ${l.fiduciary_pillar}</div>
+                        <div class="book-formula-code"><code>${l.formula}</code></div>
+                    </div>
+                    <div class="book-card-footer">
+                        ${statusBadge}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Client-side real-time 0.001ms DCF Engine
+    function updateDCFCalculation() {
+        const fcf = parseFloat(document.getElementById('slider-dcf-fcf')?.value || 120);
+        const growth = parseFloat(document.getElementById('slider-dcf-growth')?.value || 9.0) / 100;
+        const discount = parseFloat(document.getElementById('slider-dcf-discount')?.value || 9.5) / 100;
+        const mos = parseFloat(document.getElementById('slider-dcf-mos')?.value || 30) / 100;
+
+        const elFcf = document.getElementById('val-dcf-fcf');
+        const elGrowth = document.getElementById('val-dcf-growth');
+        const elDiscount = document.getElementById('val-dcf-discount');
+        const elMos = document.getElementById('val-dcf-mos');
+
+        if (elFcf) elFcf.textContent = `$${fcf.toFixed(1)} M`;
+        if (elGrowth) elGrowth.textContent = `${(growth * 100).toFixed(1)}%`;
+        if (elDiscount) elDiscount.textContent = `${(discount * 100).toFixed(1)}%`;
+        if (elMos) elMos.textContent = `${(mos * 100).toFixed(1)}%`;
+
+        let effectiveDiscount = discount <= 0.025 ? 0.035 : discount;
+        let cf = fcf;
+        let discountedSum = 0;
+        for (let yr = 1; yr <= 5; yr++) {
+            cf = cf * (1 + growth);
+            discountedSum += cf / Math.pow(1 + effectiveDiscount, yr);
+        }
+        const terminalCf = cf * (1 + 0.025);
+        const terminalVal = terminalCf / (effectiveDiscount - 0.025);
+        const discountedTerminal = terminalVal / Math.pow(1 + effectiveDiscount, 5);
+
+        const enterpriseVal = discountedSum + discountedTerminal;
+        const equityVal = enterpriseVal + 30.0 - 10.0; // sample cash $30M, debt $10M
+        const intrinsicPrice = equityVal / 10.0; // sample 10M shares
+        const buyBelowPrice = intrinsicPrice * (1 - mos);
+
+        const priceEl = document.getElementById('dcf-intrinsic-price');
+        const buyBelowEl = document.getElementById('dcf-buy-below');
+        if (priceEl) priceEl.textContent = `$${intrinsicPrice.toFixed(2)}`;
+        if (buyBelowEl) buyBelowEl.textContent = `$${buyBelowPrice.toFixed(2)}`;
+    }
+
+    // Client-side real-time Snowball Compounding Visualizer
+    function updateSnowballCalculation() {
+        const initial = parseFloat(document.getElementById('slider-snow-initial')?.value || 1000);
+        const monthly = parseFloat(document.getElementById('slider-snow-monthly')?.value || 100);
+        const roi = parseFloat(document.getElementById('slider-snow-roi')?.value || 15) / 100;
+        const years = parseInt(document.getElementById('slider-snow-years')?.value || 20);
+
+        const elInit = document.getElementById('val-snow-initial');
+        const elMonth = document.getElementById('val-snow-monthly');
+        const elRoi = document.getElementById('val-snow-roi');
+        const elYrs = document.getElementById('val-snow-years');
+
+        if (elInit) elInit.textContent = `$${initial.toLocaleString()}`;
+        if (elMonth) elMonth.textContent = `$${monthly.toLocaleString()}`;
+        if (elRoi) elRoi.textContent = `${(roi * 100).toFixed(1)}%`;
+        if (elYrs) elYrs.textContent = `${years} ឆ្នាំ`;
+
+        const rMonthly = roi / 12.0;
+        let compounded = initial;
+        let linear = initial;
+        const labels = [];
+        const compoundData = [];
+        const linearData = [];
+
+        for (let y = 1; y <= years; y++) {
+            for (let m = 0; m < 12; m++) {
+                compounded = (compounded + monthly) * (1 + rMonthly);
+                linear += monthly;
+            }
+            labels.push(`Y${y}`);
+            compoundData.push(Math.round(compounded));
+            linearData.push(Math.round(linear));
+        }
+
+        const totalDeposited = initial + (monthly * 12 * years);
+        const netProfit = compounded - totalDeposited;
+        const multiplier = compounded / totalDeposited;
+
+        const depEl = document.getElementById('snow-total-deposited');
+        const totEl = document.getElementById('snow-compounded-total');
+        const profEl = document.getElementById('snow-net-profit');
+        const multEl = document.getElementById('snow-multiplier');
+
+        if (depEl) depEl.textContent = `$${Math.round(totalDeposited).toLocaleString()}`;
+        if (totEl) totEl.textContent = `$${Math.round(compounded).toLocaleString()}`;
+        if (profEl) profEl.textContent = `+$${Math.round(netProfit).toLocaleString()}`;
+        if (multEl) multEl.textContent = `${multiplier.toFixed(1)}x ដង`;
+
+        renderSnowballChart(labels, compoundData, linearData);
+    }
+
+    function renderSnowballChart(labels, compoundData, linearData) {
+        const canvas = document.getElementById('snowballChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        if (snowballChartInstance) {
+            snowballChartInstance.data.labels = labels;
+            snowballChartInstance.data.datasets[0].data = compoundData;
+            snowballChartInstance.data.datasets[1].data = linearData;
+            snowballChartInstance.update('none');
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        snowballChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '❄️ Snowball Compounded ($)',
+                        data: compoundData,
+                        borderColor: '#00ffd5',
+                        backgroundColor: 'rgba(0, 255, 213, 0.15)',
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35
+                    },
+                    {
+                        label: '💵 Linear Savings ($)',
+                        data: linearData,
+                        borderColor: '#f59e0b',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0', font: { family: 'Outfit, sans-serif', size: 11 } } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: {
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: val => '$' + (val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val)
+                        },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    }
+                }
+            }
+        });
+    }
+
+    function setupAcademyEventListeners() {
+        // DCF Sliders
+        ['slider-dcf-fcf', 'slider-dcf-growth', 'slider-dcf-discount', 'slider-dcf-mos'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', updateDCFCalculation);
+        });
+
+        // Snowball Sliders
+        ['slider-snow-initial', 'slider-snow-monthly', 'slider-snow-roi', 'slider-snow-years'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', updateSnowballCalculation);
+        });
+
+        // Tier Tab Buttons
+        document.querySelectorAll('.tier-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tier-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeTier = btn.getAttribute('data-tier') || 'tier_1';
+                renderAcademyTier(activeTier);
+            });
+        });
+    }
+
+    function renderAcademyDashboard() {
+        fetchAcademyData();
+        updateDCFCalculation();
+        updateSnowballCalculation();
+    }
+
+    // Initialize Academy Listeners
+    setupAcademyEventListeners();
 });
+

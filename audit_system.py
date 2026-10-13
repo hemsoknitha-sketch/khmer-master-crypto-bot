@@ -2727,6 +2727,91 @@ def run_audit():
         failures.append(f"Invariant 71 check failed: {e}")
         log_fail(str(e))
 
+    # [CHECK 57/57] Verifying Angkor Quant Fiduciary Academy & Warren Buffett 12 Books Mastery Engine (Invariant 72)...
+    print("\n[CHECK 57/57] Verifying Angkor Quant Fiduciary Academy & Warren Buffett 12 Books Mastery Engine (Invariant 72)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv72 = "Invariant 72: Angkor Quant Fiduciary Academy & Warren Buffett 12 Books Mastery Engine" in agents_md
+
+        # 2. buffett_academy_engine validation & dynamic unit test
+        import buffett_academy_engine as bae
+        has_12_lessons = len(bae.ACADEMY_LESSONS) == 12
+        has_4_tiers = len(bae.ACADEMY_TIERS) == 4
+        
+        dcf_test = bae.BuffettValuationEngine.calculate_dcf_intrinsic_value(
+            current_fcf=100.0, growth_rate_5y=0.08, terminal_growth=0.025, discount_rate=0.09
+        )
+        is_dcf_valid = dcf_test["intrinsic_value_per_share"] > 0 and dcf_test["buy_below_price"] < dcf_test["intrinsic_value_per_share"]
+
+        snow_test = bae.BuffettValuationEngine.calculate_compound_snowball(
+            initial_capital=1000.0, monthly_addition=100.0, annual_roi_pct=15.0, years=10
+        )
+        is_snow_valid = snow_test["final_compounded_balance"] > snow_test["total_contributions"]
+
+        cert_test = bae.FiduciaryCertificateManager.generate_certificate(
+            user_id=12345678, user_name="Audit Tester", rank="BLACK_BELT"
+        )
+        is_cert_verified = bae.FiduciaryCertificateManager.verify_certificate(
+            user_id=cert_test["user_id"],
+            user_name=cert_test["user_name"],
+            rank=cert_test["rank"],
+            serial_number=cert_test["serial_number"],
+            timestamp=cert_test["timestamp"],
+            cert_hash=cert_test["cert_hash"]
+        )
+
+        # 3. Database Layer inspection
+        import database as db
+        has_db_init = hasattr(db, "init_academy_tables")
+        has_db_prog = hasattr(db, "get_academy_user_progress")
+        has_db_less = hasattr(db, "record_academy_lesson_completed")
+        has_db_quiz = hasattr(db, "record_academy_quiz_result")
+        has_db_cert = hasattr(db, "save_academy_certificate")
+
+        # 4. Bot Thread & Command Registry inspection
+        with open("bot_thread.py", "r", encoding="utf-8") as bf:
+            bt_code = bf.read()
+        has_acad_cmd = "async def academy_command" in bt_code
+        has_acad_handler = "CommandHandler(\"academy\", academy_command)" in bt_code
+        has_acad_callback = "elif data.startswith(\"acad_\"):" in bt_code
+
+        import bot_commands_registry
+        public_cmds = bot_commands_registry.get_public_bot_commands()
+        has_acad_registry = any(c.command == "academy" for c in public_cmds)
+
+        # 5. Web GUI Dashboard & REST API inspection
+        with open("web_gui/index.html", "r", encoding="utf-8") as hf:
+            html_code = hf.read()
+        has_tab_academy = "id=\"tab-academy\"" in html_code
+        has_nav_academy = "data-tab=\"tab-academy\"" in html_code
+
+        with open("web_gui/app.js", "r", encoding="utf-8") as jf:
+            js_code = jf.read()
+        has_js_academy = "renderAcademyDashboard" in js_code
+
+        with open("web_gui_server.py", "r", encoding="utf-8") as sf:
+            server_code = sf.read()
+        has_api_academy = "/api/academy" in server_code
+
+        all_inv72_passed = (
+            has_inv72 and has_12_lessons and has_4_tiers and
+            is_dcf_valid and is_snow_valid and is_cert_verified and
+            has_db_init and has_db_prog and has_db_less and has_db_quiz and has_db_cert and
+            has_acad_cmd and has_acad_handler and has_acad_callback and has_acad_registry and
+            has_tab_academy and has_nav_academy and has_js_academy and has_api_academy
+        )
+
+        if all_inv72_passed:
+            log_pass("Angkor Quant Fiduciary Academy & Warren Buffett 12 Books Mastery Engine (Invariant 72) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 72 check failed: inv72={has_inv72}, lessons={has_12_lessons}, tiers={has_4_tiers}, dcf={is_dcf_valid}, snow={is_snow_valid}, cert={is_cert_verified}, db_init={has_db_init}, cmd={has_acad_cmd}, handler={has_acad_handler}, cb={has_acad_callback}, reg={has_acad_registry}, tab={has_tab_academy}, nav={has_nav_academy}, js={has_js_academy}, api={has_api_academy}")
+            log_fail("Angkor Quant Fiduciary Academy (Invariant 72) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 72 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

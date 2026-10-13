@@ -1180,6 +1180,23 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - Accessible via `/mt5_smart` (and `/mt5 SMART`), providing real-time session telemetry, 8-Pillar audit cards, and 1-tap presets.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 56/56].
 
+### Invariant 72: Angkor Quant Fiduciary Academy & Warren Buffett 12 Books Mastery Engine (AQ72)
+- **Location:** `buffett_academy_engine.py`, `database.py` (`init_academy_tables`, `get_academy_user_progress`, `record_academy_lesson_completed`, `record_academy_quiz_result`, `save_academy_certificate`), `bot_thread.py` (`academy_command`, `/academy`, `/buffett`), `bot_commands_registry.py`, `web_gui/index.html` (`tab-academy`), `web_gui/app.js` (`renderAcademyDashboard`)
+- **Rule:**
+  1. **Canonical 12-Book 4-Tier Quant Curriculum:**
+     - Integrates Warren Buffett's 12 canonical books into a structured 4-Tier curriculum:
+       - Tier 1: White Belt (Mindset & Anti-Gambling Shield, Books 1-3).
+       - Tier 2: Green Belt (Financial Forensics & Moat Engineering, Books 4-6).
+       - Tier 3: Brown Belt (Capital Allocation & Mental Inversion, Books 7-10).
+       - Tier 4: Black Belt (Algorithmic Value & Fiduciary Master, Books 11-12).
+  2. **Quantitative Mathematical Valuation Models:**
+     - Enforces algorithmic implementation of Owner Earnings, 2-Stage Discounted Cash Flow (DCF) with Gordon Growth Terminal Value, Margin of Safety (30%), Piotroski 9-point F-Score, and Fractional Kelly position sizing to eliminate Gambler's Ruin.
+  3. **Cryptographically Signed Fiduciary Diplomas:**
+     - Fiduciary Graduate Certificates are secured with SHA-256 HMAC digital signatures to guarantee authentic verification and prevent counterfeit credentials.
+  4. **Multi-Platform Interactive Execution:**
+     - Fully operational across Telegram Bot (`/academy`), Web Mini App GUI (`tab-academy`), and REST APIs (`/api/academy`, `/api/academy/dcf`, `/api/academy/snowball`).
+- **Enforcement:** Verified by `audit_system.py` [CHECK 57/57].
+
 ---
 
 ## 4. STANDARD WORKFLOW FOR FUTURE SESSIONS

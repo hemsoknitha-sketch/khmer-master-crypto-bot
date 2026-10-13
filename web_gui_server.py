@@ -2918,8 +2918,99 @@ async def handle_gtc_qr(request: web.Request) -> web.FileResponse:
 
 
 # ==============================================================================
+# ANGKOR QUANT FIDUCIARY ACADEMY (WARREN BUFFETT 12 BOOKS) REST API
+# ==============================================================================
+
+async def handle_api_academy(request: web.Request) -> web.Response:
+    """Returns curriculum tiers, lesson catalog, and user learning progress."""
+    try:
+        user_id = int(request.query.get("user_id", DEFAULT_VIP_CHAT_ID))
+    except Exception:
+        user_id = DEFAULT_VIP_CHAT_ID
+
+    import buffett_academy_engine as bae
+    progress = db.get_academy_user_progress(user_id)
+
+    lessons_summary = []
+    for lid in sorted(bae.ACADEMY_LESSONS.keys()):
+        les = bae.ACADEMY_LESSONS[lid]
+        lessons_summary.append({
+            "id": les["id"],
+            "tier": les["tier"],
+            "book_title": les["book_title"],
+            "author": les["author"],
+            "year": les["year"],
+            "title_km": les["title_km"],
+            "title_en": les["title_en"],
+            "core_thesis": les["core_thesis"],
+            "fiduciary_pillar": les["fiduciary_pillar"],
+            "formula": les["formula"],
+            "is_completed": les["id"] in progress.get("completed_lessons", []),
+            "is_quiz_passed": les["id"] in progress.get("quizzes_passed", [])
+        })
+
+    return web.json_response({
+        "status": "success",
+        "tiers": bae.ACADEMY_TIERS,
+        "lessons": lessons_summary,
+        "progress": progress
+    })
+
+async def handle_api_academy_dcf(request: web.Request) -> web.Response:
+    """Calculates dynamic DCF Intrinsic Value and Margin of Safety."""
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    import buffett_academy_engine as bae
+    fcf = float(data.get("fcf", 120.0))
+    growth_5y = float(data.get("growth_5y", 0.09))
+    terminal_growth = float(data.get("terminal_growth", 0.025))
+    discount_rate = float(data.get("discount_rate", 0.095))
+    shares = float(data.get("shares", 10.0))
+    cash = float(data.get("cash", 30.0))
+    debt = float(data.get("debt", 10.0))
+    margin_of_safety = float(data.get("margin_of_safety", 0.30))
+
+    result = bae.BuffettValuationEngine.calculate_dcf_intrinsic_value(
+        current_fcf=fcf,
+        growth_rate_5y=growth_5y,
+        terminal_growth=terminal_growth,
+        discount_rate=discount_rate,
+        shares_outstanding=shares,
+        current_cash=cash,
+        total_debt=debt,
+        margin_of_safety_pct=margin_of_safety
+    )
+    return web.json_response({"status": "success", "result": result})
+
+async def handle_api_academy_snowball(request: web.Request) -> web.Response:
+    """Simulates multi-year Snowball Compounding Wealth trajectory."""
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    import buffett_academy_engine as bae
+    initial = float(data.get("initial", 1000.0))
+    monthly = float(data.get("monthly", 100.0))
+    roi = float(data.get("roi", 15.0))
+    years = int(data.get("years", 20))
+
+    result = bae.BuffettValuationEngine.calculate_compound_snowball(
+        initial_capital=initial,
+        monthly_addition=monthly,
+        annual_roi_pct=roi,
+        years=years
+    )
+    return web.json_response({"status": "success", "result": result})
+
+
+# ==============================================================================
 # STATIC WEB GUI FILE HANDLERS
 # ==============================================================================
+
 
 async def handle_index(request: web.Request) -> web.FileResponse:
     resp = web.FileResponse(os.path.join(STATIC_DIR, "index.html"))
@@ -3011,6 +3102,11 @@ def create_web_gui_app() -> web.Application:
 
     # Master Tier-1 Macro Catalyst & US Net Liquidity route
     app.router.add_get("/api/macro/live_catalysts", handle_api_macro_live_catalysts)
+
+    # Angkor Quant Fiduciary Academy (Warren Buffett 12 Books) routes
+    app.router.add_get("/api/academy", handle_api_academy)
+    app.router.add_post("/api/academy/dcf", handle_api_academy_dcf)
+    app.router.add_post("/api/academy/snowball", handle_api_academy_snowball)
 
     return app
 

@@ -30,6 +30,7 @@ def get_public_bot_commands():
         BotCommand("start", "🚀 Start Angkor Quant & Language"),
         BotCommand("menu", "🎛️ Angkor Quant Control Panel"),
         BotCommand("webapp", "📱 Angkor Quant Mini App Web GUI"),
+        BotCommand("academy", "🎓 Angkor Buffett Academy (12 Books)"),
 
         # --- [2] SPOT INVESTMENT ENGINES (100% Spot, 0% Liquidation Risk) ---
         BotCommand("compound_grid", "📈 Angkor Compound Grid (100% Spot)"),

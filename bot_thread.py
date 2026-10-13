@@ -5865,6 +5865,55 @@ class TelegramBotThread(BaseThread):
                     except Exception:
                         pass
                 return
+            elif data.startswith("acad_"):
+                import buffett_academy_engine as bae
+                target_msg = query.message
+                user_name = update.effective_user.first_name if update.effective_user else "Valued Investor"
+                if data == "acad_home":
+                    msg, kb = bae.build_academy_home_payload(chat_id, user_lang)
+                elif data.startswith("acad_tier_"):
+                    tier_key = data.replace("acad_tier_", "")
+                    msg, kb = bae.build_academy_tier_payload(tier_key, chat_id, user_lang)
+                elif data.startswith("acad_lesson_"):
+                    try:
+                        lesson_id = int(data.split("_")[-1])
+                    except Exception:
+                        lesson_id = 1
+                    msg, kb = bae.build_academy_lesson_payload(lesson_id, chat_id, user_lang)
+                elif data.startswith("acad_quiz_"):
+                    try:
+                        lesson_id = int(data.split("_")[-1])
+                    except Exception:
+                        lesson_id = 1
+                    msg, kb = bae.build_academy_quiz_payload(lesson_id, chat_id, user_lang)
+                elif data.startswith("acad_ans_"):
+                    parts = data.split("_")
+                    try:
+                        lesson_id = int(parts[2])
+                        choice_idx = int(parts[3])
+                    except Exception:
+                        lesson_id, choice_idx = 1, 0
+                    msg, kb = bae.build_academy_answer_payload(lesson_id, choice_idx, chat_id, user_name, user_lang)
+                elif data == "acad_tool_dcf":
+                    msg, kb = bae.build_academy_dcf_tool_payload(chat_id, user_lang)
+                elif data == "acad_tool_snowball":
+                    msg, kb = bae.build_academy_snowball_tool_payload(chat_id, user_lang)
+                elif data == "acad_tool_kelly":
+                    msg, kb = bae.build_academy_kelly_tool_payload(chat_id, user_lang)
+                elif data == "acad_certificate":
+                    msg, kb = bae.build_academy_certificate_payload(chat_id, user_name, user_lang)
+                else:
+                    msg, kb = bae.build_academy_home_payload(chat_id, user_lang)
+
+                try:
+                    await query.edit_message_text(text=msg, parse_mode="Markdown", reply_markup=kb)
+                except Exception:
+                    clean_txt = msg.replace('*', '').replace('`', '').replace('_', '')
+                    try:
+                        await query.edit_message_text(text=clean_txt, reply_markup=kb)
+                    except Exception:
+                        pass
+                return
             elif data in ["btn_macro_refresh", "btn_macro_satellite", "btn_google_macro", "btn_satellite"]:
                 await macro_command(update, context)
             elif data in ["btn_wealth", "btn_wealth_menu", "btn_wealth_refresh"]:
@@ -27652,6 +27701,44 @@ class TelegramBotThread(BaseThread):
         self.app.add_handler(CommandHandler("csxtrade", csx_command))
         self.app.add_handler(CommandHandler("cambodia_stock", csx_command))
         self.app.add_handler(CommandHandler("angkor_csx", csx_command))
+
+        async def academy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """
+            🎓 Flagship Angkor Quant Fiduciary Academy Command (/academy, /buffett)
+            12 Canonical Warren Buffett Books Quantitative Curriculum & Certification.
+            """
+            if not await verify_user(update): return
+            chat_id = update.effective_chat.id if update.effective_chat else (update.callback_query.message.chat.id if update.callback_query and update.callback_query.message else None)
+            if not chat_id: return
+
+            raw_lang = db.get_user_language(chat_id)
+            user_lang = str(raw_lang or 'km').lower().strip()
+            if user_lang in ['km', 'khmer', '0', '1', 'auto'] or user_lang.isdigit():
+                user_lang = 'khmer'
+            else:
+                user_lang = 'english'
+
+            import buffett_academy_engine as bae
+            msg, keyboard = bae.build_academy_home_payload(chat_id, user_lang)
+
+            target_msg = update.effective_message or (update.callback_query.message if update.callback_query else None)
+            if target_msg:
+                try:
+                    if update.callback_query:
+                        await target_msg.edit_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                    else:
+                        await target_msg.reply_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+                except Exception:
+                    clean_txt = msg.replace('*', '').replace('`', '').replace('_', '')
+                    if update.callback_query:
+                        await target_msg.edit_text(clean_txt, reply_markup=keyboard)
+                    else:
+                        await target_msg.reply_text(clean_txt, reply_markup=keyboard)
+
+        self.app.add_handler(CommandHandler("academy", academy_command))
+        self.app.add_handler(CommandHandler("buffett", academy_command))
+        self.app.add_handler(CommandHandler("investing", academy_command))
+        self.app.add_handler(CommandHandler("angkor_academy", academy_command))
 
         self.app.add_handler(CommandHandler("capital", capital_command))
         self.app.add_handler(CommandHandler("capital_com", capital_command))
