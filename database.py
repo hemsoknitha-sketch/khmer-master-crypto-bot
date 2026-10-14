@@ -2701,6 +2701,21 @@ def get_capital_schedule_mode(chat_id: int) -> str:
     cfg = get_capital_auto_config(chat_id)
     return cfg.get("schedule_mode", "SMART_SESSION_TIMED")
 
+def is_capital_forex_enabled(chat_id: Optional[int] = None) -> bool:
+    """
+    Returns True if Forex Exchange trading is allowed on Capital.com.
+    Institutional Fiduciary Integrity Standard:
+    Defaults to False (0) to eliminate low-pip spread drag and overnight swap fees.
+    """
+    val = get_system_setting("capital_forex_enabled", default="0")
+    if val is None or str(val).strip() in ("", "0", "false", "False", "OFF", "off"):
+        return False
+    return str(val).strip() in ("1", "true", "True", "ON", "on")
+
+def set_capital_forex_enabled(enabled: bool) -> None:
+    """Sets the global Forex Exchange trading state in system_settings."""
+    update_system_setting("capital_forex_enabled", "1" if enabled else "0")
+
 def update_capital_auto_last_trade_time(chat_id: int, last_time: float):
     """Updates the last trade timestamp for cooldown calculations."""
     conn = get_db_connection()

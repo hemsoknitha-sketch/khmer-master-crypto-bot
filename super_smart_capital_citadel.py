@@ -639,6 +639,16 @@ class SuperSmartCapitalCitadel:
         if bypass_citadel:
             return True, "CITADEL_BYPASS_EXPLICIT", {}
 
+        # Pillar 0: Forex Kill-Switch & Institutional Stock Priority Gatekeeper
+        s_epic = str(epic or "").upper().strip()
+        is_fx = any(fx in s_epic for fx in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"])
+        if is_fx:
+            import database as db
+            if not db.is_capital_forex_enabled():
+                reason = f"FOREX_BLOCKED: {s_epic} is blocked by Angkor Quant Fiduciary Guard. Trading is restricted to US Equities, Indices, and Gold/Crypto CFDs."
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                return False, reason, {"is_approved": False, "rejection_reason": reason}
+
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):
             reason = diag.get("rejection_reason", "SUPER_SMART_CAPITAL_CITADEL_REJECTED")

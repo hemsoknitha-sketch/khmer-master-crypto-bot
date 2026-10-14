@@ -25953,6 +25953,73 @@ class TelegramBotThread(BaseThread):
                     context.args = args[1:]
                     await capital_scalp_command(update, context)
                     return
+                elif action in ["FOREX", "FX"]:
+                    sub_opt = str(args[1]).upper().strip() if len(args) > 1 else ""
+                    if sub_opt in ["OFF", "DISABLE", "DISABLED", "0", "STOP", "FALSE", "BLOCK"]:
+                        db.set_capital_forex_enabled(False)
+                        res_msg = (
+                            f"🛑 **[CAPITAL.COM FOREX EXCHANGE: BLOCKED 100%]** 🔒\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **ស្ថានភាព ៖** `បិទទាំងស្រុង (BLOCKED 100%)`\n"
+                            f"📈 **ទីផ្សារអនុញ្ញាត ៖** `US Mega-Caps, Indices, Gold & Crypto CFDs`\n"
+                            f"🚫 **គូ Forex ៖** `EURUSD, GBPUSD, USDJPY, AUDUSD, NZDUSD... (BLOCKED)`\n"
+                            f"🛡️ **កិច្ចការពារ ៖** `កម្ចាត់ចោលការស៊ីថ្លៃ Spread Drag & Overnight Swap Drag ១០០%!`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _ប្រព័ន្ធបង្វែរដើមទុន ១០០% ទៅកើបចំណេញលើទីផ្សារភាគហ៊ុនអាមេរិក និងសន្ទស្សន៍សកល!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🛑 **[CAPITAL.COM FOREX EXCHANGE: BLOCKED 100%]** 🔒\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **Status:** `100% BLOCKED`\n"
+                            f"📈 **Permitted Markets:** `US Mega-Caps, Indices, Gold & Crypto CFDs`\n"
+                            f"🚫 **Forex Pairs:** `EURUSD, GBPUSD, USDJPY, AUDUSD... (BLOCKED)`\n"
+                            f"🛡️ **Capital Shield:** `Zero Spread Drag & Zero Overnight Swap Financing Drag!`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _Capital 100% dedicated to high-momentum US Equities & Global Indices!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
+                    elif sub_opt in ["ON", "ENABLE", "ENABLED", "1", "START", "TRUE"]:
+                        db.set_capital_forex_enabled(True)
+                        res_msg = (
+                            f"💱 **[CAPITAL.COM FOREX EXCHANGE: ENABLED]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **ស្ថានភាព ៖** `បើកដំណើរការ (ENABLED)`\n"
+                            f"🌐 **ការជួញដូរ ៖** `Forex Majors + US Stocks + Indices`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚠️ _សូមប្រុងប្រយ័ត្នចំពោះថ្លៃ Spread និង Swap ឆ្លងយប់លើគូរូបិយប័ណ្ណ!_"
+                        ) if user_lang == 'khmer' else (
+                            f"💱 **[CAPITAL.COM FOREX EXCHANGE: ENABLED]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **Status:** `ENABLED`\n"
+                            f"🌐 **Trading Universe:** `Forex Majors + US Equities + Indices`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚠️ _Be mindful of broker spread and overnight rollover swap fees!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
+                    else:
+                        fx_status = "🟢 បើកដំណើរការ (ENABLED)" if db.is_capital_forex_enabled() else "🔴 បិទទាំងស្រុង (100% BLOCKED)"
+                        res_msg = (
+                            f"💱 **[CAPITAL.COM FOREX EXCHANGE GATEKEEPER]** 🛡️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚙️ **ស្ថានភាពបច្ចុប្បន្ន ៖** `{fx_status}`\n"
+                            f"💡 **របៀបបញ្ជា ៖**\n"
+                            f"• បិទ Forex ទាំងស្រុង ៖ `` `/capital forex OFF` ``\n"
+                            f"• បើក Forex វិញ ៖ `` `/capital forex ON` ``\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _អនុសាសន៍ Institutional ៖ បិទ Forex ដើម្បីកុំឱ្យស៊ីថ្លៃ Spread Drag & Swap ហើយវិនិយោគតែលើ US Stocks & Indices!_"
+                        ) if user_lang == 'khmer' else (
+                            f"💱 **[CAPITAL.COM FOREX EXCHANGE GATEKEEPER]** 🛡️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"⚙️ **Current Status:** `{'ENABLED' if db.is_capital_forex_enabled() else '100% BLOCKED'}`\n"
+                            f"💡 **Commands:**\n"
+                            f"• Block Forex: `` `/capital forex OFF` ``\n"
+                            f"• Enable Forex: `` `/capital forex ON` ``\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💎 _Recommendation: Keep Forex OFF to focus 100% on high-momentum US Equities!_"
+                        )
+                        await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
+                        return
                 elif action in ["RESET_DAILY", "RESETDAILY", "GOVERNOR_RESET", "RESET_GOVERNOR"]:
                     import portfolio_circuit_breaker
                     c_eng = capital_engine.get_user_capital_engine(chat_id)

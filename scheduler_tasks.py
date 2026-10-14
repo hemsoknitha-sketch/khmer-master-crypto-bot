@@ -8344,6 +8344,9 @@ async def capital_forex_monitor(app: Application):
         return
     async with _capital_forex_lock:
         try:
+            import database as db
+            if not db.is_capital_forex_enabled():
+                return
             import capital_engine
             await capital_engine.run_capital_forex_cycle(app=app)
         except Exception as e:

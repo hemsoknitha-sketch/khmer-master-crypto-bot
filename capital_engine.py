@@ -793,6 +793,17 @@ class CapitalComEngine:
         if dir_upper not in ["BUY", "SELL"]:
             return {"success": False, "error": f"Invalid direction: {direction}. Must be 'BUY' or 'SELL'."}
 
+        # Step 0: Forex Kill-Switch Guard (Institutional Fiduciary Lock)
+        is_fx = any(fx in resolved_epic for fx in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"])
+        if is_fx:
+            import database as db
+            if not db.is_capital_forex_enabled():
+                logger.warning(f"🛑 [FOREX BLOCKED] Order blocked for {resolved_epic}: Forex trading is 100% disabled by Angkor Quant Fiduciary Guard.")
+                return {
+                    "success": False,
+                    "error": f"FOREX_BLOCKED: {resolved_epic} trading is 100% disabled by Angkor Quant Fiduciary Guard. Only US Stocks, Indices, and Gold/Crypto CFDs are permitted."
+                }
+
         # Step 1: Check Market Status & Spread
         market_info = self.get_market_details(resolved_epic)
         if not market_info.get("success"):
@@ -960,9 +971,9 @@ class CapitalComEngine:
                             "response": data
                         }
 
-                # 3. Fallback: If SL/TP was rejected by exchange distance rules, execute clean Market Order without stops first
+                # 3. Fallback: If SL/TP was rejected by exchange distance rules, execute Market Order and IMMEDIATELY attach compliant Stop-Loss
                 if "stoploss" in err_code.lower() or "profitlevel" in err_code.lower():
-                    logger.warning(f"Exchange SL/TP rejected ({err_code}). Executing clean Market Order...")
+                    logger.warning(f"Exchange SL/TP rejected ({err_code}). Executing Market Order and auto-attaching compliant SL...")
                     payload_clean = {
                         "epic": resolved_epic,
                         "direction": dir_upper,
@@ -974,12 +985,25 @@ class CapitalComEngine:
                         data = res_clean.json()
                         deal_ref = data.get("dealReference")
                         logger.info(f"✅ Market entry filled cleanly! Deal Ref: {deal_ref}")
+                        conf = self.get_deal_confirmation(deal_ref) if deal_ref else {}
+                        real_deal_id = conf.get("deal_id") or deal_ref
+                        fill_price = conf.get("level")
+                        self.invalidate_account_cache()
+                        # Instantly attach breathing Stop-Loss to guarantee ZERO No-SL positions (Invariant 35)
+                        if real_deal_id:
+                            ref_p = float(fill_price or ref_px)
+                            safe_dist = max(spread * 3.5, ref_p * 0.012)
+                            attached_sl = round(ref_p - safe_dist if dir_upper == "BUY" else ref_p + safe_dist, prec)
+                            self.update_position_stops(deal_id=real_deal_id, stop_loss=attached_sl)
+                            logger.info(f"🛡️ [ZERO NO-SL GUARD] Attached compliant Stop-Loss {attached_sl} to deal {real_deal_id}!")
                         return {
                             "success": True,
                             "epic": resolved_epic,
                             "direction": dir_upper,
                             "size": size,
                             "deal_reference": deal_ref,
+                            "dealId": real_deal_id,
+                            "fill_price": fill_price,
                             "is_demo": self.is_demo,
                             "response": data
                         }
@@ -2934,15 +2958,24 @@ class CapitalAutonomousEngine:
             return ["BTCUSD", "ETHUSD", "SOLUSD"]
             
         # Monday to Friday: Institutional Kill Zones
-        # Wall Street NY Session (13:30 - 20:45 UTC = 20:30 - 03:45 Phnom Penh)
+        import database as db
+        forex_allowed = db.is_capital_forex_enabled()
+
+        # Wall Street NY Session (13:30 - 20:45 UTC = 20:30 - 03:45 Phnom Penh) - Prime US Mega-Cap Equities & Indices
         if 810 <= utc_min < 1245:
-            return ["US500", "GOLD", "NVDA", "TSLA", "US100", "GOOGL", "META", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
+            return ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "US500", "US100", "GOLD", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
         # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh)
         elif 420 <= utc_min < 810:
-            return ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA", "BTCUSD"]
+            if forex_allowed:
+                return ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA", "BTCUSD"]
+            else:
+                return ["US500", "US100", "GERMANY40", "GOLD", "NVDA", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD"]
         # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh)
         elif 0 <= utc_min < 420:
-            return ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "EURUSD"]
+            if forex_allowed:
+                return ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "EURUSD"]
+            else:
+                return ["US500", "GOLD", "US100", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "SOLUSD"]
         # Late Night Rollover Lull (20:45 - 23:59 UTC = 03:45 - 07:00 Phnom Penh): Zero-Swap Shield -> Crypto CFDs
         else:
             return ["BTCUSD", "ETHUSD", "SOLUSD"]
@@ -3182,6 +3215,16 @@ class CapitalAutonomousEngine:
             spread = cached_market.get("spread", 0.0)
             if spread <= 0:
                 spread = 0.60 if "GOLD" in epic_u else (0.05 if "OIL" in epic_u else 1.0)
+
+            # EMERGENCY STOP-LOSS ATTACHMENT PATROL (Invariant 35 Zero No-SL Standard)
+            if (sl <= 0 or sl is None) and entry_level > 0 and current_price > 0:
+                prec = _get_tradfi_precision(epic, current_price)
+                safe_dist = max(spread * 3.5, current_price * 0.012)
+                emergency_sl = round(current_price - safe_dist if direction == "BUY" else current_price + safe_dist, prec)
+                upd_sl = engine.update_position_stops(deal_id=deal_id, stop_loss=emergency_sl)
+                if upd_sl.get("success"):
+                    sl = emergency_sl
+                    logger.info(f"🛡️ [EMERGENCY SL PATROL] Successfully attached breathing Stop-Loss for {epic} ({direction}) at {emergency_sl} (Market: {current_price:.2f})")
 
             # Persistent Peak UPL tracking with Database Fallback (Survives bot restarts)
             peak_upl = self._peak_upl_cache.get(deal_id)
@@ -7275,6 +7318,9 @@ class CapitalForexExchangeSuite:
         """
         Main autonomous execution loop for Forex Exchange Suite.
         """
+        import database as db
+        if not db.is_capital_forex_enabled():
+            return
         self._stats["total_cycles"] += 1
         self._stats["last_cycle_time"] = time.time()
         session_info = self.detect_market_session()
