@@ -1794,30 +1794,62 @@ def run_audit():
 
         # 3. Functional Governor Test: Target Lock (+5.0%) and Loss Floor (-2.5%)
         test_uid = 99999901
-        gov.set_daily_baseline(test_uid, 1000.0)
-        
-        # Test Normal State (+2.0%)
-        st_norm = gov.update_and_check(test_uid, 1020.0)
-        is_normal_ok = st_norm.get("state") == "NORMAL" and st_norm.get("can_trade") is True
-
-        # Test +5% Target Lock (+5.5%)
-        st_win = gov.update_and_check(test_uid, 1055.0)
-        is_win_lock_ok = st_win.get("state") == "TARGET_LOCKED" and st_win.get("can_trade") is False
-
-        # Test Manual Reset
-        gov.reset_daily_governor(test_uid, 1000.0)
-        st_after_reset = gov.get_user_status(test_uid, 1000.0)
-        is_reset_ok = st_after_reset.get("state") == "NORMAL" and st_after_reset.get("can_trade") is True
-
-        # Test -2.5% Loss Floor (-3.0%)
-        st_loss = gov.update_and_check(test_uid, 970.0)
-        is_loss_floor_ok = st_loss.get("state") == "FLOOR_HIT" and st_loss.get("can_trade") is False
-
-        # Clean up test user
         import database as db
-        today_str = gov.get_today_str()
-        db.update_system_setting(f"cap_daily_start_eq_{test_uid}_{today_str}", "")
-        db.update_system_setting(f"cap_daily_lock_{test_uid}_{today_str}", "")
+
+        # Save any live system-wide settings for clean test isolation
+        saved_limits_dis = db.get_system_setting("cap_daily_limits_disabled")
+        saved_gov_dis = db.get_system_setting("capital_daily_governor_disabled")
+        saved_247 = db.get_system_setting("capital_global_24_7_unlocked")
+
+        try:
+            # Ensure governor limits are active for unit test validation
+            db.update_system_setting("cap_daily_limits_disabled", "0")
+            db.update_system_setting("capital_daily_governor_disabled", "0")
+            db.update_system_setting("capital_global_24_7_unlocked", "0")
+            db.update_system_setting(f"cap_daily_limits_disabled_{test_uid}", "0")
+            gov.reset_daily_governor(test_uid, 1000.0)
+            gov.set_daily_baseline(test_uid, 1000.0)
+
+            # Test Normal State (+2.0%)
+            st_norm = gov.update_and_check(test_uid, 1020.0)
+            is_normal_ok = st_norm.get("state") == "NORMAL" and st_norm.get("can_trade") is True
+
+            # Test +5% Target Lock (+5.5%)
+            st_win = gov.update_and_check(test_uid, 1055.0)
+            is_win_lock_ok = st_win.get("state") == "TARGET_LOCKED" and st_win.get("can_trade") is False
+
+            # Test Manual Reset
+            gov.reset_daily_governor(test_uid, 1000.0)
+            st_after_reset = gov.get_user_status(test_uid, 1000.0)
+            is_reset_ok = st_after_reset.get("state") == "NORMAL" and st_after_reset.get("can_trade") is True
+
+            # Test -2.5% Loss Floor (-3.0%)
+            st_loss = gov.update_and_check(test_uid, 970.0)
+            is_loss_floor_ok = st_loss.get("state") == "FLOOR_HIT" and st_loss.get("can_trade") is False
+        finally:
+            # Clean up test user keys & restore live settings
+            gov.reset_daily_governor(test_uid, 1000.0)
+            try:
+                conn_cl = db.get_db_connection()
+                cur_cl = conn_cl.cursor()
+                cur_cl.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"%{test_uid}%",))
+                conn_cl.commit()
+                conn_cl.close()
+            except Exception:
+                pass
+
+            if saved_limits_dis is not None:
+                db.update_system_setting("cap_daily_limits_disabled", saved_limits_dis)
+            else:
+                db.update_system_setting("cap_daily_limits_disabled", "")
+            if saved_gov_dis is not None:
+                db.update_system_setting("capital_daily_governor_disabled", saved_gov_dis)
+            else:
+                db.update_system_setting("capital_daily_governor_disabled", "")
+            if saved_247 is not None:
+                db.update_system_setting("capital_global_24_7_unlocked", saved_247)
+            else:
+                db.update_system_setting("capital_global_24_7_unlocked", "")
 
         # 4. Functional Radar Test: 360 Pre-flight assessment
         readiness = radar.check_trade_readiness(
@@ -1846,7 +1878,7 @@ def run_audit():
         if all_inv52_passed:
             log_pass("Capital.com Sky Net 360° Daily Capital Governor & Target Lock (Invariant 52) is 100% locked & certified!")
         else:
-            failures.append(f"Invariant 52 check failed: inv52={has_inv52}, gov={has_gov_class}, radar={has_radar_class}, win_lock={is_win_lock_ok}, floor={is_loss_floor_ok}, radar_ok={is_radar_ok}, ui={has_reset_handler}")
+            failures.append(f"Invariant 52 check failed: inv52={has_inv52}, gov={has_gov_class}, radar={has_radar_class}, norm={is_normal_ok}, win_lock={is_win_lock_ok}, reset={is_reset_ok}, floor={is_loss_floor_ok}, radar_ok={is_radar_ok}, ui={has_reset_handler}, badge={has_gov_badge}")
             log_fail("Capital.com Sky Net 360° Daily Capital Governor (Invariant 52) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 52 check failed: {e}")
@@ -1928,14 +1960,38 @@ def run_audit():
         # 2. Dynamic Unit Test: Governor Master Toggle (Limit ON/OFF)
         from portfolio_circuit_breaker import CapitalDailyAGIGovernor
         test_uid = 88888801
+        import database as db
 
-        # Test turning limits OFF
-        CapitalDailyAGIGovernor.set_daily_limits_disabled(test_uid, True)
-        is_limits_off = (CapitalDailyAGIGovernor.are_daily_limits_disabled(test_uid) is True)
+        saved_limits_dis44 = db.get_system_setting("cap_daily_limits_disabled")
+        saved_gov_dis44 = db.get_system_setting("capital_daily_governor_disabled")
+        db.update_system_setting("cap_daily_limits_disabled", "0")
+        db.update_system_setting("capital_daily_governor_disabled", "0")
 
-        # Test turning limits ON
-        CapitalDailyAGIGovernor.set_daily_limits_disabled(test_uid, False)
-        is_limits_on = (CapitalDailyAGIGovernor.are_daily_limits_disabled(test_uid) is False)
+        try:
+            # Test turning limits OFF
+            CapitalDailyAGIGovernor.set_daily_limits_disabled(test_uid, True)
+            is_limits_off = (CapitalDailyAGIGovernor.are_daily_limits_disabled(test_uid) is True)
+
+            # Test turning limits ON
+            CapitalDailyAGIGovernor.set_daily_limits_disabled(test_uid, False)
+            is_limits_on = (CapitalDailyAGIGovernor.are_daily_limits_disabled(test_uid) is False)
+        finally:
+            try:
+                conn_cl = db.get_db_connection()
+                cur_cl = conn_cl.cursor()
+                cur_cl.execute("DELETE FROM system_settings WHERE key LIKE ?", (f"%{test_uid}%",))
+                conn_cl.commit()
+                conn_cl.close()
+            except Exception:
+                pass
+            if saved_limits_dis44 is not None:
+                db.update_system_setting("cap_daily_limits_disabled", saved_limits_dis44)
+            else:
+                db.update_system_setting("cap_daily_limits_disabled", "")
+            if saved_gov_dis44 is not None:
+                db.update_system_setting("capital_daily_governor_disabled", saved_gov_dis44)
+            else:
+                db.update_system_setting("capital_daily_governor_disabled", "")
 
         # 3. Dynamic Unit Test: get_system_wide_live_spread_audit (Invariant 55)
         import capital_engine
@@ -2133,9 +2189,21 @@ def run_audit():
         conn.close()
         is_db_healthy = (row is not None and row[0] == "ok")
 
-        # Verify AI Models in repository
+        # Verify AI Models in repository (Canonical in models/ directory and root)
         critical_models = ["brain_nn.keras", "brain_patchtst.h5", "brain_xgb.pkl", "brain_catboost.pkl", "brain_lightgbm.pkl"]
-        all_models_exist = all(os.path.exists(m) and os.path.getsize(m) > 10000 for m in critical_models)
+        for m in critical_models:
+            m_path = os.path.join("models", m)
+            if os.path.exists(m_path) and not os.path.exists(m):
+                try:
+                    import shutil
+                    shutil.copy2(m_path, m)
+                except Exception:
+                    pass
+        all_models_exist = all(
+            (os.path.exists(m) and os.path.getsize(m) > 10000) or
+            (os.path.exists(os.path.join("models", m)) and os.path.getsize(os.path.join("models", m)) > 10000)
+            for m in critical_models
+        )
 
         all_inv60_61_passed = (
             has_loco_cls and has_admin_id and has_telemetry and
