@@ -52,9 +52,11 @@ The system is engineered upon two non-negotiable axioms:
    - $\text{Take Profit Distance} \ge 10.0 \times \text{Spread}$ and $R:R \ge 1:2.5$ to $1:6.0$.
    - Guarantees $\ge 90\%$ of captured market movement converts directly into clean Net Profit, rather than paying broker spread friction.
 3. **Pillar 3: Delayed Breakeven Armor & Multi-Tier Harvest (Invariant 35 - កម្ចាត់ការកៀរយកចំណេញកម្ទេចកម្ទី $+\$0.14 - +\$0.50$):**
-   - Breakeven Armor is delayed until position achieves genuine momentum ($\ge +8.5\%$ ROI or $\ge +\$3.50$ UPL), locking a guaranteed fee-clearing floor ($\text{Entry} \pm 0.5\times\text{Spread}$ Net Floor). Early oscillations never choke trades at scratch.
-   - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$6.00$ or $\ge +14.0\%$ ROI.
-   - Any Retracement Harvest exit strictly enforces $\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$ to prevent eating crumbs and death by a thousand papercuts.
+   - Breakeven Armor is delayed until position achieves genuine momentum and strictly enforces an Absolute Dollar Floor: $\text{UPL} \ge \$2.50 \text{ AND } \text{ROI} \ge +8.5\%$ (or $\text{UPL} \ge \$3.50$), locking a guaranteed fee-clearing floor ($\text{Entry} \pm 0.5\times\text{Spread}$ Net Floor). Early oscillations on micro margins ($1.50 - $15.00) are strictly forbidden from triggering Breakeven Armor or choking trades at scratch.
+   - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$5.00$ or $\text{UPL} \ge \$3.50 \text{ AND } \text{Peak ROI} \ge +12.0\%$.
+   - Any Retracement Harvest exit strictly enforces $\text{Peak UPL} \ge \$4.50$ and $\text{Current UPL} \ge \max(\$2.50, \text{spread} \times 2.0)$ to permanently prevent eating crumbs ($+\$0.14 - +\$0.35$) and death by a thousand papercuts.
+   - Moonshot Target Harvest strictly enforces $\text{UPL} \ge \$10.00$ (or $\ge \$15.00$ for runners) in addition to $\text{ROI} \ge +50.0\%$.
+   - Sizing Floor: Kelly sizer dynamically allocates minimum target margin $\ge \$10.00 - \$15.00$ per trade so VIP accounts carry enough notional weight to produce clean dollar profits rather than micro-cents.
 4. **Pillar 4: Super Smart 360° Citadel Sweep Confirmation & Trap Clearance (Invariant 58 - ស្ទាក់ចាប់កម្លាំងពិតប្រាកដ & លុបបំបាត់ Sideways Chop Trap):**
    - Every entry must be vetted by Institutional 360° Citadel Trap Clearance with $ADX \ge 25.0$ and multi-timeframe structural confluence.
    - Strictly enforces Anti-Oversold Short Guard (15m RSI $\le 36.0$ blocks Shorts) and Anti-Overbought Peak Guard (RSI $\ge 70.0$ blocks Longs).

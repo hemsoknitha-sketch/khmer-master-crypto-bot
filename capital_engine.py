@@ -3309,16 +3309,16 @@ class CapitalAutonomousEngine:
             # Detect if current market price has reached or exceeded broker-side Take-Profit level
             tp_level = float(pos.get("profitLevel", 0.0) or 0.0)
             tp_target_reached = False
-            if tp_level > 0 and upl > 0:
+            if tp_level > 0 and upl >= 2.50:
                 if direction == "BUY" and tp_level > entry_level and current_price >= (tp_level - (spread * 0.75)):
                     tp_target_reached = True
                 elif direction == "SELL" and tp_level < entry_level and current_price <= (tp_level + (spread * 0.75)):
                     tp_target_reached = True
 
-            # Full Asymmetric Moonshot target
-            asymmetric_target_reached = (roi_pct >= 100.0 or upl >= 50.0) if is_runner else (roi_pct >= 50.0 or upl >= 25.0)
+            # Full Asymmetric Moonshot target (Requires minimum institutional dollar floor >= $10.00 / $25.00)
+            asymmetric_target_reached = ((roi_pct >= 100.0 and upl >= 15.0) or upl >= 50.0) if is_runner else ((roi_pct >= 50.0 and upl >= 10.0) or upl >= 25.0)
 
-            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached) and (upl > 0)
+            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached) and (upl >= 2.50)
             if harvest_trigger:
                 tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else ("🎯 [BROKER TP HARVEST]" if tp_target_reached else ("🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"))
                 logger.info(f"{tag} Reached Target (+{roi_pct:.1f}% ROI / ${upl:+.2f})! Executing Cash Harvest for {epic}...")
@@ -3372,10 +3372,13 @@ class CapitalAutonomousEngine:
             peak_roi = (peak_upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
             # Broker SL protection status: If broker already protects profit/breakeven, don't trigger premature market exit on minor pullbacks!
             broker_sl_protecting = (direction == "BUY" and sl > entry_level) or (direction == "SELL" and sl > 0 and sl < entry_level)
+            # Invariant 35: peak_upl >= 6.00 or peak_roi >= 14.0 delayed Retracement Harvest with Absolute Dollar Floor
+            is_retrace_eligible = (peak_upl >= 6.00 or peak_roi >= 14.0)
             retrace_trigger = (
-                (peak_upl >= 6.00 or peak_roi >= 14.0)
+                is_retrace_eligible
+                and peak_upl >= 4.50
                 and (upl <= (peak_upl * ratchet_pct))
-                and (upl > max(2.0, spread * 2.0))
+                and (upl >= max(2.50, spread * 2.0))
                 and ((peak_upl >= 15.0 or peak_roi >= 30.0) or not broker_sl_protecting)
             )
             if retrace_trigger:
@@ -3498,7 +3501,8 @@ class CapitalAutonomousEngine:
             # When profit exceeds >= +12.0% ROI or >= +$5.00 UPL, advance broker Stop-Loss.
             # =========================================================================
             prec = _get_tradfi_precision(epic, current_price)
-            ratchet_broker_eligible = (roi_pct >= 12.0 or peak_upl >= 5.00 or upl >= 5.00) and peak_upl > 0
+            is_ratchet_eligible = (roi_pct >= 12.0 or peak_upl >= 5.00 or upl >= 5.00) and peak_upl > 0
+            ratchet_broker_eligible = is_ratchet_eligible and (upl >= 3.50 or peak_upl >= 4.50)
             if ratchet_broker_eligible:
                 target_protected_profit = peak_upl * ratchet_pct
                 if direction == "BUY":
@@ -3544,7 +3548,9 @@ class CapitalAutonomousEngine:
             # Guaranteed to place SL strictly below current market price for BUY (and above for SELL)
             # while locking in Entry + (Spread * 0.5) to secure a net positive return after broker fees.
             # =========================================================================
-            if (roi_pct >= 8.5 or upl >= 3.50) and deal_id not in self._be_locked_set:
+            # Invariant 35: roi_pct >= 8.5 or upl >= 3.50 delayed Breakeven Armor with Absolute Dollar Floor
+            is_be_eligible = (roi_pct >= 8.5 or upl >= 3.50) and deal_id not in self._be_locked_set
+            if is_be_eligible and upl >= 2.50:
                 breathing_cushion = max(spread * 2.5, 0.0015 * current_price)
                 if direction == "BUY":
                     target_be_sl = round(entry_level + max(spread * 0.5, 0.001 * entry_level), 2)
@@ -3611,8 +3617,8 @@ class CapitalAutonomousEngine:
                     if sl_dist > 0:
                         r_gain = (current_price - entry_level) / sl_dist if direction == "BUY" else (entry_level - current_price) / sl_dist
 
-                        # TIER 1: +1.2R Hit -> Breakeven Armor Lock
-                        if r_gain >= 1.20 and tier < 1:
+                        # TIER 1: +1.2R Hit -> Breakeven Armor Lock (Requires Net UPL >= $2.00)
+                        if r_gain >= 1.20 and tier < 1 and upl >= 2.00:
                             if direction == "BUY":
                                 be_sl = round(entry_level + max(spread * 0.6, entry_level * 0.0012), prec)
                                 safe_sl = min(be_sl, round(current_price - (spread * 1.5), prec))
@@ -3648,8 +3654,8 @@ class CapitalAutonomousEngine:
                                         except Exception:
                                             pass
 
-                        # TIER 2: +2.5R Hit -> Guaranteed +1.2R Profit Lock
-                        elif r_gain >= 2.50 and tier < 2:
+                        # TIER 2: +2.5R Hit -> Guaranteed +1.2R Profit Lock (Requires Net UPL >= $3.50)
+                        elif r_gain >= 2.50 and tier < 2 and upl >= 3.50:
                             if direction == "BUY":
                                 t2_sl = round(entry_level + (1.20 * sl_dist), prec)
                                 safe_sl = min(t2_sl, round(current_price - (spread * 1.5), prec))
@@ -3684,8 +3690,8 @@ class CapitalAutonomousEngine:
                                         except Exception:
                                             pass
 
-                        # TIER 3: +4.0R Hit -> Moonshot Harvest
-                        elif r_gain >= 4.00 and tier < 3:
+                        # TIER 3: +4.0R Hit -> Moonshot Harvest (Requires Net UPL >= $5.00)
+                        elif r_gain >= 4.00 and tier < 3 and upl >= 5.00:
                             c_res = engine.close_position(deal_id=deal_id)
                             if c_res.get("success"):
                                 if hasattr(orb_engine, "update_orb_deal_tier"):
@@ -6250,7 +6256,7 @@ class CapitalKellyPositionSizer:
         eff_cap = max(float(budget or 0.0), float(available_equity or 0.0))
         dynamic_slots = get_dynamic_max_positions_for_equity(eff_cap)
         slot_margin = eff_cap / (dynamic_slots * 1.35) if dynamic_slots > 0 else 12.0
-        target_margin = max(6.00, min(25.0, slot_margin)) if eff_cap > 0 else 12.00
+        target_margin = max(10.00, min(25.0, slot_margin)) if eff_cap > 0 else 12.00
         target_notional = target_margin * leverage
 
         if entry_price > 0:
