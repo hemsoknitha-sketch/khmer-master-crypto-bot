@@ -641,8 +641,8 @@ class SuperSmartCapitalCitadel:
 
         # Pillar 0: Forex Kill-Switch & Institutional Stock Priority Gatekeeper
         s_epic = str(epic or "").upper().strip()
-        is_fx = any(fx in s_epic for fx in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"])
-        if is_fx:
+        from capital_engine import is_forex_instrument
+        if is_forex_instrument(s_epic):
             import database as db
             if not db.is_capital_forex_enabled():
                 reason = f"FOREX_BLOCKED: {s_epic} is blocked by Angkor Quant Fiduciary Guard. Trading is restricted to US Equities, Indices, and Gold/Crypto CFDs."

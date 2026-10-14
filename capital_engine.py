@@ -47,6 +47,26 @@ def _get_tradfi_precision(epic_str: str, price_val: float = 0.0) -> int:
         return 5
     return 2
 
+FOREX_FIAT_CURRENCIES = {
+    "EUR", "GBP", "USD", "JPY", "AUD", "CAD", "CHF", "NZD",
+    "SGD", "HKD", "CNH", "SEK", "NOK", "ZAR", "MXN", "TRY", "PLN"
+}
+
+def is_forex_instrument(epic_str: str) -> bool:
+    """
+    Returns True if the given instrument is a traditional Forex currency pair.
+    Accurately excludes Crypto CFDs (BTCUSD, ETHUSD, SOLUSD), Indices (US500, US100), and Equities.
+    """
+    s = str(epic_str or "").upper().strip()
+    if len(s) == 6 and s[:3] in FOREX_FIAT_CURRENCIES and s[3:6] in FOREX_FIAT_CURRENCIES:
+        return True
+    known_fx = (
+        "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
+        "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "NZDJPY", "CADJPY", "CHFJPY",
+        "EURAUD", "EURCAD", "EURCHF", "GBPAUD", "GBPCAD", "GBPCHF", "AUDCAD", "AUDNZD"
+    )
+    return any(fx in s for fx in known_fx)
+
 # Setup Logger
 logger = logging.getLogger("CapitalComEngine")
 if not logger.handlers:
@@ -794,8 +814,7 @@ class CapitalComEngine:
             return {"success": False, "error": f"Invalid direction: {direction}. Must be 'BUY' or 'SELL'."}
 
         # Step 0: Forex Kill-Switch Guard (Institutional Fiduciary Lock)
-        is_fx = any(fx in resolved_epic for fx in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"])
-        if is_fx:
+        if is_forex_instrument(resolved_epic):
             import database as db
             if not db.is_capital_forex_enabled():
                 logger.warning(f"🛑 [FOREX BLOCKED] Order blocked for {resolved_epic}: Forex trading is 100% disabled by Angkor Quant Fiduciary Guard.")
@@ -8314,6 +8333,11 @@ def is_capital_trading_schedule_active(schedule_mode: str = "SMART_SESSION_TIMED
 
         # Session-specific asset compatibility for TradFi assets
         if epic:
+            if is_forex_instrument(epic):
+                import database as db
+                if not db.is_capital_forex_enabled():
+                    return False, f"Forex trading for {epic} is 100% disabled by Angkor Quant Fiduciary Guard", info
+
             if current_session == "TOKYO_ASIAN":
                 # Tokyo/Asian Focus: USDJPY, AUDUSD, NZDUSD, GOLD, SILVER, US500
                 tokyo_allowed = ["USDJPY", "AUDUSD", "NZDUSD", "GOLD", "SILVER", "US500", "SP500"]
