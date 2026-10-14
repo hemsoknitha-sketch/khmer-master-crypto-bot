@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ69)
-**Document Version:** 6.8.0 (Angkor Quant Master Specification - The 69 Pillars & TradFi Fiduciary Integrity Lock)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ73)
+**Document Version:** 7.3.0 (Angkor Quant Master Specification - The 73 Pillars & TradFi Fiduciary Integrity Lock)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -31,13 +31,23 @@ The system is engineered upon two non-negotiable axioms:
   3. Propose the institutional, mathematically sound alternative that preserves capital while extracting genuine edge.
 - **Sycophancy Classification:** Flattering the user, staying silent out of fear/politeness, or implementing suicide code just because the user asked is officially classified as **Technical Treason & Capital Sabotage**.
 
-### 1.1.1 THE SIX PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ69)
-**(គ្រឹះ ៦ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58)**
+### 1.1.1 THE SEVEN PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ73)
+**(គ្រឹះ ៧ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58, 73)**
 **Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
-1. **Pillar 1: Dynamic Volatility Breathing Stop Standard (Invariant 35 - កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួល):**
+0. **Pillar 0: Universal Multi-Layer Forex Deactivation & Capital Protection Shield (Invariant 73 - របាំងបិទទាំងស្រុង Forex Exchange ការពារ Spread & Negative Expectancy):**
+   - Default state: Forex trading is 100% disabled (`capital_forex_enabled = 0`).
+   - 5-Tier Defense Architecture:
+     1. Scheduler Gate: `capital_forex_monitor` aborts immediately if disabled.
+     2. Engine Suite Gate: `CapitalForexExchangeSuite.execute_forex_cycle` aborts immediately.
+     3. Citadel Pre-Flight Gatekeeper: `validate_capital_entry_gatekeeper` Pillar 0 intercepts and blocks any Forex pair (`is_forex_epic`) with `BLOCKED_FOREX_DISABLED`.
+     4. Execution Gateway: `place_position` unconditionally blocks forex order placement with `FOREX_BLOCKED`.
+     5. Autonomous Universe Purge: `CapitalAutonomousEngine.get_session_priority_assets` completely purges all Forex pairs, prioritizing US Mega-Cap equities (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`), Major Indices (`US500`, `US100`, `DE40`), and Commodities/Crypto (`GOLD`, `OIL_CRUDE`, `BTCUSD`).
+1. **Pillar 1: Dynamic Volatility Breathing Stop & Broker Rejection Fallback Armor (Invariant 35 - កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួល & គ្មាន No-SL Trading):**
    - TradFi Standard: $\text{SL Distance} \ge \max(2.50\times\text{ATR}, 3.5\times\text{Spread}, 0.0035\times\text{Price})$.
    - Trend Scalp Standard: $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$.
    - Eliminates tight/micro stops ($1.0\times\text{ATR}_{5m}$) that get clipped by broker spread expansion or minor oscillations before directional thrust can unfold. Zero No-SL trading.
+   - Broker SL Rejection Recovery Armor: When broker rejects SL/TP distance on order placement, system fills market order and immediately attaches breathing SL via `update_position_stops` (`ref_p ± max(spread * 3.5, ref_p * 0.012)`).
+   - Continuous Emergency SL Patrol: `_ratchet_engine_positions` audits all open positions every cycle; if `sl <= 0` or `sl is None`, it automatically calculates and attaches a breathing stop loss dynamically. Zero naked, unhedged positions permitted.
 2. **Pillar 2: Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34 - កម្ចាត់ការស៊ីថ្លៃ Spread):**
    - $\text{Take Profit Distance} \ge 10.0 \times \text{Spread}$ and $R:R \ge 1:2.5$ to $1:6.0$.
    - Guarantees $\ge 90\%$ of captured market movement converts directly into clean Net Profit, rather than paying broker spread friction.
@@ -1196,6 +1206,31 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   4. **Multi-Platform Interactive Execution:**
      - Fully operational across Telegram Bot (`/academy`), Web Mini App GUI (`tab-academy`), and REST APIs (`/api/academy`, `/api/academy/dcf`, `/api/academy/snowball`).
 - **Enforcement:** Verified by `audit_system.py` [CHECK 57/57].
+
+---
+
+### Invariant 73: Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Asset Selection Standard (AQ73)
+- **Location:** `capital_engine.py` (`place_position`, `_ratchet_engine_positions`, `CapitalAutonomousEngine.get_session_priority_assets`, `CapitalForexExchangeSuite`), `super_smart_capital_citadel.py` (`validate_capital_entry_gatekeeper`), `database.py` (`is_capital_forex_enabled`, `set_capital_forex_enabled`), `scheduler_tasks.py` (`capital_forex_monitor`), `bot_thread.py` (`/capital FOREX ON|OFF`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal (Section 1.1), the system mathematically eliminates retail Forex micro-pip churn, spread drag, and unhedged drawdowns across Capital.com TradFi:
+  1. **Forex 100% Deactivation by Default (Universal Kill-Switch):**
+     - Forex trading is permanently disabled by default (`is_capital_forex_enabled() == False`).
+     - Five-Tier Immutable Defense Gates:
+       1. *Scheduler Level:* `scheduler_tasks.capital_forex_monitor` aborts immediately if forex is disabled.
+       2. *Engine Suite Level:* `CapitalForexExchangeSuite.execute_forex_cycle` aborts before scanning.
+       3. *Citadel Gatekeeper Level:* `SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper` Pillar 0 intercepts any Forex pair (`is_forex_epic`) and rejects entry with reason `BLOCKED_FOREX_DISABLED`.
+       4. *Execution Gateway Level:* `CapitalComEngine.place_position` rejects all forex pair orders with error `FOREX_BLOCKED`.
+       5. *Asset Priority Purge:* `CapitalAutonomousEngine.get_session_priority_assets` completely purges all Forex pairs from autonomous scanning lists.
+  2. **US Mega-Cap Equity & Index Prioritization:**
+     - The autonomous TradFi universe strictly prioritizes Wall Street Mega-Cap Stocks (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`), Institutional Indices (`US500`, `US100`, `DE40`), and High-Beta Commodities/Crypto (`GOLD`, `OIL_CRUDE`, `BTCUSD`).
+     - Eradicates inverted R:R and negative mathematical expectancy ($E[X] \le 0$) where 10 micro Forex wins (+15 cents) were wiped out by a single loss.
+  3. **Zero No-SL Trading & Broker Rejection Fallback Armor:**
+     - If Capital.com API rejects SL/TP distance on order entry (Error -1013 / broker distance constraint), the market order execution MUST immediately invoke `update_position_stops` with a dynamic breathing SL (`ref_p ± max(spread * 3.5, ref_p * 0.012)`).
+     - *Continuous Emergency SL Patrol:* `_ratchet_engine_positions` audits all open positions on every cycle. If any active position has `sl <= 0` or `sl is None`, the engine immediately calculates and attaches a breathing stop loss dynamically. Running naked or unhedged positions is strictly prohibited.
+  4. **Anti-Crumb Delayed Multi-Tier Trailing Ratchet:**
+     - Breakeven Armor is delayed until position achieves genuine momentum ($\ge +8.5\%$ ROI or $\ge +\$3.50$ UPL), locking a fee-clearing floor ($\text{Entry} \pm 0.5\times\text{Spread}$).
+     - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$6.00$ or $\ge +14.0\%$ ROI.
+     - Retracement harvest exits strictly require $\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$ to prevent taking cent crumbs while absorbing full downside risk.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 58/58].
 
 ---
 

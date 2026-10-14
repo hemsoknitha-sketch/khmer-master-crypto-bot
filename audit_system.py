@@ -2881,6 +2881,69 @@ def run_audit():
         failures.append(f"Invariant 72 check failed: {e}")
         log_fail(str(e))
 
+    # -------------------------------------------------------------------------
+    # [CHECK 58/58] Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Asset Selection Standard (Invariant 73)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 58/58] Verifying Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Selection Standard (Invariant 73)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv73 = "Invariant 73: Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Asset Selection Standard" in agents_md
+        has_p0_forex = "Pillar 0: Universal Multi-Layer Forex Deactivation" in agents_md
+
+        # 2. Database layer: is_capital_forex_enabled & set_capital_forex_enabled
+        import database as db
+        has_forex_get = hasattr(db, "is_capital_forex_enabled")
+        has_forex_set = hasattr(db, "set_capital_forex_enabled")
+
+        # Dynamic unit test: verify disabled state
+        orig_forex_state = db.is_capital_forex_enabled()
+        db.set_capital_forex_enabled(False)
+        is_forex_off = db.is_capital_forex_enabled() is False
+
+        # 3. SuperSmartCapitalCitadel Gatekeeper test for forex epic
+        import super_smart_capital_citadel as sscc
+        citadel = sscc.get_super_smart_capital_citadel()
+        is_approved, gate_reason, diag = citadel.validate_capital_entry_gatekeeper(
+            epic="EURUSD",
+            direction="BUY"
+        )
+        is_gatekeeper_blocking_forex = (is_approved is False) and ("FOREX" in str(gate_reason).upper())
+
+        # 4. capital_engine.py inspections
+        with open("capital_engine.py", "r", encoding="utf-8") as cf:
+            cap_code = cf.read()
+        has_place_forex_block = "FOREX_BLOCKED" in cap_code
+        has_emergency_sl_patrol = "EMERGENCY SL PATROL" in cap_code or "Emergency SL Patrol" in cap_code
+        has_sl_recovery_armor = "update_position_stops" in cap_code and "safe_dist = max(spread * 3.5, ref_p * 0.012)" in cap_code
+
+        # 5. Priority assets verification in CapitalAutonomousEngine
+        import capital_engine as ce
+        auto_engine = ce.get_capital_autonomous_engine()
+        priority_assets = auto_engine.get_session_priority_assets()
+        # Verify no standard forex pairs in priority assets
+        forex_pairs_in_priority = [p for p in priority_assets if p in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "NZDUSD", "USDCAD"]]
+        has_clean_equities = len(forex_pairs_in_priority) == 0 and ("US500" in priority_assets or "NVDA" in priority_assets)
+
+        # Restore original state
+        db.set_capital_forex_enabled(orig_forex_state)
+
+        all_inv73_passed = (
+            has_inv73 and has_p0_forex and has_forex_get and has_forex_set and
+            is_forex_off and is_gatekeeper_blocking_forex and has_place_forex_block and
+            has_emergency_sl_patrol and has_sl_recovery_armor and has_clean_equities
+        )
+
+        if all_inv73_passed:
+            log_pass("Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Selection Standard (Invariant 73) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 73 check failed: inv73={has_inv73}, p0={has_p0_forex}, f_get={has_forex_get}, f_set={has_forex_set}, f_off={is_forex_off}, gate_block={is_gatekeeper_blocking_forex}, place_block={has_place_forex_block}, patrol={has_emergency_sl_patrol}, sl_armor={has_sl_recovery_armor}, clean_eq={has_clean_equities}")
+            log_fail("Capital.com TradFi Multi-Layer Forex Kill-Switch (Invariant 73) validation failed!")
+    except Exception as e:
+        failures.append(f"Invariant 73 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:

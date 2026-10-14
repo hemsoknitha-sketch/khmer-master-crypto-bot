@@ -666,3 +666,9 @@ class SuperSmartCapitalCitadel:
             f"SL: ${sl_str} | TP: ${tp_str}"
         )
         return True, "SUPER_SMART_CAPITAL_CLEARANCE_GRANTED", diag
+
+
+def get_super_smart_capital_citadel() -> type:
+    """Returns the canonical SuperSmartCapitalCitadel class."""
+    return SuperSmartCapitalCitadel
+

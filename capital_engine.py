@@ -7844,6 +7844,9 @@ def get_capital_auto_engine() -> CapitalAutonomousEngine:
     """Returns singleton instance of CapitalAutonomousEngine."""
     return CAPITAL_AUTO_ENGINE
 
+get_capital_autonomous_engine = get_capital_auto_engine
+
+
 def get_capital_ib_manager() -> CapitalPartnerRebateManager:
     """Returns singleton instance of CapitalPartnerRebateManager."""
     return CAPITAL_IB_MANAGER
