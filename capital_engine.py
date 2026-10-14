@@ -525,22 +525,65 @@ class CapitalComEngine:
             cid = chat_id or getattr(self, "_custom_chat_id", None)
             conn = db.get_db_connection()
             cur = conn.cursor()
-            if cid:
-                cur.execute("""
-                    SELECT deal_id, epic, direction, size, entry_price, sl, tp
-                    FROM capital_auto_trades
-                    WHERE chat_id = ? AND status = 'OPEN'
-                """, (cid,))
-            else:
-                cur.execute("""
-                    SELECT deal_id, epic, direction, size, entry_price, sl, tp
-                    FROM capital_auto_trades
-                    WHERE status = 'OPEN'
-                """)
-            open_db_trades = cur.fetchall()
+            
+            all_open_trades = []
+            # 1. capital_auto_trades
+            try:
+                if cid:
+                    cur.execute("""
+                        SELECT deal_id, epic, direction, size, entry_price, sl, tp, 'AUTO' as origin
+                        FROM capital_auto_trades
+                        WHERE chat_id = ? AND status = 'OPEN'
+                    """, (cid,))
+                else:
+                    cur.execute("""
+                        SELECT deal_id, epic, direction, size, entry_price, sl, tp, 'AUTO' as origin
+                        FROM capital_auto_trades
+                        WHERE status = 'OPEN'
+                    """)
+                all_open_trades.extend(cur.fetchall())
+            except Exception:
+                pass
+
+            # 2. capital_orb_trades
+            try:
+                if cid:
+                    cur.execute("""
+                        SELECT deal_id, epic, direction, 0.05 as size, entry_price, sl, tp, 'ORB' as origin
+                        FROM capital_orb_trades
+                        WHERE chat_id = ? AND status LIKE 'ACTIVE%'
+                    """, (cid,))
+                else:
+                    cur.execute("""
+                        SELECT deal_id, epic, direction, 0.05 as size, entry_price, sl, tp, 'ORB' as origin
+                        FROM capital_orb_trades
+                        WHERE status LIKE 'ACTIVE%'
+                    """)
+                all_open_trades.extend(cur.fetchall())
+            except Exception:
+                pass
+
+            # 3. capital_scalp_trades
+            try:
+                if cid:
+                    cur.execute("""
+                        SELECT deal_id, epic, direction, 0.05 as size, entry_price, sl, tp, 'SCALP' as origin
+                        FROM capital_scalp_trades
+                        WHERE chat_id = ? AND status = 'OPEN'
+                    """, (cid,))
+                else:
+                    cur.execute("""
+                        SELECT deal_id, epic, direction, 0.05 as size, entry_price, sl, tp, 'SCALP' as origin
+                        FROM capital_scalp_trades
+                        WHERE status = 'OPEN'
+                    """)
+                all_open_trades.extend(cur.fetchall())
+            except Exception:
+                pass
+
             conn.close()
 
-            if not open_db_trades:
+            if not all_open_trades:
                 return 0
 
             broker_positions = self.get_open_positions()
@@ -548,8 +591,8 @@ class CapitalComEngine:
             broker_deal_refs = {str(p.get("position", {}).get("dealReference")) for p in broker_positions if p.get("position", {}).get("dealReference")}
 
             reconciled = 0
-            for row in open_db_trades:
-                deal_id, epic, direction, size, entry_price, sl, tp = row
+            for row in all_open_trades:
+                deal_id, epic, direction, size, entry_price, sl, tp, origin = row
                 if deal_id and (str(deal_id) not in broker_deal_ids and str(deal_id) not in broker_deal_refs):
                     # Deal is no longer open on broker: it was closed!
                     mkt = self.get_market_details(epic)
@@ -557,7 +600,7 @@ class CapitalComEngine:
                     size_val = float(size) if size else 0.01
 
                     # Reconstruct exit price based on direction and SL/TP bounds
-                    if direction.upper() == "BUY":
+                    if str(direction).upper() == "BUY":
                         if sl and sl > 0 and current_mid <= sl:
                             exit_price = sl
                         elif tp and tp > 0 and current_mid >= tp:
@@ -574,9 +617,15 @@ class CapitalComEngine:
                             exit_price = current_mid
                         pnl = round((float(entry_price) - exit_price) * size_val, 2)
 
-                    db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=exit_price, pnl=pnl)
+                    if origin == "AUTO":
+                        db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=exit_price, pnl=pnl)
+                    elif origin == "ORB":
+                        db.update_capital_orb_trade_status(str(deal_id), status="CLOSED", scale_tier=3)
+                    elif origin == "SCALP":
+                        db.update_capital_scalp_trade_status(str(deal_id), status="CLOSED", pnl=pnl)
+
                     reconciled += 1
-                    logger.info(f"🔄 [CAPITAL SYNC] Reconciled broker-closed trade {deal_id} ({epic} {direction}): Exit ${exit_price:,.2f}, PnL ${pnl:+,.2f}")
+                    logger.info(f"🔄 [CAPITAL SYNC] Reconciled broker-closed {origin} trade {deal_id} ({epic} {direction}): Exit ${exit_price:,.2f}, PnL ${pnl:+,.2f}")
 
                     if pnl < 0:
                         # Post-StopLoss Quarantine Lock: Blacklist asset for 45 minutes to prevent re-entry knife loops
@@ -3236,14 +3285,22 @@ class CapitalAutonomousEngine:
                 spread = 0.60 if "GOLD" in epic_u else (0.05 if "OIL" in epic_u else 1.0)
 
             # EMERGENCY STOP-LOSS ATTACHMENT PATROL (Invariant 35 Zero No-SL Standard)
-            if (sl <= 0 or sl is None) and entry_level > 0 and current_price > 0:
-                prec = _get_tradfi_precision(epic, current_price)
-                safe_dist = max(spread * 3.5, current_price * 0.012)
+            # Also tightens suicidal / catastrophic manual stops (> 15% price distance) to breathing stops
+            prec = _get_tradfi_precision(epic, current_price)
+            safe_dist = max(spread * 3.5, current_price * 0.015)
+            is_suicidal_sl = (
+                sl > 0 and (
+                    (direction == "BUY" and sl < (entry_level * 0.85)) or
+                    (direction == "SELL" and sl > (entry_level * 1.15))
+                )
+            )
+            if ((sl <= 0 or sl is None) or is_suicidal_sl) and entry_level > 0 and current_price > 0:
                 emergency_sl = round(current_price - safe_dist if direction == "BUY" else current_price + safe_dist, prec)
                 upd_sl = engine.update_position_stops(deal_id=deal_id, stop_loss=emergency_sl)
                 if upd_sl.get("success"):
                     sl = emergency_sl
-                    logger.info(f"🛡️ [EMERGENCY SL PATROL] Successfully attached breathing Stop-Loss for {epic} ({direction}) at {emergency_sl} (Market: {current_price:.2f})")
+                    tag_sl = "Tightened suicidal Stop-Loss" if is_suicidal_sl else "Attached breathing Stop-Loss"
+                    logger.info(f"🛡️ [EMERGENCY SL PATROL] Successfully {tag_sl} for {epic} ({direction}) at {emergency_sl} (Market: {current_price:.2f})")
 
             # Persistent Peak UPL tracking with Database Fallback (Survives bot restarts)
             peak_upl = self._peak_upl_cache.get(deal_id)
@@ -3381,9 +3438,19 @@ class CapitalAutonomousEngine:
                 and (upl >= max(2.50, spread * 2.0))
                 and ((peak_upl >= 15.0 or peak_roi >= 30.0) or not broker_sl_protecting)
             )
-            if retrace_trigger:
-                tag = "💎 [AUTONOMOUS RATCHET HARVEST]"
-                logger.info(f"{tag} Peak was ${peak_upl:.2f}, current UPL ${upl:.2f} reached {int(ratchet_pct*100)}% trailing floor. Executing Market Harvest for {epic}...")
+
+            # Volatility Shock & Sudden Flash Reversal Protective Early Harvest:
+            # If position achieved positive expansion (Peak UPL >= $2.50) but suddenly plunges below 50% of peak,
+            # force-harvest immediately to bank profit before turning into a red loss
+            shock_harvest_trigger = (
+                peak_upl >= 2.50
+                and upl <= (peak_upl * 0.50)
+                and upl >= max(0.80, spread * 1.5)
+            )
+
+            if retrace_trigger or shock_harvest_trigger:
+                tag = "⚡ [FLASH SHOCK EARLY HARVEST]" if shock_harvest_trigger else "💎 [AUTONOMOUS RATCHET HARVEST]"
+                logger.info(f"{tag} Peak was ${peak_upl:.2f}, current UPL ${upl:.2f} reached trailing floor. Executing Market Harvest for {epic}...")
                 close_res = engine.close_position(deal_id=deal_id)
                 if close_res.get("success"):
                     closed_count += 1
@@ -5292,6 +5359,26 @@ class CapitalOpeningRangeBreakoutEngine:
             if len(open_pos) >= max_pos:
                 return False
 
+            # Check if resolved_epic already has an open position (Zero Duplicate Stacking)
+            open_epics = {
+                (p.get("position", {}).get("epic") or p.get("market", {}).get("epic") or "").upper()
+                for p in open_pos
+            }
+            if resolved_epic.upper() in open_epics:
+                logger.info(f"🛡️ [ORB DEDUPLICATION] {resolved_epic} already has an open position for user {chat_id}. Skipping duplicate order.")
+                return False
+
+            # Check post-SL / harvest quarantine cooldown
+            try:
+                auto_eng = get_capital_auto_engine()
+                if resolved_epic.upper() in getattr(auto_eng, "_asset_cooldowns", {}):
+                    if time.time() < auto_eng._asset_cooldowns[resolved_epic.upper()]:
+                        rem_cd = int(auto_eng._asset_cooldowns[resolved_epic.upper()] - time.time())
+                        logger.info(f"⏳ [ORB COOLDOWN] {resolved_epic} is under post-SL quarantine ({rem_cd}s left). Skipping entry.")
+                        return False
+            except Exception:
+                pass
+
             # Small Capital Fortress Shield: bypass Natural Gas on accounts < $100
             if eff_equity < 100 and any(g in resolved_epic.upper() for g in ["NATURALGAS", "GAS"]):
                 return False
@@ -5308,7 +5395,8 @@ class CapitalOpeningRangeBreakoutEngine:
                 sl_price=sl,
                 tp_price=eff_tp,
                 confidence_score=85.0,  # High confidence institutional ORB breakout
-                budget=budget
+                budget=budget,
+                available_equity=user_avail
             )
             # Dynamic clamp to broker min deal size (eliminates -1013 / min_lot broker rejections)
             try:
@@ -6281,6 +6369,17 @@ class CapitalKellyPositionSizer:
                 final_lot = min(15.0, max(10.0, final_lot))
             elif clean_epic in ["OIL", "OIL_CRUDE"]:
                 final_lot = min(0.5, max(0.3, final_lot))
+
+        # High-Beta Index & Stock Capital Shield for Accounts < $500 (Invariant 25, 33)
+        # Clamps US100 strictly <= 0.05 contracts, US500 <= 0.10, and Mega-Cap Stocks <= 0.20 shares
+        # Eliminates 0.5 contract index orders ($15k notional) from wiping out $300 capital
+        if eff_cap < 500:
+            if clean_epic in ["US100", "NASDAQ"]:
+                final_lot = min(0.05, max(rule["min_lot"], final_lot))
+            elif clean_epic in ["US500", "SP500"]:
+                final_lot = min(0.10, max(rule["min_lot"], final_lot))
+            elif is_stock:
+                final_lot = min(0.20, max(rule["min_lot"], final_lot))
 
         # Snap to lot_step
         step = rule["lot_step"]

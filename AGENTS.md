@@ -47,7 +47,7 @@ The system is engineered upon two non-negotiable axioms:
    - Trend Scalp Standard: $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$.
    - Eliminates tight/micro stops ($1.0\times\text{ATR}_{5m}$) that get clipped by broker spread expansion or minor oscillations before directional thrust can unfold. Zero No-SL trading.
    - Broker SL Rejection Recovery Armor: When broker rejects SL/TP distance on order placement, system fills market order and immediately attaches breathing SL via `update_position_stops` (`ref_p ± max(spread * 3.5, ref_p * 0.012)`).
-   - Continuous Emergency SL Patrol: `_ratchet_engine_positions` audits all open positions every cycle; if `sl <= 0` or `sl is None`, it automatically calculates and attaches a breathing stop loss dynamically. Zero naked, unhedged positions permitted.
+   - Continuous Emergency SL Patrol & Suicidal Stop Tightening: `_ratchet_engine_positions` audits all open positions every cycle; if `sl <= 0` or `sl is None`, or if an erroneous manual/legacy stop is set suicidally far (> 15% distance from current price), it automatically calculates and attaches a dynamic breathing stop loss (`safe_dist = max(spread * 3.5, current_price * 0.015)`). Zero naked or unbounded-risk positions permitted.
 2. **Pillar 2: Spread Drag Elimination & Asymmetric 10x Hurdle (Invariant 34 - កម្ចាត់ការស៊ីថ្លៃ Spread):**
    - $\text{Take Profit Distance} \ge 10.0 \times \text{Spread}$ and $R:R \ge 1:2.5$ to $1:6.0$.
    - Guarantees $\ge 90\%$ of captured market movement converts directly into clean Net Profit, rather than paying broker spread friction.
@@ -55,8 +55,11 @@ The system is engineered upon two non-negotiable axioms:
    - Breakeven Armor is delayed until position achieves genuine momentum and strictly enforces an Absolute Dollar Floor: $\text{UPL} \ge \$2.50 \text{ AND } \text{ROI} \ge +8.5\%$ (or $\text{UPL} \ge \$3.50$), locking a guaranteed fee-clearing floor ($\text{Entry} \pm 0.5\times\text{Spread}$ Net Floor). Early oscillations on micro margins ($1.50 - $15.00) are strictly forbidden from triggering Breakeven Armor or choking trades at scratch.
    - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$5.00$ or $\text{UPL} \ge \$3.50 \text{ AND } \text{Peak ROI} \ge +12.0\%$.
    - Any Retracement Harvest exit strictly enforces $\text{Peak UPL} \ge \$4.50$ and $\text{Current UPL} \ge \max(\$2.50, \text{spread} \times 2.0)$ to permanently prevent eating crumbs ($+\$0.14 - +\$0.35$) and death by a thousand papercuts.
+   - Volatility Shock & Flash Reversal Protective Early Harvest: If a trade achieves Peak UPL $\ge +\$2.50$ (or Peak $\text{ROI} \ge +8.0\%$) and subsequently dumps/pulls back $\ge 50\%$ from its peak (`upl <= peak_upl * 0.50`), the engine executes an immediate market exit (`SHOCK_EARLY_HARVEST`), locking in gains before violent whipsaws wipe out profits and push trades into the red.
+   - Universal Cross-Engine Deduplication & Single-Asset Exposure Lock: Universal verification across Autonomous, ORB, and Scalp engines blocks duplicate entries on the same asset (`epic in open_epics`), preventing catastrophic stacking of multiple positions on volatile assets (US100, GOLD).
+   - Unified 3-Table Broker SL Sync & 45-Minute Post-SL Quarantine: Reconciles position exits across `capital_auto_trades`, `capital_orb_trades`, and `capital_scalp_trades`. A stop-out event enforces a mandatory 45-minute quarantine (`time.time() + 2700.0`) on that asset across all engines, prohibiting revenge re-entries.
    - Moonshot Target Harvest strictly enforces $\text{UPL} \ge \$10.00$ (or $\ge \$15.00$ for runners) in addition to $\text{ROI} \ge +50.0\%$.
-   - Sizing Floor: Kelly sizer dynamically allocates minimum target margin $\ge \$10.00 - \$15.00$ per trade so VIP accounts carry enough notional weight to produce clean dollar profits rather than micro-cents.
+   - Sizing Floor & Small Capital Shield: Kelly sizer dynamically allocates minimum target margin $\ge \$10.00 - \$15.00$ per trade, while strictly clamping high-beta contracts on accounts $< \$500$ (US100 $\le 0.05$, US500 $\le 0.10$, Mega-Cap Stocks $\le 0.20$ shares).
 4. **Pillar 4: Super Smart 360° Citadel Sweep Confirmation & Trap Clearance (Invariant 58 - ស្ទាក់ចាប់កម្លាំងពិតប្រាកដ & លុបបំបាត់ Sideways Chop Trap):**
    - Every entry must be vetted by Institutional 360° Citadel Trap Clearance with $ADX \ge 25.0$ and multi-timeframe structural confluence.
    - Strictly enforces Anti-Oversold Short Guard (15m RSI $\le 36.0$ blocks Shorts) and Anti-Overbought Peak Guard (RSI $\ge 70.0$ blocks Longs).
@@ -469,6 +472,20 @@ Any modification that breaks any of the following 55 invariants is considered an
      - Sequential iteration loops over multiple active users are strictly eliminated.
      - Trade evaluations, balance verifications, and order executions across all active traders (Live Mainnet and Demo Evaluation) are dispatched simultaneously in parallel via syncio.gather and dedicated thread-pool workers (xecute_autonomous_cycle, xecute_orb_cycle, _execute_lead_lag_trade_worker, xecute_forex_cycle).
      - Eliminates the 4–5 second sequential broker delay between users, guaranteeing identical market snapshot pricing, zero execution disparity, and synchronized Breakeven Armor execution across tens of thousands of traders.
+   8. **Volatility Shock & Flash Reversal Protective Early Harvest (SHOCK_EARLY_HARVEST):**
+      - When an open position achieves $\text{Peak UPL} \ge \$2.50$ (or $\text{Peak ROI} \ge +8.0\%$) and subsequently experiences a sharp reversal where current UPL erodes to $\le 50\%$ of peak (`upl <= peak_upl * 0.50`), the engine immediately fires an emergency market exit. This prevents sudden market drops or flash pumps from erasing gains and turning winning trades into deep losses.
+   9. **Universal Cross-Engine Deduplication & Single-Asset Exposure Lock:**
+      - All execution paths (`CapitalAutonomousEngine`, `CapitalOpeningRangeBreakoutEngine`, `CapitalTrendScalpEngine`) must audit active open epics across the entire account. If an asset is already active, any secondary entry attempt is immediately aborted (`DEDUP_ALREADY_OPEN`), eliminating duplicate position stacking on US100, GOLD, or tech equities.
+   10. **Unified 3-Table Broker SL Reconciliation & 45-Minute Cross-Engine Quarantine:**
+       - Broker position closures are reconciled across all three engine ledgers: `capital_auto_trades`, `capital_orb_trades`, and `capital_scalp_trades`.
+       - Any position closed via Stop-Loss (`pnl < 0`) triggers an immediate 45-minute cooldown (`self._asset_cooldowns[epic] = now + 2700.0`) across all engines, stopping immediate re-entry churn on the same asset.
+   11. **High-Beta Index & Stock Capital Sizing Shield for Micro Accounts (< $500 Capital):**
+       - `CapitalKellyPositionSizer.calculate_lot_size` enforces strict maximum lot caps when available equity $< \$500$:
+         * `US100` (Nasdaq 100): maximum $0.05$ contracts.
+         * `US500` (S&P 500): maximum $0.10$ contracts.
+         * US Mega-Cap Equities (`NVDA`, `TSLA`, `META`, `GOOGL`, etc.): maximum $0.20$ shares.
+   12. **Emergency Stop-Loss Patrol & Suicidal Stop Tightening:**
+       - Continuous patrol in `_ratchet_engine_positions` dynamically discovers missing SLs (`sl <= 0`) or erroneous stops placed $> 15\%$ away from current market price, immediately updating them to a volatility-adapted breathing stop (`safe_dist = max(spread * 3.5, current_price * 0.015)`).
 - **Enforcement:** Verified by `audit_system.py` [CHECK 28/29].
 
 ### Invariant 36: Capital.com Pro Referral Gatekeeper & Live Account Verification Standard
