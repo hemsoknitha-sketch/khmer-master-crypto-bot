@@ -1328,6 +1328,7 @@ def run_audit():
         has_capital_ring_fence = "wealth_capital_cap" in pw_code and "0.35" in pw_code
         has_skynet_top_fomo = "ANTI_TOP_FOMO_GUARD" in sno_code
         has_skynet_wealth_cap = "WEALTH_CAPITAL_RING_FENCE_REACHED" in sno_code
+        import sky_net_orchestrator as sno
 
         # Dynamic Unit Test 1: Sky Net Anti-Top FOMO Guard (RSI > 65.0 must block BUY)
         block_fomo_ok, block_fomo_reason, _ = sno.validate_cross_engine_entry(
