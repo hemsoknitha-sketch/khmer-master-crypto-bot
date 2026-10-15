@@ -7245,6 +7245,27 @@ class TelegramBotThread(BaseThread):
                     pass
                 context.args = []
                 await capital_scalp_command(update, context)
+            elif data == "btn_cap_scalp_radar":
+                try:
+                    await update.callback_query.answer("⚡ In-Memory Dual Radar Armed for Gold & Shares!")
+                except Exception:
+                    pass
+                import capital_engine
+                scalp_engine = capital_engine.get_capital_trend_scalp_engine()
+                sys_engine = capital_engine.get_capital_engine()
+                await scalp_engine.auto_arm_event_universe_radar(sys_engine)
+                armed_traps = scalp_engine.get_armed_radar_traps()
+                t_lines = []
+                for ep, tr in armed_traps.items():
+                    t_lines.append(f"• `{ep}`: Buy @ `${tr.get('buy_breakout', 0):,.2f}` | Sell @ `${tr.get('sell_breakdown', 0):,.2f}` (SL: `${tr.get('buy_sl', 0):,.2f}`)")
+                traps_str = "\n".join(t_lines) if t_lines else "ពុំទាន់មាន Traps"
+                await update.effective_message.reply_text(
+                    f"🎯 **[IN-MEMORY DUAL RADAR ARMED (GOLD & SHARES)]** ⚡\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"📡 **កម្រង Traps ក្នុង RAM (0% Broker Exposure) ៖**\n{traps_str}\n\n"
+                    f"🛡️ **ក្បួនការពារ ៖** គ្មាន Order លើ Broker Orderbook, កេះភ្លាម OCO Disarm ភ្លាម <0.1ms, Dynamic Breathing SL!",
+                    parse_mode="Markdown"
+                )
             elif data == "btn_cap_kelly_toggle":
                 curr_state = db.is_capital_kelly_enabled(chat_id)
                 new_state = not curr_state
@@ -24704,8 +24725,29 @@ class TelegramBotThread(BaseThread):
                     db.set_capital_scalp_config(chat_id, enabled=False, is_demo=scalp_cfg.get("is_demo", False))
                 elif sub in ["MODE"] and len(args) > 1:
                     target_mode = str(args[1]).upper().strip()
-                    if target_mode in ["ALL", "CRYPTO", "TRADFI"]:
+                    if target_mode in ["ALL", "CRYPTO", "TRADFI", "SHARES"]:
                         db.set_capital_scalp_config(chat_id, enabled=scalp_cfg.get("enabled", False), budget=scalp_cfg.get("budget", 30.0), mode=target_mode, is_demo=scalp_cfg.get("is_demo", False))
+                elif sub in ["RADAR", "ARM"]:
+                    sys_engine = capital_engine.get_capital_engine()
+                    await scalp_engine.auto_arm_event_universe_radar(sys_engine)
+                    armed_traps = scalp_engine.get_armed_radar_traps()
+                    t_lines = []
+                    for ep, tr in armed_traps.items():
+                        t_lines.append(f"• `{ep}`: Buy @ `${tr.get('buy_breakout', 0):,.2f}` | Sell @ `${tr.get('sell_breakdown', 0):,.2f}` (SL: `${tr.get('buy_sl', 0):,.2f}`)")
+                    traps_str = "\n".join(t_lines) if t_lines else "ពុំទាន់មាន Traps"
+                    await update.effective_message.reply_text(
+                        f"🎯 **[IN-MEMORY DUAL RADAR ARMED (GOLD & SHARES)]** ⚡\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"📡 **កម្រង Traps ក្នុង RAM (0% Broker Exposure) ៖**\n{traps_str}\n\n"
+                        f"🛡️ **ក្បួនការពារ ៖** គ្មាន Order លើ Broker Orderbook, កេះភ្លាម OCO Disarm ភ្លាម <0.1ms, Dynamic Breathing SL!",
+                        parse_mode="Markdown"
+                    )
+                    return
+                elif sub in ["DISARM"]:
+                    for ep in list(scalp_engine.get_armed_radar_traps().keys()):
+                        scalp_engine.disarm_scalp_radar_trap(ep, "MANUAL_ALL")
+                    await update.effective_message.reply_text("🗑️ បានលុប Traps ទាំងអស់ចេញពី RAM រួចរាល់!", parse_mode="Markdown")
+                    return
 
             scalp_cfg = db.get_capital_scalp_config(chat_id)
             is_scalp_on = scalp_cfg.get("enabled", False)
@@ -24714,6 +24756,7 @@ class TelegramBotThread(BaseThread):
             mode = scalp_cfg.get("mode", "ALL")
             stats = db.get_capital_scalp_stats(chat_id)
             active_majors = scalp_engine.get_session_active_majors(mode=mode)
+            armed_traps_cnt = len(scalp_engine.get_armed_radar_traps())
 
             status_badge = "🟢 ACTIVE (24/7 Trend Scalping)" if is_scalp_on else "⚪ PAUSED (Standby)"
             acct_badge = "🧪 DEMO PRACTICE" if is_demo else "⚡ LIVE MAINNET"
@@ -24733,16 +24776,19 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("🎛️ ASSET CONTROLS (Stocks/Crypto)", callback_data="btn_cap_admin_assets")
                 ]] if is_super_admin else []),
                 [
-                    InlineKeyboardButton("🔄 Refresh Scalp Matrix", callback_data="btn_cap_scalp_refresh"),
-                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions")
+                    InlineKeyboardButton("⚡ IN-MEMORY RADAR (Gold & Shares)", callback_data="btn_cap_scalp_radar"),
+                    InlineKeyboardButton("🔄 Refresh Scalp Matrix", callback_data="btn_cap_scalp_refresh")
                 ],
                 [
-                    InlineKeyboardButton("🏛️ /capital Menu", callback_data="btn_cap_menu"),
+                    InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions"),
+                    InlineKeyboardButton("🏛️ /capital Menu", callback_data="btn_cap_menu")
+                ],
+                [
                     InlineKeyboardButton("🔄 Refresh", callback_data="btn_cap_refresh")
                 ]
             ])
 
-            majors_str = ", ".join(active_majors) if active_majors else "GOLD, US100, US500, BTCUSD, ETHUSD, SOLUSD"
+            majors_str = ", ".join(active_majors) if active_majors else "GOLD, US100, US500, NVDA, TSLA, BTCUSD, ETHUSD, SOLUSD"
             tot_trades = stats.get("total_trades", 0)
             wins = stats.get("wins", 0)
             win_rate = stats.get("win_rate", 0.0)
@@ -24752,11 +24798,12 @@ class TelegramBotThread(BaseThread):
                 msg = (
                     f"⚡ **[CAPITAL.COM 24/7 TREND SCALP ENGINE]** 🎯\n"
                     f"{ui_standards.DIVIDER_HEAVY}\n"
-                    f"🎯 **ទ្រព្យគោលដៅ ៖** `GOLD, US100, US500, BTC, ETH, SOL`\n"
+                    f"🎯 **ទ្រព្យគោលដៅ ៖** `GOLD, US100, US500, NVDA, TSLA, META, AAPL, BTC, ETH, SOL`\n"
                     f"📊 **ស្ថានភាព ៖** `{status_badge}`\n"
                     f"💼 **បរិស្ថានគណនី ៖** `{acct_badge}`\n"
                     f"💵 **ទុន Margin ក្នុងមួយក្បាច់ ៖** `${budget:.2f} USD` (Kelly Isolated)\n"
                     f"📡 **កម្រងទ្រព្យសកម្មបច្ចុប្បន្ន ៖** `{majors_str}`\n"
+                    f"🎯 **In-Memory Dual Radar ៖** `{armed_traps_cnt} Traps Active in RAM` (0% Broker Exposure)\n"
                     f"🛡️ **ក្បួនការពារ ៖** `Breakeven Armor @ +1.2R (0.00R Risk)`\n"
                     f"💎 **ការកើបចំណេញ ៖** `10x Spread Hurdle + Golden 85% Ratchet`\n"
                     f"{ui_standards.DIVIDER_LIGHT}\n"

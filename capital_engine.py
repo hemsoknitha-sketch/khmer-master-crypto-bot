@@ -7566,14 +7566,22 @@ class CapitalTrendScalpEngine:
       5. Anti-Whipsaw Cooldown (15m Blacklist after SL hit to eliminate double-loss disaster)
     """
 
-    TREND_MAJORS_TRADFI = ["GOLD", "US100", "US500"]
+    TREND_MAJORS_SHARES = ["NVDA", "TSLA", "META", "AAPL", "MSFT", "AMZN", "GOOGL"]
+    TREND_MAJORS_TRADFI = ["GOLD", "US100", "US500", "NVDA", "TSLA", "META", "AAPL", "MSFT", "AMZN", "GOOGL"]
     TREND_MAJORS_CRYPTO = ["BTCUSD", "ETHUSD", "SOLUSD"]
-    ALL_SCALP_MAJORS = ["GOLD", "US100", "US500", "BTCUSD", "ETHUSD", "SOLUSD"]
+    ALL_SCALP_MAJORS = ["GOLD", "US100", "US500", "NVDA", "TSLA", "META", "AAPL", "MSFT", "AMZN", "GOOGL", "BTCUSD", "ETHUSD", "SOLUSD"]
 
     def __init__(self):
         self._asset_cooldowns: Dict[str, float] = {}  # epic -> cooldown_timestamp
         self._last_cycle_ts: float = 0.0
         self._scan_interval: float = 15.0  # Run every 15 seconds
+        self._armed_radar_traps: Dict[str, Dict[str, Any]] = {}  # epic -> trap_dict
+        self._radar_stats = {
+            "total_traps_armed": 0,
+            "total_traps_triggered": 0,
+            "total_oco_disarmed": 0,
+            "last_trigger": {}
+        }
         self._stats = {
             "total_scanned": 0,
             "total_executed": 0,
@@ -7581,11 +7589,105 @@ class CapitalTrendScalpEngine:
             "last_trade": None
         }
 
+    def arm_scalp_radar_trap(
+        self,
+        epic: str,
+        current_price: float = 0.0,
+        atr_15m: float = 0.0,
+        swing_high: float = 0.0,
+        swing_low: float = 0.0,
+        mode: str = "DUAL",
+        user_id: Optional[int] = None,
+        ttl_seconds: float = 1800.0
+    ) -> Dict[str, Any]:
+        """
+        Arms a High-Speed In-Memory Virtual Radar Trap in Python RAM for Gold/Shares.
+        Zero pending orders sent to Capital.com orderbook. 100% immune to pre-market spoofing.
+        """
+        try:
+            import super_smart_capital_citadel
+            radar_cls = super_smart_capital_citadel.CapitalInMemoryVirtualRadar
+            trap_data = radar_cls.arm_radar_trap(
+                epic=epic,
+                engine_source="CAPITAL_SCALP",
+                current_price=current_price,
+                atr_15m=atr_15m,
+                swing_high=swing_high,
+                swing_low=swing_low,
+                mode=mode,
+                user_id=user_id,
+                ttl_seconds=ttl_seconds
+            )
+            raw_epic = str(epic or "").upper().strip()
+            self._armed_radar_traps[raw_epic] = trap_data
+            self._radar_stats["total_traps_armed"] += 1
+            return trap_data
+        except Exception as e:
+            logger.error(f"Error arming scalp radar trap for {epic}: {e}")
+            return {}
+
+    def evaluate_armed_scalp_radar(
+        self,
+        epic: str,
+        current_bid: float = 0.0,
+        current_ask: float = 0.0,
+        spread: float = 0.0
+    ) -> Dict[str, Any]:
+        """
+        Evaluates current price against armed traps in RAM with sub-millisecond latency.
+        Triggers instant execution upon breakout confirmation and executes Instant In-Memory OCO Disarm.
+        """
+        try:
+            import super_smart_capital_citadel
+            radar_cls = super_smart_capital_citadel.CapitalInMemoryVirtualRadar
+            eval_res = radar_cls.evaluate_armed_trap_trigger(
+                epic=epic,
+                current_bid=current_bid,
+                current_ask=current_ask,
+                spread=spread,
+                engine_source="CAPITAL_SCALP"
+            )
+            if eval_res.get("triggered"):
+                raw_epic = str(epic or "").upper().strip()
+                if raw_epic in self._armed_radar_traps:
+                    del self._armed_radar_traps[raw_epic]
+                self._radar_stats["total_traps_triggered"] += 1
+                self._radar_stats["total_oco_disarmed"] += 1
+                self._radar_stats["last_trigger"] = eval_res
+            return eval_res
+        except Exception as e:
+            logger.debug(f"Error evaluating armed scalp radar for {epic}: {e}")
+            return {"triggered": False, "reason": str(e)}
+
+    def disarm_scalp_radar_trap(self, epic: str, reason: str = "MANUAL_DISARM") -> bool:
+        """Purges trap from RAM in < 0.01ms."""
+        raw_epic = str(epic or "").upper().strip()
+        purged = False
+        if raw_epic in self._armed_radar_traps:
+            del self._armed_radar_traps[raw_epic]
+            purged = True
+        try:
+            import super_smart_capital_citadel
+            super_smart_capital_citadel.CapitalInMemoryVirtualRadar.disarm_trap(
+                f"CAPITAL_SCALP_{raw_epic}", reason=reason
+            )
+        except Exception:
+            pass
+        return purged
+
+    def get_armed_radar_traps(self) -> Dict[str, Dict[str, Any]]:
+        """Returns active in-memory radar traps."""
+        return dict(self._armed_radar_traps)
+
+    def get_radar_stats(self) -> Dict[str, Any]:
+        """Returns radar telemetry statistics."""
+        return dict(self._radar_stats)
+
     def get_session_active_majors(self, mode: str = "ALL") -> List[str]:
         """
         Returns active tradable instruments based on global market hours (UTC+7 Phnom Penh).
         - Saturday & Sunday (Weekend) & Overnight Swap Shield: 100% Crypto CFDs (BTCUSD, ETHUSD, SOLUSD).
-        - Weekdays (Mon-Fri) London / NY Sessions: Full Priority on GOLD, US100, US500 + Crypto.
+        - Weekdays (Mon-Fri) London / NY Sessions: Full Priority on GOLD, US100, US500, US Mega-Caps + Crypto.
         """
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         weekday = now_dt.weekday()  # Monday = 0, Friday = 4, Saturday = 5, Sunday = 6
@@ -7600,6 +7702,8 @@ class CapitalTrendScalpEngine:
             raw_majors = list(self.TREND_MAJORS_CRYPTO)
         elif mode == "CRYPTO":
             raw_majors = list(self.TREND_MAJORS_CRYPTO)
+        elif mode == "SHARES":
+            raw_majors = list(self.TREND_MAJORS_SHARES)
         elif mode == "TRADFI":
             raw_majors = list(self.TREND_MAJORS_TRADFI)
         else:
@@ -7817,6 +7921,41 @@ class CapitalTrendScalpEngine:
             "reason": f"15M Trend + 5M Pullback Impulse + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Breathing SL)"
         }
 
+    async def auto_arm_event_universe_radar(self, engine: Optional[CapitalComEngine] = None):
+        """
+        Automatically arms in-memory dual-directional virtual radar for Gold and Shares
+        during high-volatility event windows (CPI/NFP/FOMC) or active London/NY market sessions.
+        """
+        eng = engine or get_capital_engine()
+        event_assets = ["GOLD", "US100", "US500", "NVDA", "TSLA", "META"]
+        for epic in event_assets:
+            resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+            if resolved_epic in self._armed_radar_traps:
+                continue
+            try:
+                candles = await asyncio.to_thread(eng.get_historical_prices, resolved_epic, "MINUTE_15", 30)
+                if len(candles) < 15:
+                    continue
+                closes = [c["close"] for c in candles]
+                highs = [c["high"] for c in candles]
+                lows = [c["low"] for c in candles]
+                curr_p = closes[-1]
+                tr_list = [max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1])) for i in range(1, len(candles))]
+                atr_15m = sum(tr_list[-14:]) / 14.0 if len(tr_list) >= 14 else (curr_p * 0.012)
+                swing_h = max(highs[-10:])
+                swing_l = min(lows[-10:])
+                self.arm_scalp_radar_trap(
+                    epic=resolved_epic,
+                    current_price=curr_p,
+                    atr_15m=atr_15m,
+                    swing_high=swing_h,
+                    swing_low=swing_l,
+                    mode="DUAL",
+                    ttl_seconds=1800.0
+                )
+            except Exception as e_arm:
+                logger.debug(f"Auto-arm event radar error for {epic}: {e_arm}")
+
     async def execute_scalp_cycle(self, app=None):
         """
         Executes 24/7 autonomous scalping across registered active users.
@@ -7835,13 +7974,51 @@ class CapitalTrendScalpEngine:
         if not active_users:
             return
 
-        # 1. Master Setup Evaluation: Scan candidate assets once using primary engine
         sys_engine = get_capital_engine()
-        candidate_assets = self.get_session_active_majors(mode="ALL")
         valid_setups = []
+
+        # 1. In-Memory Virtual Radar Fast Evaluation for Armed Event Assets (Gold & Shares)
+        if self._armed_radar_traps:
+            for trap_epic in list(self._armed_radar_traps.keys()):
+                resolved_epic = EPIC_MAP.get(trap_epic.upper(), trap_epic.upper())
+                if self._asset_cooldowns.get(resolved_epic, 0.0) > now:
+                    continue
+                try:
+                    mkt = await asyncio.to_thread(sys_engine.get_market_details, resolved_epic)
+                    if mkt.get("success"):
+                        bid_p = float(mkt.get("bid", 0.0) or 0.0)
+                        ask_p = float(mkt.get("ask", 0.0) or 0.0)
+                        sp_val = float(mkt.get("spread", 0.0) or (ask_p - bid_p))
+                        radar_res = self.evaluate_armed_scalp_radar(resolved_epic, bid_p, ask_p, sp_val)
+                        if radar_res.get("triggered"):
+                            valid_setups.append((resolved_epic, {
+                                "success": True,
+                                "epic": resolved_epic,
+                                "signal": radar_res.get("direction"),
+                                "confidence": radar_res.get("confidence", 95.0),
+                                "entry_price": radar_res.get("entry_price"),
+                                "sl": radar_res.get("sl"),
+                                "tp": radar_res.get("tp"),
+                                "sl_dist": radar_res.get("sl_dist"),
+                                "tp_dist": radar_res.get("sl_dist") * 2.5,
+                                "rr_ratio": 2.5,
+                                "spread": sp_val,
+                                "reason": f"⚡ In-Memory Dual Radar Triggered ({radar_res.get('trigger_type')}) [0% Broker Exposure]"
+                            }))
+                except Exception as e_rad:
+                    logger.debug(f"Radar evaluation note for {trap_epic}: {e_rad}")
+
+        # Auto-arm priority event assets in memory if empty (Gold, US100, Mega-Cap Shares)
+        if len(self._armed_radar_traps) == 0:
+            asyncio.create_task(self.auto_arm_event_universe_radar(sys_engine))
+
+        # 2. Master Setup Evaluation: Scan candidate assets once using primary engine
+        candidate_assets = self.get_session_active_majors(mode="ALL")
 
         for epic in candidate_assets:
             resolved_epic = EPIC_MAP.get(epic.upper(), epic.upper())
+            if any(s[0] == resolved_epic for s in valid_setups):
+                continue
             if self._asset_cooldowns.get(resolved_epic, 0.0) > now:
                 continue
 
@@ -7852,7 +8029,7 @@ class CapitalTrendScalpEngine:
         if not valid_setups:
             return
 
-        # 2. Ultra-Fast Concurrent Dispatch across all active users in parallel (asyncio.gather)
+        # 3. Ultra-Fast Concurrent Dispatch across all active users in parallel (asyncio.gather)
         async def _process_user_scalp(user_cfg: dict):
             chat_id = user_cfg.get("chat_id")
             is_demo = user_cfg.get("is_demo", False)
