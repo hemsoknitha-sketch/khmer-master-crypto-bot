@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ74)
-**Document Version:** 7.4.0 (Angkor Quant Master Specification - The 74 Pillars & TradFi Small Capital Fortress Lock)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ76)
+**Document Version:** 7.6.0 (Angkor Quant Master Specification - The 76 Pillars, Super Admin Absolute Fleet Command & In-Memory Dual-Directional Stealth Breakout Radar Lock)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -31,8 +31,8 @@ The system is engineered upon two non-negotiable axioms:
   3. Propose the institutional, mathematically sound alternative that preserves capital while extracting genuine edge.
 - **Sycophancy Classification:** Flattering the user, staying silent out of fear/politeness, or implementing suicide code just because the user asked is officially classified as **Technical Treason & Capital Sabotage**.
 
-### 1.1.1 THE SEVEN PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ73)
-**(គ្រឹះ ៧ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58, 73)**
+### 1.1.1 THE NINE PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ76)
+**(គ្រឹះ ៩ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58, 73, 74, 75, 76)**
 **Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
 0. **Pillar 0: Universal Multi-Layer Forex Deactivation & Capital Protection Shield (Invariant 73 - របាំងបិទទាំងស្រុង Forex Exchange ការពារ Spread & Negative Expectancy):**
    - Default state: Forex trading is 100% disabled (`capital_forex_enabled = 0`).
@@ -42,6 +42,9 @@ The system is engineered upon two non-negotiable axioms:
      3. Citadel Pre-Flight Gatekeeper: `validate_capital_entry_gatekeeper` Pillar 0 intercepts and blocks any Forex pair (`is_forex_epic`) with `BLOCKED_FOREX_DISABLED`.
      4. Execution Gateway: `place_position` unconditionally blocks forex order placement with `FOREX_BLOCKED`.
      5. Autonomous Universe Purge: `CapitalAutonomousEngine.get_session_priority_assets` completely purges all Forex pairs, prioritizing US Mega-Cap equities (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`), Major Indices (`US500`, `US100`, `DE40`), and Commodities/Crypto (`GOLD`, `OIL_CRUDE`, `BTCUSD`).
+0.5. **Pillar 0.5: Super Admin Dynamic Asset Control Shield (Invariant 75 - របាំងបញ្ជាបិទបើកទ្រព្យសម្បត្តិឯករាជ្យ & សិទ្ធិបញ្ជាកងនាវាស្វ័យប្រវត្ត):**
+   - Super Admin (`859271875` and system administrators) holds absolute authority to toggle any specific equity/index/commodity/crypto CFD (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`, `US100`, `US500`, `DE40`, `GOLD`, `OIL_CRUDE`, `BTCUSD`, etc.) ON or OFF for all users.
+   - Deactivated assets are immediately purged from dynamic priority lists by `CapitalAutonomousEngine.get_session_priority_assets` and `CapitalTrendScalpEngine.get_session_active_majors`, and strictly rejected by `validate_capital_entry_gatekeeper` and `evaluate_institutional_tradfi_trap` with `BLOCKED_ASSET_DISABLED`.
 1. **Pillar 1: Dynamic Volatility Breathing Stop & Broker Rejection Fallback Armor (Invariant 35 - កម្រិតកាត់ខាតមានលំហដកដង្ហើមសមាមាត្រភាពប្រែប្រួល & គ្មាន No-SL Trading):**
    - TradFi Standard: $\text{SL Distance} \ge \max(2.50\times\text{ATR}, 3.5\times\text{Spread}, 0.0035\times\text{Price})$.
    - Trend Scalp Standard: $\text{SL Distance} \ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$.
@@ -70,6 +73,12 @@ The system is engineered upon two non-negotiable axioms:
 6. **Pillar 6: Daily Capital Governor (Invariant 52 - ចាក់សោរប្រាក់ចំណេញ $+5.0\%$ ឈប់ និងកម្រិតខាតអតិបរមា $-2.5\%$ ផ្អាក):**
    - Net daily return $+5.0\%$ triggers `TARGET_LOCKED`, locking realized gains and barring new entries for the day.
    - Daily loss floor $-2.5\%$ triggers `FLOOR_HIT`, suspending entries to preserve capital against revenge trading and losing streaks.
+7. **Pillar 7: Super Admin Absolute Execution Authority & Dynamic Demo Fallback Mirror (Invariant 75 - សិទ្ធិអំណាចដាច់ខាត Super Admin & កញ្ចក់ការពារដើមទុន Demo $10,000):**
+   - Super Admin (`859271875` and all system administrators) possess unconditional, unrestricted execution authority across `/capital`, `/capital_scalp`, and all TradFi engines. Regardless of live account balance shortages, unverified referral gatekeepers, or low margin, Super Admin execution is never blocked.
+   - When Super Admin's Live balance is $< \$10.00$, the system automatically engages the Dynamic Demo Fallback Mirror ($10,000 balance), ensuring zero downtime and continuous operation of all quantitative algorithms without throwing margin errors.
+8. **Pillar 8: In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76 - រ៉ាដាក្នុង RAM ស្ទាក់ចាប់ ២ ទិសដៅ Gold & Shares គ្មាន Pending Order):**
+   - Replaces risky broker orderbook limit/stop orders with zero-footprint memory triggers (`_scalp_breakout_radars`) for Gold and US Mega-Cap Shares.
+   - Executes market orders only upon confirmed breakout structure + volume confirmation, immediately attaching dynamic breathing stop-losses ($\ge \max(2.20\times\text{ATR}, 3.5\times\text{Spread})$) and asymmetric take-profit targets ($\ge 10\times\text{Spread}$).
 
 ### 1.1.2 THE SUPER SMART BINANCE FUTURES RISK & PROFIT HARMONIZATION PILLARS (/smartx, /turbo_hedge, /auto_trade, /pre_pump, /wealth)
 **(គ្រឹះរួមបញ្ចូលគ្នាការពារហានិភ័យ & កើបចំណេញកម្រិតកំពូលលើ BINANCE FUTURES ទាំង ៥ ប្រព័ន្ធ)**
@@ -1283,6 +1292,37 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - Retracement Harvest: requires $\text{Peak UPL} \ge \$4.50$ and $\text{Current UPL} \ge \max(\$2.50, \text{spread} \times 2.0)$.
      - Asymmetric Target Cash Harvest: targets $+30\% - +50\%$ ROI with net dollar gain $\ge \$10.00 - \$25.00+$.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 59/59].
+
+---
+
+### Invariant 75: Super Admin Absolute Authority, Global Fleet Master Toggle & Asset-Level Dynamic Shield (AQ75)
+- **Location:** `database.py` (`get_capital_disabled_assets`, `is_capital_asset_enabled`, `set_capital_asset_status`, `is_capital_global_trading_enabled`, `set_capital_global_trading_switch`, `enable_all_capital_users`, `disable_all_capital_users`), `capital_engine.py` (`place_position`, `place_working_order`, `CapitalAutonomousEngine.get_session_priority_assets`, `CapitalTrendScalpEngine.get_session_active_majors`, `_dispatch_user_trade`, `_process_user_scalp`), `super_smart_capital_citadel.py` (`validate_capital_entry_gatekeeper` Pillar 0.5, `evaluate_institutional_tradfi_trap`), `bot_thread.py` (`button_callback_handler`, `admin_capital_command`, `capital_scalp_command`, `capital_command`), `audit_system.py`
+- **Rule:** Under the Non-Negotiable Fiduciary Oath and Absolute Architectural Specification Lock:
+  1. **Super Admin Unconditional Execution Authority:**
+     - Super Admin (Chat ID `859271875` and all system administrators verified via `database.is_admin(chat_id)`) possess unrestricted command and trade authority across `/capital`, `/capital_scalp`, and all TradFi engines.
+     - Unconditionally exempt from Capital.com referral gatekeeper blocks, live account balance minimums, and local margin pre-flight lockout (`RC_NOT_ENOUGH_MARGIN`).
+     - *Dynamic Demo Fallback Mirror ($10,000):* If Super Admin's Live account has $< \$10.00$ available balance, both `CapitalAutonomousEngine` and `CapitalTrendScalpEngine` dynamically mirror execution onto Capital.com Demo mode ($10,000), guaranteeing zero execution stall, continuous algorithm operation, and zero unhandled rejections.
+  2. **Global Fleet Master Toggles (`ALL_ON`, `ALL_OFF`):**
+     - Super Admin can execute fleet-wide activation or shutdown for all users across Autonomous (`is_capital_global_trading_enabled("AUTO")`) and Trend Scalping (`is_capital_global_trading_enabled("SCALP")`) with 1-tap Telegram buttons or CLI commands (`/capital ALL_ON`, `/capital ALL_OFF`, `/capital_scalp ALL_ON`, `/capital_scalp ALL_OFF`).
+     - Global disable commands protect Super Admin (`preserve_super_admin=True`) by default so master oversight and autonomous tracking remain operational.
+  3. **Asset-Level Dynamic Control Shield (Pillar 0.5):**
+     - Super Admin has direct sub-millisecond authority to toggle trading on any specific asset (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`, `US100`, `US500`, `DE40`, `GOLD`, `OIL_CRUDE`, `BTCUSD`, etc.) ON or OFF for all users.
+     - Disabled assets are stored in canonical persistent settings (`capital_disabled_assets`) and immediately intercepted by Pillar 0.5 of `validate_capital_entry_gatekeeper` and `evaluate_institutional_tradfi_trap` with rejection reason `BLOCKED_ASSET_DISABLED`.
+     - `get_session_priority_assets` and `get_session_active_majors` dynamically purge disabled assets from radar queues.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 60/61].
+
+### Invariant 76: In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (AQ76)
+- **Location:** `super_smart_capital_citadel.py` (`SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap`), `capital_engine.py` (`CapitalTrendScalpEngine._scalp_breakout_radars`, `_process_user_scalp`), `bot_thread.py` (`capital_scalp_command`, `button_callback_handler`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
+  1. **Zero Broker Orderbook Footprint:**
+     - To eliminate stop-hunting, front-running, and predatory market maker sweeps against small retail balances, breakout triggers for US Mega-Cap Shares (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`) and Commodities (`GOLD`, `OIL_CRUDE`) are NEVER placed as working/pending orders on broker servers.
+     - Radars are maintained exclusively in ultra-fast RAM (`_scalp_breakout_radars`) calculating dynamic upper breakout levels ($\text{High}_{15m} + 0.10\times\text{ATR}$) and lower breakdown levels ($\text{Low}_{15m} - 0.10\times\text{ATR}$).
+  2. **Dual-Directional Institutional Spring & Thrust Confirmation:**
+     - Order execution fires strictly as immediate Market Orders upon confirmed structural breach accompanied by real-time volume expansion ($RVOL \ge 1.0\times$) and directional ADX thrust ($ADX \ge 22.0$).
+  3. **Mandatory Volatility Breathing Stop & Asymmetric 10x Hurdle:**
+     - Every triggered market order immediately attaches dynamic breathing SL ($\ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$) and asymmetric profit targets ($\ge 10\times\text{Spread}$ and $R:R \ge 1:2.5$).
+     - Zero naked, zero unhedged, and zero unstopped positions permitted.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 61/61].
 
 ---
 

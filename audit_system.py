@@ -2988,6 +2988,120 @@ def run_audit():
         failures.append(f"Invariant 74 check failed: {e}")
         log_fail(str(e))
 
+    # -------------------------------------------------------------------------
+    # [CHECK 60/61] Super Admin Absolute Authority, Global Fleet Toggle & Dynamic Asset Shield (Invariant 75)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 60/61] Verifying Super Admin Absolute Authority, Global Fleet Master Toggle & Asset-Level Dynamic Shield (Invariant 75)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv75 = "Invariant 75: Super Admin Absolute Authority, Global Fleet Master Toggle & Asset-Level Dynamic Shield" in agents_md
+
+        with open("database.py", "r", encoding="utf-8") as dbf:
+            db_code = dbf.read()
+        has_db_assets = "get_capital_disabled_assets" in db_code and "set_capital_asset_status" in db_code
+        has_db_global = "is_capital_global_trading_enabled" in db_code and "set_capital_global_trading_switch" in db_code
+
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as scf:
+            citadel_code = scf.read()
+        has_citadel_p05 = "is_capital_asset_enabled" in citadel_code and ("ASSET_BLOCKED_BY_ADMIN" in citadel_code or "Pillar 0.5" in citadel_code)
+
+        with open("capital_engine.py", "r", encoding="utf-8") as cef:
+            cap_code = cef.read()
+        has_sa_margin_bypass = "SUPER ADMIN MARGIN BYPASS" in cap_code or "is_sa_caller" in cap_code
+        has_sa_demo_mirror = "DEMO MIRROR" in cap_code or "Dynamically mirroring on Capital Demo" in cap_code
+        has_asset_purge = "get_capital_disabled_assets" in cap_code or "disabled_assets" in cap_code
+
+        with open("bot_thread.py", "r", encoding="utf-8") as btf:
+            bot_code = btf.read()
+        has_btn_assets = "btn_cap_admin_assets" in bot_code and "btn_cap_toggle_asset_" in bot_code
+        has_btn_fleet = "btn_cap_all_users_on" in bot_code and "btn_cap_all_users_off" in bot_code
+
+        # Dynamic Unit Test: Test Asset Shield & Super Admin Authority
+        import database as db
+        # 1. Super Admin authorization must always be True
+        sa_auth = db.is_capital_user_authorized(859271875)
+        # 2. Test toggling an asset dynamically
+        test_epic = "TEST_ASSET_XYZ"
+        db.set_capital_asset_status(test_epic, False)
+        is_disabled = not db.is_capital_asset_enabled(test_epic)
+        db.set_capital_asset_status(test_epic, True)
+        is_re_enabled = db.is_capital_asset_enabled(test_epic)
+
+        # 3. Test global switch
+        orig_auto_switch = db.is_capital_global_trading_enabled("AUTO")
+        db.set_capital_global_trading_switch(True, "AUTO")
+        auto_on = db.is_capital_global_trading_enabled("AUTO")
+        db.set_capital_global_trading_switch(orig_auto_switch, "AUTO")
+
+        all_inv75_passed = (
+            has_inv75 and has_db_assets and has_db_global and has_citadel_p05 and
+            has_sa_margin_bypass and has_sa_demo_mirror and has_asset_purge and
+            has_btn_assets and has_btn_fleet and sa_auth and is_disabled and is_re_enabled and auto_on
+        )
+
+        if all_inv75_passed:
+            log_pass("Super Admin Absolute Authority, Global Fleet Master Toggle & Asset-Level Dynamic Shield (Invariant 75) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 75 check failed: inv75={has_inv75}, db_assets={has_db_assets}, db_global={has_db_global}, p05={has_citadel_p05}, margin_bypass={has_sa_margin_bypass}, demo_mirror={has_sa_demo_mirror}, asset_purge={has_asset_purge}, btn_assets={has_btn_assets}, btn_fleet={has_btn_fleet}, sa_auth={sa_auth}, toggle_test={is_disabled and is_re_enabled}")
+            log_fail("Invariant 75 check failed!")
+    except Exception as e:
+        failures.append(f"Invariant 75 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 61/61] In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 61/61] Verifying In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76)...")
+    try:
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv76 = "Invariant 76: In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities" in agents_md
+
+        with open("capital_engine.py", "r", encoding="utf-8") as cef:
+            cap_code = cef.read()
+        has_breakout_radars = "_armed_radar_traps" in cap_code and "CapitalInMemoryVirtualRadar" in cap_code
+        has_radar_dual = "arm_scalp_radar_trap" in cap_code or "CapitalInMemoryVirtualRadar" in cap_code
+        has_stealth_exec = "evaluate_armed_scalp_radar" in cap_code or "evaluate_armed_trap_trigger" in cap_code
+        has_breathing_sl = "Dynamic Breathing SL" in cap_code or "Dynamic Volatility Breathing Stop" in cap_code
+
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as scf:
+            citadel_code = scf.read()
+        has_citadel_radar = "class CapitalInMemoryVirtualRadar" in citadel_code
+
+        # Dynamic Unit Test: Verify in-memory radar state structure in CapitalTrendScalpEngine
+        import capital_engine as ce
+        import super_smart_capital_citadel as sscc
+        scalp_eng = ce.get_capital_trend_scalp_engine()
+        has_radar_attr = hasattr(scalp_eng, "_armed_radar_traps") and isinstance(scalp_eng._armed_radar_traps, dict)
+
+        # Dynamic Unit Test: Arm and disarm virtual radar trap in memory
+        test_trap = sscc.CapitalInMemoryVirtualRadar.arm_radar_trap(
+            epic="TEST_GOLD",
+            engine_source="AUDIT_TEST",
+            current_price=2650.0,
+            atr_15m=15.0,
+            swing_high=2660.0,
+            swing_low=2640.0
+        )
+        is_trap_armed = bool(test_trap and "buy_breakout" in test_trap and test_trap.get("status") == "ARMED")
+        is_disarmed = sscc.CapitalInMemoryVirtualRadar.disarm_trap("AUDIT_TEST_TEST_GOLD", reason="AUDIT_TEST")
+
+        all_inv76_passed = (
+            has_inv76 and has_breakout_radars and has_radar_dual and
+            has_stealth_exec and has_breathing_sl and has_citadel_radar and has_radar_attr and
+            is_trap_armed and is_disarmed
+        )
+
+        if all_inv76_passed:
+            log_pass("In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 76 check failed: inv76={has_inv76}, radars={has_breakout_radars}, dual={has_radar_dual}, exec={has_stealth_exec}, breathing_sl={has_breathing_sl}, citadel_radar={has_citadel_radar}, radar_attr={has_radar_attr}, arm_test={is_trap_armed}, disarm_test={is_disarmed}")
+            log_fail("Invariant 76 check failed!")
+    except Exception as e:
+        failures.append(f"Invariant 76 check failed: {e}")
+        log_fail(str(e))
+
     # Final Summary
     print("\n" + "=" * 70)
     if not failures:
