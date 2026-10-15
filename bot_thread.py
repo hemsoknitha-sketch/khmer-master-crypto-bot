@@ -5821,6 +5821,10 @@ class TelegramBotThread(BaseThread):
                         InlineKeyboardButton("⚡ Volume Spikes", callback_data="csx_view_spikes")
                     ],
                     [
+                        InlineKeyboardButton("📑 របាយការណ៍បិទផ្សារ | Daily Report", callback_data="csx_view_daily_report"),
+                        InlineKeyboardButton("🌅 ត្រៀមបើកផ្សារ | Morning Brief", callback_data="csx_view_morning_brief")
+                    ],
+                    [
                         InlineKeyboardButton("ABC", callback_data="csx_stock_ABC"),
                         InlineKeyboardButton("PWSA", callback_data="csx_stock_PWSA"),
                         InlineKeyboardButton("PAS", callback_data="csx_stock_PAS"),
@@ -5850,6 +5854,10 @@ class TelegramBotThread(BaseThread):
                     text = await engine.format_top_dividends_telegram(lang=lang_code)
                 elif action == "view_spikes":
                     text = await engine.format_volume_spikes_telegram(lang=lang_code)
+                elif action == "view_daily_report":
+                    text = await engine.format_daily_closing_report_telegram(lang=lang_code)
+                elif action == "view_morning_brief":
+                    text = await engine.format_daily_morning_brief_telegram(lang=lang_code)
                 elif action.startswith("stock_"):
                     sym = action[6:].upper()
                     text = await engine.format_stock_detail_telegram(sym, lang=lang_code)
@@ -27742,6 +27750,10 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton("⚡ Volume Spikes", callback_data="csx_view_spikes")
                 ],
                 [
+                    InlineKeyboardButton("📑 របាយការណ៍បិទផ្សារ | Daily Report", callback_data="csx_view_daily_report"),
+                    InlineKeyboardButton("🌅 ត្រៀមបើកផ្សារ | Morning Brief", callback_data="csx_view_morning_brief")
+                ],
+                [
                     InlineKeyboardButton("ABC", callback_data="csx_stock_ABC"),
                     InlineKeyboardButton("PWSA", callback_data="csx_stock_PWSA"),
                     InlineKeyboardButton("PAS", callback_data="csx_stock_PAS"),
@@ -27769,6 +27781,10 @@ class TelegramBotThread(BaseThread):
                     msg = await engine.format_top_dividends_telegram(lang=user_lang)
                 elif sub in ["SPIKE", "SPIKES", "VOL", "VOLUME", "RVOL"]:
                     msg = await engine.format_volume_spikes_telegram(lang=user_lang)
+                elif sub in ["REPORT", "DAILY", "EOD", "CLOSE", "CLOSING"]:
+                    msg = await engine.format_daily_closing_report_telegram(lang=user_lang)
+                elif sub in ["BRIEF", "MORNING", "OPEN", "OPENING"]:
+                    msg = await engine.format_daily_morning_brief_telegram(lang=user_lang)
                 else:
                     msg = await engine.format_market_summary_telegram(lang=user_lang)
             else:
@@ -28361,6 +28377,32 @@ class TelegramBotThread(BaseThread):
             id='csx_market_monitor'
         )
         self.log_signal.emit("🏛️ Cambodia Securities Exchange (CSX) AI Monitor job scheduled (60s loop).")
+
+        # 🌅 CSX AI Market Morning Opening Brief (08:30 AM ICT, Mon-Fri)
+        self.scheduler.add_job(
+            scheduler_tasks.csx_daily_morning_brief_job,
+            'cron',
+            day_of_week='mon-fri',
+            hour=8,
+            minute=30,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id='csx_daily_morning_brief_job'
+        )
+        self.log_signal.emit("🌅 CSX AI Morning Briefing job scheduled at 08:30 AM (Mon-Fri ICT).")
+
+        # 🏛️ CSX AI Market Daily Closing EOD Report (15:05 PM ICT, Mon-Fri)
+        self.scheduler.add_job(
+            scheduler_tasks.csx_daily_closing_report_job,
+            'cron',
+            day_of_week='mon-fri',
+            hour=15,
+            minute=5,
+            timezone="Asia/Phnom_Penh",
+            args=[self.app],
+            id='csx_daily_closing_report_job'
+        )
+        self.log_signal.emit("🏛️ CSX AI Daily Closing EOD Report job scheduled at 15:05 PM (Mon-Fri ICT).")
 
         self.scheduler.start()
         self.log_signal.emit("⏰ APScheduler started (Cron Jobs active).")

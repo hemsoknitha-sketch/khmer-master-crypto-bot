@@ -8402,11 +8402,11 @@ async def csx_market_monitor(app: Application):
             now = time.time()
             for sym, s in stocks.items():
                 rvol = s.get("rvol", 1.0)
-                if rvol >= 2.0 and s.get("turnover", 0.0) >= 10000000.0:  # RVOL >= 2x and turnover >= 10M KHR (~$2,500)
+                if rvol >= 1.5 and s.get("turnover", 0.0) >= 5000000.0:  # RVOL >= 1.5x and turnover >= 5M KHR (~$1,250)
                     last_alert = _csx_last_alert_ts.get(sym, 0.0)
                     if (now - last_alert) > 7200.0:  # 2-hour debounce per stock
                         _csx_last_alert_ts[sym] = now
-                        alert_msg = (
+                        alert_msg_kh = (
                             f"⚡ **[CSX ABNORMAL VOLUME SPIKE ALERT]** 🇰🇭\n"
                             f"🏛️ **ភាគហ៊ុន ៖** `{sym}` ({s.get('name_kh')})\n"
                             f"{ui_standards.DIVIDER_DOUBLE}\n"
@@ -8418,16 +8418,151 @@ async def csx_market_monitor(app: Application):
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"💡 _លំហូរទុនស្ថាប័នកំពុងចាក់ចូលភាគហ៊ុន {sym}!_"
                         )
-                        db.record_csx_alert("VOLUME_SPIKE", sym, alert_msg)
+                        alert_msg_en = (
+                            f"⚡ **[CSX INSTITUTIONAL VOLUME SPIKE ALERT]** 🇰🇭\n"
+                            f"🏛️ **Equity:** `{sym}` ({s.get('name_en')})\n"
+                            f"{ui_standards.DIVIDER_DOUBLE}\n"
+                            f"🔥 **RVOL Surge:** `{rvol:.2f}x` vs 20-Day Average!\n"
+                            f"💵 **Current Price:** `{s.get('close'):,.0f} KHR` ({'+' if s.get('change',0)>0 else ''}{s.get('pct_change',0):.2f}%)\n"
+                            f"📦 **Today Volume:** `{s.get('volume'):,.0f} shares` (Avg: `{s.get('avg_vol_20'):,.0f}`)\n"
+                            f"💰 **Turnover:** `{s.get('turnover'):,.0f} KHR` (~${s.get('turnover_usd'):,.0f})\n"
+                            f"🎯 **AI Signal:** `{s.get('ai_signal')}`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _Institutional smart money flow detected in {sym}!_"
+                        )
+                        db.record_csx_alert("VOLUME_SPIKE", sym, alert_msg_kh)
                         if app and hasattr(app, "bot"):
                             try:
-                                await app.bot.send_message(
-                                    chat_id=ui_standards.SUPER_ADMIN_ID,
-                                    text=alert_msg,
-                                    parse_mode="Markdown"
-                                )
+                                recipients, _ = get_alert_target_recipients("csx_spike")
+                                if not any(r[0] == ui_standards.SUPER_ADMIN_ID for r in recipients):
+                                    recipients.append((ui_standards.SUPER_ADMIN_ID, 'khmer'))
+
+                                for cid, u_lang in recipients:
+                                    is_en = str(u_lang).lower() in ['en', 'english']
+                                    text_to_send = alert_msg_en if is_en else alert_msg_kh
+                                    try:
+                                        await app.bot.send_message(
+                                            chat_id=cid,
+                                            text=text_to_send,
+                                            parse_mode="Markdown"
+                                        )
+                                    except Exception:
+                                        clean_txt = text_to_send.replace('*', '').replace('`', '').replace('_', '')
+                                        try:
+                                            await app.bot.send_message(chat_id=cid, text=clean_txt)
+                                        except Exception:
+                                            pass
                             except Exception as notif_e:
                                 logger.debug(f"CSX Telegram alert error: {notif_e}")
         except Exception as e:
             print(f"⚠️ [CSX MARKET MONITOR NOTICE]: {e}")
+
+
+async def csx_daily_closing_report_job(app: Application):
+    """
+    🏛️ CSX AI Market Daily Closing Executive Report Job (15:05 ICT Mon-Fri)
+    Dispatches comprehensive daily closing summary, CSX Index, volume, turnover,
+    and dividend screeners to Super Admin and all VIP users.
+    """
+    try:
+        import datetime
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        ict_dt = now_utc + datetime.timedelta(hours=7)
+        if ict_dt.weekday() in (5, 6):
+            return  # Skip weekends
+
+        import csx_engine
+        import database as db
+        import ui_standards
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+        engine = csx_engine.get_csx_engine()
+        stocks = await engine.refresh_all_stocks(force=True)
+        try:
+            db.record_csx_eod_batch(stocks)
+        except Exception:
+            pass
+
+        recipients, _ = get_alert_target_recipients("csx_daily")
+        if not any(r[0] == ui_standards.SUPER_ADMIN_ID for r in recipients):
+            recipients.append((ui_standards.SUPER_ADMIN_ID, 'khmer'))
+
+        if not recipients:
+            return
+
+        csx_keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📊 សង្ខេបទីផ្សារ | Overview", callback_data="csx_view_overview"),
+                InlineKeyboardButton("🔄 ផ្ទុកឡើងវិញ | Refresh", callback_data="csx_refresh")
+            ],
+            [
+                InlineKeyboardButton("💰 ភាគលាភខ្ពស់ | Dividends", callback_data="csx_view_dividends"),
+                InlineKeyboardButton("⚡ Volume Spikes", callback_data="csx_view_spikes")
+            ]
+        ])
+
+        async def get_report_payload(cid, lang):
+            l_code = 'english' if str(lang).lower() in ['en', 'english'] else 'khmer'
+            txt = await engine.format_daily_closing_report_telegram(lang=l_code)
+            return txt, csx_keyboard
+
+        await parallel_broadcast(app, recipients, get_report_payload)
+
+        kh_text = await engine.format_daily_closing_report_telegram(lang='khmer')
+        db.record_csx_alert("DAILY_CLOSING_REPORT", "CSX_INDEX", kh_text[:500])
+        print(f"✅ [CSX DAILY REPORT] Successfully broadcasted EOD closing report to {len(recipients)} recipients.")
+    except Exception as e:
+        print(f"⚠️ [CSX DAILY CLOSING REPORT NOTICE]: {e}")
+
+
+async def csx_daily_morning_brief_job(app: Application):
+    """
+    🌅 CSX AI Market Daily Morning Opening Brief Job (08:30 ICT Mon-Fri)
+    Dispatches pre-market briefing, previous close, top dividend yields,
+    and oversold accumulation opportunities to Super Admin and all VIP users.
+    """
+    try:
+        import datetime
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        ict_dt = now_utc + datetime.timedelta(hours=7)
+        if ict_dt.weekday() in (5, 6):
+            return  # Skip weekends
+
+        import csx_engine
+        import database as db
+        import ui_standards
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+        engine = csx_engine.get_csx_engine()
+        recipients, _ = get_alert_target_recipients("csx_daily")
+        if not any(r[0] == ui_standards.SUPER_ADMIN_ID for r in recipients):
+            recipients.append((ui_standards.SUPER_ADMIN_ID, 'khmer'))
+
+        if not recipients:
+            return
+
+        csx_keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📊 សង្ខេបទីផ្សារ | Overview", callback_data="csx_view_overview"),
+                InlineKeyboardButton("🔄 ផ្ទុកឡើងវិញ | Refresh", callback_data="csx_refresh")
+            ],
+            [
+                InlineKeyboardButton("💰 ភាគលាភខ្ពស់ | Dividends", callback_data="csx_view_dividends"),
+                InlineKeyboardButton("⚡ Volume Spikes", callback_data="csx_view_spikes")
+            ]
+        ])
+
+        async def get_brief_payload(cid, lang):
+            l_code = 'english' if str(lang).lower() in ['en', 'english'] else 'khmer'
+            txt = await engine.format_daily_morning_brief_telegram(lang=l_code)
+            return txt, csx_keyboard
+
+        await parallel_broadcast(app, recipients, get_brief_payload)
+
+        kh_text = await engine.format_daily_morning_brief_telegram(lang='khmer')
+        db.record_csx_alert("DAILY_MORNING_BRIEF", "CSX_INDEX", kh_text[:500])
+        print(f"✅ [CSX MORNING BRIEF] Successfully broadcasted morning brief to {len(recipients)} recipients.")
+    except Exception as e:
+        print(f"⚠️ [CSX DAILY MORNING BRIEF NOTICE]: {e}")
+
 

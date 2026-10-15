@@ -606,6 +606,223 @@ class CSXEngine:
             lines.append("💡 _Select options below for deep quant audit & dividend screeners!_")
             return "\n".join(lines)
 
+    async def format_daily_closing_report_telegram(self, lang: str = "khmer") -> str:
+        """
+        Builds the Flagship CSX Daily Closing Bell Executive Report (EOD at 15:05 ICT).
+        Dispatched automatically to Super Admin and VIP users every trading day.
+        """
+        overview = await self.get_market_overview()
+        idx = overview["index"]
+        clk = overview["clock"]
+        gainers = overview["gainers"]
+        losers = overview["losers"]
+        top_turn = overview["top_turnover"][:5]
+
+        idx_sign = "+" if idx.get("change", 0.0) >= 0 else ""
+        idx_emoji = "🟢" if idx.get("change", 0.0) >= 0 else "🔴"
+
+        stocks = overview["stocks"]
+        value_buys = [s for s in stocks.values() if s.get("rsi", 50.0) <= 38.0]
+        high_div = sorted(
+            [s for s in stocks.values() if s.get("div_yield_est", 0) > 0],
+            key=lambda x: x["div_yield_est"],
+            reverse=True
+        )[:3]
+
+        if lang == "khmer":
+            lines = [
+                "🏛️ **[របាយការណ៍បិទផ្សារប្រចាំថ្ងៃ CSX DAILY REPORT]** 🇰🇭",
+                "📊 _ប្រព័ន្ធតាមដានទិន្នន័យផ្សារមូលបត្រកម្ពុជាស្វ័យប្រវត្ត EOD_",
+                ui_standards.DIVIDER_DOUBLE,
+                f"📅 **កាលបរិច្ឆេទ ៖** `{idx.get('date', '')}` | ម៉ោង `{clk['time_str']}`",
+                f"🔔 **ស្ថានភាព ៖** `ទីផ្សារបិទទ្វារបញ្ចប់ការជួញដូរ (EOD Close)`",
+                ui_standards.DIVIDER_LIGHT,
+                f"📈 **CSX INDEX ៖** `{idx['close']:,.2f} pts` {idx_emoji}",
+                f"   ├ បំរែបំរួលថ្ងៃនេះ ៖ `{idx_sign}{idx['change']:,.2f} pts` (`{idx_sign}{idx['pct_change']:.2f}%`)",
+                f"   ├ បរិមាណជួញដូរសរុប ៖ `{overview['total_volume']:,.0f} ហ៊ុន`",
+                f"   ├ ចរន្តទឹកប្រាក់សរុប ៖ `{overview['total_turnover']:,.0f} KHR`",
+                f"   └ គិតជាដុល្លារ ៖ `~${overview['total_turnover_usd']:,.2f} USD`",
+                ui_standards.DIVIDER_LIGHT,
+                "🏆 **ចរន្តទឹកប្រាក់ខ្ពស់បំផុត (Top Turnover) ៖**"
+            ]
+            for s in top_turn:
+                s_sign = "+" if s["change"] > 0 else ""
+                s_ico = "🟢" if s["change"] > 0 else ("🔴" if s["change"] < 0 else "⚪")
+                lines.append(
+                    f"• {s_ico} **{s['symbol']}** ៖ `{s['close']:,.0f}៛` ({s_sign}{s['pct_change']:.2f}%) | `{s['turnover']:,.0f}៛`"
+                )
+
+            if gainers:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("🚀 **ភាគហ៊ុនកើនថ្លៃខ្ពស់បំផុត (Top Gainers) ៖**")
+                for s in gainers[:3]:
+                    lines.append(f"• 🟢 **{s['symbol']}** ៖ `{s['close']:,.0f}៛` (`+{s['pct_change']:.2f}%`)")
+
+            if losers:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("🔻 **ភាគហ៊ុនធ្លាក់ថ្លៃខ្លាំងបំផុត (Top Losers) ៖**")
+                for s in losers[:3]:
+                    lines.append(f"• 🔴 **{s['symbol']}** ៖ `{s['close']:,.0f}៛` (`{s['pct_change']:.2f}%`)")
+
+            if value_buys:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("💎 **ឱកាសតម្លៃធូរ (AI Value Buy / RSI Oversold) ៖**")
+                for s in value_buys:
+                    lines.append(f"• 🟢 **{s['symbol']}** ៖ RSI `{s['rsi']:.1f}` | ភាគលាភ `~{s['div_yield_est']:.1f}%` ({s['close']:,.0f}៛)")
+
+            if high_div:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("💰 **ភាគលាភខ្ពស់បំផុត (Top Dividend Yield) ៖**")
+                for s in high_div:
+                    lines.append(f"• 🏆 **{s['symbol']}** ៖ `~{s['div_yield_est']:.1f}%` (`{s['annual_div_khr']:,.0f}៛/ហ៊ុន`)")
+
+            lines.append(ui_standards.DIVIDER_HEAVY)
+            lines.append("💡 _ប្រព័ន្ធ Angkor Quant ផ្ញើជូន Super Admin & VIPs រៀងរាល់ថ្ងៃបិទផ្សារ!_")
+            return "\n".join(lines)
+        else:
+            lines = [
+                "🏛️ **[CSX DAILY CLOSING REPORT | MARKET EOD]** 🇰🇭",
+                "📊 _Institutional Automated Equity Intelligence Suite_",
+                ui_standards.DIVIDER_DOUBLE,
+                f"📅 **Date:** `{idx.get('date', '')}` | `{clk['time_str']}`",
+                f"🔔 **Status:** `Official Market Close (EOD Summary)`",
+                ui_standards.DIVIDER_LIGHT,
+                f"📈 **CSX INDEX:** `{idx['close']:,.2f} pts` {idx_emoji}",
+                f"   ├ Daily Change: `{idx_sign}{idx['change']:,.2f} pts` (`{idx_sign}{idx['pct_change']:.2f}%`)",
+                f"   ├ Total Market Volume: `{overview['total_volume']:,.0f} shares`",
+                f"   ├ Total Turnover: `{overview['total_turnover']:,.0f} KHR`",
+                f"   └ In USD Equivalent: `~${overview['total_turnover_usd']:,.2f} USD`",
+                ui_standards.DIVIDER_LIGHT,
+                "🏆 **Top Equities by Value Turnover:**"
+            ]
+            for s in top_turn:
+                s_sign = "+" if s["change"] > 0 else ""
+                s_ico = "🟢" if s["change"] > 0 else ("🔴" if s["change"] < 0 else "⚪")
+                lines.append(
+                    f"• {s_ico} **{s['symbol']}**: `{s['close']:,.0f} KHR` ({s_sign}{s['pct_change']:.2f}%) | `{s['turnover']:,.0f} KHR`"
+                )
+
+            if gainers:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("🚀 **Top Daily Gainers:**")
+                for s in gainers[:3]:
+                    lines.append(f"• 🟢 **{s['symbol']}**: `{s['close']:,.0f} KHR` (`+{s['pct_change']:.2f}%`)")
+
+            if losers:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("🔻 **Top Daily Losers:**")
+                for s in losers[:3]:
+                    lines.append(f"• 🔴 **{s['symbol']}**: `{s['close']:,.0f} KHR` (`{s['pct_change']:.2f}%`)")
+
+            if value_buys:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("💎 **Value Opportunities (RSI Oversold <= 38):**")
+                for s in value_buys:
+                    lines.append(f"• 🟢 **{s['symbol']}**: RSI `{s['rsi']:.1f}` | Div `~{s['div_yield_est']:.1f}%` ({s['close']:,.0f} KHR)")
+
+            if high_div:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("💰 **Top Dividend Harvest Screener:**")
+                for s in high_div:
+                    lines.append(f"• 🏆 **{s['symbol']}**: `~{s['div_yield_est']:.1f}%` (`{s['annual_div_khr']:,.0f} KHR/share`)")
+
+            lines.append(ui_standards.DIVIDER_HEAVY)
+            lines.append("💡 _Angkor Quant Daily Institutional Alert for Super Admin & VIP Users._")
+            return "\n".join(lines)
+
+    async def format_daily_morning_brief_telegram(self, lang: str = "khmer") -> str:
+        """
+        Builds the Flagship CSX Morning Opening Brief (08:30 ICT Mon-Fri).
+        Dispatched automatically to Super Admin and VIP users before continuous trading.
+        """
+        overview = await self.get_market_overview()
+        idx = overview["index"]
+        clk = overview["clock"]
+        stocks = overview["stocks"]
+
+        idx_sign = "+" if idx.get("change", 0.0) >= 0 else ""
+        idx_emoji = "🟢" if idx.get("change", 0.0) >= 0 else "🔴"
+
+        ranked_div = sorted(
+            [s for s in stocks.values() if s.get("div_yield_est", 0) > 0],
+            key=lambda x: x["div_yield_est"],
+            reverse=True
+        )[:4]
+        value_buys = [s for s in stocks.values() if s.get("rsi", 50.0) <= 38.0]
+
+        if lang == "khmer":
+            lines = [
+                "🌅 **[ព្រឹត្តិបត្រត្រៀមបើកទីផ្សារ CSX MORNING RADAR]** 🇰🇭",
+                "🏛️ _ការវិភាគទុនវិនិយោគមុនពេលជួញដូរបន្ត (Opening Auction 08:00 - 09:00)_",
+                ui_standards.DIVIDER_DOUBLE,
+                f"⏰ **ម៉ោងកម្ពុជា ៖** `{clk['time_str']}`",
+                f"🤖 **ស្ថានភាពទីផ្សារ ៖** `{clk['name_kh']}`",
+                f"⏳ **វគ្គបន្ទាប់ ៖** `{clk['next_session']}`",
+                ui_standards.DIVIDER_LIGHT,
+                f"📈 **CSX INDEX (ថ្ងៃមុន) ៖** `{idx['close']:,.2f} pts` {idx_emoji}",
+                f"   ├ បំរែបំរួល ៖ `{idx_sign}{idx['change']:,.2f} pts` (`{idx_sign}{idx['pct_change']:.2f}%`)",
+                f"   └ ទំហំជួញដូរ ៖ `{overview['total_volume']:,.0f} ហ៊ុន` (~${overview['total_turnover_usd']:,.2f})",
+                ui_standards.DIVIDER_LIGHT,
+                "💰 **ភាគលាភខ្ពស់បំផុតត្រៀមសន្សំទិញ (Top Dividend Yields) ៖**"
+            ]
+            for i, s in enumerate(ranked_div, 1):
+                lines.append(
+                    f"{i}. 🏆 **{s['symbol']}** ៖ `~{s['div_yield_est']:.1f}%`/ឆ្នាំ (`{s['annual_div_khr']:,.0f}៛/ហ៊ុន`) | `{s['close']:,.0f}៛`"
+                )
+
+            if value_buys:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("💎 **ភាគហ៊ុនស្ថិតក្នុងតំបន់ RSI Oversold (សន្សំទិញ) ៖**")
+                for s in value_buys:
+                    lines.append(f"• 🟢 **{s['symbol']}** ៖ RSI `{s['rsi']:.1f}` | តម្លៃ `{s['close']:,.0f}៛`")
+
+            lines.append(ui_standards.DIVIDER_LIGHT)
+            lines.append("⏰ **កាលវិភាគជួញដូរ CSX ថ្ងៃនេះ ៖**")
+            lines.append("• `08:00 - 09:00` ៖ ផ្គូផ្គងបើកផ្សារ (Opening Auction)")
+            lines.append("• `09:00 - 11:30` ៖ ជួញដូរបន្តពេលព្រឹក (Continuous Morning)")
+            lines.append("• `11:30 - 12:30` ៖ សម្រាកអាហារថ្ងៃត្រង់ (Lunch Break)")
+            lines.append("• `12:30 - 14:50` ៖ ជួញដូរបន្តពេលរសៀល (Continuous Afternoon)")
+            lines.append("• `14:50 - 15:00` ៖ ផ្គូផ្គងបិទផ្សារ (Closing Auction)")
+            lines.append(ui_standards.DIVIDER_HEAVY)
+            lines.append("💡 _Angkor Quant CSX Morning Intelligence ជូន Super Admin & VIPs!_")
+            return "\n".join(lines)
+        else:
+            lines = [
+                "🌅 **[CSX MORNING OPENING RADAR BRIEF]** 🇰🇭",
+                "🏛️ _Pre-Market Equity Intelligence (Opening Auction 08:00 - 09:00 ICT)_",
+                ui_standards.DIVIDER_DOUBLE,
+                f"⏰ **Local Time:** `{clk['time_str']}`",
+                f"🤖 **Current Phase:** `{clk['name_en']}`",
+                f"⏳ **Next Session:** `{clk['next_session']}`",
+                ui_standards.DIVIDER_LIGHT,
+                f"📈 **CSX INDEX (Prior Close):** `{idx['close']:,.2f} pts` {idx_emoji}",
+                f"   ├ Daily Change: `{idx_sign}{idx['change']:,.2f} pts` (`{idx_sign}{idx['pct_change']:.2f}%`)",
+                f"   └ Previous Turnover: `~${overview['total_turnover_usd']:,.2f} USD`",
+                ui_standards.DIVIDER_LIGHT,
+                "💰 **Top Dividend Harvest Screener:**"
+            ]
+            for i, s in enumerate(ranked_div, 1):
+                lines.append(
+                    f"{i}. 🏆 **{s['symbol']}**: `~{s['div_yield_est']:.1f}%`/yr (`{s['annual_div_khr']:,.0f} KHR/sh`) | `{s['close']:,.0f} KHR`"
+                )
+
+            if value_buys:
+                lines.append(ui_standards.DIVIDER_LIGHT)
+                lines.append("💎 **Undervalued Equities (RSI <= 38.0 Accumulation):**")
+                for s in value_buys:
+                    lines.append(f"• 🟢 **{s['symbol']}**: RSI `{s['rsi']:.1f}` | Price `{s['close']:,.0f} KHR`")
+
+            lines.append(ui_standards.DIVIDER_LIGHT)
+            lines.append("⏰ **CSX Session Trading Schedule:**")
+            lines.append("• `08:00 - 09:00` : Opening Periodic Auction")
+            lines.append("• `09:00 - 11:30` : Continuous Morning Trading")
+            lines.append("• `11:30 - 12:30` : Lunch Break")
+            lines.append("• `12:30 - 14:50` : Continuous Afternoon Trading")
+            lines.append("• `14:50 - 15:00` : Closing Periodic Auction")
+            lines.append(ui_standards.DIVIDER_HEAVY)
+            lines.append("💡 _Angkor Quant CSX Morning Intelligence for Super Admin & VIP Users._")
+            return "\n".join(lines)
+
     async def format_stock_detail_telegram(self, symbol: str, lang: str = "khmer") -> str:
         """
         Builds institutional deep-dive for a single CSX stock.

@@ -1159,7 +1159,10 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - 14-period RSI (Relative Strength Index) identifying Oversold ($\le 38.0$) value zones and Overbought ($\ge 68.0$) profit zones.
      - 20-day Average Volume & Relative Volume (RVOL) expansion tracking.
      - Annual Dividend Yield Screeners & Cash Payout metrics (PWSA, PPAP, PAS, ABC, CGSM, DBDE) for systematic passive income harvesting.
-  4. **Abnormal Volume Spike Harvester:** Stocks exhibiting institutional volume surges (RVOL $\ge 2.0\times$ and turnover $\ge 10,000,000$ KHR) trigger automated Telegram alerts to the Super Admin with a 2-hour per-stock debounce.
+  4. **Abnormal Volume Spike Harvester & Dual Daily Executive Alert Standard:**
+     - Stocks exhibiting institutional volume surges (RVOL $\ge 1.5\times$ and turnover $\ge 5,000,000$ KHR) trigger automated Telegram alerts to both Super Admin and VIP users with a 2-hour per-stock debounce.
+     - **Daily Pre-Market Morning Radar (08:30 ICT Mon-Fri):** Dispatches opening briefing, dividend yields, and RSI accumulation watchlists to Super Admin and all VIP users.
+     - **Daily EOD Closing Bell Report (15:05 ICT Mon-Fri):** Dispatches comprehensive market closing wrap, CSX Index performance, turnover, volume, top gainers/losers, and passive dividend screener to Super Admin and all VIP users.
   5. **Cambodia Local Trading Hours (ICT / UTC+7) Clock Awareness:**
      - Opening Auction (08:00 - 09:00 ICT)
      - Continuous Morning Session (09:00 - 11:30 ICT)
