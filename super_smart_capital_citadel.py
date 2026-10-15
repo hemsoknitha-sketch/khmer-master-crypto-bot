@@ -238,6 +238,30 @@ class SuperSmartCapitalCitadel:
         closes = [float(c.get("close", 0.0)) for c in candles_15m]
         volumes = [float(c.get("volume", 0.0)) for c in candles_15m]
 
+        # Calculate 15m ATR and preliminary breathing SL upfront (Invariant 74)
+        trs = [max(h - l, abs(h - c_prev), abs(l - c_prev)) for h, l, c_prev in zip(highs[1:], lows[1:], closes[:-1])] if len(closes) > 1 else [curr_price * 0.005]
+        atr_15m = sum(trs[-14:]) / 14.0 if len(trs) >= 14 else (curr_price * 0.005)
+
+        prec = _get_tradfi_precision(resolved_epic, curr_price)
+        s_epic = resolved_epic.upper()
+        is_gold = any(g in s_epic for g in ["GOLD", "XAU"])
+        is_stock = any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+        is_crypto_cfd = any(cr in s_epic for cr in ["BTCUSD", "ETHUSD", "SOLUSD", "BTC", "ETH", "SOL"])
+        is_index = any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
+
+        if is_gold:
+            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0040 * curr_price)
+        elif is_stock:
+            breathing_sl_dist = max(2.20 * atr_15m, 0.0150 * curr_price, 3.5 * spread)
+        elif is_crypto_cfd:
+            breathing_sl_dist = max(2.80 * atr_15m, 4.0 * spread, 0.0080 * curr_price)
+        elif is_index:
+            breathing_sl_dist = max(2.20 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+        else:
+            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+
+        preliminary_sl = round(curr_price - breathing_sl_dist if norm_side == "BUY" else curr_price + breathing_sl_dist, prec)
+
         # --------------------------------------------------------------------
         # 1. PILLAR 6: NON-NEGOTIABLE SAFETY HARD GUARDS (RSI ARMOR & ADX MOMENTUM)
         # --------------------------------------------------------------------
@@ -269,7 +293,10 @@ class SuperSmartCapitalCitadel:
                 "is_approved": False,
                 "rejection_reason": reason,
                 "rsi_15m": rsi_15m,
-                "confluence_score": 0.0
+                "confluence_score": 0.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -286,7 +313,10 @@ class SuperSmartCapitalCitadel:
                 "is_approved": False,
                 "rejection_reason": reason,
                 "rsi_15m": rsi_15m,
-                "confluence_score": 0.0
+                "confluence_score": 0.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -305,7 +335,10 @@ class SuperSmartCapitalCitadel:
                 "rejection_reason": reason,
                 "adx_15m": adx_15m,
                 "rsi_15m": rsi_15m,
-                "confluence_score": 0.0
+                "confluence_score": 0.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res

@@ -872,6 +872,26 @@ class CapitalComEngine:
                     "error": f"FOREX_BLOCKED: {resolved_epic} trading is 100% disabled by Angkor Quant Fiduciary Guard. Only US Stocks, Indices, and Gold/Crypto CFDs are permitted."
                 }
 
+        # Step 0b: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
+        if getattr(self, "_custom_chat_id", None) and self._custom_chat_id > 0:
+            try:
+                import portfolio_circuit_breaker
+                cur_bal_data = self.get_account_balance()
+                cur_bal = max(float(cur_bal_data.get("equity") or 0.0), float(cur_bal_data.get("balance") or 0.0), float(cur_bal_data.get("available") or 1000.0))
+                is_gov_lck, gov_msg, _ = portfolio_circuit_breaker.CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(
+                    chat_id=self._custom_chat_id,
+                    current_balance=cur_bal,
+                    is_demo=self.is_demo
+                )
+                if is_gov_lck:
+                    logger.info(f"👑 [CAPITAL GOVERNOR] Order blocked for User {self._custom_chat_id}: {gov_msg}")
+                    return {
+                        "success": False,
+                        "error": f"DAILY_GOVERNOR_LOCKED: {gov_msg}"
+                    }
+            except Exception as e_gov:
+                logger.debug(f"Place position daily governor check note: {e_gov}")
+
         # Step 1: Check Market Status & Spread
         market_info = self.get_market_details(resolved_epic)
         if not market_info.get("success"):
@@ -5367,6 +5387,22 @@ class CapitalOpeningRangeBreakoutEngine:
             if len(open_pos) >= max_pos:
                 return False
 
+            # Pillar 6: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
+            try:
+                import portfolio_circuit_breaker
+                eval_bal = max(user_avail, user_bal, eff_equity)
+                is_gov_lck, gov_reason, _ = portfolio_circuit_breaker.CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(
+                    chat_id=chat_id,
+                    current_balance=eval_bal,
+                    app=app,
+                    is_demo=is_demo
+                )
+                if is_gov_lck:
+                    logger.info(f"👑 [ORB GOVERNOR] Trade blocked for User {chat_id}: {gov_reason}")
+                    return False
+            except Exception as e_gov:
+                logger.debug(f"ORB Daily Governor check note: {e_gov}")
+
             # Check if resolved_epic already has an open position (Zero Duplicate Stacking)
             open_epics = {
                 (p.get("position", {}).get("epic") or p.get("market", {}).get("epic") or "").upper()
@@ -7810,6 +7846,25 @@ class CapitalTrendScalpEngine:
 
             if len(open_pos) >= max_pos:
                 return False
+
+            # Pillar 6: Sky Net 360° Daily Capital Governor (+5.0% Target Lock / -2.5% Loss Floor)
+            try:
+                import portfolio_circuit_breaker
+                bal_data = await asyncio.to_thread(user_engine.get_account_balance)
+                s_avail = float(bal_data.get("available", budget) or budget)
+                s_bal = float(bal_data.get("balance", budget) or budget)
+                eval_bal = max(s_avail, s_bal, budget)
+                is_gov_lck, gov_reason, _ = portfolio_circuit_breaker.CapitalDailyAGIGovernor.evaluate_and_check_daily_lock(
+                    chat_id=chat_id,
+                    current_balance=eval_bal,
+                    app=app,
+                    is_demo=is_demo
+                )
+                if is_gov_lck:
+                    logger.info(f"👑 [SCALP GOVERNOR] Trade blocked for User {chat_id}: {gov_reason}")
+                    return False
+            except Exception as e_gov:
+                logger.debug(f"Scalp Daily Governor check note: {e_gov}")
 
             open_epics = {
                 (p.get("position", {}).get("epic") or p.get("market", {}).get("epic") or "").upper()

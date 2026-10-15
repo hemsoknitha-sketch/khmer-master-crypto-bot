@@ -478,17 +478,22 @@ class CapitalDailyAGIGovernor:
         return True
 
     @classmethod
-    def set_daily_limits_disabled(cls, chat_id: int, disabled: bool = True) -> bool:
-        """Enables or disables Daily Limits (+5% Target Lock & -2.5% Loss Floor) for a user."""
+    def set_daily_limits_disabled(cls, chat_id: int, disabled: bool = True, is_global: bool = False) -> bool:
+        """Enables or disables Daily Limits (+5% Target Lock & -2.5% Loss Floor) for a user or globally."""
         import database as db
         val = "1" if disabled else "0"
-        db.update_system_setting(f"cap_daily_limits_disabled_{chat_id}", val)
-        if disabled:
-            today_str = cls.get_today_str()
-            db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
-            db.update_system_setting(f"cap_daily_lock_{chat_id}_live_{today_str}", "NORMAL")
-            db.update_system_setting(f"cap_daily_lock_{chat_id}_demo_{today_str}", "NORMAL")
-        logger.info(f"🛡️ [CAPITAL GOVERNOR] User {chat_id} Daily Limits Disabled: {disabled}")
+        if is_global or chat_id == 0:
+            db.update_system_setting("cap_daily_limits_disabled", val)
+            db.update_system_setting("capital_daily_governor_disabled", val)
+            logger.info(f"🛡️ [CAPITAL GOVERNOR] GLOBAL Daily Limits Disabled: {disabled}")
+        if chat_id and chat_id > 0:
+            db.update_system_setting(f"cap_daily_limits_disabled_{chat_id}", val)
+            if disabled:
+                today_str = cls.get_today_str()
+                db.update_system_setting(f"cap_daily_lock_{chat_id}_{today_str}", "NORMAL")
+                db.update_system_setting(f"cap_daily_lock_{chat_id}_live_{today_str}", "NORMAL")
+                db.update_system_setting(f"cap_daily_lock_{chat_id}_demo_{today_str}", "NORMAL")
+            logger.info(f"🛡️ [CAPITAL GOVERNOR] User {chat_id} Daily Limits Disabled: {disabled}")
         return True
 
     @classmethod

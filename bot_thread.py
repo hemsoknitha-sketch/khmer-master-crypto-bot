@@ -26043,11 +26043,16 @@ class TelegramBotThread(BaseThread):
                     return
                 elif action in ["LIMIT", "LIMITS", "DAILY_LIMIT", "DAILYLIMIT", "LIMIT_DAILY", "GOVERNOR"]:
                     sub_opt = str(args[1]).upper().strip() if len(args) > 1 else ""
+                    target_scope = str(args[2]).upper().strip() if len(args) > 2 else ""
+                    is_admin = (chat_id == 859271875 or db.is_admin(chat_id))
+                    is_global = is_admin and (target_scope in ["GLOBAL", "ALL"] or sub_opt in ["GLOBAL_OFF", "GLOBAL_ON"])
                     import portfolio_circuit_breaker
-                    if sub_opt in ["OFF", "DISABLE", "DISABLED", "0", "REMOVE", "FALSE"]:
-                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, True)
+                    if sub_opt in ["OFF", "DISABLE", "DISABLED", "0", "REMOVE", "FALSE", "GLOBAL_OFF"]:
+                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, True, is_global=is_global)
+                        scope_str = " (ប្រព័ន្ធទាំងមូល / GLOBAL)" if is_global else ""
+                        scope_en = " (GLOBAL / ALL TRADERS)" if is_global else ""
                         res_msg = (
-                            f"🔓 **[SKY NET 360° DAILY LIMITS: DISABLED]** 🟢\n"
+                            f"🔓 **[SKY NET 360° DAILY LIMITS: DISABLED{scope_str}]** 🟢\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"✅ **ស្ថានភាព ៖** `បានដកចេញជោគជ័យ (DISABLED 100%)`\n"
                             f"🎯 **Daily Profit Lock (+5%) ៖** `បិទ (ជួញដូរបន្តគ្មានដែនកំណត់)`\n"
@@ -26055,19 +26060,38 @@ class TelegramBotThread(BaseThread):
                             f"🛡️ **ការការពារទុន ៖** `SL/TP, Breakeven Armor & Trailing Ratchet លើ Position នីមួយៗនៅតែការពារ ១០០%!`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"🚀 _ប្រព័ន្ធនឹងជួញដូរបន្តឥតឈប់ឈរ និងមិនខកខានឱកាសវិនិយោគឡើយ!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🔓 **[SKY NET 360° DAILY LIMITS: DISABLED{scope_en}]** 🟢\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **Status:** `DISABLED 100%`\n"
+                            f"🎯 **Daily Profit Lock (+5%):** `Bypassed (Continuous compounding)`\n"
+                            f"🛑 **Daily Stop-Loss Lock (-2.5%):** `Bypassed (Continuous trading)`\n"
+                            f"🛡️ **Capital Armor:** `Per-trade Dynamic SL/TP, Breakeven Armor & Trailing Ratchet 100% active!`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"🚀 _Trading operates continuously without daily circuit freezes!_"
                         )
                         await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
                         return
-                    elif sub_opt in ["ON", "ENABLE", "ENABLED", "1", "TRUE"]:
-                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, False)
+                    elif sub_opt in ["ON", "ENABLE", "ENABLED", "1", "TRUE", "GLOBAL_ON"]:
+                        portfolio_circuit_breaker.CapitalDailyAGIGovernor.set_daily_limits_disabled(chat_id, False, is_global=is_global)
+                        scope_str = " (ប្រព័ន្ធទាំងមូល / GLOBAL)" if is_global else ""
+                        scope_en = " (GLOBAL / ALL TRADERS)" if is_global else ""
                         res_msg = (
-                            f"🔒 **[SKY NET 360° DAILY LIMITS: ENABLED]** 🛡️\n"
+                            f"🔒 **[SKY NET 360° DAILY LIMITS: ENABLED{scope_str}]** 🛡️\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"✅ **ស្ថានភាព ៖** `បានបើកដំណើរការឡើងវិញ (ENABLED)`\n"
                             f"🎯 **Daily Profit Lock ៖** `+5.0% Target Lock (Bank 100% Profits)`\n"
                             f"🛑 **Daily Stop-Loss Lock ៖** `-2.5% Loss Floor (Capital Shield)`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"💡 _ប្រព័ន្ធនឹងការពារ និងចាក់សោរប្រាក់ចំណេញពេលសម្រេចបាន +5% ប្រចាំថ្ងៃ!_"
+                        ) if user_lang == 'khmer' else (
+                            f"🔒 **[SKY NET 360° DAILY LIMITS: ENABLED{scope_en}]** 🛡️\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"✅ **Status:** `ENABLED`\n"
+                            f"🎯 **Daily Profit Lock:** `+5.0% Target Lock`\n"
+                            f"🛑 **Daily Stop-Loss Lock:** `-2.5% Loss Floor`\n"
+                            f"{ui_standards.DIVIDER_HEAVY}\n"
+                            f"💡 _Profits locked automatically at +5.0% daily goal!_"
                         )
                         await update.effective_message.reply_text(res_msg, parse_mode="Markdown")
                         return
