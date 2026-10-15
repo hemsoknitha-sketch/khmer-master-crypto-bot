@@ -1,5 +1,5 @@
-# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ73)
-**Document Version:** 7.3.0 (Angkor Quant Master Specification - The 73 Pillars & TradFi Fiduciary Integrity Lock)  
+# ANGKOR QUANT - AI AGENTS GROUND TRUTH & SPECIFICATION LOCK (AQ74)
+**Document Version:** 7.4.0 (Angkor Quant Master Specification - The 74 Pillars & TradFi Small Capital Fortress Lock)  
 **Target Environment:** Google Cloud Platform (GCP VPS) `e2-standard-4` (4 vCPUs, 16 GB RAM, Tokyo `asia-northeast1-a`) / Ubuntu 22.04+ LTS & Windows Desktop  
 **Cloud AI Infrastructure:** Google Gemini 2.5 Flash + Hugging Face Cloud Inference (DeepSeek-R1 & Llama-3-70B via `HF_TOKEN`)  
 **Authority:** Absolute Architectural Ground Truth (Loaded Automatically in Every Session)  
@@ -1249,7 +1249,32 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
      - Breakeven Armor is delayed until position achieves genuine momentum ($\ge +8.5\%$ ROI or $\ge +\$3.50$ UPL), locking a fee-clearing floor ($\text{Entry} \pm 0.5\times\text{Spread}$).
      - Trailing Profit Ratchet is delayed until peak UPL achieves $\ge +\$6.00$ or $\ge +14.0\%$ ROI.
      - Retracement harvest exits strictly require $\text{UPL} \ge \max(2.0, \text{spread} \times 2.0)$ to prevent taking cent crumbs while absorbing full downside risk.
-- **Enforcement:** Verified by `audit_system.py` [CHECK 58/58].
+- **Enforcement:** Verified by `audit_system.py` [CHECK 58/59].
+
+### Invariant 74: Super Smart 4-Phase TradFi Small Capital Fortress & Permanent Anti-Crumb Integrity Protocol (AQ74)
+- **Location:** `super_smart_capital_citadel.py` (`SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap`), `capital_engine.py` (`_ratchet_engine_positions`, `CapitalKellyPositionSizer`, `CapitalAutonomousEngine.get_session_priority_assets`), `audit_system.py`
+- **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal, small capital TradFi trading ($50 - $200 USD) on Capital.com is strictly locked to four non-negotiable architectural phases:
+  1. **Phase 1: Institutional 360° Citadel Asset Selection & Dynamic Priority Ranking:**
+     - Universe priority strictly favors Tier 1 assets: US Mega-Cap Stocks (`NVDA`, `TSLA`), S&P 500 (`US500`), and Gold (`GOLD`) (+50 ranking boost), followed by Tier 2 (`US100`, `GOOGL`, `META`, `AAPL`, `MSFT`) (+35 boost).
+     - Crypto CFDs (`BTCUSD`, `ETHUSD`, `SOLUSD`) are penalized (-15 pts) and require $\ge 90\%$ confidence and $RVOL \ge 0.75\times$ to overcome broker CFD spread drag. Forex is 100% disabled (`capital_forex_enabled = 0`).
+  2. **Phase 2: Asset-Specific DNA Breathing Stop-Loss:**
+     - Gold DNA: $\text{SL Distance} \ge \max(2.50 \times \text{ATR}_{15m}, 3.5 \times \text{Spread}, 0.0040 \times \text{Price})$ to absorb liquidity sweep spring wicks.
+     - Equities DNA: $\text{SL Distance} \ge \max(2.20 \times \text{ATR}_{15m}, 0.0150 \times \text{Price}, 3.5 \times \text{Spread})$ to absorb cash open volatility.
+     - Crypto CFDs DNA: $\text{SL Distance} \ge \max(2.80 \times \text{ATR}_{15m}, 4.0 \times \text{Spread}, 0.0080 \times \text{Price})$ with $\text{TP} \ge 12.0 \times \text{Spread}$ hurdle.
+     - Indices DNA: $\text{SL Distance} \ge \max(2.20 \times \text{ATR}_{15m}, 3.5 \times \text{Spread}, 0.0035 \times \text{Price})$.
+     - Eradicates rigid micro-stops ($1.0\times\text{ATR}$) that get clipped by broker spread expansion.
+  3. **Phase 3: Fractional Kelly Dynamic Sizer for Small Capital Accounts:**
+     - Dynamic Slot Allocation: Accounts $< \$100$ are locked to max 2 positions concurrently ($<\$150$ to max 3 positions), with target margin $10 - $15 per position.
+     - Hard risk clamp: 1R risk per trade is strictly capped at $\le 2.0\% - 2.5\%$ ($1.50 - $2.50 USD for $100 account).
+     - Accounts $< \$200$ clamp Gold lot size $\le 0.04$ lot, and Crypto CFDs to `min_lot` (0.001 BTC). High-beta indices are clamped on accounts $< \$500$ (US100 $\le 0.05$, US500 $\le 0.10$, Stocks $\le 0.20$).
+  4. **Phase 4: Permanent Anti-Crumb Lock & 4-Tier Harvest Protocol (+15% to +30% ROI):**
+     - ZERO Micro-Penny Exits: No trade may ever be closed by voluntary software logic for crumbs ($+\$0.14 - +\$0.80$).
+     - Delayed Breakeven Armor: only triggers when $\text{UPL} \ge \$2.50 \text{ AND } \text{ROI} \ge +8.5\%$ (or $\text{UPL} \ge \$3.50$), locking $\text{Entry} \pm 0.5\times\text{Spread}$.
+     - The Golden 80%-85% Trailing Ratchet: locks $80\% - 85\%$ of peak gains when $\text{Peak UPL} \ge \$3.50 - \$5.00$ or $\text{Peak ROI} \ge +15\% - +30\%$.
+     - Flash Shock Protective Early Harvest: triggers only when $\text{Peak UPL} \ge \$3.50$ (or $\text{Peak ROI} \ge +15.0\%$) and $\text{UPL} \le \text{Peak UPL} \times 0.50$, locking in guaranteed net cash $\ge \max(\$1.50, \text{spread} \times 2.0)$.
+     - Retracement Harvest: requires $\text{Peak UPL} \ge \$4.50$ and $\text{Current UPL} \ge \max(\$2.50, \text{spread} \times 2.0)$.
+     - Asymmetric Target Cash Harvest: targets $+30\% - +50\%$ ROI with net dollar gain $\ge \$10.00 - \$25.00+$.
+- **Enforcement:** Verified by `audit_system.py` [CHECK 59/59].
 
 ---
 

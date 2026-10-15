@@ -2882,9 +2882,9 @@ def run_audit():
         log_fail(str(e))
 
     # -------------------------------------------------------------------------
-    # [CHECK 58/58] Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Asset Selection Standard (Invariant 73)
+    # [CHECK 58/59] Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Asset Selection Standard (Invariant 73)
     # -------------------------------------------------------------------------
-    print("\n[CHECK 58/58] Verifying Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Selection Standard (Invariant 73)...")
+    print("\n[CHECK 58/59] Verifying Capital.com TradFi Multi-Layer Forex Kill-Switch & Institutional Equity Selection Standard (Invariant 73)...")
     try:
         # 1. Ground Truth Lock in AGENTS.md
         with open("AGENTS.md", "r", encoding="utf-8") as f:
@@ -2942,6 +2942,50 @@ def run_audit():
             log_fail("Capital.com TradFi Multi-Layer Forex Kill-Switch (Invariant 73) validation failed!")
     except Exception as e:
         failures.append(f"Invariant 73 check failed: {e}")
+        log_fail(str(e))
+
+    # -------------------------------------------------------------------------
+    # [CHECK 59/59] Super Smart 4-Phase TradFi Small Capital Fortress & Anti-Crumb Integrity (Invariant 74)
+    # -------------------------------------------------------------------------
+    print("\n[CHECK 59/59] Verifying Super Smart 4-Phase TradFi Small Capital Fortress & Anti-Crumb Integrity Protocol (Invariant 74)...")
+    try:
+        # 1. Ground Truth Lock in AGENTS.md
+        with open("AGENTS.md", "r", encoding="utf-8") as f:
+            agents_md = f.read()
+        has_inv74 = "Invariant 74: Super Smart 4-Phase TradFi Small Capital Fortress & Permanent Anti-Crumb Integrity Protocol" in agents_md
+
+        # 2. Asset-specific DNA breathing SL in super_smart_capital_citadel.py
+        with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as scf:
+            citadel_code = scf.read()
+        has_gold_dna = "Gold DNA: High volatility wicks" in citadel_code and "0.0040 * curr_price" in citadel_code
+        has_crypto_dna = "Crypto CFD DNA" in citadel_code and "tp_spread_mult = 12.0" in citadel_code
+        has_stock_dna = "Stock DNA: Structural swing breathing stop" in citadel_code
+
+        # 3. Dynamic testing of citadel gatekeeper with asset-specific SL
+        import super_smart_capital_citadel as sscc
+        citadel_cls = sscc.get_super_smart_capital_citadel()
+        diag_gold = citadel_cls.evaluate_institutional_tradfi_trap("GOLD", "BUY")
+        has_diag_gold = "invalidation_sl" in diag_gold and diag_gold.get("spread") is not None
+
+        # 4. Anti-crumb and small capital clamp inspections in capital_engine.py
+        with open("capital_engine.py", "r", encoding="utf-8") as cef:
+            cap_engine_code = cef.read()
+        has_anti_crumb_shock = "peak_upl >= 3.50 or peak_roi >= 15.0" in cap_engine_code and "upl >= max(1.50, spread * 2.0)" in cap_engine_code
+        has_anti_crumb_retrace = "upl >= max(2.50, spread * 2.0)" in cap_engine_code
+        has_small_cap_gold_clamp = "eff_cap < 200" in cap_engine_code and 'clean_epic in ["GOLD", "XAUUSD"]' in cap_engine_code
+
+        all_inv74_passed = (
+            has_inv74 and has_gold_dna and has_crypto_dna and has_stock_dna and
+            has_diag_gold and has_anti_crumb_shock and has_anti_crumb_retrace and has_small_cap_gold_clamp
+        )
+
+        if all_inv74_passed:
+            log_pass("Super Smart 4-Phase TradFi Small Capital Fortress & Anti-Crumb Integrity Protocol (Invariant 74) is 100% locked & certified!")
+        else:
+            failures.append(f"Invariant 74 check failed: inv74={has_inv74}, gold_dna={has_gold_dna}, crypto_dna={has_crypto_dna}, stock_dna={has_stock_dna}, diag_gold={has_diag_gold}, anti_crumb_shock={has_anti_crumb_shock}, anti_crumb_retrace={has_anti_crumb_retrace}, small_cap_gold={has_small_cap_gold_clamp}")
+            log_fail("Invariant 74 check failed!")
+    except Exception as e:
+        failures.append(f"Invariant 74 check failed: {e}")
         log_fail(str(e))
 
     # Final Summary

@@ -3284,10 +3284,18 @@ class CapitalAutonomousEngine:
             if spread <= 0:
                 spread = 0.60 if "GOLD" in epic_u else (0.05 if "OIL" in epic_u else 1.0)
 
-            # EMERGENCY STOP-LOSS ATTACHMENT PATROL (Invariant 35 Zero No-SL Standard)
+            # EMERGENCY STOP-LOSS ATTACHMENT PATROL (Invariant 35 & 74 Zero No-SL Standard)
             # Also tightens suicidal / catastrophic manual stops (> 15% price distance) to breathing stops
             prec = _get_tradfi_precision(epic, current_price)
-            safe_dist = max(spread * 3.5, current_price * 0.015)
+            if any(g in epic_u for g in ["GOLD", "XAU"]):
+                safe_dist = max(spread * 3.5, current_price * 0.008, 15.0 * spread)
+            elif is_stock:
+                safe_dist = max(spread * 3.5, current_price * 0.015)
+            elif is_crypto:
+                safe_dist = max(spread * 4.0, current_price * 0.018)
+            else:
+                safe_dist = max(spread * 3.5, current_price * 0.012)
+
             is_suicidal_sl = (
                 sl > 0 and (
                     (direction == "BUY" and sl < (entry_level * 0.85)) or
@@ -3429,23 +3437,23 @@ class CapitalAutonomousEngine:
             peak_roi = (peak_upl / estimated_margin) * 100.0 if estimated_margin > 0 else 0.0
             # Broker SL protection status: If broker already protects profit/breakeven, don't trigger premature market exit on minor pullbacks!
             broker_sl_protecting = (direction == "BUY" and sl > entry_level) or (direction == "SELL" and sl > 0 and sl < entry_level)
-            # Invariant 35: peak_upl >= 6.00 or peak_roi >= 14.0 delayed Retracement Harvest with Absolute Dollar Floor
+            # Invariant 35 & 74: Delayed Retracement Harvest with Absolute Dollar Floor (Anti-Crumb Lock)
             is_retrace_eligible = (peak_upl >= 6.00 or peak_roi >= 14.0)
             retrace_trigger = (
                 is_retrace_eligible
-                and peak_upl >= 4.50
+                and peak_upl >= 3.50
                 and (upl <= (peak_upl * ratchet_pct))
                 and (upl >= max(2.50, spread * 2.0))
                 and ((peak_upl >= 15.0 or peak_roi >= 30.0) or not broker_sl_protecting)
             )
 
-            # Volatility Shock & Sudden Flash Reversal Protective Early Harvest:
-            # If position achieved positive expansion (Peak UPL >= $2.50) but suddenly plunges below 50% of peak,
-            # force-harvest immediately to bank profit before turning into a red loss
+            # Volatility Shock & Sudden Flash Reversal Protective Early Harvest (Invariant 74 Anti-Crumb Guaranteed Floor):
+            # If position achieved positive expansion (Peak UPL >= $3.50 or Peak ROI >= 15.0%) but suddenly plunges below 50% of peak,
+            # force-harvest immediately to bank clean profit (>= max($1.50, spread * 2.0)) before turning into a red loss
             shock_harvest_trigger = (
-                peak_upl >= 2.50
+                (peak_upl >= 3.50 or peak_roi >= 15.0)
                 and upl <= (peak_upl * 0.50)
-                and upl >= max(0.80, spread * 1.5)
+                and upl >= max(1.50, spread * 2.0)
             )
 
             if retrace_trigger or shock_harvest_trigger:
@@ -3519,7 +3527,7 @@ class CapitalAutonomousEngine:
                     # On Wednesday Triple Swap: Harvest if profit >= 2.50 to avoid 3-day penalty.
                     # On standard weeknights: Only market-harvest if major target reached (ROI >= 25.0% or UPL >= 15.00),
                     # otherwise let positions with active trailing stops continue running overnight without interruption!
-                    should_swap_harvest = (w_utc == 2 and (roi_pct >= 5.0 or upl >= 2.50)) or (roi_pct >= 25.0 or upl >= 15.00)
+                    should_swap_harvest = (((w_utc == 2 and (roi_pct >= 5.0 or upl >= 2.50)) or (roi_pct >= 25.0 or upl >= 15.00)) and (upl >= 2.00))
                     if should_swap_harvest:
                         tag = "🛡️ [ROLLOVER SWAP SHIELD HARVEST]"
                         logger.info(f"{tag} Banking ${upl:+.2f} on {epic} before 22:00 UTC swap rollover to avoid overnight financing drag!")
@@ -6380,6 +6388,13 @@ class CapitalKellyPositionSizer:
                 final_lot = min(0.10, max(rule["min_lot"], final_lot))
             elif is_stock:
                 final_lot = min(0.20, max(rule["min_lot"], final_lot))
+
+        # Small Capital Gold & Crypto Shield for Accounts < $200 (Invariant 74)
+        if eff_cap < 200:
+            if clean_epic in ["GOLD", "XAUUSD"]:
+                final_lot = min(0.08, max(rule["min_lot"], final_lot))
+            elif is_crypto:
+                final_lot = rule["min_lot"]
 
         # Snap to lot_step
         step = rule["lot_step"]

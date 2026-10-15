@@ -568,22 +568,45 @@ class SuperSmartCapitalCitadel:
         is_approved = (confluence_score >= 68.0)
 
         # --------------------------------------------------------------------
-        # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & DYNAMIC VOLATILITY BREATHING STOP (INVARIANTS 34 & 35)
+        # 8. PILLAR 8: ASYMMETRIC R:R >= 1:2.5 & ASSET-SPECIFIC DNA BREATHING STOP (INVARIANTS 34, 35 & 74)
         # --------------------------------------------------------------------
         prec = _get_tradfi_precision(resolved_epic, curr_price)
-        # Dynamic Volatility Breathing Stop Standard (Invariant 35 / Pillar 2):
-        # SL Distance >= max(2.50 * ATR, 3.5 * Spread, 0.0035 * Price)
-        breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+        s_epic = resolved_epic.upper()
+        is_gold = any(g in s_epic for g in ["GOLD", "XAU"])
+        is_stock = any(st in s_epic for st in ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"])
+        is_crypto_cfd = any(cr in s_epic for cr in ["BTCUSD", "ETHUSD", "SOLUSD", "BTC", "ETH", "SOL"])
+        is_index = any(idx in s_epic for idx in ["US500", "SP500", "US100", "NASDAQ", "DE40", "GERMANY40", "US30", "DOW"])
+
+        # Asset-Specific Volatility & Spread DNA Breathing Stop (Invariant 74):
+        if is_gold:
+            # Gold DNA: High volatility wicks & liquidity spring sweep breathing stop
+            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0040 * curr_price)
+            tp_spread_mult = 10.0
+        elif is_stock:
+            # Stock DNA: Structural swing breathing stop + session opening gap buffer
+            breathing_sl_dist = max(2.20 * atr_15m, 0.0150 * curr_price, 3.5 * spread)
+            tp_spread_mult = 10.0
+        elif is_crypto_cfd:
+            # Crypto CFD DNA: Wide broker spread drag elimination breathing stop
+            breathing_sl_dist = max(2.80 * atr_15m, 4.0 * spread, 0.0080 * curr_price)
+            tp_spread_mult = 12.0  # Extra hurdle to overcome wide CFD spreads
+        elif is_index:
+            # Index DNA: Contract point breathing stop
+            breathing_sl_dist = max(2.20 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+            tp_spread_mult = 10.0
+        else:
+            breathing_sl_dist = max(2.50 * atr_15m, 3.5 * spread, 0.0035 * curr_price)
+            tp_spread_mult = 10.0
 
         if norm_side == "BUY":
             invalidation_sl = round(min(swing_low - (0.25 * atr_15m), curr_price - breathing_sl_dist), prec)
             risk_dist = max(breathing_sl_dist, curr_price - invalidation_sl)
-            tp_1 = round(curr_price + max(risk_dist * 2.5, 10.0 * spread), prec)  # Institutional 1:2.5 Min Hurdle & >= 10x spread
+            tp_1 = round(curr_price + max(risk_dist * 2.5, tp_spread_mult * spread), prec)  # Institutional 1:2.5 Min Hurdle
             tp_2 = round(curr_price + max(risk_dist * 5.0, 15.0 * spread), prec)  # Institutional 1:5.0 Major Target
         else:
             invalidation_sl = round(max(swing_high + (0.25 * atr_15m), curr_price + breathing_sl_dist), prec)
             risk_dist = max(breathing_sl_dist, invalidation_sl - curr_price)
-            tp_1 = round(curr_price - max(risk_dist * 2.5, 10.0 * spread), prec)
+            tp_1 = round(curr_price - max(risk_dist * 2.5, tp_spread_mult * spread), prec)
             tp_2 = round(curr_price - max(risk_dist * 5.0, 15.0 * spread), prec)
 
         rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
