@@ -149,6 +149,20 @@ class SuperSmartCapitalCitadel:
             if now - cached_ts < cls._CACHE_TTL:
                 return cached_res
 
+        # Super Admin Asset Control Shield (All Users)
+        import database as db
+        if not db.is_capital_asset_enabled(resolved_epic):
+            reason = f"ADMIN_ASSET_DISABLED: {resolved_epic} is currently deactivated by Super Admin for all users."
+            res = {
+                "epic": resolved_epic,
+                "proposed_side": norm_side,
+                "is_approved": False,
+                "rejection_reason": reason,
+                "confluence_score": 0.0
+            }
+            cls._CITADEL_CACHE[cache_key] = (now, res)
+            return res
+
         # Retrieve active engine if not passed
         if engine is None:
             engine = capital_engine.get_capital_engine()
@@ -704,6 +718,13 @@ class SuperSmartCapitalCitadel:
                 reason = f"FOREX_BLOCKED: {s_epic} is blocked by Angkor Quant Fiduciary Guard. Trading is restricted to US Equities, Indices, and Gold/Crypto CFDs."
                 print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
                 return False, reason, {"is_approved": False, "rejection_reason": reason}
+
+        # Pillar 0.5: Super Admin Asset Control Shield (All Users)
+        import database as db
+        if not db.is_capital_asset_enabled(s_epic):
+            reason = f"ASSET_BLOCKED_BY_ADMIN: {s_epic} is currently deactivated by Super Admin for all users."
+            print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+            return False, reason, {"is_approved": False, "rejection_reason": reason}
 
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):

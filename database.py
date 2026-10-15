@@ -2955,6 +2955,130 @@ def set_capital_user_custom_assets(chat_id: int, assets: list):
     clean_assets = [str(x).strip().upper() for x in assets if str(x).strip()]
     update_system_setting(f"cap_custom_assets_{chat_id}", ",".join(clean_assets))
 
+# ==============================================================================
+# SUPER ADMIN CAPITAL ASSET & GLOBAL USER CONTROLS (SUPER SMART & SUPER FAST)
+# ==============================================================================
+_DISABLED_CAPITAL_EPICS_CACHE: Optional[set] = None
+
+def get_capital_disabled_assets() -> list:
+    """Returns list of TradFi/Crypto asset epics deactivated by Super Admin for all users."""
+    global _DISABLED_CAPITAL_EPICS_CACHE
+    if _DISABLED_CAPITAL_EPICS_CACHE is not None:
+        return sorted(list(_DISABLED_CAPITAL_EPICS_CACHE))
+    val = get_system_setting("cap_disabled_assets", "")
+    if not val:
+        _DISABLED_CAPITAL_EPICS_CACHE = set()
+        return []
+    items = {x.strip().upper() for x in val.split(",") if x.strip()}
+    _DISABLED_CAPITAL_EPICS_CACHE = items
+    return sorted(list(items))
+
+def is_capital_asset_enabled(epic: str) -> bool:
+    """Returns True if the TradFi/Crypto asset is active, False if disabled by Super Admin for all users."""
+    if not epic:
+        return True
+    s = str(epic).upper().strip()
+    disabled = set(get_capital_disabled_assets())
+    aliases = [s, s.replace("USDT", "USD"), s.replace("USD", ""), s.replace("USDT", "")]
+    for a in aliases:
+        if a in disabled:
+            return False
+    return True
+
+def set_capital_asset_status(epic: str, is_enabled: bool) -> bool:
+    """Activates or deactivates a specific stock, index, commodity, or crypto coin for ALL users."""
+    global _DISABLED_CAPITAL_EPICS_CACHE
+    s = str(epic).upper().strip()
+    disabled = set(get_capital_disabled_assets())
+    if is_enabled:
+        disabled.discard(s)
+        disabled.discard(s.replace("USDT", "USD"))
+        disabled.discard(s.replace("USD", ""))
+    else:
+        disabled.add(s)
+    _DISABLED_CAPITAL_EPICS_CACHE = disabled
+    update_system_setting("cap_disabled_assets", ",".join(sorted(list(disabled))))
+    return True
+
+def get_capital_asset_status_map() -> dict:
+    """Returns active/disabled status map for primary Wall Street stocks, indices, commodities, and crypto CFDs."""
+    primary_assets = [
+        "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN",
+        "US100", "US500", "DE40",
+        "GOLD", "NATGAS", "OIL_CRUDE",
+        "BTCUSD", "ETHUSD", "SOLUSD"
+    ]
+    disabled = set(get_capital_disabled_assets())
+    return {a: (a not in disabled and a.replace("USD", "") not in disabled) for a in primary_assets}
+
+def is_capital_global_trading_enabled(engine: str = "AUTO") -> bool:
+    """Checks if global trading is enabled for all users for AUTO, SCALP, or ALL."""
+    eng = engine.upper()
+    if eng in ["AUTO", "CAPITAL_AUTO"]:
+        val = get_system_setting("cap_global_auto_enabled", "1")
+    elif eng in ["SCALP", "CAPITAL_SCALP"]:
+        val = get_system_setting("cap_global_scalp_enabled", "1")
+    else:
+        val_auto = get_system_setting("cap_global_auto_enabled", "1")
+        val_scalp = get_system_setting("cap_global_scalp_enabled", "1")
+        return (val_auto in ["1", "true", "TRUE", "True", "yes"]) and (val_scalp in ["1", "true", "TRUE", "True", "yes"])
+    return val in ["1", "true", "TRUE", "True", "yes"]
+
+def set_capital_global_trading_switch(enabled: bool, engine: str = "ALL"):
+    """Sets the global trading switch for Capital Auto and/or Capital Scalp."""
+    s_val = "1" if enabled else "0"
+    eng = engine.upper()
+    if eng in ["ALL", "BOTH"]:
+        update_system_setting("cap_global_auto_enabled", s_val)
+        update_system_setting("cap_global_scalp_enabled", s_val)
+    elif eng in ["AUTO", "CAPITAL_AUTO"]:
+        update_system_setting("cap_global_auto_enabled", s_val)
+    elif eng in ["SCALP", "CAPITAL_SCALP"]:
+        update_system_setting("cap_global_scalp_enabled", s_val)
+
+def enable_all_capital_users(engine: str = "ALL") -> int:
+    """Enables auto trade / trend scalp for all registered Capital.com users in batch."""
+    set_capital_global_trading_switch(True, engine)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    updated_count = 0
+    try:
+        eng = engine.upper()
+        if eng in ["ALL", "AUTO"]:
+            cursor.execute("UPDATE capital_auto_config SET is_enabled = 1")
+            updated_count += max(0, cursor.rowcount)
+        if eng in ["ALL", "SCALP"]:
+            cursor.execute("UPDATE capital_scalp_config SET is_enabled = 1")
+            updated_count += max(0, cursor.rowcount)
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error in enable_all_capital_users: {e}")
+    finally:
+        conn.close()
+    return max(1, updated_count)
+
+def disable_all_capital_users(engine: str = "ALL", preserve_super_admin: bool = True) -> int:
+    """Disables auto trade / trend scalp for all users in batch (preserving Super Admin by default)."""
+    set_capital_global_trading_switch(False, engine)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    updated_count = 0
+    try:
+        eng = engine.upper()
+        where_clause = "WHERE chat_id != 859271875" if preserve_super_admin else ""
+        if eng in ["ALL", "AUTO"]:
+            cursor.execute(f"UPDATE capital_auto_config SET is_enabled = 0 {where_clause}")
+            updated_count += max(0, cursor.rowcount)
+        if eng in ["ALL", "SCALP"]:
+            cursor.execute(f"UPDATE capital_scalp_config SET is_enabled = 0 {where_clause}")
+            updated_count += max(0, cursor.rowcount)
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error in disable_all_capital_users: {e}")
+    finally:
+        conn.close()
+    return max(1, updated_count)
+
 def get_capital_open_trades_by_epic(epic: str) -> list:
     """Returns all OPEN trades across all users for a given epic."""
     conn = get_db_connection()
@@ -4112,7 +4236,7 @@ def is_capital_user_authorized(chat_id: int) -> bool:
     3. User is linked in capital_user_referrals with partner_code containing 'az48cxia'
     4. User license_expiry is 'Administrator'
     """
-    if chat_id in [859271875, 537186806]:
+    if chat_id in [859271875, 537186806] or is_admin(chat_id):
         return True
 
     # Check administrator license

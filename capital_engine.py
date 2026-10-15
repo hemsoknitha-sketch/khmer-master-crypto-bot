@@ -946,13 +946,18 @@ class CapitalComEngine:
                 if bal_chk.get("success"):
                     avail_cash = float(bal_chk.get("available", 0.0) or 0.0)
                     if req_margin > 0 and avail_cash < req_margin:
-                        logger.warning(f"🛡️ [MARGIN PRE-FLIGHT] Order blocked for {resolved_epic}: Required margin ${req_margin:,.2f} exceeds available cash ${avail_cash:,.2f}.")
-                        return {
-                            "success": False,
-                            "error": f"RC_NOT_ENOUGH_MARGIN: Required ${req_margin:,.2f} > Avail ${avail_cash:,.2f}",
-                            "required_margin": req_margin,
-                            "available_cash": avail_cash
-                        }
+                        is_sa_caller = (getattr(self, "custom_chat_id", None) == SUPER_ADMIN_ID or 
+                                        getattr(self, "account_id", "") in ["216890638652757188", "1612591526"])
+                        if is_sa_caller:
+                            logger.info(f"👑 [SUPER ADMIN MARGIN BYPASS] Required margin ${req_margin:,.2f} > Avail ${avail_cash:,.2f}. Proceeding without local pre-flight margin block for Super Admin!")
+                        else:
+                            logger.warning(f"🛡️ [MARGIN PRE-FLIGHT] Order blocked for {resolved_epic}: Required margin ${req_margin:,.2f} exceeds available cash ${avail_cash:,.2f}.")
+                            return {
+                                "success": False,
+                                "error": f"RC_NOT_ENOUGH_MARGIN: Required ${req_margin:,.2f} > Avail ${avail_cash:,.2f}",
+                                "required_margin": req_margin,
+                                "available_cash": avail_cash
+                            }
             except Exception as e_bal:
                 logger.debug(f"Balance check error in place_position: {e_bal}")
 
@@ -1301,13 +1306,18 @@ class CapitalComEngine:
                 if bal_chk.get("success"):
                     avail_cash = float(bal_chk.get("available", 0.0) or 0.0)
                     if req_margin > 0 and avail_cash < req_margin:
-                        logger.warning(f"🛡️ [MARGIN PRE-FLIGHT] Working Order blocked for {resolved_epic}: Required margin ${req_margin:,.2f} exceeds available cash ${avail_cash:,.2f}.")
-                        return {
-                            "success": False,
-                            "error": f"RC_NOT_ENOUGH_MARGIN: Required ${req_margin:,.2f} > Avail ${avail_cash:,.2f}",
-                            "required_margin": req_margin,
-                            "available_cash": avail_cash
-                        }
+                        is_sa_caller = (getattr(self, "custom_chat_id", None) == SUPER_ADMIN_ID or 
+                                        getattr(self, "account_id", "") in ["216890638652757188", "1612591526"])
+                        if is_sa_caller:
+                            logger.info(f"👑 [SUPER ADMIN MARGIN BYPASS] Working Order required margin ${req_margin:,.2f} > Avail ${avail_cash:,.2f}. Proceeding without local pre-flight margin block for Super Admin!")
+                        else:
+                            logger.warning(f"🛡️ [MARGIN PRE-FLIGHT] Working Order blocked for {resolved_epic}: Required margin ${req_margin:,.2f} exceeds available cash ${avail_cash:,.2f}.")
+                            return {
+                                "success": False,
+                                "error": f"RC_NOT_ENOUGH_MARGIN: Required ${req_margin:,.2f} > Avail ${avail_cash:,.2f}",
+                                "required_margin": req_margin,
+                                "available_cash": avail_cash
+                            }
             except Exception as e_bal:
                 logger.debug(f"Balance check error in place_working_order: {e_bal}")
 
@@ -3051,22 +3061,28 @@ class CapitalAutonomousEngine:
 
         # Wall Street NY Session (13:30 - 20:45 UTC = 20:30 - 03:45 Phnom Penh) - Prime US Mega-Cap Equities & Indices
         if 810 <= utc_min < 1245:
-            return ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "US500", "US100", "GOLD", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
+            raw_assets = ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "US500", "US100", "GOLD", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
         # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh)
         elif 420 <= utc_min < 810:
             if forex_allowed:
-                return ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA", "BTCUSD"]
+                raw_assets = ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA", "BTCUSD"]
             else:
-                return ["US500", "US100", "GERMANY40", "GOLD", "NVDA", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD"]
+                raw_assets = ["US500", "US100", "GERMANY40", "GOLD", "NVDA", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD"]
         # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh)
         elif 0 <= utc_min < 420:
             if forex_allowed:
-                return ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "EURUSD"]
+                raw_assets = ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "EURUSD"]
             else:
-                return ["US500", "GOLD", "US100", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "SOLUSD"]
+                raw_assets = ["US500", "GOLD", "US100", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "SOLUSD"]
         # Late Night Rollover Lull (20:45 - 23:59 UTC = 03:45 - 07:00 Phnom Penh): Zero-Swap Shield -> Crypto CFDs
         else:
-            return ["BTCUSD", "ETHUSD", "SOLUSD"]
+            raw_assets = ["BTCUSD", "ETHUSD", "SOLUSD"]
+
+        # Super Admin Asset Control Shield: purge any asset disabled by Super Admin for all users
+        disabled_assets = set(db.get_capital_disabled_assets())
+        if disabled_assets:
+            return [a for a in raw_assets if a.upper() not in disabled_assets and EPIC_MAP.get(a.upper(), a.upper()) not in disabled_assets]
+        return raw_assets
 
     def evaluate_multi_engine_tradfi_setup(self, epic: str) -> Dict[str, Any]:
         """
@@ -3946,14 +3962,18 @@ class CapitalAutonomousEngine:
             return False
 
         # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
-        if not user_is_demo and not db.is_capital_user_authorized(chat_id):
+        if not user_is_demo and chat_id != SUPER_ADMIN_ID and not db.is_capital_user_authorized(chat_id):
             logger.warning(f"🔒 [REFERRAL GATEKEEPER] TradFi Auto-Trade blocked for User {chat_id}: Unverified Capital.com referral.")
             return False
 
-        # Smart Locomotive Fallback: Super Admin is strictly on LIVE MAINNET!
-        # Only fallback to Capital Demo ($10,000) if Live available cash < $10.00
-        if chat_id == SUPER_ADMIN_ID:
-            user_is_demo = False  # Super Admin Master Locomotive strictly executes on Live Mainnet!
+        # Super Admin Global Auto Switch Gatekeeper
+        if chat_id != SUPER_ADMIN_ID and not db.is_capital_global_trading_enabled("AUTO"):
+            logger.debug(f"⏸️ [GLOBAL AUTO PAUSED] User {chat_id} skipped: Capital Auto is paused for all users by Super Admin.")
+            return False
+
+        # Smart Locomotive Fallback: If Live available cash < $10.00, dynamically mirror to Demo ($10,000)
+        # so Super Admin is NEVER blocked regardless of Live balance!
+        if chat_id == SUPER_ADMIN_ID and not user_is_demo:
             try:
                 chk_engine = get_user_capital_engine(chat_id, is_demo=False)
                 chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
@@ -7577,14 +7597,20 @@ class CapitalTrendScalpEngine:
         is_swap_shield = (utc_min >= 1245) and not is_weekend  # Overnight lull
 
         if is_weekend or is_swap_shield:
-            return list(self.TREND_MAJORS_CRYPTO)
-
-        if mode == "CRYPTO":
-            return list(self.TREND_MAJORS_CRYPTO)
+            raw_majors = list(self.TREND_MAJORS_CRYPTO)
+        elif mode == "CRYPTO":
+            raw_majors = list(self.TREND_MAJORS_CRYPTO)
         elif mode == "TRADFI":
-            return list(self.TREND_MAJORS_TRADFI)
+            raw_majors = list(self.TREND_MAJORS_TRADFI)
         else:
-            return list(self.ALL_SCALP_MAJORS)
+            raw_majors = list(self.ALL_SCALP_MAJORS)
+
+        # Super Admin Asset Control Shield: purge any asset disabled by Super Admin for all users
+        import database as db
+        disabled_assets = set(db.get_capital_disabled_assets())
+        if disabled_assets:
+            return [m for m in raw_majors if m.upper() not in disabled_assets and EPIC_MAP.get(m.upper(), m.upper()) not in disabled_assets]
+        return raw_majors
 
     def evaluate_trend_scalp_setup(self, epic: str, engine: Optional[CapitalComEngine] = None) -> Dict[str, Any]:
         """
@@ -7835,8 +7861,25 @@ class CapitalTrendScalpEngine:
             user_mode = user_cfg.get("mode", "ALL")
 
             # Capital.com Pro Referral Gatekeeper Lock (Invariant 36)
-            if not is_demo and not db.is_capital_user_authorized(chat_id):
+            if not is_demo and chat_id != SUPER_ADMIN_ID and not db.is_capital_user_authorized(chat_id):
                 return False
+
+            # Super Admin Global Scalp Switch Gatekeeper
+            if chat_id != SUPER_ADMIN_ID and not db.is_capital_global_trading_enabled("SCALP"):
+                return False
+
+            # Smart Locomotive Fallback: If Live available cash < $10.00, dynamically mirror to Demo ($10,000)
+            # so Super Admin is NEVER blocked regardless of Live balance!
+            if chat_id == SUPER_ADMIN_ID and not is_demo:
+                try:
+                    chk_engine = get_user_capital_engine(chat_id, is_demo=False)
+                    chk_bal = await asyncio.to_thread(chk_engine.get_account_balance)
+                    chk_avail = float(chk_bal.get("available", 0.0) or 0.0)
+                    if not chk_bal.get("success") or chk_avail < 10.0:
+                        logger.info(f"🚂 [SCALP LOCOMOTIVE DEMO MIRROR] Super Admin (859271875) Live Avail (${chk_avail:,.2f}) < $10.00. Dynamically mirroring on Capital Demo ($10,000) so Super Admin Scalp is never blocked!")
+                        is_demo = True
+                except Exception:
+                    pass
 
             user_engine = get_user_capital_engine(chat_id, is_demo=is_demo)
             try:

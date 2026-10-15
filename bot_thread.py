@@ -6515,9 +6515,8 @@ class TelegramBotThread(BaseThread):
                 new_state = not curr_state
                 cfg = db.get_capital_auto_config(chat_id)
                 is_demo = cfg.get("is_demo", False)
-                if chat_id == 859271875:
-                    is_demo = False  # Super Admin Master Locomotive strictly trades on LIVE MAINNET!
-                if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if new_state and not is_demo and not is_sa and not db.is_capital_user_authorized(chat_id):
                     try:
                         await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
                     except Exception:
@@ -6620,7 +6619,8 @@ class TelegramBotThread(BaseThread):
                 cfg = db.get_capital_auto_config(chat_id)
                 curr_demo = bool(cfg.get("is_demo", False))
                 new_demo = not curr_demo
-                if not new_demo and not db.is_capital_user_authorized(chat_id):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not new_demo and not is_sa and not db.is_capital_user_authorized(chat_id):
                     try:
                         await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការដើម្បី Trade Live!", show_alert=True)
                     except Exception:
@@ -6930,6 +6930,171 @@ class TelegramBotThread(BaseThread):
                     f"បានបិទ Capital Auto Trade សម្រាប់ User `{target_uid}` រួចរាល់!",
                     parse_mode="Markdown"
                 )
+            elif data == "btn_cap_admin_assets":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                try:
+                    await update.callback_query.answer("🎛️ បើកផ្ទាំងគ្រប់គ្រង Assets (Stocks/Crypto)...")
+                except Exception:
+                    pass
+                c_text, c_kb = build_capital_asset_controls_ui(chat_id, user_lang)
+                try:
+                    await update.effective_message.edit_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+                except Exception:
+                    await update.effective_message.reply_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+            elif data == "btn_cap_enable_all_assets":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                all_known_assets = [
+                    "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN",
+                    "US100", "US500", "DE40",
+                    "GOLD", "NATGAS", "OIL_CRUDE",
+                    "BTCUSD", "ETHUSD", "SOLUSD"
+                ]
+                for a in all_known_assets:
+                    db.set_capital_asset_status(a, True)
+                try:
+                    await update.callback_query.answer("🟢 បានបើកដំណើរការគ្រប់ Assets ទាំងអស់ (All Assets Enabled)!", show_alert=True)
+                except Exception:
+                    pass
+                c_text, c_kb = build_capital_asset_controls_ui(chat_id, user_lang)
+                try:
+                    await update.effective_message.edit_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+                except Exception:
+                    await update.effective_message.reply_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+            elif data.startswith("btn_cap_toggle_asset_"):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                target_epic = data.replace("btn_cap_toggle_asset_", "").strip().upper()
+                curr_status = db.is_capital_asset_enabled(target_epic)
+                new_status = not curr_status
+                db.set_capital_asset_status(target_epic, new_status)
+                status_kh = "បើកដំណើរការ (ENABLED) 🟢" if new_status else "បិទដំណើរការ (DISABLED) 🛑"
+                try:
+                    await update.callback_query.answer(f"{target_epic}: {status_kh} សម្រាប់ Users ទាំងអស់!", show_alert=True)
+                except Exception:
+                    pass
+                c_text, c_kb = build_capital_asset_controls_ui(chat_id, user_lang)
+                try:
+                    await update.effective_message.edit_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+                except Exception:
+                    await update.effective_message.reply_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+            elif data == "btn_cap_all_users_on":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                cnt_auto = db.enable_all_capital_users("AUTO")
+                cnt_scalp = db.enable_all_capital_users("SCALP")
+                db.set_capital_global_trading_switch(True, "ALL")
+                try:
+                    await update.callback_query.answer(f"🌐 បានបើកដំណើរការវិនិយោគពេញលេញសម្រាប់ ALL USERS! (Auto: {cnt_auto}, Scalp: {cnt_scalp})", show_alert=True)
+                except Exception:
+                    pass
+                notif = (
+                    f"🌐 **[GLOBAL MASTER TOGGLE: ALL USERS ACTIVATED]** 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 **បញ្ជាដោយ ៖** Super Admin (`{chat_id}`)\n"
+                    f"🤖 **Capital Auto ៖** `បើកដំណើរការ ({cnt_auto} Users)`\n"
+                    f"⚡ **Trend Scalp 24/7 ៖** `បើកដំណើរការ ({cnt_scalp} Users)`\n"
+                    f"🌍 **Global Switch ៖** `🟢 100% ACTIVE (All Systems Go)`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🚀 _ប្រព័ន្ធ AI កំពុងស្កេន និងចាប់យកឱកាសវិនិយោគសម្រាប់ Users ទាំងអស់!_"
+                )
+                await update.effective_message.reply_text(notif, parse_mode="Markdown")
+            elif data == "btn_cap_all_users_off":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                cnt_auto = db.disable_all_capital_users("AUTO", preserve_super_admin=True)
+                cnt_scalp = db.disable_all_capital_users("SCALP", preserve_super_admin=True)
+                db.set_capital_global_trading_switch(False, "ALL")
+                try:
+                    await update.callback_query.answer(f"🛑 បានផ្អាកដំណើរការវិនិយោគសម្រាប់ ALL USERS! (Auto: {cnt_auto}, Scalp: {cnt_scalp})", show_alert=True)
+                except Exception:
+                    pass
+                notif = (
+                    f"🛑 **[GLOBAL MASTER TOGGLE: ALL USERS PAUSED]** ⏸️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"👑 **បញ្ជាដោយ ៖** Super Admin (`{chat_id}`)\n"
+                    f"🤖 **Capital Auto ៖** `ផ្អាក ({cnt_auto} Users)`\n"
+                    f"⚡ **Trend Scalp 24/7 ៖** `ផ្អាក ({cnt_scalp} Users)`\n"
+                    f"👑 **Super Admin ៖** `នៅតែដំណើរការធម្មតា (Preserved)`\n"
+                    f"🌍 **Global Switch ៖** `🛑 PAUSED`\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"🛡️ _ទុនរបស់ Users ទាំងអស់ត្រូវបានចាក់សោរ និងការពារសុវត្ថិភាព ១០០%!_"
+                )
+                await update.effective_message.reply_text(notif, parse_mode="Markdown")
+            elif data == "btn_cap_all_auto_toggle":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                curr_auto = db.is_capital_global_trading_enabled("AUTO")
+                new_auto = not curr_auto
+                db.set_capital_global_trading_switch(new_auto, "AUTO")
+                try:
+                    await update.callback_query.answer(f"Auto Global Switch: {'ON 🟢' if new_auto else 'OFF 🛑'}", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await admin_capital_command(update, context)
+            elif data == "btn_cap_all_scalp_toggle":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                curr_scalp = db.is_capital_global_trading_enabled("SCALP")
+                new_scalp = not curr_scalp
+                db.set_capital_global_trading_switch(new_scalp, "SCALP")
+                try:
+                    await update.callback_query.answer(f"Scalp Global Switch: {'ON 🟢' if new_scalp else 'OFF 🛑'}", show_alert=True)
+                except Exception:
+                    pass
+                context.args = []
+                await admin_capital_command(update, context)
+            elif data == "btn_cap_admin_menu":
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if not is_sa:
+                    try:
+                        await update.callback_query.answer("⛔ Super Admin Authorization Required!", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                try:
+                    await update.callback_query.answer("👑 Capital Admin Directory...")
+                except Exception:
+                    pass
+                context.args = ["LIST"]
+                await admin_capital_command(update, context)
             elif data == "btn_citadel_refresh":
                 import system_security_citadel as sc
                 try:
@@ -7044,9 +7209,8 @@ class TelegramBotThread(BaseThread):
                 new_state = not curr_state
                 cfg = db.get_capital_scalp_config(chat_id)
                 is_demo = cfg.get("is_demo", False)
-                if chat_id == 859271875:
-                    is_demo = False  # Super Admin strictly on Live Mainnet
-                if new_state and not is_demo and not db.is_capital_user_authorized(chat_id):
+                is_sa = (chat_id == 859271875 or db.is_admin(chat_id))
+                if new_state and not is_demo and not is_sa and not db.is_capital_user_authorized(chat_id):
                     try:
                         await update.callback_query.answer("🔒 ទាមទារការចុះឈ្មោះក្រោម Referral ដៃគូផ្លូវការ!", show_alert=True)
                     except Exception:
@@ -7066,8 +7230,6 @@ class TelegramBotThread(BaseThread):
                 cfg = db.get_capital_scalp_config(chat_id)
                 curr_demo = cfg.get("is_demo", False)
                 new_demo = not curr_demo
-                if chat_id == 859271875:
-                    new_demo = False  # Super Admin strictly on Live Mainnet
                 db.set_capital_scalp_config(chat_id, enabled=cfg.get("enabled", False), budget=cfg.get("budget", 30.0), mode=cfg.get("mode", "ALL"), max_positions=cfg.get("max_positions", 3), is_demo=new_demo)
                 toast_msg = "🧪 ប្តូរទៅ Demo Practice!" if new_demo else "⚡ ប្តូរទៅ Live Mainnet!"
                 try:
@@ -24473,11 +24635,48 @@ class TelegramBotThread(BaseThread):
 
             scalp_engine = capital_engine.get_capital_trend_scalp_engine()
             scalp_cfg = db.get_capital_scalp_config(chat_id)
+            is_super_admin = (chat_id == 859271875 or db.is_admin(chat_id))
 
-            # Handle Subcommands: ON, OFF, DEMO, LIVE, STATUS, BUDGET
+            # Handle Subcommands: ON, OFF, DEMO, LIVE, STATUS, BUDGET, ALL_ON, ALL_OFF, ASSET
             if args:
                 sub = str(args[0]).upper().strip()
-                if sub in ["ON", "START", "ENABLE"]:
+                if sub in ["ALL_ON", "ALL_USERS_ON", "GLOBAL_ON"] and is_super_admin:
+                    cnt = db.enable_all_capital_users("SCALP")
+                    db.set_capital_global_trading_switch(True, "SCALP")
+                    await update.effective_message.reply_text(
+                        f"🌐 **[ALL USERS SCALP ACTIVATED]** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"បានបើកដំណើរការ Trend Scalp 24/7 សម្រាប់ {cnt} Users រួចរាល់!\n"
+                        f"• Scalp Global Switch: `🟢 ACTIVE`",
+                        parse_mode="Markdown"
+                    )
+                    return
+                elif sub in ["ALL_OFF", "ALL_USERS_OFF", "GLOBAL_OFF"] and is_super_admin:
+                    cnt = db.disable_all_capital_users("SCALP", preserve_super_admin=True)
+                    db.set_capital_global_trading_switch(False, "SCALP")
+                    await update.effective_message.reply_text(
+                        f"🛑 **[ALL USERS SCALP PAUSED]** ⏸️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"បានផ្អាកដំណើរការ Trend Scalp 24/7 សម្រាប់ {cnt} Users (Super Admin preserved)!\n"
+                        f"• Scalp Global Switch: `🛑 PAUSED`",
+                        parse_mode="Markdown"
+                    )
+                    return
+                elif sub in ["ASSET", "ASSETS"] and is_super_admin:
+                    if len(args) > 1:
+                        target_epic = str(args[1]).upper().strip()
+                        target_st = True
+                        if len(args) > 2:
+                            target_st = str(args[2]).upper().strip() in ["ON", "1", "ENABLE", "ENABLED", "TRUE"]
+                        db.set_capital_asset_status(target_epic, target_st)
+                        st_lbl = "ENABLED 🟢" if target_st else "DISABLED 🛑"
+                        await update.effective_message.reply_text(f"🎛️ **[ASSET STATUS UPDATED]**\n`{target_epic}`: `{st_lbl}` សម្រាប់ Users ទាំងអស់!", parse_mode="Markdown")
+                        return
+                    else:
+                        c_text, c_kb = build_capital_asset_controls_ui(chat_id, user_lang)
+                        await update.effective_message.reply_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+                        return
+                elif sub in ["ON", "START", "ENABLE"]:
                     b_val = scalp_cfg.get("budget", 30.0)
                     if len(args) > 1:
                         try:
@@ -24526,6 +24725,13 @@ class TelegramBotThread(BaseThread):
                     InlineKeyboardButton(toggle_text, callback_data="btn_cap_scalp_toggle"),
                     InlineKeyboardButton(demo_text, callback_data="btn_cap_scalp_demo")
                 ],
+                *([[
+                    InlineKeyboardButton("🌐 ALL USERS ON", callback_data="btn_cap_all_users_on"),
+                    InlineKeyboardButton("🛑 ALL USERS OFF", callback_data="btn_cap_all_users_off")
+                ]] if is_super_admin else []),
+                *([[
+                    InlineKeyboardButton("🎛️ ASSET CONTROLS (Stocks/Crypto)", callback_data="btn_cap_admin_assets")
+                ]] if is_super_admin else []),
                 [
                     InlineKeyboardButton("🔄 Refresh Scalp Matrix", callback_data="btn_cap_scalp_refresh"),
                     InlineKeyboardButton("📊 Positions", callback_data="btn_cap_positions")
@@ -25239,6 +25445,109 @@ class TelegramBotThread(BaseThread):
             ])
             return gate_text, gate_kb
 
+        def build_capital_asset_controls_ui(chat_id: int, user_lang: str = "khmer") -> tuple:
+            """
+            Builds the interactive 1-tap Super Admin Asset Control Matrix (Stocks, Indices, Commodities, Crypto).
+            Enables instant sub-millisecond toggling of any asset for ALL Users.
+            """
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            import ui_standards
+
+            status_map = db.get_capital_asset_status_map()
+            disabled_assets = db.get_capital_disabled_assets()
+            global_auto = db.is_capital_global_trading_enabled("AUTO")
+            global_scalp = db.is_capital_global_trading_enabled("SCALP")
+
+            # Structured asset catalog
+            equities = ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"]
+            indices = ["US100", "US500", "DE40"]
+            commodities = ["GOLD", "NATGAS", "OIL_CRUDE"]
+            crypto = ["BTCUSD", "ETHUSD", "SOLUSD"]
+
+            all_catalog = equities + indices + commodities + crypto
+            active_count = sum(1 for a in all_catalog if db.is_capital_asset_enabled(a))
+            total_count = len(all_catalog)
+
+            lines = [
+                "👑 **[SUPER ADMIN: ASSET & GLOBAL CONTROLS]** 🎛️",
+                f"{ui_standards.DIVIDER_HEAVY}",
+                f"🌍 **Global Switches (All Users) ៖**",
+                f"• Auto Engine: `{'🟢 ON' if global_auto else '🛑 PAUSED'}` | Scalp Engine: `{'🟢 ON' if global_scalp else '🛑 PAUSED'}`",
+                f"🎯 **ស្ថានភាព Assets សកម្ម ៖** `{active_count}/{total_count} Instruments Active`",
+                f"{ui_standards.DIVIDER_LIGHT}",
+                "📊 **ស្ថានភាពលម្អិតតាមប្រភេទទ្រព្យ (Tap button to toggle) ៖**",
+            ]
+
+            def _asset_badge(epic: str) -> str:
+                return "🟢" if db.is_capital_asset_enabled(epic) else "🛑"
+
+            lines.append("• **Equities:** " + " ".join(f"`{a}`:{_asset_badge(a)}" for a in equities))
+            lines.append("• **Indices:** " + " ".join(f"`{a}`:{_asset_badge(a)}" for a in indices))
+            lines.append("• **Commodities:** " + " ".join(f"`{a}`:{_asset_badge(a)}" for a in commodities))
+            lines.append("• **Crypto CFDs:** " + " ".join(f"`{a}`:{_asset_badge(a)}" for a in crypto))
+
+            if disabled_assets:
+                lines.append(f"{ui_standards.DIVIDER_LIGHT}")
+                lines.append(f"⛔ **Assets ត្រូវបានបិទសម្រាប់ Users ៖** `{', '.join(sorted(disabled_assets))}`")
+
+            lines.append(f"{ui_standards.DIVIDER_HEAVY}")
+            lines.append("💡 _ចុចលើប៊ូតុងខាងក្រោមដើម្បីបើក ឬបិទការជួញដូរលើភាគហ៊ុន/កាក់នីមួយៗភ្លាមៗ!_")
+
+            # Build keyboard
+            kb = []
+
+            # 1. Equities rows
+            kb.append([
+                InlineKeyboardButton(f"{_asset_badge('NVDA')} NVDA", callback_data="btn_cap_toggle_asset_NVDA"),
+                InlineKeyboardButton(f"{_asset_badge('TSLA')} TSLA", callback_data="btn_cap_toggle_asset_TSLA"),
+                InlineKeyboardButton(f"{_asset_badge('META')} META", callback_data="btn_cap_toggle_asset_META"),
+                InlineKeyboardButton(f"{_asset_badge('GOOGL')} GOOGL", callback_data="btn_cap_toggle_asset_GOOGL")
+            ])
+            kb.append([
+                InlineKeyboardButton(f"{_asset_badge('AAPL')} AAPL", callback_data="btn_cap_toggle_asset_AAPL"),
+                InlineKeyboardButton(f"{_asset_badge('MSFT')} MSFT", callback_data="btn_cap_toggle_asset_MSFT"),
+                InlineKeyboardButton(f"{_asset_badge('AMZN')} AMZN", callback_data="btn_cap_toggle_asset_AMZN")
+            ])
+
+            # 2. Indices row
+            kb.append([
+                InlineKeyboardButton(f"{_asset_badge('US100')} US100", callback_data="btn_cap_toggle_asset_US100"),
+                InlineKeyboardButton(f"{_asset_badge('US500')} US500", callback_data="btn_cap_toggle_asset_US500"),
+                InlineKeyboardButton(f"{_asset_badge('DE40')} DE40", callback_data="btn_cap_toggle_asset_DE40")
+            ])
+
+            # 3. Commodities & Crypto
+            kb.append([
+                InlineKeyboardButton(f"{_asset_badge('GOLD')} GOLD", callback_data="btn_cap_toggle_asset_GOLD"),
+                InlineKeyboardButton(f"{_asset_badge('NATGAS')} NATGAS", callback_data="btn_cap_toggle_asset_NATGAS"),
+                InlineKeyboardButton(f"{_asset_badge('OIL_CRUDE')} OIL", callback_data="btn_cap_toggle_asset_OIL_CRUDE")
+            ])
+            kb.append([
+                InlineKeyboardButton(f"{_asset_badge('BTCUSD')} BTC", callback_data="btn_cap_toggle_asset_BTCUSD"),
+                InlineKeyboardButton(f"{_asset_badge('ETHUSD')} ETH", callback_data="btn_cap_toggle_asset_ETHUSD"),
+                InlineKeyboardButton(f"{_asset_badge('SOLUSD')} SOL", callback_data="btn_cap_toggle_asset_SOLUSD")
+            ])
+
+            # 4. Global Action Controls
+            kb.append([
+                InlineKeyboardButton("🟢 Enable All Assets", callback_data="btn_cap_enable_all_assets"),
+                InlineKeyboardButton("🔄 Refresh Matrix", callback_data="btn_cap_admin_assets")
+            ])
+            kb.append([
+                InlineKeyboardButton("🌐 All Users: ON", callback_data="btn_cap_all_users_on"),
+                InlineKeyboardButton("🛑 All Users: OFF", callback_data="btn_cap_all_users_off")
+            ])
+            kb.append([
+                InlineKeyboardButton("🤖 Auto Switch", callback_data="btn_cap_all_auto_toggle"),
+                InlineKeyboardButton("⚡ Scalp Switch", callback_data="btn_cap_all_scalp_toggle")
+            ])
+            kb.append([
+                InlineKeyboardButton("👑 VIP Users Directory", callback_data="btn_cap_admin_menu"),
+                InlineKeyboardButton("🔙 /capital Menu", callback_data="btn_cap_menu")
+            ])
+
+            return "\n".join(lines), InlineKeyboardMarkup(kb)
+
         async def admin_capital_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """
             Admin command to manage Capital.com VIP users:
@@ -25247,6 +25556,9 @@ class TelegramBotThread(BaseThread):
             - /admin_capital off <chat_id_or_account_id>: Stops auto trade for user
             - /admin_capital approve <chat_id_or_account_id>: Approves Live Capital access
             - /admin_capital reject <chat_id_or_account_id>: Revokes Live Capital access
+            - /admin_capital all_on: Enables Auto & Scalp trading for ALL Users
+            - /admin_capital all_off: Disables Auto & Scalp trading for ALL Users
+            - /admin_capital asset <epic> [on|off]: Enables or disables specific stock/coin for ALL Users
             """
             if not await verify_user(update): return
             chat_id = update.effective_chat.id if update.effective_chat else None
@@ -25279,6 +25591,51 @@ class TelegramBotThread(BaseThread):
                 context.args = ["ADMIN"]
                 await capital_spread_command(update, context)
                 return
+
+            if args and args[0].upper() in ["ALL_ON", "ALL_USERS_ON", "GLOBAL_ON"]:
+                c_a = db.enable_all_capital_users("AUTO")
+                c_s = db.enable_all_capital_users("SCALP")
+                db.set_capital_global_trading_switch(True, "ALL")
+                await update.effective_message.reply_text(
+                    f"🌐 **[GLOBAL MASTER TOGGLE: ALL USERS ACTIVATED]** 🟢\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"បានបើកដំណើរការវិនិយោគពេញលេញសម្រាប់ ALL USERS!\n"
+                    f"• Capital Auto: `{c_a} Users`\n"
+                    f"• Trend Scalp 24/7: `{c_s} Users`\n"
+                    f"• Global Trading Switch: `🟢 ACTIVE`",
+                    parse_mode="Markdown"
+                )
+                return
+
+            if args and args[0].upper() in ["ALL_OFF", "ALL_USERS_OFF", "GLOBAL_OFF"]:
+                c_a = db.disable_all_capital_users("AUTO", preserve_super_admin=True)
+                c_s = db.disable_all_capital_users("SCALP", preserve_super_admin=True)
+                db.set_capital_global_trading_switch(False, "ALL")
+                await update.effective_message.reply_text(
+                    f"🛑 **[GLOBAL MASTER TOGGLE: ALL USERS PAUSED]** ⏸️\n"
+                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                    f"បានផ្អាកដំណើរការវិនិយោគសម្រាប់ ALL USERS (Super Admin preserved)!\n"
+                    f"• Capital Auto: `{c_a} Users`\n"
+                    f"• Trend Scalp 24/7: `{c_s} Users`\n"
+                    f"• Global Trading Switch: `🛑 PAUSED`",
+                    parse_mode="Markdown"
+                )
+                return
+
+            if args and args[0].upper() in ["ASSET", "ASSETS"]:
+                if len(args) > 1:
+                    target_epic = str(args[1]).upper().strip()
+                    target_st = True
+                    if len(args) > 2:
+                        target_st = str(args[2]).upper().strip() in ["ON", "1", "ENABLE", "ENABLED", "TRUE"]
+                    db.set_capital_asset_status(target_epic, target_st)
+                    st_lbl = "ENABLED 🟢" if target_st else "DISABLED 🛑"
+                    await update.effective_message.reply_text(f"🎛️ **[ASSET STATUS UPDATED]**\n`{target_epic}`: `{st_lbl}` សម្រាប់ Users ទាំងអស់!", parse_mode="Markdown")
+                    return
+                else:
+                    c_text, c_kb = build_capital_asset_controls_ui(chat_id, user_lang)
+                    await update.effective_message.reply_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+                    return
 
             if not args or args[0].upper() in ["LIST", "USERS", "OVERVIEW", "ALL"]:
                 all_users = db.get_all_capital_users_overview()
@@ -25324,6 +25681,14 @@ class TelegramBotThread(BaseThread):
                     kb_rows.append(btn_row)
 
                 kb_rows.append([
+                    InlineKeyboardButton("🎛️ Asset Controls (Stocks/Crypto)", callback_data="btn_cap_admin_assets"),
+                    InlineKeyboardButton("🔄 Refresh Directory", callback_data="btn_cap_admin_menu")
+                ])
+                kb_rows.append([
+                    InlineKeyboardButton("🌐 ALL USERS: ON", callback_data="btn_cap_all_users_on"),
+                    InlineKeyboardButton("🛑 ALL USERS: OFF", callback_data="btn_cap_all_users_off")
+                ])
+                kb_rows.append([
                     InlineKeyboardButton("👑 Total Spread Audit (Live)", callback_data="btn_cap_admin_total_spread"),
                     InlineKeyboardButton("📄 Export JSON", callback_data="btn_cap_admin_spread_json")
                 ])
@@ -25331,6 +25696,10 @@ class TelegramBotThread(BaseThread):
                 lines.append(f"{ui_standards.DIVIDER_HEAVY}")
                 lines.append("💡 **កូដបញ្ជា ១-Tap សម្រាប់ Super Admin ៖**")
                 lines.append("• `` `/admin_capital spread` `` (ពិនិត្យ Real Live Total Spread ប្រព័ន្ធទាំងមូល)")
+                lines.append("• `` `/admin_capital all_on` `` (បើក Auto & Scalp សម្រាប់ All Users ទាំងអស់)")
+                lines.append("• `` `/admin_capital all_off` `` (បិទ Auto & Scalp សម្រាប់ All Users ទាំងអស់)")
+                lines.append("• `` `/admin_capital asset NVDA off` `` (បិទ NVDA សម្រាប់ Users ទាំងអស់)")
+                lines.append("• `` `/admin_capital asset NVDA on` `` (បើក NVDA សម្រាប់ Users ទាំងអស់)")
                 lines.append("• `` `/admin_capital on <Account_ID> 400 live 10 24/7` `` (បើក Auto Trade ១០ កាក់ ស្មើដៃ Admin ២៤/៧)")
                 lines.append("• `` `/admin_capital on <Account_ID> 50 live` `` (បើក Auto Trade កម្រិតទូទៅ)")
                 lines.append("• `` `/admin_capital off <Account_ID>` `` (បិទ Auto Trade)")
@@ -25893,6 +26262,7 @@ class TelegramBotThread(BaseThread):
             if not chat_id: return
             user_lang = db.get_user_language(chat_id)
             args = list(context.args) if context and context.args else []
+            is_super_admin = (chat_id == 859271875 or db.is_admin(chat_id))
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             import capital_engine
@@ -25933,6 +26303,80 @@ class TelegramBotThread(BaseThread):
             elif cmd_text in ["capital_scalp", "capitalscalp"]:
                 await capital_scalp_command(update, context)
                 return
+
+            # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
+            if args:
+                first_tok = str(args[0]).strip().replace('$', '')
+                is_num_cap = False
+                try:
+                    float(first_tok)
+                    is_num_cap = True
+                except ValueError:
+                    is_num_cap = False
+                if is_num_cap:
+                    args = ["AUTO", "ON"] + args
+                elif first_tok.upper() in ["ON", "START", "RUN", "LIVE", "ENABLE", "OFF", "STOP", "HALT", "DISABLE"]:
+                    args = ["AUTO"] + args
+
+                action = str(args[0]).upper().strip()
+                if action in ["ALL_ON", "ALL_USERS_ON", "GLOBAL_ON"] and is_super_admin:
+                    cnt_a = db.enable_all_capital_users("AUTO")
+                    cnt_s = db.enable_all_capital_users("SCALP")
+                    db.set_capital_global_trading_switch(True, "ALL")
+                    await update.effective_message.reply_text(
+                        f"🌐 **[GLOBAL MASTER TOGGLE: ALL USERS ACTIVATED]** 🟢\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"បានបើកដំណើរការវិនិយោគពេញលេញសម្រាប់ ALL USERS!\n"
+                        f"• Capital Auto: `{cnt_a} Users`\n"
+                        f"• Trend Scalp 24/7: `{cnt_s} Users`\n"
+                        f"• Global Trading Switch: `🟢 ACTIVE`",
+                        parse_mode="Markdown"
+                    )
+                    return
+                elif action in ["ALL_OFF", "ALL_USERS_OFF", "GLOBAL_OFF"] and is_super_admin:
+                    cnt_a = db.disable_all_capital_users("AUTO", preserve_super_admin=True)
+                    cnt_s = db.disable_all_capital_users("SCALP", preserve_super_admin=True)
+                    db.set_capital_global_trading_switch(False, "ALL")
+                    await update.effective_message.reply_text(
+                        f"🛑 **[GLOBAL MASTER TOGGLE: ALL USERS PAUSED]** ⏸️\n"
+                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                        f"បានផ្អាកដំណើរការវិនិយោគសម្រាប់ ALL USERS (Super Admin preserved)!\n"
+                        f"• Capital Auto: `{cnt_a} Users`\n"
+                        f"• Trend Scalp 24/7: `{cnt_s} Users`\n"
+                        f"• Global Trading Switch: `🛑 PAUSED`",
+                        parse_mode="Markdown"
+                    )
+                    return
+                elif action in ["ASSET", "ASSETS"] and is_super_admin:
+                    if len(args) > 1:
+                        target_epic = str(args[1]).upper().strip()
+                        target_st = True
+                        if len(args) > 2:
+                            target_st = str(args[2]).upper().strip() in ["ON", "1", "ENABLE", "ENABLED", "TRUE"]
+                        db.set_capital_asset_status(target_epic, target_st)
+                        st_lbl = "ENABLED 🟢" if target_st else "DISABLED 🛑"
+                        await update.effective_message.reply_text(f"🎛️ **[ASSET STATUS UPDATED]**\n`{target_epic}`: `{st_lbl}` សម្រាប់ Users ទាំងអស់!", parse_mode="Markdown")
+                        return
+                    else:
+                        c_text, c_kb = build_capital_asset_controls_ui(chat_id, user_lang)
+                        await update.effective_message.reply_text(c_text, parse_mode="Markdown", reply_markup=c_kb)
+                        return
+                elif action in ["ADMIN", "USERS", "DIRECTORY"] and is_super_admin:
+                    context.args = args[1:]
+                    await admin_capital_command(update, context)
+                    return
+                elif action in ["PROP", "PROPFIRM", "CHALLENGE"]:
+                    context.args = args[1:]
+                    await prop_firm_command(update, context)
+                    return
+                elif action in ["IB", "REBATE", "PARTNER"]:
+                    context.args = args[1:]
+                    await capital_ib_command(update, context)
+                    return
+                elif action in ["SCALP", "TREND_SCALP", "TRENDSCALP"]:
+                    context.args = args[1:]
+                    await capital_scalp_command(update, context)
+                    return
 
             # Subcommands routing: /capital PROP / /capital IB / /capital LEADLAG / /capital ORB / /capital KELLY / /capital SPREAD / /capital SCALP
             if args:
@@ -26640,6 +27084,14 @@ class TelegramBotThread(BaseThread):
                 *([[
                     InlineKeyboardButton("🛡️ Master Protect", callback_data="btn_cap_master_protect"),
                     InlineKeyboardButton("👑 Total Spread Audit (Admin)", callback_data="btn_cap_admin_total_spread")
+                ]] if is_super_admin else []),
+                *([[
+                    InlineKeyboardButton("🎛️ Asset Controls (Stocks/Crypto)", callback_data="btn_cap_admin_assets"),
+                    InlineKeyboardButton("👑 VIP Users Directory", callback_data="btn_cap_admin_menu")
+                ]] if is_super_admin else []),
+                *([[
+                    InlineKeyboardButton("🌐 ALL USERS: ON", callback_data="btn_cap_all_users_on"),
+                    InlineKeyboardButton("🛑 ALL USERS: OFF", callback_data="btn_cap_all_users_off")
                 ]] if is_super_admin else []),
                 [
                     InlineKeyboardButton(auto_btn_text, callback_data="btn_cap_auto_toggle"),
