@@ -5222,22 +5222,27 @@ class TelegramBotThread(BaseThread):
             if args and len(args) > 0:
                 raw_sym = str(args[0]).upper().strip()
                 if raw_sym and raw_sym not in ['NONE', 'ALL', 'SCAN']:
-                    target_symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
+                    if raw_sym in ['EVENT', 'MACRO', 'FED', 'WARSH', 'CPI', 'NFP', 'FOMC', 'CALENDAR']:
+                        target_symbol = raw_sym
+                    elif raw_sym in ['GOLD', 'XAU', 'XAUUSD', 'PAXG']:
+                        target_symbol = 'GOLD'
+                    else:
+                        target_symbol = raw_sym if raw_sym.endswith("USDT") else f"{raw_sym}USDT"
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🔄 Refresh Breaking News", callback_data="btn_news_refresh"),
-                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt")
+                    InlineKeyboardButton("🏛️ Macro & Fed Event", callback_data="btn_news_macro_event")
                 ],
                 [
-                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt"),
-                    InlineKeyboardButton("🐋 Whale Radar", callback_data="btn_whales_refresh")
+                    InlineKeyboardButton("🧠 5-Agent AGI Analysis", callback_data="btn_analyze_prompt"),
+                    InlineKeyboardButton("📈 ML 24h Forecast", callback_data="btn_predict_prompt")
                 ],
                 [
-                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge"),
-                    InlineKeyboardButton("💼 Portfolio PnL", callback_data="btn_menu_portfolio")
+                    InlineKeyboardButton("🐋 Whale Radar", callback_data="btn_whales_refresh"),
+                    InlineKeyboardButton("🚀 Turbo Hedge HFT", callback_data="btn_turbo_hedge")
                 ],
                 [
                     InlineKeyboardButton("🎛️ Master Control Panel", callback_data="btn_menu_refresh")
@@ -5273,17 +5278,17 @@ class TelegramBotThread(BaseThread):
             if user_lang == 'en':
                 report_text += (
                     "\n\n📋 **1-TAP QUICK SCAN ៖**\n"
-                    "`` `/news SCAN` `` | `` `/news BTC` `` | `` `/news ETH` `` | `` `/news SOL` ``"
+                    "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
                 )
             elif user_lang == 'zh':
                 report_text += (
                     "\n\n📋 **一键快捷扫描 ៖**\n"
-                    "`` `/news SCAN` `` | `` `/news BTC` `` | `` `/news ETH` `` | `` `/news SOL` ``"
+                    "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
                 )
             else:
                 report_text += (
                     "\n\n📋 **បញ្ជាស្កេនរហ័ស 1-TAP ៖**\n"
-                    "`` `/news SCAN` `` | `` `/news BTC` `` | `` `/news ETH` `` | `` `/news SOL` ``"
+                    "`` `/news SCAN` `` | `` `/news FED` `` | `` `/news GOLD` `` | `` `/news BTC` ``"
                 )
 
             delivered = False
@@ -8110,6 +8115,9 @@ class TelegramBotThread(BaseThread):
             elif data in ["btn_whales_refresh", "btn_whales"]:
                 await whales_command(update, context)
             elif data in ["btn_news_refresh", "btn_news"]:
+                await news_command(update, context)
+            elif data in ["btn_news_macro_event", "btn_macro_event"]:
+                context.args = ["EVENT"]
                 await news_command(update, context)
             elif data in ["btn_add_api_prompt", "btn_menu_api"]:
                 await add_api_command(update, context)

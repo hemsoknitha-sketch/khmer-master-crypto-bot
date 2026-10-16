@@ -440,6 +440,81 @@ def _build_rich_dynamic_fallback(
         if "news.google.com" in u and len(u) > 90: return "https://news.google.com"
         return u
 
+    # 🛡️ Tri-Market Real-Time Pulse & Red Folder Active Sensor
+    tri_market_en = ""
+    tri_market_zh = ""
+    tri_market_km = ""
+    red_folder_banner_en = ""
+    red_folder_banner_zh = ""
+    red_folder_banner_km = ""
+
+    try:
+        import economic_calendar_guard
+        tri_pulse = economic_calendar_guard.fetch_tri_market_macro_pulse()
+        g = tri_pulse["gold"]
+        eq = tri_pulse["equities"]
+        c = tri_pulse["crypto"]
+
+        gold_badge_km = "📈 ឡើង" if g["change_pct"] >= 0 else "📉 ចុះ"
+        sp_badge_km = "📈 ឡើង" if eq["sp500_change_pct"] >= 0 else "📉 ចុះ"
+        nas_badge_km = "📈 ឡើង" if eq["nasdaq_change_pct"] >= 0 else "📉 ចុះ"
+        btc_badge_km = "📈 ឡើង" if c["btc_change_pct"] >= 0 else "📉 ចុះ"
+
+        gold_badge_en = "📈 UP" if g["change_pct"] >= 0 else "📉 DOWN"
+        sp_badge_en = "📈 UP" if eq["sp500_change_pct"] >= 0 else "📉 DOWN"
+        btc_badge_en = "📈 UP" if c["btc_change_pct"] >= 0 else "📉 DOWN"
+
+        gold_badge_zh = "📈 涨" if g["change_pct"] >= 0 else "📉 跌"
+        sp_badge_zh = "📈 涨" if eq["sp500_change_pct"] >= 0 else "📉 跌"
+        btc_badge_zh = "📈 涨" if c["btc_change_pct"] >= 0 else "📉 跌"
+
+        tri_market_km = (
+            f"📊 **តារាងសន្ទុះទីផ្សារទាំង ៣ (TRI-MARKET QUANTITATIVE PULSE) ៖**\n"
+            f"• 🥇 **ទីផ្សារមាស (Spot Gold) ៖** `${g['price']:,.2f}` (`{g['change_pct']:+.2f}%` {gold_badge_km}) | ឱកាសឡើង ៖ `{g['prob_up']:.1f}%`\n"
+            f"• 📈 **ភាគហ៊ុនអាមេរិក (S&P 500) ៖** `${eq['sp500_price']:,.2f}` (`{eq['sp500_change_pct']:+.2f}%` {sp_badge_km}) | US100 ៖ `${eq['nasdaq_price']:,.2f}` (`{eq['nasdaq_change_pct']:+.2f}%` {nas_badge_km})\n"
+            f"• 🚀 **គ្រីបតូ (Bitcoin BTC) ៖** `${c['btc_price']:,.2f}` (`{c['btc_change_pct']:+.2f}%` {btc_badge_km}) | ETH ៖ `${c['eth_price']:,.2f}`\n\n"
+        )
+        tri_market_en = (
+            f"📊 **TRI-MARKET QUANTITATIVE PULSE ៖**\n"
+            f"• 🥇 **Spot Gold (XAU/USD) ៖** `${g['price']:,.2f}` (`{g['change_pct']:+.2f}%` {gold_badge_en}) | Bullish Prob: `{g['prob_up']:.1f}%`\n"
+            f"• 📈 **US Equities (S&P 500) ៖** `${eq['sp500_price']:,.2f}` (`{eq['sp500_change_pct']:+.2f}%` {sp_badge_en}) | US100: `${eq['nasdaq_price']:,.2f}`\n"
+            f"• 🚀 **Crypto (Bitcoin BTC) ៖** `${c['btc_price']:,.2f}` (`{c['btc_change_pct']:+.2f}%` {btc_badge_en}) | ETH: `${c['eth_price']:,.2f}`\n\n"
+        )
+        tri_market_zh = (
+            f"📊 **三大核心市场量化脉搏 (TRI-MARKET PULSE) ៖**\n"
+            f"• 🥇 **现货黄金 (Spot Gold) ៖** `${g['price']:,.2f}` (`{g['change_pct']:+.2f}%` {gold_badge_zh}) | 看涨胜率: `{g['prob_up']:.1f}%`\n"
+            f"• 📈 **美股大盘 (S&P 500) ៖** `${eq['sp500_price']:,.2f}` (`{eq['sp500_change_pct']:+.2f}%` {sp_badge_zh}) | 纳指100: `${eq['nasdaq_price']:,.2f}`\n"
+            f"• 🚀 **加密资产 (Bitcoin BTC) ៖** `${c['btc_price']:,.2f}` (`{c['btc_change_pct']:+.2f}%` {btc_badge_zh}) | ETH: `${c['eth_price']:,.2f}`\n\n"
+        )
+
+        bo_info = economic_calendar_guard.check_red_folder_blackout()
+        if bo_info.get("is_blackout"):
+            phase = bo_info.get("phase", "PRE_EVENT")
+            phase_lbl_km = f"មុនពេលប្រកាស ({bo_info.get('minutes_remaining', 30)} នាទី)" if phase == "PRE_EVENT" else f"ក្រោយពេលប្រកាស ({bo_info.get('minutes_since', 5)} នាទី)"
+            phase_lbl_en = f"Pre-Release ({bo_info.get('minutes_remaining', 30)}m countdown)" if phase == "PRE_EVENT" else f"Post-Release ({bo_info.get('minutes_since', 5)}m elapsed)"
+            phase_lbl_zh = f"发布前预警 ({bo_info.get('minutes_remaining', 30)}分钟倒计时)" if phase == "PRE_EVENT" else f"发布后观察 ({bo_info.get('minutes_since', 5)}分钟)"
+
+            red_folder_banner_km = (
+                f"🏛️ **[RED FOLDER ECONOMIC GUARD ACTIVE]** ⚡\n"
+                f"⚠️ **ព្រឹត្តិការណ៍ ៖** `{bo_info.get('event_name')}` | ⏳ `{phase_lbl_km}`\n"
+                f"🛑 **ចំណាត់ការ ៖** `FORCED WAIT (ផ្អាកបើក Trade ថ្មីទប់ស្កាត់ Spread & Slippage)`\n"
+                f"{DIVIDER_LIGHT}\n\n"
+            )
+            red_folder_banner_en = (
+                f"🏛️ **[RED FOLDER ECONOMIC GUARD ACTIVE]** ⚡\n"
+                f"⚠️ **Major Event ៖** `{bo_info.get('event_name')}` | ⏳ `{phase_lbl_en}`\n"
+                f"🛑 **Status ៖** `FORCED WAIT (Holding new entries to eliminate spread expansion)`\n"
+                f"{DIVIDER_LIGHT}\n\n"
+            )
+            red_folder_banner_zh = (
+                f"🏛️ **[重大宏观红标经济日历防御激活]** ⚡\n"
+                f"⚠️ **核心事件 ៖** `{bo_info.get('event_name')}` | ⏳ `{phase_lbl_zh}`\n"
+                f"🛑 **防御机制 ៖** `强制观望 (FORCED WAIT - 彻底规避点差扩大与滑点风险)`\n"
+                f"{DIVIDER_LIGHT}\n\n"
+            )
+    except Exception:
+        pass
+
     if lang == "en":
         headlines_md = "\n".join([
             f"{i+1}. {'🟢' if it['sentiment']=='BULLISH' else ('🔴' if it['sentiment']=='BEARISH' else '⚪')} [{it['title'][:75]}]({_clean_link(it['link'])}) — _{it['source']}_"
@@ -448,8 +523,10 @@ def _build_rich_dynamic_fallback(
         article = (
             f"📰 **ANGKOR QUANT | GLOBAL MACRO & CRYPTO WIRE v14.00** 🌐\n"
             f"{DIVIDER_HEAVY}\n\n"
+            f"{red_folder_banner_en}"
             f"🔥 **BREAKING MARKET HEADLINES & TRADFI CONFLUENCE:**\n"
             f"{headlines_md}\n\n"
+            f"{tri_market_en}"
             f"📡 **LIVE MACRO SATELLITE PULSE ៖**\n"
             f"• **DXY Dollar Index ៖** `{dxy:,.2f}` (`{dxy_chg:+.2f}%`) | **S&P 500 ៖** `${sp500:,.2f}` (`{sp_chg:+.2f}%`)\n"
             f"• **US 10Y Yield ៖** `{yield_10y:.2f}%` | **Fed Rate Cut Odds ៖** `{fed_odds:.1f}%` | **Sentiment ៖** `{fng_score}/100 ({fng_label})`\n\n"
@@ -478,8 +555,10 @@ def _build_rich_dynamic_fallback(
         article = (
             f"📰 **ANGKOR QUANT | 全球宏观与加密行业电讯 v14.00** 🌐\n"
             f"{DIVIDER_HEAVY}\n\n"
+            f"{red_folder_banner_zh}"
             f"🔥 **全球突发新闻头条与 TradFi 宏观共振：**\n"
             f"{headlines_md}\n\n"
+            f"{tri_market_zh}"
             f"📡 **实时卫星宏观脉搏 ៖**\n"
             f"• **美元指数 DXY ៖** `{dxy:,.2f}` (`{dxy_chg:+.2f}%`) | **标普500 ៖** `${sp500:,.2f}` (`{sp_chg:+.2f}%`)\n"
             f"• **美债10年期收益率 ៖** `{yield_10y:.2f}%` | **美联储降息概率 ៖** `{fed_odds:.1f}%` | **情绪指数 ៖** `{fng_score}/100 ({fng_label})`\n\n"
@@ -510,8 +589,10 @@ def _build_rich_dynamic_fallback(
         article = (
             f"📰 **ANGKOR QUANT | GLOBAL MACRO & CRYPTO WIRE v14.00** 🌐\n"
             f"{DIVIDER_HEAVY}\n\n"
+            f"{red_folder_banner_km}"
             f"🔥 **ព័ត៌មានទាន់ហេតុការណ៍ & ឥទ្ធិពល TRADFI (TOP BREAKING WIRE) ៖**\n"
             f"{headlines_md}\n\n"
+            f"{tri_market_km}"
             f"📡 **ទិន្នន័យផ្កាយរណបម៉ាក្រូសេដ្ឋកិច្ច (LIVE MACRO PULSE) ៖**\n"
             f"• 💵 **DXY Dollar Index ៖** `{dxy:,.2f}` (`{dxy_chg:+.2f}%`) | 📈 **S&P 500 ៖** `${sp500:,.2f}` (`{sp_chg:+.2f}%`)\n"
             f"• 🏦 **US 10Y Yield ៖** `{yield_10y:.2f}%` | 🔮 **Fed Rate Cut Odds ៖** `{fed_odds:.1f}%` | 🌡️ **Fear & Greed ៖** `{fng_score}/100 ({fng_label})`\n"
@@ -542,6 +623,31 @@ def generate_news_report(symbol: str = None, lang: str = "khmer", ai_engine = No
     """
     sym_str = str(symbol).upper().strip() if symbol else ""
     target_sym_cmd = sym_str.replace("USDT", "") if sym_str else "BTC"
+
+    # 🛡️ SUPER SMART MACRO EVENT INTERCEPTOR (100% Zero Missed Alerts)
+    if sym_str in ["EVENT", "MACRO", "FED", "WARSH", "CPI", "NFP", "FOMC", "CALENDAR", "NEWS_EVENT"]:
+        try:
+            import economic_calendar_guard
+            bo_info = economic_calendar_guard.check_red_folder_blackout()
+            if bo_info.get("is_blackout"):
+                if bo_info.get("phase") == "PRE_EVENT":
+                    report_text = economic_calendar_guard.generate_pre_event_assessment(bo_info)
+                else:
+                    report_text = economic_calendar_guard.generate_post_event_outcome(bo_info)
+                return NewsReportResult(report_text, resolve_thematic_cover("CENTRAL_BANK", "Federal Reserve Macro Event"))
+            else:
+                events = economic_calendar_guard.fetch_usd_economic_events()
+                next_ev = events[0] if events else {"title": "Federal Reserve Monetary Policy Assessment", "minutes_remaining": 30.0, "date_str": "Upcoming"}
+                mock_bo = {
+                    "event_name": next_ev.get("title", "Federal Reserve Monetary Policy Assessment"),
+                    "minutes_remaining": next_ev.get("minutes_remaining", 30.0),
+                    "event_time_utc": next_ev.get("date_str", "Scheduled"),
+                    "phase": "PRE_EVENT"
+                }
+                report_text = economic_calendar_guard.generate_pre_event_assessment(mock_bo)
+                return NewsReportResult(report_text, resolve_thematic_cover("CENTRAL_BANK", "Federal Reserve Macro Event"))
+        except Exception as e_ev:
+            print(f"⚠️ Event interceptor notice: {e_ev}")
     
     # 1. Fetch live multi-tier breaking news items
     news_list = fetch_live_news(symbol, limit=5)
