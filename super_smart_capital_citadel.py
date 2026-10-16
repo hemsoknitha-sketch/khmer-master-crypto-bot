@@ -245,9 +245,9 @@ class SuperSmartCapitalCitadel:
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
 
-        # Step 2: Fetch 15m and 1h historical candles
-        candles_15m = engine.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=60)
-        candles_1h = engine.get_historical_prices(resolved_epic, resolution="HOUR", max_bars=40)
+        # Step 2: Fetch 15m and 1h historical candles (Multi-Period EMA 20/50/200 Suite Lookback)
+        candles_15m = engine.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=220)
+        candles_1h = engine.get_historical_prices(resolved_epic, resolution="HOUR", max_bars=60)
 
         if not candles_15m or len(candles_15m) < 25:
             # Fallback to shared RAM price cache or basic validation if API prices temporarily unavailable
@@ -608,14 +608,25 @@ class SuperSmartCapitalCitadel:
             return res
 
         # --------------------------------------------------------------------
-        # 6. PILLAR 7: MULTI-TIMEFRAME & SESSION KILL ZONE CONFLUENCE
+        # 6. PILLAR 7: MULTI-TIMEFRAME & SESSION KILL ZONE CONFLUENCE (EMA 20, 50, 200 SUITE)
         # --------------------------------------------------------------------
-        ema50_15m = float(pd.Series(closes).ewm(span=50, adjust=False).mean().iloc[-1])
+        s_closes_15m = pd.Series(closes)
+        ema20_15m = float(s_closes_15m.ewm(span=20, adjust=False).mean().iloc[-1]) if len(closes) >= 15 else curr_price
+        ema50_15m = float(s_closes_15m.ewm(span=50, adjust=False).mean().iloc[-1]) if len(closes) >= 20 else curr_price
+        ema200_15m = float(s_closes_15m.ewm(span=200, adjust=False).mean().iloc[-1]) if len(closes) >= 40 else ema50_15m
+
         closes_1h = [float(c.get("close", 0.0)) for c in candles_1h] if candles_1h else []
-        ema50_1h = float(pd.Series(closes_1h).ewm(span=50, adjust=False).mean().iloc[-1]) if len(closes_1h) >= 20 else curr_price
+        s_closes_1h = pd.Series(closes_1h) if len(closes_1h) >= 10 else None
+        ema20_1h = float(s_closes_1h.ewm(span=20, adjust=False).mean().iloc[-1]) if s_closes_1h is not None and len(closes_1h) >= 15 else curr_price
+        ema50_1h = float(s_closes_1h.ewm(span=50, adjust=False).mean().iloc[-1]) if s_closes_1h is not None and len(closes_1h) >= 20 else curr_price
+        ema200_1h = float(s_closes_1h.ewm(span=200, adjust=False).mean().iloc[-1]) if s_closes_1h is not None and len(closes_1h) >= 40 else ema50_1h
 
         is_1h_bullish = curr_price >= ema50_1h
         is_1h_bearish = curr_price <= ema50_1h
+
+        # True Institutional Triple EMA Stack (Price > EMA 20 > EMA 50 > EMA 200)
+        is_triple_ema_bullish = (curr_price > ema20_15m > ema50_15m > ema200_15m)
+        is_triple_ema_bearish = (curr_price < ema20_15m < ema50_15m < ema200_15m)
 
         # Session Alignment
         # London Kill Zone: 07:00 - 10:00 UTC (14:00 - 17:00 ICT)
@@ -672,9 +683,22 @@ class SuperSmartCapitalCitadel:
                 score += 10.0
                 factors.append("BULLISH_FVG_IMBALANCE (+10)")
 
-            if curr_price > ema50_15m:
+            # Multi-Period Exponential Moving Average Suite (20, 50, 200)
+            if is_triple_ema_bullish:
+                score += 15.0
+                factors.append("TRIPLE_EMA_BULLISH_STACK (+15)")
+            elif curr_price > ema20_15m > ema50_15m:
+                score += 12.0
+                factors.append("15M_EMA20_EMA50_UPTREND (+12)")
+            elif curr_price > ema50_15m:
                 score += 10.0
                 factors.append("15M_EMA50_UPTREND (+10)")
+
+            if curr_price >= ema200_15m:
+                score += 10.0
+                factors.append("MACRO_ABOVE_EMA200 (+10)")
+            elif not has_bullish_choch:
+                score -= 12.0
 
             if is_1h_bullish:
                 score += 12.0
@@ -732,9 +756,22 @@ class SuperSmartCapitalCitadel:
                 score += 10.0
                 factors.append("BEARISH_FVG_IMBALANCE (+10)")
 
-            if curr_price < ema50_15m:
+            # Multi-Period Exponential Moving Average Suite (20, 50, 200)
+            if is_triple_ema_bearish:
+                score += 15.0
+                factors.append("TRIPLE_EMA_BEARISH_STACK (+15)")
+            elif curr_price < ema20_15m < ema50_15m:
+                score += 12.0
+                factors.append("15M_EMA20_EMA50_DOWNTREND (+12)")
+            elif curr_price < ema50_15m:
                 score += 10.0
                 factors.append("15M_EMA50_DOWNTREND (+10)")
+
+            if curr_price <= ema200_15m:
+                score += 10.0
+                factors.append("MACRO_BELOW_EMA200 (+10)")
+            elif not has_bearish_choch:
+                score -= 12.0
 
             if is_1h_bearish:
                 score += 12.0
@@ -842,7 +879,11 @@ class SuperSmartCapitalCitadel:
             "target_tp_major": tp_2,
             "risk_reward_ratio": rr_ratio,
             "confluence_factors": factors,
-            "smc_ict_setup": smc_ict_payload
+            "smc_ict_setup": smc_ict_payload,
+            "ema20_15m": round(ema20_15m, prec),
+            "ema50_15m": round(ema50_15m, prec),
+            "ema200_15m": round(ema200_15m, prec),
+            "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED")
         }
 
         cls._CITADEL_CACHE[cache_key] = (now, result)

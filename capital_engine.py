@@ -1602,8 +1602,8 @@ class CapitalComEngine:
                 "spread": spread
             }
 
-        # 3. Fetch 15m Candles for Technical Confluence
-        candles = self.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=40)
+        # 3. Fetch 15m Candles for Technical Confluence (EMA 20/50/200 Multi-Period Lookback)
+        candles = self.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=220)
         if len(candles) < 20:
             return {
                 "success": True,
@@ -1619,18 +1619,24 @@ class CapitalComEngine:
         highs = [c["high"] for c in candles]
         lows = [c["low"] for c in candles]
 
-        # Calculate EMA 20 & EMA 50
+        # Calculate Exponential Moving Averages (EMA 20, EMA 50, EMA 200)
         def _ema(prices: List[float], period: int) -> float:
-            if len(prices) < period:
-                return prices[-1] if prices else 0.0
+            if not prices:
+                return 0.0
             mult = 2.0 / (period + 1)
-            val = sum(prices[:period]) / period
-            for p in prices[period:]:
-                val = (p - val) * mult + val
+            p = max(3, min(period, len(prices)))
+            val = sum(prices[:p]) / p
+            for x in prices[p:]:
+                val = (x - val) * mult + val
             return val
 
         ema20 = _ema(closes, 20)
-        ema50 = _ema(closes, min(50, len(closes)))
+        ema50 = _ema(closes, 50)
+        ema200 = _ema(closes, 200)
+
+        # Institutional Triple EMA Trend Stack (20, 50, 200)
+        is_triple_ema_bullish = (closes[-1] > ema20 > ema50 > ema200)
+        is_triple_ema_bearish = (closes[-1] < ema20 < ema50 < ema200)
 
         # Calculate RSI 14
         deltas = [closes[i+1] - closes[i] for i in range(len(closes)-1)]
@@ -1723,15 +1729,25 @@ class CapitalComEngine:
         bullish_score = 0
         bearish_score = 0
 
-        # 1. EMA Trend (35 pts)
-        if closes[-1] > ema20 > ema50:
+        # 1. EMA Trend (35 pts) - Institutional EMA 20, 50, 200 Confluence
+        if is_triple_ema_bullish:
             bullish_score += 35
-        elif closes[-1] < ema20 < ema50:
+        elif is_triple_ema_bearish:
             bearish_score += 35
+        elif closes[-1] > ema20 > ema50:
+            bullish_score += 35 if closes[-1] >= ema200 else 25
+        elif closes[-1] < ema20 < ema50:
+            bearish_score += 35 if closes[-1] <= ema200 else 25
         elif closes[-1] > ema20:
-            bullish_score += 20
+            bullish_score += 20 if closes[-1] >= ema200 else 10
         elif closes[-1] < ema20:
-            bearish_score += 20
+            bearish_score += 20 if closes[-1] <= ema200 else 10
+
+        # Macro Trend Gatekeeper (EMA 200 dividing line)
+        if closes[-1] < ema200:
+            bullish_score = max(0, bullish_score - 15)
+        if closes[-1] > ema200:
+            bearish_score = max(0, bearish_score - 15)
 
         # 2. RSI Momentum Sweet Spot (25 pts)
         # Pullback sweet spot: 48 - 66 for Bullish (riding uptrend without chasing top)
@@ -1884,6 +1900,8 @@ class CapitalComEngine:
             "spread": spread,
             "ema20": round(ema20, 2),
             "ema50": round(ema50, 2),
+            "ema200": round(ema200, 2),
+            "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED"),
             "rsi": rsi,
             "atr": atr,
             "adx": adx,
@@ -4282,6 +4300,7 @@ class CapitalAutonomousEngine:
                                 f"🏛️ **ឧបករណ៍ TradFi ៖** `{resolved_epic}`\n"
                                 f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
                                 f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
+                                f"📈 **Exponential MA Trend ៖** EMA 20 (`{setup.get('ema20', 0):.2f}`) | 50 (`{setup.get('ema50', 0):.2f}`) | 200 (`{setup.get('ema200', 0):.2f}`) [{setup.get('triple_ema_alignment', 'TREND')}]\n"
                                 f"📊 **កម្លាំង Trend & Volume ៖** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
                                 f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
                                 f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
@@ -4305,6 +4324,7 @@ class CapitalAutonomousEngine:
                                 f"🏛️ **TradFi Instrument:** `{resolved_epic}`\n"
                                 f"🎯 **Direction:** `{dir_emoji}`\n"
                                 f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
+                                f"📈 **Exponential MA Trend:** EMA 20 (`{setup.get('ema20', 0):.2f}`) | 50 (`{setup.get('ema50', 0):.2f}`) | 200 (`{setup.get('ema200', 0):.2f}`) [{setup.get('triple_ema_alignment', 'TREND')}]\n"
                                 f"📊 **Trend & Volume:** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
                                 f"📦 **Contract Size:** `{executed_size}`\n"
                                 f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
@@ -7815,7 +7835,7 @@ class CapitalTrendScalpEngine:
             }
 
         # 3. 15M Trend Alignment (Anchor Timeframe)
-        candles_15m = eng.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=40)
+        candles_15m = eng.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=220)
         if len(candles_15m) < 25:
             return {
                 "success": False,
@@ -7829,17 +7849,20 @@ class CapitalTrendScalpEngine:
         lows_15m = [c["low"] for c in candles_15m]
 
         def _calc_ema(prices: List[float], period: int) -> float:
-            if len(prices) < period:
-                return prices[-1] if prices else 0.0
+            if not prices:
+                return 0.0
             mult = 2.0 / (period + 1)
-            ema = sum(prices[:period]) / period
-            for p in prices[period:]:
-                ema = (p - ema) * mult + ema
+            p = max(3, min(period, len(prices)))
+            ema = sum(prices[:p]) / p
+            for px in prices[p:]:
+                ema = (px - ema) * mult + ema
             return ema
 
         ema9_15m = _calc_ema(closes_15m, 9)
+        ema20_15m = _calc_ema(closes_15m, 20)
         ema21_15m = _calc_ema(closes_15m, 21)
         ema50_15m = _calc_ema(closes_15m, 50)
+        ema200_15m = _calc_ema(closes_15m, 200)
 
         # 15M ATR(14)
         tr_list = []
@@ -7851,15 +7874,19 @@ class CapitalTrendScalpEngine:
             tr_list.append(tr)
         atr_15m = sum(tr_list[-14:]) / 14.0 if len(tr_list) >= 14 else (tr_list[-1] if tr_list else 1.0)
 
-        is_15m_bullish = (ema9_15m > ema21_15m >= ema50_15m) or (closes_15m[-1] > ema21_15m > ema50_15m)
-        is_15m_bearish = (ema9_15m < ema21_15m <= ema50_15m) or (closes_15m[-1] < ema21_15m < ema50_15m)
+        # Institutional Triple EMA Trend Alignment (20, 50, 200)
+        is_triple_ema_bullish = (closes_15m[-1] > ema20_15m > ema50_15m > ema200_15m)
+        is_triple_ema_bearish = (closes_15m[-1] < ema20_15m < ema50_15m < ema200_15m)
+
+        is_15m_bullish = is_triple_ema_bullish or (((ema9_15m > ema21_15m >= ema50_15m) or (closes_15m[-1] > ema20_15m > ema50_15m) or (closes_15m[-1] > ema21_15m > ema50_15m)) and closes_15m[-1] >= ema200_15m * 0.995)
+        is_15m_bearish = is_triple_ema_bearish or (((ema9_15m < ema21_15m <= ema50_15m) or (closes_15m[-1] < ema20_15m < ema50_15m) or (closes_15m[-1] < ema21_15m < ema50_15m)) and closes_15m[-1] <= ema200_15m * 1.005)
 
         if not is_15m_bullish and not is_15m_bearish:
             return {
                 "success": False,
                 "epic": resolved_epic,
                 "signal": "HOLD_NEUTRAL",
-                "reason": "15M Trend is mixed/sideways (EMA 9/21/50 not aligned)."
+                "reason": f"15M Trend is mixed/sideways (EMA 20/50/200 not aligned: Close={closes_15m[-1]:.2f}, EMA20={ema20_15m:.2f}, EMA50={ema50_15m:.2f}, EMA200={ema200_15m:.2f})."
             }
 
         # 4. 5M Micro Pullback & Impulse Rejection
@@ -7877,7 +7904,9 @@ class CapitalTrendScalpEngine:
         lows_5m = [c["low"] for c in candles_5m]
 
         ema9_5m = _calc_ema(closes_5m, 9)
+        ema20_5m = _calc_ema(closes_5m, 20)
         ema21_5m = _calc_ema(closes_5m, 21)
+        ema50_5m = _calc_ema(closes_5m, 50)
 
         tr_5m_list = []
         for i in range(1, len(candles_5m)):
@@ -7933,9 +7962,9 @@ class CapitalTrendScalpEngine:
             logger.debug(f"SMC 5M detection note: {e_smc_det}")
 
         if is_15m_bullish:
-            # Bullish Pullback: Price recently tested near EMA21 and closed back above EMA9/21
+            # Bullish Pullback: Price recently tested near EMA20/21 and closed back above EMA9/20
             recent_low = min(lows_5m[-3:])
-            is_ema_pullback = (recent_low <= ema21_5m * 1.003 and closes_5m[-1] >= ema9_5m * 0.998)
+            is_ema_pullback = (recent_low <= max(ema20_5m, ema21_5m) * 1.003 and closes_5m[-1] >= min(ema9_5m, ema20_5m) * 0.998)
 
             # SMC & ICT Confluence triggers
             is_ob_retest = has_bull_ob_5m
@@ -7960,9 +7989,9 @@ class CapitalTrendScalpEngine:
                     smc_trigger_reason = "5M EMA 21 Dynamic Pullback"
 
         elif is_15m_bearish:
-            # Bearish Pullback: Price recently surged near EMA21 and closed back below EMA9/21
+            # Bearish Pullback: Price recently surged near EMA20/21 and closed back below EMA9/20
             recent_high = max(highs_5m[-3:])
-            is_ema_pullback = (recent_high >= ema21_5m * 0.997 and closes_5m[-1] <= ema9_5m * 1.002)
+            is_ema_pullback = (recent_high >= min(ema20_5m, ema21_5m) * 0.997 and closes_5m[-1] <= max(ema9_5m, ema20_5m) * 1.002)
 
             # SMC & ICT Confluence triggers
             is_ob_retest = has_bear_ob_5m
@@ -8063,6 +8092,10 @@ class CapitalTrendScalpEngine:
             "spread": spread,
             "atr_5m": round(atr_5m, 4),
             "atr_15m": round(atr_15m, 4),
+            "ema20_15m": round(ema20_15m, 4),
+            "ema50_15m": round(ema50_15m, 4),
+            "ema200_15m": round(ema200_15m, 4),
+            "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED"),
             "smc_trigger": smc_trigger_reason,
             "smc_factors": smc_factors_list,
             "smc_ict_setup": cit_eval.get("smc_ict_setup", {}),
@@ -8333,11 +8366,13 @@ class CapitalTrendScalpEngine:
                         smc_tag = setup.get("smc_trigger", "15M Trend + 5M Pullback")
                         smc_facts = setup.get("smc_factors", [])
                         smc_facts_str = " | ".join(smc_facts[:2]) if smc_facts else "Institutional Citadel Clearance"
+                        ema_lbl = f"EMA 20/50/200: {setup.get('ema20_15m', 0):.1f} | {setup.get('ema50_15m', 0):.1f} | {setup.get('ema200_15m', 0):.1f} ({setup.get('triple_ema_alignment', 'STACK')})"
                         msg = (
                             f"⚡ **[CAPITAL.COM 24/7 TREND SCALP EXECUTED]** 🎯\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"🏛️ **ឧបករណ៍ ៖** `{epic}` (Major)\n"
                             f"🎯 **ទិសដៅ ៖** `{direction}` ({smc_tag})\n"
+                            f"📈 **Exponential Trend ៖** `{ema_lbl}`\n"
                             f"🧠 **SMC & ICT Confluence ៖** `{smc_facts_str}`\n"
                             f"📦 **ទំហំ ៖** `{size} contracts` (Margin: `${budget:.2f}`)\n"
                             f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
@@ -8345,7 +8380,7 @@ class CapitalTrendScalpEngine:
                             f"🎯 **Scalp Target TP ៖** `${tp:,.2f}` (R:R 1:{rr_val:.1f} | 10x Spread Hurdle)\n"
                             f"🛡️ **ការការពារ ៖** `Delayed Multi-Tier Harvest & Breakeven Armor`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"🚀 _ប្រព័ន្ធដេញកើបចំណេញ Smart Money Concept & ICT ២៤/៧!_"
+                            f"🚀 _ប្រព័ន្ធដេញកើបចំណេញ Triple EMA (20/50/200) & SMC/ICT ២៤/៧!_"
                         )
                         asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
                     except Exception as e_msg:

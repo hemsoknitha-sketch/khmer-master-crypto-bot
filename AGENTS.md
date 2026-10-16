@@ -1104,9 +1104,9 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 - **Rule:**
   1. **24/7 Continuous Trend Scalp Alpha Generation:**
      - Operates around the clock across all tradeable Capital.com CFD markets (Forex, US Indices, Gold/Oil, and Crypto CFDs) to extract high-frequency directional alpha without waiting for session opening bells.
-  2. **Strict 3-EMA Confluence & RSI Momentum Band Protocol:**
-     - BUY Setup: Requires strictly $\text{EMA}_9 > \text{EMA}_{21} > \text{EMA}_{50}$, current price above $\text{EMA}_9$, and RSI momentum in the sweet spot ($44 \le \text{RSI} \le 68$).
-     - SELL Setup: Requires strictly $\text{EMA}_9 < \text{EMA}_{21} < \text{EMA}_{50}$, current price below $\text{EMA}_9$, and RSI momentum in the sweet spot ($32 \le \text{RSI} \le 56$).
+  2. **Strict 3-EMA Confluence (EMA 20, 50, 200 Institutional Stack) & RSI Momentum Band Protocol:**
+     - BUY Setup: Requires strictly $\text{Price} > \text{EMA}_{20} > \text{EMA}_{50} > \text{EMA}_{200}$ (True Institutional Bullish Stack) or $\text{EMA}_9 > \text{EMA}_{21} > \text{EMA}_{50}$, current price above $\text{EMA}_9$, and RSI momentum in the sweet spot ($44 \le \text{RSI} \le 68$).
+     - SELL Setup: Requires strictly $\text{Price} < \text{EMA}_{20} < \text{EMA}_{50} < \text{EMA}_{200}$ (True Institutional Bearish Stack) or $\text{EMA}_9 < \text{EMA}_{21} < \text{EMA}_{50}$, current price below $\text{EMA}_9$, and RSI momentum in the sweet spot ($32 \le \text{RSI} \le 56$).
      - Sideways consolidation (ADX $< 22$ or tangled EMAs) is strictly rejected.
   3. **Dynamic Volatility Breathing Stop & 360° Citadel Trap Clearance:**
      - Stop-Loss distance must strictly enforce:
