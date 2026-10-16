@@ -109,6 +109,245 @@ def _calc_adx_14(high_arr: List[float], low_arr: List[float], close_arr: List[fl
     return round(float(adx), 2)
 
 
+# -----------------------------------------------------------------------------
+# Multi-Timeframe Candlestick Pattern Engine & RAM Cache (H1, H4, D1)
+# -----------------------------------------------------------------------------
+_HTF_CANDLE_CACHE: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+
+def get_cached_htf_candles(
+    engine: Any,
+    epic: str,
+    resolution: str,
+    max_bars: int = 10,
+    ttl_sec: float = 60.0
+) -> List[Dict[str, Any]]:
+    """
+    Sub-millisecond cached fetcher for higher timeframe historical candles (H1, H4, D1).
+    Prevents repeated broker API calls within the TTL window.
+    """
+    now = time.time()
+    cache_key = f"{epic}_{resolution}_{max_bars}"
+    if cache_key in _HTF_CANDLE_CACHE:
+        ts, cached = _HTF_CANDLE_CACHE[cache_key]
+        if now - ts < ttl_sec:
+            return cached
+    try:
+        if engine and hasattr(engine, "get_historical_prices"):
+            candles = engine.get_historical_prices(epic, resolution=resolution, max_bars=max_bars)
+            if candles:
+                _HTF_CANDLE_CACHE[cache_key] = (now, candles)
+                return candles
+    except Exception as e:
+        logger.debug(f"Failed to fetch {resolution} candles for {epic}: {e}")
+    return []
+
+
+class TradFiCandlestickPatternEngine:
+    """
+    Institutional Multi-Timeframe Candlestick Pattern Engine for TradFi Assets (H1, H4, D1).
+    Detects high-probability reversal and continuation patterns:
+    - Bullish: Hammer, Inverted Hammer, Bullish Engulfing, Morning Star, Piercing Line, Three White Soldiers, Dragonfly Doji, Bullish Harami
+    - Bearish: Shooting Star, Hanging Man, Bearish Engulfing, Evening Star, Dark Cloud Cover, Three Black Crows, Gravestone Doji, Bearish Harami
+    """
+
+    @classmethod
+    def analyze_patterns(cls, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyzes a sequence of OHLCV candles (latest at the end) and returns detected patterns."""
+        if not candles or len(candles) < 2:
+            return {"bullish": [], "bearish": [], "bias": "NEUTRAL", "score_impact": 0}
+
+        bullish = []
+        bearish = []
+
+        curr = candles[-1]
+        prev = candles[-2]
+        prev2 = candles[-3] if len(candles) >= 3 else None
+
+        c_open = float(curr.get("open", 0.0))
+        c_high = float(curr.get("high", 0.0))
+        c_low = float(curr.get("low", 0.0))
+        c_close = float(curr.get("close", 0.0))
+
+        p_open = float(prev.get("open", 0.0))
+        p_high = float(prev.get("high", 0.0))
+        p_low = float(prev.get("low", 0.0))
+        p_close = float(prev.get("close", 0.0))
+
+        c_range = max(1e-6, c_high - c_low)
+        c_body = abs(c_close - c_open)
+        c_upper_wick = max(0.0, c_high - max(c_open, c_close))
+        c_lower_wick = max(0.0, min(c_open, c_close) - c_low)
+
+        p_range = max(1e-6, p_high - p_low)
+        p_body = abs(p_close - p_open)
+
+        # -------------------------------------------------------------
+        # 1-CANDLE PATTERNS
+        # -------------------------------------------------------------
+        # Hammer (Bullish Rejection Pinbar at support)
+        if c_lower_wick >= 1.8 * max(0.001, c_body) and c_upper_wick <= 0.40 * max(0.001, c_body) and c_body >= 0.08 * c_range:
+            bullish.append("HAMMER")
+
+        # Inverted Hammer (Bullish Rejection at bottom)
+        if c_upper_wick >= 1.8 * max(0.001, c_body) and c_lower_wick <= 0.40 * max(0.001, c_body) and c_body >= 0.08 * c_range and c_close <= p_close:
+            bullish.append("INVERTED_HAMMER")
+
+        # Shooting Star (Bearish Rejection Pinbar at resistance)
+        if c_upper_wick >= 1.8 * max(0.001, c_body) and c_lower_wick <= 0.40 * max(0.001, c_body) and c_body >= 0.08 * c_range:
+            bearish.append("SHOOTING_STAR")
+
+        # Hanging Man (Bearish Rejection at top of trend)
+        if c_lower_wick >= 1.8 * max(0.001, c_body) and c_upper_wick <= 0.40 * max(0.001, c_body) and c_close >= p_close and c_body >= 0.08 * c_range:
+            bearish.append("HANGING_MAN")
+
+        # Dragonfly Doji (Bullish Exhaustion Reversal)
+        if c_body <= 0.08 * c_range and c_upper_wick <= 0.10 * c_range and c_lower_wick >= 0.60 * c_range:
+            bullish.append("DRAGONFLY_DOJI")
+
+        # Gravestone Doji (Bearish Exhaustion Reversal)
+        if c_body <= 0.08 * c_range and c_lower_wick <= 0.10 * c_range and c_upper_wick >= 0.60 * c_range:
+            bearish.append("GRAVESTONE_DOJI")
+
+        # -------------------------------------------------------------
+        # 2-CANDLE PATTERNS
+        # -------------------------------------------------------------
+        # Bullish Engulfing
+        if p_close < p_open and c_close > c_open:
+            if c_close >= p_open and c_open <= p_close and c_body > p_body:
+                bullish.append("BULLISH_ENGULFING")
+
+        # Bearish Engulfing
+        if p_close > p_open and c_close < c_open:
+            if c_close <= p_open and c_open >= p_close and c_body > p_body:
+                bearish.append("BEARISH_ENGULFING")
+
+        # Piercing Line (Bullish Reversal)
+        p_mid = (p_open + p_close) / 2.0
+        if p_close < p_open and c_close > c_open:
+            if c_open <= p_close and c_close > p_mid and c_close < p_open:
+                bullish.append("PIERCING_LINE")
+
+        # Dark Cloud Cover (Bearish Reversal)
+        if p_close > p_open and c_close < c_open:
+            if c_open >= p_close and c_close < p_mid and c_close > p_open:
+                bearish.append("DARK_CLOUD_COVER")
+
+        # Bullish Harami (Inside bar reversal)
+        if p_close < p_open and c_close > c_open:
+            if c_open >= p_close and c_close <= p_open and c_body <= 0.60 * p_body and p_body >= 0.35 * p_range:
+                bullish.append("BULLISH_HARAMI")
+
+        # Bearish Harami (Inside bar reversal)
+        if p_close > p_open and c_close < c_open:
+            if c_open <= p_close and c_close >= p_open and c_body <= 0.60 * p_body and p_body >= 0.35 * p_range:
+                bearish.append("BEARISH_HARAMI")
+
+        # -------------------------------------------------------------
+        # 3-CANDLE PATTERNS
+        # -------------------------------------------------------------
+        if prev2:
+            p2_open = float(prev2.get("open", 0.0))
+            p2_high = float(prev2.get("high", 0.0))
+            p2_low = float(prev2.get("low", 0.0))
+            p2_close = float(prev2.get("close", 0.0))
+            p2_range = max(1e-6, p2_high - p2_low)
+            p2_body = abs(p2_close - p2_open)
+            p2_mid = (p2_open + p2_close) / 2.0
+
+            # Morning Star (Bullish Reversal)
+            if p2_close < p2_open and p2_body >= 0.35 * p2_range:
+                if p_body <= 0.40 * p_range:
+                    if c_close > c_open and c_close > p2_mid:
+                        bullish.append("MORNING_STAR")
+
+            # Evening Star (Bearish Reversal)
+            if p2_close > p2_open and p2_body >= 0.35 * p2_range:
+                if p_body <= 0.40 * p_range:
+                    if c_close < c_open and c_close < p2_mid:
+                        bearish.append("EVENING_STAR")
+
+            # Three White Soldiers
+            if p2_close > p2_open and p_close > p_open and c_close > c_open:
+                if c_close > p_close > p2_close and c_open > p_open > p2_open:
+                    if c_upper_wick <= 0.35 * c_range and (p_high - max(p_open, p_close)) <= 0.35 * p_range:
+                        bullish.append("THREE_WHITE_SOLDIERS")
+
+            # Three Black Crows
+            if p2_close < p2_open and p_close < p_open and c_close < c_open:
+                if c_close < p_close < p2_close and c_open < p_open < p2_open:
+                    if c_lower_wick <= 0.35 * c_range and (min(p_open, p_close) - p_low) <= 0.35 * p_range:
+                        bearish.append("THREE_BLACK_CROWS")
+
+        bias = "NEUTRAL"
+        impact = 0
+        if bullish and not bearish:
+            bias = "BULLISH"
+            impact = 15 if any(p in bullish for p in ["BULLISH_ENGULFING", "MORNING_STAR", "THREE_WHITE_SOLDIERS"]) else 10
+        elif bearish and not bullish:
+            bias = "BEARISH"
+            impact = -15 if any(p in bearish for p in ["BEARISH_ENGULFING", "EVENING_STAR", "THREE_BLACK_CROWS"]) else -10
+        elif bullish and bearish:
+            bias = "CONFLICTING"
+            impact = 0
+
+        return {
+            "bullish": list(dict.fromkeys(bullish)),
+            "bearish": list(dict.fromkeys(bearish)),
+            "bias": bias,
+            "score_impact": impact
+        }
+
+    @classmethod
+    def evaluate_multi_timeframe_patterns(cls, engine: Any, epic: str) -> Dict[str, Any]:
+        """
+        Evaluates candlestick patterns across H1 (1 Hour), H4 (4 Hour), and D1 (1 Day).
+        Returns aggregated pattern dictionaries, detected pattern list, and bias.
+        """
+        c_h1 = get_cached_htf_candles(engine, epic, resolution="HOUR", max_bars=10, ttl_sec=60.0)
+        c_h4 = get_cached_htf_candles(engine, epic, resolution="HOUR_4", max_bars=10, ttl_sec=120.0)
+        c_d1 = get_cached_htf_candles(engine, epic, resolution="DAY", max_bars=10, ttl_sec=300.0)
+
+        pat_h1 = cls.analyze_patterns(c_h1)
+        pat_h4 = cls.analyze_patterns(c_h4)
+        pat_d1 = cls.analyze_patterns(c_d1)
+
+        bullish_list = []
+        bearish_list = []
+
+        if pat_h1.get("bullish"):
+            bullish_list.extend([f"H1_{p}" for p in pat_h1["bullish"]])
+        if pat_h1.get("bearish"):
+            bearish_list.extend([f"H1_{p}" for p in pat_h1["bearish"]])
+
+        if pat_h4.get("bullish"):
+            bullish_list.extend([f"H4_{p}" for p in pat_h4["bullish"]])
+        if pat_h4.get("bearish"):
+            bearish_list.extend([f"H4_{p}" for p in pat_h4["bearish"]])
+
+        if pat_d1.get("bullish"):
+            bullish_list.extend([f"D1_{p}" for p in pat_d1["bullish"]])
+        if pat_d1.get("bearish"):
+            bearish_list.extend([f"D1_{p}" for p in pat_d1["bearish"]])
+
+        summary_parts = []
+        if bullish_list:
+            summary_parts.append(f"Bullish: {', '.join(bullish_list)}")
+        if bearish_list:
+            summary_parts.append(f"Bearish: {', '.join(bearish_list)}")
+        summary_str = " | ".join(summary_parts) if summary_parts else "None"
+
+        return {
+            "H1": pat_h1,
+            "H4": pat_h4,
+            "D1": pat_d1,
+            "bullish_patterns": bullish_list,
+            "bearish_patterns": bearish_list,
+            "has_bullish": len(bullish_list) > 0,
+            "has_bearish": len(bearish_list) > 0,
+            "summary": summary_str
+        }
+
+
 class SuperSmartCapitalCitadel:
     """
     Institutional TradFi Position Opening Gatekeeper & Sky Net Trap Citadel for Capital.com.
@@ -248,6 +487,12 @@ class SuperSmartCapitalCitadel:
         # Step 2: Fetch 15m and 1h historical candles (Multi-Period EMA 20/50/200 Suite Lookback)
         candles_15m = engine.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=220)
         candles_1h = engine.get_historical_prices(resolved_epic, resolution="HOUR", max_bars=60)
+
+        # Multi-Timeframe Candlestick Pattern Evaluation (H1, H4, D1)
+        htf_patterns_eval = TradFiCandlestickPatternEngine.evaluate_multi_timeframe_patterns(engine, resolved_epic)
+        pat_h1 = htf_patterns_eval.get("H1", {})
+        pat_h4 = htf_patterns_eval.get("H4", {})
+        pat_d1 = htf_patterns_eval.get("D1", {})
 
         if not candles_15m or len(candles_15m) < 25:
             # Fallback to shared RAM price cache or basic validation if API prices temporarily unavailable
@@ -712,6 +957,21 @@ class SuperSmartCapitalCitadel:
                 score += 8.0
                 factors.append("INTERBANK_KILL_ZONE_ACTIVE (+8)")
 
+            # Multi-Timeframe Candlestick Pattern Confluence (H1, H4, D1)
+            if pat_h1.get("bullish"):
+                score += 10.0
+                factors.append(f"H1_BULLISH_{pat_h1['bullish'][0]} (+10)")
+            if pat_h4.get("bullish"):
+                score += 15.0
+                factors.append(f"H4_BULLISH_{pat_h4['bullish'][0]} (+15)")
+            if pat_d1.get("bullish"):
+                score += 15.0
+                factors.append(f"D1_BULLISH_{pat_d1['bullish'][0]} (+15)")
+
+            # Counter-reversal penalty
+            if pat_h4.get("bearish") or pat_d1.get("bearish"):
+                score -= 15.0
+
         elif norm_side == "SELL":
             # Premium advantage
             if is_premium:
@@ -784,6 +1044,21 @@ class SuperSmartCapitalCitadel:
             if in_kill_zone:
                 score += 8.0
                 factors.append("INTERBANK_KILL_ZONE_ACTIVE (+8)")
+
+            # Multi-Timeframe Candlestick Pattern Confluence (H1, H4, D1)
+            if pat_h1.get("bearish"):
+                score += 10.0
+                factors.append(f"H1_BEARISH_{pat_h1['bearish'][0]} (+10)")
+            if pat_h4.get("bearish"):
+                score += 15.0
+                factors.append(f"H4_BEARISH_{pat_h4['bearish'][0]} (+15)")
+            if pat_d1.get("bearish"):
+                score += 15.0
+                factors.append(f"D1_BEARISH_{pat_d1['bearish'][0]} (+15)")
+
+            # Counter-reversal penalty
+            if pat_h4.get("bullish") or pat_d1.get("bullish"):
+                score -= 15.0
 
         confluence_score = round(max(0.0, min(99.5, score)), 1)
         is_approved = (confluence_score >= 68.0)
@@ -883,7 +1158,8 @@ class SuperSmartCapitalCitadel:
             "ema20_15m": round(ema20_15m, prec),
             "ema50_15m": round(ema50_15m, prec),
             "ema200_15m": round(ema200_15m, prec),
-            "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED")
+            "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED"),
+            "candlestick_patterns": htf_patterns_eval
         }
 
         cls._CITADEL_CACHE[cache_key] = (now, result)

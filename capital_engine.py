@@ -1791,6 +1791,46 @@ class CapitalComEngine:
             elif closes[-1] < closes[-2] < closes[-3]:
                 bearish_score += 10
 
+        # 5b. Multi-Timeframe Candlestick Pattern Engine (H1, H4, D1 Bullish & Bearish Patterns)
+        htf_patterns = {}
+        htf_patterns_summary = []
+        try:
+            import super_smart_capital_citadel
+            htf_patterns = super_smart_capital_citadel.TradFiCandlestickPatternEngine.evaluate_multi_timeframe_patterns(self, resolved_epic)
+            pat_h1 = htf_patterns.get("H1", {})
+            pat_h4 = htf_patterns.get("H4", {})
+            pat_d1 = htf_patterns.get("D1", {})
+
+            # Bullish Candlestick Patterns (+10 H1, +15 H4, +15 D1)
+            if pat_h1.get("bullish"):
+                bullish_score += 10
+                htf_patterns_summary.append(f"H1_BULLISH_{pat_h1['bullish'][0]}")
+            if pat_h4.get("bullish"):
+                bullish_score += 15
+                htf_patterns_summary.append(f"H4_BULLISH_{pat_h4['bullish'][0]}")
+            if pat_d1.get("bullish"):
+                bullish_score += 15
+                htf_patterns_summary.append(f"D1_BULLISH_{pat_d1['bullish'][0]}")
+
+            # Bearish Candlestick Patterns (+10 H1, +15 H4, +15 D1)
+            if pat_h1.get("bearish"):
+                bearish_score += 10
+                htf_patterns_summary.append(f"H1_BEARISH_{pat_h1['bearish'][0]}")
+            if pat_h4.get("bearish"):
+                bearish_score += 15
+                htf_patterns_summary.append(f"H4_BEARISH_{pat_h4['bearish'][0]}")
+            if pat_d1.get("bearish"):
+                bearish_score += 15
+                htf_patterns_summary.append(f"D1_BEARISH_{pat_d1['bearish'][0]}")
+
+            # Anti-Reversal Protection: Major HTF Reversal Veto / Penalty
+            if pat_h4.get("bearish") or pat_d1.get("bearish"):
+                bullish_score = max(0, bullish_score - 15)
+            if pat_h4.get("bullish") or pat_d1.get("bullish"):
+                bearish_score = max(0, bearish_score - 15)
+        except Exception as e_htf_pat:
+            logger.debug(f"HTF Candlestick pattern eval note: {e_htf_pat}")
+
         # 6. Premium vs Discount Dealing Range Math (SMC / ICT Equilibrium)
         lookback_window = min(35, len(highs) - 2)
         sw_high = max(highs[-lookback_window:-2])
@@ -1855,7 +1895,9 @@ class CapitalComEngine:
                 "atr": atr,
                 "market_status": market_status,
                 "is_falling_knife": is_falling_knife,
-                "is_rising_rocket": is_rising_rocket
+                "is_rising_rocket": is_rising_rocket,
+                "candlestick_patterns": htf_patterns,
+                "htf_patterns_summary": htf_patterns_summary
             }
 
         spread_audit = {}
@@ -1918,7 +1960,9 @@ class CapitalComEngine:
             "tp": tp,
             "market_status": market_status,
             "is_falling_knife": is_falling_knife,
-            "is_rising_rocket": is_rising_rocket
+            "is_rising_rocket": is_rising_rocket,
+            "candlestick_patterns": htf_patterns,
+            "htf_patterns_summary": htf_patterns_summary
         }
 
     def execute_smart_tradfi_order(
@@ -4301,6 +4345,7 @@ class CapitalAutonomousEngine:
                                 f"🎯 **ទិសដៅ ៖** `{dir_emoji}`\n"
                                 f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
                                 f"📈 **Exponential MA Trend ៖** EMA 20 (`{setup.get('ema20', 0):.2f}`) | 50 (`{setup.get('ema50', 0):.2f}`) | 200 (`{setup.get('ema200', 0):.2f}`) [{setup.get('triple_ema_alignment', 'TREND')}]\n"
+                                f"🕯️ **Candlestick Patterns (H1/H4/D1) ៖** `{(' | '.join(setup.get('htf_patterns_summary', []))) or 'Momentum Structure Confirmed'}`\n"
                                 f"📊 **កម្លាំង Trend & Volume ៖** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
                                 f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
                                 f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
@@ -4325,6 +4370,7 @@ class CapitalAutonomousEngine:
                                 f"🎯 **Direction:** `{dir_emoji}`\n"
                                 f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
                                 f"📈 **Exponential MA Trend:** EMA 20 (`{setup.get('ema20', 0):.2f}`) | 50 (`{setup.get('ema50', 0):.2f}`) | 200 (`{setup.get('ema200', 0):.2f}`) [{setup.get('triple_ema_alignment', 'TREND')}]\n"
+                                f"🕯️ **Candlestick Patterns (H1/H4/D1):** `{(' | '.join(setup.get('htf_patterns_summary', []))) or 'Momentum Structure Confirmed'}`\n"
                                 f"📊 **Trend & Volume:** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
                                 f"📦 **Contract Size:** `{executed_size}`\n"
                                 f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
@@ -7939,6 +7985,10 @@ class CapitalTrendScalpEngine:
         has_bull_ob_5m = has_bear_ob_5m = has_bull_fvg_5m = has_bear_fvg_5m = False
         has_bull_ote_5m = has_bear_ote_5m = has_bull_idm_5m = has_bear_idm_5m = False
         has_bull_choch_5m = has_bear_choch_5m = False
+        has_bull_candle_h1 = has_bear_candle_h1 = False
+        has_bull_candle_h4 = has_bear_candle_h4 = False
+        candle_trigger_name = ""
+        htf_pats = {}
         try:
             import super_smart_capital_citadel
             sscc = super_smart_capital_citadel.SuperSmartCapitalCitadel
@@ -7958,8 +8008,24 @@ class CapitalTrendScalpEngine:
             has_bear_idm_5m = idm_5m.get("bearish_idm_swept", False)
             has_bull_choch_5m = choch_5m.get("bullish_choch", False)
             has_bear_choch_5m = choch_5m.get("bearish_choch", False)
+
+            htf_pats = super_smart_capital_citadel.TradFiCandlestickPatternEngine.evaluate_multi_timeframe_patterns(eng, resolved_epic)
+            p_h1 = htf_pats.get("H1", {})
+            p_h4 = htf_pats.get("H4", {})
+            if p_h1.get("bullish"):
+                has_bull_candle_h1 = True
+                candle_trigger_name = f"H1 {p_h1['bullish'][0]}"
+            elif p_h4.get("bullish"):
+                has_bull_candle_h4 = True
+                candle_trigger_name = f"H4 {p_h4['bullish'][0]}"
+            if p_h1.get("bearish"):
+                has_bear_candle_h1 = True
+                candle_trigger_name = f"H1 {p_h1['bearish'][0]}"
+            elif p_h4.get("bearish"):
+                has_bear_candle_h4 = True
+                candle_trigger_name = f"H4 {p_h4['bearish'][0]}"
         except Exception as e_smc_det:
-            logger.debug(f"SMC 5M detection note: {e_smc_det}")
+            logger.debug(f"SMC 5M & Pattern detection note: {e_smc_det}")
 
         if is_15m_bullish:
             # Bullish Pullback: Price recently tested near EMA20/21 and closed back above EMA9/20
@@ -7971,13 +8037,16 @@ class CapitalTrendScalpEngine:
             is_fvg_tap = has_bull_fvg_5m
             is_ote_entry = has_bull_ote_5m
             is_idm_sweep = has_bull_idm_5m
+            is_candle_trigger = has_bull_candle_h1 or has_bull_candle_h4
 
-            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep:
+            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep or is_candle_trigger:
                 direction = "BUY"
                 entry_price = current_ask if current_ask > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price + tp_dist
-                if is_ob_retest:
+                if is_candle_trigger:
+                    smc_trigger_reason = f"Bullish Candlestick Pattern ({candle_trigger_name})"
+                elif is_ob_retest:
                     smc_trigger_reason = "Bullish Order Block Retest"
                 elif is_fvg_tap:
                     smc_trigger_reason = "Bullish FVG C.E. Tap"
@@ -7998,13 +8067,16 @@ class CapitalTrendScalpEngine:
             is_fvg_tap = has_bear_fvg_5m
             is_ote_entry = has_bear_ote_5m
             is_idm_sweep = has_bear_idm_5m
+            is_candle_trigger = has_bear_candle_h1 or has_bear_candle_h4
 
-            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep:
+            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep or is_candle_trigger:
                 direction = "SELL"
                 entry_price = current_bid if current_bid > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price - tp_dist
-                if is_ob_retest:
+                if is_candle_trigger:
+                    smc_trigger_reason = f"Bearish Candlestick Pattern ({candle_trigger_name})"
+                elif is_ob_retest:
                     smc_trigger_reason = "Bearish Order Block Retest"
                 elif is_fvg_tap:
                     smc_trigger_reason = "Bearish FVG C.E. Tap"
@@ -8099,6 +8171,9 @@ class CapitalTrendScalpEngine:
             "smc_trigger": smc_trigger_reason,
             "smc_factors": smc_factors_list,
             "smc_ict_setup": cit_eval.get("smc_ict_setup", {}),
+            "candlestick_patterns": cit_eval.get("candlestick_patterns", htf_pats),
+            "candlestick_summary": [f for f in cit_eval.get("confluence_factors", []) if "BULLISH_" in f or "BEARISH_" in f],
+            "candle_trigger": candle_trigger_name,
             "reason": f"15M Trend + {smc_trigger_reason} + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Breathing SL)"
         }
 
@@ -8374,6 +8449,7 @@ class CapitalTrendScalpEngine:
                             f"🎯 **ទិសដៅ ៖** `{direction}` ({smc_tag})\n"
                             f"📈 **Exponential Trend ៖** `{ema_lbl}`\n"
                             f"🧠 **SMC & ICT Confluence ៖** `{smc_facts_str}`\n"
+                            f"🕯️ **Candlestick Patterns (H1/H4/D1) ៖** `{(' | '.join(setup.get('candlestick_summary', []))) or setup.get('candle_trigger', 'HTF Structure Confirmed')}`\n"
                             f"📦 **ទំហំ ៖** `{size} contracts` (Margin: `${budget:.2f}`)\n"
                             f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
                             f"🛑 **Dynamic Breathing Stop ៖** `${sl:,.2f}` (2.2x ATR Noise Buffer)\n"
