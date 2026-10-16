@@ -422,7 +422,10 @@ class SuperSmartCapitalCitadel:
                 "is_chop_zone": True,
                 "radar_armed": True,
                 "swing_high": swing_high,
-                "swing_low": swing_low
+                "swing_low": swing_low,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -440,7 +443,10 @@ class SuperSmartCapitalCitadel:
                 "is_approved": False,
                 "rejection_reason": reason,
                 "price_range_pct": price_range_pct,
-                "confluence_score": 25.0
+                "confluence_score": 25.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -457,7 +463,10 @@ class SuperSmartCapitalCitadel:
                 "is_approved": False,
                 "rejection_reason": reason,
                 "price_range_pct": price_range_pct,
-                "confluence_score": 25.0
+                "confluence_score": 25.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -501,7 +510,10 @@ class SuperSmartCapitalCitadel:
                 "proposed_side": norm_side,
                 "is_approved": False,
                 "rejection_reason": reason,
-                "confluence_score": 20.0
+                "confluence_score": 20.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -517,13 +529,16 @@ class SuperSmartCapitalCitadel:
                 "proposed_side": norm_side,
                 "is_approved": False,
                 "rejection_reason": reason,
-                "confluence_score": 20.0
+                "confluence_score": 20.0,
+                "spread": spread,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
 
         # --------------------------------------------------------------------
-        # 4. PILLAR 3 & 4: MARKET STRUCTURE SHIFT & FVG / ORDER BLOCK TAP
+        # 4. PILLAR 3 & 4: SMART MONEY CONCEPTS (SMC) & ICT STRUCTURE MATRIX
         # --------------------------------------------------------------------
         # Calculate 15m ATR
         trs = []
@@ -532,25 +547,36 @@ class SuperSmartCapitalCitadel:
             trs.append(tr)
         atr_15m = sum(trs[-14:]) / 14.0 if len(trs) >= 14 else (curr_price * 0.005)
 
-        # Detect 3-bar Fair Value Gap (FVG)
-        has_bullish_fvg = False
-        has_bearish_fvg = False
-        fvg_level = 0.0
+        # 4a. Order Blocks (OB) & Breaker Blocks Detection
+        detected_obs = cls.detect_tradfi_order_blocks(candles_15m, curr_price)
+        has_bullish_ob_test = any(ob["type"] == "BULLISH_OB" and ob.get("is_testing") for ob in detected_obs)
+        has_bearish_ob_test = any(ob["type"] == "BEARISH_OB" and ob.get("is_testing") for ob in detected_obs)
+        active_bullish_ob = next((ob for ob in detected_obs if ob["type"] == "BULLISH_OB"), None)
+        active_bearish_ob = next((ob for ob in detected_obs if ob["type"] == "BEARISH_OB"), None)
 
-        for i in range(-5, -1):
-            # Bullish FVG: Low of candle [i+1] > High of candle [i-1]
-            if lows[i + 1] > highs[i - 1]:
-                gap_size = lows[i + 1] - highs[i - 1]
-                if gap_size > atr_15m * 0.30:
-                    has_bullish_fvg = True
-                    fvg_level = (lows[i + 1] + highs[i - 1]) / 2.0
+        # 4b. 3-bar Fair Value Gap (FVG) / Imbalance & Consequent Encroachment (C.E.)
+        detected_fvgs = cls.detect_tradfi_fair_value_gaps(candles_15m, curr_price, atr_15m)
+        has_bullish_fvg = any(f["type"] == "BULLISH_FVG" for f in detected_fvgs)
+        has_bearish_fvg = any(f["type"] == "BEARISH_FVG" for f in detected_fvgs)
+        has_bullish_fvg_test = any(f["type"] == "BULLISH_FVG" and f.get("is_testing") for f in detected_fvgs)
+        has_bearish_fvg_test = any(f["type"] == "BEARISH_FVG" and f.get("is_testing") for f in detected_fvgs)
 
-            # Bearish FVG: High of candle [i+1] < Low of candle [i-1]
-            if highs[i + 1] < lows[i - 1]:
-                gap_size = lows[i - 1] - highs[i + 1]
-                if gap_size > atr_15m * 0.30:
-                    has_bearish_fvg = True
-                    fvg_level = (lows[i - 1] + highs[i + 1]) / 2.0
+        # 4c. Market Structure: Change of Character (CHoCH) & Break of Structure (BOS)
+        structure_info = cls.detect_tradfi_choch_and_bos(candles_15m)
+        has_bullish_choch = structure_info.get("bullish_choch", False)
+        has_bearish_choch = structure_info.get("bearish_choch", False)
+        has_bullish_bos = structure_info.get("bullish_bos", False)
+        has_bearish_bos = structure_info.get("bearish_bos", False)
+
+        # 4d. ICT Optimal Trade Entry (OTE 61.8% - 78.6% with 70.5% Sweet Spot)
+        ote_info = cls.detect_tradfi_dealing_range_ote(candles_15m, curr_price)
+        has_bullish_ote = ote_info.get("ote_bullish", False)
+        has_bearish_ote = ote_info.get("ote_bearish", False)
+
+        # 4e. Smart Money Inducement (IDM) Sweeps
+        idm_info = cls.detect_tradfi_inducement_sweep(candles_15m, curr_price)
+        has_bullish_idm_swept = idm_info.get("bullish_idm_swept", False)
+        has_bearish_idm_swept = idm_info.get("bearish_idm_swept", False)
 
         # Market Structure Shift (Displacement candle check)
         recent_ranges = [highs[k] - lows[k] for k in range(-3, 0)]
@@ -574,7 +600,9 @@ class SuperSmartCapitalCitadel:
                 "rejection_reason": reason,
                 "spread": spread,
                 "spread_drag_pct": round(spread_drag_pct, 1),
-                "confluence_score": 15.0
+                "confluence_score": 15.0,
+                "invalidation_sl": preliminary_sl,
+                "breathing_sl_dist": breathing_sl_dist
             }
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
@@ -595,7 +623,7 @@ class SuperSmartCapitalCitadel:
         in_kill_zone = (7 <= utc_hour <= 10) or (13 <= utc_hour <= 16)
 
         # --------------------------------------------------------------------
-        # 7. CONFLUENCE SCORING & DECISION MATRIX
+        # 7. CONFLUENCE SCORING & DECISION MATRIX (SMC & ICT ENHANCED)
         # --------------------------------------------------------------------
         score = 50.0
         factors = []
@@ -608,15 +636,41 @@ class SuperSmartCapitalCitadel:
             else:
                 score -= 10.0
 
-            # SSL Liquidity Sweep Spring
+            # SSL Liquidity Sweep Spring (Turtle Soup)
             if has_ssl_sweep:
                 score += 25.0
                 factors.append("SSL_LIQUIDITY_SWEEP_CONFIRMED (+25)")
 
-            # Bullish FVG Imbalance
-            if has_bullish_fvg:
+            # Bullish Order Block Retest
+            if has_bullish_ob_test:
+                score += 18.0
+                factors.append("BULLISH_ORDER_BLOCK_RETEST (+18)")
+
+            # ICT Discount OTE (61.8% - 78.6% Sweet Spot)
+            if has_bullish_ote:
+                score += 15.0
+                factors.append("ICT_DISCOUNT_OTE_70.5_ENTRY (+15)")
+
+            # Bullish CHoCH (Market Structure Shift)
+            if has_bullish_choch:
+                score += 15.0
+                factors.append("BULLISH_CHOCH_REVERSAL_SHIFT (+15)")
+            elif has_bullish_bos:
                 score += 12.0
-                factors.append("BULLISH_FVG_IMBALANCE (+12)")
+                factors.append("BULLISH_BOS_EXPANSION (+12)")
+
+            # Inducement Swept
+            if has_bullish_idm_swept:
+                score += 12.0
+                factors.append("BULLISH_IDM_LIQUIDITY_SWEPT (+12)")
+
+            # Bullish FVG Imbalance & Consequent Encroachment
+            if has_bullish_fvg_test:
+                score += 14.0
+                factors.append("BULLISH_FVG_CONSEQUENT_ENCROACHMENT (+14)")
+            elif has_bullish_fvg:
+                score += 10.0
+                factors.append("BULLISH_FVG_IMBALANCE (+10)")
 
             if curr_price > ema50_15m:
                 score += 10.0
@@ -642,15 +696,41 @@ class SuperSmartCapitalCitadel:
             else:
                 score -= 10.0
 
-            # BSL Liquidity Sweep Upthrust
+            # BSL Liquidity Sweep Upthrust (Turtle Soup)
             if has_bsl_sweep:
                 score += 25.0
                 factors.append("BSL_LIQUIDITY_SWEEP_CONFIRMED (+25)")
 
-            # Bearish FVG Imbalance
-            if has_bearish_fvg:
+            # Bearish Order Block Retest
+            if has_bearish_ob_test:
+                score += 18.0
+                factors.append("BEARISH_ORDER_BLOCK_RETEST (+18)")
+
+            # ICT Premium OTE (61.8% - 78.6% Sweet Spot)
+            if has_bearish_ote:
+                score += 15.0
+                factors.append("ICT_PREMIUM_OTE_70.5_ENTRY (+15)")
+
+            # Bearish CHoCH (Market Structure Shift)
+            if has_bearish_choch:
+                score += 15.0
+                factors.append("BEARISH_CHOCH_REVERSAL_SHIFT (+15)")
+            elif has_bearish_bos:
                 score += 12.0
-                factors.append("BEARISH_FVG_IMBALANCE (+12)")
+                factors.append("BEARISH_BOS_EXPANSION (+12)")
+
+            # Inducement Swept
+            if has_bearish_idm_swept:
+                score += 12.0
+                factors.append("BEARISH_IDM_LIQUIDITY_SWEPT (+12)")
+
+            # Bearish FVG Imbalance & Consequent Encroachment
+            if has_bearish_fvg_test:
+                score += 14.0
+                factors.append("BEARISH_FVG_CONSEQUENT_ENCROACHMENT (+14)")
+            elif has_bearish_fvg:
+                score += 10.0
+                factors.append("BEARISH_FVG_IMBALANCE (+10)")
 
             if curr_price < ema50_15m:
                 score += 10.0
@@ -703,17 +783,34 @@ class SuperSmartCapitalCitadel:
             tp_spread_mult = 10.0
 
         if norm_side == "BUY":
-            invalidation_sl = round(min(swing_low - (0.25 * atr_15m), curr_price - breathing_sl_dist), prec)
+            # Structural Invalidation anchored behind Order Block bottom or Swing Low
+            ob_anchor = (active_bullish_ob.get("bottom", swing_low) - (0.15 * atr_15m)) if active_bullish_ob else swing_low
+            invalidation_sl = round(min(ob_anchor, swing_low - (0.25 * atr_15m), curr_price - breathing_sl_dist), prec)
             risk_dist = max(breathing_sl_dist, curr_price - invalidation_sl)
             tp_1 = round(curr_price + max(risk_dist * 2.5, tp_spread_mult * spread), prec)  # Institutional 1:2.5 Min Hurdle
             tp_2 = round(curr_price + max(risk_dist * 5.0, 15.0 * spread), prec)  # Institutional 1:5.0 Major Target
         else:
-            invalidation_sl = round(max(swing_high + (0.25 * atr_15m), curr_price + breathing_sl_dist), prec)
+            ob_anchor = (active_bearish_ob.get("top", swing_high) + (0.15 * atr_15m)) if active_bearish_ob else swing_high
+            invalidation_sl = round(max(ob_anchor, swing_high + (0.25 * atr_15m), curr_price + breathing_sl_dist), prec)
             risk_dist = max(breathing_sl_dist, invalidation_sl - curr_price)
             tp_1 = round(curr_price - max(risk_dist * 2.5, tp_spread_mult * spread), prec)
             tp_2 = round(curr_price - max(risk_dist * 5.0, 15.0 * spread), prec)
 
         rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
+
+        smc_ict_payload = {
+            "order_blocks": detected_obs,
+            "fair_value_gaps": detected_fvgs,
+            "structure": structure_info,
+            "ote_info": ote_info,
+            "idm_info": idm_info,
+            "has_bullish_ob_test": has_bullish_ob_test,
+            "has_bearish_ob_test": has_bearish_ob_test,
+            "has_bullish_ote": has_bullish_ote,
+            "has_bearish_ote": has_bearish_ote,
+            "has_bullish_choch": has_bullish_choch,
+            "has_bearish_choch": has_bearish_choch
+        }
 
         result = {
             "epic": resolved_epic,
@@ -744,11 +841,310 @@ class SuperSmartCapitalCitadel:
             "target_tp_min": tp_1,
             "target_tp_major": tp_2,
             "risk_reward_ratio": rr_ratio,
-            "confluence_factors": factors
+            "confluence_factors": factors,
+            "smc_ict_setup": smc_ict_payload
         }
 
         cls._CITADEL_CACHE[cache_key] = (now, result)
         return result
+
+    # =========================================================================
+    # INSTITUTIONAL SMART MONEY CONCEPTS (SMC) & ICT DETECTION HELPERS
+    # =========================================================================
+
+    @classmethod
+    def detect_tradfi_order_blocks(cls, candles: List[Dict[str, Any]], current_price: float) -> List[Dict[str, Any]]:
+        """
+        Identifies Institutional Order Blocks (OB) & Breaker Blocks:
+        - Bullish OB: Last down-close candle before a high-momentum upward impulse.
+        - Bearish OB: Last up-close candle before a high-momentum downward impulse.
+        - Mean Threshold: 50% midpoint of the Order Block.
+        - Active Mitigation: Checks if current price is actively testing the OB.
+        """
+        if not candles or len(candles) < 15:
+            return []
+        obs = []
+        n = len(candles)
+        opens = [float(c.get("open", 0.0)) for c in candles]
+        highs = [float(c.get("high", 0.0)) for c in candles]
+        lows = [float(c.get("low", 0.0)) for c in candles]
+        closes = [float(c.get("close", 0.0)) for c in candles]
+
+        body_sizes = [abs(closes[i] - opens[i]) for i in range(n)]
+        avg_body = np.mean(body_sizes[-20:]) if len(body_sizes) >= 20 else np.mean(body_sizes)
+        if avg_body <= 0:
+            avg_body = 0.001
+
+        for i in range(max(1, n - 25), n - 2):
+            c_open = opens[i]
+            c_close = closes[i]
+            c_high = highs[i]
+            c_low = lows[i]
+
+            # Bullish Order Block (Red candle before green impulse)
+            if c_close < c_open:
+                fwd_high = max(highs[i+1:min(n, i+3)])
+                fwd_body = abs(closes[i+1] - opens[i+1]) if (i+1 < n) else 0.0
+                if fwd_high > c_high and fwd_body >= (avg_body * 1.20):
+                    subsequent_lows = lows[i+2:n]
+                    is_mitigated = any(l < c_low for l in subsequent_lows) if len(subsequent_lows) > 0 else False
+                    is_testing = (c_low <= current_price <= (c_high + avg_body * 0.25))
+                    mt = (c_high + c_low) / 2.0
+                    if not is_mitigated:
+                        obs.append({
+                            "type": "BULLISH_OB",
+                            "index": i,
+                            "top": c_high,
+                            "bottom": c_low,
+                            "mean_threshold": mt,
+                            "is_testing": is_testing,
+                            "mitigated": False
+                        })
+
+            # Bearish Order Block (Green candle before red impulse)
+            elif c_close > c_open:
+                fwd_low = min(lows[i+1:min(n, i+3)])
+                fwd_body = abs(closes[i+1] - opens[i+1]) if (i+1 < n) else 0.0
+                if fwd_low < c_low and fwd_body >= (avg_body * 1.20):
+                    subsequent_highs = highs[i+2:n]
+                    is_mitigated = any(h > c_high for h in subsequent_highs) if len(subsequent_highs) > 0 else False
+                    is_testing = ((c_low - avg_body * 0.25) <= current_price <= c_high)
+                    mt = (c_high + c_low) / 2.0
+                    if not is_mitigated:
+                        obs.append({
+                            "type": "BEARISH_OB",
+                            "index": i,
+                            "top": c_high,
+                            "bottom": c_low,
+                            "mean_threshold": mt,
+                            "is_testing": is_testing,
+                            "mitigated": False
+                        })
+        return obs
+
+    @classmethod
+    def detect_tradfi_fair_value_gaps(cls, candles: List[Dict[str, Any]], current_price: float, atr: float) -> List[Dict[str, Any]]:
+        """
+        Identifies 3-candle Fair Value Gaps (FVG) / Imbalances:
+        - BISI (Bullish FVG): Low[i] > High[i-2]
+        - SIBI (Bearish FVG): High[i] < Low[i-2]
+        - Consequent Encroachment (C.E.): 50% midpoint of the FVG.
+        """
+        if not candles or len(candles) < 10:
+            return []
+        fvgs = []
+        n = len(candles)
+        highs = [float(c.get("high", 0.0)) for c in candles]
+        lows = [float(c.get("low", 0.0)) for c in candles]
+
+        for i in range(max(2, n - 20), n):
+            # Bullish FVG
+            if lows[i] > highs[i-2]:
+                gap_bottom = highs[i-2]
+                gap_top = lows[i]
+                gap_size = gap_top - gap_bottom
+                if gap_size >= (atr * 0.25):
+                    ce = (gap_top + gap_bottom) / 2.0
+                    subsequent_lows = lows[i+1:n] if (i+1 < n) else []
+                    is_fully_filled = any(l <= gap_bottom for l in subsequent_lows) if len(subsequent_lows) > 0 else False
+                    is_testing = (gap_bottom <= current_price <= gap_top)
+                    is_testing_ce = (gap_bottom <= current_price <= ce)
+                    if not is_fully_filled:
+                        fvgs.append({
+                            "type": "BULLISH_FVG",
+                            "top": gap_top,
+                            "bottom": gap_bottom,
+                            "consequent_encroachment": ce,
+                            "is_testing": is_testing,
+                            "is_testing_ce": is_testing_ce,
+                            "gap_size": gap_size,
+                            "filled": False
+                        })
+            # Bearish FVG
+            elif highs[i] < lows[i-2]:
+                gap_top = lows[i-2]
+                gap_bottom = highs[i]
+                gap_size = gap_top - gap_bottom
+                if gap_size >= (atr * 0.25):
+                    ce = (gap_top + gap_bottom) / 2.0
+                    subsequent_highs = highs[i+1:n] if (i+1 < n) else []
+                    is_fully_filled = any(h >= gap_top for h in subsequent_highs) if len(subsequent_highs) > 0 else False
+                    is_testing = (gap_bottom <= current_price <= gap_top)
+                    is_testing_ce = (ce <= current_price <= gap_top)
+                    if not is_fully_filled:
+                        fvgs.append({
+                            "type": "BEARISH_FVG",
+                            "top": gap_top,
+                            "bottom": gap_bottom,
+                            "consequent_encroachment": ce,
+                            "is_testing": is_testing,
+                            "is_testing_ce": is_testing_ce,
+                            "gap_size": gap_size,
+                            "filled": False
+                        })
+        return fvgs
+
+    @classmethod
+    def detect_tradfi_choch_and_bos(cls, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Detects structural shifts across 3-bar fractal swing pivots:
+        - Change of Character (CHoCH): Trend reversal (e.g. Lower High broken upward).
+        - Break of Structure (BOS): Trend continuation (e.g. Higher High extended).
+        """
+        res = {
+            "bullish_choch": False, "bearish_choch": False, "choch_level": 0.0,
+            "bullish_bos": False, "bearish_bos": False, "bos_level": 0.0
+        }
+        if not candles or len(candles) < 20:
+            return res
+        n = len(candles)
+        highs = [float(c.get("high", 0.0)) for c in candles]
+        lows = [float(c.get("low", 0.0)) for c in candles]
+        closes = [float(c.get("close", 0.0)) for c in candles]
+
+        shs = [(i, highs[i]) for i in range(2, n - 2) if highs[i] > highs[i-1] and highs[i] > highs[i-2] and highs[i] > highs[i+1] and highs[i] > highs[i+2]]
+        sls = [(i, lows[i]) for i in range(2, n - 2) if lows[i] < lows[i-1] and lows[i] < lows[i-2] and lows[i] < lows[i+1] and lows[i] < lows[i+2]]
+
+        curr_close = closes[-1]
+
+        # CHoCH (Trend Reversal)
+        if len(shs) >= 2:
+            last_sh_idx, last_sh_val = shs[-1]
+            prev_sh_idx, prev_sh_val = shs[-2]
+            if last_sh_val < prev_sh_val and curr_close > last_sh_val:
+                res["bullish_choch"] = True
+                res["choch_level"] = last_sh_val
+        if len(sls) >= 2:
+            last_sl_idx, last_sl_val = sls[-1]
+            prev_sl_idx, prev_sl_val = sls[-2]
+            if last_sl_val > prev_sl_val and curr_close < last_sl_val:
+                res["bearish_choch"] = True
+                res["choch_level"] = last_sl_val
+
+        # BOS (Trend Continuation)
+        if len(shs) >= 2:
+            highest_prior = max(s[1] for s in shs[-2:])
+            if curr_close > highest_prior:
+                res["bullish_bos"] = True
+                res["bos_level"] = highest_prior
+        if len(sls) >= 2:
+            lowest_prior = min(s[1] for s in sls[-2:])
+            if curr_close < lowest_prior:
+                res["bearish_bos"] = True
+                res["bos_level"] = lowest_prior
+
+        return res
+
+    @classmethod
+    def detect_tradfi_dealing_range_ote(cls, candles: List[Dict[str, Any]], current_price: float) -> Dict[str, Any]:
+        """
+        Computes ICT Dealing Range Equilibrium (50%) and Optimal Trade Entry (OTE 61.8% - 78.6%):
+        - Bullish OTE: Retracement into Discount zone (between 21.4% and 42.0% from bottom).
+        - Bearish OTE: Retracement into Premium zone (between 58.0% and 78.6% from bottom).
+        - ICT 70.5% Sweet Spot.
+        """
+        res = {
+            "range_high": 0.0, "range_low": 0.0, "equilibrium": 0.0,
+            "pct_in_range": 50.0, "is_discount": False, "is_premium": False,
+            "ote_bullish": False, "ote_bearish": False, "ote_705_level": 0.0
+        }
+        if not candles or len(candles) < 15:
+            return res
+        highs = [float(c.get("high", 0.0)) for c in candles]
+        lows = [float(c.get("low", 0.0)) for c in candles]
+
+        r_high = float(np.max(highs[-35:-1])) if len(highs) >= 36 else float(np.max(highs))
+        r_low = float(np.min(lows[-35:-1])) if len(lows) >= 36 else float(np.min(lows))
+        d_range = max(1e-6, r_high - r_low)
+        eq = r_low + (d_range * 0.50)
+        pct = round(((current_price - r_low) / d_range) * 100.0, 1)
+
+        ote_bullish = (21.4 <= pct <= 42.0)
+        ote_705_bullish = r_low + (d_range * 0.295)
+
+        ote_bearish = (58.0 <= pct <= 78.6)
+        ote_705_bearish = r_low + (d_range * 0.705)
+
+        res["range_high"] = r_high
+        res["range_low"] = r_low
+        res["equilibrium"] = eq
+        res["pct_in_range"] = pct
+        res["is_discount"] = (current_price < eq)
+        res["is_premium"] = (current_price > eq)
+        res["ote_bullish"] = ote_bullish
+        res["ote_bearish"] = ote_bearish
+        res["ote_705_level"] = ote_705_bullish if current_price < eq else ote_705_bearish
+        return res
+
+    @classmethod
+    def detect_tradfi_inducement_sweep(cls, candles: List[Dict[str, Any]], current_price: float) -> Dict[str, Any]:
+        """
+        Detects Smart Money Inducement (IDM) Sweeps:
+        Minor internal structure pullback low/high swept before tapping the major Order Block.
+        Prevents entering retail inducement traps.
+        """
+        res = {"bullish_idm_swept": False, "bearish_idm_swept": False, "idm_level": 0.0}
+        if not candles or len(candles) < 12:
+            return res
+        highs = [float(c.get("high", 0.0)) for c in candles]
+        lows = [float(c.get("low", 0.0)) for c in candles]
+        closes = [float(c.get("close", 0.0)) for c in candles]
+
+        minor_low = float(np.min(lows[-8:-3]))
+        minor_high = float(np.max(highs[-8:-3]))
+
+        if min(lows[-3:]) < minor_low and closes[-1] > minor_low:
+            res["bullish_idm_swept"] = True
+            res["idm_level"] = minor_low
+
+        if max(highs[-3:]) > minor_high and closes[-1] < minor_high:
+            res["bearish_idm_swept"] = True
+            res["idm_level"] = minor_high
+
+        return res
+
+    @classmethod
+    def evaluate_tradfi_smc_ict(cls, epic: str, engine: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Direct institutional query API for SMC & ICT setups on Capital.com assets.
+        Analyzes 15M and 1H structure, Order Blocks, FVGs, OTE, CHoCH, and Liquidity Pools.
+        """
+        import capital_engine
+        resolved_epic = capital_engine.EPIC_MAP.get(str(epic or "").upper().strip(), str(epic or "").upper().strip())
+        eng = engine or capital_engine.get_capital_engine()
+
+        candles_15m = eng.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=45)
+        if not candles_15m or len(candles_15m) < 20:
+            return {"success": False, "reason": "INSUFFICIENT_CANDLES"}
+
+        market_info = eng.get_market_details(resolved_epic)
+        curr_price = float(market_info.get("mid", 0.0) or candles_15m[-1].get("close", 0.0))
+        spread = float(market_info.get("spread", 0.0) or 0.35)
+
+        # Evaluate Buy side
+        buy_diag = cls.evaluate_institutional_tradfi_trap(resolved_epic, "BUY", engine=eng)
+        sell_diag = cls.evaluate_institutional_tradfi_trap(resolved_epic, "SELL", engine=eng)
+
+        buy_score = buy_diag.get("confluence_score", 0.0)
+        sell_score = sell_diag.get("confluence_score", 0.0)
+
+        best_dir = "BUY" if buy_score > sell_score else "SELL"
+        best_diag = buy_diag if best_dir == "BUY" else sell_diag
+        best_score = max(buy_score, sell_score)
+
+        return {
+            "success": True,
+            "epic": resolved_epic,
+            "direction": best_dir if best_score >= 68.0 else "WAIT",
+            "confidence": best_score,
+            "is_approved": best_diag.get("is_approved", False),
+            "rejection_reason": best_diag.get("rejection_reason", "CLEARANCE_GRANTED"),
+            "sl": best_diag.get("invalidation_sl", 0.0),
+            "tp": best_diag.get("target_tp_min", 0.0),
+            "rr_ratio": best_diag.get("risk_reward_ratio", 2.5),
+            "confluence_factors": best_diag.get("confluence_factors", []),
+            "smc_ict_setup": best_diag.get("smc_ict_setup", {})
+        }
 
     @classmethod
     def validate_capital_entry_gatekeeper(

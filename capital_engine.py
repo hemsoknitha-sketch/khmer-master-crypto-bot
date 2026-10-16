@@ -3185,12 +3185,24 @@ class CapitalAutonomousEngine:
         except Exception as e_smc:
             logger.debug(f"SMC Citadel confluence check note: {e_smc}")
 
-        # 2c. Super Smart Capital Citadel 8-Pillar Institutional Trap Confluence
+        # 2c. Super Smart Capital Citadel 8-Pillar Institutional Trap Confluence (SMC & ICT Enhanced)
         citadel_boost = 0.0
         citadel_approved = True
         try:
             import super_smart_capital_citadel
             tentative_dir = "BUY" if (raw_sig in ["BUY", "STRONG_BUY"] or smc_act == "BUY") else ("SELL" if (raw_sig in ["SELL", "STRONG_SELL"] or smc_act == "SELL") else None)
+            
+            # If tentative_dir is not yet set, evaluate native TradFi Smart Money Concepts (OB / FVG / OTE / CHoCH)
+            if not tentative_dir:
+                native_smc = super_smart_capital_citadel.SuperSmartCapitalCitadel.evaluate_tradfi_smc_ict(resolved_epic, engine=engine)
+                if native_smc.get("success") and native_smc.get("direction") in ["BUY", "SELL"]:
+                    tentative_dir = native_smc["direction"]
+                    smc_act = tentative_dir
+                    smc_cf = float(native_smc.get("confidence", 75.0))
+                    base_quant["smc_action"] = smc_act
+                    base_quant["smc_confidence"] = smc_cf
+                    smc_boost = min(25.0, (smc_cf - 50.0) * 0.5)
+
             if tentative_dir:
                 cit_diag = super_smart_capital_citadel.SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap(resolved_epic, tentative_dir, engine=engine)
                 c_score = float(cit_diag.get("confluence_score", 50.0))
@@ -3198,6 +3210,21 @@ class CapitalAutonomousEngine:
                 base_quant["citadel_diagnostics"] = cit_diag
                 base_quant["citadel_score"] = c_score
                 base_quant["citadel_approved"] = citadel_approved
+
+                # Extract and merge Smart Money Concepts & ICT confluence
+                if cit_diag.get("smc_ict_setup"):
+                    base_quant["tradfi_smc_ict"] = cit_diag["smc_ict_setup"]
+                    smc_f = [f for f in cit_diag.get("confluence_factors", []) if any(k in f for k in ["ORDER_BLOCK", "FVG", "OTE", "CHOCH", "BOS", "IDM", "SWEEP"])]
+                    if smc_f:
+                        combined_smc = list(dict.fromkeys(base_quant.get("smc_factors", []) + smc_f))
+                        base_quant["smc_factors"] = combined_smc
+                    # If MT5 SMC was WAIT, elevate direction and confidence from native TradFi Citadel
+                    if smc_act == "WAIT" and c_score >= 70.0 and citadel_approved:
+                        smc_act = tentative_dir
+                        smc_cf = c_score
+                        base_quant["smc_action"] = smc_act
+                        base_quant["smc_confidence"] = smc_cf
+                        smc_boost = min(25.0, (c_score - 50.0) * 0.5)
 
                 if citadel_approved:
                     citadel_boost = min(20.0, (c_score - 50.0) * 0.4)
@@ -7878,34 +7905,115 @@ class CapitalTrendScalpEngine:
         sl_dist = max(2.20 * atr_15m, 3.0 * atr_5m, 3.5 * spread)
         tp_dist = max(2.50 * sl_dist, 10.0 * spread)  # Invariant 34: Minimum 10x Spread Hurdle
 
+        # Smart Money Concepts (SMC) & ICT 5M/15M Confluence Detection
+        smc_trigger_reason = "5M Pullback Rejection towards EMA 21"
+        has_bull_ob_5m = has_bear_ob_5m = has_bull_fvg_5m = has_bear_fvg_5m = False
+        has_bull_ote_5m = has_bear_ote_5m = has_bull_idm_5m = has_bear_idm_5m = False
+        has_bull_choch_5m = has_bear_choch_5m = False
+        try:
+            import super_smart_capital_citadel
+            sscc = super_smart_capital_citadel.SuperSmartCapitalCitadel
+            obs_5m = sscc.detect_tradfi_order_blocks(candles_5m, mid_price)
+            fvgs_5m = sscc.detect_tradfi_fair_value_gaps(candles_5m, mid_price, atr_5m)
+            ote_5m = sscc.detect_tradfi_dealing_range_ote(candles_5m, mid_price)
+            idm_5m = sscc.detect_tradfi_inducement_sweep(candles_5m, mid_price)
+            choch_5m = sscc.detect_tradfi_choch_and_bos(candles_5m)
+
+            has_bull_ob_5m = any(ob["type"] == "BULLISH_OB" and ob.get("is_testing") for ob in obs_5m)
+            has_bear_ob_5m = any(ob["type"] == "BEARISH_OB" and ob.get("is_testing") for ob in obs_5m)
+            has_bull_fvg_5m = any(f["type"] == "BULLISH_FVG" and f.get("is_testing") for f in fvgs_5m)
+            has_bear_fvg_5m = any(f["type"] == "BEARISH_FVG" and f.get("is_testing") for f in fvgs_5m)
+            has_bull_ote_5m = ote_5m.get("ote_bullish", False)
+            has_bear_ote_5m = ote_5m.get("ote_bearish", False)
+            has_bull_idm_5m = idm_5m.get("bullish_idm_swept", False)
+            has_bear_idm_5m = idm_5m.get("bearish_idm_swept", False)
+            has_bull_choch_5m = choch_5m.get("bullish_choch", False)
+            has_bear_choch_5m = choch_5m.get("bearish_choch", False)
+        except Exception as e_smc_det:
+            logger.debug(f"SMC 5M detection note: {e_smc_det}")
+
         if is_15m_bullish:
             # Bullish Pullback: Price recently tested near EMA21 and closed back above EMA9/21
             recent_low = min(lows_5m[-3:])
-            if recent_low <= ema21_5m * 1.003 and closes_5m[-1] >= ema9_5m * 0.998:
+            is_ema_pullback = (recent_low <= ema21_5m * 1.003 and closes_5m[-1] >= ema9_5m * 0.998)
+
+            # SMC & ICT Confluence triggers
+            is_ob_retest = has_bull_ob_5m
+            is_fvg_tap = has_bull_fvg_5m
+            is_ote_entry = has_bull_ote_5m
+            is_idm_sweep = has_bull_idm_5m
+
+            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep:
                 direction = "BUY"
                 entry_price = current_ask if current_ask > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price + tp_dist
+                if is_ob_retest:
+                    smc_trigger_reason = "Bullish Order Block Retest"
+                elif is_fvg_tap:
+                    smc_trigger_reason = "Bullish FVG C.E. Tap"
+                elif is_ote_entry:
+                    smc_trigger_reason = "ICT Discount OTE 70.5%"
+                elif is_idm_sweep:
+                    smc_trigger_reason = "Bullish IDM Liquidity Sweep"
+                else:
+                    smc_trigger_reason = "5M EMA 21 Dynamic Pullback"
+
         elif is_15m_bearish:
             # Bearish Pullback: Price recently surged near EMA21 and closed back below EMA9/21
             recent_high = max(highs_5m[-3:])
-            if recent_high >= ema21_5m * 0.997 and closes_5m[-1] <= ema9_5m * 1.002:
+            is_ema_pullback = (recent_high >= ema21_5m * 0.997 and closes_5m[-1] <= ema9_5m * 1.002)
+
+            # SMC & ICT Confluence triggers
+            is_ob_retest = has_bear_ob_5m
+            is_fvg_tap = has_bear_fvg_5m
+            is_ote_entry = has_bear_ote_5m
+            is_idm_sweep = has_bear_idm_5m
+
+            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep:
                 direction = "SELL"
                 entry_price = current_bid if current_bid > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price - tp_dist
+                if is_ob_retest:
+                    smc_trigger_reason = "Bearish Order Block Retest"
+                elif is_fvg_tap:
+                    smc_trigger_reason = "Bearish FVG C.E. Tap"
+                elif is_ote_entry:
+                    smc_trigger_reason = "ICT Premium OTE 70.5%"
+                elif is_idm_sweep:
+                    smc_trigger_reason = "Bearish IDM Liquidity Sweep"
+                else:
+                    smc_trigger_reason = "5M EMA 21 Dynamic Pullback"
+
+        elif has_bull_choch_5m and has_bull_ob_5m and rsi_15m <= 65.0:
+            # ICT 5M Market Structure Shift Reversal (CHoCH + Bullish OB)
+            direction = "BUY"
+            entry_price = current_ask if current_ask > 0 else mid_price
+            sl_price = entry_price - sl_dist
+            tp_price = entry_price + tp_dist
+            smc_trigger_reason = "ICT 5M CHoCH Market Structure Shift Reversal"
+
+        elif has_bear_choch_5m and has_bear_ob_5m and rsi_15m >= 38.0:
+            # ICT 5M Market Structure Shift Reversal (CHoCH + Bearish OB)
+            direction = "SELL"
+            entry_price = current_bid if current_bid > 0 else mid_price
+            sl_price = entry_price - sl_dist
+            tp_price = entry_price - tp_dist
+            smc_trigger_reason = "ICT 5M CHoCH Market Structure Shift Reversal"
 
         if not direction or entry_price <= 0:
             return {
                 "success": False,
                 "epic": resolved_epic,
                 "signal": "HOLD_NEUTRAL",
-                "reason": "Waiting for 5M Pullback Rejection towards EMA 21."
+                "reason": "Waiting for 5M Pullback Rejection towards EMA 21 or SMC/ICT Order Block / FVG."
             }
 
         # 5. Super Smart 360° Institutional Citadel Trap & Liquidity Sweeps Verification
         citadel_approved = True
         citadel_score = 85.0
+        cit_eval = {}
         try:
             import super_smart_capital_citadel
             cit_eval = super_smart_capital_citadel.SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap(
@@ -7937,6 +8045,10 @@ class CapitalTrendScalpEngine:
         rr_ratio = tp_dist / sl_dist if sl_dist > 0 else 2.5
         final_conf = max(85.0, min(98.0, citadel_score))
 
+        smc_factors_list = [f for f in cit_eval.get("confluence_factors", []) if any(k in f for k in ["ORDER_BLOCK", "FVG", "OTE", "CHOCH", "BOS", "IDM", "SWEEP"])]
+        if smc_trigger_reason and smc_trigger_reason.upper().replace(" ", "_") not in str(smc_factors_list):
+            smc_factors_list.insert(0, smc_trigger_reason.upper().replace(" ", "_"))
+
         return {
             "success": True,
             "epic": resolved_epic,
@@ -7951,7 +8063,10 @@ class CapitalTrendScalpEngine:
             "spread": spread,
             "atr_5m": round(atr_5m, 4),
             "atr_15m": round(atr_15m, 4),
-            "reason": f"15M Trend + 5M Pullback Impulse + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Breathing SL)"
+            "smc_trigger": smc_trigger_reason,
+            "smc_factors": smc_factors_list,
+            "smc_ict_setup": cit_eval.get("smc_ict_setup", {}),
+            "reason": f"15M Trend + {smc_trigger_reason} + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Breathing SL)"
         }
 
     async def auto_arm_event_universe_radar(self, engine: Optional[CapitalComEngine] = None):
@@ -8215,18 +8330,22 @@ class CapitalTrendScalpEngine:
                     try:
                         import ui_standards
                         rr_val = setup.get("rr_ratio", 2.5)
+                        smc_tag = setup.get("smc_trigger", "15M Trend + 5M Pullback")
+                        smc_facts = setup.get("smc_factors", [])
+                        smc_facts_str = " | ".join(smc_facts[:2]) if smc_facts else "Institutional Citadel Clearance"
                         msg = (
                             f"⚡ **[CAPITAL.COM 24/7 TREND SCALP EXECUTED]** 🎯\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
                             f"🏛️ **ឧបករណ៍ ៖** `{epic}` (Major)\n"
-                            f"🎯 **ទិសដៅ ៖** `{direction}` (15M Trend + 5M Pullback)\n"
+                            f"🎯 **ទិសដៅ ៖** `{direction}` ({smc_tag})\n"
+                            f"🧠 **SMC & ICT Confluence ៖** `{smc_facts_str}`\n"
                             f"📦 **ទំហំ ៖** `{size} contracts` (Margin: `${budget:.2f}`)\n"
                             f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
                             f"🛑 **Dynamic Breathing Stop ៖** `${sl:,.2f}` (2.2x ATR Noise Buffer)\n"
                             f"🎯 **Scalp Target TP ៖** `${tp:,.2f}` (R:R 1:{rr_val:.1f} | 10x Spread Hurdle)\n"
                             f"🛡️ **ការការពារ ៖** `Delayed Multi-Tier Harvest & Breakeven Armor`\n"
                             f"{ui_standards.DIVIDER_HEAVY}\n"
-                            f"🚀 _ប្រព័ន្ធដេញកើបចំណេញតាម Trend ស្វ័យប្រវត្ត ២៤/៧!_"
+                            f"🚀 _ប្រព័ន្ធដេញកើបចំណេញ Smart Money Concept & ICT ២៤/៧!_"
                         )
                         asyncio.create_task(app.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown"))
                     except Exception as e_msg:
