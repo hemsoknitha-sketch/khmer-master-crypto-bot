@@ -1831,6 +1831,29 @@ class CapitalComEngine:
         except Exception as e_htf_pat:
             logger.debug(f"HTF Candlestick pattern eval note: {e_htf_pat}")
 
+        # 5c. Institutional Fibonacci Retracement Engine (38.2%, 50% Eq, 61.8% Golden Pocket, 78.6% OTE)
+        fib_analysis = {}
+        try:
+            import super_smart_capital_citadel
+            fib_analysis = super_smart_capital_citadel.TradFiFibonacciRetracementEngine.calculate_fibonacci_retracement(candles, mid_price, lookback=35)
+            fib_trend = fib_analysis.get("trend")
+            if fib_trend == "BULLISH":
+                if fib_analysis.get("in_golden_pocket"):
+                    bullish_score += 18
+                elif fib_analysis.get("in_ote_zone"):
+                    bullish_score += 14
+                elif fib_analysis.get("is_equilibrium"):
+                    bullish_score += 10
+            elif fib_trend == "BEARISH":
+                if fib_analysis.get("in_golden_pocket"):
+                    bearish_score += 18
+                elif fib_analysis.get("in_ote_zone"):
+                    bearish_score += 14
+                elif fib_analysis.get("is_equilibrium"):
+                    bearish_score += 10
+        except Exception as e_fib_eval:
+            logger.debug(f"Fibonacci Retracement eval note: {e_fib_eval}")
+
         # 6. Premium vs Discount Dealing Range Math (SMC / ICT Equilibrium)
         lookback_window = min(35, len(highs) - 2)
         sw_high = max(highs[-lookback_window:-2])
@@ -1897,7 +1920,8 @@ class CapitalComEngine:
                 "is_falling_knife": is_falling_knife,
                 "is_rising_rocket": is_rising_rocket,
                 "candlestick_patterns": htf_patterns,
-                "htf_patterns_summary": htf_patterns_summary
+                "htf_patterns_summary": htf_patterns_summary,
+                "fibonacci": fib_analysis
             }
 
         spread_audit = {}
@@ -1962,7 +1986,8 @@ class CapitalComEngine:
             "is_falling_knife": is_falling_knife,
             "is_rising_rocket": is_rising_rocket,
             "candlestick_patterns": htf_patterns,
-            "htf_patterns_summary": htf_patterns_summary
+            "htf_patterns_summary": htf_patterns_summary,
+            "fibonacci": fib_analysis
         }
 
     def execute_smart_tradfi_order(
@@ -4346,6 +4371,7 @@ class CapitalAutonomousEngine:
                                 f"🧠 **AI Confidence ៖** `{confidence}% (Google Macro + Quant)`\n"
                                 f"📈 **Exponential MA Trend ៖** EMA 20 (`{setup.get('ema20', 0):.2f}`) | 50 (`{setup.get('ema50', 0):.2f}`) | 200 (`{setup.get('ema200', 0):.2f}`) [{setup.get('triple_ema_alignment', 'TREND')}]\n"
                                 f"🕯️ **Candlestick Patterns (H1/H4/D1) ៖** `{(' | '.join(setup.get('htf_patterns_summary', []))) or 'Momentum Structure Confirmed'}`\n"
+                                f"📐 **Fibonacci Retracement ៖** `{setup.get('fibonacci', {}).get('summary') or 'Pullback Equilibrium Vetted'}`\n"
                                 f"📊 **កម្លាំង Trend & Volume ៖** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
                                 f"📦 **ទំហំកិច្ចសន្យា ៖** `{executed_size} contracts`\n"
                                 f"💵 **តម្លៃចូល (Entry) ៖** `${entry_px:,.2f}`\n"
@@ -4371,6 +4397,7 @@ class CapitalAutonomousEngine:
                                 f"🧠 **AI Confidence:** `{confidence}% (Google Macro + Quant)`\n"
                                 f"📈 **Exponential MA Trend:** EMA 20 (`{setup.get('ema20', 0):.2f}`) | 50 (`{setup.get('ema50', 0):.2f}`) | 200 (`{setup.get('ema200', 0):.2f}`) [{setup.get('triple_ema_alignment', 'TREND')}]\n"
                                 f"🕯️ **Candlestick Patterns (H1/H4/D1):** `{(' | '.join(setup.get('htf_patterns_summary', []))) or 'Momentum Structure Confirmed'}`\n"
+                                f"📐 **Fibonacci Retracement:** `{setup.get('fibonacci', {}).get('summary') or 'Pullback Equilibrium Vetted'}`\n"
                                 f"📊 **Trend & Volume:** ADX `{adx_str}` | RVOL `{rvol_str}`\n"
                                 f"📦 **Contract Size:** `{executed_size}`\n"
                                 f"💵 **Entry Price:** `${entry_px:,.2f}`\n"
@@ -8024,6 +8051,11 @@ class CapitalTrendScalpEngine:
             elif p_h4.get("bearish"):
                 has_bear_candle_h4 = True
                 candle_trigger_name = f"H4 {p_h4['bearish'][0]}"
+
+            fib_15m = super_smart_capital_citadel.TradFiFibonacciRetracementEngine.calculate_fibonacci_retracement(candles_15m, mid_price)
+            fib_5m = super_smart_capital_citadel.TradFiFibonacciRetracementEngine.calculate_fibonacci_retracement(candles_5m, mid_price)
+            has_bull_fib_pocket = (fib_15m.get("in_golden_pocket") and fib_15m.get("trend") == "BULLISH") or (fib_5m.get("in_golden_pocket") and fib_5m.get("trend") == "BULLISH")
+            has_bear_fib_pocket = (fib_15m.get("in_golden_pocket") and fib_15m.get("trend") == "BEARISH") or (fib_5m.get("in_golden_pocket") and fib_5m.get("trend") == "BEARISH")
         except Exception as e_smc_det:
             logger.debug(f"SMC 5M & Pattern detection note: {e_smc_det}")
 
@@ -8032,19 +8064,21 @@ class CapitalTrendScalpEngine:
             recent_low = min(lows_5m[-3:])
             is_ema_pullback = (recent_low <= max(ema20_5m, ema21_5m) * 1.003 and closes_5m[-1] >= min(ema9_5m, ema20_5m) * 0.998)
 
-            # SMC & ICT Confluence triggers
+            # SMC, ICT & Fibonacci Confluence triggers
             is_ob_retest = has_bull_ob_5m
             is_fvg_tap = has_bull_fvg_5m
             is_ote_entry = has_bull_ote_5m
             is_idm_sweep = has_bull_idm_5m
             is_candle_trigger = has_bull_candle_h1 or has_bull_candle_h4
 
-            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep or is_candle_trigger:
+            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep or is_candle_trigger or has_bull_fib_pocket:
                 direction = "BUY"
                 entry_price = current_ask if current_ask > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price + tp_dist
-                if is_candle_trigger:
+                if has_bull_fib_pocket:
+                    smc_trigger_reason = f"Fibonacci Golden Pocket 61.8% Retest ({fib_15m.get('fib_618', 0):.2f})"
+                elif is_candle_trigger:
                     smc_trigger_reason = f"Bullish Candlestick Pattern ({candle_trigger_name})"
                 elif is_ob_retest:
                     smc_trigger_reason = "Bullish Order Block Retest"
@@ -8062,19 +8096,21 @@ class CapitalTrendScalpEngine:
             recent_high = max(highs_5m[-3:])
             is_ema_pullback = (recent_high >= min(ema20_5m, ema21_5m) * 0.997 and closes_5m[-1] <= max(ema9_5m, ema20_5m) * 1.002)
 
-            # SMC & ICT Confluence triggers
+            # SMC, ICT & Fibonacci Confluence triggers
             is_ob_retest = has_bear_ob_5m
             is_fvg_tap = has_bear_fvg_5m
             is_ote_entry = has_bear_ote_5m
             is_idm_sweep = has_bear_idm_5m
             is_candle_trigger = has_bear_candle_h1 or has_bear_candle_h4
 
-            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep or is_candle_trigger:
+            if is_ema_pullback or is_ob_retest or is_fvg_tap or is_ote_entry or is_idm_sweep or is_candle_trigger or has_bear_fib_pocket:
                 direction = "SELL"
                 entry_price = current_bid if current_bid > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price - tp_dist
-                if is_candle_trigger:
+                if has_bear_fib_pocket:
+                    smc_trigger_reason = f"Fibonacci Golden Pocket 61.8% Rejection ({fib_15m.get('fib_618', 0):.2f})"
+                elif is_candle_trigger:
                     smc_trigger_reason = f"Bearish Candlestick Pattern ({candle_trigger_name})"
                 elif is_ob_retest:
                     smc_trigger_reason = "Bearish Order Block Retest"
@@ -8174,6 +8210,7 @@ class CapitalTrendScalpEngine:
             "candlestick_patterns": cit_eval.get("candlestick_patterns", htf_pats),
             "candlestick_summary": [f for f in cit_eval.get("confluence_factors", []) if "BULLISH_" in f or "BEARISH_" in f],
             "candle_trigger": candle_trigger_name,
+            "fibonacci": cit_eval.get("fibonacci", fib_15m),
             "reason": f"15M Trend + {smc_trigger_reason} + 360° Citadel (R:R 1:{rr_ratio:.1f}, 10x Spread Hurdle satisfied, Dynamic Breathing SL)"
         }
 
@@ -8450,6 +8487,7 @@ class CapitalTrendScalpEngine:
                             f"📈 **Exponential Trend ៖** `{ema_lbl}`\n"
                             f"🧠 **SMC & ICT Confluence ៖** `{smc_facts_str}`\n"
                             f"🕯️ **Candlestick Patterns (H1/H4/D1) ៖** `{(' | '.join(setup.get('candlestick_summary', []))) or setup.get('candle_trigger', 'HTF Structure Confirmed')}`\n"
+                            f"📐 **Fibonacci Retracement ៖** `{setup.get('fibonacci', {}).get('summary') or 'Pullback Equilibrium Vetted'}`\n"
                             f"📦 **ទំហំ ៖** `{size} contracts` (Margin: `${budget:.2f}`)\n"
                             f"💵 **តម្លៃចូល (Entry) ៖** `${entry_p:,.2f}`\n"
                             f"🛑 **Dynamic Breathing Stop ៖** `${sl:,.2f}` (2.2x ATR Noise Buffer)\n"

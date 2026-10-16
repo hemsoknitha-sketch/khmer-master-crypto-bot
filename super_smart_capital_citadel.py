@@ -348,6 +348,206 @@ class TradFiCandlestickPatternEngine:
         }
 
 
+class TradFiFibonacciRetracementEngine:
+    """
+    Institutional Fibonacci Retracement & Golden Ratio Extension Engine for TradFi Assets.
+    Calculates key Fibonacci pullback boundaries and expansion targets:
+    - 0.0% (Swing Pivot Base)
+    - 23.6% (Shallow Pullback / Trend Acceleration)
+    - 38.2% (First Line of Institutional Defense)
+    - 50.0% (Gann / ICT Equilibrium Fair Value Threshold)
+    - 61.8% (Golden Ratio Primary Retracement Boundary)
+    - 65.0% - 70.5% (Golden Pocket Core & ICT OTE Sweet Spot)
+    - 78.6% (Deep Discount Floor / Structural Invalidation Boundary)
+    - 100.0% (Structural Anchor High/Low)
+    - 127.2% (-27.2% Take-Profit Extension 1)
+    - 161.8% (-61.8% Golden Ratio Moonshot Extension 2)
+    """
+
+    @classmethod
+    def calculate_fibonacci_retracement(
+        cls,
+        candles: List[Dict[str, Any]],
+        current_price: float,
+        lookback: int = 35
+    ) -> Dict[str, Any]:
+        """
+        Calculates multi-level Fibonacci retracements and projections from recent structural swings.
+        Determines whether price is currently testing the Golden Pocket (61.8% - 70.5%) or Equilibrium (50%).
+        """
+        default_res = {
+            "trend": "NEUTRAL",
+            "swing_high": current_price,
+            "swing_low": current_price,
+            "impulse_range": 0.0,
+            "retracement_pct": 50.0,
+            "levels": {},
+            "extensions": {},
+            "fib_382": current_price,
+            "fib_500": current_price,
+            "fib_618": current_price,
+            "fib_650": current_price,
+            "fib_705": current_price,
+            "fib_786": current_price,
+            "in_golden_pocket": False,
+            "in_ote_zone": False,
+            "is_equilibrium": False,
+            "zone_name": "NEUTRAL",
+            "confluence_score": 0,
+            "recommended_sl": 0.0,
+            "tp1_target": 0.0,
+            "tp2_target": 0.0,
+            "summary": "Neutral Fibonacci"
+        }
+        if not candles or len(candles) < 15:
+            return default_res
+
+        window = min(lookback, len(candles) - 1)
+        highs = [float(c.get("high", 0.0)) for c in candles[-window:]]
+        lows = [float(c.get("low", 0.0)) for c in candles[-window:]]
+
+        # Identify structural swing high and low (excluding active incomplete candle)
+        swing_high = float(np.max(highs[:-1])) if len(highs) > 2 else float(np.max(highs))
+        swing_low = float(np.min(lows[:-1])) if len(lows) > 2 else float(np.min(lows))
+        impulse_range = max(1e-6, swing_high - swing_low)
+
+        # Find indices of swing high and swing low to determine the prevailing impulse direction
+        idx_high = int(np.argmax(highs[:-1])) if len(highs) > 2 else 0
+        idx_low = int(np.argmin(lows[:-1])) if len(lows) > 2 else 0
+
+        # If swing_low occurred BEFORE swing_high -> Impulse was UPWARD (Bullish Impulse, currently retracing down)
+        # If swing_high occurred BEFORE swing_low -> Impulse was DOWNWARD (Bearish Impulse, currently retracing up)
+        if idx_low < idx_high:
+            trend = "BULLISH"
+            # In Bullish impulse, 0% is at Swing High, 100% is at Swing Low
+            fib_0 = swing_high
+            fib_236 = swing_high - 0.236 * impulse_range
+            fib_382 = swing_high - 0.382 * impulse_range
+            fib_500 = swing_high - 0.500 * impulse_range  # Equilibrium
+            fib_618 = swing_high - 0.618 * impulse_range  # Golden Pocket Upper
+            fib_650 = swing_high - 0.650 * impulse_range
+            fib_705 = swing_high - 0.705 * impulse_range  # OTE Sweet Spot
+            fib_786 = swing_high - 0.786 * impulse_range  # Deep Discount Floor
+            fib_100 = swing_low
+
+            # Expansion targets upward beyond Swing High
+            tp_ext_1272 = swing_high + 0.272 * impulse_range
+            tp_ext_1618 = swing_high + 0.618 * impulse_range
+
+            # Retracement percentage from high: 0% = at high, 100% = at low
+            retracement_pct = round(((swing_high - current_price) / impulse_range) * 100.0, 1)
+
+            # Golden pocket: 61.8% to 70.5% (or 78.6%)
+            in_golden_pocket = (fib_705 <= current_price <= fib_618 * 1.002)
+            in_ote_zone = (fib_786 <= current_price <= fib_618 * 1.002)
+            is_equilibrium = (fib_618 <= current_price <= fib_382)
+            recommended_sl = fib_786 - (impulse_range * 0.04)  # Safe buffer below 78.6%
+            tp1_target = swing_high
+            tp2_target = tp_ext_1618
+
+            if in_golden_pocket:
+                zone_name = "BULLISH_GOLDEN_POCKET"
+                confluence_score = 20
+            elif in_ote_zone:
+                zone_name = "BULLISH_OTE_DISCOUNT"
+                confluence_score = 15
+            elif is_equilibrium:
+                zone_name = "BULLISH_EQUILIBRIUM"
+                confluence_score = 10
+            elif retracement_pct < 23.6:
+                zone_name = "OVEREXTENDED_HIGH"
+                confluence_score = 0
+            else:
+                zone_name = "DEEP_PULLBACK"
+                confluence_score = 5
+
+        else:
+            trend = "BEARISH"
+            # In Bearish impulse, 0% is at Swing Low, 100% is at Swing High
+            fib_0 = swing_low
+            fib_236 = swing_low + 0.236 * impulse_range
+            fib_382 = swing_low + 0.382 * impulse_range
+            fib_500 = swing_low + 0.500 * impulse_range  # Equilibrium
+            fib_618 = swing_low + 0.618 * impulse_range  # Golden Pocket Lower
+            fib_650 = swing_low + 0.650 * impulse_range
+            fib_705 = swing_low + 0.705 * impulse_range  # OTE Sweet Spot
+            fib_786 = swing_low + 0.786 * impulse_range  # Deep Premium Ceiling
+            fib_100 = swing_high
+
+            # Expansion targets downward beyond Swing Low
+            tp_ext_1272 = swing_low - 0.272 * impulse_range
+            tp_ext_1618 = swing_low - 0.618 * impulse_range
+
+            # Retracement percentage from low: 0% = at low, 100% = at high
+            retracement_pct = round(((current_price - swing_low) / impulse_range) * 100.0, 1)
+
+            # Golden pocket: 61.8% to 70.5% (or 78.6%)
+            in_golden_pocket = (fib_618 * 0.998 <= current_price <= fib_705)
+            in_ote_zone = (fib_618 * 0.998 <= current_price <= fib_786)
+            is_equilibrium = (fib_382 <= current_price <= fib_618)
+            recommended_sl = fib_786 + (impulse_range * 0.04)  # Safe buffer above 78.6%
+            tp1_target = swing_low
+            tp2_target = tp_ext_1618
+
+            if in_golden_pocket:
+                zone_name = "BEARISH_GOLDEN_POCKET"
+                confluence_score = 20
+            elif in_ote_zone:
+                zone_name = "BEARISH_OTE_PREMIUM"
+                confluence_score = 15
+            elif is_equilibrium:
+                zone_name = "BEARISH_EQUILIBRIUM"
+                confluence_score = 10
+            elif retracement_pct < 23.6:
+                zone_name = "OVEREXTENDED_LOW"
+                confluence_score = 0
+            else:
+                zone_name = "DEEP_PULLBACK"
+                confluence_score = 5
+
+        levels_dict = {
+            "0.0%": round(fib_0, 4),
+            "23.6%": round(fib_236, 4),
+            "38.2%": round(fib_382, 4),
+            "50.0%": round(fib_500, 4),
+            "61.8%": round(fib_618, 4),
+            "65.0%": round(fib_650, 4),
+            "70.5%": round(fib_705, 4),
+            "78.6%": round(fib_786, 4),
+            "100.0%": round(fib_100, 4)
+        }
+        ext_dict = {
+            "127.2%": round(tp_ext_1272, 4),
+            "161.8%": round(tp_ext_1618, 4)
+        }
+        summary_str = f"{trend} Retracement: {retracement_pct:.1f}% ({zone_name}) | Golden Pocket: {fib_618:.2f} - {fib_705:.2f}"
+
+        return {
+            "trend": trend,
+            "swing_high": round(swing_high, 4),
+            "swing_low": round(swing_low, 4),
+            "impulse_range": round(impulse_range, 4),
+            "retracement_pct": retracement_pct,
+            "levels": levels_dict,
+            "extensions": ext_dict,
+            "fib_382": round(fib_382, 4),
+            "fib_500": round(fib_500, 4),
+            "fib_618": round(fib_618, 4),
+            "fib_650": round(fib_650, 4),
+            "fib_705": round(fib_705, 4),
+            "fib_786": round(fib_786, 4),
+            "in_golden_pocket": in_golden_pocket,
+            "in_ote_zone": in_ote_zone,
+            "is_equilibrium": is_equilibrium,
+            "zone_name": zone_name,
+            "confluence_score": confluence_score,
+            "recommended_sl": round(recommended_sl, 4),
+            "tp1_target": round(tp1_target, 4),
+            "tp2_target": round(tp2_target, 4),
+            "summary": summary_str
+        }
+
+
 class SuperSmartCapitalCitadel:
     """
     Institutional TradFi Position Opening Gatekeeper & Sky Net Trap Citadel for Capital.com.
@@ -828,6 +1028,9 @@ class SuperSmartCapitalCitadel:
         max_recent_range = max(recent_ranges) if recent_ranges else atr_15m
         has_displacement = max_recent_range >= (1.2 * atr_15m)
 
+        # 4f. Institutional Fibonacci Retracement & Golden Pocket (38.2%, 50% Eq, 61.8% / 70.5% / 78.6%)
+        fib_analysis = TradFiFibonacciRetracementEngine.calculate_fibonacci_retracement(candles_15m, curr_price, lookback=35)
+
         # --------------------------------------------------------------------
         # 5. PILLAR 5: SPREAD DRAG ELIMINATION & ASYMMETRIC 10X HURDLE (INVARIANT 34)
         # --------------------------------------------------------------------
@@ -920,6 +1123,17 @@ class SuperSmartCapitalCitadel:
                 score += 12.0
                 factors.append("BULLISH_IDM_LIQUIDITY_SWEPT (+12)")
 
+            # Fibonacci Retracement Confluence (61.8% Golden Pocket / 50% Equilibrium)
+            if fib_analysis.get("in_golden_pocket") and fib_analysis.get("trend") == "BULLISH":
+                score += 20.0
+                factors.append("FIBONACCI_GOLDEN_POCKET_618_RETEST (+20)")
+            elif fib_analysis.get("in_ote_zone") and fib_analysis.get("trend") == "BULLISH":
+                score += 15.0
+                factors.append("FIBONACCI_DISCOUNT_OTE_ZONE (+15)")
+            elif fib_analysis.get("is_equilibrium") and fib_analysis.get("trend") == "BULLISH":
+                score += 12.0
+                factors.append("FIBONACCI_EQUILIBRIUM_500_RETEST (+12)")
+
             # Bullish FVG Imbalance & Consequent Encroachment
             if has_bullish_fvg_test:
                 score += 14.0
@@ -1007,6 +1221,17 @@ class SuperSmartCapitalCitadel:
             if has_bearish_idm_swept:
                 score += 12.0
                 factors.append("BEARISH_IDM_LIQUIDITY_SWEPT (+12)")
+
+            # Fibonacci Retracement Confluence (61.8% Golden Pocket / 50% Equilibrium)
+            if fib_analysis.get("in_golden_pocket") and fib_analysis.get("trend") == "BEARISH":
+                score += 20.0
+                factors.append("FIBONACCI_GOLDEN_POCKET_618_REJECTION (+20)")
+            elif fib_analysis.get("in_ote_zone") and fib_analysis.get("trend") == "BEARISH":
+                score += 15.0
+                factors.append("FIBONACCI_PREMIUM_OTE_ZONE (+15)")
+            elif fib_analysis.get("is_equilibrium") and fib_analysis.get("trend") == "BEARISH":
+                score += 12.0
+                factors.append("FIBONACCI_EQUILIBRIUM_500_REJECTION (+12)")
 
             # Bearish FVG Imbalance & Consequent Encroachment
             if has_bearish_fvg_test:
@@ -1121,7 +1346,8 @@ class SuperSmartCapitalCitadel:
             "has_bullish_ote": has_bullish_ote,
             "has_bearish_ote": has_bearish_ote,
             "has_bullish_choch": has_bullish_choch,
-            "has_bearish_choch": has_bearish_choch
+            "has_bearish_choch": has_bearish_choch,
+            "fibonacci": fib_analysis
         }
 
         result = {
@@ -1159,7 +1385,8 @@ class SuperSmartCapitalCitadel:
             "ema50_15m": round(ema50_15m, prec),
             "ema200_15m": round(ema200_15m, prec),
             "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED"),
-            "candlestick_patterns": htf_patterns_eval
+            "candlestick_patterns": htf_patterns_eval,
+            "fibonacci": fib_analysis
         }
 
         cls._CITADEL_CACHE[cache_key] = (now, result)
