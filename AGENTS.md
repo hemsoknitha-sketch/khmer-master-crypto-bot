@@ -77,8 +77,21 @@ The system is engineered upon two non-negotiable axioms:
    - Super Admin (`859271875` and all system administrators) possess unconditional, unrestricted execution authority across `/capital`, `/capital_scalp`, and all TradFi engines. Regardless of live account balance shortages, unverified referral gatekeepers, or low margin, Super Admin execution is never blocked.
    - When Super Admin's Live balance is $< \$10.00$, the system automatically engages the Dynamic Demo Fallback Mirror ($10,000 balance), ensuring zero downtime and continuous operation of all quantitative algorithms without throwing margin errors.
 8. **Pillar 8: In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (Invariant 76 - រ៉ាដាក្នុង RAM ស្ទាក់ចាប់ ២ ទិសដៅ Gold & Shares គ្មាន Pending Order):**
-   - Replaces risky broker orderbook limit/stop orders with zero-footprint memory triggers (`_scalp_breakout_radars`) for Gold and US Mega-Cap Shares.
-   - Executes market orders only upon confirmed breakout structure + volume confirmation, immediately attaching dynamic breathing stop-losses ($\ge \max(2.20\times\text{ATR}, 3.5\times\text{Spread})$) and asymmetric take-profit targets ($\ge 10\times\text{Spread}$).
+   - **Never Predict, Only React at Boundaries (លុបបំបាត់ការចូលផ្សារតាមការស្មាន ១០០%):**
+     - **Equilibrium Chop Zone Injunction (35% - 65% Dealing Range):** AI is strictly prohibited from opening market orders in the middle 30% of the dealing range (`BLOCK_CHOP_ZONE_EQUILIBRIUM`). Over 90% of retail losses occur in the middle of chop where price moves via Brownian random walk.
+     - **In-Memory Dual-Directional Stealth Radar:** Maintains zero-footprint memory triggers in RAM at swing boundaries:
+       * **Path A (Confirmed Breakout Thrust):** Price punches through High/Low + confirmed by volume ($RVOL \ge 1.0\times$) and spread $\rightarrow$ Triggers instant boundary Market Order with SL anchored at Range Midpoint.
+       * **Path B (Turtle Soup / Liquidity Sweep Reversal):** Price pierces High/Low to sweep retail stop liquidity, but fails to sustain and closes back inside the range $\rightarrow$ Triggers immediate counter-trend FADE (Turtle Soup Reversal) with tight SL anchored directly behind the sweep wick.
+     - **Structural Dynamic Lot Sizing & Dollar Risk Hard Clamp ($\le \$2.50$):**
+       - Sizing is mathematically locked to structural invalidation distance:
+         $$\text{Allowed Lot} = \min\left(\text{Kelly Lot}, \frac{\text{Max Allowed Dollar Risk (\$2.50)}}{\text{Structural SL Distance}}\right)$$
+       - Clamps high-beta contracts on accounts $< \$500$ (US100 $\le 0.05$, US500 $\le 0.10$, Mega-Cap Stocks $\le 0.20$ shares, Gold $\le 0.08$ lot). Regardless of volatility breathing stop width ($30 - $45), dollar loss can NEVER exceed $\$2.50$ on micro accounts.
+     - **Volatility Shock & Flash Reversal Protective Early Harvest (`SHOCK_EARLY_HARVEST`):**
+       - If Peak UPL achieves $\ge +\$2.50$ (or Peak $\text{ROI} \ge +8.0\%$) and subsequently retraces $\ge 50\%$ from its peak (`upl <= peak_upl * 0.50`), the engine executes an immediate market exit (`SHOCK_EARLY_HARVEST`), locking in net fee-cleared gains before whipsaws turn red.
+       - Realistic cash target harvest for micro accounts $< \$500$ is locked at $\text{UPL} \ge \$4.50$ or $\text{ROI} \ge +25.0\%$.
+     - **Unified 45-Minute Post-SL Quarantine & Daily Governor:**
+       - Reconciles position exits across `capital_auto_trades`, `capital_orb_trades`, and `capital_scalp_trades`. A stop-out event enforces a mandatory 45-minute quarantine on that asset across all engines, prohibiting revenge re-entries.
+       - Daily -2.5% loss floor and +5.0% profit target lock strictly enforced for all accounts.
 
 ### 1.1.2 THE SUPER SMART BINANCE FUTURES RISK & PROFIT HARMONIZATION PILLARS (/smartx, /turbo_hedge, /auto_trade, /pre_pump, /wealth)
 **(គ្រឹះរួមបញ្ចូលគ្នាការពារហានិភ័យ & កើបចំណេញកម្រិតកំពូលលើ BINANCE FUTURES ទាំង ៥ ប្រព័ន្ធ)**
@@ -1312,16 +1325,23 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
 - **Enforcement:** Verified by `audit_system.py` [CHECK 60/61].
 
 ### Invariant 76: In-Memory Dual-Directional Stealth Breakout Radar for TradFi Shares & Commodities (AQ76)
-- **Location:** `super_smart_capital_citadel.py` (`SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap`), `capital_engine.py` (`CapitalTrendScalpEngine._scalp_breakout_radars`, `_process_user_scalp`), `bot_thread.py` (`capital_scalp_command`, `button_callback_handler`), `audit_system.py`
+- **Location:** `super_smart_capital_citadel.py` (`SuperSmartCapitalCitadel.evaluate_institutional_tradfi_trap`, `CapitalInMemoryVirtualRadar`), `capital_engine.py` (`CapitalTrendScalpEngine._scalp_breakout_radars`, `_process_user_scalp`, `CapitalKellyPositionSizer.calculate_lot_size`), `bot_thread.py` (`capital_scalp_command`, `button_callback_handler`), `audit_system.py`
 - **Rule:** Under the Sacred Covenant of Brutal Engineering Honesty & Fiduciary Refusal:
-  1. **Zero Broker Orderbook Footprint:**
-     - To eliminate stop-hunting, front-running, and predatory market maker sweeps against small retail balances, breakout triggers for US Mega-Cap Shares (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`) and Commodities (`GOLD`, `OIL_CRUDE`) are NEVER placed as working/pending orders on broker servers.
-     - Radars are maintained exclusively in ultra-fast RAM (`_scalp_breakout_radars`) calculating dynamic upper breakout levels ($\text{High}_{15m} + 0.10\times\text{ATR}$) and lower breakdown levels ($\text{Low}_{15m} - 0.10\times\text{ATR}$).
-  2. **Dual-Directional Institutional Spring & Thrust Confirmation:**
-     - Order execution fires strictly as immediate Market Orders upon confirmed structural breach accompanied by real-time volume expansion ($RVOL \ge 1.0\times$) and directional ADX thrust ($ADX \ge 22.0$).
-  3. **Mandatory Volatility Breathing Stop & Asymmetric 10x Hurdle:**
-     - Every triggered market order immediately attaches dynamic breathing SL ($\ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$) and asymmetric profit targets ($\ge 10\times\text{Spread}$ and $R:R \ge 1:2.5$).
-     - Zero naked, zero unhedged, and zero unstopped positions permitted.
+  1. **Never Predict, Only React at Boundaries (លុបបំបាត់ការចូលផ្សារតាមការស្មាន ១០០%):**
+     - **Equilibrium Chop Zone Injunction (35% - 65% Dealing Range):** AI is strictly prohibited from opening market orders in the middle 30% of the dealing range (`BLOCK_CHOP_ZONE_EQUILIBRIUM`). Over 90% of retail losses occur in the middle of chop where price moves via Brownian random walk.
+     - **Zero Broker Orderbook Footprint:** To eliminate stop-hunting, front-running, and predatory market maker sweeps against small retail balances, breakout triggers for US Mega-Cap Shares (`NVDA`, `TSLA`, `META`, `GOOGL`, `AAPL`, `MSFT`, `AMZN`) and Commodities (`GOLD`, `OIL_CRUDE`) are NEVER placed as working/pending orders on broker servers. Radars are maintained exclusively in ultra-fast RAM (`CapitalInMemoryVirtualRadar`).
+  2. **Dual-Directional Path A (Breakout Thrust) vs Path B (Turtle Soup Reversal):**
+     - **Path A (Confirmed Breakout Thrust):** Order execution fires strictly as immediate Market Orders upon confirmed structural breach above High or below Low accompanied by real-time volume expansion ($RVOL \ge 1.0\times$) and directional ADX thrust ($ADX \ge 22.0$). SL is anchored at Range Midpoint.
+     - **Path B (Turtle Soup / Liquidity Sweep Reversal):** When price punches beyond High/Low (grabbing retail stop liquidity) but fails to sustain and closes back inside the dealing range, the system triggers an immediate counter-trend FADE (Turtle Soup Reversal), placing SL tightly behind the sweep wick and TP at range equilibrium.
+  3. **Structural Dynamic Lot Sizing & Dollar Risk Hard Clamp ($\le \$2.50$):**
+     - Sizing is mathematically locked to structural invalidation distance:
+       $$\text{Allowed Lot} = \min\left(\text{Kelly Lot}, \frac{\text{Max Allowed Dollar Risk (\$2.50)}}{\text{Structural SL Distance}}\right)$$
+     - Clamps high-beta contracts on accounts $< \$500$ (US100 $\le 0.05$, US500 $\le 0.10$, Mega-Cap Stocks $\le 0.20$ shares, Gold $\le 0.08$ lot). Regardless of volatility breathing stop width ($30 - $45), dollar loss can NEVER exceed $\$2.50$ on micro accounts.
+  4. **Volatility Shock & Flash Reversal Protective Early Harvest (`SHOCK_EARLY_HARVEST`):**
+     - If Peak UPL achieves $\ge +\$2.50$ (or Peak $\text{ROI} \ge +8.0\%$) and subsequently retraces $\ge 50\%$ from its peak (`upl <= peak_upl * 0.50`), the engine executes an immediate market exit (`SHOCK_EARLY_HARVEST`), locking in net fee-cleared gains before whipsaws turn red. Cash target harvest for accounts $< \$500$ is locked at $\text{UPL} \ge \$4.50$ or $\text{ROI} \ge +25.0\%$.
+  5. **Mandatory Breathing Stop & 45-Minute Post-SL Quarantine:**
+     - Dynamic breathing SL ($\ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$) and asymmetric profit targets ($\ge 10\times\text{Spread}$ and $R:R \ge 1:2.5$). Zero naked or unbounded-risk positions permitted.
+     - A stop-out event enforces a mandatory 45-minute quarantine on that asset across all engines, prohibiting revenge re-entries.
 - **Enforcement:** Verified by `audit_system.py` [CHECK 61/61].
 
 ---

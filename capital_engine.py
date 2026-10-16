@@ -3416,12 +3416,28 @@ class CapitalAutonomousEngine:
                 elif direction == "SELL" and tp_level < entry_level and current_price <= (tp_level + (spread * 0.75)):
                     tp_target_reached = True
 
-            # Full Asymmetric Moonshot target (Requires minimum institutional dollar floor >= $10.00 / $25.00)
-            asymmetric_target_reached = ((roi_pct >= 100.0 and upl >= 15.0) or upl >= 50.0) if is_runner else ((roi_pct >= 50.0 and upl >= 10.0) or upl >= 25.0)
+            # Full Asymmetric Moonshot target (Requires minimum institutional dollar floor >= $4.50 / $10.00)
+            asymmetric_target_reached = ((roi_pct >= 60.0 and upl >= 12.0) or upl >= 25.0) if is_runner else ((roi_pct >= 25.0 and upl >= 4.50) or upl >= 10.0)
 
-            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached) and (upl >= 2.50)
+            # Volatility Shock & Flash Reversal Protective Early Harvest (Invariant 74 Pillar 3)
+            # If position achieved Peak UPL >= +$2.50 (or Peak ROI >= 8.0%) and then retraces >= 50% from peak,
+            # execute an immediate market harvest to protect +50% of gains before falling into the red.
+            shock_early_harvest = (
+                (peak_upl >= 2.50 or roi_pct >= 8.0) and
+                peak_upl > 0 and
+                (upl <= peak_upl * 0.50) and
+                (upl >= max(1.25, spread * 2.0))
+            )
+
+            harvest_trigger = (target_lock_harvest or tp_target_reached or asymmetric_target_reached or shock_early_harvest) and (upl >= 1.25)
             if harvest_trigger:
-                tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else ("🎯 [BROKER TP HARVEST]" if tp_target_reached else ("🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"))
+                tag = "👑 [360° SKY NET +5% TARGET HARVEST]" if target_lock_harvest else (
+                    "⚡ [SHOCK EARLY HARVEST - 50% RETRACEMENT PROTECTION]" if shock_early_harvest else (
+                        "🎯 [BROKER TP HARVEST]" if tp_target_reached else (
+                            "🚀 [3RD RUNNER MEGA HARVEST]" if is_runner else "🎯 [CLEAN CASH HARVEST]"
+                        )
+                    )
+                )
                 logger.info(f"{tag} Reached Target (+{roi_pct:.1f}% ROI / ${upl:+.2f})! Executing Cash Harvest for {epic}...")
                 close_res = engine.close_position(deal_id=deal_id)
                 if close_res.get("success"):
@@ -6451,6 +6467,23 @@ class CapitalKellyPositionSizer:
                 final_lot = min(0.08, max(rule["min_lot"], final_lot))
             elif is_crypto:
                 final_lot = rule["min_lot"]
+
+        # Invariant 74 & 76: Structural Dynamic Risk Dollar Hard Clamp (Max Risk <= $2.50 for Micro Accounts < $200)
+        sl_dist = abs(entry_price - sl_price) if entry_price > 0 and sl_price > 0 else 0.0
+        if eff_cap < 200 and sl_dist > 0:
+            max_allowed_risk_dollar = 2.50
+            if clean_epic in ["GOLD", "XAUUSD"]:
+                max_safe_lot = max_allowed_risk_dollar / sl_dist
+                final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
+            elif clean_epic in ["US100", "NASDAQ", "US500", "SP500"]:
+                max_safe_lot = max_allowed_risk_dollar / sl_dist
+                final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
+            elif clean_epic in ["OIL", "OIL_CRUDE"]:
+                max_safe_lot = max_allowed_risk_dollar / (sl_dist * 10.0)
+                final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
+            elif is_stock:
+                max_safe_lot = max_allowed_risk_dollar / sl_dist
+                final_lot = min(final_lot, max(rule["min_lot"], max_safe_lot))
 
         # Snap to lot_step
         step = rule["lot_step"]

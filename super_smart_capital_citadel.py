@@ -392,6 +392,41 @@ class SuperSmartCapitalCitadel:
         is_discount = curr_price < equilibrium
         is_premium = curr_price > equilibrium
 
+        # Equilibrium Chop Zone Injunction (Pillar 1 & Invariant 76):
+        # Strictly block market order guessing in the middle 30% of the dealing range (35.0% - 65.0%)
+        # 90% of whipsaw losses occur from taking directional market orders in the middle of chop!
+        # Automatically arm the in-memory dual-directional stealth breakout radar in RAM to await boundary reaction instead.
+        if 35.0 <= price_range_pct <= 65.0:
+            CapitalInMemoryVirtualRadar.arm_radar_trap(
+                epic=resolved_epic,
+                engine_source="CITADEL_RADAR",
+                current_price=curr_price,
+                atr_15m=atr_15m,
+                swing_high=swing_high,
+                swing_low=swing_low,
+                mode="DUAL"
+            )
+            reason = (
+                f"BLOCK_CHOP_ZONE_EQUILIBRIUM: Price is at {price_range_pct:.1f}% of Dealing Range "
+                f"(Middle Chop Zone 35%-65%). Guessing direction in the middle of the river is strictly prohibited. "
+                f"Dual-Directional In-Memory Stealth Radar armed in RAM (High: {swing_high:.2f}, Low: {swing_low:.2f}) "
+                f"to await confirmed boundary breakout or sweep reversal."
+            )
+            res = {
+                "epic": resolved_epic,
+                "proposed_side": norm_side,
+                "is_approved": False,
+                "rejection_reason": reason,
+                "price_range_pct": price_range_pct,
+                "confluence_score": 20.0,
+                "is_chop_zone": True,
+                "radar_armed": True,
+                "swing_high": swing_high,
+                "swing_low": swing_low
+            }
+            cls._CITADEL_CACHE[cache_key] = (now, res)
+            return res
+
         # Hard Veto on Deep Trapped Zones:
         # Longing in Extreme Premium (> 82.0%) without structural base is retail suicide
         if norm_side == "BUY" and price_range_pct > 82.0:
@@ -855,13 +890,25 @@ class CapitalInMemoryVirtualRadar:
         tp1_dist = sl_dist * 2.5
         tp2_dist = sl_dist * 4.0
 
-        buy_sl = round(buy_breakout - sl_dist, prec)
+        # Breakout Structural Invalidation Stops (Anchor behind Midpoint or Breathing SL)
+        range_mid = swing_low + 0.5 * (swing_high - swing_low)
+        buy_sl = round(max(range_mid, buy_breakout - sl_dist), prec)
         buy_tp1 = round(buy_breakout + tp1_dist, prec)
         buy_tp2 = round(buy_breakout + tp2_dist, prec)
 
-        sell_sl = round(sell_breakdown + sl_dist, prec)
+        sell_sl = round(min(range_mid, sell_breakdown + sl_dist), prec)
         sell_tp1 = round(sell_breakdown - tp1_dist, prec)
         sell_tp2 = round(sell_breakdown - tp2_dist, prec)
+
+        # Turtle Soup / Liquidity Sweep Structural Stops (Anchored right outside the sweep wick!)
+        # Ultra-safe structural stop right below/above sweep wick
+        sweep_buy_sl = round(swing_low - max(spread_bench * 2.5, atr_15m * 0.15), prec)
+        sweep_buy_tp1 = round(range_mid, prec)  # Target 1: Dealing Range Equilibrium
+        sweep_buy_tp2 = round(swing_high - max(spread_bench * 1.5, atr_15m * 0.10), prec)  # Target 2: Range High
+
+        sweep_sell_sl = round(swing_high + max(spread_bench * 2.5, atr_15m * 0.15), prec)
+        sweep_sell_tp1 = round(range_mid, prec)  # Target 1: Dealing Range Equilibrium
+        sweep_sell_tp2 = round(swing_low + max(spread_bench * 1.5, atr_15m * 0.10), prec)  # Target 2: Range Low
 
         trap_data = {
             "trap_key": trap_key,
@@ -874,6 +921,7 @@ class CapitalInMemoryVirtualRadar:
             "sl_dist": sl_dist,
             "swing_high": swing_high,
             "swing_low": swing_low,
+            "range_mid": range_mid,
             "buy_breakout": buy_breakout,
             "sell_breakdown": sell_breakdown,
             "buy_sweep": buy_sweep,
@@ -884,6 +932,12 @@ class CapitalInMemoryVirtualRadar:
             "sell_sl": sell_sl,
             "sell_tp1": sell_tp1,
             "sell_tp2": sell_tp2,
+            "sweep_buy_sl": sweep_buy_sl,
+            "sweep_buy_tp1": sweep_buy_tp1,
+            "sweep_buy_tp2": sweep_buy_tp2,
+            "sweep_sell_sl": sweep_sell_sl,
+            "sweep_sell_tp1": sweep_sell_tp1,
+            "sweep_sell_tp2": sweep_sell_tp2,
             "status": "ARMED",
             "armed_at": now,
             "expires_at": now + ttl_seconds
@@ -919,7 +973,9 @@ class CapitalInMemoryVirtualRadar:
         now = time.time()
         matching_keys = [k for k in cls._ARMED_TRAPS.keys() if k.endswith(f"_{raw_epic}")]
         if engine_source:
-            matching_keys = [k for k in matching_keys if k.startswith(f"{engine_source.upper()}_")]
+            filtered = [k for k in matching_keys if k.startswith(f"{engine_source.upper()}_")]
+            if filtered:
+                matching_keys = filtered
 
         if not matching_keys:
             return {"triggered": False, "reason": "NO_ARMED_TRAP"}
@@ -957,10 +1013,15 @@ class CapitalInMemoryVirtualRadar:
             if is_buy_breakout or is_buy_sweep_spring:
                 exec_side = "BUY"
                 exec_price = current_ask if current_ask > 0 else mid_price
-                sl_val = trap["buy_sl"]
-                tp1_val = trap["buy_tp1"]
-                tp2_val = trap["buy_tp2"]
                 trigger_type = "BREAKOUT_MOMENTUM" if is_buy_breakout else "SWEEP_SPRING_BOUNCE"
+                if trigger_type == "SWEEP_SPRING_BOUNCE":
+                    sl_val = trap.get("sweep_buy_sl", trap["buy_sl"])
+                    tp1_val = trap.get("sweep_buy_tp1", trap["buy_tp1"])
+                    tp2_val = trap.get("sweep_buy_tp2", trap["buy_tp2"])
+                else:
+                    sl_val = trap["buy_sl"]
+                    tp1_val = trap["buy_tp1"]
+                    tp2_val = trap["buy_tp2"]
 
                 # Instant In-Memory OCO Disarm of Opposing Side
                 trap["status"] = f"TRIGGERED_{exec_side}"
@@ -999,10 +1060,15 @@ class CapitalInMemoryVirtualRadar:
             if is_sell_breakdown or is_sell_sweep_rejection:
                 exec_side = "SELL"
                 exec_price = current_bid if current_bid > 0 else mid_price
-                sl_val = trap["sell_sl"]
-                tp1_val = trap["sell_tp1"]
-                tp2_val = trap["sell_tp2"]
                 trigger_type = "BREAKDOWN_MOMENTUM" if is_sell_breakdown else "SWEEP_BLOWOFF_FADE"
+                if trigger_type == "SWEEP_BLOWOFF_FADE":
+                    sl_val = trap.get("sweep_sell_sl", trap["sell_sl"])
+                    tp1_val = trap.get("sweep_sell_tp1", trap["sell_tp1"])
+                    tp2_val = trap.get("sweep_sell_tp2", trap["sell_tp2"])
+                else:
+                    sl_val = trap["sell_sl"]
+                    tp1_val = trap["sell_tp1"]
+                    tp2_val = trap["sell_tp2"]
 
                 # Instant In-Memory OCO Disarm of Opposing Side
                 trap["status"] = f"TRIGGERED_{exec_side}"
