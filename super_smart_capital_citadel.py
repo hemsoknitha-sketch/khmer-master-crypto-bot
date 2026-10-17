@@ -126,14 +126,28 @@ def get_cached_htf_candles(
     Prevents repeated broker API calls within the TTL window.
     """
     now = time.time()
-    cache_key = f"{epic}_{resolution}_{max_bars}"
+    try:
+        import capital_engine
+        resolved_epic = capital_engine.EPIC_MAP.get(str(epic or "").upper().strip(), str(epic or "").upper().strip())
+    except Exception:
+        resolved_epic = str(epic or "").upper().strip()
+
+    cache_key = f"{resolved_epic}_{resolution}_{max_bars}"
     if cache_key in _HTF_CANDLE_CACHE:
         ts, cached = _HTF_CANDLE_CACHE[cache_key]
         if now - ts < ttl_sec:
             return cached
     try:
-        if engine and hasattr(engine, "get_historical_prices"):
-            candles = engine.get_historical_prices(epic, resolution=resolution, max_bars=max_bars)
+        eng = engine
+        if eng is None:
+            try:
+                import capital_engine
+                eng = capital_engine.get_capital_engine()
+            except Exception:
+                eng = None
+
+        if eng and hasattr(eng, "get_historical_prices"):
+            candles = eng.get_historical_prices(resolved_epic, resolution=resolution, max_bars=max_bars)
             if candles:
                 _HTF_CANDLE_CACHE[cache_key] = (now, candles)
                 return candles
@@ -548,6 +562,163 @@ class TradFiFibonacciRetracementEngine:
         }
 
 
+class TradFiH4MarketStructureAnchor:
+    """
+    Wall Street Institutional H4 Top-Down Market Structure & Trend Anchor Engine (AQ76).
+    Enforces the Non-Negotiable Institutional Directional Bias Lock:
+    - Analyzes H4 200 EMA, H4 50 EMA, H4 20 EMA, and H4 Fractal Swings (HH-HL vs LH-LL).
+    - If H4 is Bullish: Strictly VETOES all Short/Sell signals on 15m (Counter-trend short trap).
+    - If H4 is Bearish: Strictly VETOES all Long/Buy signals on 15m (Falling knife trap).
+    - Only permits trades aligning with the macro structural tide (Long dips/breakouts in uptrend, Short rips/breakdowns in downtrend).
+    """
+
+    _ANCHOR_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+    _CACHE_TTL: float = 120.0  # 2 minutes cache for H4 trend anchor
+
+    @classmethod
+    def evaluate_h4_trend_anchor(
+        cls,
+        engine: Any,
+        epic: str,
+        current_price: float = 0.0
+    ) -> Dict[str, Any]:
+        """
+        Analyzes H4 candles (up to 100-200 bars) to establish the Macro Trend Anchor.
+        Returns:
+            - h4_bias: "BULLISH", "BEARISH", or "NEUTRAL"
+            - veto_short: True if H4 Bullish (rejects Sell/Short on 15m)
+            - veto_long: True if H4 Bearish (rejects Buy/Long on 15m)
+            - ema20_h4, ema50_h4, ema200_h4
+            - structure: "H4_BULLISH_HH_HL", "H4_BEARISH_LH_LL", etc.
+            - current_price
+            - reason: Diagnostic explanation
+        """
+        import capital_engine
+        resolved_epic = capital_engine.EPIC_MAP.get(str(epic or "").upper().strip(), str(epic or "").upper().strip())
+        now = time.time()
+        cache_key = resolved_epic
+
+        if cache_key in cls._ANCHOR_CACHE:
+            cached_ts, cached_res = cls._ANCHOR_CACHE[cache_key]
+            if now - cached_ts < cls._CACHE_TTL:
+                res = dict(cached_res)
+                if current_price > 0:
+                    res["current_price"] = current_price
+                return res
+
+        default_res = {
+            "epic": resolved_epic,
+            "h4_bias": "NEUTRAL",
+            "veto_short": False,
+            "veto_long": False,
+            "ema20_h4": current_price,
+            "ema50_h4": current_price,
+            "ema200_h4": current_price,
+            "structure": "NEUTRAL_CONSOLIDATION",
+            "current_price": current_price,
+            "candles_count": 0,
+            "reason": "Insufficient H4 candles; anchor neutral."
+        }
+
+        candles_h4 = get_cached_htf_candles(engine, resolved_epic, resolution="HOUR_4", max_bars=100, ttl_sec=120.0)
+        is_fallback = False
+        if not candles_h4 or len(candles_h4) < 15:
+            # Fallback to H1 candles if H4 unavailable
+            candles_h4 = get_cached_htf_candles(engine, resolved_epic, resolution="HOUR", max_bars=100, ttl_sec=60.0)
+            is_fallback = True
+
+        if not candles_h4 or len(candles_h4) < 12:
+            cls._ANCHOR_CACHE[cache_key] = (now, default_res)
+            return default_res
+
+        closes = [float(c.get("close", 0.0)) for c in candles_h4]
+        highs = [float(c.get("high", 0.0)) for c in candles_h4]
+        lows = [float(c.get("low", 0.0)) for c in candles_h4]
+        curr_p = float(current_price) if current_price > 0 else (closes[-1] if closes else 0.0)
+
+        s_closes = pd.Series(closes)
+        ema20 = float(s_closes.ewm(span=20, adjust=False).mean().iloc[-1]) if len(closes) >= 15 else curr_p
+        ema50 = float(s_closes.ewm(span=50, adjust=False).mean().iloc[-1]) if len(closes) >= 20 else ema20
+        ema200 = float(s_closes.ewm(span=200, adjust=False).mean().iloc[-1]) if len(closes) >= 40 else ema50
+
+        # Fractal Swings on H4
+        n = len(candles_h4)
+        w = 2 if n >= 25 else 1
+        shs = [highs[i] for i in range(w, n - w) if all(highs[i] >= highs[i - k] and highs[i] >= highs[i + k] for k in range(1, w + 1))]
+        sls = [lows[i] for i in range(w, n - w) if all(lows[i] <= lows[i - k] and lows[i] <= lows[i + k] for k in range(1, w + 1))]
+
+        has_hh = len(shs) >= 2 and shs[-1] > shs[-2]
+        has_hl = len(sls) >= 2 and sls[-1] > sls[-2]
+        has_lh = len(shs) >= 2 and shs[-1] < shs[-2]
+        has_ll = len(sls) >= 2 and sls[-1] < sls[-2]
+
+        is_triple_bullish = (curr_p > ema20 > ema50 > ema200)
+        is_triple_bearish = (curr_p < ema20 < ema50 < ema200)
+
+        is_above_ema200 = (curr_p >= ema200)
+        is_below_ema200 = (curr_p <= ema200)
+        is_above_ema50 = (curr_p >= ema50)
+        is_below_ema50 = (curr_p <= ema50)
+
+        # Structure classification
+        tf_prefix = "H1_FALLBACK" if is_fallback else "H4"
+        if (has_hh and has_hl) or (has_hh and is_above_ema50):
+            structure_desc = f"{tf_prefix}_BULLISH_HH_HL"
+        elif (has_lh and has_ll) or (has_ll and is_below_ema50):
+            structure_desc = f"{tf_prefix}_BEARISH_LH_LL"
+        elif is_triple_bullish:
+            structure_desc = f"{tf_prefix}_BULLISH_TRIPLE_EMA_STACK"
+        elif is_triple_bearish:
+            structure_desc = f"{tf_prefix}_BEARISH_TRIPLE_EMA_STACK"
+        elif is_above_ema200 and is_above_ema50:
+            structure_desc = f"{tf_prefix}_BULLISH_ABOVE_EMA200_EMA50"
+        elif is_below_ema200 and is_below_ema50:
+            structure_desc = f"{tf_prefix}_BEARISH_BELOW_EMA200_EMA50"
+        elif is_above_ema200:
+            structure_desc = f"{tf_prefix}_BULLISH_ABOVE_EMA200"
+        elif is_below_ema200:
+            structure_desc = f"{tf_prefix}_BEARISH_BELOW_EMA200"
+        else:
+            structure_desc = f"{tf_prefix}_RANGING_CONSOLIDATION"
+
+        # Directional Bias Determination
+        is_bullish = (is_above_ema200 and (is_above_ema50 or has_hh or has_hl or is_triple_bullish)) or (is_triple_bullish and curr_p >= ema50)
+        is_bearish = (is_below_ema200 and (is_below_ema50 or has_lh or has_ll or is_triple_bearish)) or (is_triple_bearish and curr_p <= ema50)
+
+        h4_bias = "NEUTRAL"
+        veto_short = False
+        veto_long = False
+        reason = "Macro structure in consolidation."
+
+        if is_bullish and not (curr_p < ema200 * 0.992):
+            h4_bias = "BULLISH"
+            veto_short = True
+            veto_long = False
+            reason = f"{tf_prefix} Market Structure is BULLISH (Price ${curr_p:,.2f} >= EMA200 ${ema200:,.2f} with {structure_desc}). Shorting vetoed."
+        elif is_bearish and not (curr_p > ema200 * 1.008):
+            h4_bias = "BEARISH"
+            veto_long = True
+            veto_short = False
+            reason = f"{tf_prefix} Market Structure is BEARISH (Price ${curr_p:,.2f} <= EMA200 ${ema200:,.2f} with {structure_desc}). Buying vetoed."
+
+        res = {
+            "epic": resolved_epic,
+            "h4_bias": h4_bias,
+            "veto_short": veto_short,
+            "veto_long": veto_long,
+            "ema20_h4": round(ema20, 4),
+            "ema50_h4": round(ema50, 4),
+            "ema200_h4": round(ema200, 4),
+            "structure": structure_desc,
+            "current_price": curr_p,
+            "candles_count": len(candles_h4),
+            "is_fallback": is_fallback,
+            "reason": reason
+        }
+        cls._ANCHOR_CACHE[cache_key] = (now, res)
+        return res
+
+
 class SuperSmartCapitalCitadel:
     """
     Institutional TradFi Position Opening Gatekeeper & Sky Net Trap Citadel for Capital.com.
@@ -753,6 +924,60 @@ class SuperSmartCapitalCitadel:
                         return res
         except Exception as e_ecg:
             logger.debug(f"Economic calendar trap evaluation note: {e_ecg}")
+
+        # Step 1.2: H4 Top-Down Structural Directional Anchor (Wall Street Institutional Macro Tide Lock)
+        h4_anchor = {"h4_bias": "NEUTRAL", "veto_short": False, "veto_long": False}
+        try:
+            h4_anchor = TradFiH4MarketStructureAnchor.evaluate_h4_trend_anchor(engine, resolved_epic, curr_price)
+            prec = _get_tradfi_precision(resolved_epic, curr_price)
+            bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
+            sp_val = spread if spread > 0 else bench_sp
+
+            if norm_side == "SELL" and h4_anchor.get("veto_short"):
+                ema200_val = h4_anchor.get("ema200_h4", curr_price)
+                reason = (
+                    f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BULLISH (Price ${curr_price:,.2f} >= "
+                    f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'HH-HL')}). "
+                    f"Selling/Shorting on 15m against the institutional H4 macro uptrend is strictly prohibited "
+                    f"by Wall Street Top-Down Anchor."
+                )
+                sl_default = round(curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": reason,
+                    "confluence_score": 0.0,
+                    "spread": sp_val,
+                    "invalidation_sl": sl_default,
+                    "h4_trend_anchor": h4_anchor
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
+
+            if norm_side == "BUY" and h4_anchor.get("veto_long"):
+                ema200_val = h4_anchor.get("ema200_h4", curr_price)
+                reason = (
+                    f"H4_TOP_DOWN_TREND_VETO: H4 Market Structure is BEARISH (Price ${curr_price:,.2f} <= "
+                    f"H4 EMA200 ${ema200_val:,.2f} with {h4_anchor.get('structure', 'LH-LL')}). "
+                    f"Buying/Longing on 15m against the institutional H4 macro downtrend is strictly prohibited "
+                    f"by Wall Street Top-Down Anchor (Falling Knife Guard)."
+                )
+                sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5), prec)
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": reason,
+                    "confluence_score": 0.0,
+                    "spread": sp_val,
+                    "invalidation_sl": sl_default,
+                    "h4_trend_anchor": h4_anchor
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
+        except Exception as e_h4:
+            logger.debug(f"H4 trend anchor evaluation note: {e_h4}")
 
         # Step 2: Fetch 15m and 1h historical candles (Multi-Period EMA 20/50/200 Suite Lookback)
         candles_15m = engine.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=220)
@@ -1252,6 +1477,11 @@ class SuperSmartCapitalCitadel:
                 score += 15.0
                 factors.append(f"D1_BULLISH_{pat_d1['bullish'][0]} (+15)")
 
+            # H4 Macro Trend Anchor Confluence
+            if h4_anchor.get("h4_bias") == "BULLISH":
+                score += 15.0
+                factors.append("H4_MACRO_TREND_ALIGNMENT (+15)")
+
             # Counter-reversal penalty
             if pat_h4.get("bearish") or pat_d1.get("bearish"):
                 score -= 15.0
@@ -1350,6 +1580,11 @@ class SuperSmartCapitalCitadel:
             if pat_d1.get("bearish"):
                 score += 15.0
                 factors.append(f"D1_BEARISH_{pat_d1['bearish'][0]} (+15)")
+
+            # H4 Macro Trend Anchor Confluence
+            if h4_anchor.get("h4_bias") == "BEARISH":
+                score += 15.0
+                factors.append("H4_MACRO_TREND_ALIGNMENT (+15)")
 
             # Counter-reversal penalty
             if pat_h4.get("bullish") or pat_d1.get("bullish"):
@@ -1456,7 +1691,8 @@ class SuperSmartCapitalCitadel:
             "ema200_15m": round(ema200_15m, prec),
             "triple_ema_alignment": "BULLISH_STACK" if is_triple_ema_bullish else ("BEARISH_STACK" if is_triple_ema_bearish else "MIXED"),
             "candlestick_patterns": htf_patterns_eval,
-            "fibonacci": fib_analysis
+            "fibonacci": fib_analysis,
+            "h4_trend_anchor": h4_anchor
         }
 
         cls._CITADEL_CACHE[cache_key] = (now, result)
@@ -1836,6 +2072,27 @@ class SuperSmartCapitalCitadel:
                         return False, reason, {"is_approved": False, "rejection_reason": reason, "economic_event": blackout_info}
         except Exception as e_ecg:
             logger.debug(f"Economic calendar gatekeeper evaluation note: {e_ecg}")
+
+        # Pillar 0.7: H4 Top-Down Structural Directional Anchor Gatekeeper
+        try:
+            h4_anchor_gate = TradFiH4MarketStructureAnchor.evaluate_h4_trend_anchor(engine, s_epic)
+            norm_dir = "BUY" if str(direction or "").upper() in ["BUY", "LONG"] else ("SELL" if str(direction or "").upper() in ["SELL", "SHORT"] else "UNKNOWN")
+            if norm_dir == "SELL" and h4_anchor_gate.get("veto_short"):
+                reason = (
+                    f"BLOCKED_BY_H4_TREND_ANCHOR: {s_epic} H4 Market Structure is BULLISH "
+                    f"({h4_anchor_gate.get('structure', 'HH-HL')}). Shorting against institutional macro uptrend is prohibited."
+                )
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                return False, reason, {"is_approved": False, "rejection_reason": reason, "h4_trend_anchor": h4_anchor_gate}
+            elif norm_dir == "BUY" and h4_anchor_gate.get("veto_long"):
+                reason = (
+                    f"BLOCKED_BY_H4_TREND_ANCHOR: {s_epic} H4 Market Structure is BEARISH "
+                    f"({h4_anchor_gate.get('structure', 'LH-LL')}). Longing against institutional macro downtrend is prohibited (Falling Knife Guard)."
+                )
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                return False, reason, {"is_approved": False, "rejection_reason": reason, "h4_trend_anchor": h4_anchor_gate}
+        except Exception as e_h4_gate:
+            logger.debug(f"H4 gatekeeper evaluation note: {e_h4_gate}")
 
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):

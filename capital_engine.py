@@ -3343,6 +3343,13 @@ class CapitalAutonomousEngine:
         is_falling_knife = base_quant.get("is_falling_knife", False)
         is_rising_rocket = base_quant.get("is_rising_rocket", False)
 
+        if not citadel_approved and ((raw_sig in ["BUY", "STRONG_BUY"]) or smc_act == "BUY" or (raw_sig in ["SELL", "STRONG_SELL"]) or smc_act == "SELL"):
+            cit_reason = base_quant.get("citadel_diagnostics", {}).get("rejection_reason", "CITADEL_TRAP_VETO")
+            logger.info(f"🛡️ [CITADEL TRAP VETO] {resolved_epic} trade vetoed: {cit_reason}")
+            base_quant["final_action"] = "HOLD"
+            base_quant["final_confidence"] = 40.0
+            return base_quant
+
         if is_falling_knife and ((raw_sig in ["BUY", "STRONG_BUY"]) or smc_act == "BUY"):
             logger.info(f"🛡️ [ANTI-KNIFE VETO] {resolved_epic} BUY vetoed: Active 15M Bearish Plunge. Awaiting bullish reversal confirmation candle.")
             base_quant["final_action"] = "HOLD"
