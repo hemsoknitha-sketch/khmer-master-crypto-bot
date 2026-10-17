@@ -66,6 +66,7 @@ The system is engineered upon two non-negotiable axioms:
 4. **Pillar 4: Super Smart 360° Citadel Sweep Confirmation & Trap Clearance (Invariant 58 - ស្ទាក់ចាប់កម្លាំងពិតប្រាកដ & លុបបំបាត់ Sideways Chop Trap):**
    - Every entry must be vetted by Institutional 360° Citadel Trap Clearance with $ADX \ge 25.0$ and multi-timeframe structural confluence.
    - Strictly enforces Anti-Oversold Short Guard (15m RSI $\le 36.0$ blocks Shorts) and Anti-Overbought Peak Guard (RSI $\ge 70.0$ blocks Longs).
+   - Economic Calendar Red Folder Blackout Guard (Pillar 1 TradFi News Shield): Strictly freezes new TradFi entries 30 minutes prior to US High-Impact releases (CPI, NFP, FOMC, Core PCE, Powell Speeches) with `PRE_EVENT_FREEZE`, and enforces 15-minute post-event spread normalization & 150-second toxic execution zone clearance before permitting entries.
 5. **Pillar 5: Rollover Swap Shield & Wednesday Triple-Swap Lockout (Invariant 53 - របាំងការពារកម្រៃ Swap ឆ្លងយប់ & 3x Swap):**
    - Strictly blocks new TradFi entries during the overnight lull between 03:45 AM and 07:00 AM ICT (20:45 to 23:59 UTC), avoiding spread blowout and overnight financing interest.
    - Enforces early lockout on Wednesday nights (from 03:15 AM Thursday ICT) to completely eliminate 3-day (300%) triple rollover swap charges.
@@ -999,6 +1000,7 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
        6. Strict Capital Armor (15m RSI $\le 36.0$ Bottom Shield, Anti-Top FOMO RSI $\ge 70.0$).
        7. Interbank Sessions, Kill Zones & Rollover Swap Shield (Invariant 53 Compliance).
        8. Asymmetric Minimum $R:R \ge 1:2.5$ to $1:6.0$ & Structural Invalidation SL.
+       9. Economic Calendar Red Folder Blackout Guard (Pillar 1 TradFi News Shield): Strictly freezes new TradFi entries 30 minutes prior to US High-Impact releases (CPI, NFP, FOMC, Core PCE, Powell Speeches) with `PRE_EVENT_FREEZE`, and enforces 15-minute post-event spread normalization & 150-second toxic execution zone clearance before permitting entries.
   2. **Broker-Level Pre-Flight Gatekeeper Integration:**
      - `SuperSmartCapitalCitadel.validate_capital_entry_gatekeeper` acts as the universal gatekeeper in `CapitalComEngine.place_position`. All automated, autonomous, and manual orders are intercepted and vetted before payload transmission to Capital.com REST API (`/positions`).
 - **Enforcement:** Verified by `audit_system.py` [CHECK 45/45].

@@ -684,6 +684,76 @@ class SuperSmartCapitalCitadel:
             cls._CITADEL_CACHE[cache_key] = (now, res)
             return res
 
+        # Step 1.1: Economic Calendar Red Folder Blackout Guard (30m Pre-Event Freeze & 15m Post-Event Cooling)
+        try:
+            import economic_calendar_guard
+            blackout_info = economic_calendar_guard.check_red_folder_blackout()
+            if blackout_info.get("is_blackout"):
+                phase = blackout_info.get("phase", "ACTIVE")
+                ev_name = blackout_info.get("event_name", "US Red Folder Macro Event")
+                prec = _get_tradfi_precision(resolved_epic, curr_price)
+                bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
+                sp_val = spread if spread > 0 else bench_sp
+                sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5) if norm_side == "BUY" else curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
+
+                if phase == "PRE_EVENT":
+                    rem_m = blackout_info.get("minutes_remaining", 0.0)
+                    reason = (
+                        f"ECONOMIC_BLACKOUT_PRE_EVENT: High-impact event '{ev_name}' in {rem_m:.1f}m. "
+                        f"Pre-event blackout active (30m freeze) to eliminate spread blowout & violent slippage."
+                    )
+                    res = {
+                        "epic": resolved_epic,
+                        "proposed_side": norm_side,
+                        "is_approved": False,
+                        "rejection_reason": reason,
+                        "confluence_score": 0.0,
+                        "spread": sp_val,
+                        "invalidation_sl": sl_default,
+                        "economic_event": blackout_info
+                    }
+                    cls._CITADEL_CACHE[cache_key] = (now, res)
+                    return res
+                elif phase == "POST_EVENT":
+                    is_toxic, toxic_sec = economic_calendar_guard.is_toxic_window()
+                    if is_toxic:
+                        reason = (
+                            f"ECONOMIC_BLACKOUT_TOXIC_ZONE: Event '{ev_name}' released. "
+                            f"Initial toxic window active ({toxic_sec:.1f}s remaining). Tier-1 LP spread defense engaged."
+                        )
+                        res = {
+                            "epic": resolved_epic,
+                            "proposed_side": norm_side,
+                            "is_approved": False,
+                            "rejection_reason": reason,
+                            "confluence_score": 0.0,
+                            "spread": sp_val,
+                            "invalidation_sl": sl_default,
+                            "economic_event": blackout_info
+                        }
+                        cls._CITADEL_CACHE[cache_key] = (now, res)
+                        return res
+                    is_norm, c_sp, max_allowed = economic_calendar_guard.is_spread_normalized(resolved_epic, spread)
+                    if not is_norm and spread > 0.0:
+                        reason = (
+                            f"ECONOMIC_BLACKOUT_SPREAD_EXPANDED: Post-event spread {c_sp} exceeds normalized limit "
+                            f"{max_allowed} for {resolved_epic} following '{ev_name}'."
+                        )
+                        res = {
+                            "epic": resolved_epic,
+                            "proposed_side": norm_side,
+                            "is_approved": False,
+                            "rejection_reason": reason,
+                            "confluence_score": 0.0,
+                            "spread": sp_val,
+                            "invalidation_sl": sl_default,
+                            "economic_event": blackout_info
+                        }
+                        cls._CITADEL_CACHE[cache_key] = (now, res)
+                        return res
+        except Exception as e_ecg:
+            logger.debug(f"Economic calendar trap evaluation note: {e_ecg}")
+
         # Step 2: Fetch 15m and 1h historical candles (Multi-Period EMA 20/50/200 Suite Lookback)
         candles_15m = engine.get_historical_prices(resolved_epic, resolution="MINUTE_15", max_bars=220)
         candles_1h = engine.get_historical_prices(resolved_epic, resolution="HOUR", max_bars=60)
@@ -1722,6 +1792,50 @@ class SuperSmartCapitalCitadel:
             reason = f"ASSET_BLOCKED_BY_ADMIN: {s_epic} is currently deactivated by Super Admin for all users."
             print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
             return False, reason, {"is_approved": False, "rejection_reason": reason}
+
+        # Pillar 0.6: Economic Calendar Red Folder Blackout Guard (30m Pre-Event Freeze & 15m Post-Event Cooling)
+        try:
+            import economic_calendar_guard
+            blackout_info = economic_calendar_guard.check_red_folder_blackout()
+            if blackout_info.get("is_blackout"):
+                phase = blackout_info.get("phase", "ACTIVE")
+                ev_name = blackout_info.get("event_name", "US Red Folder Macro Event")
+                if phase == "PRE_EVENT":
+                    rem_m = blackout_info.get("minutes_remaining", 0.0)
+                    reason = (
+                        f"BLOCKED_BY_ECONOMIC_CALENDAR (PRE_EVENT): High-impact Red Folder event '{ev_name}' "
+                        f"scheduled in {rem_m:.1f}m. Pre-event blackout active (30m freeze) to eliminate spread blowout & violent slippage."
+                    )
+                    print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                    return False, reason, {"is_approved": False, "rejection_reason": reason, "economic_event": blackout_info}
+                elif phase == "POST_EVENT":
+                    is_toxic, toxic_sec = economic_calendar_guard.is_toxic_window()
+                    if is_toxic:
+                        reason = (
+                            f"BLOCKED_BY_ECONOMIC_CALENDAR (TOXIC_ZONE): High-impact event '{ev_name}' released. "
+                            f"Initial toxic window active ({toxic_sec:.1f}s remaining). Tier-1 LP spread defense engaged."
+                        )
+                        print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                        return False, reason, {"is_approved": False, "rejection_reason": reason, "economic_event": blackout_info}
+
+                    curr_spread = 0.0
+                    if engine and hasattr(engine, "get_market_details"):
+                        try:
+                            m_det = engine.get_market_details(epic)
+                            curr_spread = float(m_det.get("spread", 0.0) or 0.0)
+                        except Exception:
+                            curr_spread = 0.0
+
+                    is_norm, c_sp, max_allowed = economic_calendar_guard.is_spread_normalized(s_epic, curr_spread)
+                    if not is_norm and curr_spread > 0.0:
+                        reason = (
+                            f"BLOCKED_BY_ECONOMIC_CALENDAR (SPREAD_EXPANDED): Post-event spread {c_sp} exceeds normalized limit "
+                            f"{max_allowed} for {s_epic} following '{ev_name}'. Awaiting institutional spread stabilization."
+                        )
+                        print(f"🛑 [SUPER SMART CAPITAL CITADEL] {reason}")
+                        return False, reason, {"is_approved": False, "rejection_reason": reason, "economic_event": blackout_info}
+        except Exception as e_ecg:
+            logger.debug(f"Economic calendar gatekeeper evaluation note: {e_ecg}")
 
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):
