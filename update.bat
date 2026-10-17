@@ -28,15 +28,18 @@ echo   ✅ [ជោគជ័យ ១០០%%] កូដថ្មីត្រូវ
 echo.
 echo   💡 របៀបឱ្យ VPS ដំណើរការកូដថ្មីនេះ (ជ្រើសរើស ១ ក្នុងចំណោម ២) ៖
 echo.
-echo   វិធីទី ១ (ងាយស្រួលបំផុត) ៖
-echo      គ្រាន់តែចូលទៅកាន់ Telegram រួចវាយបញ្ជា /sync_brain នោះ Bot នឹង Update ភ្លាម!
+echo   វិធីទី ១ (ស្វ័យប្រវត្ត ១០០%% ដោយមិនបាច់ធ្វើអ្វី) ៖
+echo      នៅលើ Google Cloud VPS ប្រព័ន្ធ Cron Job ដំណើរការ auto_update_vps.sh
+echo      រៀងរាល់ ២ នាទីម្តងដោយស្វ័យប្រវត្ត (Auto-Pull ^& Safe Restart Zero Data Loss)!
 echo.
-echo   វិធីទី ២ (ប្រសិនបើចង់ Restart VPS ទាំងស្រុង) ៖
-echo      សូមបើក Browser ចូល Google Cloud Console -^> ចុចប៊ូតុង SSH ពណ៌ខៀវ
+echo   វិធីទី ២ (ប្រសិនបើចង់ Update ភ្លាមៗលើ VPS តាម SSH) ៖
+echo      សូមបើក Browser ចូល Google Cloud Console -^> ចុចប៊ូតុង SSH
 echo      រួចវាយពាក្យបញ្ជា ៖
-echo         cd /opt/khmer-master-crypto-bot
-echo         git pull origin main
-echo         sudo systemctl restart khmer-master-crypto-bot
+echo         cd /opt/khmer-master-crypto-bot ^&^& bash auto_update_vps.sh
+echo.
+echo   💡 ចំណាំ ៖ ពាក្យបញ្ជា /sync_brain ក្នុង Telegram គឺសម្រាប់ Hot-Reload ទម្ងន់
+echo      AI Models ពី Hugging Face Hub។ ចំណែកកូដ Python គឺ Update តាមវិធីខាងលើ!
 echo ======================================================================
 echo.
 pause
+

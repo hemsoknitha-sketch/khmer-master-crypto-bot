@@ -71,9 +71,14 @@ sudo systemctl enable khmer-master-crypto-bot.service
 echo "🚀 Restarting bot service..."
 sudo systemctl restart khmer-master-crypto-bot.service || sudo systemctl restart khmer-master-crypto.service || true
 
+# 5. Ensure 2-Minute Auto-Update Cron Job is configured (Checks GitHub every 2 minutes)
+echo "⏰ Configuring 2-Minute Auto-Update Cron Job for GitHub & Zero-Downtime Deployment..."
+chmod +x "$APP_DIR/auto_update_vps.sh" 2>/dev/null || true
+(crontab -l 2>/dev/null | grep -v "auto_update_vps.sh" ; echo "*/2 * * * * cd $APP_DIR && bash auto_update_vps.sh > /dev/null 2>&1") | crontab -
+
 echo ""
 echo "========================================================================="
-echo "🎉 SUCCESS! Service is installed, enabled, and running 24/7!"
+echo "🎉 SUCCESS! Service & Auto-Update Cron installed, enabled, and running 24/7!"
 echo "========================================================================="
 echo "You can now control the bot using EITHER command:"
 echo "  👉 sudo systemctl restart khmer-master-crypto-bot"
@@ -81,4 +86,7 @@ echo "  👉 sudo systemctl restart khmer-crypto-bot"
 echo ""
 echo "Check Status:"
 echo "  👉 sudo systemctl status khmer-master-crypto-bot"
+echo "Auto-Update Crontab:"
+echo "  👉 crontab -l"
 echo "========================================================================="
+
