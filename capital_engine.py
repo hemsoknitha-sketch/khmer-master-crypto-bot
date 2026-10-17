@@ -8080,11 +8080,14 @@ class CapitalTrendScalpEngine:
         swing_low: float = 0.0,
         mode: str = "DUAL",
         user_id: Optional[int] = None,
-        ttl_seconds: float = 1800.0
+        ttl_seconds: float = 1800.0,
+        candles_15m: Optional[List[Dict[str, Any]]] = None,
+        fvg_setup: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Arms a High-Speed In-Memory Virtual Radar Trap in Python RAM for Gold/Shares.
         Zero pending orders sent to Capital.com orderbook. 100% immune to pre-market spoofing.
+        Supports Breakout, Liquidity Sweep (Turtle Soup), and 15M FVG + Golden Pocket (0.618) Retests.
         """
         try:
             import super_smart_capital_citadel
@@ -8098,7 +8101,9 @@ class CapitalTrendScalpEngine:
                 swing_low=swing_low,
                 mode=mode,
                 user_id=user_id,
-                ttl_seconds=ttl_seconds
+                ttl_seconds=ttl_seconds,
+                candles_15m=candles_15m,
+                fvg_setup=fvg_setup
             )
             raw_epic = str(epic or "").upper().strip()
             self._armed_radar_traps[raw_epic] = trap_data
@@ -8428,7 +8433,11 @@ class CapitalTrendScalpEngine:
                 entry_price = current_ask if current_ask > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price + tp_dist
-                if has_bull_fib_pocket:
+                if is_fvg_tap and has_bull_fib_pocket:
+                    smc_trigger_reason = f"Institutional 15M FVG + Golden Pocket 61.8% Retest ({fib_15m.get('fib_618', 0):.2f}) [R:R 1:4.0+]"
+                    tp_dist = max(4.0 * sl_dist, 18.0 * spread)
+                    tp_price = entry_price + tp_dist
+                elif has_bull_fib_pocket:
                     smc_trigger_reason = f"Fibonacci Golden Pocket 61.8% Retest ({fib_15m.get('fib_618', 0):.2f})"
                 elif is_candle_trigger:
                     smc_trigger_reason = f"Bullish Candlestick Pattern ({candle_trigger_name})"
@@ -8460,7 +8469,11 @@ class CapitalTrendScalpEngine:
                 entry_price = current_bid if current_bid > 0 else mid_price
                 sl_price = entry_price - sl_dist
                 tp_price = entry_price - tp_dist
-                if has_bear_fib_pocket:
+                if is_fvg_tap and has_bear_fib_pocket:
+                    smc_trigger_reason = f"Institutional 15M FVG + Golden Pocket 61.8% Rejection ({fib_15m.get('fib_618', 0):.2f}) [R:R 1:4.0+]"
+                    tp_dist = max(4.0 * sl_dist, 18.0 * spread)
+                    tp_price = entry_price - tp_dist
+                elif has_bear_fib_pocket:
                     smc_trigger_reason = f"Fibonacci Golden Pocket 61.8% Rejection ({fib_15m.get('fib_618', 0):.2f})"
                 elif is_candle_trigger:
                     smc_trigger_reason = f"Bearish Candlestick Pattern ({candle_trigger_name})"
@@ -8596,7 +8609,8 @@ class CapitalTrendScalpEngine:
                     swing_high=swing_h,
                     swing_low=swing_l,
                     mode="DUAL",
-                    ttl_seconds=1800.0
+                    ttl_seconds=1800.0,
+                    candles_15m=candles
                 )
             except Exception as e_arm:
                 logger.debug(f"Auto-arm event radar error for {epic}: {e_arm}")
@@ -8636,6 +8650,8 @@ class CapitalTrendScalpEngine:
                         sp_val = float(mkt.get("spread", 0.0) or (ask_p - bid_p))
                         radar_res = self.evaluate_armed_scalp_radar(resolved_epic, bid_p, ask_p, sp_val)
                         if radar_res.get("triggered"):
+                            rr_target = float(radar_res.get("rr_ratio", 2.5))
+                            tp_target = radar_res.get("tp2") if (rr_target >= 4.0 and radar_res.get("tp2")) else radar_res.get("tp")
                             valid_setups.append((resolved_epic, {
                                 "success": True,
                                 "epic": resolved_epic,
@@ -8643,12 +8659,12 @@ class CapitalTrendScalpEngine:
                                 "confidence": radar_res.get("confidence", 95.0),
                                 "entry_price": radar_res.get("entry_price"),
                                 "sl": radar_res.get("sl"),
-                                "tp": radar_res.get("tp"),
+                                "tp": tp_target,
                                 "sl_dist": radar_res.get("sl_dist"),
-                                "tp_dist": radar_res.get("sl_dist") * 2.5,
-                                "rr_ratio": 2.5,
+                                "tp_dist": radar_res.get("sl_dist") * rr_target,
+                                "rr_ratio": rr_target,
                                 "spread": sp_val,
-                                "reason": f"⚡ In-Memory Dual Radar Triggered ({radar_res.get('trigger_type')}) [0% Broker Exposure]"
+                                "reason": f"⚡ In-Memory Dual Radar Triggered ({radar_res.get('trigger_type')}) [0% Broker Exposure, R:R 1:{rr_target:.1f}]"
                             }))
                 except Exception as e_rad:
                     logger.debug(f"Radar evaluation note for {trap_epic}: {e_rad}")

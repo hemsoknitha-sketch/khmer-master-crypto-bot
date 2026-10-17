@@ -94,6 +94,7 @@ The system is engineered upon two non-negotiable axioms:
      - **In-Memory Dual-Directional Stealth Radar:** Maintains zero-footprint memory triggers in RAM at swing boundaries:
        * **Path A (Confirmed Breakout Thrust):** Price punches through High/Low + confirmed by volume ($RVOL \ge 1.0\times$) and spread $\rightarrow$ Triggers instant boundary Market Order with SL anchored at Range Midpoint.
        * **Path B (Turtle Soup / Liquidity Sweep Reversal):** Price pierces High/Low to sweep retail stop liquidity, but fails to sustain and closes back inside the range $\rightarrow$ Triggers immediate counter-trend FADE (Turtle Soup Reversal) with tight SL anchored directly behind the sweep wick.
+       * **Path C (Institutional 15M Fair Value Gap & Golden Pocket Retest):** Price retraces into 15m FVG imbalance box overlapping Fibonacci Golden Pocket (0.618 - 0.705) + Liquidity Sweep confluence $\rightarrow$ Triggers boundary retest order with structural SL behind FVG/78.6% floor and asymmetric targets TP1 at +2.5R (BE Armor) and TP2 at +4.5R to +6.0R ($R:R \ge 1:4.0$).
      - **Structural Dynamic Lot Sizing & Dollar Risk Hard Clamp ($\le \$2.50$):**
        - Sizing is mathematically locked to structural invalidation distance:
          $$\text{Allowed Lot} = \min\left(\text{Kelly Lot}, \frac{\text{Max Allowed Dollar Risk (\$2.50)}}{\text{Structural SL Distance}}\right)$$
@@ -104,6 +105,11 @@ The system is engineered upon two non-negotiable axioms:
      - **Unified 45-Minute Post-SL Quarantine & Daily Governor:**
        - Reconciles position exits across `capital_auto_trades`, `capital_orb_trades`, and `capital_scalp_trades`. A stop-out event enforces a mandatory 45-minute quarantine on that asset across all engines, prohibiting revenge re-entries.
        - Daily -2.5% loss floor and +5.0% profit target lock strictly enforced for all accounts.
+9. **Pillar 9: Institutional 15M Fair Value Gap (FVG) & Smart Money Imbalance Retest Engine (Invariant 76 - ក្បួនស្ទាក់ចាប់ស្ថាប័ន 15m FVG & Golden Pocket 0.618 Retest, $R:R \ge 1:4.0$):**
+   - **Smart Money Imbalance Displacement:** Identifies unfilled 3-bar Fair Value Gaps (BISI / SIBI) with minimum displacement $\text{gap\_size} \ge 0.25\times\text{ATR}_{15m}$ and Consequent Encroachment (C.E., 50% midpoint).
+   - **Golden Pocket Retest Confluence (0.618 - 0.705 / 0.786):** When price retraces into the FVG box that coincides with the 61.8% Golden Pocket and ICT 70.5% OTE Sweet Spot (plus prior SSL/BSL sweeps), the setup receives top-tier institutional clearance (+30 to +35 conviction boost).
+   - **Asymmetric High Payoff Profile ($R:R \ge 1:4.0$ to $1:6.0$):** Invalidation SL is anchored tightly behind the FVG boundary & 78.6% floor. Multi-target scale-out banks 50% cash profit at TP1 (+2.5R, locking Breakeven Armor, risk = 0.00R) and harvests TP2 at +4.5R to +6.0R ($R:R \ge 1:4.0$).
+   - **Zero-Footprint Virtual Radar Integration:** Monitored exclusively in Python RAM (`CapitalInMemoryVirtualRadar`) without sending pending orders to broker servers, 100% immune to broker hunt wicks and Judas swings.
 
 ### 1.1.2 THE SUPER SMART BINANCE FUTURES RISK & PROFIT HARMONIZATION PILLARS (/smartx, /turbo_hedge, /auto_trade, /pre_pump, /wealth)
 **(គ្រឹះរួមបញ្ចូលគ្នាការពារហានិភ័យ & កើបចំណេញកម្រិតកំពូលលើ BINANCE FUTURES ទាំង ៥ ប្រព័ន្ធ)**
@@ -1357,6 +1363,8 @@ equirements.txt, pp.py), database.py (ip_hf_workers), ot_thread.py (mt5_hf_co
   5. **Mandatory Breathing Stop & 45-Minute Post-SL Quarantine:**
      - Dynamic breathing SL ($\ge \max(2.20\times\text{ATR}_{15m}, 3.00\times\text{ATR}_{5m}, 3.5\times\text{Spread})$) and asymmetric profit targets ($\ge 10\times\text{Spread}$ and $R:R \ge 1:2.5$). Zero naked or unbounded-risk positions permitted.
      - A stop-out event enforces a mandatory 45-minute quarantine on that asset across all engines, prohibiting revenge re-entries.
+  6. **Institutional 15M Fair Value Gap (FVG) & Golden Pocket (0.618) Retest Radar (Path C, $R:R \ge 1:4.0$):**
+     - Price retracements into 15m FVG boxes overlapping the 61.8% Golden Pocket and 70.5% ICT OTE zone trigger zero-footprint in-memory retest orders (`FVG_GOLDEN_POCKET_RETEST_BOUNCE` / `FVG_GOLDEN_POCKET_RETEST_REJECTION`) with structural invalidation SL behind the FVG boundary and asymmetric targets TP1 at +2.5R and TP2 at +4.5R to +6.0R ($R:R \ge 1:4.0$).
 - **Enforcement:** Verified by `audit_system.py` [CHECK 61/61].
 
 ---

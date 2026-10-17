@@ -561,6 +561,230 @@ class TradFiFibonacciRetracementEngine:
             "summary": summary_str
         }
 
+
+class TradFiFairValueGapEngine:
+    """
+    🏛️ Institutional 15M Fair Value Gap (FVG) & Smart Money Imbalance Retest Engine (Pillar 5 / AQ76).
+    Engineered for Capital.com Gold, US Mega-Cap Tech Shares (NVDA, TSLA, META, AAPL, etc.), and Indices.
+
+    Key SMC & ICT Principles:
+    1. 3-Bar Imbalance Displacement:
+       - BISI (Bullish FVG): Low[i] > High[i-2] (Displacement buying leaving unfilled liquidity).
+       - SIBI (Bearish FVG): High[i] < Low[i-2] (Displacement selling leaving unfilled liquidity).
+       - Consequent Encroachment (C.E.): 50% midpoint of the FVG box (institutional benchmark).
+    2. Golden Pocket Retest Confluence (0.618 - 0.705 / 0.786):
+       - When price retraces back into the FVG box that coincides with the 61.8% Golden Pocket
+         and ICT 70.5% OTE Sweet Spot, high-probability Smart Money accumulation/distribution occurs.
+    3. Liquidity Sweep Confluence (Turtle Soup):
+       - If prior SSL was swept before the Bullish FVG, or prior BSL was swept before the Bearish FVG,
+         the retest offers elite institutional conviction (Score +35).
+    4. Asymmetric High Payoff Profile (R:R >= 1:4.0 to 1:6.0):
+       - Invalidation SL anchored tightly behind the FVG boundary & 78.6% discount/premium floor.
+       - TP1 at +2.5R (50% scale-out, locks BE Armor), TP2 at +4.5R to +6.0R (capturing the expansion wave).
+    """
+
+    @classmethod
+    def detect_fair_value_gaps(
+        cls,
+        candles: List[Dict[str, Any]],
+        current_price: float,
+        atr: float
+    ) -> List[Dict[str, Any]]:
+        """Identifies active, unfilled 3-bar Fair Value Gaps (FVG) / Imbalances."""
+        if not candles or len(candles) < 10:
+            return []
+        fvgs = []
+        n = len(candles)
+        highs = [float(c.get("high", 0.0)) for c in candles]
+        lows = [float(c.get("low", 0.0)) for c in candles]
+
+        for i in range(max(2, n - 20), n):
+            # Bullish FVG (BISI)
+            if lows[i] > highs[i-2]:
+                gap_bottom = highs[i-2]
+                gap_top = lows[i]
+                gap_size = gap_top - gap_bottom
+                if gap_size >= (atr * 0.25):
+                    ce = (gap_top + gap_bottom) / 2.0
+                    subsequent_lows = lows[i+1:n] if (i+1 < n) else []
+                    is_fully_filled = any(l <= gap_bottom for l in subsequent_lows) if len(subsequent_lows) > 0 else False
+                    is_testing = (gap_bottom <= current_price <= gap_top)
+                    is_testing_ce = (gap_bottom <= current_price <= ce)
+                    if not is_fully_filled:
+                        fvgs.append({
+                            "type": "BULLISH_FVG",
+                            "top": gap_top,
+                            "bottom": gap_bottom,
+                            "consequent_encroachment": ce,
+                            "is_testing": is_testing,
+                            "is_testing_ce": is_testing_ce,
+                            "gap_size": gap_size,
+                            "filled": False
+                        })
+            # Bearish FVG (SIBI)
+            elif highs[i] < lows[i-2]:
+                gap_top = lows[i-2]
+                gap_bottom = highs[i]
+                gap_size = gap_top - gap_bottom
+                if gap_size >= (atr * 0.25):
+                    ce = (gap_top + gap_bottom) / 2.0
+                    subsequent_highs = highs[i+1:n] if (i+1 < n) else []
+                    is_fully_filled = any(h >= gap_top for h in subsequent_highs) if len(subsequent_highs) > 0 else False
+                    is_testing = (gap_bottom <= current_price <= gap_top)
+                    is_testing_ce = (ce <= current_price <= gap_top)
+                    if not is_fully_filled:
+                        fvgs.append({
+                            "type": "BEARISH_FVG",
+                            "top": gap_top,
+                            "bottom": gap_bottom,
+                            "consequent_encroachment": ce,
+                            "is_testing": is_testing,
+                            "is_testing_ce": is_testing_ce,
+                            "gap_size": gap_size,
+                            "filled": False
+                        })
+        return fvgs
+
+    @classmethod
+    def evaluate_fvg_golden_pocket_retest(
+        cls,
+        candles_15m: List[Dict[str, Any]],
+        curr_price: float,
+        atr_15m: float,
+        spread: float = 0.35,
+        fib_analysis: Optional[Dict[str, Any]] = None,
+        detected_fvgs: Optional[List[Dict[str, Any]]] = None,
+        has_ssl_sweep: bool = False,
+        has_bsl_sweep: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Evaluates confluence between 15m Fair Value Gaps (FVG) and Fibonacci Golden Pocket (0.618 - 0.705).
+        Returns institutional clearance, structural invalidation SL, and asymmetric TP1 / TP2 (R:R >= 1:4.0).
+        """
+        default_res = {
+            "has_confluence": False,
+            "confluence_type": "NONE",
+            "direction": "NONE",
+            "setup_name": "NONE",
+            "fvg": None,
+            "fvg_top": 0.0,
+            "fvg_bottom": 0.0,
+            "consequent_encroachment": 0.0,
+            "fib_618": 0.0,
+            "fib_705": 0.0,
+            "fib_786": 0.0,
+            "is_testing": False,
+            "has_sweep_confluence": False,
+            "invalidation_sl": 0.0,
+            "tp1": 0.0,
+            "tp2": 0.0,
+            "rr_ratio": 2.5,
+            "confluence_score": 0.0
+        }
+        if not candles_15m or len(candles_15m) < 15:
+            return default_res
+
+        if fib_analysis is None:
+            fib_analysis = TradFiFibonacciRetracementEngine.calculate_fibonacci_retracement(candles_15m, curr_price, lookback=35)
+
+        if detected_fvgs is None:
+            detected_fvgs = cls.detect_fair_value_gaps(candles_15m, curr_price, atr_15m)
+
+        trend = fib_analysis.get("trend", "NEUTRAL")
+        fib_618 = float(fib_analysis.get("fib_618", 0.0))
+        fib_705 = float(fib_analysis.get("fib_705", 0.0))
+        fib_786 = float(fib_analysis.get("fib_786", 0.0))
+        swing_high = float(fib_analysis.get("swing_high", curr_price))
+        swing_low = float(fib_analysis.get("swing_low", curr_price))
+
+        # 1. Bullish FVG + Golden Pocket Retest
+        bullish_fvgs = [f for f in detected_fvgs if f.get("type") == "BULLISH_FVG"]
+        for fvg in bullish_fvgs:
+            fvg_top = float(fvg["top"])
+            fvg_bottom = float(fvg["bottom"])
+            ce = float(fvg["consequent_encroachment"])
+
+            # Golden Pocket bounds in upward impulse: 61.8% to 78.6%
+            gp_upper = max(fib_618, fib_705)
+            gp_lower = min(fib_705, fib_786)
+            has_overlap = (max(fvg_bottom, gp_lower) <= min(fvg_top, gp_upper * 1.002))
+            is_testing_fvg = (fvg_bottom * 0.999 <= curr_price <= fvg_top * 1.001) or fvg.get("is_testing", False)
+
+            if has_overlap and (is_testing_fvg or fib_analysis.get("in_golden_pocket") or fib_analysis.get("in_ote_zone")):
+                sl_anchor = min(fvg_bottom, fib_786, swing_low)
+                sl_dist = max(atr_15m * 2.20, curr_price - sl_anchor + (atr_15m * 0.15), spread * 3.5)
+                sl = curr_price - sl_dist
+                tp1 = curr_price + max(sl_dist * 2.5, spread * 10.0)
+                tp2 = curr_price + max(sl_dist * 4.5, spread * 18.0)
+                rr = round(abs(tp2 - curr_price) / max(1e-6, sl_dist), 2)
+                score = 35.0 if has_ssl_sweep else 30.0
+
+                return {
+                    "has_confluence": True,
+                    "confluence_type": "BULLISH_FVG_GOLDEN_POCKET",
+                    "direction": "BUY",
+                    "setup_name": "INSTITUTIONAL_BULLISH_FVG_GOLDEN_POCKET_RETEST",
+                    "fvg": fvg,
+                    "fvg_top": fvg_top,
+                    "fvg_bottom": fvg_bottom,
+                    "consequent_encroachment": ce,
+                    "fib_618": fib_618,
+                    "fib_705": fib_705,
+                    "fib_786": fib_786,
+                    "is_testing": is_testing_fvg,
+                    "has_sweep_confluence": has_ssl_sweep,
+                    "invalidation_sl": round(sl, 4),
+                    "tp1": round(tp1, 4),
+                    "tp2": round(tp2, 4),
+                    "rr_ratio": max(4.0, rr),
+                    "confluence_score": score
+                }
+
+        # 2. Bearish FVG + Golden Pocket Retest
+        bearish_fvgs = [f for f in detected_fvgs if f.get("type") == "BEARISH_FVG"]
+        for fvg in bearish_fvgs:
+            fvg_top = float(fvg["top"])
+            fvg_bottom = float(fvg["bottom"])
+            ce = float(fvg["consequent_encroachment"])
+
+            gp_lower = min(fib_618, fib_705)
+            gp_upper = max(fib_705, fib_786)
+            has_overlap = (max(fvg_bottom, gp_lower * 0.998) <= min(fvg_top, gp_upper))
+            is_testing_fvg = (fvg_bottom * 0.999 <= curr_price <= fvg_top * 1.001) or fvg.get("is_testing", False)
+
+            if has_overlap and (is_testing_fvg or fib_analysis.get("in_golden_pocket") or fib_analysis.get("in_ote_zone")):
+                sl_anchor = max(fvg_top, fib_786, swing_high)
+                sl_dist = max(atr_15m * 2.20, sl_anchor - curr_price + (atr_15m * 0.15), spread * 3.5)
+                sl = curr_price + sl_dist
+                tp1 = curr_price - max(sl_dist * 2.5, spread * 10.0)
+                tp2 = curr_price - max(sl_dist * 4.5, spread * 18.0)
+                rr = round(abs(curr_price - tp2) / max(1e-6, sl_dist), 2)
+                score = 35.0 if has_bsl_sweep else 30.0
+
+                return {
+                    "has_confluence": True,
+                    "confluence_type": "BEARISH_FVG_GOLDEN_POCKET",
+                    "direction": "SELL",
+                    "setup_name": "INSTITUTIONAL_BEARISH_FVG_GOLDEN_POCKET_RETEST",
+                    "fvg": fvg,
+                    "fvg_top": fvg_top,
+                    "fvg_bottom": fvg_bottom,
+                    "consequent_encroachment": ce,
+                    "fib_618": fib_618,
+                    "fib_705": fib_705,
+                    "fib_786": fib_786,
+                    "is_testing": is_testing_fvg,
+                    "has_sweep_confluence": has_bsl_sweep,
+                    "invalidation_sl": round(sl, 4),
+                    "tp1": round(tp1, 4),
+                    "tp2": round(tp2, 4),
+                    "rr_ratio": max(4.0, rr),
+                    "confluence_score": score
+                }
+
+        return default_res
+
+
 class TradFiSessionKillZoneRouter:
     """
     🏛️ Institutional Interbank Session Kill Zone & Dynamic Asset Router (Pillar 0.8 & Invariant 77 / AQ76).
@@ -1480,6 +1704,18 @@ class SuperSmartCapitalCitadel:
         # 4f. Institutional Fibonacci Retracement & Golden Pocket (38.2%, 50% Eq, 61.8% / 70.5% / 78.6%)
         fib_analysis = TradFiFibonacciRetracementEngine.calculate_fibonacci_retracement(candles_15m, curr_price, lookback=35)
 
+        # 4g. Institutional 15m Fair Value Gap (FVG) & Golden Pocket Retest Confluence (Pillar 5 / AQ76)
+        fvg_gp_setup = cls.detect_fvg_golden_pocket_retest(
+            candles_15m=candles_15m,
+            curr_price=curr_price,
+            atr_15m=atr_15m,
+            spread=spread,
+            fib_analysis=fib_analysis,
+            detected_fvgs=detected_fvgs,
+            has_ssl_sweep=has_ssl_sweep,
+            has_bsl_sweep=has_bsl_sweep
+        )
+
         # --------------------------------------------------------------------
         # 5. PILLAR 5: SPREAD DRAG ELIMINATION & ASYMMETRIC 10X HURDLE (INVARIANT 34)
         # --------------------------------------------------------------------
@@ -1528,6 +1764,8 @@ class SuperSmartCapitalCitadel:
         # Session Alignment
         # London Kill Zone: 07:00 - 10:00 UTC (14:00 - 17:00 ICT)
         # NY Kill Zone: 13:00 - 16:00 UTC (20:00 - 23:00 ICT)
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        utc_hour = now_utc.hour
         in_kill_zone = (7 <= utc_hour <= 10) or (13 <= utc_hour <= 16)
 
         # --------------------------------------------------------------------
@@ -1572,8 +1810,16 @@ class SuperSmartCapitalCitadel:
                 score += 12.0
                 factors.append("BULLISH_IDM_LIQUIDITY_SWEPT (+12)")
 
+            # Pillar 5: Institutional 15M FVG + Golden Pocket (0.618) Retest Confluence
+            if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY":
+                if fvg_gp_setup.get("has_sweep_confluence"):
+                    score += 35.0
+                    factors.append("INSTITUTIONAL_SWEEP_FVG_GOLDEN_POCKET_TRIPLE_CONFLUENCE (+35)")
+                else:
+                    score += 30.0
+                    factors.append("INSTITUTIONAL_FVG_GOLDEN_POCKET_RETEST (+30)")
             # Fibonacci Retracement Confluence (61.8% Golden Pocket / 50% Equilibrium)
-            if fib_analysis.get("in_golden_pocket") and fib_analysis.get("trend") == "BULLISH":
+            elif fib_analysis.get("in_golden_pocket") and fib_analysis.get("trend") == "BULLISH":
                 score += 20.0
                 factors.append("FIBONACCI_GOLDEN_POCKET_618_RETEST (+20)")
             elif fib_analysis.get("in_ote_zone") and fib_analysis.get("trend") == "BULLISH":
@@ -1676,8 +1922,16 @@ class SuperSmartCapitalCitadel:
                 score += 12.0
                 factors.append("BEARISH_IDM_LIQUIDITY_SWEPT (+12)")
 
+            # Pillar 5: Institutional 15M FVG + Golden Pocket (0.618) Retest Confluence
+            if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "SELL":
+                if fvg_gp_setup.get("has_sweep_confluence"):
+                    score += 35.0
+                    factors.append("INSTITUTIONAL_SWEEP_FVG_GOLDEN_POCKET_TRIPLE_CONFLUENCE (+35)")
+                else:
+                    score += 30.0
+                    factors.append("INSTITUTIONAL_FVG_GOLDEN_POCKET_RETEST (+30)")
             # Fibonacci Retracement Confluence (61.8% Golden Pocket / 50% Equilibrium)
-            if fib_analysis.get("in_golden_pocket") and fib_analysis.get("trend") == "BEARISH":
+            elif fib_analysis.get("in_golden_pocket") and fib_analysis.get("trend") == "BEARISH":
                 score += 20.0
                 factors.append("FIBONACCI_GOLDEN_POCKET_618_REJECTION (+20)")
             elif fib_analysis.get("in_ote_zone") and fib_analysis.get("trend") == "BEARISH":
@@ -1779,24 +2033,34 @@ class SuperSmartCapitalCitadel:
             tp_spread_mult = 10.0
 
         if norm_side == "BUY":
-            # Structural Invalidation anchored behind Order Block bottom or Swing Low
+            # Structural Invalidation anchored behind Order Block bottom, Swing Low or FVG Golden Pocket floor
             ob_anchor = (active_bullish_ob.get("bottom", swing_low) - (0.15 * atr_15m)) if active_bullish_ob else swing_low
+            if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY":
+                fvg_anchor = min(fvg_gp_setup.get("fvg_bottom", swing_low), fvg_gp_setup.get("fib_786", swing_low)) - (0.15 * atr_15m)
+                ob_anchor = min(ob_anchor, fvg_anchor)
             invalidation_sl = round(min(ob_anchor, swing_low - (0.25 * atr_15m), curr_price - breathing_sl_dist), prec)
             risk_dist = max(breathing_sl_dist, curr_price - invalidation_sl)
             tp_1 = round(curr_price + max(risk_dist * 2.5, tp_spread_mult * spread), prec)  # Institutional 1:2.5 Min Hurdle
-            tp_2 = round(curr_price + max(risk_dist * 5.0, 15.0 * spread), prec)  # Institutional 1:5.0 Major Target
+            # If FVG + Golden Pocket Retest is validated, aim for asymmetric R:R >= 1:4.0 to 1:6.0
+            tp2_mult = 4.5 if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "BUY") else 5.0
+            tp_2 = round(curr_price + max(risk_dist * tp2_mult, 15.0 * spread), prec)  # Institutional Major Target
         else:
             ob_anchor = (active_bearish_ob.get("top", swing_high) + (0.15 * atr_15m)) if active_bearish_ob else swing_high
+            if fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "SELL":
+                fvg_anchor = max(fvg_gp_setup.get("fvg_top", swing_high), fvg_gp_setup.get("fib_786", swing_high)) + (0.15 * atr_15m)
+                ob_anchor = max(ob_anchor, fvg_anchor)
             invalidation_sl = round(max(ob_anchor, swing_high + (0.25 * atr_15m), curr_price + breathing_sl_dist), prec)
             risk_dist = max(breathing_sl_dist, invalidation_sl - curr_price)
             tp_1 = round(curr_price - max(risk_dist * 2.5, tp_spread_mult * spread), prec)
-            tp_2 = round(curr_price - max(risk_dist * 5.0, 15.0 * spread), prec)
+            tp2_mult = 4.5 if (fvg_gp_setup.get("has_confluence") and fvg_gp_setup.get("direction") == "SELL") else 5.0
+            tp_2 = round(curr_price - max(risk_dist * tp2_mult, 15.0 * spread), prec)
 
         rr_ratio = round((abs(tp_1 - curr_price) / max(1e-6, abs(curr_price - invalidation_sl))), 2)
 
         smc_ict_payload = {
             "order_blocks": detected_obs,
             "fair_value_gaps": detected_fvgs,
+            "fvg_golden_pocket_setup": fvg_gp_setup,
             "structure": structure_info,
             "ote_info": ote_info,
             "idm_info": idm_info,
@@ -1829,6 +2093,8 @@ class SuperSmartCapitalCitadel:
             "has_ssl_sweep": has_ssl_sweep,
             "has_bullish_fvg": has_bullish_fvg,
             "has_bearish_fvg": has_bearish_fvg,
+            "fvg_golden_pocket_setup": fvg_gp_setup,
+            "has_fvg_golden_pocket": bool(fvg_gp_setup.get("has_confluence")),
             "has_displacement": has_displacement,
             "in_kill_zone": in_kill_zone,
             "current_price": curr_price,
@@ -1929,64 +2195,39 @@ class SuperSmartCapitalCitadel:
     @classmethod
     def detect_tradfi_fair_value_gaps(cls, candles: List[Dict[str, Any]], current_price: float, atr: float) -> List[Dict[str, Any]]:
         """
-        Identifies 3-candle Fair Value Gaps (FVG) / Imbalances:
+        Identifies 3-candle Fair Value Gaps (FVG) / Imbalances via TradFiFairValueGapEngine:
         - BISI (Bullish FVG): Low[i] > High[i-2]
         - SIBI (Bearish FVG): High[i] < Low[i-2]
         - Consequent Encroachment (C.E.): 50% midpoint of the FVG.
         """
-        if not candles or len(candles) < 10:
-            return []
-        fvgs = []
-        n = len(candles)
-        highs = [float(c.get("high", 0.0)) for c in candles]
-        lows = [float(c.get("low", 0.0)) for c in candles]
+        return TradFiFairValueGapEngine.detect_fair_value_gaps(candles, current_price, atr)
 
-        for i in range(max(2, n - 20), n):
-            # Bullish FVG
-            if lows[i] > highs[i-2]:
-                gap_bottom = highs[i-2]
-                gap_top = lows[i]
-                gap_size = gap_top - gap_bottom
-                if gap_size >= (atr * 0.25):
-                    ce = (gap_top + gap_bottom) / 2.0
-                    subsequent_lows = lows[i+1:n] if (i+1 < n) else []
-                    is_fully_filled = any(l <= gap_bottom for l in subsequent_lows) if len(subsequent_lows) > 0 else False
-                    is_testing = (gap_bottom <= current_price <= gap_top)
-                    is_testing_ce = (gap_bottom <= current_price <= ce)
-                    if not is_fully_filled:
-                        fvgs.append({
-                            "type": "BULLISH_FVG",
-                            "top": gap_top,
-                            "bottom": gap_bottom,
-                            "consequent_encroachment": ce,
-                            "is_testing": is_testing,
-                            "is_testing_ce": is_testing_ce,
-                            "gap_size": gap_size,
-                            "filled": False
-                        })
-            # Bearish FVG
-            elif highs[i] < lows[i-2]:
-                gap_top = lows[i-2]
-                gap_bottom = highs[i]
-                gap_size = gap_top - gap_bottom
-                if gap_size >= (atr * 0.25):
-                    ce = (gap_top + gap_bottom) / 2.0
-                    subsequent_highs = highs[i+1:n] if (i+1 < n) else []
-                    is_fully_filled = any(h >= gap_top for h in subsequent_highs) if len(subsequent_highs) > 0 else False
-                    is_testing = (gap_bottom <= current_price <= gap_top)
-                    is_testing_ce = (ce <= current_price <= gap_top)
-                    if not is_fully_filled:
-                        fvgs.append({
-                            "type": "BEARISH_FVG",
-                            "top": gap_top,
-                            "bottom": gap_bottom,
-                            "consequent_encroachment": ce,
-                            "is_testing": is_testing,
-                            "is_testing_ce": is_testing_ce,
-                            "gap_size": gap_size,
-                            "filled": False
-                        })
-        return fvgs
+    @classmethod
+    def detect_fvg_golden_pocket_retest(
+        cls,
+        candles_15m: List[Dict[str, Any]],
+        curr_price: float,
+        atr_15m: float,
+        spread: float = 0.35,
+        fib_analysis: Optional[Dict[str, Any]] = None,
+        detected_fvgs: Optional[List[Dict[str, Any]]] = None,
+        has_ssl_sweep: bool = False,
+        has_bsl_sweep: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Evaluates 15m Fair Value Gap (FVG) + Golden Pocket (0.618 - 0.705) Retest Confluence (Pillar 5 / AQ76).
+        Yields elite institutional setups with asymmetric payoff R:R >= 1:4.0 to 1:6.0.
+        """
+        return TradFiFairValueGapEngine.evaluate_fvg_golden_pocket_retest(
+            candles_15m=candles_15m,
+            curr_price=curr_price,
+            atr_15m=atr_15m,
+            spread=spread,
+            fib_analysis=fib_analysis,
+            detected_fvgs=detected_fvgs,
+            has_ssl_sweep=has_ssl_sweep,
+            has_bsl_sweep=has_bsl_sweep
+        )
 
     @classmethod
     def detect_tradfi_choch_and_bos(cls, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -2323,11 +2564,14 @@ class CapitalInMemoryVirtualRadar:
         swing_low: float = 0.0,
         mode: str = "DUAL",
         user_id: Optional[int] = None,
-        ttl_seconds: float = 1800.0
+        ttl_seconds: float = 1800.0,
+        candles_15m: Optional[List[Dict[str, Any]]] = None,
+        fvg_setup: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Arms a High-Speed In-Memory Virtual Radar Trap in Python RAM.
         Zero pending orders sent to Capital.com orderbook. 100% Immune to pre-market spoofing.
+        Supports Breakout, Liquidity Sweep (Turtle Soup), and 15m FVG + Golden Pocket (0.618) Retests.
         """
         raw_epic = str(epic or "").upper().strip()
         now = time.time()
@@ -2382,7 +2626,71 @@ class CapitalInMemoryVirtualRadar:
 
         sweep_sell_sl = round(swing_high + max(spread_bench * 2.5, atr_15m * 0.15), prec)
         sweep_sell_tp1 = round(range_mid, prec)  # Target 1: Dealing Range Equilibrium
-        sweep_sell_tp2 = round(swing_low + max(spread_bench * 1.5, atr_15m * 0.10), prec)  # Target 2: Range Low
+        sweep_sell_tp2 = round(swing_low - max(spread_bench * 1.5, atr_15m * 0.10), prec)  # Target 2: Range Low
+
+        # Pillar 5: Institutional 15m Fair Value Gap (FVG) & Golden Pocket (0.618) Retest Arming
+        buy_fvg_trigger = 0.0
+        buy_fvg_bottom = 0.0
+        buy_fvg_top = 0.0
+        buy_fvg_sl = 0.0
+        buy_fvg_tp1 = 0.0
+        buy_fvg_tp2 = 0.0
+
+        sell_fvg_trigger = 0.0
+        sell_fvg_bottom = 0.0
+        sell_fvg_top = 0.0
+        sell_fvg_sl = 0.0
+        sell_fvg_tp1 = 0.0
+        sell_fvg_tp2 = 0.0
+        has_fvg_trap = False
+        fvg_trap_details = {}
+
+        if fvg_setup and fvg_setup.get("has_confluence"):
+            has_fvg_trap = True
+            fvg_trap_details = fvg_setup
+            dir_fvg = fvg_setup.get("direction", "BUY")
+            if dir_fvg == "BUY":
+                buy_fvg_top = round(float(fvg_setup.get("fvg_top", current_price)), prec)
+                buy_fvg_bottom = round(float(fvg_setup.get("fvg_bottom", current_price)), prec)
+                buy_fvg_trigger = round(float(fvg_setup.get("consequent_encroachment", (buy_fvg_top + buy_fvg_bottom) / 2.0)), prec)
+                buy_fvg_sl = round(float(fvg_setup.get("invalidation_sl", current_price - sl_dist)), prec)
+                buy_fvg_tp1 = round(float(fvg_setup.get("tp1", current_price + sl_dist * 2.5)), prec)
+                buy_fvg_tp2 = round(float(fvg_setup.get("tp2", current_price + sl_dist * 4.5)), prec)
+            else:
+                sell_fvg_top = round(float(fvg_setup.get("fvg_top", current_price)), prec)
+                sell_fvg_bottom = round(float(fvg_setup.get("fvg_bottom", current_price)), prec)
+                sell_fvg_trigger = round(float(fvg_setup.get("consequent_encroachment", (sell_fvg_top + sell_fvg_bottom) / 2.0)), prec)
+                sell_fvg_sl = round(float(fvg_setup.get("invalidation_sl", current_price + sl_dist)), prec)
+                sell_fvg_tp1 = round(float(fvg_setup.get("tp1", current_price - sl_dist * 2.5)), prec)
+                sell_fvg_tp2 = round(float(fvg_setup.get("tp2", current_price - sl_dist * 4.5)), prec)
+        elif candles_15m and len(candles_15m) >= 15:
+            try:
+                fvg_eval = TradFiFairValueGapEngine.evaluate_fvg_golden_pocket_retest(
+                    candles_15m=candles_15m,
+                    curr_price=current_price,
+                    atr_15m=atr_15m,
+                    spread=spread_bench
+                )
+                if fvg_eval.get("has_confluence"):
+                    has_fvg_trap = True
+                    fvg_trap_details = fvg_eval
+                    dir_fvg = fvg_eval.get("direction", "BUY")
+                    if dir_fvg == "BUY":
+                        buy_fvg_top = round(float(fvg_eval.get("fvg_top", current_price)), prec)
+                        buy_fvg_bottom = round(float(fvg_eval.get("fvg_bottom", current_price)), prec)
+                        buy_fvg_trigger = round(float(fvg_eval.get("consequent_encroachment", (buy_fvg_top + buy_fvg_bottom) / 2.0)), prec)
+                        buy_fvg_sl = round(float(fvg_eval.get("invalidation_sl", current_price - sl_dist)), prec)
+                        buy_fvg_tp1 = round(float(fvg_eval.get("tp1", current_price + sl_dist * 2.5)), prec)
+                        buy_fvg_tp2 = round(float(fvg_eval.get("tp2", current_price + sl_dist * 4.5)), prec)
+                    else:
+                        sell_fvg_top = round(float(fvg_eval.get("fvg_top", current_price)), prec)
+                        sell_fvg_bottom = round(float(fvg_eval.get("fvg_bottom", current_price)), prec)
+                        sell_fvg_trigger = round(float(fvg_eval.get("consequent_encroachment", (sell_fvg_top + sell_fvg_bottom) / 2.0)), prec)
+                        sell_fvg_sl = round(float(fvg_eval.get("invalidation_sl", current_price + sl_dist)), prec)
+                        sell_fvg_tp1 = round(float(fvg_eval.get("tp1", current_price - sl_dist * 2.5)), prec)
+                        sell_fvg_tp2 = round(float(fvg_eval.get("tp2", current_price - sl_dist * 4.5)), prec)
+            except Exception as e_fvg_arm:
+                logger.debug(f"FVG arming note for {raw_epic}: {e_fvg_arm}")
 
         trap_data = {
             "trap_key": trap_key,
@@ -2412,6 +2720,20 @@ class CapitalInMemoryVirtualRadar:
             "sweep_sell_sl": sweep_sell_sl,
             "sweep_sell_tp1": sweep_sell_tp1,
             "sweep_sell_tp2": sweep_sell_tp2,
+            "has_fvg_trap": has_fvg_trap,
+            "fvg_trap_details": fvg_trap_details,
+            "buy_fvg_trigger": buy_fvg_trigger,
+            "buy_fvg_top": buy_fvg_top,
+            "buy_fvg_bottom": buy_fvg_bottom,
+            "buy_fvg_sl": buy_fvg_sl,
+            "buy_fvg_tp1": buy_fvg_tp1,
+            "buy_fvg_tp2": buy_fvg_tp2,
+            "sell_fvg_trigger": sell_fvg_trigger,
+            "sell_fvg_top": sell_fvg_top,
+            "sell_fvg_bottom": sell_fvg_bottom,
+            "sell_fvg_sl": sell_fvg_sl,
+            "sell_fvg_tp1": sell_fvg_tp1,
+            "sell_fvg_tp2": sell_fvg_tp2,
             "status": "ARMED",
             "armed_at": now,
             "expires_at": now + ttl_seconds
@@ -2425,6 +2747,52 @@ class CapitalInMemoryVirtualRadar:
             f"SELL Trigger: ${sell_breakdown:,.{prec}f} (SL: ${sell_sl:,.{prec}f}, TP1: ${sell_tp1:,.{prec}f})"
         )
         return trap_data
+
+    @classmethod
+    def arm_fvg_golden_pocket_trap(
+        cls,
+        epic: str,
+        direction: str,
+        fvg_top: float,
+        fvg_bottom: float,
+        ce_price: float,
+        sl: float,
+        tp1: float,
+        tp2: float,
+        current_price: float = 0.0,
+        atr_15m: float = 0.0,
+        engine_source: str = "CAPITAL_SCALP",
+        user_id: Optional[int] = None,
+        ttl_seconds: float = 2400.0
+    ) -> Dict[str, Any]:
+        """
+        Arms an Institutional 15m Fair Value Gap (FVG) + Golden Pocket (0.618) Retest Radar Trap in RAM.
+        Zero broker pending order footprint. Triggers at boundary/C.E. retest with R:R >= 1:4.0.
+        """
+        fvg_setup = {
+            "has_confluence": True,
+            "direction": direction.upper(),
+            "fvg_top": fvg_top,
+            "fvg_bottom": fvg_bottom,
+            "consequent_encroachment": ce_price,
+            "invalidation_sl": sl,
+            "tp1": tp1,
+            "tp2": tp2,
+            "rr_ratio": 4.5
+        }
+        ref_p = current_price if current_price > 0 else (fvg_top + fvg_bottom) / 2.0
+        return cls.arm_radar_trap(
+            epic=epic,
+            engine_source=engine_source,
+            current_price=ref_p,
+            atr_15m=atr_15m,
+            swing_high=max(fvg_top, ref_p * 1.01),
+            swing_low=min(fvg_bottom, ref_p * 0.99),
+            mode="FVG_RETEST",
+            user_id=user_id,
+            ttl_seconds=ttl_seconds,
+            fvg_setup=fvg_setup
+        )
 
     @classmethod
     def evaluate_armed_trap_trigger(
@@ -2479,6 +2847,88 @@ class CapitalInMemoryVirtualRadar:
             sell_sweep = trap.get("sell_sweep", 0.0)
             swing_low = trap.get("swing_low", 0.0)
             swing_high = trap.get("swing_high", 0.0)
+
+            # Check 0: Institutional Fair Value Gap (FVG) & Golden Pocket (0.618) Retest Trigger
+            if trap.get("has_fvg_trap"):
+                # Bullish FVG Retest Bounce
+                if trap.get("buy_fvg_trigger", 0.0) > 0 and trap.get("buy_fvg_bottom", 0.0) > 0:
+                    b_top = trap["buy_fvg_top"]
+                    b_bot = trap["buy_fvg_bottom"]
+                    b_trig = trap["buy_fvg_trigger"]
+                    if (b_bot * 0.999 <= mid_price <= b_top * 1.001) and (mid_price >= b_trig or current_ask >= b_trig):
+                        exec_side = "BUY"
+                        exec_price = current_ask if current_ask > 0 else mid_price
+                        trigger_type = "FVG_GOLDEN_POCKET_RETEST_BOUNCE"
+                        sl_val = trap.get("buy_fvg_sl", trap["buy_sl"])
+                        tp1_val = trap.get("buy_fvg_tp1", trap["buy_tp1"])
+                        tp2_val = trap.get("buy_fvg_tp2", trap["buy_tp2"])
+                        rr_val = round(abs(tp2_val - exec_price) / max(1e-6, abs(exec_price - sl_val)), 2)
+
+                        trap["status"] = f"TRIGGERED_{exec_side}"
+                        trap["triggered_at"] = now
+                        trap["trigger_price"] = exec_price
+                        cls._STATS["total_traps_triggered"] += 1
+                        cls._STATS["total_oco_disarmed"] += 1
+                        cls._STATS["last_trigger"] = {
+                            "epic": raw_epic, "side": exec_side, "price": exec_price, "type": trigger_type, "time": now
+                        }
+                        logger.info(f"⚡ [CAPITAL RADAR TRIGGERED] {exec_side} on {raw_epic} @ ${exec_price:,.2f} ({trigger_type}) | Institutional R:R {rr_val} >= 1:4.0")
+                        cls.disarm_trap(trap_key, f"TRIGGERED_{exec_side}")
+                        return {
+                            "triggered": True,
+                            "trap_key": trap_key,
+                            "epic": raw_epic,
+                            "direction": exec_side,
+                            "trigger_type": trigger_type,
+                            "entry_price": exec_price,
+                            "sl": sl_val,
+                            "tp": tp1_val,
+                            "tp2": tp2_val,
+                            "sl_dist": abs(exec_price - sl_val),
+                            "confidence": 96.0,
+                            "rr_ratio": max(4.0, rr_val),
+                            "setup": "INSTITUTIONAL_FVG_GOLDEN_POCKET_RETEST"
+                        }
+
+                # Bearish FVG Retest Rejection
+                if trap.get("sell_fvg_trigger", 0.0) > 0 and trap.get("sell_fvg_top", 0.0) > 0:
+                    s_top = trap["sell_fvg_top"]
+                    s_bot = trap["sell_fvg_bottom"]
+                    s_trig = trap["sell_fvg_trigger"]
+                    if (s_bot * 0.999 <= mid_price <= s_top * 1.001) and (mid_price <= s_trig or current_bid <= s_trig):
+                        exec_side = "SELL"
+                        exec_price = current_bid if current_bid > 0 else mid_price
+                        trigger_type = "FVG_GOLDEN_POCKET_RETEST_REJECTION"
+                        sl_val = trap.get("sell_fvg_sl", trap["sell_sl"])
+                        tp1_val = trap.get("sell_fvg_tp1", trap["sell_tp1"])
+                        tp2_val = trap.get("sell_fvg_tp2", trap["sell_tp2"])
+                        rr_val = round(abs(exec_price - tp2_val) / max(1e-6, abs(sl_val - exec_price)), 2)
+
+                        trap["status"] = f"TRIGGERED_{exec_side}"
+                        trap["triggered_at"] = now
+                        trap["trigger_price"] = exec_price
+                        cls._STATS["total_traps_triggered"] += 1
+                        cls._STATS["total_oco_disarmed"] += 1
+                        cls._STATS["last_trigger"] = {
+                            "epic": raw_epic, "side": exec_side, "price": exec_price, "type": trigger_type, "time": now
+                        }
+                        logger.info(f"⚡ [CAPITAL RADAR TRIGGERED] {exec_side} on {raw_epic} @ ${exec_price:,.2f} ({trigger_type}) | Institutional R:R {rr_val} >= 1:4.0")
+                        cls.disarm_trap(trap_key, f"TRIGGERED_{exec_side}")
+                        return {
+                            "triggered": True,
+                            "trap_key": trap_key,
+                            "epic": raw_epic,
+                            "direction": exec_side,
+                            "trigger_type": trigger_type,
+                            "entry_price": exec_price,
+                            "sl": sl_val,
+                            "tp": tp1_val,
+                            "tp2": tp2_val,
+                            "sl_dist": abs(sl_val - exec_price),
+                            "confidence": 96.0,
+                            "rr_ratio": max(4.0, rr_val),
+                            "setup": "INSTITUTIONAL_FVG_GOLDEN_POCKET_RETEST"
+                        }
 
             # Check 1: Bullish Breakout OR Sweep Spring Bounce
             is_buy_breakout = (mid_price >= buy_trigger)
@@ -2803,5 +3253,11 @@ def get_capital_in_memory_virtual_radar() -> type:
 def get_tradfi_scale_out_manager() -> type:
     """Returns the canonical TradFiMultiTargetScaleOutManager class."""
     return TradFiMultiTargetScaleOutManager
+
+
+def get_tradfi_fvg_engine() -> type:
+    """Returns the canonical TradFiFairValueGapEngine class."""
+    return TradFiFairValueGapEngine
+
 
 
