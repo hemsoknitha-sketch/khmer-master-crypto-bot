@@ -2157,25 +2157,84 @@ class CapitalComEngine:
             if not tp or tp <= 0 or tp >= bid:
                 tp = round(bid - min_tp_dist, prec)
 
-        # 4. Transmit Protected Position
+        # Pillar 4: Institutional 3-Stage Multi-Target Scale-Out Plan (TP1 50%, TP2 30%, Runner 20%)
+        import super_smart_capital_citadel as sscc
+        scale_mgr = sscc.get_tradfi_scale_out_manager()
+        scale_plan = scale_mgr.calculate_scale_out_plan(
+            epic=resolved_epic,
+            direction=dir_u,
+            entry_price=mid_px,
+            sl_price=sl,
+            total_size=size,
+            spread=spread,
+            min_deal_size=min_size,
+            tp1_r=2.20,
+            tp2_r=4.00,
+            runner_r=10.00
+        )
+
+        # 4. Transmit Protected Position (Multi-Tranche Scale-Out or Single Dynamic Order)
         max_spreads = {
             "GOLD": 1.20, "US500": 1.50, "US100": 2.00, "OIL_CRUDE": 0.10, "BTCUSD": 80.0,
             "NVDA": 0.60, "TSLA": 0.60, "AAPL": 0.50, "MSFT": 0.60, "AMZN": 0.60
         }
         max_spread = max_spreads.get(resolved_epic, 5.0)
 
+        if scale_plan.get("can_split"):
+            tranches_res = []
+            for tr_spec in scale_plan["tranches"]:
+                t_id = tr_spec["id"]
+                t_size = tr_spec["size"]
+                t_tp = tr_spec["target"]
+                t_res = self.place_position(
+                    epic=resolved_epic,
+                    direction=dir_u,
+                    size=t_size,
+                    stop_loss=sl,
+                    take_profit=t_tp,
+                    max_allowed_spread=max_spread
+                )
+                if t_res.get("success"):
+                    t_res["tranche_id"] = t_id
+                    t_res["size"] = t_size
+                    t_res["sl_dist"] = scale_plan["sl_dist"]
+                    t_res["sl"] = sl
+                    t_res["tp"] = t_tp
+                    tranches_res.append(t_res)
+            if tranches_res:
+                primary_res = tranches_res[0].copy()
+                primary_res["tranches"] = tranches_res
+                primary_res["scale_plan"] = scale_plan
+                primary_res["sl"] = sl
+                primary_res["tp"] = scale_plan["tp1_price"]
+                primary_res["tp1"] = scale_plan["tp1_price"]
+                primary_res["tp2"] = scale_plan["tp2_price"]
+                primary_res["tp3"] = scale_plan["tp3_price"]
+                primary_res["sl_dist"] = scale_plan["sl_dist"]
+                primary_res["confidence"] = analysis.get("confidence")
+                primary_res["rsi"] = analysis.get("rsi")
+                primary_res["atr"] = atr
+                return primary_res
+
+        # Fallback / Single Position Execution
+        eff_tp = scale_plan.get("tp1_price") or tp
         res = self.place_position(
             epic=resolved_epic,
             direction=dir_u,
             size=size,
             stop_loss=sl,
-            take_profit=tp,
+            take_profit=eff_tp,
             max_allowed_spread=max_spread
         )
 
         if res.get("success"):
             res["sl"] = sl
-            res["tp"] = tp
+            res["tp"] = eff_tp
+            res["tp1"] = scale_plan.get("tp1_price", eff_tp)
+            res["tp2"] = scale_plan.get("tp2_price", eff_tp)
+            res["tp3"] = scale_plan.get("tp3_price", eff_tp)
+            res["sl_dist"] = scale_plan.get("sl_dist", min_sl_dist)
+            res["tranche_id"] = "SINGLE"
             res["confidence"] = analysis.get("confidence")
             res["rsi"] = analysis.get("rsi")
             res["atr"] = atr
@@ -3576,6 +3635,162 @@ class CapitalAutonomousEngine:
                         continue
 
             # =========================================================================
+            # PILLAR 4: INSTITUTIONAL 3-STAGE MULTI-TARGET SCALE-OUT (TP1, TP2 & RUNNER)
+            # Stage 1 (+2.0R to +2.5R):
+            #   - TP1_50: Close 50% lot to bank cash, update companion tranches to BE Armor.
+            #   - SINGLE: Shift SL to Breakeven Armor (+0.5x spread profit floor), set scale_tier = 1.
+            #     Trade is 100% loss-immune (0.00R Risk Free Roll) and continues running!
+            # Stage 2 (+4.0R):
+            #   - TP2_30: Close 30% lot to bank solid cash, update runner to +2.0R profit lock.
+            #   - SINGLE: Ratchet SL to +2.0R profit floor, set scale_tier = 2.
+            #     Solid cash banked into pocket, runner unleashed to +10.0R!
+            # Stage 3 (+4.0R ... +10.0R):
+            #   - Moonshot Runner riding trend with 15m ATR / 3-EMA Trailing Ratchet to +10.0R.
+            # =========================================================================
+            db_auto_trades = db.get_active_capital_auto_trades(deal_id=str(deal_id))
+            auto_trade_meta = db_auto_trades[0] if db_auto_trades else {}
+            scale_tier = int(auto_trade_meta.get("scale_tier", 0) or 0)
+            tranche_id = str(auto_trade_meta.get("tranche_id", "SINGLE") or "SINGLE")
+            trade_sl_dist = float(auto_trade_meta.get("sl_dist", 0.0) or 0.0)
+            if trade_sl_dist <= 0:
+                trade_sl_dist = abs(entry_level - sl) if sl > 0 else max(spread * 3.5, entry_level * 0.0035, 0.01)
+
+            r_gain = (current_price - entry_level) / trade_sl_dist if direction == "BUY" else (entry_level - current_price) / trade_sl_dist
+
+            if scale_tier >= 2 or tranche_id == "RUNNER_20":
+                is_runner = True
+                ratchet_pct = 0.85
+
+            if r_gain >= 2.00 and scale_tier < 1 and upl >= 2.00:
+                if tranche_id == "TP1_50":
+                    logger.info(f"🎯 [MULTI-TARGET TP1 HARVEST] Banking 50% Tranche on {epic} ({direction}) @ +{r_gain:.2f}R (+${upl:+.2f})!")
+                    close_res = engine.close_position(deal_id=deal_id)
+                    if close_res.get("success"):
+                        closed_count += 1
+                        self._peak_upl_cache.pop(deal_id, None)
+                        self._be_locked_set.discard(deal_id)
+                        db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=current_price, pnl=upl)
+                        try:
+                            for ct in db.get_active_capital_auto_trades():
+                                if ct.get("chat_id") == chat_id and ct.get("epic") == epic and ct.get("deal_id") != str(deal_id):
+                                    c_deal = ct.get("deal_id")
+                                    be_sl = round(entry_level + max(spread * 0.5, entry_level * 0.001), prec) if direction == "BUY" else round(entry_level - max(spread * 0.5, entry_level * 0.001), prec)
+                                    safe_be = min(be_sl, round(current_price - (spread * 1.5), prec)) if direction == "BUY" else max(be_sl, round(current_price + (spread * 1.5), prec))
+                                    engine.update_position_stops(deal_id=c_deal, stop_loss=safe_be)
+                                    db.update_capital_auto_trade_scale_tier(c_deal, 1, status="ACTIVE_TIER1")
+                        except Exception:
+                            pass
+                        if chat_id:
+                            try:
+                                import notification_manager, ui_standards
+                                msg_t1 = (
+                                    f"🎯 **[MULTI-TARGET TP1 HIT: +{r_gain:.2f}R]** 💰\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🏛️ **ឧបករណ៍ ៖** `{epic}` ({direction})\n"
+                                    f"📦 **Tranche 1 (50%) ៖** `បានបិទកើបចំណេញជោគជ័យ!`\n"
+                                    f"💰 **ប្រាក់ចំណេញកើបបាន ៖** `+${upl:,.2f} USD` (+{roi_pct:.1f}% ROI)\n"
+                                    f"🛡️ **កិច្ចការពារ Tranche នៅសល់ ៖** `រំកិល Stop-Loss មក Breakeven Armor (+0.5x Spread)`\n"
+                                    f"🎉 **ស្ថានភាពហានិភ័យ ៖** `Risk 0.00R (Free Roll) - គ្មានថ្ងៃខាតវិញ ១០០%!_`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🚀 _ម៉ាស៊ីន AI កំពុងបន្តរត់តាមគោលដៅ TP2 (+4.0R) & Moonshot Runner!_"
+                                )
+                                notification_manager.send_telegram_notification(app, chat_id, msg_t1, category="[CAPITAL TP1]")
+                            except Exception:
+                                pass
+                        continue
+                elif tranche_id == "SINGLE":
+                    be_sl = round(entry_level + max(spread * 0.5, entry_level * 0.001), prec) if direction == "BUY" else round(entry_level - max(spread * 0.5, entry_level * 0.001), prec)
+                    safe_be = min(be_sl, round(current_price - (spread * 1.5), prec)) if direction == "BUY" else max(be_sl, round(current_price + (spread * 1.5), prec))
+                    should_upd_be = (safe_be > sl) if direction == "BUY" else (sl <= 0 or safe_be < sl)
+                    if should_upd_be:
+                        upd_be = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_be)
+                        if upd_be.get("success"):
+                            db.update_capital_auto_trade_scale_tier(str(deal_id), 1, status="ACTIVE_TP1")
+                            self._be_locked_set.add(deal_id)
+                            ratcheted_count += 1
+                            logger.info(f"🎯 [MULTI-TARGET TP1 HIT] Shifted SL for {epic} to Breakeven Armor {safe_be} (R: +{r_gain:.2f}R, Risk: 0.00R Free Roll)")
+                            if chat_id:
+                                try:
+                                    import notification_manager, ui_standards
+                                    msg_t1 = (
+                                        f"🎯 **[MULTI-TARGET TP1 HIT: +{r_gain:.2f}R]** 🛡️\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🏛️ **ឧបករណ៍ ៖** `{epic}` ({direction})\n"
+                                        f"📈 **កំណើនបច្ចុប្បន្ន ៖** `+{r_gain:.2f}R` (+${upl:,.2f} USD, +{roi_pct:.1f}% ROI)\n"
+                                        f"🛡️ **កិច្ចការពារ Stop-Loss ៖** `{safe_be}` (Breakeven Armor + 0.5x Spread Profit Floor)\n"
+                                        f"🎉 **ស្ថានភាពហានិភ័យ ៖** `Risk 0.00R (Free Roll) - ធានាថា Trade នេះលែងមានថ្ងៃចាញ់វិញ ១០០%!_`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🚀 _ម៉ាស៊ីន AI រក្សា Position ឱ្យរត់បន្តទៅកាន់ TP2 (+4.0R) & Moonshot Runner!_"
+                                    )
+                                    notification_manager.send_telegram_notification(app, chat_id, msg_t1, category="[CAPITAL TP1]")
+                                except Exception:
+                                    pass
+
+            elif r_gain >= 4.00 and scale_tier < 2 and upl >= 3.50:
+                if tranche_id == "TP2_30":
+                    logger.info(f"💎 [MULTI-TARGET TP2 HARVEST] Banking 30% Tranche on {epic} ({direction}) @ +{r_gain:.2f}R (+${upl:+.2f})!")
+                    close_res = engine.close_position(deal_id=deal_id)
+                    if close_res.get("success"):
+                        closed_count += 1
+                        self._peak_upl_cache.pop(deal_id, None)
+                        self._be_locked_set.discard(deal_id)
+                        db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=current_price, pnl=upl)
+                        try:
+                            for ct in db.get_active_capital_auto_trades():
+                                if ct.get("chat_id") == chat_id and ct.get("epic") == epic and ct.get("deal_id") != str(deal_id):
+                                    c_deal = ct.get("deal_id")
+                                    t2_floor = round(entry_level + (2.0 * trade_sl_dist), prec) if direction == "BUY" else round(entry_level - (2.0 * trade_sl_dist), prec)
+                                    safe_t2 = min(t2_floor, round(current_price - (spread * 1.5), prec)) if direction == "BUY" else max(t2_floor, round(current_price + (spread * 1.5), prec))
+                                    engine.update_position_stops(deal_id=c_deal, stop_loss=safe_t2)
+                                    db.update_capital_auto_trade_scale_tier(c_deal, 2, status="ACTIVE_TIER2")
+                        except Exception:
+                            pass
+                        if chat_id:
+                            try:
+                                import notification_manager, ui_standards
+                                msg_t2 = (
+                                    f"💎 **[MULTI-TARGET TP2 HIT: +{r_gain:.2f}R]** 💰\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🏛️ **ឧបករណ៍ ៖** `{epic}` ({direction})\n"
+                                    f"📦 **Tranche 2 (30%) ៖** `បានបិទកើបចំណេញសាច់ប្រាក់រឹងមាំសម្រាប់ថ្ងៃ!`\n"
+                                    f"💰 **ប្រាក់ចំណេញកើបបាន ៖** `+${upl:,.2f} USD` (+{roi_pct:.1f}% ROI)\n"
+                                    f"🚀 **Moonshot Runner 20% ៖** `រំកិល Stop-Loss ចាក់សោរប្រាក់ចំណេញ +2.0R ក្នុងហោប៉ៅ!`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"👑 _Runner ២០% ចុងក្រោយកំពុងរត់ស្រូបយក Super Trend រហូតដល់ +10.0R!_"
+                                )
+                                notification_manager.send_telegram_notification(app, chat_id, msg_t2, category="[CAPITAL TP2]")
+                            except Exception:
+                                pass
+                        continue
+                elif tranche_id == "SINGLE":
+                    t2_floor = round(entry_level + (2.0 * trade_sl_dist), prec) if direction == "BUY" else round(entry_level - (2.0 * trade_sl_dist), prec)
+                    safe_t2 = min(t2_floor, round(current_price - (spread * 1.5), prec)) if direction == "BUY" else max(t2_floor, round(current_price + (spread * 1.5), prec))
+                    should_upd_t2 = (safe_t2 > sl) if direction == "BUY" else (sl <= 0 or safe_t2 < sl)
+                    if should_upd_t2:
+                        upd_t2 = engine.update_position_stops(deal_id=deal_id, stop_loss=safe_t2)
+                        if upd_t2.get("success"):
+                            db.update_capital_auto_trade_scale_tier(str(deal_id), 2, status="ACTIVE_TP2")
+                            ratcheted_count += 1
+                            is_runner = True
+                            logger.info(f"💎 [MULTI-TARGET TP2 HIT] Ratcheted SL for {epic} to +2.0R Profit Floor {safe_t2} (R: +{r_gain:.2f}R, Cash Locked)")
+                            if chat_id:
+                                try:
+                                    import notification_manager, ui_standards
+                                    msg_t2 = (
+                                        f"💎 **[MULTI-TARGET TP2 HIT: +{r_gain:.2f}R]** 💰\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🏛️ **ឧបករណ៍ ៖** `{epic}` ({direction})\n"
+                                        f"📈 **កំណើនបច្ចុប្បន្ន ៖** `+{r_gain:.2f}R` (+${upl:,.2f} USD, +{roi_pct:.1f}% ROI)\n"
+                                        f"💰 **ប្រាក់ចំណេញចាក់សោរក្នុងហោប៉ៅ ៖** `+2.00R ធានាឈ្នះរឹងមាំ ១០០%`\n"
+                                        f"🛡️ **Trailing Stop-Loss ៖** `{safe_t2}`\n"
+                                        f"{ui_standards.DIVIDER_HEAVY}\n"
+                                        f"🚀 _កំពុងបន្តរត់តាមគោលដៅធំបំផុត Moonshot Runner (+5.0R ដល់ +10.0R)!_"
+                                    )
+                                    notification_manager.send_telegram_notification(app, chat_id, msg_t2, category="[CAPITAL TP2]")
+                                except Exception:
+                                    pass
+
+            # =========================================================================
             # TIER 4: SUPER SMART ASYMMETRIC CASH TARGET HARVEST (Bank 100% Win at Real Target)
             # 1. Sky Net 360° Daily Target Lock (+5.0% Daily Goal Achieved): Instant Exit to bank gains
             # 2. Broker Take-Profit Hit / Near-Target Exhaustion: Reached within 0.75x spread of TP
@@ -3606,9 +3821,15 @@ class CapitalAutonomousEngine:
             tp_target_reached = False
             if tp_level > 0 and upl >= 2.50:
                 if direction == "BUY" and tp_level > entry_level and current_price >= (tp_level - (spread * 0.75)):
-                    tp_target_reached = True
+                    if tranche_id == "SINGLE" and scale_tier < 2 and r_gain < 4.0:
+                        pass
+                    else:
+                        tp_target_reached = True
                 elif direction == "SELL" and tp_level < entry_level and current_price <= (tp_level + (spread * 0.75)):
-                    tp_target_reached = True
+                    if tranche_id == "SINGLE" and scale_tier < 2 and r_gain < 4.0:
+                        pass
+                    else:
+                        tp_target_reached = True
 
             # Full Asymmetric Moonshot target (Requires minimum institutional dollar floor >= $4.50 / $10.00)
             asymmetric_target_reached = ((roi_pct >= 60.0 and upl >= 12.0) or upl >= 25.0) if is_runner else ((roi_pct >= 25.0 and upl >= 4.50) or upl >= 10.0)
@@ -4369,18 +4590,46 @@ class CapitalAutonomousEngine:
                 tp = trade_res.get("tp", 0.0)
                 executed_size = trade_res.get("size", size or 0.01)
 
-                # Record in database
-                db.record_capital_auto_trade(
-                    chat_id=chat_id,
-                    deal_id=str(deal_id),
-                    deal_reference=str(deal_ref),
-                    epic=resolved_epic,
-                    direction=final_action,
-                    size=executed_size,
-                    entry_price=entry_px,
-                    sl=sl,
-                    tp=tp
-                )
+                # Record in database (Multi-Tranche Scale-Out or Single Dynamic Trade)
+                if trade_res.get("tranches"):
+                    for tr in trade_res["tranches"]:
+                        tr_ref = tr.get("deal_reference", "AUTO")
+                        tr_id = tr.get("response", {}).get("dealId", tr_ref)
+                        db.record_capital_auto_trade(
+                            chat_id=chat_id,
+                            deal_id=str(tr_id),
+                            deal_reference=str(tr_ref),
+                            epic=resolved_epic,
+                            direction=final_action,
+                            size=tr.get("size", executed_size),
+                            entry_price=entry_px,
+                            sl=tr.get("sl", sl),
+                            tp=tr.get("tp", tp),
+                            scale_tier=0,
+                            sl_dist=tr.get("sl_dist", 0.0),
+                            tranche_id=tr.get("tranche_id", "SINGLE"),
+                            tp1=trade_res.get("tp1", 0.0),
+                            tp2=trade_res.get("tp2", 0.0),
+                            tp3=trade_res.get("tp3", 0.0)
+                        )
+                else:
+                    db.record_capital_auto_trade(
+                        chat_id=chat_id,
+                        deal_id=str(deal_id),
+                        deal_reference=str(deal_ref),
+                        epic=resolved_epic,
+                        direction=final_action,
+                        size=executed_size,
+                        entry_price=entry_px,
+                        sl=sl,
+                        tp=tp,
+                        scale_tier=0,
+                        sl_dist=trade_res.get("sl_dist", 0.0),
+                        tranche_id=trade_res.get("tranche_id", "SINGLE"),
+                        tp1=trade_res.get("tp1", 0.0),
+                        tp2=trade_res.get("tp2", 0.0),
+                        tp3=trade_res.get("tp3", 0.0)
+                    )
                 db.update_capital_auto_last_trade_time(chat_id, now)
 
                 # Broadcast Master Trade to VIP Followers if Super Admin executed

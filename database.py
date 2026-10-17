@@ -1076,6 +1076,11 @@ def init_db():
             FOREIGN KEY (chat_id) REFERENCES users (chat_id)
         )
     ''')
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+        try:
+            cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
 
     # Prop Firm Challenge Engine Config & Risk Tracker
     cursor.execute('''
@@ -2802,9 +2807,15 @@ def record_capital_auto_trade(
     entry_price: float = 0.0,
     sl: float = 0.0,
     tp: float = 0.0,
+    scale_tier: int = 0,
+    sl_dist: float = 0.0,
+    tranche_id: str = "SINGLE",
+    tp1: float = 0.0,
+    tp2: float = 0.0,
+    tp3: float = 0.0,
     **kwargs
 ) -> int:
-    """Records an executed TradFi / Forex trade into capital_auto_trades with full alias support."""
+    """Records an executed TradFi / Forex trade into capital_auto_trades with full alias and scale-out support."""
     # Resolve any alias kwargs
     if not sl and "sl_price" in kwargs:
         try: sl = float(kwargs["sl_price"])
@@ -2812,6 +2823,23 @@ def record_capital_auto_trade(
     if not tp and "tp_price" in kwargs:
         try: tp = float(kwargs["tp_price"])
         except Exception: pass
+    if not tp1 and "tp1_price" in kwargs:
+        try: tp1 = float(kwargs["tp1_price"])
+        except Exception: pass
+    if not tp2 and "tp2_price" in kwargs:
+        try: tp2 = float(kwargs["tp2_price"])
+        except Exception: pass
+    if not tp3 and "tp3_price" in kwargs:
+        try: tp3 = float(kwargs["tp3_price"])
+        except Exception: pass
+    if not sl_dist and "calc_sl_dist" in kwargs:
+        try: sl_dist = float(kwargs["calc_sl_dist"])
+        except Exception: pass
+    if not scale_tier and "tier" in kwargs:
+        try: scale_tier = int(kwargs["tier"])
+        except Exception: pass
+    if tranche_id == "SINGLE" and "tranche" in kwargs:
+        tranche_id = str(kwargs["tranche"])
     if not deal_reference and "deal_ref" in kwargs:
         deal_reference = str(kwargs["deal_ref"])
     if not deal_id:
@@ -2821,15 +2849,95 @@ def record_capital_auto_trade(
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+        try:
+            cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+
     cursor.execute("""
         INSERT INTO capital_auto_trades
-        (chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
-    """, (chat_id, str(deal_id), str(deal_reference), str(epic), str(direction), float(size), float(entry_price), float(sl), float(tp)))
+        (chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?)
+    """, (chat_id, str(deal_id), str(deal_reference), str(epic), str(direction), float(size), float(entry_price), float(sl), float(tp), float(tp1), float(tp2), float(tp3), float(sl_dist), int(scale_tier), str(tranche_id)))
     trade_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return trade_id
+
+def update_capital_auto_trade_scale_tier(deal_id: str, scale_tier: int, status: Optional[str] = None):
+    """Updates scale_tier and status for a TradFi position in capital_auto_trades."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+        try:
+            cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+
+    if status:
+        cursor.execute("""
+            UPDATE capital_auto_trades
+            SET scale_tier = ?, status = ?
+            WHERE (deal_id = ? OR deal_reference = ?) AND status != 'CLOSED'
+        """, (int(scale_tier), str(status), str(deal_id), str(deal_id)))
+    else:
+        cursor.execute("""
+            UPDATE capital_auto_trades
+            SET scale_tier = ?
+            WHERE (deal_id = ? OR deal_reference = ?) AND status != 'CLOSED'
+        """, (int(scale_tier), str(deal_id), str(deal_id)))
+    conn.commit()
+    conn.close()
+
+def get_active_capital_auto_trades(deal_id: Optional[str] = None) -> list:
+    """Returns active positions from capital_auto_trades with scale_tier and targets."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    for col, col_type in [("tp1", "REAL DEFAULT 0.0"), ("tp2", "REAL DEFAULT 0.0"), ("tp3", "REAL DEFAULT 0.0"), ("sl_dist", "REAL DEFAULT 0.0"), ("scale_tier", "INTEGER DEFAULT 0"), ("tranche_id", "TEXT DEFAULT 'SINGLE'")]:
+        try:
+            cursor.execute(f"ALTER TABLE capital_auto_trades ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+
+    if deal_id:
+        cursor.execute("""
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id
+            FROM capital_auto_trades
+            WHERE (deal_id = ? OR deal_reference = ?) AND (status = 'OPEN' OR status LIKE 'ACTIVE%')
+            ORDER BY id DESC
+        """, (str(deal_id), str(deal_id)))
+    else:
+        cursor.execute("""
+            SELECT id, chat_id, deal_id, deal_reference, epic, direction, size, entry_price, sl, tp, status, tp1, tp2, tp3, sl_dist, scale_tier, tranche_id
+            FROM capital_auto_trades
+            WHERE status = 'OPEN' OR status LIKE 'ACTIVE%'
+            ORDER BY id DESC
+        """)
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": r[0],
+            "chat_id": r[1],
+            "deal_id": r[2],
+            "deal_reference": r[3],
+            "epic": r[4],
+            "direction": r[5],
+            "size": r[6],
+            "entry_price": r[7],
+            "sl": r[8],
+            "tp": r[9],
+            "status": r[10],
+            "tp1": r[11],
+            "tp2": r[12],
+            "tp3": r[13],
+            "sl_dist": r[14],
+            "scale_tier": r[15],
+            "tranche_id": r[16]
+        }
+        for r in rows
+    ]
 
 def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float):
     """Marks a TradFi trade as closed with final exit price and PnL."""
@@ -2839,7 +2947,7 @@ def update_capital_auto_trade_close(deal_id: str, exit_price: float, pnl: float)
     cursor.execute("""
         UPDATE capital_auto_trades
         SET exit_price = ?, pnl = ?, status = 'CLOSED', closed_at = ?
-        WHERE (deal_id = ? OR deal_reference = ?) AND status = 'OPEN'
+        WHERE (deal_id = ? OR deal_reference = ?) AND status != 'CLOSED'
     """, (exit_price, pnl, now_str, str(deal_id), str(deal_id)))
     conn.commit()
     conn.close()

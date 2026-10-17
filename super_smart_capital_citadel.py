@@ -2596,6 +2596,200 @@ class CapitalInMemoryVirtualRadar:
         return dict(cls._STATS)
 
 
+class TradFiMultiTargetScaleOutManager:
+    """
+    KHMER MASTER CRYPTO / ANGKOR QUANT - INSTITUTIONAL 3-STAGE MULTI-TARGET SCALE-OUT MANAGER
+    ========================================================================================
+    Pillar 4: យន្តការប្រមូលចំណេញជា ៣ ដំណាក់កាល (Multi-Target Scale-Out: TP1, TP2 & Runner)
+    
+    Axioms:
+      1. TP1 (កាត់យកចំណេញ 50% នៅ +2.0R ទៅ +2.5R):
+         - Instantly shifts Stop-Loss to Breakeven Armor (Entry ± 0.5x Spread Profit Floor).
+         - Result: Risk becomes strictly 0.00R (Free Roll), trade is 100% loss-immune!
+      2. TP2 (កាត់យកចំណេញ 30% នៅ +4.0R):
+         - Ratchets guaranteed profit floor to +2.0R to bank solid cash profit into pocket.
+      3. Moonshot Runner (ទុក 20% ចុងក្រោយ):
+         - Leaves the remaining 20% lot / runner to trail behind 15m ATR / 3-EMA (20/50/200) confluence,
+           absorbing mega super-trend repricing all the way up to +5R ... +10R without capital risk.
+    """
+
+    @classmethod
+    def calculate_scale_out_plan(
+        cls,
+        epic: str,
+        direction: str,
+        entry_price: float,
+        sl_price: float,
+        total_size: float,
+        spread: float = 0.0,
+        min_deal_size: float = 0.01,
+        tp1_r: float = 2.20,
+        tp2_r: float = 4.00,
+        runner_r: float = 10.00
+    ) -> Dict[str, Any]:
+        """
+        Calculates 3-stage scale-out target prices and tranche lot sizes.
+        """
+        prec = _get_tradfi_precision(epic, entry_price)
+        dir_u = direction.upper()
+        raw_sl_dist = abs(entry_price - sl_price) if sl_price > 0 else 0.0
+        min_sl_dist = max(spread * 3.5, entry_price * 0.0035, 0.01)
+        sl_dist = max(raw_sl_dist, min_sl_dist)
+
+        if dir_u == "BUY":
+            tp1 = round(entry_price + (tp1_r * sl_dist), prec)
+            tp2 = round(entry_price + (tp2_r * sl_dist), prec)
+            tp3 = round(entry_price + (runner_r * sl_dist), prec)
+            be_sl = round(entry_price + max(spread * 0.5, entry_price * 0.001), prec)
+            tp2_floor_sl = round(entry_price + (2.0 * sl_dist), prec)
+        else:
+            tp1 = round(entry_price - (tp1_r * sl_dist), prec)
+            tp2 = round(entry_price - (tp2_r * sl_dist), prec)
+            tp3 = round(entry_price - (runner_r * sl_dist), prec)
+            be_sl = round(entry_price - max(spread * 0.5, entry_price * 0.001), prec)
+            tp2_floor_sl = round(entry_price - (2.0 * sl_dist), prec)
+
+        # Tranche lot calculation: splittable only if total_size >= 3 * min_deal_size
+        can_split = total_size >= (min_deal_size * 3.0)
+        s_min = str(min_deal_size)
+        lot_prec = len(s_min.split('.')[1]) if '.' in s_min else 2
+
+        if can_split:
+            t1_size = round(total_size * 0.50, lot_prec)
+            t2_size = round(total_size * 0.30, lot_prec)
+            t3_size = max(min_deal_size, round(total_size - t1_size - t2_size, lot_prec))
+            if t1_size < min_deal_size or t2_size < min_deal_size:
+                can_split = False
+                t1_size = total_size
+                t2_size = 0.0
+                t3_size = 0.0
+        else:
+            t1_size = total_size
+            t2_size = 0.0
+            t3_size = 0.0
+
+        return {
+            "can_split": can_split,
+            "sl_dist": sl_dist,
+            "tp1_r": tp1_r,
+            "tp2_r": tp2_r,
+            "runner_r": runner_r,
+            "tp1_price": tp1,
+            "tp2_price": tp2,
+            "tp3_price": tp3,
+            "be_sl": be_sl,
+            "tp2_floor_sl": tp2_floor_sl,
+            "tranches": [
+                {"id": "TP1_50", "name": "Stage 1 (50% TP1)", "size": t1_size, "target": tp1, "r": tp1_r},
+                {"id": "TP2_30", "name": "Stage 2 (30% TP2)", "size": t2_size, "target": tp2, "r": tp2_r},
+                {"id": "RUNNER_20", "name": "Stage 3 (20% Runner)", "size": t3_size, "target": tp3, "r": runner_r}
+            ] if can_split else [
+                {"id": "SINGLE", "name": "Single Position (Dynamic Multi-Stage)", "size": total_size, "target": tp3, "r": runner_r}
+            ]
+        }
+
+    @classmethod
+    def calculate_r_multiple(
+        cls,
+        entry_price: float,
+        current_price: float,
+        direction: str,
+        sl_dist: float
+    ) -> float:
+        """Calculates current R-multiple gain."""
+        if sl_dist <= 0:
+            return 0.0
+        dir_u = direction.upper()
+        if dir_u == "BUY":
+            return (current_price - entry_price) / sl_dist
+        else:
+            return (entry_price - current_price) / sl_dist
+
+    @classmethod
+    def evaluate_scale_out_lifecycle(
+        cls,
+        epic: str,
+        direction: str,
+        entry_price: float,
+        current_price: float,
+        sl_dist: float,
+        spread: float,
+        upl: float,
+        peak_upl: float,
+        scale_tier: int = 0,
+        tranche_id: str = "SINGLE"
+    ) -> Dict[str, Any]:
+        """
+        Evaluates real-time scale-out transition:
+        - Stage 1 (+2.0R to +2.5R): Move SL to Breakeven Armor, set scale_tier = 1.
+        - Stage 2 (+4.0R): Ratchet SL to +2.0R Profit Floor, set scale_tier = 2.
+        - Stage 3 (+4.0R ... +10.0R): Moonshot Runner, trailed by 15m ATR / 3-EMA / Ratchet.
+        """
+        prec = _get_tradfi_precision(epic, current_price)
+        dir_u = direction.upper()
+        r_gain = cls.calculate_r_multiple(entry_price, current_price, dir_u, sl_dist)
+
+        # Stage 1: +2.0R to +2.5R
+        if r_gain >= 2.00 and scale_tier < 1 and upl >= 2.00:
+            be_sl = round(entry_price + max(spread * 0.5, entry_price * 0.001), prec) if dir_u == "BUY" else round(entry_price - max(spread * 0.5, entry_price * 0.001), prec)
+            safe_sl = min(be_sl, round(current_price - (spread * 1.5), prec)) if dir_u == "BUY" else max(be_sl, round(current_price + (spread * 1.5), prec))
+            return {
+                "action": "STAGE_1_BREAKEVEN_ARMOR",
+                "stage": 1,
+                "r_gain": r_gain,
+                "new_sl": safe_sl,
+                "new_scale_tier": 1,
+                "should_close_tranche": (tranche_id == "TP1_50"),
+                "reason": f"TP1 reached (+{r_gain:.2f}R). SL shifted to Breakeven Armor (Risk: 0.00R Free Roll)."
+            }
+
+        # Stage 2: +4.0R
+        if r_gain >= 4.00 and scale_tier < 2 and upl >= 3.50:
+            floor_sl = round(entry_price + (2.0 * sl_dist), prec) if dir_u == "BUY" else round(entry_price - (2.0 * sl_dist), prec)
+            safe_sl = min(floor_sl, round(current_price - (spread * 1.5), prec)) if dir_u == "BUY" else max(floor_sl, round(current_price + (spread * 1.5), prec))
+            return {
+                "action": "STAGE_2_PROFIT_LOCK",
+                "stage": 2,
+                "r_gain": r_gain,
+                "new_sl": safe_sl,
+                "new_scale_tier": 2,
+                "should_close_tranche": (tranche_id == "TP2_30"),
+                "reason": f"TP2 reached (+{r_gain:.2f}R). Ratcheted +2.0R guaranteed cash profit floor."
+            }
+
+        # Stage 3: Runner active
+        if scale_tier >= 2:
+            if r_gain >= 10.00 or upl >= 50.00:
+                return {
+                    "action": "STAGE_3_MOONSHOT_HARVEST",
+                    "stage": 3,
+                    "r_gain": r_gain,
+                    "new_sl": None,
+                    "new_scale_tier": 3,
+                    "should_close_tranche": True,
+                    "reason": f"Moonshot +10.0R reached (+{r_gain:.2f}R, ${upl:+.2f}). Banking maximum runner profit."
+                }
+            return {
+                "action": "STAGE_3_RUNNER_TRAIL",
+                "stage": 3,
+                "r_gain": r_gain,
+                "new_sl": None,
+                "new_scale_tier": scale_tier,
+                "should_close_tranche": False,
+                "reason": f"Moonshot Runner riding trend (+{r_gain:.2f}R). Protected by Trailing Stop & Golden Ratchet."
+            }
+
+        return {
+            "action": "HOLD",
+            "stage": scale_tier,
+            "r_gain": r_gain,
+            "new_sl": None,
+            "new_scale_tier": scale_tier,
+            "should_close_tranche": False,
+            "reason": f"Holding position (Current: +{r_gain:.2f}R, Target TP1: +2.0R)."
+        }
+
+
 def get_super_smart_capital_citadel() -> type:
     """Returns the canonical SuperSmartCapitalCitadel class."""
     return SuperSmartCapitalCitadel
@@ -2604,4 +2798,10 @@ def get_super_smart_capital_citadel() -> type:
 def get_capital_in_memory_virtual_radar() -> type:
     """Returns the canonical CapitalInMemoryVirtualRadar class."""
     return CapitalInMemoryVirtualRadar
+
+
+def get_tradfi_scale_out_manager() -> type:
+    """Returns the canonical TradFiMultiTargetScaleOutManager class."""
+    return TradFiMultiTargetScaleOutManager
+
 
