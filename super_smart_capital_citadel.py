@@ -561,6 +561,170 @@ class TradFiFibonacciRetracementEngine:
             "summary": summary_str
         }
 
+class TradFiSessionKillZoneRouter:
+    """
+    🏛️ Institutional Interbank Session Kill Zone & Dynamic Asset Router (Pillar 0.8 & Invariant 77 / AQ76).
+    Enforces the Time-and-Asset Confluence Discipline:
+      1. Asian Session (07:00 - 13:30 ICT / 00:00 - 06:30 UTC):
+         - US Tech Equities (NVDA, TSLA, META, GOOGL, AAPL, MSFT, AMZN) and Indices (US100, US500) are closed / pre-market only.
+         - Scanning and entry are strictly VETOED on US Equities/Indices to avoid illiquid sideways chop traps.
+         - Prime focus strictly on GOLD (XAUUSD), SILVER, OIL_CRUDE, and 24/7 Crypto CFDs (BTCUSD, ETHUSD, SOLUSD).
+      2. London Open Kill Zone (14:00 - 18:30 ICT / 07:00 - 11:30 UTC, up to 20:30 ICT / 13:30 UTC):
+         - Prime focus on GOLD (XAUUSD) and DE40 / GERMANY40 (DAX), plus Commodities & Crypto.
+         - US Cash Equities remain locked until Wall Street Cash Open at 20:30 ICT (13:30 UTC).
+      3. New York Open Kill Zone (20:30 - 01:30 ICT / 13:30 - 18:30 UTC, up to 03:30 ICT / 20:30 UTC):
+         - Prime institutional focus on US100, US500, NVDA, TSLA, META, GOOGL, AAPL, MSFT, AMZN, GOLD, OIL_CRUDE.
+      4. Overnight Rollover Swap Shield & Flat Cash (03:30 - 07:00 ICT / 20:30 - 23:59 UTC):
+         - Intraday TradFi positions are harvested / flattened to Flat Cash.
+         - All new TradFi entries blocked to eliminate overnight financing fees and 3x-10x spread blowout.
+         - 100% Ring-fenced for continuous 24/7 Crypto CFDs (BTCUSD, ETHUSD, SOLUSD).
+    """
+
+    US_EQUITIES = {"NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN"}
+    US_INDICES = {"US100", "US500", "WALLSTREET", "US30", "DJ30"}
+    EUROPEAN_INDICES = {"DE40", "GERMANY40", "UK100", "FR40"}
+    COMMODITIES = {"GOLD", "XAUUSD", "SILVER", "XAGUSD", "OIL", "OIL_CRUDE", "BRENT"}
+    CRYPTO_CFDS = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD", "BTC", "ETH", "SOL"}
+
+    @classmethod
+    def get_current_session_info(cls) -> Dict[str, Any]:
+        """Returns the active interbank market session, time windows, and target assets."""
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        utc_min = now_utc.hour * 60 + now_utc.minute
+        weekday = now_utc.weekday()
+
+        is_weekend = (weekday == 5) or (weekday == 4 and utc_min >= 1245) or (weekday == 6 and utc_min < 1320)
+        if is_weekend:
+            return {
+                "session": "WEEKEND_CRYPTO_ONLY",
+                "session_name": "Weekend 24/7 Crypto Mode",
+                "ict_hours": "Weekend",
+                "utc_hours": "Fri 20:45 - Sun 22:00 UTC",
+                "primary_focus": ["BTCUSD", "ETHUSD", "SOLUSD"],
+                "is_tradfi_open": False,
+                "flat_cash_active": False
+            }
+
+        if 1230 <= utc_min <= 1439:
+            return {
+                "session": "OVERNIGHT_FLAT_CASH",
+                "session_name": "Overnight Rollover Swap Shield & Flat Cash",
+                "ict_hours": "03:30 - 07:00 ICT",
+                "utc_hours": "20:30 - 23:59 UTC",
+                "primary_focus": ["BTCUSD", "ETHUSD", "SOLUSD"],
+                "is_tradfi_open": False,
+                "flat_cash_active": True
+            }
+
+        if 0 <= utc_min < 420:
+            return {
+                "session": "ASIAN_SESSION",
+                "session_name": "Tokyo / Asian Session",
+                "ict_hours": "07:00 - 14:00 ICT (Prime: 07:00 - 13:30 ICT)",
+                "utc_hours": "00:00 - 07:00 UTC",
+                "primary_focus": ["GOLD", "SILVER", "OIL_CRUDE", "BTCUSD", "ETHUSD", "SOLUSD"],
+                "is_tradfi_open": True,
+                "flat_cash_active": False
+            }
+
+        if 420 <= utc_min < 810:
+            return {
+                "session": "LONDON_KILL_ZONE",
+                "session_name": "London Open Kill Zone",
+                "ict_hours": "14:00 - 20:30 ICT (Prime: 14:00 - 18:30 ICT)",
+                "utc_hours": "07:00 - 13:30 UTC",
+                "primary_focus": ["GOLD", "DE40", "GERMANY40", "SILVER", "OIL_CRUDE", "BTCUSD", "ETHUSD"],
+                "is_tradfi_open": True,
+                "flat_cash_active": False
+            }
+
+        return {
+            "session": "NEW_YORK_KILL_ZONE",
+            "session_name": "New York Open Kill Zone",
+            "ict_hours": "20:30 - 03:30 ICT (Prime: 20:30 - 01:30 ICT)",
+            "utc_hours": "13:30 - 20:30 UTC",
+            "primary_focus": ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "BTCUSD"],
+            "is_tradfi_open": True,
+            "flat_cash_active": False
+        }
+
+    @classmethod
+    def validate_session_asset_routing(cls, epic: str) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Validates whether the requested asset conforms to the Active Session Kill Zone.
+        Returns:
+            - is_allowed (bool)
+            - reason (str)
+            - session_info (dict)
+        """
+        import capital_engine
+        raw_epic = str(epic or "").upper().strip()
+        resolved_epic = capital_engine.EPIC_MAP.get(raw_epic, raw_epic)
+
+        # 24/7 Crypto CFDs are always allowed continuous execution
+        is_crypto = any(c in resolved_epic for c in ["BTC", "ETH", "SOL", "XRP", "DOGE"])
+        session_info = cls.get_current_session_info()
+        sess_code = session_info["session"]
+
+        if is_crypto:
+            return True, "CRYPTO_24_7_CONTINUOUS_CLEARANCE", session_info
+
+        # Weekend check for TradFi
+        if sess_code == "WEEKEND_CRYPTO_ONLY":
+            reason = (
+                f"SESSION_KILL_ZONE_WEEKEND_TRADFI_CLOSED: TradFi markets are closed on weekends. "
+                f"Only continuous 24/7 Crypto CFDs (BTCUSD, ETHUSD, SOLUSD) are permitted."
+            )
+            return False, reason, session_info
+
+        # Overnight Rollover Swap Shield & Flat Cash (03:30 - 07:00 ICT = 20:30 - 23:59 UTC)
+        if sess_code == "OVERNIGHT_FLAT_CASH":
+            reason = (
+                f"ROLLOVER_SWAP_DEAD_ZONE: TradFi entry blocked between 20:30-23:59 UTC "
+                f"(03:30-07:00 ICT) to eliminate overnight financing drag and spread explosion. "
+                f"Flat Cash Shield is active."
+            )
+            return False, reason, session_info
+
+        is_us_stock = any(s == resolved_epic or s in resolved_epic for s in cls.US_EQUITIES)
+        is_us_index = any(idx == resolved_epic or idx in resolved_epic for idx in cls.US_INDICES)
+        is_eu_index = any(de == resolved_epic or de in resolved_epic for de in cls.EUROPEAN_INDICES)
+
+        # Asian Session (07:00 - 13:30 / 14:00 ICT = 00:00 - 07:00 UTC)
+        if sess_code == "ASIAN_SESSION":
+            if is_us_stock or is_us_index:
+                reason = (
+                    f"SESSION_KILL_ZONE_ASIAN_US_EQUITIES_CLOSED: US Tech Equities (NVDA, TSLA, META, GOOGL) and "
+                    f"Indices (US100, US500) are closed during Asian Session (07:00-13:30 ICT / 00:00-06:30 UTC). "
+                    f"Trading unliquid pre-market leads to low-volume sideways chop. "
+                    f"Session routing strictly prioritizes GOLD (XAUUSD), Commodities, and Crypto."
+                )
+                return False, reason, session_info
+            if is_eu_index:
+                reason = (
+                    f"SESSION_KILL_ZONE_ASIAN_DE40_CLOSED: European indices (DE40/DAX) are closed during Asian Session. "
+                    f"European open begins at 14:00 ICT (07:00 UTC)."
+                )
+                return False, reason, session_info
+            return True, "ASIAN_SESSION_COMMODITY_CLEARANCE", session_info
+
+        # London Open Kill Zone (14:00 - 18:30 / 20:30 ICT = 07:00 - 13:30 UTC)
+        if sess_code == "LONDON_KILL_ZONE":
+            if is_us_stock:
+                reason = (
+                    f"SESSION_KILL_ZONE_LONDON_US_EQUITIES_WAITING_OPEN: Wall Street Cash Market opens at 20:30 ICT (13:30 UTC). "
+                    f"London Open Kill Zone (14:00-18:30 ICT) strictly focuses on GOLD (XAUUSD) and DE40 (DAX). "
+                    f"US Cash Equities ({resolved_epic}) are locked until New York Open."
+                )
+                return False, reason, session_info
+            return True, "LONDON_KILL_ZONE_CLEARANCE", session_info
+
+        # New York Open Kill Zone (20:30 - 01:30 / 03:30 ICT = 13:30 - 20:30 UTC)
+        if sess_code == "NEW_YORK_KILL_ZONE":
+            return True, "NEW_YORK_KILL_ZONE_CLEARANCE", session_info
+
+        return True, "DEFAULT_SESSION_CLEARANCE", session_info
+
 
 class TradFiH4MarketStructureAnchor:
     """
@@ -822,38 +986,28 @@ class SuperSmartCapitalCitadel:
         if curr_price <= 0:
             curr_price = mid_price if mid_price > 0 else 1.0
 
-        # Step 1: Interbank Session & Rollover Swap Shield (Pillar 7)
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        utc_hour = now_utc.hour
-        utc_minute = now_utc.minute
-        utc_minutes = utc_hour * 60 + utc_minute
-        w_utc = now_utc.weekday()
-
-        is_crypto = any(c in resolved_epic.upper() for c in ["BTC", "ETH", "SOL", "XRP"])
-
-        # TradFi Rollover Dead Zone: 20:45 - 23:59 UTC (03:45 - 07:00 ICT)
-        # Broker spreads blow out 3x-10x, liquidity drops, and financing fees are charged
-        is_rollover_dead_zone = (1245 <= utc_minutes <= 1439)
-        if not is_crypto and is_rollover_dead_zone:
-            reason = (
-                f"ROLLOVER_SWAP_DEAD_ZONE: TradFi entry blocked between 20:45-23:59 UTC "
-                f"(03:45-07:00 ICT) to eliminate overnight financing drag and spread explosion."
-            )
-            prec = _get_tradfi_precision(resolved_epic, curr_price)
-            bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
-            sp_val = spread if spread > 0 else bench_sp
-            sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5) if norm_side == "BUY" else curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
-            res = {
-                "epic": resolved_epic,
-                "proposed_side": norm_side,
-                "is_approved": False,
-                "rejection_reason": reason,
-                "confluence_score": 0.0,
-                "spread": sp_val,
-                "invalidation_sl": sl_default
-            }
-            cls._CITADEL_CACHE[cache_key] = (now, res)
-            return res
+        # Step 1: Interbank Session Kill Zone & Dynamic Asset Routing (Pillar 0.8 & Invariant 77)
+        try:
+            is_sess_ok, sess_reason, sess_info = TradFiSessionKillZoneRouter.validate_session_asset_routing(resolved_epic)
+            if not is_sess_ok:
+                prec = _get_tradfi_precision(resolved_epic, curr_price)
+                bench_sp = 0.35 if "GOLD" in resolved_epic else 0.50
+                sp_val = spread if spread > 0 else bench_sp
+                sl_default = round(curr_price - max(0.0040 * curr_price, sp_val * 3.5) if norm_side == "BUY" else curr_price + max(0.0040 * curr_price, sp_val * 3.5), prec)
+                res = {
+                    "epic": resolved_epic,
+                    "proposed_side": norm_side,
+                    "is_approved": False,
+                    "rejection_reason": sess_reason,
+                    "confluence_score": 0.0,
+                    "spread": sp_val,
+                    "invalidation_sl": sl_default,
+                    "session_info": sess_info
+                }
+                cls._CITADEL_CACHE[cache_key] = (now, res)
+                return res
+        except Exception as e_sess_trap:
+            logger.debug(f"Session routing trap check note: {e_sess_trap}")
 
         # Step 1.1: Economic Calendar Red Folder Blackout Guard (30m Pre-Event Freeze & 15m Post-Event Cooling)
         try:
@@ -2093,6 +2247,15 @@ class SuperSmartCapitalCitadel:
                 return False, reason, {"is_approved": False, "rejection_reason": reason, "h4_trend_anchor": h4_anchor_gate}
         except Exception as e_h4_gate:
             logger.debug(f"H4 gatekeeper evaluation note: {e_h4_gate}")
+
+        # Pillar 0.8: Interbank Session Kill Zone & Dynamic Asset Routing Gatekeeper
+        try:
+            is_sess_ok, sess_reason, sess_info = TradFiSessionKillZoneRouter.validate_session_asset_routing(s_epic)
+            if not is_sess_ok:
+                print(f"🛑 [SUPER SMART CAPITAL CITADEL] {sess_reason}")
+                return False, sess_reason, {"is_approved": False, "rejection_reason": sess_reason, "session_info": sess_info}
+        except Exception as e_sess_gate:
+            logger.debug(f"Session kill zone gatekeeper evaluation note: {e_sess_gate}")
 
         diag = cls.evaluate_institutional_tradfi_trap(epic, direction, engine=engine)
         if not diag.get("is_approved"):

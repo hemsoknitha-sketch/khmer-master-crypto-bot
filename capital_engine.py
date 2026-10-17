@@ -3122,10 +3122,16 @@ class CapitalAutonomousEngine:
         """
         Determines active tradable instruments based on global market hours (UTC+7 Phnom Penh):
         - Monday to Friday: Full Priority on Real TradFi Markets + Institutional Kill Zones:
-            * Asian / Tokyo Kill Zone (00:00 - 07:00 UTC = 07:00 - 14:00 ICT): USDJPY, AUDUSD, NZDUSD, US500, GOLD, SILVER, GERMANY40, BTCUSD
-            * London Kill Zone (07:00 - 13:30 UTC = 14:00 - 20:30 ICT): EURUSD, GBPUSD, GERMANY40, US500, GOLD, US100, OIL_CRUDE, SILVER, NVDA
-            * Wall Street NY Session (13:30 - 20:45 UTC = 20:30 - 03:45 ICT): US500, GOLD, NVDA, TSLA, US100, GOOGL, META, OIL_CRUDE, GERMANY40, BTCUSD
-            * Overnight Swap Shield Lull (20:45 - 23:59 UTC = 03:45 - 07:00 ICT): BTCUSD, ETHUSD, SOLUSD (TradFi paused to eliminate rollover swap drag)
+            * Asian / Tokyo Kill Zone (00:00 - 07:00 UTC = 07:00 - 14:00 ICT, Prime: 07:00 - 13:30 ICT):
+              Focus on GOLD, SILVER, OIL_CRUDE, BTCUSD, ETHUSD, SOLUSD.
+              (US Equities & US Indices closed to eliminate illiquid sideways chop).
+            * London Open Kill Zone (07:00 - 13:30 UTC = 14:00 - 20:30 ICT, Prime: 14:00 - 18:30 ICT):
+              Focus on GOLD (XAUUSD), GERMANY40 (DE40/DAX), OIL_CRUDE, SILVER, BTCUSD, ETHUSD, SOLUSD.
+              (US Cash Equities locked until Wall Street open).
+            * Wall Street NY Open Kill Zone (13:30 - 20:30 UTC = 20:30 - 03:30 ICT, Prime: 20:30 - 01:30 ICT):
+              Focus on US100, US500, NVDA, TSLA, META, GOOGL, AAPL, MSFT, AMZN, GOLD, OIL_CRUDE, BTCUSD.
+            * Overnight Swap Shield & Flat Cash (20:30 - 23:59 UTC = 03:30 - 07:00 ICT):
+              BTCUSD, ETHUSD, SOLUSD (TradFi paused and flattened to eliminate rollover swap drag & spread blowout).
         - Saturday & Sunday (24/7): 100% Dedicated to 24/7 Crypto CFDs:
             * BTCUSD, ETHUSD, SOLUSD (Zero-Swap & Weekend Gap Shield active on TradFi)
         """
@@ -3146,22 +3152,22 @@ class CapitalAutonomousEngine:
         import database as db
         forex_allowed = db.is_capital_forex_enabled()
 
-        # Wall Street NY Session (13:30 - 20:45 UTC = 20:30 - 03:45 Phnom Penh) - Prime US Mega-Cap Equities & Indices
-        if 810 <= utc_min < 1245:
-            raw_assets = ["NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "US500", "US100", "GOLD", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
-        # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh)
+        # Wall Street NY Session (13:30 - 20:30 UTC = 20:30 - 03:30 Phnom Penh) - Prime US Mega-Cap Equities & Indices
+        if 810 <= utc_min < 1230:
+            raw_assets = ["US100", "US500", "NVDA", "TSLA", "META", "GOOGL", "AAPL", "MSFT", "AMZN", "GOLD", "OIL_CRUDE", "GERMANY40", "BTCUSD"]
+        # London Session (07:00 - 13:30 UTC = 14:00 - 20:30 Phnom Penh) - Prime Focus on GOLD & DE40 (DAX)
         elif 420 <= utc_min < 810:
             if forex_allowed:
-                raw_assets = ["EURUSD", "GBPUSD", "GERMANY40", "US500", "GOLD", "US100", "OIL_CRUDE", "SILVER", "NVDA", "BTCUSD"]
+                raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER", "EURUSD", "GBPUSD", "BTCUSD", "ETHUSD"]
             else:
-                raw_assets = ["US500", "US100", "GERMANY40", "GOLD", "NVDA", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD"]
-        # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh)
+                raw_assets = ["GOLD", "GERMANY40", "OIL_CRUDE", "SILVER", "BTCUSD", "ETHUSD", "SOLUSD"]
+        # Tokyo / Asian Session (00:00 - 07:00 UTC = 07:00 - 14:00 Phnom Penh) - Prime Focus on GOLD & Commodities
         elif 0 <= utc_min < 420:
             if forex_allowed:
-                raw_assets = ["USDJPY", "AUDUSD", "NZDUSD", "US500", "GOLD", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "EURUSD"]
+                raw_assets = ["GOLD", "SILVER", "OIL_CRUDE", "USDJPY", "AUDUSD", "BTCUSD", "ETHUSD", "SOLUSD"]
             else:
-                raw_assets = ["US500", "GOLD", "US100", "SILVER", "GERMANY40", "BTCUSD", "ETHUSD", "SOLUSD"]
-        # Late Night Rollover Lull (20:45 - 23:59 UTC = 03:45 - 07:00 Phnom Penh): Zero-Swap Shield -> Crypto CFDs
+                raw_assets = ["GOLD", "SILVER", "OIL_CRUDE", "BTCUSD", "ETHUSD", "SOLUSD"]
+        # Late Night Rollover Lull & Flat Cash (20:30 - 23:59 UTC = 03:30 - 07:00 Phnom Penh): Zero-Swap Shield -> Crypto CFDs
         else:
             raw_assets = ["BTCUSD", "ETHUSD", "SOLUSD"]
 
@@ -3501,6 +3507,73 @@ class CapitalAutonomousEngine:
 
             is_runner = (deal_id == runner_deal_id)
             ratchet_pct = 0.85 if is_runner else 0.80
+
+            # =========================================================================
+            # OVERNIGHT SWAP SHIELD & FLAT CASH HARVEST PROTOCOL (03:30 - 07:00 ICT = 20:30 - 23:59 UTC)
+            # Pillars 5, 0.8 & Invariant 53/77: Protects capital against overnight rollover financing drag
+            # and broker 3x-10x spread blowout by flattening open intraday TradFi positions.
+            # =========================================================================
+            now_utc_exit = datetime.datetime.now(datetime.timezone.utc)
+            utc_min_exit = now_utc_exit.hour * 60 + now_utc_exit.minute
+            is_overnight_flat_cash_window = (1230 <= utc_min_exit <= 1439)
+
+            if is_overnight_flat_cash_window and not is_crypto:
+                flat_cash_eligible = (upl >= max(0.50, spread * 1.5)) or (upl >= 0.0)
+                if flat_cash_eligible:
+                    tag_fc = "🌙 [OVERNIGHT SWAP SHIELD & FLAT CASH HARVEST]"
+                    logger.info(
+                        f"{tag_fc} Exiting TradFi position {epic} (UPL: ${upl:+.2f}, ROI: +{roi_pct:.1f}%) "
+                        f"at {current_price:,.2f} before overnight rollover swap charges and spread explosion..."
+                    )
+                    close_res = engine.close_position(deal_id=deal_id)
+                    if close_res.get("success"):
+                        closed_count += 1
+                        self._peak_upl_cache.pop(deal_id, None)
+                        self._be_locked_set.discard(deal_id)
+                        try:
+                            import database as db
+                            db.update_capital_auto_trade_close(deal_id=str(deal_id), exit_price=current_price, pnl=upl)
+                            conn = db.get_db_connection()
+                            cur = conn.cursor()
+                            cur.execute("DELETE FROM system_settings WHERE key = ?", (f"cap_peak_{deal_id}",))
+                            conn.commit()
+                            conn.close()
+                        except Exception:
+                            pass
+                        self._asset_cooldowns[epic_u] = time.time() + 900.0
+
+                        if chat_id:
+                            try:
+                                import notification_manager, ui_standards
+                                notif_msg = (
+                                    f"🌙 **[OVERNIGHT SWAP SHIELD - FLAT CASH HARVEST]** ⚡\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"🏛️ **ឧបករណ៍ TradFi ៖** `{epic}`\n"
+                                    f"🎯 **ទិសដៅ ៖** `{direction}`\n"
+                                    f"📦 **ទំហំ ៖** `{size} contracts`\n"
+                                    f"💵 **តម្លៃចូល (Entry) ៖** `${entry_level:,.2f}`\n"
+                                    f"📊 **តម្លៃបិទ ៖** `${current_price:,.2f}`\n"
+                                    f"💰 **ប្រាក់ចំណេញសុទ្ធ ៖** `+${upl:,.2f} USD` (+{roi_pct:.1f}% ROI)\n"
+                                    f"🔝 **ចំណុចកំពូល (Peak UPL) ៖** `+${peak_upl:,.2f} USD`\n"
+                                    f"🛡️ **មូលហេតុ ៖** `Flat Cash មុនម៉ោង 03:30 ICT ការពារថ្លៃ Swap ឆ្លងយប់ & Spread Blowout`\n"
+                                    f"{ui_standards.DIVIDER_HEAVY}\n"
+                                    f"✅ _បិទ Position យកប្រាក់ចំណេញសុទ្ធចូល Cash ជោគជ័យ!_"
+                                )
+                                notification_manager.send_telegram_notification(app, chat_id, notif_msg, category="[CAPITAL HARVEST]")
+                            except Exception as e_fc_notif:
+                                logger.debug(f"Failed to send flat cash notification: {e_fc_notif}")
+
+                        if chat_id == SUPER_ADMIN_ID or (not chat_id and not engine.is_demo):
+                            try:
+                                get_capital_master_locomotive().synchronize_master_exit(
+                                    epic=epic,
+                                    exit_price=current_price,
+                                    reason="OVERNIGHT_FLAT_CASH_EXIT",
+                                    app=app
+                                )
+                            except Exception:
+                                pass
+                        continue
 
             # =========================================================================
             # TIER 4: SUPER SMART ASYMMETRIC CASH TARGET HARVEST (Bank 100% Win at Real Target)
@@ -7847,7 +7920,9 @@ class CapitalTrendScalpEngine:
         """
         Returns active tradable instruments based on global market hours (UTC+7 Phnom Penh).
         - Saturday & Sunday (Weekend) & Overnight Swap Shield: 100% Crypto CFDs (BTCUSD, ETHUSD, SOLUSD).
-        - Weekdays (Mon-Fri) London / NY Sessions: Full Priority on GOLD, US100, US500, US Mega-Caps + Crypto.
+        - Asian Session (07:00 - 13:30 ICT / 00:00 - 07:00 UTC): GOLD + Crypto CFDs.
+        - London Open Kill Zone (14:00 - 18:30 ICT / 07:00 - 13:30 UTC): GOLD, DE40 (GERMANY40) + Crypto CFDs.
+        - New York Open Kill Zone (20:30 - 01:30 ICT / 13:30 - 20:30 UTC): US100, US500, US Mega-Caps, GOLD + Crypto CFDs.
         """
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         weekday = now_dt.weekday()  # Monday = 0, Friday = 4, Saturday = 5, Sunday = 6
@@ -7855,19 +7930,40 @@ class CapitalTrendScalpEngine:
 
         # TradFi weekend closure: Friday 20:45 UTC to Sunday 22:00 UTC
         is_weekend = (weekday == 5) or (weekday == 4 and utc_min >= 1245) or (weekday == 6 and utc_min < 1320)
-        # Daily Rollover Swap Shield: strictly 20:45 - 23:59 UTC (03:45 - 07:00 ICT)
-        is_swap_shield = (utc_min >= 1245) and not is_weekend  # Overnight lull
+        # Daily Rollover Swap Shield & Flat Cash: strictly 20:30 - 23:59 UTC (03:30 - 07:00 ICT)
+        is_swap_shield = (utc_min >= 1230) and not is_weekend  # Overnight lull
 
         if is_weekend or is_swap_shield:
             raw_majors = list(self.TREND_MAJORS_CRYPTO)
         elif mode == "CRYPTO":
             raw_majors = list(self.TREND_MAJORS_CRYPTO)
         elif mode == "SHARES":
-            raw_majors = list(self.TREND_MAJORS_SHARES)
+            # Shares only active during NY Session (13:30 - 20:30 UTC)
+            if 810 <= utc_min < 1230:
+                raw_majors = list(self.TREND_MAJORS_SHARES)
+            else:
+                raw_majors = []
         elif mode == "TRADFI":
-            raw_majors = list(self.TREND_MAJORS_TRADFI)
+            if 810 <= utc_min < 1230:
+                # NY Session
+                raw_majors = list(self.TREND_MAJORS_TRADFI)
+            elif 420 <= utc_min < 810:
+                # London Kill Zone: GOLD and DE40
+                raw_majors = ["GOLD", "GERMANY40"]
+            else:
+                # Asian Session: GOLD
+                raw_majors = ["GOLD"]
         else:
-            raw_majors = list(self.ALL_SCALP_MAJORS)
+            # Mode "ALL"
+            if 810 <= utc_min < 1230:
+                # NY Session: All scalp majors
+                raw_majors = list(self.ALL_SCALP_MAJORS)
+            elif 420 <= utc_min < 810:
+                # London Kill Zone: GOLD, DE40 + Crypto
+                raw_majors = ["GOLD", "GERMANY40", "BTCUSD", "ETHUSD", "SOLUSD"]
+            else:
+                # Asian Session: GOLD + Crypto
+                raw_majors = ["GOLD", "BTCUSD", "ETHUSD", "SOLUSD"]
 
         # Super Admin Asset Control Shield: purge any asset disabled by Super Admin for all users
         import database as db
