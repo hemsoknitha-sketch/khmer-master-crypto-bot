@@ -3068,6 +3068,8 @@ def run_audit():
         with open("super_smart_capital_citadel.py", "r", encoding="utf-8") as scf:
             citadel_code = scf.read()
         has_citadel_radar = "class CapitalInMemoryVirtualRadar" in citadel_code
+        has_fvg_engine = "class TradFiFairValueGapEngine" in citadel_code and "detect_fair_value_gaps" in citadel_code and "evaluate_fvg_golden_pocket_retest" in citadel_code
+        has_fvg_radar = "arm_fvg_golden_pocket_trap" in citadel_code and "FVG_GOLDEN_POCKET_RETEST_BOUNCE" in citadel_code
 
         # Dynamic Unit Test: Verify in-memory radar state structure in CapitalTrendScalpEngine
         import capital_engine as ce
@@ -3090,7 +3092,7 @@ def run_audit():
         all_inv76_passed = (
             has_inv76 and has_breakout_radars and has_radar_dual and
             has_stealth_exec and has_breathing_sl and has_citadel_radar and has_radar_attr and
-            is_trap_armed and is_disarmed
+            is_trap_armed and is_disarmed and has_fvg_engine and has_fvg_radar
         )
 
         if all_inv76_passed:
