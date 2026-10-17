@@ -618,10 +618,13 @@ function handleStreamData(data) {
     if (data.capital_overview && data.capital_overview.tradfi) {
         state.capitalData = data.capital_overview;
         renderCapitalCockpit(data.capital_overview);
-        renderSessionRadar(data.capital_overview.schedule);
+        renderSessionRadar(data.capital_overview.schedule, data.capital_overview.kill_zone_routing);
         renderGovernorGauges(data.capital_overview.governor);
         renderSMCRadar(data.capital_overview.smc_radar);
         renderIBRebates(data.capital_overview.ib_rebates);
+        if (data.capital_overview.armed_radars) renderArmedRadars(data.capital_overview.armed_radars);
+        if (data.capital_overview.fleet_assets) renderAssetFleetShield(data.capital_overview.fleet_assets);
+        if (data.capital_overview.scale_out_matrix) renderScaleOutMatrix(data.capital_overview.scale_out_matrix);
     }
 
     // 7. Micro-pulse visual feedback on refresh button to indicate active live streaming
@@ -2791,16 +2794,19 @@ async function fetchCapitalOverview() {
 
         state.capitalData = json.data;
         renderCapitalCockpit(json.data);
-        renderSessionRadar(json.data.schedule);
+        renderSessionRadar(json.data.schedule, json.data.kill_zone_routing);
         renderGovernorGauges(json.data.governor);
         renderSMCRadar(json.data.smc_radar);
         renderIBRebates(json.data.ib_rebates);
+        if (json.data.armed_radars) renderArmedRadars(json.data.armed_radars);
+        if (json.data.fleet_assets) renderAssetFleetShield(json.data.fleet_assets);
+        if (json.data.scale_out_matrix) renderScaleOutMatrix(json.data.scale_out_matrix);
     } catch (e) {
         console.warn('Failed to fetch Capital overview:', e);
     }
 }
 
-function renderSessionRadar(sched) {
+function renderSessionRadar(sched, routing) {
     if (!sched) return;
     const nameEl = document.getElementById('session-active-name');
     if (nameEl) {
@@ -2834,7 +2840,151 @@ function renderSessionRadar(sched) {
             btn.classList.remove('active');
         }
     });
+
+    // Update 4-Zone Matrix
+    const sessPill = document.getElementById('active-session-pill');
+    if (sessPill) {
+        sessPill.textContent = (sched.current_session || 'NEW_YORK').replace('_', ' ');
+    }
+    const sess = sched.current_session || '';
+    const zAsian = document.getElementById('zone-asian');
+    const zLondon = document.getElementById('zone-london');
+    const zNy = document.getElementById('zone-ny');
+    const zRollover = document.getElementById('zone-rollover');
+    const tagAsian = document.getElementById('tag-zone-asian');
+    const tagLondon = document.getElementById('tag-zone-london');
+    const tagNy = document.getElementById('tag-zone-ny');
+    const tagRollover = document.getElementById('tag-zone-rollover');
+
+    [zAsian, zLondon, zNy, zRollover].forEach(z => z && z.classList.remove('active-zone'));
+
+    if (sess === 'TOKYO_ASIAN') {
+        if (zAsian) zAsian.classList.add('active-zone');
+        if (tagAsian) { tagAsian.textContent = 'ACTIVE (GOLD/CRYPTO)'; tagAsian.className = 'zone-status-tag tag-active'; }
+        if (tagNy) { tagNy.textContent = 'US EQUITIES VETOED'; tagNy.className = 'zone-status-tag tag-veto'; }
+    } else if (sess === 'LONDON') {
+        if (zLondon) zLondon.classList.add('active-zone');
+        if (tagLondon) { tagLondon.textContent = 'ACTIVE (GOLD & DAX)'; tagLondon.className = 'zone-status-tag tag-active'; }
+        if (tagNy) { tagNy.textContent = 'LOCKED (PRE-MARKET)'; tagNy.className = 'zone-status-tag tag-locked'; }
+    } else if (sess === 'NEW_YORK') {
+        if (zNy) zNy.classList.add('active-zone');
+        if (tagNy) { tagNy.textContent = 'ACTIVE (WALL ST CASH)'; tagNy.className = 'zone-status-tag tag-active'; }
+    } else if (sched.is_swap_shield_active) {
+        if (zRollover) zRollover.classList.add('active-zone');
+        if (tagRollover) { tagRollover.textContent = 'FLAT CASH ACTIVE'; tagRollover.className = 'zone-status-tag tag-shield'; }
+    }
 }
+
+function renderArmedRadars(radars) {
+    const grid = document.getElementById('radar-armed-grid');
+    const countBadge = document.getElementById('radar-live-count-badge');
+    if (!grid) return;
+    const list = radars || [];
+    if (countBadge) countBadge.textContent = `${list.length} Radar${list.length === 1 ? '' : 's'} Armed in RAM`;
+    if (!list.length) {
+        grid.innerHTML = `
+            <div class="empty-state-mini">
+                <span>🛡️ គ្មាន Radar ក្នុង RAM — ប្រព័ន្ធកំពុងស្កេនរក Breakout & 15m FVG Retest...</span>
+            </div>
+        `;
+        return;
+    }
+    grid.innerHTML = list.map(r => {
+        const isFvg = !!r.has_fvg_trap;
+        const epic = r.epic || 'GOLD';
+        const buyTrig = Number(r.buy_breakout || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+        const sellTrig = Number(r.sell_breakdown || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+        const buySl = Number(r.buy_sl || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+        const sellSl = Number(r.sell_sl || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+        const buyTp1 = Number(r.buy_tp1 || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+        const sellTp1 = Number(r.sell_tp1 || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+        const expSec = r.expires_in_sec || 0;
+
+        let fvgHtml = '';
+        if (isFvg && (r.buy_fvg_trigger > 0 || r.sell_fvg_trigger > 0)) {
+            const trigP = r.buy_fvg_trigger > 0 ? r.buy_fvg_trigger : r.sell_fvg_trigger;
+            const tp2P = r.buy_fvg_tp2 > 0 ? r.buy_fvg_tp2 : r.sell_fvg_tp2;
+            fvgHtml = `
+                <div class="fvg-retest-banner">
+                    <span class="fvg-badge-pill">📦 15M FVG & Golden Pocket (0.618) Retest</span>
+                    <span class="fvg-metrics">Trigger: $${Number(trigP).toFixed(2)} | Target TP2 (R:R ≥ 1:4.0): $${Number(tp2P || 0).toFixed(2)}</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="radar-card-item">
+                <div class="radar-card-top">
+                    <div class="radar-asset-title">
+                        <span class="radar-asset-dot"></span>
+                        <strong class="radar-epic">${epic}</strong>
+                        <span class="radar-mode-tag">${r.mode}</span>
+                    </div>
+                    <span class="radar-ram-tag">⚡ Direct RAM (${expSec}s)</span>
+                </div>
+                <div class="radar-levels-grid">
+                    <div class="radar-level-col buy">
+                        <div class="radar-dir-label text-neon-emerald">▲ BUY BREAKOUT</div>
+                        <div class="radar-level-val">$${buyTrig}</div>
+                        <div class="radar-sub-level">SL: $${buySl} | TP1: $${buyTp1}</div>
+                    </div>
+                    <div class="radar-level-col sell">
+                        <div class="radar-dir-label text-neon-crimson">▼ SELL BREAKDOWN</div>
+                        <div class="radar-level-val">$${sellTrig}</div>
+                        <div class="radar-sub-level">SL: $${sellSl} | TP1: $${sellTp1}</div>
+                    </div>
+                </div>
+                ${fvgHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+function renderAssetFleetShield(fleet) {
+    const grid = document.getElementById('fleet-assets-grid');
+    if (!grid) return;
+    const list = fleet || [];
+    if (!list.length) return;
+    grid.innerHTML = list.map(item => {
+        const isEn = item.enabled !== false;
+        return `
+            <div class="asset-fleet-item ${isEn ? 'active' : 'disabled'}">
+                <div class="asset-fleet-info">
+                    <strong class="asset-fleet-name">${item.epic}</strong>
+                    <span class="asset-fleet-status ${isEn ? 'text-neon-emerald' : 'text-neon-crimson'}">${isEn ? '🟢 ACTIVE' : '🔴 DISABLED'}</span>
+                </div>
+                <button type="button" class="btn-asset-toggle ${isEn ? 'btn-disable' : 'btn-enable'}" onclick="toggleTradFiAsset('${item.epic}', ${isEn})">
+                    ${isEn ? 'Disable' : 'Enable'}
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function toggleTradFiAsset(epic, currentEnabled) {
+    if (!epic) return;
+    try {
+        const res = await fetch('/api/capital/toggle_asset', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({epic: epic, enabled: !currentEnabled})
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            showToast(json.message || `Asset ${epic} updated!`, 'success');
+            fetchCapitalOverview();
+        } else {
+            showToast(json.message || 'Failed to update asset', 'error');
+        }
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+    }
+}
+
+function renderScaleOutMatrix(matrix) {
+    // Rendered via visual cards in DOM
+}
+
 
 function renderCapitalCockpit(data) {
     if (!data || !data.tradfi) return;

@@ -5266,6 +5266,406 @@ input:checked + .slider:before {
     color: #94a3b8;
 }
 
+/* ==========================================================================
+   SUPER SMART INSTITUTIONAL TRADFI COCKPIT STYLES (AQ76)
+   In-Memory Radar Matrix, Session Kill Zones, Asset Fleet Shield & Scale-Out
+   ========================================================================== */
+
+.capital-radar-card,
+.session-killzones-card,
+.fleet-shield-card,
+.scale-out-card {
+    margin-top: 18px;
+}
+
+.radar-header-badges,
+.session-killzone-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* --- In-Memory Virtual Radar Grid --- */
+.radar-armed-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.radar-card-item {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.radar-card-item:hover {
+    border-color: rgba(56, 189, 248, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(56, 189, 248, 0.15);
+}
+
+.radar-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.radar-asset-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.radar-asset-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 8px #38bdf8;
+    animation: radar-pulse 1.8s infinite;
+}
+
+@keyframes radar-pulse {
+    0% { transform: scale(0.9); opacity: 0.7; }
+    50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 12px #38bdf8; }
+    100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+.radar-epic {
+    font-size: 14px;
+    font-weight: 800;
+    color: #f8fafc;
+    letter-spacing: 0.5px;
+}
+
+.radar-mode-tag {
+    font-size: 9.5px;
+    font-weight: 800;
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+.radar-ram-tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #10b981;
+    font-family: var(--font-mono);
+}
+
+.radar-levels-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.radar-level-col {
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.radar-level-col.buy {
+    border-left: 3px solid #10b981;
+}
+
+.radar-level-col.sell {
+    border-left: 3px solid #f43f5e;
+}
+
+.radar-dir-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.radar-level-val {
+    font-size: 15px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    color: #f8fafc;
+    margin-bottom: 4px;
+}
+
+.radar-sub-level {
+    font-size: 10px;
+    color: #94a3b8;
+    font-family: var(--font-mono);
+}
+
+.fvg-retest-banner {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(168, 85, 247, 0.15));
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fvg-badge-pill {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fvg-metrics {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: #e2e8f0;
+}
+
+/* --- Interbank Session Kill Zones --- */
+.session-killzones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.session-zone-box {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.session-zone-box.active-zone {
+    border-color: #38bdf8;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+    background: rgba(56, 189, 248, 0.08);
+}
+
+.zone-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.zone-flag {
+    font-size: 20px;
+}
+
+.zone-title {
+    font-size: 13px;
+    color: #f8fafc;
+    display: block;
+}
+
+.zone-hours {
+    font-size: 10px;
+    color: #94a3b8;
+    font-family: var(--font-mono);
+    display: block;
+}
+
+.zone-status-tag {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.zone-status-tag.tag-active {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid #10b981;
+}
+
+.zone-status-tag.tag-veto {
+    background: rgba(244, 63, 94, 0.2);
+    color: #f43f5e;
+    border: 1px solid #f43f5e;
+}
+
+.zone-status-tag.tag-locked {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid #f59e0b;
+}
+
+.zone-status-tag.tag-shield {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+    border: 1px solid #38bdf8;
+}
+
+.zone-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 11px;
+    color: #cbd5e1;
+}
+
+.zone-rule-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+/* --- Fleet Assets Dynamic Shield --- */
+.fleet-assets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.asset-fleet-item {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.asset-fleet-item.active {
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+.asset-fleet-item.disabled {
+    border-color: rgba(244, 63, 94, 0.35);
+    opacity: 0.65;
+}
+
+.asset-fleet-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.asset-fleet-name {
+    font-size: 12px;
+    color: #f8fafc;
+    letter-spacing: 0.5px;
+}
+
+.asset-fleet-status {
+    font-size: 9.5px;
+    font-weight: 800;
+}
+
+.btn-asset-toggle {
+    width: 100%;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 0;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-asset-toggle.btn-disable {
+    background: rgba(244, 63, 94, 0.15);
+    color: #f43f5e;
+    border: 1px solid rgba(244, 63, 94, 0.4);
+}
+
+.btn-asset-toggle.btn-disable:hover {
+    background: #f43f5e;
+    color: #fff;
+}
+
+.btn-asset-toggle.btn-enable {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.btn-asset-toggle.btn-enable:hover {
+    background: #10b981;
+    color: #fff;
+}
+
+/* --- Institutional 3-Stage Scale-Out Track --- */
+.scale-out-steps-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.scale-step-box {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.scale-step-box:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    transform: translateY(-2px);
+}
+
+.step-num-badge {
+    font-size: 9px;
+    font-weight: 800;
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border-radius: 4px;
+    padding: 2px 6px;
+    display: inline-block;
+    margin-bottom: 6px;
+}
+
+.step-num-badge.badge-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.step-title {
+    font-size: 13px;
+    color: #f8fafc;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.step-target {
+    font-size: 12px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.step-desc {
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.5;
+    margin: 0;
+}
+
+
 
 
 

@@ -1052,8 +1052,9 @@ async def get_cached_capital_overview(chat_id: int = 0) -> dict:
         raw_rebate = float(ib_data.get("total_rebate_usd", 0.0) or 0.0)
         accum_spread = round(raw_rebate * 3.33, 2)
 
-        # 5. SMC Citadel 9-Confluence Live Scanner
-        smc_assets = ["XAUUSD", "US500", "EURUSD", "BTCUSD", "OIL_CRUDE"]
+        # 5. SMC Citadel 9-Confluence Live Scanner (Forex Purged per Invariant 73)
+        import super_smart_capital_citadel as sscc
+        smc_assets = ["XAUUSD", "US100", "US500", "NVDA", "BTCUSD", "OIL_CRUDE"]
         smc_radar = []
         for sym in smc_assets:
             try:
@@ -1069,6 +1070,92 @@ async def get_cached_capital_overview(chat_id: int = 0) -> dict:
                     })
             except Exception:
                 pass
+
+        # 6. In-Memory Dual-Directional Stealth Breakout Radar & 15M FVG Retest Traps in RAM (Invariant 76 & Pillar 5/9)
+        raw_traps = sscc.CapitalInMemoryVirtualRadar.get_armed_traps()
+        armed_radars = []
+        now_ts = time.time()
+        for k, t in raw_traps.items():
+            if t.get("status") == "ARMED" and now_ts < t.get("expires_at", float("inf")):
+                armed_radars.append({
+                    "trap_key": k,
+                    "epic": t.get("epic"),
+                    "mode": t.get("mode", "DUAL"),
+                    "engine_source": t.get("engine_source", "CAPITAL_SCALP"),
+                    "armed_price": float(t.get("armed_price", 0.0)),
+                    "atr_15m": float(t.get("atr_15m", 0.0)),
+                    "sl_dist": float(t.get("sl_dist", 0.0)),
+                    "buy_breakout": float(t.get("buy_breakout", 0.0)),
+                    "buy_sl": float(t.get("buy_sl", 0.0)),
+                    "buy_tp1": float(t.get("buy_tp1", 0.0)),
+                    "sell_breakdown": float(t.get("sell_breakdown", 0.0)),
+                    "sell_sl": float(t.get("sell_sl", 0.0)),
+                    "sell_tp1": float(t.get("sell_tp1", 0.0)),
+                    "has_fvg_trap": bool(t.get("has_fvg_trap", False)),
+                    "buy_fvg_trigger": float(t.get("buy_fvg_trigger", 0.0)),
+                    "buy_fvg_top": float(t.get("buy_fvg_top", 0.0)),
+                    "buy_fvg_bottom": float(t.get("buy_fvg_bottom", 0.0)),
+                    "buy_fvg_sl": float(t.get("buy_fvg_sl", 0.0)),
+                    "buy_fvg_tp1": float(t.get("buy_fvg_tp1", 0.0)),
+                    "buy_fvg_tp2": float(t.get("buy_fvg_tp2", 0.0)),
+                    "sell_fvg_trigger": float(t.get("sell_fvg_trigger", 0.0)),
+                    "sell_fvg_top": float(t.get("sell_fvg_top", 0.0)),
+                    "sell_fvg_bottom": float(t.get("sell_fvg_bottom", 0.0)),
+                    "sell_fvg_sl": float(t.get("sell_fvg_sl", 0.0)),
+                    "sell_fvg_tp1": float(t.get("sell_fvg_tp1", 0.0)),
+                    "sell_fvg_tp2": float(t.get("sell_fvg_tp2", 0.0)),
+                    "expires_in_sec": max(0, int(t.get("expires_at", now_ts) - now_ts)),
+                    "status": "ARMED"
+                })
+
+        # 7. Super Admin Asset Fleet Control (Invariant 75)
+        tradfi_fleet_assets = [
+            "GOLD", "US100", "US500", "DE40", "NVDA", "TSLA",
+            "META", "GOOGL", "AAPL", "MSFT", "AMZN", "OIL_CRUDE", "BTCUSD"
+        ]
+        disabled_assets = db.get_capital_disabled_assets() if hasattr(db, "get_capital_disabled_assets") else []
+        fleet_status = []
+        for a in tradfi_fleet_assets:
+            fleet_status.append({
+                "epic": a,
+                "enabled": (a not in disabled_assets),
+                "is_active": db.is_capital_asset_enabled(a) if hasattr(db, "is_capital_asset_enabled") else True
+            })
+
+        # 8. Interbank Session Kill Zone Dynamic Routing & Overnight Flat Cash (Invariant 77)
+        curr_sess = sched_info.get("current_session", "NEW_YORK")
+        is_asian = (curr_sess == "TOKYO_ASIAN")
+        is_london = (curr_sess == "LONDON")
+        is_ny = (curr_sess == "NEW_YORK")
+        is_swap = sched_info.get("is_swap_shield_active", False)
+        kill_zone_routing = {
+            "current_session": curr_sess,
+            "session_name_kh": sched_info.get("session_name_kh", ""),
+            "session_name_en": sched_info.get("session_name_en", ""),
+            "us_equities_status": "VETOED (CLOSED/PRE-MARKET)" if is_asian else ("LOCKED (WAITING NY CASH OPEN)" if is_london else ("ACTIVE (WALL ST CASH OPEN)" if is_ny else "STANDBY")),
+            "us_equities_allowed": bool(is_ny),
+            "gold_commodities_status": "PRIME INSTITUTIONAL HUNT" if (is_asian or is_london or is_ny) else "STANDBY",
+            "crypto_status": "24/7 CONTINUOUS RADAR",
+            "overnight_flat_cash": {
+                "active": is_swap,
+                "action": "FLAT_CASH_EXIT_BEFORE_2100_UTC" if is_swap else "MONITORING_SWAP_WINDOW",
+                "reason": "Eliminates overnight financing debits & 3x-10x spread blowout"
+            },
+            "forex_shield": {
+                "status": "100% BLOCKED & DEACTIVATED",
+                "rule": "Invariant 73 5-Tier Defense (Negative Expectancy & Spread Drag Elimination)"
+            }
+        }
+
+        # 9. Institutional Scale-Out Matrix & Risk Armor (Pillars 1, 3, 4)
+        scale_out_matrix = {
+            "tp1_scale_out": "50% Lot at +2.5R (Shifts SL to BE Armor Entry ± 0.5x Spread Net Floor, Risk = 0.00R Free-Roll)",
+            "tp2_scale_out": "30% Lot at +4.0R (Ratchets SL to +2.0R Guaranteed Profit Floor)",
+            "moonshot_runner": "20% Lot Uncapped Runner (Trails behind 15m ATR / 3-EMA confluence up to +5R..+10R)",
+            "shock_harvest": "Peak UPL >= $2.50 pulling back >= 50% triggers immediate SHOCK_EARLY_HARVEST exit",
+            "emergency_sl_patrol": "Active (Zero Naked Stops, breathing cushion >= max(2.20*ATR_15m, 3.5*Spread))",
+            "post_sl_quarantine": "Unified 45-Minute Cooldown across all engines"
+        }
 
         is_auto_on = bool(db.is_capital_auto_enabled(cid))
         equity_val = float(tradfi.get("equity", 200.0) or 200.0)
@@ -1089,6 +1176,7 @@ async def get_cached_capital_overview(chat_id: int = 0) -> dict:
                 "swap_settlement_ict": sched_info.get("swap_settlement_ict", "05:00 ICT"),
                 "now_ict": sched_info.get("now_ict", "")
             },
+            "kill_zone_routing": kill_zone_routing,
             "governor": {
                 "today": gov_status.get("today", ""),
                 "daily_pnl_usd": float(gov_status.get("daily_pnl_usd", 0.0)),
@@ -1101,6 +1189,7 @@ async def get_cached_capital_overview(chat_id: int = 0) -> dict:
                 "status": str(gov_status.get("status", "ACTIVE_MONITORING")),
                 "breakeven_armor": "ARMED (85% ATR Trailing)"
             },
+            "scale_out_matrix": scale_out_matrix,
             "ib_rebates": {
                 "tier": ib_data.get("tier", "SILVER"),
                 "rebate_pct": float(ib_data.get("rebate_pct", 30.0)),
@@ -1112,6 +1201,8 @@ async def get_cached_capital_overview(chat_id: int = 0) -> dict:
                 "target_spread_tier4": 2000.0
             },
             "smc_radar": smc_radar,
+            "armed_radars": armed_radars,
+            "fleet_assets": fleet_status,
             "auto_trading": {
                 "enabled": is_auto_on,
                 "max_positions": capital_engine.get_dynamic_max_positions_for_equity(equity_val)
@@ -2200,6 +2291,31 @@ async def handle_api_capital_close_pos(request: web.Request) -> web.Response:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
 
+async def handle_api_capital_toggle_asset(request: web.Request) -> web.Response:
+    """Toggles individual TradFi asset execution ON/OFF fleet-wide (Invariant 75)."""
+    try:
+        data = await request.json()
+        epic = str(data.get("epic", "")).upper().strip()
+        enabled = bool(data.get("enabled", True))
+        if not epic:
+            return web.json_response({"status": "error", "message": "epic required"}, status=400)
+
+        db.set_capital_asset_status(epic, enabled)
+        # Purge GUI cache to reflect instantly in sub-0.01ms stream
+        if "capital" in _GUI_CACHE:
+            _GUI_CACHE["capital"].clear()
+
+        return web.json_response({
+            "status": "success",
+            "epic": epic,
+            "enabled": enabled,
+            "message": f"Asset {epic} set to {'ENABLED' if enabled else 'DISABLED'} fleet-wide"
+        })
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+
 # ==============================================================================
 # MT5 INSTITUTIONAL TERMINAL REST API HANDLERS
 # ==============================================================================
@@ -3131,6 +3247,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_post("/api/capital/schedule", handle_api_capital_schedule)
     app.router.add_post("/api/capital/toggle", handle_api_capital_toggle)
     app.router.add_post("/api/capital/close", handle_api_capital_close_pos)
+    app.router.add_post("/api/capital/toggle_asset", handle_api_capital_toggle_asset)
 
     # Super Fast Live Gold Indicator & 1-Tap Execution routes
     app.router.add_get("/api/gold/live_signal", handle_api_gold_live_signal)
