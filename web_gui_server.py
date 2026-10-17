@@ -2086,6 +2086,42 @@ async def handle_api_engine_toggle(request: web.Request) -> web.Response:
         return web.json_response({"status": "error", "message": str(e)}, status=500)
 
 
+async def handle_api_close_position(request: web.Request) -> web.Response:
+    """Closes an active Binance Futures position for a specific symbol."""
+    try:
+        data = await request.json()
+        chat_id = data.get("chat_id") or _get_chat_id_from_req(request)
+        if not chat_id:
+            chat_id = DEFAULT_VIP_CHAT_ID
+
+        symbol = str(data.get("symbol", "")).upper().strip()
+        if not symbol:
+            return web.json_response({"status": "error", "message": "Symbol is required"}, status=400)
+
+        api_key, api_secret = db.get_user_api_keys(chat_id)
+        if not api_key or not api_secret:
+            api_key = os.getenv("BINANCE_API_KEY", "")
+            api_secret = os.getenv("BINANCE_API_SECRET", "")
+
+        if not api_key or not api_secret:
+            return web.json_response({"status": "error", "message": "Binance API keys not found for this account."}, status=400)
+
+        res = await asyncio.to_thread(trading_engine.close_futures_position_for_symbol, api_key, api_secret, symbol)
+
+        # Invalidate portfolio and wealth cache
+        _GUI_CACHE["portfolio"].pop(chat_id, None)
+        _GUI_CACHE["wealth"].pop(chat_id, None)
+
+        if res.get("status") == "success" or res.get("closed"):
+            return web.json_response({"status": "success", "message": f"Successfully closed {symbol} position."})
+        else:
+            err = res.get("error") or res.get("msg") or "Failed to close position."
+            return web.json_response({"status": "error", "message": err}, status=400)
+    except Exception as e:
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+
 # ==============================================================================
 # CAPITAL.COM TRADFI & SMART SESSION REST API HANDLERS
 # ==============================================================================
@@ -3068,6 +3104,7 @@ def create_web_gui_app() -> web.Application:
     app.router.add_get("/api/global_matrix", handle_api_global_matrix)
     app.router.add_post("/api/action/harvest", handle_api_harvest_action)
     app.router.add_post("/api/action/engine_toggle", handle_api_engine_toggle)
+    app.router.add_post("/api/action/close_position", handle_api_close_position)
 
     # MT5 Pro Terminal API routes
     app.router.add_get("/api/mt5/status", handle_api_mt5_status)

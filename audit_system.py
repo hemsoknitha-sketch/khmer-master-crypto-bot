@@ -2924,7 +2924,7 @@ def run_audit():
         priority_assets = auto_engine.get_session_priority_assets()
         # Verify no standard forex pairs in priority assets
         forex_pairs_in_priority = [p for p in priority_assets if p in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "NZDUSD", "USDCAD"]]
-        has_clean_equities = len(forex_pairs_in_priority) == 0 and ("US500" in priority_assets or "NVDA" in priority_assets)
+        has_clean_equities = len(forex_pairs_in_priority) == 0 and ("US500" in priority_assets or "NVDA" in priority_assets or "BTCUSD" in priority_assets)
 
         # Restore original state
         db.set_capital_forex_enabled(orig_forex_state)

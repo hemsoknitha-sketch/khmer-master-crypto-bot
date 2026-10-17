@@ -46,7 +46,7 @@ function resolveChatId() {
             return parsedStored;
         }
     } catch (e) { }
-    return 537186806; // Default to Super Admin ID for standalone browser access
+    return 859271875; // Default to Super Admin ID for standalone browser access
 }
 
 // Global Application State
@@ -2318,12 +2318,23 @@ function setupEventListeners() {
         } else if (targetTabId === 'tab-controls') {
             fetchEngineStates();
         } else if (targetTabId === 'tab-academy') {
-            renderAcademyDashboard();
+            if (typeof renderAcademyDashboard === 'function') {
+                renderAcademyDashboard();
+            } else if (window.renderAcademyDashboard) {
+                window.renderAcademyDashboard();
+            }
         }
     }
 
-    // Expose switchTab globally for hub pills
+    // Expose interactive handlers globally for hub pills, cards and inline triggers
     window.switchTab = switchTab;
+    window.closeTrade = closeTrade;
+    window.closeCapitalPosition = closeCapitalPosition;
+    window.closeMT5Position = closeMT5Position;
+    window.closeAllMT5Positions = closeAllMT5Positions;
+    window.submitMT5Order = submitMT5Order;
+    window.executeGoldTrade = executeGoldTrade;
+    window.toggleEngine = toggleEngine;
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
@@ -3253,14 +3264,14 @@ function setupCapitalEventListeners() {
 // -----------------------------------------------------------------------------
 // App Lifecycle
 // -----------------------------------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
-    applySovereignCloaking();
-    initNeuralCanvas();
-    startClocks();
-    initCharts();
-    setupEventListeners();
-    setupCapitalEventListeners();
-    initRealtimeStream();
+function initApp() {
+    try { applySovereignCloaking(); } catch (e) { console.warn('Cloaking notice:', e); }
+    try { initNeuralCanvas(); } catch (e) { console.warn('Canvas notice:', e); }
+    try { startClocks(); } catch (e) { console.warn('Clocks notice:', e); }
+    try { initCharts(); } catch (e) { console.warn('Charts notice:', e); }
+    try { setupEventListeners(); } catch (e) { console.warn('Listeners notice:', e); }
+    try { setupCapitalEventListeners(); } catch (e) { console.warn('Capital Listeners notice:', e); }
+    try { initRealtimeStream(); } catch (e) { console.warn('Realtime Stream notice:', e); }
 
     // Initial Load
     fetchPortfolio();
@@ -3313,6 +3324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchLiveGoldSignal();
             fetchGoldOrbChart();
         }
+    }, 15000);
     // ==============================================================================
     // ANGKOR QUANT FIDUCIARY ACADEMY (WARREN BUFFETT 12 BOOKS) INTERACTIVE CONTROLLER
     // ==============================================================================
@@ -3578,7 +3590,22 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSnowballCalculation();
     }
 
+    // Expose Academy methods to window for global access
+    window.renderAcademyDashboard = renderAcademyDashboard;
+    window.updateDCFCalculation = updateDCFCalculation;
+    window.updateSnowballCalculation = updateSnowballCalculation;
+    window.renderAcademyTier = renderAcademyTier;
+    window.fetchAcademyData = fetchAcademyData;
+    window.setupAcademyEventListeners = setupAcademyEventListeners;
+
     // Initialize Academy Listeners
     setupAcademyEventListeners();
-});
+}
+
+// Guaranteed DOM Ready Execution across all webviews & browsers
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
 
