@@ -49,9 +49,31 @@
 ---
 
 ## 3. MANDATORY PROTOCOL FOR EVERY CONVERSATION & TASK
-1. **Audit First:** Run `python audit_system.py` before and after any code modification. All 61 checks must remain 100% PASS with 0 defects.
+1. **Audit First:** Run `python audit_system.py` before and after any code modification. All 62 checks must remain 100% PASS with 0 defects.
 2. **Immediate Git Push:** Commit with clear description and push immediately to GitHub `origin main`.
 3. **VPS Directive in Output:** Always end response with the 1-tap VPS update command:
    ```bash
    cd /opt/khmer-master-crypto-bot && bash auto_update_vps.sh
    ```
+
+---
+
+## 4. DUAL-TIER INTELLECTUAL PROPERTY PROTECTION & ANTI-LEAKAGE COVENANT (AQ76 INVARIANT 79)
+**(កតិកាសញ្ញាការពារកម្មសិទ្ធិបញ្ញា ២ ជាន់ & ហាមដាច់ខាតការបែកធ្លាយបច្ចេកទេសក្នុង PUBLIC COMMANDS)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+
+1. **The Non-Negotiable Fiduciary IP Oath:**
+   - សម្រាប់មុខងារ Commands នីមួយៗ និង User Interface ទូទៅ **ហាមដាច់ខាត** មិនឱ្យរៀបរាប់ ឬបង្ហាញបច្ចេកទេស/រូបមន្តគណិតវិទ្យាផ្ទៃក្នុង (Internal math formulas, Hawkes jump equations $\lambda(t)$, ATR gap compression, exact Sharpe/Sortino ratios, specific trailing ROI percentages, specific RSI bounds like 38.0/68.0, RAM tick latency microseconds, Min-Notional shields, or Invariant numbers Invariant 16, 26, 38, 41, etc.) ទៅកាន់ VIP Users ទូទៅឡើយ។ ព្រោះនាំឱ្យអ្នកប្រើប្រាស់អាចចម្លងបច្ចេកទេសធ្វើតាមប្រព័ន្ធយើងបាន។
+   - លើកលែងតែ **ADMIN Commands (`is_admin=True` ឬ `chat_id in ADMIN_USER_IDS`)** គឺអាចលម្អិតបច្ចេកទេសពេញលេញ (Full Institutional Technical Depth & Telemetry) បាន។
+
+2. **Public VIP Commands Tier (`is_admin=False`):**
+   - ត្រូវផ្តោតសំខាន់លើ **អត្ថប្រយោជន៍ជាក់ស្តែង (User Benefits), ភាពងាយស្រួលប្រើប្រាស់ (Ease of Use), ការការពារដើមទុន (Capital Preservation), និងគំរូបញ្ជាចម្លង ១-Tap (1-Tap Copyable Commands)**។
+   - មិនត្រូវប្រើឈ្មោះ Algorithm កំបាំង ឬលេខបញ្ជាក់ Invariant ក្នុងសារ Bot ឡើយ។
+   - `bot_commands_registry.get_public_bot_commands()` ត្រូវរក្សាត្រឹមតែ ៣០ Commands ចាំបាច់បំផុត ចែកជា ៥ ប្រភេទច្បាស់លាស់ គ្មានការលេចធ្លាយបច្ចេកទេស។
+
+3. **Admin Commands Tier (`is_admin=True`):**
+   - រក្សាទុកកម្រិតបច្ចេកទេសស៊ីជម្រៅពេញលេញ រួមមាន៖ Low-level system diagnostics, exact mathematical formulas, Invariant logs, RAM Citadel latency telemetry, broker execution gateway bypasses, និង Fleet Command master controls។
+
+4. **Smart Bot Guide Dual-Tier Lock:**
+   - គ្រប់ Views ក្នុង `smart_bot_guide.py` (`_build_spot_view`, `_build_futures_view`, `_build_tradfi_view`, `_build_radars_view`, និង `_build_guide_view`) ត្រូវតែឆ្លងកាត់ការផ្ទៀងផ្ទាត់ `is_admin` ជានិច្ច ដោយបង្ហាញសង្ខេបសម្រាប់ VIP និងបង្ហាញបច្ចេកទេសពេញលេញសម្រាប់ Super Admin។
+

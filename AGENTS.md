@@ -31,6 +31,23 @@ The system is engineered upon two non-negotiable axioms:
   3. Propose the institutional, mathematically sound alternative that preserves capital while extracting genuine edge.
 - **Sycophancy Classification:** Flattering the user, staying silent out of fear/politeness, or implementing suicide code just because the user asked is officially classified as **Technical Treason & Capital Sabotage**.
 
+### 1.1.0 DUAL-TIER INTELLECTUAL PROPERTY PROTECTION & ANTI-LEAKAGE COVENANT (AQ76 INVARIANT 79)
+**(កតិកាសញ្ញាការពារកម្មសិទ្ធិបញ្ញា ២ ជាន់ & ហាមដាច់ខាតការបែកធ្លាយបច្ចេកទេសក្នុង PUBLIC COMMANDS)**
+**Authority:** Absolute, Immutable, and Permanent Lock Across All Sessions and Future Conversations.
+- **The Non-Negotiable Fiduciary IP Oath:**  
+  Under NO circumstances shall any AI agent reveal, describe, or leak proprietary quantitative formulas, mathematical mechanics, specific threshold numbers, model architectures, or internal Invariant IDs in Public VIP user commands or interfaces.
+  - **Reasoning:** សម្រាប់មុខងារ Commands នីមួយៗ និង User Interface ទូទៅ មិនចាំបាច់រៀបរាប់បច្ចេកទេស ឬរូបមន្តនោះទេ ព្រោះនាំឱ្យអ្នកប្រើប្រាស់អាចចម្លងបច្ចេកទេសយកទៅធ្វើតាមប្រព័ន្ធយើង។ លើកលែងតែ ADMIN Commands ទើបអាចលម្អិតបច្ចេកទេសពេញលេញបាន។
+- **Dual-Tier System Architecture:**
+  1. **Public VIP Commands Tier (`is_admin=False`):**
+     - Strictly focus on **User Benefits, Ease of Use, Capital Safety, and 1-Tap Copyable Commands**.
+     - Forbidden: Mathematical formulas (Hawkes jump equations $\lambda(t)$, ATR gap multipliers, exact breakeven/trailing percentages, RSI boundaries 38.0/68.0, RAM tick latency microseconds, Min-Notional exact thresholds, or Invariant tags).
+     - Permitted: Functional benefits, safety explanations ("Protects capital by avoiding panic bottoms", "Dynamic volatility buffer", "Breakeven Armor", "Multi-model consensus"), and 1-tap command presets.
+     - `bot_commands_registry.get_public_bot_commands()`: Strictly clamped to 30 essential public commands categorized into 5 logical pillars with zero formula leakage.
+  2. **Super Admin Tier (`is_admin=True`):**
+     - Full unrestricted institutional depth: exact formulas, telemetry, Invariant references, low-level diagnostics, full model quorum thresholds, and backend logs.
+  3. **Smart Bot Guide Dual-Tier Branching:**
+     - All guide views in `smart_bot_guide.py` (`_build_spot_view`, `_build_futures_view`, `_build_tradfi_view`, `_build_radars_view`, and `_build_guide_view`) MUST branch on `is_admin`.
+
 ### 1.1.1 THE NINE PILLARS OF SUPER SMART CAPITAL.COM TRADFI FIDUCIARY INTEGRITY & CAPITAL PROTECTION (AQ76)
 **(គ្រឹះ ៩ ប្រការស្ថាបត្យករកំពូល ការពារដើមទុន & ធានាប្រាក់ចំណេញពិតប្រាកដក្នុង Capital.com TradFi - Invariants 34, 35, 52, 53, 58, 73, 74, 75, 76)**
 **Authority:** Absolute, Immutable, and Permanent Lock Across All Existing and Future Sessions.
