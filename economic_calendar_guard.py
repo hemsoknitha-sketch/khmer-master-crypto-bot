@@ -33,7 +33,8 @@ RED_FOLDER_KEYWORDS = [
     "CPI", "CONSUMER PRICE", "NON-FARM", "NFP", "FOMC", "FEDERAL FUNDS",
     "INTEREST RATE", "PCE", "UNEMPLOYMENT RATE", "GDP", "POWELL",
     "JACKSON HOLE", "CORE INFLATION", "WARSH", "FED SPEAKS", "CHAIRMAN",
-    "RATE DECISION", "POLICY STATEMENT", "TESTIFIES", "PRESS CONFERENCE"
+    "RATE DECISION", "POLICY STATEMENT", "TESTIFIES", "PRESS CONFERENCE",
+    "SPEECH", "TESTIMONY", "ECB", "BOJ", "TREASURY", "YELLEN"
 ]
 
 PRE_EVENT_MINUTES = 30.0
@@ -42,55 +43,140 @@ POST_EVENT_MINUTES = 15.0
 
 def fetch_usd_economic_events(force_refresh: bool = False) -> List[Dict[str, Any]]:
     """
-    Fetches High-Impact USD economic events for the current week.
-    Caches results in memory for 1 hour.
+    Fetches High-Impact USD & Global Macro economic events for the current week.
+    Multi-Tier Institutional Redundancy:
+    - Tier 1: FinanceCalendar API (Live edge-cached JSON)
+    - Tier 2: Federal Reserve Official Speeches & Press Releases RSS XML (Direct real-time feed)
+    - Tier 3: FairEconomy / ForexFactory NFS JSON (Fallback)
+    Caches results in memory for 30 minutes if events found, or 60s if empty.
     """
     global _CALENDAR_CACHE
     now = time.time()
 
     if not force_refresh and "events" in _CALENDAR_CACHE:
         cache_time, cached_list = _CALENDAR_CACHE["events"]
-        if now - cache_time < _CACHE_TTL_SECONDS:
+        ttl = _CACHE_TTL_SECONDS if cached_list else 60.0
+        if now - cache_time < ttl:
             return cached_list
 
-    events = []
+    events: List[Dict[str, Any]] = []
+    seen_keys = set()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
+    # --- Tier 1: FinanceCalendar API ---
     try:
-        url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-        res = requests.get(url, headers=headers, timeout=6)
-        if res.status_code == 200:
-            raw_data = res.json()
-            for item in raw_data:
-                country = item.get("country", "")
-                impact = item.get("impact", "")
-                title = item.get("title", "")
-                date_str = item.get("date", "")
-
-                if country != "USD":
+        today_str = datetime.date.today().isoformat()
+        next_week_str = (datetime.date.today() + datetime.timedelta(days=7)).isoformat()
+        fc_url = f"https://www.financecalendar.com/wp-json/fc/v1/calendar?from={today_str}&to={next_week_str}"
+        res_fc = requests.get(fc_url, headers=headers, timeout=5)
+        if res_fc.status_code == 200:
+            fc_data = res_fc.json()
+            fc_items = fc_data.get("events", []) if isinstance(fc_data, dict) else (fc_data if isinstance(fc_data, list) else [])
+            for item in fc_items:
+                t_utc = item.get("time_utc")
+                title = item.get("title") or item.get("name") or ""
+                impact = str(item.get("impact", "")).lower()
+                is_red = (impact in ["high", "medium"]) or any(kw in title.upper() for kw in RED_FOLDER_KEYWORDS)
+                if not is_red or not t_utc:
                     continue
-
-                is_red = (impact in ["High", "Holiday"]) or any(kw in title.upper() for kw in RED_FOLDER_KEYWORDS)
-                if not is_red:
-                    continue
-
                 try:
-                    # ISO format parsing (e.g. 2026-09-24T08:30:00-04:00)
-                    dt = datetime.datetime.fromisoformat(date_str)
-                    dt_utc = dt.astimezone(datetime.timezone.utc)
-                    events.append({
-                        "title": title,
-                        "impact": impact,
-                        "datetime_utc": dt_utc,
-                        "timestamp": dt_utc.timestamp(),
-                        "date_str": date_str
-                    })
+                    dt = datetime.datetime.fromisoformat(t_utc).astimezone(datetime.timezone.utc)
+                    key = f"{title[:25]}_{dt.strftime('%Y%m%d%H%M')}"
+                    if key not in seen_keys:
+                        seen_keys.add(key)
+                        events.append({
+                            "title": title,
+                            "impact": "High" if impact == "high" else "Medium",
+                            "datetime_utc": dt,
+                            "timestamp": dt.timestamp(),
+                            "date_str": t_utc
+                        })
                 except Exception:
                     continue
-    except Exception as e:
-        logger.debug(f"Calendar fetch note: {e}")
+    except Exception as e_fc:
+        logger.debug(f"Tier 1 FinanceCalendar fetch note: {e_fc}")
+
+    # --- Tier 2: Federal Reserve Official Speeches & Press Releases RSS XML ---
+    try:
+        import email.utils
+        import xml.etree.ElementTree as ET
+        fed_urls = [
+            "https://www.federalreserve.gov/feeds/speeches.xml",
+            "https://www.federalreserve.gov/feeds/press_all.xml"
+        ]
+        for u in fed_urls:
+            try:
+                res_fed = requests.get(u, headers=headers, timeout=5)
+                if res_fed.status_code == 200:
+                    root = ET.fromstring(res_fed.content)
+                    for item in root.findall(".//item"):
+                        raw_title = (item.find("title").text or "").strip()
+                        pub_date = (item.find("pubDate").text or "").strip()
+                        if not raw_title or not pub_date:
+                            continue
+                        try:
+                            parsed_tuple = email.utils.parsedate_to_datetime(pub_date)
+                            dt_utc = parsed_tuple.astimezone(datetime.timezone.utc)
+                            title = f"Federal Reserve: {raw_title}"
+                            key = f"{title[:25]}_{dt_utc.strftime('%Y%m%d%H%M')}"
+                            if key not in seen_keys:
+                                seen_keys.add(key)
+                                events.append({
+                                    "title": title,
+                                    "impact": "High",
+                                    "datetime_utc": dt_utc,
+                                    "timestamp": dt_utc.timestamp(),
+                                    "date_str": pub_date
+                                })
+                        except Exception:
+                            continue
+            except Exception:
+                continue
+    except Exception as e_fed:
+        logger.debug(f"Tier 2 Fed RSS fetch note: {e_fed}")
+
+    # --- Tier 3: FairEconomy NFS JSON (Fallback) ---
+    if len(events) < 3:
+        try:
+            url_fe = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+            res_fe = requests.get(url_fe, headers=headers, timeout=5)
+            if res_fe.status_code == 200:
+                raw_data = res_fe.json()
+                for item in raw_data:
+                    country = item.get("country", "")
+                    impact = item.get("impact", "")
+                    title = item.get("title", "")
+                    date_str = item.get("date", "")
+
+                    if country != "USD":
+                        continue
+
+                    is_red = (impact in ["High", "Holiday"]) or any(kw in title.upper() for kw in RED_FOLDER_KEYWORDS)
+                    if not is_red:
+                        continue
+
+                    try:
+                        dt = datetime.datetime.fromisoformat(date_str)
+                        dt_utc = dt.astimezone(datetime.timezone.utc)
+                        key = f"{title[:25]}_{dt_utc.strftime('%Y%m%d%H%M')}"
+                        if key not in seen_keys:
+                            seen_keys.add(key)
+                            events.append({
+                                "title": title,
+                                "impact": impact,
+                                "datetime_utc": dt_utc,
+                                "timestamp": dt_utc.timestamp(),
+                                "date_str": date_str
+                            })
+                    except Exception:
+                        continue
+        except Exception as e_fe:
+            logger.debug(f"Tier 3 FairEconomy fetch note: {e_fe}")
+
+    # Sort events by timestamp
+    events.sort(key=lambda x: x["timestamp"])
 
     _CALENDAR_CACHE["events"] = (now, events)
     return events
@@ -138,8 +224,11 @@ def format_event_ict_datetime(dt_utc: datetime.datetime) -> Tuple[str, str, str]
 
 def check_red_folder_blackout() -> Dict[str, Any]:
     """
-    Evaluates current time against high-impact USD economic events.
-    Returns blackout status, phase, event name, and remaining minutes.
+    Evaluates current time against high-impact USD & Global Macro economic events.
+    Supports 3 distinct operational phases:
+    1. PRE_EVENT: 30 minutes before release countdown.
+    2. PRESS_CONFERENCE_LIVE: Active speech / press conference underway (up to 45m).
+    3. POST_EVENT: 15 minutes post-release spread cooling and reaction window.
     """
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     now_ts = now_utc.timestamp()
@@ -149,6 +238,10 @@ def check_red_folder_blackout() -> Dict[str, Any]:
         ev_ts = ev["timestamp"]
         diff_sec = ev_ts - now_ts
         diff_min = diff_sec / 60.0
+
+        is_speech_or_conf = any(kw in ev["title"].upper() for kw in [
+            "PRESS CONFERENCE", "SPEECH", "TESTIFIES", "TESTIMONY", "POWELL", "CHAIRMAN", "WARSH"
+        ])
 
         # Phase 1: Pre-event blackout (30 mins before)
         if 0.0 <= diff_min <= PRE_EVENT_MINUTES:
@@ -162,8 +255,22 @@ def check_red_folder_blackout() -> Dict[str, Any]:
                 "reason": f"Red Folder Event '{ev['title']}' scheduled in {int(diff_min)}m"
             }
 
-        # Phase 2: Post-event blackout (15 mins after)
-        if -POST_EVENT_MINUTES <= diff_min < 0.0:
+        # Phase 2: Live Press Conference / Speech in progress (first 45 mins)
+        if is_speech_or_conf and -45.0 <= diff_min < 0.0:
+            since_min = abs(diff_min)
+            return {
+                "is_blackout": True,
+                "phase": "PRESS_CONFERENCE_LIVE",
+                "event_name": ev["title"],
+                "minutes_since": round(since_min, 1),
+                "datetime_utc": ev["datetime_utc"],
+                "event_time_utc": ev["datetime_utc"].strftime("%H:%M UTC"),
+                "reason": f"Live Press Conference '{ev['title']}' in progress ({int(since_min)}m elapsed)"
+            }
+
+        # Phase 3: Post-event blackout (15 mins after for data, 45-60m for speeches)
+        post_window = 60.0 if is_speech_or_conf else POST_EVENT_MINUTES
+        if -post_window <= diff_min < 0.0:
             since_min = abs(diff_min)
             return {
                 "is_blackout": True,
@@ -591,11 +698,86 @@ def get_latest_macro_news_alert() -> Optional[Dict[str, Any]]:
     return dict(_LAST_MACRO_ALERT_REPORT) if _LAST_MACRO_ALERT_REPORT else None
 
 
+def generate_live_conference_assessment(blackout_info: Dict[str, Any]) -> str:
+    """
+    Generates the official Live Press Conference / Fed Speech Intelligence Alert.
+    Dispatched when a high-impact press conference (e.g. FOMC Press Conference, Fed Chair Powell Speaks)
+    is actively underway.
+    """
+    now_utc, now_ict, cur_date_km, cur_time_ict, cur_time_utc = get_current_ict_datetime()
+    event_name = blackout_info.get("event_name", "Major Economic Press Conference")
+    mins_since = float(blackout_info.get("minutes_since", 5.0))
+
+    dt_utc = blackout_info.get("datetime_utc")
+    if dt_utc:
+        ev_date_km, ev_time_ict, ev_time_utc = format_event_ict_datetime(dt_utc)
+    else:
+        ev_date_km = cur_date_km
+        ev_time_ict = cur_time_ict
+        ev_time_utc = blackout_info.get("event_time_utc", "Live")
+
+    pulse = fetch_tri_market_macro_pulse(force_refresh=True)
+    g = pulse["gold"]
+    eq = pulse["equities"]
+    c = pulse["crypto"]
+    m = pulse["macro"]
+
+    gold_up_down_str = "📈 ឡើង" if g["change_pct"] >= 0 else "📉 ចុះ"
+    sp_up_down_str = "📈 ឡើង" if eq["sp500_change_pct"] >= 0 else "📉 ចុះ"
+    nas_up_down_str = "📈 ឡើង" if eq["nasdaq_change_pct"] >= 0 else "📉 ចុះ"
+    btc_up_down_str = "📈 ឡើង" if c["btc_change_pct"] >= 0 else "📉 ចុះ"
+    eth_up_down_str = "📈 ឡើង" if c["eth_change_pct"] >= 0 else "📉 ចុះ"
+
+    msg = (
+        f"🎙️ **[SUPER SMART LIVE PRESS CONFERENCE & FED SPEECH ALERT]** ⚡\n"
+        f"{ui_standards.DIVIDER_HEAVY}\n"
+        f"📅 **កាលបរិច្ឆេទ ៖** `{cur_date_km}`\n"
+        f"⏰ **ម៉ោងកម្ពុជា (ICT UTC+7) ៖** `{cur_time_ict}` | 🌐 **ម៉ោងសកល (UTC) ៖** `{cur_time_utc}`\n"
+        f"🔍 **ស្ថានភាពស្រាវជ្រាវ ៖** `🟢 Live Wire Feed | សន្និសីទសារព័ត៌មានកំពុងប្រព្រឹត្តទៅផ្ទាល់`\n"
+        f"{ui_standards.DIVIDER_LIGHT}\n"
+        f"⚠️ **ព្រឹត្តិការណ៍កំពុងផ្សាយផ្ទាល់ ៖** `{event_name}`\n"
+        f"🎙️ **ស្ថានភាព ៖** `កំពុងថ្លែងសុន្ទរកថា & ឆ្លើយសំណួរអ្នកកាសែត ({int(mins_since)} នាទីកន្លងទៅ)`\n"
+        f"📅 **កាលបរិច្ឆេទចាប់ផ្តើម ៖** `{ev_date_km}`\n"
+        f"⏰ **ម៉ោងចាប់ផ្តើមផ្លូវការ ៖** `{ev_time_ict}` ICT (UTC+7) | `{ev_time_utc}`\n"
+        f"🛑 **ចំណាត់ការការពារ ៖** `FORCED WAIT (ហាមដាច់ខាតដាក់ Pending Order | Spread កំពុងប្រែប្រួលខ្លាំង)`\n"
+        f"{ui_standards.DIVIDER_LIGHT}\n\n"
+        f"📊 **សន្ទុះទីផ្សារផ្សាយផ្ទាល់ក្នុងពេលកំពុងថ្លែង (LIVE TRANSMISSION PULSE) ៖**\n\n"
+        f"🥇 **១. ទីផ្សារមាស (SPOT GOLD XAU/USD) ៖**\n"
+        f"• តម្លៃបច្ចុប្បន្ន ៖ `${g['price']:,.2f}` (`{g['change_pct']:+.2f}%` {gold_up_down_str})\n"
+        f"• ប្រូបាប៊ីលីតេស្ថាប័ន ៖ ឱកាសឡើង `{g['prob_up']:.1f}%` | ឱកាសចុះ `{g['prob_down']:.1f}%`\n"
+        f"• ចំណុចរង់ចាំ ៖ `In-Memory Stealth Radar កំពុងចាំចាប់ Turtle Soup Sweep Reversal`\n\n"
+        f"📈 **២. ទីផ្សារភាគហ៊ុនសហរដ្ឋអាមេរិក (US EQUITIES) ៖**\n"
+        f"• S&P 500 ៖ `${eq['sp500_price']:,.2f}` (`{eq['sp500_change_pct']:+.2f}%` {sp_up_down_str})\n"
+        f"• Nasdaq 100 ៖ `${eq['nasdaq_price']:,.2f}` (`{eq['nasdaq_change_pct']:+.2f}%` {nas_up_down_str})\n"
+        f"• ប្រតិកម្មម៉ាក្រូ ៖ `{eq['direction']}`\n\n"
+        f"🚀 **៣. ទីផ្សាររូបិយប័ណ្ណគ្រីបតូ (CRYPTO ASSETS) ៖**\n"
+        f"• Bitcoin (BTC) ៖ `${c['btc_price']:,.2f}` (`{c['btc_change_pct']:+.2f}%` {btc_up_down_str})\n"
+        f"• Ethereum (ETH) ៖ `${c['eth_price']:,.2f}` (`{c['eth_change_pct']:+.2f}%` {eth_up_down_str})\n"
+        f"• សន្ទុះ On-Chain ៖ `{c['direction']}`\n\n"
+        f"{ui_standards.DIVIDER_LIGHT}\n"
+        f"📡 **សូចនាករម៉ាក្រូសេដ្ឋកិច្ចកំពុងប្រែប្រួល (REAL-TIME LIVE MACRO) ៖**\n"
+        f"• 💵 **DXY Dollar Index ៖** `{m['dxy_index']}` (`{m['dxy_change_pct']:+.2f}%`)\n"
+        f"• 🏦 **US 10Y Yield ៖** `{m['us10y_yield']:.2f}%` | 🔮 **Fed Rate Cut Odds ៖** `{m['fed_rate_cut_prob']:.1f}%`\n"
+        f"• 🌡️ **Fear & Greed Index ៖** `{m['fear_greed_score']}/100 ({m['fear_greed_label']})`\n\n"
+        f"🧠 **ការវិភាគ & យុទ្ធសាស្ត្រប្រតិបត្តិការ (INSTITUTIONAL STRATEGY) ៖**\n"
+        f"ទីក្រុងវ៉ាស៊ីនតោន ៖ ក្នុងអំឡុងពេលសន្និសីទសារព័ត៌មានផ្ទាល់ រាល់ពាក្យពេចន៍របស់អ្នកថ្លែង (ដូចជាប្រធាន Fed លោក Jerome Powell) អាចបង្កឱ្យមានរលកប្រែប្រួលរហ័ស (Whipsaw Volatility) ទាំងសងខាង។ ប្រព័ន្ធ Angkor Quant ដំណើរការ **In-Memory Dual-Directional Stealth Radar** នៅក្នុង RAM ដោយគ្មានការដាក់ Pending Order លើ Broker ដើម្បីការពារ Spread Blowout ១០០%។ ប្រព័ន្ធនឹងធ្វើការបញ្ជាទិញលក់ភ្លាមៗនៅពេលមានការបញ្ជាក់ Breakout ឬ Turtle Soup Reversal ក្រោយពេលសន្និសីទបញ្ចប់ និង Spread ត្រជាក់ចុះធម្មតា!\n\n"
+        f"{ui_standards.DIVIDER_HEAVY}\n"
+        f"👉 _វាយបញ្ជា ``/news`` ដើម្បីអានព័ត៌មានលម្អិត ឬ ``/capital_scalp`` ដើម្បីពិនិត្យ Position សកម្ម!_"
+    )
+    return msg
+
+
+def get_latest_macro_news_alert() -> Optional[Dict[str, Any]]:
+    """Returns the most recent dispatched macro pre/post event report."""
+    global _LAST_MACRO_ALERT_REPORT
+    return dict(_LAST_MACRO_ALERT_REPORT) if _LAST_MACRO_ALERT_REPORT else None
+
+
 async def notify_economic_blackout_if_needed(app, blackout_info: Dict[str, Any]) -> None:
     """
-    Sends Super Smart, actionable Pre-Event and Post-Event Intelligence notifications
-    to Super Admin and active VIP users.
-    Guarantees ZERO OMISSION (គ្មានការខកខាន): both Pre-Event and Post-Event alerts are sent!
+    Sends Super Smart, actionable Pre-Event, Live Press Conference, and Post-Event Intelligence notifications
+    to Super Admin and ALL VIP users.
+    Guarantees ZERO OMISSION (គ្មានការខកខាន): Pre-Event, Live Conference, and Post-Event alerts are sent!
     """
     global _LAST_ALERT_SENT_TS, _LAST_ALERTED_EVENT, _LAST_ALERTED_PHASES, _LAST_MACRO_ALERT_REPORT
 
@@ -606,9 +788,18 @@ async def notify_economic_blackout_if_needed(app, blackout_info: Dict[str, Any])
     phase = blackout_info.get("phase", "PRE_EVENT")
     now = time.time()
 
-    # Track alert by event + phase so Pre-Event never blocks Post-Event
+    import database as db
+
+    # Track alert by event + phase so Pre-Event never blocks Live Conference or Post-Event
     phase_key = f"{event_name}_{phase}"
     last_sent = _LAST_ALERTED_PHASES.get(phase_key, 0.0)
+
+    # Database deduplication check
+    try:
+        if db.is_economic_event_alerted(phase_key):
+            return
+    except Exception:
+        pass
 
     # Throttling: Alert once per 2 hours per phase of an event
     if (now - last_sent) < 7200.0:
@@ -617,10 +808,16 @@ async def notify_economic_blackout_if_needed(app, blackout_info: Dict[str, Any])
     _LAST_ALERTED_PHASES[phase_key] = now
     _LAST_ALERTED_EVENT = event_name
     _LAST_ALERT_SENT_TS = now
+    try:
+        db.mark_economic_event_alerted(phase_key)
+    except Exception:
+        pass
 
     # Generate the rich, professional Chuon Nath report
     if phase == "PRE_EVENT":
         msg = generate_pre_event_assessment(blackout_info)
+    elif phase == "PRESS_CONFERENCE_LIVE":
+        msg = generate_live_conference_assessment(blackout_info)
     else:
         msg = generate_post_event_outcome(blackout_info)
 
@@ -631,26 +828,27 @@ async def notify_economic_blackout_if_needed(app, blackout_info: Dict[str, Any])
         "timestamp": now
     }
 
+    # 1. Alert Super Admin (859271875)
     try:
-        # Alert Super Admin (859271875)
         await app.bot.send_message(chat_id=859271875, text=msg, parse_mode="Markdown")
-        logger.info(f"🚨 [ECONOMIC GUARD] Sent Super Smart {phase} notification for {event_name}")
+        logger.info(f"🚨 [ECONOMIC GUARD] Sent Super Smart {phase} notification for {event_name} to Super Admin")
     except Exception as e:
         logger.debug(f"Failed to send admin economic guard alert: {e}")
 
-    # Alert active VIP Capital auto users
+    # 2. Universal Broadcast to ALL VIP users
     try:
-        import database as db
-        active_users = db.get_active_capital_auto_users()
-        for u in active_users:
-            uid = u.get("chat_id")
-            if uid and uid != 859271875:
+        vip_users = db.get_vip_users_with_lang()
+        sent_uids = {859271875}
+        for row in vip_users:
+            uid = row[0] if isinstance(row, (tuple, list)) else row
+            if uid and uid not in sent_uids:
+                sent_uids.add(uid)
                 try:
                     await app.bot.send_message(chat_id=uid, text=msg, parse_mode="Markdown")
                 except Exception:
                     pass
-    except Exception:
-        pass
+    except Exception as e_vip:
+        logger.debug(f"Failed to broadcast economic guard alert to VIP users: {e_vip}")
 
 
 def is_toxic_window() -> Tuple[bool, float]:

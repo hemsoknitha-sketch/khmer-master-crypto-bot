@@ -28987,9 +28987,11 @@ class TelegramBotThread(BaseThread):
         self.scheduler.add_job(
             scheduler_tasks.check_economic_calendar,
             'interval',
-            minutes=30,
+            minutes=1,
             args=[self.app, self.ai_engine],
-            id='check_economic_calendar'
+            id='check_economic_calendar',
+            max_instances=1,
+            coalesce=True
         )
 
         self.scheduler.add_job(

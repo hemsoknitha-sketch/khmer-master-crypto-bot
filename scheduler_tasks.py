@@ -23,7 +23,7 @@ logger = logging.getLogger("SchedulerTasks")
 # Anti-Spam State Machine for Insufficient Balance & News Broadcasts
 GLOBAL_INSUFFICIENT_MUTE = {}
 _LAST_NEWS_ALERT_BROADCAST_TIME: float = 0.0
-_NEWS_ALERT_COOLDOWN_SECONDS: float = 900.0  # 15 minutes minimum window between routine news alert broadcasts
+_NEWS_ALERT_COOLDOWN_SECONDS: float = 180.0  # 3 minutes minimum window between routine news alert broadcasts
 
 async def parallel_broadcast(app: Application, users, text_or_func, parse_mode="Markdown", photo_path=None, reply_markup=None):
     """
@@ -973,10 +973,10 @@ async def check_crypto_news(app: Application, ai_engine):
                 db.mark_news_seen(link)
                 continue
 
-            # 🛡️ ANTI-SPAM BROADCAST COOLDOWN (15-Minute Minimum Separation Window)
+            # 🛡️ ANTI-SPAM BROADCAST COOLDOWN (3-Minute Minimum Window, Immediate for Score >= 9)
             now_ts = time.time()
             time_since_last_alert = now_ts - _LAST_NEWS_ALERT_BROADCAST_TIME
-            if time_since_last_alert < _NEWS_ALERT_COOLDOWN_SECONDS and score < 10:
+            if time_since_last_alert < _NEWS_ALERT_COOLDOWN_SECONDS and score < 9:
                 logger.info(
                     f"⏳ [NEWS RADAR COOLDOWN]: Article '{title[:50]}...' (Score {score}/10) held. "
                     f"Last broadcast was {int(time_since_last_alert)}s ago (Cooldown: {_NEWS_ALERT_COOLDOWN_SECONDS}s). Marking seen to keep queue fresh."
@@ -1424,261 +1424,20 @@ async def check_crypto_news(app: Application, ai_engine):
         logger.error(f"Error checking crypto news: {e}")
 
 async def check_economic_calendar(app: Application, ai_engine=None):
-    """Fetches economic calendar, uses AI to predict impact, and executes front-run trades."""
-    print("📅 Checking Global Macro-Economic Matrix...")
+    """
+    Angkor Quant Institutional Economic Calendar & Live Macro Radar (Invariant 58 & 59)
+    Scans Multi-Tier Redundant feeds (FinanceCalendar, Federal Reserve Official Speeches/Press Releases)
+    every 60 seconds with ZERO blind spot.
+    Broadcasts Pre-Event Assessment (T-30m), Live Press Conference Alerts, and Post-Event Outcome Reports
+    with full Tri-Market Probability Matrix (Gold, Equities, Crypto) directly to Super Admin & all VIP users.
+    """
     try:
-        from datetime import datetime, timezone
-        import requests
-        import database as db
-        import trading_engine
-        
-        url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-        try:
-            response = await asyncio.to_thread(requests.get, url, timeout=15)
-            if response.status_code != 200:
-                return
-            events = response.json()
-        except Exception:
-            return
-            
-        vip_users_lang = db.get_vip_users_with_lang()
-        if not vip_users_lang:
-            return
-            
-        now_utc = datetime.now(timezone.utc)
-        
-        for event in events:
-            # We only care about USD high impact
-            if event.get('country') != 'USD' or event.get('impact') != 'High':
-                continue
-                
-            title = event.get('title', '')
-            date_str = event.get('date', '') # e.g. "2026-07-19T18:45:00-04:00"
-            
-            if not date_str:
-                continue
-                
-            try:
-                event_time = datetime.fromisoformat(date_str)
-            except ValueError:
-                continue
-                
-            event_time_utc = event_time.astimezone(timezone.utc)
-            time_diff = event_time_utc - now_utc
-            minutes_to_event = time_diff.total_seconds() / 60.0
-            
-            # If it's between 0 and 20 minutes from now, trigger front-run
-            if 0 < minutes_to_event <= 20:
-                event_id = f"{title}_{date_str}"
-                
-                if db.is_economic_event_alerted(event_id):
-                    continue
-                    
-                db.mark_economic_event_alerted(event_id)
-                
-                forecast = event.get('forecast', 'N/A')
-                previous = event.get('previous', 'N/A')
-                minutes_rounded = int(minutes_to_event)
-                
-                # AI Sentiment Analysis & Macro Transmission Engine
-                ai_analysis = ""
-                sentiment = "NEUTRAL"
-                if ai_engine:
-                    prompt = (
-                        f"The USD economic event '{title}' is happening in {minutes_rounded} mins.\n"
-                        f"Forecast: {forecast}, Previous: {previous}.\n"
-                        f"Direct Verdict: Is this BULLISH, BEARISH, or NEUTRAL for Bitcoin?\n"
-                        f"Provide your answer in this exact format:\n"
-                        f"VERDICT: <BULLISH, BEARISH, or NEUTRAL>\n"
-                        f"ANALYSIS: <Explain macroeconomic impact on Bitcoin in exactly 2 concise Khmer sentences. Output ONLY the clean final text with zero drafting notes.>"
-                    )
-                    try:
-                        ai_resp = await asyncio.to_thread(ai_engine.analyze_opportunity, prompt)
-                        clean_resp = ai_engine._clean_response(ai_resp) if hasattr(ai_engine, '_clean_response') else ai_resp
-                        
-                        import re
-                        m = re.search(r'\b(BULLISH|BEARISH|NEUTRAL)\b', clean_resp.upper())
-                        if m:
-                            sentiment = m.group(1)
-                        
-                        filtered_lines = []
-                        for l in clean_resp.split('\n'):
-                            ls = l.strip()
-                            if not ls:
-                                continue
-                            if ls.upper().startswith("VERDICT:"):
-                                continue
-                            if ls.upper().startswith("ANALYSIS:"):
-                                ls = ls[len("ANALYSIS:"):].strip()
-                            if ls.upper() in ["BULLISH", "BEARISH", "NEUTRAL"]:
-                                continue
-                            if ls:
-                                filtered_lines.append(ls)
-                        
-                        if filtered_lines:
-                            ai_analysis = " ".join(filtered_lines)
-                        else:
-                            ai_analysis = clean_resp
-                    except Exception:
-                        ai_analysis = "⚠️ AI Analysis temporarily unavailable."
-                
-                # 1-Tap Copyable Execution Command
-                if sentiment == "BULLISH":
-                    exec_cmd = "/turbo_hedge BTCUSDT 20 10 BUY 2.5 1234"
-                elif sentiment == "BEARISH":
-                    exec_cmd = "/turbo_hedge BTCUSDT 20 10 SELL 2.5 1234"
-                else:
-                    exec_cmd = "/turbo_hedge HEDGE BTC 100 1234"
-                
-                # Institutional Interactive Keyboards (100% Routed Callbacks)
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                if sentiment == "BULLISH":
-                    macro_kb = InlineKeyboardMarkup([
-                        [
-                            InlineKeyboardButton("🚀 Long BTC ($20 10x)", callback_data="btn_alert_exec_btc_buy"),
-                            InlineKeyboardButton("🛒 Spot Buy BTC ($50)", callback_data="btn_alert_exec_btc_spot")
-                        ],
-                        [
-                            InlineKeyboardButton("🎯 Launch Turbo Top", callback_data="btn_turbo_hedge_top_launch"),
-                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
-                        ]
-                    ])
-                elif sentiment == "BEARISH":
-                    macro_kb = InlineKeyboardMarkup([
-                        [
-                            InlineKeyboardButton("🔻 Short BTC ($20 10x)", callback_data="btn_alert_exec_btc_sell"),
-                            InlineKeyboardButton("🛡️ Hedge BTC (0% Risk)", callback_data="btn_alert_exec_btc_hedge")
-                        ],
-                        [
-                            InlineKeyboardButton("📉 Short Top Dumpers", callback_data="btn_alert_exec_top_dumpers"),
-                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
-                        ]
-                    ])
-                else:
-                    macro_kb = InlineKeyboardMarkup([
-                        [
-                            InlineKeyboardButton("🛡️ Hedge BTC (0% Risk)", callback_data="btn_alert_exec_btc_hedge"),
-                            InlineKeyboardButton("🎛️ Turbo Hedge Suite", callback_data="btn_turbo_hedge")
-                        ]
-                    ])
-                
-                async def process_economic_trade(chat_id, lang):
-                    user_lang = lang if lang else 'khmer'
-                    config = db.get_auto_trade_config(chat_id)
-                    action_taken = "No trade executed (Auto-Trade off)."
-                    
-                    if config and config.get("enabled"):
-                        if not db.can_user_buy(chat_id):
-                            action_taken = f"Skipped: Max trades limit reached. Waiting for sales."
-                            return
-                        # MICRO-COMPOUNDING AUTO-REINVEST ENGINE
-                        base_amount = config.get("amount", 50.0)
-                        
-                        try:
-                            import capital_orchestrator
-                            total_capital = capital_orchestrator.get_total_deployable_capital(chat_id)
-                            if total_capital > 0:
-                                # PHASE 2: Dynamic Capital Shifting (Smart Allocation 80/20)
-                                import dynamic_ranking
-                                alloc_pct = dynamic_ranking.get_dynamic_coin_allocation(symbol)
-                                if alloc_pct == 0.0:
-                                    print(f"Skipped trade for {symbol}: Cold coin (Rank > 5).")
-                                    return
-                                    
-                                dynamic_amount = total_capital * alloc_pct
-                                computed_trade_amount = max(base_amount, dynamic_amount) # Compound up, never below base
-                                
-                                # LIQUIDITY GUARD: Ensure we have enough free USDT
-                                keys = db.get_user_api(chat_id)
-                                if keys:
-                                    api_key, api_secret = keys
-                                    available_usdt = trading_engine.get_spot_balance(api_key, api_secret, "USDT")
-                                    trade_amount = min(computed_trade_amount, available_usdt)
-                                    if trade_amount < 10.0: # Binance minimum trade size
-                                        print(f"Skipped trade for {chat_id} due to insufficient USDT ({available_usdt}).")
-                                        return
-                                else:
-                                    trade_amount = computed_trade_amount
-                            else:
-                                trade_amount = base_amount
-                        except Exception:
-                            trade_amount = base_amount
-                            
-                        trailing_pct = config.get("trailing_pct", 10.0)
-                        symbol = "BTCUSDT"
-                        
-                        api_key = config.get("api_key")
-                        api_secret = config.get("api_secret")
-                        if api_key and api_secret:
-                            try:
-                                current_price = await asyncio.to_thread(trading_engine.get_current_price, symbol)
-                                qty = round(trade_amount / current_price, 5)
-                                
-                                if sentiment == "BULLISH":
-                                    res = await asyncio.to_thread(trading_engine.place_market_buy, api_key, api_secret, symbol, trade_amount)
-                                    if "error" not in res:
-                                        # Extract actual spent amount
-                                        buy_price = float(res.get("price", current_price))
-                                        qty = float(res.get("origQty", qty))
-                                        actual_spent = float(res.get("cummulativeQuoteQty", buy_price * qty))
-                                        
-                                        db.add_active_trade(chat_id, symbol, qty, buy_price, trailing_pct)
-                                        
-                                        downsize_warning = ""
-                                        if actual_spent < trade_amount * 0.95:
-                                            downsize_warning = f" ⚠️ (Auto-Resized to ${actual_spent:.2f})"
-                                            
-                                        action_taken = f"✅ Front-run BULLISH position opened with ${actual_spent:.2f}.{downsize_warning}"
-                                    else:
-                                        err = res.get('error', '')
-                                        if "Insufficient" in err:
-                                            from notification_manager import logger
-                                            logger.info(f"SILENCED Scheduler [User {chat_id}]: {err}")
-                                            action_taken = "⏸️ Skipped (Insufficient Balance - Muted)"
-                                        else:
-                                            action_taken = f"❌ Trade Failed: {err}"
-                                elif sentiment == "BEARISH":
-                                    leverage = 20
-                                    res = await asyncio.to_thread(trading_engine.place_futures_short, api_key, api_secret, symbol, trade_amount, leverage)
-                                    if "error" not in res:
-                                        action_taken = f"📉 **Auto-Short (Futures):** {trade_amount} USDT Margin @ {leverage}x"
-                                        try:
-                                            conn = db.get_db_connection()
-                                            c = conn.cursor()
-                                            c.execute("INSERT INTO active_shorts (chat_id, symbol, margin_usdt, leverage, entry_price) VALUES (?, ?, ?, ?, ?)",
-                                                      (chat_id, symbol, trade_amount, leverage, current_price))
-                                            conn.commit()
-                                            conn.close()
-                                        except Exception: pass
-                                    else:
-                                        err = res.get('error', '')
-                                        if "Insufficient" in err:
-                                            from notification_manager import logger
-                                            logger.info(f"SILENCED Scheduler Short [User {chat_id}]: {err}")
-                                            action_taken = "⏸️ Skipped (Insufficient Balance - Muted)"
-                                        else:
-                                            action_taken = f"❌ **Short Failed:** {err}"
-                            except Exception as e:
-                                action_taken = f"❌ **Execution Error:** {e}"
-                                
-                    alert_msg = loc.get_text(
-                        user_lang,
-                        'macro_event_alert',
-                        title=title,
-                        minutes=minutes_rounded,
-                        forecast=forecast,
-                        previous=previous,
-                        sentiment=sentiment,
-                        ai_analysis=ai_analysis,
-                        action_taken=action_taken,
-                        exec_cmd=exec_cmd
-                    )
-                    return alert_msg
-                
-                await parallel_broadcast(app, vip_users_lang, process_economic_trade, reply_markup=macro_kb)
-                        
+        import economic_calendar_guard
+        blackout_info = economic_calendar_guard.check_red_folder_blackout()
+        if blackout_info.get("is_blackout"):
+            await economic_calendar_guard.notify_economic_blackout_if_needed(app, blackout_info)
     except Exception as e:
-        print(f"Error checking economic calendar: {e}")
+        logger.error(f"Error checking economic calendar: {e}")
 
 async def check_whale_trades(app: Application):
     """Detects massive USDT/USDC deposits and withdrawals from Binance."""
